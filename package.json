@@ -1,0 +1,31 @@
+{
+  "name": "fero",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "tap tests/integration/**/*.test.js --reporter spec --test-arg=--constants.connections.jitter=10 --test-arg=--constants.restore.wait=10 --test-arg=--constants.retries.max=0"
+  },
+  "keywords": [],
+  "author": "pemrouz (https://github.com/pemrouz)",
+  "license": "pemrouz.mit-license.org",
+  "dependencies": {
+    "bintrees": "^1.0.1",
+    "colors": "^1.1.2",
+    "express": "^4.14.0",
+    "google-protobuf": "^3.1.1",
+    "lodash.merge": "^4.6.0",
+    "lodash.range": "^3.2.0",
+    "lodash.shuffle": "^4.2.0",
+    "lodash.throttle": "^4.1.1",
+    "minimist": "^1.2.0",
+    "rijs": "*",
+    "rxjs": "^5.0.0-rc.1"
+  },
+  "devDependencies": {
+    "babel-preset-es2015": "^6.22.0",
+    "colors": "^1.1.2",
+    "lodash.padstart": "^4.6.1",
+    "tap": "^8.0.1"
+  }
+}
