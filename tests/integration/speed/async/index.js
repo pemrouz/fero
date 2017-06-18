@@ -1,0 +1,1 @@
+require('../bench')('speed/async')

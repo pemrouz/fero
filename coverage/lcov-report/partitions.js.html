@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Code coverage report for partitions.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="prettify.css" />
+    <link rel="stylesheet" href="base.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+<body>
+<div class='wrapper'>
+  <div class='pad1'>
+    <h1>
+      <a href="index.html">All files</a> partitions.js
+    </h1>
+    <div class='clearfix'>
+      <div class='fl pad1y space-right2'>
+        <span class="strong">100% </span>
+        <span class="quiet">Statements</span>
+        <span class='fraction'>30/30</span>
+      </div>
+      <div class='fl pad1y space-right2'>
+        <span class="strong">97.3% </span>
+        <span class="quiet">Branches</span>
+        <span class='fraction'>36/37</span>
+      </div>
+      <div class='fl pad1y space-right2'>
+        <span class="strong">100% </span>
+        <span class="quiet">Functions</span>
+        <span class='fraction'>5/5</span>
+      </div>
+      <div class='fl pad1y space-right2'>
+        <span class="strong">100% </span>
+        <span class="quiet">Lines</span>
+        <span class='fraction'>29/29</span>
+      </div>
+    </div>
+  </div>
+  <div class='status-line high'></div>
+<pre><table class="coverage">
+<tr><td class="line-count quiet">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63</td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span></td><td class="text"><pre class="prettyprint lang-js">module.exports = Partitions 
+&nbsp;
+function Partitions(peers){
+  def(this, 'peers', peers)
+&nbsp;
+  peers.cache
+    .on('commit', this.change.bind(this))
+    .on('change', this.commit.bind(this))
+}
+&nbsp;
+Partitions.prototype.lookup = function(change){
+  return (change.key || change.slice(6, change[5] + 6).toString()).split('.')[0]
+}
+&nbsp;
+Partitions.prototype.commit = function(change){
+  return !this.peers.me &amp;&amp; !change.buffer ? this.peers.broadcast(this.peers.serialise(change), this.peers.constants.commands.proxy)
+          // on client, create new update = proxy to servers
+       :  this.peers.me &amp;&amp; !change.buffer ? this.peers.broadcast(this.peers.serialise(this.append(change)), this.peers.constants.commands.commit)
+          // on server, create new update =&gt; commit &amp; propagate to servers + clients
+       :  this.peers.me &amp;&amp;  change.buffer.command == this.peers.constants.commands.proxy  ? this.peers.broadcast(change.buffer, this.peers.constants.commands.commit)
+          // on server, committed received update =&gt; propagate to peers + clients
+       :  this.peers.me &amp;&amp;  change.buffer.command == this.peers.constants.commands.commit ? this.peers.multicast(change.buffer, this.peers.constants.commands.commit)
+          // on server, receive commit =&gt; propagate to clients
+       :  false  
+}
+&nbsp;
+Partitions.prototype.append = function(change, sender){
+  const p = this.lookup(change)
+&nbsp;
+  if (!this[p]) this[p] = []
+&nbsp;
+  const head = ((last(this[p]).ptime || 0) + 1) % this.peers.constants.partitions.history.max
+&nbsp;
+  if (!change.ptime)
+    change.ptime = head
+  
+  if (change.ptime === head) {
+    // deb('applying', head, p.grey)
+    this[p].push(change)
+    return change
+  } else if (change.ptime &gt; head)
+    sender.nack(p, head)
+&nbsp;
+  if (change.ptime &lt; head) {
+    deb('reject', head, change.ptime)
+  }
+}
+&nbsp;
+// TODO don't persist if not replica
+Partitions.prototype.change = function(buffer, sender){
+  const change = buffer.type ? <span class="branch-0 cbranch-no" title="branch not covered" >buffer </span>: this.peers.deserialise(buffer) // TODO: Should always be buffer? If not, add test
+&nbsp;
+  if (change.type !== 'update' &amp;&amp; change.type !== 'remove' &amp;&amp; change.type !== 'add') // TODO: bitwise if always buffer
+    return deb('non standard change', change, buffer)
+&nbsp;
+  set(this.append(change, sender))(this.peers.cache)
+  
+  return change 
+}
+&nbsp;
+const deb = require('./deb')('par'.bgRed.bold)
+    , { last } = require('./utils')
+    , { def, set } = require('utilise/pure')</pre></td></tr>
+</table></pre>
+<div class='push'></div><!-- for sticky footer -->
+</div><!-- /wrapper -->
+<div class='footer quiet pad2 space-top1 center small'>
+  Code coverage
+  generated by <a href="http://istanbul-js.org/" target="_blank">istanbul</a> at Sun Mar 12 2017 20:47:12 GMT+0000 (GMT Standard Time)
+</div>
+</div>
+<script src="prettify.js"></script>
+<script>
+window.onload = function () {
+        if (typeof prettyPrint === 'function') {
+            prettyPrint();
+        }
+};
+</script>
+<script src="sorter.js"></script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+*, *::before, *::after {
+  box-sizing: border-box; }
+
+:host { 
+  font-family: monospace;
+  font-size: 1em;
+  position: fixed;
+  overflow: auto;
+  display: block; 
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: black; }
+
+  .container {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 150px;
+    right: 100px; }
+
+    .row {
+      position: relative;
+      margin: 1.5em 0; }
+
+    .row:hover .block {
+      box-shadow: 0 0 0 2px magenta; }
+
+    .row .block {
+      opacity: 0.8;
+      cursor: pointer;
+      height: 2em;
+      background: white;
+      position: relative;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.5); }
+
+    .row .block:not(.is-recv) {
+      background: crimson; }
+
+      .row .block::before {
+        color: aqua;
+        content: attr(id);
+        position: absolute;
+        margin-left: calc(-260px - 7px);
+        width: 260px;
+        text-align: right;
+        line-height: 2em;
+        margin-right: 10px; } 
+
+      .row .block:hover {
+        opacity: 1 }
+
+      .row .send,
+      .row .recv {
+        position: absolute;
+        background:  black;
+        display: inline-block;
+        color: white;
+        line-height: 1em;
+        border-radius: 3px;
+        padding: 2px;
+        font-size: 1em;
+        font-weight: bold;
+        margin: calc(0.5em - 2px); }
+
+      .row .send::before,
+      .row .recv::before {
+        content: '+'; }
+
+      .row .recv {
+        margin-left: calc(100% + 5px); }
+
+      .row:hover .send::after,
+      .row:hover .recv::after {
+        content: '';
+        display: block; 
+        width: 0px;
+        height: 100%;
+        top: 0;
+        margin-left: calc(-0.5em - 2px); 
+        position: fixed;
+        border: 1px dashed green; }
