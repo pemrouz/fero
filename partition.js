@@ -21,7 +21,6 @@ Partition.prototype.slice = function(from){
 }
 
 Partition.prototype.append = function(change) {
-  // console.log("append", change, key('peer.peers.name')(change), change && change.peer && change.peer.peers)
   if (change.ptime > this.next) 
     return deb('reject >', this.peers.me, this.partition, this.next, change.ptime), false
 

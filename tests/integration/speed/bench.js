@@ -38,7 +38,6 @@ module.exports = async test => {
             , clients = await createClients(details)
             , results = await run(cluster, clients, details)
 
-        // await delay(5000)
         key(`${records}.${lsize}.${csize}.${msize}`, results)(dump)
         values(clients).map(d => d.kill())
         values(cluster).map(d => d.kill())

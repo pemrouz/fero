@@ -15,9 +15,6 @@ Partitions.prototype.head = function(id){
 // get the partition a change belongs to
 Partitions.prototype.lookup = function(change){
   return change.key && (change.key.split ? change.key.split('.')[0] : change.key || '')
-  // return change._key    ? (change._key.split ? change._key.split('.')[0] : str(change._key).split('.')[0])
-  //      : change._buffer ? change._buffer.slice(3, change._buffer[1] + 3).toString().split('.')[0]
-  //      : null
 }
 
 // get offsets for all partitions, relative to base
@@ -54,7 +51,7 @@ Partitions.prototype.append = function(change, partition = this.lookup(change)){
   // append change 
   if (!this[partition].append(change))
     return false //deb('append failed', change)
-// console.log("change", change)
+
   if (!change.replay)
     this.cache.emit('change', change)
 

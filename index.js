@@ -1,12 +1,8 @@
-// BISMIHI
-// BISMILLAHNOOR
 module.exports = exports = async (name = '*', opts = {}) => {
   if (is.fn(opts)) opts = { from: opts }
-  const server  = await (opts.client ? false : Server(opts.ports))
-      // , tracer  = await Tracer(opts)
+  const server = await (opts.client ? false : Server(opts.ports))
 
-  // return restore(opts, new Cache(extend({ name, server, tracer })(opts)))
-  return restore(opts, new Cache(extend({ name, server/*, tracer*/ })(opts)))
+  return restore(opts, new Cache(extend({ name, server })(opts)))
 }
 
 exports.all = async (names, opts) => 
@@ -15,6 +11,5 @@ exports.all = async (names, opts) =>
 
 const { extend, def, is, to } = require('utilise/pure')
     , Server = require('./server')
-    // , Tracer = require('./tracer')
     , Cache  = require('./cache')
     , { restore } = Cache

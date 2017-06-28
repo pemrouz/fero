@@ -16,7 +16,6 @@ const fero = require('fero')
       }
 
 test(`rolling ${csize}`, { timeout }, async () => Promise.all(
-  // (await cluster(csize)).map(server => { p = server.destroy(); console.log("server.peers", server.peers); return p })
   (await cluster(csize)).map(server => server.destroy())
 ))
 
