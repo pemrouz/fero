@@ -101,7 +101,6 @@ function sync(message) {
     const ldiff = peer.peers.cache.partitions.diff(rpartitions)
         , lpeers = peer.peers.lists.connected.map(d => d.id)
     deb('(L) sync L → R', ldiff.length, peer.uuid.bgRed)
-// console.log("str(ldiff)", str({ laddress, ldiff, lpeers }).length)
     peer.send({ laddress, ldiff, lpeers }, peer.peers.constants.commands.done)
   }
 
@@ -116,7 +115,6 @@ function sync(message) {
 
 // R
 function done(message) {
-  // console.log("done", message.buffer.length, message.buffer.toString().length, message.text().length)
   const { peer } = message
       , { laddress, ldiff, lpeers } = message.json()
   
@@ -172,7 +170,6 @@ const canFastForwardPartitions = (lpartitions, rpartitions, laddress, raddress) 
                                                                                                    : false
 
 function canFastForwardPeers(lpeers, rpeers) {
-  // console.log("canpff", lpeers, rpeers)
   return  lpeers.every(is.in(rpeers)) && rpeers.every(is.in(lpeers)) ? true
        : !lpeers.every(is.in(rpeers)) && rpeers.every(is.in(lpeers)) ? 'L → R'
        : !rpeers.every(is.in(lpeers)) && lpeers.every(is.in(rpeers)) ? 'R → L'

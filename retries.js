@@ -8,7 +8,6 @@ function Retries({ base, max, cap, jitter } = {}){
 }
 
 Retries.prototype.retry = function(attempt){
-  // console.log("retry", attempt, this.jitter, this.cap, this.base, jit(this.jitter, min(this.cap, this.base * pow(2, attempt))))
   return jit(this.jitter, min(this.cap, this.base * pow(2, attempt)))
 }
 

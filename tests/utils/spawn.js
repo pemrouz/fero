@@ -15,12 +15,12 @@ module.exports = file => (test, base = {}) => (d, i) => {
 
 function override(overrides, i) {
   const args = process.argv.slice(2).concat('-i', i)
-  // console.log("args", args)
+
   keys(overrides)
     .map(d => ~args.indexOf(`-${d}`)
       ? args[args.indexOf(`-${d}`)+1] = str(overrides[d])
       : args.push(`-${d}`, str(overrides[d]))
     )
-    // console.log("overrides", overrides, args)
+
   return args
 }

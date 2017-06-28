@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-EXIT_STATUS=0
-DEBUG=$DEBUG node ./tests/tcp-init || EXIT_STATUS=1
-# node --harmony ./basic-speed || EXIT_STATUS=$?
-# node --harmony ./basic-speed || EXIT_STATUS=$?
-
-echo "status: $EXIT_STATUS"
-exit $EXIT_STATUS

@@ -9,4 +9,4 @@ const connected = async clients => combine(clients, 'connected')
   .then(d => log('clients connected'.green, '(', clients.length, ')'))
   .then(d => clients)
 
-module.exports = async ({ lsize, test }) => connected(Array(lsize).fill().map(spawn(test, { l: lsize, m: msize })))
+module.exports = async ({ lsize, test }) => connected(Array(lsize).fill().map(spawn(test, { l: lsize, m: msize, c: csize })))
