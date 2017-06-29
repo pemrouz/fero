@@ -14,7 +14,8 @@
     "colors": "^1.1.2",
     "lodash.merge": "^4.6.0",
     "lodash.shuffle": "^4.2.0",
-    "minimist": "^1.2.0"
+    "minimist": "^1.2.0",
+    "utilise": "^2.1.1"
   },
   "devDependencies": {
     "lodash.padstart": "^4.6.1",
