@@ -7,7 +7,7 @@ test('reply with function', async ({ plan, same, ok }) => {
       , client = await fero('test', { client: true })
 
   // wait till client/server connected to each other
-  await Promise.all([server.on('client'), client.on('connected')])
+  await Promise.all([server.once('client'), client.once('connected')])
 
   // global listeners
   client
@@ -35,7 +35,7 @@ test('reply with return value', async ({ plan, same, ok }) => {
       , client = await fero('test', { client: true, ports: [7000] })
 
   // wait till client/server connected to each other
-  await Promise.all([server.on('client'), client.on('connected')])
+  await Promise.all([server.once('client'), client.once('connected')])
 
   // global listeners
   client

@@ -132,6 +132,10 @@ test('should handle messages during reconnect and resync', async ({ test }) => {
         .filter(d => server1.test2.length == server2.test2.length)
         .filter(d => server1.test3.length == server2.test3.length && server1.test3.length == messages)
 
+      console.log("messages sent whilst connected", server1.test1.length)
+      console.log("messages sent whilst disconnected and reconnecting", server1.test2.length)
+      console.log("messages sent whilst reconnected", server1.test3.length)
+
       await server1.destroy()
       await server2.destroy()
     }))
