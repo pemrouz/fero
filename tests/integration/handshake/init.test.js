@@ -133,7 +133,8 @@ test('should not ff server from client - rewind client', async ({ same }) => {
   await Promise.all([server1.once('client'), client.once('connected')])
   await server1.destroy()
 
-  const server2 = global.server2 = await fero('test')
+  const server2 = await fero('test')
+
   client.peers.create(server2.peers.me.host, server2.peers.me.port)
 
   await Promise.all([server2.once('client'), client.once('connected')])
