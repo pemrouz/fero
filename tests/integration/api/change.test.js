@@ -8,7 +8,7 @@ test('two servers', async ({ plan, same }) => {
       , server2 = await fero('test')
       , servers = [server1, server2]
 
-  await Promise.all(servers.map(d => d.on('connected')))
+  await Promise.all(servers.map(d => d.once('connected.init')))
 
   // update from server1, wait till replicated
   server1.update('foo', 'from1')
@@ -38,7 +38,7 @@ test('server/client', async ({ plan, same }) => {
       , client = await fero('test', { client: true })
       , agents = [server, client]
 
-  await Promise.all([server.on('client'), client.on('connected')])
+  await Promise.all([server.once('client'), client.once('connected')])
 
   // update from server, wait till replicated
   server.update('foo', 'from1')

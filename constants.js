@@ -13,7 +13,7 @@ Constants.prototype.dht = {
 }
 
 Constants.prototype.restore = {
-  wait: 1000
+  wait: 3000
 }
 
 Constants.prototype.retries = {

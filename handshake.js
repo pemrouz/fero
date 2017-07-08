@@ -57,6 +57,9 @@ function init(message) {
   if (is.in(rpeers)(lid))
     return deb('abandon - connected init', rid.grey, peer.uuid.bgRed) 
 
+  if (laddress == 'client' && !peer.peers.ready) 
+    return deb('server (R) not ready'), peer.socket.destroy()
+
   // deb('init rneed diff', rneed.length, peer.uuid.bgRed)
   // deb('(R) init', dirpartitions, dirpeers, `${peer.peers.me.address} ← ${peer.socket.remoteAddress}:${peer.socket.remotePort}`.grey, peer.uuid.bgRed)
 
@@ -86,6 +89,9 @@ function sync(message) {
 
   let { raddress, rpartitions, rpeers, rdiff } = message.json()
     , laddress = peer.peers.me ? peer.peers.me.address : 'client'
+
+  if (raddress == 'client' && !peer.peers.ready) 
+    return deb('server (L) not ready'), peer.socket.destroy()
 
   if (rdiff) {
     deb('(L) sync R → L', rdiff.length, peer.uuid.bgRed)
