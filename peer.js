@@ -55,9 +55,10 @@ define(Peer.prototype, 'socket', {
 Peer.prototype.connect = connect
 
 Peer.prototype.fail = function(){
-  delete this.timeouts.flushout
-  delete this.timeouts.flushin
+  delete clearTimeout(this.timeouts.flushout)
+  delete clearTimeout(this.timeouts.flushin)
   this.hw.outbox = 0
+  if (this.status == 'removed') return deb('retry skip (removed)') // TODO: Throw on write fail
   if (!this.server) return deb('retry skip', this.uuid.bgRed), this.peers.remove(this)
   if (this.retry >= this.peers.retries.max) {
     deb('retries exceeded', this.peers.retries.max, this.id)
@@ -211,6 +212,7 @@ const yack = Buffer.from([124,32,0,0,0,8,0,0,0,0,0,0,0,0])
 Peer.prototype.setStatus = function(status, address){
   if (!status || this.status == status) return console.log("should not be called", this.status, status)// TODO needed?
 
+  // TODO: This should move into pre-handshake
   if (address) {
     let existing = this.peers[formatID(address)]
     if (existing && existing != this) {

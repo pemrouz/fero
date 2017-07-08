@@ -4,7 +4,11 @@ function Partitions(cache){
   def(this, 'cache', cache)
 
   cache
-    .on('commit', change => this.append(change))
+    .on('commit', change => {
+      this.append(change)
+      if (cache.peers.me) 
+        cache.peers.multicast(change.buffer, cache.peers.constants.commands.commit)
+    })
 }
 
 // get the latest offset of a particular partition

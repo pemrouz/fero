@@ -64,14 +64,17 @@ Cache.prototype.destroy = function(){
 }
 
 Cache.restore = async ({ restore }, cache) => {
-  if (!restore) return deb('no restore'.yellow), cache
-  await Promise.race([delay(cache.peers.constants.restore.wait), cache.on('connected')])
-  if (!cache.peers.lists.connected.length && !keys(cache).length) {
+  if (!cache.peers.me) return cache
+  const wait = delay(cache.peers.constants.restore.wait)
+  await Promise.race([wait, cache.on('connected.init')])
+  wait.abort()
+  if (restore && !cache.peers.lists.connected.length && !keys(cache).length) {
     await restore(cache)
     deb(`restored ${str(keys(cache).length)} records`.green)
   } else {
     deb(`abandon restore`.yellow)
   }
+  cache.peers.ready = true
   return cache
 }
 

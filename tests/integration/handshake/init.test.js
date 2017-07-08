@@ -12,7 +12,7 @@ test('should connect two servers', async ({  }) => {
   server1.peers.dht.lookup = d => d == 'A' ? server1.peers.me : server1.peers.lists.connected[0]
   server2.peers.dht.lookup = d => d == 'B' ? server2.peers.me : server2.peers.lists.connected[0]
 
-  await Promise.all(servers.map(d => d.once('connected')))
+  await Promise.all(servers.map(d => d.once('connected.init')))
 
   // commit on own partition
   Array(messages)
@@ -83,7 +83,7 @@ test('should sync cache whilst connecting', async ({ same, plan }) => {
   const server2 = await fero('test')
       , servers = [server1, server2]
 
-  await Promise.all(servers.map(d => d.once('connected')))
+  await Promise.all(servers.map(d => d.once('connected.init')))
 
   same(keys(server1).length, messages)
   same(keys(server2).length, messages)

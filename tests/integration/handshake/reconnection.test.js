@@ -10,8 +10,8 @@ test('should fast-forward right', async ({ same, plan }) => {
   server1.peers.dht.lookup = d => server1.peers.me
   server2.peers.dht.lookup = d => server2.peers.lists.connected[0]
 
-  await Promise.all(servers.map(d => d.once('connected')))
-  
+  await Promise.all(servers.map(d => d.once('connected.init')))
+
   for (peer of server1.peers)
     server1.peers.remove(peer)
 
@@ -48,7 +48,7 @@ test('should fast-forward left', async ({ same, plan }) => {
   server1.peers.dht.lookup = d => server1.peers.me
   server2.peers.dht.lookup = d => server2.peers.lists.connected[0]
 
-  await Promise.all(servers.map(d => d.once('connected')))
+  await Promise.all(servers.map(d => d.once('connected.init')))
 
   for (peer of server2.peers)
     server2.peers.remove(peer)
@@ -89,7 +89,7 @@ test('should handle messages during reconnect and resync', async ({ test }) => {
       server1.peers.dht.lookup = d => server1.peers.me
       server2.peers.dht.lookup = d => server2.peers.lists.connected[0]
 
-      await Promise.all(servers.map(d => d.on('connected')))
+      await Promise.all(servers.map(d => d.once('connected.init')))
 
       // initialise arrays
       server1.update('test1', []) // for before disconnection
