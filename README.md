@@ -12,7 +12,7 @@ Fero is a new way to write fast, scalable, stateful services that are also very 
 
 ## Why
 
-The request-response paradigm alone architecturally scales poorly across microservices. In contrast, the stream processing paradigm allows you to set up a declarative workflow of streams across the network, where each step in the reactive chain can be independently scaled. For a quick background, start with [Turning the Database Inside Out](https://www.youtube.com/watch?v=fU9hR3kiOK0).
+The request-response paradigm alone architecturally scales poorly across microservices. In contrast, the stream processing paradigm allows you to set up a declarative workflow of streams across the network, where each step in the reactive chain can be independently scaled. For a light intro, see [Turning the Database Inside Out](https://www.youtube.com/watch?v=fU9hR3kiOK0).
 
 Whilst stateless services are easy to scale and operate, the cost of going to another service or database on every request is sometimes not acceptable. This also just pushes the bottleneck and problem of distribution further downstream, or poorly managed adhoc caches mushroom. The lack of state makes them severely limited, hence the motivation is to be able to create services that are as easy to dynamically scale as AWS Lamda, but with replicated shared state.
 
@@ -94,6 +94,8 @@ users
 ## Differences with Kafka
 
 * Kafka relies on having a separate Zookeper cluster for electing a new master for a partition. Fero uses a DHT - a consistent hashring by default and this could later be made more [sophisticated like Microsoft Orleans](https://www.youtube.com/watch?v=H0i_bXKwujQ). Hence there is no reliance on any other system, which considerably simplifies operations and lowers the barrier to getting started.
+
+* There are no brokers - each node either handles a request or proxies it to the owner to handle.
 
 * Kafka makes your data between services distributed. You still need to write your own distributed services on top of that. Fero provides _application-layer_ sharding, so you just write resources/services that are distributed in the first place. You simply process an incoming stream and produce an outgoing stream.
 
