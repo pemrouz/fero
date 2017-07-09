@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "tap tests/integration/**/*.test.js --reporter spec --test-arg=--constants.restore.wait=10 --test-arg=--constants.retries.max=1"
+    "test": "tap tests/integration/**/*.test.js --reporter spec --test-arg=--constants.restore.wait=10 --test-arg=--constants.retries.max=1 --timeout=0"
   },
   "keywords": [],
   "author": "pemrouz (https://github.com/pemrouz)",
