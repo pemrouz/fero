@@ -49,7 +49,6 @@ Cache.prototype.destroy = function(){
 
     // clear timeouts
     for (let timeout in this.timeouts) {
-      console.log("timeout", this.timeouts[timeout])
       this.timeouts[timeout].abort
        ? this.timeouts[timeout].abort()
        : clearTimeout(this.timeouts[timeout])
@@ -70,12 +69,10 @@ Cache.prototype.destroy = function(){
 
     // close tcp server
     if (this.peers.me) {
-
       await new Promise(resolve => {
         this.peers.me.raw.unref()
         this.peers.me.raw.close(resolve)
       })
-      console.log("server closed")
     }
 
     await Promise.all(this.emit('destroy'))
