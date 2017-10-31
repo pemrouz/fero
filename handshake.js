@@ -47,7 +47,7 @@ function init(message) {
   const { peer } = message
   peer.socket.attempted = true
 
-  const { laddress, lpeers, lpartitions, lid } = message.json()
+  const { laddress, lpeers, lpartitions, lid } = message.value
       , rpartitions = peer.peers.me ? peer.peers.cache.partitions.heads() : {}
       , rpeers = peer.peers.lists.connected.map(d => d.id)
       , raddress = peer.peers.me ? peer.peers.me.address : 'client'
@@ -87,7 +87,7 @@ function init(message) {
 function sync(message) {
   const { peer } = message
 
-  let { raddress, rpartitions, rpeers, rdiff } = message.json()
+  let { raddress, rpartitions, rpeers, rdiff } = message.value
     , laddress = peer.peers.me ? peer.peers.me.address : 'client'
 
   if (raddress == 'client' && !peer.peers.ready) 
@@ -97,7 +97,7 @@ function sync(message) {
     deb('(L) sync R → L', rdiff.length, peer.uuid.bgRed)
 
     if (!peer.peers.me) peer.peers.cache.reset()
-    rdiff.map(change => peer.peers.cache.partitions.append(extend(new Change(change))({ replay: true })))
+    rdiff.map(change => peer.peers.cache.partitions.append(createChange(change)))
     rpeers
       .filter(not(isConnected(peer.peers)))
       .map(dot)
@@ -122,13 +122,13 @@ function sync(message) {
 // R
 function done(message) {
   const { peer } = message
-      , { laddress, ldiff, lpeers } = message.json()
+      , { laddress, ldiff, lpeers } = message.value
   
   if (ldiff) {
     deb('(R) done L → R', ldiff.length, peer.uuid.bgRed)
     if (!peer.peers.me) peer.peers.cache.reset()
     ldiff
-      .map(change => peer.peers.cache.partitions.append(extend(new Change(change))({ replay: true })))
+      .map(change => peer.peers.cache.partitions.append(createChange(change)))
     lpeers
       .filter(not(isConnected(peer.peers)))
       .map(dot)
@@ -149,12 +149,12 @@ function done(message) {
 
 const net = require('net')
     , deb = require('./deb')('han'.bgWhite.black.bold)
-
-const isConnected = peers => id => id in peers && (peers[id].status === 'connected')
+    , isConnected = peers => id => id in peers && (peers[id].status === 'connected')
     , { key, keys, not, is, time, split, str, parse, flatten, extend } = require('utilise/pure')
     , { jit } = require('./utils')
     , dot = str => str.replace(/-/g, '.')
     , Change = require('./messages/change')
+    , createChange = ({ type, key, value }) => extend(new Change(type, key, value))({ replay: true })
 
 // function canFastForward(lpartitions, lpeers, rpartitions, rpeers) {
 //   const partitions = canFastForwardPartitions(lpartitions, rpartitions) 

@@ -1,5 +1,6 @@
 // TODO: should use parameterised version
 const Constants = require('../constants')
+    , Change = require('./change')
     , constants = new Constants() 
     , deb = require('../deb')('mes'.bgBlack.bold)
     , define = Object.defineProperty
@@ -15,8 +16,11 @@ function Message(buffer, peer, command, tack){
 }
 
 Message.prototype.reply = function(reply) {
-  if (!reply.length || reply instanceof Array) reply = str(reply) 
-  const buffer = Buffer.allocUnsafe(4 + Buffer.byteLength(reply))
+  reply = reply instanceof Buffer ? reply
+        : reply instanceof Change ? reply.buffer
+        : new Change('', '', reply).buffer
+
+  const buffer = Buffer.allocUnsafe(4 + reply.length)
   buffer.writeUInt32LE(this.tack)
   buffer.fill(reply, 4)
   this.peer.send(buffer, constants.commands.reply)
@@ -38,10 +42,10 @@ define(Message.prototype, 'value', {
   // TODO (perf): check impact of undefined check vs falsy vs typeof
 , get: function(){ 
     return this._value !== undefined ? this._value : (this.buffer && (
-      this._value = this.buffer[2] === constants.types.string ? this.buffer.slice(this.buffer[1] + 3).toString()
+      this._value = this.buffer[2] === constants.types.string ?  this.buffer.slice(this.buffer[1] + 3).toString()
                   : this.buffer[2] === constants.types.number ? +this.buffer.slice(this.buffer[1] + 3).toString()
                   : this.buffer[2] === constants.types.json   ? JSON.parse(this.buffer.slice(this.buffer[1] + 3).toString())
-                                                               : undefined
+                                                              : undefined
       ))
     }
 })
@@ -51,16 +55,3 @@ define(Message.prototype, 'type', {
   // TODO (perf): check impact of undefined check vs falsy vs typeof
 , get: function(){ return this._type || (this._type = constants.change[this.buffer[0]]) }
 })
-
-Message.prototype.text = function(){
-  return this.buffer.toString()
-}
-
-Message.prototype.json = function(){
-  return parse(this.text())
-}
-
-// TODO: serdes as int, not string
-Message.prototype.number = function(){
-  return +this.text()
-}

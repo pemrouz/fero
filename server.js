@@ -32,7 +32,9 @@ const listen = server => function(){
   def(server, 'port'   , server.raw.address().port)
   def(server, 'address', `${server.host}:${server.port}`)
   def(server, 'id'     , formatID(server.address))
-  def(server, 'uuid'   , ' me ')
+  def(server, 'uuid'   , 0)
+  def(server, 'tacks'  , 0, 1)
+  def(server, 'subscriptions', {})
   deb('init', server.id.bold)
   server.emit('init', server)
 }

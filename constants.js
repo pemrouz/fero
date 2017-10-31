@@ -50,12 +50,16 @@ Constants.prototype.types = {
 }
 
 Constants.prototype.change = {
-  0x1: 'update' 
+  0x1: 'update'
 , 0x2: 'remove'
 , 0x3: 'add'
-, 'update'  : 0x1
-, 'remove'  : 0x2
-, 'add'     : 0x3
+, 0x4: 'subscribe'
+, 0x5: 'stop'
+, 'update'     : 0x1
+, 'remove'     : 0x2
+, 'add'        : 0x3
+, 'subscribe'  : 0x4
+, 'stop'       : 0x5
 }
 
 Constants.prototype.commands = {
@@ -82,6 +86,6 @@ Constants.prototype.partitions = {
 }
 
 Constants.prototype.outbox = {
-  max: pow(2, 28)
+  max: pow(2, 16)
 , frag: pow(2, 16)
 }

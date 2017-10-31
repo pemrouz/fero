@@ -12,8 +12,10 @@ function Peers({ name = '*', tracer, server, client, udp, hosts, ports, hash, ca
   def(this, 'connections' , this.constants.connections.max[server ? 'server' : 'client'])
   def(this, 'lists'       , { disconnected: [], connected: [], connecting: [], throttled: [], client: [], all: [] })
   def(this, 'sindex'      , 0, 1)
+  def(this, 'uuid'        , 0, 1)
   def(this, 'timeouts'    , { })
   def(this, 'ready'       , !this.me, 1)
+  def(this, 'destroyed'   , false, 1)
   def(this, 'discover'    , {
     tcp: require('./discovertcp')(this, hosts, ports)
   , udp: require('./discoverudp')(this, name, udp)
@@ -47,15 +49,6 @@ function Peers({ name = '*', tracer, server, client, udp, hosts, ports, hash, ca
     })
 }
 
-const { def, emitterify, debounce, remove, keys, values, is } = require('utilise/pure')
-    , { emit, last, formatID } = require('./utils')
-    , { init, sync, done } = require('./handshake')
-    , Partitions = require('./partitions')
-    , Constants = require('./constants')
-    , Retries = require('./retries')
-    , DHT = require('./dht')
-    , define = Object.defineProperty
-
 Peers.prototype.create = function(host, port, socket, server) {
   const id = formatID(`${host}:${port}`)
       , peer = id in this                   ? !deb('duplicate peer', id)
@@ -64,15 +57,14 @@ Peers.prototype.create = function(host, port, socket, server) {
 }
 
 Peers.prototype.remove = function(peer) {
-  return new Promise(resolve => {
+  return new Promise(async resolve => {
     if (is.str(peer))
       peer = this[peer]
 
-    if (this[peer.id] != peer) // TODO: This should never happen
+
+    if (this[peer.id] != peer) // TODO: Confirm if this is still possible
       return deb('mismatch - already removed'.red, peer.id, peer.uuid, peer/*.bgRed*/) 
     
-    deb('removing', peer.id, peer.uuid.bgRed)
-
     for (let timeout in peer.timeouts) {
       clearTimeout(peer.timeouts[timeout])
       delete peer.timeouts[timeout]
@@ -84,13 +76,11 @@ Peers.prototype.remove = function(peer) {
       peer.socket.destroy() // TODO: should destroy gracefully
     }
 
-    remove(peer.id)(this)
     peer.setStatus('removed')
+    remove(peer.id)(this)
     resolve() // TODO: should remove gracefully from cluster
   })
 }
-
-process.on('uncaughtException', e => console.log("uncaught", e))
 
 Peers.prototype.multicast = function(buffer, command, audience = 'client', results = []) {
   for (let i = 0; i < this.lists[audience].length; i++)
@@ -112,41 +102,90 @@ Peers.prototype.anycast = Peers.prototype.send = function(message) {
     deb('sending with no-one connected', this.name)
 }
 
-Peers.prototype.owner = function(change) {
-  // TODO: mark cached owner by generation
-  change.owner = this.dht.lookup(this.cache.partitions.lookup(change))
-  return change.owner
-}
-
 Peers.prototype.join = function(socket) {
   this.create(socket.remoteAddress, socket.remotePort, socket)
 }
 
+Peers.prototype.owner = function(change) {
+  // TODO: mark cached owner by generation
+  if (change.owner) return change.owner
+
+  if (change.type == 'stop') {
+    if (change.peer.server) {
+      delete change.value.owner
+      delete change._buffer
+    } 
+
+    return change.owner = (change.value.owner 
+      ? [...this].find(d => d.uuid == change.value.owner) 
+      : this.me
+      )
+  }
+
+  return change.owner = this.dht.lookup(this.cache.partitions.lookup(change))
+}
+
 Peers.prototype.proxy = function(message){
   const owner = this.owner(message)
-  if (!owner || owner === this.me) {
+
+  if (/*!owner || */owner === this.me) {
+    if (message.type == 'stop') { 
+      if (!(message.value.tack in message.peer.subscriptions))
+        return console.error("no subscription", message.value)
+      message.peer.subscriptions[message.value.tack].source.emit('stop')
+      delete message.peer.subscriptions[message.value.tack]
+      return message.reply('stopped')
+    }
+
     const reply = this.from(message, this.cache)
+    
     // TODO: perf this
-    return !is.def(reply)     ? false
-         :  is.promise(reply) ? reply.then(reply => is.def(reply) && message.reply(reply))
-                              : message.reply(reply)
-  } else if (owner) {
-    owner.send(message.buffer, this.constants.commands.proxy).on('reply', reply => message.reply(reply))
+    const finish = reply => 
+      reply === false   ? false
+   : !is.def(reply)     ? message.reply('sack')
+   :  is.stream(reply)  ? (message.peer.subscriptions[message.tack] = reply.each(d => message.reply(d))).source.emit('start')
+   :  is.promise(reply) ? reply.then(finish)
+                        : message.reply(reply)
+
+    return finish(reply)
+  } else /*if (owner)*/ {
+    if (!owner)  
+      return console.error("no owner", message, owner)
+    message.reply(new Change('subscribe', '', message.owner.uuid))
+    owner
+      .send(message.buffer, this.constants.commands.proxy)
+      .on('reply')
+      .each(reply => message.reply(reply.buffer))
     // if (this.tracer)
     //   update(`${this.me.port}-${owner.port}-${owner.tacks}.pid`, `${buffer.peer.client ? 'client' : buffer.peer.port}-${this.me.port}-${buffer.tack}`)(this.tracer)
   }
 }
 
 Peers.prototype.accept = function(change){
-  const serialised = { json: () => change, peer: { server: !!this.me }}
-      , result = this.from(serialised, this.cache)
+  const reply = emitterify().on('reply')
+      , message = { 
+          reply: value => reply.next({ value })
+        , value: change
+        , tack: ++this.me.tacks
+        , owner: this.me
+        , peer: this.me
+        }
+  
+  reply
+    .on('stop')
+    .map(d => this.proxy({ 
+      type: 'stop'
+    , owner: this.me
+    , peer: this.me
+    , value: { tack: message.tack }
+    , reply: d => d
+    }))
 
-  return { 
-    on: async (d) => {
-      const resolved = await result
-      return { json: () => resolved } 
-    }
-  }
+  Promise
+    .resolve()
+    .then(d => this.proxy(message))
+
+  return { on: d => reply }
 }
 
 Peers.prototype.from = function(change){
@@ -183,5 +222,14 @@ async function pool() {
    }
 }
 
-const deb = require('./deb')('per'.bgGreen.bold)
+const { def, emitterify, debounce, remove, keys, values, is, time } = require('utilise/pure')
+    , { emit, last, formatID } = require('./utils')
+    , { init, sync, done } = require('./handshake')
+    , { Message, Change } = require('./messages')
+    , Partitions = require('./partitions')
+    , Constants = require('./constants')
+    , Retries = require('./retries')
     , Peer = require('./peer')
+    , DHT = require('./dht')
+    , deb = require('./deb')('per'.bgGreen.bold)
+    , define = Object.defineProperty

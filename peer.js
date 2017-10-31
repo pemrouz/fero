@@ -1,21 +1,22 @@
 module.exports = Peer
 
 function Peer(peers, host, port, socket, server) {
-  define(this, 'uuid'   , { enumerable: true, value: ` ${~~(Math.random()*90) + 10} ` }) // TODO UUID
-  define(this, 'status' , { enumerable: true, value: '', writable: true })
-  def(this, '_socket'   , null, 1)
-  def(this, 'peers'     , peers)
-  def(this, 'host'      , host, 1)
-  def(this, 'port'      , port, 1)
-  def(this, 'server'    , !!server, 1)
-  def(this, 'retry'     , 0, 1)
-  def(this, 'hw'        , { inbox: 0, outbox: 0, yacks: 0 })
-  def(this, 'lw'        , { inbox: 0, outbox: 0, yacks: 0 })
-  def(this, 'tacks'     , 0, 1)
-  def(this, 'inbox'     , [], 1)
-  def(this, 'outbox'    , Buffer.allocUnsafe(this.peers.constants.outbox.max), 1)
-  def(this, 'buffer'    , { filling: 0, tack: 0, offset: 0, len: 0, hw: 0, lenc: 0, frag: 0/*Buffer.alloc(this.peers.constants.outbox.frag)*/ }) // TODO dynamically allocate based on len
-  def(this, 'timeouts'  , {})
+  define(this, 'uuid'       , { enumerable: true, value: str(++peers.uuid) })
+  define(this, 'status'     , { enumerable: true, value: '', writable: true })
+  def(this, '_socket'       , null, 1)
+  def(this, 'peers'         , peers)
+  def(this, 'host'          , host, 1)
+  def(this, 'port'          , port, 1)
+  def(this, 'server'        , !!server, 1)
+  def(this, 'retry'         , 0, 1)
+  def(this, 'hw'            , { inbox: 0, outbox: 0, yacks: 0 })
+  def(this, 'lw'            , { inbox: 0, outbox: 0, yacks: 0 })
+  def(this, 'tacks'         , 0, 1)
+  def(this, 'inbox'         , [], 1)
+  def(this, 'outbox'        , Buffer.allocUnsafe(this.peers.constants.outbox.max), 1)
+  def(this, 'buffer'        , { filling: 0, tack: 0, offset: 0, len: 0, hw: 0, lenc: 0, frag: 0 })
+  def(this, 'timeouts'      , {})
+  def(this, 'subscriptions' , {})
   this.setStatus('disconnected', this.address)
   this.socket = socket
 }
@@ -24,7 +25,7 @@ const define = Object.defineProperty
     , { emit, formatID } = require('./utils')
     , { wait, def, is, debounce, values, str, remove, update, time, not } = require('utilise/pure')
     , { connect } = require('./handshake')
-    , { Message, Ack } = require('./messages')
+    , { Message, Ack, Change } = require('./messages')
 
 define(Peer.prototype, 'address', {
   get: function(){ return `${this.host}:${this.port}` }
@@ -84,42 +85,49 @@ function Guarantees(peer){
   this.tack = peer.tacks
 }
 
-Guarantees.prototype.on = function(event, fn){
+Guarantees.prototype.on = function(event){
   const cache = this.peer.peers.cache
-  if (fn) {
-    return event == 'ack'   ? cache
-            .on('ack', this.fn = m => this.ack(m) && (cache.off('ack', this.fn), fn(m)))
-         : event == 'reply' ? cache
-            .on('reply', this.fn = m => this.reply(m) && (cache.off('reply', this.fn), fn(m)))
-         : new Error('invalid guarantee')
-  } else {
-    return event === 'ack' ? cache
-            .on('ack.guarantees')
-            .filter((m, i, n) => this.ack(m) && n.unsubscribe())
-         : event === 'reply' ? cache
-            .on('reply.guarantees')
-            .filter((m, i, n) => this.reply(m) && n.unsubscribe())
-            .map(m => new Message(m.buffer.slice(4)))
-         : event === 'commit' ? 42 /* TODO */
-         : new Error('invalid guarantee')
-  }
+      , self = this
+
+  return event === 'ack' ? cache
+          .on('ack')
+          .filter(this.ack.bind(this))
+       : event === 'reply' ? cache
+          .on('reply')
+          .on('stop', function(){ return self.peer
+            .send(new Change('stop', '', { tack: self.tack, owner: this.source.owner }))
+            .on('reply')
+          })
+          .filter(this.reply.bind(this))
+          .map(m => new Message(m.buffer.slice(4)))
+          .filter(this.subscribe.bind(this))
+       : event === 'commit' ? 42 /* TODO */
+       : new Error('invalid guarantee')
 }
 
 Guarantees.prototype.ack = function(m){
   return m.peer == this.peer && m.value >= this.tack
 }
 
-Guarantees.prototype.reply = function(m, fn){
-  return m.peer == this.peer && m.buffer.readUInt32LE() == this.tack
+Guarantees.prototype.subscribe = function(m, i, n){
+  return !n.source.owner && m.type == 'subscribe'
+       ? (n.source.owner = m.value, false)
+       : true
+}
+
+Guarantees.prototype.reply = function(m, i, n){
+  return m.peer === this.peer && m.buffer.readUInt32LE() === this.tack
 }
 
 Peer.prototype.send = function(message, command = this.peers.constants.commands.proxy) {
   if (!message) return
-  if (!message.length) message = str(message) 
-  const len = Buffer.byteLength(message)
+
+  message = message instanceof Buffer ? message
+          : message instanceof Change ? message.buffer
+          : new Change('', '', message).buffer
 
   // flush
-  if (len > this.outbox.length - this.hw.outbox - 6) {
+  if (message.length > this.outbox.length - this.hw.outbox - 6) {
     if (!this.socket || this.socket.destroyed) return this.fail()
     this.socket.write(this.outbox.slice(0, this.hw.outbox))
     this.outbox = Buffer.allocUnsafe(this.peers.constants.outbox.max)
@@ -127,11 +135,11 @@ Peer.prototype.send = function(message, command = this.peers.constants.commands.
     this.peers.cache.emit('tack', { value: this.tacks, peer: this })
     
     // TODO: only if too long?
-    if (len > this.outbox.length - 6) {
-      const long = Buffer.allocUnsafe(len+6)
+    if (message.length > this.outbox.length - 6) {
+      const long = Buffer.allocUnsafe(message.length+6)
       long[0] = 124
       long[1] = command
-      long.writeUInt32BE(len, 2)
+      long.writeUInt32BE(message.length, 2)
       long.fill(message, 6)
 
       this.socket.write(long)
@@ -147,8 +155,8 @@ Peer.prototype.send = function(message, command = this.peers.constants.commands.
 
   this.outbox[this.hw.outbox] = 124
   this.outbox[this.hw.outbox+1] = command
-  this.outbox.writeUInt32BE(len, this.hw.outbox+2)
-  this.outbox.fill(message, this.hw.outbox + 6, this.hw.outbox = this.hw.outbox + len + 6)
+  this.outbox.writeUInt32BE(message.length, this.hw.outbox+2)
+  this.outbox.fill(message, this.hw.outbox + 6, this.hw.outbox = this.hw.outbox + message.length + 6)
   !this.timeouts.flushout && (this.timeouts.flushout = p.then(d => {
     if (!this.socket || this.socket.destroyed) return this.fail()
     this.socket.write(Buffer.from(this.outbox.slice(0, this.hw.outbox)))
@@ -230,6 +238,7 @@ Peer.prototype.setStatus = function(status, address){
     this.peers.lists[this.status] = this.peers.lists[this.status].filter(not(is(this)))
 
   if (address) {
+    // TODO: clear subscriptions here too?
     remove(this.id)(this.peers)
     const [h, p] = address.split(':')
     this.host = h

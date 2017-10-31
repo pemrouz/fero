@@ -22,6 +22,11 @@ test(`swarm ${csize}`, { timeout }, async () => Promise.all(
 
 async function cluster(size) {
   const servers = await Promise.all(Array(size).fill().map(d => fero('test', opts)))
-  await Promise.all(servers.map((server, i) => server.on('connected').filter(d => (console.log("server.peers.lists.connected.length", i, server.peers.lists.connected.length), true)).filter(server => server.peers.lists.connected.length == size - 1)))
+  await Promise.all(servers
+    .map((server, i) => server
+      .on('connected')
+      .filter(server => server.peers.lists.connected.length == size - 1)
+    )
+  )
   return servers
 }
