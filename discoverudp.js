@@ -65,7 +65,7 @@ const listening = ({ name, peers, socket, udp, ip, port, ttl }) => () => {
 
   peers.timeouts.udp = schedule(d => 
     (peers.lists.connected.length || peers.lists.client.length)
-      ? clearInterval(peers.timeouts.udp)
+      ? clearTimeout(peers.timeouts.udp)
       : udp.multicast(peers.me 
         ? `holler ${name} ${peers.me.address}`
         : `client ${name}`
