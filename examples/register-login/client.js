@@ -1,4 +1,3 @@
-// server2.js
 const fero = require('fero')
 
 async function register(users) {

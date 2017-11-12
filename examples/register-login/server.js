@@ -1,4 +1,3 @@
-// server1.js
 const fero = require('fero')
     , users = []
 
