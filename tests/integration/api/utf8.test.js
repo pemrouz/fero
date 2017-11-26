@@ -11,7 +11,7 @@ test('change with non-standard char', async ({ plan, same, ok }) => {
 
   // global listeners
   server.update('quote', '“')
-  await client.on('change')
+  await client.once('change')
 
   same(server, { quote: '“' }, 'non-standard quote')
   same(client, { quote: '“' }, 'non-standard quote')
@@ -22,7 +22,7 @@ test('change with non-standard char', async ({ plan, same, ok }) => {
 
 test('send/reply with non-standard char', async ({ plan, same, ok }) => {
   plan(1)
-  const server = await fero('test', req => req.text())
+  const server = await fero('test', req => req.value)
       , client = await fero('test', { client: true })
 
   // wait till client/server connected to each other
@@ -30,7 +30,7 @@ test('send/reply with non-standard char', async ({ plan, same, ok }) => {
 
   // global listeners
   const reply = await client.peers.send('“').on('reply')
-  same(reply.text(), '“', 'non-standard quote')
+  same(reply.value, '“', 'non-standard quote')
   
   await server.destroy()
   await client.destroy()
