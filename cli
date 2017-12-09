@@ -123,7 +123,7 @@ async function list(){
       print(values(details), ['name', 'id', '_uuid'])
     })
     
-  udp.multicast(`list ${name}`)
+  udp.multicast(`list ${name || ''}`)
 }
 
 function print(
