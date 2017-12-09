@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 process.argv.push('--color')
 const fero = require('./')
+    , { stream } = require('./utils')
     , { debounce, parse, keys, values, az, za, key, extend, by, not, is, str, lo } = require('utilise/pure')
     , { green, gray, dim, yellow, red } = require('chalk')
     , { cursorTo } = require('readline')
@@ -108,7 +109,7 @@ async function list(){
               return p
             }, {})).sort(za('count', '_hash')))
 
-      cursorTo(process.stdout, 0, 0)
+      reset()
       print(rows.map(d => {
         d.hash = ranked[0] && d._hash == ranked[0]._hash ? green(d._hash)
                : ranked[1] && d._hash == ranked[1]._hash ? yellow(d._hash)
@@ -122,7 +123,7 @@ async function list(){
     .map(([uuid]) => {
       delete details[uuid]
       clear()
-      cursorTo(process.stdout, 0, 0)
+      reset()
       print(values(details), ['name', 'id', '_uuid'])
     })
     
@@ -148,23 +149,29 @@ function print(
 
 async function get(){
   const client = await fero(name, { client: true })
-  await client.once('connected')
-  const output = key(k)(client)
       , conditions = (
           is.arr(where) ? where 
         : is.def(where) ? [where]
                         : []
         ).map(d => d.split('='))
 
-    json  === true  ? console.log(JSON.stringify(output))
-  : table === false ? console.log(output)
-  : print(
-      values(output).filter(row => conditions.every(([k, v]) => lo(str(key(k)(row))).includes(lo(v))))
-    , is.str(sort)  ? sort.split(',')  : undefined
-    , is.str(table) ? table.split(',') : undefined
-    )
+  await client.once('connected')
+  stream(client)
+    .each(() => {
+      clear()
+      reset()
 
-  client.destroy()
+      const output = key(k)(client)
+        json  === true  ? console.log(JSON.stringify(output))
+      : table === false ? console.log(output)
+      : print(
+          values(output).filter(row => conditions.every(([k, v]) => lo(str(key(k)(row))).includes(lo(v))))
+        , is.str(sort)  ? sort.split(',')  : undefined
+        , is.str(table) ? table.split(',') : undefined
+        )
+    })
+    .source
+    .emit('start')
 }
 
 async function set(){
@@ -181,4 +188,8 @@ async function set(){
 function clear(){
   process.stdout.write('\033[2J');
   process.stdout.write('\033[0f');
+}
+
+function reset(){
+  cursorTo(process.stdout, 0, 0)
 }
