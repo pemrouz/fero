@@ -384,7 +384,7 @@ Key | Default | Description
 
 ## CLI
 
-![image](https://user-images.githubusercontent.com/2184177/33799198-e2e71cca-dd1e-11e7-9d1e-453074385fe1.png)
+![image](https://user-images.githubusercontent.com/2184177/33800033-ff9a13e8-dd2f-11e7-8dc2-a16a9197b9e6.png)
 
 ## License
 
