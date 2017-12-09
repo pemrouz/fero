@@ -22,18 +22,17 @@ commands[command in commands ? command : 'help']()
 
 function help(){
   console.error(`
-  usage: fero <command> 
-
+  
   commands:
     
     * ${green('list, ls')}
-      gives a live summary (#servers, #clients, #keys, #partitions) across all services
+      gives a live summary (name, id, partitions, commits, hash) across all services
 
       examples:
         ${gray('fero list')}
 
     * ${green('list, ls <name>')}
-      gives a live summary (#servers, #clients, #keys, #partitions) for a particular service (<name>)
+      gives a live summary (name, id, partitions, commits, hash) for a particular service (<name>)
 
       examples:
         ${gray('fero list users')}
