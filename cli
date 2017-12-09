@@ -128,8 +128,8 @@ async function list(){
 
 function print(
   rows
-, head = keys(rows[0]).filter(by(0, not(is('_')))).slice(0, is.num(table) ? table : Infinity)
 , sort = [] 
+, head = keys(rows[0]).filter(by(0, not(is('_')))).slice(0, is.num(table) ? table : Infinity)
 ){
   const table = new Table({ head })
       
@@ -157,8 +157,8 @@ async function get(){
   : table === false ? console.log(output)
   : print(
       values(output).filter(row => conditions.every(([k, v]) => lo(str(key(k)(row))).includes(lo(v))))
-    , is.str(table) ? table.split(',') : undefined
     , is.str(sort)  ? sort.split(',')  : undefined
+    , is.str(table) ? table.split(',') : undefined
     )
 
   client.destroy()
