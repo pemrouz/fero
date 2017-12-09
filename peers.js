@@ -12,7 +12,8 @@ function Peers({ name = '*', tracer, server, client, udp, hosts, ports, hash, ca
   def(this, 'connections' , this.constants.connections.max[server ? 'server' : 'client'])
   def(this, 'lists'       , { disconnected: [], connected: [], connecting: [], throttled: [], client: [], all: [] })
   def(this, 'sindex'      , 0, 1)
-  def(this, 'uuid'        , 0, 1)
+  def(this, 'uuids'       , 0, 1)
+  def(this, 'uuid'        , uuid())
   def(this, 'timeouts'    , { })
   def(this, 'ready'       , !this.me, 1)
   def(this, 'destroyed'   , false, 1)
@@ -29,10 +30,10 @@ function Peers({ name = '*', tracer, server, client, udp, hosts, ports, hash, ca
 
   cache
     // TODO (perf): test if using consts is faster
-    .on('proxy' , this.proxy.bind(this))
-    .on('init', init.bind(this))
-    .on('sync', sync.bind(this))
-    .on('done', done.bind(this))
+    .on('proxy', this.proxy.bind(this))
+    .on('init' , init.bind(this))
+    .on('sync' , sync.bind(this))
+    .on('done' , done.bind(this))
 
   cache
     .on('status', (status, peer) => {
@@ -229,6 +230,7 @@ const { def, emitterify, debounce, remove, keys, values, is, time } = require('u
     , Partitions = require('./partitions')
     , Constants = require('./constants')
     , Retries = require('./retries')
+    , uuid = () => require('uuid/v4')()
     , Peer = require('./peer')
     , DHT = require('./dht')
     , deb = require('./deb')('per'.bgGreen.bold)
