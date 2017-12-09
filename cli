@@ -3,7 +3,7 @@ process.argv.push('--color')
 const fero = require('./')
     , { stream } = require('./utils')
     , { debounce, parse, keys, values, az, za, key, extend, by, not, is, str, lo } = require('utilise/pure')
-    , { green, gray, dim, yellow, red, bold } = require('chalk')
+    , { green, magenta, yellow, red, bold } = require('chalk')
     , { cursorTo } = require('readline')
     , discover = require('./discoverudp')
     , argv = require('minimist')(process.argv.slice(2))
@@ -28,13 +28,13 @@ function help(){
       ${bold('gives a live summary (name, id, partitions, commits, hash) across all services')}
 
       examples:
-        ${gray('fero list')}
+        ${magenta('fero list')}
 
     * ${green('list, ls <name>')}
       ${bold('gives a live summary (name, id, partitions, commits, hash) for a particular service (<name>)')}
 
       examples:
-        ${gray('fero list users')}
+        ${magenta('fero list users')}
 
     * ${green('get <name> <key>')}
       ${bold('gets the value of the <key> in the resource <name>')}
@@ -53,9 +53,9 @@ function help(){
 
 
       examples:
-        ${gray('fero get users 28')}
-        ${gray('fero get users --table id,username --sort last_updated,firstname')}
-        ${gray('fero get users --table --where name=david')}
+        ${magenta('fero get users 28')}
+        ${magenta('fero get users --table id,username --sort last_updated,firstname')}
+        ${magenta('fero get users --table --where name=david')}
 
     * ${green('set <name> <key> <value>')}
       ${bold('sets the value of the <key> in the resource <name> to <value>')}
@@ -64,7 +64,7 @@ function help(){
       the value will be attempted to be parsed as JSON, before falling back to string
       
       examples:
-        ${gray('fero set users 28.email foo@bar.com')}
+        ${magenta('fero set users 28.email foo@bar.com')}
 
     * ${green('help')}
       ${bold('prints this message')}
