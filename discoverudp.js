@@ -43,7 +43,7 @@ module.exports = function discoverudp(
       })
     })
     .on('stop', () => udp.multicast(`stop ${peers.uuid}`))
-    .pipe(o => o.each(debounce((d , i, n) => n.next(d))))
+    .pipe(o => o.each(debounce(12)((d , i, n) => n.next(d))))
     .filter((d, i, n) => !('reason' in n.source))
     .map(() => udp.multicast([
         'list'
