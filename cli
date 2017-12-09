@@ -3,7 +3,7 @@ process.argv.push('--color')
 const fero = require('./')
     , { stream } = require('./utils')
     , { debounce, parse, keys, values, az, za, key, extend, by, not, is, str, lo } = require('utilise/pure')
-    , { green, gray, dim, yellow, red } = require('chalk')
+    , { green, gray, dim, yellow, red, bold } = require('chalk')
     , { cursorTo } = require('readline')
     , discover = require('./discoverudp')
     , argv = require('minimist')(process.argv.slice(2))
@@ -22,25 +22,24 @@ commands[command in commands ? command : 'help']()
 
 function help(){
   console.error(`
-  
   commands:
     
     * ${green('list, ls')}
-      gives a live summary (name, id, partitions, commits, hash) across all services
+      ${bold('gives a live summary (name, id, partitions, commits, hash) across all services')}
 
       examples:
         ${gray('fero list')}
 
     * ${green('list, ls <name>')}
-      gives a live summary (name, id, partitions, commits, hash) for a particular service (<name>)
+      ${bold('gives a live summary (name, id, partitions, commits, hash) for a particular service (<name>)')}
 
       examples:
         ${gray('fero list users')}
 
     * ${green('get <name> <key>')}
-      gets the value of the <key> in the resource <name>
-      note: key can be empty which will return the state of the entire resource
-      note: key can be a deep key to get an arbitrary part of the resource (e.g. a.b.c)
+      ${bold('gets the value of the <key> in the resource <name>')}
+      key can be empty which will return the state of the entire resource
+      key can be a deep key to get an arbitrary part of the resource (e.g. a.b.c)
 
       -j, --json: dump output as json
       -t, --table: pretty print output as table, 
@@ -59,16 +58,16 @@ function help(){
         ${gray('fero get users --table --where name=david')}
 
     * ${green('set <name> <key> <value>')}
-      sets the value of the <key> in the resource <name> to <value>
+      ${bold('sets the value of the <key> in the resource <name> to <value>')}
       the key can be empty which will set the state of the entire resource
       the key can be a deep key to set an arbitrarily deep property of the resource (e.g. a.b.c)
-      the value will be attempted to be parsed as JSON, before fallbacking to string
+      the value will be attempted to be parsed as JSON, before falling back to string
       
       examples:
         ${gray('fero set users 28.email foo@bar.com')}
 
     * ${green('help')}
-      prints this message
+      ${bold('prints this message')}
 
   options
 
