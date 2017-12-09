@@ -128,7 +128,7 @@ async function list(){
 
 function print(
   rows
-, head = keys(rows[0]).filter(by(0, not(is('_'))))
+, head = keys(rows[0]).filter(by(0, not(is('_')))).slice(0, is.num(table) ? table : Infinity)
 , sort = [] 
 ){
   const table = new Table({ head })
