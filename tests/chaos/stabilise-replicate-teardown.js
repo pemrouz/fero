@@ -29,10 +29,9 @@ test(`chaos servers: ${s}, clients: ${c}, messages: ${m}`, { timeout }, async ()
       , all     = [...servers, ...clients]
   
   // fire messages from each client
-  clients
-    .map(client => range(m)
-      ((d, i) => client.update(`${client.peers.uuid}.${i}`, i))
-    )
+  for (let i = 0; i < c; i++)
+    for (let j = 0; j < m; j++)
+      await clients[i].update(`${clients[i].peers.uuid}.${j}`, j).on('ack')  
 
   // await till messages from all clients replicated across all nodes
   await merge(...all.map(d => d.on('change')))
