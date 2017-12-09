@@ -1,6 +1,6 @@
 {
   "name": "fero",
-  "version": "1.4.0",
+  "version": "1.4.1-test1",
   "description": "",
   "main": "index",
   "bin": "./cli",
