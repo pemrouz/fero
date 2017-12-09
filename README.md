@@ -8,7 +8,11 @@ Fero is a new way to write fast, scalable, stateful services that are also very 
 * **[Differences with Kafka](#differences-with-kafka):** Lighter, Application-Layer Sharding, Dynamic
 * **[Performance](#performance):** Faster than Kafka/Redis, Sub-Millisecond Latency
 * **[Next Steps & Contributing](#next-steps--contributing):** Monitoring Tools
-* **[Ripple](#ripple)**, **[Testing](#testing)**, **[Credits](#credits)**, **[API](#api)** & **[License](#license)**
+* **[Ripple](#ripple)**, **[Testing](#testing)**, **[Credits](#credits)**, **[API](#api)**, **[CLI](#cli)** & **[License](#license)**
+
+
+<p align="center"><img width="313" src="https://user-images.githubusercontent.com/2184177/33799022-57efc7d2-dd1b-11e7-8432-c2ad6e0f7bf8.gif" /></p>
+<p align="center"">(<code>fero ls</code>, whilst running <a href="https://github.com/pemrouz/fero/blob/master/tests/chaos/stabilise-replicate-teardown.js#L27-L45">test</a> that spins up 10 servers, 10 clients, fires 100 messages from each client, waits till replicated to all nodes, then tears down)</p>
 
 ## Why
 
@@ -378,6 +382,10 @@ Key | Default | Description
 `outbox.max` | `2**28` | The maximum outbox buffer size in bytes, after which a flush will be forced if surpassed within one microtask. Setting to 0 will effectively disable any batching. 
 `outbox.frag` | `2**16` | The maximum message size that can be buffered across partial TCP `data` events
 
-# License
+## CLI
+
+![image](https://user-images.githubusercontent.com/2184177/33799198-e2e71cca-dd1e-11e7-9d1e-453074385fe1.png)
+
+## License
 
 MIT License © Pedram Emrouznejad
