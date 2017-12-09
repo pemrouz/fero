@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 const fero = require('./')
-    , { debounce, parse, keys, values, az, za, key, extend, by, not, is } = require('utilise/pure')
+    , { debounce, parse, keys, values, az, za, key, extend, by, not, is, str, lo } = require('utilise/pure')
     , { green, gray, dim, yellow, red } = require('chalk')
     , { cursorTo } = require('readline')
     , discover = require('./discoverudp')
     , argv = require('minimist')(process.argv.slice(2))
     , [command, name, k, v] = argv._
-    , port = argv.p || argv.port || 5000
+    , port  = argv.p || argv.port || 5000
+    , json  = argv.j || argv.json || false
+    , table = argv.t || argv.table
+    , sort  = argv.s || argv.sort
+    , where = argv.w || argv.where
     , commands = { help, list, ls: list, get, set } 
     , TIMEOUT = 60*5*1000
     , block = debounce(TIMEOUT)(() => console.error('timeout!'))
@@ -20,23 +24,46 @@ function help(){
 
   commands:
     
-    * ${green('list, ls', gray('(example: fero list)'))}
+    * ${green('list, ls')}
       gives a live summary (#servers, #clients, #keys, #partitions) across all services
 
-    * ${green('list, ls <name>', gray('(example: fero list users)'))}
+      examples:
+        ${gray('fero list')}
+
+    * ${green('list, ls <name>')}
       gives a live summary (#servers, #clients, #keys, #partitions) for a particular service (<name>)
 
-    * ${green('get <name> <key>', gray('(example: fero get users 28)'))}
+      examples:
+        ${gray('fero list users')}
+
+    * ${green('get <name> <key>')}
       gets the value of the <key> in the resource <name>
       note: key can be empty which will return the state of the entire resource
       note: key can be a deep key to get an arbitrary part of the resource (e.g. a.b.c)
 
-    * ${green('set <name> <key> <value>', gray('(example: fero set users 28.email foo@bar.com)'))}
+      -j, --json: dump output as json
+      -t, --table: pretty print output as table, optionally listing fields to show (defaults to fields of first row)
+      -s, --sort: comma-delimited list of columns to sort on when displaying as table (default none)
+      -w, --where: 
+        * comma-delimited list of "key=val" to filter rows on
+        * the key can be a deep key
+        * matching is case-insentive, partial, on stringified value of that key (i.e. works with objects)
+
+
+      examples:
+        ${gray('fero get users 28')}
+        ${gray('fero get users --table id,username --sort last_updated,firstname')}
+        ${gray('fero get users --table --where name=david')}
+
+    * ${green('set <name> <key> <value>')}
       sets the value of the <key> in the resource <name> to <value>
       the key can be empty which will set the state of the entire resource
       the key can be a deep key to set an arbitrarily deep property of the resource (e.g. a.b.c)
       the value will be attempted to be parsed as JSON, before fallbacking to string
       
+      examples:
+        ${gray('fero set users 28.email foo@bar.com')}
+
     * ${green('help')}
       prints this message
 
@@ -78,12 +105,13 @@ async function list(){
               return p
             }, {})).sort(za('count', '_hash')))
 
+      cursorTo(process.stdout, 0, 0)
       print(rows.map(d => {
         d.hash = ranked[0] && d._hash == ranked[0]._hash ? green(d._hash)
                : ranked[1] && d._hash == ranked[1]._hash ? yellow(d._hash)
                                                          : red(d._hash)
         return d
-      }))
+      }), ['name', 'id', '_uuid'])
     })
 
   udp
@@ -91,28 +119,52 @@ async function list(){
     .map(([uuid]) => {
       delete details[uuid]
       clear()
-      print(values(details))
+      cursorTo(process.stdout, 0, 0)
+      print(values(details), ['name', 'id', '_uuid'])
     })
     
   udp.multicast(`list ${name}`)
 }
 
-function print(arr){
-  const head = keys(arr[0]).filter(by(0, not(is('_'))))
-      , table = new Table({ head });
+function print(
+  rows
+, head = keys(rows[0]).filter(by(0, not(is('_'))))
+, sort = [] 
+){
+  const table = new Table({ head })
+      
+  table.push(...rows
+    .sort(az(...sort))
+    .map(key(head, 'NULL'))
+    .map(values)
+    .map(d => d.map(str))
+  )
 
-  table.push(...arr.sort(az('name', 'id', '_uuid')).map(key(head)).map(values))
-  // process.stdout.write('\033[2J');
-  // process.stdout.write('\033[0f');
-  cursorTo(process.stdout, 0, 0)
   console.log(table.toString())
 }
 
-function get(){
-  console.error('TODO: Implement me')
+async function get(){
+  const client = await fero(name, { client: true })
+  await client.once('connected')
+  const output = key(k)(client)
+      , conditions = (
+          is.arr(where) ? where 
+        : is.def(where) ? [where]
+                        : []
+        ).map(d => d.split('='))
+
+    json  === true  ? console.log(JSON.stringify(output))
+  : table === false ? console.log(output)
+  : print(
+      values(output).filter(row => conditions.every(([k, v]) => lo(str(key(k)(row))).includes(lo(v))))
+    , is.str(table) ? table.split(',') : undefined
+    , is.str(sort)  ? sort.split(',')  : undefined
+    )
+
+  client.destroy()
 }
 
-function set(){
+async function set(){
   console.error('TODO: Implement me')
 }
 
