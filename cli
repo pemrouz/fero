@@ -168,7 +168,14 @@ async function get(){
 }
 
 async function set(){
-  console.error('TODO: Implement me')
+  const server = await fero(name)
+      , replicated = server.on('change')
+          .filter(({ key, value }) => key == k && value == v)
+
+  await server.once('connected.init')
+  server.update(k, v)
+  await replicated
+  server.destroy()
 }
 
 function clear(){
