@@ -42,7 +42,9 @@ function help(){
       note: key can be a deep key to get an arbitrary part of the resource (e.g. a.b.c)
 
       -j, --json: dump output as json
-      -t, --table: pretty print output as table, optionally listing fields to show (defaults to fields of first row)
+      -t, --table: pretty print output as table, 
+        * optionally list fields to show (defaults to fields of first row)
+        * or specify a number to truncate the number of columns
       -s, --sort: comma-delimited list of columns to sort on when displaying as table (default none)
       -w, --where: 
         * comma-delimited list of "key=val" to filter rows on
