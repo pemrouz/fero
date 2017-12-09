@@ -54,14 +54,17 @@ Cache.prototype.destroy = function(){
        : clearTimeout(this.timeouts[timeout])
       delete this.timeouts[timeout]
     }
+    
     for (let timeout in this.peers.timeouts) {
       clearTimeout(this.peers.timeouts[timeout])
       delete this.peers.timeouts[timeout]
     }
 
     // close udp server
-    if (this.peers.discover.udp)
+    if (this.peers.discover.udp) { 
+      await Promise.all(this.peers.discover.udp.emit('stop'))
       await new Promise(resolve => this.peers.discover.udp.socket.close(resolve))
+    }
 
     // remove peers
     for (let peer of this.peers)

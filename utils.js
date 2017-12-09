@@ -1,4 +1,4 @@
-const { emitterify, extend } = require('utilise/pure')
+const { emitterify, extend, keys, is } = require('utilise/pure')
 
 const { random, pow } = Math
 
@@ -27,6 +27,39 @@ const combine = (arr, event, combined = emitterify()) => {
   return combined.on(event)
 }
 
+const merge = (...streams) => {
+  const output = emitterify().on('change')
+
+  keys(streams)
+    .map(stream => streams[stream]
+      .map(output.next)
+    )
+
+  return output
+}
+
+const stream = (input, { destroy = true, id  } = {}) => emitterify(input)
+  .on('value')
+  .on('start', function(){
+    this.next({ type: 'update', value: input })
+
+    input
+      .on('change')
+      .map(this.next)
+      .until(this.once('stop'))
+
+    this
+      .once('stop')
+      .filter(d => destroy)
+      .map(d => input.emit('stop'))
+  })
+  .unpromise()
+
 const avg = list => (list.reduce((a, b) => a + b, 0) / list.length) 
-    
-module.exports = { formatID, jit, emit, last, combine, avg, ms, dp }
+
+const start = o => {
+  o.source.emit('start')
+  return o
+}    
+
+module.exports = { formatID, jit, emit, last, combine, avg, ms, dp, merge, stream, start }

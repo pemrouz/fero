@@ -36,6 +36,7 @@ Constants.prototype.udp = {
   skip: false
 , jitter: 2000
 , retry: false
+, monitor: true
 }
 
 Constants.prototype.types = {

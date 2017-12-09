@@ -1,7 +1,7 @@
 module.exports = Peer
 
 function Peer(peers, host, port, socket, server) {
-  define(this, 'uuid'       , { enumerable: true, value: str(++peers.uuid) })
+  define(this, 'uuid'       , { enumerable: true, value: str(++peers.uuids) })
   define(this, 'status'     , { enumerable: true, value: '', writable: true })
   def(this, '_socket'       , null, 1)
   def(this, 'peers'         , peers)

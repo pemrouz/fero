@@ -1,0 +1,122 @@
+#!/usr/bin/env node
+const fero = require('./')
+    , { debounce, parse, keys, values, az, za, key, extend, by, not, is } = require('utilise/pure')
+    , { green, gray, dim, yellow, red } = require('chalk')
+    , { cursorTo } = require('readline')
+    , discover = require('./discoverudp')
+    , argv = require('minimist')(process.argv.slice(2))
+    , [command, name, k, v] = argv._
+    , port = argv.p || argv.port || 5000
+    , commands = { help, list, ls: list, get, set } 
+    , TIMEOUT = 60*5*1000
+    , block = debounce(TIMEOUT)(() => console.error('timeout!'))
+    , Table = require('cli-table')
+
+commands[command in commands ? command : 'help']()
+
+function help(){
+  console.error(`
+  usage: fero <command> 
+
+  commands:
+    
+    * ${green('list, ls', gray('(example: fero list)'))}
+      gives a live summary (#servers, #clients, #keys, #partitions) across all services
+
+    * ${green('list, ls <name>', gray('(example: fero list users)'))}
+      gives a live summary (#servers, #clients, #keys, #partitions) for a particular service (<name>)
+
+    * ${green('get <name> <key>', gray('(example: fero get users 28)'))}
+      gets the value of the <key> in the resource <name>
+      note: key can be empty which will return the state of the entire resource
+      note: key can be a deep key to get an arbitrary part of the resource (e.g. a.b.c)
+
+    * ${green('set <name> <key> <value>', gray('(example: fero set users 28.email foo@bar.com)'))}
+      sets the value of the <key> in the resource <name> to <value>
+      the key can be empty which will set the state of the entire resource
+      the key can be a deep key to set an arbitrarily deep property of the resource (e.g. a.b.c)
+      the value will be attempted to be parsed as JSON, before fallbacking to string
+      
+    * ${green('help')}
+      prints this message
+
+  options
+
+    -p, --port: change web server port, 0 for random, -1 to disable, defaults to 5000
+  `)
+  process.exit(1)
+}
+
+async function list(){
+  block()
+  clear()
+  
+  const udp = discover()
+      , details = {}
+
+  await udp.once('listening')
+
+  udp
+    .on('list')
+    .filter(([rname, id]) => id)
+    .filter(([rname, id]) => (!name || rname == name))
+    .map(([rname, id, _uuid, _hash, partitions, commits]) => {
+      block()
+      details[_uuid] = { 
+        name: rname
+      , id
+      , partitions
+      , commits
+      , _hash
+      , _uuid
+      }
+
+      const rows = values(details)
+          , ranked = Object.assign([{}, {}], values(rows.reduce((p, { _hash }) => { 
+              p[_hash] = p[_hash] || { _hash, count: 0 }
+              p[_hash].count++
+              return p
+            }, {})).sort(za('count', '_hash')))
+
+      print(rows.map(d => {
+        d.hash = ranked[0] && d._hash == ranked[0]._hash ? green(d._hash)
+               : ranked[1] && d._hash == ranked[1]._hash ? yellow(d._hash)
+                                                         : red(d._hash)
+        return d
+      }))
+    })
+
+  udp
+    .on('stop')
+    .map(([uuid]) => {
+      delete details[uuid]
+      clear()
+      print(values(details))
+    })
+    
+  udp.multicast(`list ${name}`)
+}
+
+function print(arr){
+  const head = keys(arr[0]).filter(by(0, not(is('_'))))
+      , table = new Table({ head });
+
+  table.push(...arr.sort(az('name', 'id', '_uuid')).map(key(head)).map(values))
+  // process.stdout.write('\033[2J');
+  // process.stdout.write('\033[0f');
+  cursorTo(process.stdout, 0, 0)
+  console.log(table.toString())
+}
+
+function get(){
+  console.error('TODO: Implement me')
+}
+
+function set(){
+  console.error('TODO: Implement me')
+}
+
+function clear(){
+  process.stdout.write('\033[2J');
+  process.stdout.write('\033[0f');
+}

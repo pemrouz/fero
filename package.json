@@ -2,7 +2,8 @@
   "name": "fero",
   "version": "1.3.0",
   "description": "",
-  "main": "index.js",
+  "main": "index",
+  "bin": "./cli",
   "scripts": {
     "test": "tap tests/integration/**/*.test.js --reporter spec --test-arg=--trace-warnings --test-arg=--constants.restore.wait=10 --test-arg=--constants.retries.max=1 --timeout=0"
   },
@@ -11,11 +12,15 @@
   "license": "pemrouz.mit-license.org",
   "dependencies": {
     "bintrees": "^1.0.1",
+    "chalk": "^2.3.0",
+    "cli-table": "^0.3.1",
     "colors": "^1.1.2",
+    "easy-table": "^1.1.0",
     "lodash.merge": "^4.6.0",
     "lodash.shuffle": "^4.2.0",
     "minimist": "^1.2.0",
-    "utilise": "^2.1.1"
+    "utilise": "^2.2.2",
+    "uuid": "^3.1.0"
   },
   "devDependencies": {
     "lodash.padstart": "^4.6.1",
