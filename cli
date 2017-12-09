@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+process.argv.push('--color')
 const fero = require('./')
     , { debounce, parse, keys, values, az, za, key, extend, by, not, is, str, lo } = require('utilise/pure')
     , { green, gray, dim, yellow, red } = require('chalk')
