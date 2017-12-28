@@ -18,7 +18,6 @@ function emit(li, param1){
 
 const last = d => d && d[d.length-1] || {}
 
-
 const combine = (arr, event, combined = emitterify()) => {
   arr.map(parent => parent
     .on(event)
