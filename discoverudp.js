@@ -42,7 +42,12 @@ module.exports = function discoverudp(
         time(1000, () => process.exit(1))
       })
     })
-    .on('stop', () => udp.multicast(`stop ${peers.uuid}`))
+    .on('stop', () => 
+      udp.socket._receiving
+        ? udp.multicast(`stop ${peers.uuid}`)
+        // NOTE: could block init on udp listen instead
+        : deb('unclean exit without notifying monitor'.red) 
+    )
     .pipe(o => o.each(debounce(12)((d , i, n) => n.next(d))))
     .filter((d, i, n) => !('reason' in n.source))
     .map(() => udp.multicast([
