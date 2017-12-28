@@ -36,7 +36,7 @@ Cache.prototype.set = function(t, k, v) {
 }
 
 Cache.prototype.add = function(v, k) {
-  return this.change(new Change('add', k || this.length, v))
+  return this.change(new Change('add', k || '', v))
 }
 
 Cache.prototype.patch = function(k, v) {

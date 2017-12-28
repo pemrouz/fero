@@ -53,4 +53,4 @@ Partition.prototype.append = function(change) {
 
 const deb = require('./deb')('par'.bgRed.bold)
     , { last } = require('./utils')
-    , { def, set, is, clone, to, keys, flatten, key } = require('utilise/pure')
+    , { def } = require('utilise/pure')
