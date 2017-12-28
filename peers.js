@@ -139,7 +139,7 @@ Peers.prototype.proxy = function(message){
     }
 
     const reply = this.from(message, this.cache)
-    
+
     // TODO: perf this
     const finish = reply => 
       reply === false   ? false
@@ -190,7 +190,13 @@ Peers.prototype.accept = function(change){
 }
 
 Peers.prototype.from = function(change){
-  return this.broadcast(this.cache.partitions.append(change) && change.buffer, this.constants.commands.commit)
+  // TODO: Should probably reuse this.cache.change, check perf impact
+  if (!this.cache.partitions.append(change))
+    return false
+
+  // NOTE: This could be .replicate - broadcast and await replication factor before acking
+  this.broadcast(change.buffer, this.constants.commands.commit)
+  return change.value.id || true
 }
 
 Peers.prototype.next = function(change){

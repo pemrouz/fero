@@ -143,3 +143,40 @@ test('reply with stream (brokered subscription)', async ({ plan, same, ok, notOk
   await server2.destroy()
   await client.destroy()
 })
+
+test('two servers', async ({ plan, same }) => {
+  plan(2)
+  const server1 = await fero('test')
+      , server2 = await fero('test')
+      , servers = [server1, server2]
+
+  await Promise.all(servers.map(d => d.once('connected.init')))
+
+  // update from server1, wait till commit
+  await server1.update('foo', '1').on('reply')
+  same(server1, { foo: 1 })
+
+  // update from server2, wait till commit
+  await server2.update('foo', '2').on('reply')
+  same(server2, { foo: 2 })
+  
+  await server1.destroy()
+  await server2.destroy()
+})
+
+test('server/client', async ({ plan, same }) => {
+  plan(2)
+  const server = await fero('test')
+      , client = await fero('test', { client: true })
+      , agents = [server, client]
+
+  await Promise.all([server.once('client'), client.once('connected')])
+
+  // update from server, wait till replicated
+  await client.update('foo', 1).on('reply')
+  same(client, { foo: 1 })
+  same(server, { foo: 1 })
+
+  await server.destroy()
+  await client.destroy()
+})

@@ -101,7 +101,6 @@ Guarantees.prototype.on = function(event){
           .filter(this.reply.bind(this))
           .map(m => new Message(m.buffer.slice(4)))
           .filter(this.subscribe.bind(this))
-       : event === 'commit' ? 42 /* TODO */
        : new Error('invalid guarantee')
 }
 

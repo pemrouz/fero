@@ -12,7 +12,11 @@ Cache.prototype.change = function(change) {
   // TODO: return same guarantees? replication?
   return !this.peers.me                              ? this.peers.send(change.buffer)
        :  this.peers.owner(change) !== this.peers.me ? change.owner.send(change.buffer)
-       :  this.peers.broadcast(this.partitions.append(change) && change.buffer, this.peers.constants.commands.commit)
+       : (this.peers.broadcast(
+            this.partitions.append(change) && change.buffer
+          , this.peers.constants.commands.commit
+          )
+         , { on: () => ({ value: change.value.id || true }) })
 }
 
 Cache.prototype.update = function(k, v) {
