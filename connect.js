@@ -17,7 +17,7 @@ const connect = storage => async cache => {
 
 // restore from storage if first mover
 const restore = async (cache, storage) => {
-  cache.timeouts.restore = delay(cache.peers.constants.restore.wait)
+  cache.timeouts.restore = delay(cache.peers.constants.connect.wait)
   await Promise.race([cache.timeouts.restore, cache.on('connected.init')])
   cache.timeouts.restore.abort()
       
