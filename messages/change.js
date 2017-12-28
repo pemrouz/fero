@@ -23,11 +23,13 @@ Change.prototype.serialise = function() {
     this.key = typeof this.key === 'number' ? ''+this.key : ''
   
   let v
-  /// TODO: Add boolean type too
+
   const vtype = typeof this.value === 'object'    ? (v = JSON.stringify(this.value), constants.types.json)
               : typeof this.value === 'undefined' ? (v = ''                        , constants.types.undefined)
               : typeof this.value === 'number'    ? (v = ''+this.value             , constants.types.number)
+              : typeof this.value === 'boolean'   ? (v = (this.value ? '0' : '1')  , constants.types.boolean)
                                                   : (v = this.value                , constants.types.string)
+
   this._buffer = Buffer.allocUnsafe(3 + this.key.length + Buffer.byteLength(v)) // TODO recycle buffers
   this._buffer[0] = constants.change[this.type]
   this._buffer[1] = this.key.length

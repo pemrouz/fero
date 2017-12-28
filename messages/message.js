@@ -42,10 +42,11 @@ define(Message.prototype, 'value', {
   // TODO (perf): check impact of undefined check vs falsy vs typeof
 , get: function(){ 
     return this._value !== undefined ? this._value : (this.buffer && (
-      this._value = this.buffer[2] === constants.types.string ?  this.buffer.slice(this.buffer[1] + 3).toString()
-                  : this.buffer[2] === constants.types.number ? +this.buffer.slice(this.buffer[1] + 3).toString()
-                  : this.buffer[2] === constants.types.json   ? JSON.parse(this.buffer.slice(this.buffer[1] + 3).toString())
-                                                              : undefined
+      this._value = this.buffer[2] === constants.types.string  ?  this.buffer.slice(this.buffer[1] + 3).toString()
+                  : this.buffer[2] === constants.types.number  ? +this.buffer.slice(this.buffer[1] + 3).toString()
+                  : this.buffer[2] === constants.types.json    ? JSON.parse(this.buffer.slice(this.buffer[1] + 3).toString())
+                  : this.buffer[2] === constants.types.boolean ? !!this.buffer.slice(this.buffer[1] + 3)
+                                                               : undefined
       ))
     }
 })

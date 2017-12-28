@@ -43,11 +43,13 @@ Constants.prototype.types = {
   0x1: 'string'
 , 0x2: 'number'
 , 0x3: 'json'
-, 0x4: 'undefined'
+, 0x4: 'boolean'
+, 0x5: 'undefined'
 , 'string'   : 0x1
 , 'number'   : 0x2
 , 'json'     : 0x3
-, 'undefined': 0x4
+, 'boolean'  : 0x4
+, 'undefined': 0x5
 }
 
 Constants.prototype.change = {
