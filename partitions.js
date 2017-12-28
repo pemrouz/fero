@@ -43,11 +43,26 @@ Partitions.prototype.diff = function(base){
     .map(key(['type', 'key', 'value', 'ptime'])) // TODO proper serialise
 }
 
-Partitions.prototype.append = function(change, partition = this.lookup(change)){
+Partitions.prototype.append = function(change){
+  // NOTE: not sure if this is overloading add too much
+  if (change.type == 'add' && !change.key) {
+    const id = nextID(this.cache)
+
+    if (is.lit(change.value)) change.value.id = id
+
+    if (change instanceof Message) {
+      change.buffer = (new Change(change.type, id, change.value)).buffer
+      change._key = change._value = change._type = undefined
+    } else {
+      change.key = id
+    }
+  }
+
+  const partition = this.lookup(change)
+
   // create partition if doesn't exist
   if (!this[partition])
     this[partition] = new Partition(partition, this.cache.peers)
-
   // TODO: inline?
   if (!set(change, true)(this.cache))
     return false
@@ -64,5 +79,8 @@ Partitions.prototype.append = function(change, partition = this.lookup(change)){
 
 const deb = require('./deb')('par'.bgRed.bold)
     , { last } = require('./utils')
-    , { def, set, is, clone, to, keys, flatten, key, str } = require('utilise/pure')
+    , { def, set, is, clone, to, keys, flatten, key, str, az } = require('utilise/pure')
     , Partition = require('./partition')
+    , Change = require('./messages/change')
+    , Message = require('./messages/message')
+    , nextID = cache => ((+keys(cache).sort(az()).pop() + 1) || 1)
