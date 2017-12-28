@@ -10,8 +10,10 @@ test('should be able to create multiple fast moving peers without conflict', asy
   const client = await fero('test', { client: true })
   await client.once('connected')  
 
-  // immediately commit on server 2 after creating
-  const server2 = await fero('test', { constants: { restore: { wait: 99999 }}})
+  // immediately commit on server 2 after committing
+  const server2 = await fero('test')
+  await server2.once('connected')
+
   same(server2.peers.lists.connected.length, 1, 'server2 connected on init')
   server2.update('server2', 1)
 
@@ -25,7 +27,9 @@ test('should be able to create multiple fast moving peers without conflict', asy
   await server2.destroy()
 
   // replacement server should pick up where previous node left off 
-  const server3 = await fero('test', { constants: { restore: { wait: 99999 }}})
+  const server3 = await fero('test')
+  await server3.once('connected')
+
   same(server3.peers.lists.connected.length, 1, 'server3 connected on init')
   server3.update('server2', server3.server2 + 1)
 

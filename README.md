@@ -107,7 +107,7 @@ users
 
 * Partitions are fixed in Kafka and very visible to consumers. Fero aims for location-transparency, you never have to care about the underlying partitions. Partitions are also more dynamic in fero (top-level keys by default) rather than being fixed upfront. 
 
-* Kafka stores the log to disk - albeit in a sequential way that makes it comparably as fast as storing in-memory. This gives you a consistent throughput when you are writing terabytes of data, because there is no max memory limit that you can overrun. You can process terabytes of data with fero, but it won't store it in memory. If you want to keep everything since time 0, you would typically have a fast critical path, and then pipe commits to a separate audit service to store, or for slower consumers, batch processing, historical analysis etc. Fero is also agnostic from where you load your initial state, whether it's a file, database, or something else (see `restore` function) so you probably wouldn't use disk for this anyway.
+* Kafka stores the log to disk - albeit in a sequential way that makes it comparably as fast as storing in-memory. This gives you a consistent throughput when you are writing terabytes of data, because there is no max memory limit that you can overrun. You can process terabytes of data with fero, but it won't store it in memory. If you want to keep everything since time 0, you would typically have a fast critical path, and then pipe commits to a separate audit service to store, or for slower consumers, batch processing, historical analysis etc. Fero is also agnostic from where you load your initial state, whether it's a file, database, or something else (see `connect` function) so you probably wouldn't use disk for this anyway.
 
 * Although there are other in-sync replicas (ISR's) for a partition, only one master node is ever serving requests with Kafka. In contrast, although fero only does writes for a partition on one node, you can read from any replica, hence you can scale the two independently. The replica variables will be made more configurable in the future so you can adjust the dial as you please.
 
@@ -300,7 +300,6 @@ The following were super helpful:
     * `client` - if `true`, this is a client node (i.e. does not own any partitions). In the future, this can also be a string which would be equivalent of Kafka consumer groups. Defaults to `false`.
     * `udp { ip = '224.0.0.251', port = 5354, ttl = 128 }` - Multicast parameters used to discover other peers. If `false`, skips discovery via UDP altogether.
     * `hash` - the hash function used by the consistent hashring
-    * `restore` - an async function that will be invoked if this is the first server peer to start up, which allows for restoring initial state.
 
   Returns a promise that resolves to an instance of `Cache`
 
@@ -359,6 +358,22 @@ The Cache has two main subsystems: Peers and Partitions.
 
 The Partitions is essentially a map of Partition's. Partition is just a log of change records. This module just listens for commits and appends them to the corresponding log, update the state of the cache. You can specify your own partitioning strategy as a function, but essentially it should result in orthogonal partitions. The default is by top-level keys, but you can imagine other strategies, like by user/IP/ID/session/etc, which would result in magically co-locating peers that deal with a particular users data _across different services_ onto a single machine.
 
+### Connect
+
+`connect` is a utility that just makes it easier to connecting a node to something. 
+
+```js
+const { fero, connect } = require('fero') 
+    , db = { restore, add, update, remove }
+    , server = await connect(db)(fero('users', processor))
+```
+
+This will do two things:
+
+* **restore** - it will wait a configurable amount of time before either joining an existing cluster, or considering itself the first peer of the cluster and invoking the `restore` function on `db` to restore initial state
+
+* **replay** - if the functions `add`/`update`/`remove` are defined on `db`, they will be invoked for the when the corresponding change occurs
+
 ### Constants
 
 Constants can be set via the command-line (e.g. `--constants.outbox.max`), overriden in JS (e.g. `{ constants: { outbox: { max: 0 }}}`) on construction, otherwise it will use the default value.
@@ -366,7 +381,7 @@ Constants can be set via the command-line (e.g. `--constants.outbox.max`), overr
 Key | Default | Description
 --- | --- | ---
 `dht.vnodes` | `200` | The number of additional virtual nodes created for each peer on the hashring to even out hotspots and create an even distribution
-`restore.wait` | `1000` | How many milliseconds to wait to discover other peers before considering this server as the first peer in the cluster and invoking the `restore` function to restore initial state
+`connect.wait` | `1000` | How many milliseconds to wait to discover other peers before considering this server as the first peer in the cluster and invoking the `restore` function to restore initial state
 `retries.base` | `100` | The milliseconds to wait using exponential backoff on the first attempt to retry connecting to a peer
 `retries.cap` | `60000` | The maximum ceiling in milliseconds a retry attempt will be scheduled
 `retries.max` | `5` | The maximum number of retry attempts before declaring a peer a failure and dropping it

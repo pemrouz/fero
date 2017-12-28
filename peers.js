@@ -15,7 +15,7 @@ function Peers({ name = '*', tracer, server, client, udp, hosts, ports, hash, ca
   def(this, 'uuids'       , 0, 1)
   def(this, 'uuid'        , uuid())
   def(this, 'timeouts'    , { })
-  def(this, 'ready'       , !this.me, 1)
+  def(this, 'ready'       , true, 1)
   def(this, 'destroyed'   , false, 1)
   def(this, 'discover'    , {
     tcp: require('./discovertcp')(this, hosts, ports)

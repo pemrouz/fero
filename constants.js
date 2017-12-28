@@ -12,7 +12,7 @@ Constants.prototype.dht = {
   vnodes: 200
 }
 
-Constants.prototype.restore = {
+Constants.prototype.connect = {
   wait: 3000
 }
 

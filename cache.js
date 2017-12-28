@@ -64,6 +64,7 @@ Cache.prototype.destroy = function(){
     if (this.peers.discover.udp) { 
       await Promise.all(this.peers.discover.udp.emit('stop'))
       await new Promise(resolve => this.peers.discover.udp.socket.close(resolve))
+      
     }
 
     // remove peers
@@ -84,28 +85,13 @@ Cache.prototype.destroy = function(){
   })
 }
 
-Cache.restore = async ({ restore }, cache) => {
-  if (!cache.peers.me) return cache
-  cache.timeouts.restore = delay(cache.peers.constants.restore.wait)
-  await Promise.race([cache.timeouts.restore, cache.on('connected.init')])
-  cache.timeouts.restore.abort()
-  if (restore && !cache.peers.lists.connected.length && !keys(cache).length) {
-    await restore(cache)
-    deb(`restored ${str(keys(cache).length)} records`.green)
-  } else {
-    deb(`abandon restore`.yellow)
-  }
-  cache.peers.ready = true
-  return cache
-}
-
 Cache.prototype.reset = function(){
   deb('reset')
   keys(this).map(k => { delete this[k] })
   keys(this.partitions).map(k => { delete this.partitions[k] })
 }
 
-const { def, emitterify, extend, key, delay, keys, str } = require('utilise/pure')
+const { def, emitterify, extend, key, keys, str } = require('utilise/pure')
     , Partitions = require('./partitions')
     , Change = require('./messages/change')
     , Peers = require('./peers')
