@@ -173,14 +173,11 @@ async function get(){
 }
 
 async function set(){
-  const server = await fero(name)
-      , replicated = server.on('change')
-          .filter(({ key, value }) => key == k && value == v)
+  const client = await fero(name, { client: true })
 
-  await server.once('connected.init')
-  server.update(k, v)
-  await replicated
-  server.destroy()
+  await client.once('connected.init')
+  await client.update(k, v).on('reply')
+  client.destroy()
 }
 
 function clear(){
