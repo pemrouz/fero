@@ -196,7 +196,7 @@ Peers.prototype.from = function(change){
 
   // NOTE: This could be .replicate - broadcast and await replication factor before acking
   this.broadcast(change.buffer, this.constants.commands.commit)
-  return change.value.id || true
+  return change.value && change.value.id || true
 }
 
 Peers.prototype.next = function(change){

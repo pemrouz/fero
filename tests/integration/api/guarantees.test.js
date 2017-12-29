@@ -144,7 +144,7 @@ test('reply with stream (brokered subscription)', async ({ plan, same, ok, notOk
   await client.destroy()
 })
 
-test('two servers', async ({ plan, same }) => {
+test('commit - two servers', async ({ plan, same }) => {
   plan(2)
   const server1 = await fero('test')
       , server2 = await fero('test')
@@ -164,8 +164,8 @@ test('two servers', async ({ plan, same }) => {
   await server2.destroy()
 })
 
-test('server/client', async ({ plan, same }) => {
-  plan(2)
+test('commit - server/client', async ({ plan, same }) => {
+  plan(4)
   const server = await fero('test')
       , client = await fero('test', { client: true })
       , agents = [server, client]
@@ -177,6 +177,10 @@ test('server/client', async ({ plan, same }) => {
   same(client, { foo: 1 })
   same(server, { foo: 1 })
 
+  await client.remove('foo').on('reply')
+  same(client, {})
+  same(server, {})
+  
   await server.destroy()
   await client.destroy()
 })
