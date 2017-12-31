@@ -30,7 +30,7 @@ function connect(){
 
       this.socket.attempted = true
       this.send({
-        laddress: this.peers.me ? this.peers.me.address : 'client'
+        laddress: this.peers.me ? this.peers.me.address : `client ${this.peers.group}`
       , lpeers: this.peers.lists.connected.map(d => d.id)
       , lpartitions: this.peers.me ? this.peers.cache.partitions.heads() : {}
       , lid: this.peers.me ? this.peers.me.id : ''
@@ -50,14 +50,14 @@ function init(message) {
   const { laddress, lpeers, lpartitions, lid } = message.value
       , rpartitions = peer.peers.me ? peer.peers.cache.partitions.heads() : {}
       , rpeers = peer.peers.lists.connected.map(d => d.id)
-      , raddress = peer.peers.me ? peer.peers.me.address : 'client'
+      , raddress = peer.peers.me ? peer.peers.me.address : `client ${peer.peers.group}`
       , dirpartitions = canFastForwardPartitions(lpartitions, rpartitions, laddress, raddress)
       , dirpeers = true // TODO: canFastForwardPeers(lpeers, rpeers)
 
   if (is.in(rpeers)(lid))
     return deb('abandon - connected init', rid.grey, peer.uuid.bgRed) 
 
-  if (laddress == 'client' && !peer.peers.ready) 
+  if (laddress.startsWith('client') && !peer.peers.ready) 
     return deb('server (R) not ready'), peer.socket.destroy()
 
   // deb('init rneed diff', rneed.length, peer.uuid.bgRed)
@@ -73,9 +73,9 @@ function init(message) {
     deb('(R) init R → L', rdiff.length, peer.uuid.bgRed)
     peer.send({ raddress, rpeers, rdiff }, peer.peers.constants.commands.sync) // TODO: JSON is wasteful here, we have the buffers
     
-    if (laddress === 'client') {
+    if (laddress.startsWith('client')) {
       peer.setStatus('client')
-      peer.client = true
+      peer.client = laddress.slice(7) || true
     } else { 
       peer.setStatus('connected', laddress)
       peer.server = true
@@ -88,9 +88,9 @@ function sync(message) {
   const { peer } = message
 
   let { raddress, rpartitions, rpeers, rdiff } = message.value
-    , laddress = peer.peers.me ? peer.peers.me.address : 'client'
+    , laddress = peer.peers.me ? peer.peers.me.address : `client ${peer.peers.group}`
 
-  if (raddress == 'client' && !peer.peers.ready) 
+  if (raddress.startsWith('client') && !peer.peers.ready) 
     return deb('server (L) not ready'), peer.socket.destroy()
 
   if (rdiff) {
@@ -110,9 +110,9 @@ function sync(message) {
     peer.send({ laddress, ldiff, lpeers }, peer.peers.constants.commands.done)
   }
 
-  if (raddress === 'client') {
+  if (raddress.startsWith('client')) {
     peer.setStatus('client')
-    peer.client = true
+    peer.client = raddress.slice(7) || true
   } else { 
     peer.setStatus('connected', raddress)
     peer.server = true
@@ -138,9 +138,9 @@ function done(message) {
     deb('(R) done R → L', peer.uuid.bgRed)    
   }
 
-  if (laddress === 'client') {
+  if (laddress.startsWith('client')) {
     peer.setStatus('client')
-    peer.client = true
+    peer.client = laddress.slice(7) || true
   } else { 
     peer.setStatus('connected', laddress)
     peer.server = true
@@ -168,8 +168,8 @@ const net = require('net')
 
 // TODO: Allow bidirectional conflict-free merges
 const canFastForwardPartitions = (lpartitions, rpartitions, laddress, raddress) => 
-  laddress == 'client'                                                                             ? 'R → L'
-: raddress == 'client'                                                                             ? 'L → R'
+  laddress.startsWith('client')                                                                    ? 'R → L'
+: raddress.startsWith('client')                                                                    ? 'L → R'
 : str(lpartitions) == str(rpartitions)                                                             ? true
 : keys(rpartitions).every(id => id in lpartitions && lpartitions[id].head >= rpartitions[id].head) ? 'L → R'
 : keys(lpartitions).every(id => id in rpartitions && rpartitions[id].head >= lpartitions[id].head) ? 'R → L'

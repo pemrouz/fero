@@ -5,6 +5,7 @@ function Peers({ name = '*', tracer, server, client, udp, hosts, ports, hash, ca
   def(this, 'tracer'      , tracer)
   def(this, 'me'          , server)
   def(this, 'cache'       , cache)
+  def(this, 'group'       , is.str(client) ? client : '')
   def(this, 'pool'        , debounce(50)(pool))
   def(this, 'constants'   , new Constants(constants))
   def(this, 'dht'         , new DHT(this, hash))
