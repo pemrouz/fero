@@ -201,7 +201,7 @@ Peers.prototype.from = function(change){
 }
 
 Peers.prototype.next = function(change){
-  return change.peer.server && Peers.prototype.from.call(this, change)
+  return (change.peer.server || change.peer.client == 'monitor') && Peers.prototype.from.call(this, change)
 }
 
 Peers.prototype[Symbol.iterator] = function*(){

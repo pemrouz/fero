@@ -146,7 +146,7 @@ function print(
 }
 
 async function get(){
-  const client = await fero(name, { client: true })
+  const client = await fero(name, { client: 'monitor' })
       , conditions = (
           is.arr(where) ? where 
         : is.def(where) ? [where]
@@ -173,7 +173,7 @@ async function get(){
 }
 
 async function set(){
-  const client = await fero(name, { client: true })
+  const client = await fero(name, { client: 'monitor' })
 
   await client.once('connected.init')
   await client.update(k, v).on('reply')
