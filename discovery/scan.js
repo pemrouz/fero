@@ -1,4 +1,4 @@
-module.exports = function discovertcp(peers, hosts = ['127.0.0.1'], ports = []){
+module.exports = function scan(peers, hosts, ports){
   const space = generate(hosts, ports, peers.me)
 
   def(peers, 'size', space.length)
@@ -9,13 +9,14 @@ module.exports = function discovertcp(peers, hosts = ['127.0.0.1'], ports = []){
     .map((d, i) => time(i*50, _ => peers.create(d[0], d[1], null, true)))
 }
 
-const deb = require('./deb')('tcp'.bgYellow.bold)
+const deb = require('../deb')('tcp'.bgYellow.bold)
     , shuffle = require('lodash.shuffle')
-    , { def, str, time } = require('utilise/pure')
+    , { is, def, str, time } = require('utilise/pure')
 
 const generate = (hosts, ports, me) => {
+  if (is.str(hosts)) hosts = hosts.split(',') // TODO handle this in constants
   deb('generate space', hosts.join(', '), ports.join(','))
-  const [start, end] = ports
+  const [start, end = start] = ports
       , space = []
 
   for (const host of hosts)
