@@ -1,15 +1,17 @@
 module.exports = Peers
 
-function Peers({ name = '*', tracer, server, client, udp, hosts, ports, hash, cache, from, constants = {}} = {}){
+function Peers(name, server, cache, opts = {}){
+  const { client, hosts, ports, hash, from, retries } = opts
+      , constants = key(['commands', 'connections', 'connect', 'dht', 'multicast', 'types', 'change', 'partitions', 'outbox'])(opts)
+
   def(this, 'name'        , name)
-  def(this, 'tracer'      , tracer)
   def(this, 'me'          , server)
   def(this, 'cache'       , cache)
+  def(this, 'constants'   , constants)
   def(this, 'group'       , is.str(client) ? client : '')
   def(this, 'pool'        , debounce(50)(pool))
-  def(this, 'constants'   , new Constants(constants))
   def(this, 'dht'         , new DHT(this, hash))
-  def(this, 'retries'     , new Retries(this.constants.retries))
+  def(this, 'retries'     , new Retries(retries))
   def(this, 'connections' , this.constants.connections.max[server ? 'server' : 'client'])
   def(this, 'lists'       , { disconnected: [], connected: [], connecting: [], throttled: [], client: [], all: [] })
   def(this, 'sindex'      , 0, 1)
@@ -19,8 +21,8 @@ function Peers({ name = '*', tracer, server, client, udp, hosts, ports, hash, ca
   def(this, 'ready'       , true, 1)
   def(this, 'destroyed'   , false, 1)
   def(this, 'discover'    , {
-    tcp: require('./discovertcp')(this, hosts, ports)
-  , udp: require('./discoverudp')(this, name, udp)
+    scan: require('./discovery/scan')(this, hosts, ports)
+  , multicast: require('./discovery/multicast')(this)
   })
   
   if (from)
@@ -62,7 +64,6 @@ Peers.prototype.remove = function(peer) {
   return new Promise(async resolve => {
     if (is.str(peer))
       peer = this[peer]
-
 
     if (this[peer.id] != peer) // TODO: Confirm if this is still possible
       return deb('mismatch - already removed'.red, peer.id, peer.uuid, peer/*.bgRed*/) 
@@ -230,12 +231,11 @@ async function pool() {
    }
 }
 
-const { def, emitterify, debounce, remove, keys, values, is, time } = require('utilise/pure')
+const { def, emitterify, debounce, remove, key, keys, values, is, time } = require('utilise/pure')
     , { emit, last, formatID } = require('./utils')
     , { init, sync, done } = require('./handshake')
     , { Message, Change } = require('./messages')
     , Partitions = require('./partitions')
-    , Constants = require('./constants')
     , Retries = require('./retries')
     , uuid = () => require('uuid/v4')()
     , Peer = require('./peer')

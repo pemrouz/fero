@@ -1,9 +1,9 @@
 module.exports = Cache
 
-function Cache(opts){
+function Cache(name, server, opts){
   // TODO (perf): inline on prototype?
   emitterify(this)
-  def(this, 'peers'     , new Peers(extend({ cache: this })(opts)))
+  def(this, 'peers'     , new Peers(name, server, this, opts))
   def(this, 'partitions', new Partitions(this))
   def(this, 'timeouts'  , {})
 }
@@ -64,11 +64,10 @@ Cache.prototype.destroy = function(){
       delete this.peers.timeouts[timeout]
     }
 
-    // close udp server
-    if (this.peers.discover.udp) { 
-      await Promise.all(this.peers.discover.udp.emit('stop'))
-      await new Promise(resolve => this.peers.discover.udp.socket.close(resolve))
-      
+    // close multicast server
+    if (this.peers.discover.multicast) { 
+      await Promise.all(this.peers.discover.multicast.emit('stop'))
+      await this.peers.discover.multicast.close()
     }
 
     // remove peers

@@ -5,7 +5,7 @@ const fero = require('./')
     , { debounce, parse, keys, values, az, za, key, extend, by, not, is, str, lo } = require('utilise/pure')
     , { green, magenta, yellow, red, bold } = require('chalk')
     , { cursorTo } = require('readline')
-    , discover = require('./discoverudp')
+    , discover = require('./discovery/multicast')
     , argv = require('minimist')(process.argv.slice(2))
     , [command, name, k, v] = argv._
     , port  = argv.p || argv.port || 5000
@@ -83,7 +83,7 @@ async function list(){
   const udp = discover()
       , details = {}
 
-  await udp.once('listening')
+  await udp.once('listen')
 
   udp
     .on('list')

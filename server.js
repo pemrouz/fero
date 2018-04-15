@@ -1,6 +1,8 @@
-module.exports = (bounds = [0, 0]) => {
-  const [start, end = start] = bounds
-      , ports = shuffle(Array(1 + end - start).fill().map((d, i) => i + start))
+module.exports = ({ hosts, ports }) => {
+  if (is.str(hosts)) hosts = hosts.split(',') // TODO: handle in constants
+  if (!ports.length) ports = [0]
+  const [start, end = start] = ports
+      , shuffledPorts = shuffle(Array(1 + end - start).fill().map((d, i) => i + start))
       , server = emitterify({})
 
   server
@@ -9,10 +11,10 @@ module.exports = (bounds = [0, 0]) => {
     .filter(d => !server.id)
     .map(d => createServer()
       .on('error', error(d))
-      .listen(d, '127.0.0.1', listen(server))
+      .listen(d, hosts[0], listen(server))
     )
 
-  ports.map(port => server.emit('scan', port))
+  shuffledPorts.map(port => server.emit('scan', port))
 
   return server.on('init')
 }
@@ -47,4 +49,4 @@ const deb = require('./deb')('srv'.bgCyan.bold)
     , { createServer } = require('net') 
     , { jit } = require('./utils')
 
-const { delay, def, emitterify } = require('utilise/pure')
+const { is, delay, def, emitterify } = require('utilise/pure')
