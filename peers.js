@@ -4,7 +4,8 @@ function Peers(name, server, cache, opts = {}){
   const { client, hosts, ports, hash, from, retries } = opts
       , constants = key(['commands', 'connections', 'connect', 'dht', 'multicast', 'types', 'change', 'partitions', 'outbox'])(opts)
 
-  def(this, 'name'        , name)
+  def(this, 'name'        , FERO_GEN ? `${FERO_GEN}:${name}` : name)
+  def(this, 'logical'     , name)
   def(this, 'me'          , server)
   def(this, 'cache'       , cache)
   def(this, 'constants'   , constants)
@@ -242,3 +243,4 @@ const { def, emitterify, debounce, remove, key, keys, values, is, time } = requi
     , DHT = require('./dht')
     , deb = require('./deb')('per'.bgGreen.bold)
     , define = Object.defineProperty
+    , { FERO_GEN } = process.env

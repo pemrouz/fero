@@ -7,7 +7,7 @@ module.exports = exports = async (name = '*', opts = {}) => {
 
 exports.all = async (names, opts) => 
   (await Promise.all(names.map(name => exports(name, opts))))
-    .reduce(to.obj(cache => cache.peers.name), {})
+    .reduce(to.obj(cache => cache.peers.logical), {})
 
 exports.connect = require('./connect')
 
