@@ -1,0 +1,14 @@
+{
+  "name": "fero",
+  "version": "0.0.0",
+  "description": "distributed, replicated reactive resources — fero(name, opts) on top of `data`",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --no-warnings --test \"day0/*.test.ts\"",
+    "perf": "node --experimental-strip-types --no-warnings --test \"day0/*.perf.ts\"",
+    "day0:server": "node --experimental-strip-types --no-warnings day0/server.ts",
+    "day0:client": "node --experimental-strip-types --no-warnings day0/client.ts"
+  },
+  "author": "pemrouz",
+  "license": "MIT"
+}
