@@ -7,19 +7,12 @@
 import { test } from 'node:test'
 import { ok } from 'node:assert'
 import { encodeFrame, Framer, type ChangeRecord } from './message.ts'
+import { bench } from '../utils/index.ts'
 
-const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[xs.length >> 1]
-// One untimed warmup (JIT + caches), then median-of-5. Thresholds carry ~2–2.5×
-// headroom over the steady-state median on a loaded WSL2 box — loose enough to
-// survive scheduling variance, tight enough to catch a real 2×+ regression.
-const time = (fn: () => void) => {
-  fn()
-  return median([0, 0, 0, 0, 0].map(() => {
-    const t0 = performance.now()
-    fn()
-    return performance.now() - t0
-  }))
-}
+// Thresholds below carry ~2–2.5× headroom over the steady-state median on a
+// loaded WSL2 box — loose enough to survive scheduling variance, tight enough to
+// catch a real 2×+ regression. bench.time() does one untimed warmup (JIT +
+// caches), then the median of five timed runs.
 
 const N = 1000
 // Realistic steady-state replication: object-valued updates with sibling keys.
@@ -31,13 +24,13 @@ const batch: ChangeRecord[] = Array.from({ length: N }, (_, i) => ({
 const frame = encodeFrame(batch)
 
 test(`encode+frame ${N} object-valued records`, () => {
-  const elapsed = time(() => void encodeFrame(batch))
+  const elapsed = bench.time(() => void encodeFrame(batch))
   console.log(`  encode ${N}: ${elapsed.toFixed(3)}ms (${frame.length} bytes)`)
   ok(elapsed < 12, `encode ${N} took ${elapsed.toFixed(3)}ms (threshold 12ms)`)
 })
 
 test(`frame + lazy scan ${N} records (no value read)`, () => {
-  const elapsed = time(() => {
+  const elapsed = bench.time(() => {
     const records = new Framer().push(frame).flatMap((f) => f.records())
     // touch only type — the relay/route path; values must stay unparsed
     let n = 0
@@ -49,7 +42,7 @@ test(`frame + lazy scan ${N} records (no value read)`, () => {
 })
 
 test(`frame + full decode ${N} records (read key + value)`, () => {
-  const elapsed = time(() => {
+  const elapsed = bench.time(() => {
     const records = new Framer().push(frame).flatMap((f) => f.records())
     for (const r of records) {
       if (r.key.length === 0) throw new Error('key')
@@ -61,10 +54,10 @@ test(`frame + full decode ${N} records (read key + value)`, () => {
 })
 
 test('lazy scan is meaningfully cheaper than full decode', () => {
-  const scan = time(() => {
+  const scan = bench.time(() => {
     for (const r of new Framer().push(frame).flatMap((f) => f.records())) if (r.type !== 'update') throw 0
   })
-  const full = time(() => {
+  const full = bench.time(() => {
     for (const r of new Framer().push(frame).flatMap((f) => f.records())) void (r.value as any).score
   })
   console.log(`  scan ${scan.toFixed(3)}ms vs full ${full.toFixed(3)}ms`)

@@ -8,25 +8,7 @@ import assert from 'node:assert/strict'
 import net from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { Peer, STATUS } from './peer.ts'
-import type { Frame, ChangeRecord } from './message.ts'
-
-// apply a decoded frame's records to a $() replica via the day-0 res contract
-function applyFrame(res: any, frame: Frame) {
-  for (const record of frame.records()) {
-    if (record.type === 'update') res.update(record.value, record.key)
-    else if (record.type === 'insert') res.insert(record.value, record.key, record.at)
-    else if (record.type === 'remove') res.remove(record.key)
-  }
-}
-
-const until = async (check: () => boolean, ms = 1000) => {
-  const deadline = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > deadline) return false
-    await new Promise((r) => setTimeout(r, 5))
-  }
-  return true
-}
+import { until, apply } from '../utils/index.ts'
 
 // Start a server that wraps each accepted socket in an inbound Peer; returns the
 // replica proxy it applies frames into, plus a frame counter and teardown.
@@ -43,7 +25,7 @@ function serve(): Promise<{ port: number; replica: any; frames: () => number; cl
         socket,
         onFrame: (f) => {
           frames++
-          applyFrame(res, f)
+          for (const record of f.records()) apply(res, record)
         },
       })
       inbound.push(peer)

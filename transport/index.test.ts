@@ -5,47 +5,21 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import net from 'node:net'
 import { $, value, view } from '../../data/index.ts'
-import { transport, type Mesh } from './index.ts'
-import { STATUS } from './peer.ts'
+import { transport } from './index.ts'
 import type { ChangeRecord } from './message.ts'
+import { ports, until, connected, apply } from '../utils/index.ts'
 
-const freePort = () =>
-  new Promise<number>((resolve) => {
-    const s = net.createServer()
-    s.listen(0, '127.0.0.1', () => {
-      const p = (s.address() as net.AddressInfo).port
-      s.close(() => resolve(p))
-    })
-  })
-
-const until = async (check: () => boolean, ms = 2000) => {
-  const deadline = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > deadline) return false
-    await new Promise((r) => setTimeout(r, 5))
-  }
-  return true
-}
-
+// A storeless mesh needs somewhere to land records so the test can assert where
+// they went: a $() plus an apply bound to its res.
 const applier = () => {
   const store = $({})
   const res = (store as any)[view].res
-  return {
-    store,
-    apply: (record: ChangeRecord) => {
-      if (record.type === 'update') res.update(record.value, record.key)
-      else if (record.type === 'insert') res.insert(record.value, record.key, record.at)
-      else if (record.type === 'remove') res.remove(record.key)
-    },
-  }
+  return { store, apply: (record: ChangeRecord) => apply(res, record) }
 }
 
-const connected = (mesh: Mesh, addr: string) => (mesh.peers[addr]?.status?.[value] ?? -1) === STATUS.connected
-
 test('two servers discover, connect, and route writes to their owners', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
   const A = applier()
@@ -93,7 +67,7 @@ test('two servers discover, connect, and route writes to their owners', async ()
 })
 
 test('membership gossips: a third node that only knows A learns B', async () => {
-  const [p1, p2, p3] = [await freePort(), await freePort(), await freePort()]
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
   const A = applier()

@@ -7,16 +7,7 @@ import { ok } from 'node:assert'
 import { Log } from './partition.ts'
 import { view } from './index.ts'
 import type { ChangeRecord } from '../transport/message.ts'
-
-const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[xs.length >> 1]
-const time = (fn: () => void) => {
-  fn() // warmup
-  return median([0, 0, 0, 0, 0].map(() => {
-    const t0 = performance.now()
-    fn()
-    return performance.now() - t0
-  }))
-}
+import { bench } from '../utils/index.ts'
 
 const N = 10_000
 const records: ChangeRecord[] = Array.from({ length: N }, (_, i) => ({
@@ -26,7 +17,7 @@ const records: ChangeRecord[] = Array.from({ length: N }, (_, i) => ({
 }))
 
 test(`append ${N} records to the log`, () => {
-  const elapsed = time(() => {
+  const elapsed = bench.time(() => {
     const log = new Log()
     for (let i = 0; i < N; i++) log.append(records[i])
   })
@@ -37,7 +28,7 @@ test(`append ${N} records to the log`, () => {
 test(`project a ${N}-record log into a view (replay)`, () => {
   const log = new Log()
   for (let i = 0; i < N; i++) log.append(records[i])
-  const elapsed = time(() => void view(log))
+  const elapsed = bench.time(() => void view(log))
   console.log(`  project ${N}: ${elapsed.toFixed(3)}ms`)
   ok(elapsed < 60, `project ${N} took ${elapsed.toFixed(3)}ms (threshold 60ms)`)
 })

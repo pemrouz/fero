@@ -9,8 +9,7 @@ import { ok, equal } from 'node:assert'
 import { value } from '../../data/index.ts'
 import { Peers } from './peers.ts'
 import { STATUS } from './peer.ts'
-
-const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[xs.length >> 1]
+import { bench } from '../utils/index.ts'
 
 const N = 2000
 
@@ -47,12 +46,7 @@ test(`status transition cost is flat in N (N=${N})`, () => {
       on = !on
     }
   }
-  flips() // untimed warmup
-  const elapsed = median([0, 0, 0, 0, 0].map(() => {
-    const t0 = performance.now()
-    flips()
-    return performance.now() - t0
-  }))
+  const elapsed = bench.time(flips) // one untimed warmup + median-of-5
   console.log(`  ${1000} transitions over N=${N} pool: ${elapsed.toFixed(3)}ms`)
   // ~2.5× headroom over the loaded-box median; the O(1)-delta guard above is the
   // real correctness check — this just catches an O(N)-per-transition regression.

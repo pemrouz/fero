@@ -10,8 +10,7 @@ import { test } from 'node:test'
 import { ok } from 'node:assert'
 import { $, value } from '../../data/index.ts'
 import { apply, view, type Change } from './replicate.ts'
-
-const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)]
+import { bench } from '../utils/index.ts'
 
 function timeApply(records: string[]): number {
   const proxy = $({})
@@ -27,7 +26,7 @@ test('apply 10k object updates — serialize→parse→apply', () => {
   const records = Array.from({ length: N }, (_, i) =>
     JSON.stringify({ type: 'update', key: ['user' + i], value: { name: 'P', active: true, score: i } }),
   )
-  const elapsed = median([0, 0, 0, 0, 0].map(() => timeApply(records)))
+  const elapsed = bench.median([0, 0, 0, 0, 0].map(() => timeApply(records)))
   console.log(`  apply ${N} updates: ${elapsed.toFixed(2)}ms`)
   ok(elapsed < 60, `apply ${N} updates took ${elapsed.toFixed(2)}ms (threshold 60ms)`)
 })
@@ -39,7 +38,7 @@ test('apply 10k array inserts — ordered push path', () => {
   )
   // arrays: seed the root as [] via an initial update, then inserts
   const seed = JSON.stringify({ type: 'update', key: [], value: [] })
-  const elapsed = median([0, 0, 0, 0, 0].map(() => timeApply([seed, ...records])))
+  const elapsed = bench.median([0, 0, 0, 0, 0].map(() => timeApply([seed, ...records])))
   console.log(`  apply ${N} inserts: ${elapsed.toFixed(2)}ms`)
   ok(elapsed < 80, `apply ${N} inserts took ${elapsed.toFixed(2)}ms (threshold 80ms)`)
 })
