@@ -1,6 +1,6 @@
 // L0 wire codec + framer — the hottest file in the repo.
 //
-// fero's foundational hypothesis (proven in day0/): a `data` change record
+// fero's foundational hypothesis (proven by the day-0 spike): a `data` change record
 // — { type, key:string[], value, at? } — IS the wire format. message.ts makes
 // that binary: it encodes a *batch* of change records into one length-prefixed
 // frame, and decodes an inbound frame into lazy `RecordView`s that parse only the
@@ -45,6 +45,7 @@ export const VERB = {
   CALL: 9, // RPC request: { method, arg }; frame id correlates the reply
   SUBSCRIBE: 10, // live subscription open: { method, arg }; frame id is the sub id
   UNSUBSCRIBE: 11, // close the subscription with this frame id
+  WRITE: 12, // forward a write-request to the partition owner; owner commits it locally (origin=owner) and replicates
   // a RECORDS frame WITH a frame id is a subscription delta for that sub id (vs a
   // plain replication RECORDS frame, which carries no id)
 } as const

@@ -112,7 +112,7 @@ export class Peer {
     try {
       frames = this.#framer.push(chunk)
     } catch {
-      this.destroy() // bad framing → drop the peer (defensive; see IDEAS.md)
+      this.destroy() // bad framing → drop the peer (defensive; see ../IDEAS.md)
       return
     }
     for (const f of frames) this.#onFrame?.(f, this)
@@ -157,7 +157,7 @@ export class Peer {
   // single frame; a relayed batch spanning origins splits into the fewest frames
   // that keep each frame's base+index provenance valid (encodeFrames). If not
   // connected, records stay queued and flush on connect (bounded-buffer/
-  // backpressure handling: see IDEAS.md).
+  // backpressure handling: see ../IDEAS.md).
   flush() {
     this.#flushing = false
     if (!this.#outbox.length) return

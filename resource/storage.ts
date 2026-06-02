@@ -11,7 +11,7 @@ import type { Storage } from './index.ts'
 // Append-only file WAL. `load` parses the newline-delimited records (a missing
 // file is an empty log); `append` writes one line per record. Synchronous fsync
 // per write — the simplest correct durability. Higher throughput (batched /
-// async / fsync-coalesced writes) and compaction are deferred — see ./IDEAS.md.
+// async / fsync-coalesced writes) and compaction are deferred — see ../IDEAS.md.
 export function fileStorage(path: string): Storage {
   return {
     load(): ChangeRecord[] {

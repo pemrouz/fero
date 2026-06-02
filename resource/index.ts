@@ -33,13 +33,13 @@
 //
 // v1 scope: server / full-replication mode (every server materializes every
 // record via dialed-broadcast). Deferred — client→server RPC dispatch, per-
-// client `read()` projections, DHT-partitioned routing. See ./IDEAS.md.
+// client `read()` projections, DHT-partitioned routing. See ../IDEAS.md.
 
 import { $, value as VALUE, view as VIEWSYM } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
 import { Log } from '../log/partition.ts'
 import { applyRecord } from '../log/index.ts'
-import type { ChangeRecord } from '../transport/message.ts'
+import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 
 export { value } from '../../data/index.ts'
 export { fileStorage } from './storage.ts'
@@ -156,6 +156,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // the write-capture sink; the `applying` guard stops that re-emission from
   // being re-logged or re-broadcast.
   let applying = false
+  // Set while a FORWARDED write is being applied locally (see applyLocalWrite): the
+  // sink commits it as-is instead of re-evaluating ownership, so it never bounces.
+  let committingForward = false
 
   // Accept a record into local state: dedup by per-origin high-water, Lamport-
   // merge the clock, log it (full per-origin history), LWW-resolve, and apply the
@@ -221,9 +224,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // its deltas (initial snapshot + changes) to the client; else ship one value.
     onSubscribe: (subId: number, method: string, arg: unknown, address: string) => serveSubscribe(subId, method, arg, address),
     onUnsubscribe: (subId: number, address: string) => serveUnsubscribe(subId, address),
+    // Inbound write-request: a peer forwarded a write for a partition we own.
+    // Apply it as a LOCAL write so our sink commits it (stamps origin=us, logs,
+    // replicates) — we are the single sequencer for the partition.
+    onWrite: (record: ChangeRecord) => applyLocalWrite(record),
   })
 
   const uuid = mesh.uuid
+  const me = mesh.me
 
   // Write-capture: a local assignment on the proxy is stamped with our
   // provenance, recorded as the current LWW winner for its key (the proxy has
@@ -240,6 +248,35 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       return
     }
     if (applying) return
+    // Owner-routed writes (Milestone F1): the partition owner is the single
+    // sequencer for its keys. If we don't own this partition — and the owner is a
+    // connected peer — FORWARD the raw write; the owner commits it under its own
+    // provenance and replicates the canonical record back to us. The optimistic
+    // local value is already applied (the set trap ran before this sink), so we
+    // just hand off and return; the canonical origin=owner record arrives via
+    // broadcast and reconciles. Clients (no `me`) and an unreachable owner fall
+    // through to a local commit so a write is never dropped. Full replication is
+    // retained here, so every replica still sees each origin's seqs in order —
+    // the in-order-per-origin invariant the dedup/LWW core relies on holds.
+    //
+    // A FORWARDED write (committingForward) is committed here unconditionally — we
+    // do NOT re-check ownership. The forwarder already routed it to us; re-checking
+    // would re-forward whenever ring views transiently disagree during mesh
+    // formation (each side computing a different owner), ping-ponging the write
+    // until membership converges. Honoring the forwarder's decision ends the write
+    // in one hop; a brief ring disagreement at worst commits at a not-yet-true
+    // owner, which still broadcasts and converges by LWW (as the pre-F1 model did).
+    if (!committingForward) {
+      const owner = me !== undefined ? mesh.owner(partitionOf(change)) : undefined
+      if (owner !== undefined && owner !== me && mesh.forward(owner, change)) return
+    }
+    commitLocal(change)
+  })
+
+  // Commit a record under OUR provenance: stamp (origin=us, Lamport seq), record
+  // it as the LWW winner for its key, log it, and replicate. Used for partitions
+  // we own and as the never-drop fallback when an owner is unreachable.
+  function commitLocal(change: ChangeRecord) {
     const n = ++clock
     change.origin = uuid
     change.seq = n
@@ -252,7 +289,22 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     } else versions.set(key, { seq: n, origin: uuid })
     log.append(change)
     mesh.broadcast(change) // full replication: every server materializes every record
-  })
+  }
+
+  // A peer forwarded a write for a partition we own. Apply it to our proxy as a
+  // local write (NOT guarded by `applying`) so the write-capture sink above runs
+  // and commits it under our provenance — turning the forwarder's optimistic
+  // write into our authoritative, sequenced one. `committingForward` tells the
+  // sink to commit it as-is rather than re-evaluate ownership (no re-forward → no
+  // ping-pong while ring views are still settling).
+  const applyLocalWrite = (record: ChangeRecord) => {
+    committingForward = true
+    try {
+      applyRecord(res, record)
+    } finally {
+      committingForward = false
+    }
+  }
 
   const cluster: Cluster = {
     peers: mesh.peers,

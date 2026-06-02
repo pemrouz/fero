@@ -74,6 +74,7 @@ These apply in spirit, often in letter:
 - **Shared helpers live in [utils/](utils/), named `noun.verb()`.** Don't copy-paste fixtures (free ports, polling, timing, record-apply) between test/perf files — import them via the `#utils` subpath (a Node import map in package.json → [utils/index.ts](utils/index.ts), so no `../../` juggling): `import { ports, until, bench, apply } from '#utils'`. Naming convention: group related operations under a lowercase **noun** namespace and name the method for the **action** — `ports.free()`, `bench.time()` — and keep one-off predicates/actions **flat** — `until()`, `sleep()`, `connected()`, `apply()`. Prefer `ports.free()` over a `freePort`/`free_port` free function: the noun reads as the thing you want, the verb as what to do with it. The perf timing primitive (`bench.time` = one untimed warmup + median-of-5) lives here too, so every `*.perf.ts` measures identically.
 - **One logical change per commit. Present before committing.** Surface (a) what changed, (b) why, (c) test results, (d) perf results before running `git commit`. Conventional-Commits-ish prefixes (`feat(transport):`, `fix(log):`, `perf:`).
 - **Keep docs in sync with code.** When you change behaviour, public API, or commands, update plan.md and (later) README.md in the same change.
+- **Two ledgers: [IDEAS.md](IDEAS.md) (open) + [DECISIONS.md](DECISIONS.md) (settled).** One pair at the repo root, not per-layer. [IDEAS.md](IDEAS.md) holds *only* open work, grouped by cross-cutting **workstream** (a theme spanning several modules) with `[P1/P2/P3]` priority + `(module)` tags — it's the attention list for what's not yet done. [DECISIONS.md](DECISIONS.md) is the append-only "why": when a workstream lands, write its record there (context / decision / consequences) and **lift its open "Remaining:" sub-points into the right IDEAS workstream** — don't let "done" notes pile up in IDEAS. Never delete a decision record (supersede it). New cross-cutting idea → add to the matching IDEAS workstream, not a fresh per-module file.
 - **Don't undo recent perf work.** Check `git log` for recent `perf:` / `fix:` commits before refactoring hot paths.
 - **Run all tests + perf on every change.** Add regression tests for fixes; extend perf tests when a new hot path appears.
 
@@ -86,16 +87,18 @@ These apply in spirit, often in letter:
 - **Readable example sources.** Gallery apps showcase the lib; no dense one-liners or imperative paint loops; bind reactively.
 - **Flattering benchmark workloads.** When benchmarking against peers (e.g. Kafka, Redis), pick bounded workloads where fero is durably ahead. The ticker example was deleted from data for an insert-rate crossover; don't repeat the lesson.
 
-## Open design questions (from plan.md §11)
+## Open design questions
 
-These are deliberately unresolved — pick them up as the build hits them:
+The living list is **[IDEAS.md](IDEAS.md) → "Open questions"** — plan.md §11's
+threads (failover re-subscribe, cross-partition ordering, AsyncIterator methods, plus
+the design-resolved-but-impl-pending commit-on-return and `cluster.me` surface) and
+the ones the build has since surfaced (owner-routing strategy — now mid-implementation
+as F1, value codec, hash choice, conflict-merge model). Pick them up as the build hits
+them; resolved ones graduate to [DECISIONS.md](DECISIONS.md).
 
-1. Syntax for fire-and-forget writes inside handlers (default: handler awaits each commit's ack).
-2. Re-subscription behaviour on connected-server failover.
-3. Cross-partition ordering inside a handler (no atomicity — document, don't paper over).
-4. Whether AsyncIterator-returning methods need a path beyond Promise/ViewProxy.
-5. `cluster.me` availability before first peer-connect.
-6. Reserved top-level keys on the returned object (`data`, `methods`, `cluster`, `destroy`) — keep new surface nested under one of the three reactive surfaces.
+One §11 item is effectively settled, so it lives below as a rule instead: reserved
+top-level keys (`data`, `methods`, `cluster`, `destroy`) — keep new surface nested
+under one of the three reactive surfaces.
 
 ## What NOT to do
 

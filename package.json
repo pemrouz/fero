@@ -7,10 +7,8 @@
     "#utils": "./utils/index.ts"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --no-warnings --test \"utils/*.test.ts\" \"day0/*.test.ts\" \"transport/*.test.ts\" \"log/*.test.ts\" \"resource/*.test.ts\"",
-    "perf": "node --experimental-strip-types --no-warnings --test \"day0/*.perf.ts\" \"transport/*.perf.ts\" \"log/*.perf.ts\" \"resource/*.perf.ts\"",
-    "day0:server": "node --experimental-strip-types --no-warnings day0/server.ts",
-    "day0:client": "node --experimental-strip-types --no-warnings day0/client.ts"
+    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"transport/*.test.ts\" \"log/*.test.ts\" \"resource/*.test.ts\"",
+    "perf": "node --experimental-strip-types --no-warnings --test \"transport/*.perf.ts\" \"log/*.perf.ts\" \"resource/*.perf.ts\""
   },
   "author": "pemrouz",
   "license": "MIT"

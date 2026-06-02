@@ -11,7 +11,7 @@ import { rmSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { value } from '../../data/index.ts'
 import { fero, fileStorage } from './index.ts'
-import { ports, until, connected, sleep } from '../utils/index.ts'
+import { ports, until, connected, sleep } from '#utils'
 
 // Order-insensitive structural compare. Replicas converge on VALUES, not on
 // object key insertion order (a node that wrote key b then received key a holds
@@ -82,7 +82,7 @@ test('2-node: assignment write on A replicates to B; cluster.peers reflects memb
 
   const expected = { user42: { name: 'P' }, user99: { name: 'Q' } }
   assert.ok(
-    await until(() => JSON.stringify(B.data[value]) === JSON.stringify(expected)),
+    await until(() => sameState(B.data[value], expected)),
     `B.data = ${JSON.stringify(B.data[value])}`,
   )
   assert.deepEqual(A.data[value], expected) // A converges too (full replication)
@@ -116,7 +116,7 @@ test('2-node: a custom method that writes context.data replicates to the peer', 
 
   const expected = { p1: { score: 10 }, p2: { score: 20 } }
   assert.ok(
-    await until(() => JSON.stringify(B.data[value]) === JSON.stringify(expected)),
+    await until(() => sameState(B.data[value], expected)),
     `B.data = ${JSON.stringify(B.data[value])}`,
   )
 
@@ -188,7 +188,7 @@ test('2-node: a peer that joins AFTER writes catches up (anti-entropy)', async (
 
   const expected = { a: 1, b: 2, c: 3 }
   assert.ok(
-    await until(() => JSON.stringify(B.data[value]) === JSON.stringify(expected)),
+    await until(() => sameState(B.data[value], expected)),
     `B caught up to ${JSON.stringify(B.data[value])}`,
   )
 
@@ -234,13 +234,13 @@ test('3-node: a late joiner catches up to BOTH peers’ writes via one connectio
   A.data.fromA = 1
   B.data.fromB = 2
   const expected = { fromA: 1, fromB: 2 }
-  assert.ok(await until(() => JSON.stringify(A.data[value]) === JSON.stringify(expected)), 'A,B converge first')
+  assert.ok(await until(() => sameState(A.data[value], expected)), 'A,B converge first')
 
   // C joins knowing ONLY A (ports:[p1]); it must end up with B's write too —
   // A's log carries B's records (it received them), so one catch-up suffices.
   const C = await fero('cu3', { host: '127.0.0.1', port: p3, ports: [p1], wait: 150 })
   assert.ok(
-    await until(() => JSON.stringify(C.data[value]) === JSON.stringify(expected)),
+    await until(() => sameState(C.data[value], expected)),
     `C caught up to ${JSON.stringify(C.data[value])}`,
   )
 
@@ -469,4 +469,91 @@ test('2-node: a write that causally follows a remote write wins (Lamport order)'
 
   A.destroy()
   B.destroy()
+})
+
+// ── Milestone F1: owner-routed writes (owner-authoritative, full replication) ──
+
+test('F1: a write to a peer-owned partition is committed by the owner and replicates', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const a2 = `127.0.0.1:${p2}`
+  const a3 = `127.0.0.1:${p3}`
+  const A = await fero('f1own', { host: '127.0.0.1', port: p1, ports: [p1, p2, p3], wait: 250 })
+  const B = await fero('f1own', { host: '127.0.0.1', port: p2, ports: [p1, p2, p3], wait: 250 })
+  const C = await fero('f1own', { host: '127.0.0.1', port: p3, ports: [p1, p2, p3], wait: 250 })
+  try {
+    assert.ok(await until(() => connected(A.cluster, a2) && connected(A.cluster, a3)), 'full mesh')
+
+    // A key OWNED BY B (not A). Writing it on A must FORWARD to B: A never
+    // broadcasts it (the sink returns right after forwarding) and never logs it,
+    // so C can ONLY receive it from B's own commit+broadcast — which proves B, the
+    // owner, sequenced it. All three nodes agree on the owner (one ring).
+    let key: string | undefined
+    for (let i = 0; i < 2000 && !key; i++) if (A.cluster.owner('k' + i) === a2) key = 'k' + i
+    assert.ok(key, 'found a B-owned key')
+    assert.equal(B.cluster.owner(key!), a2, 'B agrees it owns the key')
+
+    A.data[key!] = 'via-A'
+    assert.ok(
+      await until(() => B.data[key!][value] === 'via-A' && C.data[key!][value] === 'via-A', 8000),
+      `B=${B.data[key!][value]} C=${C.data[key!][value]}`,
+    )
+  } finally {
+    A.destroy()
+    B.destroy()
+    C.destroy()
+  }
+})
+
+test('F1: a batch written on one node routes across owners and converges exactly', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  const A = await fero('f1batch', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
+  const B = await fero('f1batch', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  try {
+    assert.ok(await until(() => connected(A.cluster, a2) && connected(B.cluster, a1)), 'A↔B connect')
+
+    // 30 keys split by the ring: A owns ~half (local commit), B owns ~half (A
+    // forwards them to B, which commits and broadcasts back). Convergence to
+    // EXACTLY the 30 keys on B proves no loss and no echo storm under forwarding.
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    const owners = new Set(keys.map((k) => A.cluster.owner(k)))
+    assert.ok(owners.size >= 2, `batch spans both owners (got ${owners.size}) so forwarding is exercised`)
+
+    for (const k of keys) A.data[k] = k
+    const expected = Object.fromEntries(keys.map((k) => [k, k]))
+    assert.ok(await until(() => sameState(B.data[value], expected), 8000), `B: ${Object.keys(B.data[value]).length}/30`)
+    assert.ok(sameState(A.data[value], expected), 'A holds the full set too (canonical records returned)')
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
+test('F1: concurrent writes to one key from both nodes serialize through the owner', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  const A = await fero('f1ser', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
+  const B = await fero('f1ser', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  try {
+    assert.ok(await until(() => connected(A.cluster, a2) && connected(B.cluster, a1)), 'A↔B connect')
+
+    // Both nodes write the SAME key. Whoever owns it is the single sequencer; both
+    // must converge to ONE identical value (linearizable per partition — vs the
+    // pre-F1 model where each committed locally and LWW arbitrated after the fact).
+    A.data.hot = 'A'
+    B.data.hot = 'B'
+    assert.ok(
+      await until(() => {
+        const va = A.data.hot[value]
+        const vb = B.data.hot[value]
+        return va !== undefined && va === vb
+      }, 8000),
+      `A=${A.data.hot[value]} B=${B.data.hot[value]}`,
+    )
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
 })

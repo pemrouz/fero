@@ -16,7 +16,7 @@
 // steady state around ~80–105ms standalone / ~80–90ms under the full parallel
 // suite. The dominant cost remains data's defensive `sclone`; its allocations
 // make the path GC-sensitive. Cutting the clone (a non-cloning sink for the
-// broadcast path) is the known win — see ./IDEAS.md. Median-of-5 + warmup.
+// broadcast path) is the known win — see ../IDEAS.md. Median-of-5 + warmup.
 
 import { test } from 'node:test'
 import { ok } from 'node:assert'

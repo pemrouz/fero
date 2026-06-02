@@ -1,7 +1,7 @@
 // owner() is on the per-record routing hot path. This guards lookup latency on
 // a realistic ring (5 peers × 200 vnodes = 1000 sorted entries) and the
 // rebuild-on-churn cost. Median-of-5, hard thresholds (never widened). The
-// hash-function bake-off (djb2 vs wy/xxhash) is deferred — see IDEAS.md.
+// hash-function bake-off (djb2 vs wy/xxhash) is deferred — see ../IDEAS.md.
 
 import { test } from 'node:test'
 import { ok } from 'node:assert'
