@@ -101,8 +101,16 @@ describes.
   inserts work via direct assignment; document or generalize.
 
 ## Testing
+- **[NOTE] Convergence is on VALUES, not key order.** Two replicas can hold the
+  same map with different object key insertion order (a node that wrote `b` then
+  received `a` holds `{b,a}`; its peer holds `{a,b}`). This is correct for a KV
+  store, but means cross-replica equality checks must be order-insensitive
+  (`sameState` in the tests), and any future feature that depends on iteration
+  order (e.g. ordered projections) must impose its own ordering, not rely on the
+  proxy's. The chaos test caught this.
 - **[P2] N-node convergence + membership churn** — 3+ nodes, a node joins late
-  (motivates catch-up), a node drops (motivates re-subscribe). Chaos (L4).
+  (motivates catch-up), a node drops (motivates re-subscribe). Chaos (L4). The
+  crash-recovery path (kill, peer writes, restart, catch-up) IS now covered.
 - **[P2] Method-returns-ViewProxy subscription** — once RPC lands: a method
   returning `data.filter(...)` consumed as a live subscription vs `await`ed as a
   snapshot (return-type dispatch, plan §1).
