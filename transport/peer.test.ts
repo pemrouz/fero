@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import net from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { Peer, STATUS } from './peer.ts'
-import { until, apply } from '../utils/index.ts'
+import { until, apply } from '#utils'
 
 // Start a server that wraps each accepted socket in an inbound Peer; returns the
 // replica proxy it applies frames into, plus a frame counter and teardown.

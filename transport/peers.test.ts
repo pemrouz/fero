@@ -4,7 +4,7 @@ import net from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { Peers } from './peers.ts'
 import { STATUS, type Peer } from './peer.ts'
-import { until, apply } from '../utils/index.ts'
+import { until, apply } from '#utils'
 
 // a server that applies inbound frames into a replica via the pool's accept()
 function serve() {

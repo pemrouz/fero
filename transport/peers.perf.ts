@@ -9,7 +9,7 @@ import { ok, equal } from 'node:assert'
 import { value } from '../../data/index.ts'
 import { Peers } from './peers.ts'
 import { STATUS } from './peer.ts'
-import { bench } from '../utils/index.ts'
+import { bench } from '#utils'
 
 const N = 2000
 

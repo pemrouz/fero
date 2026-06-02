@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { value } from '../../data/index.ts'
 import { log, view, distribute } from './index.ts'
-import { ports, until, connected, sleep } from '../utils/index.ts'
+import { ports, until, connected, sleep } from '#utils'
 
 test('view projects a log: replay of existing records + live appends', () => {
   const l = log()

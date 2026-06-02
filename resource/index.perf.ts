@@ -21,7 +21,7 @@
 import { test } from 'node:test'
 import { ok } from 'node:assert'
 import { fero } from './index.ts'
-import { ports, bench } from '../utils/index.ts'
+import { ports, bench } from '#utils'
 
 const N = 10_000
 

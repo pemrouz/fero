@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "description": "distributed, replicated reactive resources — fero(name, opts) on top of `data`",
   "type": "module",
+  "imports": {
+    "#utils": "./utils/index.ts"
+  },
   "scripts": {
     "test": "node --experimental-strip-types --no-warnings --test \"utils/*.test.ts\" \"day0/*.test.ts\" \"transport/*.test.ts\" \"log/*.test.ts\" \"resource/*.test.ts\"",
     "perf": "node --experimental-strip-types --no-warnings --test \"day0/*.perf.ts\" \"transport/*.perf.ts\" \"log/*.perf.ts\" \"resource/*.perf.ts\"",

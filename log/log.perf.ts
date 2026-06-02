@@ -7,7 +7,7 @@ import { ok } from 'node:assert'
 import { Log } from './partition.ts'
 import { view } from './index.ts'
 import type { ChangeRecord } from '../transport/message.ts'
-import { bench } from '../utils/index.ts'
+import { bench } from '#utils'
 
 const N = 10_000
 const records: ChangeRecord[] = Array.from({ length: N }, (_, i) => ({
