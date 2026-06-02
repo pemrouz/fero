@@ -77,10 +77,25 @@ describes.
   committing method primitive) and **no cross-partition atomicity** (§11.3).
   Partitioned *holding* (a node materializes only owned partitions) stays out of
   scope — it makes reads async/routed and breaks the synchronous `data.x` API.
-- **[P2] `read()` is full passthrough — no per-client projection.** plan §6.2:
-  the connected server runs `read(_, {peer, data})` once per client at subscribe
-  time, returning that client's projection; re-invoked on auth change, diffed,
-  deltas shipped. v1 `read()` returns the whole `data` proxy to everyone.
+- **[ADDRESSED — Milestone E] Live subscriptions (server-push).** A client's
+  `methods.X(arg)` returns a unified handle: `await` it ⇒ a one-shot RPC
+  (snapshot/ack); use it reactively (`.tap`/`.filter`/`.connect`/`[value]`) ⇒ it
+  opens a live subscription (`SUBSCRIBE` verb), the server runs the method per
+  client and, if it returns a ViewProxy (the default `read` → whole `data`, or a
+  custom `data.filter(...)` projection), connects a sink that streams the initial
+  snapshot + every delta back over the client's connection (RECORDS frames tagged
+  with the sub id); the client folds them into a local ViewProxy. `then` is the
+  only access that does NOT subscribe, so await-or-not picks the mode (plan §1).
+  Remaining: (a) **per-client projection re-binding** — plan §6.2 re-invokes
+  `read` on auth change, diffs, ships the delta; v1 runs `read` once at subscribe
+  (a custom `read` returning `data.filter(s => visible(s, peer))` already gives a
+  per-client view, just not re-bound on auth change). (b) **failover re-subscribe**
+  (§11.2) — if the connected server drops, the client doesn't yet re-subscribe
+  elsewhere. (c) **'move' deltas** (ordered projections: sort/top) aren't applied
+  client-side (applyRecord ignores move) — unordered projections are fine. (d)
+  subscriptions are torn down on `destroy()` or explicit unsubscribe; per-handle
+  GC-driven teardown is deferred. (e) AsyncIterator consumption (§11.4) — not a
+  path yet; await (snapshot) and reactive (live) are the two modes.
 - **[DONE — Milestone A] Conflict rule: last-writer-wins.** Records now carry
   provenance (origin uuid + a Lamport `seq`); concurrent same-key writes resolve
   by lexicographic (seq, origin) per key path, so nodes converge instead of

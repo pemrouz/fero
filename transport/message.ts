@@ -43,6 +43,10 @@ export const VERB = {
   REJECT: 7, // RPC reply: { error } for the call with this frame's id
   DIGEST: 8, // anti-entropy: a peer's per-origin high-water vector (catch-up)
   CALL: 9, // RPC request: { method, arg }; frame id correlates the reply
+  SUBSCRIBE: 10, // live subscription open: { method, arg }; frame id is the sub id
+  UNSUBSCRIBE: 11, // close the subscription with this frame id
+  // a RECORDS frame WITH a frame id is a subscription delta for that sub id (vs a
+  // plain replication RECORDS frame, which carries no id)
 } as const
 
 // record tag (byte 0 of each record): bits 0-1 type, bit2 hasAt, bit3 keyDelta

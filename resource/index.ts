@@ -217,6 +217,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // caller as context.peer; the transport ships the return value back. (Defined
     // after the method table below — fires only once a client is connected.)
     onCall: (method: string, arg: unknown, address: string) => serveCall(method, arg, address),
+    // Inbound subscription: run the method, and if it returns a ViewProxy stream
+    // its deltas (initial snapshot + changes) to the client; else ship one value.
+    onSubscribe: (subId: number, method: string, arg: unknown, address: string) => serveSubscribe(subId, method, arg, address),
+    onUnsubscribe: (subId: number, address: string) => serveUnsubscribe(subId, address),
   })
 
   const uuid = mesh.uuid
@@ -284,17 +288,62 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   }
   const serveCall = (method: string, arg: unknown, address: string): unknown => snapshot(invoke(method, arg, address))
 
-  // The local method surface (server) calls handlers in-process; a read-only
-  // client (no listen port) has no handlers — every call is RPC'd to its
-  // connected server. `await`-ing the result is the consumption mode for values;
-  // the ViewProxy-subscription mode is deferred (E).
+  // Server side of a subscription: run the method here; if it returns a ViewProxy
+  // (a projection — the default `read` returns the whole `data`, a custom one may
+  // return `data.filter(...)`), connect a sink and stream every change (the
+  // initial snapshot first, then deltas) to the subscriber. A plain value is shipped
+  // once. The sink host is retained per (address, subId) so it keeps firing until
+  // the client unsubscribes (data holds sinks only by WeakRef).
+  const subscriptions = new Map<string, object>()
+  const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
+    let result: unknown
+    try {
+      result = invoke(method, arg, address)
+    } catch {
+      return // a failed subscription just yields no stream (RPC path surfaces errors)
+    }
+    if (isViewProxy(result)) {
+      subscriptions.set(`${address}:${subId}`, (result as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change)))
+    } else {
+      mesh.deltaTo(address, subId, { type: 'update', key: [], value: result })
+    }
+  }
+  const serveUnsubscribe = (subId: number, address: string) => void subscriptions.delete(`${address}:${subId}`)
+
+  // The local method surface (server) calls handlers in-process. A read-only
+  // client (no listen port) has no handlers — each method returns a HANDLE that
+  // is both a thenable and a live ViewProxy: `await methods.x(arg)` is a one-shot
+  // RPC (snapshot/ack), while reactive use (`methods.x(arg).tap(...)`, `.filter`,
+  // `[value]`) opens a server-pushed live subscription. await-or-not picks the
+  // mode (plan §1) — `then` is the only access that does NOT subscribe.
   const isClient = mesh.me === undefined
   const localMethods: Record<string, (arg?: any) => any> = {}
   for (const k of Object.keys(allMethods)) localMethods[k] = (arg?: any) => invoke(k, arg)
   context.methods = localMethods // method-to-method calls run locally
 
+  const clientSubs = new Set<() => void>()
+  const clientHandle = (method: string, arg: unknown) => {
+    let live: any // the local ViewProxy, created (and the subscription opened) lazily
+    const ensure = () => {
+      if (live) return
+      live = $({})
+      const res = (live as any)[VIEWSYM].res
+      const unsub = mesh.subscribe(method, arg, (record: ChangeRecord) => applyRecord(res, record))
+      if (unsub) clientSubs.add(unsub)
+    }
+    return new Proxy(noop, {
+      get(_t, prop) {
+        if (prop === 'then') return (onF: any, onR: any) => mesh.call(method, arg).then(onF, onR) // await ⇒ one-shot RPC
+        if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined // ignore JS-internal probes
+        if (prop === 'constructor' || prop === 'toJSON') return undefined
+        ensure() // any real data/operator access ⇒ subscribe + delegate to the live proxy
+        return live[prop]
+      },
+    })
+  }
+
   const methodSurface: Record<string, (arg?: any) => any> = isClient
-    ? (new Proxy({}, { get: (_t, name: string) => (arg?: any) => mesh.call(name, arg) }) as any)
+    ? (new Proxy({}, { get: (_t, name: string) => (arg?: any) => clientHandle(name, arg) }) as any)
     : localMethods
 
   await mesh.ready
@@ -305,9 +354,18 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     cluster,
     destroy() {
       void writeHost // retain the sink host until teardown
+      for (const unsub of clientSubs) unsub()
       mesh.destroy()
     },
   }
+}
+
+// noop target for the callable client-handle Proxy (mirrors data's ViewProxy).
+const noop = () => {}
+
+// A `data` ViewProxy carries the view symbol; a plain value does not.
+function isViewProxy(v: unknown): boolean {
+  return v != null && (typeof v === 'object' || typeof v === 'function') && (v as any)[VIEWSYM] !== undefined
 }
 
 // Reduce a method's return value for the wire: a ViewProxy collapses to its

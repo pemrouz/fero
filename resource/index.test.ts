@@ -315,6 +315,67 @@ test('chaos: a node crashes, its peer keeps writing, it restarts and catches up'
   }
 })
 
+test('client subscription: methods.read() streams live updates from the server', async () => {
+  const p1 = await ports.free()
+  const A = await fero('sub', { host: '127.0.0.1', port: p1, wait: 50 })
+  A.data.x = 1
+
+  const C = await fero('sub', { host: '127.0.0.1', ports: [p1], wait: 200 })
+  const view = C.methods.read() // consumed reactively (not awaited) ⇒ opens a live subscription
+
+  // initial snapshot arrives over the wire
+  assert.ok(await until(() => view[value]?.x === 1), `initial snapshot: ${JSON.stringify(view[value])}`)
+
+  // a server-side write is pushed to the subscriber live
+  A.data.y = 2
+  assert.ok(await until(() => view[value]?.y === 2), `live insert: ${JSON.stringify(view[value])}`)
+
+  // and an update to an existing key
+  A.data.x = 10
+  assert.ok(await until(() => view[value]?.x === 10), `live update: ${JSON.stringify(view[value])}`)
+
+  C.destroy()
+  A.destroy()
+})
+
+test('client subscription: the handle is reactive — connect sees post-subscription deltas', async () => {
+  const p1 = await ports.free()
+  const A = await fero('sub2', { host: '127.0.0.1', port: p1, wait: 50 })
+  const C = await fero('sub2', { host: '127.0.0.1', ports: [p1], wait: 200 })
+
+  const view = C.methods.read()
+  const changes = view.connect([]) // capture the live change stream on the handle
+
+  // establish the subscription first — a sentinel write must round-trip to the
+  // view (otherwise writes can race the SUBSCRIBE and fold into the snapshot).
+  A.data.ready = true
+  assert.ok(await until(() => view[value]?.ready === true), 'subscription established')
+  const base = changes.length
+
+  // a write AFTER establishment is pushed and captured as a fresh delta
+  A.data.score = 42
+  assert.ok(await until(() => view[value]?.score === 42), `live delta: ${JSON.stringify(view[value])}`)
+  assert.ok(changes.length > base, `change stream grew (${base} → ${changes.length})`)
+
+  C.destroy()
+  A.destroy()
+})
+
+test('client subscription: await methods.read() is a one-shot snapshot (RPC path)', async () => {
+  const p1 = await ports.free()
+  const A = await fero('sub3', { host: '127.0.0.1', port: p1, wait: 50 })
+  A.data.a = 1
+  A.data.b = 2
+  const C = await fero('sub3', { host: '127.0.0.1', ports: [p1], wait: 200 })
+
+  // awaited ⇒ one-shot RPC, returns a plain snapshot (not a live proxy)
+  const snap = await C.methods.read()
+  assert.deepEqual(snap, { a: 1, b: 2 })
+
+  C.destroy()
+  A.destroy()
+})
+
 test('client RPC: a read-only client dispatches method calls to its server', async () => {
   const p1 = await ports.free()
   const seenPeers: string[] = []
@@ -371,7 +432,15 @@ test('client RPC: an unknown method rejects', async () => {
   const A = await fero('rpcerr', { host: '127.0.0.1', port: p1, wait: 50 })
   const C = await fero('rpcerr', { host: '127.0.0.1', ports: [p1], wait: 200 })
 
-  await assert.rejects(() => C.methods.nope({}), /unknown method/)
+  // (the client handle is a thenable Proxy, not a Promise instance, so await it
+  // and catch directly rather than via assert.rejects)
+  let err: Error | undefined
+  try {
+    await C.methods.nope({})
+  } catch (e) {
+    err = e as Error
+  }
+  assert.match(err?.message ?? '', /unknown method/)
 
   C.destroy()
   A.destroy()
