@@ -5,34 +5,13 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import net from 'node:net'
 import os from 'node:os'
 import { join } from 'node:path'
 import { rmSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { value } from '../../data/index.ts'
 import { fero, fileStorage } from './index.ts'
-import { STATUS } from '../transport/peer.ts'
-
-const freePort = () =>
-  new Promise<number>((resolve) => {
-    const s = net.createServer()
-    s.listen(0, '127.0.0.1', () => {
-      const p = (s.address() as net.AddressInfo).port
-      s.close(() => resolve(p))
-    })
-  })
-
-const until = async (check: () => boolean, ms = 2000) => {
-  const deadline = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > deadline) return false
-    await new Promise((r) => setTimeout(r, 5))
-  }
-  return true
-}
-
-const connected = (c: any, addr: string) => (c.peers[addr]?.status?.[value] ?? -1) === STATUS.connected
+import { ports, until, connected, sleep } from '../utils/index.ts'
 
 // Order-insensitive structural compare. Replicas converge on VALUES, not on
 // object key insertion order (a node that wrote key b then received key a holds
@@ -41,7 +20,7 @@ const stable = (o: unknown): string => JSON.stringify(o, (_k, v) => (v && typeof
 const sameState = (a: unknown, b: unknown) => stable(a) === stable(b)
 
 test('single node: data writes, default methods, and read() compose', async () => {
-  const r = await fero('solo', { port: await freePort(), wait: 50 })
+  const r = await fero('solo', { port: await ports.free(), wait: 50 })
 
   // assignment write → readable on the same proxy
   r.data.user42 = { name: 'P', active: true }
@@ -66,7 +45,7 @@ test('single node: data writes, default methods, and read() compose', async () =
 test('custom methods are recognized by value type; config keys are not methods', async () => {
   const calls: any[] = []
   const r = await fero('rec', {
-    port: await freePort(),
+    port: await ports.free(),
     wait: 50,
     region: 'eu-west', // config (non-function) — must NOT become a method
     login: (arg: any, context: any) => {
@@ -89,7 +68,7 @@ test('custom methods are recognized by value type; config keys are not methods',
 })
 
 test('2-node: assignment write on A replicates to B; cluster.peers reflects membership', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('shared', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
@@ -117,7 +96,7 @@ test('2-node: assignment write on A replicates to B; cluster.peers reflects memb
 })
 
 test('2-node: a custom method that writes context.data replicates to the peer', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('m', {
     host: '127.0.0.1',
@@ -146,7 +125,7 @@ test('2-node: a custom method that writes context.data replicates to the peer', 
 })
 
 test('2-node: many writes converge to exactly the written keys (no echo storm)', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('noecho', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
   const B = await fero('noecho', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
@@ -154,7 +133,7 @@ test('2-node: many writes converge to exactly the written keys (no echo storm)',
 
   for (let i = 0; i < 10; i++) A.data['k' + i] = i
   assert.ok(await until(() => Object.keys(B.data[value]).length === 10))
-  await new Promise((r) => setTimeout(r, 50)) // give any echo a chance to land
+  await sleep(50) // give any echo a chance to land
 
   // both sides hold exactly the 10 written keys — an echo storm or dual-connection
   // double-send would surface as divergence or extra activity; convergence holds.
@@ -168,7 +147,7 @@ test('2-node: many writes converge to exactly the written keys (no echo storm)',
 })
 
 test('2-node: concurrent same-key writes converge (last-writer-wins, deterministic)', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('lww', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
@@ -193,7 +172,7 @@ test('2-node: concurrent same-key writes converge (last-writer-wins, determinist
 })
 
 test('2-node: a peer that joins AFTER writes catches up (anti-entropy)', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('cu', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 150 })
 
@@ -221,8 +200,30 @@ test('2-node: a peer that joins AFTER writes catches up (anti-entropy)', async (
   B.destroy()
 })
 
+test('3-node: writes from one node converge on all three (full-mesh broadcast)', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const a2 = `127.0.0.1:${p2}`
+  const a3 = `127.0.0.1:${p3}`
+  const A = await fero('route', { host: '127.0.0.1', port: p1, ports: [p1, p2, p3], wait: 250 })
+  const B = await fero('route', { host: '127.0.0.1', port: p2, ports: [p1, p2, p3], wait: 250 })
+  const C = await fero('route', { host: '127.0.0.1', port: p3, ports: [p1, p2, p3], wait: 250 })
+  assert.ok(await until(() => connected(A.cluster, a2) && connected(A.cluster, a3)), 'full mesh')
+
+  const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+  for (const k of keys) A.data[k] = k
+  const expected = Object.fromEntries(keys.map((k) => [k, k]))
+
+  // Every server materializes every record (full replication) — all three converge.
+  assert.ok(await until(() => sameState(B.data[value], expected), 3000), `B converged: ${Object.keys(B.data[value]).length}/30`)
+  assert.ok(await until(() => sameState(C.data[value], expected), 3000), `C converged: ${Object.keys(C.data[value]).length}/30`)
+
+  A.destroy()
+  B.destroy()
+  C.destroy()
+})
+
 test('3-node: a late joiner catches up to BOTH peers’ writes via one connection', async () => {
-  const [p1, p2, p3] = [await freePort(), await freePort(), await freePort()]
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('cu3', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 150 })
@@ -252,7 +253,7 @@ test('persistence: state survives a restart via the storage seam (WAL)', async (
   const path = join(os.tmpdir(), `fero-wal-${randomUUID()}.log`)
   try {
     // first instance: write some state, then tear down
-    const A1 = await fero('persist', { port: await freePort(), wait: 30, storage: fileStorage(path) })
+    const A1 = await fero('persist', { port: await ports.free(), wait: 30, storage: fileStorage(path) })
     A1.data.user42 = { name: 'P', active: true }
     A1.methods.update({ key: ['user42', 'active'], value: false })
     A1.data.user99 = { name: 'Q' }
@@ -261,7 +262,7 @@ test('persistence: state survives a restart via the storage seam (WAL)', async (
     A1.destroy()
 
     // a fresh instance over the same WAL restores the materialized state
-    const A2 = await fero('persist', { port: await freePort(), wait: 30, storage: fileStorage(path) })
+    const A2 = await fero('persist', { port: await ports.free(), wait: 30, storage: fileStorage(path) })
     assert.deepEqual(A2.data[value], { user42: { name: 'P', active: false } })
 
     // and writes continue cleanly on top of the restored log
@@ -275,7 +276,7 @@ test('persistence: state survives a restart via the storage seam (WAL)', async (
 
 test('chaos: a node crashes, its peer keeps writing, it restarts and catches up', async () => {
   const path = join(os.tmpdir(), `fero-chaos-${randomUUID()}.log`)
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
   try {
@@ -291,7 +292,7 @@ test('chaos: a node crashes, its peer keeps writing, it restarts and catches up'
 
     // CRASH A — its server closes, B's dial drops and starts reconnecting.
     A1.destroy()
-    await new Promise((r) => setTimeout(r, 30)) // let the port free
+    await sleep(30) // let the port free
 
     // B keeps writing while A is down — A never sees these live.
     B.data.c = 3
@@ -315,7 +316,7 @@ test('chaos: a node crashes, its peer keeps writing, it restarts and catches up'
 })
 
 test('client RPC: a read-only client dispatches method calls to its server', async () => {
-  const p1 = await freePort()
+  const p1 = await ports.free()
   const seenPeers: string[] = []
   const A = await fero('rpc', {
     host: '127.0.0.1',
@@ -347,7 +348,7 @@ test('client RPC: a read-only client dispatches method calls to its server', asy
 })
 
 test('client RPC: a client write routes to the server and replicates', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('rpcw', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
   const B = await fero('rpcw', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
@@ -366,7 +367,7 @@ test('client RPC: a client write routes to the server and replicates', async () 
 })
 
 test('client RPC: an unknown method rejects', async () => {
-  const p1 = await freePort()
+  const p1 = await ports.free()
   const A = await fero('rpcerr', { host: '127.0.0.1', port: p1, wait: 50 })
   const C = await fero('rpcerr', { host: '127.0.0.1', ports: [p1], wait: 200 })
 
@@ -377,7 +378,7 @@ test('client RPC: an unknown method rejects', async () => {
 })
 
 test('2-node: a write that causally follows a remote write wins (Lamport order)', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('lamport', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
