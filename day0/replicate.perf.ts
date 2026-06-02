@@ -10,7 +10,7 @@ import { test } from 'node:test'
 import { ok } from 'node:assert'
 import { $, value } from '../../data/index.ts'
 import { apply, view, type Change } from './replicate.ts'
-import { bench } from '../utils/index.ts'
+import { bench } from '#utils'
 
 function timeApply(records: string[]): number {
   const proxy = $({})

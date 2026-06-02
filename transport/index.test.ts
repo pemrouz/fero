@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { $, value, view } from '../../data/index.ts'
 import { transport } from './index.ts'
 import type { ChangeRecord } from './message.ts'
-import { ports, until, connected, apply } from '../utils/index.ts'
+import { ports, until, connected, apply } from '#utils'
 
 // A storeless mesh needs somewhere to land records so the test can assert where
 // they went: a $() plus an apply bound to its res.

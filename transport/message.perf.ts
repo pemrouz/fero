@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import { ok } from 'node:assert'
 import { encodeFrame, Framer, type ChangeRecord } from './message.ts'
-import { bench } from '../utils/index.ts'
+import { bench } from '#utils'
 
 // Thresholds below carry ~2–2.5× headroom over the steady-state median on a
 // loaded WSL2 box — loose enough to survive scheduling variance, tight enough to

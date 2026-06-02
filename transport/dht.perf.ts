@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import { ok } from 'node:assert'
 import { DHT } from './dht.ts'
-import { bench } from '../utils/index.ts'
+import { bench } from '#utils'
 
 // Thresholds below carry ~2× headroom over the loaded-box median — catch a real
 // 2×+ regression without flaking on variance. bench.time() does one untimed
