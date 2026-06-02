@@ -34,6 +34,12 @@ const until = async (check: () => boolean, ms = 2000) => {
 
 const connected = (c: any, addr: string) => (c.peers[addr]?.status?.[value] ?? -1) === STATUS.connected
 
+// Order-insensitive structural compare. Replicas converge on VALUES, not on
+// object key insertion order (a node that wrote key b then received key a holds
+// {b,a}; its peer holds {a,b}) — so equality must ignore key order.
+const stable = (o: unknown): string => JSON.stringify(o, (_k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => (x < y ? -1 : 1))) : v))
+const sameState = (a: unknown, b: unknown) => stable(a) === stable(b)
+
 test('single node: data writes, default methods, and read() compose', async () => {
   const r = await fero('solo', { port: await freePort(), wait: 50 })
 
@@ -262,6 +268,47 @@ test('persistence: state survives a restart via the storage seam (WAL)', async (
     A2.data.user1 = { name: 'R' }
     assert.deepEqual(A2.data[value], { user42: { name: 'P', active: false }, user1: { name: 'R' } })
     A2.destroy()
+  } finally {
+    rmSync(path, { force: true })
+  }
+})
+
+test('chaos: a node crashes, its peer keeps writing, it restarts and catches up', async () => {
+  const path = join(os.tmpdir(), `fero-chaos-${randomUUID()}.log`)
+  const [p1, p2] = [await freePort(), await freePort()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  try {
+    const A1 = await fero('chaos', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, storage: fileStorage(path) })
+    const B = await fero('chaos', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+    assert.ok(await until(() => connected(A1.cluster, a2) && connected(B.cluster, a1)), 'A↔B connect')
+
+    A1.data.a = 1
+    B.data.b = 2
+    const before = { a: 1, b: 2 }
+    assert.ok(await until(() => sameState(A1.data[value], before)), 'A converges')
+    assert.ok(await until(() => sameState(B.data[value], before)), 'B converges')
+
+    // CRASH A — its server closes, B's dial drops and starts reconnecting.
+    A1.destroy()
+    await new Promise((r) => setTimeout(r, 30)) // let the port free
+
+    // B keeps writing while A is down — A never sees these live.
+    B.data.c = 3
+    B.data.d = 4
+    assert.ok(await until(() => B.data.d[value] === 4))
+
+    // RESTART A on the same port + WAL: it restores {a,b} from disk, B reconnects,
+    // and the digest exchange ships A the writes it missed while down.
+    const A2 = await fero('chaos', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, storage: fileStorage(path) })
+    const after = { a: 1, b: 2, c: 3, d: 4 }
+    assert.ok(
+      await until(() => sameState(A2.data[value], after), 4000),
+      `A recovered+caught up to ${JSON.stringify(A2.data[value])}`,
+    )
+
+    A2.destroy()
+    B.destroy()
   } finally {
     rmSync(path, { force: true })
   }
