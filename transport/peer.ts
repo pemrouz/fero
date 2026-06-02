@@ -13,8 +13,21 @@
 // 'throttled'); splitting them lets peers.ts filter on either axis cleanly.
 
 import net from 'node:net'
-import { Framer, encodeFrames, type ChangeRecord, type Frame } from './message.ts'
+import { Framer, encodeFrame, encodeFrames, VERB, type ChangeRecord, type Frame } from './message.ts'
 import { Retries, type RetryOpts } from './retries.ts'
+
+// Failure detector. TCP `close` does NOT fire for a hard-crashed or
+// silently-partitioned peer, so a half-open connection looks alive forever. An
+// application-level heartbeat fixes that: every `interval` ms we send a PING; the
+// peer answers PONG (any inbound frame counts as liveness). After `misses`
+// unanswered probes the peer is flagged `suspect` — the reachability signal the
+// membership/view layer keys off (it never trusts raw STATUS.connected for
+// liveness). `suspect` is orthogonal to `status` (the socket may still be open),
+// so it does not disturb the data path's status===connected routing checks.
+const PING_FRAME = encodeFrame([], { verb: VERB.PING }) // constant, reused (never mutated)
+const PONG_FRAME = encodeFrame([], { verb: VERB.PONG })
+const HEARTBEAT_MS = 1000 // default probe interval
+const HEARTBEAT_MISSES = 3 // unanswered probes before flagging suspect
 
 export const STATUS = {
   disconnected: 0,
@@ -25,12 +38,15 @@ export const STATUS = {
 export type Status = (typeof STATUS)[keyof typeof STATUS]
 export const STATUS_NAME = ['disconnected', 'connecting', 'throttled', 'connected'] as const
 
+export type HeartbeatOpts = { interval?: number; misses?: number }
+
 export type PeerOpts = {
   host: string
   port: number
   role?: 'server' | 'client'
   socket?: net.Socket // inbound: wrap an already-accepted socket (won't redial)
   retries?: RetryOpts
+  heartbeat?: HeartbeatOpts
   onStatus?: (peer: Peer) => void
   onFrame?: (frame: Frame, peer: Peer) => void
 }
@@ -53,16 +69,31 @@ export class Peer {
   #onStatus?: (peer: Peer) => void
   #onFrame?: (frame: Frame, peer: Peer) => void
 
+  // Failure detector state.
+  #suspect = false
+  #missed = 0 // probes sent since the last inbound frame
+  #heartbeat?: ReturnType<typeof setInterval>
+  #hbInterval: number
+  #hbMisses: number
+
   constructor(opts: PeerOpts) {
     this.host = opts.host
     this.port = opts.port
     this.address = `${opts.host}:${opts.port}`
     this.role = opts.role ?? 'server'
     this.#retries = new Retries(opts.retries)
+    this.#hbInterval = opts.heartbeat?.interval ?? HEARTBEAT_MS
+    this.#hbMisses = opts.heartbeat?.misses ?? HEARTBEAT_MISSES
     this.#onStatus = opts.onStatus
     this.#onFrame = opts.onFrame
     this.#dialed = !opts.socket
     if (opts.socket) this.#attach(opts.socket, true) // inbound — already connected
+  }
+
+  // Likely-dead-but-socket-still-open (the failure detector's verdict). Distinct
+  // from `status`; the view layer treats this — not status — as "unreachable".
+  get suspect() {
+    return this.#suspect
   }
 
   // Was this peer dialed by us (outbound) vs accepted (inbound)? The dialer is
@@ -75,6 +106,12 @@ export class Peer {
     if (this.status === s) return
     this.status = s
     this.#onStatus?.(this)
+  }
+
+  #setSuspect(s: boolean) {
+    if (this.#suspect === s) return
+    this.#suspect = s
+    this.#onStatus?.(this) // mirror upward (same channel as status; peers.ts reflects both)
   }
 
   // Write a prebuilt frame immediately (control frames: handshake INIT/SYNC/DONE,
@@ -93,6 +130,7 @@ export class Peer {
     socket.once('connect', () => {
       this.#retries.reset()
       this.#setStatus(STATUS.connected)
+      this.#startHeartbeat()
       if (this.#outbox.length) this.#schedule() // flush anything queued pre-connect
     })
     this.#attach(socket, false)
@@ -100,11 +138,15 @@ export class Peer {
 
   #attach(socket: net.Socket, ready: boolean) {
     socket.setNoDelay(true)
+    socket.setKeepAlive(true, this.#hbInterval) // OS-level backstop under the app heartbeat
     socket.on('data', (chunk: Buffer) => this.#onData(chunk))
     socket.once('error', () => {}) // swallow; 'close' always follows and does cleanup
     socket.once('close', () => this.#onClose())
     this.#socket = socket
-    if (ready) this.#setStatus(STATUS.connected)
+    if (ready) {
+      this.#setStatus(STATUS.connected)
+      this.#startHeartbeat()
+    }
   }
 
   #onData(chunk: Buffer) {
@@ -115,11 +157,22 @@ export class Peer {
       this.destroy() // bad framing → drop the peer (defensive; see ../IDEAS.md)
       return
     }
-    for (const f of frames) this.#onFrame?.(f, this)
+    for (const f of frames) {
+      // Any inbound frame is proof of life: reset the miss counter and clear suspicion.
+      this.#missed = 0
+      if (this.#suspect) this.#setSuspect(false)
+      if (f.verb === VERB.PING) {
+        this.write(PONG_FRAME) // liveness probe → answer it
+        continue
+      }
+      if (f.verb === VERB.PONG) continue // pure liveness ack — nothing to deliver
+      this.#onFrame?.(f, this)
+    }
   }
 
   #onClose() {
     this.#socket = undefined
+    this.#stopHeartbeat()
     if (this.#destroyed) return
     this.#setStatus(STATUS.disconnected)
     if (this.#dialed) this.#scheduleReconnect() // inbound peers can't be redialed
@@ -134,6 +187,32 @@ export class Peer {
       this.connect()
     }, delay)
     this.#reconnect.unref?.()
+  }
+
+  // Failure detector. One probe per interval; the peer's PONG (or any inbound
+  // frame) resets the miss counter via #onData. After #hbMisses unanswered probes
+  // we flag suspect — but keep probing, so a peer that recovers clears it.
+  #startHeartbeat() {
+    if (this.#heartbeat || this.#hbInterval <= 0) return
+    this.#missed = 0
+    this.#heartbeat = setInterval(() => this.#beat(), this.#hbInterval)
+    this.#heartbeat.unref?.()
+  }
+
+  #stopHeartbeat() {
+    if (this.#heartbeat) {
+      clearInterval(this.#heartbeat)
+      this.#heartbeat = undefined
+    }
+    this.#missed = 0
+    this.#setSuspect(false)
+  }
+
+  #beat() {
+    if (!this.#socket?.writable) return
+    if (this.#missed >= this.#hbMisses) this.#setSuspect(true) // probes went unanswered → likely dead
+    this.#missed++
+    this.write(PING_FRAME)
   }
 
   // Queue a change record for delivery; coalesced into one frame per microtask.
@@ -172,6 +251,7 @@ export class Peer {
     if (this.#destroyed) return
     this.#destroyed = true
     if (this.#reconnect) clearTimeout(this.#reconnect)
+    this.#stopHeartbeat()
     this.#socket?.destroy()
     this.#socket = undefined
     this.#setStatus(STATUS.disconnected)

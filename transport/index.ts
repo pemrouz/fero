@@ -29,6 +29,7 @@ export type TransportOpts = {
   broker?: { host: string; port: number }
   dht?: DHTOpts
   retries?: RetryOpts
+  heartbeat?: { interval?: number; misses?: number } // failure-detector probe interval + miss threshold
   uuid?: string
   wait?: number // ms to wait for a peer before resolving ready (the "I'm first" case)
   onRecord?: (record: ChangeRecord, peer?: Peer) => void // inbound records (incl. self-routed)
@@ -107,6 +108,7 @@ export function transport(opts: TransportOpts): Mesh {
   const pool = new Peers({
     me,
     retries: opts.retries,
+    heartbeat: opts.heartbeat,
     onConnect: (peer) => {
       resolveReady() // first outbound connection ⇒ cluster reachable
       initiate(peer, hooks) // the dialer starts the handshake
