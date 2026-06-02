@@ -24,7 +24,7 @@ export function log(): Log {
 }
 
 // Apply a change record to a root `res` — the inverse of the wire codec, the
-// same terminal contract day0/replicate.ts proved. The one place records become
+// same terminal contract the day-0 spike proved. The one place records become
 // state. Shared with L2.
 export function applyRecord(res: any, record: ChangeRecord) {
   if (record.type === 'update') res.update(record.value, record.key)

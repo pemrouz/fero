@@ -38,6 +38,7 @@ export type TransportOpts = {
   callTimeout?: number // ms before an unanswered call() rejects (default 5000)
   onSubscribe?: (subId: number, method: string, arg: unknown, address: string) => void // a peer opened a live subscription
   onUnsubscribe?: (subId: number, address: string) => void // a peer closed one
+  onWrite?: (record: ChangeRecord, address: string) => void // a peer forwarded a write-request for a partition we own
 }
 
 export type Mesh = {
@@ -48,6 +49,8 @@ export type Mesh = {
   send: (record: ChangeRecord) => void
   replicate: (record: ChangeRecord, replicas?: number) => void
   broadcast: (record: ChangeRecord) => void
+  forward: (address: string, record: ChangeRecord) => boolean // route a write-request to the owner; false if it isn't connected
+  owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
   digestTo: (address: string, vector: Record<string, number>) => void // send our high-water digest
   catchupTo: (address: string, records: ChangeRecord[]) => void // ship records a peer lacks
   call: (method: string, arg: unknown) => Promise<unknown> // RPC to a connected server
@@ -144,6 +147,12 @@ export function transport(opts: TransportOpts): Mesh {
       case VERB.UNSUBSCRIBE:
         opts.onUnsubscribe?.(frame.id!, peer.address)
         return
+      case VERB.WRITE:
+        // A peer forwarded a write-request for a partition we own. Hand each
+        // record to L2, which commits it locally (its sink stamps origin=us and
+        // replicates) — so we become the single sequencer for the partition.
+        for (const record of frame.records()) opts.onWrite?.(record as unknown as ChangeRecord, peer.address)
+        return
       case VERB.CALL: {
         const id = frame.id
         const { method, arg } = (frame.records()[0]?.value as { method: string; arg: unknown }) ?? { method: '', arg: undefined }
@@ -223,6 +232,17 @@ export function transport(opts: TransportOpts): Mesh {
       }
     },
     broadcast: (record) => pool.broadcast(record),
+    owners: (key, replicas) => dht.owners(key, replicas),
+    // Forward a write-request to the partition owner (WRITE verb, point-to-point —
+    // not the batched broadcast outbox). Returns false if the owner isn't a
+    // connected peer right now, so the caller can fall back to a local commit
+    // rather than drop the write.
+    forward(address, record) {
+      const peer = pool.peer(address)
+      if (!peer) return false
+      peer.write(encodeFrame([record], { verb: VERB.WRITE }))
+      return true
+    },
     // Point-to-point. Sent as prebuilt frames straight to the peer's socket (not
     // the batched broadcast outbox), so catch-up traffic never disturbs the
     // single-origin-contiguous invariant the steady-state outbox relies on.

@@ -23,7 +23,7 @@ const VNODES = 200 // virtual nodes per peer — smooth distribution, ≈1/N mov
 // to nearly the same value and cluster on the ring — yielding a wildly uneven
 // distribution. fmix32 spreads those low-bit differences across all 32 bits.
 // Fast, allocation-free. Injectable; bake off vs wy/xxhash in dht.perf.ts (see
-// IDEAS.md).
+// ../IDEAS.md).
 export const hash32 = (s: string): number => {
   let h = 5381
   for (let i = 0; i < s.length; i++) h = (Math.imul(h, 33) ^ s.charCodeAt(i)) >>> 0
@@ -121,6 +121,9 @@ export class DHT {
   owner(key: string): string | undefined {
     if (this.#dirty) this.#rebuild()
     if (this.#hashes.length === 0) return undefined
+    // Sole member owns every key — skip the hash + binary search (the common
+    // single-node case, and the per-write owner check on a solo server's hot path).
+    if (this.#members.size === 1) return this.#owners[0]
     return this.#owners[this.#search(this.#hash(key))]
   }
 

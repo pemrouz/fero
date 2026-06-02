@@ -172,7 +172,7 @@ test('bad magic byte throws (fail-fast resync)', () => {
 })
 
 // The whole point: a decoded record applied via the day-0 res contract
-// reconstructs the source state. Mirrors day0/replicate.ts apply().
+// reconstructs the source state — the same apply() contract the day-0 spike proved.
 test('apply contract: decoded records reconstruct source state in $()', () => {
   const a = $({})
   const ca = a.connect([]) // capture A's change records as it mutates
