@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import net from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { Peer, STATUS } from './peer.ts'
-import { until, apply } from '#utils'
+import { until, apply, sleep } from '#utils'
 
 // Start a server that wraps each accepted socket in an inbound Peer; returns the
 // replica proxy it applies frames into, plus a frame counter and teardown.
@@ -112,4 +112,41 @@ test('dialed peer schedules a reconnect (→ throttled) after a drop', async () 
   // after the socket closes, a dialed peer backs off → throttled
   assert.ok(await until(() => client.status === STATUS.throttled), `status=${client.status}`)
   client.destroy()
+})
+
+test('failure detector: a peer that stops answering is flagged suspect (socket still open)', async () => {
+  // A server that ACCEPTS but never answers — no 'data' listener, so the socket
+  // stays paused and our PINGs go unanswered: a hung / silently-partitioned peer
+  // that TCP `close` would never reveal.
+  const sockets: net.Socket[] = []
+  const deaf = net.createServer((s) => sockets.push(s))
+  await new Promise<void>((r) => deaf.listen(0, '127.0.0.1', () => r()))
+  const port = (deaf.address() as net.AddressInfo).port
+
+  const client = new Peer({ host: '127.0.0.1', port, retries: { max: 0 }, heartbeat: { interval: 25, misses: 3 } })
+  client.connect()
+  assert.ok(await until(() => client.status === STATUS.connected), 'connects')
+  assert.equal(client.suspect, false, 'not suspect on a fresh connection')
+
+  // ~misses × interval later, with no PONGs, the detector flips suspect — but the
+  // socket is still open, so status stays connected (suspect is orthogonal).
+  assert.ok(await until(() => client.suspect === true, 2000), 'flips suspect when probes go unanswered')
+  assert.equal(client.status, STATUS.connected, 'still socket-connected — only suspect, not disconnected')
+
+  client.destroy()
+  sockets.forEach((s) => s.destroy())
+  await new Promise<void>((r) => deaf.close(() => r()))
+})
+
+test('failure detector: a peer that keeps answering is never flagged suspect', async () => {
+  const srv = await serve() // serve()'s inbound Peer answers PINGs with PONGs
+  const client = new Peer({ host: '127.0.0.1', port: srv.port, retries: { max: 0 }, heartbeat: { interval: 25, misses: 3 } })
+  client.connect()
+  assert.ok(await until(() => client.status === STATUS.connected))
+
+  await sleep(300) // run well past misses × interval (3 × 25ms); PONGs keep arriving
+  assert.equal(client.suspect, false, 'a responsive peer is never flagged suspect')
+
+  client.destroy()
+  await srv.close()
 })

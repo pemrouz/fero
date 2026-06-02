@@ -11,14 +11,15 @@
 // peer.ts — lives in a side Map; a Peer's onStatus callback mirrors its state
 // into the proxy as a single assignment.
 
-import { $ } from '../../data/index.ts'
-import { Peer, STATUS } from './peer.ts'
+import { $, value as VALUE } from '../../data/index.ts'
+import { Peer, STATUS, type HeartbeatOpts } from './peer.ts'
 import type { Frame, ChangeRecord } from './message.ts'
 import type { RetryOpts } from './retries.ts'
 
 export type PeersOpts = {
   me?: string // own address ("host:port") — rejected if added (no self-connect)
   retries?: RetryOpts
+  heartbeat?: HeartbeatOpts
   onFrame?: (frame: Frame, peer: Peer) => void
   onConnect?: (peer: Peer) => void // fired when a DIALED peer reaches connected (the dialer initiates the handshake)
 }
@@ -34,12 +35,14 @@ export class Peers {
   #conns = new Map<string, Peer>() // address → socket machinery
   #me?: string
   #retries?: RetryOpts
+  #heartbeat?: HeartbeatOpts
   #onFrame?: (frame: Frame, peer: Peer) => void
   #onConnect?: (peer: Peer) => void
 
   constructor(opts: PeersOpts = {}) {
     this.#me = opts.me
     this.#retries = opts.retries
+    this.#heartbeat = opts.heartbeat
     this.#onFrame = opts.onFrame
     this.#onConnect = opts.onConnect
   }
@@ -69,6 +72,7 @@ export class Peers {
     const peer = new Peer({
       ...opts,
       retries: this.#retries,
+      heartbeat: this.#heartbeat,
       onStatus: (p) => this.#mirror(p),
       onFrame: (f, p) => this.#onFrame?.(f, p),
     })
@@ -76,10 +80,16 @@ export class Peers {
     return peer
   }
 
-  // Reflect a Peer's connection state into the proxy — one nested assignment,
-  // one change record; the derived projections recompute in O(delta).
+  // Reflect a Peer's connection state into the proxy. Both `status` and the
+  // failure-detector `suspect` flag come through here; we write only the field
+  // that actually changed (read the row snapshot first) so a suspect flip doesn't
+  // emit a redundant `status` record that would needlessly churn derived
+  // projections (e.g. the DHT's connected-servers reconcile).
   #mirror(peer: Peer) {
-    this.peers[peer.address].status = peer.status
+    const row = this.peers[peer.address]
+    const snap: any = row[VALUE] ?? {}
+    if (snap.status !== peer.status) row.status = peer.status
+    if (snap.suspect !== peer.suspect) row.suspect = peer.suspect
     if (peer.status === STATUS.connected && peer.dialed) this.#onConnect?.(peer)
   }
 

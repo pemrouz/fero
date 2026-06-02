@@ -46,6 +46,8 @@ export const VERB = {
   SUBSCRIBE: 10, // live subscription open: { method, arg }; frame id is the sub id
   UNSUBSCRIBE: 11, // close the subscription with this frame id
   WRITE: 12, // forward a write-request to the partition owner; owner commits it locally (origin=owner) and replicates
+  PING: 13, // liveness probe (empty body); the peer answers PONG. Failure detector — see peer.ts
+  PONG: 14, // liveness reply to a PING (empty body)
   // a RECORDS frame WITH a frame id is a subscription delta for that sub id (vs a
   // plain replication RECORDS frame, which carries no id)
 } as const
