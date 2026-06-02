@@ -76,25 +76,25 @@ const sessions = await fero('sessions')
 
 // — server, methods only (shorthand) —
 const sessions = await fero('sessions', {
-  login:  async (arg, ctx) => { … return { ok, id } },
-  logout: async (arg, ctx) => { … },
+  login:  async (arg, context) => { … return { ok, id } },
+  logout: async (arg, context) => { … },
 })
 
 // — server, full config —
 const sessions = await fero('sessions', {
   // any function key is a method
-  login(arg, ctx)            { … return reply },
-  logout(arg, ctx)           { … },
+  login(arg, context)            { … return reply },
+  logout(arg, context)           { … },
 
   // overridable defaults for direct mutation
-  update(change, ctx)        { /* default: ctx.data[change.key] = change.value */ },
-  // insert(change, ctx)
-  // remove(change, ctx)
+  update(change, context)        { /* default: context.data[change.key] = change.value */ },
+  // insert(change, context)
+  // remove(change, context)
 
   // subscription methods (return ViewProxies)
-  read(_, ctx)               { return ctx.data /* projection per peer */ },
-  activeUsers(_, ctx)        { return ctx.data.filter(s => s.active) },
-  leaderboard(_, ctx)        { return ctx.data.group('country').sum('value').top(10) },
+  read(_, context)               { return context.data /* projection per peer */ },
+  activeUsers(_, context)        { return context.data.filter(s => s.active) },
+  leaderboard(_, context)        { return context.data.group('country').sum('value').top(10) },
 
   // non-function keys are config
   storage: { restore, insert, update, remove },
@@ -230,11 +230,11 @@ Inside a handler, every `data.x = y` is intercepted: change record built, routed
 ## 7. Handler shape
 
 ```js
-methodName(arg, ctx) { … return reply }
+methodName(arg, context) { … return reply }
 ```
 
 - **`arg`** — the single object passed at the call site. `methods.login({email, pw})` → `arg = {email, pw}`.
-- **`ctx`** — `{ data, peer, methods, cluster }`.
+- **`context`** — `{ data, peer, methods, cluster }`.
   - `data` — the local replica's ViewProxy. Reads are local-consistent; writes route via DHT.
   - `peer` — the caller (client or server peer). Carries `{address, status, auth?}`.
   - `methods` — peer methods (call one method from another, with auth identity preserved).
@@ -259,7 +259,7 @@ update(change, { peer, data }) {
 }
 ```
 
-Recursion-safety: when a method assigns to `ctx.data`, it's a *trusted local commit* on the owner — replicates outward but doesn't re-invoke the method. Off-owner writes are the ones that get routed-then-dispatched.
+Recursion-safety: when a method assigns to `context.data`, it's a *trusted local commit* on the owner — replicates outward but doesn't re-invoke the method. Off-owner writes are the ones that get routed-then-dispatched.
 
 ---
 
@@ -277,9 +277,9 @@ Recursion-safety: when a method assigns to `ctx.data`, it's a *trusted local com
 | `cache.next({type:'GET',key})` | `await sessions.data[...key]` |
 | `cache.destroy()` | unchanged |
 | `await cache.once('connected')` | `await fero(...)` (it IS the ready signal) |
-| `req.type==='LOGIN' ? login(req) : …` | `login(arg, ctx) { … }` |
-| `req.type==='UPDATE' ? authz && req.next()` | `update(change, ctx) { if(!authz) throw; data[k]=v }` |
-| `req.type==='SUBSCRIBE' ? authz && req.next()` | `read(_, ctx) { return data.filter(…) }` |
+| `req.type==='LOGIN' ? login(req) : …` | `login(arg, context) { … }` |
+| `req.type==='UPDATE' ? authz && req.next()` | `update(change, context) { if(!authz) throw; data[k]=v }` |
+| `req.type==='SUBSCRIBE' ? authz && req.next()` | `read(_, context) { return data.filter(…) }` |
 | `req.reply(v) / return v` | `return v` (or `throw`) |
 | `cache.on('commit')` + `.on('change')` | `sessions.data.connect(...)` / `.tap(...)` |
 | `cache.on('disconnected' \| 'connecting' \| 'connected' \| 'removed' \| 'client')` | `sessions.cluster.peers.connect(...)` |
