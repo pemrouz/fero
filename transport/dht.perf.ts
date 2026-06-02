@@ -6,18 +6,11 @@
 import { test } from 'node:test'
 import { ok } from 'node:assert'
 import { DHT } from './dht.ts'
+import { bench } from '../utils/index.ts'
 
-const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[xs.length >> 1]
-// One untimed warmup, then median-of-5. Thresholds carry ~2× headroom over the
-// loaded-box median — catch a real 2×+ regression without flaking on variance.
-const time = (fn: () => void) => {
-  fn()
-  return median([0, 0, 0, 0, 0].map(() => {
-    const t0 = performance.now()
-    fn()
-    return performance.now() - t0
-  }))
-}
+// Thresholds below carry ~2× headroom over the loaded-box median — catch a real
+// 2×+ regression without flaking on variance. bench.time() does one untimed
+// warmup, then median-of-5.
 
 const ring = () => {
   const dht = new DHT()
@@ -30,7 +23,7 @@ const KEYS = Array.from({ length: 100_000 }, (_, i) => 'user' + i)
 
 test('owner() lookup — 100k routes over a 1000-entry ring', () => {
   const dht = ring()
-  const elapsed = time(() => {
+  const elapsed = bench.time(() => {
     let sink = 0
     for (let i = 0; i < KEYS.length; i++) sink += dht.owner(KEYS[i])!.length
     if (sink === 0) throw new Error('sink')
@@ -41,7 +34,7 @@ test('owner() lookup — 100k routes over a 1000-entry ring', () => {
 
 test('rebuild on membership churn — add/remove a peer (5→6→5)', () => {
   const dht = ring()
-  const elapsed = time(() => {
+  const elapsed = bench.time(() => {
     dht.add('10.0.0.99:3000')
     dht.owner('warm') // trigger rebuild (1200 entries)
     dht.remove('10.0.0.99:3000')

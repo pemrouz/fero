@@ -20,33 +20,14 @@
 
 import { test } from 'node:test'
 import { ok } from 'node:assert'
-import net from 'node:net'
 import { fero } from './index.ts'
-
-const freePort = () =>
-  new Promise<number>((resolve) => {
-    const s = net.createServer()
-    s.listen(0, '127.0.0.1', () => {
-      const p = (s.address() as net.AddressInfo).port
-      s.close(() => resolve(p))
-    })
-  })
-
-const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[xs.length >> 1]
-const time = (fn: () => void) => {
-  fn() // warmup
-  return median([0, 0, 0, 0, 0].map(() => {
-    const t0 = performance.now()
-    fn()
-    return performance.now() - t0
-  }))
-}
+import { ports, bench } from '../utils/index.ts'
 
 const N = 10_000
 
 test('L2: N assignment writes through the resource layer (sink → log → broadcast)', async () => {
-  const r = await fero('perf-write', { port: await freePort(), wait: 10 })
-  const elapsed = time(() => {
+  const r = await fero('perf-write', { port: await ports.free(), wait: 10 })
+  const elapsed = bench.time(() => {
     for (let i = 0; i < N; i++) r.data['k' + i] = { score: i, active: (i & 1) === 0 }
   })
   console.log(`  ${N} data writes: ${elapsed.toFixed(3)}ms`)
@@ -55,8 +36,8 @@ test('L2: N assignment writes through the resource layer (sink → log → broad
 })
 
 test('L2: N default-method dispatches (methods.update → norm → setPath)', async () => {
-  const r = await fero('perf-method', { port: await freePort(), wait: 10 })
-  const elapsed = time(() => {
+  const r = await fero('perf-method', { port: await ports.free(), wait: 10 })
+  const elapsed = bench.time(() => {
     for (let i = 0; i < N; i++) r.methods.update({ key: ['k' + i], value: { score: i } })
   })
   console.log(`  ${N} method updates: ${elapsed.toFixed(3)}ms`)

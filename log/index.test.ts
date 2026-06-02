@@ -1,29 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import net from 'node:net'
 import { value } from '../../data/index.ts'
 import { log, view, distribute } from './index.ts'
-import { STATUS } from '../transport/peer.ts'
-
-const freePort = () =>
-  new Promise<number>((resolve) => {
-    const s = net.createServer()
-    s.listen(0, '127.0.0.1', () => {
-      const p = (s.address() as net.AddressInfo).port
-      s.close(() => resolve(p))
-    })
-  })
-
-const until = async (check: () => boolean, ms = 2000) => {
-  const deadline = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > deadline) return false
-    await new Promise((r) => setTimeout(r, 5))
-  }
-  return true
-}
-
-const connected = (mesh: any, addr: string) => (mesh.peers[addr]?.status?.[value] ?? -1) === STATUS.connected
+import { ports, until, connected, sleep } from '../utils/index.ts'
 
 test('view projects a log: replay of existing records + live appends', () => {
   const l = log()
@@ -52,7 +31,7 @@ test('the view is itself reactive — connect/tap sees each applied record', () 
 })
 
 test('2-node: append on A replicates to B’s view (log → mesh → view)', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
   const A = distribute({ name: 'r', host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
@@ -78,7 +57,7 @@ test('2-node: append on A replicates to B’s view (log → mesh → view)', asy
 })
 
 test('2-node: replication does not echo (inbound records are not re-broadcast)', async () => {
-  const [p1, p2] = [await freePort(), await freePort()]
+  const [p1, p2] = [await ports.free(), await ports.free()]
   const a2 = `127.0.0.1:${p2}`
   const A = distribute({ name: 'r2', host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
   const B = distribute({ name: 'r2', host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
@@ -86,7 +65,7 @@ test('2-node: replication does not echo (inbound records are not re-broadcast)',
 
   for (let i = 0; i < 10; i++) A.log.append({ type: 'update', key: ['k' + i], value: i })
   assert.ok(await until(() => B.log.size === 10))
-  await new Promise((r) => setTimeout(r, 50)) // give any echo a chance to arrive
+  await sleep(50) // give any echo a chance to arrive
 
   // exactly 10 on each — no duplicates from echo or dual-connection double-send
   assert.equal(A.log.size, 10)

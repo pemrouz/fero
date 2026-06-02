@@ -4,30 +4,13 @@ import net from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { Peers } from './peers.ts'
 import { STATUS, type Peer } from './peer.ts'
-import type { Frame } from './message.ts'
-
-const until = async (check: () => boolean, ms = 1000) => {
-  const deadline = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > deadline) return false
-    await new Promise((r) => setTimeout(r, 5))
-  }
-  return true
-}
-
-function applyFrame(res: any, frame: Frame) {
-  for (const record of frame.records()) {
-    if (record.type === 'update') res.update(record.value, record.key)
-    else if (record.type === 'insert') res.insert(record.value, record.key, record.at)
-    else if (record.type === 'remove') res.remove(record.key)
-  }
-}
+import { until, apply } from '../utils/index.ts'
 
 // a server that applies inbound frames into a replica via the pool's accept()
 function serve() {
   const replica = $({})
   const res = (replica as any)[view].res
-  const pool = new Peers({ onFrame: (f) => applyFrame(res, f) })
+  const pool = new Peers({ onFrame: (f) => { for (const record of f.records()) apply(res, record) } })
   const server = net.createServer((socket) =>
     pool.accept(socket, { host: socket.remoteAddress ?? '127.0.0.1', port: socket.remotePort ?? 0 }),
   )
