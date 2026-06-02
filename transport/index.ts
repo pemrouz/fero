@@ -16,7 +16,7 @@ import { STATUS, type Peer } from './peer.ts'
 import { DHT, type DHTOpts } from './dht.ts'
 import { staticDiscovery } from './discovery/static.ts'
 import { initiate, handle, type Identity, type HandshakeHooks } from './handshake.ts'
-import { partitionOf, encodeFrame, VERB, type ChangeRecord, type Frame } from './message.ts'
+import { partitionOf, encodeFrame, encodeFrames, VERB, type ChangeRecord, type Frame } from './message.ts'
 import type { RetryOpts } from './retries.ts'
 
 export type TransportOpts = {
@@ -211,18 +211,9 @@ export function transport(opts: TransportOpts): Mesh {
     catchupTo(address, records) {
       const peer = pool.peer(address)
       if (!peer || !records.length) return
-      // Group into maximal runs that share an origin AND have contiguous seqs, so
-      // each frame's base+index provenance decodes correctly (Lamport gaps in an
-      // origin's history split into separate frames). Provenance-less records
-      // (origin undefined) each form a singleton non-prov frame.
-      let i = 0
-      while (i < records.length) {
-        const origin = records[i].origin
-        let j = i + 1
-        while (j < records.length && records[j].origin === origin && records[j].seq === (records[j - 1].seq ?? 0) + 1) j++
-        peer.write(encodeFrame(records.slice(i, j), { origin, seq: records[i].seq }))
-        i = j
-      }
+      // Reuse the outbox's mixed-origin framing: maximal runs of one origin with
+      // contiguous seqs per frame (Lamport gaps and origin changes split).
+      for (const buf of encodeFrames(records)) peer.write(buf)
     },
     hasServer: () => pickServer() !== undefined,
     call(method, arg) {

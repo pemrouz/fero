@@ -13,7 +13,7 @@
 // 'throttled'); splitting them lets peers.ts filter on either axis cleanly.
 
 import net from 'node:net'
-import { Framer, encodeFrame, type ChangeRecord, type Frame } from './message.ts'
+import { Framer, encodeFrames, type ChangeRecord, type Frame } from './message.ts'
 import { Retries, type RetryOpts } from './retries.ts'
 
 export const STATUS = {
@@ -153,16 +153,19 @@ export class Peer {
     queueMicrotask(() => this.flush())
   }
 
-  // One frame, one write per tick. If not connected, records stay queued and
-  // flush on connect (bounded-buffer/backpressure handling: see IDEAS.md).
+  // One write per tick. Own writes (one origin, contiguous seqs) coalesce into a
+  // single frame; a relayed batch spanning origins splits into the fewest frames
+  // that keep each frame's base+index provenance valid (encodeFrames). If not
+  // connected, records stay queued and flush on connect (bounded-buffer/
+  // backpressure handling: see IDEAS.md).
   flush() {
     this.#flushing = false
     if (!this.#outbox.length) return
     const socket = this.#socket
     if (!socket?.writable || this.status !== STATUS.connected) return
-    const buf = encodeFrame(this.#outbox)
+    const outbox = this.#outbox
     this.#outbox = []
-    socket.write(buf)
+    for (const buf of encodeFrames(outbox)) socket.write(buf)
   }
 
   destroy() {

@@ -52,11 +52,31 @@ describes.
   (plan §11.2) — today a call picks the first connected server with no retry/
   re-route; (c) `context.methods` from within a remote handler still runs locally
   (fine for full replication).
-- **[P1] Writes inside a handler don't route to the partition owner.** plan §5:
-  "every `data.x = y` inside a handler is routed via DHT to the owner, committed,
-  replicated; the handler awaits the ack." v1 just broadcasts (full replication),
-  so there's no per-write ack and no owner routing. Lands with DHT-partitioned
-  holding (L1 [P2]) + the commit-ack protocol (plan open-q §11.1).
+- **[ATTEMPTED then REVERTED — Milestone F] Owner-routed writes conflict with
+  in-order-per-origin dedup.** I built owner-routing (`publish` → partition owner →
+  owner relays to replicas) and a 3-node test immediately exposed a *fundamental*
+  conflict: owner-relay delivers one writer's records to a third node via TWO paths
+  (some direct, some relayed through the owner), so they arrive **out of order**.
+  But the whole replication core assumes a given origin's records arrive **in seq
+  order** — the per-origin high-water dedup drops any `seq <= seen[origin]`, and the
+  anti-entropy digest is a single per-origin high-water. Out-of-order arrival makes
+  the dedup drop late-arriving lower seqs as false duplicates → silent data loss →
+  divergence. So owner-routing was reverted to the correct full-mesh **broadcast**
+  model (every writer broadcasts its own writes in-order → dedup/anti-entropy/LWW
+  all sound). Doing F correctly needs ONE of:
+  1. **Gap-tolerant dedup + gap-aware anti-entropy** — track a contiguous water +
+     an above-water gap set per origin (TCP-SACK-style), and make `recordsSince`
+     ship by gaps, not just water. Bounded if delivery is mostly-ordered.
+  2. **Owner re-sequencing** — the owner stamps each partition's writes with its
+     OWN ordered seq and relays under origin=owner, so every replica sees one
+     in-order stream per (owner, partition). Cleaner conceptually but introduces an
+     optimistic(origin=writer)+canonical(origin=owner) duality to reconcile.
+  The general `encodeFrames` mixed-origin framing (a real robustness win, needed by
+  either approach) was kept. Also still open from plan §5: **commit-ack** (handler
+  awaits durable commit — assignment can't express the await per open-q #1, needs a
+  committing method primitive) and **no cross-partition atomicity** (§11.3).
+  Partitioned *holding* (a node materializes only owned partitions) stays out of
+  scope — it makes reads async/routed and breaks the synchronous `data.x` API.
 - **[P2] `read()` is full passthrough — no per-client projection.** plan §6.2:
   the connected server runs `read(_, {peer, data})` once per client at subscribe
   time, returning that client's projection; re-invoked on auth change, diffed,

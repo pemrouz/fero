@@ -247,7 +247,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       cur.origin = uuid
     } else versions.set(key, { seq: n, origin: uuid })
     log.append(change)
-    mesh.broadcast(change)
+    mesh.broadcast(change) // full replication: every server materializes every record
   })
 
   const cluster: Cluster = {

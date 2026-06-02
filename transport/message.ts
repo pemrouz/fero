@@ -246,6 +246,26 @@ export function encodeFrame(
   return b.subarray(0, w.off)
 }
 
+// Encode a batch that may mix origins — splitting it into the fewest frames each
+// of which satisfies the single-origin, contiguous-seq invariant base+index
+// relies on. A run breaks when the origin changes or the seq isn't the previous
+// + 1 (Lamport gaps split). Provenance-less records (origin undefined) group
+// into one frame. Used by the per-peer outbox (own writes batch into ONE frame;
+// relayed records from other origins split cleanly) and by catch-up shipping.
+export function encodeFrames(records: ChangeRecord[]): Buffer[] {
+  const frames: Buffer[] = []
+  let i = 0
+  while (i < records.length) {
+    const origin = records[i].origin
+    let j = i + 1
+    if (origin === undefined) while (j < records.length && records[j].origin === undefined) j++
+    else while (j < records.length && records[j].origin === origin && records[j].seq === (records[j - 1].seq ?? 0) + 1) j++
+    frames.push(encodeFrame(records.slice(i, j), origin !== undefined ? { origin, seq: records[i].seq } : {}))
+    i = j
+  }
+  return frames
+}
+
 // ─────────────────────────────────────────── Framer (receive, straddle-safe)
 
 // One per peer. push(chunk) returns the complete frames in the stream so far;
