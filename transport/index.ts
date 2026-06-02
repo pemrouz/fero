@@ -36,6 +36,8 @@ export type TransportOpts = {
   onDigest?: (vector: Record<string, number>, address: string) => void // a peer's anti-entropy digest
   onCall?: (method: string, arg: unknown, address: string) => unknown // inbound RPC — return the reply (may be a Promise)
   callTimeout?: number // ms before an unanswered call() rejects (default 5000)
+  onSubscribe?: (subId: number, method: string, arg: unknown, address: string) => void // a peer opened a live subscription
+  onUnsubscribe?: (subId: number, address: string) => void // a peer closed one
 }
 
 export type Mesh = {
@@ -50,6 +52,8 @@ export type Mesh = {
   catchupTo: (address: string, records: ChangeRecord[]) => void // ship records a peer lacks
   call: (method: string, arg: unknown) => Promise<unknown> // RPC to a connected server
   hasServer: () => boolean // is there a connected server to call?
+  subscribe: (method: string, arg: unknown, onDelta: (record: ChangeRecord) => void) => (() => void) | undefined // open a live subscription; returns an unsubscribe (or undefined if no server)
+  deltaTo: (address: string, subId: number, record: ChangeRecord) => void // server → client: ship one subscription delta
   ready: Promise<void>
   destroy: () => void
 }
@@ -121,14 +125,24 @@ export function transport(opts: TransportOpts): Mesh {
   dht.track(servers)
 
   // RPC state: outstanding calls keyed by frame id, resolved on RESOLVE/REJECT.
+  // The same counter ids subscriptions; `subs` routes inbound deltas to handlers.
   let callId = 0
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void; timer?: ReturnType<typeof setTimeout> }>()
+  const subs = new Map<number, (record: ChangeRecord) => void>()
 
   function dispatch(frame: Frame, peer: Peer) {
     if (handle(frame, peer, hooks)) return // INIT/SYNC/DONE
     switch (frame.verb) {
       case VERB.DIGEST:
         opts.onDigest?.((frame.records()[0]?.value as Record<string, number>) ?? {}, peer.address)
+        return
+      case VERB.SUBSCRIBE: {
+        const { method, arg } = (frame.records()[0]?.value as { method: string; arg: unknown }) ?? { method: '', arg: undefined }
+        opts.onSubscribe?.(frame.id!, method, arg, peer.address)
+        return
+      }
+      case VERB.UNSUBSCRIBE:
+        opts.onUnsubscribe?.(frame.id!, peer.address)
         return
       case VERB.CALL: {
         const id = frame.id
@@ -152,8 +166,15 @@ export function transport(opts: TransportOpts): Mesh {
         else waiter.reject(new Error(String(value)))
         return
       }
-      default:
-        for (const record of frame.records()) opts.onRecord?.(record as unknown as ChangeRecord, peer) // RECORDS → deliver
+      default: {
+        // RECORDS with a frame id is a subscription delta (route by sub id);
+        // without one it is plain replication (deliver to onRecord).
+        const sub = frame.id !== undefined ? subs.get(frame.id) : undefined
+        for (const record of frame.records()) {
+          if (sub) sub(record as unknown as ChangeRecord)
+          else opts.onRecord?.(record as unknown as ChangeRecord, peer)
+        }
+      }
     }
   }
 
@@ -216,6 +237,20 @@ export function transport(opts: TransportOpts): Mesh {
       for (const buf of encodeFrames(records)) peer.write(buf)
     },
     hasServer: () => pickServer() !== undefined,
+    subscribe(method, arg, onDelta) {
+      const address = pickServer()
+      const peer = address ? pool.peer(address) : undefined
+      if (!peer) return undefined
+      const id = ++callId
+      subs.set(id, onDelta)
+      peer.write(encodeFrame([{ type: 'update', key: [], value: { method, arg } }], { verb: VERB.SUBSCRIBE, id }))
+      return () => {
+        if (subs.delete(id)) peer.write(encodeFrame([{ type: 'update', key: [], value: null }], { verb: VERB.UNSUBSCRIBE, id }))
+      }
+    },
+    deltaTo(address, subId, record) {
+      pool.peer(address)?.write(encodeFrame([record], { verb: VERB.RECORDS, id: subId }))
+    },
     call(method, arg) {
       const address = pickServer()
       const peer = address ? pool.peer(address) : undefined
