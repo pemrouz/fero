@@ -589,6 +589,55 @@ test('reciprocal catch-up: two nodes that each wrote while isolated both heal on
   }
 })
 
+// ── Milestone V1f: heal/rejoin + multi-node merge ──
+
+test('V1f: an evicted node rejoins the cluster after restart', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = failoverCfg(p1, p2, p3)
+  const A = await fero('vrejoin', cfg(p1))
+  const B = await fero('vrejoin', cfg(p2))
+  let C = await fero('vrejoin', cfg(p3))
+  const cAddr = C.cluster.me as string
+  try {
+    assert.ok(await until(() => [A, B, C].every((n) => n.cluster.members.length === 3), 8000), 'view [A,B,C] forms')
+
+    C.destroy() // C fails → evicted
+    assert.ok(
+      await until(() => [A, B].every((n) => n.cluster.members.length === 2 && !n.cluster.members.includes(cAddr)), 8000),
+      'C is evicted',
+    )
+    const afterEvict = A.cluster.epoch
+
+    C = await fero('vrejoin', cfg(p3)) // C restarts on the same address → must be re-admitted
+    assert.ok(
+      await until(() => [A, B, C!].every((n) => n.cluster.members.length === 3 && n.cluster.members.includes(cAddr)), 8000),
+      `C rejoins: ${A.cluster.members.length}/${B.cluster.members.length}/${C.cluster.members.length}`,
+    )
+    assert.ok(A.cluster.epoch > afterEvict, 'rejoin bumped the epoch past the eviction')
+  } finally {
+    A.destroy()
+    B.destroy()
+    C.destroy()
+  }
+})
+
+test('V1f: four nodes converge on a single committed view', async () => {
+  const ps = [await ports.free(), await ports.free(), await ports.free(), await ports.free()]
+  const nodes: Array<Awaited<ReturnType<typeof fero>>> = []
+  for (const p of ps) nodes.push(await fero('v4', { host: '127.0.0.1', port: p, ports: ps, wait: 300 }))
+  try {
+    assert.ok(
+      await until(() => nodes.every((n) => n.cluster.members.length === 4), 10000),
+      `members: ${nodes.map((n) => n.cluster.members.length).join(',')}`,
+    )
+    const mem = JSON.stringify(nodes[0].cluster.members)
+    assert.ok(nodes.every((n) => JSON.stringify(n.cluster.members) === mem), 'all four agree on the same committed view')
+    assert.ok(nodes.every((n) => n.cluster.owner('probe') === nodes[0].cluster.owner('probe')), 'all rings agree on ownership')
+  } finally {
+    nodes.forEach((n) => n.destroy())
+  }
+})
+
 // ── Milestone V1d: epoch fencing in LWW ──
 
 test('V1d: a write committed under a newer view-epoch wins (epoch-fenced LWW)', async () => {
