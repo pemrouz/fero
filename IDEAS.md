@@ -47,12 +47,17 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    (it sits alongside the §11.1 write-paths). (resource)
 7. **Owner-routing: fan-out reduction & failover** (partitioned routing). **F1**
    (owner-routed writes) and **V** (view-synchronous membership — stable ownership
-   per epoch) have landed ([DECISIONS F1](DECISIONS.md), [V](DECISIONS.md)). Still
-   open: **F2** — per-partition sequencing + R-way replication (`mesh.replicate` to
-   the R owners; dedup + catch-up keyed *per partition* via `Log.heads()`/`diff()`
-   instead of per-origin) to cut fan-out below full-mesh broadcast — and **F3** —
-   owner failover / version continuity on handoff (the next clockwise replica,
-   already caught up, continues the partition counter). F2 also picks up the V
+   per epoch) have landed ([DECISIONS F1](DECISIONS.md), [V](DECISIONS.md)). **F2/F3
+   investigated and DEFERRED** ([DECISIONS F2](DECISIONS.md)): R-way fan-out reduction
+   requires partitioned holding (routed/async non-local reads — it breaks synchronous
+   `data.x`), and per-partition sequencing under full broadcast is a *regression* at
+   ownership handoffs (the current per-origin model is more robust). So this is now a
+   **partitioned-holding** milestone, gated on a deliberate decision to make non-local
+   reads async. When taken: **F2** — per-partition sequencing + R-way replication
+   (`mesh.replicate` to the R owners; dedup + catch-up keyed *per partition* via
+   `Log.heads()`/`diff()`) — and **F3** — owner failover / version continuity on
+   handoff (the next clockwise replica, already caught up, continues the partition
+   counter, behind a drained view-change barrier). F2 also picks up the V
    deferrals: the stronger **reject-stale-epoch-from-an-evicted-node** fence (needs
    the per-partition owner lineage + a uuid↔address map), the **commit-ack drain**
    (PREPARE-ACK high-water vectors; also [open question 1]), the
