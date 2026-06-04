@@ -281,3 +281,41 @@ the attempt-epoch is an F2 refinement. Two-established-cluster merge works via t
 lowest-coordinator + epoch-ordering path but isn't dedicated-tested (chaos backlog);
 a sub-quorum remnant stays read-only (CP) — a force-to-solo (AP) degrade is deliberately
 not offered. Incarnation numbers (flapper fencing beyond the debounce) deferred.
+
+## F2 — Per-partition sequencing / R-way replication: deferred to partitioned holding · Investigated · (no code)
+
+**Context.** F1 + V give owner-routed writes with stable per-epoch ownership. The last
+owner-routing goal ([open question 7](IDEAS.md)) was F2: cut replication fan-out from
+O(N) full broadcast to O(R) by replicating each partition to only its R replicas, with
+per-partition sequencing (+ F3 owner-failover continuity).
+
+**Finding — deferred. Two reasons, both fundamental.**
+
+1. **R-way fan-out is incompatible with fero's synchronous reads.** `data.x` reads are
+   synchronous-and-local *because every node materializes the full state*. Replicating a
+   partition to only R nodes means every other node can't serve a local read of it —
+   reads must become async/routed (**partitioned holding**, plan §5–6's routed model).
+   That changes a core API (synchronous `data.x`). So fan-out reduction is not a
+   transparent optimization; it's a deliberate read-semantics decision.
+
+2. **Per-partition sequencing under FULL broadcast is a regression, not a clean refactor.**
+   Per-partition dedup (a per-partition high-water) is only safe if a partition's version
+   stream arrives **in order from a single source**. Under full broadcast that source is
+   the partition's owner, which **changes at every view-change handoff** — so the stream
+   spans owners O1→O2 over different links, can arrive out of order, and the high-water
+   drops the late lower versions (the original-F data loss, relocated to handoffs). The
+   current **per-ORIGIN** model is *robust* to handoffs precisely because each owner is
+   its own independent origin (separate uuid-keyed dedup stream), with `(epoch, seq,
+   origin)` LWW resolving per key. Per-partition sequencing is safe ONLY with a single
+   in-order source per partition — i.e. R-way + a coordinated, **drained** handoff
+   (commit-ack), so the epoch transition is a barrier, not a broadcast race. It therefore
+   belongs WITH partitioned holding, built to that shape — not speculatively under
+   broadcast, where it would *reduce* robustness for zero scaling benefit.
+
+**Decision.** **Stop at Milestone V.** Keep the per-origin + epoch-fenced-LWW core — it
+is correct, convergent, and more handoff-robust under full broadcast than per-partition
+would be. **Partitioned holding** (routed/async non-local reads + R-way + per-partition
+sequencing + commit-ack drain + the V deferrals above) is a future milestone, gated on a
+deliberate decision to make non-local reads async. Until then fero is a fully-replicated,
+view-synchronous, linearizable-per-partition store with synchronous local reads — which
+is the right default for its target scale.
