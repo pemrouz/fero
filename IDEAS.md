@@ -45,19 +45,29 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    plain assignments. Route assignments through the method (for an auth/validation
    hook) or keep them separate? A genuinely-open design point, not in plan §11
    (it sits alongside the §11.1 write-paths). (resource)
-7. **Owner-routing: fan-out reduction & failover** (partitioned routing). Owner
-   re-sequencing **phase 1 (F1) has landed** ([DECISIONS F1](DECISIONS.md)):
-   `VERB.WRITE` forwards a write to the partition owner, which commits under
-   `origin=owner` and broadcasts, so each partition has a single sequencer and is
-   linearizable — but fan-out is still full-mesh broadcast. Still open: **F2** —
-   per-partition sequencing + R-way replication (`mesh.replicate` to the R owners;
-   dedup + catch-up keyed *per partition* via `Log.heads()`/`diff()` instead of
-   per-origin) to cut fan-out below full broadcast — and **F3** — owner failover /
-   version continuity on handoff (next clockwise replica, already a caught-up
-   replica, continues the partition counter; `(version, owner)` breaks split-brain
-   ties). The gap-tolerant-dedup alternative from [DECISIONS F](DECISIONS.md) stays
-   parked unless F2's per-partition sequencing proves insufficient. (resource,
-   transport, log)
+7. **Owner-routing: fan-out reduction & failover** (partitioned routing). **F1**
+   (owner-routed writes) and **V** (view-synchronous membership — stable ownership
+   per epoch) have landed ([DECISIONS F1](DECISIONS.md), [V](DECISIONS.md)). Still
+   open: **F2** — per-partition sequencing + R-way replication (`mesh.replicate` to
+   the R owners; dedup + catch-up keyed *per partition* via `Log.heads()`/`diff()`
+   instead of per-origin) to cut fan-out below full-mesh broadcast — and **F3** —
+   owner failover / version continuity on handoff (the next clockwise replica,
+   already caught up, continues the partition counter). F2 also picks up the V
+   deferrals: the stronger **reject-stale-epoch-from-an-evicted-node** fence (needs
+   the per-partition owner lineage + a uuid↔address map), the **commit-ack drain**
+   (PREPARE-ACK high-water vectors; also [open question 1]), the
+   **outbox-flush-before-ring-rebuild** (a no-op under full broadcast, matters once
+   replication is ring-routed), and preserving a **buffered write's attempt-epoch**
+   on flush (today it flushes under the current epoch). The gap-tolerant-dedup
+   alternative from [DECISIONS F](DECISIONS.md) stays parked unless F2's per-partition
+   sequencing proves insufficient. (resource, transport, log)
+
+   Membership hardening still open (from the V review, deferred): a dedicated
+   **two-established-cluster merge** test (works via lowest-coordinator + epoch
+   ordering, but only chaos-adjacent tested); **min-cluster-size** behaviour — a
+   sub-quorum remnant stays read-only (CP); a force-to-solo (AP) degrade is
+   deliberately not offered; **incarnation numbers** for flapper fencing beyond the
+   stability debounce. (resource, transport)
 8. **Value codec.** Adopt a CBOR / `data`-owned binary value form behind the
    `encodeValue`/`decodeValue` seam? `JSON.parse` of object values is ~85% of decode
    cost (~2.4ms vs ~0.35ms lazy-scan for 1000 object records) — decide with a perf
@@ -150,17 +160,13 @@ Builds on [DECISIONS B](DECISIONS.md).
 
 ### Partitioned ownership & routing — [P2] (transport: dht, index; log; resource)
 The L2 refinement that turns full replication into the routed/projected model
-(plan §5–6). The DHT + `mesh.send`/`replicate` are ready; v1 just uses `broadcast`.
-- **[P1] Ring = connected SERVERS only.** `track()` rings whatever projection it's
-  given; index must pass a server-filtered projection (or the DHT must learn roles),
-  else wrong ring membership misroutes writes.
+(plan §5–6). Owner-routed writes (F1) + view-synchronous membership (V) have landed,
+so the ring is driven by the committed view and is stable within an epoch — ring
+churn / "connected SERVERS only" / transient-misrouting are resolved by V. Remaining:
 - **Partitioned holding** (a node materializes only its owned partitions, routes the
-  rest) — gated on the owner-routing strategy [open question 7] and on reads being
-  allowed to go async/routed (breaks synchronous `data.x` today).
-- **`replicate()` to R owners**; `owners()` distinct-R correctness under churn.
-- **Ring consistency under churn** — nodes briefly disagree on membership during
-  connect/disconnect → transient misrouting; document, lean on the DHT checksum to
-  detect divergence.
+  rest) — gated on F2 [open question 7] and on reads being allowed to go async/routed
+  (breaks synchronous `data.x` today).
+- **`replicate()` to R owners** (F2); `owners()` distinct-R correctness under churn.
 - **[P3] Vnode count vs cluster size** (200/peer → 20k+ ring entries at 100s of
   peers; revisit count or ring structure — jump/HRW in parked alternatives).
 

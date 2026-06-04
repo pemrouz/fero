@@ -221,3 +221,63 @@ not drift.
 
 **Open follow-up → IDEAS:** converge the two someday (make `distribute()` also
 proxy-sourced, log a pure sidecar) so L1 and L2 share one replication core.
+
+## V — View-synchronous membership · Adopted · `5c45e61` → `1d8c533`
+
+**Context.** [F1](#f1--owner-routed-writes-via-forwarding-owner-re-sequencing-phase-1--adopted)
+makes the partition owner the single writer, but ownership was derived from *live
+connections* (`dht.track(servers)`), so the ring churned on every connect/disconnect
+and nodes transiently disagreed on `owner(K)` (F1 needed `committingForward` to paper
+over it). Under incremental mass-join (200 nodes) the ring would never stabilise.
+A design review (go-with-fixes) confirmed the fix is **view-synchronous membership**:
+the cluster agrees on a sequence of numbered views `{epoch, members}` and ownership is
+stable within an epoch. The review caught the implementation-blocking gaps folded in
+below (no failure detector; locally-derived epochs; one-directional catch-up).
+
+**Decision.** Built across six increments (a prerequisite + five):
+- **V0 — failure detector** (`5c45e61`). PING/PONG heartbeat + `setKeepAlive`; after
+  N missed probes a peer is flagged `suspect` (orthogonal to `status` — the socket may
+  still be open). TCP `close` never fires for a crash/silent partition, so this is the
+  reachability signal everything else keys off.
+- **V1a — layering seam** (`a0b6db5`). `VIEW_*` verbs + explicit dispatch → hooks (a
+  view frame never reaches `onRecord`); an `epoch` field on `ChangeRecord` carried in
+  the prov frame; `mesh.installView`/`viewMembers`. Zero behaviour change.
+- **V1b — ring-from-view + merge** (`62499b8`). The DHT ring is rebuilt SOLELY by a
+  committed view (`dht.track` removed). The view forms via a Paxos-flavoured ballot:
+  the lowest-address **reachable** node is the soft coordinator; PREPARE→PROMISE→COMMIT
+  with **promise semantics** (one proposer per epoch) make `epoch` a unique per-view
+  token; **joint-consensus** quorum (majority of BOTH old and new view) means at most
+  one view commits per epoch even under a partition. Fixed two real latent bugs:
+  `mesh.forward` ignoring `peer.write`'s result (silent dropped write); one-directional
+  anti-entropy (catch-up is now **reciprocal**, so a node that missed a write while a
+  link was down heals on reconnect).
+- **V1c — failover + eviction** (`4b5360b`). A member unreachable past an eviction
+  grace is dropped; a dead coordinator is superseded by the next-lowest reachable
+  automatically. Fresh-epoch ballots + promise-release timeouts keep a coordinator
+  dying mid-2PC from wedging the cluster.
+- **V1d — epoch-fenced LWW** (`cf024f7`). LWW extended to `(epoch, seq, origin)`: a
+  write under a newer view wins, so a straggler from a superseded view can't clobber
+  the current one. Within a view (constant epoch) behaviour is unchanged.
+- **V1e — write-gate** (`1d8c533`). A node writes only while it can reach a majority of
+  its view (a CACHED boolean); otherwise it is read-only and BUFFERS writes (bounded,
+  drop-oldest) instead of committing/broadcasting, flushing when quorum returns. So a
+  partition's minority side can't diverge — only the (≤1) majority side progresses.
+  Supersedes F1's never-drop local commit for a quorum-less node. `cluster.writable`
+  exposes it.
+
+**Consequences.** Ownership is stable within an epoch (the foundation F2/F3 need).
+This is a CP posture across membership changes: the minority side of a partition is
+*unavailable* (read-only) rather than divergent. Steady-state perf is unchanged — the
+coordinator tick is unref'd and idle when stable, the write path reads one cached
+boolean; ~44ms/10k writes. Heal/rejoin (an evicted node restarts and is re-admitted),
+4-node convergence, and reciprocal catch-up are tested; failover ~1.2s.
+
+**Still open → [IDEAS open question 7](IDEAS.md):** stronger epoch fencing (REJECT a
+stale-epoch write from an evicted node — needs the per-partition owner lineage +
+uuid↔address) and the commit-ack drain land with **F2** (per-partition sequencing +
+R-way replication — the fan-out scaling win) and **F3** (owner failover continuity).
+Buffered writes currently flush under the current epoch (win LWW on rejoin) — preserving
+the attempt-epoch is an F2 refinement. Two-established-cluster merge works via the
+lowest-coordinator + epoch-ordering path but isn't dedicated-tested (chaos backlog);
+a sub-quorum remnant stays read-only (CP) — a force-to-solo (AP) degrade is deliberately
+not offered. Incarnation numbers (flapper fencing beyond the debounce) deferred.
