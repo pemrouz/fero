@@ -44,6 +44,7 @@ export type ViewOpts = {
   evictAfter?: number // grace before evicting a continuously-unreachable member (default 1500ms)
   now?: () => number // injectable clock (tests); defaults to Date.now
   onCommit?: (view: View) => void // L2 hook: a new view committed (epoch/members changed)
+  onWritable?: (writable: boolean) => void // L2 hook: quorum reachability changed (the write-gate)
 }
 
 const sortedEqual = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
@@ -51,6 +52,7 @@ const sortedEqual = (a: string[], b: string[]) => a.length === b.length && a.eve
 export class ViewManager {
   epoch = 1
   members: string[]
+  canWrite = true // can we currently reach a majority of the view? (the write-gate)
 
   #me: string
   #mesh: Mesh
@@ -59,6 +61,7 @@ export class ViewManager {
   #evictAfter: number
   #now: () => number
   #onCommit?: (v: View) => void
+  #onWritable?: (w: boolean) => void
 
   // Ballot state. `promised` is the highest (epoch, proposer) this node has
   // accepted a PREPARE for — it refuses to ack a different proposer at that epoch.
@@ -79,6 +82,7 @@ export class ViewManager {
     this.#evictAfter = opts.evictAfter ?? 1500
     this.#now = opts.now ?? Date.now
     this.#onCommit = opts.onCommit
+    this.#onWritable = opts.onWritable
     this.members = [opts.me] // boot as a solo view of self
     this.#mesh.installView(this.members)
     this.#tick = setInterval(() => this.#coordinate(), opts.interval ?? 150)
@@ -123,9 +127,10 @@ export class ViewManager {
   // proposing prematurely produces dueling/aborted rounds. Waiting for stability
   // lets the true coordinator propose the settled membership once.
   #coordinate() {
-    if (this.#proposal) return // a ballot is already in flight
     const reachableArr = this.#reachable()
     const reachable = new Set(reachableArr)
+    this.#updateWritable(reachable) // the write-gate — recomputed every tick, for ALL nodes
+    if (this.#proposal) return // a ballot is already in flight
     const now = this.#now()
 
     // Eviction-grace bookkeeping: track when each member first went unreachable.
@@ -254,5 +259,20 @@ export class ViewManager {
     let c = 0
     for (const m of set) if (acks.has(m)) c++
     return c * 2 > set.length
+  }
+
+  // Write-gate: can I reach a MAJORITY of my committed view? If not (a partition's
+  // minority side, or a quorum-less remnant), writes must NOT commit — they buffer
+  // until quorum returns — so two sides can't both accept writes and diverge. A
+  // CACHED boolean recomputed only here (every tick) and on commit, so the write
+  // path reads one flag (no per-write O(members) scan).
+  #updateWritable(reachable: Set<string>) {
+    let inView = 0
+    for (const m of this.members) if (reachable.has(m)) inView++
+    const w = inView * 2 > this.members.length
+    if (w !== this.canWrite) {
+      this.canWrite = w
+      this.#onWritable?.(w)
+    }
   }
 }

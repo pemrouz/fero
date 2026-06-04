@@ -54,6 +54,7 @@ export type Cluster = {
   owner: (key: string) => string | undefined // DHT owner of a partition key
   readonly epoch: number // current committed view-epoch (Milestone V); 1 for a read-only client
   readonly members: string[] // current committed view membership (servers); [] for a client
+  readonly writable: boolean // can this server reach a quorum of its view? false ⇒ read-only (writes buffer)
 }
 
 // What every method receives as its second arg. plan §6.1 names data/peer/
@@ -140,6 +141,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // here — version churn was the dominant cost when this was a fresh object per
   // write (see index.perf.ts).
   const versions = new Map<string, { epoch: number; seq: number; origin: string }>()
+  // Write-gate buffer (Milestone V1e): writes attempted while we can't reach a
+  // quorum of the view are held here (NOT committed/broadcast) and flushed when
+  // quorum returns — so a partition's minority side stays read-only instead of
+  // diverging. Bounded (drop-oldest) so a long partition can't grow it without limit.
+  const pending: ChangeRecord[] = []
+  const MAX_PENDING = 10_000
 
   // The key path a record contends on for LWW. An insert folds `at` into the
   // path so an insert and a later update to the same key contend as one key;
@@ -265,7 +272,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // read-only client (no listen address) isn't a ring member, so it has no
   // ViewManager. Every committed write is stamped with the current view epoch
   // (carried on the wire; fenced at apply in V1d).
-  const viewMgr = me !== undefined ? new ViewManager({ me, mesh, peers: mesh.peers, ...viewOpts }) : undefined
+  const viewMgr =
+    me !== undefined ? new ViewManager({ me, mesh, peers: mesh.peers, ...viewOpts, onWritable: (w) => w && flushPending() }) : undefined
   const viewEpoch = (): number => viewMgr?.epoch ?? 1
 
   // Write-capture: a local assignment on the proxy is stamped with our
@@ -312,6 +320,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // it as the LWW winner for its key, log it, and replicate. Used for partitions
   // we own and as the never-drop fallback when an owner is unreachable.
   function commitLocal(change: ChangeRecord) {
+    // Write-gate chokepoint (V1e): without a reachable quorum we are read-only —
+    // buffer the write (don't stamp/log/broadcast) so a minority can't diverge.
+    // This SUPERSEDES F1's never-drop local commit for a quorum-less node. Both
+    // local writes and forwarded writes (applyLocalWrite) funnel through here.
+    if (viewMgr && !viewMgr.canWrite) {
+      if (pending.length >= MAX_PENDING) pending.shift() // bounded: drop oldest
+      pending.push(change)
+      return
+    }
     const n = ++clock
     change.origin = uuid
     change.seq = n
@@ -343,6 +360,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
+  // Quorum returned (the write-gate opened): re-commit everything buffered while
+  // read-only, in order. commitLocal re-checks canWrite, so anything that can't go
+  // out (gate closed again) simply re-buffers. (Buffered writes flush under the
+  // CURRENT epoch — a known V1e semantic; preserving the attempt-epoch is an F2
+  // refinement.)
+  function flushPending() {
+    if (!pending.length) return
+    const batch = pending.splice(0)
+    for (const c of batch) commitLocal(c)
+  }
+
   const cluster: Cluster = {
     peers: mesh.peers,
     get me() {
@@ -355,6 +383,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     },
     get members() {
       return viewMgr ? viewMgr.members : []
+    },
+    get writable() {
+      return viewMgr ? viewMgr.canWrite : true
     },
   }
 

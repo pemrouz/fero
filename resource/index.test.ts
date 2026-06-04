@@ -614,6 +614,41 @@ test('V1d: a write committed under a newer view-epoch wins (epoch-fenced LWW)', 
   }
 })
 
+// ── Milestone V1e: write-gate (quorum-loss → read-only + buffer) ──
+
+test('V1e: a node that loses quorum goes read-only and buffers writes, flushing on recovery', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  // evictAfter huge so the survivor does NOT evict the dead peer — we want it to
+  // STAY a quorum-less minority of its [A,B] view while the peer is gone.
+  const cfg = (port: number) => ({
+    host: '127.0.0.1',
+    port,
+    ports: [p1, p2],
+    wait: 200,
+    heartbeat: { interval: 100, misses: 2 },
+    view: { evictAfter: 100_000 },
+  })
+  const A = await fero('vgate', cfg(p1))
+  let B = await fero('vgate', cfg(p2))
+  try {
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), 'view [A,B] forms')
+    assert.equal(A.cluster.writable, true, 'writable with a quorum')
+
+    B.destroy() // A is now 1 of 2 — no quorum
+    assert.ok(await until(() => A.cluster.writable === false, 5000), 'A goes read-only without quorum')
+
+    A.data.x = 'written-while-readonly' // buffered, NOT committed/broadcast
+
+    // B returns on the same address → A regains quorum → flushes the buffered write
+    B = await fero('vgate', cfg(p2))
+    assert.ok(await until(() => A.cluster.writable === true, 8000), 'A is writable again once quorum returns')
+    assert.ok(await until(() => B.data.x[value] === 'written-while-readonly', 8000), `buffered write flushed to B: ${B.data.x[value]}`)
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
 // ── Milestone V1b: view-synchronous membership — merge + late-joiner ──
 
 test('V1b: singletons merge into one committed view (ballot + joint-consensus quorum)', async () => {
