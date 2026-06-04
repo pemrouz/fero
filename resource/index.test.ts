@@ -224,6 +224,54 @@ test('3-node: writes from one node converge on all three (full-mesh broadcast)',
   }
 })
 
+// ── Milestone P0: replica-set seam (cluster.replicas + the `replicas` factor) ──
+// Pure routing surface — no replication behavior changes yet (P2 scopes delivery).
+
+test('P0: full replication (default ∞) — cluster.replicas holds every partition on every member', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const A = await fero('repl-full', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
+  const B = await fero('repl-full', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  try {
+    // The ring is driven by the committed view (not raw connections), so wait for it.
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), 'view committed')
+    for (const k of ['user42', 'order7', 'x', 'session-abc']) {
+      const set = A.cluster.replicas(k)
+      assert.equal(set.length, 2, `${k} held on all members`)
+      assert.equal(new Set(set).size, 2, 'distinct')
+      assert.equal(set[0], A.cluster.owner(k), 'first is the owner')
+      for (const m of set) assert.ok(A.cluster.members.includes(m), `${m} is a view member`)
+    }
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
+test('P0: replicas:R holds a partition on exactly R members (owner + successors clockwise)', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2 })
+  const A = await fero('repl-r', cfg(p1))
+  const B = await fero('repl-r', cfg(p2))
+  const C = await fero('repl-r', cfg(p3))
+  try {
+    assert.ok(await until(() => A.cluster.members.length === 3, 8000), 'view committed (3 members)')
+    // Every node agrees on the same R-set for a key (the ring is the committed view).
+    for (const k of ['user42', 'order7', 'k29', 'aaa', 'zzz']) {
+      const set = A.cluster.replicas(k)
+      assert.equal(set.length, 2, `${k} held on exactly R=2 members`)
+      assert.equal(new Set(set).size, 2, 'distinct')
+      assert.equal(set[0], A.cluster.owner(k), 'first is the owner')
+      for (const m of set) assert.ok(A.cluster.members.includes(m), `${m} is a view member`)
+      assert.deepEqual(B.cluster.replicas(k), set, 'B agrees on the R-set')
+      assert.deepEqual(C.cluster.replicas(k), set, 'C agrees on the R-set')
+    }
+  } finally {
+    A.destroy()
+    B.destroy()
+    C.destroy()
+  }
+})
+
 test('3-node: a late joiner catches up to BOTH peers’ writes via one connection', async () => {
   const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`

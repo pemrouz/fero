@@ -52,6 +52,7 @@ export type Cluster = {
   readonly me?: string // this server's listen address (undefined for read-only clients)
   uuid: string
   owner: (key: string) => string | undefined // DHT owner of a partition key
+  replicas: (key: string) => string[] // the R-way replica set for a partition key (owner + the next R-1 peers clockwise); ALL members under full replication (the default). Milestone P.
   readonly epoch: number // current committed view-epoch (Milestone V); 1 for a read-only client
   readonly members: string[] // current committed view membership (servers); [] for a client
   readonly writable: boolean // can this server reach a quorum of its view? false ⇒ read-only (writes buffer)
@@ -217,6 +218,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   delete (config as any).storage // L2 config — not a transport option
   const viewOpts = (config.view as Record<string, unknown>) ?? {}
   delete (config as any).view // L2 view-change tuning — not a transport option
+  // Replication factor (Milestone P). `replicas: R` holds each partition on R
+  // replicas (owner + R-1 ring successors); the default ∞ holds every partition
+  // on every server (full replication — the pre-P behavior, byte-identical).
+  // Extracted here so it parameterizes L2 routing; the ring math itself lives in
+  // the DHT (mesh.owners). Threaded to the DHT too so its own replicate() default
+  // matches, though L2 always passes R explicitly.
+  const R = typeof config.replicas === 'number' ? (config.replicas as number) : Infinity
+  delete (config as any).replicas
+  config.dht = { ...((config.dht as Record<string, unknown>) ?? {}), replicas: R }
   if (storage) {
     for (const record of await storage.load()) applyInbound(record)
     log.onAppend((record) => storage.append(record))
@@ -378,6 +388,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     },
     uuid: mesh.uuid,
     owner: (key: string) => mesh.owner(key),
+    replicas: (key: string) => mesh.owners(key, R), // owner + R-1 successors; all members when R is ∞ (full replication)
     get epoch() {
       return viewMgr?.epoch ?? 1
     },
