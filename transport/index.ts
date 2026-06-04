@@ -40,6 +40,12 @@ export type TransportOpts = {
   onSubscribe?: (subId: number, method: string, arg: unknown, address: string) => void // a peer opened a live subscription
   onUnsubscribe?: (subId: number, address: string) => void // a peer closed one
   onWrite?: (record: ChangeRecord, address: string) => void // a peer forwarded a write-request for a partition we own
+  // Membership view-change control frames (Milestone V) — each routes to its own
+  // hook so a view frame can NEVER fall through to onRecord (the data path).
+  onViewPrepare?: (value: unknown, address: string) => void
+  onViewAck?: (value: unknown, address: string) => void
+  onViewCommit?: (value: unknown, address: string) => void
+  onJoinRequest?: (value: unknown, address: string) => void
 }
 
 export type Mesh = {
@@ -52,6 +58,9 @@ export type Mesh = {
   broadcast: (record: ChangeRecord) => void
   forward: (address: string, record: ChangeRecord) => boolean // route a write-request to the owner; false if it isn't connected
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
+  installView: (members: string[]) => void // adopt a committed view's membership (V1a: stored; V1b: drives the ring)
+  viewMembers: () => string[] // the current committed view's members
+  viewSend: (address: string, verb: number, value: unknown) => boolean // send a view-change control frame; false if the peer isn't connected
   digestTo: (address: string, vector: Record<string, number>) => void // send our high-water digest
   catchupTo: (address: string, records: ChangeRecord[]) => void // ship records a peer lacks
   call: (method: string, arg: unknown) => Promise<unknown> // RPC to a connected server
@@ -129,6 +138,11 @@ export function transport(opts: TransportOpts): Mesh {
   const servers = pool.peers.filter((p: any) => p.role === 'server' && p.status === STATUS.connected)
   dht.track(servers)
 
+  // Committed view membership (Milestone V). Seeded to [self]; L2 installs each
+  // committed view here. V1a stores it inert (the ring still tracks live servers
+  // above); V1b switches the ring to read from this and removes dht.track.
+  let view: string[] = me ? [me] : []
+
   // RPC state: outstanding calls keyed by frame id, resolved on RESOLVE/REJECT.
   // The same counter ids subscriptions; `subs` routes inbound deltas to handlers.
   let callId = 0
@@ -154,6 +168,20 @@ export function transport(opts: TransportOpts): Mesh {
         // record to L2, which commits it locally (its sink stamps origin=us and
         // replicates) — so we become the single sequencer for the partition.
         for (const record of frame.records()) opts.onWrite?.(record as unknown as ChangeRecord, peer.address)
+        return
+      // Membership view-change frames (Milestone V) — explicit cases so they
+      // route to their own hooks and never fall through to onRecord below.
+      case VERB.VIEW_PREPARE:
+        opts.onViewPrepare?.(frame.records()[0]?.value, peer.address)
+        return
+      case VERB.VIEW_ACK:
+        opts.onViewAck?.(frame.records()[0]?.value, peer.address)
+        return
+      case VERB.VIEW_COMMIT:
+        opts.onViewCommit?.(frame.records()[0]?.value, peer.address)
+        return
+      case VERB.JOIN_REQUEST:
+        opts.onJoinRequest?.(frame.records()[0]?.value, peer.address)
         return
       case VERB.CALL: {
         const id = frame.id
@@ -235,6 +263,22 @@ export function transport(opts: TransportOpts): Mesh {
     },
     broadcast: (record) => pool.broadcast(record),
     owners: (key, replicas) => dht.owners(key, replicas),
+    // Milestone V seam. V1a: installView just stores the committed membership and
+    // viewMembers reads it back — the DHT ring still tracks live connected servers
+    // (dht.track above), so this is inert (zero behaviour change). V1b makes
+    // installView rebuild the ring from these members and removes dht.track.
+    installView: (members) => {
+      view = members.slice()
+    },
+    viewMembers: () => view,
+    // Send a view-change control frame (one record value under a VIEW_* verb),
+    // point-to-point. Returns false if the peer isn't connected.
+    viewSend: (address, verb, value) => {
+      const peer = pool.peer(address)
+      if (!peer) return false
+      peer.write(encodeFrame([{ type: 'update', key: [], value }], { verb }))
+      return true
+    },
     // Forward a write-request to the partition owner (WRITE verb, point-to-point —
     // not the batched broadcast outbox). Returns false if the owner isn't a
     // connected peer right now, so the caller can fall back to a local commit

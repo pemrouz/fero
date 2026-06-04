@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { $, value, view } from '../../data/index.ts'
 import { transport } from './index.ts'
-import type { ChangeRecord } from './message.ts'
+import { VERB, type ChangeRecord } from './message.ts'
 import { ports, until, connected, apply } from '#utils'
 
 // A storeless mesh needs somewhere to land records so the test can assert where
@@ -87,4 +87,44 @@ test('membership gossips: a third node that only knows A learns B', async () => 
   mA.destroy()
   mB.destroy()
   mC.destroy()
+})
+
+test('view-change frames route to their own hook, never to onRecord (Milestone V seam)', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  let prepared: { value: unknown; address: string } | undefined
+  let dataRecords = 0
+  const mA = transport({ name: 'vseam', host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, onRecord: () => {} })
+  const mB = transport({
+    name: 'vseam',
+    host: '127.0.0.1',
+    port: p2,
+    ports: [p1, p2],
+    wait: 200,
+    onRecord: () => {
+      dataRecords++
+    },
+    onViewPrepare: (value, address) => {
+      prepared = { value, address }
+    },
+  })
+  try {
+    assert.ok(await until(() => connected(mA, a2) && connected(mB, a1)), 'A↔B connect')
+
+    const payload = { epoch: 2, members: [a1, a2], proposer: a1 }
+    assert.ok(mA.viewSend(a2, VERB.VIEW_PREPARE, payload), 'viewSend reaches the connected peer')
+
+    assert.ok(await until(() => prepared !== undefined), 'onViewPrepare fires on B')
+    assert.deepEqual(prepared!.value, payload, 'the view payload arrives intact')
+    // NB: prepared.address is the inbound socket's EPHEMERAL address, not A's
+    // listen address (inbound peers aren't re-keyed yet — see IDEAS). The view
+    // protocol therefore identifies the sender from the payload (proposer), not
+    // peer.address; we only assert an address was tagged.
+    assert.ok(typeof prepared!.address === 'string' && prepared!.address.length > 0, 'tagged with the inbound peer address')
+    assert.equal(dataRecords, 0, 'the view frame never reached onRecord (the data path)')
+  } finally {
+    mA.destroy()
+    mB.destroy()
+  }
 })
