@@ -32,6 +32,20 @@ test('owner() lookup — 100k routes over a 1000-entry ring', () => {
   ok(elapsed < 50, `100k lookups took ${elapsed.toFixed(3)}ms (threshold 50ms)`)
 })
 
+test('owners(key, R=3) — 100k R-set lookups over a 1000-entry ring', () => {
+  // The R-set computation is on the write path once P2 scopes replication
+  // (owner forwards the committed record to replicas(P)). A walk from the owner
+  // slot collecting R distinct peers — should stay within ~3× of owner().
+  const dht = ring()
+  const elapsed = bench.time(() => {
+    let sink = 0
+    for (let i = 0; i < KEYS.length; i++) sink += dht.owners(KEYS[i], 3).length
+    if (sink === 0) throw new Error('sink')
+  })
+  console.log(`  100k owners(_,3) lookups: ${elapsed.toFixed(3)}ms (${((elapsed * 1000) / KEYS.length).toFixed(3)}µs each)`)
+  ok(elapsed < 120, `100k R-set lookups took ${elapsed.toFixed(3)}ms (threshold 120ms)`)
+})
+
 test('rebuild on membership churn — add/remove a peer (5→6→5)', () => {
   const dht = ring()
   const elapsed = bench.time(() => {
