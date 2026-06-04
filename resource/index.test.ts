@@ -589,6 +589,31 @@ test('reciprocal catch-up: two nodes that each wrote while isolated both heal on
   }
 })
 
+// ── Milestone V1d: epoch fencing in LWW ──
+
+test('V1d: a write committed under a newer view-epoch wins (epoch-fenced LWW)', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  // A starts solo (view [A]@1) and writes k under epoch 1.
+  const A = await fero('vepoch', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 120 })
+  A.data.k = 'epoch1'
+  // B joins; the cluster merges to a higher epoch. B then writes k under it.
+  const B = await fero('vepoch', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 120 })
+  try {
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), 'merged')
+    assert.ok(A.cluster.epoch >= 2, `epoch advanced past 1 (got ${A.cluster.epoch})`)
+    B.data.k = 'epoch2' // committed under the newer epoch
+
+    // both converge to the newer-epoch write (the (epoch, seq, origin) LWW order)
+    assert.ok(
+      await until(() => A.data.k[value] === 'epoch2' && B.data.k[value] === 'epoch2', 8000),
+      `A=${A.data.k[value]} B=${B.data.k[value]}`,
+    )
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
 // ── Milestone V1b: view-synchronous membership — merge + late-joiner ──
 
 test('V1b: singletons merge into one committed view (ballot + joint-consensus quorum)', async () => {
