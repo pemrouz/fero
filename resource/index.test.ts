@@ -486,7 +486,12 @@ test('F1: a write to a peer-owned partition is committed by the owner and replic
   const B = await fero('f1own', { host: '127.0.0.1', port: p2, ports: [p1, p2, p3], wait: 250 })
   const C = await fero('f1own', { host: '127.0.0.1', port: p3, ports: [p1, p2, p3], wait: 250 })
   try {
-    assert.ok(await until(() => connected(A.cluster, a2) && connected(A.cluster, a3)), 'full mesh')
+    // Wait for the committed 3-node VIEW (the ring derives from it, Milestone V) —
+    // not just raw connectivity — before computing owners.
+    assert.ok(
+      await until(() => A.cluster.members.length === 3 && B.cluster.members.length === 3 && C.cluster.members.length === 3, 8000),
+      `view formed: ${A.cluster.members.length}/${B.cluster.members.length}/${C.cluster.members.length}`,
+    )
 
     // A key OWNED BY B (not A). Writing it on A must FORWARD to B: A never
     // broadcasts it (the sink returns right after forwarding) and never logs it,
@@ -516,7 +521,7 @@ test('F1: a batch written on one node routes across owners and converges exactly
   const A = await fero('f1batch', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
   const B = await fero('f1batch', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
   try {
-    assert.ok(await until(() => connected(A.cluster, a2) && connected(B.cluster, a1)), 'A↔B connect')
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), 'view [A,B] formed')
 
     // 30 keys split by the ring: A owns ~half (local commit), B owns ~half (A
     // forwards them to B, which commits and broadcasts back). Convergence to
@@ -542,7 +547,7 @@ test('F1: concurrent writes to one key from both nodes serialize through the own
   const A = await fero('f1ser', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
   const B = await fero('f1ser', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
   try {
-    assert.ok(await until(() => connected(A.cluster, a2) && connected(B.cluster, a1)), 'A↔B connect')
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), 'view [A,B] formed')
 
     // Both nodes write the SAME key. Whoever owns it is the single sequencer; both
     // must converge to ONE identical value (linearizable per partition — vs the
@@ -560,5 +565,83 @@ test('F1: concurrent writes to one key from both nodes serialize through the own
   } finally {
     A.destroy()
     B.destroy()
+  }
+})
+
+test('reciprocal catch-up: two nodes that each wrote while isolated both heal on connect', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  // Start A alone (knows nobody yet) and let it write before B exists.
+  const A = await fero('recip', { host: '127.0.0.1', port: p1, ports: [p1], wait: 80 })
+  A.data.fromA = 1
+  // B starts knowing A; B also writes before they sync. Now EACH holds a record
+  // the other lacks — so a one-directional digest would heal only one side.
+  const B = await fero('recip', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 80 })
+  B.data.fromB = 2
+  try {
+    const expected = { fromA: 1, fromB: 2 }
+    assert.ok(await until(() => sameState(A.data[value], expected), 8000), `A: ${JSON.stringify(A.data[value])}`)
+    assert.ok(await until(() => sameState(B.data[value], expected), 8000), `B: ${JSON.stringify(B.data[value])}`)
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
+// ── Milestone V1b: view-synchronous membership — merge + late-joiner ──
+
+test('V1b: singletons merge into one committed view (ballot + joint-consensus quorum)', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const A = await fero('vmerge', { host: '127.0.0.1', port: p1, ports: [p1, p2, p3], wait: 250 })
+  const B = await fero('vmerge', { host: '127.0.0.1', port: p2, ports: [p1, p2, p3], wait: 250 })
+  const C = await fero('vmerge', { host: '127.0.0.1', port: p3, ports: [p1, p2, p3], wait: 250 })
+  try {
+    // Three nodes that each boot as a solo view [self]@1 must converge on ONE
+    // committed view of all three — the lowest-address coordinator proposes, the
+    // others defer and ack, joint-consensus commits.
+    assert.ok(
+      await until(() => [A, B, C].every((n) => n.cluster.members.length === 3), 8000),
+      `members: ${A.cluster.members.length}/${B.cluster.members.length}/${C.cluster.members.length}`,
+    )
+    // identical committed membership and epoch on every node
+    const mem = JSON.stringify(A.cluster.members)
+    assert.equal(JSON.stringify(B.cluster.members), mem, 'B sees the same members')
+    assert.equal(JSON.stringify(C.cluster.members), mem, 'C sees the same members')
+    assert.ok(A.cluster.epoch >= 2 && B.cluster.epoch === A.cluster.epoch && C.cluster.epoch === A.cluster.epoch, 'one agreed epoch')
+    // identical rings → all agree on the owner of any key
+    assert.ok(
+      A.cluster.owner('probe') === B.cluster.owner('probe') && B.cluster.owner('probe') === C.cluster.owner('probe'),
+      'rings agree on ownership',
+    )
+  } finally {
+    A.destroy()
+    B.destroy()
+    C.destroy()
+  }
+})
+
+test('V1b: a late joiner is admitted to the committed view', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const A = await fero('vjoin', { host: '127.0.0.1', port: p1, ports: [p1, p2, p3], wait: 200 })
+  const B = await fero('vjoin', { host: '127.0.0.1', port: p2, ports: [p1, p2, p3], wait: 200 })
+  let C: Awaited<ReturnType<typeof fero>> | undefined
+  try {
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), 'view [A,B] forms first')
+    const epoch2 = A.cluster.epoch
+
+    // C joins knowing ONLY A (ports:[p1]); the coordinator must fold it into a new
+    // committed view that all three agree on, at a HIGHER epoch.
+    C = await fero('vjoin', { host: '127.0.0.1', port: p3, ports: [p1], wait: 200 })
+    assert.ok(
+      await until(() => [A, B, C!].every((n) => n.cluster.members.length === 3), 8000),
+      `admitted: ${A.cluster.members.length}/${B.cluster.members.length}/${C!.cluster.members.length}`,
+    )
+    assert.ok(A.cluster.epoch > epoch2, 'admitting C bumped the epoch')
+    assert.ok(A.cluster.owner('probe') === C!.cluster.owner('probe'), 'C shares the ring')
+  } finally {
+    A.destroy()
+    B.destroy()
+    C?.destroy()
   }
 })

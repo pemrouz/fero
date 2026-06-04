@@ -34,7 +34,7 @@ export type TransportOpts = {
   wait?: number // ms to wait for a peer before resolving ready (the "I'm first" case)
   onRecord?: (record: ChangeRecord, peer?: Peer) => void // inbound records (incl. self-routed)
   onConnect?: (address: string) => void // a DIALED peer's handshake completed (catch-up trigger)
-  onDigest?: (vector: Record<string, number>, address: string) => void // a peer's anti-entropy digest
+  onDigest?: (payload: unknown, address: string) => void // a peer's anti-entropy digest ({v: vector, reply: bool})
   onCall?: (method: string, arg: unknown, address: string) => unknown // inbound RPC — return the reply (may be a Promise)
   callTimeout?: number // ms before an unanswered call() rejects (default 5000)
   onSubscribe?: (subId: number, method: string, arg: unknown, address: string) => void // a peer opened a live subscription
@@ -61,7 +61,7 @@ export type Mesh = {
   installView: (members: string[]) => void // adopt a committed view's membership (V1a: stored; V1b: drives the ring)
   viewMembers: () => string[] // the current committed view's members
   viewSend: (address: string, verb: number, value: unknown) => boolean // send a view-change control frame; false if the peer isn't connected
-  digestTo: (address: string, vector: Record<string, number>) => void // send our high-water digest
+  digestTo: (address: string, payload: unknown) => void // send our anti-entropy digest payload
   catchupTo: (address: string, records: ChangeRecord[]) => void // ship records a peer lacks
   call: (method: string, arg: unknown) => Promise<unknown> // RPC to a connected server
   hasServer: () => boolean // is there a connected server to call?
@@ -133,14 +133,11 @@ export function transport(opts: TransportOpts): Mesh {
     pool.peers[me] = { address: me, host, port: opts.port, role: 'server', status: STATUS.connected }
     dht.add(me)
   }
-  // The ring tracks connected SERVERS (the self row above is one) — clients and
-  // inbound ephemeral connections are role 'client' and excluded.
-  const servers = pool.peers.filter((p: any) => p.role === 'server' && p.status === STATUS.connected)
-  dht.track(servers)
-
-  // Committed view membership (Milestone V). Seeded to [self]; L2 installs each
-  // committed view here. V1a stores it inert (the ring still tracks live servers
-  // above); V1b switches the ring to read from this and removes dht.track.
+  // Committed view membership (Milestone V). The ring is driven SOLELY by the
+  // committed view (installView below), NOT by live connections — ownership is
+  // stable within an epoch. L2's ViewManager installs each committed view; until
+  // it does, a server rings only itself (seeded via dht.add(me) above), so a
+  // pre-view write owns locally and broadcasts (converges) rather than misroutes.
   let view: string[] = me ? [me] : []
 
   // RPC state: outstanding calls keyed by frame id, resolved on RESOLVE/REJECT.
@@ -153,7 +150,7 @@ export function transport(opts: TransportOpts): Mesh {
     if (handle(frame, peer, hooks)) return // INIT/SYNC/DONE
     switch (frame.verb) {
       case VERB.DIGEST:
-        opts.onDigest?.((frame.records()[0]?.value as Record<string, number>) ?? {}, peer.address)
+        opts.onDigest?.(frame.records()[0]?.value ?? {}, peer.address)
         return
       case VERB.SUBSCRIBE: {
         const { method, arg } = (frame.records()[0]?.value as { method: string; arg: unknown }) ?? { method: '', arg: undefined }
@@ -263,12 +260,13 @@ export function transport(opts: TransportOpts): Mesh {
     },
     broadcast: (record) => pool.broadcast(record),
     owners: (key, replicas) => dht.owners(key, replicas),
-    // Milestone V seam. V1a: installView just stores the committed membership and
-    // viewMembers reads it back — the DHT ring still tracks live connected servers
-    // (dht.track above), so this is inert (zero behaviour change). V1b makes
-    // installView rebuild the ring from these members and removes dht.track.
+    // Adopt a committed view's membership: rebuild the DHT ring to EXACTLY these
+    // members (add new, remove departed). This is the only thing that mutates the
+    // ring, so ownership is constant between view commits.
     installView: (members) => {
       view = members.slice()
+      for (const m of dht.members()) if (!view.includes(m)) dht.remove(m)
+      for (const m of view) if (!dht.has(m)) dht.add(m)
     },
     viewMembers: () => view,
     // Send a view-change control frame (one record value under a VIEW_* verb),
@@ -280,14 +278,16 @@ export function transport(opts: TransportOpts): Mesh {
       return true
     },
     // Forward a write-request to the partition owner (WRITE verb, point-to-point —
-    // not the batched broadcast outbox). Returns false if the owner isn't a
-    // connected peer right now, so the caller can fall back to a local commit
-    // rather than drop the write.
+    // not the batched broadcast outbox). Returns whether the frame was actually
+    // handed to a writable socket: false if the owner has no peer OR its socket
+    // isn't writable right now (e.g. mid-reconnect), so the caller falls back to a
+    // local commit rather than SILENTLY DROPPING the write. (peer.write returns
+    // false only when the socket is gone — small control frames don't hit
+    // backpressure — so a false here means the frame did not go out.)
     forward(address, record) {
       const peer = pool.peer(address)
       if (!peer) return false
-      peer.write(encodeFrame([record], { verb: VERB.WRITE }))
-      return true
+      return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
     },
     // Point-to-point. Sent as prebuilt frames straight to the peer's socket (not
     // the batched broadcast outbox), so catch-up traffic never disturbs the
