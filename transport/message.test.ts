@@ -86,6 +86,26 @@ test('provenance: origin + per-record seq round-trip (baseSeq + index)', () => {
   assert.deepEqual(records[1].toJSON(), { type: 'insert', key: [], value: { n: 2 }, at: 'b', origin: 'node-A', seq: 101 })
 })
 
+test('provenance: view-epoch round-trips in prov frames (Milestone V)', () => {
+  const batch: ChangeRecord[] = [
+    { type: 'update', key: ['a'], value: 1 },
+    { type: 'update', key: ['b'], value: 2 },
+  ]
+  const frame = decodeFrame(encodeFrame(batch, { origin: 'node-A', seq: 10, epoch: 5 }))
+  assert.equal(frame.epoch, 5)
+  const records = frame.records()
+  assert.deepEqual(
+    records.map((r) => r.epoch),
+    [5, 5], // one epoch per frame (writes don't straddle a view)
+  )
+  assert.deepEqual(
+    records.map((r) => r.seq),
+    [10, 11],
+  )
+  // toJSON carries the epoch back out alongside origin/seq
+  assert.deepEqual(records[0].toJSON(), { type: 'update', key: ['a'], value: 1, origin: 'node-A', seq: 10, epoch: 5 })
+})
+
 test('provenance is read from records[0] when not passed explicitly', () => {
   const batch: ChangeRecord[] = [
     { type: 'update', key: ['a'], value: 1, origin: 'node-Z', seq: 7 },

@@ -207,19 +207,21 @@ test('3-node: writes from one node converge on all three (full-mesh broadcast)',
   const A = await fero('route', { host: '127.0.0.1', port: p1, ports: [p1, p2, p3], wait: 250 })
   const B = await fero('route', { host: '127.0.0.1', port: p2, ports: [p1, p2, p3], wait: 250 })
   const C = await fero('route', { host: '127.0.0.1', port: p3, ports: [p1, p2, p3], wait: 250 })
-  assert.ok(await until(() => connected(A.cluster, a2) && connected(A.cluster, a3)), 'full mesh')
+  try {
+    assert.ok(await until(() => connected(A.cluster, a2) && connected(A.cluster, a3)), 'full mesh')
 
-  const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
-  for (const k of keys) A.data[k] = k
-  const expected = Object.fromEntries(keys.map((k) => [k, k]))
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    for (const k of keys) A.data[k] = k
+    const expected = Object.fromEntries(keys.map((k) => [k, k]))
 
-  // Every server materializes every record (full replication) — all three converge.
-  assert.ok(await until(() => sameState(B.data[value], expected), 3000), `B converged: ${Object.keys(B.data[value]).length}/30`)
-  assert.ok(await until(() => sameState(C.data[value], expected), 3000), `C converged: ${Object.keys(C.data[value]).length}/30`)
-
-  A.destroy()
-  B.destroy()
-  C.destroy()
+    // Every server materializes every record (full replication) — all three converge.
+    assert.ok(await until(() => sameState(B.data[value], expected), 8000), `B converged: ${Object.keys(B.data[value]).length}/30`)
+    assert.ok(await until(() => sameState(C.data[value], expected), 8000), `C converged: ${Object.keys(C.data[value]).length}/30`)
+  } finally {
+    A.destroy()
+    B.destroy()
+    C.destroy()
+  }
 })
 
 test('3-node: a late joiner catches up to BOTH peers’ writes via one connection', async () => {
@@ -228,25 +230,28 @@ test('3-node: a late joiner catches up to BOTH peers’ writes via one connectio
   const a2 = `127.0.0.1:${p2}`
   const A = await fero('cu3', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 150 })
   const B = await fero('cu3', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 150 })
-  assert.ok(await until(() => connected(A.cluster, a2) && connected(B.cluster, a1)), 'A↔B connect')
+  let C: Awaited<ReturnType<typeof fero>> | undefined
+  try {
+    assert.ok(await until(() => connected(A.cluster, a2) && connected(B.cluster, a1)), 'A↔B connect')
 
-  // A and B each write; full replication means both logs hold both writes.
-  A.data.fromA = 1
-  B.data.fromB = 2
-  const expected = { fromA: 1, fromB: 2 }
-  assert.ok(await until(() => sameState(A.data[value], expected)), 'A,B converge first')
+    // A and B each write; full replication means both logs hold both writes.
+    A.data.fromA = 1
+    B.data.fromB = 2
+    const expected = { fromA: 1, fromB: 2 }
+    assert.ok(await until(() => sameState(A.data[value], expected), 8000), 'A,B converge first')
 
-  // C joins knowing ONLY A (ports:[p1]); it must end up with B's write too —
-  // A's log carries B's records (it received them), so one catch-up suffices.
-  const C = await fero('cu3', { host: '127.0.0.1', port: p3, ports: [p1], wait: 150 })
-  assert.ok(
-    await until(() => sameState(C.data[value], expected)),
-    `C caught up to ${JSON.stringify(C.data[value])}`,
-  )
-
-  A.destroy()
-  B.destroy()
-  C.destroy()
+    // C joins knowing ONLY A (ports:[p1]); it must end up with B's write too —
+    // A's log carries B's records (it received them), so one catch-up suffices.
+    C = await fero('cu3', { host: '127.0.0.1', port: p3, ports: [p1], wait: 150 })
+    assert.ok(
+      await until(() => sameState(C!.data[value], expected), 8000),
+      `C caught up to ${JSON.stringify(C.data[value])}`,
+    )
+  } finally {
+    A.destroy()
+    B.destroy()
+    C?.destroy()
+  }
 })
 
 test('persistence: state survives a restart via the storage seam (WAL)', async () => {

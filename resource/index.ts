@@ -233,6 +233,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const uuid = mesh.uuid
   const me = mesh.me
 
+  // Membership view (Milestone V). The committed { epoch, members } the cluster
+  // agrees on; ownership is stable within an epoch. Seeded to a solo view of
+  // self; the view-change protocol (V1b+) installs subsequent views. In V1a this
+  // is inert plumbing — every committed write is stamped with view.epoch (carried
+  // on the wire) but nothing consumes the epoch yet (fencing lands in V1d), and
+  // the ring still tracks live servers, so there is no behaviour change.
+  const view: { epoch: number; members: string[] } = { epoch: 1, members: me !== undefined ? [me] : [] }
+  mesh.installView(view.members)
+
   // Write-capture: a local assignment on the proxy is stamped with our
   // provenance, recorded as the current LWW winner for its key (the proxy has
   // already materialized it — it's the newest write we know of), logged, and
@@ -280,6 +289,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const n = ++clock
     change.origin = uuid
     change.seq = n
+    change.epoch = view.epoch // the view this write commits under (carried on the wire; fenced in V1d)
     seen.set(uuid, n)
     const key = versionKey(change)
     const cur = versions.get(key)

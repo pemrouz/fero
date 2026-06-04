@@ -48,6 +48,10 @@ export const VERB = {
   WRITE: 12, // forward a write-request to the partition owner; owner commits it locally (origin=owner) and replicates
   PING: 13, // liveness probe (empty body); the peer answers PONG. Failure detector — see peer.ts
   PONG: 14, // liveness reply to a PING (empty body)
+  VIEW_PREPARE: 15, // view-change phase 1: coordinator proposes { epoch, members, proposerId } (a ballot)
+  VIEW_ACK: 16, // view-change phase 1 reply: a member promises the ballot (carries its high-water vector — V1d)
+  VIEW_COMMIT: 17, // view-change phase 2: install the agreed { epoch, members }
+  JOIN_REQUEST: 18, // a node asks to be admitted to the cluster (folded into the next view by the coordinator)
   // a RECORDS frame WITH a frame id is a subscription delta for that sub id (vs a
   // plain replication RECORDS frame, which carries no id)
 } as const
@@ -82,6 +86,7 @@ export type ChangeRecord = {
   at?: string
   origin?: string // provenance: the uuid of the node that originated the write
   seq?: number // provenance: that origin's per-node monotonic sequence number
+  epoch?: number // provenance: the membership view-epoch this write was committed under (Milestone V); carried in prov frames, fenced at apply in V1d
 }
 
 // The partition a change record belongs to — its top-level key, or `at` for a
@@ -184,15 +189,17 @@ const keySize = (key: string[]) => {
 
 // Encode change records into one RECORDS frame (one logical socket.write batch).
 // `id` (optional) writes a u48 stream/ack id into the header. Provenance
-// (`origin`+`seq`) is written when given explicitly OR carried on records[0];
-// the body then opens with [origin str][baseSeq varint] and every record's seq
-// is baseSeq + its index (records must be that origin's consecutive writes).
+// (`origin`+`seq`+`epoch`) is written when given explicitly OR carried on
+// records[0]; the body then opens with [origin str][baseSeq varint][epoch varint]
+// and every record's seq is baseSeq + its index (records must be that origin's
+// consecutive writes within ONE view-epoch).
 export function encodeFrame(
   records: ChangeRecord[],
-  { verb = VERB.RECORDS, id, origin, seq }: { verb?: number; id?: number; origin?: string; seq?: number } = {},
+  { verb = VERB.RECORDS, id, origin, seq, epoch }: { verb?: number; id?: number; origin?: string; seq?: number; epoch?: number } = {},
 ): Buffer {
   const provOrigin = origin ?? records[0]?.origin
   const baseSeq = seq ?? records[0]?.seq ?? 0
+  const provEpoch = epoch ?? records[0]?.epoch ?? 0
   const hasProv = provOrigin !== undefined
   const hasId = id !== undefined
   const headerLen = HEADER + (hasId ? ID_LEN : 0)
@@ -201,6 +208,7 @@ export function encodeFrame(
   if (hasProv) {
     w.str(provOrigin!, Buffer.byteLength(provOrigin!))
     w.varint(baseSeq)
+    w.varint(provEpoch)
   }
   w.varint(records.length)
 
@@ -264,10 +272,14 @@ export function encodeFrames(records: ChangeRecord[]): Buffer[] {
   let i = 0
   while (i < records.length) {
     const origin = records[i].origin
+    const epoch = records[i].epoch
     let j = i + 1
     if (origin === undefined) while (j < records.length && records[j].origin === undefined) j++
-    else while (j < records.length && records[j].origin === origin && records[j].seq === (records[j - 1].seq ?? 0) + 1) j++
-    frames.push(encodeFrame(records.slice(i, j), origin !== undefined ? { origin, seq: records[i].seq } : {}))
+    // A run is one origin's contiguous seqs within one epoch — break on origin
+    // change, a Lamport-seq gap, OR an epoch change (catch-up may ship an origin's
+    // records spanning several view-epochs; each frame carries one epoch).
+    else while (j < records.length && records[j].origin === origin && records[j].seq === (records[j - 1].seq ?? 0) + 1 && records[j].epoch === epoch) j++
+    frames.push(encodeFrame(records.slice(i, j), origin !== undefined ? { origin, seq: records[i].seq, epoch } : {}))
     i = j
   }
   return frames
@@ -324,15 +336,15 @@ export class Frame {
   private get afterId() {
     return HEADER + (this.buf[1] & FLAG_HAS_ID ? ID_LEN : 0)
   }
-  // Parse the provenance ext ([origin str][baseSeq varint]) if FLAG_PROV is set.
-  // Returns the origin, the base sequence, and the offset where the record count
-  // begins. When there's no provenance, origin is undefined and off = afterId.
-  #prov?: { origin?: string; baseSeq: number; off: number }
-  private prov(): { origin?: string; baseSeq: number; off: number } {
+  // Parse the provenance ext ([origin str][baseSeq varint][epoch varint]) if
+  // FLAG_PROV is set. Returns origin, base sequence, base epoch, and the offset
+  // where the record count begins. No provenance → origin undefined, off = afterId.
+  #prov?: { origin?: string; baseSeq: number; epoch: number; off: number }
+  private prov(): { origin?: string; baseSeq: number; epoch: number; off: number } {
     if (this.#prov) return this.#prov
     const buf = this.buf
     let off = this.afterId
-    if (!(buf[1] & FLAG_PROV)) return (this.#prov = { baseSeq: 0, off })
+    if (!(buf[1] & FLAG_PROV)) return (this.#prov = { baseSeq: 0, epoch: 0, off })
     let len = 0
     let shift = 0
     let b: number
@@ -350,7 +362,14 @@ export class Frame {
       baseSeq |= (b & 0x7f) << shift
       shift += 7
     } while (b & 0x80)
-    return (this.#prov = { origin, baseSeq: baseSeq >>> 0, off })
+    let epoch = 0
+    shift = 0
+    do {
+      b = buf[off++]
+      epoch |= (b & 0x7f) << shift
+      shift += 7
+    } while (b & 0x80)
+    return (this.#prov = { origin, baseSeq: baseSeq >>> 0, epoch: epoch >>> 0, off })
   }
 
   get origin(): string | undefined {
@@ -359,13 +378,16 @@ export class Frame {
   get baseSeq(): number {
     return this.prov().baseSeq
   }
+  get epoch(): number {
+    return this.prov().epoch
+  }
 
   // Lazy: walk `count` recLen varints and slice a RecordView per record. No key
   // or value parse — that happens only when a RecordView field is read. When the frame
   // carries provenance, each RecordView is stamped with origin + (baseSeq + index).
   records(): RecordView[] {
     const buf = this.buf
-    const { origin, baseSeq, off: start } = this.prov()
+    const { origin, baseSeq, epoch, off: start } = this.prov()
     let off = start
     let count = 0
     let shift = 0
@@ -388,6 +410,7 @@ export class Frame {
       if (origin !== undefined) {
         record.origin = origin
         record.seq = baseSeq + i
+        record.epoch = epoch
       }
       out[i] = record
       off += len
@@ -418,6 +441,7 @@ export class RecordView {
   // Provenance, stamped by Frame.records() when the frame carries it (else undefined).
   origin?: string
   seq?: number
+  epoch?: number
 
   constructor(buf: Buffer) {
     this.#buf = buf
@@ -568,6 +592,7 @@ export class RecordView {
     if (this.origin !== undefined) {
       out.origin = this.origin
       out.seq = this.seq
+      if (this.epoch) out.epoch = this.epoch // omit the 0/unset default (pre-view records)
     }
     return out
   }
