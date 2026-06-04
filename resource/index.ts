@@ -139,7 +139,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // re-write (not reallocated) so the steady-state write path allocates nothing
   // here — version churn was the dominant cost when this was a fresh object per
   // write (see index.perf.ts).
-  const versions = new Map<string, { seq: number; origin: string }>()
+  const versions = new Map<string, { epoch: number; seq: number; origin: string }>()
 
   // The key path a record contends on for LWW. An insert folds `at` into the
   // path so an insert and a later update to the same key contend as one key;
@@ -176,15 +176,20 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       seen.set(origin, n)
       if (n > clock) clock = n // Lamport merge
       log.append(record)
+      const e = record.epoch ?? 0
       const key = versionKey(record)
       const cur = versions.get(key)
-      // LWW, lexicographic (seq, origin): higher seq wins; origin uuid breaks
-      // exact ties so every node elects the same winner. Loser stays logged.
-      if (cur && !(n > cur.seq || (n === cur.seq && origin > cur.origin))) return
+      // LWW, lexicographic (epoch, seq, origin): a write committed under a NEWER
+      // membership view wins (epoch fencing — Milestone V1d), so a straggler from
+      // a superseded view can't clobber the current one; within a view (constant
+      // epoch) the Lamport seq decides; origin uuid breaks exact ties. Every node
+      // elects the same winner. Loser stays logged.
+      if (cur && !(e > cur.epoch || (e === cur.epoch && (n > cur.seq || (n === cur.seq && origin > cur.origin))))) return
       if (cur) {
+        cur.epoch = e
         cur.seq = n
         cur.origin = origin
-      } else versions.set(key, { seq: n, origin })
+      } else versions.set(key, { epoch: e, seq: n, origin })
     } else {
       log.append(record) // provenance-less (handshake / non-fero) — apply verbatim
     }
@@ -310,14 +315,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const n = ++clock
     change.origin = uuid
     change.seq = n
-    change.epoch = viewEpoch() // the view this write commits under (carried on the wire; fenced in V1d)
+    const e = (change.epoch = viewEpoch()) // the view this write commits under (carried on the wire + fenced in LWW)
     seen.set(uuid, n)
     const key = versionKey(change)
     const cur = versions.get(key)
     if (cur) {
+      cur.epoch = e
       cur.seq = n
       cur.origin = uuid
-    } else versions.set(key, { seq: n, origin: uuid })
+    } else versions.set(key, { epoch: e, seq: n, origin: uuid })
     log.append(change)
     mesh.broadcast(change) // full replication: every server materializes every record
   }
