@@ -621,6 +621,71 @@ test('V1b: singletons merge into one committed view (ballot + joint-consensus qu
   }
 })
 
+// ── Milestone V1c: coordinator failover + eviction ──
+
+const failoverCfg = (p1: number, p2: number, p3: number) => (port: number) => ({
+  host: '127.0.0.1',
+  port,
+  ports: [p1, p2, p3],
+  wait: 250,
+  heartbeat: { interval: 100, misses: 2 }, // fast liveness detection
+  view: { evictAfter: 300 }, // short eviction grace
+})
+
+test('V1c: killing the coordinator forms a new view without it (failover)', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = failoverCfg(p1, p2, p3)
+  const A = await fero('vfo', cfg(p1))
+  const B = await fero('vfo', cfg(p2))
+  const C = await fero('vfo', cfg(p3))
+  const byAddr = new Map([A, B, C].map((n) => [n.cluster.me as string, n]))
+  let survivors: Array<Awaited<ReturnType<typeof fero>>> | undefined
+  try {
+    assert.ok(await until(() => [A, B, C].every((n) => n.cluster.members.length === 3), 8000), 'view [A,B,C] forms')
+    const epoch0 = A.cluster.epoch
+    const coordAddr = [...A.cluster.members].sort()[0] // lowest address = the coordinator
+    const coord = byAddr.get(coordAddr)!
+    survivors = [A, B, C].filter((n) => n !== coord)
+
+    coord.destroy() // kill the coordinator
+
+    // the next-lowest reachable node takes over and commits a view EXCLUDING it
+    assert.ok(
+      await until(() => survivors!.every((n) => n.cluster.members.length === 2 && !n.cluster.members.includes(coordAddr)), 8000),
+      `survivors: ${survivors!.map((n) => JSON.stringify(n.cluster.members)).join(' ')}`,
+    )
+    assert.ok(survivors[0].cluster.epoch > epoch0, 'failover bumped the epoch')
+    assert.equal([...survivors[0].cluster.members].sort().join(), [...survivors[1].cluster.members].sort().join(), 'survivors agree')
+  } finally {
+    ;(survivors ?? [A, B, C]).forEach((n) => n.destroy())
+  }
+})
+
+test('V1c: a failed non-coordinator member is evicted from the view', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = failoverCfg(p1, p2, p3)
+  const A = await fero('vev', cfg(p1))
+  const B = await fero('vev', cfg(p2))
+  const C = await fero('vev', cfg(p3))
+  const byAddr = new Map([A, B, C].map((n) => [n.cluster.me as string, n]))
+  let survivors: Array<Awaited<ReturnType<typeof fero>>> | undefined
+  try {
+    assert.ok(await until(() => [A, B, C].every((n) => n.cluster.members.length === 3), 8000), 'view [A,B,C] forms')
+    const victimAddr = [...A.cluster.members].sort()[2] // highest address = a non-coordinator
+    const victim = byAddr.get(victimAddr)!
+    survivors = [A, B, C].filter((n) => n !== victim)
+
+    victim.destroy()
+
+    assert.ok(
+      await until(() => survivors!.every((n) => n.cluster.members.length === 2 && !n.cluster.members.includes(victimAddr)), 8000),
+      `survivors: ${survivors!.map((n) => JSON.stringify(n.cluster.members)).join(' ')}`,
+    )
+  } finally {
+    ;(survivors ?? [A, B, C]).forEach((n) => n.destroy())
+  }
+})
+
 test('V1b: a late joiner is admitted to the committed view', async () => {
   const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
   const A = await fero('vjoin', { host: '127.0.0.1', port: p1, ports: [p1, p2, p3], wait: 200 })

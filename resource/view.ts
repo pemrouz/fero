@@ -40,7 +40,9 @@ export type ViewOpts = {
   mesh: Mesh
   peers: any // cluster.peers ViewProxy — reachability is read from it
   interval?: number // coordinator tick (default 150ms)
-  ackTimeout?: number // abort a proposal that hasn't reached quorum within this (default 1000ms)
+  ackTimeout?: number // abort a proposal that hasn't reached quorum within this (default 600ms)
+  evictAfter?: number // grace before evicting a continuously-unreachable member (default 1500ms)
+  now?: () => number // injectable clock (tests); defaults to Date.now
   onCommit?: (view: View) => void // L2 hook: a new view committed (epoch/members changed)
 }
 
@@ -54,21 +56,28 @@ export class ViewManager {
   #mesh: Mesh
   #peers: any
   #ackTimeout: number
+  #evictAfter: number
+  #now: () => number
   #onCommit?: (v: View) => void
 
   // Ballot state. `promised` is the highest (epoch, proposer) this node has
   // accepted a PREPARE for — it refuses to ack a different proposer at that epoch.
   #promisedEpoch = 0
   #promisedProposer = ''
+  #promiseTimer?: ReturnType<typeof setTimeout> // releases a promise if its ballot never commits (dead proposer)
   #proposal?: { epoch: number; members: string[]; acks: Set<string>; timer?: ReturnType<typeof setTimeout> }
+  #highestProposed = 0 // highest epoch we've ever PROPOSED — each new ballot uses a fresh epoch above it
   #tick?: ReturnType<typeof setInterval>
   #lastProposable = '' // debounce: the proposable set seen on the previous tick
+  #unreachableSince = new Map<string, number>() // member → when it first went unreachable (eviction grace)
 
   constructor(opts: ViewOpts) {
     this.#me = opts.me
     this.#mesh = opts.mesh
     this.#peers = opts.peers
     this.#ackTimeout = opts.ackTimeout ?? 600
+    this.#evictAfter = opts.evictAfter ?? 1500
+    this.#now = opts.now ?? Date.now
     this.#onCommit = opts.onCommit
     this.members = [opts.me] // boot as a solo view of self
     this.#mesh.installView(this.members)
@@ -79,6 +88,7 @@ export class ViewManager {
   destroy() {
     if (this.#tick) clearInterval(this.#tick)
     if (this.#proposal?.timer) clearTimeout(this.#proposal.timer)
+    if (this.#promiseTimer) clearTimeout(this.#promiseTimer)
     this.#proposal = undefined
   }
 
@@ -102,27 +112,40 @@ export class ViewManager {
     return lo
   }
 
-  // Coordinator tick: if I'm the lowest reachable address and there are reachable
-  // servers not yet in the committed view, propose to admit them. (V1b only ADDS
-  // members — eviction/failover is V1c.)
+  // Coordinator tick. The coordinator is the lowest-address REACHABLE node, so
+  // when it dies the next-lowest takes over automatically (failover) — no separate
+  // election. It proposes a view that ADMITS reachable non-members and EVICTS
+  // members that have been continuously unreachable past the eviction grace (the
+  // grace + the V0 detector's own miss threshold avoid evicting on a brief blip).
   //
   // DEBOUNCE: propose only once the proposable set is STABLE across two ticks.
-  // During mesh formation a node briefly sees a subset of peers (e.g. B sees C
-  // before discovering the lower-addressed A) and would propose prematurely —
-  // producing dueling proposals that the promise rule refuses, each wasting an
-  // abort timeout. Waiting for stability lets the true coordinator emerge and
-  // propose the full membership once, so the common case is a single clean round.
+  // During mesh formation (or a flapping peer) a node briefly sees a subset, and
+  // proposing prematurely produces dueling/aborted rounds. Waiting for stability
+  // lets the true coordinator propose the settled membership once.
   #coordinate() {
     if (this.#proposal) return // a ballot is already in flight
-    const reachable = this.#reachable()
-    if (this.#coordinator(reachable) !== this.#me) {
-      this.#lastProposable = ''
-      return // not the coordinator
+    const reachableArr = this.#reachable()
+    const reachable = new Set(reachableArr)
+    const now = this.#now()
+
+    // Eviction-grace bookkeeping: track when each member first went unreachable.
+    for (const m of this.members) {
+      if (reachable.has(m)) this.#unreachableSince.delete(m)
+      else if (!this.#unreachableSince.has(m)) this.#unreachableSince.set(m, now)
     }
-    const proposed = [...new Set([...this.members, ...reachable])].sort()
+
+    if (this.#coordinator(reachableArr) !== this.#me) {
+      this.#lastProposable = ''
+      return // not the lowest reachable → not the coordinator
+    }
+
+    // Keep members that are reachable OR still within the eviction grace; drop
+    // those unreachable past the grace; add newly-reachable servers.
+    const kept = this.members.filter((m) => reachable.has(m) || now - (this.#unreachableSince.get(m) ?? now) < this.#evictAfter)
+    const proposed = [...new Set([...kept, ...reachableArr])].sort()
     if (sortedEqual(proposed, this.members)) {
       this.#lastProposable = ''
-      return // nothing new to admit
+      return // membership unchanged
     }
     const key = proposed.join(',')
     if (key !== this.#lastProposable) {
@@ -133,7 +156,12 @@ export class ViewManager {
   }
 
   #propose(members: string[]) {
-    const epoch = this.epoch + 1
+    // Fresh ballot ABOVE anything we've committed, promised, or proposed — so a
+    // retry or a failover proposal overrides a stuck promise left by a dead
+    // proposer at the previous epoch (else same-epoch + different-proposer would
+    // be refused by the promise rule and the cluster couldn't make progress).
+    const epoch = Math.max(this.epoch, this.#promisedEpoch, this.#highestProposed) + 1
+    this.#highestProposed = epoch
     this.#promisedEpoch = epoch
     this.#promisedProposer = this.#me
     const proposal = { epoch, members, acks: new Set<string>([this.#me]), timer: undefined as ReturnType<typeof setTimeout> | undefined }
@@ -160,6 +188,18 @@ export class ViewManager {
     if (epoch === this.#promisedEpoch && proposer !== this.#promisedProposer) return // promised another proposer this epoch
     this.#promisedEpoch = epoch
     this.#promisedProposer = proposer
+    // Release the promise if this ballot never commits — the proposer may have
+    // died mid-2PC. Without this, we'd stay promised to a dead proposer and refuse
+    // a new coordinator's ballot at this epoch forever. (A fresh higher ballot also
+    // overrides it, but releasing lets a re-proposal at the SAME epoch proceed.)
+    if (this.#promiseTimer) clearTimeout(this.#promiseTimer)
+    this.#promiseTimer = setTimeout(() => {
+      if (this.#promisedEpoch === epoch && this.epoch < epoch) {
+        this.#promisedEpoch = this.epoch
+        this.#promisedProposer = ''
+      }
+    }, this.#ackTimeout * 2)
+    this.#promiseTimer.unref?.()
     this.#mesh.viewSend(proposer, VERB.VIEW_ACK, { epoch, proposer, member: this.#me })
   }
 
@@ -197,10 +237,15 @@ export class ViewManager {
 
   #install(epoch: number, members: string[]) {
     if (this.#proposal?.timer) clearTimeout(this.#proposal.timer)
+    if (this.#promiseTimer) clearTimeout(this.#promiseTimer)
     this.#proposal = undefined
     this.epoch = epoch
     this.members = members.slice().sort()
     if (epoch > this.#promisedEpoch) this.#promisedEpoch = epoch
+    if (epoch > this.#highestProposed) this.#highestProposed = epoch
+    // drop eviction-grace tracking for nodes no longer in the view; still-members
+    // that remain unreachable keep their timer (the next tick re-evaluates).
+    for (const m of [...this.#unreachableSince.keys()]) if (!this.members.includes(m)) this.#unreachableSince.delete(m)
     this.#mesh.installView(this.members) // rebuild the DHT ring to exactly this view
     this.#onCommit?.({ epoch: this.epoch, members: this.members })
   }

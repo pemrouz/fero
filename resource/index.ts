@@ -203,6 +203,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // inbound) is appended to storage.
   const storage = config.storage as Storage | undefined
   delete (config as any).storage // L2 config — not a transport option
+  const viewOpts = (config.view as Record<string, unknown>) ?? {}
+  delete (config as any).view // L2 view-change tuning — not a transport option
   if (storage) {
     for (const record of await storage.load()) applyInbound(record)
     log.onAppend((record) => storage.append(record))
@@ -258,7 +260,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // read-only client (no listen address) isn't a ring member, so it has no
   // ViewManager. Every committed write is stamped with the current view epoch
   // (carried on the wire; fenced at apply in V1d).
-  const viewMgr = me !== undefined ? new ViewManager({ me, mesh, peers: mesh.peers }) : undefined
+  const viewMgr = me !== undefined ? new ViewManager({ me, mesh, peers: mesh.peers, ...viewOpts }) : undefined
   const viewEpoch = (): number => viewMgr?.epoch ?? 1
 
   // Write-capture: a local assignment on the proxy is stamped with our
