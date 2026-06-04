@@ -40,6 +40,7 @@ import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
 import { Log } from '../log/partition.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
+import { ViewManager } from './view.ts'
 
 export { value } from '../../data/index.ts'
 export { fileStorage } from './storage.ts'
@@ -51,6 +52,8 @@ export type Cluster = {
   readonly me?: string // this server's listen address (undefined for read-only clients)
   uuid: string
   owner: (key: string) => string | undefined // DHT owner of a partition key
+  readonly epoch: number // current committed view-epoch (Milestone V); 1 for a read-only client
+  readonly members: string[] // current committed view membership (servers); [] for a client
 }
 
 // What every method receives as its second arg. plan §6.1 names data/peer/
@@ -214,8 +217,19 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // every record they lack. The receiver folds the records through the same
     // dedup + LWW path above, so a late joiner or a peer that blipped converges
     // without any node having to stay connected the whole time.
-    onConnect: (address: string) => mesh.digestTo(address, Object.fromEntries(seen)),
-    onDigest: (vector: Record<string, number>, address: string) => mesh.catchupTo(address, log.recordsSince(vector)),
+    // The digest is RECIPROCAL: the dialer sends {v, reply:true}; the receiver
+    // ships back the records the dialer lacks AND replies with its OWN digest
+    // {reply:false}, so the dialer ships what the RECEIVER lacks. Without the
+    // reply leg, catch-up is one-directional — a node that missed a write while a
+    // link was down (e.g. a write committed locally during a forward failure, then
+    // the link reconnects) would never learn it's behind, since onConnect only
+    // fires on the dialer. The reply:false leg doesn't reciprocate again (bounded).
+    onConnect: (address: string) => mesh.digestTo(address, { v: Object.fromEntries(seen), reply: true }),
+    onDigest: (payload: any, address: string) => {
+      const vector: Record<string, number> = payload?.v ?? payload ?? {}
+      mesh.catchupTo(address, log.recordsSince(vector))
+      if (payload?.reply) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: false })
+    },
     // Inbound RPC: a client called one of our methods. Run it here with the
     // caller as context.peer; the transport ships the return value back. (Defined
     // after the method table below — fires only once a client is connected.)
@@ -228,19 +242,24 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // Apply it as a LOCAL write so our sink commits it (stamps origin=us, logs,
     // replicates) — we are the single sequencer for the partition.
     onWrite: (record: ChangeRecord) => applyLocalWrite(record),
+    // Membership view-change frames (Milestone V) → the view-change state machine.
+    onViewPrepare: (value: unknown) => viewMgr?.onPrepare(value),
+    onViewAck: (value: unknown) => viewMgr?.onAck(value),
+    onViewCommit: (value: unknown) => viewMgr?.onCommit(value),
+    onJoinRequest: (value: unknown) => viewMgr?.onJoinRequest(),
   })
 
   const uuid = mesh.uuid
   const me = mesh.me
 
-  // Membership view (Milestone V). The committed { epoch, members } the cluster
-  // agrees on; ownership is stable within an epoch. Seeded to a solo view of
-  // self; the view-change protocol (V1b+) installs subsequent views. In V1a this
-  // is inert plumbing — every committed write is stamped with view.epoch (carried
-  // on the wire) but nothing consumes the epoch yet (fencing lands in V1d), and
-  // the ring still tracks live servers, so there is no behaviour change.
-  const view: { epoch: number; members: string[] } = { epoch: 1, members: me !== undefined ? [me] : [] }
-  mesh.installView(view.members)
+  // Membership view (Milestone V). Servers run the view-change state machine: it
+  // forms a committed { epoch, members } the cluster agrees on, and drives the
+  // DHT ring (via mesh.installView) so ownership is stable within an epoch. A
+  // read-only client (no listen address) isn't a ring member, so it has no
+  // ViewManager. Every committed write is stamped with the current view epoch
+  // (carried on the wire; fenced at apply in V1d).
+  const viewMgr = me !== undefined ? new ViewManager({ me, mesh, peers: mesh.peers }) : undefined
+  const viewEpoch = (): number => viewMgr?.epoch ?? 1
 
   // Write-capture: a local assignment on the proxy is stamped with our
   // provenance, recorded as the current LWW winner for its key (the proxy has
@@ -289,7 +308,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const n = ++clock
     change.origin = uuid
     change.seq = n
-    change.epoch = view.epoch // the view this write commits under (carried on the wire; fenced in V1d)
+    change.epoch = viewEpoch() // the view this write commits under (carried on the wire; fenced in V1d)
     seen.set(uuid, n)
     const key = versionKey(change)
     const cur = versions.get(key)
@@ -323,6 +342,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     },
     uuid: mesh.uuid,
     owner: (key: string) => mesh.owner(key),
+    get epoch() {
+      return viewMgr?.epoch ?? 1
+    },
+    get members() {
+      return viewMgr ? viewMgr.members : []
+    },
   }
 
   // Default methods (plan §6.3), overridable by same-named opts functions. Each
@@ -416,6 +441,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     cluster,
     destroy() {
       void writeHost // retain the sink host until teardown
+      viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
     },

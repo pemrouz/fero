@@ -31,6 +31,12 @@ test('two servers discover, connect, and route writes to their owners', async ()
   // both dial each other → both see the other connected
   assert.ok(await until(() => connected(mA, a2) && connected(mB, a1)), 'A↔B should connect')
 
+  // The ring is driven by a committed view (Milestone V), not raw connections —
+  // L0 used standalone installs it directly (L2's ViewManager does this in a real
+  // cluster). Both nodes adopt the same view → identical rings.
+  mA.installView([a1, a2])
+  mB.installView([a1, a2])
+
   // rings agree on membership (same owner for any key on both nodes)
   assert.equal(mA.owner('probe'), mB.owner('probe'))
 
