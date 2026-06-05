@@ -319,3 +319,75 @@ sequencing + commit-ack drain + the V deferrals above) is a future milestone, ga
 deliberate decision to make non-local reads async. Until then fero is a fully-replicated,
 view-synchronous, linearizable-per-partition store with synchronous local reads — which
 is the right default for its target scale.
+
+> **Superseded by Milestone P.** The user took the deliberate decision F2 was gated on
+> ("go option 2 — partitioned holding, non-local reads become async"). F2's two findings
+> still hold and shaped P's design: per-partition sequencing is done WITH scoping (not
+> under full broadcast), and the per-origin core is preserved unchanged for R=∞.
+
+## P — Partitioned holding (R-way replication) · Adopted · `b079b26` (P0) → P2
+
+**Context.** The user chose "option 2" from the F2 deferral: make holding R-way (each
+partition on R replicas, not every node) so storage + write fan-out scale O(R) not O(N),
+accepting that non-local reads become async/routed (Milestone Q1). Reads become
+**hold-relative**: synchronous for partitions a node holds, `await`/subscribe for those it
+doesn't. Built centerpiece-first as increments, each gated by the full suite AND an
+**adversarial review workflow** (the reviews caught two classes of real defect before
+commit — see below).
+
+**P0 — replica-set seam (`b079b26`).** `cluster.replicas(key)` (owner + R-1 ring
+successors) + a `replicas: R` config, default ∞ = full replication (byte-identical to
+pre-P). Pure routing surface; the ring math (`dht.owners`) already existed.
+
+**P1 — DROPPED (not committed).** The plan was to re-key dedup/catch-up to
+(origin,partition) "under the full-replication safety net" first. The P1 review found this
+**regresses the anti-entropy path for zero full-replication benefit**: (a) the digest
+grows O(origins) → O(origins×partitions) ≈ every key, re-sent on every reconnect; (b)
+`recordsSince` grouped by (origin,partition) yields gapped seqs (the Lamport clock is
+global), so `encodeFrames` emits one frame per record instead of one. Root cause was a
+*planning* error — per-(origin,partition) only helps once holding is scoped; under full
+replication per-origin is strictly better. Reverted; folded into P2, gated on R.
+
+**P2 — scoped R-way replication.** Granularity is **gated on R, fixed per instance**, so
+full replication (R=∞) keeps the per-origin path byte-for-byte:
+- **Log/dedup granularity** (`Log({scoped})`, resource `seenKey`): R=∞ keys by origin
+  (compact digest, coalesced frames); finite R keys by (origin,partition) so each
+  partition's stream is independently complete (single owner-sequencer → gap-free), the
+  digest is bounded to held partitions, and an acquired partition re-syncs from seq 0.
+- **Held-set materialization**: `holds(key)` = me ∈ owners(key,R) (short-circuits to true
+  when R≥members — no ring scan on the hot path). The `onRecord` wrapper drops inbound
+  records for partitions we don't hold; a foreign write we originate is forwarded to the
+  owner and the optimistic local value dropped (`dropLocal`).
+- **Scoped delivery**: the owner commits and `replicatePeers(change,R)` to the OTHER
+  replicas (vs `broadcast`); R≥members falls back to broadcast (avoids an owners() scan).
+- **Scoped catch-up**: the digest carries the sender's LISTEN address; the responder
+  filters `recordsSince` to partitions the requester holds (per the ring), so it ships
+  only what the requester replicates — yet still re-ships a partition the requester is
+  ACQUIRING (absent from its vector). `recordsSince` sorts by (origin,seq) so frames
+  coalesce.
+- **Acquisition re-sync** (the P2-review blocker fix): anti-entropy was only triggered by
+  `onConnect`, never on view commit, so a node that joined and acquired partitions on the
+  ring rebalance **never received their history → silent R→R-1 under-replication (data
+  loss)**. Fixed by re-syncing on `ViewManager.onCommit` (immediate, after the new ring
+  installs) AND a **periodic anti-entropy timer** (`antiEntropy`, default 1000ms, scoped
+  only) — the robust backstop for the commit-order race (a commit-triggered digest can
+  reach a peer that hasn't committed the new view yet) and ordinary drift. The reciprocal
+  digest heals both directions, so a current holder ships the acquirer its share.
+
+**Consequences / known limitations (carried to IDEAS, gated on later milestones).**
+- **Orphans tolerated.** A former replica after a ring expansion, a write committed during
+  the formation window, a never-drop fallback at an unreachable owner, or a transiently
+  misrouted forward can leave an *extra copy* of a partition on a non-replica. These are
+  not data loss — acquisition re-sync ensures the partition's true R-set holds it — but
+  they violate "exactly R replicas". **Shedding** them safely needs P4's drained barrier
+  (shedding before the new replica has acquired would lose data), so it's deferred to P4.
+- **Digest is O(held keys)** per node (bounded by R/N of the keyspace). A Merkle/range-hash
+  compaction is the deferred **P3** refinement; until then periodic AE re-ships the full
+  per-(origin,partition) vector.
+- **`holds()` allocates** (owners() array) per inbound record when R<members; an
+  allocation-free ring predicate is a perf follow-up.
+
+**Decision.** Holding is R-way and durability-safe under membership change (acquisition
+heals to R). Full replication (R=∞) is unchanged and remains the default. Reads stay
+synchronous-and-local for held partitions; **Q1** makes non-local reads `await`/subscribe.
+P4 (drained handoff barrier + orphan shedding) and P3 (digest compaction) refine it.

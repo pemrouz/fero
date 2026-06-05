@@ -54,7 +54,7 @@ export type Mesh = {
   uuid: string
   owner: (key: string) => string | undefined
   send: (record: ChangeRecord) => void
-  replicate: (record: ChangeRecord, replicas?: number) => void
+  replicatePeers: (record: ChangeRecord, replicas: number) => void // scoped replication (Milestone P): send a committed record to the OTHER R-1 replicas of its partition (excludes self — the committer already holds + logged it)
   broadcast: (record: ChangeRecord) => void
   forward: (address: string, record: ChangeRecord) => boolean // route a write-request to the owner; false if it isn't connected
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
@@ -252,10 +252,13 @@ export function transport(opts: TransportOpts): Mesh {
       if (owner === me) deliverLocal(record)
       else if (owner) pool.sendTo(owner, record)
     },
-    replicate(record, replicas) {
+    // Scoped replication (Milestone P): the partition's owner (which committed the
+    // record under its own provenance) ships it to the OTHER replicas in its R-set.
+    // Excludes self — the committer already applied + logged it (commitLocal). Uses
+    // the same batched per-peer outbox as broadcast, so framing is identical.
+    replicatePeers(record, replicas) {
       for (const owner of dht.owners(partitionOf(record), replicas)) {
-        if (owner === me) deliverLocal(record)
-        else pool.sendTo(owner, record)
+        if (owner !== me) pool.sendTo(owner, record)
       }
     },
     broadcast: (record) => pool.broadcast(record),

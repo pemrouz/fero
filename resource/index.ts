@@ -37,7 +37,7 @@
 
 import { $, value as VALUE, view as VIEWSYM } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
-import { Log } from '../log/partition.ts'
+import { Log, originKey } from '../log/partition.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 import { ViewManager } from './view.ts'
@@ -118,9 +118,26 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     else config[k] = v
   }
 
-  // State: the proxy is the source of truth; the log records history (catch-up
-  // groundwork — not yet read back in v1).
-  const log = new Log()
+  // Replication factor (Milestone P). `replicas: R` holds each partition on R
+  // replicas (owner + R-1 ring successors); the default ∞ holds every partition on
+  // every server (full replication — the pre-P behavior, byte-identical). Extracted
+  // FIRST because it picks the granularity of the log + dedup + anti-entropy: full
+  // ⇒ per-origin (compact O(origins) digest, coalesced catch-up frames); finite R
+  // (scoped) ⇒ per-(origin,partition) (a node holds only its partitions and still
+  // re-syncs an acquired one from seq 0). Threaded to the DHT so its replicate
+  // default matches; L2 always passes R explicitly.
+  const R = typeof config.replicas === 'number' ? (config.replicas as number) : Infinity
+  delete (config as any).replicas
+  config.dht = { ...((config.dht as Record<string, unknown>) ?? {}), replicas: R }
+  const scoped = R !== Infinity
+  // Periodic anti-entropy interval (ms) — drives scoped acquisition + drift healing
+  // (see resync below). Extracted so it isn't passed to the transport; only armed in
+  // scoped mode.
+  const antiEntropyMs = typeof config.antiEntropy === 'number' ? (config.antiEntropy as number) : 1000
+  delete (config as any).antiEntropy
+
+  // State: the proxy is the source of truth; the log records history.
+  const log = new Log({ scoped })
   const data = $({})
   const res = (data as any)[VIEWSYM].res
 
@@ -136,7 +153,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // increments contiguously and the microtask outbox flushes before the next
   // (macrotask) inbound, so a frame's records keep contiguous seqs (base+index).
   let clock = 0 // this node's Lamport clock; local writes stamp ++clock
-  const seen = new Map<string, number>() // origin → highest seq seen (dedup high-water)
+  // Dedup high-water, keyed by seenKey(origin, partition) below: per-origin under
+  // full replication (compact digest), per-(origin,partition) under scoped holding
+  // (Milestone P — so each partition's stream is independently complete). Doubles
+  // as the anti-entropy digest a node sends (Object.fromEntries(seen)).
+  const seen = new Map<string, number>()
   // keyPath → current LWW winner. The {seq,origin} stamp is MUTATED in place on
   // re-write (not reallocated) so the steady-state write path allocates nothing
   // here — version churn was the dominant cost when this was a fresh object per
@@ -160,6 +181,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     return key.length === 1 ? key[0] : key.join('\x00')
   }
 
+  // The provenance key a record dedups / catches-up under (see `seen` above).
+  // Full replication ⇒ origin alone; scoped holding ⇒ (origin,partition). Mirrors
+  // the log's index granularity (constructed with the same `scoped` flag), so the
+  // digest a node sends and the records a peer ships back agree on the key.
+  const seenKey = scoped
+    ? (origin: string, p: string): string => originKey(origin, p)
+    : (origin: string, _p: string): string => origin
+
   // Inbound records carry their origin's provenance. (1) Drop duplicates by
   // per-origin high-water. (2) Log every accepted record (the full per-origin
   // history catch-up forwards from). (3) Apply only LWW winners to the proxy —
@@ -179,10 +208,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const applyInbound = (record: ChangeRecord) => {
     const origin = record.origin
     if (origin !== undefined) {
+      const sk = seenKey(origin, partitionOf(record))
       const n = record.seq ?? 0
-      if (n <= (seen.get(origin) ?? 0)) return // already have it (dedup)
-      seen.set(origin, n)
-      if (n > clock) clock = n // Lamport merge
+      if (n <= (seen.get(sk) ?? 0)) return // already have it (dedup, per seenKey granularity)
+      seen.set(sk, n)
+      if (n > clock) clock = n // Lamport merge (global)
       log.append(record)
       const e = record.epoch ?? 0
       const key = versionKey(record)
@@ -218,15 +248,6 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   delete (config as any).storage // L2 config — not a transport option
   const viewOpts = (config.view as Record<string, unknown>) ?? {}
   delete (config as any).view // L2 view-change tuning — not a transport option
-  // Replication factor (Milestone P). `replicas: R` holds each partition on R
-  // replicas (owner + R-1 ring successors); the default ∞ holds every partition
-  // on every server (full replication — the pre-P behavior, byte-identical).
-  // Extracted here so it parameterizes L2 routing; the ring math itself lives in
-  // the DHT (mesh.owners). Threaded to the DHT too so its own replicate() default
-  // matches, though L2 always passes R explicitly.
-  const R = typeof config.replicas === 'number' ? (config.replicas as number) : Infinity
-  delete (config as any).replicas
-  config.dht = { ...((config.dht as Record<string, unknown>) ?? {}), replicas: R }
   if (storage) {
     for (const record of await storage.load()) applyInbound(record)
     log.onAppend((record) => storage.append(record))
@@ -235,9 +256,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const mesh: Mesh = transport({
     name,
     ...(config as object),
-    onRecord: applyInbound,
+    // Scoped holding (Milestone P): materialize ONLY partitions we replicate. A
+    // server with finite R drops inbound records for partitions it doesn't hold
+    // (scoped delivery shouldn't send them, but catch-up over-ship or a transitional
+    // ring could). Storage replay calls applyInbound DIRECTLY (it restores our own
+    // held partitions), so the held-gate lives here, not in applyInbound.
+    onRecord: (record: ChangeRecord) => {
+      if (scoped && !holds(partitionOf(record))) return
+      applyInbound(record)
+    },
     // Catch-up (anti-entropy). When a dialed peer's handshake completes, send it
-    // our per-origin high-water digest; when a peer sends us theirs, ship back
+    // our high-water digest; when a peer sends us theirs, ship back
     // every record they lack. The receiver folds the records through the same
     // dedup + LWW path above, so a late joiner or a peer that blipped converges
     // without any node having to stay connected the whole time.
@@ -248,11 +277,26 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // link was down (e.g. a write committed locally during a forward failure, then
     // the link reconnects) would never learn it's behind, since onConnect only
     // fires on the dialer. The reply:false leg doesn't reciprocate again (bounded).
-    onConnect: (address: string) => mesh.digestTo(address, { v: Object.fromEntries(seen), reply: true }),
+    // Only servers (me defined) initiate anti-entropy — a read-only client has no
+    // log to sync and reads via subscriptions, so it never digests (it would just
+    // be shipped state it drops).
+    onConnect: (address: string) => {
+      if (me !== undefined) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: true, me })
+    },
     onDigest: (payload: any, address: string) => {
       const vector: Record<string, number> = payload?.v ?? payload ?? {}
-      mesh.catchupTo(address, log.recordsSince(vector))
-      if (payload?.reply) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: false })
+      let recs = log.recordsSince(vector)
+      // Scoped holding (P2): ship only partitions the REQUESTER replicates — its own
+      // LISTEN address (payload.me, not the ephemeral connection address) against the
+      // committed-view ring. Avoids wasting catch-up bandwidth on partitions it would
+      // just drop. A partition it's ACQUIRING is absent from its vector, so
+      // recordsSince ships it in full and this filter keeps it (it holds it per the
+      // ring) — that's the re-sync path. Skipped when R≥members (it holds all) or in
+      // full replication (no filter — and no owners() scan on the catch-up path).
+      if (scoped && payload?.me && R < viewSize())
+        recs = recs.filter((r) => mesh.owners(partitionOf(r), R).includes(payload.me))
+      mesh.catchupTo(address, recs)
+      if (me !== undefined && payload?.reply) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: false, me })
     },
     // Inbound RPC: a client called one of our methods. Run it here with the
     // caller as context.peer; the transport ships the return value back. (Defined
@@ -276,6 +320,37 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const uuid = mesh.uuid
   const me = mesh.me
 
+  const viewSize = (): number => mesh.viewMembers().length
+
+  // Does this node hold (replicate) a partition's records? Full replication ⇒
+  // always (every server holds everything). Scoped (finite R) ⇒ only if we're in
+  // the partition's R-set on the committed-view ring. A read-only client (no `me`)
+  // holds nothing. The R≥members short-circuit avoids an owners() ring scan when R
+  // covers everyone (scoped degenerates to full replication) — this runs on every
+  // inbound record + foreign write, so the scan would be a hot-path blowup.
+  const holds = (key: string): boolean => {
+    if (me === undefined) return false
+    if (!scoped || R >= viewSize()) return true
+    return mesh.owners(key, R).includes(me)
+  }
+
+  // Anti-entropy re-sync (Milestone P, scoped only): send our high-water digest to
+  // every other committed-view member, asking for what we lack — the reciprocal
+  // reply leg then heals BOTH directions. This is the ACQUISITION path: on a view
+  // change the ring rebalances partitions onto a node that has no records for them
+  // (absent from its digest), so a current holder ships them in full. Driven by (a)
+  // ViewManager.onCommit (immediate, after the new ring installs) and (b) a periodic
+  // timer (the robust backstop — a commit-triggered digest can race the peer's own
+  // commit, and periodic AE also heals ordinary drift). Full replication doesn't
+  // need it (every node holds everything; onConnect catch-up suffices), so it's
+  // gated to scoped — keeping the R=∞ path unchanged. (Digest is O(held keys); a
+  // Merkle/range-hash compaction is the deferred P3 refinement.)
+  const resync = () => {
+    if (!scoped || me === undefined) return
+    const digest = { v: Object.fromEntries(seen), reply: true, me }
+    for (const m of mesh.viewMembers()) if (m !== me) mesh.digestTo(m, digest)
+  }
+
   // Membership view (Milestone V). Servers run the view-change state machine: it
   // forms a committed { epoch, members } the cluster agrees on, and drives the
   // DHT ring (via mesh.installView) so ownership is stable within an epoch. A
@@ -283,8 +358,24 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // ViewManager. Every committed write is stamped with the current view epoch
   // (carried on the wire; fenced at apply in V1d).
   const viewMgr =
-    me !== undefined ? new ViewManager({ me, mesh, peers: mesh.peers, ...viewOpts, onWritable: (w) => w && flushPending() }) : undefined
+    me !== undefined
+      ? new ViewManager({
+          me,
+          mesh,
+          peers: mesh.peers,
+          ...viewOpts,
+          onWritable: (w) => w && flushPending(),
+          onCommit: () => resync(), // ring rebalanced → re-sync acquired partitions (scoped)
+        })
+      : undefined
   const viewEpoch = (): number => viewMgr?.epoch ?? 1
+
+  // Periodic anti-entropy (scoped only): the robust backstop for acquisition + drift
+  // (a commit-triggered resync can race a peer that hasn't committed the new view
+  // yet; this re-runs until both rings agree and the partition transfers). Off in
+  // full replication (the R=∞ path is unchanged — onConnect catch-up suffices there).
+  const aeTimer = scoped && me !== undefined ? setInterval(resync, antiEntropyMs) : undefined
+  aeTimer?.unref?.()
 
   // Write-capture: a local assignment on the proxy is stamped with our
   // provenance, recorded as the current LWW winner for its key (the proxy has
@@ -307,10 +398,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // provenance and replicates the canonical record back to us. The optimistic
     // local value is already applied (the set trap ran before this sink), so we
     // just hand off and return; the canonical origin=owner record arrives via
-    // broadcast and reconciles. Clients (no `me`) and an unreachable owner fall
-    // through to a local commit so a write is never dropped. Full replication is
-    // retained here, so every replica still sees each origin's seqs in order —
-    // the in-order-per-origin invariant the dedup/LWW core relies on holds.
+    // replication and reconciles. Clients (no `me`) and an unreachable owner fall
+    // through to a local commit so a write is never dropped. The dedup/LWW core's
+    // in-order invariant holds per (origin,partition) — each partition's single
+    // owner is one in-order source.
     //
     // A FORWARDED write (committingForward) is committed here unconditionally — we
     // do NOT re-check ownership. The forwarder already routed it to us; re-checking
@@ -318,13 +409,35 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // formation (each side computing a different owner), ping-ponging the write
     // until membership converges. Honoring the forwarder's decision ends the write
     // in one hop; a brief ring disagreement at worst commits at a not-yet-true
-    // owner, which still broadcasts and converges by LWW (as the pre-F1 model did).
+    // owner, which still replicates and converges by LWW (as the pre-F1 model did).
     if (!committingForward) {
-      const owner = me !== undefined ? mesh.owner(partitionOf(change)) : undefined
-      if (owner !== undefined && owner !== me && mesh.forward(owner, change)) return
+      const p = partitionOf(change)
+      const owner = me !== undefined ? mesh.owner(p) : undefined
+      if (owner !== undefined && owner !== me && mesh.forward(owner, change)) {
+        // Scoped holding (P2): we forwarded a write for a partition we DON'T
+        // replicate. The owner commits + replicates to the R-set (not us), so the
+        // canonical record never comes back — drop the optimistic value we just
+        // applied rather than orphan a stale copy. (Reading this key is a remote
+        // read — Milestone Q1.) Under full replication we keep it: the canonical
+        // record returns and reconciles.
+        if (scoped && !holds(p)) dropLocal(p)
+        return
+      }
     }
     commitLocal(change)
   })
+
+  // Silently remove a foreign partition we optimistically applied but don't hold
+  // (after forwarding its write to the owner). Guarded by `applying` so the removal
+  // doesn't re-enter the sink — no echo, no spurious forwarded 'remove'.
+  const dropLocal = (partition: string) => {
+    applying = true
+    try {
+      applyRecord(res, { type: 'remove', key: [partition] })
+    } finally {
+      applying = false
+    }
+  }
 
   // Commit a record under OUR provenance: stamp (origin=us, Lamport seq), record
   // it as the LWW winner for its key, log it, and replicate. Used for partitions
@@ -343,7 +456,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     change.origin = uuid
     change.seq = n
     const e = (change.epoch = viewEpoch()) // the view this write commits under (carried on the wire + fenced in LWW)
-    seen.set(uuid, n)
+    const p = partitionOf(change)
+    seen.set(seenKey(uuid, p), n)
     const key = versionKey(change)
     const cur = versions.get(key)
     if (cur) {
@@ -352,7 +466,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       cur.origin = uuid
     } else versions.set(key, { epoch: e, seq: n, origin: uuid })
     log.append(change)
-    mesh.broadcast(change) // full replication: every server materializes every record
+    // Replicate to peers: scoped mode with R < members ships only to the OTHER
+    // replicas in this partition's R-set (we already applied + logged it); otherwise
+    // (full replication, or R≥members so everyone holds all) broadcast to every
+    // connected server. The R≥members case broadcasts rather than calling
+    // replicatePeers→owners() (which would full-scan the ring).
+    if (scoped && R < viewSize()) mesh.replicatePeers(change, R)
+    else mesh.broadcast(change)
   }
 
   // A peer forwarded a write for a partition we own. Apply it to our proxy as a
@@ -491,6 +611,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     cluster,
     destroy() {
       void writeHost // retain the sink host until teardown
+      if (aeTimer) clearInterval(aeTimer)
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
