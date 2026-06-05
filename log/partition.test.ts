@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Log, partitionOf } from './partition.ts'
+import { Log, partitionOf, originKey } from './partition.ts'
 
 test('append segments by partition (key[0]) and tracks per-partition heads', () => {
   const log = new Log()
@@ -45,15 +45,15 @@ test('since/diff give the catch-up tail (the sync primitives)', () => {
   assert.deepEqual(log.heads(), { p: 5, q: 1 })
 })
 
-test('recordsSince / originHeads: the per-origin anti-entropy primitives', () => {
-  const log = new Log()
+test('recordsSince / marks (full mode): the per-origin anti-entropy primitives', () => {
+  const log = new Log() // default: full replication → per-origin index
   // two origins; seqs strictly increasing per origin (Lamport — note A's gap 2→5)
   log.append({ type: 'update', key: ['x'], value: 1, origin: 'A', seq: 1 })
   log.append({ type: 'update', key: ['y'], value: 2, origin: 'A', seq: 2 })
   log.append({ type: 'update', key: ['z'], value: 3, origin: 'B', seq: 1 })
   log.append({ type: 'update', key: ['x'], value: 9, origin: 'A', seq: 5 }) // Lamport jump
 
-  assert.deepEqual(log.originHeads(), { A: 5, B: 1 })
+  assert.deepEqual(log.marks(), { A: 5, B: 1 })
 
   // a peer that has A up to seq 2 and nothing from B gets A's seq-5 record + all of B
   assert.deepEqual(
@@ -66,5 +66,40 @@ test('recordsSince / originHeads: the per-origin anti-entropy primitives', () =>
   assert.deepEqual(
     log.recordsSince({}).map((r) => [r.origin, r.seq]),
     [['A', 1], ['A', 2], ['A', 5], ['B', 1]],
+  )
+})
+
+test('recordsSince / marks (scoped mode): per-(origin,partition) anti-entropy + rebalance', () => {
+  const log = new Log({ scoped: true }) // finite R → per-(origin,partition) index
+  // origin A writes partitions x and y; origin B writes z. Per (origin,partition)
+  // each stream's seqs are strictly increasing — A's x-stream jumps 1→5.
+  log.append({ type: 'update', key: ['x'], value: 1, origin: 'A', seq: 1 })
+  log.append({ type: 'update', key: ['y'], value: 2, origin: 'A', seq: 2 })
+  log.append({ type: 'update', key: ['z'], value: 3, origin: 'B', seq: 1 })
+  log.append({ type: 'update', key: ['x'], value: 9, origin: 'A', seq: 5 })
+
+  assert.deepEqual(log.marks(), {
+    [originKey('A', 'x')]: 5,
+    [originKey('A', 'y')]: 2,
+    [originKey('B', 'z')]: 1,
+  })
+
+  // a peer with A.x up to seq 1 and nothing else gets A.x's seq-5 record + all of
+  // A.y and B.z (never seen → from the start). Output sorted by (origin,seq) so an
+  // origin's records coalesce into the fewest frames: A.y(seq2) before A.x(seq5).
+  assert.deepEqual(
+    log.recordsSince({ [originKey('A', 'x')]: 1 }).map((r) => [r.origin, partitionOf(r), r.seq]),
+    [['A', 'y', 2], ['A', 'x', 5], ['B', 'z', 1]],
+  )
+  // fully caught up → nothing
+  assert.equal(log.recordsSince(log.marks()).length, 0)
+
+  // THE rebalance case (why scoped keys by (origin,partition)): a node that holds
+  // A.x and A.y but is ACQUIRING z has no mark for B.z, so all of z ships — even
+  // though z.seq (1) sits BELOW A's high-water (5). A per-origin mark of {A:5}
+  // would have wrongly suppressed it, silently losing the partition.
+  assert.deepEqual(
+    log.recordsSince({ [originKey('A', 'x')]: 5, [originKey('A', 'y')]: 2 }).map((r) => [partitionOf(r), r.seq]),
+    [['z', 1]],
   )
 })

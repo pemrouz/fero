@@ -272,6 +272,111 @@ test('P0: replicas:R holds a partition on exactly R members (owner + successors 
   }
 })
 
+// ── Milestone P2: scoped replication (R-way holding) ──
+// With finite R a partition materializes on exactly its R replicas; a non-replica
+// neither stores inbound records for it nor retains an optimistic copy of a write
+// it originated (it forwards to the owner and drops the local value).
+
+test('P2: replicas:2 — each partition lands on exactly its R replicas, nowhere else', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2 })
+  const A = await fero('p2-place', cfg(p1))
+  const B = await fero('p2-place', cfg(p2))
+  const C = await fero('p2-place', cfg(p3))
+  const all = [A, B, C]
+  const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+  const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  try {
+    assert.ok(await until(() => all.every((n) => n.cluster.members.length === 3), 8000), 'view committed')
+    const keys = Array.from({ length: 24 }, (_, i) => 'k' + i)
+    for (const k of keys) A.data[k] = k // A originates every write (owner / replica / foreign all exercised)
+
+    for (const k of keys) {
+      const reps = A.cluster.replicas(k) // owner + 1 successor (R=2)
+      assert.equal(reps.length, 2, `${k} has 2 replicas`)
+      // the 2 replicas converge on the key…
+      for (const addr of reps) assert.ok(await until(() => has(node(addr), k), 8000), `replica ${addr} has ${k}`)
+      // …and the 1 non-replica never materializes it (A drops the keys it forwarded
+      // but doesn't hold; B/C never receive a partition they don't replicate).
+      for (const n of all) if (!reps.includes(n.cluster.me)) assert.ok(!has(n, k), `non-replica ${n.cluster.me} lacks ${k}`)
+    }
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('P2: replicas:2 — concurrent writes from every node converge to exactly their replicas', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2 })
+  const A = await fero('p2-conv', cfg(p1))
+  const B = await fero('p2-conv', cfg(p2))
+  const C = await fero('p2-conv', cfg(p3))
+  const all = [A, B, C]
+  const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+  const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  try {
+    assert.ok(await until(() => all.every((n) => n.cluster.members.length === 3), 8000), 'view committed')
+    // each node originates its own namespace — exercises per-(origin,partition) dedup
+    // + scoped replication from multiple origins concurrently.
+    const keys: string[] = []
+    for (let i = 0; i < 12; i++) {
+      A.data['a' + i] = i
+      B.data['b' + i] = i
+      C.data['c' + i] = i
+      keys.push('a' + i, 'b' + i, 'c' + i)
+    }
+    for (const k of keys) {
+      const reps = A.cluster.replicas(k)
+      for (const addr of reps) assert.ok(await until(() => has(node(addr), k), 8000), `replica ${addr} has ${k}`)
+      for (const n of all) if (!reps.includes(n.cluster.me)) assert.ok(!has(n, k), `non-replica ${n.cluster.me} lacks ${k}`)
+    }
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('P2: replicas:2 — a node that joins after writes ACQUIRES its share (durability heals to R)', async () => {
+  // The acquisition path (Milestone P): when membership grows, the ring rebalances
+  // partitions onto the joiner, which must back-fill their history via anti-entropy
+  // — else they stay under-replicated (R→R-1, silent data loss). Fast AE interval
+  // so the test converges quickly.
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150 })
+  const A = await fero('p2-acq', cfg(p1))
+  const B = await fero('p2-acq', cfg(p2))
+  const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  try {
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), '2-member view')
+    const keys = Array.from({ length: 40 }, (_, i) => 'k' + i)
+    for (const k of keys) A.data[k] = k
+    assert.ok(await until(() => keys.every((k) => has(B, k)), 8000), 'B holds all (R=2 ≥ 2 members)')
+
+    // C joins → 3-member view; the ring now assigns many partitions an R-set containing C.
+    const C = await fero('p2-acq', cfg(p3))
+    const all = [A, B, C]
+    const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+    try {
+      assert.ok(await until(() => all.every((n) => n.cluster.members.length === 3), 8000), '3-member view')
+      // Every key must be held by BOTH its R-set replicas — durability healed to R,
+      // no partition left under-replicated (the blocker the review caught).
+      for (const k of keys) {
+        for (const addr of A.cluster.replicas(k)) {
+          assert.ok(await until(() => has(node(addr), k), 10000), `replica ${addr} acquired ${k}`)
+        }
+      }
+      // And C genuinely acquired a non-trivial share (it's a replica of some keys).
+      const cKeys = keys.filter((k) => A.cluster.replicas(k).includes(C.cluster.me))
+      assert.ok(cKeys.length > 0, `C is a replica of some keys (got ${cKeys.length})`)
+      for (const k of cKeys) assert.ok(has(C, k), `C acquired its replica key ${k}`)
+    } finally {
+      C.destroy()
+    }
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
 test('3-node: a late joiner catches up to BOTH peers’ writes via one connection', async () => {
   const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`

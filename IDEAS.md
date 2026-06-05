@@ -45,27 +45,34 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    plain assignments. Route assignments through the method (for an auth/validation
    hook) or keep them separate? A genuinely-open design point, not in plan §11
    (it sits alongside the §11.1 write-paths). (resource)
-7. **Owner-routing: fan-out reduction & failover** (partitioned routing). **F1**
-   (owner-routed writes) and **V** (view-synchronous membership — stable ownership
-   per epoch) have landed ([DECISIONS F1](DECISIONS.md), [V](DECISIONS.md)). **F2/F3
-   investigated and DEFERRED** ([DECISIONS F2](DECISIONS.md)): R-way fan-out reduction
-   requires partitioned holding (routed/async non-local reads — it breaks synchronous
-   `data.x`), and per-partition sequencing under full broadcast is a *regression* at
-   ownership handoffs (the current per-origin model is more robust). So this is now a
-   **partitioned-holding** milestone, gated on a deliberate decision to make non-local
-   reads async. When taken: **F2** — per-partition sequencing + R-way replication
-   (`mesh.replicate` to the R owners; dedup + catch-up keyed *per partition* via
-   `Log.heads()`/`diff()`) — and **F3** — owner failover / version continuity on
-   handoff (the next clockwise replica, already caught up, continues the partition
-   counter, behind a drained view-change barrier). F2 also picks up the V
-   deferrals: the stronger **reject-stale-epoch-from-an-evicted-node** fence (needs
-   the per-partition owner lineage + a uuid↔address map), the **commit-ack drain**
-   (PREPARE-ACK high-water vectors; also [open question 1]), the
-   **outbox-flush-before-ring-rebuild** (a no-op under full broadcast, matters once
-   replication is ring-routed), and preserving a **buffered write's attempt-epoch**
-   on flush (today it flushes under the current epoch). The gap-tolerant-dedup
-   alternative from [DECISIONS F](DECISIONS.md) stays parked unless F2's per-partition
-   sequencing proves insufficient. (resource, transport, log)
+7. **Partitioned holding (R-way) — remaining work.** The user took option 2:
+   **P0** (replica-set seam) and **P2** (scoped R-way replication + per-(origin,partition)
+   dedup/catch-up + acquisition re-sync) have LANDED ([DECISIONS P](DECISIONS.md)); F2/F3
+   are superseded by P. Granularity is R-gated, so full replication (R=∞) is unchanged.
+   What's left, by milestone:
+   - **P3 — anti-entropy digest compaction.** P2's scoped digest is O(held keys), re-sent
+     by periodic AE every `antiEntropy` ms. Replace with a **Merkle / range-hash** tree:
+     exchange a root, drill only into differing subtrees (O(log keys) + the diff). Also:
+     smarter peer-selection (digest a random subset per round, not all view members — the
+     current fan-out is O(N²) per round). (log, resource)
+   - **P4 — drained handoff barrier + orphan shedding.** (a) Make the view-change a
+     **drained cutover**: the new replica is caught up BEFORE the view goes live (no
+     under-replication window — P2 heals *eventually* via AE, not atomically). (b) **Shed
+     orphans**: after the barrier confirms the new R-set holds a partition, drop the extra
+     copies P2 tolerates (former replica on ring expansion, formation-window write,
+     never-drop fallback at an unreachable owner, transiently-misrouted forward). Shedding
+     needs the barrier — dropping before acquisition completes would lose data. Also picks
+     up the V deferrals: the stronger **reject-stale-epoch-from-an-evicted-node** fence
+     (per-partition owner lineage + a uuid↔address map), the **commit-ack drain**
+     (PREPARE-ACK high-water vectors; also [open question 1]), **outbox-flush-before-ring-
+     rebuild**, and preserving a **buffered write's attempt-epoch** on flush. (resource,
+     transport)
+   - **Perf follow-ups.** `holds()` allocates an `owners()` array per inbound record when
+     R<members — add an allocation-free ring predicate (`dht.holds(key, addr, R)`). The
+     gap-tolerant-dedup alternative from [DECISIONS F](DECISIONS.md) stays parked. (transport)
+
+   Reads (Q1) make non-local access `await`/subscribe; aggregates (Q2/Q3) are the
+   distributed-query slice of L3. See open questions below + [DECISIONS P](DECISIONS.md).
 
    Membership hardening still open (from the V review, deferred): a dedicated
    **two-established-cluster merge** test (works via lowest-coordinator + epoch

@@ -6,40 +6,83 @@
 //   • onAppend(fn)           — observe appends (the view + replication subscribe)
 //   • heads() / since() / diff(base) — the offset-vector sync primitives (per-
 //                              partition catch-up).
-//   • recordsSince(vector)   — the per-ORIGIN anti-entropy primitive: given a
-//                              peer's {origin→highest seq}, the records it lacks.
-//                              This is what L2's catch-up ships on (re)connect.
+//   • recordsSince(vector)   — the anti-entropy primitive: given a peer's
+//                              {key→highest seq} high-water vector, the records it
+//                              lacks. This is what L2's catch-up ships on
+//                              (re)connect. The vector's KEY GRANULARITY follows
+//                              the holding mode (see `scoped` below).
+//   • marks()                — this log's own high-water vector (the digest a node
+//                              would send), in the same key granularity.
 //
 // Segmenting by partition (not one flat log) means ownership — which moves
 // per-partition via the DHT — maps cleanly onto log segments for rebalancing.
-// A parallel per-origin index (records carry provenance since Milestone A) backs
-// recordsSince: each origin's records arrive in strictly increasing seq order
-// (the resource layer dedups before appending), so the index stays seq-sorted
-// and a peer's missing tail is a binary-search slice.
+// A parallel provenance index (records carry origin+seq since Milestone A) backs
+// recordsSince: each stream arrives in strictly increasing seq order (the resource
+// layer dedups before appending), so the index stays seq-sorted and a peer's
+// missing tail is a binary-search slice.
+//
+// Granularity (Milestone P). Under FULL replication the index is keyed by ORIGIN:
+// every node holds every partition, so an origin's whole seq stream is one
+// contiguous in-order run — a compact O(origins) digest, and catch-up frames
+// coalesce into one. Under SCOPED holding (finite R) a node materializes only the
+// partitions it replicates, so it sees just a SUBSET of an origin's writes; a
+// per-origin mark would then conflate partitions — a node that acquires a
+// partition on rebalance, or misses one, couldn't tell what's missing and catch-up
+// would silently drop records. So `scoped` mode keys the index by
+// (ORIGIN,PARTITION): each partition's stream is independently complete (its single
+// owner is one in-order source), the digest is naturally bounded to the partitions
+// the node holds, and a newly-held partition re-syncs from seq 0. The mode is fixed
+// at construction (R is fixed per resource), so only ONE index is ever maintained —
+// full replication keeps the per-origin path byte-for-byte and pays nothing.
 
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 
 export { partitionOf }
 
+// The (origin,partition) composite key for scoped mode: origin is a uuid,
+// partition a top-level key — neither contains \0, the separator the resource's
+// versionKey also relies on. Shared with L2 so the digest a node sends and the
+// records a peer ships back agree on the key byte-for-byte.
+export const originKey = (origin: string, partition: string): string => origin + '\x00' + partition
+
 export type AppendListener = (record: ChangeRecord, partition: string, offset: number) => void
+
+export type LogOpts = {
+  // false (default): index by origin — full-replication anti-entropy (compact).
+  // true: index by (origin,partition) — scoped-holding anti-entropy (Milestone P).
+  scoped?: boolean
+}
 
 export class Log {
   #segments = new Map<string, ChangeRecord[]>() // partition → ordered records
-  #byOrigin = new Map<string, ChangeRecord[]>() // origin → records, seq-ascending
+  #index = new Map<string, ChangeRecord[]>() // provenance key (origin OR origin\0partition) → records, seq-ascending
   #listeners = new Set<AppendListener>()
+  #scoped: boolean
+
+  constructor({ scoped = false }: LogOpts = {}) {
+    this.#scoped = scoped
+  }
+
+  // The provenance-index key for a record: origin (full) or origin\0partition
+  // (scoped). Callers of marks()/recordsSince() build their vector with the same
+  // granularity (full replication ⇒ per-origin; finite R ⇒ per-(origin,partition)).
+  #key(record: ChangeRecord): string {
+    return this.#scoped ? originKey(record.origin!, partitionOf(record)) : record.origin!
+  }
 
   // Append a record to its partition's segment; returns the partition's new head
   // (entry count). Notifies listeners synchronously. Records carrying provenance
-  // are also threaded onto their origin's seq-ordered index (for recordsSince).
+  // are also threaded onto their seq-ordered provenance index (for recordsSince).
   append(record: ChangeRecord): number {
     const p = partitionOf(record)
     let seg = this.#segments.get(p)
     if (!seg) this.#segments.set(p, (seg = []))
     seg.push(record)
     if (record.origin !== undefined) {
-      let byO = this.#byOrigin.get(record.origin)
-      if (!byO) this.#byOrigin.set(record.origin, (byO = []))
-      byO.push(record)
+      const k = this.#key(record)
+      let idx = this.#index.get(k)
+      if (!idx) this.#index.set(k, (idx = []))
+      idx.push(record)
     }
     const head = seg.length
     for (const fn of this.#listeners) fn(record, p, head)
@@ -87,23 +130,29 @@ export class Log {
     return [...this.#segments.keys()]
   }
 
-  // Per-origin high-water marks: { origin → highest seq held }. The digest a node
-  // sends a peer so the peer can compute what to ship back.
-  originHeads(): Record<string, number> {
+  // This log's high-water marks: { provenance-key → highest seq held }. The digest
+  // a node sends a peer so the peer can compute what to ship back. Per-origin in
+  // full mode, per-(origin,partition) in scoped mode (then naturally bounded to the
+  // partitions this node holds — it only has records for those).
+  marks(): Record<string, number> {
     const v: Record<string, number> = {}
-    for (const [origin, recs] of this.#byOrigin) v[origin] = recs.length ? (recs[recs.length - 1].seq ?? 0) : 0
+    for (const [key, recs] of this.#index) v[key] = recs.length ? (recs[recs.length - 1].seq ?? 0) : 0
     return v
   }
 
   // The anti-entropy delta: every record whose seq exceeds the peer's high-water
-  // for that origin. Origins the peer has never seen (absent from `vector`) ship
-  // in full. Output is grouped by origin, each group seq-ascending — ready for
-  // provenance-preserving framing. Each origin's index is seq-sorted, so the
-  // first record past the peer's mark is a binary search.
+  // for its provenance key. Keys the peer has never seen (absent from `vector`)
+  // ship in full — so a partition acquired on rebalance re-syncs from the start.
+  // Each index group is seq-sorted, so the first record past the peer's mark is a
+  // binary search. In scoped mode the groups are per (origin,partition); the output
+  // is re-sorted by (origin,seq) so an origin's records across partitions coalesce
+  // into the fewest frames (encodeFrames breaks a run on an origin change or a
+  // seq gap), recovering the single-frame full-replication behavior wherever the
+  // held partitions' seqs happen to be contiguous.
   recordsSince(vector: Record<string, number> = {}): ChangeRecord[] {
     const out: ChangeRecord[] = []
-    for (const [origin, recs] of this.#byOrigin) {
-      const mark = vector[origin] ?? 0
+    for (const [key, recs] of this.#index) {
+      const mark = vector[key] ?? 0
       // binary search for the first index whose seq > mark
       let lo = 0
       let hi = recs.length
@@ -114,6 +163,8 @@ export class Log {
       }
       for (let i = lo; i < recs.length; i++) out.push(recs[i])
     }
+    if (this.#scoped)
+      out.sort((a, b) => (a.origin! < b.origin! ? -1 : a.origin! > b.origin! ? 1 : (a.seq ?? 0) - (b.seq ?? 0)))
     return out
   }
 
