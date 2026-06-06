@@ -63,9 +63,9 @@ export type Mesh = {
   viewSend: (address: string, verb: number, value: unknown) => boolean // send a view-change control frame; false if the peer isn't connected
   digestTo: (address: string, payload: unknown) => void // send our anti-entropy digest payload
   catchupTo: (address: string, records: ChangeRecord[]) => void // ship records a peer lacks
-  call: (method: string, arg: unknown) => Promise<unknown> // RPC to a connected server
+  call: (method: string, arg: unknown, to?: string) => Promise<unknown> // RPC; to a specific peer (owner-routed reads — Q1) or a picked connected server
   hasServer: () => boolean // is there a connected server to call?
-  subscribe: (method: string, arg: unknown, onDelta: (record: ChangeRecord) => void) => (() => void) | undefined // open a live subscription; returns an unsubscribe (or undefined if no server)
+  subscribe: (method: string, arg: unknown, onDelta: (record: ChangeRecord) => void, to?: string) => (() => void) | undefined // live subscription; to a specific peer or a picked server; returns an unsubscribe (or undefined if not connected)
   deltaTo: (address: string, subId: number, record: ChangeRecord) => void // server → client: ship one subscription delta
   ready: Promise<void>
   destroy: () => void
@@ -304,8 +304,8 @@ export function transport(opts: TransportOpts): Mesh {
       for (const buf of encodeFrames(records)) peer.write(buf)
     },
     hasServer: () => pickServer() !== undefined,
-    subscribe(method, arg, onDelta) {
-      const address = pickServer()
+    subscribe(method, arg, onDelta, to) {
+      const address = to ?? pickServer()
       const peer = address ? pool.peer(address) : undefined
       if (!peer) return undefined
       const id = ++callId
@@ -318,8 +318,8 @@ export function transport(opts: TransportOpts): Mesh {
     deltaTo(address, subId, record) {
       pool.peer(address)?.write(encodeFrame([record], { verb: VERB.RECORDS, id: subId }))
     },
-    call(method, arg) {
-      const address = pickServer()
+    call(method, arg, to) {
+      const address = to ?? pickServer()
       const peer = address ? pool.peer(address) : undefined
       if (!peer) return Promise.reject(new Error('fero: no connected server to call'))
       const id = ++callId

@@ -75,8 +75,16 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
      gap-tolerant-dedup alternative from [DECISIONS F](DECISIONS.md) stays parked. NUL-in-key
      over-match in shed/versionKey is an inherited separator assumption. (transport, resource)
 
-   Reads (Q1) make non-local access `await`/subscribe; aggregates (Q2/Q3) are the
-   distributed-query slice of L3. See open questions below + [DECISIONS P](DECISIONS.md).
+   Reads (**Q1** — LANDED, [DECISIONS Q1](DECISIONS.md)) make non-local access
+   `await`/subscribe via an owner-routed `read(key)` + a `data.x` facade. Q1 follow-ups
+   (documented limitations, the routed read is the robust fallback): a **subscription-
+   cleanup-on-disconnect** hook (pre-existing; now also leaks forwarded subscriptions on an
+   ungraceful client/relay disconnect — needs a peer-disconnect callback); **deep nested
+   writes** (`data.x.y.z=v`) into a non-held partition (depth-1 routes; deeper doesn't);
+   **`await data.x.field`** on a non-held key (resolves the subscription, not a one-shot of
+   the field); **read-your-writes** lag when a write's owner-forward fails; the inherent
+   **operator-name key collision** in the facade. Aggregates (Q2/Q3) are the distributed-
+   query slice of L3. See open questions below + [DECISIONS P](DECISIONS.md) / [Q1](DECISIONS.md).
 
    Membership hardening still open (from the V review, deferred): a dedicated
    **two-established-cluster merge** test (works via lowest-coordinator + epoch

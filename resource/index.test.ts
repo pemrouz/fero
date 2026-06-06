@@ -473,6 +473,135 @@ test('P4: replicas:2 — a FULL R-set move (both old replicas dropped) sheds saf
   }
 })
 
+test('Q1: a scoped server reads a partition it does NOT hold via owner-routed `await data.x`', async () => {
+  // Hold-relative reads: a held key is local+sync; a non-held key is a remote handle
+  // — `await data.x` fetches one-shot from the owner, `data.x.connect(...)` opens a
+  // live remote view. Here A reads a key whose R-set excludes it.
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150 })
+  const A = await fero('q1', cfg(p1))
+  const B = await fero('q1', cfg(p2))
+  const C = await fero('q1', cfg(p3))
+  const all = [A, B, C]
+  const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed')
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    const foreign = keys.find((k) => !A.cluster.replicas(k).includes(A.cluster.me))!
+    assert.ok(foreign, 'a key A does not replicate exists')
+
+    // write it from its owner (a holder); it lands on its R-set, NOT on A.
+    node(A.cluster.owner(foreign)!).data[foreign] = { v: 42 }
+    assert.ok(
+      await until(() => A.cluster.replicas(foreign).every((a) => foreign in (node(a).data[value] ?? {})), 8000),
+      'the R-set holds the key',
+    )
+    assert.ok(!(foreign in (A.data[value] ?? {})), 'A does not hold it locally')
+
+    // await A.data[foreign] → owner-routed one-shot remote read returns the value.
+    let got: any
+    for (let i = 0; i < 40; i++) {
+      got = await A.data[foreign]
+      if (got && got.v === 42) break
+      await sleep(150)
+    }
+    assert.equal(got?.v, 42, 'A read the foreign key via owner-routed await data.x')
+
+    // a held key stays synchronous + local (no remote handle).
+    const mine = keys.find((k) => A.cluster.replicas(k).includes(A.cluster.me))!
+    node(A.cluster.owner(mine)!).data[mine] = { v: 7 }
+    assert.ok(await until(() => mine in (A.data[value] ?? {}), 8000), 'A holds its own key locally')
+    assert.equal((A.data[value] as any)[mine]?.v, 7, 'held key reads locally and synchronously')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q1: a read-only client reads any partition via read-forwarding through its server', async () => {
+  // A client connects to ONE server, but can read EVERY partition: the server it
+  // reaches forwards a read for a key it doesn't hold to that key's owner.
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150 })
+  const A = await fero('q1c', cfg(p1))
+  const B = await fero('q1c', cfg(p2))
+  const C = await fero('q1c', cfg(p3))
+  const all = [A, B, C]
+  const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  let client: any
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed')
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: k } // each written by its owner
+    assert.ok(
+      await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => k in (node(a).data[value] ?? {}))), 8000),
+      'every key placed on its R-set',
+    )
+    // client dials ONLY server A.
+    client = await fero('q1c', { host: '127.0.0.1', ports: [p1], wait: 200 })
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected to A')
+
+    // read keys whose owner is NOT A → must forward A→owner.
+    const foreign = keys.filter((k) => A.cluster.owner(k) !== A.cluster.me)
+    assert.ok(foreign.length > 0, 'some keys are owned off A')
+    for (const k of foreign.slice(0, 6)) {
+      let got: any
+      for (let i = 0; i < 40; i++) {
+        got = await client.data[k]
+        if (got && got.v === k) break
+        await sleep(150)
+      }
+      assert.equal(got?.v, k, `client read ${k} (owner ${A.cluster.owner(k)}) via forwarding through A`)
+    }
+  } finally {
+    client?.destroy()
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q1: facade robustness — prototype-name keys read remotely; nested writes route to the owner', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150 })
+  const A = await fero('q1r', cfg(p1))
+  const B = await fero('q1r', cfg(p2))
+  const C = await fero('q1r', cfg(p3))
+  const all = [A, B, C]
+  const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed')
+
+    // (a) a partition named like an Object.prototype method must NOT be shadowed —
+    // it reads via the owner-routed remote handle, not a stale local child.
+    const proto = ['valueOf', 'toString', 'hasOwnProperty'].find((k) => !A.cluster.replicas(k).includes(A.cluster.me))
+    if (proto) {
+      node(A.cluster.owner(proto)!).data[proto] = { v: 'proto' }
+      await until(() => A.cluster.replicas(proto).every((a) => proto in (node(a).data[value] ?? {})), 8000)
+      let got: any
+      for (let i = 0; i < 40; i++) {
+        got = await A.data[proto]
+        if (got && got.v === 'proto') break
+        await sleep(150)
+      }
+      assert.equal(got?.v, 'proto', `prototype-name key ${proto} read remotely (not shadowed)`)
+    }
+
+    // (b) a depth-1 nested write into a partition A does NOT hold routes to the owner.
+    const foreign = Array.from({ length: 30 }, (_, i) => 'fk' + i).find((k) => !A.cluster.replicas(k).includes(A.cluster.me))!
+    assert.ok(foreign, 'a non-held key exists')
+    A.data[foreign].score = 99 // nested write through the facade on a non-holder
+    const owner = node(A.cluster.owner(foreign)!)
+    assert.ok(
+      await until(() => (owner.data[value] as any)?.[foreign]?.score === 99, 8000),
+      'nested write routed to the owner',
+    )
+    assert.ok(!(foreign in (A.data[value] ?? {})), 'A did not orphan the nested write locally')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
 test('3-node: a late joiner catches up to BOTH peers’ writes via one connection', async () => {
   const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
