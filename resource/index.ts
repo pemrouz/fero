@@ -1105,8 +1105,21 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (isClient) return clientHandle('aggregate', { ...spec, fold: true })
     // R≥members ⇒ this node holds the whole resource → run the aggregate LOCALLY over
     // complete state (re-checked per access as membership grows). Matches "all data local
-    // ⇒ run locally unchanged".
-    if (R >= viewSize()) return (data as any)[op](...args)
+    // ⇒ run locally unchanged". EXCEPT some/every: their DECLARATIVE (col) form has no raw
+    // data-lib equivalent (data's some/every require a PREDICATE FN — `data.some('active')`
+    // would throw "fn is not a function"), so they always go through the fold, which
+    // reconstructs the predicate from (col,val) in buildPartial. The fold is correct for
+    // any R (owner-scoping is a disjoint cover regardless of how many nodes hold each
+    // partition); at R≥members it just fans out to members that each happen to hold all.
+    //   NOTE — under FULL replication (R=∞, the default) the facade is NOT built (the raw
+    //   proxy is returned, to keep that hot path byte-identical), so this code never runs
+    //   there: `data.sum/max/min/avg('col')` / `data.length()` work (data accepts a column),
+    //   but `data.some/every('col')` falls through to data's raw some/every and throws — use
+    //   the NATIVE predicate form `data.some(s => s.active)` under full replication (you hold
+    //   all the data, so the local some/every IS the global). The declarative col form is the
+    //   scoped-distributed sugar. Not a Q2 regression (data's some/every always needed a fn);
+    //   making the col form uniform needs a data-lib some(col)/every(col) overload — IDEAS.
+    if (R >= viewSize() && op !== 'some' && op !== 'every') return (data as any)[op](...args)
     return foldAggregate(spec)
   }
   // Q3 boundary guard. These operators are HOLISTIC or ordered — the global answer needs
@@ -1202,7 +1215,12 @@ const extremum =
 const avgRule: Rule = (vs) => {
   let s = 0
   let c = 0
-  for (const v of vs) if (v != null) { s += (v as any).sum || 0; c += (v as any).count || 0 }
+  // `?? 0` (not `|| 0`) on .sum so a NaN-poisoned local shard (data's SumValue does `+v`,
+  // NaN on a non-numeric column) PROPAGATES to the global, matching single-node `data.avg`
+  // and sumRule's own ?? 0 — `|| 0` would mask it to a confidently-wrong finite number.
+  // count is always finite (a row count). (A REMOTE NaN already arrives as null via the JSON
+  // wire codec — the documented value-codec limitation — where ?? and || agree.)
+  for (const v of vs) if (v != null) { s += (v as any).sum ?? 0; c += (v as any).count ?? 0 }
   return c === 0 ? undefined : s / c
 }
 // some = OR: any holder with a match ⇒ Σ(match counts) > 0. Empty ⇒ 0 ⇒ false.

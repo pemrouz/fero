@@ -545,6 +545,14 @@ adversarial-review workflow (it earned its keep — see below).
   data-corruption path found by hand: a stale subscription delta (a frame with an id but no
   matching sub, arriving after a churn unsubscribe) fell through to `onRecord` and clobbered
   the root → drop id'd frames with no sub (plain replication never carries a frame id).
+- Q2 capstone (the integrated surface): `data.some/every('col')` CRASHED ("fn is not a
+  function") on the `R ≥ members` facade branch — it forwarded the column STRING to data's raw
+  some/every, which need a predicate FN; the only some/every test took the `R < members` fold
+  path. Fixed by routing some/every through the fold even at `R ≥ members` (the fold
+  reconstructs the predicate from `(col,val)`; correct for any R). Also: `avgRule` kept `|| 0`
+  where sumRule had been fixed to `?? 0`, so a NaN-poisoned local shard masked to 0 → `?? 0`.
+  (Full replication's `some/every('col')` is a documented limitation, not a regression — →
+  [IDEAS / Aggregates].)
 
 **Consequences.**
 - Full replication (R=∞) is UNCHANGED: the facade isn't built (raw proxy returned), so the

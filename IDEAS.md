@@ -106,6 +106,14 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
      (today a slow/departed holder silently undercounts after `callTimeout`); per-handle GC
      teardown of an abandoned fold handle; the chained-aggregate auto-detect past the facade.
      (resource, transport)
+   - **`some/every('col')` under FULL replication** — the declarative column form is the
+     scoped-distributed sugar (it folds via `buildPartial`'s `filter(col,val).length()`); under
+     R=∞ the facade isn't built (to keep that path byte-identical), so `data.some('col')` falls
+     through to data's raw `some`/`every`, which require a predicate FN (throws "fn is not a
+     function" — use the native `data.some(fn)` there). Making the col form uniform across R=∞
+     needs a data-lib `some(col)/every(col)` overload (the `data` lib accepts a column for
+     sum/max/min/avg/filter but not some/every) — then fero's full-rep path works unchanged.
+     `sum/max/min/avg('col')` + `length()` already work on every config. (data, resource)
    See open questions below + [DECISIONS P](DECISIONS.md) / [Q1](DECISIONS.md) / [Q2](DECISIONS.md).
 
    Membership hardening still open (from the V review, deferred): a dedicated
