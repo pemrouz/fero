@@ -1419,3 +1419,84 @@ test('Q2b: a NaN partial (non-numeric column) propagates to the global sum — n
     all.forEach((n) => n.destroy())
   }
 })
+
+// ── Milestone Q2c: view-change rebind + holder churn + acquisition heal ──
+// A live fold must survive membership changes: each node re-scopes its own owner-scoped
+// partials on its own commit, the coordinator reconciles its holder set (add new / drop
+// departed / retry the admit race), and acquired partitions heal in. The data is UNCHANGED
+// across the churn, so the fold must settle back to EXACTLY the same global — any permanent
+// deviation is a double-count (re-scope failed) or a gap (reconcile/acquisition failed).
+
+test('Q2c: a live fold survives a node JOIN — re-scopes + reconciles, settles to the same global', async () => {
+  const pts = await Promise.all(Array.from({ length: 4 }, () => ports.free()))
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: pts, wait: 250, replicas: 2, antiEntropy: 150 })
+  const A = await fero('q2cg', cfg(pts[0]))
+  const B = await fero('q2cg', cfg(pts[1]))
+  const C = await fero('q2cg', cfg(pts[2]))
+  let D: any
+  const node = (addr: string) => [A, B, C, D].find((n) => n && n.cluster.me === addr)!
+  const formed3 = (n: any) => n.cluster.members.length === 3 && [A, B, C].every((x) => x === n || connected(n.cluster, x.cluster.me))
+  let last: any
+  let agg: any
+  let host: any
+  try {
+    assert.ok(await until(() => [A, B, C].every(formed3), 8000), '3-node formed')
+    const keys = Array.from({ length: 24 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 5 }
+    const globalSum = keys.length * 5
+    agg = A.data.sum('v') // hold the handle alive
+    host = agg.connect({}, (c: any) => {
+      last = c.value
+    })
+    void host
+    assert.ok(await until(() => last === globalSum, 8000), `fold converged pre-join: ${last}/${globalSum}`)
+
+    D = await fero('q2cg', cfg(pts[3])) // a 4th node joins → ring rebalances onto it
+    assert.ok(await until(() => [A, B, C, D].every((n) => n.cluster.members.length === 4), 12000), '4-node view committed')
+    // data UNCHANGED → after rebalance + D's acquisition + every node's re-scope, the fold
+    // must settle back to EXACTLY globalSum (no double-count from a stale owner, no gap).
+    assert.ok(await until(() => last === globalSum, 15000), `fold held the global after join: ${last}/${globalSum}`)
+  } finally {
+    ;[A, B, C, D].forEach((n) => {
+      try {
+        n && n.destroy()
+      } catch {}
+    })
+  }
+})
+
+test('Q2c: killing a holder drops its shard + survivors re-scope — fold heals to the global', async () => {
+  const { all, node, ok } = await q2bForm('q2ck', 2)
+  const [A, B, C] = all
+  let last: any
+  let agg: any
+  let host: any
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const keys = Array.from({ length: 24 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 5 }
+    const globalSum = keys.length * 5
+    agg = A.data.sum('v')
+    host = agg.connect({}, (c: any) => {
+      last = c.value
+    })
+    void host
+    assert.ok(await until(() => last === globalSum, 8000), `fold converged: ${last}/${globalSum}`)
+
+    C.destroy() // kill a holder that is NOT the coordinator (A); R=2 ⇒ no partition was only on C
+    assert.ok(
+      await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 14000),
+      `C evicted → 2-member view (${A.cluster.members.length}/${B.cluster.members.length})`,
+    )
+    // survivors {A,B} re-ring (R≥2 members ⇒ both hold all), acquire C's old partitions from
+    // each other's surviving replica, re-scope ownership, and the fold drops C's stale shard —
+    // healing back to globalSum (no data lost).
+    assert.ok(await until(() => last === globalSum, 15000), `fold healed after kill: ${last}/${globalSum}`)
+  } finally {
+    ;[A, B].forEach((n) => {
+      try {
+        n.destroy()
+      } catch {}
+    })
+  }
+})

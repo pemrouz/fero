@@ -102,6 +102,17 @@ export class Peer {
     return this.#dialed
   }
 
+  // Can a control frame be written RIGHT NOW (socket exists and is writable)? A peer
+  // row can exist while its socket is still connecting (status 'connecting') — write()
+  // would silently drop the frame (it doesn't queue control frames). Callers that need a
+  // frame to actually go out (a subscription whose success they record — see transport
+  // subscribe()) gate on this so a not-yet-connected peer reports failure and is retried,
+  // rather than being recorded as subscribed with a dropped SUBSCRIBE. Distinct from
+  // write()'s false, which also covers backpressure (the frame IS queued by the socket).
+  get writable() {
+    return this.#socket?.writable ?? false
+  }
+
   #setStatus(s: Status) {
     if (this.status === s) return
     this.status = s
