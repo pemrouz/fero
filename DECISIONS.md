@@ -441,3 +441,52 @@ test exercises the multi-confirm path (no loss, eventual exactly-R).
 under-replication window during handoff and no data loss. The drained-ballot variant (gate
 commit on catch-up) is unnecessary given keep-until-confirmed, so it's dropped from the
 roadmap.
+
+## Q1 — Hold-relative reads (owner-routed `read` + `data.x` facade) · Adopted
+
+**Context.** With R-way holding, a node materializes only the partitions it replicates, so
+non-local reads must be routed. Reads become **hold-relative**: synchronous-and-local for a
+partition the node holds, a **remote handle** (await ⇒ one-shot, reactive ⇒ subscribe) for
+one it doesn't. The user chose "both" — an explicit owner-routed read engine PLUS a
+transparent `data.x` facade over it.
+
+**Design.**
+- **Keyed read**: the default `read` method is now `read()` ⇒ whole data, `read(key)` ⇒ the
+  child view. On a holder, `c.data[key]` is the live local child — snapshot for an RPC,
+  streamed for a subscription, through the existing serve machinery.
+- **Owner-routed handle** (`makeHandle`/`remoteRead`): a thenable+ViewProxy targeting a
+  specific peer. A server is fully meshed with the owner → routes straight to `owner(key)`;
+  a client routes to a picked server which **forwards** the read to the owner (read-
+  forwarding in `serveCall`/`serveSubscribe` for any `read(key)` it doesn't hold — so a
+  client reaches every partition through one server). `transport.call/subscribe` gained an
+  optional target-peer arg.
+- **`data.x` facade**: a Proxy over the returned `data` — a top-level KEY access is
+  hold-relative (`readKey`); operators, built-ins, symbols, writes (top-level + depth-1
+  nested) pass through to the raw proxy. Built only for a scoped server or a client; a
+  full-replication server returns the RAW proxy (transparent no-op — hot path unchanged).
+  `holds()` is memoised per key (cleared on view commit) so a facade read is O(1), not an
+  O(R) ring scan per access.
+
+**Adversarial review (fixes folded in).** Confirmed + fixed: prototype-name keys leaking
+through `prop in Operators` (→ own-key `hasOwnProperty` check); root write-ops
+`data.update/insert/remove` misread as keys (→ added to the passthrough set); depth-1
+nested writes into a non-held partition silently dropped (→ a `set` trap on the read handle
+routes them to the raw proxy → owner); a per-read ring scan (→ the holds() memo).
+
+**Known limitations (documented; the explicit owner-routed read is the robust fallback).**
+- **Operator-name key collision**: a partition genuinely named like an operator (`filter`,
+  `group`, `map`, …) or a built-in (`connect`, `update`, …) can't be READ through `data.x`
+  (the facade returns the operator) — read it via the snapshot (`data[value][key]`) or the
+  routed method; writes are unaffected.
+- **Deep nested writes** (`data.x.y.z = v`) into a NON-held partition aren't routed
+  (depth-1 is) — use a top-level assignment `data.x = {…}` or operate on the holding node.
+- **`await data.x.field`** on a non-held key resolves the not-yet-populated subscription
+  rather than a one-shot of the field — `await data.x` then read the field.
+- **Read-your-writes** can lag if a write's owner-forward FAILS (committed as a local
+  orphan, but the read routes to the stale owner until anti-entropy reconciles).
+- **Subscription cleanup on ungraceful disconnect** (a pre-existing gap, now also affecting
+  forwarded subscriptions) — needs a peer-disconnect hook; deferred (IDEAS).
+
+**Decision.** Reads are hold-relative: local+sync where held, owner-routed remote handle
+where not, with a transparent `data.x` facade for ergonomics over a robust explicit engine.
+The facade is best-effort sugar with documented edges; the routed read is the guarantee.

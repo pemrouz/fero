@@ -35,7 +35,7 @@
 // record via dialed-broadcast). Deferred — client→server RPC dispatch, per-
 // client `read()` projections, DHT-partitioned routing. See ../IDEAS.md.
 
-import { $, value as VALUE, view as VIEWSYM } from '../../data/index.ts'
+import { $, value as VALUE, view as VIEWSYM, Operators } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
 import { Log, originKey } from '../log/partition.ts'
 import { applyRecord } from '../log/index.ts'
@@ -343,10 +343,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // holds nothing. The R≥members short-circuit avoids an owners() ring scan when R
   // covers everyone (scoped degenerates to full replication) — this runs on every
   // inbound record + foreign write, so the scan would be a hot-path blowup.
+  // The ring is constant between view commits, so memoize the owners() scan per key
+  // (cleared on commit). Keeps holds() — on the inbound, write, AND facade-read paths
+  // — O(1) in steady state instead of an O(R) ring walk per access.
+  const heldCache = new Map<string, boolean>()
   const holds = (key: string): boolean => {
     if (me === undefined) return false
     if (!scoped || R >= viewSize()) return true
-    return mesh.owners(key, R).includes(me)
+    let h = heldCache.get(key)
+    if (h === undefined) heldCache.set(key, (h = mesh.owners(key, R).includes(me)))
+    return h
   }
 
   // Anti-entropy re-sync (Milestone P, scoped only): send our high-water digest to
@@ -381,6 +387,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
           ...viewOpts,
           onWritable: (w) => w && flushPending(),
           onCommit: () => {
+            heldCache.clear() // the ring changed — invalidate the holds() memo
             markOrphans() // ring rebalanced → note partitions we no longer replicate (shed once handed off)
             resync() // ...and re-sync the ones we now acquire
           },
@@ -609,7 +616,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // assigning to data is a trusted local commit; it does NOT re-invoke the method
   // (plan §5 recursion-safety) — the sink replicates, it doesn't dispatch.
   const defaults: Record<string, Method> = {
-    read: (_arg, c) => c.data, // full passthrough (per-client projection: deferred)
+    // read() → whole data; read(key) → just that key's child view (Q1 keyed read —
+    // the server side of an owner-routed remote read). On a holder, c.data[key] is
+    // the live local child; snapshot for the RPC reply, streamed for a subscription.
+    read: (arg, c) => (typeof arg === 'string' ? c.data[arg] : c.data),
     update: (chg, c) => setPath(c.data, norm(chg?.key), chg?.value),
     insert: (chg, c) => setPath(c.data, norm(chg?.at ?? chg?.key), chg?.value),
     remove: (chg, c) => delPath(c.data, norm(chg?.key)),
@@ -627,7 +637,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (!fn) throw new Error(`fero: unknown method "${method}"`)
     return fn(arg, peer ? { ...context, peer } : context)
   }
-  const serveCall = (method: string, arg: unknown, address: string): unknown => snapshot(invoke(method, arg, address))
+  // Read-forwarding (Q1): a `read(key)` for a partition we don't hold (a client
+  // routed here, but we're not the owner) forwards to the owner, which holds it —
+  // returning a Promise the transport awaits before replying. The owner holds the
+  // key so it serves (no re-forward). Only in scoped mode; full replication holds all.
+  const serveCall = (method: string, arg: unknown, address: string): unknown => {
+    if (method === 'read' && typeof arg === 'string' && scoped && !holds(arg)) {
+      const owner = mesh.owner(arg)
+      if (owner !== undefined && owner !== me) return mesh.call('read', arg, owner)
+    }
+    return snapshot(invoke(method, arg, address))
+  }
 
   // Server side of a subscription: run the method here; if it returns a ViewProxy
   // (a projection — the default `read` returns the whole `data`, a custom one may
@@ -635,8 +655,18 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // initial snapshot first, then deltas) to the subscriber. A plain value is shipped
   // once. The sink host is retained per (address, subId) so it keeps firing until
   // the client unsubscribes (data holds sinks only by WeakRef).
-  const subscriptions = new Map<string, object>()
+  const subscriptions = new Map<string, { host?: object; unsub?: () => void }>()
   const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
+    // Read-forwarding (Q1): subscribe a non-held read key FROM the owner and relay its
+    // deltas to the subscriber; the upstream unsub is closed on unsubscribe.
+    if (method === 'read' && typeof arg === 'string' && scoped && !holds(arg)) {
+      const owner = mesh.owner(arg)
+      if (owner !== undefined && owner !== me) {
+        const unsub = mesh.subscribe('read', arg, (record: ChangeRecord) => mesh.deltaTo(address, subId, record), owner)
+        if (unsub) subscriptions.set(`${address}:${subId}`, { unsub })
+        return
+      }
+    }
     let result: unknown
     try {
       result = invoke(method, arg, address)
@@ -644,12 +674,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       return // a failed subscription just yields no stream (RPC path surfaces errors)
     }
     if (isViewProxy(result)) {
-      subscriptions.set(`${address}:${subId}`, (result as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change)))
+      subscriptions.set(`${address}:${subId}`, { host: (result as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change)) })
     } else {
       mesh.deltaTo(address, subId, { type: 'update', key: [], value: result })
     }
   }
-  const serveUnsubscribe = (subId: number, address: string) => void subscriptions.delete(`${address}:${subId}`)
+  const serveUnsubscribe = (subId: number, address: string) => {
+    const k = `${address}:${subId}`
+    subscriptions.get(k)?.unsub?.() // forwarded subscription → close the upstream; local → just drop the host (sink GC'd)
+    subscriptions.delete(k)
+  }
 
   // The local method surface (server) calls handlers in-process. A read-only
   // client (no listen port) has no handlers — each method returns a HANDLE that
@@ -663,34 +697,97 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   context.methods = localMethods // method-to-method calls run locally
 
   const clientSubs = new Set<() => void>()
-  const clientHandle = (method: string, arg: unknown) => {
+  // A remote-access HANDLE: a thenable (await ⇒ one-shot RPC) that is ALSO a live
+  // ViewProxy (reactive use ⇒ a server-pushed subscription). `to()` picks the target
+  // peer lazily — a specific owner (owner-routed reads) or undefined ⇒ a picked
+  // connected server. `then` is the only access that does NOT subscribe.
+  const makeHandle = (method: string, arg: unknown, to?: () => string | undefined, writeKey?: string) => {
     let live: any // the local ViewProxy, created (and the subscription opened) lazily
     const ensure = () => {
       if (live) return
       live = $({})
       const res = (live as any)[VIEWSYM].res
-      const unsub = mesh.subscribe(method, arg, (record: ChangeRecord) => applyRecord(res, record))
+      const unsub = mesh.subscribe(method, arg, (record: ChangeRecord) => applyRecord(res, record), to?.())
       if (unsub) clientSubs.add(unsub)
     }
     return new Proxy(noop, {
       get(_t, prop) {
-        if (prop === 'then') return (onF: any, onR: any) => mesh.call(method, arg).then(onF, onR) // await ⇒ one-shot RPC
+        if (prop === 'then') return (onF: any, onR: any) => mesh.call(method, arg, to?.()).then(onF, onR) // await ⇒ one-shot RPC
         if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined // ignore JS-internal probes
         if (prop === 'constructor' || prop === 'toJSON') return undefined
         ensure() // any real data/operator access ⇒ subscribe + delegate to the live proxy
         return live[prop]
       },
+      // Nested write into a non-held partition (`data.x.y = v`): route to the RAW proxy
+      // so it flows through the write-capture sink → owner. Only the READ handle carries
+      // a writeKey (a method handle has none — set is a harmless no-op). Depth-1 only;
+      // deeper writes into a non-held partition aren't routed (use a top-level assignment
+      // `data.x = {…}` or the holding node) — a documented first-cut limitation.
+      set(_t, prop, v) {
+        if (writeKey !== undefined && typeof prop === 'string') (data as any)[writeKey][prop] = v
+        return true
+      },
     })
   }
+  const clientHandle = (method: string, arg: unknown) => makeHandle(method, arg) // routed to a picked server
+
+  // Owner-routed remote read (Q1): reading a partition this node doesn't hold returns
+  // a handle that fetches (await) or subscribes from a HOLDER. A server is fully
+  // meshed with the owner → route straight to owner(key); a client routes to a picked
+  // server (which forwards to the owner — read-forwarding, a follow-up). `await
+  // data.x` is one-shot; `data.x.tap(...)`/`.filter`/`[value]` opens a live remote view.
+  const remoteRead = (key: string) => makeHandle('read', key, me !== undefined ? () => mesh.owner(key) : undefined, key)
+
+  // The read surface: synchronous-and-local for a partition we hold, a remote handle
+  // for one we don't (hold-relative reads). The `data` facade returned below is sugar
+  // over this. Internal machinery keeps using the raw `data` (held partitions only).
+  const readKey = (key: string) => (holds(key) ? data[key] : remoteRead(key))
 
   const methodSurface: Record<string, (arg?: any) => any> = isClient
     ? (new Proxy({}, { get: (_t, name: string) => (arg?: any) => clientHandle(name, arg) }) as any)
     : localMethods
 
+  // The `data` facade (Q1): top-level KEY access is hold-relative — the local child
+  // view if we hold the partition, a remote handle (await/subscribe to a holder) if
+  // not. Operators (`.filter`, `.group`, …), the built-ins, symbols (`[value]`,
+  // iterator), and writes pass straight through to the underlying proxy, so the full
+  // data surface is preserved and operators run over the LOCAL (held) partitions. We
+  // distinguish a partition key from an operator/built-in via the data lib's
+  // `Operators` table. Only built when this node can have non-held keys (a scoped
+  // server, or any client); a full-replication server returns the raw proxy — a
+  // transparent no-op — so its hot read path is unchanged.
+  // Built-ins that pass straight through to the raw proxy (the data-lib apply-trap
+  // ops that are NOT in the Operators table): the reactive built-ins, the terminal
+  // write ops (update/insert/remove), and JS internals. Without update/insert/remove
+  // here, `data.update(...)` would be misread as a partition key named "update".
+  const BUILTIN = new Set(['connect', 'raf', 'patch', 'first', 'last', 'then', 'toJSON', 'constructor', 'update', 'insert', 'remove'])
+  // own-key check (NOT `prop in Operators`): Operators is a plain object literal, so
+  // `in` walks Object.prototype and would wrongly classify partition keys named
+  // toString/valueOf/hasOwnProperty/… as operators (returning a stale local child
+  // instead of a remote handle). hasOwnProperty.call matches only registered operators.
+  const isOperator = (prop: string) => Object.prototype.hasOwnProperty.call(Operators, prop)
+  const dataFacade =
+    scoped || isClient
+      ? new Proxy(data, {
+          get(t, prop) {
+            if (typeof prop === 'symbol' || isOperator(prop as string) || BUILTIN.has(prop as string)) return (t as any)[prop]
+            return readKey(prop as string)
+          },
+          set(t, prop, v) {
+            ;(t as any)[prop] = v
+            return true
+          },
+          deleteProperty(t, prop) {
+            delete (t as any)[prop]
+            return true
+          },
+        })
+      : data
+
   await mesh.ready
 
   return {
-    data,
+    data: dataFacade,
     methods: methodSurface,
     cluster,
     destroy() {
