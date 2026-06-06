@@ -575,3 +575,74 @@ gather engine; top-K needs `applyRecord` 'move' support — [DECISIONS E](#e--li
 slow/departed-holder silent undercount); **per-handle GC teardown** of an abandoned fold +
 **ungraceful-disconnect** subscription cleanup; **chained-aggregate auto-detection** past the
 facade's first hop.
+
+## Q3 — Whole-resource read() = distributed gather (holistic ops after read) · Adopted · Q3a–Q3b
+
+**Context.** Q2 distributes the DECOMPOSABLE aggregates (a fixed associative combine over disjoint
+owner-scoped partials). The HOLISTIC ops — unbounded sort (`az/za/top/limit`), `distinct`, bare
+`group`, general `reduce`, exact median/percentile — can't fold from per-shard partials: the global
+answer needs the full multiset co-located, and the user logic (`reduce`'s closure, a sort
+comparator) can't cross the wire (Q2's hard rule). The user's framing settled the API shape: the
+efficiently-distributable ops work WITHOUT a read; **anything needing the whole resource comes AFTER
+`read()` — `read()` IS the download** — which forces the O(N) cost to be visible in the code; and a
+holistic result can be promoted to its own **derived named resource**. So Q3 is not a new `gather()`
+primitive — it makes whole-resource `read()` an actual distributed gather (today it silently returns
+the contacted node's local shard under scoping — fine under full replication, a partial under R-way).
+
+**Decision — `read()` (no key) under scoping folds owner-scoped ROWS into the whole resource.**
+- **Gather = the Q2 fold with a union rule (Q3a).** A new internal spec `{op:'rows'}` returns the
+  holder's owner-scoped `ownedView()` (a disjoint cover — each partition shipped once, 1× wire);
+  `RULES.rows` = `Object.assign({}, …partials)` (union by key). `foldOnce`/`openFold`/`foldAggregate`
+  are reused verbatim — the gather is just a fold whose partials are row-set OBJECTS and whose combine
+  is union. Union-by-key is IDEMPOTENT, so it tolerates transient ring disagreement a scalar Σ can't
+  (two holders briefly claiming a key land it once, not twice); deletes/ownership-moves converge via
+  full-union-recompute + root-replace. The **closure problem dissolves**: holistic ops run LOCALLY on
+  the gathered proxy (`methods.read().az('v')`, `.reduce(fn)`) — only ROWS cross the wire, never
+  functions, and `data`'s positional `'move'` deltas stay local (no [DECISIONS E] dependency).
+- **Client gather, server-as-coordinator (Q3a).** A client's `read()` routes to the server it dialed,
+  which folds (`serveCall` ⇒ `foldOnce`; `serveSubscribe` ⇒ `openFold`). The reactive subscribe branch
+  is UNGATED on R (membership-robust — `openFold.reconcileMembers` re-arms on commit). A branch gated on
+  membership-at-subscribe let a `read()` opened while members≤R stream the server's local `c.data`
+  forever and go silently PARTIAL once a join sharded the resource (the Q3a review's confirmed major —
+  grow-past-R regression test added). The stateless `serveCall` one-shot keeps the `R<viewSize()`
+  local-read optimization (it re-evaluates per call).
+- **Server gather + holistic-after-read (Q3b).** A scoped server's own no-key `methods.read()` is the
+  gather HANDLE — `await` ⇒ one-shot global, reactive ⇒ live gather. Only the DEFAULT `read` is swapped
+  (a user-supplied `read` is their projection); MEMOIZED to one handle per node. In-handler
+  `c.methods.read()` is the same handle (await ⇒ global, reactive ⇒ live, sync `[value]` ⇒ the
+  in-progress union); a handler reads `c.data` for the local held state.
+
+**Adversarial review caught real defects before commit.**
+- Q3a: a BLOCKER — the reactive gather gate evaluated once at subscribe went silently partial when the
+  cluster grew past R (fix: ungate the subscribe branch on R; the gather is correct at any R and
+  re-arms on commit; the grow-past-R regression was verified to FAIL under the old gate).
+- Q3b: three majors, all from mutating `localMethods.read` in place + returning a live handle —
+  **M1** a custom `read` was silently swapped for the raw gather under scoping (fix: gate the override
+  AND the Q3a wire branches on `allMethods.read === defaults.read`); **M2** a handler RETURNING
+  `c.methods.read()` replied with the fold's empty in-progress union because `snapshot()`'s
+  isViewProxy/`[VALUE]` probe opened the live fold (fix: resolve a returned handle via `foldOnce`,
+  detected by a side-effect-free `FOLD_HANDLES` WeakSet — probing the resolver symbol on a `data`
+  ViewProxy throws "Cannot convert a Symbol to a string", which the first fix attempt hit and the
+  existing client-read tests caught); **M3** a fresh `foldAggregate` per reactive call leaked an
+  O(resource) union-fold into `aggregateReconciles` forever (fix: memoize one handle per node).
+
+**Consequences.**
+- Full replication (R=∞) is UNCHANGED: the facade isn't built and `read()` isn't overridden / gathered,
+  so the hot read/write paths are byte-identical (`index.perf.ts` holds). Every Q3 path is gated on
+  `scoped`. New `gather.perf.ts` guards the rows-partial build (~4ms/10k) + union fold (~10ms/10k).
+- The gather is honestly O(N): O(total rows) transfer + an O(total) union recompute per shard delta (a
+  live holistic-after-read recomputes the whole answer). That's the explicit "download everything" cost
+  — guarded against superlinearity, not against itself. Calling a holistic op DIRECTLY on `data` (no
+  read) still returns a LOUD local-only result (never a silent gather) and the warning points at
+  `methods.read().<op>()` / a derived named resource.
+- median/percentile (deferred — `data` has no such operator; the user computes over the gathered set),
+  and the user-supplied COMBINE path (ship per-shard partials, fold without the full gather) are NOT in
+  Q3 — the combine needs per-holder logic, i.e. pre-deployed functions (the named-method fold seam).
+
+**Still open → [IDEAS open question 7 / Aggregates].** **median/percentile/quantile** terminals over
+the gathered set; the **user-supplied combine / named-method fold** (the scalable alternative to the
+O(N) gather); **gather-hardening** (a bounded one-shot deadline + partial-result signal; the
+union-recompute is O(N)/delta — an incremental per-key merge is the perf follow-up); **per-handle GC**
+of an abandoned gather handle + the **ungraceful-disconnect** subscription leak (now also via the
+gather's `openFold` — shared transport-layer infra, an `onPeerGone` hook + a peer→subId reverse index);
+and **server-side `methods.read(key)`** owner-routing (today LOCAL — the `data[key]` facade routes).

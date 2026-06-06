@@ -78,8 +78,9 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    Reads (**Q1** — LANDED, [DECISIONS Q1](DECISIONS.md)) make non-local access
    `await`/subscribe via an owner-routed `read(key)` + a `data.x` facade. Q1 follow-ups
    (documented limitations, the routed read is the robust fallback): a **subscription-
-   cleanup-on-disconnect** hook (pre-existing; now also leaks forwarded subscriptions on an
-   ungraceful client/relay disconnect — needs a peer-disconnect callback); **deep nested
+   cleanup-on-disconnect** hook (pre-existing; now also leaks forwarded subscriptions — and a
+   Q3 whole-resource-read `openFold` gather — on an ungraceful client/relay disconnect; needs an
+   `onPeerGone` transport hook + a peer→subId reverse index, fixing all paths at once); **deep nested
    writes** (`data.x.y.z=v`) into a non-held partition (depth-1 routes; deeper doesn't);
    **`await data.x.field`** on a non-held key (resolves the subscription, not a one-shot of
    the field); **read-your-writes** lag when a write's owner-forward fails; the inherent
@@ -87,25 +88,33 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
 
    Decomposable aggregates (**Q2** — LANDED, [DECISIONS Q2](DECISIONS.md)) make whole-resource
    `data.sum/count/max/min/avg/some/every` an owner-scoped fan-out + fold (one row → O(holders)
-   global update; full replication unchanged). The remaining distributed-query work is the rest
-   of the L3 slice:
-   - **Named-method fold** — a method returning a decomposable aggregate (`anyActive: (_,c) =>
-     c.data.some(s => s.active)`), run per-holder over OWNER-SCOPED `c.data`, the combine derived
-     from the terminal operator's type. This is the function-carrying dispatch (closure
-     predicates, and the seam grouped aggregates need); Q2 ships only DECLARATIVE specs
-     (`col[,val]`) + rejects inline closures loudly. (resource)
-   - **L3 chain planner / gather engine** — bare `data.group(col)` (bucket→rows = a row gather),
-     `top/limit-K` (sort emits BMV1 'move' deltas `applyRecord` ignores → needs whole-array
-     re-ship or 'move' support — [DECISIONS E](DECISIONS.md)), `length(fn)` (whole-histogram
-     re-ship, not O(1)), and any CHAINED aggregate past the facade's first hop (`data.filter(p)
-     .sum()`, `group(c).sum(v)`) — all loudly flagged by the Q2f boundary guard, deferred to the
-     planner that splits a chain into per-shard + roll-up + local stages. (planner, resource)
-   - **Q3 holistic** — exact median/percentile, general `reduce`, unbounded sort: gather-to-one
-     OR a user-supplied combine, never a silent gather. (planner, resource)
-   - **Aggregate fold hardening** — a bounded one-shot-gather deadline + a partial-result signal
-     (today a slow/departed holder silently undercounts after `callTimeout`); per-handle GC
-     teardown of an abandoned fold handle; the chained-aggregate auto-detect past the facade.
-     (resource, transport)
+   global update; full replication unchanged). Holistic ops via GATHER (**Q3** — LANDED,
+   [DECISIONS Q3](DECISIONS.md)): whole-resource `read()` (no key) under scoping now folds every
+   holder's owner-scoped ROWS (`{op:'rows'}` + union rule) into the whole resource, so holistic
+   ops run AFTER read over the gathered proxy LOCALLY (`methods.read().az('v')`/`.reduce(fn)`/
+   `.distinct()` — closures never cross the wire). Decomposable = before read; whole-resource =
+   after read. The remaining distributed-query work is the rest of the L3 slice:
+   - **Named-method fold / user-supplied combine** — a method returning a decomposable aggregate
+     (`anyActive: (_,c) => c.data.some(s => s.active)`), run per-holder over OWNER-SCOPED `c.data`,
+     the combine derived from the terminal operator's type (or user-supplied). This is the
+     function-carrying dispatch (closure predicates; the seam grouped aggregates need; AND the
+     SCALABLE alternative to Q3's O(N) gather — ship per-shard partials + a combine instead of all
+     rows). Q2 ships only DECLARATIVE specs (`col[,val]`) + rejects inline closures loudly. (resource)
+   - **L3 chain planner** — `top/limit-K` (sort emits BMV1 'move' deltas `applyRecord` ignores →
+     needs whole-array re-ship or 'move' support — [DECISIONS E](DECISIONS.md)), `length(fn)`
+     (whole-histogram re-ship, not O(1)), bare `group(col)`, and any CHAINED aggregate past the
+     facade's first hop (`data.filter(p).sum()`, `group(c).sum(v)`) — all loudly flagged by the Q2f
+     boundary guard (now pointing at `read()`-first), deferred to the planner that splits a chain
+     into per-shard + roll-up + local stages. (Bare holistic ops work today via `read().<op>()`; the
+     planner is the EFFICIENT, no-full-gather path for the foldable ones.) (planner, resource)
+   - **median/percentile/quantile** — `data` has no such operator; Q3 defers them (the user computes
+     over `methods.read()`). Add as fero terminals over the gathered set, or contribute local
+     operators to `data` and distribute via gather. (resource, data)
+   - **Gather / fold hardening** — a bounded one-shot-gather deadline + a partial-result signal
+     (today a slow/departed holder silently undercounts after `callTimeout`); the gather's
+     union-recompute is O(total)/delta — an INCREMENTAL per-key merge is the perf follow-up;
+     per-handle GC teardown of an abandoned fold/gather handle; the chained-aggregate auto-detect
+     past the facade. (resource, transport)
    - **`some/every('col')` under FULL replication** — the declarative column form is the
      scoped-distributed sugar (it folds via `buildPartial`'s `filter(col,val).length()`); under
      R=∞ the facade isn't built (to keep that path byte-identical), so `data.some('col')` falls
