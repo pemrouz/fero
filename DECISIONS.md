@@ -490,3 +490,80 @@ routes them to the raw proxy → owner); a per-read ring scan (→ the holds() m
 **Decision.** Reads are hold-relative: local+sync where held, owner-routed remote handle
 where not, with a transparent `data.x` facade for ergonomics over a robust explicit engine.
 The facade is best-effort sugar with documented edges; the routed read is the guarantee.
+
+## Q2 — Decomposable distributed aggregates (owner-scoped fan-out + fold) · Adopted · Q2a–Q2f
+
+**Context.** With R-way holding ([P](#p--partitioned-holding-r-way-replication--adopted--b079b26-p0--p2))
+no single node materializes the whole resource, so an aggregate over ALL of it
+(`data.sum('value')`, `.length()` (count), `.max/min/avg`, `.some/every`) can't run locally.
+Q2 is the first slice of the L3 "distributed operator graph" the architecture files under
+"later": each holder runs the aggregate LOCALLY over its shard, streams a partial, and the
+querying node folds the partials into the global — one row change → one partial delta → an
+O(holders) global update. Built as V-style increments (Q2a–Q2f), the risky ones gated by an
+adversarial-review workflow (it earned its keep — see below).
+
+**Decision — owner-scoped fan-out + fold.**
+- **Dedup = OWNER-scoping (Q2a).** A partition lives on R replicas but has exactly ONE
+  owner, so each holder aggregates ONLY the partitions it OWNS (`data.filter((_v,k) =>
+  mesh.owner(k) === me).<op>()` over the RAW proxy). The union across holders is a DISJOINT
+  cover of the keyspace — every row counted exactly once regardless of R. A serializable spec
+  `{op,col[,val]}` crosses the wire (the `aggregate` default method); each symmetric holder
+  reconstructs the same owner-scoped operator locally — the NAME/shape travels, not a closure.
+- **Fold (Q2b).** `await data.sum('v')` is a one-shot gather (`foldOnce`); reactive use opens
+  a live fold (`openFold`) that subscribes to every holder's partial and refolds per delta.
+  SELF IS NOT A WIRE TARGET (`pool.peer(me)` is undefined) — the querier's own shard is
+  obtained IN-PROCESS and folded alongside the N-1 remote partials (miss it ⇒ a 1/N
+  undercount, the blocker the review caught). Combine rules: sum/count → Σ; max/min →
+  extremum skipping `undefined`; avg → Σsum/Σcount (divide LAST); some → Σ(match) > 0; every
+  → Σmatch === Σtotal.
+- **View-change rebind + churn (Q2c).** data's `filter` only re-runs its predicate on a ROW
+  change, never when a partition changes OWNER under a stable row — so each node RE-SCOPES its
+  own owner-scoped partials on its own commit (`livePartial`, a generation-guarded rebuild
+  since data's `FunctionSink` can't be synchronously disconnected). Subscriptions PERSIST
+  across a commit (a stable holder pushes its re-scoped value), so the coordinator only
+  reconciles membership (add new / drop departed / RETRY the admit race on the aeTimer).
+  Acquired partitions heal in (the rebuilt partial stays connected to the live `data`).
+- **avg + some/every (Q2d).** avg ships a `{sum,count}` PAIR (AvgValue exposes only the
+  quotient, which can't combine); some/every take a DECLARATIVE predicate `(col[,val])` — a
+  closure can't cross the wire, so an inline closure on the facade is REJECTED LOUDLY.
+- **Client server-as-coordinator (Q2e).** A read-only client can't owner-scope/fold, so its
+  facade aggregates route to its connected server with `{fold:true}`; the server folds and
+  streams the GLOBAL back. The fan-out STRIPS the flag (holders return partials) — no recursion.
+- **Q3 boundary guard (Q2f).** Holistic/ordered ops (az/za/top/limit, group, distinct,
+  reduce) and length(fn)/closures can't fold from partials — on a scoped facade they return a
+  LOCAL result but WARN LOUDLY (once per op), never silently mistaken for the global.
+
+**Adversarial reviews caught real defects before commit.**
+- Q2b: the SELF-routing 1/N undercount; a `sumRule` `|| 0` masking a NaN partial to 0 (→
+  `?? 0`, propagate NaN like the single-node path); a GC-freeze of derived partial chains
+  (data's `FunctionSink` doesn't back-ref its source → retain the source proxy alongside the
+  sink host, also hardening Q1 custom-read subscriptions).
+- Q2c: a BLOCKER reproduced at ~30% — `mesh.subscribe` returned a truthy unsub even when the
+  SUBSCRIBE was DROPPED on a not-yet-writable socket (the admit race), so the retry was
+  suppressed and a holder's shard dropped FOREVER. Fixed by gating subscribe on a new
+  `peer.writable` (not `write()`'s false, which also covers backpressure). Plus a
+  data-corruption path found by hand: a stale subscription delta (a frame with an id but no
+  matching sub, arriving after a churn unsubscribe) fell through to `onRecord` and clobbered
+  the root → drop id'd frames with no sub (plain replication never carries a frame id).
+
+**Consequences.**
+- Full replication (R=∞) is UNCHANGED: the facade isn't built (raw proxy returned), so the
+  hot read/write paths are byte-identical (`index.perf.ts` 150ms threshold holds on every
+  increment). Every Q2 path is gated on `scoped` / `R < members`.
+- Steady-state (after a membership change settles) the fold is exact; transients during
+  settling are eventual-consistent (same posture as P2 acquisition / Q1 read-your-writes).
+- Decomposable = a fixed associative combine over disjoint per-OWNER partials, each a single
+  streamable ViewProxy (or a `{sum,count}`/`{match,total}` pair). HOLISTIC (gather-to-one /
+  user combine) and CHAINED aggregates (a grouped aggregate `group.sum`, or any aggregate past
+  the facade's first hop) are L3-planner work — drawn and POLICED by the boundary guard, not
+  crossed silently.
+
+**Still open → [IDEAS open question 7 / Aggregates].** The **named-method fold** (a method
+returning a decomposable aggregate, run per-holder over owner-scoped data, combine derived
+from the operator type — the function-carrying dispatch for closure predicates + grouped
+aggregates); **group bucket→rows + top/limit-K + length(fn)** (the L3 chain planner / a
+gather engine; top-K needs `applyRecord` 'move' support — [DECISIONS E](#e--live-subscriptions-server-push--adopted--27e687f));
+**gather-hardening** (a bounded one-shot deadline + a partial-result signal vs the
+slow/departed-holder silent undercount); **per-handle GC teardown** of an abandoned fold +
+**ungraceful-disconnect** subscription cleanup; **chained-aggregate auto-detection** past the
+facade's first hop.

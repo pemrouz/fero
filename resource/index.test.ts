@@ -1646,3 +1646,35 @@ test('Q2e: a read-only client gets GLOBAL aggregates via server-as-coordinator',
     all.forEach((n) => n.destroy())
   }
 })
+
+// ── Milestone Q2f: Q3 boundary guard ──
+// Holistic / ordered operators (az/za/top/limit, group, distinct, reduce) can't fold from
+// per-shard partials. On a scoped facade they return a LOCAL result but warn LOUDLY (once
+// per op) so they're never silently mistaken for the global answer.
+
+test('Q2f: a holistic op on the facade is loudly flagged (local result, never silent)', async () => {
+  const { all, ok } = await q2bForm('q2f', 2)
+  const orig = console.warn
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const warnings: string[] = []
+    console.warn = (...a: unknown[]) => warnings.push(a.join(' '))
+    void A.data.za('v') // ordered (descending sort) → holistic
+    void A.data.group('country') // grouped → needs L3 planner
+    void A.data.top('v', 5) // top-K → holistic (move-deltas applyRecord ignores)
+    console.warn = orig
+    assert.ok(warnings.some((w) => w.includes('HOLISTIC') && w.includes('za')), `za flagged; warnings=${warnings.length}`)
+    assert.ok(warnings.some((w) => w.includes('group')), 'group flagged')
+    assert.ok(warnings.some((w) => w.includes('top')), 'top flagged')
+    // decomposable aggregates do NOT warn (they distribute) — sanity that the guard is scoped to holistic.
+    const before = warnings.length
+    console.warn = (...a: unknown[]) => warnings.push(a.join(' '))
+    void A.data.sum('v')
+    console.warn = orig
+    assert.equal(warnings.length, before, 'sum did not warn (it distributes)')
+  } finally {
+    console.warn = orig
+    all.forEach((n) => n.destroy())
+  }
+})

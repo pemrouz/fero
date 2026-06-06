@@ -1109,12 +1109,33 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (R >= viewSize()) return (data as any)[op](...args)
     return foldAggregate(spec)
   }
+  // Q3 boundary guard. These operators are HOLISTIC or ordered — the global answer needs
+  // the full multiset co-located (a gather-to-one or a user combine), or, for a grouped
+  // aggregate, the L3 chain planner — so they CAN'T fold from per-shard partials. On a
+  // scoped node `data.sort(...)`/`data.top(...)`/`data.group(...)`/`data.reduce(...)` would
+  // otherwise run over only this node's held partitions and SILENTLY look like a global
+  // answer. We return that local result but WARN LOUDLY (once per op) so it's never
+  // silently mistaken for the global. top/limit-K specifically: data's sort emits positional
+  // BMV1 'move' deltas that applyRecord ignores ([DECISIONS E]), so a folded top-K can't
+  // track order without a whole-array re-ship — Q3. A full-replication node never builds the
+  // facade, so this never fires there (local IS global).
+  const HOLISTIC = new Set(['az', 'za', 'top', 'limit', 'group', 'distinct', 'reduce']) // registered chainable operators (sort family = az/za/top/limit)
+  const holisticWarned = new Set<string>()
+  const holisticGuard = (op: string) => (...args: unknown[]) => {
+    if (!isClient && R >= viewSize()) return (data as any)[op](...args) // holds everything → local is global
+    if (!holisticWarned.has(op)) {
+      holisticWarned.add(op)
+      console.warn(`fero: data.${op}(...) is HOLISTIC over the WHOLE resource and can't fold from per-shard partials — returning a LOCAL result (held partitions only). A gather-to-one or user combine is the Q3 path; a grouped aggregate (e.g. group(...).sum(...)) needs the L3 chain planner. (Decomposable aggregates — sum/count/max/min/avg/some/every — distribute via the facade.)`)
+    }
+    return (data as any)[op](...args)
+  }
   const dataFacade =
     scoped || isClient
       ? new Proxy(data, {
           get(t, prop) {
             if (typeof prop === 'symbol' || BUILTIN.has(prop as string)) return (t as any)[prop]
             if (distributable && DECOMPOSABLE.has(prop as string)) return distributed(prop as string)
+            if (distributable && HOLISTIC.has(prop as string)) return holisticGuard(prop as string) // Q3 boundary: loud, never silent
             if (isOperator(prop as string)) return (t as any)[prop]
             return readKey(prop as string)
           },
