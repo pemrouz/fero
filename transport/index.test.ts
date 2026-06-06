@@ -134,3 +134,42 @@ test('view-change frames route to their own hook, never to onRecord (Milestone V
     mB.destroy()
   }
 })
+
+test('a peer drop fires onPeerGone (the subscription-reap signal) for the SAME address a sub was keyed under, not onUnsubscribe', async () => {
+  // The L2 subscription-hygiene fix relies on onPeerGone firing on a socket close (which never
+  // delivers an UNSUBSCRIBE frame) — and firing for the SAME address onSubscribe saw (the ephemeral
+  // inbound address), so a reverse-index reap finds the sub.
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  const subs: string[] = []
+  const unsubbed: string[] = []
+  const gone: string[] = []
+  const mA = transport({
+    name: 'pg',
+    host: '127.0.0.1',
+    port: p1,
+    ports: [p1, p2],
+    wait: 200,
+    onRecord() {},
+    onSubscribe: (id, _m, _a, address) => subs.push(address), // address = the ephemeral inbound peer
+    onUnsubscribe: (_id, address) => unsubbed.push(address),
+    onPeerGone: (address) => gone.push(address),
+  })
+  const mB = transport({ name: 'pg', host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200, onRecord() {} })
+  try {
+    assert.ok(await until(() => connected(mA, a2) && connected(mB, a1)), 'A↔B connected')
+    // mB opens a subscription to mA — so a leaked sub WOULD matter.
+    mB.subscribe('read', undefined, () => {}, a1)
+    assert.ok(await until(() => subs.length === 1), 'mA served the subscription')
+    const subAddr = subs[0] // the address mA keyed the sub under (ephemeral inbound)
+
+    // mB drops ungracefully (transport destroy = socket close, NO UNSUBSCRIBE frame).
+    mB.destroy()
+
+    assert.ok(await until(() => gone.includes(subAddr)), `onPeerGone fired for the sub's address (${subAddr}); gone=${JSON.stringify(gone)}`)
+    assert.equal(unsubbed.length, 0, 'onUnsubscribe did NOT fire — the drop was ungraceful (no UNSUBSCRIBE frame)')
+  } finally {
+    mA.destroy()
+  }
+})

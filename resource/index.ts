@@ -321,6 +321,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // its deltas (initial snapshot + changes) to the client; else ship one value.
     onSubscribe: (subId: number, method: string, arg: unknown, address: string) => serveSubscribe(subId, method, arg, address),
     onUnsubscribe: (subId: number, address: string) => serveUnsubscribe(subId, address),
+    // A peer dropped (socket close / destroy) without an UNSUBSCRIBE — reap its served subscriptions
+    // so a gone client/coordinator doesn't leak its sinks / openFolds (subscription hygiene).
+    onPeerGone: (address: string) => reapPeer(address),
     // Inbound write-request: a peer forwarded a write for a partition we own.
     // Apply it as a LOCAL write so our sink commits it (stamps origin=us, logs,
     // replicates) — we are the single sequencer for the partition.
@@ -847,6 +850,19 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // isn't enough. (The default read returns the root `data`, retained anyway, so this only
   // bites derived views.) Held until the client unsubscribes.
   const subscriptions = new Map<string, { host?: object; src?: object; unsub?: () => void; close?: () => void }>()
+  // Reverse index address → its open subIds, so an ungraceful disconnect (a socket drop, which never
+  // delivers an UNSUBSCRIBE frame) can REAP that peer's served subscriptions instead of leaking them
+  // (subscription-hygiene fix; before this a dropped client/coordinator leaked its sink hosts, Q1
+  // read-forward upstreams, and — worst — Q3 gather / Q2 fold openFolds, each pinning an
+  // aggregateReconciles entry re-run every commit + AE tick FOREVER). Keyed by the EXACT address (no
+  // `host:port` string-splitting — `:` appears in the key). addSub keeps it in lockstep with `subscriptions`.
+  const subsByPeer = new Map<string, Set<number>>()
+  const addSub = (address: string, subId: number, entry: { host?: object; src?: object; unsub?: () => void; close?: () => void }) => {
+    subscriptions.set(`${address}:${subId}`, entry)
+    let ids = subsByPeer.get(address)
+    if (!ids) subsByPeer.set(address, (ids = new Set()))
+    ids.add(subId)
+  }
   const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
     // Read-forwarding (Q1): subscribe a non-held read key FROM the owner and relay its
     // deltas to the subscriber; the upstream unsub is closed on unsubscribe.
@@ -854,7 +870,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       const owner = mesh.owner(arg)
       if (owner !== undefined && owner !== me) {
         const unsub = mesh.subscribe('read', arg, (record: ChangeRecord) => mesh.deltaTo(address, subId, record), owner)
-        if (unsub) subscriptions.set(`${address}:${subId}`, { unsub })
+        if (unsub) addSub(address, subId, { unsub })
         return
       }
     }
@@ -876,7 +892,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (method === 'read' && arg == null && scoped && allMethods.read === defaults.read) {
       const g = openFold({ op: 'rows' }, RULES.rows)
       const host = (g.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
-      subscriptions.set(`${address}:${subId}`, { host, src: g.proxy, close: g.close })
+      addSub(address, subId, { host, src: g.proxy, close: g.close })
       return
     }
     // A CLIENT's reactive distributed aggregate (Milestone Q2e): build the FOLD here and
@@ -887,7 +903,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         const s = stripFold(arg)
         const f = openFold(s, RULES[s.op])
         const host = (f.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
-        subscriptions.set(`${address}:${subId}`, { host, src: f.proxy, close: f.close })
+        addSub(address, subId, { host, src: f.proxy, close: f.close })
       } catch {
         // unknown op → no stream (RPC path surfaces errors)
       }
@@ -900,7 +916,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (method === 'aggregate') {
       try {
         const lp = livePartial(arg, (v) => mesh.deltaTo(address, subId, { type: 'update', key: [], value: v }))
-        subscriptions.set(`${address}:${subId}`, { close: lp.close })
+        addSub(address, subId, { close: lp.close })
       } catch {
         // an unknown op throws in buildPartial — yield no stream (RPC path surfaces errors)
       }
@@ -914,7 +930,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
     if (isViewProxy(result)) {
       const host = (result as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
-      subscriptions.set(`${address}:${subId}`, { host, src: result as object }) // src retains the source chain (see map decl)
+      addSub(address, subId, { host, src: result as object }) // src retains the source chain (see map decl)
     } else {
       mesh.deltaTo(address, subId, { type: 'update', key: [], value: result })
     }
@@ -923,8 +939,19 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const k = `${address}:${subId}`
     const sub = subscriptions.get(k)
     sub?.unsub?.() // forwarded subscription → close the upstream; local → just drop the host (sink GC'd)
-    sub?.close?.() // a livePartial (served aggregate) → deregister its rescope + drop refs
+    sub?.close?.() // a livePartial / openFold (served aggregate or gather) → deregister its rescope/reconcile + drop refs
     subscriptions.delete(k)
+    const ids = subsByPeer.get(address)
+    if (ids && ids.delete(subId) && ids.size === 0) subsByPeer.delete(address)
+  }
+  // A peer's connection dropped (socket close / destroy) without an UNSUBSCRIBE — reap every
+  // subscription we served it (idempotent: routes each through serveUnsubscribe). Iterates a COPY,
+  // since serveUnsubscribe mutates subsByPeer. No-op for a peer we never served (a dial failure, or a
+  // server that only ever called/replicated). This is the chokepoint that stops the openFold leak.
+  const reapPeer = (address: string) => {
+    const ids = subsByPeer.get(address)
+    if (!ids) return
+    for (const subId of [...ids]) serveUnsubscribe(subId, address)
   }
 
   // The local method surface (server) calls handlers in-process. A read-only
@@ -1249,8 +1276,20 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
     },
-  }
+    // Internals seam (Symbol-keyed, off the typed/enumerable public API): observability +
+    // fault-injection for tests and power users. `servedSubscriptions` is the count of live
+    // subscriptions this node serves (asserts the reap of a dropped peer); `drop` abruptly closes a
+    // peer's connection (no UNSUBSCRIBE — the way a real network drop looks) to exercise that reap.
+    [diagnostics]: {
+      servedSubscriptions: () => subscriptions.size,
+      drop: (address: string) => mesh.drop(address),
+    },
+  } as Fero
 }
+
+// Symbol-keyed internals handle on a returned fero() instance (`instance[diagnostics]`): kept OFF
+// the typed public surface (data/methods/cluster/destroy) and out of Object.keys.
+export const diagnostics = Symbol('fero.diagnostics')
 
 // noop target for the callable client-handle Proxy (mirrors data's ViewProxy).
 const noop = () => {}
