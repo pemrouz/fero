@@ -203,12 +203,19 @@ export function transport(opts: TransportOpts): Mesh {
         return
       }
       default: {
-        // RECORDS with a frame id is a subscription delta (route by sub id);
-        // without one it is plain replication (deliver to onRecord).
-        const sub = frame.id !== undefined ? subs.get(frame.id) : undefined
-        for (const record of frame.records()) {
-          if (sub) sub(record as unknown as ChangeRecord)
-          else opts.onRecord?.(record as unknown as ChangeRecord, peer)
+        // RECORDS with a frame id is a subscription delta (route by sub id); without one
+        // it is plain replication (deliver to onRecord). A frame that HAS an id but no
+        // matching sub is a STALE/late delta for an already-closed subscription — e.g. an
+        // in-flight aggregate partial arriving after a fold unsubscribed a departed holder
+        // under churn (Q2c) — and is DROPPED: falling through to onRecord would mis-apply a
+        // {key:[],value} subscription delta as a replicated record and clobber state (a
+        // key:[] root replace). Plain replication never carries a frame id, so this only
+        // ever drops orphaned subscription deltas.
+        if (frame.id !== undefined) {
+          const sub = subs.get(frame.id)
+          if (sub) for (const record of frame.records()) sub(record as unknown as ChangeRecord)
+        } else {
+          for (const record of frame.records()) opts.onRecord?.(record as unknown as ChangeRecord, peer)
         }
       }
     }
@@ -307,7 +314,15 @@ export function transport(opts: TransportOpts): Mesh {
     subscribe(method, arg, onDelta, to) {
       const address = to ?? pickServer()
       const peer = address ? pool.peer(address) : undefined
-      if (!peer) return undefined
+      // Gate on writability BEFORE committing the sub: a peer row can exist while its
+      // socket is still connecting (the admit race — a member is in the committed view a
+      // tick before its socket finishes), and write() would SILENTLY DROP the SUBSCRIBE
+      // (control frames don't queue). Reporting failure (undefined) here makes the caller
+      // (a fold's reconcileMembers) NOT record it subscribed, so the aeTimer/commit retry
+      // re-attempts once connected — without this the holder's whole shard is dropped
+      // forever. Gating on `writable` (not write()'s return) avoids a false-negative on
+      // backpressure, where write() returns false but the frame IS queued and will send.
+      if (!peer || !peer.writable) return undefined
       const id = ++callId
       subs.set(id, onDelta)
       peer.write(encodeFrame([{ type: 'update', key: [], value: { method, arg } }], { verb: VERB.SUBSCRIBE, id }))

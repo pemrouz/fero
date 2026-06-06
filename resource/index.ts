@@ -372,6 +372,23 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     for (const m of mesh.viewMembers()) if (m !== me) mesh.digestTo(m, digest)
   }
 
+  // Live distributed-aggregate machinery that reacts to membership changes (Milestone
+  // Q2c). Two registries, both populated lazily as partials/folds go live; defined here
+  // so the viewMgr.onCommit + aeTimer closures can walk them.
+  //   • aggregateRebinds — each LIVE owner-scoped partial (a fold's local self-partial,
+  //     or a holder's served partial) re-scopes itself when ITS ring changes (a view
+  //     commit). data's filter caches per-row classification and only re-runs its
+  //     predicate on a ROW change — never when a partition changes OWNER under a stable
+  //     row — so a partial would keep counting a partition it no longer owns (while the
+  //     new owner double-counts it) until rebuilt. Walked on commit ONLY.
+  //   • aggregateReconciles — each live FOLD reconciles its remote-holder subscription
+  //     set: add newly-admitted members, drop departed ones, and RETRY a member that
+  //     wasn't connected yet when it was admitted (the admit race — a view can commit a
+  //     moment before the coordinator↔member socket finishes the handshake). Walked on
+  //     commit AND on the periodic anti-entropy tick (the retry backstop).
+  const aggregateRebinds = new Set<() => void>()
+  const aggregateReconciles = new Set<() => void>()
+
   // Membership view (Milestone V). Servers run the view-change state machine: it
   // forms a committed { epoch, members } the cluster agrees on, and drives the
   // DHT ring (via mesh.installView) so ownership is stable within an epoch. A
@@ -390,6 +407,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
             heldCache.clear() // the ring changed — invalidate the holds() memo
             markOrphans() // ring rebalanced → note partitions we no longer replicate (shed once handed off)
             resync() // ...and re-sync the ones we now acquire
+            for (const rescope of aggregateRebinds) rescope() // re-scope live owner-scoped partials over the new ring (Q2c)
+            for (const reconcile of aggregateReconciles) reconcile() // add/drop fold holders for the new membership
           },
         })
       : undefined
@@ -399,7 +418,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // (a commit-triggered resync can race a peer that hasn't committed the new view
   // yet; this re-runs until both rings agree and the partition transfers). Off in
   // full replication (the R=∞ path is unchanged — onConnect catch-up suffices there).
-  const aeTimer = scoped && me !== undefined ? setInterval(resync, antiEntropyMs) : undefined
+  // Also drives the fold-member reconcile RETRY (Q2c): a holder admitted a tick before
+  // its socket finished connecting is picked up here, not just at the (already-past)
+  // commit — the same backstop role anti-entropy plays for acquisition.
+  const aeTimer =
+    scoped && me !== undefined
+      ? setInterval(() => {
+          resync()
+          for (const reconcile of aggregateReconciles) reconcile()
+        }, antiEntropyMs)
+      : undefined
   aeTimer?.unref?.()
 
   // Write-capture: a local assignment on the proxy is stamped with our
@@ -633,6 +661,44 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
+  // A LIVE owner-scoped partial (Milestone Q2c): builds buildPartial(spec), streams its
+  // value to `onValue` (initial + every delta), and RE-SCOPES itself on a view commit so
+  // ownership is re-evaluated over the new ring. Used by BOTH a holder's served partial
+  // and a fold's local self-partial — each node re-scopes its OWN partials on its OWN
+  // commit, and (because the subscription/sink persists) the re-scoped value flows to the
+  // consumer with no re-subscribe.
+  //
+  // Re-scope = rebuild the filter→op chain (data's filter won't re-run its predicate on an
+  // ownership move under a stable row). The previous generation's FunctionSink CANNOT be
+  // synchronously disconnected (data's connect returns the host, not the sink — the sink
+  // GC's only once the host is unreferenced), so it keeps firing the OLD scope until GC; a
+  // GENERATION guard makes those stale firings no-ops. The rebuilt chain stays connected to
+  // the LIVE raw `data`, so an acquired partition's rows (applyInbound → inserts) re-fire
+  // the filter and the partial re-publishes — the acquisition-window heal, no synthetic re-fold.
+  const livePartial = (spec: any, onValue: (v: unknown) => void) => {
+    let gen = 0
+    let proxy: any // retained so the current generation's chain doesn't GC (FunctionSink doesn't back-ref it)
+    let host: any
+    const build = () => {
+      const myGen = ++gen
+      proxy = buildPartial(spec)
+      host = proxy.connect({}, (c: ChangeRecord) => {
+        if (gen === myGen) onValue(c.value) // ignore the prior generation's post-rescope firings
+      })
+    }
+    build() // connect's attach-snapshot calls onValue synchronously with the current value
+    const rescope = () => build()
+    aggregateRebinds.add(rescope)
+    return {
+      close: () => {
+        aggregateRebinds.delete(rescope)
+        gen++ // silence any in-flight firing
+        void proxy
+        void host
+      },
+    }
+  }
+
   const cluster: Cluster = {
     peers: mesh.peers,
     get me() {
@@ -709,7 +775,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // freeze the stream after a full GC on a long-running server — pinning only the host
   // isn't enough. (The default read returns the root `data`, retained anyway, so this only
   // bites derived views.) Held until the client unsubscribes.
-  const subscriptions = new Map<string, { host?: object; src?: object; unsub?: () => void }>()
+  const subscriptions = new Map<string, { host?: object; src?: object; unsub?: () => void; close?: () => void }>()
   const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
     // Read-forwarding (Q1): subscribe a non-held read key FROM the owner and relay its
     // deltas to the subscriber; the upstream unsub is closed on unsubscribe.
@@ -720,6 +786,19 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         if (unsub) subscriptions.set(`${address}:${subId}`, { unsub })
         return
       }
+    }
+    // A served aggregate partial (Milestone Q2c) is a livePartial: it re-scopes itself on
+    // THIS holder's own view commit (ownership moved → owner-scope changes) and pushes the
+    // new value over this EXISTING subscription, so the coordinator never re-subscribes a
+    // stable holder. Streamed as a root-update delta.
+    if (method === 'aggregate') {
+      try {
+        const lp = livePartial(arg, (v) => mesh.deltaTo(address, subId, { type: 'update', key: [], value: v }))
+        subscriptions.set(`${address}:${subId}`, { close: lp.close })
+      } catch {
+        // an unknown op throws in buildPartial — yield no stream (RPC path surfaces errors)
+      }
+      return
     }
     let result: unknown
     try {
@@ -736,7 +815,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   }
   const serveUnsubscribe = (subId: number, address: string) => {
     const k = `${address}:${subId}`
-    subscriptions.get(k)?.unsub?.() // forwarded subscription → close the upstream; local → just drop the host (sink GC'd)
+    const sub = subscriptions.get(k)
+    sub?.unsub?.() // forwarded subscription → close the upstream; local → just drop the host (sink GC'd)
+    sub?.close?.() // a livePartial (served aggregate) → deregister its rescope + drop refs
     subscriptions.delete(k)
   }
 
@@ -835,41 +916,41 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     let liveRes: any
     const partials = new Map<string, unknown>()
     const recombine = () => applyRecord(liveRes, { type: 'update', key: [], value: rule([...partials.values()]) })
+
+    // The querier's OWN shard is a livePartial (in-process; it re-scopes itself on the
+    // querier's own commit). Remote holders are subscriptions kept in `subs`; each remote
+    // holder re-scopes its OWN served partial (also a livePartial) and pushes the new value
+    // over the EXISTING subscription — so the coordinator never needs to re-subscribe a
+    // stable holder, only add new members / drop departed ones (reconcileMembers).
+    let localPartial: { close: () => void } | undefined
+    const subs = new Map<string, () => void>() // member → unsubscribe (only the ones actually subscribed)
+    const reconcileMembers = () => {
+      const members = new Set(mesh.viewMembers())
+      for (const [m, unsub] of subs) if (!members.has(m)) { unsub(); subs.delete(m) } // departed → close the subscription
+      // Drop any partial for a non-member (covers a subscribed-then-departed holder AND an
+      // admit-race member that was seeded in `partials` but never subscribed, then left
+      // before connecting — keying cleanup off `partials`, not `subs`, reaps both).
+      for (const m of [...partials.keys()]) if (m !== me && !members.has(m)) partials.delete(m)
+      for (const m of members) {
+        if (m === me || subs.has(m)) continue
+        if (!partials.has(m)) partials.set(m, undefined) // identity until its first snapshot arrives
+        const unsub = mesh.subscribe('aggregate', spec, (rec: ChangeRecord) => { partials.set(m, rec.value); recombine() }, m)
+        if (unsub) subs.set(m, unsub) // only mark subscribed on success — an unreachable member is RETRIED next tick (admit race)
+      }
+      recombine()
+    }
     const ensure = () => {
       if (live) return
       live = $({})
       liveRes = (live as any)[VIEWSYM].res
-      // local self-partial (in-process — self can't be a wire target, see above).
-      const localPartial = invoke('aggregate', spec) as any
-      partials.set(me!, snapshot(localPartial))
-      const localHost = localPartial.connect({}, (c: ChangeRecord) => {
-        partials.set(me!, c.value)
-        recombine()
-      })
-      // remote partials from every OTHER committed-view holder.
-      const unsubs: (() => void)[] = []
-      for (const o of mesh.viewMembers()) {
-        if (o === me) continue
-        partials.set(o, undefined) // identity until its first snapshot arrives (folds in within one RTT)
-        const unsub = mesh.subscribe(
-          'aggregate',
-          spec,
-          (rec: ChangeRecord) => {
-            partials.set(o, rec.value)
-            recombine()
-          },
-          o,
-        )
-        if (unsub) unsubs.push(unsub)
-      }
-      recombine()
+      localPartial = livePartial(spec, (v) => { partials.set(me!, v); recombine() })
+      reconcileMembers()
+      aggregateReconciles.add(reconcileMembers) // commit + aeTimer: add/drop holders + retry the admit race
       clientSubs.add(() => {
-        for (const u of unsubs) u()
-        void localHost // retain the local sink host (data holds sinks by WeakRef)
-        void localPartial // AND retain the SOURCE proxy: data's FunctionSink stores only
-        // `this.fn`, not `this.p` (core.ts) — so pinning the host keeps the SINK alive but
-        // NOT its filter→aggregate source chain, which is reachable only via WeakRefs and
-        // would GC out from under us, freezing the local partial on a long-running server.
+        aggregateReconciles.delete(reconcileMembers)
+        for (const unsub of subs.values()) unsub()
+        subs.clear()
+        localPartial?.close()
       })
     }
     // The handle: `then` (await ⇒ one-shot gather) is the ONLY access that does not
