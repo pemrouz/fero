@@ -693,6 +693,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         return owned.filter(col, spec.val).length()
       case 'every':
         return composite($({ match: 0, total: 0 }), { match: owned.filter(col, spec.val).length(), total: owned.length() })
+      // 'rows' (Milestone Q3): this holder's OWNER-SCOPED row set itself (not a scalar) — the
+      // per-shard partial a whole-resource GATHER folds. Each holder ships its owned rows; the
+      // querier UNIONs them by key (RULES.rows) into the whole resource — the "download
+      // everything" step holistic ops (sort/distinct/group/reduce) run AFTER. Owner-scoped so
+      // the union is a disjoint cover (each row once, 1× wire, not R×); the union is idempotent
+      // by key, so it tolerates the transient ring disagreement a scalar fold can't (two holders
+      // both reporting a key land it once, not twice). livePartial emits the whole owned snapshot
+      // on every delta, which is exactly the {key:[], value} shape the fold consumes.
+      case 'rows':
+        return owned
       default:
         throw new Error(`fero: unknown aggregate op "${spec?.op}"`)
     }
@@ -804,6 +814,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       const owner = mesh.owner(arg)
       if (owner !== undefined && owner !== me) return mesh.call('read', arg, owner)
     }
+    // Whole-resource read() under scoping (Milestone Q3): a client called read() with NO key.
+    // No single node holds the whole resource, so GATHER it — fold every holder's owner-scoped
+    // rows into the union (the {op:'rows'} partial, fold stripped → no recursion) — and reply
+    // with the global snapshot. This is the explicit "download everything" the user chains
+    // holistic ops after. R≥members / full replication hold everything, so read() stays a local
+    // c.data snapshot there (the hot path is byte-identical — the gather only arms when scoped).
+    if (method === 'read' && arg == null && scoped && R < viewSize()) return foldOnce({ op: 'rows' }, RULES.rows)
     // A CLIENT routed a distributed aggregate here (Milestone Q2e): a client can't
     // owner-scope or fold, so it sends {fold:true} and THIS server (a coordinator) returns
     // the GLOBAL via a one-shot gather. The gather fans out PARTIAL requests (fold stripped)
@@ -840,6 +857,27 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         if (unsub) subscriptions.set(`${address}:${subId}`, { unsub })
         return
       }
+    }
+    // A CLIENT's reactive whole-resource read() under scoping (Milestone Q3): build the live
+    // GATHER here (the union of every holder's owner-scoped rows, refolded on any shard delta)
+    // and stream it to the client; the client runs its holistic ops over the gathered proxy
+    // locally. Same openFold machinery as a distributed aggregate, with the union rule. Torn
+    // down on unsubscribe.
+    //   NOT gated on R<viewSize() (unlike the stateless serveCall one-shot) — this branch runs
+    // ONCE at subscribe and is never re-evaluated, so gating on membership-at-subscribe would let a
+    // read() opened while members≤R (server momentarily holds all) stream that server's LOCAL c.data
+    // forever, then go SILENTLY PARTIAL once a join shards the resource and the server sheds keys
+    // (the Q3a review's confirmed defect). The gather is correct at ANY R — owner-scoping is a
+    // disjoint cover regardless of replica count — and openFold's reconcileMembers re-arms on each
+    // commit, so an ungated gather is membership-robust. Mirrors the aggregate subscribe branch
+    // (also ungated). Full replication never builds the facade / sends a scoped read, so R=∞ is
+    // unaffected. (serveCall keeps the R<viewSize() optimization: it re-evaluates per call, so a
+    // complete-local read at members≤R is always current.)
+    if (method === 'read' && arg == null && scoped) {
+      const g = openFold({ op: 'rows' }, RULES.rows)
+      const host = (g.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
+      subscriptions.set(`${address}:${subId}`, { host, src: g.proxy, close: g.close })
+      return
     }
     // A CLIENT's reactive distributed aggregate (Milestone Q2e): build the FOLD here and
     // stream the global result to the client; the fold fans out partial requests (fold
@@ -1236,6 +1274,14 @@ const everyRule: Rule = (vs) => {
   for (const v of vs) if (v != null) { m += (v as any).match || 0; t += (v as any).total || 0 }
   return m === t
 }
+// rows = UNION (Milestone Q3): fold each holder's owner-scoped row-set OBJECT into the whole
+// resource. Object.assign by key — owner-scoping makes the keysets disjoint (no collision), and
+// even under transient ring disagreement (two holders briefly claiming a key) the merge is
+// idempotent (the key lands once, same replicated value), unlike a scalar Σ which would double.
+// A missing/undefined partial (an empty-owned holder, or a wire-failed remote) folds as the
+// empty contribution. This is the "download everything to one node" gather — the whole-resource
+// snapshot/stream holistic operators (sort/distinct/group/reduce) compute over locally.
+const unionRule: Rule = (vs) => Object.assign({}, ...vs.filter((o) => o != null && typeof o === 'object'))
 const RULES: Record<string, Rule> = {
   sum: sumRule,
   count: sumRule,
@@ -1244,6 +1290,7 @@ const RULES: Record<string, Rule> = {
   avg: avgRule,
   some: someRule,
   every: everyRule,
+  rows: unionRule,
 }
 
 // A `data` ViewProxy carries the view symbol; a plain value does not.
