@@ -2040,3 +2040,43 @@ test('Q3b regression (M3): a scoped server methods.read() is memoized to ONE gat
     all.forEach((n) => n.destroy())
   }
 })
+
+test('Q3 capstone: a CLIENT chains a holistic op over its gathered read() — client.methods.read().az(v) = global order', async () => {
+  // The headline consumer shape (capstone test-gap fill): a read-only client gathers the whole
+  // resource via its server (server-as-coordinator) and runs the holistic op LOCALLY over the
+  // client-gathered proxy — same machinery as the server path, but the common case.
+  const { all, node, ok } = await q2bForm('q3cli', 2)
+  let client: any
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 20 }, (_, i) => 'k' + i)
+    const vals: Record<string, number> = {}
+    keys.forEach((k, i) => (vals[k] = (i * 7 + 3) % 53)) // distinct ⇒ unambiguous order
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: vals[k] }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+    const expected = keys.map((k) => vals[k]).sort((a, b) => a - b)
+
+    const pA = +A.cluster.me!.split(':')[1]
+    client = await fero('q3cli', { host: '127.0.0.1', ports: [pA], wait: 200 })
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected')
+
+    const handle = client.methods.read() // client gather (server-as-coordinator)
+    const sorted = handle.az('v') // holistic op over the client-gathered proxy, run locally
+    void sorted.connect([])
+    let got: number[] = []
+    for (let i = 0; i < 80; i++) {
+      const snap = sorted[value]
+      if (Array.isArray(snap) && snap.length === keys.length) {
+        got = snap.map((r: any) => r.v)
+        if (got.length === expected.length && got.every((v, j) => v === expected[j])) break
+      }
+      await sleep(150)
+    }
+    assert.deepEqual(got, expected, 'client global ascending order over the gathered resource')
+  } finally {
+    client?.destroy()
+    all.forEach((n) => n.destroy())
+  }
+})
