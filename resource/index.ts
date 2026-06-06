@@ -820,7 +820,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // with the global snapshot. This is the explicit "download everything" the user chains
     // holistic ops after. R≥members / full replication hold everything, so read() stays a local
     // c.data snapshot there (the hot path is byte-identical — the gather only arms when scoped).
-    if (method === 'read' && arg == null && scoped && R < viewSize()) return foldOnce({ op: 'rows' }, RULES.rows)
+    if (method === 'read' && arg == null && scoped && R < viewSize() && allMethods.read === defaults.read) return foldOnce({ op: 'rows' }, RULES.rows)
     // A CLIENT routed a distributed aggregate here (Milestone Q2e): a client can't
     // owner-scope or fold, so it sends {fold:true} and THIS server (a coordinator) returns
     // the GLOBAL via a one-shot gather. The gather fans out PARTIAL requests (fold stripped)
@@ -873,7 +873,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // (also ungated). Full replication never builds the facade / sends a scoped read, so R=∞ is
     // unaffected. (serveCall keeps the R<viewSize() optimization: it re-evaluates per call, so a
     // complete-local read at members≤R is always current.)
-    if (method === 'read' && arg == null && scoped) {
+    if (method === 'read' && arg == null && scoped && allMethods.read === defaults.read) {
       const g = openFold({ op: 'rows' }, RULES.rows)
       const host = (g.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
       subscriptions.set(`${address}:${subId}`, { host, src: g.proxy, close: g.close })
@@ -1074,8 +1074,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const foldAggregate = (spec: { op: string; col?: unknown; val?: unknown }) => {
     const rule = RULES[spec.op]
     let opened: { proxy: any; close: () => void } | undefined
-    return new Proxy(noop, {
+    const handle = new Proxy(noop, {
       get(_t, prop) {
+        // FOLD_ONCE (Q3b review M2): resolve a ONE-SHOT global via foldOnce WITHOUT opening the live
+        // fold. snapshot() reads this tag (only on a confirmed FOLD_HANDLES member) instead of its
+        // isViewProxy/[VALUE] probe, which would otherwise open the fold and read its still-empty
+        // in-progress union — so a handler returning this handle (`(_,c) => c.methods.read()`) replies
+        // with the GLOBAL on the RPC path, not a local partial. Must precede the symbol-reject below.
+        if (prop === FOLD_ONCE) return () => foldOnce(spec, rule)
         if (prop === 'then') return (onF: any, onR: any) => foldOnce(spec, rule).then(onF, onR)
         if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined
         if (prop === 'constructor' || prop === 'toJSON') return undefined
@@ -1086,6 +1092,35 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         return opened.proxy[prop]
       },
     })
+    FOLD_HANDLES.add(handle) // so snapshot() resolves a RETURNED handle via foldOnce (M2)
+    return handle
+  }
+
+  // Server-side whole-resource read() gather (Milestone Q3b). A scoped SERVER holds only its
+  // R-set, so its own no-key `methods.read()` would otherwise return a LOCAL partial — wrong for
+  // the holistic ops (`methods.read().az('v')`, `.distinct()`, `.reduce(...)`) the user runs AFTER
+  // read. Replace the DEFAULT no-key read with the gather HANDLE (foldAggregate over {op:'rows'}):
+  // `await methods.read()` is a one-shot gather, reactive use opens the live gather and the holistic
+  // op runs over the merged whole-resource proxy locally.
+  //   • Only when read is the DEFAULT (allMethods.read === defaults.read): a user-supplied `read` is
+  //     THEIR projection — never silently swap it for the raw gather (which would diverge from the
+  //     full-rep path, where the custom read runs over complete state). [Q3b review M1]
+  //   • MEMOIZED to ONE handle per node: the spec is the constant {op:'rows'}, so a single
+  //     foldAggregate (one live openFold, membership-robust via reconcile) backs every call. A fresh
+  //     handle per reactive call would leak an O(resource) union-fold into aggregateReconciles —
+  //     re-run every commit + AE tick — forever. [Q3b review M3]
+  //   • Keyed `methods.read(key)` is LOCAL (this node's held child view, via baseRead). Owner-routing
+  //     for a non-held key is the `data` facade (`data[key]` → remoteRead) or an inbound client RPC
+  //     (serveCall read-forwarding) — NOT this surface. [Q3b review m4]
+  //   • In-handler `context.methods.read()` is this same gather handle (context.methods IS
+  //     localMethods): `await` ⇒ global, reactive ⇒ live, sync `[value]` ⇒ the in-progress union;
+  //     a handler wanting the LOCAL held state reads `c.data` directly. [Q3b review m5; DECISIONS Q3]
+  // Ungated on R (membership-robust — openFold re-arms on commit). Full replication (scoped=false)
+  // keeps the raw-c.data read — that node holds everything, so local IS global.
+  if (!isClient && scoped && allMethods.read === defaults.read) {
+    const baseRead = localMethods.read
+    let gather: any
+    localMethods.read = (arg?: any) => (arg == null ? (gather ??= foldAggregate({ op: 'rows' })) : baseRead(arg))
   }
 
   const methodSurface: Record<string, (arg?: any) => any> = isClient
@@ -1160,23 +1195,23 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (R >= viewSize() && op !== 'some' && op !== 'every') return (data as any)[op](...args)
     return foldAggregate(spec)
   }
-  // Q3 boundary guard. These operators are HOLISTIC or ordered — the global answer needs
-  // the full multiset co-located (a gather-to-one or a user combine), or, for a grouped
-  // aggregate, the L3 chain planner — so they CAN'T fold from per-shard partials. On a
-  // scoped node `data.sort(...)`/`data.top(...)`/`data.group(...)`/`data.reduce(...)` would
-  // otherwise run over only this node's held partitions and SILENTLY look like a global
-  // answer. We return that local result but WARN LOUDLY (once per op) so it's never
-  // silently mistaken for the global. top/limit-K specifically: data's sort emits positional
-  // BMV1 'move' deltas that applyRecord ignores ([DECISIONS E]), so a folded top-K can't
-  // track order without a whole-array re-ship — Q3. A full-replication node never builds the
-  // facade, so this never fires there (local IS global).
+  // Q3 boundary guard. These operators are HOLISTIC or ordered — the global answer needs the
+  // full multiset co-located — so they CAN'T fold from per-shard partials. The Q3 path is to
+  // GATHER first: `methods.read()` (no key) downloads the whole resource (Q3a/Q3b), and the
+  // holistic op runs over THAT — `methods.read().az('v')`, `.distinct()`, `.reduce(...)` — or you
+  // derive it as its own named resource. Calling the op DIRECTLY on `data` (no read) runs over
+  // only this node's held partitions and would SILENTLY look like a global answer, so we return
+  // that local result but WARN LOUDLY (once per op). top/limit-K specifically: data's sort emits
+  // positional BMV1 'move' deltas applyRecord ignores ([DECISIONS E]); a grouped aggregate
+  // (group(c).sum(v)) needs the L3 chain planner — both still deferred. A full-replication node
+  // never builds the facade, so this never fires there (local IS global).
   const HOLISTIC = new Set(['az', 'za', 'top', 'limit', 'group', 'distinct', 'reduce']) // registered chainable operators (sort family = az/za/top/limit)
   const holisticWarned = new Set<string>()
   const holisticGuard = (op: string) => (...args: unknown[]) => {
     if (!isClient && R >= viewSize()) return (data as any)[op](...args) // holds everything → local is global
     if (!holisticWarned.has(op)) {
       holisticWarned.add(op)
-      console.warn(`fero: data.${op}(...) is HOLISTIC over the WHOLE resource and can't fold from per-shard partials — returning a LOCAL result (held partitions only). A gather-to-one or user combine is the Q3 path; a grouped aggregate (e.g. group(...).sum(...)) needs the L3 chain planner. (Decomposable aggregates — sum/count/max/min/avg/some/every — distribute via the facade.)`)
+      console.warn(`fero: data.${op}(...) is HOLISTIC over the WHOLE resource and can't fold from per-shard partials — returning a LOCAL result (held partitions only). Run it AFTER methods.read() (which gathers the whole resource) — e.g. methods.read().${op}(...) — or derive it as its own named resource. (group(...).sum(...) needs the L3 chain planner; decomposable aggregates — sum/count/max/min/avg/some/every — distribute via the facade with no read.)`)
     }
     return (data as any)[op](...args)
   }
@@ -1219,6 +1254,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
 // noop target for the callable client-handle Proxy (mirrors data's ViewProxy).
 const noop = () => {}
+
+// Resolver tag on a foldAggregate/gather handle: `handle[FOLD_ONCE]` yields a `() => Promise<global>`
+// that resolves a ONE-SHOT gather WITHOUT opening the handle's live fold.
+const FOLD_ONCE = Symbol('fero.foldOnce')
+// Identity set of live fold/gather handles (foldAggregate's Proxies). snapshot() membership-checks
+// this — a side-effect-free WeakSet probe — to decide whether to resolve a returned handle via
+// foldOnce. We do NOT probe the FOLD_ONCE symbol on every method return: reading an unknown symbol
+// off a `data` ViewProxy throws "Cannot convert a Symbol value to a string" (Q3b review M2 fix).
+const FOLD_HANDLES = new WeakSet<object>()
 
 // Combine rules for distributed aggregates (Milestone Q2): how N owner-scoped
 // partials fold into the global answer. Each is associative + commutative so the
@@ -1308,5 +1352,12 @@ function isViewProxy(v: unknown): boolean {
 // an empty-holder partial crossed the wire as a serialized proxy and NaN-poisoned
 // the extremum fold; the read() path never hit it (its root is always an object).
 function snapshot(v: unknown): unknown {
+  // A fold/gather HANDLE (foldAggregate) resolves its ONE-SHOT global via foldOnce — detected by a
+  // side-effect-free FOLD_HANDLES membership check (NOT by probing the FOLD_ONCE symbol on every
+  // value: an unknown symbol read off a `data` ViewProxy throws "Cannot convert a Symbol to a
+  // string"). Resolving here means a method that RETURNS such a handle (`(_,c)=>c.methods.read()`)
+  // replies with the awaited global, instead of the isViewProxy/[VALUE] probe opening the fold and
+  // shipping its empty in-progress union (Q3b review M2). Returns a Promise the CALL handler awaits.
+  if (typeof v === 'function' && FOLD_HANDLES.has(v as object)) return (v as any)[FOLD_ONCE]()
   return isViewProxy(v) ? (v as any)[VALUE] : v
 }
