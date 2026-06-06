@@ -1678,3 +1678,77 @@ test('Q2f: a holistic op on the facade is loudly flagged (local result, never si
     all.forEach((n) => n.destroy())
   }
 })
+
+// ── Q2 capstone regressions (found by the integrated-surface review) ──
+
+test('Q2 regression: some/every(col) work at R≥viewSize (no "fn is not a function" crash)', async () => {
+  // The R≥members branch must NOT forward a column STRING to data's raw some/every (which
+  // need a predicate FN) — it routes through the fold instead. Solo R=3 (single-member
+  // view) and a 2-node R=2 (every node holds all) both hit R≥viewSize.
+  const solo = await fero('q2reg-solo', { host: '127.0.0.1', port: await ports.free(), wait: 50, replicas: 3 })
+  try {
+    solo.data.a = { active: true }
+    solo.data.b = { active: true }
+    assert.equal(await solo.data.some('active'), true, 'solo some(col)')
+    assert.equal(await solo.data.every('active'), true, 'solo every(col)')
+    solo.data.c = { active: false }
+    await sleep(80)
+    assert.equal(await solo.data.every('active'), false, 'solo every(col) flips false')
+    assert.equal(await solo.data.some('active'), true, 'solo some(col) still true')
+  } finally {
+    solo.destroy()
+  }
+
+  const { all, node, ok } = await q2bForm('q2reg2', 2, 2) // 2 nodes, R=2 ⇒ R≥members
+  try {
+    assert.ok(ok, '2-node cluster formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 12 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { active: true }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+    for (const n of all) {
+      assert.equal(await n.data.some('active'), true, `${n.cluster.me}: some(col) at R≥members`)
+      assert.equal(await n.data.every('active'), true, `${n.cluster.me}: every(col) at R≥members`)
+    }
+    node(A.cluster.owner('k3')!).data.k3 = { active: false }
+    for (const n of all) {
+      let e: any
+      for (let i = 0; i < 40; i++) {
+        e = await n.data.every('active')
+        if (e === false) break
+        await sleep(120)
+      }
+      assert.equal(e, false, `${n.cluster.me}: every(col) flips false across both owners`)
+    }
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q2 regression: avg propagates a NaN local shard (not masked to 0)', async () => {
+  // avgRule uses `?? 0` (not `|| 0`) on .sum, mirroring sumRule — a NaN-poisoned local
+  // partial propagates to the global, matching single-node `data.avg`. Query the OWNER of
+  // the bad key so its NaN partial is LOCAL (no wire NaN→null codec dependency).
+  const { all, node, ok } = await q2bForm('q2regnan', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 16 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 4 }
+    const bad = 'oops'
+    node(A.cluster.owner(bad)!).data[bad] = { v: 'not-a-number' }
+    assert.ok(await until(() => has(node(A.cluster.owner(bad)!), bad), 8000), 'bad key on its owner')
+    const owner = node(A.cluster.owner(bad)!)
+    let got: any
+    for (let i = 0; i < 30; i++) {
+      got = await owner.data.avg('v')
+      if (typeof got === 'number' && Number.isNaN(got)) break
+      await sleep(120)
+    }
+    assert.ok(Number.isNaN(got), `owner's distributed avg is NaN (propagated, not masked to ${got})`)
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
