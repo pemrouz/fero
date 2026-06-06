@@ -390,4 +390,54 @@ full replication (R=∞) keeps the per-origin path byte-for-byte:
 **Decision.** Holding is R-way and durability-safe under membership change (acquisition
 heals to R). Full replication (R=∞) is unchanged and remains the default. Reads stay
 synchronous-and-local for held partitions; **Q1** makes non-local reads `await`/subscribe.
-P4 (drained handoff barrier + orphan shedding) and P3 (digest compaction) refine it.
+P4 (orphan shedding) and P3 (digest compaction) refine it.
+
+### P4 — Confirmed orphan shedding · Adopted
+
+**Context.** P2 left ORPHANS — partitions a node holds but no longer replicates (a former
+replica after a ring expansion; a write committed locally at a non-replica via the
+never-drop fallback or a misrouted forward). P2 healed durability (the true R-set acquires
+the data via anti-entropy) but tolerated the orphan as an EXTRA copy, violating "exactly R
+replicas". P4 sheds them.
+
+**Design — keep-until-confirmed (no consensus change).** The "no under-replication window"
+property falls out of *when* we shed, not of gating the view-change ballot: an orphan is
+KEPT until a current R-set member is confirmed caught up, so the partition stays ≥R
+replicated throughout the handoff (the old holder holds the fort until the new R-set has
+it), then the orphan drops.
+- `orphans: Set` — populated on view commit (`markOrphans` scans `log.partitions()` for
+  `!holds`) and in `commitLocal` (a write committed where `!holds(p)`).
+- `shedConfirmed(peerMarks, peerMe)` runs on every digest (both reciprocal legs): for each
+  orphan, if the sender is a current R-set member AND its marks cover ALL our
+  (origin,partition) records, record it caught up; **shed only once EVERY R-set member is
+  confirmed**. Single-confirmation is UNSAFE — if a partition's R-set moves entirely
+  (`{A,B}→{C,D}`), shedding A as soon as C is caught up (before D acquired) leaves the
+  partition on `{C}` alone (1 < R). Conservative throughout: a missing/lower peer mark
+  keeps the orphan — **no data can ever be lost**.
+- `shed(p)` is a COMPLETE in-memory removal: proxy (guarded), log segment + provenance
+  index (`Log.drop`), `seen` marks, `versions`. After it, the node no longer advertises p
+  in its digest.
+- Perf: `commitLocal` computes the R-set ONCE (`mesh.owners` → `mesh.replicateTo(rset,…)` +
+  the orphan check reuse it) instead of a second `holds()` ring scan per scoped write
+  (review finding). All P4 work is scoped-gated; R=∞ is untouched.
+
+**Adversarial review.** The window bug above was found independently and fixed
+(multi-confirm) before the review; the review's verifiers actually *under-called* it
+(dismissed), confirming the value of not relying on a single check. A 4-node FULL-R-set-move
+test exercises the multi-confirm path (no loss, eventual exactly-R).
+
+**Known limitations (deferred, documented).**
+- **Durable shed.** `shed()` is in-memory only; the append-only WAL (`fileStorage`) still
+  holds the partition, and restore replays it through `applyInbound` (no held-gate on the
+  restore path), so a scoped node WITH storage resurrects a shed orphan across a restart
+  (re-advertises it until it rejoins and re-sheds — self-healing, no data loss). A durable
+  shed needs a tombstone / WAL compaction — folded into the already-deferred WAL-compaction
+  work (IDEAS). Only affects `{replicas:R, storage:…}`.
+- **NUL in keys.** Shed's suffix matching (and the existing `versionKey` / `originKey`) use
+  `\x00` as a separator, assuming top-level keys contain no NUL byte — an inherited library
+  assumption, not new to P4.
+
+**Decision.** A partitioned cluster converges to EXACTLY R replicas per partition, with no
+under-replication window during handoff and no data loss. The drained-ballot variant (gate
+commit on catch-up) is unnecessary given keep-until-confirmed, so it's dropped from the
+roadmap.

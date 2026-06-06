@@ -54,7 +54,7 @@ export type Mesh = {
   uuid: string
   owner: (key: string) => string | undefined
   send: (record: ChangeRecord) => void
-  replicatePeers: (record: ChangeRecord, replicas: number) => void // scoped replication (Milestone P): send a committed record to the OTHER R-1 replicas of its partition (excludes self — the committer already holds + logged it)
+  replicateTo: (addresses: string[], record: ChangeRecord) => void // scoped replication (Milestone P): send a committed record to the given R-set, excluding self (the committer already holds + logged it). Caller passes the precomputed owners(key,R) so the ring is walked once per write.
   broadcast: (record: ChangeRecord) => void
   forward: (address: string, record: ChangeRecord) => boolean // route a write-request to the owner; false if it isn't connected
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
@@ -252,14 +252,12 @@ export function transport(opts: TransportOpts): Mesh {
       if (owner === me) deliverLocal(record)
       else if (owner) pool.sendTo(owner, record)
     },
-    // Scoped replication (Milestone P): the partition's owner (which committed the
-    // record under its own provenance) ships it to the OTHER replicas in its R-set.
-    // Excludes self — the committer already applied + logged it (commitLocal). Uses
-    // the same batched per-peer outbox as broadcast, so framing is identical.
-    replicatePeers(record, replicas) {
-      for (const owner of dht.owners(partitionOf(record), replicas)) {
-        if (owner !== me) pool.sendTo(owner, record)
-      }
+    // Scoped replication (Milestone P): ship a committed record to the given R-set
+    // (the caller's precomputed owners(key,R)), excluding self — the committer already
+    // applied + logged it (commitLocal). Uses the same batched per-peer outbox as
+    // broadcast, so framing is identical.
+    replicateTo(addresses, record) {
+      for (const a of addresses) if (a !== me) pool.sendTo(a, record)
     },
     broadcast: (record) => pool.broadcast(record),
     owners: (key, replicas) => dht.owners(key, replicas),

@@ -46,30 +46,34 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    hook) or keep them separate? A genuinely-open design point, not in plan §11
    (it sits alongside the §11.1 write-paths). (resource)
 7. **Partitioned holding (R-way) — remaining work.** The user took option 2:
-   **P0** (replica-set seam) and **P2** (scoped R-way replication + per-(origin,partition)
-   dedup/catch-up + acquisition re-sync) have LANDED ([DECISIONS P](DECISIONS.md)); F2/F3
-   are superseded by P. Granularity is R-gated, so full replication (R=∞) is unchanged.
-   What's left, by milestone:
+   **P0** (replica-set seam), **P2** (scoped R-way replication + per-(origin,partition)
+   dedup/catch-up + acquisition re-sync), and **P4** (confirmed orphan shedding — exactly R
+   replicas, no under-replication window) have LANDED ([DECISIONS P](DECISIONS.md)); F2/F3
+   are superseded by P, and the drained-ballot barrier is dropped (keep-until-confirmed
+   shedding gives the no-window property without it). Granularity is R-gated, so full
+   replication (R=∞) is unchanged. What's left:
    - **P3 — anti-entropy digest compaction.** P2's scoped digest is O(held keys), re-sent
      by periodic AE every `antiEntropy` ms. Replace with a **Merkle / range-hash** tree:
      exchange a root, drill only into differing subtrees (O(log keys) + the diff). Also:
      smarter peer-selection (digest a random subset per round, not all view members — the
      current fan-out is O(N²) per round). (log, resource)
-   - **P4 — drained handoff barrier + orphan shedding.** (a) Make the view-change a
-     **drained cutover**: the new replica is caught up BEFORE the view goes live (no
-     under-replication window — P2 heals *eventually* via AE, not atomically). (b) **Shed
-     orphans**: after the barrier confirms the new R-set holds a partition, drop the extra
-     copies P2 tolerates (former replica on ring expansion, formation-window write,
-     never-drop fallback at an unreachable owner, transiently-misrouted forward). Shedding
-     needs the barrier — dropping before acquisition completes would lose data. Also picks
-     up the V deferrals: the stronger **reject-stale-epoch-from-an-evicted-node** fence
-     (per-partition owner lineage + a uuid↔address map), the **commit-ack drain**
-     (PREPARE-ACK high-water vectors; also [open question 1]), **outbox-flush-before-ring-
-     rebuild**, and preserving a **buffered write's attempt-epoch** on flush. (resource,
-     transport)
+   - **Durable shed (folds into WAL compaction).** P4's `shed()` is in-memory only; the
+     append-only WAL still holds the partition and restore replays it (no held-gate on the
+     restore path), so a scoped node WITH `storage` resurrects a shed orphan across a
+     restart (self-healing on rejoin, no data loss). Needs a tombstone / log compaction —
+     do it alongside the existing **WAL compaction** item. Only affects `{replicas:R,
+     storage:…}`. (resource, log, storage)
+   - **V deferrals (no longer barrier-gated).** The stronger
+     **reject-stale-epoch-from-an-evicted-node** fence (per-partition owner lineage + a
+     uuid↔address map), the **commit-ack drain** (PREPARE-ACK high-water vectors; also
+     [open question 1]), **outbox-flush-before-ring-rebuild**, and preserving a **buffered
+     write's attempt-epoch** on flush. (resource, transport)
    - **Perf follow-ups.** `holds()` allocates an `owners()` array per inbound record when
-     R<members — add an allocation-free ring predicate (`dht.holds(key, addr, R)`). The
-     gap-tolerant-dedup alternative from [DECISIONS F](DECISIONS.md) stays parked. (transport)
+     R<members — add an allocation-free ring predicate (`dht.holds(key, addr, R)`).
+     `shedConfirmed` is O(orphans × seen) per digest (fine — orphans are transient; large
+     rebalances on huge keyspaces could want a per-partition seen index). The
+     gap-tolerant-dedup alternative from [DECISIONS F](DECISIONS.md) stays parked. NUL-in-key
+     over-match in shed/versionKey is an inherited separator assumption. (transport, resource)
 
    Reads (Q1) make non-local access `await`/subscribe; aggregates (Q2/Q3) are the
    distributed-query slice of L3. See open questions below + [DECISIONS P](DECISIONS.md).
