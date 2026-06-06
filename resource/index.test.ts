@@ -1500,3 +1500,84 @@ test('Q2c: killing a holder drops its shard + survivors re-scope — fold heals 
     })
   }
 })
+
+// ── Milestone Q2d: avg ({sum,count} pair) + some/every (declarative OR/AND) ──
+
+test('Q2d: global avg folds (sum,count) pairs and divides last — not average-of-averages', async () => {
+  const { all, node, ok } = await q2bForm('q2davg', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    const vals: Record<string, number> = {}
+    for (const k of keys) {
+      const v = ((k.charCodeAt(1) * 13 + k.length * 7) % 50) + 1
+      vals[k] = v
+      node(A.cluster.owner(k)!).data[k] = { v }
+    }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+    const globalAvg = keys.reduce((s, k) => s + vals[k], 0) / keys.length
+    for (const n of all) {
+      let got: any
+      for (let i = 0; i < 40; i++) {
+        got = await n.data.avg('v')
+        if (typeof got === 'number' && Math.abs(got - globalAvg) < 1e-9) break
+        await sleep(120)
+      }
+      assert.ok(typeof got === 'number' && Math.abs(got - globalAvg) < 1e-9, `${n.cluster.me}: avg=${got} expected ${globalAvg}`)
+    }
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q2d: global some/every over a declarative predicate (OR / AND)', async () => {
+  const { all, node, ok } = await q2bForm('q2dse', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 20 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { active: true }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+    for (const n of all) {
+      assert.equal(await n.data.some('active'), true, `${n.cluster.me}: some(active) = true (a match exists)`)
+      assert.equal(await n.data.every('active'), true, `${n.cluster.me}: every(active) = true (all match)`)
+    }
+    // flip ONE key inactive on its owner → some stays true, every flips false.
+    node(A.cluster.owner('k5')!).data.k5 = { active: false }
+    assert.ok(await until(() => (node(A.cluster.owner('k5')!).data[value] as any)?.k5?.active === false, 8000), 'k5 flipped')
+    for (const n of all) {
+      let s: any
+      let e: any
+      for (let i = 0; i < 40; i++) {
+        s = await n.data.some('active')
+        e = await n.data.every('active')
+        if (s === true && e === false) break
+        await sleep(120)
+      }
+      assert.equal(s, true, `${n.cluster.me}: some still true (others active)`)
+      assert.equal(e, false, `${n.cluster.me}: every now false (k5 inactive)`)
+    }
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q2d: a closure predicate on the facade is rejected loudly (local fallback, not silent)', async () => {
+  const { all, ok } = await q2bForm('q2drej', 2)
+  const orig = console.warn
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const warnings: string[] = []
+    console.warn = (...a: unknown[]) => warnings.push(a.join(' '))
+    void A.data.some((s: any) => s.active) // a closure can't cross the wire → warn + local fallback
+    console.warn = orig
+    assert.ok(warnings.some((w) => w.includes("can't be distributed")), `closure rejected loudly; warnings=${JSON.stringify(warnings)}`)
+  } finally {
+    console.warn = orig
+    all.forEach((n) => n.destroy())
+  }
+})

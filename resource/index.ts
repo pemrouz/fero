@@ -645,17 +645,54 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // ships sum/count/max/min (string-parameterized, no fn); avg/some/every/group land
   // in later increments. Returns a `data` ViewProxy (scalar here) — snapshot for an
   // RPC, change-stream for a subscription, exactly like `read`.
+  // A COMPOSITE partial (avg's {sum,count}, every's {match,total}) is built from two O(1)
+  // aggregate sub-views mirrored onto one object ViewProxy. Two subtleties: (1) a `data`
+  // ViewProxy is `typeof === 'function'` (it wraps noop), so it can't be a connect ANCHOR
+  // (`connect(viewProxy, 'prop')` is misread as a bare-fn sink) — we mirror via a plain
+  // anchor + assignment into `out`; (2) data's FunctionSink doesn't back-ref its source, so
+  // the two sub-views would GC and freeze — `aggRetain` (keyed by the returned proxy) pins
+  // the sub-views + anchor for exactly as long as `out` is reachable. O(1) per delta (the
+  // sub-views are running aggregates; the mirror is a scalar assignment).
+  const aggRetain = new WeakMap<object, unknown[]>()
+  const composite = (out: any, fields: Record<string, any>): any => {
+    const anchor = {}
+    const retain: unknown[] = [anchor]
+    for (const [prop, view] of Object.entries(fields)) {
+      view.connect(anchor, () => {
+        out[prop] = (view as any)[VALUE]
+      })
+      retain.push(view)
+    }
+    aggRetain.set(out, retain)
+    return out
+  }
   const buildPartial = (spec: any): any => {
     const owned = ownedView()
+    const col = spec?.col
     switch (spec?.op) {
       case 'sum':
-        return owned.sum(spec.col)
+        return owned.sum(col)
       case 'count':
         return owned.length()
       case 'max':
-        return owned.max(spec.col)
+        return owned.max(col)
       case 'min':
-        return owned.min(spec.col)
+        return owned.min(col)
+      // avg ships a {sum, count} PAIR (data's AvgValue exposes only the quotient, which
+      // can't be combined — average-of-averages is wrong). count = #owned rows with a
+      // DEFINED projected value (matching AvgValue's own counting); the fold divides last.
+      case 'avg': {
+        const defined = col != null ? (r: any) => r?.[col] != null : (r: any) => r != null
+        return composite($({ sum: 0, count: 0 }), { sum: owned.sum(col), count: owned.filter(defined).length() })
+      }
+      // some/every take a DECLARATIVE predicate (col[, val]) — a closure can't cross the
+      // wire to other holders (use a named method for that, a follow-up). some ships this
+      // holder's MATCH COUNT (fold: Σ > 0 ⇒ any match exists); every ships {match, total}
+      // (fold: Σmatch === Σtotal ⇒ all rows match; empty ⇒ 0===0 ⇒ true, vacuous).
+      case 'some':
+        return owned.filter(col, spec.val).length()
+      case 'every':
+        return composite($({ match: 0, total: 0 }), { match: owned.filter(col, spec.val).length(), total: owned.length() })
       default:
         throw new Error(`fero: unknown aggregate op "${spec?.op}"`)
     }
@@ -682,8 +719,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const build = () => {
       const myGen = ++gen
       proxy = buildPartial(spec)
-      host = proxy.connect({}, (c: ChangeRecord) => {
-        if (gen === myGen) onValue(c.value) // ignore the prior generation's post-rescope firings
+      // Emit the whole partial SNAPSHOT (not the per-change c.value): a scalar partial's
+      // snapshot is the scalar, but an OBJECT partial (avg's {sum,count}, every's
+      // {match,total}) emits per-KEY change records whose c.value is just one field — only
+      // the snapshot carries the full {…}. The gen guard ignores the prior generation's
+      // post-rescope firings (its FunctionSink can't be synchronously disconnected).
+      host = proxy.connect({}, () => {
+        if (gen === myGen) onValue(snapshot(proxy))
       })
     }
     build() // connect's attach-snapshot calls onValue synchronously with the current value
@@ -995,18 +1037,29 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // (bucketed) and top/limit-K are holistic-shaped → Q3 (the loud guard lands in Q2f).
   // A client cannot owner-scope or fold (no me/view) → its aggregates route to a server
   // (server-as-coordinator, Q2f); until then the facade leaves them to the raw operator.
-  const DECOMPOSABLE = new Set(['sum', 'max', 'min', 'length'])
+  const DECOMPOSABLE = new Set(['sum', 'max', 'min', 'avg', 'some', 'every', 'length'])
   const distributable = scoped && me !== undefined
-  const distributed = (op: string) => (arg?: unknown) => {
+  const distributed = (op: string) => (...args: unknown[]) => {
     // R≥members ⇒ this node holds the whole resource → run the aggregate LOCALLY over
     // complete state (re-checked per access as membership grows). Matches "all data
     // local ⇒ run locally unchanged".
-    if (R >= viewSize()) return (data as any)[op](arg)
+    if (R >= viewSize()) return (data as any)[op](...args)
+    const a0 = args[0]
     if (op === 'length') {
-      if (arg !== undefined) return (data as any).length(arg) // length(fn) bucketed → Q3 (local for now; guarded in Q2f)
+      if (a0 !== undefined) return (data as any).length(a0) // length(fn) bucketed → Q3 (local for now; guarded in Q2f)
       return foldAggregate({ op: 'count' })
     }
-    return foldAggregate({ op, col: arg })
+    // A closure can't cross the wire to other holders, so it can't be distributed.
+    // Distributed aggregates take a DECLARATIVE argument (a column name, and for some/every
+    // an optional value); a closure predicate needs a named aggregator method (a follow-up).
+    // Warn LOUDLY and fall back to a LOCAL partial (held partitions only) rather than
+    // silently returning it as if global.
+    if (typeof a0 === 'function') {
+      console.warn(`fero: data.${op}(fn) can't be distributed — a closure can't cross the wire. Returning a LOCAL partial (held partitions only). Use data.${op}('column'${op === 'some' || op === 'every' ? "[, value]" : ''}) for a global aggregate.`)
+      return (data as any)[op](...args)
+    }
+    if (op === 'some' || op === 'every') return foldAggregate({ op, col: a0, val: args[1] })
+    return foldAggregate({ op, col: a0 })
   }
   const dataFacade =
     scoped || isClient
@@ -1075,11 +1128,35 @@ const extremum =
     for (const v of vs) if (v !== undefined && (m === undefined || better(v as number, m))) m = v as number
     return m
   }
+// avg folds the per-holder {sum, count} PAIRS and divides LAST (Σsum/Σcount) — exact,
+// unlike average-of-averages. Empty (Σcount === 0) ⇒ undefined, matching data's AvgValue.
+const avgRule: Rule = (vs) => {
+  let s = 0
+  let c = 0
+  for (const v of vs) if (v != null) { s += (v as any).sum || 0; c += (v as any).count || 0 }
+  return c === 0 ? undefined : s / c
+}
+// some = OR: any holder with a match ⇒ Σ(match counts) > 0. Empty ⇒ 0 ⇒ false.
+const someRule: Rule = (vs) => {
+  let s = 0
+  for (const v of vs) if (v != null) s += (v as number) || 0
+  return s > 0
+}
+// every = AND: all rows match ⇒ Σmatch === Σtotal across holders. Empty ⇒ 0===0 ⇒ true.
+const everyRule: Rule = (vs) => {
+  let m = 0
+  let t = 0
+  for (const v of vs) if (v != null) { m += (v as any).match || 0; t += (v as any).total || 0 }
+  return m === t
+}
 const RULES: Record<string, Rule> = {
   sum: sumRule,
   count: sumRule,
   max: extremum((a, b) => a > b),
   min: extremum((a, b) => a < b),
+  avg: avgRule,
+  some: someRule,
+  every: everyRule,
 }
 
 // A `data` ViewProxy carries the view symbol; a plain value does not.
