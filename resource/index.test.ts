@@ -1873,3 +1873,170 @@ test('Q3a: a reactive read() opened at members≤R re-arms the gather when the c
     live.forEach((n) => n.destroy())
   }
 })
+
+// ── Milestone Q3b: holistic ops AFTER a server's own read() (the headline capability) ──
+// A scoped SERVER holds only its R-set, so its own methods.read() (no key) must GATHER the whole
+// resource; the holistic operator then runs LOCALLY over the gathered proxy — a closure that
+// never crosses the wire. This is the "download everything, then sort/reduce/distinct" path.
+
+test('Q3b: methods.read().az(v) on a scoped server returns the GLOBAL sorted order', async () => {
+  const { all, node, ok } = await q2bForm('q3baz', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 24 }, (_, i) => 'k' + i)
+    const vals: Record<string, number> = {}
+    keys.forEach((k, i) => (vals[k] = (i * 7 + 3) % 53)) // step 7 mod 53 ⇒ all distinct ⇒ unambiguous order
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: vals[k] }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+
+    // A holds only its R-set locally — its RAW data.az would be a partial. read() gathers first.
+    const aLocal = A.data[value] ?? {}
+    assert.ok(keys.some((k) => !(k in aLocal)), 'A does not hold the whole resource locally')
+    const expected = keys.map((k) => vals[k]).sort((a, b) => a - b)
+
+    const handle = A.methods.read() // server's own whole-resource read = gather
+    const sorted = handle.az('v') // holistic op AFTER read, over the gathered proxy (runs locally)
+    void sorted.connect([]) // keep the filter→sort chain alive (FunctionSink doesn't back-ref)
+    let got: number[] = []
+    for (let i = 0; i < 80; i++) {
+      const snap = sorted[value]
+      if (Array.isArray(snap) && snap.length === keys.length) {
+        got = snap.map((r: any) => r.v)
+        if (got.length === expected.length && got.every((v, j) => v === expected[j])) break
+      }
+      await sleep(150)
+    }
+    assert.deepEqual(got, expected, 'global ascending order over the gathered resource (not A’s local shard)')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q3b: methods.read().reduce(fn) folds the whole gathered resource (general closure, runs locally)', async () => {
+  const { all, node, ok } = await q2bForm('q3bred', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 20 }, (_, i) => 'k' + i)
+    const vals: Record<string, number> = {}
+    for (const k of keys) {
+      vals[k] = (k.charCodeAt(1) * 3 + k.length) % 17
+      node(A.cluster.owner(k)!).data[k] = { v: vals[k] }
+    }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+    const globalSum = keys.reduce((s, k) => s + vals[k], 0)
+
+    const handle = A.methods.read()
+    // a GENERAL fold via an arbitrary closure — impossible to ship to holders, correct here
+    // because read() gathered the rows and the closure runs LOCALLY on the merged proxy.
+    const folded = handle.reduce((acc: number, row: any) => acc + (row?.v ?? 0), 0)
+    let got: any
+    const host = folded.connect({}, (c: any) => (got = c.value)) // scalar ⇒ function sink (XU0)
+    void host
+    for (let i = 0; i < 80; i++) {
+      if (got === globalSum) break
+      await sleep(150)
+    }
+    assert.equal(got, globalSum, 'reduce folded the WHOLE gathered resource (not A’s local shard)')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+// ── Q3b capstone regressions (found by the adversarial review) ──
+
+test('Q3b regression (M1): a custom no-key read is NOT swapped for the raw gather under scoping', async () => {
+  // The gather override must replace only the DEFAULT read. A user-supplied read is THEIR projection;
+  // swapping it for the raw gather under scoping (but not full-rep) is silent, mode-dependent wrong data.
+  const pts = await Promise.all(Array.from({ length: 3 }, () => ports.free()))
+  let calls = 0
+  const cfg = (port: number) => ({
+    host: '127.0.0.1',
+    port,
+    ports: pts,
+    wait: 250,
+    replicas: 2,
+    antiEntropy: 150,
+    read: (arg: any, c: any) => (typeof arg === 'string' ? c.data[arg] : ((calls++, c.data.filter((r: any) => r?.keep === true)))),
+  })
+  const all = await Promise.all(pts.map((p) => fero('q3m1', cfg(p))))
+  const node = (addr: string) => all.find((x) => x.cluster.me === addr)!
+  try {
+    assert.ok(await until(() => all.every((x) => x.cluster.members.length === 3), 8000), 'formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 18 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { keep: k.charCodeAt(1) % 2 === 0 } // ~half keep:true
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+
+    const before = calls
+    const view = A.methods.read() // custom no-key read ⇒ generic surface, NOT the gather handle
+    await sleep(300) // give any (incorrect) gather a chance to populate keep:false rows
+    const snap = view[value] ?? {}
+    assert.ok(calls > before, 'custom read handler ran (the gather did NOT bypass it)')
+    assert.ok(
+      Object.values(snap).every((r: any) => r?.keep === true),
+      `custom filter applied — no keep:false rows leaked (got ${JSON.stringify(snap)})`,
+    )
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q3b regression (M2): a handler returning c.methods.read() replies with the GLOBAL, not a local partial', async () => {
+  // snapshot() must resolve a returned gather handle via foldOnce (await ⇒ global) instead of
+  // opening its live fold and reading the still-empty in-progress union.
+  const pts = await Promise.all(Array.from({ length: 3 }, () => ports.free()))
+  const cfg = (port: number) => ({
+    host: '127.0.0.1',
+    port,
+    ports: pts,
+    wait: 250,
+    replicas: 2,
+    antiEntropy: 150,
+    whole: (_arg: any, c: any) => c.methods.read(), // returns the gather handle
+  })
+  const all = await Promise.all(pts.map((p) => fero('q3m2', cfg(p))))
+  const node = (addr: string) => all.find((x) => x.cluster.me === addr)!
+  let client: any
+  try {
+    assert.ok(await until(() => all.every((x) => x.cluster.members.length === 3), 8000), 'formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 24 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: k.length }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+    assert.ok(keys.some((k) => !(k in (A.data[value] ?? {}))), 'A is missing some keys locally')
+
+    const pA = +A.cluster.me!.split(':')[1]
+    client = await fero('q3m2', { host: '127.0.0.1', ports: [pA], wait: 200 })
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected')
+
+    let snap: any
+    for (let i = 0; i < 40; i++) {
+      snap = await client.methods.whole()
+      if (snap && keys.every((k) => k in snap)) break
+      await sleep(150)
+    }
+    assert.ok(snap && keys.every((k) => k in snap), `handler RPC returned the whole resource (${Object.keys(snap ?? {}).length}/${keys.length})`)
+  } finally {
+    client?.destroy()
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q3b regression (M3): a scoped server methods.read() is memoized to ONE gather handle (no per-call fold leak)', async () => {
+  // A fresh foldAggregate per reactive call would leak an O(resource) union-fold into
+  // aggregateReconciles, re-run every commit + AE tick, forever. Memoize to one handle per node.
+  const { all, ok } = await q2bForm('q3m3', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    assert.strictEqual(A.methods.read(), A.methods.read(), 'same memoized gather handle across calls')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
