@@ -83,8 +83,30 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    writes** (`data.x.y.z=v`) into a non-held partition (depth-1 routes; deeper doesn't);
    **`await data.x.field`** on a non-held key (resolves the subscription, not a one-shot of
    the field); **read-your-writes** lag when a write's owner-forward fails; the inherent
-   **operator-name key collision** in the facade. Aggregates (Q2/Q3) are the distributed-
-   query slice of L3. See open questions below + [DECISIONS P](DECISIONS.md) / [Q1](DECISIONS.md).
+   **operator-name key collision** in the facade.
+
+   Decomposable aggregates (**Q2** — LANDED, [DECISIONS Q2](DECISIONS.md)) make whole-resource
+   `data.sum/count/max/min/avg/some/every` an owner-scoped fan-out + fold (one row → O(holders)
+   global update; full replication unchanged). The remaining distributed-query work is the rest
+   of the L3 slice:
+   - **Named-method fold** — a method returning a decomposable aggregate (`anyActive: (_,c) =>
+     c.data.some(s => s.active)`), run per-holder over OWNER-SCOPED `c.data`, the combine derived
+     from the terminal operator's type. This is the function-carrying dispatch (closure
+     predicates, and the seam grouped aggregates need); Q2 ships only DECLARATIVE specs
+     (`col[,val]`) + rejects inline closures loudly. (resource)
+   - **L3 chain planner / gather engine** — bare `data.group(col)` (bucket→rows = a row gather),
+     `top/limit-K` (sort emits BMV1 'move' deltas `applyRecord` ignores → needs whole-array
+     re-ship or 'move' support — [DECISIONS E](DECISIONS.md)), `length(fn)` (whole-histogram
+     re-ship, not O(1)), and any CHAINED aggregate past the facade's first hop (`data.filter(p)
+     .sum()`, `group(c).sum(v)`) — all loudly flagged by the Q2f boundary guard, deferred to the
+     planner that splits a chain into per-shard + roll-up + local stages. (planner, resource)
+   - **Q3 holistic** — exact median/percentile, general `reduce`, unbounded sort: gather-to-one
+     OR a user-supplied combine, never a silent gather. (planner, resource)
+   - **Aggregate fold hardening** — a bounded one-shot-gather deadline + a partial-result signal
+     (today a slow/departed holder silently undercounts after `callTimeout`); per-handle GC
+     teardown of an abandoned fold handle; the chained-aggregate auto-detect past the facade.
+     (resource, transport)
+   See open questions below + [DECISIONS P](DECISIONS.md) / [Q1](DECISIONS.md) / [Q2](DECISIONS.md).
 
    Membership hardening still open (from the V review, deferred): a dedicated
    **two-established-cluster merge** test (works via lowest-coordinator + epoch
