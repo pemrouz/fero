@@ -1197,3 +1197,91 @@ test('V1b: a late joiner is admitted to the committed view', async () => {
     C?.destroy()
   }
 })
+
+// ── Milestone Q2a: owner-scoped aggregate PARTIAL primitive (no fan-out yet) ──
+// The `aggregate` default method returns this node's partial for a distributed
+// aggregate, computed over ONLY the partitions it OWNS. Because every partition has
+// exactly one owner, the union of all holders' owner-scoped partials is a DISJOINT
+// cover of the keyspace — each row counted once regardless of R (the dedup the fold
+// in Q2b relies on). Here we prove the partial is owner-scoped and the cover is
+// disjoint; the fold itself lands in Q2b.
+
+test('Q2a: solo node owns everything — partial == full local aggregate', async () => {
+  const r = await fero('q2a-solo', { port: await ports.free(), wait: 50 })
+  try {
+    let expected = 0
+    for (let i = 0; i < 12; i++) {
+      const v = (i * 5) % 7
+      r.data['k' + i] = { v }
+      expected += v
+    }
+    assert.equal(r.methods.aggregate({ op: 'sum', col: 'v' })[value], expected, 'sum over all owned keys')
+    assert.equal(r.methods.aggregate({ op: 'count' })[value], 12, 'count')
+    assert.equal(r.methods.aggregate({ op: 'max', col: 'v' })[value], 6, 'max')
+    assert.equal(r.methods.aggregate({ op: 'min', col: 'v' })[value], 0, 'min')
+  } finally {
+    r.destroy()
+  }
+})
+
+test('Q2a: holder partials are owner-scoped — Σ partials == global, each key once (R=2)', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150 })
+  const A = await fero('q2a', cfg(p1))
+  const B = await fero('q2a', cfg(p2))
+  const C = await fero('q2a', cfg(p3))
+  const all = [A, B, C]
+  const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed')
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    const vals: Record<string, number> = {}
+    for (const k of keys) {
+      const v = ((k.charCodeAt(1) * 7 + k.length) % 13) + 1
+      vals[k] = v
+      node(A.cluster.owner(k)!).data[k] = { v } // each key written by its owner
+    }
+    assert.ok(
+      await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000),
+      'every key placed on its full R-set',
+    )
+
+    // (1) each node's owner-scoped partial == sum of v over keys IT OWNS.
+    for (const n of all) {
+      const owned = keys.filter((k) => n.cluster.owner(k) === n.cluster.me)
+      const expected = owned.reduce((s, k) => s + vals[k], 0)
+      assert.equal(n.methods.aggregate({ op: 'sum', col: 'v' })[value], expected, `${n.cluster.me} owner-scoped sum`)
+      assert.equal(n.methods.aggregate({ op: 'count' })[value], owned.length, `${n.cluster.me} owner-scoped count`)
+    }
+
+    // (2) DISJOINT cover: Σ owner-scoped partials == global sum/count (no double-count, no gap).
+    const globalSum = keys.reduce((s, k) => s + vals[k], 0)
+    const foldSum = all.reduce((s, n) => s + n.methods.aggregate({ op: 'sum', col: 'v' })[value], 0)
+    assert.equal(foldSum, globalSum, 'Σ partials == global sum')
+    const foldCount = all.reduce((s, n) => s + n.methods.aggregate({ op: 'count' })[value], 0)
+    assert.equal(foldCount, keys.length, 'Σ partial counts == #keys (each counted once despite R=2)')
+
+    // (3) a node EXCLUDES a key it holds as a non-owner replica.
+    const witness = all.find((n) => keys.some((k) => has(n, k) && n.cluster.owner(k) !== n.cluster.me))!
+    assert.ok(witness, 'some node holds a key it does not own')
+    const heldNotOwned = keys.find((k) => has(witness, k) && witness.cluster.owner(k) !== witness.cluster.me)!
+    const ownedSum = keys.filter((k) => witness.cluster.owner(k) === witness.cluster.me).reduce((s, k) => s + vals[k], 0)
+    assert.equal(witness.methods.aggregate({ op: 'sum', col: 'v' })[value], ownedSum, `held-but-not-owned key ${heldNotOwned} excluded from ${witness.cluster.me}'s partial`)
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q2a: empty-set identities (sum=0, count=0, max/min=undefined)', async () => {
+  const r = await fero('q2a-empty', { port: await ports.free(), wait: 50 })
+  try {
+    assert.equal(r.methods.aggregate({ op: 'sum', col: 'v' })[value], 0, 'empty sum = 0')
+    assert.equal(r.methods.aggregate({ op: 'count' })[value], 0, 'empty count = 0')
+    assert.equal(r.methods.aggregate({ op: 'max', col: 'v' })[value], undefined, 'empty max = undefined')
+    assert.equal(r.methods.aggregate({ op: 'min', col: 'v' })[value], undefined, 'empty min = undefined')
+  } finally {
+    r.destroy()
+  }
+})
