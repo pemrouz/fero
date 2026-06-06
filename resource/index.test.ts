@@ -1752,3 +1752,124 @@ test('Q2 regression: avg propagates a NaN local shard (not masked to 0)', async 
     all.forEach((n) => n.destroy())
   }
 })
+
+// ── Milestone Q3a: whole-resource read() as a distributed gather ──
+// Under scoping no single node holds the whole resource, so read() with NO key GATHERS — it
+// folds every holder's owner-scoped rows into the union (the "download everything" step the
+// user chains holistic ops after). A client gets it via server-as-coordinator; the contacted
+// server, holding only its R-set, would otherwise return a silent PARTIAL.
+
+test('Q3a: a client read() gathers the WHOLE resource, not just the contacted server’s shard', async () => {
+  const { all, node, ok } = await q2bForm('q3a', 2)
+  let client: any
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: k.length }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+
+    // The contacted server A holds only its R-set (R=2 of 3 nodes) — it is MISSING some keys
+    // locally. Without the gather a client read() would inherit that partial; with it, all 30.
+    const aLocal = A.data[value] ?? {}
+    const missingAtA = keys.filter((k) => !(k in aLocal))
+    assert.ok(missingAtA.length > 0, `A does not hold the whole resource locally (missing ${missingAtA.length})`)
+
+    const pA = +A.cluster.me!.split(':')[1]
+    client = await fero('q3a', { host: '127.0.0.1', ports: [pA], wait: 200 }) // dials ONLY A
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected to A')
+
+    // await client.methods.read() → the GLOBAL snapshot (A folds every holder's owned rows).
+    let snap: any
+    for (let i = 0; i < 40; i++) {
+      snap = await client.methods.read()
+      if (snap && keys.every((k) => k in snap)) break
+      await sleep(150)
+    }
+    assert.ok(snap && keys.every((k) => k in snap), `client read() has all ${keys.length} keys (got ${Object.keys(snap ?? {}).length})`)
+    assert.equal(Object.keys(snap).length, keys.length, 'no extra/duplicated keys (disjoint owner cover)')
+    assert.deepEqual(snap[missingAtA[0]], { v: missingAtA[0].length }, 'a key A does NOT hold locally is present in the gather')
+  } finally {
+    client?.destroy()
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q3a: a client’s reactive read() streams the live gather and tracks a fresh write anywhere', async () => {
+  const { all, node, ok } = await q2bForm('q3ar', 2)
+  let client: any
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 18 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 1 }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+
+    const pA = +A.cluster.me!.split(':')[1]
+    client = await fero('q3ar', { host: '127.0.0.1', ports: [pA], wait: 200 })
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected to A')
+
+    const view = client.methods.read() // reactive (not awaited) ⇒ live gather subscription
+    assert.ok(await until(() => keys.every((k) => k in (view[value] ?? {})), 10000), `live gather converged: ${Object.keys(view[value] ?? {}).length}/${keys.length}`)
+
+    // a fresh write on its owner (a key whose owner may NOT be A) shows up live in the gather.
+    node(A.cluster.owner('fresh')!).data.fresh = { v: 99 }
+    assert.ok(await until(() => (view[value] ?? {}).fresh?.v === 99, 10000), `live gather tracked the write: ${JSON.stringify((view[value] ?? {}).fresh)}`)
+  } finally {
+    client?.destroy()
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q3a: a reactive read() opened at members≤R re-arms the gather when the cluster grows past R', async () => {
+  // Q3a-review regression (confirmed major): the reactive gather subscribe branch must NOT be
+  // gated on R<viewSize() at subscribe time. A client opening read() while members≤R (the
+  // contacted server momentarily holds everything) would otherwise stream that server's LOCAL
+  // c.data forever and go SILENTLY PARTIAL once a join shards the resource and the server sheds
+  // keys. openFold's reconcileMembers re-arms on each commit — so the gather tracks growth.
+  const pts = await Promise.all(Array.from({ length: 3 }, () => ports.free()))
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: pts, wait: 250, replicas: 2, antiEntropy: 150 })
+  const A = await fero('q3grow', cfg(pts[0]))
+  const B = await fero('q3grow', cfg(pts[1]))
+  let C: any, client: any
+  const live: any[] = [A, B]
+  try {
+    // 2-member view: members(2) ≤ R(2) ⇒ the OLD gate (R<viewSize) was FALSE at subscribe time.
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), '2-member view formed')
+
+    const pA = +A.cluster.me!.split(':')[1]
+    client = await fero('q3grow', { host: '127.0.0.1', ports: [pA], wait: 200 })
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected to A')
+
+    // open the reactive gather while members ≤ R, and confirm it converges.
+    A.data.seed = { v: 1 }
+    const view = client.methods.read()
+    assert.ok(await until(() => (view[value] ?? {}).seed?.v === 1, 8000), 'reactive gather converged at members≤R')
+
+    // grow past R: a 3rd node joins ⇒ members(3) > R(2) ⇒ the resource shards.
+    C = await fero('q3grow', cfg(pts[2]))
+    live.push(C)
+    const all = [A, B, C]
+    assert.ok(await until(() => all.every((n) => n.cluster.members.length === 3), 12000), 'view grew to 3 members')
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client still on A after the join')
+
+    // a key whose R-set EXCLUDES A — A no longer holds it, so a stale local-c.data stream WOULD miss it.
+    const node = (addr: string) => all.find((x) => x.cluster.me === addr)!
+    let k = ''
+    for (let i = 0; i < 1000; i++) {
+      const cand = 'g' + i
+      if (!A.cluster.replicas(cand).includes(A.cluster.me!)) { k = cand; break }
+    }
+    assert.ok(k, 'found a key whose R-set excludes A')
+    node(A.cluster.owner(k)!).data[k] = { v: 42 }
+
+    // the live gather must surface it despite A not holding it — proof the gather re-armed on growth.
+    assert.ok(await until(() => (view[value] ?? {})[k]?.v === 42, 12000), `live gather surfaced a non-A-held key after growth: ${JSON.stringify((view[value] ?? {})[k])}`)
+    assert.equal((view[value] ?? {}).seed?.v, 1, 'original key still present')
+  } finally {
+    client?.destroy()
+    live.forEach((n) => n.destroy())
+  }
+})
