@@ -592,6 +592,47 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     for (const c of batch) commitLocal(c)
   }
 
+  // ── Distributed aggregates (Milestone Q2) ──
+  //
+  // With R-way holding no single node materializes the whole resource, so an
+  // aggregate over ALL of it (`data.sum('value')`) is computed partial-per-shard +
+  // folded: each holder runs the aggregate LOCALLY over the partitions it OWNS,
+  // streams its partial, and the querying node folds every holder's partial into the
+  // global answer (the fold lands in Q2b). One row change → one partial delta → an
+  // O(1) global update.
+  //
+  // OWNER-scoping (not holder-scoping) is the dedup: a partition lives on R replicas,
+  // but has exactly ONE owner, so scoping each holder's partial to the partitions it
+  // OWNS makes the union a DISJOINT cover of the keyspace — every row counted exactly
+  // once regardless of R. The owner-scoped view filters the RAW `data` proxy (the
+  // held partitions) to the keys we own on the committed ring; `data`'s filter passes
+  // the key to its predicate (`(value, name) => …`), and ownership exactly partitions
+  // the keyspace. Built over the RAW proxy, never the `dataFacade` (which would
+  // recurse into remote handles).
+  const ownedView = () => (data as any).filter((_v: unknown, k: string) => mesh.owner(k) === me)
+
+  // This node's owner-scoped PARTIAL for a serializable aggregate spec ({op, col}).
+  // The spec crosses the wire to every symmetric holder, which reconstructs the same
+  // owner-scoped operator locally — so the NAME/shape travels, not a closure. Q2a
+  // ships sum/count/max/min (string-parameterized, no fn); avg/some/every/group land
+  // in later increments. Returns a `data` ViewProxy (scalar here) — snapshot for an
+  // RPC, change-stream for a subscription, exactly like `read`.
+  const buildPartial = (spec: any): any => {
+    const owned = ownedView()
+    switch (spec?.op) {
+      case 'sum':
+        return owned.sum(spec.col)
+      case 'count':
+        return owned.length()
+      case 'max':
+        return owned.max(spec.col)
+      case 'min':
+        return owned.min(spec.col)
+      default:
+        throw new Error(`fero: unknown aggregate op "${spec?.op}"`)
+    }
+  }
+
   const cluster: Cluster = {
     peers: mesh.peers,
     get me() {
@@ -620,6 +661,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // the server side of an owner-routed remote read). On a holder, c.data[key] is
     // the live local child; snapshot for the RPC reply, streamed for a subscription.
     read: (arg, c) => (typeof arg === 'string' ? c.data[arg] : c.data),
+    // aggregate(spec) → this node's owner-scoped PARTIAL for a distributed aggregate
+    // (Milestone Q2). A ViewProxy like read — snapshot for an RPC, streamed for a
+    // subscription. The querying node fans this method out to every holder and folds
+    // the partials into the global answer (Q2b). Owner-scoped over the RAW proxy via
+    // buildPartial, so the union across holders is a disjoint cover (no R-fold
+    // double-count). Closes over data/mesh/me (not c.data) — it needs ownership.
+    aggregate: (spec) => buildPartial(spec),
     update: (chg, c) => setPath(c.data, norm(chg?.key), chg?.value),
     insert: (chg, c) => setPath(c.data, norm(chg?.at ?? chg?.key), chg?.value),
     remove: (chg, c) => delPath(c.data, norm(chg?.key)),
