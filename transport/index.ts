@@ -39,6 +39,7 @@ export type TransportOpts = {
   callTimeout?: number // ms before an unanswered call() rejects (default 5000)
   onSubscribe?: (subId: number, method: string, arg: unknown, address: string) => void // a peer opened a live subscription
   onUnsubscribe?: (subId: number, address: string) => void // a peer closed one
+  onPeerGone?: (address: string) => void // a peer's connection dropped (socket close / destroy) — reap its served subscriptions (it never sent UNSUBSCRIBE)
   onWrite?: (record: ChangeRecord, address: string) => void // a peer forwarded a write-request for a partition we own
   // Membership view-change control frames (Milestone V) — each routes to its own
   // hook so a view frame can NEVER fall through to onRecord (the data path).
@@ -67,6 +68,7 @@ export type Mesh = {
   hasServer: () => boolean // is there a connected server to call?
   subscribe: (method: string, arg: unknown, onDelta: (record: ChangeRecord) => void, to?: string) => (() => void) | undefined // live subscription; to a specific peer or a picked server; returns an unsubscribe (or undefined if not connected)
   deltaTo: (address: string, subId: number, record: ChangeRecord) => void // server → client: ship one subscription delta
+  drop: (address: string) => boolean // abruptly close a peer's connection (no UNSUBSCRIBE/teardown frames) — fault injection for chaos tests + the subscription-reap path; false if not connected
   ready: Promise<void>
   destroy: () => void
 }
@@ -122,6 +124,7 @@ export function transport(opts: TransportOpts): Mesh {
       resolveReady() // first outbound connection ⇒ cluster reachable
       initiate(peer, hooks) // the dialer starts the handshake
     },
+    onPeerGone: (peer) => opts.onPeerGone?.(peer.address), // socket close/destroy → L2 reaps that peer's served subscriptions
     onFrame: (frame: Frame, peer: Peer) => dispatch(frame, peer),
   })
 
@@ -332,6 +335,15 @@ export function transport(opts: TransportOpts): Mesh {
     },
     deltaTo(address, subId, record) {
       pool.peer(address)?.write(encodeFrame([record], { verb: VERB.RECORDS, id: subId }))
+    },
+    // Abruptly close a peer's connection — no UNSUBSCRIBE / teardown frames, the way a real network
+    // drop looks. Drives onPeerGone (→ L2 reaps that peer's served subscriptions) and is the fault
+    // injection the chaos harness needs. Returns false if the peer isn't tracked.
+    drop(address) {
+      const peer = pool.peer(address)
+      if (!peer) return false
+      peer.destroy()
+      return true
     },
     call(method, arg, to) {
       const address = to ?? pickServer()

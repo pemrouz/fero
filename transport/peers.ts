@@ -22,6 +22,7 @@ export type PeersOpts = {
   heartbeat?: HeartbeatOpts
   onFrame?: (frame: Frame, peer: Peer) => void
   onConnect?: (peer: Peer) => void // fired when a DIALED peer reaches connected (the dialer initiates the handshake)
+  onPeerGone?: (peer: Peer) => void // fired when a peer transitions TO disconnected (socket close / destroy) — drives subscription reaping
 }
 
 export type PeerInfo = { host: string; port: number; role?: 'server' | 'client' }
@@ -38,6 +39,7 @@ export class Peers {
   #heartbeat?: HeartbeatOpts
   #onFrame?: (frame: Frame, peer: Peer) => void
   #onConnect?: (peer: Peer) => void
+  #onPeerGone?: (peer: Peer) => void
 
   constructor(opts: PeersOpts = {}) {
     this.#me = opts.me
@@ -45,6 +47,7 @@ export class Peers {
     this.#heartbeat = opts.heartbeat
     this.#onFrame = opts.onFrame
     this.#onConnect = opts.onConnect
+    this.#onPeerGone = opts.onPeerGone
   }
 
   // Register a server peer we should dial (from discovery/handshake) and dial it.
@@ -88,7 +91,14 @@ export class Peers {
   #mirror(peer: Peer) {
     const row = this.peers[peer.address]
     const snap: any = row[VALUE] ?? {}
-    if (snap.status !== peer.status) row.status = peer.status
+    if (snap.status !== peer.status) {
+      row.status = peer.status
+      // A transition TO disconnected (socket close / destroy) fires onPeerGone — the signal L2
+      // reaps a gone peer's served subscriptions on (it never sends an UNSUBSCRIBE frame). Gated to
+      // the status CHANGE (not a `suspect`-only mirror), so a suspect flip doesn't spuriously reap;
+      // firing for a never-connected dial-failure is harmless (the reaper finds no subs).
+      if (peer.status === STATUS.disconnected) this.#onPeerGone?.(peer)
+    }
     if (snap.suspect !== peer.suspect) row.suspect = peer.suspect
     if (peer.status === STATUS.connected && peer.dialed) this.#onConnect?.(peer)
   }

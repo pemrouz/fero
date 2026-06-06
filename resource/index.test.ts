@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { rmSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { value } from '../../data/index.ts'
-import { fero, fileStorage } from './index.ts'
+import { fero, fileStorage, diagnostics } from './index.ts'
 import { ports, until, connected, sleep } from '#utils'
 
 // Order-insensitive structural compare. Replicas converge on VALUES, not on
@@ -2075,6 +2075,77 @@ test('Q3 capstone: a CLIENT chains a holistic op over its gathered read() — cl
       await sleep(150)
     }
     assert.deepEqual(got, expected, 'client global ascending order over the gathered resource')
+  } finally {
+    client?.destroy()
+    all.forEach((n) => n.destroy())
+  }
+})
+
+// ── Subscription hygiene: reap a gone peer's served subscriptions ──
+// Served subscriptions are torn down on an explicit UNSUBSCRIBE frame. An UNGRACEFUL disconnect (a
+// socket drop) never sends one — so without onPeerGone reaping, a dropped client/coordinator leaks
+// its sinks and (worst) its Q3-gather / Q2-fold openFolds, each pinning an aggregateReconciles entry
+// re-run every commit + AE tick forever.
+
+test('subscription hygiene: an ungraceful peer drop reaps ALL its served subscriptions (gather + fold, no leak)', async () => {
+  const { all, node, ok } = await q2bForm('reap', 2)
+  let client: any
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 12 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 2 }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+
+    const pA = +A.cluster.me!.split(':')[1]
+    client = await fero('reap', { host: '127.0.0.1', ports: [pA], wait: 200 })
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected to A')
+
+    // open TWO server-pushed subscriptions on A: a reactive whole-resource gather AND an aggregate
+    // fold — A serves both (each an openFold), so the reverse-index reap must drop MORE than one.
+    const view = client.methods.read()
+    const agg = client.data.sum('v')
+    void agg.connect({}, () => {})
+    assert.ok(await until(() => Object.keys(view[value] ?? {}).length === keys.length, 10000), 'gather streaming to the client')
+    assert.ok(await until(() => (A as any)[diagnostics].servedSubscriptions() >= 2, 10000), `A serves the client's gather + fold (${(A as any)[diagnostics].servedSubscriptions()})`)
+
+    // ABRUPT drop: the CLIENT closes its link to A (A's listen address — unambiguous) with no
+    // UNSUBSCRIBE. A sees the socket close → onPeerGone(the client's inbound address) → reapPeer.
+    assert.ok((client as any)[diagnostics].drop(A.cluster.me), 'client dropped its connection to A')
+    assert.ok(
+      await until(() => (A as any)[diagnostics].servedSubscriptions() === 0, 8000),
+      `A reaped every served sub for the dropped peer (now ${(A as any)[diagnostics].servedSubscriptions()})`,
+    )
+  } finally {
+    client?.destroy()
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('subscription hygiene: a GRACEFUL client.destroy() also leaves no served subscriptions (idempotent with onPeerGone)', async () => {
+  // Graceful teardown sends UNSUBSCRIBE (serveUnsubscribe) AND drops the socket (onPeerGone→reapPeer):
+  // both must coexist without double-free / crash, ending at zero served subs.
+  const { all, node, ok } = await q2bForm('reapg', 2)
+  let client: any
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 8 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 1 }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+
+    const pA = +A.cluster.me!.split(':')[1]
+    client = await fero('reapg', { host: '127.0.0.1', ports: [pA], wait: 200 })
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected')
+    const view = client.methods.read()
+    assert.ok(await until(() => Object.keys(view[value] ?? {}).length === keys.length, 10000), 'gather streaming')
+    assert.ok(await until(() => (A as any)[diagnostics].servedSubscriptions() >= 1, 10000), 'A serves the gather')
+
+    client.destroy() // graceful: UNSUBSCRIBE frames + socket close
+    client = undefined
+    assert.ok(await until(() => (A as any)[diagnostics].servedSubscriptions() === 0, 6000), `A has no leaked subs after graceful destroy (${(A as any)[diagnostics].servedSubscriptions()})`)
   } finally {
     client?.destroy()
     all.forEach((n) => n.destroy())
