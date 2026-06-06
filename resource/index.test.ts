@@ -1581,3 +1581,68 @@ test('Q2d: a closure predicate on the facade is rejected loudly (local fallback,
     all.forEach((n) => n.destroy())
   }
 })
+
+// ── Milestone Q2e: client server-as-coordinator ──
+// A read-only client can't owner-scope or fold (no me/view/ring). Its facade aggregates
+// route to its one connected server, which builds the fold and streams the GLOBAL back.
+
+test('Q2e: a read-only client gets GLOBAL aggregates via server-as-coordinator', async () => {
+  const { all, node, ok } = await q2bForm('q2ec', 2)
+  const A = all[0]
+  let client: any
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 24 }, (_, i) => 'k' + i)
+    const vals: Record<string, number> = {}
+    for (const k of keys) {
+      const v = (k.charCodeAt(1) % 9) + 1
+      vals[k] = v
+      node(A.cluster.owner(k)!).data[k] = { v }
+    }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'placed')
+    const globalSum = keys.reduce((s, k) => s + vals[k], 0)
+    const globalAvg = globalSum / keys.length
+
+    const pA = +A.cluster.me!.split(':')[1]
+    client = await fero('q2ec', { host: '127.0.0.1', ports: [pA], wait: 200 }) // dials ONLY A
+    assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected to A')
+
+    // await: global sum / count / avg, folded by A on the client's behalf.
+    let s: any
+    for (let i = 0; i < 40; i++) {
+      s = await client.data.sum('v')
+      if (s === globalSum) break
+      await sleep(150)
+    }
+    assert.equal(s, globalSum, 'client await data.sum() == global')
+    let c: any
+    for (let i = 0; i < 40; i++) {
+      c = await client.data.length()
+      if (c === keys.length) break
+      await sleep(150)
+    }
+    assert.equal(c, keys.length, 'client await data.length() == global count')
+    let av: any
+    for (let i = 0; i < 40; i++) {
+      av = await client.data.avg('v')
+      if (typeof av === 'number' && Math.abs(av - globalAvg) < 1e-9) break
+      await sleep(150)
+    }
+    assert.ok(typeof av === 'number' && Math.abs(av - globalAvg) < 1e-9, `client await data.avg() == global avg (${av}/${globalAvg})`)
+
+    // reactive: the server streams the live global to the client.
+    let last: any
+    const agg = client.data.sum('v')
+    const host = agg.connect({}, (ch: any) => {
+      last = ch.value
+    })
+    void host
+    assert.ok(await until(() => last === globalSum, 10000), `client reactive sum converged: ${last}/${globalSum}`)
+    node(A.cluster.owner('zz')!).data.zz = { v: 1000 } // a fresh write anywhere
+    assert.ok(await until(() => last === globalSum + 1000, 10000), `client reactive tracked the write: ${last}`)
+  } finally {
+    client?.destroy()
+    all.forEach((n) => n.destroy())
+  }
+})
