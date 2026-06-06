@@ -286,8 +286,12 @@ test('P2: replicas:2 — each partition lands on exactly its R replicas, nowhere
   const all = [A, B, C]
   const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
   const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  // Fully formed = committed 3-view AND full mesh — so a forwarded write reaches a
+  // connected owner (no never-drop fallback → no transient orphan to confuse the
+  // immediate non-replica assertion below).
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
   try {
-    assert.ok(await until(() => all.every((n) => n.cluster.members.length === 3), 8000), 'view committed')
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed (view + full mesh)')
     const keys = Array.from({ length: 24 }, (_, i) => 'k' + i)
     for (const k of keys) A.data[k] = k // A originates every write (owner / replica / foreign all exercised)
 
@@ -314,8 +318,9 @@ test('P2: replicas:2 — concurrent writes from every node converge to exactly t
   const all = [A, B, C]
   const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
   const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
   try {
-    assert.ok(await until(() => all.every((n) => n.cluster.members.length === 3), 8000), 'view committed')
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed (view + full mesh)')
     // each node originates its own namespace — exercises per-(origin,partition) dedup
     // + scoped replication from multiple origins concurrently.
     const keys: string[] = []
@@ -370,6 +375,97 @@ test('P2: replicas:2 — a node that joins after writes ACQUIRES its share (dura
       for (const k of cKeys) assert.ok(has(C, k), `C acquired its replica key ${k}`)
     } finally {
       C.destroy()
+    }
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
+test('P4: replicas:2 — after a join rebalances the ring, orphans are SHED (exactly R replicas)', async () => {
+  // P2 heals durability (acquisition); P4 restores "exactly R replicas" by shedding
+  // the extra copies a former replica holds — but only AFTER the new R-set member is
+  // confirmed caught up, so the partition is never under-replicated during handoff.
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150 })
+  const A = await fero('p4-shed', cfg(p1))
+  const B = await fero('p4-shed', cfg(p2))
+  const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  try {
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), '2-member view')
+    const keys = Array.from({ length: 40 }, (_, i) => 'k' + i)
+    for (const k of keys) A.data[k] = k
+    assert.ok(await until(() => keys.every((k) => has(B, k)), 8000), 'both hold all (R=2 ≥ 2 members)')
+
+    const C = await fero('p4-shed', cfg(p3))
+    const all = [A, B, C]
+    const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+    try {
+      assert.ok(await until(() => all.every((n) => n.cluster.members.length === 3), 8000), '3-member view')
+      // Durability: each key held by BOTH its R-set replicas.
+      for (const k of keys) for (const addr of A.cluster.replicas(k)) {
+        assert.ok(await until(() => has(node(addr), k), 10000), `replica ${addr} holds ${k}`)
+      }
+      // Exactly R: every node ends up holding ONLY the keys it replicates — the orphan
+      // extra-copies (former replicas dropped from a key's R-set) are shed.
+      for (const n of all) {
+        assert.ok(
+          await until(() => keys.filter((k) => has(n, k)).every((k) => A.cluster.replicas(k).includes(n.cluster.me)), 10000),
+          `${n.cluster.me} holds only its replica keys (orphans shed)`,
+        )
+        // …and still holds ALL of its replica keys (shedding never dropped a held one).
+        for (const k of keys.filter((k) => A.cluster.replicas(k).includes(n.cluster.me))) {
+          assert.ok(has(n, k), `${n.cluster.me} still holds replica key ${k}`)
+        }
+      }
+    } finally {
+      C.destroy()
+    }
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
+test('P4: replicas:2 — a FULL R-set move (both old replicas dropped) sheds safely, no loss', async () => {
+  // The case single-confirmation gets wrong: with N≥4 a partition's R-set can move
+  // entirely off the old pair ({A,B}→{C,D}). Both A,B become orphans; shedding either
+  // before BOTH C and D are caught up would under-replicate. Confirmed shedding waits
+  // for every R-set member, so no key is ever lost and each ends up on exactly R.
+  const p = [await ports.free(), await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: p, wait: 300, replicas: 2, antiEntropy: 150 })
+  const A = await fero('p4-move', cfg(p[0]))
+  const B = await fero('p4-move', cfg(p[1]))
+  const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  try {
+    assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), '2-member view')
+    const keys = Array.from({ length: 40 }, (_, i) => 'k' + i)
+    for (const k of keys) A.data[k] = k
+    assert.ok(await until(() => keys.every((k) => has(B, k)), 8000), 'both hold all')
+
+    const C = await fero('p4-move', cfg(p[2]))
+    const D = await fero('p4-move', cfg(p[3]))
+    const all = [A, B, C, D]
+    const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+    try {
+      assert.ok(await until(() => all.every((n) => n.cluster.members.length === 4), 10000), '4-member view')
+      // Some key's R-set fully moved off the old pair — the multi-confirm-critical case.
+      const moved = keys.filter((k) => { const r = A.cluster.replicas(k); return !r.includes(A.cluster.me) && !r.includes(B.cluster.me) })
+      assert.ok(moved.length > 0, `at least one key fully moved off {A,B} (got ${moved.length})`)
+      // No loss: every key on BOTH its R-set replicas.
+      for (const k of keys) for (const addr of A.cluster.replicas(k)) {
+        assert.ok(await until(() => has(node(addr), k), 12000), `replica ${addr} holds ${k}`)
+      }
+      // Exactly R: orphans shed everywhere.
+      for (const n of all) {
+        assert.ok(
+          await until(() => keys.filter((k) => has(n, k)).every((k) => A.cluster.replicas(k).includes(n.cluster.me)), 12000),
+          `${n.cluster.me} holds only its replica keys (orphans shed)`,
+        )
+      }
+    } finally {
+      C.destroy()
+      D.destroy()
     }
   } finally {
     A.destroy()

@@ -130,6 +130,19 @@ export class Log {
     return [...this.#segments.keys()]
   }
 
+  // Drop a partition entirely — its segment AND its provenance-index entries — when
+  // a node SHEDS a partition it no longer replicates (Milestone P4). Scoped-only:
+  // the index is keyed (origin,partition) so a partition's groups are removable; in
+  // full mode there's nothing to shed (every node holds every partition). After this
+  // the node no longer claims the partition in its digest (marks), so a stale shed
+  // copy can't mislead anti-entropy.
+  drop(partition: string): void {
+    this.#segments.delete(partition)
+    if (!this.#scoped) return
+    const suffix = '\x00' + partition // index keys are origin\0partition; the \0 anchors the match
+    for (const key of this.#index.keys()) if (key.endsWith(suffix)) this.#index.delete(key)
+  }
+
   // This log's high-water marks: { provenance-key → highest seq held }. The digest
   // a node sends a peer so the peer can compute what to ship back. Per-origin in
   // full mode, per-(origin,partition) in scoped mode (then naturally bounded to the

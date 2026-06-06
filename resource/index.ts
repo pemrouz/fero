@@ -169,6 +169,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // diverging. Bounded (drop-oldest) so a long partition can't grow it without limit.
   const pending: ChangeRecord[] = []
   const MAX_PENDING = 10_000
+  // Orphan partitions (Milestone P4): partitions we hold data for but no longer
+  // REPLICATE (per the committed ring) — a former replica after a ring expansion, or
+  // a write committed locally at a non-replica (never-drop fallback / misrouted
+  // forward). We KEEP them (so the partition stays ≥R-replicated — no under-
+  // replication window) until a current R-set member is confirmed caught up, then
+  // SHED (drop our copy). Scoped-only.
+  const orphans = new Set<string>()
+  // Per-orphan set of R-set members confirmed caught up (see shedConfirmed): we shed
+  // only once EVERY current R-set member is in here, so the partition is fully
+  // R-replicated WITHOUT us before we drop it.
+  const shedReady = new Map<string, Set<string>>()
 
   // The key path a record contends on for LWW. An insert folds `at` into the
   // path so an insert and a later update to the same key contend as one key;
@@ -296,6 +307,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (scoped && payload?.me && R < viewSize())
         recs = recs.filter((r) => mesh.owners(partitionOf(r), R).includes(payload.me))
       mesh.catchupTo(address, recs)
+      // Confirmed shedding (P4): the sender's marks tell us whether it (an R-set
+      // member) is caught up on a partition we hold but no longer replicate — if so,
+      // shed our orphan copy.
+      if (scoped && payload?.me) shedConfirmed(payload.v ?? {}, payload.me)
       if (me !== undefined && payload?.reply) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: false, me })
     },
     // Inbound RPC: a client called one of our methods. Run it here with the
@@ -365,7 +380,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
           peers: mesh.peers,
           ...viewOpts,
           onWritable: (w) => w && flushPending(),
-          onCommit: () => resync(), // ring rebalanced → re-sync acquired partitions (scoped)
+          onCommit: () => {
+            markOrphans() // ring rebalanced → note partitions we no longer replicate (shed once handed off)
+            resync() // ...and re-sync the ones we now acquire
+          },
         })
       : undefined
   const viewEpoch = (): number => viewMgr?.epoch ?? 1
@@ -439,6 +457,65 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
+  // Fully shed an orphan partition (Milestone P4): remove it from the proxy, the
+  // log (segment + provenance index), the dedup high-water, and the LWW version map
+  // — a complete handoff off this node. Called ONLY once a current R-set member is
+  // confirmed caught up (shedConfirmed), so the partition is never less than
+  // R-replicated. After this we no longer claim the partition in our digest.
+  const shed = (partition: string) => {
+    dropLocal(partition) // proxy (guarded — no re-emit / spurious forwarded remove)
+    log.drop(partition)
+    const suffix = '\x00' + partition
+    for (const k of seen.keys()) if (k.endsWith(suffix)) seen.delete(k)
+    for (const k of versions.keys()) if (k === partition || k.startsWith(partition + '\x00')) versions.delete(k)
+    orphans.delete(partition)
+    shedReady.delete(partition)
+  }
+
+  // Note partitions we hold but no longer replicate as orphans-to-shed (scan on view
+  // commit, when the ring rebalances). A write committed locally at a non-replica
+  // adds itself directly (commitLocal).
+  const markOrphans = () => {
+    if (!scoped || me === undefined) return
+    for (const p of log.partitions()) if (!holds(p) && !orphans.has(p)) orphans.add(p)
+  }
+
+  // Confirmed shedding: a peer (at listen address `peerMe`) sent its high-water
+  // marks. For each orphan partition we hold, if that peer is a current R-set member
+  // AND its marks cover ALL our (origin,partition) records, record it as caught up.
+  // We shed only once EVERY member of the partition's current R-set is confirmed
+  // caught up — so the partition is fully R-replicated WITHOUT us before we drop it.
+  // Single-confirmation would be UNSAFE: if a partition's R-set moves entirely
+  // ({A,B}→{C,D}), shedding A as soon as C is caught up (before D acquired) would
+  // leave the partition on just {C} (1 < R). Conservative throughout: a missing/
+  // lower peer mark keeps the orphan (no data can ever be lost). Runs on every
+  // digest (both legs), so orphans drain within a few anti-entropy rounds.
+  const shedConfirmed = (peerMarks: Record<string, number>, peerMe: string) => {
+    if (!scoped || me === undefined || !orphans.size) return
+    for (const p of [...orphans]) {
+      if (holds(p)) {
+        orphans.delete(p) // we replicate it again (ring moved back) — not an orphan
+        shedReady.delete(p)
+        continue
+      }
+      const rset = mesh.owners(p, R)
+      if (!rset.includes(peerMe)) continue // peer isn't a current R-set holder of p
+      let caughtUp = true
+      const suffix = '\x00' + p
+      for (const [key, seq] of seen) {
+        if (key.endsWith(suffix) && (peerMarks[key] ?? 0) < seq) {
+          caughtUp = false
+          break
+        }
+      }
+      if (!caughtUp) continue
+      let ready = shedReady.get(p)
+      if (!ready) shedReady.set(p, (ready = new Set()))
+      ready.add(peerMe)
+      if (rset.every((m) => ready!.has(m))) shed(p) // every R-set member caught up → safe to drop
+    }
+  }
+
   // Commit a record under OUR provenance: stamp (origin=us, Lamport seq), record
   // it as the LWW winner for its key, log it, and replicate. Used for partitions
   // we own and as the never-drop fallback when an owner is unreachable.
@@ -469,10 +546,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // Replicate to peers: scoped mode with R < members ships only to the OTHER
     // replicas in this partition's R-set (we already applied + logged it); otherwise
     // (full replication, or R≥members so everyone holds all) broadcast to every
-    // connected server. The R≥members case broadcasts rather than calling
-    // replicatePeers→owners() (which would full-scan the ring).
-    if (scoped && R < viewSize()) mesh.replicatePeers(change, R)
-    else mesh.broadcast(change)
+    // connected server. Compute the R-set ONCE and reuse it for both the send and the
+    // orphan check (holds() would otherwise re-scan the ring a second time per write).
+    if (scoped && R < viewSize()) {
+      const rset = mesh.owners(p, R)
+      mesh.replicateTo(rset, change)
+      // A write committed at a node NOT in the partition's R-set (the never-drop
+      // fallback when the owner is unreachable, or a misrouted forward) is an orphan:
+      // keep it (we shipped it to the true R-set above) but mark it to shed once that
+      // R-set is confirmed caught up (P4).
+      if (!rset.includes(me!)) orphans.add(p)
+    } else mesh.broadcast(change)
   }
 
   // A peer forwarded a write for a partition we own. Apply it to our proxy as a
