@@ -703,7 +703,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // initial snapshot first, then deltas) to the subscriber. A plain value is shipped
   // once. The sink host is retained per (address, subId) so it keeps firing until
   // the client unsubscribes (data holds sinks only by WeakRef).
-  const subscriptions = new Map<string, { host?: object; unsub?: () => void }>()
+  // `src` retains the served SOURCE proxy alongside its sink host: data's FunctionSink
+  // (core.ts) back-refs only `this.fn`, not its source, so a derived projection (a custom
+  // read's `data.filter(...)`, or an `aggregate` partial) would GC its filter→op chain and
+  // freeze the stream after a full GC on a long-running server — pinning only the host
+  // isn't enough. (The default read returns the root `data`, retained anyway, so this only
+  // bites derived views.) Held until the client unsubscribes.
+  const subscriptions = new Map<string, { host?: object; src?: object; unsub?: () => void }>()
   const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
     // Read-forwarding (Q1): subscribe a non-held read key FROM the owner and relay its
     // deltas to the subscriber; the upstream unsub is closed on unsubscribe.
@@ -722,7 +728,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       return // a failed subscription just yields no stream (RPC path surfaces errors)
     }
     if (isViewProxy(result)) {
-      subscriptions.set(`${address}:${subId}`, { host: (result as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change)) })
+      const host = (result as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
+      subscriptions.set(`${address}:${subId}`, { host, src: result as object }) // src retains the source chain (see map decl)
     } else {
       mesh.deltaTo(address, subId, { type: 'update', key: [], value: result })
     }
@@ -791,6 +798,93 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // over this. Internal machinery keeps using the raw `data` (held partitions only).
   const readKey = (key: string) => (holds(key) ? data[key] : remoteRead(key))
 
+  // ── Distributed aggregate FOLD (Milestone Q2b) ──
+  //
+  // The querying side of a distributed aggregate: gather every holder's owner-scoped
+  // partial and fold them into the global answer. A handle mirroring Q1's makeHandle —
+  // `await data.sum('v')` is a one-shot gather (foldOnce); reactive use
+  // (`data.sum('v').tap(...)`/`[value]`) opens a live subscription to every holder's
+  // partial and refolds on each delta. One row change → one holder partial delta → one
+  // global recompute (O(holders), independent of dataset size — the "one row → O(1)
+  // global update" property; the recompute walks the small per-holder map, not the keyspace).
+  //
+  // SELF IS NOT A WIRE TARGET. The querying node is itself a holder owning a ring
+  // slice, but mesh.subscribe/call(...,me) cannot route to self (self is only a
+  // cluster.peers row, never a socket — pool.peer(me) is undefined). So its OWN partial
+  // is obtained IN-PROCESS via invoke('aggregate', spec) + a local connect sink — the
+  // identical producer serveSubscribe streams, minus the socket — and folded alongside
+  // the N-1 remote partials. Miss this and the querying node's whole shard is silently
+  // dropped (a 1/N undercount on the common path).
+  const foldAggregate = (spec: { op: string; col?: unknown }) => {
+    const rule = RULES[spec.op]
+    // one-shot gather (await): local partial + a call to every OTHER holder, folded once.
+    // KNOWN tail-latency (→ Q2c gather hardening): a connected-but-unresponsive holder
+    // stalls the Promise.all for the full callTimeout (5s), after which its shard folds as
+    // the identity (undefined → 0 / skipped) — a silent undercount with no error signal.
+    // The departed-holder case (viewMembers still lists it until eviction) is the same
+    // shape, deferred to Q2c with the slow-peer bound (a per-gather deadline + a partial-
+    // result signal). Steady-state (all holders responsive) is exact.
+    const foldOnce = async (): Promise<unknown> => {
+      const local = snapshot(invoke('aggregate', spec))
+      const others = mesh.viewMembers().filter((m) => m !== me)
+      const remotes = await Promise.all(others.map((o) => (mesh.call('aggregate', spec, o) as Promise<unknown>).catch(() => undefined)))
+      return rule([local, ...remotes])
+    }
+    // live fold: a result proxy whose root value is refolded on every partial delta.
+    let live: any
+    let liveRes: any
+    const partials = new Map<string, unknown>()
+    const recombine = () => applyRecord(liveRes, { type: 'update', key: [], value: rule([...partials.values()]) })
+    const ensure = () => {
+      if (live) return
+      live = $({})
+      liveRes = (live as any)[VIEWSYM].res
+      // local self-partial (in-process — self can't be a wire target, see above).
+      const localPartial = invoke('aggregate', spec) as any
+      partials.set(me!, snapshot(localPartial))
+      const localHost = localPartial.connect({}, (c: ChangeRecord) => {
+        partials.set(me!, c.value)
+        recombine()
+      })
+      // remote partials from every OTHER committed-view holder.
+      const unsubs: (() => void)[] = []
+      for (const o of mesh.viewMembers()) {
+        if (o === me) continue
+        partials.set(o, undefined) // identity until its first snapshot arrives (folds in within one RTT)
+        const unsub = mesh.subscribe(
+          'aggregate',
+          spec,
+          (rec: ChangeRecord) => {
+            partials.set(o, rec.value)
+            recombine()
+          },
+          o,
+        )
+        if (unsub) unsubs.push(unsub)
+      }
+      recombine()
+      clientSubs.add(() => {
+        for (const u of unsubs) u()
+        void localHost // retain the local sink host (data holds sinks by WeakRef)
+        void localPartial // AND retain the SOURCE proxy: data's FunctionSink stores only
+        // `this.fn`, not `this.p` (core.ts) — so pinning the host keeps the SINK alive but
+        // NOT its filter→aggregate source chain, which is reachable only via WeakRefs and
+        // would GC out from under us, freezing the local partial on a long-running server.
+      })
+    }
+    // The handle: `then` (await ⇒ one-shot gather) is the ONLY access that does not
+    // subscribe; any real read/operator access ⇒ open the live fold + delegate.
+    return new Proxy(noop, {
+      get(_t, prop) {
+        if (prop === 'then') return (onF: any, onR: any) => foldOnce().then(onF, onR)
+        if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined
+        if (prop === 'constructor' || prop === 'toJSON') return undefined
+        ensure()
+        return live[prop]
+      },
+    })
+  }
+
   const methodSurface: Record<string, (arg?: any) => any> = isClient
     ? (new Proxy({}, { get: (_t, name: string) => (arg?: any) => clientHandle(name, arg) }) as any)
     : localMethods
@@ -814,11 +908,32 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // toString/valueOf/hasOwnProperty/… as operators (returning a stale local child
   // instead of a remote handle). hasOwnProperty.call matches only registered operators.
   const isOperator = (prop: string) => Object.prototype.hasOwnProperty.call(Operators, prop)
+  // Decomposable aggregate terminals (Q2): on a scoped SERVER, `data.sum('v')` over the
+  // WHOLE resource is a fan-out + fold, not a local operator (which would see only this
+  // node's held partitions = a partial). count is `length()` with no arg; `length(fn)`
+  // (bucketed) and top/limit-K are holistic-shaped → Q3 (the loud guard lands in Q2f).
+  // A client cannot owner-scope or fold (no me/view) → its aggregates route to a server
+  // (server-as-coordinator, Q2f); until then the facade leaves them to the raw operator.
+  const DECOMPOSABLE = new Set(['sum', 'max', 'min', 'length'])
+  const distributable = scoped && me !== undefined
+  const distributed = (op: string) => (arg?: unknown) => {
+    // R≥members ⇒ this node holds the whole resource → run the aggregate LOCALLY over
+    // complete state (re-checked per access as membership grows). Matches "all data
+    // local ⇒ run locally unchanged".
+    if (R >= viewSize()) return (data as any)[op](arg)
+    if (op === 'length') {
+      if (arg !== undefined) return (data as any).length(arg) // length(fn) bucketed → Q3 (local for now; guarded in Q2f)
+      return foldAggregate({ op: 'count' })
+    }
+    return foldAggregate({ op, col: arg })
+  }
   const dataFacade =
     scoped || isClient
       ? new Proxy(data, {
           get(t, prop) {
-            if (typeof prop === 'symbol' || isOperator(prop as string) || BUILTIN.has(prop as string)) return (t as any)[prop]
+            if (typeof prop === 'symbol' || BUILTIN.has(prop as string)) return (t as any)[prop]
+            if (distributable && DECOMPOSABLE.has(prop as string)) return distributed(prop as string)
+            if (isOperator(prop as string)) return (t as any)[prop]
             return readKey(prop as string)
           },
           set(t, prop, v) {
@@ -851,6 +966,41 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 // noop target for the callable client-handle Proxy (mirrors data's ViewProxy).
 const noop = () => {}
 
+// Combine rules for distributed aggregates (Milestone Q2): how N owner-scoped
+// partials fold into the global answer. Each is associative + commutative so the
+// fold is order-independent across holders. Module-level (no instance state) so a
+// fero() instance pays nothing to reference them.
+//   sum/count → Σ (a missing/undefined partial folds as identity 0).
+//   max/min   → extremum over the DEFINED partials, skipping undefined (an empty
+//               holder publishes undefined, and Math.max(undefined,x) is NaN), so
+//               all-undefined ⇒ undefined (matches data's own empty-set semantics).
+type Rule = (values: unknown[]) => unknown
+// `?? 0` (null/undefined → identity), NOT `|| 0`: the only legitimate identity is an
+// ABSENT partial (undefined seed / a holder owning nothing). `|| 0` would ALSO swallow
+// a NaN partial — and data's SumValue (+v) poisons a holder's whole owner-scoped sum to
+// NaN on a non-numeric column value — masking a dropped shard as a confidently-wrong
+// finite number while the single-node (R≥members) path returns NaN. With `?? 0`, NaN
+// propagates to the global, matching single-node. (count partials are always finite, so
+// this only affects sum's garbage-in case.)
+const sumRule: Rule = (vs) => vs.reduce((a: number, b) => a + (b == null ? 0 : (b as number)), 0)
+// NOTE (garbage-in, documented): a non-numeric / NaN column value makes max/min
+// ORDER-DEPENDENT (the comparator does no coercion and NaN comparisons are always
+// false) — a known edge that resolves once the write path validates/coerces numerics;
+// the empty-partial (undefined) case IS handled (skipped), so 0/negatives are exact.
+const extremum =
+  (better: (a: number, b: number) => boolean): Rule =>
+  (vs) => {
+    let m: number | undefined
+    for (const v of vs) if (v !== undefined && (m === undefined || better(v as number, m))) m = v as number
+    return m
+  }
+const RULES: Record<string, Rule> = {
+  sum: sumRule,
+  count: sumRule,
+  max: extremum((a, b) => a > b),
+  min: extremum((a, b) => a < b),
+}
+
 // A `data` ViewProxy carries the view symbol; a plain value does not.
 function isViewProxy(v: unknown): boolean {
   return v != null && (typeof v === 'object' || typeof v === 'function') && (v as any)[VIEWSYM] !== undefined
@@ -859,11 +1009,12 @@ function isViewProxy(v: unknown): boolean {
 // Reduce a method's return value for the wire: a ViewProxy collapses to its
 // snapshot (its [value]); everything else passes through. Lets `await read()`
 // return a plain object across the network while a local server can hand back
-// the live proxy.
+// the live proxy. A ViewProxy is detected by its VIEW symbol (isViewProxy) and its
+// [value] returned UNCONDITIONALLY — even when that value is `undefined`, which a
+// scalar aggregate legitimately is for an empty set (an empty max/min/avg partial).
+// The old `snap !== undefined` heuristic returned the PROXY itself in that case, so
+// an empty-holder partial crossed the wire as a serialized proxy and NaN-poisoned
+// the extremum fold; the read() path never hit it (its root is always an object).
 function snapshot(v: unknown): unknown {
-  if (v != null && (typeof v === 'object' || typeof v === 'function')) {
-    const snap = (v as any)[VALUE]
-    if (snap !== undefined) return snap
-  }
-  return v
+  return isViewProxy(v) ? (v as any)[VALUE] : v
 }

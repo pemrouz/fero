@@ -1285,3 +1285,137 @@ test('Q2a: empty-set identities (sum=0, count=0, max/min=undefined)', async () =
     r.destroy()
   }
 })
+
+// ── Milestone Q2b: fold combiner + facade terminals (sum/count/max/min) ──
+// The querying side: `await data.sum('v')` gathers every holder's owner-scoped partial
+// and folds to the global; reactive use refolds on each delta. The querying node folds
+// its OWN shard in-process (it cannot subscribe to itself) — the self-routing fix.
+
+const q2bForm = async (name: string, R: number, n = 3) => {
+  const pts = await Promise.all(Array.from({ length: n }, () => ports.free()))
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: pts, wait: 250, replicas: R, antiEntropy: 150 })
+  const all = await Promise.all(pts.map((p) => fero(name, cfg(p))))
+  const node = (addr: string) => all.find((x) => x.cluster.me === addr)!
+  const formed = (x: any) => x.cluster.members.length === n && all.every((y) => y === x || connected(x.cluster, y.cluster.me))
+  const ok = await until(() => all.every(formed), 8000)
+  return { all, node, ok }
+}
+
+test('Q2b: await data.sum/count folds the WHOLE resource incl. the querier’s own shard (R=2)', async () => {
+  const { all, node, ok } = await q2bForm('q2b', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    const vals: Record<string, number> = {}
+    for (const k of keys) {
+      const v = ((k.charCodeAt(1) * 7 + k.length) % 13) + 1
+      vals[k] = v
+      node(A.cluster.owner(k)!).data[k] = { v }
+    }
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 8000), 'every key on its R-set')
+    const globalSum = keys.reduce((s, k) => s + vals[k], 0)
+
+    // self-routing guard: A owns a non-empty shard, and the global INCLUDES it.
+    const aShard = keys.filter((k) => A.cluster.owner(k) === A.cluster.me).reduce((s, k) => s + vals[k], 0)
+    assert.ok(aShard > 0, 'querier A owns a non-empty shard')
+
+    // every node, as coordinator, folds its own shard + peers' to the same global.
+    for (const n of all) {
+      let gotSum: any
+      for (let i = 0; i < 40; i++) {
+        gotSum = await n.data.sum('v')
+        if (gotSum === globalSum) break
+        await sleep(150)
+      }
+      assert.equal(gotSum, globalSum, `${n.cluster.me}: await data.sum folds whole resource (incl. own shard)`)
+      let gotCount: any
+      for (let i = 0; i < 40; i++) {
+        gotCount = await n.data.length()
+        if (gotCount === keys.length) break
+        await sleep(150)
+      }
+      assert.equal(gotCount, keys.length, `${n.cluster.me}: await data.length() == #keys (each counted once despite R=2)`)
+    }
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q2b: reactive data.sum().connect refolds on a single write (one delta → O(holders) recompute)', async () => {
+  const { all, node, ok } = await q2bForm('q2br', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const keys = Array.from({ length: 12 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 2 }
+    const base = keys.length * 2
+    let last: any
+    const agg = A.data.sum('v') // hold the handle so its subscriptions stay alive
+    const host = agg.connect({}, (c: any) => {
+      last = c.value
+    })
+    void host
+    assert.ok(await until(() => last === base, 8000), `reactive fold converged to ${base}, got ${last}`)
+    // a fresh write on its owner bumps the live global by exactly its value.
+    node(A.cluster.owner('newk')!).data.newk = { v: 100 }
+    assert.ok(await until(() => last === base + 100, 8000), `live fold tracked the write to ${base + 100}, got ${last}`)
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q2b: global max/min skip empty-owned holders (undefined partials)', async () => {
+  const { all, node, ok } = await q2bForm('q2bm', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    // ONE key exists → only its R-set holds it, only ONE node owns it; the other two
+    // own zero written keys → their partial max/min is undefined and MUST be skipped.
+    node(A.cluster.owner('solo')!).data.solo = { v: 42 }
+    assert.ok(await until(() => A.cluster.replicas('solo').every((a) => has(node(a), 'solo')), 8000), 'solo on its R-set')
+    for (const n of all) {
+      let mx: any
+      for (let i = 0; i < 40; i++) {
+        mx = await n.data.max('v')
+        if (mx === 42) break
+        await sleep(150)
+      }
+      assert.equal(mx, 42, `${n.cluster.me}: max skips undefined partials from empty-owned holders`)
+      assert.equal(await n.data.min('v'), 42, `${n.cluster.me}: min skips undefined too`)
+    }
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('Q2b: a NaN partial (non-numeric column) propagates to the global sum — not masked to 0', async () => {
+  // Regression for the `|| 0` → `?? 0` fix: data's SumValue poisons a holder's whole
+  // owner-scoped partial to NaN on a non-numeric column value. The fold must PROPAGATE
+  // NaN (matching the single-node R≥members path), not swallow it to 0 and return a
+  // confidently-wrong finite number. We query the OWNER of the bad key so its NaN partial
+  // is LOCAL (no wire NaN→null codec dependency).
+  const { all, node, ok } = await q2bForm('q2bnan', 2)
+  try {
+    assert.ok(ok, 'cluster fully formed')
+    const A = all[0]
+    const has = (x: any, k: string) => k in (x.data[value] ?? {})
+    const keys = Array.from({ length: 20 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 3 }
+    const bad = 'oops'
+    node(A.cluster.owner(bad)!).data[bad] = { v: 'not-a-number' } // poisons its owner's partial → NaN
+    assert.ok(await until(() => has(node(A.cluster.owner(bad)!), bad), 8000), 'bad key on its owner')
+    const owner = node(A.cluster.owner(bad)!)
+    let got: any
+    for (let i = 0; i < 30; i++) {
+      got = await owner.data.sum('v')
+      if (typeof got === 'number' && Number.isNaN(got)) break
+      await sleep(120)
+    }
+    assert.ok(Number.isNaN(got), `owner's distributed sum is NaN (propagated, not masked to a finite ${got})`)
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
