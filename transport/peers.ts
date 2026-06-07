@@ -18,6 +18,7 @@ import type { RetryOpts } from './retries.ts'
 
 export type PeersOpts = {
   me?: string // own address ("host:port") — rejected if added (no self-connect)
+  uuid?: string // own stable identity — rejects a self-connect reached via an ALTERNATE address (uuid self-reject)
   retries?: RetryOpts
   heartbeat?: HeartbeatOpts
   onFrame?: (frame: Frame, peer: Peer) => void
@@ -50,7 +51,9 @@ export class Peers {
   // dialed peer to that address WINS when present. (2) the teardown set. NOT in #conns (so broadcast
   // — dialed-only — never double-sends) and never published (so the ring sees only dialed rows).
   #shadows = new Map<string, Peer>()
+  #selfAddrs = new Set<string>() // OUR own alternate addresses, learned by uuid at handshake — never (re)dial them
   #me?: string
+  #uuid?: string
   #retries?: RetryOpts
   #heartbeat?: HeartbeatOpts
   #onFrame?: (frame: Frame, peer: Peer) => void
@@ -59,6 +62,7 @@ export class Peers {
 
   constructor(opts: PeersOpts = {}) {
     this.#me = opts.me
+    this.#uuid = opts.uuid
     this.#retries = opts.retries
     this.#heartbeat = opts.heartbeat
     this.#onFrame = opts.onFrame
@@ -70,7 +74,8 @@ export class Peers {
   // Idempotent: a re-announced address is a no-op (set semantics give dedup free).
   add({ host, port, role = 'server' }: PeerInfo): Peer | undefined {
     const address = `${host}:${port}`
-    if (address === this.#me) return undefined // never connect to self
+    if (address === this.#me) return undefined // never connect to self (by address)
+    if (this.#selfAddrs.has(address)) return undefined // a self alternate-address, learned via uuid at handshake — no self-loop
     if (this.#blocked.has(address)) return undefined // isolated link: refuse to (re)dial, incl. gossip-revival via handshake learn
     const existing = this.#conns.get(address)
     if (existing) return existing // dedup
@@ -109,6 +114,18 @@ export class Peers {
     // that listen key (the real send target), stranding routing while the row still shows connected.
     // An already-identified inbound peer is in #shadows (server) or #published (client); skip it.
     if (this.#shadows.get(peer.address) === peer || (!peer.dialed && this.#published.has(peer))) return
+    // Self-reject by uuid: a dial to one of our OWN alternate addresses (multi-NIC, localhost vs
+    // 127.0.0.1) — or a uuid collision — completes a handshake carrying OUR uuid. add()'s self-guard
+    // is a host:port STRING compare, so it misses an alternate-address self; the uuid catches it.
+    // Tear the connection down and, for a dial, remember the address so discovery can't redial it
+    // into a self-loop in the mesh. (A dialed self peer's row lingers disconnected → dead-row prune.)
+    if (this.#uuid && id.uuid === this.#uuid) {
+      if (peer.dialed) this.#selfAddrs.add(peer.address)
+      this.#conns.delete(peer.address)
+      this.#shadows.delete(peer.address)
+      peer.destroy()
+      return
+    }
     peer.uuid = id.uuid
     if (peer.dialed) {
       const row = this.peers[peer.address]

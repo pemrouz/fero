@@ -242,3 +242,30 @@ test('an inbound-only server link (no dial back) still serves deltas via the sha
     mB.destroy()
   }
 })
+
+test('a peer presenting our OWN uuid is rejected — no self-loop (alternate-address self / uuid collision)', async () => {
+  // add()'s self-guard compares host:port STRINGS, so a self reached via a DIFFERENT address string
+  // (multi-NIC, localhost vs 127.0.0.1) slips through; the handshake reveals the peer's uuid === ours
+  // and we reject it. Two nodes sharing a uuid deterministically drive the same code path: each
+  // refuses the other and remembers the address, so no mesh forms and no reconnect loop runs.
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  const mA = transport({ name: 'dup', host: '127.0.0.1', port: p1, ports: [p1, p2], uuid: 'shared-uuid', wait: 200, onRecord() {} })
+  const mB = transport({ name: 'dup', host: '127.0.0.1', port: p2, ports: [p1, p2], uuid: 'shared-uuid', wait: 200, onRecord() {} })
+  try {
+    // let both dial, handshake, and reject; then assert the steady state is NO connection — and that
+    // it STAYS that way (the self alternate-address is blocked from redial, so no reconnect loop).
+    await sleep(250)
+    assert.equal(connected(mA, a2), false, 'A rejected B (shared uuid → self-reject)')
+    assert.equal(connected(mB, a1), false, 'B rejected A (shared uuid → self-reject)')
+    // the dialed self peer leaves a row that LINGERS disconnected (the dead-row prune item), never
+    // connected — locks DECISIONS T's stated consequence against regression.
+    assert.equal(mA.peers[a2]?.status?.[value], STATUS.disconnected, 'A’s row for the self-address lingers disconnected')
+    await sleep(150)
+    assert.equal(connected(mA, a2) || connected(mB, a1), false, 'stays rejected — no reconnect loop')
+  } finally {
+    mA.destroy()
+    mB.destroy()
+  }
+})
