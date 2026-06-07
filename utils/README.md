@@ -76,35 +76,28 @@ numeric enum from [../transport/peer.ts](../transport/peer.ts):32-37, where
 `connected === 3`). Both the L0 mesh and the L2 cluster expose `.peers` as a
 ViewProxy, so the same predicate works against either.
 
-**`apply` is the receive-path contract** ([index.ts](index.ts):74-78): dispatch on
-`record.type` to `res.update(value, key)` / `res.insert(value, key, at)` /
-`res.remove(key)` — the same terminal write contract the day-0 spike proved (plan
-§10). Apply a whole frame by iterating `frame.records()` and calling it per record.
-Note this body is **identical** to `applyRecord` in
-[../log/index.ts](../log/index.ts):29-33 — see Design notes.
+**`apply` is the receive-path contract** ([index.ts](index.ts)): it **re-exports**
+L1's [`applyRecord`](../log/index.ts) under the fixture name — `update`/`insert`/
+`remove` dispatched onto a `data` res, the same terminal write contract the day-0
+spike proved (plan §10). The fixture is therefore *provably* the same code replicas
+run and can't drift from it. Apply a whole frame by iterating `frame.records()` and
+calling it per record.
 
 ## Design notes
 
-- **`apply` ≡ `applyRecord`.** [index.ts](index.ts):74-78 and
-  [../log/index.ts](../log/index.ts):29-33 are byte-identical — the record-apply
-  invariant lives in two places across the test-helper / library boundary. The
-  trade-off is real: collapsing them to one definition (re-export from L1) makes the
-  fixture provably the same code replicas run, but drags the whole L1 import graph
-  into a test helper; keeping them separate keeps `#utils` light but risks silent
-  drift that would hide the exact bug a test exists to catch. `#utils` is already not
-  strictly dependency-light — it imports `STATUS` and `ChangeRecord` from
-  [../transport](../transport/) — so the lean-ness argument is weaker than it looks.
+- **`apply` IS `applyRecord`.** It is a re-export of L1's single definition
+  (`export { applyRecord as apply } from '../log/index.ts'`), so the record-apply
+  invariant has exactly one home and a future change (e.g. `'move'`-delta support)
+  lands in one place. Cycle-safe: no library module imports `#utils`, so the test
+  helper depending on L1 introduces no loop. (`#utils` was never strictly
+  dependency-light anyway — it already imports `STATUS` from
+  [../transport](../transport/).)
 - **`STATUS` is positional/numeric**, so `connected` keys off the integer `3`; a
   string-enum refactor is parked in [../IDEAS.md](../IDEAS.md) (Wire-format
   micro-optimizations).
 
 ## Open work
 
-- **`apply`/`applyRecord` de-duplication** — the contract's home is L1's
-  [`applyRecord`](../log/index.ts); the safe fix is for this module's `apply` to
-  re-export it (`export { applyRecord as apply } from '../log/index.ts'`) so the
-  fixture is provably the same code replicas run (cycle-safe — no library module
-  imports `#utils`).
 - The broader perf-and-fixtures discipline lives in [../CLAUDE.md](../CLAUDE.md)
   ("Performance is a hard requirement", "Conventions inherited from data"); open
   workstreams across the layers are in [../IDEAS.md](../IDEAS.md).
