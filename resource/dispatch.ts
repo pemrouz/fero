@@ -117,6 +117,14 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     if (!ids) subsByPeer.set(address, (ids = new Set()))
     ids.add(subId)
   }
+  // Stream a live ViewProxy's changes to a subscriber: connect a delta sink, then retain it — plus the
+  // source proxy (`src`, so a derived projection's filter→op chain doesn't GC) and an optional teardown
+  // (`close`, a livePartial/openFold) — under (address, subId). The three subscribe branches that return
+  // a live proxy (the Q3 gather, a Q2 fold, a custom method's projection) share this.
+  const streamProxy = (address: string, subId: number, proxy: any, close?: () => void) => {
+    const host = proxy.connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
+    addSub(address, subId, { host, src: proxy, close })
+  }
   const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
     // Read-forwarding (Q1): subscribe a non-held read key FROM the owner and relay its
     // deltas to the subscriber; the upstream unsub is closed on unsubscribe.
@@ -143,8 +151,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // complete-local read at members≤R is always current.)
     if (method === 'read' && arg == null && gathersWholeRead) {
       const g = fold.openFold({ op: 'rows' }, AGG.rows.combine)
-      const host = (g.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
-      addSub(address, subId, { host, src: g.proxy, close: g.close })
+      streamProxy(address, subId, g.proxy, g.close)
       return
     }
     // A CLIENT's reactive distributed aggregate (Milestone Q2e): build the FOLD here and
@@ -154,8 +161,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       try {
         const s = stripFold(arg)
         const f = fold.openFold(s, AGG[s.op]?.combine)
-        const host = (f.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
-        addSub(address, subId, { host, src: f.proxy, close: f.close })
+        streamProxy(address, subId, f.proxy, f.close)
       } catch {
         // unknown op → no stream (RPC path surfaces errors)
       }
@@ -181,8 +187,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       return // a failed subscription just yields no stream (RPC path surfaces errors)
     }
     if (isViewProxy(result)) {
-      const host = (result as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
-      addSub(address, subId, { host, src: result as object }) // src retains the source chain (see map decl)
+      streamProxy(address, subId, result)
     } else {
       mesh.deltaTo(address, subId, { type: 'update', key: [], value: result })
     }
@@ -318,6 +323,24 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     if (op === 'some' || op === 'every') return { op, col: args[0], val: args[1] }
     return { op, col: args[0] }
   }
+  // distributed(op): a scoped server's `data.sum('v')` etc. over the WHOLE resource. A spec that can't
+  // cross the wire warns + falls back local; a client routes to a server-coordinator; otherwise the call
+  // either runs LOCALLY (canRunLocal, below) or fans out a fold.
+  //   canRunLocal — R≥members ⇒ this node holds the whole resource → run the aggregate locally over
+  //   complete state (re-checked per access as membership grows; "all data local ⇒ run unchanged").
+  //   EXCEPT some/every: their DECLARATIVE (col) form has no raw data-lib equivalent (data's some/every
+  //   require a PREDICATE FN — `data.some('active')` throws "fn is not a function"), so they always go
+  //   through the fold, which reconstructs the predicate from (col,val) in buildPartial. The fold is
+  //   correct for any R (owner-scoping is a disjoint cover); at R≥members it just fans out to members
+  //   that each happen to hold all.
+  //   NOTE — under FULL replication (R=∞, the default) the facade is NOT built (the raw proxy is
+  //   returned, to keep that hot path byte-identical), so this code never runs there:
+  //   `data.sum/max/min/avg('col')` / `data.length()` work (data accepts a column), but
+  //   `data.some/every('col')` falls through to data's raw some/every and throws — use the NATIVE
+  //   predicate form `data.some(s => s.active)` under full replication (you hold all the data, so the
+  //   local some/every IS the global). The declarative col form is the scoped-distributed sugar. Not a
+  //   Q2 regression (data's some/every always needed a fn); a uniform col form needs a data-lib
+  //   some(col)/every(col) overload — IDEAS.
   const distributed = (op: string) => (...args: unknown[]) => {
     const spec = specOf(op, args)
     if (spec === null) {
@@ -331,23 +354,10 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // which builds the fold and streams the GLOBAL back (server-as-coordinator, Q2e). The
     // `fold:true` flag tells the server to fold rather than return its own partial.
     if (isClient) return clientHandle('aggregate', { ...spec, fold: true })
-    // R≥members ⇒ this node holds the whole resource → run the aggregate LOCALLY over
-    // complete state (re-checked per access as membership grows). Matches "all data local
-    // ⇒ run locally unchanged". EXCEPT some/every: their DECLARATIVE (col) form has no raw
-    // data-lib equivalent (data's some/every require a PREDICATE FN — `data.some('active')`
-    // would throw "fn is not a function"), so they always go through the fold, which
-    // reconstructs the predicate from (col,val) in buildPartial. The fold is correct for
-    // any R (owner-scoping is a disjoint cover regardless of how many nodes hold each
-    // partition); at R≥members it just fans out to members that each happen to hold all.
-    //   NOTE — under FULL replication (R=∞, the default) the facade is NOT built (the raw
-    //   proxy is returned, to keep that hot path byte-identical), so this code never runs
-    //   there: `data.sum/max/min/avg('col')` / `data.length()` work (data accepts a column),
-    //   but `data.some/every('col')` falls through to data's raw some/every and throws — use
-    //   the NATIVE predicate form `data.some(s => s.active)` under full replication (you hold
-    //   all the data, so the local some/every IS the global). The declarative col form is the
-    //   scoped-distributed sugar. Not a Q2 regression (data's some/every always needed a fn);
-    //   making the col form uniform needs a data-lib some(col)/every(col) overload — IDEAS.
-    if (R >= viewSize() && op !== 'some' && op !== 'every') return (data as any)[op](...args)
+    // canRunLocal: holds the whole resource (R≥members) ⇒ run locally — EXCEPT some/every, which
+    // always fold (no raw data-lib col form). See the note above the function.
+    const canRunLocal = R >= viewSize() && op !== 'some' && op !== 'every'
+    if (canRunLocal) return (data as any)[op](...args)
     return fold.foldAggregate(spec)
   }
   // Q3 boundary guard. These operators are HOLISTIC or ordered — the global answer needs the
