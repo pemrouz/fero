@@ -12,7 +12,6 @@
 import net from 'node:net'
 import { value } from '../../data/index.ts'
 import { STATUS } from '../transport/peer.ts'
-import type { ChangeRecord } from '../transport/message.ts'
 
 // ── ports ────────────────────────────────────────────────────────────────────
 export const ports = {
@@ -69,10 +68,9 @@ export const connected = (mesh: any, addr: string): boolean =>
   (mesh.peers[addr]?.status?.[value] ?? -1) === STATUS.connected
 
 // Apply one change record to a `data` res (the [view].res write contract) — the
-// receive path every replica runs. Callers applying a whole frame iterate
-// `frame.records()` and call this per record.
-export const apply = (res: any, record: ChangeRecord): void => {
-  if (record.type === 'update') res.update(record.value, record.key)
-  else if (record.type === 'insert') res.insert(record.value, record.key, record.at)
-  else if (record.type === 'remove') res.remove(record.key)
-}
+// receive path every replica runs. This IS the library's terminal apply contract,
+// re-exported from L1 (log) so the test/perf fixture is provably the same code
+// replicas run and can never silently drift from it (e.g. when 'move'-delta support
+// lands). Callers applying a whole frame iterate `frame.records()` and call it per
+// record. Cycle-safe: no library module imports #utils.
+export { applyRecord as apply } from '../log/index.ts'
