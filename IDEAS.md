@@ -83,10 +83,11 @@ dialable address. The remaining items build on that identity:
   shadows are now pruned from `#shadows` on their own drop — [DECISIONS T](DECISIONS.md);
   the lingering `disconnected` *row* of a dialed/client peer is what's still open, plus
   the rapid-reconnect shadow-overwrite leak noted there.)
-- **uuid self-identity + self-reject.** `me` is a single host:port string; a
-  multi-interface node or a dial+accept race needs uuid identity to reject self and
-  dedup. The uuid is now stored per-`Peer` + on the row ([DECISIONS T](DECISIONS.md)),
-  so self-reject can compare it instead of the host:port string.
+- **uuid self-identity + self-reject — LANDED** ([DECISIONS T2](DECISIONS.md)): a peer
+  presenting our own uuid is rejected (a self-loop via an alternate address — multi-NIC,
+  `localhost` vs `127.0.0.1` — or a uuid collision) and the address remembered so
+  discovery/gossip/heal can't redial it. Remaining: `#selfAddrs` is add-only — clear a
+  stale block if a uuid collision is later fixed (defensible to leave; misconfig).
 - **[P3] Incarnation numbers** for flapper fencing beyond the stability debounce
   ([DECISIONS V](DECISIONS.md) deferral) — pairs with uuid self-identity.
 

@@ -123,12 +123,15 @@ export function transport(opts: TransportOpts): Mesh {
     // fan-out). identify runs before onConnect so a catch-up routes to a stable address.
     done: (peer: Peer, id: Identity) => {
       pool.identify(peer, id)
-      if (peer.dialed) opts.onConnect?.(peer.address)
+      // Gate onConnect on still-connected: identify() self-rejects (destroys) a peer presenting our
+      // OWN uuid, so a self-connect must not fire the catch-up / ready trigger.
+      if (peer.dialed && peer.status === STATUS.connected) opts.onConnect?.(peer.address)
     },
   }
 
   const pool = new Peers({
     me,
+    uuid,
     retries: opts.retries,
     heartbeat: opts.heartbeat,
     onConnect: (peer) => {

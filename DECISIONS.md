@@ -859,9 +859,37 @@ asymmetric regression tests + the deterministic-ordering test gates were added.
 - The `onSubscribe`/reap address shifted from ephemeral to the listen address for server↔server subs;
   the transport reap + view-frame tests were updated to assert the stable address.
 
+### T2 — uuid self-reject · Adopted
+
+**Context.** `add()`'s self-guard is a host:port STRING compare against `me`, so a dial to one of our
+OWN alternate addresses (multi-NIC, `localhost` vs `127.0.0.1`) reaches a different string, connects,
+and would mesh the node with ITSELF — a self-loop in `cluster.peers`. The handshake already carries our
+uuid back to us; nothing compared it.
+
+**Decision.** `Peers` takes a `uuid` opt; `identify()` self-rejects when the peer's identity carries OUR
+uuid — destroys the connection, removes it from `#conns`/`#shadows`, and (for a dial) records the address
+in `#selfAddrs` so discovery/gossip/heal can't redial it. `add()` refuses a known `#selfAddrs` address.
+The self-reject sits ABOVE the existing `id.listen === me` guard (so a true self reached via gossip-revival
+with `id.listen === me` is torn down, not left as an idle zombie socket), and BELOW the idempotency guard
+(a first-time self peer is neither shadow nor published, so it isn't skipped). The `done` hook gates
+`onConnect` on `peer.status === STATUS.connected`, so a self-rejected (destroyed) peer doesn't fire the
+catch-up/ready trigger. A dialed self leaves a row that **lingers disconnected** (the dead-row prune item);
+it is `!dialed`-gated out of `onPeerGone` and never ringed.
+
+**Adversarial review (clean).** A no-false-positive argument holds: `transport()` defaults `uuid` to
+`crypto.randomUUID()`, so two distinct nodes that both omit it still differ — the only match is a genuine
+uuid collision, which the design intentionally treats as mutual refusal. Verified: correct teardown keys
+for both dialed (alt-address) and inbound (ephemeral) self peers; `onConnect` never wrongly suppressed
+(a normal dialed peer is always `connected` at `done`); `ready` still resolves (pool `onConnect` fires at
+TCP-connect + the `wait` backstop). Tests 152/152, perf 17/17.
+
+**Known limitation (by design).** `#selfAddrs` is add-only — correct & bounded for true self alt-addresses;
+for a uuid-*collision* peer the address stays blocked until process restart (a misconfiguration is refused
+deterministically). Self-healing a fixed collision is the place to revisit if ever wanted.
+
 **Open follow-ups → [IDEAS → Identity, dedup & connection hygiene](IDEAS.md):** connection-dedup to
 one bidirectional socket (connected-wins by uuid — re-key now *surfaces* the collision); dead-row /
 stale-`#shadows` pruning on a plain disconnect (we prune a shadow when it reaps, but a dialed row still
-lingers); uuid-based self-reject (the uuid is now stored, the compare isn't wired). A rapid B-reconnect
-that re-identifies a new shadow before the old one's close processes can leak the old shadow's served
-subs (bounded; folds into the churn-leak item).
+lingers — incl. the self-reject's disconnected row). A rapid B-reconnect that re-identifies a new shadow
+before the old one's close processes can leak the old shadow's served subs (bounded; folds into the
+churn-leak item).
