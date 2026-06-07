@@ -162,6 +162,7 @@ export function transport(opts: TransportOpts): Mesh {
   let callId = 0
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void; timer?: ReturnType<typeof setTimeout> }>()
   const subs = new Map<number, (record: ChangeRecord) => void>()
+  const warnedVerbs = new Set<number>() // unrecognized verbs already warned about (fail-closed default, once per verb)
 
   function dispatch(frame: Frame, peer: Peer) {
     if (handle(frame, peer, hooks)) return // INIT/SYNC/DONE
@@ -219,22 +220,34 @@ export function transport(opts: TransportOpts): Mesh {
         else waiter.reject(new Error(String(value)))
         return
       }
-      default: {
-        // RECORDS with a frame id is a subscription delta (route by sub id); without one
-        // it is plain replication (deliver to onRecord). A frame that HAS an id but no
-        // matching sub is a STALE/late delta for an already-closed subscription — e.g. an
-        // in-flight aggregate partial arriving after a fold unsubscribed a departed holder
-        // under churn (Q2c) — and is DROPPED: falling through to onRecord would mis-apply a
-        // {key:[],value} subscription delta as a replicated record and clobber state (a
-        // key:[] root replace). Plain replication never carries a frame id, so this only
-        // ever drops orphaned subscription deltas.
+      case VERB.RECORDS: {
+        // The steady-state DATA path (the highest-throughput inbound) — a first-class named case, not
+        // the catch-all. RECORDS with a frame id is a subscription delta (route by sub id); without
+        // one it is plain replication (deliver to onRecord). A frame that HAS an id but no matching
+        // sub is a STALE/late delta for an already-closed subscription — e.g. an in-flight aggregate
+        // partial arriving after a fold unsubscribed a departed holder under churn (Q2c) — and is
+        // DROPPED: falling through to onRecord would mis-apply a {key:[],value} subscription delta as
+        // a replicated record and clobber state (a key:[] root replace). Plain replication never
+        // carries a frame id, so this only ever drops orphaned subscription deltas.
         if (frame.id !== undefined) {
           const sub = subs.get(frame.id)
           if (sub) for (const record of frame.records()) sub(record)
         } else {
           for (const record of frame.records()) opts.onRecord?.(record, peer)
         }
+        return
       }
+      default:
+        // FAIL CLOSED on an unrecognized verb — DROP it rather than let it fall into the RECORDS path,
+        // where a structurally-valid-but-unknown frame would mis-apply via onRecord and clobber state.
+        // (PING/PONG are consumed in peer.ts; INIT/SYNC/DONE in handle() above; ACK is unused — so
+        // nothing legitimate reaches here.) Warn once per verb so version-skew / corruption is visible
+        // without flooding the log.
+        if (!warnedVerbs.has(frame.verb)) {
+          warnedVerbs.add(frame.verb)
+          console.warn(`fero/transport: dropping frame with unrecognized verb ${frame.verb} from ${peer.address}`)
+        }
+        return
     }
   }
 
