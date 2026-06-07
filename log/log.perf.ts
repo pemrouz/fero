@@ -4,7 +4,7 @@
 
 import { test } from 'node:test'
 import { ok } from 'node:assert'
-import { Log } from './partition.ts'
+import { Log } from './log.ts'
 import { view } from './index.ts'
 import type { ChangeRecord } from '../transport/message.ts'
 import { bench } from '#utils'

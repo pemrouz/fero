@@ -40,7 +40,7 @@
 
 import { $, view as VIEWSYM } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
-import { Log, originKey } from '../log/partition.ts'
+import { Log, originKey } from '../log/log.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 import { ViewManager } from './view.ts'

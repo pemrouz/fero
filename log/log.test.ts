@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Log, partitionOf, originKey } from './partition.ts'
+import { Log, partitionOf, originKey } from './log.ts'
 
 test('append segments by partition (key[0]) and tracks per-partition heads', () => {
   const log = new Log()

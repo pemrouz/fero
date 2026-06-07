@@ -13,10 +13,10 @@
 
 import { $, value, view as VIEWSYM } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
-import { Log } from './partition.ts'
+import { Log } from './log.ts'
 import type { ChangeRecord } from '../transport/message.ts'
 
-export { Log } from './partition.ts'
+export { Log } from './log.ts'
 export { value }
 
 export function log(): Log {
