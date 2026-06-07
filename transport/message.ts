@@ -279,6 +279,15 @@ export function encodeFrame(
   return b.subarray(0, w.off)
 }
 
+// A CONTROL frame carries exactly one record whose value IS the payload — the
+// shape every non-data verb (CALL/RESOLVE/REJECT, SUBSCRIBE/UNSUBSCRIBE, DIGEST,
+// VIEW_*, JOIN_REQUEST) uses. This names that shape so callers stop hand-spelling
+// `encodeFrame([{type:'update',key:[],value}], {verb,id})`. Decode the payload
+// back with `frame.value` (Frame.value getter). Same allocation as the inline
+// form — not on the data RECORDS hot path, so message.perf is unaffected.
+export const controlFrame = (verb: number, value: unknown, id?: number): Buffer =>
+  encodeFrame([{ type: 'update', key: [], value }], { verb, id })
+
 // Encode a batch that may mix origins — splitting it into the fewest frames each
 // of which satisfies the single-origin, contiguous-seq invariant base+index
 // relies on. A run breaks when the origin changes or the seq isn't the previous
@@ -407,6 +416,13 @@ export class Frame {
   }
   get epoch(): number {
     return this.prov().epoch
+  }
+
+  // The single payload of a CONTROL frame: records()[0].value (the inverse of
+  // controlFrame()). Ignores records[1..] — control frames carry exactly one
+  // record; `undefined` for an empty frame (PING/PONG).
+  get value(): unknown {
+    return this.records()[0]?.value
   }
 
   // Lazy: walk `count` recLen varints and slice a RecordView per record. No key

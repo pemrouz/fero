@@ -8,7 +8,7 @@
 // `{type:'update', key:[], value: Identity}` — through the same message.ts codec
 // the data path uses, just under a different frame verb. No second serializer.
 
-import { encodeFrame, VERB, type Frame } from './message.ts'
+import { controlFrame, VERB, type Frame } from './message.ts'
 import type { Peer } from './peer.ts'
 
 export type Identity = {
@@ -18,7 +18,7 @@ export type Identity = {
   peers: string[] // known server listen addresses — gossiped so the mesh closes
 }
 
-const control = (verb: number, id: Identity) => encodeFrame([{ type: 'update', key: [], value: id }], { verb })
+const control = (verb: number, id: Identity) => controlFrame(verb, id)
 
 export type HandshakeHooks = {
   identity: () => Identity // our current identity + known server addresses
@@ -58,4 +58,4 @@ export function handle(frame: Frame, peer: Peer, hooks: HandshakeHooks): boolean
   }
 }
 
-const identityOf = (frame: Frame): Identity => (frame.records()[0]?.value as Identity) ?? { uuid: '', role: 'client', peers: [] }
+const identityOf = (frame: Frame): Identity => (frame.value as Identity) ?? { uuid: '', role: 'client', peers: [] }
