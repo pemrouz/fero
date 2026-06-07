@@ -441,59 +441,56 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   aeTimer?.unref?.()
 
   // ── 4 · write path: capture sink → forward-to-owner | commit-local ──
-  // Write-capture: a local assignment on the proxy is stamped with our
-  // provenance, recorded as the current LWW winner for its key (the proxy has
-  // already materialized it — it's the newest write we know of), logged, and
-  // broadcast. `connect(obj, fn)` pins the sink to `obj`; we retain that host
-  // (via destroy's closure) so the sink stays alive (data holds it only by
-  // WeakRef). The first emission is the empty attach-snapshot of an empty proxy
-  // — swallow it. Inbound re-emissions are skipped (the `applying` guard) — they
-  // were already logged/applied in onRecord.
+  // Write-capture: a local assignment on the proxy is stamped with our provenance, recorded as the
+  // current LWW winner for its key (the proxy already materialized it — the newest write we know of),
+  // logged, and broadcast. `connect(obj, fn)` pins the sink to `obj`; we retain that host (via
+  // destroy's closure) so the sink stays alive (data holds it only by WeakRef).
+  //
+  // FOUR BRANCHES, in order (the numbered leads in the body mark each):
+  //   1) prime        — swallow the empty attach-snapshot of the fresh proxy.
+  //   2) applying-skip — an inbound re-emission (the `applying` guard); already logged/applied in onRecord.
+  //   3) F1 forward    — owner-routed writes: the partition OWNER is the single sequencer for its keys.
+  //      If we don't own this partition and the owner is a connected peer, FORWARD the raw write; the
+  //      owner commits it under its own provenance and replicates the canonical record back. The
+  //      optimistic local value is already applied (the set trap ran before this sink), so we hand off
+  //      and return. Clients (no `me`) and an unreachable owner fall through to (4) so a write is never
+  //      dropped. A FORWARDED write (committingForward) SKIPS this branch — committed as-is in (4)
+  //      without re-checking ownership: re-checking would re-forward whenever ring views transiently
+  //      disagree during mesh formation, ping-ponging the write until membership converges; honoring the
+  //      forwarder's decision ends it in one hop (a brief disagreement at worst commits at a not-yet-true
+  //      owner, which still replicates and converges by LWW, as pre-F1). The dedup/LWW core's in-order
+  //      invariant holds per (origin,partition) — each partition's single owner is one in-order source.
+  //   4) commit-local — stamp/log/replicate under our provenance (owned partitions + never-drop fallback).
+  // NB: a plain `data.x = y` commits straight through this sink — it does NOT dispatch through
+  // methods.update/insert/remove, so a user-overridden `update` (auth/validation) intercepts only
+  // methods.update(...) calls, not assignments. Deliberate (routing assignments through the method
+  // risks the re-entrancy the `applying` guard prevents, plan §7) — ../IDEAS.md "Assignment ↔
+  // methods.update parity".
   let primed = false
   const writeHost = data.connect({}, (change: ChangeRecord) => {
+    // 1) prime: swallow the empty attach-snapshot.
     if (!primed) {
       primed = true
       return
     }
+
+    // 2) applying-skip: an inbound re-emission — already handled in onRecord.
     if (applying) return
-    // NB: a plain `data.x = y` assignment commits straight through this sink — it does
-    // NOT dispatch through methods.update/insert/remove, so a user-overridden `update`
-    // (for auth/validation) intercepts only methods.update(...) calls, not assignments.
-    // Deliberate, not an oversight: routing assignments through the method risks the
-    // re-entrancy the `applying` guard prevents (plan §7). Open design call — ../IDEAS.md
-    // "Assignment ↔ methods.update parity".
-    // Owner-routed writes (Milestone F1): the partition owner is the single
-    // sequencer for its keys. If we don't own this partition — and the owner is a
-    // connected peer — FORWARD the raw write; the owner commits it under its own
-    // provenance and replicates the canonical record back to us. The optimistic
-    // local value is already applied (the set trap ran before this sink), so we
-    // just hand off and return; the canonical origin=owner record arrives via
-    // replication and reconciles. Clients (no `me`) and an unreachable owner fall
-    // through to a local commit so a write is never dropped. The dedup/LWW core's
-    // in-order invariant holds per (origin,partition) — each partition's single
-    // owner is one in-order source.
-    //
-    // A FORWARDED write (committingForward) is committed here unconditionally — we
-    // do NOT re-check ownership. The forwarder already routed it to us; re-checking
-    // would re-forward whenever ring views transiently disagree during mesh
-    // formation (each side computing a different owner), ping-ponging the write
-    // until membership converges. Honoring the forwarder's decision ends the write
-    // in one hop; a brief ring disagreement at worst commits at a not-yet-true
-    // owner, which still replicates and converges by LWW (as the pre-F1 model did).
+
+    // 3) F1 forward: not owner + owner reachable ⇒ hand off (a forwarded write skips this).
     if (!committingForward) {
       const p = partitionOf(change)
       const owner = me !== undefined ? mesh.owner(p) : undefined
       if (owner !== undefined && owner !== me && mesh.forward(owner, change)) {
-        // Scoped holding (P2): we forwarded a write for a partition we DON'T
-        // replicate. The owner commits + replicates to the R-set (not us), so the
-        // canonical record never comes back — drop the optimistic value we just
-        // applied rather than orphan a stale copy. (Reading this key is a remote
-        // read — Milestone Q1.) Under full replication we keep it: the canonical
-        // record returns and reconciles.
+        // P2: forwarded a write for a partition we DON'T replicate — drop the optimistic value (the
+        // owner replicates to the R-set, not us; reading this key is a Q1 remote read). Full
+        // replication keeps it: the canonical record returns and reconciles.
         if (scoped && !holds(p)) dropLocal(p)
         return
       }
     }
+
+    // 4) commit-local: stamp/log/replicate under our provenance.
     commitLocal(change)
   })
 
