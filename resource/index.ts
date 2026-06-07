@@ -31,9 +31,12 @@
 // for the L1 `distribute()` variant where the LOG is the write API instead
 // (arch A); here the PROXY is (arch B), because assignment is the write surface.
 //
-// v1 scope: server / full-replication mode (every server materializes every
-// record via dialed-broadcast). Deferred — client→server RPC dispatch, per-
-// client `read()` projections, DHT-partitioned routing. See ../IDEAS.md.
+// Built across milestones A–H, V, P/P4, Q1–Q3 (see ../DECISIONS.md): the
+// per-origin LWW core (A) and proxy-as-source model (H) are the foundation;
+// client→server RPC (D), per-client read() projections + live subscriptions (E),
+// owner-routed writes (F1), view-synchronous membership (V), R-way scoped holding
+// + orphan shedding (P/P4), hold-relative reads (Q1), and distributed aggregates
+// + whole-resource gather (Q2/Q3) all ship here. Open work: ../IDEAS.md.
 
 import { $, value as VALUE, view as VIEWSYM, Operators } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
@@ -66,7 +69,7 @@ export type Context = {
   methods: Record<string, (arg?: any) => any>
   log: Log
   name: string
-  peer?: any // the calling peer (set for routed RPC — deferred; undefined locally)
+  peer?: any // the calling peer's listen address (set for routed RPC — DECISIONS D); undefined for an in-process method-to-method call. NB: plan §6.1/§7 describe a richer { address, status, auth } peer object — auth not yet built (../IDEAS.md).
 }
 
 export type Fero = {
@@ -448,6 +451,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       return
     }
     if (applying) return
+    // NB: a plain `data.x = y` assignment commits straight through this sink — it does
+    // NOT dispatch through methods.update/insert/remove, so a user-overridden `update`
+    // (for auth/validation) intercepts only methods.update(...) calls, not assignments.
+    // Deliberate, not an oversight: routing assignments through the method risks the
+    // re-entrancy the `applying` guard prevents (plan §7). Open design call — ../IDEAS.md
+    // "Assignment ↔ methods.update parity".
     // Owner-routed writes (Milestone F1): the partition owner is the single
     // sequencer for its keys. If we don't own this partition — and the owner is a
     // connected peer — FORWARD the raw write; the owner commits it under its own
@@ -789,6 +798,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // buildPartial, so the union across holders is a disjoint cover (no R-fold
     // double-count). Closes over data/mesh/me (not c.data) — it needs ownership.
     aggregate: (spec) => buildPartial(spec),
+    // NB: plain assignments (`data.x = y`) bypass these — they commit straight through
+    // the write-capture sink, not via these methods. See ../IDEAS.md "Assignment ↔
+    // methods.update parity". Overriding `update` guards methods.update(...) calls only.
     update: (chg, c) => setPath(c.data, norm(chg?.key), chg?.value),
     insert: (chg, c) => setPath(c.data, norm(chg?.at ?? chg?.key), chg?.value),
     remove: (chg, c) => delPath(c.data, norm(chg?.key)),
