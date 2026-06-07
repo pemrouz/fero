@@ -31,12 +31,20 @@ export const lazyHandle = (opts: {
 }): any => {
   let delegate: any // the live proxy, created (and the subscription/fold opened) on first real access
   return new Proxy(noop, {
+    // GUARD ORDER IS LOAD-BEARING — two Q3b defects came from reordering this. Keep 1→5:
     get(_t, prop) {
+      // 1 · extraGet FIRST — a caller's own symbol (foldAggregate's FOLD_ONCE) must resolve here,
+      //     BEFORE step 3 would swallow it as an unknown symbol.
       const extra = opts.extraGet?.(prop)
       if (extra) return extra.v
-      if (prop === 'then') return opts.then // await ⇒ one-shot (does NOT open the live thing)
+      // 2 · `then` ⇒ the one-shot resolve — the ONLY access that does NOT open the live thing.
+      if (prop === 'then') return opts.then
+      // 3 · reject unknown symbols BEFORE step 5 — probing one on a real ViewProxy throws "Cannot
+      //     convert a Symbol to a string". VIEWSYM/VALUE pass through to the delegate.
       if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined
+      // 4 · constructor/toJSON never open a subscription.
       if (prop === 'constructor' || prop === 'toJSON') return undefined
+      // 5 · any real prop ⇒ open the live subscription/fold once, then delegate.
       if (delegate === undefined) delegate = opts.open()
       return delegate[prop]
     },
@@ -50,10 +58,11 @@ export const lazyHandle = (opts: {
 // Resolver tag on a foldAggregate/gather handle: `handle[FOLD_ONCE]` yields a `() => Promise<global>`
 // that resolves a ONE-SHOT gather WITHOUT opening the handle's live fold.
 export const FOLD_ONCE = Symbol('fero.foldOnce')
-// Identity set of live fold/gather handles (foldAggregate's Proxies). snapshot() membership-checks
-// this — a side-effect-free WeakSet probe — to decide whether to resolve a returned handle via
-// foldOnce. We do NOT probe the FOLD_ONCE symbol on every method return: reading an unknown symbol
-// off a `data` ViewProxy throws "Cannot convert a Symbol value to a string" (Q3b review M2 fix).
+// Identity set of live fold/gather handles (foldAggregate's Proxies). Closed loop: SOLE writer is
+// foldAggregate (fold.ts); SOLE reader is snapshot() (below). snapshot() membership-checks this — a
+// side-effect-free WeakSet probe — to decide whether to resolve a returned handle via foldOnce. We
+// do NOT probe the FOLD_ONCE symbol on every method return: reading an unknown symbol off a `data`
+// ViewProxy throws "Cannot convert a Symbol value to a string" (Q3b review M2 fix).
 export const FOLD_HANDLES = new WeakSet<object>()
 
 // A `data` ViewProxy carries the view symbol; a plain value does not.
