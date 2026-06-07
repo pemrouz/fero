@@ -79,6 +79,24 @@ const HEADER = 7 // MAGIC + flags + verb + bodyLen:u32
 const ID_LEN = 6 // u48 stream/ack id (plain Number; no BigInt on the ack path)
 const EMPTY = Buffer.allocUnsafe(0)
 
+// Hard ceiling on a single frame's body. A hostile (or corrupt) header can claim
+// a ~4 GiB bodyLen; the framer would then buffer `carry` unbounded waiting for a
+// frame that never completes (OOM from a few bytes). Reject any frame whose body
+// exceeds this — generous enough for a large catch-up batch, small enough that one
+// bad header can't exhaust memory. Overridable per-Framer for tests / tuning.
+const MAX_FRAME = 256 * 1024 * 1024
+
+// Thrown by the framer/decoder on a malformed or hostile frame (bad magic,
+// oversized body, a count/length that overruns the buffer, a reserved value
+// type). A distinct type so the peer can drop the connection on a wire-level
+// fault WITHOUT swallowing a genuine handler/apply bug (which must still surface).
+export class FrameError extends Error {
+  constructor(message: string) {
+    super(`fero: ${message}`)
+    this.name = 'FrameError'
+  }
+}
+
 export type ChangeRecord = {
   type: 'update' | 'insert' | 'remove' | 'move'
   key: string[]
@@ -292,14 +310,21 @@ export function encodeFrames(records: ChangeRecord[]): Buffer[] {
 // copy) until the rest arrives. Concat happens only when a frame straddles.
 export class Framer {
   private carry: Buffer = EMPTY
+  private maxFrame: number
+  constructor(opts: { maxFrame?: number } = {}) {
+    this.maxFrame = opts.maxFrame ?? MAX_FRAME
+  }
   push(chunk: Buffer): Frame[] {
     let buf = this.carry.length ? Buffer.concat([this.carry, chunk]) : chunk
     const frames: Frame[] = []
     let off = 0
     while (buf.length - off >= HEADER) {
-      if (buf[off] !== MAGIC) throw new Error(`fero: bad frame magic 0x${buf[off].toString(16)}`)
+      if (buf[off] !== MAGIC) throw new FrameError(`bad frame magic 0x${buf[off].toString(16)}`)
       const flags = buf[off + 1]
       const bodyLen = buf.readUInt32LE(off + 3) // ONE load, not four shift-adds
+      // Bound the body BEFORE the straddle check — else a header claiming a huge
+      // body makes `carry` grow unbounded waiting for bytes that never arrive.
+      if (bodyLen > this.maxFrame) throw new FrameError(`frame body ${bodyLen} exceeds max ${this.maxFrame}`)
       const idLen = flags & FLAG_HAS_ID ? ID_LEN : 0
       const need = HEADER + idLen + bodyLen
       if (buf.length - off < need) break // straddle → stash the tail below
@@ -353,6 +378,8 @@ export class Frame {
       len |= (b & 0x7f) << shift
       shift += 7
     } while (b & 0x80)
+    len >>>= 0
+    if (len > buf.length - off) throw new FrameError(`provenance origin length ${len} overruns frame`)
     const origin = buf.toString('utf8', off, off + len)
     off += len
     let baseSeq = 0
@@ -397,8 +424,14 @@ export class Frame {
       count |= (b & 0x7f) << shift
       shift += 7
     } while (b & 0x80)
-    const out: RecordView[] = new Array(count >>> 0)
-    for (let i = 0; i < out.length; i++) {
+    count >>>= 0
+    // Each record needs at least its 1-byte recLen varint, so a count exceeding
+    // the bytes remaining is impossible — reject before `new Array(count)` (a
+    // hostile count = 2^28 would otherwise allocate / iterate billions). A
+    // truncated count varint runs off past the body → length - off < 0 → caught.
+    if (count > buf.length - off) throw new FrameError(`record count ${count} exceeds ${buf.length - off} body bytes`)
+    const out: RecordView[] = new Array(count)
+    for (let i = 0; i < count; i++) {
       let len = 0
       shift = 0
       do {
@@ -406,6 +439,10 @@ export class Frame {
         len |= (b & 0x7f) << shift
         shift += 7
       } while (b & 0x80)
+      len >>>= 0
+      // A recLen that runs past the body would over-read into the next frame / out
+      // of bounds — reject (also catches a truncated recLen varint: off > length).
+      if (len > buf.length - off) throw new FrameError(`record ${i} length ${len} overruns ${buf.length - off} remaining body bytes`)
       const record = new RecordView(buf.subarray(off, off + len))
       if (origin !== undefined) {
         record.origin = origin
@@ -465,6 +502,8 @@ export class RecordView {
       nseg |= (b & 0x7f) << shift
       shift += 7
     } while (b & 0x80)
+    nseg >>>= 0
+    if (nseg > buf.length - off) throw new FrameError(`key has ${nseg} segments, exceeds record`)
     for (let i = 0; i < nseg; i++) {
       let l = 0
       shift = 0
@@ -473,6 +512,8 @@ export class RecordView {
         l |= (b & 0x7f) << shift
         shift += 7
       } while (b & 0x80)
+      l >>>= 0
+      if (l > buf.length - off) throw new FrameError(`key segment ${i} length ${l} overruns record`)
       off += l
     }
     this.#hasAt = (buf[0] & HAS_AT) !== 0
@@ -484,6 +525,8 @@ export class RecordView {
         l |= (b & 0x7f) << shift
         shift += 7
       } while (b & 0x80)
+      l >>>= 0
+      if (l > buf.length - off) throw new FrameError(`at length ${l} overruns record`)
       this.#atStart = off
       off += l
       this.#atEnd = off
@@ -504,6 +547,8 @@ export class RecordView {
       nseg |= (b & 0x7f) << shift
       shift += 7
     } while (b & 0x80)
+    nseg >>>= 0
+    if (nseg > buf.length - off) throw new FrameError(`key has ${nseg} segments, exceeds record`)
     const key: string[] = new Array(nseg)
     for (let i = 0; i < nseg; i++) {
       let l = 0
@@ -513,6 +558,8 @@ export class RecordView {
         l |= (b & 0x7f) << shift
         shift += 7
       } while (b & 0x80)
+      l >>>= 0
+      if (l > buf.length - off) throw new FrameError(`key segment ${i} length ${l} overruns record`)
       key[i] = buf.toString('utf8', off, off + l)
       off += l
     }
@@ -558,6 +605,7 @@ export class RecordView {
         break
       }
       case VT.f64:
+        if (off + 8 > buf.length) throw new FrameError('f64 value overruns record')
         v = buf.readDoubleLE(off)
         break
       case VT.str: {
@@ -567,6 +615,8 @@ export class RecordView {
           l |= (b & 0x7f) << shift
           shift += 7
         } while (b & 0x80)
+        l >>>= 0
+        if (l > buf.length - off) throw new FrameError(`str value length ${l} overruns record`)
         v = buf.toString('utf8', off, off + l)
         break
       }
@@ -577,9 +627,18 @@ export class RecordView {
           l |= (b & 0x7f) << shift
           shift += 7
         } while (b & 0x80)
-        v = JSON.parse(buf.toString('utf8', off, off + l))
+        l >>>= 0
+        if (l > buf.length - off) throw new FrameError(`obj value length ${l} overruns record`)
+        try {
+          v = JSON.parse(buf.toString('utf8', off, off + l))
+        } catch {
+          throw new FrameError('invalid JSON object value') // corrupt body → drop peer, don't crash
+        }
         break
       }
+      default:
+        // vtype 7 and 9-15 are reserved/unused — a malformed or hostile frame.
+        throw new FrameError(`reserved value type ${vtype}`)
     }
     this.#valueParsed = true
     return (this.#value = v)

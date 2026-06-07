@@ -13,7 +13,7 @@
 // 'throttled'); splitting them lets peers.ts filter on either axis cleanly.
 
 import net from 'node:net'
-import { Framer, encodeFrame, encodeFrames, VERB, type ChangeRecord, type Frame } from './message.ts'
+import { Framer, encodeFrame, encodeFrames, VERB, FrameError, type ChangeRecord, type Frame } from './message.ts'
 import { Retries, type RetryOpts } from './retries.ts'
 
 // Failure detector. TCP `close` does NOT fire for a hard-crashed or
@@ -176,7 +176,19 @@ export class Peer {
         continue
       }
       if (f.verb === VERB.PONG) continue // pure liveness ack — nothing to deliver
-      this.#onFrame?.(f, this)
+      try {
+        this.#onFrame?.(f, this)
+      } catch (e) {
+        // A malformed/hostile frame body surfaces as a FrameError only when the
+        // consumer LAZILY parses it (count/length overrun, reserved vtype) — drop
+        // the peer, mirroring the framer's structural-fault handling above. Any
+        // other throw is a genuine handler/apply bug; rethrow so it isn't masked.
+        if (e instanceof FrameError) {
+          this.destroy()
+          return
+        }
+        throw e
+      }
     }
   }
 

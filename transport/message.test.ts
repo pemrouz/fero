@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { $, value, view } from '../../data/index.ts'
-import { encodeFrame, decodeFrame, Framer, VERB, type ChangeRecord } from './message.ts'
+import { encodeFrame, decodeFrame, Framer, FrameError, VERB, type ChangeRecord } from './message.ts'
 
 // decode a single-frame buffer to plain records (via RecordView getters)
 const recordsOf = (buf: Buffer) => decodeFrame(buf).records().map((r) => r.toJSON())
@@ -188,7 +188,170 @@ test('lazy: reading type/key does not require reading value, and memoises', () =
 test('bad magic byte throws (fail-fast resync)', () => {
   const buf = encodeFrame([{ type: 'update', key: ['x'], value: 1 }])
   buf[0] = 0x00
+  assert.throws(() => new Framer().push(buf), FrameError)
   assert.throws(() => new Framer().push(buf), /bad frame magic/)
+})
+
+// ─────────────────────────────────────────── defensive decode (hostile frames)
+// `records()` and the lazy getters trust wire-supplied counts/lengths; an
+// attacker (or corruption) can make them overrun the buffer or trigger a giant
+// allocation. Every malformed frame must throw a typed FrameError (→ peer.ts
+// drops the connection) and NEVER crash, hang, or over-read. See ../IDEAS.md.
+
+const MAGIC = 0xfe
+const HEADER = 7
+// Wrap an arbitrary body in a valid (magic + bodyLen) frame header, so decode
+// faults come purely from the body, not the framer.
+const framed = (body: Buffer, verb = VERB.RECORDS, flags = 0): Buffer => {
+  const buf = Buffer.allocUnsafe(HEADER + body.length)
+  buf[0] = MAGIC
+  buf[1] = flags
+  buf[2] = verb
+  buf.writeUInt32LE(body.length, 3)
+  body.copy(buf, HEADER)
+  return buf
+}
+// LEB128 unsigned varint as bytes (mirrors the encoder, for hand-built bodies).
+const varint = (v: number): number[] => {
+  const out: number[] = []
+  while (v > 0x7f) {
+    out.push((v & 0x7f) | 0x80)
+    v >>>= 7
+  }
+  out.push(v)
+  return out
+}
+
+test('record count exceeding the body throws (no giant allocation)', () => {
+  // body = a single varint claiming 2^28 records, then nothing. The old code did
+  // `new Array(2^28)` and looped — OOM/hang. Must reject in O(1) instead.
+  const body = Buffer.from(varint(1 << 28))
+  assert.throws(() => decodeFrame(framed(body)).records(), FrameError)
+  assert.throws(() => decodeFrame(framed(body)).records(), /record count .* exceeds/)
+})
+
+test('record length overrunning the body throws', () => {
+  // count = 1, recLen = 1000, but only a couple of body bytes remain.
+  const body = Buffer.from([...varint(1), ...varint(1000), 0x00, 0x00])
+  assert.throws(() => decodeFrame(framed(body)).records(), FrameError)
+  assert.throws(() => decodeFrame(framed(body)).records(), /overruns/)
+})
+
+test('oversized bodyLen header is rejected immediately (no unbounded buffering)', () => {
+  // A 7-byte header alone, claiming a ~4 GiB body. The framer must reject on the
+  // header — not stash it as `carry` and wait for 4 GiB that never comes.
+  const header = Buffer.allocUnsafe(HEADER)
+  header[0] = MAGIC
+  header[1] = 0
+  header[2] = VERB.RECORDS
+  header.writeUInt32LE(0xffffffff, 3)
+  assert.throws(() => new Framer().push(header), FrameError)
+  assert.throws(() => new Framer().push(header), /exceeds max/)
+})
+
+test('per-Framer maxFrame caps even an in-range body', () => {
+  const big = encodeFrame([{ type: 'update', key: ['x'], value: 'a'.repeat(100) }])
+  assert.ok(big.length - HEADER > 16)
+  assert.throws(() => new Framer({ maxFrame: 16 }).push(big), FrameError)
+  // the default framer accepts the same frame
+  assert.equal(new Framer().push(big).length, 1)
+})
+
+test('reserved value-type nibble throws on value read', () => {
+  for (const vt of [7, 9, 15]) {
+    // one record: tag = update | (vt << 4); empty key (nseg=0); no value bytes.
+    const rec = [vt << 4, 0x00]
+    const body = Buffer.from([...varint(1), ...varint(rec.length), ...rec])
+    const r = decodeFrame(framed(body)).records()[0]
+    assert.equal(r.type, 'update') // type/key still readable
+    assert.throws(() => r.value, FrameError, `vtype ${vt}`)
+    assert.throws(() => r.value, /reserved value type/, `vtype ${vt}`)
+  }
+})
+
+test('key segment count exceeding the record throws on key read', () => {
+  // tag = update/null; nseg = 1000; record ends → no segment-length bytes.
+  const rec = [0x00, ...varint(1000)]
+  const body = Buffer.from([...varint(1), ...varint(rec.length), ...rec])
+  const r = decodeFrame(framed(body)).records()[0]
+  assert.throws(() => r.key, FrameError)
+})
+
+test('truncated f64 value throws FrameError, not a raw RangeError', () => {
+  // tag = update | (f64 << 4) = 0x50; empty key; zero value bytes (needs 8).
+  const rec = [0x50, 0x00]
+  const body = Buffer.from([...varint(1), ...varint(rec.length), ...rec])
+  const r = decodeFrame(framed(body)).records()[0]
+  assert.throws(() => r.value, FrameError)
+})
+
+test('invalid JSON in an object value throws FrameError, not SyntaxError', () => {
+  // tag = update | (obj << 4) = 0x80; empty key; obj value = len 3, bytes "{[}".
+  const bad = Buffer.from('{[}')
+  const rec = [0x80, 0x00, ...varint(bad.length), ...bad]
+  const body = Buffer.from([...varint(1), ...varint(rec.length), ...rec])
+  const r = decodeFrame(framed(body)).records()[0]
+  assert.throws(() => r.value, FrameError)
+})
+
+test('a header-only chunk yields no frames and does not throw (graceful wait)', () => {
+  const buf = encodeFrame([{ type: 'update', key: ['x'], value: 1 }])
+  const framer = new Framer()
+  assert.deepEqual(framer.push(buf.subarray(0, 4)), []) // partial header → wait
+  const frames = framer.push(buf.subarray(4)) // rest arrives
+  assert.equal(frames.length, 1)
+  assert.deepEqual(frames[0].records()[0].toJSON(), { type: 'update', key: ['x'], value: 1 })
+})
+
+// Seeded LCG so the fuzz is reproducible (no Math.random nondeterminism).
+const rng = (seed: number) => () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+
+test('fuzz: thousands of random valid records round-trip (bounds never false-positive)', () => {
+  const rand = rng(0xc0ffee)
+  const pick = <T>(xs: T[]) => xs[Math.floor(rand() * xs.length)]
+  const types = ['update', 'insert', 'remove'] as const
+  const randValue = (): unknown => {
+    switch (Math.floor(rand() * 9)) {
+      case 0: return null
+      case 1: return undefined
+      case 2: return rand() < 0.5
+      case 3: return Math.floor((rand() - 0.5) * 4_000_000_000) // int32-ish
+      case 4: return (rand() - 0.5) * 1e9 // f64
+      case 5: return 'str ' + 'üé🚀'.repeat(Math.floor(rand() * 6))
+      case 6: return { name: 'u' + Math.floor(rand() * 1000), active: rand() < 0.5, score: Math.floor(rand() * 1e6) }
+      case 7: return [1, 'two', { three: rand() }]
+      default: return Math.floor(rand() * 1e6)
+    }
+  }
+  for (let n = 0; n < 3000; n++) {
+    const rec: ChangeRecord = { type: pick(types), key: Array.from({ length: Math.floor(rand() * 4) }, (_, i) => 'k' + i), value: randValue() }
+    if (rand() < 0.3) rec.at = 'at' + Math.floor(rand() * 100)
+    assert.deepEqual(recordsOf(encodeFrame([rec])), [rec], JSON.stringify(rec))
+  }
+})
+
+test('fuzz: single-byte corruption of valid frames never crashes (FrameError or clean decode)', () => {
+  const rand = rng(0x1234abcd)
+  const batch: ChangeRecord[] = [
+    { type: 'update', key: ['users', '42'], value: { name: 'P', active: true, score: 7 } },
+    { type: 'insert', key: [], value: { id: 1 }, at: 'user99' },
+    { type: 'remove', key: ['gone'], value: undefined },
+    { type: 'update', key: ['n'], value: 3.14159 },
+  ]
+  const clean = encodeFrame(batch, { origin: 'node-A', seq: 5, epoch: 2 })
+  for (let trial = 0; trial < 4000; trial++) {
+    const buf = Buffer.from(clean) // copy
+    const pos = Math.floor(rand() * buf.length)
+    buf[pos] = (buf[pos] + 1 + Math.floor(rand() * 255)) & 0xff // flip a byte
+    try {
+      // force a FULL parse of every field — the only way corruption surfaces
+      for (const f of new Framer().push(buf)) for (const r of f.records()) void r.toJSON()
+    } catch (e) {
+      // The contract: any decode fault is a typed FrameError (→ peer dropped),
+      // never a raw RangeError/SyntaxError/TypeError that would crash the process.
+      assert.ok(e instanceof FrameError, `corruption at ${pos} threw ${(e as Error).constructor.name}: ${(e as Error).message}`)
+    }
+  }
 })
 
 // The whole point: a decoded record applied via the day-0 res contract
