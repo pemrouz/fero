@@ -37,7 +37,7 @@ export type DispatchDeps = {
   data: any // the RAW root ViewProxy — readKey's held-local child + makeHandle's depth-1 nested-write path (re-enters the core sink)
   clientSubs: Set<() => void> // teardown callbacks drained by destroy — a remote-read subscription / fold close lands here
   invoke: (method: string, arg: unknown, peer?: string) => unknown // composer's in-process dispatcher (runs a handler with context)
-  fold: Fold // the makeFold() engine: foldOnce / openFold / livePartial / foldAggregate
+  fold: Fold // the makeFold() engine: gatherOnce / gatherLive / livePartial / foldAggregate
 }
 
 export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold }: DispatchDeps) => {
@@ -74,7 +74,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // with the global snapshot. This is the explicit "download everything" the user chains
     // holistic ops after. R≥members / full replication hold everything, so read() stays a local
     // c.data snapshot there (the hot path is byte-identical — the gather only arms when scoped).
-    if (method === 'read' && arg == null && R < viewSize() && gathersWholeRead) return fold.foldOnce({ op: 'rows' }, AGG.rows.combine)
+    if (method === 'read' && arg == null && R < viewSize() && gathersWholeRead) return fold.gatherOnce({ op: 'rows' }, AGG.rows.combine)
     // A CLIENT routed a distributed aggregate here (Milestone Q2e): a client can't
     // owner-scope or fold, so it sends {fold:true} and THIS server (a coordinator) returns
     // the GLOBAL via a one-shot gather. The gather fans out PARTIAL requests (fold stripped)
@@ -83,7 +83,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // → the partial path below.)
     if (method === 'aggregate' && (arg as any)?.fold) {
       const s = stripFold(arg)
-      return fold.foldOnce(s, AGG[s.op]?.combine) // a Promise; the CALL handler awaits it before replying
+      return fold.gatherOnce(s, AGG[s.op]?.combine) // a Promise; the CALL handler awaits it before replying
     }
     return snapshot(invoke(method, arg, address))
   }
@@ -101,7 +101,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // isn't enough. (The default read returns the root `data`, retained anyway, so this only
   // bites derived views.) Held until the client unsubscribes.
   // One served subscription's retained handles: `host` (the sink pin), `src` (the source-proxy pin —
-  // see note above), `unsub` (a forwarded upstream's close), `close` (a livePartial/openFold teardown).
+  // see note above), `unsub` (a forwarded upstream's close), `close` (a livePartial/gatherLive teardown).
   type ServedSub = { host?: object; src?: object; unsub?: () => void; close?: () => void }
   const subscriptions = new Map<string, ServedSub>()
   // Reverse index address → its open subIds, so an ungraceful disconnect (a socket drop, which never
@@ -119,7 +119,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   }
   // Stream a live ViewProxy's changes to a subscriber: connect a delta sink, then retain it — plus the
   // source proxy (`src`, so a derived projection's filter→op chain doesn't GC) and an optional teardown
-  // (`close`, a livePartial/openFold) — under (address, subId). The three subscribe branches that return
+  // (`close`, a livePartial/gatherLive) — under (address, subId). The three subscribe branches that return
   // a live proxy (the Q3 gather, a Q2 fold, a custom method's projection) share this.
   const streamProxy = (address: string, subId: number, proxy: any, close?: () => void) => {
     const host = proxy.connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
@@ -137,20 +137,20 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // A CLIENT's reactive whole-resource read() under scoping (Milestone Q3): build the live
     // GATHER here (the union of every holder's owner-scoped rows, refolded on any shard delta)
     // and stream it to the client; the client runs its holistic ops over the gathered proxy
-    // locally. Same openFold machinery as a distributed aggregate, with the union rule. Torn
+    // locally. Same gatherLive machinery as a distributed aggregate, with the union rule. Torn
     // down on unsubscribe.
     //   NOT gated on R<viewSize() (unlike the stateless serveCall one-shot) — this branch runs
     // ONCE at subscribe and is never re-evaluated, so gating on membership-at-subscribe would let a
     // read() opened while members≤R (server momentarily holds all) stream that server's LOCAL c.data
     // forever, then go SILENTLY PARTIAL once a join shards the resource and the server sheds keys
     // (the Q3a review's confirmed defect). The gather is correct at ANY R — owner-scoping is a
-    // disjoint cover regardless of replica count — and openFold's reconcileMembers re-arms on each
+    // disjoint cover regardless of replica count — and gatherLive's reconcileMembers re-arms on each
     // commit, so an ungated gather is membership-robust. Mirrors the aggregate subscribe branch
     // (also ungated). Full replication never builds the facade / sends a scoped read, so R=∞ is
     // unaffected. (serveCall keeps the R<viewSize() optimization: it re-evaluates per call, so a
     // complete-local read at members≤R is always current.)
     if (method === 'read' && arg == null && gathersWholeRead) {
-      const g = fold.openFold({ op: 'rows' }, AGG.rows.combine)
+      const g = fold.gatherLive({ op: 'rows' }, AGG.rows.combine)
       streamProxy(address, subId, g.proxy, g.close)
       return
     }
@@ -160,7 +160,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     if (method === 'aggregate' && (arg as any)?.fold) {
       try {
         const s = stripFold(arg)
-        const f = fold.openFold(s, AGG[s.op]?.combine)
+        const f = fold.gatherLive(s, AGG[s.op]?.combine)
         streamProxy(address, subId, f.proxy, f.close)
       } catch {
         // unknown op → no stream (RPC path surfaces errors)
@@ -196,7 +196,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     const k = `${address}:${subId}`
     const sub = subscriptions.get(k)
     sub?.unsub?.() // forwarded subscription → close the upstream; local → just drop the host (sink GC'd)
-    sub?.close?.() // a livePartial / openFold (served aggregate or gather) → deregister its rescope/reconcile + drop refs
+    sub?.close?.() // a livePartial / gatherLive (served aggregate or gather) → deregister its rescope/reconcile + drop refs
     subscriptions.delete(k)
     const ids = subsByPeer.get(address)
     if (ids && ids.delete(subId) && ids.size === 0) subsByPeer.delete(address)
@@ -204,7 +204,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // A peer's connection dropped (socket close / destroy) without an UNSUBSCRIBE — reap every
   // subscription we served it (idempotent: routes each through serveUnsubscribe). Iterates a COPY,
   // since serveUnsubscribe mutates subsByPeer. No-op for a peer we never served (a dial failure, or a
-  // server that only ever called/replicated). This is the chokepoint that stops the openFold leak.
+  // server that only ever called/replicated). This is the chokepoint that stops the gatherLive leak.
   const reapPeer = (address: string) => {
     const ids = subsByPeer.get(address)
     if (!ids) return
@@ -266,7 +266,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   //     THEIR projection — never silently swap it for the raw gather (which would diverge from the
   //     full-rep path, where the custom read runs over complete state). [Q3b review M1]
   //   • MEMOIZED to ONE handle per node: the spec is the constant {op:'rows'}, so a single
-  //     foldAggregate (one live openFold, membership-robust via reconcile) backs every call. A fresh
+  //     foldAggregate (one live gatherLive, membership-robust via reconcile) backs every call. A fresh
   //     handle per reactive call would leak an O(resource) union-fold into aggregateReconciles —
   //     re-run every commit + AE tick — forever. [Q3b review M3]
   //   • Keyed `methods.read(key)` is LOCAL (this node's held child view, via baseRead). Owner-routing
@@ -275,7 +275,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   //   • In-handler `context.methods.read()` is this same gather handle (context.methods IS
   //     localMethods): `await` ⇒ global, reactive ⇒ live, sync `[value]` ⇒ the in-progress union;
   //     a handler wanting the LOCAL held state reads `c.data` directly. [Q3b review m5; DECISIONS Q3]
-  // Ungated on R (membership-robust — openFold re-arms on commit). Full replication (scoped=false)
+  // Ungated on R (membership-robust — gatherLive re-arms on commit). Full replication (scoped=false)
   // keeps the raw-c.data read — that node holds everything, so local IS global.
   if (!isClient && gathersWholeRead) {
     const baseRead = localMethods.read

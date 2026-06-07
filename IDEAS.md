@@ -95,7 +95,7 @@ dialable address. The remaining items build on that identity:
 
 > The peer-disconnect (`onPeerGone`) hook + `peer→subId` reverse index that reaps a
 > gone peer's served subscriptions (incl. forwarded subs and the Q3 `read()` gather's
-> `openFold`) on ungraceful disconnect is **already built** — `peers.ts` fires
+> `gatherLive`) on ungraceful disconnect is **already built** — `peers.ts` fires
 > `onPeerGone` on the status→disconnected transition, `dispatch.ts` keeps the reverse
 > index + `reapPeer`, covered by the resource reap tests. (Was listed open here; it
 > landed alongside Q1/Q3.)

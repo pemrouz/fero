@@ -1828,7 +1828,7 @@ test('Q3a: a reactive read() opened at members≤R re-arms the gather when the c
   // gated on R<viewSize() at subscribe time. A client opening read() while members≤R (the
   // contacted server momentarily holds everything) would otherwise stream that server's LOCAL
   // c.data forever and go SILENTLY PARTIAL once a join shards the resource and the server sheds
-  // keys. openFold's reconcileMembers re-arms on each commit — so the gather tracks growth.
+  // keys. gatherLive's reconcileMembers re-arms on each commit — so the gather tracks growth.
   const pts = await Promise.all(Array.from({ length: 3 }, () => ports.free()))
   const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: pts, wait: 250, replicas: 2, antiEntropy: 150 })
   const A = await fero('q3grow', cfg(pts[0]))
@@ -1987,7 +1987,7 @@ test('Q3b regression (M1): a custom no-key read is NOT swapped for the raw gathe
 })
 
 test('Q3b regression (M2): a handler returning c.methods.read() replies with the GLOBAL, not a local partial', async () => {
-  // snapshot() must resolve a returned gather handle via foldOnce (await ⇒ global) instead of
+  // snapshot() must resolve a returned gather handle via gatherOnce (await ⇒ global) instead of
   // opening its live fold and reading the still-empty in-progress union.
   const pts = await Promise.all(Array.from({ length: 3 }, () => ports.free()))
   const cfg = (port: number) => ({
@@ -2103,7 +2103,7 @@ test('subscription hygiene: an ungraceful peer drop reaps ALL its served subscri
     assert.ok(await until(() => connected(client.cluster, A.cluster.me), 6000), 'client connected to A')
 
     // open TWO server-pushed subscriptions on A: a reactive whole-resource gather AND an aggregate
-    // fold — A serves both (each an openFold), so the reverse-index reap must drop MORE than one.
+    // fold — A serves both (each an gatherLive), so the reverse-index reap must drop MORE than one.
     const view = client.methods.read()
     const agg = client.data.sum('v')
     void agg.connect({}, () => {})
