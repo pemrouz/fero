@@ -93,5 +93,3 @@ The matching workstreams in [IDEAS.md](../IDEAS.md):
 - **Wire-format micro-optimizations** [P3] — the reserved `FLAG_COL`/`FLAG_UNIFORM`/`KEY_DELTA` bits (columnar body, prefix-delta keys) are placeholders, not yet built.
 
 Cross-cutting open questions: [#8 value codec](../IDEAS.md), [#9 hash function](../IDEAS.md).
-
-> **Cleanup candidate.** The `as unknown as ChangeRecord` casts in `dispatch()` are redundant — a `RecordView` is already structurally a change record — and can be deleted.
