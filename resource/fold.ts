@@ -28,6 +28,13 @@ import { lazyHandle, FOLD_ONCE, FOLD_HANDLES, snapshot } from './handle.ts'
 //               holder publishes undefined, and Math.max(undefined,x) is NaN), so
 //               all-undefined ⇒ undefined (matches data's own empty-set semantics).
 export type Rule = (values: unknown[]) => unknown
+// The SERIALIZABLE aggregate spec that crosses the wire (never a closure): an op plus an optional
+// column/value. `FoldSpec` adds the `fold:true` flag a CLIENT sets so a server coordinator folds the
+// global rather than returning its own partial. Both narrow from the `unknown`/`any` a method arg
+// arrives as — every engine hop below is annotated with which shape it holds, so the spec's identity
+// is a type, not three scattered prose notes.
+export type AggSpec = { op: string; col?: unknown; val?: unknown }
+export type FoldSpec = AggSpec & { fold?: true }
 // `?? 0` (null/undefined → identity), NOT `|| 0`: the only legitimate identity is an
 // ABSENT partial (undefined seed / a holder owning nothing). `|| 0` would ALSO swallow
 // a NaN partial — and data's SumValue (+v) poisons a holder's whole owner-scoped sum to
@@ -169,7 +176,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // AGG registry (above): each op pairs its owner-scoped PARTIAL builder with the associative
   // COMBINE. Owner-scoped over the RAW proxy via ownedView — so the union across holders is a
   // disjoint cover. The spec (never a closure) is what crosses the wire to symmetric holders.
-  const buildPartial = (spec: any): any => {
+  const buildPartial = (spec: AggSpec): any => {
     const entry = AGG[spec?.op]
     if (!entry) throw new Error(`fero: unknown aggregate op "${spec?.op}"`)
     return entry.partial({ owned: ownedView(), col: spec?.col, val: spec?.val, composite })
@@ -183,7 +190,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // stays connected to the LIVE raw `data`, so an acquired partition's inbound rows re-fire the
   // filter and re-publish — the acquisition-window heal, no synthetic re-fold. Used by BOTH a
   // holder's served partial and a fold's local self-partial.
-  const livePartial = (spec: any, onValue: (v: unknown) => void) => {
+  const livePartial = (spec: AggSpec, onValue: (v: unknown) => void) => {
     let gen = 0
     let proxy: any // retained so the current generation's chain doesn't GC (FunctionSink doesn't back-ref it)
     let host: any
@@ -215,7 +222,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // after the call timeout (a known silent undercount — gather hardening is deferred). Stateless, so
   // it reflects the CURRENT ring per call. Backs `await data.sum(...)`, serveCall's client one-shot,
   // and the no-key read() gather.
-  const foldOnce = async (spec: any, rule: Rule): Promise<unknown> => {
+  const foldOnce = async (spec: AggSpec, rule: Rule): Promise<unknown> => {
     const local = snapshot(invoke('aggregate', spec))
     const others = mesh.viewMembers().filter((m) => m !== me)
     const remotes = await Promise.all(others.map((o) => (mesh.call('aggregate', spec, o) as Promise<unknown>).catch(() => undefined)))
@@ -229,7 +236,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // only adds new members / drops departed ones (reconcileMembers, run on commit + aeTimer). One row
   // change → one partial delta → one O(holders) recompute. Serves the local fold handle AND a
   // client's gather/aggregate subscription.
-  const openFold = (spec: any, rule: Rule) => {
+  const openFold = (spec: AggSpec, rule: Rule) => {
     const live: any = $({})
     const liveRes = (live as any)[VIEWSYM].res
     const partials = new Map<string, unknown>()
@@ -268,7 +275,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // resolve a RETURNED handle to a one-shot global without opening the live fold; registers in
   // FOLD_HANDLES so snapshot() identifies it. Used by the `data` facade's distributed() and the
   // no-key read() gather memo (both in [./dispatch.ts]).
-  const foldAggregate = (spec: { op: string; col?: unknown; val?: unknown }) => {
+  const foldAggregate = (spec: AggSpec) => {
     const rule = AGG[spec.op]?.combine
     const handle = lazyHandle({
       then: (onF, onR) => foldOnce(spec, rule).then(onF, onR),

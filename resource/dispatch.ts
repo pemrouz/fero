@@ -20,7 +20,7 @@ import { $, view as VIEWSYM, Operators } from '../../data/index.ts'
 import { applyRecord } from '../log/index.ts'
 import { type ChangeRecord } from '../transport/message.ts'
 import { type Mesh } from '../transport/index.ts'
-import { AGG, type Fold } from './fold.ts'
+import { AGG, type Fold, type AggSpec } from './fold.ts'
 import { lazyHandle, isViewProxy, snapshot } from './handle.ts'
 import type { Method, Context } from './index.ts'
 
@@ -48,7 +48,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // returning a Promise the transport awaits before replying. The owner holds the
   // key so it serves (no re-forward). Only in scoped mode; full replication holds all.
   // Strip the `fold` flag → the partial spec a fold fans out to holders (no recursion).
-  const stripFold = (arg: any) => ({ op: arg?.op, col: arg?.col, val: arg?.val })
+  const stripFold = (arg: any): AggSpec => ({ op: arg?.op, col: arg?.col, val: arg?.val })
   const serveCall = (method: string, arg: unknown, address: string): unknown => {
     if (method === 'read' && typeof arg === 'string' && scoped && !holds(arg)) {
       const owner = mesh.owner(arg)
@@ -86,7 +86,10 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // freeze the stream after a full GC on a long-running server — pinning only the host
   // isn't enough. (The default read returns the root `data`, retained anyway, so this only
   // bites derived views.) Held until the client unsubscribes.
-  const subscriptions = new Map<string, { host?: object; src?: object; unsub?: () => void; close?: () => void }>()
+  // One served subscription's retained handles: `host` (the sink pin), `src` (the source-proxy pin —
+  // see note above), `unsub` (a forwarded upstream's close), `close` (a livePartial/openFold teardown).
+  type ServedSub = { host?: object; src?: object; unsub?: () => void; close?: () => void }
+  const subscriptions = new Map<string, ServedSub>()
   // Reverse index address → its open subIds, so an ungraceful disconnect (a socket drop, which never
   // delivers an UNSUBSCRIBE frame) can REAP that peer's served subscriptions instead of leaking them
   // (subscription-hygiene fix; before this a dropped client/coordinator leaked its sink hosts, Q1
@@ -94,7 +97,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // aggregateReconciles entry re-run every commit + AE tick FOREVER). Keyed by the EXACT address (no
   // `host:port` string-splitting — `:` appears in the key). addSub keeps it in lockstep with `subscriptions`.
   const subsByPeer = new Map<string, Set<number>>()
-  const addSub = (address: string, subId: number, entry: { host?: object; src?: object; unsub?: () => void; close?: () => void }) => {
+  const addSub = (address: string, subId: number, entry: ServedSub) => {
     subscriptions.set(`${address}:${subId}`, entry)
     let ids = subsByPeer.get(address)
     if (!ids) subsByPeer.set(address, (ids = new Set()))
@@ -152,7 +155,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // stable holder. Streamed as a root-update delta.
     if (method === 'aggregate') {
       try {
-        const lp = fold.livePartial(arg, (v) => mesh.deltaTo(address, subId, { type: 'update', key: [], value: v }))
+        const lp = fold.livePartial(arg as AggSpec, (v) => mesh.deltaTo(address, subId, { type: 'update', key: [], value: v }))
         addSub(address, subId, { close: lp.close })
       } catch {
         // an unknown op throws in buildPartial — yield no stream (RPC path surfaces errors)
@@ -297,7 +300,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // Build a SERIALIZABLE aggregate spec from a facade call, or null if it can't be
   // distributed (a closure predicate, or length(fn) bucketed — both deferred). count is
   // length() with no arg.
-  const specOf = (op: string, args: unknown[]): { op: string; col?: unknown; val?: unknown } | null => {
+  const specOf = (op: string, args: unknown[]): AggSpec | null => {
     if (op === 'length') return args[0] !== undefined ? null : { op: 'count' } // length(fn) bucketed → Q3
     if (typeof args[0] === 'function') return null // a closure can't cross the wire
     if (op === 'some' || op === 'every') return { op, col: args[0], val: args[1] }
