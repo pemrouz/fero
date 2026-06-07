@@ -5,7 +5,7 @@
 // fold engine ([./fold.ts]). Keeping them in ONE neutral leaf — rather than in either of those
 // two mutually-referencing modules — is what avoids a dispatch↔fold import cycle, and it keeps
 // `FOLD_HANDLES` a single shared identity (a handle registered by the fold engine is recognised
-// by `snapshot` called from the dispatch side). Nothing here is public (re-exported by neither
+// by `forWire` called from the dispatch side). Nothing here is public (re-exported by neither
 // index.ts nor internals.ts).
 
 import { value as VALUE, view as VIEWSYM } from '../../data/index.ts'
@@ -59,7 +59,7 @@ export const lazyHandle = (opts: {
 // that resolves a ONE-SHOT gather WITHOUT opening the handle's live fold.
 export const FOLD_ONCE = Symbol('fero.gatherOnce')
 // Identity set of live fold/gather handles (foldAggregate's Proxies). Closed loop: SOLE writer is
-// foldAggregate (fold.ts); SOLE reader is snapshot() (below). snapshot() membership-checks this — a
+// foldAggregate (fold.ts); SOLE reader is forWire() (below). forWire() membership-checks this — a
 // side-effect-free WeakSet probe — to decide whether to resolve a returned handle via gatherOnce. We
 // do NOT probe the FOLD_ONCE symbol on every method return: reading an unknown symbol off a `data`
 // ViewProxy throws "Cannot convert a Symbol value to a string" (Q3b review M2 fix).
@@ -79,7 +79,7 @@ export function isViewProxy(v: unknown): boolean {
 // The old `snap !== undefined` heuristic returned the PROXY itself in that case, so
 // an empty-holder partial crossed the wire as a serialized proxy and NaN-poisoned
 // the extremum fold; the read() path never hit it (its root is always an object).
-export function snapshot(v: unknown): unknown {
+export function forWire(v: unknown): unknown {
   // A fold/gather HANDLE (foldAggregate) resolves its ONE-SHOT global via gatherOnce — detected by a
   // side-effect-free FOLD_HANDLES membership check (NOT by probing the FOLD_ONCE symbol on every
   // value: an unknown symbol read off a `data` ViewProxy throws "Cannot convert a Symbol to a

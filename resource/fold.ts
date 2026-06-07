@@ -18,7 +18,7 @@ import { $, value as VALUE, view as VIEWSYM } from '../../data/index.ts'
 import { applyRecord } from '../log/index.ts'
 import { type ChangeRecord } from '../transport/message.ts'
 import { type Mesh } from '../transport/index.ts'
-import { lazyHandle, FOLD_ONCE, FOLD_HANDLES, snapshot } from './handle.ts'
+import { lazyHandle, FOLD_ONCE, FOLD_HANDLES, forWire } from './handle.ts'
 
 // Combine rules for distributed aggregates (Milestone Q2): how N owner-scoped
 // partials fold into the global answer. Each is associative + commutative so the
@@ -208,7 +208,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
       // Emit the whole partial SNAPSHOT (not c.value): an OBJECT partial (avg/every) emits per-KEY
       // change records whose c.value is one field — only the snapshot carries the full {…}.
       host = proxy.connect({}, () => {
-        if (gen === myGen) onValue(snapshot(proxy))
+        if (gen === myGen) onValue(forWire(proxy))
       })
     }
     build() // connect's attach-snapshot calls onValue synchronously with the current value
@@ -231,7 +231,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // it reflects the CURRENT ring per call. Backs `await data.sum(...)`, serveCall's client one-shot,
   // and the no-key read() gather.
   const gatherOnce = async (spec: AggSpec, rule: Rule): Promise<unknown> => {
-    const local = snapshot(invoke('aggregate', spec))
+    const local = forWire(invoke('aggregate', spec))
     const others = mesh.viewMembers().filter((m) => m !== me)
     const remotes = await Promise.all(others.map((o) => (mesh.call('aggregate', spec, o) as Promise<unknown>).catch(() => undefined)))
     return rule([local, ...remotes])
@@ -279,9 +279,9 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
 
   // The querying-side FOLD HANDLE (mirrors makeHandle): a lazyHandle that is a thenable (await ⇒
   // gatherOnce one-shot) AND a live ViewProxy (real access ⇒ open()s gatherLive and delegates). Exposes
-  // the FOLD_ONCE resolver via extraGet (runs BEFORE lazyHandle's symbol-reject) so snapshot() can
+  // the FOLD_ONCE resolver via extraGet (runs BEFORE lazyHandle's symbol-reject) so forWire() can
   // resolve a RETURNED handle to a one-shot global without opening the live fold; registers in
-  // FOLD_HANDLES so snapshot() identifies it. Used by the `data` facade's distributed() and the
+  // FOLD_HANDLES so forWire() identifies it. Used by the `data` facade's distributed() and the
   // no-key read() gather memo (both in [./dispatch.ts]).
   const foldAggregate = (spec: AggSpec) => {
     const rule = AGG[spec.op]?.combine
@@ -294,7 +294,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
         return opened.proxy
       },
     })
-    FOLD_HANDLES.add(handle) // SOLE writer of FOLD_HANDLES (sole reader: snapshot() in handle.ts) — so snapshot() resolves a RETURNED handle via gatherOnce (M2)
+    FOLD_HANDLES.add(handle) // SOLE writer of FOLD_HANDLES (sole reader: forWire() in handle.ts) — so forWire() resolves a RETURNED handle via gatherOnce (M2)
     return handle
   }
 
