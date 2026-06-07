@@ -114,6 +114,10 @@ function delPath(data: any, path: (string | number)[]) {
 }
 
 export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
+  // Build phases (skim the ── banners): 0 config · 1 replication core · 2 restore+mesh
+  // · 3 holding+membership · 4 write path (+orphan shed) · 5 surfaces.
+
+  // ── 0 · config: methods/config split + replication factor ──
   // Recognition rule (plan §1): function values are methods, everything else is
   // transport/resource config. By value type, not key name.
   const methods: Record<string, Method> = {}
@@ -141,12 +145,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const antiEntropyMs = typeof config.antiEntropy === 'number' ? (config.antiEntropy as number) : 1000
   delete (config as any).antiEntropy
 
+  // ── 1 · replication core: state (proxy = truth, log = history) + provenance + dedup + LWW ──
   // State: the proxy is the source of truth; the log records history.
   const log = new Log({ scoped })
   const data = $({})
   const res = (data as any)[VIEWSYM].res
 
-  // ── Replication core: provenance + dedup + last-writer-wins ──
+  // Provenance + dedup + last-writer-wins.
   //
   // `clock` is a LAMPORT clock (not a plain counter): merged up on every inbound
   // record, bumped on every local write. That makes a local write always
@@ -174,17 +179,6 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // diverging. Bounded (drop-oldest) so a long partition can't grow it without limit.
   const pending: ChangeRecord[] = []
   const MAX_PENDING = 10_000
-  // Orphan partitions (Milestone P4): partitions we hold data for but no longer
-  // REPLICATE (per the committed ring) — a former replica after a ring expansion, or
-  // a write committed locally at a non-replica (never-drop fallback / misrouted
-  // forward). We KEEP them (so the partition stays ≥R-replicated — no under-
-  // replication window) until a current R-set member is confirmed caught up, then
-  // SHED (drop our copy). Scoped-only.
-  const orphans = new Set<string>()
-  // Per-orphan set of R-set members confirmed caught up (see shedConfirmed): we shed
-  // only once EVERY current R-set member is in here, so the partition is fully
-  // R-replicated WITHOUT us before we drop it.
-  const shedReady = new Map<string, Set<string>>()
 
   // The key path a record contends on for LWW. An insert folds `at` into the
   // path so an insert and a later update to the same key contend as one key;
@@ -255,6 +249,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
+  // ── 2 · durable restore + transport mesh ──
   // Restore durable state BEFORE the mesh exists (no network yet → no races):
   // replay the persisted log through applyInbound, rebuilding seen/clock/versions
   // and the proxy. The append-on-write hook is attached AFTER replay so we don't
@@ -272,6 +267,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const mesh: Mesh = transport({
     name,
     ...(config as object),
+    // NB: these hooks call closures defined BELOW (holds / resync / shedConfirmed /
+    // applyLocalWrite / viewMgr / dispatch). Safe forward refs: a hook only fires
+    // post-construction (once a peer connects), by which point all are bound.
     // Scoped holding (Milestone P): materialize ONLY partitions we replicate. A
     // server with finite R drops inbound records for partitions it doesn't hold
     // (scoped delivery shouldn't send them, but catch-up over-ship or a transitional
@@ -346,6 +344,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   const viewSize = (): number => mesh.viewMembers().length
 
+  // ── 3 · holding + membership + anti-entropy ──
   // Does this node hold (replicate) a partition's records? Full replication ⇒
   // always (every server holds everything). Scoped (finite R) ⇒ only if we're in
   // the partition's R-set on the committed-view ring. A read-only client (no `me`)
@@ -439,6 +438,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       : undefined
   aeTimer?.unref?.()
 
+  // ── 4 · write path: capture sink → forward-to-owner | commit-local ──
   // Write-capture: a local assignment on the proxy is stamped with our
   // provenance, recorded as the current LWW winner for its key (the proxy has
   // already materialized it — it's the newest write we know of), logged, and
@@ -494,6 +494,20 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
     commitLocal(change)
   })
+
+  // ── orphan shedding (P4, scoped): keep a no-longer-replicated partition until a
+  //    current R-set member is confirmed caught up, then drop it (never < R replicas) ──
+  // Orphan partitions (Milestone P4): partitions we hold data for but no longer
+  // REPLICATE (per the committed ring) — a former replica after a ring expansion, or
+  // a write committed locally at a non-replica (never-drop fallback / misrouted
+  // forward). We KEEP them (so the partition stays ≥R-replicated — no under-
+  // replication window) until a current R-set member is confirmed caught up, then
+  // SHED (drop our copy). Scoped-only.
+  const orphans = new Set<string>()
+  // Per-orphan set of R-set members confirmed caught up (see shedConfirmed): we shed
+  // only once EVERY current R-set member is in here, so the partition is fully
+  // R-replicated WITHOUT us before we drop it.
+  const shedReady = new Map<string, Set<string>>()
 
   // Silently remove a foreign partition we optimistically applied but don't hold
   // (after forwarding its write to the owner). Guarded by `applying` so the removal
@@ -635,11 +649,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     for (const c of batch) commitLocal(c)
   }
 
-  // ── Distributed aggregates (Milestone Q2/Q3) ──
-  // The fold ENGINE — owner-scoped partial construction, the live re-scoping partial, and the
-  // querying-side one-shot + live gather — lives in [./fold.ts] (makeFold), built below once
-  // `invoke` + clientSubs exist (the engine's only injected deps beyond the raw proxy/mesh/state).
+  // Distributed aggregates (Milestone Q2/Q3): the fold ENGINE — owner-scoped partial
+  // construction, the live re-scoping partial, and the querying-side one-shot + live gather
+  // — lives in [./fold.ts] (makeFold), built below once `invoke` + clientSubs exist (the
+  // engine's only injected deps beyond the raw proxy/mesh/state).
 
+  // ── 5 · surfaces: cluster + methods + dispatch ──
   const cluster: Cluster = {
     peers: mesh.peers,
     get me() {
