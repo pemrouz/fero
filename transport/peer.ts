@@ -36,7 +36,6 @@ export const STATUS = {
   connected: 3,
 } as const
 export type Status = (typeof STATUS)[keyof typeof STATUS]
-export const STATUS_NAME = ['disconnected', 'connecting', 'throttled', 'connected'] as const
 
 export type HeartbeatOpts = { interval?: number; misses?: number }
 
@@ -229,11 +228,6 @@ export class Peer {
   // Queue a change record for delivery; coalesced into one frame per microtask.
   send(record: ChangeRecord) {
     this.#outbox.push(record)
-    this.#schedule()
-  }
-
-  sendMany(records: ChangeRecord[]) {
-    for (let i = 0; i < records.length; i++) this.#outbox.push(records[i])
     this.#schedule()
   }
 

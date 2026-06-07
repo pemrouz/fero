@@ -1,6 +1,5 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { $, value } from '../../data/index.ts'
 import { DHT, hash32 } from './dht.ts'
 
 const keys = (n: number) => Array.from({ length: n }, (_, i) => 'key-' + i)
@@ -62,29 +61,12 @@ test('owners(key, R) returns R distinct peers clockwise', () => {
   assert.equal(dht.owners('user42', 99).length, 4)
 })
 
-test('remove updates ownership; checksum reflects membership', () => {
+test('remove updates ownership', () => {
   const dht = new DHT()
   for (const a of ['a:1', 'b:1', 'c:1']) dht.add(a)
-  const c3 = dht.checksum
   dht.remove('b:1')
   assert.equal(dht.has('b:1'), false)
-  assert.notEqual(dht.checksum, c3)
   assert.ok(['a:1', 'c:1'].includes(dht.owner('whatever')!))
-})
-
-test('track() reconciles the ring from a membership ViewProxy', () => {
-  const dht = new DHT()
-  const peers = $({}) // stand-in for a peers.connected projection, keyed by address
-  peers['a:1'] = { address: 'a:1' }
-  peers['b:1'] = { address: 'b:1' }
-  dht.track(peers) // initial sync on attach
-  assert.deepEqual(dht.members().sort(), ['a:1', 'b:1'])
-
-  peers['c:1'] = { address: 'c:1' } // insert → ring grows
-  assert.deepEqual(dht.members().sort(), ['a:1', 'b:1', 'c:1'])
-
-  delete peers['a:1'] // remove → ring shrinks
-  assert.deepEqual(dht.members().sort(), ['b:1', 'c:1'])
 })
 
 test('hash32 is deterministic and 32-bit unsigned', () => {

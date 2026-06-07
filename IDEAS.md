@@ -187,9 +187,8 @@ Everything on the per-routed-record path.
 - **Hash bake-off** → [open question 9].
 - **[P3] Self-delivery fast-path** for `owner === me` (a self-routed write still
   allocates the record).
-- **[P3] Incremental `track()`** (parse the single insert/remove for O(1)
-  bookkeeping vs re-diffing the whole membership set) / **rebuild without the
-  `[hash,owner][]` tuple array** (sort an index permutation into typed arrays).
+- **[P3] Rebuild without the `[hash,owner][]` tuple array** (sort an index
+  permutation into typed arrays).
 
 ### Bounded memory & compaction — [P1] (log, resource)
 Several unbounded structures interlock and share one compaction pass.

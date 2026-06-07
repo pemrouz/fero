@@ -94,4 +94,4 @@ The matching workstreams in [IDEAS.md](../IDEAS.md):
 
 Cross-cutting open questions: [#8 value codec](../IDEAS.md), [#9 hash function](../IDEAS.md).
 
-> **Cleanup candidates.** `DHT.track()` / `checksum` / `#host` are dead after Milestone V (the ring is view-driven, not connection-tracked); `Peer.sendMany` and `STATUS_NAME` are unused exports. The `as unknown as ChangeRecord` casts in `dispatch()` are redundant — a `RecordView` is already structurally a change record — and can be deleted.
+> **Cleanup candidate.** The `as unknown as ChangeRecord` casts in `dispatch()` are redundant — a `RecordView` is already structurally a change record — and can be deleted.
