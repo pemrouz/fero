@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { $, value, view } from '../../data/index.ts'
 import { transport } from './index.ts'
-import { VERB, type ChangeRecord } from './message.ts'
+import { type ChangeRecord } from './message.ts'
 import { ports, until, connected, apply } from '#utils'
 
 // A storeless mesh needs somewhere to land records so the test can assert where
@@ -119,7 +119,7 @@ test('view-change frames route to their own hook, never to onRecord (Milestone V
     assert.ok(await until(() => connected(mA, a2) && connected(mB, a1)), 'A↔B connect')
 
     const payload = { epoch: 2, members: [a1, a2], proposer: a1 }
-    assert.ok(mA.viewSend(a2, VERB.VIEW_PREPARE, payload), 'viewSend reaches the connected peer')
+    assert.ok(mA.viewPrepare(a2, payload), 'viewPrepare reaches the connected peer')
 
     assert.ok(await until(() => prepared !== undefined), 'onViewPrepare fires on B')
     assert.deepEqual(prepared!.value, payload, 'the view payload arrives intact')

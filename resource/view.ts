@@ -29,9 +29,7 @@
 //     aborts + retries without it — no explicit bidi handshake needed here.
 
 import { value as VALUE } from '../../data/index.ts'
-import { STATUS } from '../transport/peer.ts'
-import { VERB } from '../transport/message.ts'
-import type { Mesh } from '../transport/index.ts'
+import { STATUS, type Mesh } from '../transport/index.ts' // L0 public seam — no reach into peer.ts/message.ts internals
 
 export type View = { epoch: number; members: string[] }
 
@@ -171,7 +169,7 @@ export class ViewManager {
     this.#promisedProposer = this.#me
     const proposal = { epoch, members, acks: new Set<string>([this.#me]), timer: undefined as ReturnType<typeof setTimeout> | undefined }
     this.#proposal = proposal
-    for (const m of members) if (m !== this.#me) this.#mesh.viewSend(m, VERB.VIEW_PREPARE, { epoch, members, proposer: this.#me })
+    for (const m of members) if (m !== this.#me) this.#mesh.viewPrepare(m, { epoch, members, proposer: this.#me })
     // Abort if quorum isn't reached in time → the next tick retries (dropping any
     // member that's gone unreachable in the meantime).
     proposal.timer = setTimeout(() => {
@@ -205,7 +203,7 @@ export class ViewManager {
       }
     }, this.#ackTimeout * 2)
     this.#promiseTimer.unref?.()
-    this.#mesh.viewSend(proposer, VERB.VIEW_ACK, { epoch, proposer, member: this.#me })
+    this.#mesh.viewAck(proposer, { epoch, proposer, member: this.#me })
   }
 
   onAck(value: any) {
@@ -223,7 +221,7 @@ export class ViewManager {
     if (!p) return
     if (!this.#majority(this.members, p.acks)) return // majority of the OLD view
     if (!this.#majority(p.members, p.acks)) return // majority of the NEW view (joint consensus)
-    for (const m of p.members) if (m !== this.#me) this.#mesh.viewSend(m, VERB.VIEW_COMMIT, { epoch: p.epoch, members: p.members })
+    for (const m of p.members) if (m !== this.#me) this.#mesh.viewCommit(m, { epoch: p.epoch, members: p.members })
     this.#install(p.epoch, p.members)
   }
 

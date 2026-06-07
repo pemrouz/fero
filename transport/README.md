@@ -42,7 +42,7 @@ const reply = await mesh.call('login', arg)
 await mesh.ready                        // resolves when reachable, or after `wait` ms
 ```
 
-The `Mesh` seam (routing `owner`/`owners`/`send`/`replicateTo`/`broadcast`/`forward`; membership `installView`/`viewMembers`/`viewSend`; catch-up `digestTo`/`catchupTo`; RPC `call`/`subscribe`/`deltaTo`; `peers`/`me`/`uuid`/`ready`/`destroy`) is wide because L1/L2 genuinely use most of it — it is a flat routing API, not a god-class. `TransportOpts` mirrors it: config keys + one `onX` hook per inbound verb, each wired to exactly one case in `dispatch()`.
+The `Mesh` seam (routing `owner`/`owners`/`send`/`replicateTo`/`broadcast`/`forward`; membership `installView`/`viewMembers`/`viewPrepare`/`viewAck`/`viewCommit`; catch-up `digestTo`/`catchupTo`; RPC `call`/`subscribe`/`deltaTo`; `peers`/`me`/`uuid`/`ready`/`destroy`) is wide because L1/L2 genuinely use most of it — it is a flat routing API, not a god-class. `TransportOpts` mirrors it: config keys + one `onX` hook per inbound verb, each wired to exactly one case in `dispatch()`.
 
 The wire codec is exported directly (and under `fero/internals`): `VERB`, `ChangeRecord`, `partitionOf`, `encodeFrame`, `encodeFrames`, `Framer`, `Frame`, `RecordView`, `decodeFrame`.
 
