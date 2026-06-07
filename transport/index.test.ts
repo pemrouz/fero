@@ -5,9 +5,10 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { connect } from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { transport, STATUS } from './index.ts'
-import { type ChangeRecord } from './message.ts'
+import { type ChangeRecord, encodeFrame, VERB } from './message.ts'
 import { ports, until, connected, apply, sleep } from '#utils'
 
 // A storeless mesh needs somewhere to land records so the test can assert where
@@ -134,6 +135,36 @@ test('view-change frames route to their own hook, never to onRecord (Milestone V
     assert.equal(dataRecords, 0, 'the view frame never reached onRecord (the data path)')
   } finally {
     mA.destroy()
+    mB.destroy()
+  }
+})
+
+test('an unrecognized verb is dropped (fail closed), never mis-applied as a record', async () => {
+  // Regression: RECORDS is now a NAMED switch case and the dispatch default FAILS CLOSED. A
+  // structurally-valid frame carrying an UNKNOWN verb must be DROPPED — not fall into the data path,
+  // where its records would apply via onRecord and clobber state. No public mesh method sends an
+  // arbitrary verb, so inject raw frames over a bare socket (PING/PONG are consumed in peer.ts;
+  // INIT/SYNC/DONE in handle(); so an unknown verb is the only thing that reaches the default).
+  const p1 = await ports.free()
+  let records = 0
+  const B = applier()
+  const mB = transport({ name: 'verbseam', host: '127.0.0.1', port: p1, ports: [p1], wait: 200, onRecord: (r) => { records++; B.apply(r) } })
+  await mB.ready // the TCP listener is up
+  const sock = connect(p1, '127.0.0.1')
+  sock.on('error', () => {}) // ignore — the server may RST on teardown
+  try {
+    await new Promise<void>((res, rej) => { sock.once('connect', () => res()); sock.once('error', rej) })
+    // 1) a normal RECORDS frame (no id) → plain replication → reaches onRecord
+    sock.write(encodeFrame([{ type: 'update', key: ['x'], value: 1 }]))
+    // 2) an UNKNOWN verb carrying a record → must be DROPPED (never reaches onRecord)
+    sock.write(encodeFrame([{ type: 'update', key: ['y'], value: 2 }], { verb: 250 }))
+    // 3) a trailing RECORDS frame → proves the mesh survived the unknown verb AND orders after (2)
+    sock.write(encodeFrame([{ type: 'update', key: ['z'], value: 3 }]))
+    assert.ok(await until(() => B.store[value]?.z === 3), 'the trailing RECORDS frame applied (mesh survived the unknown verb)')
+    assert.equal(records, 2, 'exactly two RECORDS delivered — the unknown-verb frame was dropped, not applied')
+    assert.equal(B.store[value]?.y, undefined, 'the unknown-verb record never reached state')
+  } finally {
+    sock.destroy()
     mB.destroy()
   }
 })
