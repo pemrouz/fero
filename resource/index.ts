@@ -950,34 +950,23 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // ViewProxy (reactive use ⇒ a server-pushed subscription). `to()` picks the target
   // peer lazily — a specific owner (owner-routed reads) or undefined ⇒ a picked
   // connected server. `then` is the only access that does NOT subscribe.
-  const makeHandle = (method: string, arg: unknown, to?: () => string | undefined, writeKey?: string) => {
-    let live: any // the local ViewProxy, created (and the subscription opened) lazily
-    const ensure = () => {
-      if (live) return
-      live = $({})
-      const res = (live as any)[VIEWSYM].res
-      const unsub = mesh.subscribe(method, arg, (record: ChangeRecord) => applyRecord(res, record), to?.())
-      if (unsub) clientSubs.add(unsub)
-    }
-    return new Proxy(noop, {
-      get(_t, prop) {
-        if (prop === 'then') return (onF: any, onR: any) => mesh.call(method, arg, to?.()).then(onF, onR) // await ⇒ one-shot RPC
-        if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined // ignore JS-internal probes
-        if (prop === 'constructor' || prop === 'toJSON') return undefined
-        ensure() // any real data/operator access ⇒ subscribe + delegate to the live proxy
-        return live[prop]
+  const makeHandle = (method: string, arg: unknown, to?: () => string | undefined, writeKey?: string) =>
+    lazyHandle({
+      then: (onF, onR) => mesh.call(method, arg, to?.()).then(onF, onR), // await ⇒ one-shot RPC
+      open: () => {
+        // any real data/operator access ⇒ subscribe + delegate to the live proxy
+        const live = $({})
+        const res = (live as any)[VIEWSYM].res
+        const unsub = mesh.subscribe(method, arg, (record: ChangeRecord) => applyRecord(res, record), to?.())
+        if (unsub) clientSubs.add(unsub)
+        return live
       },
-      // Nested write into a non-held partition (`data.x.y = v`): route to the RAW proxy
-      // so it flows through the write-capture sink → owner. Only the READ handle carries
-      // a writeKey (a method handle has none — set is a harmless no-op). Depth-1 only;
-      // deeper writes into a non-held partition aren't routed (use a top-level assignment
-      // `data.x = {…}` or the holding node) — a documented first-cut limitation.
-      set(_t, prop, v) {
-        if (writeKey !== undefined && typeof prop === 'string') (data as any)[writeKey][prop] = v
-        return true
-      },
+      // Nested write into a non-held partition (`data.x.y = v`): route to the RAW proxy so it
+      // flows through the write-capture sink → owner. Only the READ handle passes a writeKey (a
+      // method handle has none — set is then absent). Depth-1 only; deeper writes into a non-held
+      // partition aren't routed (use a top-level `data.x = {…}` or the holding node) — documented.
+      set: writeKey !== undefined ? (prop, v) => ((data as any)[writeKey][prop] = v) : undefined,
     })
-  }
   const clientHandle = (method: string, arg: unknown) => makeHandle(method, arg) // routed to a picked server
 
   // Owner-routed remote read (Q1): reading a partition this node doesn't hold returns
@@ -1080,23 +1069,19 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // the N-1 remote partials. Miss this and the querier's whole shard is silently dropped.
   const foldAggregate = (spec: { op: string; col?: unknown; val?: unknown }) => {
     const rule = AGG[spec.op]?.combine
-    let opened: { proxy: any; close: () => void } | undefined
-    const handle = new Proxy(noop, {
-      get(_t, prop) {
-        // FOLD_ONCE (Q3b review M2): resolve a ONE-SHOT global via foldOnce WITHOUT opening the live
-        // fold. snapshot() reads this tag (only on a confirmed FOLD_HANDLES member) instead of its
-        // isViewProxy/[VALUE] probe, which would otherwise open the fold and read its still-empty
-        // in-progress union — so a handler returning this handle (`(_,c) => c.methods.read()`) replies
-        // with the GLOBAL on the RPC path, not a local partial. Must precede the symbol-reject below.
-        if (prop === FOLD_ONCE) return () => foldOnce(spec, rule)
-        if (prop === 'then') return (onF: any, onR: any) => foldOnce(spec, rule).then(onF, onR)
-        if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined
-        if (prop === 'constructor' || prop === 'toJSON') return undefined
-        if (!opened) {
-          opened = openFold(spec, rule)
-          clientSubs.add(opened.close) // cleaned on node destroy (per-handle GC is the inherited Q1 item)
-        }
-        return opened.proxy[prop]
+    const handle = lazyHandle({
+      then: (onF, onR) => foldOnce(spec, rule).then(onF, onR),
+      // FOLD_ONCE (Q3b review M2): resolve a ONE-SHOT global via foldOnce WITHOUT opening the live
+      // fold. snapshot() reads this tag (only on a confirmed FOLD_HANDLES member) instead of its
+      // isViewProxy/[VALUE] probe, which would otherwise open the fold and read its still-empty
+      // in-progress union — so a handler returning this handle (`(_,c) => c.methods.read()`) replies
+      // with the GLOBAL on the RPC path. lazyHandle runs extraGet BEFORE its symbol-reject, so this
+      // resolves rather than being swallowed.
+      extraGet: (prop) => (prop === FOLD_ONCE ? { v: () => foldOnce(spec, rule) } : undefined),
+      open: () => {
+        const opened = openFold(spec, rule)
+        clientSubs.add(opened.close) // cleaned on node destroy (per-handle GC is the inherited Q1 item)
+        return opened.proxy
       },
     })
     FOLD_HANDLES.add(handle) // so snapshot() resolves a RETURNED handle via foldOnce (M2)
@@ -1277,6 +1262,40 @@ export const diagnostics = Symbol('fero.diagnostics')
 
 // noop target for the callable client-handle Proxy (mirrors data's ViewProxy).
 const noop = () => {}
+
+// The shared skeleton for fero's two lazy remote handles — makeHandle (read / RPC) and
+// foldAggregate (distributed-aggregate / gather). Both are a `Proxy(noop)` that is BOTH a
+// thenable (`then` ⇒ a one-shot resolve — the ONLY access that does not open the live thing)
+// AND a live `data` ViewProxy (any real prop access lazily `open()`s a subscription/fold once
+// and delegates to it). The symbol handling is subtle and was the source of two Q3b defects,
+// so it lives in ONE place: `extraGet` runs FIRST — before the symbol reject — so a caller's
+// own symbol (foldAggregate's FOLD_ONCE) resolves instead of being swallowed; an unknown
+// symbol returns undefined (probing it on a real ViewProxy throws "Cannot convert a Symbol
+// to a string"); VIEWSYM/VALUE pass through to the delegate. `set` is optional (the read
+// handle routes a depth-1 nested write to the raw proxy; the fold handle has none).
+const lazyHandle = (opts: {
+  then: (onF: any, onR: any) => any
+  open: () => any
+  extraGet?: (prop: string | symbol) => { v: unknown } | undefined
+  set?: (prop: string, v: unknown) => void
+}): any => {
+  let delegate: any // the live proxy, created (and the subscription/fold opened) on first real access
+  return new Proxy(noop, {
+    get(_t, prop) {
+      const extra = opts.extraGet?.(prop)
+      if (extra) return extra.v
+      if (prop === 'then') return opts.then // await ⇒ one-shot (does NOT open the live thing)
+      if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined
+      if (prop === 'constructor' || prop === 'toJSON') return undefined
+      if (delegate === undefined) delegate = opts.open()
+      return delegate[prop]
+    },
+    set(_t, prop, v) {
+      if (typeof prop === 'string') opts.set?.(prop, v)
+      return true
+    },
+  })
+}
 
 // Resolver tag on a foldAggregate/gather handle: `handle[FOLD_ONCE]` yields a `() => Promise<global>`
 // that resolves a ONE-SHOT gather WITHOUT opening the handle's live fold.
