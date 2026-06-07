@@ -43,6 +43,22 @@ export type DispatchDeps = {
 export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold }: DispatchDeps) => {
   const isClient = me === undefined
 
+  // `read` is still the built-in (user didn't override it). A no-key read() on a scoped node must
+  // GATHER the whole resource (no node holds it all) — but only when read is the default; a user's own
+  // `read` projection is never silently swapped for the raw gather. `gathersWholeRead` names that
+  // combined rule once, instead of spelling `scoped && allMethods.read === defaults.read` at each site.
+  const usingDefaultRead = allMethods.read === defaults.read
+  const gathersWholeRead = scoped && usingDefaultRead
+
+  // The owner to forward a read to, or undefined to serve it locally (Q1): a scoped `read(key)` for a
+  // partition we don't hold routes to its owner (which holds it → no re-forward). Full replication, a
+  // held key, or our own ownership ⇒ undefined (serve locally). Shared by serveCall + serveSubscribe.
+  const forwardTarget = (method: string, arg: unknown): string | undefined => {
+    if (method !== 'read' || typeof arg !== 'string' || !scoped || holds(arg)) return undefined
+    const owner = mesh.owner(arg)
+    return owner !== undefined && owner !== me ? owner : undefined
+  }
+
   // Read-forwarding (Q1): a `read(key)` for a partition we don't hold (a client
   // routed here, but we're not the owner) forwards to the owner, which holds it —
   // returning a Promise the transport awaits before replying. The owner holds the
@@ -50,17 +66,15 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // Strip the `fold` flag → the partial spec a fold fans out to holders (no recursion).
   const stripFold = (arg: any): AggSpec => ({ op: arg?.op, col: arg?.col, val: arg?.val })
   const serveCall = (method: string, arg: unknown, address: string): unknown => {
-    if (method === 'read' && typeof arg === 'string' && scoped && !holds(arg)) {
-      const owner = mesh.owner(arg)
-      if (owner !== undefined && owner !== me) return mesh.call('read', arg, owner)
-    }
+    const fwd = forwardTarget(method, arg)
+    if (fwd !== undefined) return mesh.call('read', arg, fwd)
     // Whole-resource read() under scoping (Milestone Q3): a client called read() with NO key.
     // No single node holds the whole resource, so GATHER it — fold every holder's owner-scoped
     // rows into the union (the {op:'rows'} partial, fold stripped → no recursion) — and reply
     // with the global snapshot. This is the explicit "download everything" the user chains
     // holistic ops after. R≥members / full replication hold everything, so read() stays a local
     // c.data snapshot there (the hot path is byte-identical — the gather only arms when scoped).
-    if (method === 'read' && arg == null && scoped && R < viewSize() && allMethods.read === defaults.read) return fold.foldOnce({ op: 'rows' }, AGG.rows.combine)
+    if (method === 'read' && arg == null && R < viewSize() && gathersWholeRead) return fold.foldOnce({ op: 'rows' }, AGG.rows.combine)
     // A CLIENT routed a distributed aggregate here (Milestone Q2e): a client can't
     // owner-scope or fold, so it sends {fold:true} and THIS server (a coordinator) returns
     // the GLOBAL via a one-shot gather. The gather fans out PARTIAL requests (fold stripped)
@@ -106,13 +120,11 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
     // Read-forwarding (Q1): subscribe a non-held read key FROM the owner and relay its
     // deltas to the subscriber; the upstream unsub is closed on unsubscribe.
-    if (method === 'read' && typeof arg === 'string' && scoped && !holds(arg)) {
-      const owner = mesh.owner(arg)
-      if (owner !== undefined && owner !== me) {
-        const unsub = mesh.subscribe('read', arg, (record: ChangeRecord) => mesh.deltaTo(address, subId, record), owner)
-        if (unsub) addSub(address, subId, { unsub })
-        return
-      }
+    const fwd = forwardTarget(method, arg)
+    if (fwd !== undefined) {
+      const unsub = mesh.subscribe('read', arg, (record: ChangeRecord) => mesh.deltaTo(address, subId, record), fwd)
+      if (unsub) addSub(address, subId, { unsub })
+      return
     }
     // A CLIENT's reactive whole-resource read() under scoping (Milestone Q3): build the live
     // GATHER here (the union of every holder's owner-scoped rows, refolded on any shard delta)
@@ -129,7 +141,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // (also ungated). Full replication never builds the facade / sends a scoped read, so R=∞ is
     // unaffected. (serveCall keeps the R<viewSize() optimization: it re-evaluates per call, so a
     // complete-local read at members≤R is always current.)
-    if (method === 'read' && arg == null && scoped && allMethods.read === defaults.read) {
+    if (method === 'read' && arg == null && gathersWholeRead) {
       const g = fold.openFold({ op: 'rows' }, AGG.rows.combine)
       const host = (g.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
       addSub(address, subId, { host, src: g.proxy, close: g.close })
@@ -232,7 +244,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // meshed with the owner → route straight to owner(key); a client routes to a picked
   // server (which forwards to the owner — read-forwarding, a follow-up). `await
   // data.x` is one-shot; `data.x.tap(...)`/`.filter`/`[value]` opens a live remote view.
-  const remoteRead = (key: string) => makeHandle('read', key, me !== undefined ? () => mesh.owner(key) : undefined, key)
+  const remoteRead = (key: string) => makeHandle('read', key, !isClient ? () => mesh.owner(key) : undefined, key)
 
   // The read surface: synchronous-and-local for a partition we hold, a remote handle
   // for one we don't (hold-relative reads). The `data` facade returned below is sugar
@@ -260,7 +272,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   //     a handler wanting the LOCAL held state reads `c.data` directly. [Q3b review m5; DECISIONS Q3]
   // Ungated on R (membership-robust — openFold re-arms on commit). Full replication (scoped=false)
   // keeps the raw-c.data read — that node holds everything, so local IS global.
-  if (!isClient && scoped && allMethods.read === defaults.read) {
+  if (!isClient && gathersWholeRead) {
     const baseRead = localMethods.read
     let gather: any
     localMethods.read = (arg?: any) => (arg == null ? (gather ??= fold.foldAggregate({ op: 'rows' })) : baseRead(arg))
