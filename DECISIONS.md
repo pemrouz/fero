@@ -148,7 +148,7 @@ bug.
 **Decision.** A write to key K is committed by `owner(K)`. If we own the partition we
 commit locally as before; otherwise we FORWARD the raw (unstamped) write to the owner
 via a new `VERB.WRITE` frame. The owner applies it through its OWN write-capture sink
-(`applyLocalWrite`), so it commits under `origin=owner`, logs, and replicates the
+(`commitForwarded`), so it commits under `origin=owner`, logs, and replicates the
 canonical record back. Full-mesh **broadcast is retained** — the owner is the sole
 broadcaster of its committed records, each in seq order over one connection, so the
 in-order-per-origin invariant the dedup/LWW core relies on still holds. *This is the
@@ -365,7 +365,7 @@ full replication (R=∞) keeps the per-origin path byte-for-byte:
 - **Held-set materialization**: `holds(key)` = me ∈ owners(key,R) (short-circuits to true
   when R≥members — no ring scan on the hot path). The `onRecord` wrapper drops inbound
   records for partitions we don't hold; a foreign write we originate is forwarded to the
-  owner and the optimistic local value dropped (`dropLocal`).
+  owner and the optimistic local value dropped (`discardOptimistic`).
 - **Scoped delivery**: the owner commits and `replicatePeers(change,R)` to the OTHER
   replicas (vs `broadcast`); R≥members falls back to broadcast (avoids an owners() scan).
 - **Scoped catch-up**: the digest carries the sender's LISTEN address; the responder
@@ -776,7 +776,7 @@ core in the composer:
   `buildPartial`, `livePartial`, `foldOnce`, `openFold`, `foldAggregate`), joining the `AGG` registry.
 - **[dispatch.ts](resource/dispatch.ts) `makeDispatch({...})`** — the RPC + subscription servers, the
   local/client method surfaces, the remote-read handles, and the `data` facade.
-- **`index.ts`** keeps the core (write-capture sink, `applyInbound`/`commitLocal`/`applyLocalWrite`,
+- **`index.ts`** keeps the core (write-capture sink, `applyInbound`/`commitLocal`/`commitForwarded`,
   `holds`/`heldCache`, P4 shedding, the Lamport/dedup/LWW state) as the composer body.
 
 Two wiring choices made the split linear (no forward-ref): **(1) `invoke` stays in the composer** and is
