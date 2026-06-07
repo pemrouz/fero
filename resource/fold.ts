@@ -279,7 +279,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
         return opened.proxy
       },
     })
-    FOLD_HANDLES.add(handle) // so snapshot() resolves a RETURNED handle via foldOnce (M2)
+    FOLD_HANDLES.add(handle) // SOLE writer of FOLD_HANDLES (sole reader: snapshot() in handle.ts) — so snapshot() resolves a RETURNED handle via foldOnce (M2)
     return handle
   }
 

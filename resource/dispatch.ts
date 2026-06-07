@@ -358,6 +358,10 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   const dataFacade =
     scoped || isClient
       ? new Proxy(data, {
+          // CLASSIFICATION LADDER — branch order is load-bearing: symbols/built-ins first, then
+          // decomposable aggregate, then the holistic guard, then operators, and ONLY a non-operator
+          // key falls through to readKey (the hold-relative local-child | remote-handle split).
+          // Reordering misclassifies keys (e.g. a partition named like an aggregate).
           get(t, prop) {
             if (typeof prop === 'symbol' || BUILTIN.has(prop as string)) return (t as any)[prop]
             if (distributable && DECOMPOSABLE.has(prop as string)) return distributed(prop as string)
