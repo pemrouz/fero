@@ -299,12 +299,10 @@ Decomposable aggregates (Q2) and whole-resource `read()` = gather (Q3) have land
   reads LOCALLY today (the `data[key]` facade does the routing); route it to `owner(key)`
   like the facade ([DECISIONS Q3](DECISIONS.md)). (resource)
 
-### Robustness & lifecycle — [P1→P3] (transport: message, peer, index; resource)
-- **[P1] Defensive decode against malformed/hostile frames.** `records()` trusts
-  `count` and each `recLen`: `count = 2^28` → `new Array(count)` OOM, an oversized
-  `recLen` over-reads the buffer. Bound both against remaining body bytes; reject
-  (destroy peer) on violation. Matters once frames come off the network. Pairs with
-  the malformed-frame tests below.
+### Robustness & lifecycle — [P2→P3] (transport: peer, index; resource)
+Frame-decode hardening — malformed/hostile-frame bounds (count/recLen/length +
+oversized-body cap) → typed `FrameError` → peer drop — has LANDED
+([DECISIONS R](DECISIONS.md)).
 - **`destroy()` doesn't drain in-flight** (resource) — a `flush`-then-close is
   cleaner than tearing the mesh down immediately (a write mid-broadcast may not
   reach peers).

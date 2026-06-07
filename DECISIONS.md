@@ -705,3 +705,52 @@ it can sever but never heal.
 row — the churn test asserts convergence + single-view agreement, not leak-free, until pruning lands);
 `client refused before ready`; DHT distribution-bound tightening + `owners()` distinct-R under churn;
 dial-cap/jitter chaos once the reactive dial loop lands.
+
+## R — Defensive decode against malformed/hostile frames · Adopted · `33afd1d`
+
+**Context.** L0's lazy decoder ([message.ts](transport/message.ts)) trusted every length and count it
+read off the wire. Fine on localhost; once a frame comes from an untrusted peer it is a remote DoS /
+over-read surface. A 1-byte header claiming a ~4 GiB `bodyLen` grows the framer's reassembly `carry`
+unbounded waiting for bytes that never arrive (OOM from a few bytes). A record `count = 2^28` drives
+`new Array(count)` + a billion-iteration loop. An oversized `recLen` / key-segment / value length reads
+past the buffer (or mis-aligns the next record). A reserved value-type nibble decodes to silent
+`undefined`; a truncated f64 or a non-JSON object body throws a raw `RangeError`/`SyntaxError` that
+escapes the framer's `try/catch` (the parse is lazy, forced downstream in `dispatch`/apply) and crashes
+the receiving process. The [IDEAS] "[P1] Defensive decode" item flagged the `count`/`recLen` cases; the
+fix covers the whole surface.
+
+**Decision.** Bound every wire-supplied length/count against the bytes that actually remain; a violation
+throws a typed `FrameError` (an `Error` subclass) so callers can distinguish a wire fault from a real bug.
+- **Framer** caps `bodyLen` at `MAX_FRAME` (256 MiB, per-`Framer` overridable) BEFORE the straddle check,
+  so a bogus header is rejected on sight instead of growing `carry`.
+- **`records()`** rejects a `count` or `recLen` larger than the remaining body (each record needs ≥1 byte
+  for its own `recLen` varint) — the headline `new Array(2^28)` / over-read fix; a truncated varint runs
+  `off` past the body and is caught by the same `> length - off` test.
+- **`prov()` + `RecordView`** bound the provenance origin, the key `nseg` + each segment, `at`, and str/obj
+  value lengths; guard the f64 read (`off + 8 ≤ len`); wrap `JSON.parse` (corrupt object body →
+  `FrameError`); and reject reserved vtype nibbles (7, 9–15) via a `default` case.
+- **peer.ts** wraps the lazy `#onFrame` dispatch in a `try/catch`: a `FrameError` → `destroy()` the peer
+  (mirroring the framer's existing structural-fault handling); any other throw still propagates, so a
+  genuine handler/apply bug is NOT masked as "bad frame".
+
+The guards are integer comparisons inside loops the decoder already walked — zero allocations, no
+measurable cost (`message.perf` unchanged: decode 1.18 ms / 14 ms, scan 0.49 ms / 6 ms). Coverage: 13
+malformed-frame unit tests (count/recLen overrun, oversized `bodyLen`, reserved vtype, truncated f64,
+bad JSON, header-only graceful-wait) + two seeded fuzz loops — 3000 valid records round-trip (bounds
+never false-positive) and 4000 single-byte-corruption trials assert every fault is a `FrameError`, never
+a crash ([message.test.ts](transport/message.test.ts)).
+
+**Consequences.**
+- A malformed/hostile frame now deterministically drops the offending peer rather than crashing the
+  receiver or amplifying a few header bytes into GBs of allocation.
+- Bounds are *resource-proportional*, not checksum-authenticated: a peer that transmits 256 MB of
+  valid-looking framing still allocates proportionally. The fix closes the small-input → huge-allocation
+  / out-of-bounds vector, not authenticated flooding (a connection cap / backpressure is a separate
+  workstream).
+- `MAX_FRAME` is a module constant with a per-`Framer` override, not yet a `fero()` config knob — a single
+  legitimate catch-up frame is bounded at 256 MiB (revisit if "stream the diff" lands a larger batch).
+- The [L4](#l4--chaos-test-harness--reversible-partition-seam--adopted) record notes these guards in
+  passing as "already covered"; this record is their authoritative provenance.
+
+**Open follow-ups → [IDEAS](IDEAS.md):** none specific. Relates to the value-codec / wire-evolution
+workstream — a CBOR value seam would move object decoding off `JSON.parse` entirely.
