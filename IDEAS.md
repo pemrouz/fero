@@ -78,11 +78,13 @@ dialable address. The remaining items build on that identity:
   rather than collapsing them. Collapse to one bidirectional conn post-handshake
   (connected-wins by uuid; both ends must agree on the survivor or they both drop),
   changing `broadcast`'s dialed-only gate to "send over the one surviving socket".
-- **Prune dead rows.** A published row persists forever — a peer that gives up leaves a
-  `disconnected` row (slow leak). `forget(address)`/TTL wired to Peer destroy. (Server
-  shadows are now pruned from `#shadows` on their own drop — [DECISIONS T](DECISIONS.md);
-  the lingering `disconnected` *row* of a dialed/client peer is what's still open, plus
-  the rapid-reconnect shadow-overwrite leak noted there.)
+- **Prune dead rows — LANDED** ([DECISIONS T3](DECISIONS.md)): a terminal departure (an
+  inbound client / half-handshake close, or a dial that gives up) prunes the row + `#conns`
+  entry via `onGone` → `#prune`; the self-reject row is pruned too; shadows self-prune from
+  `#shadows`. Remaining: a `max=Infinity` dial to a permanently-dead address retries forever
+  (row cycles, never gives up) — an **eviction-driven explicit `forget(address)`** (the view
+  knows the peer is gone) or a TTL is the lever (pairs with the reactive dial loop /
+  dead-candidate backoff). Plus the rapid-reconnect shadow-overwrite leak noted in T.
 - **uuid self-identity + self-reject — LANDED** ([DECISIONS T2](DECISIONS.md)): a peer
   presenting our own uuid is rejected (a self-loop via an alternate address — multi-NIC,
   `localhost` vs `127.0.0.1` — or a uuid collision) and the address remembered so
