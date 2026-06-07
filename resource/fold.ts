@@ -8,7 +8,7 @@
 // closure — every holder reconstructs the same operator. (2) `makeFold(...)`: the per-instance
 // fold ENGINE — owner-scoped partial construction (`buildPartial`/`ownedView`/`composite`), the
 // live re-scoping partial (`livePartial`), the querying-side one-shot + live gather
-// (`foldOnce`/`openFold`), and the lazy fold handle (`foldAggregate`). It closes over a fero()
+// (`gatherOnce`/`gatherLive`), and the lazy fold handle (`foldAggregate`). It closes over a fero()
 // node's shared state (the raw `data` proxy, the mesh, the two aggregate registries, clientSubs)
 // passed BY REFERENCE, plus `invoke` (the in-process method dispatcher) — the one injected edge
 // back to the composer, which doesn't itself depend on the fold engine. The `data` facade and the
@@ -143,10 +143,18 @@ export type FoldDeps = {
   invoke: (method: string, arg: unknown, peer?: string) => unknown // in-process dispatcher; invoke('aggregate', spec) = this node's local partial
   aggregateRebinds: Set<() => void> // live owner-scoped partials to re-scope on a view commit (walked by the composer's onCommit)
   aggregateReconciles: Set<() => void> // live folds to reconcile holders on commit + AE tick (walked by the composer)
-  clientSubs: Set<() => void> // teardown callbacks drained by destroy (a fold handle's openFold close lands here)
+  clientSubs: Set<() => void> // teardown callbacks drained by destroy (a fold handle's gatherLive close lands here)
 }
 
 export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateReconciles, clientSubs }: FoldDeps) => {
+  // The engine's functions split on two axes — LOCAL (this node's owned shard) vs GLOBAL gather
+  // (fold across holders), and ONE-SHOT (await) vs LIVE (subscription):
+  //                │ one-shot                │ live
+  //   ─────────────┼─────────────────────────┼──────────────────────────
+  //   local shard  │ buildPartial            │ livePartial
+  //   global fold  │ gatherOnce              │ gatherLive
+  //   foldAggregate is the lazy handle that is BOTH (await ⇒ gatherOnce, real access ⇒ gatherLive).
+  //
   // OWNER-scoping (not holder-scoping) is the dedup: a partition lives on R replicas but has exactly
   // ONE owner, so scoping each holder's partial to the partitions it OWNS makes the union a DISJOINT
   // cover — every row counted once regardless of R. Filters the RAW `data` proxy; `data`'s filter
@@ -222,7 +230,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // after the call timeout (a known silent undercount — gather hardening is deferred). Stateless, so
   // it reflects the CURRENT ring per call. Backs `await data.sum(...)`, serveCall's client one-shot,
   // and the no-key read() gather.
-  const foldOnce = async (spec: AggSpec, rule: Rule): Promise<unknown> => {
+  const gatherOnce = async (spec: AggSpec, rule: Rule): Promise<unknown> => {
     const local = snapshot(invoke('aggregate', spec))
     const others = mesh.viewMembers().filter((m) => m !== me)
     const remotes = await Promise.all(others.map((o) => (mesh.call('aggregate', spec, o) as Promise<unknown>).catch(() => undefined)))
@@ -236,7 +244,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // only adds new members / drops departed ones (reconcileMembers, run on commit + aeTimer). One row
   // change → one partial delta → one O(holders) recompute. Serves the local fold handle AND a
   // client's gather/aggregate subscription.
-  const openFold = (spec: AggSpec, rule: Rule) => {
+  const gatherLive = (spec: AggSpec, rule: Rule) => {
     const live: any = $({})
     const liveRes = (live as any)[VIEWSYM].res
     const partials = new Map<string, unknown>()
@@ -270,7 +278,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   }
 
   // The querying-side FOLD HANDLE (mirrors makeHandle): a lazyHandle that is a thenable (await ⇒
-  // foldOnce one-shot) AND a live ViewProxy (real access ⇒ open()s openFold and delegates). Exposes
+  // gatherOnce one-shot) AND a live ViewProxy (real access ⇒ open()s gatherLive and delegates). Exposes
   // the FOLD_ONCE resolver via extraGet (runs BEFORE lazyHandle's symbol-reject) so snapshot() can
   // resolve a RETURNED handle to a one-shot global without opening the live fold; registers in
   // FOLD_HANDLES so snapshot() identifies it. Used by the `data` facade's distributed() and the
@@ -278,19 +286,19 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   const foldAggregate = (spec: AggSpec) => {
     const rule = AGG[spec.op]?.combine
     const handle = lazyHandle({
-      then: (onF, onR) => foldOnce(spec, rule).then(onF, onR),
-      extraGet: (prop) => (prop === FOLD_ONCE ? { v: () => foldOnce(spec, rule) } : undefined),
+      then: (onF, onR) => gatherOnce(spec, rule).then(onF, onR),
+      extraGet: (prop) => (prop === FOLD_ONCE ? { v: () => gatherOnce(spec, rule) } : undefined),
       open: () => {
-        const opened = openFold(spec, rule)
+        const opened = gatherLive(spec, rule)
         clientSubs.add(opened.close) // cleaned on node destroy (per-handle GC is the inherited Q1 item)
         return opened.proxy
       },
     })
-    FOLD_HANDLES.add(handle) // SOLE writer of FOLD_HANDLES (sole reader: snapshot() in handle.ts) — so snapshot() resolves a RETURNED handle via foldOnce (M2)
+    FOLD_HANDLES.add(handle) // SOLE writer of FOLD_HANDLES (sole reader: snapshot() in handle.ts) — so snapshot() resolves a RETURNED handle via gatherOnce (M2)
     return handle
   }
 
-  return { ownedView, buildPartial, livePartial, foldOnce, openFold, foldAggregate }
+  return { ownedView, buildPartial, livePartial, gatherOnce, gatherLive, foldAggregate }
 }
 
 export type Fold = ReturnType<typeof makeFold>

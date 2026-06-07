@@ -517,8 +517,8 @@ adversarial-review workflow (it earned its keep — see below).
   cover of the keyspace — every row counted exactly once regardless of R. A serializable spec
   `{op,col[,val]}` crosses the wire (the `aggregate` default method); each symmetric holder
   reconstructs the same owner-scoped operator locally — the NAME/shape travels, not a closure.
-- **Fold (Q2b).** `await data.sum('v')` is a one-shot gather (`foldOnce`); reactive use opens
-  a live fold (`openFold`) that subscribes to every holder's partial and refolds per delta.
+- **Fold (Q2b).** `await data.sum('v')` is a one-shot gather (`gatherOnce`); reactive use opens
+  a live fold (`gatherLive`) that subscribes to every holder's partial and refolds per delta.
   SELF IS NOT A WIRE TARGET (`pool.peer(me)` is undefined) — the querier's own shard is
   obtained IN-PROCESS and folded alongside the N-1 remote partials (miss it ⇒ a 1/N
   undercount, the blocker the review caught). Combine rules: sum/count → Σ; max/min →
@@ -600,7 +600,7 @@ the contacted node's local shard under scoping — fine under full replication, 
 **Decision — `read()` (no key) under scoping folds owner-scoped ROWS into the whole resource.**
 - **Gather = the Q2 fold with a union rule (Q3a).** A new internal spec `{op:'rows'}` returns the
   holder's owner-scoped `ownedView()` (a disjoint cover — each partition shipped once, 1× wire);
-  `RULES.rows` = `Object.assign({}, …partials)` (union by key). `foldOnce`/`openFold`/`foldAggregate`
+  `RULES.rows` = `Object.assign({}, …partials)` (union by key). `gatherOnce`/`gatherLive`/`foldAggregate`
   are reused verbatim — the gather is just a fold whose partials are row-set OBJECTS and whose combine
   is union. Union-by-key is IDEMPOTENT, so it tolerates transient ring disagreement a scalar Σ can't
   (two holders briefly claiming a key land it once, not twice); deletes/ownership-moves converge via
@@ -608,8 +608,8 @@ the contacted node's local shard under scoping — fine under full replication, 
   the gathered proxy (`methods.read().az('v')`, `.reduce(fn)`) — only ROWS cross the wire, never
   functions, and `data`'s positional `'move'` deltas stay local (no [DECISIONS E] dependency).
 - **Client gather, server-as-coordinator (Q3a).** A client's `read()` routes to the server it dialed,
-  which folds (`serveCall` ⇒ `foldOnce`; `serveSubscribe` ⇒ `openFold`). The reactive subscribe branch
-  is UNGATED on R (membership-robust — `openFold.reconcileMembers` re-arms on commit). A branch gated on
+  which folds (`serveCall` ⇒ `gatherOnce`; `serveSubscribe` ⇒ `gatherLive`). The reactive subscribe branch
+  is UNGATED on R (membership-robust — `gatherLive.reconcileMembers` re-arms on commit). A branch gated on
   membership-at-subscribe let a `read()` opened while members≤R stream the server's local `c.data`
   forever and go silently PARTIAL once a join sharded the resource (the Q3a review's confirmed major —
   grow-past-R regression test added). The stateless `serveCall` one-shot keeps the `R<viewSize()`
@@ -628,7 +628,7 @@ the contacted node's local shard under scoping — fine under full replication, 
   **M1** a custom `read` was silently swapped for the raw gather under scoping (fix: gate the override
   AND the Q3a wire branches on `allMethods.read === defaults.read`); **M2** a handler RETURNING
   `c.methods.read()` replied with the fold's empty in-progress union because `snapshot()`'s
-  isViewProxy/`[VALUE]` probe opened the live fold (fix: resolve a returned handle via `foldOnce`,
+  isViewProxy/`[VALUE]` probe opened the live fold (fix: resolve a returned handle via `gatherOnce`,
   detected by a side-effect-free `FOLD_HANDLES` WeakSet — probing the resolver symbol on a `data`
   ViewProxy throws "Cannot convert a Symbol to a string", which the first fix attempt hit and the
   existing client-read tests caught); **M3** a fresh `foldAggregate` per reactive call leaked an
@@ -652,7 +652,7 @@ the gathered set; the **user-supplied combine / named-method fold** (the scalabl
 O(N) gather); **gather-hardening** (a bounded one-shot deadline + partial-result signal; the
 union-recompute is O(N)/delta — an incremental per-key merge is the perf follow-up); **per-handle GC**
 of an abandoned gather handle + the **ungraceful-disconnect** subscription leak (now also via the
-gather's `openFold` — shared transport-layer infra, an `onPeerGone` hook + a peer→subId reverse index);
+gather's `gatherLive` — shared transport-layer infra, an `onPeerGone` hook + a peer→subId reverse index);
 and **server-side `methods.read(key)`** owner-routing (today LOCAL — the `data[key]` facade routes).
 
 ## L4 — Chaos test harness + reversible partition seam · Adopted
@@ -761,8 +761,8 @@ workstream — a CBOR value seam would move object decoding off `JSON.parse` ent
 co-lived with the aggregate engine, the RPC/subscription dispatch, the lazy handles, and the `data`
 facade. plan §9 always intended a `dispatch.ts`/`projection.ts` split; two earlier increments had landed
 the cheap parts (the `AGG` registry, the `lazyHandle` skeleton). The remaining lift was risky because
-the inner functions are **mutually recursive** (`serveCall`/`serveSubscribe` → `foldOnce`/`openFold`;
-`foldOnce` → `invoke` → `defaults.aggregate` → `buildPartial`) and several mutate shared state the
+the inner functions are **mutually recursive** (`serveCall`/`serveSubscribe` → `gatherOnce`/`gatherLive`;
+`gatherOnce` → `invoke` → `defaults.aggregate` → `buildPartial`) and several mutate shared state the
 composer's `onCommit`/`aeTimer` loops iterate — so a naïve split risks a forward-reference cycle, a
 by-value copy of state that should be shared, or a hot-path regression.
 
@@ -773,7 +773,7 @@ core in the composer:
   `dispatch.ts ↔ fold.ts` import cycle and `FOLD_HANDLES` stays one shared identity (a handle registered
   by the fold engine is recognised by `snapshot` called from the dispatch side).
 - **[fold.ts](resource/fold.ts) `makeFold({...})`** — the aggregate engine (`ownedView`, `composite`,
-  `buildPartial`, `livePartial`, `foldOnce`, `openFold`, `foldAggregate`), joining the `AGG` registry.
+  `buildPartial`, `livePartial`, `gatherOnce`, `gatherLive`, `foldAggregate`), joining the `AGG` registry.
 - **[dispatch.ts](resource/dispatch.ts) `makeDispatch({...})`** — the RPC + subscription servers, the
   local/client method surfaces, the remote-read handles, and the `data` facade.
 - **`index.ts`** keeps the core (write-capture sink, `applyInbound`/`commitLocal`/`commitForwarded`,
