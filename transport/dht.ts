@@ -11,9 +11,8 @@
 // contiguous ~1000-entry Uint32Array (5 peers × 200 vnodes) is ~4KB and fits in
 // cache, vs an RBTree of heap-scattered nodes.
 //
-// Consumes cluster.peers membership as change records (track()), not events.
-
-import { value as VALUE } from '../../data/index.ts'
+// Consumes the committed-view membership via installView (transport/index.ts) —
+// the ring changes only on a view commit, never on raw connect/disconnect.
 
 const VNODES = 200 // virtual nodes per peer — smooth distribution, ≈1/N move on churn
 
@@ -80,13 +79,6 @@ export class DHT {
     return this.#members.size
   }
 
-  // Cheap ring-divergence detector: hash of the sorted member set. Two nodes
-  // with the same checksum agree on ownership (legacy dht.js:75). Reactive
-  // value, not an emitted event.
-  get checksum(): number {
-    return this.#hash(this.members().sort().join(';'))
-  }
-
   // Rebuild the sorted arrays from the member set. O(M log M); the cold path —
   // membership change is rare relative to lookups.
   #rebuild() {
@@ -145,19 +137,4 @@ export class DHT {
     return out
   }
 
-  // Wire the ring to a membership ViewProxy (e.g. peers.connected, ideally
-  // filtered to servers): reconcile on every change record. Reconcile is O(M)
-  // but membership churn is rare, and rebuild is O(M) anyway — so we diff the
-  // full set rather than parse individual records. The FunctionSink is pinned
-  // (data keeps it alive while we hold the returned host).
-  track(projection: any): this {
-    const reconcile = () => {
-      const current: Record<string, unknown> = projection[VALUE] ?? {}
-      for (const addr in current) if (!this.#members.has(addr)) this.add(addr)
-      for (const addr of this.members()) if (!(addr in current)) this.remove(addr)
-    }
-    this.#host = projection.connect({}, reconcile) // fires once on attach → initial sync
-    return this
-  }
-  #host?: object // retains the pinned sink for the lifetime of this DHT
 }
