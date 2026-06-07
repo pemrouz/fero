@@ -314,7 +314,7 @@ fero-v2/                                  # this folder
 │
 ├── log/                                  # L1
 │   ├── index.ts                          # log() + view()
-│   ├── partition.ts
+│   ├── log.ts                            # the Log class
 │   └── *.test.ts
 │
 ├── resource/                             # L2 — the public surface
