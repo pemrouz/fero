@@ -4,7 +4,7 @@ import net from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { Peers } from './peers.ts'
 import { STATUS, type Peer } from './peer.ts'
-import { until, apply } from '#utils'
+import { until, sleep, apply } from '#utils'
 
 // a server that applies inbound frames into a replica via the pool's accept()
 function serve() {
@@ -55,6 +55,36 @@ test('peer status mirrors into the proxy and the connected projection', async ()
     JSON.stringify(client.connected[value]),
   )
   assert.equal(client.peers[`127.0.0.1:${srv.port}`].status[value], STATUS.connected)
+
+  client.destroy()
+  await srv.close()
+})
+
+test('isolate severs a dialed link and blocks redial (gossip-revival too); heal restores it', async () => {
+  const srv = await serve()
+  const addr = `127.0.0.1:${srv.port}`
+  // fast, deterministic backoff so any auto-redial would happen well within the sleep window below.
+  const client = new Peers({ retries: { base: 20, jitter: 0 } })
+  client.add({ host: '127.0.0.1', port: srv.port })
+  assert.ok(await until(() => client.peers[addr]?.status?.[value] === STATUS.connected), 'connected first')
+
+  // isolate severs the dial and removes it from the conn map (so heal can dial a fresh Peer —
+  // a destroyed one is terminal). The row goes disconnected, which is what #reachable keys off.
+  client.isolate(addr)
+  assert.ok(await until(() => client.peers[addr]?.status?.[value] === STATUS.disconnected), 'isolate severs')
+  assert.equal(client.peer(addr), undefined, 'isolated peer left the conn map')
+
+  // a re-add while blocked is a no-op — this is the gossip-revival path (a third node announces the
+  // peer via handshake learn → addServer → add); the block keeps a partitioned link DOWN.
+  assert.equal(client.add({ host: '127.0.0.1', port: srv.port }), undefined, 're-add blocked while isolated')
+  await sleep(80) // > the 20ms backoff: confirm it stays severed (no auto-redial, no gossip revival)
+  assert.equal(client.peers[addr]?.status?.[value], STATUS.disconnected, 'link stays down while isolated')
+  assert.equal(client.peer(addr), undefined, 'still no conn while isolated')
+
+  // heal: unblock + re-dial by listen address → reconnect (the rejoin-without-restart path).
+  client.heal(addr)
+  assert.ok(await until(() => client.peers[addr]?.status?.[value] === STATUS.connected), 'heal reconnects')
+  assert.ok(client.peer(addr), 'a fresh peer is back in the conn map')
 
   client.destroy()
   await srv.close()

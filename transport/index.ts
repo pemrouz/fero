@@ -69,6 +69,8 @@ export type Mesh = {
   subscribe: (method: string, arg: unknown, onDelta: (record: ChangeRecord) => void, to?: string) => (() => void) | undefined // live subscription; to a specific peer or a picked server; returns an unsubscribe (or undefined if not connected)
   deltaTo: (address: string, subId: number, record: ChangeRecord) => void // server → client: ship one subscription delta
   drop: (address: string) => boolean // abruptly close a peer's connection (no UNSUBSCRIBE/teardown frames) — fault injection for chaos tests + the subscription-reap path; false if not connected
+  isolate: (address: string) => void // fault injection: reversibly sever a dialed link AND block redial (use symmetrically for a true bidirectional partition); reverse with heal()
+  heal: (address: string) => void // reverse isolate(): unblock + re-dial by listen address (reconnect → handshake → anti-entropy heal → view re-admit)
   ready: Promise<void>
   destroy: () => void
 }
@@ -345,6 +347,10 @@ export function transport(opts: TransportOpts): Mesh {
       peer.destroy()
       return true
     },
+    // Reversible link isolation (chaos partition→heal) — see Peers.isolate/heal.
+    // Unlike drop(), isolate() blocks redial so the cut PERSISTS; heal() restores it.
+    isolate: (address) => pool.isolate(address),
+    heal: (address) => pool.heal(address),
     call(method, arg, to) {
       const address = to ?? pickServer()
       const peer = address ? pool.peer(address) : undefined

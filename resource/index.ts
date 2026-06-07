@@ -1279,10 +1279,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // Internals seam (Symbol-keyed, off the typed/enumerable public API): observability +
     // fault-injection for tests and power users. `servedSubscriptions` is the count of live
     // subscriptions this node serves (asserts the reap of a dropped peer); `drop` abruptly closes a
-    // peer's connection (no UNSUBSCRIBE — the way a real network drop looks) to exercise that reap.
+    // peer's connection (no UNSUBSCRIBE — the way a real network drop looks) to exercise that reap;
+    // `isolate`/`heal` are the reversible partition primitive the chaos harness uses (isolate both
+    // sides for a true bidirectional cut that later heals and reconverges — see Peers.isolate).
     [diagnostics]: {
       servedSubscriptions: () => subscriptions.size,
       drop: (address: string) => mesh.drop(address),
+      isolate: (address: string) => mesh.isolate(address),
+      heal: (address: string) => mesh.heal(address),
     },
   } as Fero
 }

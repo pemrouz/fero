@@ -34,6 +34,7 @@ export class Peers {
   readonly connected: any = this.peers.filter((p: any) => p.status === STATUS.connected)
 
   #conns = new Map<string, Peer>() // address → socket machinery
+  #blocked = new Set<string>() // addresses isolated by the chaos seam — refuse to (re)dial until healed
   #me?: string
   #retries?: RetryOpts
   #heartbeat?: HeartbeatOpts
@@ -55,6 +56,7 @@ export class Peers {
   add({ host, port, role = 'server' }: PeerInfo): Peer | undefined {
     const address = `${host}:${port}`
     if (address === this.#me) return undefined // never connect to self
+    if (this.#blocked.has(address)) return undefined // isolated link: refuse to (re)dial, incl. gossip-revival via handshake learn
     const existing = this.#conns.get(address)
     if (existing) return existing // dedup
     this.peers[address] = { address, host, port, role, status: STATUS.disconnected }
@@ -120,6 +122,36 @@ export class Peers {
   // Server→inbound-client push (subscriptions) is an L2 concern, not this.
   broadcast(record: ChangeRecord) {
     for (const peer of this.#conns.values()) if (peer.dialed && peer.status === STATUS.connected) peer.send(record)
+  }
+
+  // ── Fault injection (chaos harness): reversible link isolation ──────────────
+  // `drop` (transport) is terminal + one-directional; a faithful partition→heal
+  // needs a REVERSIBLE cut. isolate(address) severs our dialed link to a peer AND
+  // blocks any redial (direct retry or gossip-revival via handshake learn), so the
+  // link stays down until heal(). Used SYMMETRICALLY (the harness isolates both
+  // sides) it is a true bidirectional partition: broadcast / catch-up / forward all
+  // travel over the dialer's OUTBOUND socket, so cutting both dials cuts both
+  // directions, and the inbound sockets (the far end of those dials) close with
+  // them. Zero steady-state cost: the isolated peer leaves #conns, so broadcast /
+  // sendTo skip it with no new check; #blocked is consulted only in the cold add()
+  // dial path (empty Set ⇒ a no-op there in production).
+  isolate(address: string) {
+    this.#blocked.add(address)
+    const peer = this.#conns.get(address)
+    if (peer) {
+      peer.destroy() // sets the row disconnected (peer.ts) → #reachable drops it → eviction + write-gate engage
+      this.#conns.delete(address) // remove so heal() re-dials a FRESH Peer (a destroyed one is terminal)
+    }
+  }
+
+  // Reverse isolate(): unblock and re-dial by listen address. The disconnected row
+  // still carries host/port, so reconnect → handshake → anti-entropy heals the
+  // missed writes and the view re-admits the peer (a rejoin WITHOUT a restart).
+  heal(address: string) {
+    if (!this.#blocked.delete(address)) return // wasn't isolated
+    if (this.#conns.has(address)) return // already (re)connected by another path
+    const row = this.peers[address]?.[VALUE] as PeerInfo | undefined
+    if (row) this.add({ host: row.host, port: row.port, role: row.role ?? 'server' })
   }
 
   destroy() {
