@@ -45,6 +45,7 @@ import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 import { ViewManager } from './view.ts'
 import { AGG, type Rule } from './fold.ts'
+import { lazyHandle, FOLD_ONCE, FOLD_HANDLES, isViewProxy, snapshot } from './handle.ts'
 
 export { value } from '../../data/index.ts'
 export { fileStorage } from './storage.ts'
@@ -1260,78 +1261,3 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 // Symbol-keyed internals handle on a returned fero() instance (`instance[diagnostics]`): kept OFF
 // the typed public surface (data/methods/cluster/destroy) and out of Object.keys.
 export const diagnostics = Symbol('fero.diagnostics')
-
-// noop target for the callable client-handle Proxy (mirrors data's ViewProxy).
-const noop = () => {}
-
-// The shared skeleton for fero's two lazy remote handles — makeHandle (read / RPC) and
-// foldAggregate (distributed-aggregate / gather). Both are a `Proxy(noop)` that is BOTH a
-// thenable (`then` ⇒ a one-shot resolve — the ONLY access that does not open the live thing)
-// AND a live `data` ViewProxy (any real prop access lazily `open()`s a subscription/fold once
-// and delegates to it). The symbol handling is subtle and was the source of two Q3b defects,
-// so it lives in ONE place: `extraGet` runs FIRST — before the symbol reject — so a caller's
-// own symbol (foldAggregate's FOLD_ONCE) resolves instead of being swallowed; an unknown
-// symbol returns undefined (probing it on a real ViewProxy throws "Cannot convert a Symbol
-// to a string"); VIEWSYM/VALUE pass through to the delegate. `set` is optional (the read
-// handle routes a depth-1 nested write to the raw proxy; the fold handle has none).
-const lazyHandle = (opts: {
-  then: (onF: any, onR: any) => any
-  open: () => any
-  extraGet?: (prop: string | symbol) => { v: unknown } | undefined
-  set?: (prop: string, v: unknown) => void
-}): any => {
-  let delegate: any // the live proxy, created (and the subscription/fold opened) on first real access
-  return new Proxy(noop, {
-    get(_t, prop) {
-      const extra = opts.extraGet?.(prop)
-      if (extra) return extra.v
-      if (prop === 'then') return opts.then // await ⇒ one-shot (does NOT open the live thing)
-      if (typeof prop === 'symbol' && prop !== VIEWSYM && prop !== VALUE) return undefined
-      if (prop === 'constructor' || prop === 'toJSON') return undefined
-      if (delegate === undefined) delegate = opts.open()
-      return delegate[prop]
-    },
-    set(_t, prop, v) {
-      if (typeof prop === 'string') opts.set?.(prop, v)
-      return true
-    },
-  })
-}
-
-// Resolver tag on a foldAggregate/gather handle: `handle[FOLD_ONCE]` yields a `() => Promise<global>`
-// that resolves a ONE-SHOT gather WITHOUT opening the handle's live fold.
-const FOLD_ONCE = Symbol('fero.foldOnce')
-// Identity set of live fold/gather handles (foldAggregate's Proxies). snapshot() membership-checks
-// this — a side-effect-free WeakSet probe — to decide whether to resolve a returned handle via
-// foldOnce. We do NOT probe the FOLD_ONCE symbol on every method return: reading an unknown symbol
-// off a `data` ViewProxy throws "Cannot convert a Symbol value to a string" (Q3b review M2 fix).
-const FOLD_HANDLES = new WeakSet<object>()
-
-// The distributed-aggregate registry (the per-op partial builders + their associative
-// combine rules) lives in [./fold.ts], imported as AGG at the top. Kept module-level there
-// (no instance state) so a fero() instance pays nothing to reference it.
-
-// A `data` ViewProxy carries the view symbol; a plain value does not.
-function isViewProxy(v: unknown): boolean {
-  return v != null && (typeof v === 'object' || typeof v === 'function') && (v as any)[VIEWSYM] !== undefined
-}
-
-// Reduce a method's return value for the wire: a ViewProxy collapses to its
-// snapshot (its [value]); everything else passes through. Lets `await read()`
-// return a plain object across the network while a local server can hand back
-// the live proxy. A ViewProxy is detected by its VIEW symbol (isViewProxy) and its
-// [value] returned UNCONDITIONALLY — even when that value is `undefined`, which a
-// scalar aggregate legitimately is for an empty set (an empty max/min/avg partial).
-// The old `snap !== undefined` heuristic returned the PROXY itself in that case, so
-// an empty-holder partial crossed the wire as a serialized proxy and NaN-poisoned
-// the extremum fold; the read() path never hit it (its root is always an object).
-function snapshot(v: unknown): unknown {
-  // A fold/gather HANDLE (foldAggregate) resolves its ONE-SHOT global via foldOnce — detected by a
-  // side-effect-free FOLD_HANDLES membership check (NOT by probing the FOLD_ONCE symbol on every
-  // value: an unknown symbol read off a `data` ViewProxy throws "Cannot convert a Symbol to a
-  // string"). Resolving here means a method that RETURNS such a handle (`(_,c)=>c.methods.read()`)
-  // replies with the awaited global, instead of the isViewProxy/[VALUE] probe opening the fold and
-  // shipping its empty in-progress union (Q3b review M2). Returns a Promise the CALL handler awaits.
-  if (typeof v === 'function' && FOLD_HANDLES.has(v as object)) return (v as any)[FOLD_ONCE]()
-  return isViewProxy(v) ? (v as any)[VALUE] : v
-}
