@@ -43,7 +43,7 @@ import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
 import { Log, originKey } from '../log/log.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
-import { ViewManager } from './view.ts'
+import { ViewManager } from './membership.ts'
 import { makeFold } from './fold.ts'
 import { makeDispatch } from './dispatch.ts'
 
