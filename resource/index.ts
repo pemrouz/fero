@@ -394,8 +394,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   //     wasn't connected yet when it was admitted (the admit race — a view can commit a
   //     moment before the coordinator↔member socket finishes the handshake). Walked on
   //     commit AND on the periodic anti-entropy tick (the retry backstop).
-  const aggregateRebinds = new Set<() => void>()
-  const aggregateReconciles = new Set<() => void>()
+  type Rescope = () => void // re-scope a live owner-scoped partial over the new ring (walked on commit)
+  type Reconcile = () => void // add/drop/retry a live fold's remote-holder subscriptions (commit + AE tick)
+  const aggregateRebinds = new Set<Rescope>()
+  const aggregateReconciles = new Set<Reconcile>()
 
   // Membership view (Milestone V). Servers run the view-change state machine: it
   // forms a committed { epoch, members } the cluster agrees on, and drives the
