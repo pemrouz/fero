@@ -3,7 +3,8 @@
 The single ledger of what's **not yet done** across L0 (transport), L1 (log/view)
 and L2 (resource). Settled decisions and the rationale behind the current shape
 live in [DECISIONS.md](DECISIONS.md); this file is *only* open work — the place to
-look for what needs attention.
+look for what needs attention. When an entry cites a landed milestone for context,
+it links the [DECISIONS.md](DECISIONS.md) record rather than restating it.
 
 Grouped by **workstream** (a theme usually spans several modules) rather than by
 file, so cross-cutting work reads as one piece instead of N scattered notes.
@@ -45,101 +46,20 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    plain assignments. Route assignments through the method (for an auth/validation
    hook) or keep them separate? A genuinely-open design point, not in plan §11
    (it sits alongside the §11.1 write-paths). (resource)
-7. **Partitioned holding (R-way) — remaining work.** The user took option 2:
-   **P0** (replica-set seam), **P2** (scoped R-way replication + per-(origin,partition)
-   dedup/catch-up + acquisition re-sync), and **P4** (confirmed orphan shedding — exactly R
-   replicas, no under-replication window) have LANDED ([DECISIONS P](DECISIONS.md)); F2/F3
-   are superseded by P, and the drained-ballot barrier is dropped (keep-until-confirmed
-   shedding gives the no-window property without it). Granularity is R-gated, so full
-   replication (R=∞) is unchanged. What's left:
-   - **P3 — anti-entropy digest compaction.** P2's scoped digest is O(held keys), re-sent
-     by periodic AE every `antiEntropy` ms. Replace with a **Merkle / range-hash** tree:
-     exchange a root, drill only into differing subtrees (O(log keys) + the diff). Also:
-     smarter peer-selection (digest a random subset per round, not all view members — the
-     current fan-out is O(N²) per round). (log, resource)
-   - **Durable shed (folds into WAL compaction).** P4's `shed()` is in-memory only; the
-     append-only WAL still holds the partition and restore replays it (no held-gate on the
-     restore path), so a scoped node WITH `storage` resurrects a shed orphan across a
-     restart (self-healing on rejoin, no data loss). Needs a tombstone / log compaction —
-     do it alongside the existing **WAL compaction** item. Only affects `{replicas:R,
-     storage:…}`. (resource, log, storage)
-   - **V deferrals (no longer barrier-gated).** The stronger
-     **reject-stale-epoch-from-an-evicted-node** fence (per-partition owner lineage + a
-     uuid↔address map), the **commit-ack drain** (PREPARE-ACK high-water vectors; also
-     [open question 1]), **outbox-flush-before-ring-rebuild**, and preserving a **buffered
-     write's attempt-epoch** on flush. (resource, transport)
-   - **Perf follow-ups.** `holds()` allocates an `owners()` array per inbound record when
-     R<members — add an allocation-free ring predicate (`dht.holds(key, addr, R)`).
-     `shedConfirmed` is O(orphans × seen) per digest (fine — orphans are transient; large
-     rebalances on huge keyspaces could want a per-partition seen index). The
-     gap-tolerant-dedup alternative from [DECISIONS F](DECISIONS.md) stays parked. NUL-in-key
-     over-match in shed/versionKey is an inherited separator assumption. (transport, resource)
-
-   Reads (**Q1** — LANDED, [DECISIONS Q1](DECISIONS.md)) make non-local access
-   `await`/subscribe via an owner-routed `read(key)` + a `data.x` facade. Q1 follow-ups
-   (documented limitations, the routed read is the robust fallback): a **subscription-
-   cleanup-on-disconnect** hook (pre-existing; now also leaks forwarded subscriptions — and a
-   Q3 whole-resource-read `openFold` gather — on an ungraceful client/relay disconnect; needs an
-   `onPeerGone` transport hook + a peer→subId reverse index, fixing all paths at once); **deep nested
-   writes** (`data.x.y.z=v`) into a non-held partition (depth-1 routes; deeper doesn't);
-   **`await data.x.field`** on a non-held key (resolves the subscription, not a one-shot of
-   the field); **read-your-writes** lag when a write's owner-forward fails; the inherent
-   **operator-name key collision** in the facade.
-
-   Decomposable aggregates (**Q2** — LANDED, [DECISIONS Q2](DECISIONS.md)) make whole-resource
-   `data.sum/count/max/min/avg/some/every` an owner-scoped fan-out + fold (one row → O(holders)
-   global update; full replication unchanged). Holistic ops via GATHER (**Q3** — LANDED,
-   [DECISIONS Q3](DECISIONS.md)): whole-resource `read()` (no key) under scoping now folds every
-   holder's owner-scoped ROWS (`{op:'rows'}` + union rule) into the whole resource, so holistic
-   ops run AFTER read over the gathered proxy LOCALLY (`methods.read().az('v')`/`.reduce(fn)`/
-   `.distinct()` — closures never cross the wire). Decomposable = before read; whole-resource =
-   after read. The remaining distributed-query work is the rest of the L3 slice:
-   - **Named-method fold / user-supplied combine** — a method returning a decomposable aggregate
-     (`anyActive: (_,c) => c.data.some(s => s.active)`), run per-holder over OWNER-SCOPED `c.data`,
-     the combine derived from the terminal operator's type (or user-supplied). This is the
-     function-carrying dispatch (closure predicates; the seam grouped aggregates need; AND the
-     SCALABLE alternative to Q3's O(N) gather — ship per-shard partials + a combine instead of all
-     rows). Q2 ships only DECLARATIVE specs (`col[,val]`) + rejects inline closures loudly. (resource)
-   - **L3 chain planner** — `top/limit-K` (sort emits BMV1 'move' deltas `applyRecord` ignores →
-     needs whole-array re-ship or 'move' support — [DECISIONS E](DECISIONS.md)), `length(fn)`
-     (whole-histogram re-ship, not O(1)), bare `group(col)`, and any CHAINED aggregate past the
-     facade's first hop (`data.filter(p).sum()`, `group(c).sum(v)`) — all loudly flagged by the Q2f
-     boundary guard (now pointing at `read()`-first), deferred to the planner that splits a chain
-     into per-shard + roll-up + local stages. (Bare holistic ops work today via `read().<op>()`; the
-     planner is the EFFICIENT, no-full-gather path for the foldable ones.) (planner, resource)
-   - **median/percentile/quantile** — `data` has no such operator; Q3 defers them (the user computes
-     over `methods.read()`). Add as fero terminals over the gathered set, or contribute local
-     operators to `data` and distribute via gather. (resource, data)
-   - **Gather / fold hardening** — a bounded one-shot-gather deadline + a partial-result signal
-     (today a slow/departed holder silently undercounts after `callTimeout`); the gather's
-     union-recompute is O(total)/delta — an INCREMENTAL per-key merge is the perf follow-up;
-     per-handle GC teardown of an abandoned fold/gather handle; the chained-aggregate auto-detect
-     past the facade. (resource, transport)
-   - **`some/every('col')` under FULL replication** — the declarative column form is the
-     scoped-distributed sugar (it folds via `buildPartial`'s `filter(col,val).length()`); under
-     R=∞ the facade isn't built (to keep that path byte-identical), so `data.some('col')` falls
-     through to data's raw `some`/`every`, which require a predicate FN (throws "fn is not a
-     function" — use the native `data.some(fn)` there). Making the col form uniform across R=∞
-     needs a data-lib `some(col)/every(col)` overload (the `data` lib accepts a column for
-     sum/max/min/avg/filter but not some/every) — then fero's full-rep path works unchanged.
-     `sum/max/min/avg('col')` + `length()` already work on every config. (data, resource)
-   See open questions below + [DECISIONS P](DECISIONS.md) / [Q1](DECISIONS.md) / [Q2](DECISIONS.md).
-
-   Membership hardening still open (from the V review, deferred): a dedicated
-   **two-established-cluster merge** test (works via lowest-coordinator + epoch
-   ordering, but only chaos-adjacent tested); **min-cluster-size** behaviour — a
-   sub-quorum remnant stays read-only (CP); a force-to-solo (AP) degrade is
-   deliberately not offered; **incarnation numbers** for flapper fencing beyond the
-   stability debounce. (resource, transport)
-8. **Value codec.** Adopt a CBOR / `data`-owned binary value form behind the
+7. **Value codec.** Adopt a CBOR / `data`-owned binary value form behind the
    `encodeValue`/`decodeValue` seam? `JSON.parse` of object values is ~85% of decode
    cost (~2.4ms vs ~0.35ms lazy-scan for 1000 object records) — decide with a perf
    number, not a guess. (transport/message)
-9. **Hash function.** Lock in djb2-accumulate + fmix32, or switch to wy/xxhash32
+8. **Hash function.** Lock in djb2-accumulate + fmix32, or switch to wy/xxhash32
    after a `dht.perf.ts` bake-off? The fmix32 finalizer is load-bearing (without it
    an address's vnodes cluster). (transport/dht)
-10. **Conflict-merge model.** Stay LWW-by-Lamport, or adopt CRDT / OR-set
-    (intent-preserving merge vs simplicity)? (resource, log)
+9. **Conflict-merge model.** Stay LWW-by-Lamport, or adopt CRDT / OR-set
+   (intent-preserving merge vs simplicity)? And within LWW, refine the Lamport order
+   with an HLC/wall-clock hybrid ([DECISIONS A](DECISIONS.md))? (resource, log)
+
+> The routed/partitioned model has landed ([DECISIONS F1/V/P/Q1/Q2/Q3](DECISIONS.md));
+> its open remainders live in the Partitioned ownership, Catch-up & anti-entropy,
+> Bounded memory, and Distributed query workstreams below.
 
 ---
 
@@ -162,6 +82,14 @@ is no stable peer identity until the handshake.
 - **uuid self-identity + self-reject.** `me` is a single host:port string; a
   multi-interface node or a dial+accept race needs uuid identity to reject self and
   dedup.
+- **Peer-disconnect (`onPeerGone`) hook + `peer→subId` reverse index.** Subscriptions
+  aren't torn down on an ungraceful client/relay disconnect — a pre-existing leak that
+  now also strands forwarded subscriptions and a Q3 whole-resource `read()` `openFold`
+  gather ([DECISIONS Q1/Q3](DECISIONS.md)). One transport hook + a reverse index closes
+  every leak path at once (cross-cuts the handle-lifecycle teardown under Method/RPC and
+  Distributed query). (transport, resource)
+- **[P3] Incarnation numbers** for flapper fencing beyond the stability debounce
+  ([DECISIONS V](DECISIONS.md) deferral) — pairs with uuid self-identity.
 
 ### Zero-copy send path — [P1] (transport: message, peer)
 The design's headline send-side win; v1 uses the simpler `encodeFrame`-per-tick path.
@@ -184,18 +112,28 @@ Everything on the per-routed-record path.
 - **Hot-key hash memo.** `dht.owner()` re-hashes the key every call; routing keys
   (`user42`, …) repeat heavily — a small key→hash memo cuts the hash from the hottest
   path. Pairs with index's per-send `partitionOf` re-hash.
-- **Hash bake-off** → [open question 9].
+- **Allocation-free ring predicate.** `holds()` allocates an `owners()` array per
+  inbound record when R<members ([DECISIONS P](DECISIONS.md)) — add `dht.holds(key,
+  addr, R)` that answers without materializing the owner set.
+- **Hash bake-off** → [open question 8].
 - **[P3] Self-delivery fast-path** for `owner === me` (a self-routed write still
   allocates the record).
-- **[P3] Rebuild without the `[hash,owner][]` tuple array** (sort an index
-  permutation into typed arrays).
+- **[P3]** `shedConfirmed` is O(orphans × seen) per digest (fine — orphans are
+  transient; a large rebalance on a huge keyspace could want a per-partition seen
+  index). **[P3] Incremental `track()`** (parse the single insert/remove for O(1)
+  bookkeeping vs re-diffing the whole membership set) / **rebuild without the
+  `[hash,owner][]` tuple array** (sort an index permutation into typed arrays).
 
 ### Bounded memory & compaction — [P1] (log, resource)
 Several unbounded structures interlock and share one compaction pass.
 - **Log compaction.** Segments grow forever — collapse to latest-value-per-key
   and/or snapshot+truncate so a high-churn partition doesn't exhaust memory.
 - **WAL compaction.** The persistence WAL grows unbounded ([DECISIONS C](DECISIONS.md))
-  — snapshot+truncate.
+  — snapshot+truncate. **Durable shed** folds in here: P4's `shed()` is in-memory only,
+  so a scoped node with `storage` resurrects a shed orphan on restart (the WAL still
+  holds the partition; restore has no held-gate — self-healing on rejoin, no data loss,
+  but it re-advertises until it re-sheds). A tombstone / held-gate-on-restore is the fix;
+  only affects `{replicas:R, storage:…}` ([DECISIONS P4](DECISIONS.md)).
 - **`versions`/`seen` maps** grow unbounded ([DECISIONS A](DECISIONS.md)) — tie to the
   same pass.
 - **[P3]** `log()` storage-adapter / compaction-policy options; `heads()` allocates
@@ -211,24 +149,30 @@ The structural perf redesign [DECISIONS G](DECISIONS.md) identified.
   deployment skips the double materialization (proxy + log).
 
 ### Catch-up & anti-entropy hardening — [P2] (log, resource)
-Builds on [DECISIONS B](DECISIONS.md).
-- **Merkle/range digest** to cut the comparison for huge logs (today's digest is
-  per-origin-coarse).
+Builds on [DECISIONS B](DECISIONS.md) and [DECISIONS P](DECISIONS.md) (the scoped digest).
+- **Merkle/range digest.** Today's digest is O(keys): per-origin under full replication,
+  per-(origin,partition) and O(held keys) under scoping ([DECISIONS P](DECISIONS.md) — the
+  deferred "P3 compaction"), re-sent every `antiEntropy` ms by periodic AE. Replace with a
+  Merkle / range-hash tree: exchange a root, drill only into differing subtrees (O(log keys)
+  + the diff).
+- **Smarter peer-selection.** Periodic AE digests every view member each round (O(N²)
+  fan-out) — digest a random subset per round instead.
 - **Stream the diff.** `diff()`/`recordsSince` builds one large array; stream it
   (generator / chunked frames) so a fresh join doesn't spike sender memory.
 - **Asymmetric reachability.** Catch-up ships over the *dialed* connection only —
   verify behaviour when ONLY an inbound connection exists.
-- **HLC/wall-clock** refinement of LWW order ([DECISIONS A](DECISIONS.md)).
 
 ### Partitioned ownership & routing — [P2] (transport: dht, index; log; resource)
-The L2 refinement that turns full replication into the routed/projected model
-(plan §5–6). Owner-routed writes (F1) + view-synchronous membership (V) have landed,
-so the ring is driven by the committed view and is stable within an epoch — ring
-churn / "connected SERVERS only" / transient-misrouting are resolved by V. Remaining:
-- **Partitioned holding** (a node materializes only its owned partitions, routes the
-  rest) — gated on F2 [open question 7] and on reads being allowed to go async/routed
-  (breaks synchronous `data.x` today).
-- **`replicate()` to R owners** (F2); `owners()` distinct-R correctness under churn.
+The routed/projected model (plan §5–6) has landed
+([DECISIONS F1/V/P/Q1](DECISIONS.md)); the ring is per-epoch stable. Remaining:
+- **Reject-stale-epoch fence** (the open residue of F3) — REJECT a stale-epoch write
+  from an evicted node; needs per-partition owner lineage + a uuid↔address map
+  ([DECISIONS V/F2](DECISIONS.md)).
+- **Read-your-writes on a failed owner-forward.** When a write's owner-forward fails it
+  commits as a local orphan, but a subsequent read routes to the stale owner until
+  anti-entropy reconciles ([DECISIONS Q1](DECISIONS.md)) — tighten.
+- **`owners()` distinct-R correctness under churn** — assert exactly R distinct owners
+  across view changes (test → chaos backlog).
 - **[P3] Vnode count vs cluster size** (200/peer → 20k+ ring entries at 100s of
   peers; revisit count or ring structure — jump/HRW in parked alternatives).
 
@@ -237,6 +181,11 @@ Both halves of [open question 2], from [DECISIONS D + E](DECISIONS.md).
 - RPC re-dispatch when the connected server fails (today: first connected server, no
   retry/re-route).
 - Subscription re-subscribe elsewhere when the connected server drops.
+- **Outbox-flush-before-ring-rebuild** — flush pending sends before the ring rebuilds
+  on a view change ([DECISIONS V](DECISIONS.md) deferral).
+- **Preserve a buffered write's attempt-epoch on flush.** V1e buffers writes when
+  quorum-less and flushes them under the *current* epoch (so they win LWW on rejoin);
+  preserving the original attempt-epoch is the refinement ([DECISIONS V](DECISIONS.md)).
 
 ### Dial scheduling & discovery — [P1] (transport: peers, retries, discovery)
 - **[P1] `multicast.ts`** — LAN zero-config UDP multicast discovery (plan §9), not
@@ -264,22 +213,27 @@ Both halves of [open question 2], from [DECISIONS D + E](DECISIONS.md).
 
 ### Method / RPC semantics — [P2] (resource; transport/peer)
 From [DECISIONS D + E](DECISIONS.md) and plan §5–6.
-- **Commit-ack** primitive [open question 1]; **cross-partition atomicity**
-  [open question 3].
+- **Commit-ack** primitive [open question 1] — including the **commit-ack drain**
+  (PREPARE-ACK high-water vectors) the V/F1 handoff wants
+  ([DECISIONS V/F1](DECISIONS.md)); **cross-partition atomicity** [open question 3].
 - **Per-client projection re-binding** on auth change (plan §6.2): re-invoke `read`,
   diff, ship the delta; v1 runs `read` once at subscribe (a custom `read` returning
   `data.filter(s => visible(s, peer))` gives a per-client view, just not re-bound).
 - **Client-side `'move'` deltas** for ordered projections (sort/top) — `applyRecord`
-  ignores `move`, so unordered projections converge but ordered ones don't.
+  ignores `move`, so unordered projections converge but ordered ones don't. (Also the
+  L3 `top/limit-K` planner dependency — see Distributed query & aggregates.)
 - **`context.methods` auth identity** (plan §6.1): preserve the caller's auth across
   method-to-method calls (v1 reuses the same `context`, no per-call peer/auth); a
   remote handler's `context.methods` runs locally.
+- **[P3] Per-handle GC teardown** of an abandoned fold/gather/subscription handle —
+  the consumer-abandonment counterpart to the `onPeerGone` disconnect teardown in
+  Identity, dedup & connection hygiene.
 - **[P3]** Default `insert` nested key/`at` semantics (only top-level handled; nested
   works via direct assignment). `send()` returning a flush/ack handle to back
   await-or-not write semantics.
 
 ### Value codec & wire evolution — [P2] (transport/message)
-Gated on [open question 8].
+Gated on [open question 7].
 - **Buffer / typed-array values** don't round-trip through JSON
   (`{type:'Buffer',data:[…]}` isn't revived); **nested NaN/Infinity** become `null`
   (top-level survives via f64). A CBOR seam fixes both natively; until then document
@@ -299,6 +253,51 @@ Gated on [open question 8].
   to derive off `peers`.
 - **Deliver lazy `RecordView`s, not plain records** — keep dispatch's
   no-force-parse contract through L1.
+- **`data.x` facade edges** (Q1 documented limitations — the routed `read()` is the
+  robust fallback): a partition named like an **operator/built-in** (`filter`, `group`,
+  `connect`, …) can't be READ through the facade (it returns the operator) — read it via
+  the snapshot (`data[value][key]`) or the routed method; **deep nested writes**
+  `data.x.y.z = v` into a non-held partition aren't routed (depth-1 is); **`await
+  data.x.field`** on a non-held key resolves the subscription, not a one-shot of the field
+  ([DECISIONS Q1](DECISIONS.md)).
+
+### Distributed query & aggregates (L3) — [P2→P3] (resource; planner; data)
+Decomposable aggregates (Q2) and whole-resource `read()` = gather (Q3) have landed
+([DECISIONS Q2/Q3](DECISIONS.md)) — the rest of the L3 distributed-query slice:
+- **Named-method fold / user-supplied combine** — a method returning a decomposable
+  aggregate (`anyActive: (_,c) => c.data.some(s => s.active)`), run per-holder over
+  OWNER-scoped `c.data`, the combine derived from the terminal operator's type (or
+  user-supplied). This is the function-carrying dispatch (closure predicates; the seam
+  grouped aggregates need; AND the SCALABLE alternative to Q3's O(N) gather — ship
+  per-shard partials + a combine, not all rows). Q2 ships only DECLARATIVE specs
+  (`col[,val]`) and rejects inline closures loudly. (resource)
+- **L3 chain planner** — `top/limit-K` (depends on `applyRecord` 'move' support — see
+  Method / RPC semantics + [DECISIONS E](DECISIONS.md) — or a whole-array re-ship),
+  `length(fn)` (whole-histogram re-ship, not O(1)), bare `group(col)`, and any
+  CHAINED aggregate past the facade's first hop (`data.filter(p).sum()`, `group(c).sum(v)`)
+  — all loudly flagged by the Q2f boundary guard, deferred to the planner that splits a
+  chain into per-shard + roll-up + local stages. Bare holistic ops already work via
+  `read().<op>()`; the planner is the EFFICIENT, no-full-gather path for the foldable ones.
+  (planner, resource)
+- **median/percentile/quantile** — `data` has no such operator (Q3 defers them; the user
+  computes over `methods.read()`). Add as fero terminals over the gathered set, or
+  contribute local operators to `data` and distribute via gather. (resource, data)
+- **Gather / fold hardening** — a bounded one-shot-gather deadline + a partial-result
+  signal (today a slow/departed holder silently undercounts after `callTimeout`); the
+  union-recompute is O(total)/delta — an INCREMENTAL per-key merge is the perf follow-up;
+  chained-aggregate auto-detect past the facade; per-handle GC of an abandoned gather handle
+  (see Method / RPC semantics). (resource, transport)
+- **`some/every('col')` under FULL replication** — the declarative column form is the
+  scoped-distributed sugar (it folds via `buildPartial`'s `filter(col,val).length()`); under
+  R=∞ the facade isn't built (to keep that path byte-identical), so `data.some('col')` falls
+  through to data's raw `some`/`every`, which require a predicate FN (throws "fn is not a
+  function" — use the native `data.some(fn)` there). Making the col form uniform across R=∞
+  needs a `data`-lib `some(col)/every(col)` overload (the `data` lib accepts a column for
+  sum/max/min/avg/filter but not some/every) — then fero's full-rep path works unchanged.
+  `sum/max/min/avg('col')` + `length()` already work on every config. (data, resource)
+- **Server-side `methods.read(key)` owner-routing.** A server's keyed `methods.read(key)`
+  reads LOCALLY today (the `data[key]` facade does the routing); route it to `owner(key)`
+  like the facade ([DECISIONS Q3](DECISIONS.md)). (resource)
 
 ### Robustness & lifecycle — [P1→P3] (transport: message, peer, index; resource)
 - **[P1] Defensive decode against malformed/hostile frames.** `records()` trusts
@@ -333,30 +332,33 @@ Pure perf tail; gate each on a `*.perf.ts` threshold.
   write-ack semantics.
 - Numeric-vs-string status enum (peers); method-dispatch closure-per-method
   (one-time, fine — noted) (resource).
-- Documented non-portabilities: little-endian host (x64/arm64); varint values < 2^32.
+- Documented non-portabilities: little-endian host (x64/arm64); varint values < 2^32;
+  **NUL (`\x00`) in a top-level key** over-matches the `versionKey`/`originKey`/shed
+  suffix separators (an inherited library separator assumption — [DECISIONS P4](DECISIONS.md)).
 
 ---
 
 ## Testing & chaos backlog (mostly L4)
-- **N-node convergence + partition/kill/heal** chaos harness (port fero-old's) — the
-  big one; spans transport/log/resource. The crash-recovery path (kill, peer writes,
-  restart, catch-up) is covered; partition-heal and late-join are not.
-- **Concurrent-write divergence** — two nodes diverging under simultaneous same-key
-  writes (motivates LWW).
-- **Catch-up correctness** — a node that missed records converges via `diff` on
-  reconnect.
-- **Reconnect end-to-end** — kill/restart, fake-timer backoff for determinism;
-  **max-attempts → destroy** lifecycle.
-- **Real-socket large/straddled frame** — a record bigger than one TCP segment
-  reassembles (straddle is unit-tested, not yet over a socket).
-- **Malformed-frame tests** — truncated `bodyLen`, `count` > body, `recLen` overrun,
-  reserved vtype nibble (7, 9–15) — must error gracefully, never crash/over-read.
-  Plus a **property/fuzz** encode→decode→deepEqual loop over thousands of random
-  records.
-- **Handshake** — control-frame straddle (INIT/SYNC/DONE split across segments),
-  malformed identity payload, client refused before `ready`.
-- **Churn** (peers) — rapid connect/disconnect must not leak projection rows or
-  connections; **dial-cap/jitter** behaviour once the reactive loop lands.
+The reusable chaos HARNESS + reversible partition seam, the N-node convergence /
+partition→heal / crash→recover / churn / randomized-soak scenarios, the real-socket
+large frame, and the handshake straddle + malformed-identity tests have LANDED
+([DECISIONS L4](DECISIONS.md)). Concurrent-write divergence, catch-up correctness, and
+the malformed-frame + encode→decode / single-byte-corruption fuzz were already covered.
+What's still open:
+- **Reconnect end-to-end** — fake-timer backoff for determinism; the **max-attempts →
+  destroy** give-up lifecycle (kill/restart + rejoin are covered; the deterministic
+  backoff and give-up-then-destroy paths are not).
+- **Handshake** — **client refused before `ready`** (the guard isn't built yet — see the
+  Handshake/membership workstream; straddle + malformed identity are covered).
+- **Membership** — a dedicated **two-established-cluster merge** (works via the
+  lowest-coordinator + epoch-ordering path, only chaos-adjacent tested);
+  **min-cluster-size** behaviour (a sub-quorum remnant stays read-only — the CP posture is
+  decided in [DECISIONS V](DECISIONS.md), the behaviour is untested); flapper-fencing once
+  incarnation numbers land.
+- **Churn leak** (peers) — the churn scenario asserts convergence + single-view
+  agreement, but a dropped peer still leaves a `disconnected` row forever; wire row
+  pruning (the "Prune dead rows" workstream) and an under-test for it. **dial-cap/jitter**
+  behaviour once the reactive dial loop lands.
 - **DHT** — tighten distribution/movement bounds (deterministic hash + larger key
   set asserts the ~1/N movement law); `owners()` distinct-R under churn.
 - **Method-returns-ViewProxy** — snapshot (`await`) vs live (reactive) on one handle;
@@ -368,7 +370,7 @@ Pure perf tail; gate each on a `*.perf.ts` threshold.
 ## Parked alternatives (considered, not chosen)
 Recorded so they aren't re-litigated without a new reason.
 - **Whole-frame CBOR** — uniform + handles binary, but forfeits the scalar-nibble and
-  binary-key wins; viable only behind the value seam [open question 8].
+  binary-key wins; viable only behind the value seam [open question 7].
 - **Varint `bodyLen`** (vs fixed u32) — saves ~3 bytes/frame but adds a varint read to
   the framer's hot loop; fixed u32 keeps it branch-light.
 - **Magic-byte version nibble** — reserved for wire evolution; v1 burns the byte as a
@@ -377,5 +379,13 @@ Recorded so they aren't re-litigated without a new reason.
   buckets and complicates weighted/named nodes) and **rendezvous/HRW** (no rebuild,
   natural R-replicas, but O(M)/lookup — wins only for small M) — vs the current vnode
   ring.
-- **CRDT / OR-set** merge vs LWW-by-ptime [open question 10]; **WAL + checkpoint**
+- **Gap-tolerant dedup + gap-aware anti-entropy** (TCP-SACK-style contiguous-water +
+  above-water gap set per origin) — approach 1 to owner-routing in
+  [DECISIONS F](DECISIONS.md); F1/P chose owner re-sequencing (approach 2).
+- **Drained-ballot handoff barrier** (gate the view-change commit on catch-up) — P4's
+  keep-until-confirmed shedding gives the no-under-replication-window property without
+  it, so it's dropped from the roadmap ([DECISIONS P4](DECISIONS.md)).
+- **Force-to-solo (AP) degrade** — a sub-quorum remnant could be forced writable (AP);
+  deliberately not offered (CP posture, [DECISIONS V](DECISIONS.md)).
+- **CRDT / OR-set** merge vs LWW-by-Lamport [open question 9]; **WAL + checkpoint**
   (DB-style) as the persistence+compaction shape.

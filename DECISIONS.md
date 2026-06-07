@@ -123,7 +123,7 @@ every writer broadcasts its own writes in-order, so dedup / anti-entropy / LWW a
 all sound. The general mixed-origin `encodeFrames` framing (a real robustness win,
 needed by either future approach) was kept.
 
-**Doing F correctly needs one of (→ [IDEAS open question 7](IDEAS.md)):**
+**Doing F correctly needs one of (→ [IDEAS → Partitioned ownership & routing](IDEAS.md)):**
 1. **Gap-tolerant dedup + gap-aware anti-entropy** — track a contiguous water + an
    above-water gap set per origin (TCP-SACK-style), and make `recordsSince` ship by
    gaps, not just water. Bounded if delivery is mostly-ordered.
@@ -184,8 +184,8 @@ converges by LWW (as the pre-F1 model did).
   TCP clusters that contend for ports + CPU when run concurrently, flaking the
   timing-sensitive multi-node convergence tests. Perf stays parallel.
 
-**Still open → [IDEAS open question 7](IDEAS.md):** F1 keeps full broadcast, so it does
-NOT yet cut fan-out. **F2** — per-partition sequencing + R-way replication
+**Still open → [IDEAS → Partitioned ownership & routing](IDEAS.md):** F1 keeps full
+broadcast, so it does NOT yet cut fan-out. **F2** — per-partition sequencing + R-way replication
 (`mesh.replicate` to the R owners; dedup/catch-up keyed per partition via the log's
 `heads()`/`diff()`) — is the scaling win. **F3** — owner failover / version continuity
 on handoff (the next clockwise replica, already caught up, continues the partition's
@@ -272,8 +272,8 @@ coordinator tick is unref'd and idle when stable, the write path reads one cache
 boolean; ~44ms/10k writes. Heal/rejoin (an evicted node restarts and is re-admitted),
 4-node convergence, and reciprocal catch-up are tested; failover ~1.2s.
 
-**Still open → [IDEAS open question 7](IDEAS.md):** stronger epoch fencing (REJECT a
-stale-epoch write from an evicted node — needs the per-partition owner lineage +
+**Still open → [IDEAS → Partitioned ownership & routing](IDEAS.md):** stronger epoch
+fencing (REJECT a stale-epoch write from an evicted node — needs the per-partition owner lineage +
 uuid↔address) and the commit-ack drain land with **F2** (per-partition sequencing +
 R-way replication — the fan-out scaling win) and **F3** (owner failover continuity).
 Buffered writes currently flush under the current epoch (win LWW on rejoin) — preserving
@@ -285,7 +285,7 @@ not offered. Incarnation numbers (flapper fencing beyond the debounce) deferred.
 ## F2 — Per-partition sequencing / R-way replication: deferred to partitioned holding · Investigated · (no code)
 
 **Context.** F1 + V give owner-routed writes with stable per-epoch ownership. The last
-owner-routing goal ([open question 7](IDEAS.md)) was F2: cut replication fan-out from
+owner-routing goal ([IDEAS → Partitioned ownership & routing](IDEAS.md)) was F2: cut replication fan-out from
 O(N) full broadcast to O(R) by replicating each partition to only its R replicas, with
 per-partition sequencing (+ F3 owner-failover continuity).
 
@@ -320,10 +320,18 @@ deliberate decision to make non-local reads async. Until then fero is a fully-re
 view-synchronous, linearizable-per-partition store with synchronous local reads — which
 is the right default for its target scale.
 
-> **Superseded by Milestone P.** The user took the deliberate decision F2 was gated on
-> ("go option 2 — partitioned holding, non-local reads become async"). F2's two findings
-> still hold and shaped P's design: per-partition sequencing is done WITH scoping (not
-> under full broadcast), and the per-origin core is preserved unchanged for R=∞.
+> **Superseded by Milestone P (F2 *and* F3).** The user took the deliberate decision F2
+> was gated on ("go option 2 — partitioned holding, non-local reads become async"). F2's
+> two findings still hold and shaped P's design: per-partition sequencing is done WITH
+> scoping (not under full broadcast), and the per-origin core is preserved unchanged for
+> R=∞. **F3 (owner-failover version continuity) is obviated, not deferred:** it was the
+> *per-partition-sequencing* answer to handoff — the next owner continues the partition's
+> single counter, with `(version, owner)` breaking split-brain ties. P keeps the
+> **per-origin** core instead, so a handoff O1→O2 needs no shared counter to continue
+> (each owner writes under its own uuid-keyed stream) and split-brain ties resolve by
+> `(epoch, seq, origin)` LWW (V1d), not `(version, owner)`. The only residue of F3 still
+> open is the **reject-stale-epoch-from-an-evicted-node** fence (owner lineage +
+> uuid↔address), tracked under [IDEAS → Partitioned ownership & routing](IDEAS.md).
 
 ## P — Partitioned holding (R-way replication) · Adopted · `b079b26` (P0) → P2
 
@@ -566,7 +574,7 @@ adversarial-review workflow (it earned its keep — see below).
   the facade's first hop) are L3-planner work — drawn and POLICED by the boundary guard, not
   crossed silently.
 
-**Still open → [IDEAS open question 7 / Aggregates].** The **named-method fold** (a method
+**Still open → [IDEAS → Distributed query & aggregates](IDEAS.md).** The **named-method fold** (a method
 returning a decomposable aggregate, run per-holder over owner-scoped data, combine derived
 from the operator type — the function-carrying dispatch for closure predicates + grouped
 aggregates); **group bucket→rows + top/limit-K + length(fn)** (the L3 chain planner / a
@@ -639,10 +647,61 @@ the contacted node's local shard under scoping — fine under full replication, 
   and the user-supplied COMBINE path (ship per-shard partials, fold without the full gather) are NOT in
   Q3 — the combine needs per-holder logic, i.e. pre-deployed functions (the named-method fold seam).
 
-**Still open → [IDEAS open question 7 / Aggregates].** **median/percentile/quantile** terminals over
+**Still open → [IDEAS → Distributed query & aggregates](IDEAS.md).** **median/percentile/quantile** terminals over
 the gathered set; the **user-supplied combine / named-method fold** (the scalable alternative to the
 O(N) gather); **gather-hardening** (a bounded one-shot deadline + partial-result signal; the
 union-recompute is O(N)/delta — an incremental per-key merge is the perf follow-up); **per-handle GC**
 of an abandoned gather handle + the **ungraceful-disconnect** subscription leak (now also via the
 gather's `openFold` — shared transport-layer infra, an `onPeerGone` hook + a peer→subId reverse index);
 and **server-side `methods.read(key)`** owner-routing (today LOCAL — the `data[key]` facade routes).
+
+## L4 — Chaos test harness + reversible partition seam · Adopted
+
+**Context.** The L2 suite proved SINGLE faults via full-node `destroy()` (failover, eviction,
+quorum-loss, acquisition, shedding), each re-implementing the same N-node spin-up. Two gaps
+remained ([IDEAS testing/chaos backlog](IDEAS.md)): no reusable harness, and no FAITHFUL network
+partition — every failure test KILLED the node, so the *alive-but-unreachable* path (the V0 failure
+detector's whole reason to exist) and partition→HEAL convergence were untested. The only
+fault-injection primitive, `diagnostics.drop` (→ `peer.destroy`), is terminal and one-directional —
+it can sever but never heal.
+
+**Decision.**
+- **Reversible isolation seam** (`Peers.isolate/heal` → `mesh.isolate/heal` →
+  `instance[diagnostics].isolate/heal`). `isolate(address)` severs the dialed link AND adds the
+  address to a `#blocked` set so it can't redial — directly OR via handshake gossip-revival (a bridge
+  node re-announcing it through `learn` → `addServer` → `add`). Used SYMMETRICALLY (the harness
+  isolates both sides) it is a true bidirectional partition: every broadcast / catch-up / forward
+  travels over the DIALER's outbound socket, so cutting both dials cuts both directions and the
+  inbound sockets close with them. `heal(address)` unblocks + re-dials by listen address → reconnect →
+  handshake → anti-entropy → view re-admit (a rejoin WITHOUT a process restart). **Zero steady-state
+  cost**: an isolated peer leaves `#conns`, so `broadcast`/`sendTo` skip it with no new check;
+  `#blocked` is consulted ONLY in the cold `add()` dial path (empty set ⇒ a no-op in production) —
+  `index.perf.ts` is byte-unchanged.
+- **Reusable harness** ([tests/chaos/harness.ts](tests/chaos/harness.ts)) — one
+  `cluster({ n, replicas, … })` factory with the lifecycle the ~30 inline tests duplicated (spin-up,
+  `formed`, `node(addr)`, `place`, `converged`, `kill`/`restart`/`add`, `client`) plus the chaos ops
+  (`partition`/`heal`, leak counters). Built on `#utils` + the diagnostics seam.
+- **Cluster chaos tests** ([tests/chaos/cluster.test.ts](tests/chaos/cluster.test.ts)) — 5-node
+  multi-origin convergence; network partition→heal (majority writes, minority read-only + buffers,
+  both reconverge); crash→recover (WAL restore + catch-up); membership churn (re-agrees on one view,
+  converges); a seeded randomized soak. `npm test` now globs `tests/chaos/*.test.ts`.
+- **Wire-robustness gaps filled** — a real-socket large frame (>1 TCP segment reassembles end-to-end,
+  [peer.test.ts](transport/peer.test.ts)); the handshake state machine + control-frame straddle +
+  malformed-identity ([handshake.test.ts](transport/handshake.test.ts), which did not exist). The
+  malformed/hostile-frame decode guards + the encode→decode and single-byte-corruption fuzz loops were
+  ALREADY covered ([message.test.ts](transport/message.test.ts)) — that IDEAS entry was stale and is
+  trimmed.
+
+**Consequences.**
+- A true partition is now testable end-to-end: the minority side goes read-only (V1e write-gate) and
+  buffers, the majority progresses, heal flushes the buffer + anti-entropy reconciles, all nodes
+  reconverge — exercising the V0 detector + eviction + write-gate + rejoin path a plain kill never did.
+- The randomized soak is topology-sensitive (random ports → random ring → random coordinator/majority),
+  so it asserts the END invariant (re-merge + convergence + every *majority-committed* key present), not
+  a fixed timeline. Multi-node TCP timing means every assertion is `until`-polled and the suite stays
+  serial (`--test-concurrency=1`, see [F1](#f1--owner-routed-writes-via-forwarding-owner-re-sequencing-phase-1--adopted)).
+
+**Still open → [IDEAS](IDEAS.md):** row-pruning leak under churn (a dead peer leaves a `disconnected`
+row — the churn test asserts convergence + single-view agreement, not leak-free, until pruning lands);
+`client refused before ready`; DHT distribution-bound tightening + `owners()` distinct-R under churn;
+dial-cap/jitter chaos once the reactive dial loop lands.
