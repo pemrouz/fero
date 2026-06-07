@@ -21,7 +21,7 @@ import { applyRecord } from '../log/index.ts'
 import { type ChangeRecord } from '../transport/message.ts'
 import { type Mesh } from '../transport/index.ts'
 import { AGG, type Fold, type AggSpec } from './fold.ts'
-import { lazyHandle, isViewProxy, snapshot } from './handle.ts'
+import { lazyHandle, isViewProxy, forWire } from './handle.ts'
 import type { Method, Context } from './index.ts'
 
 export type DispatchDeps = {
@@ -85,7 +85,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       const s = stripFold(arg)
       return fold.gatherOnce(s, AGG[s.op]?.combine) // a Promise; the CALL handler awaits it before replying
     }
-    return snapshot(invoke(method, arg, address))
+    return forWire(invoke(method, arg, address))
   }
 
   // Server side of a subscription: run the method here; if it returns a ViewProxy

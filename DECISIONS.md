@@ -627,7 +627,7 @@ the contacted node's local shard under scoping — fine under full replication, 
 - Q3b: three majors, all from mutating `localMethods.read` in place + returning a live handle —
   **M1** a custom `read` was silently swapped for the raw gather under scoping (fix: gate the override
   AND the Q3a wire branches on `allMethods.read === defaults.read`); **M2** a handler RETURNING
-  `c.methods.read()` replied with the fold's empty in-progress union because `snapshot()`'s
+  `c.methods.read()` replied with the fold's empty in-progress union because `forWire()`'s
   isViewProxy/`[VALUE]` probe opened the live fold (fix: resolve a returned handle via `gatherOnce`,
   detected by a side-effect-free `FOLD_HANDLES` WeakSet — probing the resolver symbol on a `data`
   ViewProxy throws "Cannot convert a Symbol to a string", which the first fix attempt hit and the
@@ -768,10 +768,10 @@ by-value copy of state that should be shared, or a hot-path regression.
 
 **Decision.** Split into a thin **composer** (`index.ts`) plus three modules, keeping the replication
 core in the composer:
-- **[handle.ts](resource/handle.ts)** — the stateless leaf: `lazyHandle`, `snapshot`/`isViewProxy`,
+- **[handle.ts](resource/handle.ts)** — the stateless leaf: `lazyHandle`, `forWire`/`isViewProxy`,
   `FOLD_ONCE`/`FOLD_HANDLES`, `noop`. A *neutral* module both other modules import, so there is no
   `dispatch.ts ↔ fold.ts` import cycle and `FOLD_HANDLES` stays one shared identity (a handle registered
-  by the fold engine is recognised by `snapshot` called from the dispatch side).
+  by the fold engine is recognised by `forWire` called from the dispatch side).
 - **[fold.ts](resource/fold.ts) `makeFold({...})`** — the aggregate engine (`ownedView`, `composite`,
   `buildPartial`, `livePartial`, `gatherOnce`, `gatherLive`, `foldAggregate`), joining the `AGG` registry.
 - **[dispatch.ts](resource/dispatch.ts) `makeDispatch({...})`** — the RPC + subscription servers, the

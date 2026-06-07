@@ -1987,7 +1987,7 @@ test('Q3b regression (M1): a custom no-key read is NOT swapped for the raw gathe
 })
 
 test('Q3b regression (M2): a handler returning c.methods.read() replies with the GLOBAL, not a local partial', async () => {
-  // snapshot() must resolve a returned gather handle via gatherOnce (await ⇒ global) instead of
+  // forWire() must resolve a returned gather handle via gatherOnce (await ⇒ global) instead of
   // opening its live fold and reading the still-empty in-progress union.
   const pts = await Promise.all(Array.from({ length: 3 }, () => ports.free()))
   const cfg = (port: number) => ({
