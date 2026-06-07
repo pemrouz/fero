@@ -66,30 +66,36 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
 ## Workstreams
 
 ### Identity, dedup & connection hygiene — [P1] (transport: peer, peers, handshake, index)
-The biggest correctness cluster — all four modules touch one underlying gap: there
-is no stable peer identity until the handshake.
-- **Re-key inbound peers.** `accept()` keys a peer by the socket's *ephemeral*
-  `remoteAddress:remotePort`, which can't be dialed back and mislabels inbound
-  servers as role `client` (polluting `cluster.peers`). The handshake learns the
-  real listening host:port + uuid — re-key the row/connection from it.
-- **Dedup duplicate connections by uuid (connected-wins).** Each server pair forms
-  two TCP connections (A→B and B→A) with no dedup; if two nodes dial at once, two
-  sockets exist for one logical pair. Collapse to one bidirectional conn
-  post-handshake.
-- **Prune dead rows.** Rows persist forever — a peer that gives up leaves a
-  `disconnected` row (slow leak). `forget(address)`/TTL wired to Peer destroy; prune
-  ephemeral inbound rows on close.
+The biggest correctness cluster — these items share one underlying gap: there is no
+stable peer identity until the handshake. **Inbound re-key has landed**
+([DECISIONS T](DECISIONS.md)): an accepted server socket is re-keyed to its learned
+listen address on handshake DONE (uuid stamped on the `Peer` + row), so it no longer
+leaks a phantom ephemeral `client` row, and `onSubscribe`/reap key under a stable
+dialable address. The remaining items build on that identity:
+- **Dedup duplicate connections by uuid (connected-wins).** Each server pair still
+  holds two TCP sockets (A→B and B→A) — both load-bearing (one carries each
+  direction), so re-key keeps both and folds the inbound into a receive/serve *shadow*
+  rather than collapsing them. Collapse to one bidirectional conn post-handshake
+  (connected-wins by uuid; both ends must agree on the survivor or they both drop),
+  changing `broadcast`'s dialed-only gate to "send over the one surviving socket".
+- **Prune dead rows.** A published row persists forever — a peer that gives up leaves a
+  `disconnected` row (slow leak). `forget(address)`/TTL wired to Peer destroy. (Server
+  shadows are now pruned from `#shadows` on their own drop — [DECISIONS T](DECISIONS.md);
+  the lingering `disconnected` *row* of a dialed/client peer is what's still open, plus
+  the rapid-reconnect shadow-overwrite leak noted there.)
 - **uuid self-identity + self-reject.** `me` is a single host:port string; a
   multi-interface node or a dial+accept race needs uuid identity to reject self and
-  dedup.
-- **Peer-disconnect (`onPeerGone`) hook + `peer→subId` reverse index.** Subscriptions
-  aren't torn down on an ungraceful client/relay disconnect — a pre-existing leak that
-  now also strands forwarded subscriptions and a Q3 whole-resource `read()` `openFold`
-  gather ([DECISIONS Q1/Q3](DECISIONS.md)). One transport hook + a reverse index closes
-  every leak path at once (cross-cuts the handle-lifecycle teardown under Method/RPC and
-  Distributed query). (transport, resource)
+  dedup. The uuid is now stored per-`Peer` + on the row ([DECISIONS T](DECISIONS.md)),
+  so self-reject can compare it instead of the host:port string.
 - **[P3] Incarnation numbers** for flapper fencing beyond the stability debounce
   ([DECISIONS V](DECISIONS.md) deferral) — pairs with uuid self-identity.
+
+> The peer-disconnect (`onPeerGone`) hook + `peer→subId` reverse index that reaps a
+> gone peer's served subscriptions (incl. forwarded subs and the Q3 `read()` gather's
+> `openFold`) on ungraceful disconnect is **already built** — `peers.ts` fires
+> `onPeerGone` on the status→disconnected transition, `dispatch.ts` keeps the reverse
+> index + `reapPeer`, covered by the resource reap tests. (Was listed open here; it
+> landed alongside Q1/Q3.)
 
 ### Zero-copy send path — [P1] (transport: message, peer)
 The design's headline send-side win; v1 uses the simpler `encodeFrame`-per-tick path.

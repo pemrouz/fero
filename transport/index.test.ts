@@ -6,9 +6,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { $, value, view } from '../../data/index.ts'
-import { transport } from './index.ts'
+import { transport, STATUS } from './index.ts'
 import { type ChangeRecord } from './message.ts'
-import { ports, until, connected, apply } from '#utils'
+import { ports, until, connected, apply, sleep } from '#utils'
 
 // A storeless mesh needs somewhere to land records so the test can assert where
 // they went: a $() plus an apply bound to its res.
@@ -101,7 +101,8 @@ test('view-change frames route to their own hook, never to onRecord (Milestone V
   const a2 = `127.0.0.1:${p2}`
   let prepared: { value: unknown; address: string } | undefined
   let dataRecords = 0
-  const mA = transport({ name: 'vseam', host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, onRecord: () => {} })
+  let aHandshook = false
+  const mA = transport({ name: 'vseam', host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, onRecord: () => {}, onConnect: (addr) => { if (addr === a2) aHandshook = true } })
   const mB = transport({
     name: 'vseam',
     host: '127.0.0.1',
@@ -117,17 +118,19 @@ test('view-change frames route to their own hook, never to onRecord (Milestone V
   })
   try {
     assert.ok(await until(() => connected(mA, a2) && connected(mB, a1)), 'A↔B connect')
+    // Wait for A's handshake to B to COMPLETE (onConnect fires after A sends DONE; connected() only
+    // means the TCP socket is up) so B has re-keyed its inbound peer before the view frame arrives.
+    assert.ok(await until(() => aHandshook), 'A finished its handshake to B (DONE sent)')
 
     const payload = { epoch: 2, members: [a1, a2], proposer: a1 }
     assert.ok(mA.viewPrepare(a2, payload), 'viewPrepare reaches the connected peer')
 
     assert.ok(await until(() => prepared !== undefined), 'onViewPrepare fires on B')
     assert.deepEqual(prepared!.value, payload, 'the view payload arrives intact')
-    // NB: prepared.address is the inbound socket's EPHEMERAL address, not A's
-    // listen address (inbound peers aren't re-keyed yet — see IDEAS). The view
-    // protocol therefore identifies the sender from the payload (proposer), not
-    // peer.address; we only assert an address was tagged.
-    assert.ok(typeof prepared!.address === 'string' && prepared!.address.length > 0, 'tagged with the inbound peer address')
+    // The inbound peer is re-keyed to A's LISTEN address on handshake DONE (Peers.identify),
+    // and DONE precedes this post-handshake view frame on the shared socket, so a frame arriving
+    // over it is tagged with A's dialable address — the sender is identifiable from peer.address.
+    assert.equal(prepared!.address, a1, 'tagged with the sender’s listen address (re-keyed inbound peer)')
     assert.equal(dataRecords, 0, 'the view frame never reached onRecord (the data path)')
   } finally {
     mA.destroy()
@@ -137,8 +140,9 @@ test('view-change frames route to their own hook, never to onRecord (Milestone V
 
 test('a peer drop fires onPeerGone (the subscription-reap signal) for the SAME address a sub was keyed under, not onUnsubscribe', async () => {
   // The L2 subscription-hygiene fix relies on onPeerGone firing on a socket close (which never
-  // delivers an UNSUBSCRIBE frame) — and firing for the SAME address onSubscribe saw (the ephemeral
-  // inbound address), so a reverse-index reap finds the sub.
+  // delivers an UNSUBSCRIBE frame) — and firing for the SAME address onSubscribe saw, so a
+  // reverse-index reap finds the sub. The inbound server socket is re-keyed to its listen address
+  // on handshake DONE, so both onSubscribe and the reap key under that stable address (a2 below).
   const [p1, p2] = [await ports.free(), await ports.free()]
   const a1 = `127.0.0.1:${p1}`
   const a2 = `127.0.0.1:${p2}`
@@ -152,17 +156,23 @@ test('a peer drop fires onPeerGone (the subscription-reap signal) for the SAME a
     ports: [p1, p2],
     wait: 200,
     onRecord() {},
-    onSubscribe: (id, _m, _a, address) => subs.push(address), // address = the ephemeral inbound peer
+    onSubscribe: (id, _m, _a, address) => subs.push(address), // address = the re-keyed inbound peer (mB's listen addr)
     onUnsubscribe: (_id, address) => unsubbed.push(address),
     onPeerGone: (address) => gone.push(address),
   })
-  const mB = transport({ name: 'pg', host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200, onRecord() {} })
+  let bHandshook = false
+  const mB = transport({ name: 'pg', host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200, onRecord() {}, onConnect: (addr) => { if (addr === a1) bHandshook = true } })
   try {
     assert.ok(await until(() => connected(mA, a2) && connected(mB, a1)), 'A↔B connected')
+    // Wait for B's handshake to A to COMPLETE (onConnect fires after B sends DONE) so A has re-keyed
+    // its inbound peer to mB's listen address BEFORE the SUBSCRIBE — onSubscribe then sees a2, the
+    // same address onPeerGone will fire on drop (the reap-key alignment this test pins).
+    assert.ok(await until(() => bHandshook), 'B finished its handshake to A (DONE sent)')
     // mB opens a subscription to mA — so a leaked sub WOULD matter.
     mB.subscribe('read', undefined, () => {}, a1)
     assert.ok(await until(() => subs.length === 1), 'mA served the subscription')
-    const subAddr = subs[0] // the address mA keyed the sub under (ephemeral inbound)
+    const subAddr = subs[0] // the address mA keyed the sub under — the re-keyed inbound peer
+    assert.equal(subAddr, a2, 'the sub is keyed under mB’s listen address (re-keyed inbound peer), not an ephemeral port')
 
     // mB drops ungracefully (transport destroy = socket close, NO UNSUBSCRIBE frame).
     mB.destroy()
@@ -171,5 +181,64 @@ test('a peer drop fires onPeerGone (the subscription-reap signal) for the SAME a
     assert.equal(unsubbed.length, 0, 'onUnsubscribe did NOT fire — the drop was ungraceful (no UNSUBSCRIBE frame)')
   } finally {
     mA.destroy()
+  }
+})
+
+test('a one-directional drop of the DIALED socket does NOT reap subs served over the still-alive inbound shadow', async () => {
+  // A server pair holds two sockets: A→B dialed + B→A inbound shadow. A SERVES B's subscription over
+  // the inbound shadow (keyed by B's listen address a2). Dropping ONLY A's dialed socket to B must NOT
+  // fire onPeerGone(a2): the dialed peer carries no served subs, and post-re-key its listen address
+  // COLLIDES with the shadow's sub key — firing would FALSE-reap a still-live subscription. Only the
+  // shadow's own drop reaps.
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  const gone: string[] = []
+  let bHandshook = false
+  const mA = transport({ name: 'odrop', host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, onRecord() {}, onSubscribe: () => {}, onPeerGone: (address) => gone.push(address) })
+  const mB = transport({ name: 'odrop', host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200, onRecord() {}, onConnect: (addr) => { if (addr === a1) bHandshook = true } })
+  try {
+    assert.ok(await until(() => connected(mA, a2) && connected(mB, a1)), 'A↔B connected')
+    assert.ok(await until(() => bHandshook), 'B handshook to A (A re-keyed the inbound shadow to a2)')
+    mB.subscribe('read', undefined, () => {}, a1) // served over A's inbound shadow, keyed a2
+    // drop ONLY A's dialed socket to B (peer() prefers the dialed peer); A's inbound shadow stays alive
+    assert.ok(mA.drop(a2), 'dropped A→B dialed socket')
+    assert.ok(await until(() => mA.peers[a2]?.status?.[value] === STATUS.disconnected), 'A→B dialed row went disconnected')
+    await sleep(40) // give any (wrongly) deferred onPeerGone a chance to fire
+    assert.equal(gone.includes(a2), false, `a dialed-only drop must NOT reap the shadow's live subs (gone=${JSON.stringify(gone)})`)
+  } finally {
+    mA.destroy()
+    mB.destroy()
+  }
+})
+
+test('an inbound-only server link (no dial back) still serves deltas via the shadow send-fallback', async () => {
+  // After A loses its DIALED socket to B but keeps B's inbound shadow, A must still push a served delta
+  // to B over that shadow — peer() falls back to #shadows when #conns has no dialed peer. Without the
+  // fallback the shadow is send-invisible and the delta is silently dropped (the regression this pins).
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  let subId = -1
+  let bHandshook = false
+  const got: ChangeRecord[] = []
+  const mA = transport({ name: 'inonly', host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, onRecord() {}, onSubscribe: (id) => { subId = id } })
+  const mB = transport({ name: 'inonly', host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200, onRecord() {}, onConnect: (addr) => { if (addr === a1) bHandshook = true } })
+  try {
+    assert.ok(await until(() => connected(mA, a2) && connected(mB, a1)), 'A↔B connected')
+    assert.ok(await until(() => bHandshook), 'B handshook to A')
+    mB.subscribe('read', undefined, (rec) => got.push(rec), a1)
+    assert.ok(await until(() => subId >= 0), 'A served B’s subscription (over the inbound shadow)')
+    // sever A's DIALED link to B (and block redial) — A keeps ONLY B's inbound shadow
+    mA.isolate(a2)
+    assert.ok(await until(() => mA.peers[a2]?.status?.[value] === STATUS.disconnected), 'A→B dialed link severed')
+    mA.deltaTo(a2, subId, { type: 'update', key: ['x'], value: 7 })
+    assert.ok(
+      await until(() => got.some((r) => r.key?.[0] === 'x' && (r.value as number) === 7)),
+      `B received the served delta over the shadow fallback (got=${got.length})`,
+    )
+  } finally {
+    mA.destroy()
+    mB.destroy()
   }
 })

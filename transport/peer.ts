@@ -53,8 +53,12 @@ export type PeerOpts = {
 export class Peer {
   readonly host: string
   readonly port: number
-  readonly address: string
-  readonly role: 'server' | 'client'
+  // address + role are mutable: an accepted inbound socket is keyed by an undialable
+  // ephemeral port and its role is provisional until the handshake reveals identity.
+  // Peers.identify() re-keys a server peer to its learned listen address on DONE.
+  address: string
+  role: 'server' | 'client'
+  uuid = '' // stable peer identity, learned in the handshake (empty until then)
   status: Status = STATUS.disconnected
 
   #socket?: net.Socket

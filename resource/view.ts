@@ -95,9 +95,10 @@ export class ViewManager {
   }
 
   // Reachable cluster members: self + every dialed SERVER peer that is connected
-  // and not suspect (the V0 failure detector's verdict). Inbound accepted sockets
-  // are role 'client' (and keyed by an ephemeral port), so they're excluded — we
-  // only ring nodes we can route to by their listen address.
+  // and not suspect (the V0 failure detector's verdict). An inbound accepted server
+  // socket folds into its dialed listen-address row (a receive shadow that owns no
+  // row), and a client stays role 'client' — either way we ring only the dialed,
+  // listen-keyed server rows, i.e. nodes we can route to by their listen address.
   #reachable(): string[] {
     const out = new Set<string>([this.#me])
     const snap = this.#peers[VALUE] ?? {}

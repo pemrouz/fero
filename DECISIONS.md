@@ -803,3 +803,65 @@ the diagnostics seam only via `dispatch.servedCount`.
 
 **Open follow-ups → [IDEAS](IDEAS.md):** the L3 chain planner is the natural next home for the
 holistic-op guard in `dispatch.ts`. No further core decomposition planned — the core is deliberately whole.
+
+## T — Re-key inbound peers on handshake DONE (stable peer identity) · Adopted
+
+**Context.** A TCP server `accept()`s an inbound socket and keyed the resulting `Peer` (and its
+`cluster.peers` row) by the socket's *ephemeral* `remoteAddress:remotePort` with a provisional
+role `client`. That address can't be dialed back, and a peer that is really a server got
+mislabeled as a `client` — so `cluster.peers` carried a **phantom ephemeral client row** for
+every inbound server link, and the point-to-point hooks (`onSubscribe`/`onViewPrepare`/`onWrite`/…)
+tagged the sender with an unstable ephemeral address. The handshake already learns the peer's real
+uuid + listen address; nothing re-keyed from it. This is the keystone of the "Identity, dedup &
+connection hygiene" cluster ([IDEAS](IDEAS.md)) — dedup-by-uuid and dead-row pruning both need the
+stable listen-key + uuid this establishes.
+
+**Decision.** `Peers.identify(peer, id)` runs on handshake **DONE** (wired through the L0 `done`
+hook, which now carries the learned `Identity`). An accepted inbound peer owns **no** `cluster.peers`
+row until then (deferred from `accept()`), so a half-handshake inbound never leaks a row:
+- a **server** inbound socket is re-keyed to its **listen address** (uuid + role stamped) and becomes
+  a receive/serve **shadow** — its membership identity is the **dialed** peer's row, which is the
+  routable/ring identity. Both the dialed (A→B) and inbound (B→A) sockets are **kept** (each carries
+  one direction; `broadcast` stays dialed-only), so this is NOT yet connection-dedup.
+- a **client** inbound socket (no listen address) is published under its ephemeral address as role
+  `client` — unchanged externally, just deferred to DONE and now carrying a uuid.
+- a **dialed** peer already owns a correctly-keyed row — `identify` only stamps its uuid.
+
+`Peer.address`/`role` became mutable and a `uuid` field was added; `Peers` tracks a `#published`
+WeakSet (row owners: dialed peers + identified clients) and a `#shadows` **Map keyed by listen
+address** (re-keyed inbound servers). The Map does double duty: a **send fallback** in `peer()`
+(`#conns.get(addr) ?? #shadows.get(addr)`, dialed wins) so an inbound-only link is still reachable
+point-to-point, and the teardown set. `#mirror` writes rows only for published peers. **Reap keys
+by the inbound socket, not the dialed peer:** a served subscription always arrives over an inbound
+socket (a client row, or a server shadow), so `onPeerGone` fires for **`!dialed`** peers only —
+a *dialed* peer serves nothing, and post-re-key its listen address collides with the shadow's
+served-sub key, so firing it would **false-reap** the shadow's still-live subs on a one-directional
+drop. The shadow is therefore the sole server-pair reap trigger (and is pruned from `#shadows` as it
+fires). The keys align because L2 opens a served sub only after a view commit — well after the DONE
+that re-keys — so `onSubscribe` and the reap both see the listen address (the transport tests gate
+the subscribe on the dialer's `onConnect`, which fires after DONE, to make that ordering deterministic).
+
+**Adversarial review (pre-commit, fixes folded in).** A 4-lens review caught two majors my single pass
+missed: a *dialed*-socket one-directional drop **false-reaping** the shadow's live subs (the listen
+address now collides — fixed by the `!dialed` gate, which also subsumes a double-`onPeerGone`); and the
+shadow being **send-invisible** (parked outside `#conns`), regressing served delivery on an inbound-only
+link (fixed by the `peer()` fallback + keying `#shadows` by address). Two duplicate-DONE / self-address
+landmines (re-key twice → strand the dialed peer; re-key to `me`) were guarded in `identify`. Two
+asymmetric regression tests + the deterministic-ordering test gates were added.
+
+**Consequences.**
+- `cluster.peers` shows each server exactly once under its dialed listen address (uuid-stamped); no
+  phantom ephemeral client rows. The view layer's `#reachable()` is unchanged — it already ringed
+  only dialed server rows, and a server shadow owns none.
+- Off the hot path — `identify` runs once per handshake, not per record; `peer()`'s fallback is one
+  extra Map lookup only when `#conns` misses. Tests 151/151, perf 17/17 (L2 writes ~71 ms vs the 150 ms
+  gate; the peers status-transition perf flat in N). The R=∞ path is byte-identical.
+- The `onSubscribe`/reap address shifted from ephemeral to the listen address for server↔server subs;
+  the transport reap + view-frame tests were updated to assert the stable address.
+
+**Open follow-ups → [IDEAS → Identity, dedup & connection hygiene](IDEAS.md):** connection-dedup to
+one bidirectional socket (connected-wins by uuid — re-key now *surfaces* the collision); dead-row /
+stale-`#shadows` pruning on a plain disconnect (we prune a shadow when it reaps, but a dialed row still
+lingers); uuid-based self-reject (the uuid is now stored, the compare isn't wired). A rapid B-reconnect
+that re-identifies a new shadow before the old one's close processes can leak the old shadow's served
+subs (bounded; folds into the churn-leak item).

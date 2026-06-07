@@ -27,6 +27,10 @@ export type PeersOpts = {
 
 export type PeerInfo = { host: string; port: number; role?: 'server' | 'client' }
 
+// What the handshake teaches us about an accepted inbound peer (a structural subset
+// of handshake.ts's Identity — Peers stays decoupled from the join protocol).
+export type PeerIdentity = { uuid: string; role?: 'server' | 'client'; listen?: string }
+
 export class Peers {
   // cluster.peers — the reactive membership/status view, keyed by address.
   readonly peers: any = $({})
@@ -35,6 +39,17 @@ export class Peers {
 
   #conns = new Map<string, Peer>() // address → socket machinery
   #blocked = new Set<string>() // addresses isolated by the chaos seam — refuse to (re)dial until healed
+  // A peer OWNS a cluster.peers row iff it's published: every dialed peer, plus an inbound
+  // CLIENT once the handshake identifies it. An inbound SERVER socket is instead a receive/
+  // serve SHADOW (re-keyed to its listen address for stable onSubscribe/reap keys) whose
+  // membership identity is the dialed row — so a half-handshake inbound never leaks a phantom
+  // row, and the ring only ever sees dialed server rows.
+  #published = new WeakSet<Peer>()
+  // Identified inbound server sockets, keyed by listen address. Two jobs: (1) a SEND fallback in
+  // peer() so an inbound-only link (no successful dial back) is still reachable point-to-point; the
+  // dialed peer to that address WINS when present. (2) the teardown set. NOT in #conns (so broadcast
+  // — dialed-only — never double-sends) and never published (so the ring sees only dialed rows).
+  #shadows = new Map<string, Peer>()
   #me?: string
   #retries?: RetryOpts
   #heartbeat?: HeartbeatOpts
@@ -61,16 +76,58 @@ export class Peers {
     if (existing) return existing // dedup
     this.peers[address] = { address, host, port, role, status: STATUS.disconnected }
     const peer = this.#make({ host, port, role })
+    this.#published.add(peer) // a dialed peer owns its listen-keyed row
     peer.connect()
     return peer
   }
 
-  // Wrap an inbound accepted socket as a connected peer (won't be redialed).
+  // Wrap an inbound accepted socket as a connected peer (won't be redialed). It owns NO
+  // cluster.peers row yet — an accepted socket is keyed by an undialable ephemeral port and
+  // its role is unknown until the handshake. identify() (on handshake DONE) publishes a
+  // client row or folds a server into its dialed listen-address identity, so a half-handshake
+  // inbound never leaks a phantom row.
   accept(socket: any, { host, port, role = 'client' }: PeerInfo): Peer {
-    const address = `${host}:${port}`
-    this.peers[address] = { address, host, port, role, status: STATUS.connected }
-    const peer = this.#make({ host, port, role, socket })
-    return peer
+    return this.#make({ host, port, role, socket })
+  }
+
+  // Resolve an accepted inbound peer's real identity from the completed handshake (or stamp a
+  // dialed peer's uuid). An inbound socket is accepted under an ephemeral port; the handshake
+  // reveals uuid, role and (for a server) the listen address:
+  //  - a SERVER inbound socket becomes a receive/serve SHADOW re-keyed to its listen address
+  //    (so onSubscribe and the reap that follows key under one stable, dialable address), while
+  //    the DIALED peer to that listen address stays the routable/ring identity + row owner;
+  //  - a CLIENT inbound socket is published under its ephemeral address as role 'client';
+  //  - a DIALED peer already owns a correctly-keyed row — we only stamp its uuid.
+  // The ring only ever sees dialed server rows, so a server shadow is never ringed (matching the
+  // prior ephemeral-client exclusion) — this just kills the phantom client row and gives the
+  // sender a stable address. Connection-dedup to one socket + dead-row pruning stay open (IDEAS).
+  identify(peer: Peer, id: PeerIdentity) {
+    // Idempotent: a duplicate/replayed DONE (a retransmit, or a re-handshake triggered when a
+    // suspect-flip re-fires #onConnect → re-initiate, or a buggy/hostile peer) must NOT re-key an
+    // inbound peer twice. Once a shadow is re-keyed, peer.address === its listen address, and a
+    // second identify() would run #conns.delete(peer.address) — deleting the DIALED peer that owns
+    // that listen key (the real send target), stranding routing while the row still shows connected.
+    // An already-identified inbound peer is in #shadows (server) or #published (client); skip it.
+    if (this.#shadows.get(peer.address) === peer || (!peer.dialed && this.#published.has(peer))) return
+    peer.uuid = id.uuid
+    if (peer.dialed) {
+      const row = this.peers[peer.address]
+      if (row?.[VALUE]) row.uuid = id.uuid
+      return
+    }
+    if (!id.listen) {
+      peer.role = id.role ?? 'client'
+      this.#published.add(peer)
+      this.peers[peer.address] = { address: peer.address, host: peer.host, port: peer.port, role: peer.role, uuid: id.uuid, status: STATUS.connected }
+      return
+    }
+    if (id.listen === this.#me) return // self-addressed inbound: never re-key to `me` / stamp the self row (mirrors add()'s self-guard)
+    this.#conns.delete(peer.address) // drop the ephemeral key; the dialed peer owns `listen`
+    peer.role = 'server'
+    peer.address = id.listen
+    this.#shadows.set(id.listen, peer)
+    const row = this.peers[id.listen] // stamp uuid on the dialed row if it exists
+    if (row?.[VALUE]) row.uuid = id.uuid
   }
 
   #make(opts: PeerInfo & { socket?: any }): Peer {
@@ -91,22 +148,39 @@ export class Peers {
   // emit a redundant `status` record that would needlessly churn derived
   // projections (e.g. the DHT's connected-servers reconcile).
   #mirror(peer: Peer) {
-    const row = this.peers[peer.address]
-    const snap: any = row[VALUE] ?? {}
-    if (snap.status !== peer.status) {
-      row.status = peer.status
-      // A transition TO disconnected (socket close / destroy) fires onPeerGone — the signal L2
-      // reaps a gone peer's served subscriptions on (it never sends an UNSUBSCRIBE frame). Gated to
-      // the status CHANGE (not a `suspect`-only mirror), so a suspect flip doesn't spuriously reap;
-      // firing for a never-connected dial-failure is harmless (the reaper finds no subs).
-      if (peer.status === STATUS.disconnected) this.#onPeerGone?.(peer)
+    if (this.#published.has(peer)) {
+      const row = this.peers[peer.address]
+      const snap: any = row[VALUE] ?? {}
+      if (snap.status !== peer.status) {
+        row.status = peer.status
+        // A transition TO disconnected fires onPeerGone — the signal L2 reaps a gone peer's served
+        // subscriptions on (a socket close never sends UNSUBSCRIBE). Gated to the status CHANGE so a
+        // suspect flip doesn't spuriously reap. Gated to `!dialed` because subscriptions are served
+        // over INBOUND sockets (a client row here, or a server shadow below) — a DIALED peer serves
+        // none, and post-re-key its listen address COLLIDES with the shadow's served-sub key, so
+        // firing it would FALSE-reap the shadow's still-live subs on a one-directional drop.
+        if (peer.status === STATUS.disconnected && !peer.dialed) this.#onPeerGone?.(peer)
+      }
+      if (snap.suspect !== peer.suspect) row.suspect = peer.suspect
+      if (peer.status === STATUS.connected && peer.dialed) this.#onConnect?.(peer)
+      return
     }
-    if (snap.suspect !== peer.suspect) row.suspect = peer.suspect
-    if (peer.status === STATUS.connected && peer.dialed) this.#onConnect?.(peer)
+    // An unidentified inbound peer owns no row (nothing to mirror). An identified server SHADOW owns
+    // no row either, but MUST still reap its served subscriptions on drop — keyed under the same
+    // listen address onSubscribe saw (L2 opens a served sub only after a view commit, well after the
+    // DONE that re-keys, so the keys line up). It is the SOLE server-pair reap trigger (the dialed
+    // peer is gated out above); prune it from #shadows on the way out so reconnect churn can't leak.
+    if (this.#shadows.get(peer.address) === peer && peer.status === STATUS.disconnected) {
+      this.#onPeerGone?.(peer)
+      this.#shadows.delete(peer.address)
+    }
   }
 
   peer(address: string): Peer | undefined {
-    return this.#conns.get(address)
+    // The dialed peer wins; an inbound-only server link (no dial back) is reachable via its shadow,
+    // so point-to-point sends (deltaTo a served sub, forward, digest/catchup) still land. broadcast
+    // reads #conns directly, so a shadow is never double-sent.
+    return this.#conns.get(address) ?? this.#shadows.get(address)
   }
 
   // Fan-out helpers. Owner-routing (which peer) is the DHT's job (index.ts);
@@ -156,6 +230,8 @@ export class Peers {
 
   destroy() {
     for (const peer of this.#conns.values()) peer.destroy()
+    for (const peer of this.#shadows.values()) peer.destroy() // re-keyed inbound server sockets (not in #conns)
     this.#conns.clear()
+    this.#shadows.clear()
   }
 }
