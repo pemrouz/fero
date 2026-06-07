@@ -38,14 +38,14 @@
 // + orphan shedding (P/P4), hold-relative reads (Q1), and distributed aggregates
 // + whole-resource gather (Q2/Q3) all ship here. Open work: ../IDEAS.md.
 
-import { $, value as VALUE, view as VIEWSYM, Operators } from '../../data/index.ts'
+import { $, view as VIEWSYM, Operators } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
 import { Log, originKey } from '../log/partition.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 import { ViewManager } from './view.ts'
-import { AGG, type Rule } from './fold.ts'
-import { lazyHandle, FOLD_ONCE, FOLD_HANDLES, isViewProxy, snapshot } from './handle.ts'
+import { AGG, makeFold } from './fold.ts'
+import { lazyHandle, isViewProxy, snapshot } from './handle.ts'
 
 export { value } from '../../data/index.ts'
 export { fileStorage } from './storage.ts'
@@ -634,104 +634,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     for (const c of batch) commitLocal(c)
   }
 
-  // ── Distributed aggregates (Milestone Q2) ──
-  //
-  // With R-way holding no single node materializes the whole resource, so an
-  // aggregate over ALL of it (`data.sum('value')`) is computed partial-per-shard +
-  // folded: each holder runs the aggregate LOCALLY over the partitions it OWNS,
-  // streams its partial, and the querying node folds every holder's partial into the
-  // global answer (the fold lands in Q2b). One row change → one partial delta → an
-  // O(1) global update.
-  //
-  // OWNER-scoping (not holder-scoping) is the dedup: a partition lives on R replicas,
-  // but has exactly ONE owner, so scoping each holder's partial to the partitions it
-  // OWNS makes the union a DISJOINT cover of the keyspace — every row counted exactly
-  // once regardless of R. The owner-scoped view filters the RAW `data` proxy (the
-  // held partitions) to the keys we own on the committed ring; `data`'s filter passes
-  // the key to its predicate (`(value, name) => …`), and ownership exactly partitions
-  // the keyspace. Built over the RAW proxy, never the `dataFacade` (which would
-  // recurse into remote handles).
-  const ownedView = () => (data as any).filter((_v: unknown, k: string) => mesh.owner(k) === me)
-
-  // This node's owner-scoped PARTIAL for a serializable aggregate spec ({op, col}).
-  // The spec crosses the wire to every symmetric holder, which reconstructs the same
-  // owner-scoped operator locally — so the NAME/shape travels, not a closure. Q2a
-  // ships sum/count/max/min (string-parameterized, no fn); avg/some/every/group land
-  // in later increments. Returns a `data` ViewProxy (scalar here) — snapshot for an
-  // RPC, change-stream for a subscription, exactly like `read`.
-  // A COMPOSITE partial (avg's {sum,count}, every's {match,total}) is built from two O(1)
-  // aggregate sub-views mirrored onto one object ViewProxy. Two subtleties: (1) a `data`
-  // ViewProxy is `typeof === 'function'` (it wraps noop), so it can't be a connect ANCHOR
-  // (`connect(viewProxy, 'prop')` is misread as a bare-fn sink) — we mirror via a plain
-  // anchor + assignment into `out`; (2) data's FunctionSink doesn't back-ref its source, so
-  // the two sub-views would GC and freeze — `aggRetain` (keyed by the returned proxy) pins
-  // the sub-views + anchor for exactly as long as `out` is reachable. O(1) per delta (the
-  // sub-views are running aggregates; the mirror is a scalar assignment).
-  const aggRetain = new WeakMap<object, unknown[]>()
-  const composite = (out: any, fields: Record<string, any>): any => {
-    const anchor = {}
-    const retain: unknown[] = [anchor]
-    for (const [prop, view] of Object.entries(fields)) {
-      view.connect(anchor, () => {
-        out[prop] = (view as any)[VALUE]
-      })
-      retain.push(view)
-    }
-    aggRetain.set(out, retain)
-    return out
-  }
-  // Dispatch into the co-located AGG registry (bottom of file): each op pairs its
-  // owner-scoped PARTIAL builder with the associative COMBINE that folds partials into the
-  // global. Owner-scoped over the RAW proxy via ownedView (held partitions filtered to the
-  // keys we OWN on the committed ring) — so the union across holders is a disjoint cover.
-  const buildPartial = (spec: any): any => {
-    const entry = AGG[spec?.op]
-    if (!entry) throw new Error(`fero: unknown aggregate op "${spec?.op}"`)
-    return entry.partial({ owned: ownedView(), col: spec?.col, val: spec?.val, composite })
-  }
-
-  // A LIVE owner-scoped partial (Milestone Q2c): builds buildPartial(spec), streams its
-  // value to `onValue` (initial + every delta), and RE-SCOPES itself on a view commit so
-  // ownership is re-evaluated over the new ring. Used by BOTH a holder's served partial
-  // and a fold's local self-partial — each node re-scopes its OWN partials on its OWN
-  // commit, and (because the subscription/sink persists) the re-scoped value flows to the
-  // consumer with no re-subscribe.
-  //
-  // Re-scope = rebuild the filter→op chain (data's filter won't re-run its predicate on an
-  // ownership move under a stable row). The previous generation's FunctionSink CANNOT be
-  // synchronously disconnected (data's connect returns the host, not the sink — the sink
-  // GC's only once the host is unreferenced), so it keeps firing the OLD scope until GC; a
-  // GENERATION guard makes those stale firings no-ops. The rebuilt chain stays connected to
-  // the LIVE raw `data`, so an acquired partition's rows (applyInbound → inserts) re-fire
-  // the filter and the partial re-publishes — the acquisition-window heal, no synthetic re-fold.
-  const livePartial = (spec: any, onValue: (v: unknown) => void) => {
-    let gen = 0
-    let proxy: any // retained so the current generation's chain doesn't GC (FunctionSink doesn't back-ref it)
-    let host: any
-    const build = () => {
-      const myGen = ++gen
-      proxy = buildPartial(spec)
-      // Emit the whole partial SNAPSHOT (not the per-change c.value): a scalar partial's
-      // snapshot is the scalar, but an OBJECT partial (avg's {sum,count}, every's
-      // {match,total}) emits per-KEY change records whose c.value is just one field — only
-      // the snapshot carries the full {…}. The gen guard ignores the prior generation's
-      // post-rescope firings (its FunctionSink can't be synchronously disconnected).
-      host = proxy.connect({}, () => {
-        if (gen === myGen) onValue(snapshot(proxy))
-      })
-    }
-    build() // connect's attach-snapshot calls onValue synchronously with the current value
-    const rescope = () => build()
-    aggregateRebinds.add(rescope)
-    return {
-      close: () => {
-        aggregateRebinds.delete(rescope)
-        gen++ // silence any in-flight firing
-        void proxy
-        void host
-      },
-    }
-  }
+  // ── Distributed aggregates (Milestone Q2/Q3) ──
+  // The fold ENGINE — owner-scoped partial construction, the live re-scoping partial, and the
+  // querying-side one-shot + live gather — lives in [./fold.ts] (makeFold), built below once
+  // `invoke` + clientSubs exist (the engine's only injected deps beyond the raw proxy/mesh/state).
 
   const cluster: Cluster = {
     peers: mesh.peers,
@@ -767,7 +673,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // the partials into the global answer (Q2b). Owner-scoped over the RAW proxy via
     // buildPartial, so the union across holders is a disjoint cover (no R-fold
     // double-count). Closes over data/mesh/me (not c.data) — it needs ownership.
-    aggregate: (spec) => buildPartial(spec),
+    aggregate: (spec) => fold.buildPartial(spec),
     // NB: plain assignments (`data.x = y`) bypass these — they commit straight through
     // the write-capture sink, not via these methods. See ../IDEAS.md "Assignment ↔
     // methods.update parity". Overriding `update` guards methods.update(...) calls only.
@@ -805,7 +711,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // with the global snapshot. This is the explicit "download everything" the user chains
     // holistic ops after. R≥members / full replication hold everything, so read() stays a local
     // c.data snapshot there (the hot path is byte-identical — the gather only arms when scoped).
-    if (method === 'read' && arg == null && scoped && R < viewSize() && allMethods.read === defaults.read) return foldOnce({ op: 'rows' }, AGG.rows.combine)
+    if (method === 'read' && arg == null && scoped && R < viewSize() && allMethods.read === defaults.read) return fold.foldOnce({ op: 'rows' }, AGG.rows.combine)
     // A CLIENT routed a distributed aggregate here (Milestone Q2e): a client can't
     // owner-scope or fold, so it sends {fold:true} and THIS server (a coordinator) returns
     // the GLOBAL via a one-shot gather. The gather fans out PARTIAL requests (fold stripped)
@@ -814,7 +720,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // → the partial path below.)
     if (method === 'aggregate' && (arg as any)?.fold) {
       const s = stripFold(arg)
-      return foldOnce(s, AGG[s.op]?.combine) // a Promise; the CALL handler awaits it before replying
+      return fold.foldOnce(s, AGG[s.op]?.combine) // a Promise; the CALL handler awaits it before replying
     }
     return snapshot(invoke(method, arg, address))
   }
@@ -872,7 +778,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // unaffected. (serveCall keeps the R<viewSize() optimization: it re-evaluates per call, so a
     // complete-local read at members≤R is always current.)
     if (method === 'read' && arg == null && scoped && allMethods.read === defaults.read) {
-      const g = openFold({ op: 'rows' }, AGG.rows.combine)
+      const g = fold.openFold({ op: 'rows' }, AGG.rows.combine)
       const host = (g.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
       addSub(address, subId, { host, src: g.proxy, close: g.close })
       return
@@ -883,7 +789,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (method === 'aggregate' && (arg as any)?.fold) {
       try {
         const s = stripFold(arg)
-        const f = openFold(s, AGG[s.op]?.combine)
+        const f = fold.openFold(s, AGG[s.op]?.combine)
         const host = (f.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
         addSub(address, subId, { host, src: f.proxy, close: f.close })
       } catch {
@@ -897,7 +803,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // stable holder. Streamed as a root-update delta.
     if (method === 'aggregate') {
       try {
-        const lp = livePartial(arg, (v) => mesh.deltaTo(address, subId, { type: 'update', key: [], value: v }))
+        const lp = fold.livePartial(arg, (v) => mesh.deltaTo(address, subId, { type: 'update', key: [], value: v }))
         addSub(address, subId, { close: lp.close })
       } catch {
         // an unknown op throws in buildPartial — yield no stream (RPC path surfaces errors)
@@ -948,6 +854,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   context.methods = localMethods // method-to-method calls run locally
 
   const clientSubs = new Set<() => void>()
+
+  // The distributed-aggregate fold engine (Milestone Q2/Q3) — owner-scoped partials + the
+  // querying-side one-shot/live gather — lifted to [./fold.ts] (makeFold). Built here, once its
+  // injected deps exist: `invoke` (the in-process dispatcher — it does NOT depend on the engine,
+  // so the wiring stays linear) plus the raw `data` proxy, the mesh, the two aggregate registries
+  // the composer's onCommit/aeTimer walk, and clientSubs (a fold handle's teardown drains here).
+  const fold = makeFold({ data, mesh, me, invoke, aggregateRebinds, aggregateReconciles, clientSubs })
+
   // A remote-access HANDLE: a thenable (await ⇒ one-shot RPC) that is ALSO a live
   // ViewProxy (reactive use ⇒ a server-pushed subscription). `to()` picks the target
   // peer lazily — a specific owner (owner-routed reads) or undefined ⇒ a picked
@@ -983,112 +897,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // over this. Internal machinery keeps using the raw `data` (held partitions only).
   const readKey = (key: string) => (holds(key) ? data[key] : remoteRead(key))
 
-  // ── Distributed aggregate FOLD (Milestone Q2b) ──
-  //
-  // The querying side of a distributed aggregate: gather every holder's owner-scoped
-  // partial and fold them into the global answer. A handle mirroring Q1's makeHandle —
-  // `await data.sum('v')` is a one-shot gather (foldOnce); reactive use
-  // (`data.sum('v').tap(...)`/`[value]`) opens a live subscription to every holder's
-  // partial and refolds on each delta. One row change → one holder partial delta → one
-  // global recompute (O(holders), independent of dataset size — the "one row → O(1)
-  // global update" property; the recompute walks the small per-holder map, not the keyspace).
-  //
-  // SELF IS NOT A WIRE TARGET. The querying node is itself a holder owning a ring
-  // slice, but mesh.subscribe/call(...,me) cannot route to self (self is only a
-  // cluster.peers row, never a socket — pool.peer(me) is undefined). So its OWN partial
-  // is obtained IN-PROCESS via invoke('aggregate', spec) + a local connect sink — the
-  // identical producer serveSubscribe streams, minus the socket — and folded alongside
-  // the N-1 remote partials. Miss this and the querying node's whole shard is silently
-  // dropped (a 1/N undercount on the common path).
-  // One-shot gather (await): local partial + a call to every OTHER holder, folded once.
-  // KNOWN tail-latency (→ deferred gather hardening): a connected-but-unresponsive holder
-  // stalls the Promise.all for the full callTimeout (5s), after which its shard folds as the
-  // identity (undefined → 0 / skipped) — a silent undercount with no error signal. The
-  // departed-holder case (viewMembers still lists it until eviction) is the same shape.
-  // Steady-state (all holders responsive) is exact. Stateless, so it reflects the CURRENT
-  // ring/membership each call. Also the server side of a CLIENT's one-shot (Q2e).
-  const foldOnce = async (spec: any, rule: Rule): Promise<unknown> => {
-    const local = snapshot(invoke('aggregate', spec))
-    const others = mesh.viewMembers().filter((m) => m !== me)
-    const remotes = await Promise.all(others.map((o) => (mesh.call('aggregate', spec, o) as Promise<unknown>).catch(() => undefined)))
-    return rule([local, ...remotes])
-  }
-
-  // A LIVE fold: a result proxy whose root value is refolded on every partial delta, with
-  // a close() to tear it down. The querier's OWN shard is a livePartial (in-process; it
-  // re-scopes itself on the querier's own commit). Remote holders are subscriptions kept in
-  // `subs`; each remote holder re-scopes its OWN served partial (also a livePartial) and
-  // pushes the new value over the EXISTING subscription — so the coordinator never re-
-  // subscribes a stable holder, only adds new members / drops departed ones
-  // (reconcileMembers, run on commit + aeTimer). One row change → one partial delta → one
-  // O(holders) recompute. Returns { proxy, close } so it serves BOTH the local facade
-  // handle AND a CLIENT's subscription (the server holds the fold, streams the global; Q2e).
-  const openFold = (spec: any, rule: Rule) => {
-    const live: any = $({})
-    const liveRes = (live as any)[VIEWSYM].res
-    const partials = new Map<string, unknown>()
-    const recombine = () => applyRecord(liveRes, { type: 'update', key: [], value: rule([...partials.values()]) })
-    let localPartial: { close: () => void } | undefined
-    const subs = new Map<string, () => void>() // member → unsubscribe (only the ones actually subscribed)
-    const reconcileMembers = () => {
-      const members = new Set(mesh.viewMembers())
-      for (const [m, unsub] of subs) if (!members.has(m)) { unsub(); subs.delete(m) } // departed → close the subscription
-      // Drop any partial for a non-member (covers a subscribed-then-departed holder AND an
-      // admit-race member that was seeded in `partials` but never subscribed, then left
-      // before connecting — keying cleanup off `partials`, not `subs`, reaps both).
-      for (const m of [...partials.keys()]) if (m !== me && !members.has(m)) partials.delete(m)
-      for (const m of members) {
-        if (m === me || subs.has(m)) continue
-        if (!partials.has(m)) partials.set(m, undefined) // identity until its first snapshot arrives
-        const unsub = mesh.subscribe('aggregate', spec, (rec: ChangeRecord) => { partials.set(m, rec.value); recombine() }, m)
-        if (unsub) subs.set(m, unsub) // only mark subscribed on success — an unreachable member is RETRIED next tick (admit race)
-      }
-      recombine()
-    }
-    localPartial = livePartial(spec, (v) => { partials.set(me!, v); recombine() })
-    reconcileMembers()
-    aggregateReconciles.add(reconcileMembers) // commit + aeTimer: add/drop holders + retry the admit race
-    const close = () => {
-      aggregateReconciles.delete(reconcileMembers)
-      for (const unsub of subs.values()) unsub()
-      subs.clear()
-      localPartial?.close()
-    }
-    return { proxy: live, close }
-  }
-
-  // ── Distributed aggregate FOLD handle (Milestone Q2b) ──
-  //
-  // The querying side of a distributed aggregate, mirroring Q1's makeHandle: `await
-  // data.sum('v')` is a one-shot gather (foldOnce); reactive use (`data.sum('v').tap(...)`/
-  // `[value]`) opens the LIVE fold and delegates. `then` is the ONLY access that does not
-  // open the live fold.
-  //
-  // SELF IS NOT A WIRE TARGET. The querying node is itself a holder owning a ring slice,
-  // but mesh.subscribe/call(...,me) cannot route to self (self is only a cluster.peers row,
-  // never a socket — pool.peer(me) is undefined). So its OWN partial is obtained IN-PROCESS
-  // via invoke('aggregate', spec) + a local sink (openFold's livePartial), folded alongside
-  // the N-1 remote partials. Miss this and the querier's whole shard is silently dropped.
-  const foldAggregate = (spec: { op: string; col?: unknown; val?: unknown }) => {
-    const rule = AGG[spec.op]?.combine
-    const handle = lazyHandle({
-      then: (onF, onR) => foldOnce(spec, rule).then(onF, onR),
-      // FOLD_ONCE (Q3b review M2): resolve a ONE-SHOT global via foldOnce WITHOUT opening the live
-      // fold. snapshot() reads this tag (only on a confirmed FOLD_HANDLES member) instead of its
-      // isViewProxy/[VALUE] probe, which would otherwise open the fold and read its still-empty
-      // in-progress union — so a handler returning this handle (`(_,c) => c.methods.read()`) replies
-      // with the GLOBAL on the RPC path. lazyHandle runs extraGet BEFORE its symbol-reject, so this
-      // resolves rather than being swallowed.
-      extraGet: (prop) => (prop === FOLD_ONCE ? { v: () => foldOnce(spec, rule) } : undefined),
-      open: () => {
-        const opened = openFold(spec, rule)
-        clientSubs.add(opened.close) // cleaned on node destroy (per-handle GC is the inherited Q1 item)
-        return opened.proxy
-      },
-    })
-    FOLD_HANDLES.add(handle) // so snapshot() resolves a RETURNED handle via foldOnce (M2)
-    return handle
-  }
+  // (foldOnce / openFold / foldAggregate — the querying-side gather machinery — now live in the
+  // fold engine [./fold.ts], reached via `fold.*` above.)
 
   // Server-side whole-resource read() gather (Milestone Q3b). A scoped SERVER holds only its
   // R-set, so its own no-key `methods.read()` would otherwise return a LOCAL partial — wrong for
@@ -1114,7 +924,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   if (!isClient && scoped && allMethods.read === defaults.read) {
     const baseRead = localMethods.read
     let gather: any
-    localMethods.read = (arg?: any) => (arg == null ? (gather ??= foldAggregate({ op: 'rows' })) : baseRead(arg))
+    localMethods.read = (arg?: any) => (arg == null ? (gather ??= fold.foldAggregate({ op: 'rows' })) : baseRead(arg))
   }
 
   const methodSurface: Record<string, (arg?: any) => any> = isClient
@@ -1187,7 +997,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     //   scoped-distributed sugar. Not a Q2 regression (data's some/every always needed a fn);
     //   making the col form uniform needs a data-lib some(col)/every(col) overload — IDEAS.
     if (R >= viewSize() && op !== 'some' && op !== 'every') return (data as any)[op](...args)
-    return foldAggregate(spec)
+    return fold.foldAggregate(spec)
   }
   // Q3 boundary guard. These operators are HOLISTIC or ordered — the global answer needs the
   // full multiset co-located — so they CAN'T fold from per-shard partials. The Q3 path is to
