@@ -754,3 +754,52 @@ a crash ([message.test.ts](transport/message.test.ts)).
 
 **Open follow-ups → [IDEAS](IDEAS.md):** none specific. Relates to the value-codec / wire-evolution
 workstream — a CBOR value seam would move object decoding off `JSON.parse` entirely.
+
+## S — Decomposing the `fero()` god-closure (composer + fold / dispatch / handle) · Adopted · `ceb4262` → `7c8db02`
+
+**Context.** L2 was one 1337-line closure: the replication core (sink, dedup/LWW, holding, shedding)
+co-lived with the aggregate engine, the RPC/subscription dispatch, the lazy handles, and the `data`
+facade. plan §9 always intended a `dispatch.ts`/`projection.ts` split; two earlier increments had landed
+the cheap parts (the `AGG` registry, the `lazyHandle` skeleton). The remaining lift was risky because
+the inner functions are **mutually recursive** (`serveCall`/`serveSubscribe` → `foldOnce`/`openFold`;
+`foldOnce` → `invoke` → `defaults.aggregate` → `buildPartial`) and several mutate shared state the
+composer's `onCommit`/`aeTimer` loops iterate — so a naïve split risks a forward-reference cycle, a
+by-value copy of state that should be shared, or a hot-path regression.
+
+**Decision.** Split into a thin **composer** (`index.ts`) plus three modules, keeping the replication
+core in the composer:
+- **[handle.ts](resource/handle.ts)** — the stateless leaf: `lazyHandle`, `snapshot`/`isViewProxy`,
+  `FOLD_ONCE`/`FOLD_HANDLES`, `noop`. A *neutral* module both other modules import, so there is no
+  `dispatch.ts ↔ fold.ts` import cycle and `FOLD_HANDLES` stays one shared identity (a handle registered
+  by the fold engine is recognised by `snapshot` called from the dispatch side).
+- **[fold.ts](resource/fold.ts) `makeFold({...})`** — the aggregate engine (`ownedView`, `composite`,
+  `buildPartial`, `livePartial`, `foldOnce`, `openFold`, `foldAggregate`), joining the `AGG` registry.
+- **[dispatch.ts](resource/dispatch.ts) `makeDispatch({...})`** — the RPC + subscription servers, the
+  local/client method surfaces, the remote-read handles, and the `data` facade.
+- **`index.ts`** keeps the core (write-capture sink, `applyInbound`/`commitLocal`/`applyLocalWrite`,
+  `holds`/`heldCache`, P4 shedding, the Lamport/dedup/LWW state) as the composer body.
+
+Two wiring choices made the split linear (no forward-ref): **(1) `invoke` stays in the composer** and is
+injected into *both* factories — it doesn't itself depend on the engine, so the cycle resolves as
+`invoke → makeFold(invoke) → makeDispatch(fold)`; every `fold.*` / `dispatch.*` call site is inside a
+runtime arrow, so the `const`s late-bind. **(2) the `data` facade lives in `dispatch.ts`** (with
+`readKey`/`makeHandle`/`clientHandle`), not in `fold.ts` as first planned — that removes the
+`fold → clientHandle`/`readKey` back-edges and leaves `fold.ts` a pure engine. Shared mutable state
+(`aggregateRebinds`, `aggregateReconciles`, `clientSubs`) is passed **by reference** so the composer's
+loops and the modules' mutations stay coherent; `subscriptions` became private to dispatch, exposed to
+the diagnostics seam only via `dispatch.servedCount`.
+
+**Consequences.**
+- `index.ts`: **1337 → 745 lines**; the replication core is now the visible heart of the composer.
+- **No behaviour change** — the moved bodies are verbatim modulo `fold.`/`dispatch.` namespacing. Verified
+  by tests (149/149) and perf (17/17 serialized — Q2 partial build + live writes, Q3 union-fold, L2 writes
+  + method dispatch, owner lookups, encode), and by a 4-lens adversarial review (capture fidelity /
+  wiring+TDZ / identity+GC / verbatim+hot-path): all clean. The R=∞ full-replication hot path is
+  byte-identical (the facade isn't built; `methodSurface === localMethods`), and the measured **write** path
+  (sink → `commitLocal`) was never moved.
+- The construction window between `transport()` and `const dispatch` has no interleaving `await` (only
+  `storage.load()` before the mesh and `mesh.ready` after dispatch), and `onCall` is `Promise.resolve().then`
+  -deferred — so a mesh hook routing to `dispatch.*` can never fire before `dispatch` initialises.
+
+**Open follow-ups → [IDEAS](IDEAS.md):** the L3 chain planner is the natural next home for the
+holistic-op guard in `dispatch.ts`. No further core decomposition planned — the core is deliberately whole.
