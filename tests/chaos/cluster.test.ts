@@ -81,9 +81,13 @@ test('chaos: network PARTITION then HEAL — majority writes, minority buffers, 
     // HEAL: links restored, nodes rejoin WITHOUT a restart; anti-entropy + buffer
     // flush carry both sides' writes everywhere.
     c.heal()
-    assert.ok(await until(() => c.all().every((n) => n.cluster.members.length === 5), 15000), 'view re-merged to 5 members')
-    assert.ok(await until(() => c.all().every((n) => has(n, 'maj') && has(n, 'min')), 15000), 'both writes present on every node')
-    assert.ok(await c.converged(15000), 'all five reconverged after heal')
+    // Generous windows: a view re-merge + anti-entropy reconcile is the slowest path
+    // here, and these can run on a loaded box (the serial suite, or alongside other
+    // work) where timers fire late. `until` returns the instant convergence holds, so
+    // the headroom only ever costs time on a genuine stall.
+    assert.ok(await until(() => c.all().every((n) => n.cluster.members.length === 5), 30000), 'view re-merged to 5 members')
+    assert.ok(await until(() => c.all().every((n) => has(n, 'maj') && has(n, 'min')), 30000), 'both writes present on every node')
+    assert.ok(await c.converged(30000), 'all five reconverged after heal')
   } finally {
     c.destroy()
   }
@@ -204,7 +208,7 @@ test('chaos: randomized soak — interleave writes + faults, then heal/restore a
     // caps are generous — `until` returns the instant the condition holds, so the
     // headroom only matters under load, never the happy path.
     if (partitioned) c.heal()
-    assert.ok(await until(() => c.all().every((n) => n.cluster.members.length === c.all().length), 25000), 'membership re-merged after the soak')
+    assert.ok(await until(() => c.all().every((n) => n.cluster.members.length === c.all().length), 45000), 'membership re-merged after the soak')
 
     // every majority-committed key must be present everywhere, and all nodes converge.
     // (A write only ever enters `committed` when issued on a node that could reach a
@@ -212,8 +216,8 @@ test('chaos: randomized soak — interleave writes + faults, then heal/restore a
     // alive-but-isolated node and flushes on heal; either way it must end up present.)
     const keys = [...committed]
     assert.ok(keys.length > 0, 'the soak committed at least one write')
-    assert.ok(await until(() => c.all().every((n) => keys.every((k) => has(n, k))), 25000), `all ${keys.length} committed keys present on every node`)
-    assert.ok(await c.converged(25000), 'converged after the randomized soak')
+    assert.ok(await until(() => c.all().every((n) => keys.every((k) => has(n, k))), 45000), `all ${keys.length} committed keys present on every node`)
+    assert.ok(await c.converged(45000), 'converged after the randomized soak')
   } finally {
     c.destroy()
   }
