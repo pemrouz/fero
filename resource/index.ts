@@ -206,7 +206,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // the write-capture sink; the `applying` guard stops that re-emission from
   // being re-logged or re-broadcast.
   let applying = false
-  // Set while a FORWARDED write is being applied locally (see applyLocalWrite): the
+  // Set while a FORWARDED write is being applied locally (see commitForwarded): the
   // sink commits it as-is instead of re-evaluating ownership, so it never bounces.
   let committingForward = false
 
@@ -268,7 +268,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     name,
     ...(config as object),
     // NB: these hooks call closures defined BELOW (holds / resync / shedConfirmed /
-    // applyLocalWrite / viewMgr / dispatch). Safe forward refs: a hook only fires
+    // commitForwarded / viewMgr / dispatch). Safe forward refs: a hook only fires
     // post-construction (once a peer connects), by which point all are bound.
     // Scoped holding (Milestone P): materialize ONLY partitions we replicate. A
     // server with finite R drops inbound records for partitions it doesn't hold
@@ -331,7 +331,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // Inbound write-request: a peer forwarded a write for a partition we own.
     // Apply it as a LOCAL write so our sink commits it (stamps origin=us, logs,
     // replicates) — we are the single sequencer for the partition.
-    onWrite: (record: ChangeRecord) => applyLocalWrite(record),
+    onWrite: (record: ChangeRecord) => commitForwarded(record),
     // Membership view-change frames (Milestone V) → the view-change state machine.
     onViewPrepare: (value: unknown) => viewMgr?.onPrepare(value),
     onViewAck: (value: unknown) => viewMgr?.onAck(value),
@@ -485,7 +485,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         // P2: forwarded a write for a partition we DON'T replicate — drop the optimistic value (the
         // owner replicates to the R-set, not us; reading this key is a Q1 remote read). Full
         // replication keeps it: the canonical record returns and reconciles.
-        if (scoped && !holds(p)) dropLocal(p)
+        if (scoped && !holds(p)) discardOptimistic(p)
         return
       }
     }
@@ -511,7 +511,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // Silently remove a foreign partition we optimistically applied but don't hold
   // (after forwarding its write to the owner). Guarded by `applying` so the removal
   // doesn't re-enter the sink — no echo, no spurious forwarded 'remove'.
-  const dropLocal = (partition: string) => {
+  const discardOptimistic = (partition: string) => {
     applying = true
     try {
       applyRecord(res, { type: 'remove', key: [partition] })
@@ -526,7 +526,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // confirmed caught up (shedConfirmed), so the partition is never less than
   // R-replicated. After this we no longer claim the partition in our digest.
   const shed = (partition: string) => {
-    dropLocal(partition) // proxy (guarded — no re-emit / spurious forwarded remove)
+    discardOptimistic(partition) // proxy (guarded — no re-emit / spurious forwarded remove)
     log.drop(partition)
     const suffix = '\x00' + partition
     for (const k of seen.keys()) if (k.endsWith(suffix)) seen.delete(k)
@@ -586,7 +586,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // Write-gate chokepoint (V1e): without a reachable quorum we are read-only —
     // buffer the write (don't stamp/log/broadcast) so a minority can't diverge.
     // This SUPERSEDES F1's never-drop local commit for a quorum-less node. Both
-    // local writes and forwarded writes (applyLocalWrite) funnel through here.
+    // local writes and forwarded writes (commitForwarded) funnel through here.
     if (viewMgr && !viewMgr.canWrite) {
       if (pending.length >= MAX_PENDING) pending.shift() // bounded: drop oldest
       pending.push(change)
@@ -628,7 +628,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // write into our authoritative, sequenced one. `committingForward` tells the
   // sink to commit it as-is rather than re-evaluate ownership (no re-forward → no
   // ping-pong while ring views are still settling).
-  const applyLocalWrite = (record: ChangeRecord) => {
+  const commitForwarded = (record: ChangeRecord) => {
     committingForward = true
     try {
       applyRecord(res, record)
