@@ -116,10 +116,13 @@ export function transport(opts: TransportOpts): Mesh {
       if (id.listen) addServer(id.listen)
       for (const a of id.peers ?? []) addServer(a)
     },
-    // Relationship established. Fire onConnect for DIALED peers only (each pair
-    // dials both ways → gate to one side so catch-up runs once per direction,
-    // mirroring broadcast's dialed-only fan-out).
-    done: (peer: Peer) => {
+    // Relationship established. First resolve the peer's real identity (re-key an
+    // inbound server socket to its listen address, stamp uuid, publish a client row),
+    // then fire onConnect for DIALED peers only (each pair dials both ways → gate to
+    // one side so catch-up runs once per direction, mirroring broadcast's dialed-only
+    // fan-out). identify runs before onConnect so a catch-up routes to a stable address.
+    done: (peer: Peer, id: Identity) => {
+      pool.identify(peer, id)
       if (peer.dialed) opts.onConnect?.(peer.address)
     },
   }
