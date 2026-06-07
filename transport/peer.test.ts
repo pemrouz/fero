@@ -63,6 +63,30 @@ test('records round-trip over real TCP, replica converges', async () => {
   await srv.close()
 })
 
+test('a frame larger than one TCP segment reassembles over a real socket', async () => {
+  // The Framer's straddle handling is unit-tested by splitting a buffer at every byte
+  // boundary; this proves it END-TO-END over real TCP, where the kernel splits a large
+  // write into multiple 'data' chunks on its own. A ~300 KB value far exceeds a loopback
+  // segment, so reassembly is genuinely exercised (not a single-chunk happy path).
+  const srv = await serve()
+  const client = new Peer({ host: '127.0.0.1', port: srv.port })
+  client.connect()
+  assert.ok(await until(() => client.status === STATUS.connected))
+
+  const big = 'x'.repeat(300_000)
+  client.send({ type: 'update', key: ['blob'], value: { data: big, n: 42 } })
+
+  assert.ok(
+    await until(() => (srv.replica[value]?.blob?.data?.length ?? 0) === big.length, 5000),
+    `blob length ${srv.replica[value]?.blob?.data?.length ?? 0} (expected ${big.length})`,
+  )
+  assert.equal(srv.replica[value].blob.n, 42, 'the rest of the record decoded too')
+  assert.equal(srv.frames(), 1, 'one frame, however many TCP chunks it arrived in')
+
+  client.destroy()
+  await srv.close()
+})
+
 test('multiple sends in one tick coalesce into a single frame', async () => {
   const srv = await serve()
   const client = new Peer({ host: '127.0.0.1', port: srv.port })
