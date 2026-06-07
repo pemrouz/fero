@@ -11,7 +11,7 @@
 // peer.ts — lives in a side Map; a Peer's onStatus callback mirrors its state
 // into the proxy as a single assignment.
 
-import { $, value as VALUE } from '../../data/index.ts'
+import { $, value as VALUE, view as VIEW } from '../../data/index.ts'
 import { Peer, STATUS, type HeartbeatOpts } from './peer.ts'
 import type { Frame, ChangeRecord } from './message.ts'
 import type { RetryOpts } from './retries.ts'
@@ -117,12 +117,11 @@ export class Peers {
     // Self-reject by uuid: a dial to one of our OWN alternate addresses (multi-NIC, localhost vs
     // 127.0.0.1) — or a uuid collision — completes a handshake carrying OUR uuid. add()'s self-guard
     // is a host:port STRING compare, so it misses an alternate-address self; the uuid catches it.
-    // Tear the connection down and, for a dial, remember the address so discovery can't redial it
-    // into a self-loop in the mesh. (A dialed self peer's row lingers disconnected → dead-row prune.)
+    // Tear the connection down (drop its #conns entry + row via #prune) and, for a dial, remember the
+    // address so discovery can't redial it into a self-loop in the mesh.
     if (this.#uuid && id.uuid === this.#uuid) {
       if (peer.dialed) this.#selfAddrs.add(peer.address)
-      this.#conns.delete(peer.address)
-      this.#shadows.delete(peer.address)
+      this.#prune(peer) // a dialed self is published — prune leaves no lingering self row
       peer.destroy()
       return
     }
@@ -154,9 +153,20 @@ export class Peers {
       heartbeat: this.#heartbeat,
       onStatus: (p) => this.#mirror(p),
       onFrame: (f, p) => this.#onFrame?.(f, p),
+      onGone: (p) => this.#prune(p),
     })
     this.#conns.set(peer.address, peer)
     return peer
+  }
+
+  // A peer is TERMINALLY gone (an inbound socket closed, or a dial gave up) — drop its bookkeeping
+  // so a churned/departed peer doesn't leak a `disconnected` row forever. Guard the #conns delete on
+  // identity: a server SHADOW's address is its LISTEN address, which is the DIALED peer's #conns key —
+  // deleting it would strand the live dial. (A shadow owns no row + isn't in #conns under that key, so
+  // #prune is a safe no-op for it; #mirror already drops it from #shadows on its own disconnect.)
+  #prune(peer: Peer) {
+    if (this.#conns.get(peer.address) === peer) this.#conns.delete(peer.address)
+    if (this.#published.delete(peer) && this.peers[peer.address]?.[VALUE]) this.peers[VIEW].res.remove([peer.address])
   }
 
   // Reflect a Peer's connection state into the proxy. Both `status` and the

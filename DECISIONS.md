@@ -873,8 +873,8 @@ The self-reject sits ABOVE the existing `id.listen === me` guard (so a true self
 with `id.listen === me` is torn down, not left as an idle zombie socket), and BELOW the idempotency guard
 (a first-time self peer is neither shadow nor published, so it isn't skipped). The `done` hook gates
 `onConnect` on `peer.status === STATUS.connected`, so a self-rejected (destroyed) peer doesn't fire the
-catch-up/ready trigger. A dialed self leaves a row that **lingers disconnected** (the dead-row prune item);
-it is `!dialed`-gated out of `onPeerGone` and never ringed.
+catch-up/ready trigger. A dialed self's row is **pruned** (T3 routes the self-reject through `#prune`),
+so the self-address leaves no lingering row.
 
 **Adversarial review (clean).** A no-false-positive argument holds: `transport()` defaults `uuid` to
 `crypto.randomUUID()`, so two distinct nodes that both omit it still differ — the only match is a genuine
@@ -888,8 +888,41 @@ for a uuid-*collision* peer the address stays blocked until process restart (a m
 deterministically). Self-healing a fixed collision is the place to revisit if ever wanted.
 
 **Open follow-ups → [IDEAS → Identity, dedup & connection hygiene](IDEAS.md):** connection-dedup to
-one bidirectional socket (connected-wins by uuid — re-key now *surfaces* the collision); dead-row /
-stale-`#shadows` pruning on a plain disconnect (we prune a shadow when it reaps, but a dialed row still
-lingers — incl. the self-reject's disconnected row). A rapid B-reconnect that re-identifies a new shadow
-before the old one's close processes can leak the old shadow's served subs (bounded; folds into the
-churn-leak item).
+one bidirectional socket (connected-wins by uuid — re-key now *surfaces* the collision). A rapid
+B-reconnect that re-identifies a new shadow before the old one's close processes can leak the old
+shadow's served subs (bounded; folds into the churn-leak item).
+
+### T3 — prune dead rows on terminal departure · Adopted
+
+**Context.** A peer that left for good still leaked a `disconnected` row in `cluster.peers` forever (and a
+`#conns` entry): an inbound CLIENT that dropped, a dial that gave up (finite `retries.max`), a half-handshake
+inbound that closed, and the T2 self-reject's dialed row. A slow leak under churn (the IDEAS "Prune dead rows").
+
+**Decision.** `Peer` gained an `onGone` callback fired on the two TERMINAL departures — an inbound socket
+close (`#onClose`, `!dialed`: never redials) and a dial giving up (`#scheduleReconnect`, `delay < 0` → onGone
+then destroy). `Peers.#prune(peer)` removes the `#conns` entry and the row (via `peers[view].res.remove`):
+- **Guarded `#conns` delete:** `#conns.delete` runs only if `#conns.get(peer.address) === peer`. A server
+  shadow's `peer.address` is its LISTEN address — the DIALED peer's `#conns` key — so an unguarded delete would
+  strand the live dial. The guard makes `#prune` a safe no-op for a shadow (shadows are pruned from `#shadows`
+  by `#mirror` on their own disconnect; `#prune` doesn't touch `#shadows`).
+- **Guarded row delete:** only if `#published.delete(peer)` (a shadow/unidentified inbound owns no row).
+- The T2 self-reject now routes through `#prune` too (no lingering self row).
+
+The terminal gating means a *transient* dialed drop (retries left → `throttled`) keeps its row, `isolate()`/
+`pool.destroy()`/self-reject's own `destroy()` don't double-fire onGone (the `#destroyed` short-circuit in
+`#onClose`), and a give-up can't resurrect the row (`#published.delete` precedes the `destroy()`→`#mirror`).
+
+**Adversarial review (clean).** Traced the shadow-vs-dialed guard (no strand), every onGone-firing condition
+(exactly the two terminal cases; isolate's row survives for `heal`), the `res.remove` contract (canonical,
+idempotent, updates the `connected` projection + the view's `#reachable` snapshot in O(delta)), the churn
+re-add (fresh peer+row, no stale block), and give-up ordering (no resurrection). Also closes the prior
+half-handshake `#conns` leak. Default `retries.max` is `Infinity`, so the give-up branch is opt-in; the
+inbound-close prune is the steady-state win.
+
+**Consequences.** A churned/departed client or a given-up dial leaves no phantom row. Zero steady-state cost
+(terminal-path only; the row-remove is one `delete` + one change record). Tests 154/154 (2 new prune tests,
+bite-verified), perf 17/17.
+
+**Open follow-ups → [IDEAS](IDEAS.md):** a max=Infinity dial to a permanently-dead address still retries
+forever (row cycles, never gives up) — an eviction-driven explicit `forget(address)` (the view layer knows
+the peer is gone) or a TTL is the remaining lever; pairs with the reactive dial loop / dead-candidate backoff.

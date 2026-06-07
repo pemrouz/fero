@@ -259,13 +259,44 @@ test('a peer presenting our OWN uuid is rejected — no self-loop (alternate-add
     await sleep(250)
     assert.equal(connected(mA, a2), false, 'A rejected B (shared uuid → self-reject)')
     assert.equal(connected(mB, a1), false, 'B rejected A (shared uuid → self-reject)')
-    // the dialed self peer leaves a row that LINGERS disconnected (the dead-row prune item), never
-    // connected — locks DECISIONS T's stated consequence against regression.
-    assert.equal(mA.peers[a2]?.status?.[value], STATUS.disconnected, 'A’s row for the self-address lingers disconnected')
+    // the dialed self peer's row is PRUNED (dead-row prune routes the self-reject through #prune),
+    // so the self-address leaves no lingering row at all.
+    assert.ok(!(a2 in (mA.peers[value] ?? {})), 'A pruned the self-address row (no lingering self row)')
     await sleep(150)
     assert.equal(connected(mA, a2) || connected(mB, a1), false, 'stays rejected — no reconnect loop')
   } finally {
     mA.destroy()
     mB.destroy()
+  }
+})
+
+test('an inbound client row is PRUNED when the client disconnects — no lingering disconnected row', async () => {
+  // A client's inbound socket never redials, so its drop is terminal — its row must be REMOVED, not
+  // left disconnected forever (the churn leak). onGone (Peer terminal departure) → Peers.#prune.
+  const pA = await ports.free()
+  const server = transport({ name: 'prune', host: '127.0.0.1', port: pA, ports: [pA], wait: 200, onRecord() {} })
+  const client = transport({ name: 'prune', host: '127.0.0.1', ports: [pA], wait: 200, onRecord() {} })
+  const clientRows = () => Object.values((server.peers[value] ?? {}) as Record<string, any>).filter((r) => r.role === 'client')
+  try {
+    assert.ok(await until(() => clientRows().length === 1), 'server published the client row')
+    client.destroy()
+    assert.ok(await until(() => clientRows().length === 0), `server pruned the client row on disconnect (still ${clientRows().length})`)
+  } finally {
+    server.destroy()
+    client.destroy()
+  }
+})
+
+test('a dialed peer row is PRUNED when reconnect attempts are exhausted (gives up)', async () => {
+  // A dial to a dead address retries then gives up (finite max) — the row must be forgotten, not left
+  // cycling forever. (Default max is Infinity, so this only fires for a configured retry budget.)
+  const dead = await ports.free() // nobody listens here
+  const a = `127.0.0.1:${dead}`
+  const node = transport({ name: 'giveup', host: '127.0.0.1', port: await ports.free(), ports: [dead], retries: { base: 10, cap: 20, max: 2, jitter: 0 }, wait: 200, onRecord() {} })
+  try {
+    assert.ok(a in (node.peers[value] ?? {}) || true, 'the dead address was dialed') // (the row may already be pruned by the time we look)
+    assert.ok(await until(() => !(a in (node.peers[value] ?? {})), 3000), 'the given-up peer’s row was pruned')
+  } finally {
+    node.destroy()
   }
 })

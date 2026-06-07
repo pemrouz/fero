@@ -48,6 +48,7 @@ export type PeerOpts = {
   heartbeat?: HeartbeatOpts
   onStatus?: (peer: Peer) => void
   onFrame?: (frame: Frame, peer: Peer) => void
+  onGone?: (peer: Peer) => void // TERMINAL departure: an inbound socket closed (no redial) or a dial gave up (retries exhausted) — drives row pruning
 }
 
 export class Peer {
@@ -71,6 +72,7 @@ export class Peer {
   #reconnect?: ReturnType<typeof setTimeout>
   #onStatus?: (peer: Peer) => void
   #onFrame?: (frame: Frame, peer: Peer) => void
+  #onGone?: (peer: Peer) => void
 
   // Failure detector state.
   #suspect = false
@@ -89,6 +91,7 @@ export class Peer {
     this.#hbMisses = opts.heartbeat?.misses ?? HEARTBEAT_MISSES
     this.#onStatus = opts.onStatus
     this.#onFrame = opts.onFrame
+    this.#onGone = opts.onGone
     this.#dialed = !opts.socket
     if (opts.socket) this.#attach(opts.socket, true) // inbound — already connected
   }
@@ -202,11 +205,15 @@ export class Peer {
     if (this.#destroyed) return
     this.#setStatus(STATUS.disconnected)
     if (this.#dialed) this.#scheduleReconnect() // inbound peers can't be redialed
+    else this.#onGone?.(this) // inbound socket closed and won't redial → terminal, prune its row
   }
 
   #scheduleReconnect() {
     const delay = this.#retries.next()
-    if (delay < 0) return this.destroy() // attempts exhausted → give up
+    if (delay < 0) {
+      this.#onGone?.(this) // out of reconnect attempts → terminal, prune its row
+      return this.destroy()
+    }
     this.#setStatus(STATUS.throttled)
     this.#reconnect = setTimeout(() => {
       this.#reconnect = undefined
