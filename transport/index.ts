@@ -167,7 +167,7 @@ export function transport(opts: TransportOpts): Mesh {
         // A peer forwarded a write-request for a partition we own. Hand each
         // record to L2, which commits it locally (its sink stamps origin=us and
         // replicates) — so we become the single sequencer for the partition.
-        for (const record of frame.records()) opts.onWrite?.(record as unknown as ChangeRecord, peer.address)
+        for (const record of frame.records()) opts.onWrite?.(record, peer.address)
         return
       // Membership view-change frames (Milestone V) — explicit cases so they
       // route to their own hooks and never fall through to onRecord below.
@@ -216,9 +216,9 @@ export function transport(opts: TransportOpts): Mesh {
         // ever drops orphaned subscription deltas.
         if (frame.id !== undefined) {
           const sub = subs.get(frame.id)
-          if (sub) for (const record of frame.records()) sub(record as unknown as ChangeRecord)
+          if (sub) for (const record of frame.records()) sub(record)
         } else {
-          for (const record of frame.records()) opts.onRecord?.(record as unknown as ChangeRecord, peer)
+          for (const record of frame.records()) opts.onRecord?.(record, peer)
         }
       }
     }
