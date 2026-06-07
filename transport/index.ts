@@ -19,6 +19,10 @@ import { initiate, handle, type Identity, type HandshakeHooks } from './handshak
 import { partitionOf, encodeFrame, encodeFrames, controlFrame, VERB, type ChangeRecord, type Frame } from './message.ts'
 import type { RetryOpts } from './retries.ts'
 
+// Re-export the peer STATUS enum as part of the L0 public surface, so L1/L2 (e.g. the
+// view-change reachability check) read it from the Mesh seam instead of reaching into peer.ts.
+export { STATUS } from './peer.ts'
+
 export type TransportOpts = {
   name: string
   host?: string
@@ -61,7 +65,9 @@ export type Mesh = {
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
   installView: (members: string[]) => void // adopt a committed view's membership (V1a: stored; V1b: drives the ring)
   viewMembers: () => string[] // the current committed view's members
-  viewSend: (address: string, verb: number, value: unknown) => boolean // send a view-change control frame; false if the peer isn't connected
+  viewPrepare: (address: string, value: unknown) => boolean // view-change phase-1 proposal (a ballot); false if the peer isn't connected
+  viewAck: (address: string, value: unknown) => boolean // view-change phase-1 promise/ack
+  viewCommit: (address: string, value: unknown) => boolean // view-change phase-2 commit
   digestTo: (address: string, payload: unknown) => void // send our anti-entropy digest payload
   catchupTo: (address: string, records: ChangeRecord[]) => void // ship records a peer lacks
   call: (method: string, arg: unknown, to?: string) => Promise<unknown> // RPC; to a specific peer (owner-routed reads — Q1) or a picked connected server
@@ -254,6 +260,17 @@ export function transport(opts: TransportOpts): Mesh {
 
   const deliverLocal = (record: ChangeRecord) => opts.onRecord?.(record)
 
+  // Shared body for the named view-frame senders below: one VIEW_* control frame,
+  // point-to-point. False if the peer isn't connected. Named per phase (viewPrepare/
+  // viewAck/viewCommit) so L2's ViewManager never spells a wire verb — mirroring the
+  // inbound onViewPrepare/onViewAck/onViewCommit hooks (the V1a layering seam, made symmetric).
+  const sendViewFrame = (address: string, verb: number, value: unknown): boolean => {
+    const peer = pool.peer(address)
+    if (!peer) return false
+    peer.write(controlFrame(verb, value))
+    return true
+  }
+
   return {
     peers: pool.peers,
     me,
@@ -282,14 +299,10 @@ export function transport(opts: TransportOpts): Mesh {
       for (const m of view) if (!dht.has(m)) dht.add(m)
     },
     viewMembers: () => view,
-    // Send a view-change control frame (one record value under a VIEW_* verb),
-    // point-to-point. Returns false if the peer isn't connected.
-    viewSend: (address, verb, value) => {
-      const peer = pool.peer(address)
-      if (!peer) return false
-      peer.write(controlFrame(verb, value))
-      return true
-    },
+    // Named view-frame senders (V1a layering seam): L2 calls these, never a raw verb.
+    viewPrepare: (address, value) => sendViewFrame(address, VERB.VIEW_PREPARE, value),
+    viewAck: (address, value) => sendViewFrame(address, VERB.VIEW_ACK, value),
+    viewCommit: (address, value) => sendViewFrame(address, VERB.VIEW_COMMIT, value),
     // Forward a write-request to the partition owner (WRITE verb, point-to-point —
     // not the batched broadcast outbox). Returns whether the frame was actually
     // handed to a writable socket: false if the owner has no peer OR its socket
