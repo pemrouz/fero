@@ -44,7 +44,7 @@ anyone staying connected throughout.
 
 **Decision.** When a dialed peer's handshake completes (transport `onConnect`,
 gated to the dialer so catch-up runs once per direction), the two nodes exchange
-per-origin high-water **digests** (`Log.originHeads()` / resource's `seen`) and
+per-origin high-water **digests** (`Log.marks()` / resource's `seen`) and
 each ships the records the other lacks (`Log.recordsSince(vector)`, framed by
 `catchupTo`). The receiver folds them through dedup + LWW. Reconnect is automatic:
 a dropped dial → Peer retry → handshake re-fires → digest again. The handshake
