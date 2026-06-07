@@ -16,7 +16,7 @@ import { STATUS, type Peer } from './peer.ts'
 import { DHT, type DHTOpts } from './dht.ts'
 import { staticDiscovery } from './discovery/static.ts'
 import { initiate, handle, type Identity, type HandshakeHooks } from './handshake.ts'
-import { partitionOf, encodeFrame, encodeFrames, VERB, type ChangeRecord, type Frame } from './message.ts'
+import { partitionOf, encodeFrame, encodeFrames, controlFrame, VERB, type ChangeRecord, type Frame } from './message.ts'
 import type { RetryOpts } from './retries.ts'
 
 export type TransportOpts = {
@@ -155,10 +155,10 @@ export function transport(opts: TransportOpts): Mesh {
     if (handle(frame, peer, hooks)) return // INIT/SYNC/DONE
     switch (frame.verb) {
       case VERB.DIGEST:
-        opts.onDigest?.(frame.records()[0]?.value ?? {}, peer.address)
+        opts.onDigest?.(frame.value ?? {}, peer.address)
         return
       case VERB.SUBSCRIBE: {
-        const { method, arg } = (frame.records()[0]?.value as { method: string; arg: unknown }) ?? { method: '', arg: undefined }
+        const { method, arg } = (frame.value as { method: string; arg: unknown }) ?? { method: '', arg: undefined }
         opts.onSubscribe?.(frame.id!, method, arg, peer.address)
         return
       }
@@ -174,25 +174,25 @@ export function transport(opts: TransportOpts): Mesh {
       // Membership view-change frames (Milestone V) — explicit cases so they
       // route to their own hooks and never fall through to onRecord below.
       case VERB.VIEW_PREPARE:
-        opts.onViewPrepare?.(frame.records()[0]?.value, peer.address)
+        opts.onViewPrepare?.(frame.value, peer.address)
         return
       case VERB.VIEW_ACK:
-        opts.onViewAck?.(frame.records()[0]?.value, peer.address)
+        opts.onViewAck?.(frame.value, peer.address)
         return
       case VERB.VIEW_COMMIT:
-        opts.onViewCommit?.(frame.records()[0]?.value, peer.address)
+        opts.onViewCommit?.(frame.value, peer.address)
         return
       case VERB.JOIN_REQUEST:
-        opts.onJoinRequest?.(frame.records()[0]?.value, peer.address)
+        opts.onJoinRequest?.(frame.value, peer.address)
         return
       case VERB.CALL: {
         const id = frame.id
-        const { method, arg } = (frame.records()[0]?.value as { method: string; arg: unknown }) ?? { method: '', arg: undefined }
+        const { method, arg } = (frame.value as { method: string; arg: unknown }) ?? { method: '', arg: undefined }
         Promise.resolve()
           .then(() => opts.onCall?.(method, arg, peer.address))
           .then(
-            (value) => peer.write(encodeFrame([{ type: 'update', key: [], value }], { verb: VERB.RESOLVE, id })),
-            (err) => peer.write(encodeFrame([{ type: 'update', key: [], value: String((err as Error)?.message ?? err) }], { verb: VERB.REJECT, id })),
+            (value) => peer.write(controlFrame(VERB.RESOLVE, value, id)),
+            (err) => peer.write(controlFrame(VERB.REJECT, String((err as Error)?.message ?? err), id)),
           )
         return
       }
@@ -202,7 +202,7 @@ export function transport(opts: TransportOpts): Mesh {
         if (!waiter) return
         pending.delete(frame.id!)
         if (waiter.timer) clearTimeout(waiter.timer)
-        const value = frame.records()[0]?.value
+        const value = frame.value
         if (frame.verb === VERB.RESOLVE) waiter.resolve(value)
         else waiter.reject(new Error(String(value)))
         return
@@ -287,7 +287,7 @@ export function transport(opts: TransportOpts): Mesh {
     viewSend: (address, verb, value) => {
       const peer = pool.peer(address)
       if (!peer) return false
-      peer.write(encodeFrame([{ type: 'update', key: [], value }], { verb }))
+      peer.write(controlFrame(verb, value))
       return true
     },
     // Forward a write-request to the partition owner (WRITE verb, point-to-point —
@@ -306,7 +306,7 @@ export function transport(opts: TransportOpts): Mesh {
     // the batched broadcast outbox), so catch-up traffic never disturbs the
     // single-origin-contiguous invariant the steady-state outbox relies on.
     digestTo(address, vector) {
-      pool.peer(address)?.write(encodeFrame([{ type: 'update', key: [], value: vector }], { verb: VERB.DIGEST }))
+      pool.peer(address)?.write(controlFrame(VERB.DIGEST, vector))
     },
     catchupTo(address, records) {
       const peer = pool.peer(address)
@@ -330,9 +330,9 @@ export function transport(opts: TransportOpts): Mesh {
       if (!peer || !peer.writable) return undefined
       const id = ++callId
       subs.set(id, onDelta)
-      peer.write(encodeFrame([{ type: 'update', key: [], value: { method, arg } }], { verb: VERB.SUBSCRIBE, id }))
+      peer.write(controlFrame(VERB.SUBSCRIBE, { method, arg }, id))
       return () => {
-        if (subs.delete(id)) peer.write(encodeFrame([{ type: 'update', key: [], value: null }], { verb: VERB.UNSUBSCRIBE, id }))
+        if (subs.delete(id)) peer.write(controlFrame(VERB.UNSUBSCRIBE, null, id))
       }
     },
     deltaTo(address, subId, record) {
@@ -362,7 +362,7 @@ export function transport(opts: TransportOpts): Mesh {
         }, opts.callTimeout ?? 5000)
         timer.unref?.()
         pending.set(id, { resolve, reject, timer })
-        peer.write(encodeFrame([{ type: 'update', key: [], value: { method, arg } }], { verb: VERB.CALL, id }))
+        peer.write(controlFrame(VERB.CALL, { method, arg }, id))
       })
     },
     ready,
