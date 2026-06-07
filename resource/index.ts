@@ -678,46 +678,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     aggRetain.set(out, retain)
     return out
   }
+  // Dispatch into the co-located AGG registry (bottom of file): each op pairs its
+  // owner-scoped PARTIAL builder with the associative COMBINE that folds partials into the
+  // global. Owner-scoped over the RAW proxy via ownedView (held partitions filtered to the
+  // keys we OWN on the committed ring) — so the union across holders is a disjoint cover.
   const buildPartial = (spec: any): any => {
-    const owned = ownedView()
-    const col = spec?.col
-    switch (spec?.op) {
-      case 'sum':
-        return owned.sum(col)
-      case 'count':
-        return owned.length()
-      case 'max':
-        return owned.max(col)
-      case 'min':
-        return owned.min(col)
-      // avg ships a {sum, count} PAIR (data's AvgValue exposes only the quotient, which
-      // can't be combined — average-of-averages is wrong). count = #owned rows with a
-      // DEFINED projected value (matching AvgValue's own counting); the fold divides last.
-      case 'avg': {
-        const defined = col != null ? (r: any) => r?.[col] != null : (r: any) => r != null
-        return composite($({ sum: 0, count: 0 }), { sum: owned.sum(col), count: owned.filter(defined).length() })
-      }
-      // some/every take a DECLARATIVE predicate (col[, val]) — a closure can't cross the
-      // wire to other holders (use a named method for that, a follow-up). some ships this
-      // holder's MATCH COUNT (fold: Σ > 0 ⇒ any match exists); every ships {match, total}
-      // (fold: Σmatch === Σtotal ⇒ all rows match; empty ⇒ 0===0 ⇒ true, vacuous).
-      case 'some':
-        return owned.filter(col, spec.val).length()
-      case 'every':
-        return composite($({ match: 0, total: 0 }), { match: owned.filter(col, spec.val).length(), total: owned.length() })
-      // 'rows' (Milestone Q3): this holder's OWNER-SCOPED row set itself (not a scalar) — the
-      // per-shard partial a whole-resource GATHER folds. Each holder ships its owned rows; the
-      // querier UNIONs them by key (RULES.rows) into the whole resource — the "download
-      // everything" step holistic ops (sort/distinct/group/reduce) run AFTER. Owner-scoped so
-      // the union is a disjoint cover (each row once, 1× wire, not R×); the union is idempotent
-      // by key, so it tolerates the transient ring disagreement a scalar fold can't (two holders
-      // both reporting a key land it once, not twice). livePartial emits the whole owned snapshot
-      // on every delta, which is exactly the {key:[], value} shape the fold consumes.
-      case 'rows':
-        return owned
-      default:
-        throw new Error(`fero: unknown aggregate op "${spec?.op}"`)
-    }
+    const entry = AGG[spec?.op]
+    if (!entry) throw new Error(`fero: unknown aggregate op "${spec?.op}"`)
+    return entry.partial({ owned: ownedView(), col: spec?.col, val: spec?.val, composite })
   }
 
   // A LIVE owner-scoped partial (Milestone Q2c): builds buildPartial(spec), streams its
@@ -835,7 +803,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // with the global snapshot. This is the explicit "download everything" the user chains
     // holistic ops after. R≥members / full replication hold everything, so read() stays a local
     // c.data snapshot there (the hot path is byte-identical — the gather only arms when scoped).
-    if (method === 'read' && arg == null && scoped && R < viewSize() && allMethods.read === defaults.read) return foldOnce({ op: 'rows' }, RULES.rows)
+    if (method === 'read' && arg == null && scoped && R < viewSize() && allMethods.read === defaults.read) return foldOnce({ op: 'rows' }, AGG.rows.combine)
     // A CLIENT routed a distributed aggregate here (Milestone Q2e): a client can't
     // owner-scope or fold, so it sends {fold:true} and THIS server (a coordinator) returns
     // the GLOBAL via a one-shot gather. The gather fans out PARTIAL requests (fold stripped)
@@ -844,7 +812,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // → the partial path below.)
     if (method === 'aggregate' && (arg as any)?.fold) {
       const s = stripFold(arg)
-      return foldOnce(s, RULES[s.op]) // a Promise; the CALL handler awaits it before replying
+      return foldOnce(s, AGG[s.op]?.combine) // a Promise; the CALL handler awaits it before replying
     }
     return snapshot(invoke(method, arg, address))
   }
@@ -902,7 +870,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // unaffected. (serveCall keeps the R<viewSize() optimization: it re-evaluates per call, so a
     // complete-local read at members≤R is always current.)
     if (method === 'read' && arg == null && scoped && allMethods.read === defaults.read) {
-      const g = openFold({ op: 'rows' }, RULES.rows)
+      const g = openFold({ op: 'rows' }, AGG.rows.combine)
       const host = (g.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
       addSub(address, subId, { host, src: g.proxy, close: g.close })
       return
@@ -913,7 +881,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (method === 'aggregate' && (arg as any)?.fold) {
       try {
         const s = stripFold(arg)
-        const f = openFold(s, RULES[s.op])
+        const f = openFold(s, AGG[s.op]?.combine)
         const host = (f.proxy as any).connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
         addSub(address, subId, { host, src: f.proxy, close: f.close })
       } catch {
@@ -1111,7 +1079,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // via invoke('aggregate', spec) + a local sink (openFold's livePartial), folded alongside
   // the N-1 remote partials. Miss this and the querier's whole shard is silently dropped.
   const foldAggregate = (spec: { op: string; col?: unknown; val?: unknown }) => {
-    const rule = RULES[spec.op]
+    const rule = AGG[spec.op]?.combine
     let opened: { proxy: any; close: () => void } | undefined
     const handle = new Proxy(noop, {
       get(_t, prop) {
@@ -1381,15 +1349,46 @@ const everyRule: Rule = (vs) => {
 // empty contribution. This is the "download everything to one node" gather — the whole-resource
 // snapshot/stream holistic operators (sort/distinct/group/reduce) compute over locally.
 const unionRule: Rule = (vs) => Object.assign({}, ...vs.filter((o) => o != null && typeof o === 'object'))
-const RULES: Record<string, Rule> = {
-  sum: sumRule,
-  count: sumRule,
-  max: extremum((a, b) => a > b),
-  min: extremum((a, b) => a < b),
-  avg: avgRule,
-  some: someRule,
-  every: everyRule,
-  rows: unionRule,
+
+// ── Distributed aggregate registry (Milestone Q2/Q3) ──
+// One entry per op pairs its owner-scoped PARTIAL builder with the associative COMBINE that
+// folds partials into the global answer — the two halves of a decomposable aggregate,
+// co-located so adding/changing an op is ONE edit (was a switch in buildPartial + a separate
+// RULES table ~700 lines apart). `combine` is stateless + module-level (a fero() instance
+// pays nothing to reference it) and associative + commutative (order-independent across
+// holders). `partial` is a factory over a per-instance context (the owner-scoped `owned`
+// view + the `composite` builder); only the {op,col,val} spec crosses the wire, never a
+// closure — every holder reconstructs the same operator from the spec.
+type PartialCtx = { owned: any; col?: any; val?: any; composite: (out: any, fields: Record<string, any>) => any }
+const AGG: Record<string, { partial: (c: PartialCtx) => any; combine: Rule }> = {
+  sum: { partial: ({ owned, col }) => owned.sum(col), combine: sumRule },
+  count: { partial: ({ owned }) => owned.length(), combine: sumRule },
+  max: { partial: ({ owned, col }) => owned.max(col), combine: extremum((a, b) => a > b) },
+  min: { partial: ({ owned, col }) => owned.min(col), combine: extremum((a, b) => a < b) },
+  // avg ships a {sum, count} PAIR (data's AvgValue exposes only the quotient — average-of-
+  // averages is wrong). count = #owned rows with a DEFINED projected value (matching AvgValue);
+  // avgRule divides Σsum/Σcount last.
+  avg: {
+    partial: ({ owned, col, composite }) => {
+      const defined = col != null ? (r: any) => r?.[col] != null : (r: any) => r != null
+      return composite($({ sum: 0, count: 0 }), { sum: owned.sum(col), count: owned.filter(defined).length() })
+    },
+    combine: avgRule,
+  },
+  // some/every take a DECLARATIVE predicate (col[, val]) — a closure can't cross the wire
+  // (use a named method for that). some ships this holder's MATCH COUNT (someRule: Σ>0 ⇒ any
+  // match); every ships {match, total} (everyRule: Σmatch===Σtotal ⇒ all; empty ⇒ 0===0 ⇒ true).
+  some: { partial: ({ owned, col, val }) => owned.filter(col, val).length(), combine: someRule },
+  every: {
+    partial: ({ owned, col, val, composite }) =>
+      composite($({ match: 0, total: 0 }), { match: owned.filter(col, val).length(), total: owned.length() }),
+    combine: everyRule,
+  },
+  // 'rows' (Q3): this holder's OWNER-SCOPED row set itself (not a scalar) — the per-shard
+  // partial a whole-resource GATHER unions by key (unionRule) into the whole resource (the
+  // "download everything" before holistic ops run locally). Owner-scoped ⇒ a disjoint cover
+  // (each row once, 1× wire); the union is idempotent by key, so it tolerates ring churn.
+  rows: { partial: ({ owned }) => owned, combine: unionRule },
 }
 
 // A `data` ViewProxy carries the view symbol; a plain value does not.
