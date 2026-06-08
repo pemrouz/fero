@@ -1,3 +1,4 @@
+//! L2 public surface: fero(name, opts) → { data, methods, cluster, destroy } — the whole library in one call.
 // L2 public surface: fero(name, opts) → { data, methods, cluster, destroy }.
 //
 // The whole library, in one call. Composes L1's record machinery onto an L0
@@ -52,6 +53,7 @@ export { fileStorage } from './storage.ts'
 
 export type Method = (arg: any, context: Context) => any
 
+//! Cluster surface: peers + identity + ownership/replica queries + the committed view (epoch/members/writable).
 export type Cluster = {
   peers: any // L0 cluster.peers ViewProxy (queryable / connectable)
   readonly me?: string // this server's listen address (undefined for read-only clients)
@@ -63,6 +65,7 @@ export type Cluster = {
   readonly writable: boolean // can this server reach a quorum of its view? false ⇒ read-only (writes buffer)
 }
 
+//! Context: the second arg every method receives — data/cluster/methods/log/name + the calling peer (routed RPC).
 // What every method receives as its second arg. plan §6.1 names data/peer/
 // methods/cluster; log + name are useful extras for handlers and L1 work.
 export type Context = {
@@ -74,6 +77,7 @@ export type Context = {
   peer?: any // the calling peer's listen address (set for routed RPC — DECISIONS D); undefined for an in-process method-to-method call. NB: plan §6.1/§7 describe a richer { address, status, auth } peer object — auth not yet built (../IDEAS.md).
 }
 
+//! Fero: the returned instance — the three reactive surfaces + teardown.
 export type Fero = {
   data: any
   methods: Record<string, (arg?: any) => any>
@@ -81,6 +85,7 @@ export type Fero = {
   destroy: () => void
 }
 
+//! Storage: the durable-log seam (plan §4) — load() replays at boot, append() persists each accepted record.
 // Durable-log seam (plan §4). `load` returns the persisted records at boot (they
 // replay through the same accept path as inbound replication); `append` persists
 // each accepted record. A built-in file adapter lives in ./storage.ts; bring your
@@ -90,13 +95,16 @@ export type Storage = {
   append: (record: ChangeRecord) => void
 }
 
+//! FeroOpts: method functions + resource config + transport opts (minus name/onRecord) + optional storage.
 export type FeroOpts = Record<string, unknown> & Partial<Omit<TransportOpts, 'name' | 'onRecord'>> & { storage?: Storage }
 
+//! norm: coerce a record key (array path or bare scalar sugar) to a path array.
 // A change record's `key` may arrive as an array path (`['user42','active']`)
 // or a bare scalar (`'user42'`, sugar). Normalize to a path.
 const norm = (k: unknown): (string | number)[] =>
   Array.isArray(k) ? k : k == null ? [] : [k as string | number]
 
+//! setPath/delPath: walk the proxy tree and assign/delete the leaf, so the set/delete trap emits one record.
 // Walk a path on the data proxy and assign / delete the leaf. Single-segment is
 // the common case; nested walks the proxy tree (each hop is a child ViewProxy,
 // so the leaf assignment still routes through the set trap → emits one record).
@@ -113,10 +121,12 @@ function delPath(data: any, path: (string | number)[]) {
   delete o[path[path.length - 1]]
 }
 
+//! fero(name, opts): compose L0 mesh + L1 records into the three surfaces; await = ready (plan §1).
 export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // Build phases (skim the ── banners): 0 config · 1 replication core · 2 restore+mesh
   // · 3 holding+membership · 4 write path (+orphan shed) · 5 surfaces.
 
+  //! ── 0 · config: methods/config split + replication factor ──
   // ── 0 · config: methods/config split + replication factor ──
   // Recognition rule (plan §1): function values are methods, everything else is
   // transport/resource config. By value type, not key name.
@@ -127,6 +137,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     else config[k] = v
   }
 
+  //! R = replication factor (Milestone P): finite ⇒ scoped per-partition holding; default ∞ ⇒ full replication.
   // Replication factor (Milestone P). `replicas: R` holds each partition on R
   // replicas (owner + R-1 ring successors); the default ∞ holds every partition on
   // every server (full replication — the pre-P behavior, byte-identical). Extracted
@@ -139,12 +150,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   delete (config as any).replicas
   config.dht = { ...((config.dht as Record<string, unknown>) ?? {}), replicas: R }
   const scoped = R !== Infinity
+  //! antiEntropyMs: periodic anti-entropy interval driving scoped acquisition + drift healing (resync below).
   // Periodic anti-entropy interval (ms) — drives scoped acquisition + drift healing
   // (see resync below). Extracted so it isn't passed to the transport; only armed in
   // scoped mode.
   const antiEntropyMs = typeof config.antiEntropy === 'number' ? (config.antiEntropy as number) : 1000
   delete (config as any).antiEntropy
 
+  //! ── 1 · replication core: state (proxy = truth, log = history) + provenance + dedup + LWW ──
   // ── 1 · replication core: state (proxy = truth, log = history) + provenance + dedup + LWW ──
   // State: the proxy is the source of truth; the log records history.
   const log = new Log({ scoped })
@@ -162,17 +175,20 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // dedup re-delivered records. Within one synchronous write burst the clock
   // increments contiguously and the microtask outbox flushes before the next
   // (macrotask) inbound, so a frame's records keep contiguous seqs (base+index).
-  let clock = 0 // this node's Lamport clock; local writes stamp ++clock
+  let clock = 0 //! this node's Lamport clock; local writes stamp ++clock so a local write always wins LWW
+  //! seen: per-seenKey dedup high-water marks; doubles as the anti-entropy digest a node ships.
   // Dedup high-water, keyed by seenKey(origin, partition) below: per-origin under
   // full replication (compact digest), per-(origin,partition) under scoped holding
   // (Milestone P — so each partition's stream is independently complete). Doubles
   // as the anti-entropy digest a node sends (Object.fromEntries(seen)).
   const seen = new Map<string, number>()
+  //! versions: keyPath → current LWW winner stamp, MUTATED in place on re-write (zero steady-state alloc).
   // keyPath → current LWW winner. The {seq,origin} stamp is MUTATED in place on
   // re-write (not reallocated) so the steady-state write path allocates nothing
   // here — version churn was the dominant cost when this was a fresh object per
   // write (see index.perf.ts).
   const versions = new Map<string, { epoch: number; seq: number; origin: string }>()
+  //! pending: write-gate buffer (V1e) — writes held while quorum-less, flushed on quorum return; bounded drop-oldest.
   // Write-gate buffer (Milestone V1e): writes attempted while we can't reach a
   // quorum of the view are held here (NOT committed/broadcast) and flushed when
   // quorum returns — so a partition's minority side stays read-only instead of
@@ -180,6 +196,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const pending: ChangeRecord[] = []
   const MAX_PENDING = 10_000
 
+  //! versionKey: the key a record contends on for LWW — `at` folded into the path → field-level LWW.
   // The key path a record contends on for LWW. An insert folds `at` into the
   // path so an insert and a later update to the same key contend as one key;
   // distinct leaves (k1 vs k1.score) are independent → field-level LWW. The
@@ -191,6 +208,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     return key.length === 1 ? key[0] : key.join('\x00')
   }
 
+  //! seenKey: provenance key for dedup/catch-up — origin alone (full) or (origin,partition) (scoped).
   // The provenance key a record dedups / catches-up under (see `seen` above).
   // Full replication ⇒ origin alone; scoped holding ⇒ (origin,partition). Mirrors
   // the log's index granularity (constructed with the same `scoped` flag), so the
@@ -199,6 +217,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     ? (origin: string, p: string): string => originKey(origin, p)
     : (origin: string, _p: string): string => origin
 
+  //! applying: guard set while applying an inbound record, so its sink re-emission isn't re-logged/re-broadcast.
   // Inbound records carry their origin's provenance. (1) Drop duplicates by
   // per-origin high-water. (2) Log every accepted record (the full per-origin
   // history catch-up forwards from). (3) Apply only LWW winners to the proxy —
@@ -206,10 +225,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // the write-capture sink; the `applying` guard stops that re-emission from
   // being re-logged or re-broadcast.
   let applying = false
+  //! committingForward: guard so an applied forwarded write commits as-is, never re-evaluating ownership.
   // Set while a FORWARDED write is being applied locally (see commitForwarded): the
   // sink commits it as-is instead of re-evaluating ownership, so it never bounces.
   let committingForward = false
 
+  //! applyInbound: dedup → Lamport-merge → log → LWW-resolve → apply winner; shared by replication + restore replay.
   // Accept a record into local state: dedup by per-origin high-water, Lamport-
   // merge the clock, log it (full per-origin history), LWW-resolve, and apply the
   // winner to the proxy. Shared by inbound replication AND restore-from-storage
@@ -227,6 +248,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       const e = record.epoch ?? 0
       const key = versionKey(record)
       const cur = versions.get(key)
+      //! LWW resolve, lexicographic (epoch, seq, origin): epoch fences stale views, seq then origin decide; loser stays logged.
       // LWW, lexicographic (epoch, seq, origin): a write committed under a NEWER
       // membership view wins (epoch fencing — Milestone V1d), so a straggler from
       // a superseded view can't clobber the current one; within a view (constant
@@ -249,6 +271,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
+  //! ── 2 · durable restore + transport mesh ──
   // ── 2 · durable restore + transport mesh ──
   // Restore durable state BEFORE the mesh exists (no network yet → no races):
   // replay the persisted log through applyInbound, rebuilding seen/clock/versions
@@ -264,12 +287,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     log.onAppend((record) => storage.append(record))
   }
 
+  //! mesh: the L0 transport, wired with all the inbound hooks (record/digest/RPC/subscribe/write/view).
   const mesh: Mesh = transport({
     name,
     ...(config as object),
     // NB: these hooks call closures defined BELOW (holds / resync / shedConfirmed /
     // commitForwarded / viewMgr / dispatch). Safe forward refs: a hook only fires
     // post-construction (once a peer connects), by which point all are bound.
+    //! onRecord: held-gate then accept — scoped nodes drop records for partitions they don't replicate.
     // Scoped holding (Milestone P): materialize ONLY partitions we replicate. A
     // server with finite R drops inbound records for partitions it doesn't hold
     // (scoped delivery shouldn't send them, but catch-up over-ship or a transitional
@@ -279,6 +304,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (scoped && !holds(partitionOf(record))) return
       applyInbound(record)
     },
+    //! onConnect: on handshake, a server sends its digest (reply:true) so catch-up heals both directions.
     // Catch-up (anti-entropy). When a dialed peer's handshake completes, send it
     // our high-water digest; when a peer sends us theirs, ship back
     // every record they lack. The receiver folds the records through the same
@@ -297,6 +323,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     onConnect: (address: string) => {
       if (me !== undefined) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: true, me })
     },
+    //! onDigest: ship the records the peer lacks (scoped: only partitions it replicates), confirm-shed, reply once.
     onDigest: (payload: any, address: string) => {
       const vector: Record<string, number> = payload?.v ?? payload ?? {}
       let recs = log.recordsSince(vector)
@@ -316,22 +343,27 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (scoped && payload?.me) shedConfirmed(payload.v ?? {}, payload.me)
       if (me !== undefined && payload?.reply) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: false, me })
     },
+    //! onCall: inbound RPC — run the named method with the caller as context.peer, ship the return value back.
     // Inbound RPC: a client called one of our methods. Run it here with the
     // caller as context.peer; the transport ships the return value back. (The
     // dispatch surface is built after the method table below — these hooks fire
     // only once a client connects, post-construction, so `dispatch` is bound.)
     onCall: (method: string, arg: unknown, address: string) => dispatch.serveCall(method, arg, address),
+    //! onSubscribe: inbound subscription — stream a returned ViewProxy's deltas to the client (else one value).
     // Inbound subscription: run the method, and if it returns a ViewProxy stream
     // its deltas (initial snapshot + changes) to the client; else ship one value.
     onSubscribe: (subId: number, method: string, arg: unknown, address: string) => dispatch.serveSubscribe(subId, method, arg, address),
     onUnsubscribe: (subId: number, address: string) => dispatch.serveUnsubscribe(subId, address),
+    //! onPeerGone: reap a dropped peer's served subscriptions so a gone client doesn't leak sinks/openFolds.
     // A peer dropped (socket close / destroy) without an UNSUBSCRIBE — reap its served subscriptions
     // so a gone client/coordinator doesn't leak its sinks / openFolds (subscription hygiene).
     onPeerGone: (address: string) => dispatch.reapPeer(address),
+    //! onWrite: a forwarded write for a partition we own — commit it locally; we are its single sequencer.
     // Inbound write-request: a peer forwarded a write for a partition we own.
     // Apply it as a LOCAL write so our sink commits it (stamps origin=us, logs,
     // replicates) — we are the single sequencer for the partition.
     onWrite: (record: ChangeRecord) => commitForwarded(record),
+    //! onView*: membership view-change frames (Milestone V) routed to the ViewManager state machine.
     // Membership view-change frames (Milestone V) → the view-change state machine.
     onViewPrepare: (value: unknown) => viewMgr?.onPrepare(value),
     onViewAck: (value: unknown) => viewMgr?.onAck(value),
@@ -344,6 +376,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   const viewSize = (): number => mesh.viewMembers().length
 
+  //! ── 3 · holding + membership + anti-entropy ──
   // ── 3 · holding + membership + anti-entropy ──
   // Does this node hold (replicate) a partition's records? Full replication ⇒
   // always (every server holds everything). Scoped (finite R) ⇒ only if we're in
@@ -351,6 +384,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // holds nothing. The R≥members short-circuit avoids an owners() ring scan when R
   // covers everyone (scoped degenerates to full replication) — this runs on every
   // inbound record + foreign write, so the scan would be a hot-path blowup.
+  //! holds(key): does this node replicate the partition? full ⇒ always; scoped ⇒ in its R-set on the ring (memoized).
   // The ring is constant between view commits, so memoize the owners() scan per key
   // (cleared on commit). Keeps holds() — on the inbound, write, AND facade-read paths
   // — O(1) in steady state instead of an O(R) ring walk per access.
@@ -363,6 +397,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     return h
   }
 
+  //! resync (scoped): digest every view member to acquire rebalanced partitions + heal drift (reciprocal heals both ways).
   // Anti-entropy re-sync (Milestone P, scoped only): send our high-water digest to
   // every other committed-view member, asking for what we lack — the reciprocal
   // reply leg then heals BOTH directions. This is the ACQUISITION path: on a view
@@ -380,6 +415,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     for (const m of mesh.viewMembers()) if (m !== me) mesh.digestTo(m, digest)
   }
 
+  //! aggregate registries (Q2c): rebinds re-scope live partials on a ring change; reconciles fix fold holder sets.
   // Live distributed-aggregate machinery that reacts to membership changes (Milestone
   // Q2c). Two registries, both populated lazily as partials/folds go live; defined here
   // so the viewMgr.onCommit + aeTimer closures can walk them.
@@ -399,6 +435,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const aggregateRebinds = new Set<Rescope>()
   const aggregateReconciles = new Set<Reconcile>()
 
+  //! viewMgr (servers only): the view-change state machine — committed {epoch,members}; onCommit rebalances + rebinds.
   // Membership view (Milestone V). Servers run the view-change state machine: it
   // forms a committed { epoch, members } the cluster agrees on, and drives the
   // DHT ring (via mesh.installView) so ownership is stable within an epoch. A
@@ -424,6 +461,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       : undefined
   const viewEpoch = (): number => viewMgr?.epoch ?? 1
 
+  //! aeTimer (scoped): periodic resync + fold-reconcile — the backstop for acquisition/drift a commit-triggered run can race.
   // Periodic anti-entropy (scoped only): the robust backstop for acquisition + drift
   // (a commit-triggered resync can race a peer that hasn't committed the new view
   // yet; this re-runs until both rings agree and the partition transfers). Off in
@@ -440,6 +478,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       : undefined
   aeTimer?.unref?.()
 
+  //! ── 4 · write path: capture sink → forward-to-owner | commit-local ──
   // ── 4 · write path: capture sink → forward-to-owner | commit-local ──
   // Write-capture: a local assignment on the proxy is stamped with our provenance, recorded as the
   // current LWW winner for its key (the proxy already materialized it — the newest write we know of),
@@ -468,15 +507,18 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // methods.update parity".
   let primed = false
   const writeHost = data.connect({}, (change: ChangeRecord) => {
+    //! 1) prime: swallow the empty attach-snapshot.
     // 1) prime: swallow the empty attach-snapshot.
     if (!primed) {
       primed = true
       return
     }
 
+    //! 2) applying-skip: an inbound re-emission — already handled in onRecord.
     // 2) applying-skip: an inbound re-emission — already handled in onRecord.
     if (applying) return
 
+    //! 3) F1 forward: not owner + owner reachable ⇒ hand off (a forwarded write skips this).
     // 3) F1 forward: not owner + owner reachable ⇒ hand off (a forwarded write skips this).
     if (!committingForward) {
       const p = partitionOf(change)
@@ -490,12 +532,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       }
     }
 
+    //! 4) commit-local: stamp/log/replicate under our provenance.
     // 4) commit-local: stamp/log/replicate under our provenance.
     commitLocal(change)
   })
 
+  //! ── orphan shedding (P4, scoped): keep a no-longer-replicated partition until an R-set member is caught up, then drop ──
   // ── orphan shedding (P4, scoped): keep a no-longer-replicated partition until a
   //    current R-set member is confirmed caught up, then drop it (never < R replicas) ──
+  //! orphans / shedReady: partitions we hold but no longer replicate, + the R-set members confirmed caught up on each.
   // Orphan partitions (Milestone P4): partitions we hold data for but no longer
   // REPLICATE (per the committed ring) — a former replica after a ring expansion, or
   // a write committed locally at a non-replica (never-drop fallback / misrouted
@@ -508,6 +553,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // R-replicated WITHOUT us before we drop it.
   const shedReady = new Map<string, Set<string>>()
 
+  //! discardOptimistic: drop a forwarded-but-unheld partition we optimistically applied (guarded — no sink echo).
   // Silently remove a foreign partition we optimistically applied but don't hold
   // (after forwarding its write to the owner). Guarded by `applying` so the removal
   // doesn't re-enter the sink — no echo, no spurious forwarded 'remove'.
@@ -520,6 +566,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
+  //! shed: fully drop an orphan from proxy/log/seen/versions — complete handoff, only after R-set confirmed caught up.
   // Fully shed an orphan partition (Milestone P4): remove it from the proxy, the
   // log (segment + provenance index), the dedup high-water, and the LWW version map
   // — a complete handoff off this node. Called ONLY once a current R-set member is
@@ -535,6 +582,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     shedReady.delete(partition)
   }
 
+  //! markOrphans: on a ring rebalance, flag held-but-no-longer-replicated partitions as orphans-to-shed.
   // Note partitions we hold but no longer replicate as orphans-to-shed (scan on view
   // commit, when the ring rebalances). A write committed locally at a non-replica
   // adds itself directly (commitLocal).
@@ -543,6 +591,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     for (const p of log.partitions()) if (!holds(p) && !orphans.has(p)) orphans.add(p)
   }
 
+  //! shedConfirmed: mark an R-set peer caught up on each orphan from its digest; shed only when EVERY member is (never < R).
   // Confirmed shedding: a peer (at listen address `peerMe`) sent its high-water
   // marks. For each orphan partition we hold, if that peer is a current R-set member
   // AND its marks cover ALL our (origin,partition) records, record it as caught up.
@@ -579,10 +628,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
+  //! commitLocal: stamp under our provenance, record as LWW winner, log, replicate — owned writes + never-drop fallback.
   // Commit a record under OUR provenance: stamp (origin=us, Lamport seq), record
   // it as the LWW winner for its key, log it, and replicate. Used for partitions
   // we own and as the never-drop fallback when an owner is unreachable.
   function commitLocal(change: ChangeRecord) {
+    //! write-gate chokepoint (V1e): no quorum ⇒ buffer instead of commit, so a minority can't diverge.
     // Write-gate chokepoint (V1e): without a reachable quorum we are read-only —
     // buffer the write (don't stamp/log/broadcast) so a minority can't diverge.
     // This SUPERSEDES F1's never-drop local commit for a quorum-less node. Both
@@ -606,6 +657,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       cur.origin = uuid
     } else versions.set(key, { epoch: e, seq: n, origin: uuid })
     log.append(change)
+    //! replicate: scoped R<members ⇒ send to the R-set only (orphan-mark if we're not in it); else broadcast to all.
     // Replicate to peers: scoped mode with R < members ships only to the OTHER
     // replicas in this partition's R-set (we already applied + logged it); otherwise
     // (full replication, or R≥members so everyone holds all) broadcast to every
@@ -622,6 +674,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     } else mesh.broadcast(change)
   }
 
+  //! commitForwarded: apply a forwarded write so the sink commits it as ours; committingForward stops a re-forward.
   // A peer forwarded a write for a partition we own. Apply it to our proxy as a
   // local write (NOT guarded by `applying`) so the write-capture sink above runs
   // and commits it under our provenance — turning the forwarder's optimistic
@@ -637,6 +690,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
+  //! flushPending: quorum returned — re-commit the buffered writes in order (re-buffers if the gate closed again).
   // Quorum returned (the write-gate opened): re-commit everything buffered while
   // read-only, in order. commitLocal re-checks canWrite, so anything that can't go
   // out (gate closed again) simply re-buffers. (Buffered writes flush under the
@@ -648,12 +702,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     for (const c of batch) commitLocal(c)
   }
 
+  //! distributed aggregates (Q2/Q3): the fold ENGINE lives in ./fold.ts (makeFold), built below once invoke+clientSubs exist.
   // Distributed aggregates (Milestone Q2/Q3): the fold ENGINE — owner-scoped partial
   // construction, the live re-scoping partial, and the querying-side one-shot + live gather
   // — lives in [./fold.ts] (makeFold), built below once `invoke` + clientSubs exist (the
   // engine's only injected deps beyond the raw proxy/mesh/state).
 
-  // ── 5 · surfaces: cluster + methods + dispatch ──
+  //! ── 5 · surfaces: cluster + methods + dispatch ──
+  //! cluster: the public cluster surface — peers, identity, owner/replica queries, live view (epoch/members/writable).
   const cluster: Cluster = {
     peers: mesh.peers,
     get me() {
@@ -673,15 +729,18 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     },
   }
 
+  //! defaults: read/aggregate/update/insert/remove (plan §6.3), each overridable by a same-named opts function.
   // Default methods (plan §6.3), overridable by same-named opts functions. Each
   // assigns to context.data → the write-capture sink replicates the result. A method
   // assigning to data is a trusted local commit; it does NOT re-invoke the method
   // (plan §5 recursion-safety) — the sink replicates, it doesn't dispatch.
   const defaults: Record<string, Method> = {
+    //! read() → whole data; read(key) → that key's child view (Q1 keyed read, server side of a remote read).
     // read() → whole data; read(key) → just that key's child view (Q1 keyed read —
     // the server side of an owner-routed remote read). On a holder, c.data[key] is
     // the live local child; snapshot for the RPC reply, streamed for a subscription.
     read: (arg, c) => (typeof arg === 'string' ? c.data[arg] : c.data),
+    //! aggregate(spec) → this node's owner-scoped PARTIAL; the querying node fans out + folds the disjoint cover (Q2).
     // aggregate(spec) → this node's owner-scoped PARTIAL for a distributed aggregate
     // (Milestone Q2). A ViewProxy like read — snapshot for an RPC, streamed for a
     // subscription. The querying node fans this method out to every holder and folds
@@ -700,6 +759,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   const context: Context = { data, cluster, log, name, methods: undefined as any, peer: undefined }
 
+  //! invoke: run a named method on this server with context (+ peer when routed); the in-process dispatcher.
   // Run a method here (on this server). `peer`, when set, is the calling client
   // — handlers read it as context.peer for auth. A method returning a ViewProxy
   // (e.g. the default `read`) is reduced to a snapshot for the RPC reply path;
@@ -712,6 +772,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   const clientSubs = new Set<() => void>()
 
+  //! fold: build the distributed-aggregate engine (./fold.ts) now that invoke + the registries + clientSubs exist.
   // The distributed-aggregate fold engine (Milestone Q2/Q3) — owner-scoped partials + the
   // querying-side one-shot/live gather — lifted to [./fold.ts] (makeFold). Built here, once its
   // injected deps exist: `invoke` (the in-process dispatcher — it does NOT depend on the engine,
@@ -719,6 +780,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // the composer's onCommit/aeTimer walk, and clientSubs (a fold handle's teardown drains here).
   const fold = makeFold({ data, mesh, me, invoke, aggregateRebinds, aggregateReconciles, clientSubs })
 
+  //! dispatch: build LAST — the RPC/subscription servers, method surfaces, remote-read handles, and data facade.
   // The dispatch surface (Milestone D/E/Q1–Q3) — the RPC + subscription servers, the local/client
   // method surfaces, the lazy remote-read handles, and the `data` facade — lifted to [./dispatch.ts]
   // (makeDispatch). Built LAST: it consumes the fold engine's entry points + `invoke` by reference
@@ -739,6 +801,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
     },
+    //! [diagnostics]: Symbol-keyed internals seam (off the public API) — served-sub count + drop/isolate/heal fault injection.
     // Internals seam (Symbol-keyed, off the typed/enumerable public API): observability +
     // fault-injection for tests and power users. `servedSubscriptions` is the count of live
     // subscriptions this node serves (asserts the reap of a dropped peer); `drop` abruptly closes a
@@ -754,6 +817,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   } as Fero
 }
 
+//! diagnostics: the Symbol key for the internals handle, kept off the typed public surface and out of Object.keys.
 // Symbol-keyed internals handle on a returned fero() instance (`instance[diagnostics]`): kept OFF
 // the typed public surface (data/methods/cluster/destroy) and out of Object.keys.
 export const diagnostics = Symbol('fero.diagnostics')

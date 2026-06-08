@@ -1,3 +1,4 @@
+//! L2 method-dispatch + read/subscription surface: makeDispatch() wires inbound RPC/sub servers, method surfaces, lazy remote-read handles, and the `data` facade.
 // resource/dispatch.ts — the method-dispatch + read/subscription surface (L2).
 //
 // makeDispatch({...}) builds, once per fero() node, everything between "a method name arrives"
@@ -24,6 +25,7 @@ import { AGG, type Fold, type AggSpec } from './fold.ts'
 import { lazyHandle, isViewProxy, forWire } from './handle.ts'
 import type { Method, Context } from './index.ts'
 
+//! The shared node state + injected `invoke`/`fold` engines makeDispatch closes over by reference.
 export type DispatchDeps = {
   allMethods: Record<string, Method> // merged {...defaults, ...methods}; invoke lookup + the default-read identity gate
   defaults: Record<string, Method> // the built-in method table — the identity target for `allMethods.read === defaults.read`
@@ -40,9 +42,11 @@ export type DispatchDeps = {
   fold: Fold // the makeFold() engine: gatherOnce / gatherLive / livePartial / foldAggregate
 }
 
+//! Build the per-node dispatch surface; `me === undefined` marks a read-only client (no handlers, no listen port).
 export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold }: DispatchDeps) => {
   const isClient = me === undefined
 
+  //! `gathersWholeRead` = scoped && default-read: a no-key read() must gather the whole resource (never swap a user's projection).
   // `read` is still the built-in (user didn't override it). A no-key read() on a scoped node must
   // GATHER the whole resource (no node holds it all) — but only when read is the default; a user's own
   // `read` projection is never silently swapped for the raw gather. `gathersWholeRead` names that
@@ -50,6 +54,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   const usingDefaultRead = allMethods.read === defaults.read
   const gathersWholeRead = scoped && usingDefaultRead
 
+  //! The owner to forward a scoped read(key) to, or undefined to serve it locally (held / full-rep / we own it).
   // The owner to forward a read to, or undefined to serve it locally (Q1): a scoped `read(key)` for a
   // partition we don't hold routes to its owner (which holds it → no re-forward). Full replication, a
   // held key, or our own ownership ⇒ undefined (serve locally). Shared by serveCall + serveSubscribe.
@@ -64,10 +69,13 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // returning a Promise the transport awaits before replying. The owner holds the
   // key so it serves (no re-forward). Only in scoped mode; full replication holds all.
   // Strip the `fold` flag → the partial spec a fold fans out to holders (no recursion).
+  //! Drop the `fold` flag → the partial spec a fold fans out to holders (prevents recursion).
   const stripFold = (arg: any): AggSpec => ({ op: arg?.op, col: arg?.col, val: arg?.val })
+  //! Inbound RPC: read-forward to owner, else gather whole-read (Q3) / fold a client aggregate (Q2e), else invoke locally.
   const serveCall = (method: string, arg: unknown, address: string): unknown => {
     const fwd = forwardTarget(method, arg)
     if (fwd !== undefined) return mesh.call('read', arg, fwd)
+    //! No-key read() under scoping → one-shot gather of every holder's owner-scoped rows (full-rep stays a local snapshot).
     // Whole-resource read() under scoping (Milestone Q3): a client called read() with NO key.
     // No single node holds the whole resource, so GATHER it — fold every holder's owner-scoped
     // rows into the union (the {op:'rows'} partial, fold stripped → no recursion) — and reply
@@ -75,6 +83,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // holistic ops after. R≥members / full replication hold everything, so read() stays a local
     // c.data snapshot there (the hot path is byte-identical — the gather only arms when scoped).
     if (method === 'read' && arg == null && R < viewSize() && gathersWholeRead) return fold.gatherOnce({ op: 'rows' }, AGG.rows.combine)
+    //! Client-routed aggregate with {fold:true} → this server coordinates a one-shot gather of holder partials.
     // A CLIENT routed a distributed aggregate here (Milestone Q2e): a client can't
     // owner-scope or fold, so it sends {fold:true} and THIS server (a coordinator) returns
     // the GLOBAL via a one-shot gather. The gather fans out PARTIAL requests (fold stripped)
@@ -102,8 +111,10 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // bites derived views.) Held until the client unsubscribes.
   // One served subscription's retained handles: `host` (the sink pin), `src` (the source-proxy pin —
   // see note above), `unsub` (a forwarded upstream's close), `close` (a livePartial/gatherLive teardown).
+  //! One served subscription's retained handles: host (sink pin), src (source-proxy pin), unsub (upstream close), close (fold/gather teardown).
   type ServedSub = { host?: object; src?: object; unsub?: () => void; close?: () => void }
   const subscriptions = new Map<string, ServedSub>()
+  //! Reverse index address → its open subIds so an ungraceful disconnect can reap served subs instead of leaking them.
   // Reverse index address → its open subIds, so an ungraceful disconnect (a socket drop, which never
   // delivers an UNSUBSCRIBE frame) can REAP that peer's served subscriptions instead of leaking them
   // (subscription-hygiene fix; before this a dropped client/coordinator leaked its sink hosts, Q1
@@ -117,6 +128,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     if (!ids) subsByPeer.set(address, (ids = new Set()))
     ids.add(subId)
   }
+  //! Stream a live ViewProxy to a subscriber: connect a delta sink and retain host + src + optional close under (address, subId).
   // Stream a live ViewProxy's changes to a subscriber: connect a delta sink, then retain it — plus the
   // source proxy (`src`, so a derived projection's filter→op chain doesn't GC) and an optional teardown
   // (`close`, a livePartial/gatherLive) — under (address, subId). The three subscribe branches that return
@@ -125,7 +137,9 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     const host = proxy.connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
     addSub(address, subId, { host, src: proxy, close })
   }
+  //! Inbound subscribe: read-forward / live whole-read gather / live client aggregate fold / served partial / projection stream.
   const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
+    //! Read-forward a non-held read key: subscribe FROM the owner and relay its deltas (upstream closed on unsubscribe).
     // Read-forwarding (Q1): subscribe a non-held read key FROM the owner and relay its
     // deltas to the subscriber; the upstream unsub is closed on unsubscribe.
     const fwd = forwardTarget(method, arg)
@@ -134,6 +148,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       if (unsub) addSub(address, subId, { unsub })
       return
     }
+    //! Reactive no-key read() under scoping → live gather streamed to the client; ungated on R (re-arms per commit, never goes silently partial).
     // A CLIENT's reactive whole-resource read() under scoping (Milestone Q3): build the live
     // GATHER here (the union of every holder's owner-scoped rows, refolded on any shard delta)
     // and stream it to the client; the client runs its holistic ops over the gathered proxy
@@ -154,6 +169,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       streamProxy(address, subId, g.proxy, g.close)
       return
     }
+    //! Reactive client aggregate {fold:true} → build the fold here and stream the live global result (torn down on unsubscribe).
     // A CLIENT's reactive distributed aggregate (Milestone Q2e): build the FOLD here and
     // stream the global result to the client; the fold fans out partial requests (fold
     // stripped) so there's no recursion. Torn down on unsubscribe (close).
@@ -167,6 +183,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       }
       return
     }
+    //! Served aggregate partial → a livePartial that re-scopes on this holder's own view commit and pushes over the existing sub (no re-subscribe).
     // A served aggregate partial (Milestone Q2c) is a livePartial: it re-scopes itself on
     // THIS holder's own view commit (ownership moved → owner-scope changes) and pushes the
     // new value over this EXISTING subscription, so the coordinator never re-subscribes a
@@ -180,6 +197,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       }
       return
     }
+    //! Default path: invoke the method — stream it if it returns a ViewProxy, else ship the plain value once.
     let result: unknown
     try {
       result = invoke(method, arg, address)
@@ -192,6 +210,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       mesh.deltaTo(address, subId, { type: 'update', key: [], value: result })
     }
   }
+  //! Tear down one served sub: close upstream/fold, drop the host, and unwind the subsByPeer reverse index.
   const serveUnsubscribe = (subId: number, address: string) => {
     const k = `${address}:${subId}`
     const sub = subscriptions.get(k)
@@ -201,6 +220,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     const ids = subsByPeer.get(address)
     if (ids && ids.delete(subId) && ids.size === 0) subsByPeer.delete(address)
   }
+  //! A peer dropped without UNSUBSCRIBE → reap every sub we served it; the chokepoint that stops the gatherLive leak.
   // A peer's connection dropped (socket close / destroy) without an UNSUBSCRIBE — reap every
   // subscription we served it (idempotent: routes each through serveUnsubscribe). Iterates a COPY,
   // since serveUnsubscribe mutates subsByPeer. No-op for a peer we never served (a dial failure, or a
@@ -211,6 +231,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     for (const subId of [...ids]) serveUnsubscribe(subId, address)
   }
 
+  //! Local method surface: a server invokes handlers in-process; context.methods points here so method-to-method calls run locally.
   // The local method surface (server) calls handlers in-process. A read-only
   // client (no listen port) has no handlers — each method returns a HANDLE that
   // is both a thenable and a live ViewProxy: `await methods.x(arg)` is a one-shot
@@ -221,6 +242,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   for (const k of Object.keys(allMethods)) localMethods[k] = (arg?: any) => invoke(k, arg)
   context.methods = localMethods // method-to-method calls run locally
 
+  //! A remote-access HANDLE: thenable (await ⇒ one-shot RPC) AND live ViewProxy (reactive ⇒ server-pushed subscription); to() picks the target.
   // A remote-access HANDLE: a thenable (await ⇒ one-shot RPC) that is ALSO a live
   // ViewProxy (reactive use ⇒ a server-pushed subscription). `to()` picks the target
   // peer lazily — a specific owner (owner-routed reads) or undefined ⇒ a picked
@@ -236,6 +258,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
         if (unsub) clientSubs.add(unsub)
         return live
       },
+      //! Depth-1 nested write into a non-held partition → route through the raw proxy's write-capture sink to the owner (read handle only).
       // Nested write into a non-held partition (`data.x.y = v`): route to the RAW proxy so it
       // flows through the write-capture sink → owner. Only the READ handle passes a writeKey (a
       // method handle has none — set is then absent). Depth-1 only; deeper writes into a non-held
@@ -244,6 +267,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     })
   const clientHandle = (method: string, arg: unknown) => makeHandle(method, arg) // routed to a picked server
 
+  //! Owner-routed remote read (Q1): a non-held partition returns a handle that fetches/subscribes from a holder (server → owner, client → picked server).
   // Owner-routed remote read (Q1): reading a partition this node doesn't hold returns
   // a handle that fetches (await) or subscribes from a HOLDER. A server is fully
   // meshed with the owner → route straight to owner(key); a client routes to a picked
@@ -251,11 +275,13 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // data.x` is one-shot; `data.x.tap(...)`/`.filter`/`[value]` opens a live remote view.
   const remoteRead = (key: string) => makeHandle('read', key, !isClient ? () => mesh.owner(key) : undefined, key)
 
+  //! Hold-relative read: a synchronous local child for a held partition, a remote handle for one we don't hold.
   // The read surface: synchronous-and-local for a partition we hold, a remote handle
   // for one we don't (hold-relative reads). The `data` facade returned below is sugar
   // over this. Internal machinery keeps using the raw `data` (held partitions only).
   const readKey = (key: string) => (holds(key) ? data[key] : remoteRead(key))
 
+  //! Swap a scoped server's default no-key read() for a memoized gather handle so holistic ops run over the whole resource, not a local partial.
   // Server-side whole-resource read() gather (Milestone Q3b). A scoped SERVER holds only its
   // R-set, so its own no-key `methods.read()` would otherwise return a LOCAL partial — wrong for
   // the holistic ops (`methods.read().az('v')`, `.distinct()`, `.reduce(...)`) the user runs AFTER
@@ -283,10 +309,12 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     localMethods.read = (arg?: any) => (arg == null ? (gather ??= fold.foldAggregate({ op: 'rows' })) : baseRead(arg))
   }
 
+  //! The public `methods` surface: a client returns a remote handle per name; a server exposes localMethods.
   const methodSurface: Record<string, (arg?: any) => any> = isClient
     ? (new Proxy({}, { get: (_t, name: string) => (arg?: any) => clientHandle(name, arg) }) as any)
     : localMethods
 
+  //! `data` facade machinery (Q1): classify a top-level get into a held child, remote handle, distributed aggregate, or holistic guard.
   // The `data` facade (Q1): top-level KEY access is hold-relative — the local child
   // view if we hold the partition, a remote handle (await/subscribe to a holder) if
   // not. Operators (`.filter`, `.group`, …), the built-ins, symbols (`[value]`,
@@ -296,16 +324,19 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // `Operators` table. Only built when this node can have non-held keys (a scoped
   // server, or any client); a full-replication server returns the raw proxy — a
   // transparent no-op — so its hot read path is unchanged.
+  //! Built-ins that pass straight through to the raw proxy (incl. update/insert/remove, else they'd read as partition keys).
   // Built-ins that pass straight through to the raw proxy (the data-lib apply-trap
   // ops that are NOT in the Operators table): the reactive built-ins, the terminal
   // write ops (update/insert/remove), and JS internals. Without update/insert/remove
   // here, `data.update(...)` would be misread as a partition key named "update".
   const BUILTIN = new Set(['connect', 'raf', 'patch', 'first', 'last', 'then', 'toJSON', 'constructor', 'update', 'insert', 'remove'])
+  //! Operator check via hasOwnProperty (NOT `in`): `in` walks Object.prototype and would misclassify keys like toString/valueOf.
   // own-key check (NOT `prop in Operators`): Operators is a plain object literal, so
   // `in` walks Object.prototype and would wrongly classify partition keys named
   // toString/valueOf/hasOwnProperty/… as operators (returning a stale local child
   // instead of a remote handle). hasOwnProperty.call matches only registered operators.
   const isOperator = (prop: string) => Object.prototype.hasOwnProperty.call(Operators, prop)
+  //! Decomposable aggregate terminals (Q2): over the whole resource these are a fan-out + fold, not a local-partial operator.
   // Decomposable aggregate terminals (Q2): on a scoped SERVER, `data.sum('v')` over the
   // WHOLE resource is a fan-out + fold, not a local operator (which would see only this
   // node's held partitions = a partial). count is `length()` with no arg; `length(fn)`
@@ -313,7 +344,8 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   // A client cannot owner-scope or fold (no me/view) → its aggregates route to a server
   // (server-as-coordinator, Q2f); until then the facade leaves them to the raw operator.
   const DECOMPOSABLE = new Set(['sum', 'max', 'min', 'avg', 'some', 'every', 'length'])
-  const distributable = scoped || isClient // the facade only exists for scoped||isClient; intercept aggregates in both
+  const distributable = scoped || isClient //! the facade only exists for scoped||isClient; intercept aggregates in both
+  //! Build a serializable aggregate spec from a facade call, or null if it can't cross the wire (closure / bucketed length(fn)).
   // Build a SERIALIZABLE aggregate spec from a facade call, or null if it can't be
   // distributed (a closure predicate, or length(fn) bucketed — both deferred). count is
   // length() with no arg.
@@ -323,6 +355,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     if (op === 'some' || op === 'every') return { op, col: args[0], val: args[1] }
     return { op, col: args[0] }
   }
+  //! distributed(op): non-serializable warns + runs local; client routes to a coordinator; else run local (R≥members) or fold.
   // distributed(op): a scoped server's `data.sum('v')` etc. over the WHOLE resource. A spec that can't
   // cross the wire warns + falls back local; a client routes to a server-coordinator; otherwise the call
   // either runs LOCALLY (canRunLocal, below) or fans out a fold.
@@ -360,6 +393,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     if (canRunLocal) return (data as any)[op](...args)
     return fold.foldAggregate(spec)
   }
+  //! Q3 boundary guard: holistic/ordered ops can't fold from partials — run local but WARN LOUDLY (once per op) to gather via read() first.
   // Q3 boundary guard. These operators are HOLISTIC or ordered — the global answer needs the
   // full multiset co-located — so they CAN'T fold from per-shard partials. The Q3 path is to
   // GATHER first: `methods.read()` (no key) downloads the whole resource (Q3a/Q3b), and the
@@ -380,9 +414,11 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     }
     return (data as any)[op](...args)
   }
+  //! The returned `data` facade: a classifying Proxy for scoped/client, else the raw proxy (full-rep hot path unchanged).
   const dataFacade =
     scoped || isClient
       ? new Proxy(data, {
+          //! CLASSIFICATION LADDER — branch order is load-bearing: symbols/built-ins → aggregate → holistic → operator → readKey.
           // CLASSIFICATION LADDER — branch order is load-bearing: symbols/built-ins first, then
           // decomposable aggregate, then the holistic guard, then operators, and ONLY a non-operator
           // key falls through to readKey (the hold-relative local-child | remote-handle split).

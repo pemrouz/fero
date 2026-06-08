@@ -1,3 +1,4 @@
+//! L0 public surface: transport({…}) → Mesh — composes discovery + pool + handshake + DHT into a routing cluster.
 // L0 public surface: transport({…}) → Mesh. Composes the modules into a
 // self-organizing, routing cluster:
 //
@@ -23,6 +24,7 @@ import type { RetryOpts } from './retries.ts'
 // view-change reachability check) read it from the Mesh seam instead of reaching into peer.ts.
 export { STATUS } from './peer.ts'
 
+//! Config: presence of `port` ⇒ server; the rest are L1/L2 inbound-event hooks routed off the wire.
 export type TransportOpts = {
   name: string
   host?: string
@@ -53,6 +55,7 @@ export type TransportOpts = {
   onJoinRequest?: (value: unknown, address: string) => void
 }
 
+//! Mesh: the L0 seam — routing (send/replicate/forward/owners), view-change frames, RPC/subscriptions, chaos taps.
 export type Mesh = {
   peers: any // cluster.peers ViewProxy
   me?: string
@@ -81,28 +84,33 @@ export type Mesh = {
   destroy: () => void
 }
 
+//! Split "host:port" on the LAST colon so IPv6 hosts survive intact.
 const splitAddress = (address: string): [string, number] => {
   const i = address.lastIndexOf(':')
   return [address.slice(0, i), +address.slice(i + 1)]
 }
 
+//! transport(): wires pool + DHT + handshake + discovery and returns the Mesh seam.
 export function transport(opts: TransportOpts): Mesh {
   const host = opts.host ?? '127.0.0.1'
   const isServer = opts.server ?? opts.port !== undefined
   const me = isServer && opts.port !== undefined ? `${host}:${opts.port}` : undefined
   const uuid = opts.uuid ?? crypto.randomUUID()
 
+  //! ready resolves on first outbound connect, or falls back to a `wait` timer (the "I'm first" case).
   let resolveReady: () => void = () => {}
   const ready = new Promise<void>((r) => (resolveReady = r))
   const readyTimer = setTimeout(resolveReady, opts.wait ?? 500)
   readyTimer.unref?.()
 
+  //! addServer: enqueue a server candidate to dial, skipping self.
   const addServer = (address: string) => {
     if (!address || address === me) return
     const [h, p] = splitAddress(address)
     pool.add({ host: h, port: p, role: 'server' })
   }
 
+  //! Handshake hooks: advertise our identity+known servers, learn theirs, and finalize the relationship.
   const hooks: HandshakeHooks = {
     identity: (): Identity => ({
       uuid,
@@ -116,6 +124,7 @@ export function transport(opts: TransportOpts): Mesh {
       if (id.listen) addServer(id.listen)
       for (const a of id.peers ?? []) addServer(a)
     },
+    //! done: re-key the peer to its real identity, then fire onConnect for DIALED peers only (once per direction).
     // Relationship established. First resolve the peer's real identity (re-key an
     // inbound server socket to its listen address, stamp uuid, publish a client row),
     // then fire onConnect for DIALED peers only (each pair dials both ways → gate to
@@ -129,6 +138,7 @@ export function transport(opts: TransportOpts): Mesh {
     },
   }
 
+  //! Peer pool: dials/accepts sockets, runs the failure detector, and surfaces frames/connect/gone to us.
   const pool = new Peers({
     me,
     uuid,
@@ -144,12 +154,14 @@ export function transport(opts: TransportOpts): Mesh {
 
   const dht = new DHT(opts.dht)
 
+  //! Seed self into the ring + peer table — self owns partitions and is delivered locally (no socket).
   // Self is a ring member (it owns partitions) and a row in cluster.peers, but
   // has no socket — a record whose owner === me is delivered locally.
   if (me) {
     pool.peers[me] = { address: me, host, port: opts.port, role: 'server', status: STATUS.connected }
     dht.add(me)
   }
+  //! view: the committed membership that SOLELY drives the ring (not live connections) — ownership stable per epoch.
   // Committed view membership (Milestone V). The ring is driven SOLELY by the
   // committed view (installView below), NOT by live connections — ownership is
   // stable within an epoch. L2's ViewManager installs each committed view; until
@@ -157,6 +169,7 @@ export function transport(opts: TransportOpts): Mesh {
   // pre-view write owns locally and broadcasts (converges) rather than misroutes.
   let view: string[] = me ? [me] : []
 
+  //! RPC/subscription state: shared id counter; `pending` resolves calls, `subs` routes deltas, `warnedVerbs` dedupes drops.
   // RPC state: outstanding calls keyed by frame id, resolved on RESOLVE/REJECT.
   // The same counter ids subscriptions; `subs` routes inbound deltas to handlers.
   let callId = 0
@@ -164,6 +177,7 @@ export function transport(opts: TransportOpts): Mesh {
   const subs = new Map<number, (record: ChangeRecord) => void>()
   const warnedVerbs = new Set<number>() // unrecognized verbs already warned about (fail-closed default, once per verb)
 
+  //! dispatch: the inbound frame router — handshake first, then fan each verb to its hook (fail-closed default).
   function dispatch(frame: Frame, peer: Peer) {
     if (handle(frame, peer, hooks)) return // INIT/SYNC/DONE
     switch (frame.verb) {
@@ -179,11 +193,13 @@ export function transport(opts: TransportOpts): Mesh {
         opts.onUnsubscribe?.(frame.id!, peer.address)
         return
       case VERB.WRITE:
+        //! WRITE: a forwarded write-request for a partition we own — L2 commits it, making us its sole sequencer.
         // A peer forwarded a write-request for a partition we own. Hand each
         // record to L2, which commits it locally (its sink stamps origin=us and
         // replicates) — so we become the single sequencer for the partition.
         for (const record of frame.records()) opts.onWrite?.(record, peer.address)
         return
+      //! View-change frames: explicit cases so a VIEW_* frame never falls through to the onRecord data path.
       // Membership view-change frames (Milestone V) — explicit cases so they
       // route to their own hooks and never fall through to onRecord below.
       case VERB.VIEW_PREPARE:
@@ -199,6 +215,7 @@ export function transport(opts: TransportOpts): Mesh {
         opts.onJoinRequest?.(frame.value, peer.address)
         return
       case VERB.CALL: {
+        //! CALL: run the RPC handler, then reply RESOLVE/REJECT to the same frame id.
         const id = frame.id
         const { method, arg } = (frame.value as { method: string; arg: unknown }) ?? { method: '', arg: undefined }
         Promise.resolve()
@@ -211,6 +228,7 @@ export function transport(opts: TransportOpts): Mesh {
       }
       case VERB.RESOLVE:
       case VERB.REJECT: {
+        //! RESOLVE/REJECT: settle the pending call for this id (clear its timeout) — ignore if already gone.
         const waiter = pending.get(frame.id!)
         if (!waiter) return
         pending.delete(frame.id!)
@@ -221,6 +239,7 @@ export function transport(opts: TransportOpts): Mesh {
         return
       }
       case VERB.RECORDS: {
+        //! RECORDS: the steady-state data path — id ⇒ subscription delta (route by sub), no id ⇒ plain replication.
         // The steady-state DATA path (the highest-throughput inbound) — a first-class named case, not
         // the catch-all. RECORDS with a frame id is a subscription delta (route by sub id); without
         // one it is plain replication (deliver to onRecord). A frame that HAS an id but no matching
@@ -238,6 +257,7 @@ export function transport(opts: TransportOpts): Mesh {
         return
       }
       default:
+        //! Fail closed: DROP an unrecognized verb (never fall into RECORDS) and warn once per verb.
         // FAIL CLOSED on an unrecognized verb — DROP it rather than let it fall into the RECORDS path,
         // where a structurally-valid-but-unknown frame would mis-apply via onRecord and clobber state.
         // (PING/PONG are consumed in peer.ts; INIT/SYNC/DONE in handle() above; ACK is unused — so
@@ -251,6 +271,7 @@ export function transport(opts: TransportOpts): Mesh {
     }
   }
 
+  //! pickServer: choose a connected server (not self) to route an unaddressed call/subscribe to — v1: first match.
   // Pick a connected server peer to route a call to (not self). v1: first match.
   const pickServer = (): string | undefined => {
     for (const [address, row] of Object.entries((pool.peers[VALUE] ?? {}) as Record<string, any>))
@@ -258,6 +279,7 @@ export function transport(opts: TransportOpts): Mesh {
     return undefined
   }
 
+  //! TCP listener (servers only): accept inbound sockets as receive-side peers; we route over our own dialed link.
   // TCP server — accept inbound sockets as receive-side peers (role 'client';
   // we route to a server over the OUTBOUND connection we dial to its listen
   // address, learned via the handshake).
@@ -269,6 +291,7 @@ export function transport(opts: TransportOpts): Mesh {
     server.listen(opts.port, host)
   }
 
+  //! Discovery → dial: seed static candidates now and tap the ViewProxy so dynamic sources feed the same addServer path.
   // Discovery → dial. Static candidates are emitted synchronously; tap as well
   // so a dynamic source (multicast, later) feeds the same path.
   const candidates = staticDiscovery({ hosts: opts.hosts ?? [host], ports: opts.ports ?? [], broker: opts.broker, me })
@@ -279,6 +302,7 @@ export function transport(opts: TransportOpts): Mesh {
 
   const deliverLocal = (record: ChangeRecord) => opts.onRecord?.(record)
 
+  //! sendViewFrame: shared point-to-point VIEW_* sender so L2 never spells a wire verb; false if not connected.
   // Shared body for the named view-frame senders below: one VIEW_* control frame,
   // point-to-point. False if the peer isn't connected. Named per phase (viewPrepare/
   // viewAck/viewCommit) so L2's ViewManager never spells a wire verb — mirroring the
@@ -295,11 +319,13 @@ export function transport(opts: TransportOpts): Mesh {
     me,
     uuid,
     owner: (key) => dht.owner(key),
+    //! send: route a record to its partition owner — deliver locally if we own it, else over the socket.
     send(record) {
       const owner = dht.owner(partitionOf(record))
       if (owner === me) deliverLocal(record)
       else if (owner) pool.sendTo(owner, record)
     },
+    //! replicateTo: ship a committed record to its R-set, excluding self (already applied + logged).
     // Scoped replication (Milestone P): ship a committed record to the given R-set
     // (the caller's precomputed owners(key,R)), excluding self — the committer already
     // applied + logged it (commitLocal). Uses the same batched per-peer outbox as
@@ -309,6 +335,7 @@ export function transport(opts: TransportOpts): Mesh {
     },
     broadcast: (record) => pool.broadcast(record),
     owners: (key, replicas) => dht.owners(key, replicas),
+    //! installView: rebuild the ring to EXACTLY the committed members — the ONLY ring mutation, so ownership is stable per epoch.
     // Adopt a committed view's membership: rebuild the DHT ring to EXACTLY these
     // members (add new, remove departed). This is the only thing that mutates the
     // ring, so ownership is constant between view commits.
@@ -318,10 +345,11 @@ export function transport(opts: TransportOpts): Mesh {
       for (const m of view) if (!dht.has(m)) dht.add(m)
     },
     viewMembers: () => view,
-    // Named view-frame senders (V1a layering seam): L2 calls these, never a raw verb.
+    //! Named view-frame senders (V1a layering seam): L2 calls these, never a raw verb.
     viewPrepare: (address, value) => sendViewFrame(address, VERB.VIEW_PREPARE, value),
     viewAck: (address, value) => sendViewFrame(address, VERB.VIEW_ACK, value),
     viewCommit: (address, value) => sendViewFrame(address, VERB.VIEW_COMMIT, value),
+    //! forward: route a write-request to the owner (point-to-point); false if the socket isn't writable so caller commits locally.
     // Forward a write-request to the partition owner (WRITE verb, point-to-point —
     // not the batched broadcast outbox). Returns whether the frame was actually
     // handed to a writable socket: false if the owner has no peer OR its socket
@@ -334,6 +362,7 @@ export function transport(opts: TransportOpts): Mesh {
       if (!peer) return false
       return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
     },
+    //! digestTo/catchupTo: anti-entropy sent point-to-point (not the batched outbox) so it can't disturb its single-origin invariant.
     // Point-to-point. Sent as prebuilt frames straight to the peer's socket (not
     // the batched broadcast outbox), so catch-up traffic never disturbs the
     // single-origin-contiguous invariant the steady-state outbox relies on.
@@ -343,14 +372,17 @@ export function transport(opts: TransportOpts): Mesh {
     catchupTo(address, records) {
       const peer = pool.peer(address)
       if (!peer || !records.length) return
+      //! Reuse the outbox's mixed-origin framing: maximal contiguous-seq runs per frame.
       // Reuse the outbox's mixed-origin framing: maximal runs of one origin with
       // contiguous seqs per frame (Lamport gaps and origin changes split).
       for (const buf of encodeFrames(records)) peer.write(buf)
     },
     hasServer: () => pickServer() !== undefined,
+    //! subscribe: open a live sub on a server, returning an unsubscribe; undefined if no writable peer (caller retries).
     subscribe(method, arg, onDelta, to) {
       const address = to ?? pickServer()
       const peer = address ? pool.peer(address) : undefined
+      //! Gate on writability BEFORE committing the sub, else SUBSCRIBE is silently dropped and the holder's shard is lost forever.
       // Gate on writability BEFORE committing the sub: a peer row can exist while its
       // socket is still connecting (the admit race — a member is in the committed view a
       // tick before its socket finishes), and write() would SILENTLY DROP the SUBSCRIBE
@@ -367,9 +399,11 @@ export function transport(opts: TransportOpts): Mesh {
         if (subs.delete(id)) peer.write(controlFrame(VERB.UNSUBSCRIBE, null, id))
       }
     },
+    //! deltaTo: server → client — ship one subscription delta as a RECORDS frame tagged with its sub id.
     deltaTo(address, subId, record) {
       pool.peer(address)?.write(encodeFrame([record], { verb: VERB.RECORDS, id: subId }))
     },
+    //! drop: abruptly kill a peer's socket (no teardown frames) — fault injection that drives the onPeerGone reap path.
     // Abruptly close a peer's connection — no UNSUBSCRIBE / teardown frames, the way a real network
     // drop looks. Drives onPeerGone (→ L2 reaps that peer's served subscriptions) and is the fault
     // injection the chaos harness needs. Returns false if the peer isn't tracked.
@@ -379,10 +413,12 @@ export function transport(opts: TransportOpts): Mesh {
       peer.destroy()
       return true
     },
+    //! isolate/heal: reversible link partition — unlike drop, isolate blocks redial so the cut PERSISTS until heal.
     // Reversible link isolation (chaos partition→heal) — see Peers.isolate/heal.
     // Unlike drop(), isolate() blocks redial so the cut PERSISTS; heal() restores it.
     isolate: (address) => pool.isolate(address),
     heal: (address) => pool.heal(address),
+    //! call: send an RPC to a peer (or picked server) and resolve on RESOLVE/REJECT, rejecting on timeout.
     call(method, arg, to) {
       const address = to ?? pickServer()
       const peer = address ? pool.peer(address) : undefined
@@ -398,6 +434,7 @@ export function transport(opts: TransportOpts): Mesh {
       })
     },
     ready,
+    //! destroy: tear down — cancel the ready timer, close the pool and listener.
     destroy() {
       clearTimeout(readyTimer)
       void candHost

@@ -1,3 +1,4 @@
+//! Shared test/perf helpers, noun.verb()-namespaced — collected from copy-paste across every *.test.ts/*.perf.ts.
 // Shared helpers for the test + perf suites (and any pure bits the library can
 // reuse). These were copy-pasted into nearly every *.test.ts / *.perf.ts before
 // they were collected here.
@@ -13,8 +14,9 @@ import net from 'node:net'
 import { value } from '../../data/index.ts'
 import { STATUS } from '../transport/peer.ts'
 
-// ── ports ────────────────────────────────────────────────────────────────────
+//! ── ports ────────────────────────────────────────────────────────────────────
 export const ports = {
+  //! free(): OS-confirmed free port via listen(0)→readback→close — a now-snapshot, not a reservation.
   // Ask the OS for a port it just confirmed free (listen(0) → read it back →
   // close). This is a now-snapshot, not a reservation — the port is free at
   // resolve time, which is exactly what a fresh test listener wants.
@@ -28,7 +30,7 @@ export const ports = {
     }),
 }
 
-// ── bench ────────────────────────────────────────────────────────────────────
+//! ── bench ────────────────────────────────────────────────────────────────────
 // The perf-suite timing primitive: one untimed warmup (JIT + caches), then the
 // median of five timed runs — robust to a single scheduling spike on a loaded
 // box. Per CLAUDE.md, perf siblings assert `ok(elapsed < threshold)` against
@@ -45,11 +47,12 @@ export const bench = {
   },
 }
 
-// ── flat helpers ─────────────────────────────────────────────────────────────
+//! ── flat helpers ─────────────────────────────────────────────────────────────
 
-// A setTimeout you can await.
+//! A setTimeout you can await.
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+//! Poll `check` every 5ms until pass or timeout — returns false on timeout so the test fails loudly, not hangs.
 // Poll `check` every 5ms until it passes or `ms` elapses. Resolves true if it
 // passed, false on timeout — callers `assert.ok(await until(...))` so a timeout
 // fails the test loudly instead of hanging it.
@@ -62,11 +65,13 @@ export const until = async (check: () => boolean, ms = 2000): Promise<boolean> =
   return true
 }
 
+//! True when `addr` is a connected peer in a mesh/cluster `.peers` ViewProxy — works for both L0 mesh and L2 cluster.
 // True when `addr` is a connected peer in a mesh/cluster's `peers` ViewProxy.
 // Works for both the L0 mesh and the L2 cluster surface — both expose `.peers`.
 export const connected = (mesh: any, addr: string): boolean =>
   (mesh.peers[addr]?.status?.[value] ?? -1) === STATUS.connected
 
+//! apply: re-export L1's applyRecord so the fixture provably IS the replica receive path and can't drift.
 // Apply one change record to a `data` res (the [view].res write contract) — the
 // receive path every replica runs. This IS the library's terminal apply contract,
 // re-exported from L1 (log) so the test/perf fixture is provably the same code
