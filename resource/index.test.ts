@@ -2240,3 +2240,51 @@ test('subscription hygiene: a GRACEFUL client.destroy() also leaves no served su
     all.forEach((n) => n.destroy())
   }
 })
+
+test('log compaction: a high-churn key collapses in-memory; data + a fresh joiner stay correct', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const a1 = `127.0.0.1:${p1}`
+  const a2 = `127.0.0.1:${p2}`
+  // compact:false → no background pass fires; the test drives compaction deterministically via [diagnostics].compact()
+  const A = await fero('compact', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 150, compact: false })
+  const B = await fero('compact', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 150, compact: false })
+  let C: Awaited<ReturnType<typeof fero>> | undefined
+  try {
+    assert.ok(await until(() => connected(A.cluster, a2) && connected(B.cluster, a1)), 'A↔B connect')
+
+    // rewrite ONE key 200× (each rewrite is an `update` — the owner sequences them under one origin),
+    // plus two stable keys. The logs accumulate every rewrite; only the latest is live.
+    const CHURN = 200
+    for (let i = 0; i < CHURN; i++) A.data.hot = i
+    A.data.s1 = 'a'
+    A.data.s2 = 'b'
+    const expected = { hot: CHURN - 1, s1: 'a', s2: 'b' }
+    assert.ok(await until(() => sameState(A.data[value], expected) && sameState(B.data[value], expected), 8000), `A,B converge: ${JSON.stringify(B.data[value])}`)
+
+    // both logs hold the full churn history (≥ CHURN records) before compaction
+    assert.ok(await until(() => (A as any)[diagnostics].logSize() >= CHURN, 8000), `A log grew to ${(A as any)[diagnostics].logSize()}`)
+    const beforeA = (A as any)[diagnostics].logSize()
+
+    // compact both nodes — the superseded `hot` updates collapse to one (per origin), stable keys + the
+    // creating insert survive. logSize drops to a handful; the live proxy is untouched.
+    const droppedA = (A as any)[diagnostics].compact()
+    const droppedB = (B as any)[diagnostics].compact()
+    assert.ok(droppedA >= CHURN - 2, `A dropped the churn history (${droppedA} of ${beforeA})`)
+    assert.ok((A as any)[diagnostics].logSize() <= 5, `A log collapsed to ${(A as any)[diagnostics].logSize()}`)
+    assert.ok((B as any)[diagnostics].logSize() <= 5, `B log collapsed to ${(B as any)[diagnostics].logSize()}`)
+    assert.ok(droppedB >= CHURN - 2, `B dropped the churn history (${droppedB})`)
+    assert.ok(sameState(A.data[value], expected) && sameState(B.data[value], expected), 'live state unchanged by compaction')
+
+    // a fresh node catching up FROM the compacted logs still converges to the live state
+    C = await fero('compact', { host: '127.0.0.1', port: p3, ports: [p1], wait: 150, compact: false })
+    assert.ok(await until(() => sameState(C!.data[value], expected), 8000), `C caught up from a compacted log to ${JSON.stringify(C!.data[value])}`)
+
+    // and a post-compaction write still replicates everywhere
+    A.data.hot = 999
+    assert.ok(await until(() => B.data.hot[value] === 999 && C!.data.hot[value] === 999, 8000), 'a write after compaction still replicates')
+  } finally {
+    A.destroy()
+    B.destroy()
+    C?.destroy()
+  }
+})

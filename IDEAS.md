@@ -144,17 +144,41 @@ full key downstream via `log.append`→`applyRecord`) — both rejected. What's 
   `[hash,owner][]` tuple array** (sort an index permutation into typed arrays).
 
 ### Bounded memory & compaction — [P1] (log, resource)
-Several unbounded structures interlock and share one compaction pass.
-- **Log compaction.** Segments grow forever — collapse to latest-value-per-key
-  and/or snapshot+truncate so a high-churn partition doesn't exhaust memory.
-- **WAL compaction.** The persistence WAL grows unbounded ([DECISIONS C](DECISIONS.md))
-  — snapshot+truncate. **Durable shed** folds in here: P4's `shed()` is in-memory only,
-  so a scoped node with `storage` resurrects a shed orphan on restart (the WAL still
-  holds the partition; restore has no held-gate — self-healing on rejoin, no data loss,
-  but it re-advertises until it re-sheds). A tombstone / held-gate-on-restore is the fix;
-  only affects `{replicas:R, storage:…}` ([DECISIONS P4](DECISIONS.md)).
-- **`versions`/`seen` maps** grow unbounded ([DECISIONS A](DECISIONS.md)) — tie to the
-  same pass.
+Several unbounded structures interlock. **In-memory log compaction has LANDED**
+([DECISIONS W](DECISIONS.md)): `Log.compact()` collapses strictly-superseded same-origin
+`update`s (latest-update-per-key) on an unref'd timer in both modes, append path untouched,
+`marks()`/catch-up/shed preserved. Remaining:
+- **Insert/remove-churn collapse.** W collapses only `update`s, and skips a partition entirely
+  if its segment holds any NESTED remove (`key.length≥2`) — dropping a vivifier of the remove's
+  ancestor would crash replay (the impl review's set/delete/set blocker). A re-insert/delete
+  cycle, an array partition (positional `at` isn't a stable element identity — naive grouping
+  loses array elements), or churn that shares a top-level partition with a nested remove is
+  therefore not collapsed. Refinements: a per-vivifier rule (drop an update only when no later
+  nested remove depends on the ancestor it vivifies), OR — the cleaner root fix the design review
+  recommended — make `data`'s `res.remove` a no-op on an absent ancestor (also hardens view()
+  replay + cross-origin remove reordering), after which W's simple update-collapse is fully safe.
+  Element-identity keys are the separate array mechanism. (log, data)
+- **Per-partition dirty-set.** W's timer sweeps every partition (O(partitions)/tick, like
+  marks/resync) and length-gates the small ones; track partitions appended-to since the last
+  pass so the sweep is O(written), not O(total). (log)
+- **WAL compaction.** The persistence WAL grows unbounded ([DECISIONS C](DECISIONS.md)) — W
+  is IN-MEMORY only, so the on-disk file keeps every record (restore dedups on load — correct,
+  but restore cost is O(historical writes)). snapshot+truncate, or an `onCompact` hook that
+  rewrites the segment file. **Durable shed** folds in here: P4's `shed()` is in-memory only,
+  so a scoped node with `storage` resurrects a shed orphan on restart (the WAL still holds the
+  partition; restore has no held-gate — self-healing on rejoin, no data loss, but it
+  re-advertises until it re-sheds). A tombstone / held-gate-on-restore is the fix; only affects
+  `{replicas:R, storage:…}` ([DECISIONS P4](DECISIONS.md)).
+- **`versions`/`seen` maps** grow unbounded ([DECISIONS A](DECISIONS.md)) — NOT folded into W
+  (W preserves the dedup high-water): a removed key's `versions` tombstone is still needed to
+  reject a stale resurrecting write, so GC needs a safety horizon. (resource)
+- **Durable view-epoch recovery.** A `{pinned uuid, storage}` node restores its Lamport clock
+  on restart but boots `ViewManager` at epoch 1 ([membership.ts](resource/membership.ts)); a
+  post-restart local write then carries a LOWER epoch than its own restored records and is
+  epoch-fenced (V1d), so it diverges from peers and doesn't reconverge. Surfaced by the W
+  design review (it's also what forces W's `epoch ≥` dominance guard). Restore the view epoch
+  to `max(restored)` on boot (or floor a fresh node's local-write epoch above the restored
+  max). Only affects pinned-uuid + storage. (resource, membership)
 - **[P3]** `log()` storage-adapter / compaction-policy options; `heads()` allocates
   per call (cache + invalidate on append).
 

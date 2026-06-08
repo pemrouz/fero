@@ -1,6 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Log, partitionOf, originKey } from './log.ts'
+import { Log, partitionOf, originKey, versionKey } from './log.ts'
+import { view, value, applyRecord } from './index.ts'
+import type { ChangeRecord } from '../transport/message.ts'
+
+// order-insensitive deep compare (LWW converges on values, not key order — DECISIONS A)
+const stable = (o: unknown): string =>
+  JSON.stringify(o, (_k, v) =>
+    v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => (x < y ? -1 : 1))) : v,
+  )
+// the state a record list materializes (the proxy projection — what a peer ends up holding)
+const stateOf = (records: ChangeRecord[]): unknown => {
+  const log = new Log()
+  for (const r of records) log.append(r)
+  return view(log)[value]
+}
 
 test('append segments by partition (key[0]) and tracks per-partition heads', () => {
   const log = new Log()
@@ -102,4 +116,135 @@ test('recordsSince / marks (scoped mode): per-(origin,partition) anti-entropy + 
     log.recordsSince({ [originKey('A', 'x')]: 5, [originKey('A', 'y')]: 2 }).map((r) => [partitionOf(r), r.seq]),
     [['z', 1]],
   )
+})
+
+// ── compaction (collapse superseded same-key updates) ────────────────────────
+
+test('compact collapses superseded same-key updates; preserves marks + replay state (full)', () => {
+  const log = new Log()
+  // one origin churns 3 keys in partition p, 4 rounds each — 12 records, 3 live.
+  let seq = 0
+  const all: ChangeRecord[] = []
+  for (let round = 0; round < 4; round++)
+    for (const k of ['a', 'b', 'c']) {
+      const r: ChangeRecord = { type: 'update', key: ['p', k], value: round * 10 + k.charCodeAt(0), origin: 'O', seq: ++seq, epoch: 1 }
+      all.push(r)
+      log.append(r)
+    }
+  const marksBefore = log.marks()
+  const stateBefore = stable(view(log)[value])
+
+  const dropped = log.compact()
+
+  assert.equal(dropped, 9, 'drops the 9 superseded updates (keeps 1 per key)')
+  assert.equal(log.size, 3, 'segment collapsed to the 3 live keys')
+  assert.deepEqual(log.marks(), marksBefore, 'marks() preserved EXACTLY (group max-seq never dropped)')
+  assert.equal(stable(view(log)[value]), stateBefore, 'a from-0 replay of the compacted log is the same state')
+  // a fresh peer (empty vector) converges to the same state as replaying the FULL pre-compaction history
+  assert.equal(stable(stateOf(log.recordsSince({}))), stable(stateOf(all)), 'fresh-peer catch-up converges to the live state')
+})
+
+test('compact converges a LAGGING peer (mid-mark) the same as the uncompacted log would', () => {
+  const full = new Log() // reference: never compacted
+  const comp = new Log() // compacted
+  let seq = 0
+  for (let round = 0; round < 5; round++)
+    for (const k of ['x', 'y']) {
+      const r: ChangeRecord = { type: 'update', key: ['p', k], value: round, origin: 'O', seq: ++seq, epoch: 1 }
+      full.append({ ...r })
+      comp.append({ ...r })
+    }
+  comp.compact()
+  // a peer caught up to seq 4 gets the rest from each log → identical converged state
+  const fromFull = stateOf(full.recordsSince({ O: 4 }))
+  const fromComp = stateOf(comp.recordsSince({ O: 4 }))
+  assert.equal(stable(fromFull), stable(fromComp), 'lagging-peer catch-up identical compacted vs uncompacted')
+})
+
+test('compact never drops positional inserts (arrays)', () => {
+  // two array inserts at the same position are DISTINCT elements (each splices) — never collapsed
+  const arr = new Log()
+  arr.append({ type: 'insert', key: ['list'], value: 'A', at: 0, origin: 'O', seq: 1, epoch: 1 })
+  arr.append({ type: 'insert', key: ['list'], value: 'B', at: 0, origin: 'O', seq: 2, epoch: 1 })
+  assert.equal(arr.compact(), 0, 'positional inserts (same versionKey, distinct elements) are kept')
+})
+
+test('compact leaves a partition with a NESTED remove untouched (no orphan-tombstone crash on replay)', () => {
+  // THE blocker the impl review caught: a set/delete/set cycle on a nested field. If we dropped the
+  // first update (dominated by the third), the remove would replay BEFORE any vivifier → res.remove of
+  // an absent ancestor THROWS, tearing a fresh joiner's catch-up. A nested remove (key.length≥2) makes
+  // the whole partition non-compactable, so the original vivifier survives and replay is safe.
+  const t = new Log()
+  t.append({ type: 'update', key: ['lock', 'held'], value: true, origin: 'O', seq: 1, epoch: 1 })
+  t.append({ type: 'remove', key: ['lock', 'held'], origin: 'O', seq: 2, epoch: 1 })
+  t.append({ type: 'update', key: ['lock', 'held'], value: false, origin: 'O', seq: 3, epoch: 1 })
+  assert.equal(t.compact(), 0, 'a nested remove in the segment ⇒ nothing dropped (conservative)')
+  // a fresh peer catching up from the (un)compacted log replays without crashing, to the live state
+  assert.doesNotThrow(() => stateOf(t.recordsSince({})), 'catch-up replay does not crash')
+  assert.equal(stable(stateOf(t.recordsSince({}))), stable({ lock: { held: false } }), 'converges to the live state')
+
+  // a TOP-LEVEL remove of a missing key is a replay no-op, so it does NOT block compaction of a
+  // sibling partition's churn (verified in resource end-to-end too).
+  const top = new Log()
+  for (let i = 0; i < 4; i++) top.append({ type: 'update', key: ['x'], value: i, origin: 'O', seq: i + 1, epoch: 1 })
+  top.append({ type: 'remove', key: ['y'], origin: 'O', seq: 5, epoch: 1 }) // partition 'y', top-level
+  assert.equal(top.compact(), 3, "x's churn still collapses (a top-level remove doesn't block)")
+  assert.equal(stable(view(top)[value]), stable({ x: 3 }), 'x at its latest value; y never existed')
+})
+
+test('compact selects by LWW (epoch,seq), not raw max-seq — an epoch inversion keeps both', () => {
+  // stable-uuid restart: Lamport clock restored but view epoch reset, so a higher-seq
+  // local write can carry a LOWER epoch than a restored record — it is NOT the winner.
+  const inv = new Log()
+  inv.append({ type: 'update', key: ['k'], value: 'winner@epoch2', origin: 'O', seq: 1, epoch: 2 })
+  inv.append({ type: 'update', key: ['k'], value: 'newerSeq@epoch1', origin: 'O', seq: 2, epoch: 1 })
+  assert.equal(inv.compact(), 0, 'neither dominates (higher seq has lower epoch) → keep both, no winner lost')
+  assert.deepEqual(inv.marks(), { O: 2 }, 'marks unchanged')
+
+  // a genuine epoch climb (higher epoch AND higher seq) DOES collapse to the winner
+  const climb = new Log()
+  climb.append({ type: 'update', key: ['k'], value: 'old', origin: 'O', seq: 1, epoch: 1 })
+  climb.append({ type: 'update', key: ['k'], value: 'new', origin: 'O', seq: 2, epoch: 2 })
+  assert.equal(climb.compact(), 1, 'higher (epoch,seq) dominates → the loser is dropped')
+  assert.equal(stable(view(climb)[value]), stable({ k: 'new' }), 'the LWW winner survives')
+})
+
+test('compact is intra-origin: a cross-origin loser is never dropped (LWW resolves it at the receiver)', () => {
+  const log = new Log()
+  log.append({ type: 'update', key: ['k'], value: 'A1', origin: 'A', seq: 1, epoch: 1 })
+  log.append({ type: 'update', key: ['k'], value: 'A2', origin: 'A', seq: 2, epoch: 1 }) // A supersedes A1
+  log.append({ type: 'update', key: ['k'], value: 'B1', origin: 'B', seq: 1, epoch: 1 }) // different origin group
+  const dropped = log.compact()
+  assert.equal(dropped, 1, "only A's own superseded A1 is dropped; B1 (cross-origin) is kept")
+  assert.deepEqual(log.marks(), { A: 2, B: 1 }, 'both origins still advertised')
+})
+
+test('compact (scoped): per-(origin,partition) collapse keeps the acquire-from-0 digest intact', () => {
+  const log = new Log({ scoped: true })
+  let seq = 0
+  for (let round = 0; round < 6; round++) log.append({ type: 'update', key: ['x', 'f'], value: round, origin: 'A', seq: ++seq, epoch: 1 })
+  log.append({ type: 'update', key: ['y', 'f'], value: 'y', origin: 'A', seq: ++seq, epoch: 1 })
+  const marksBefore = log.marks()
+
+  assert.equal(log.compact(), 5, 'x.f collapses 6→1; y.f untouched')
+  assert.equal(log.size, 2, 'two live keys remain')
+  assert.deepEqual(log.marks(), marksBefore, 'scoped per-(origin,partition) marks preserved')
+  // an acquirer with no mark for y still gets all of y (the rebalance case still works post-compaction)
+  assert.deepEqual(
+    log.recordsSince({ [originKey('A', 'x')]: seq }).map((r) => [partitionOf(r), r.seq]),
+    [['y', seq]],
+  )
+})
+
+test('compact is a no-op below min and on provenance-less records', () => {
+  const log = new Log()
+  log.append({ type: 'update', key: ['p', 'a'], value: 1, origin: 'O', seq: 1, epoch: 1 })
+  log.append({ type: 'update', key: ['p', 'a'], value: 2, origin: 'O', seq: 2, epoch: 1 })
+  assert.equal(log.compact({ min: 3 }), 0, 'segment shorter than min is skipped')
+  // provenance-less records (handshake / non-fero) are never grouped or dropped
+  const pl = new Log()
+  pl.append({ type: 'update', key: ['p', 'a'], value: 1 })
+  pl.append({ type: 'update', key: ['p', 'a'], value: 2 })
+  assert.equal(pl.compact(), 0, 'no origin → never collapsed')
+  assert.equal(pl.size, 2)
 })

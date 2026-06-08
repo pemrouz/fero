@@ -24,6 +24,6 @@ export type { ChangeRecord } from './transport/message.ts'
 
 //! L1 — log + view
 export { log, view, distribute, applyRecord, Log } from './log/index.ts'
-export { originKey } from './log/log.ts'
+export { originKey, versionKey } from './log/log.ts'
 export type { DistributeOpts } from './log/index.ts'
 export type { LogOpts, AppendListener } from './log/log.ts'
