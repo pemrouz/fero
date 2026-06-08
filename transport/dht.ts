@@ -141,4 +141,46 @@ export class DHT {
     return out
   }
 
+  //! Allocation-free membership predicate: is `addr` among the first R distinct owners of `key`?
+  // Answers `owners(key, R).includes(addr)` WITHOUT materializing the owner `string[]`
+  // or the dedup `Set` owners() allocates each call. The hot inbound/catch-up paths
+  // ask exactly this per record — the resource `holds()` first-touch and the catch-up
+  // digest filter (resource/index.ts) — so the per-call array+Set was pure GC pressure
+  // on a yes/no question. Walk the ring clockwise from the owning slot counting DISTINCT
+  // owners; a candidate is "new" iff it didn't appear in an earlier slot of THIS walk
+  // (an O(distinct) inner scan — distinct is tiny, typically ≤3, and fmix32 spreads a
+  // peer's vnodes so distinct owners turn up within a few slots). Return true the moment
+  // `addr` is the k-th distinct owner for k ≤ R; false once R distinct non-matching owners
+  // have passed (addr is outside the R-set) or the ring is exhausted. Exactly mirrors
+  // owners().includes — including the R≥members case (owners() returns every member).
+  holds(key: string, addr: string, replicas = this.#replicas): boolean {
+    if (this.#dirty) this.#rebuild()
+    const n = this.#hashes.length
+    if (n === 0) return false
+    //! R ≥ distinct members ⇒ every member holds every partition — a Map lookup, no ring
+    // walk (mirrors owners()' all-members result + the resource holds() R≥viewSize short-circuit).
+    if (this.#members.size <= replicas) return this.#members.has(addr)
+    const start = this.#search(this.#hash(key))
+    const owners = this.#owners
+    let distinct = 0
+    for (let s = 0; s < n && distinct < replicas; s++) {
+      const cand = owners[(start + s) % n]
+      //! dedup without a Set: count `cand` only at the FIRST slot it appears in this walk.
+      // Scan ALL prior slots [0, s), not just the distinct ones already counted: with
+      // wraparound, `(start+t)%n` slots that are far apart numerically can carry the same
+      // owner (a peer's vnodes scatter across the ring), so a duplicate may sit anywhere
+      // behind us, not only among the last `distinct` entries.
+      let isNew = true
+      for (let t = 0; t < s; t++)
+        if (owners[(start + t) % n] === cand) {
+          isNew = false
+          break
+        }
+      if (!isNew) continue
+      if (cand === addr) return true
+      distinct++
+    }
+    return false
+  }
+
 }

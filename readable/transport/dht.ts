@@ -117,4 +117,30 @@ export class DHT {
     return out
   }
 
+  // Allocation-free membership predicate: is `addr` among the first R distinct owners of `key`?
+  holds(key: string, addr: string, replicas = this.#replicas): boolean {
+    if (this.#dirty) this.#rebuild()
+    const n = this.#hashes.length
+    if (n === 0) return false
+    // R ≥ distinct members ⇒ every member holds every partition — a Map lookup, no ring
+    if (this.#members.size <= replicas) return this.#members.has(addr)
+    const start = this.#search(this.#hash(key))
+    const owners = this.#owners
+    let distinct = 0
+    for (let s = 0; s < n && distinct < replicas; s++) {
+      const cand = owners[(start + s) % n]
+      // dedup without a Set: count `cand` only at the FIRST slot it appears in this walk.
+      let isNew = true
+      for (let t = 0; t < s; t++)
+        if (owners[(start + t) % n] === cand) {
+          isNew = false
+          break
+        }
+      if (!isNew) continue
+      if (cand === addr) return true
+      distinct++
+    }
+    return false
+  }
+
 }

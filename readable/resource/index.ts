@@ -181,7 +181,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       const vector: Record<string, number> = payload?.v ?? payload ?? {}
       let recs = log.recordsSince(vector)
       if (scoped && payload?.me && R < viewSize())
-        recs = recs.filter((r) => mesh.owners(partitionOf(r), R).includes(payload.me))
+        recs = recs.filter((r) => mesh.holds(partitionOf(r), payload.me, R))
       mesh.catchupTo(address, recs)
       if (scoped && payload?.me) shedConfirmed(payload.v ?? {}, payload.me)
       if (me !== undefined && payload?.reply) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: false, me })
@@ -214,7 +214,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (me === undefined) return false
     if (!scoped || R >= viewSize()) return true
     let h = heldCache.get(key)
-    if (h === undefined) heldCache.set(key, (h = mesh.owners(key, R).includes(me)))
+    if (h === undefined) heldCache.set(key, (h = mesh.holds(key, me, R)))
     return h
   }
 

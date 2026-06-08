@@ -66,6 +66,7 @@ export type Mesh = {
   broadcast: (record: ChangeRecord) => void
   forward: (address: string, record: ChangeRecord) => boolean // route a write-request to the owner; false if it isn't connected
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
+  holds: (key: string, addr: string, replicas?: number) => boolean // owners(key,R).includes(addr) without materializing the owner set (per-record held-gate / catch-up filter)
   installView: (members: string[]) => void // adopt a committed view's membership (V1a: stored; V1b: drives the ring)
   viewMembers: () => string[] // the current committed view's members
   viewPrepare: (address: string, value: unknown) => boolean // view-change phase-1 proposal (a ballot); false if the peer isn't connected
@@ -335,6 +336,8 @@ export function transport(opts: TransportOpts): Mesh {
     },
     broadcast: (record) => pool.broadcast(record),
     owners: (key, replicas) => dht.owners(key, replicas),
+    //! holds: allocation-free `owners(key,R).includes(addr)` for the per-record held-gate / catch-up filter.
+    holds: (key, addr, replicas) => dht.holds(key, addr, replicas),
     //! installView: rebuild the ring to EXACTLY the committed members — the ONLY ring mutation, so ownership is stable per epoch.
     // Adopt a committed view's membership: rebuild the DHT ring to EXACTLY these
     // members (add new, remove departed). This is the only thing that mutates the

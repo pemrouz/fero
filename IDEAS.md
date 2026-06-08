@@ -121,18 +121,20 @@ The design's headline send-side win; v1 uses the simpler `encodeFrame`-per-tick 
   (drop-oldest, or push backpressure to the `data` source) so a long partition can't
   OOM the sender.
 
-### Routing hot path — [P1] (transport: message, dht, index)
-Everything on the per-routed-record path.
-- **`RecordView.key0` / `partitionKey` accessor.** The DHT routes on `key[0]` only;
-  the current `key` getter decodes the whole `string[]`. Decode just the first
-  segment.
-- **Hot-key hash memo.** `dht.owner()` re-hashes the key every call; routing keys
-  (`user42`, …) repeat heavily — a small key→hash memo cuts the hash from the hottest
-  path. Pairs with index's per-send `partitionOf` re-hash.
-- **Allocation-free ring predicate.** `holds()` allocates an `owners()` array per
-  inbound record when R<members ([DECISIONS P](DECISIONS.md)) — add `dht.holds(key,
-  addr, R)` that answers without materializing the owner set.
-- **Hash bake-off** → [open question 8].
+### Routing hot path — [P2→P3] (transport: message, dht, index)
+Everything on the per-routed-record path. The three headline items landed/closed in
+[DECISIONS U](DECISIONS.md): the **allocation-free ring predicate `dht.holds(key, addr,
+R)`** shipped (replaces `owners().includes` on the un-memoized held-gate / catch-up
+paths — ~40% faster, zero-alloc); the **hot-key hash memo** measured net-negative
+(re-hash beats a Map memo on short keys, + an unbounded map leaks) and the
+**`RecordView.key0` accessor** a steady-state regression (kept records re-decode the
+full key downstream via `log.append`→`applyRecord`) — both rejected. What's left:
+- **[P3] Bounded-LRU hash memo** (≈256 entries) — the ONE unmeasured hash-memo case
+  ([DECISIONS U](DECISIONS.md)): a handful of hot keys among millions of routed keys,
+  where re-hash dominates and an unbounded map's GC would have hurt. Build only if
+  production profiling shows hash cost / GC pressure on the routing path.
+- **Hash bake-off** → [open question 8] (the hash CHOICE — djb2+fmix32 vs wy/xxhash32 —
+  separate from the memo).
 - **[P3] Self-delivery fast-path** for `owner === me` (a self-routed write still
   allocates the record).
 - **[P3]** `shedConfirmed` is O(orphans × seen) per digest (fine — orphans are

@@ -981,3 +981,62 @@ than an originator — fine at the defaults, noted for anyone tuning aggressivel
 OR a non-dialer-gated catch-up trigger; (2) subscription failover / re-dispatch; (3) incarnation/epoch
 fencing — plus a chaos `isolate`/`heal` rework and (the clean long-term home) a unified per-peer `link`
 abstraction replacing the `#conns`/`#shadows`/`#published` trichotomy.
+
+## U — Routing hot path: allocation-free `holds()`; hash-memo + key0 measured-rejected · Adopted + Investigated
+
+**Context.** The [IDEAS → Routing hot path](IDEAS.md) workstream listed three per-routed-record
+micro-optimizations. Each was taken to a NUMBER (CLAUDE.md: "decide with a perf number, not a guess")
+rather than assumed. Baseline on the 5-peer × 200-vnode ring (`dht.perf.ts`): `owner()` ~0.13µs,
+`owners(_,3)` ~0.30µs — both already an order under their gates, so the bar for "a real win" was high.
+
+**Decision — ADOPT the allocation-free ring predicate; REJECT the other two on the measurements.**
+
+- **Allocation-free `DHT.holds(key, addr, R)` · Adopted.** `holds()` answers
+  `owners(key, R).includes(addr)` — the exact per-record question the resource `holds()` first-touch and
+  the catch-up digest filter ask — but `owners()` allocated a `string[]` + a dedup `Set` EACH call, pure
+  GC pressure on a yes/no. The predicate walks the ring clockwise from the owning slot counting DISTINCT
+  owners (Set-free: a candidate is "new" iff it didn't appear in an earlier slot of THIS walk — the inner
+  scan checks ALL prior slots, since wraparound scatters a peer's vnodes), returning the moment `addr` is
+  the k-th distinct owner for k ≤ R, or false once R distinct non-matching owners pass. The `#members.size
+  ≤ R` short-circuit (`#members.has(addr)`) mirrors `owners()`' all-members result + the resource's
+  `R ≥ viewSize` gate. Exposed on the `Mesh` seam and wired into the two un-memoized `.includes` call
+  sites (`resource/index.ts`: `heldCache` first-touch + the catch-up filter). **Measured: ~0.18µs vs
+  `owners().includes`'s ~0.30µs (≈40% faster) AND zero per-call allocation.** Correctness is pinned by an
+  EXHAUSTIVE equivalence test — `holds() === owners().includes()` over memberships 0–8 × R 1..m+2 × 250
+  keys × (members + a non-member), ~82k assertions — not by reasoning. The **R=∞ full-replication path is
+  byte-identical**: resource `holds()` returns `true` at `!scoped || R ≥ viewSize` BEFORE reaching
+  `mesh.holds`, and the catch-up filter is gated `scoped && R < viewSize`, so full replication never calls
+  it (`index.perf` L2 write path flat at ~71ms / 150ms gate). A 4-lens adversarial review (equivalence /
+  integration / full-rep invariant / perf-discipline) found no defects.
+
+- **Hot-key hash memo · Investigated — rejected.** A `key→hash` Map memo inside `owner()`/`owners()` was
+  measured against re-hashing: **re-hash 3.83ms vs Map-memo 4.13ms for 100k lookups over 5000 distinct
+  keys — the memo is SLOWER.** djb2 + fmix32 over a short routing key is cheaper than a Map lookup, and an
+  UNBOUNDED memo also leaks one entry per distinct key ever routed. Rejected as specified. *Narrow caveat
+  (unmeasured, parked P3):* a BOUNDED LRU (≈256 entries, ~1.5KB) could win for a pathological skew — a
+  handful of hot keys among millions of routed keys, where re-hash dominates and GC of the unbounded map
+  would have hurt — but no such workload has been profiled; revisit only if production profiling shows
+  hash cost or GC pressure on the routing path.
+
+- **`RecordView.key0` / `partitionKey` accessor · Investigated — rejected.** The idea: the DHT routes on
+  `key[0]` only, so decode just the first key segment instead of the whole `string[]`. The analysis (and
+  the review) found it a STEADY-STATE REGRESSION, not a win: every record whose partition is inspected and
+  that is KEPT goes on to decode its FULL key downstream anyway — `applyInbound` → `log.append`
+  ([log/log.ts](log/log.ts) `partitionOf`, UNCONDITIONAL even under full replication) → `applyRecord`
+  (reads `record.key`). So a key0 accessor would decode segment 0 AND later the full key on the kept path
+  (an extra short decode), winning only on DROPPED records at the scoped held-gate — which, since the
+  owner replicates only to the R-set, is the EXCEPTIONAL over-ship / transient-ring case, not steady
+  state. The catch-up filter is no exception either: its log records were already key-decoded (and
+  memoised) at apply time, so `partitionOf` there hits the memo. Under full replication the held-gate
+  short-circuits, so key0 would never even run on the protected path. No clean steady-state win → not
+  built.
+
+**Consequences.** One concrete, verified hot-path win (allocation-free `holds()`); two candidate
+optimizations closed with a measured/analyzed rationale so they aren't re-litigated. The remaining
+Routing-hot-path IDEAS items (`partitionOf` `key0` and the hash bake-off) are resolved/superseded here;
+the allocation-free predicate item is done. Hash-function CHOICE (djb2+fmix32 vs wy/xxhash32) stays open
+as a separate bake-off ([IDEAS open question 8]).
+
+**Open follow-ups → [IDEAS](IDEAS.md):** bounded-LRU hash memo (P3, only if profiling demands it); the
+hash-function bake-off (open question 8); the `RecordView.key0` self-delivery / send-path micro-opts stay
+unbuilt by the same kept-path-decodes-anyway reasoning.
