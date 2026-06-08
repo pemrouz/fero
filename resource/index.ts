@@ -693,8 +693,19 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       // A write committed at a node NOT in the partition's R-set (the never-drop
       // fallback when the owner is unreachable, or a misrouted forward) is an orphan:
       // keep it (we shipped it to the true R-set above) but mark it to shed once that
-      // R-set is confirmed caught up (P4).
-      if (!rset.includes(me!)) orphans.add(p)
+      // R-set is confirmed caught up (P4). This fresh winner RAISED our shippable
+      // high-water (log.append above), so any prior shed-confirmation was earned against
+      // a LOWER mark — invalidate them (`shedReady.delete`) so EVERY R-set member must
+      // re-confirm against the new mark before we drop our copy. Without this, a member
+      // confirmed earlier (and reused as-is) could let us shed before it holds this
+      // record → under-replication / loss if the lone acquirer then fails (the P4
+      // "no under-replication window" invariant). The replicateTo above only reaches a
+      // REACHABLE R-set; the unreachable owner (the reason we fell back to a local commit)
+      // is exactly the member that must re-confirm.
+      if (!rset.includes(me!)) {
+        orphans.add(p)
+        shedReady.delete(p)
+      }
     } else mesh.broadcast(change)
   }
 

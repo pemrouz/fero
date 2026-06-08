@@ -195,6 +195,11 @@ The routed/projected model (plan §5–6) has landed
 - **Read-your-writes on a failed owner-forward.** When a write's owner-forward fails it
   commits as a local orphan, but a subsequent read routes to the stale owner until
   anti-entropy reconciles ([DECISIONS Q1](DECISIONS.md)) — tighten.
+- **Stale shed-confirmation across an orphan write — LANDED** ([DECISIONS P4a](DECISIONS.md)):
+  `commitLocal` now clears `shedReady[p]` when its never-drop fallback appends a fresh winner to
+  an orphan, so a confirmation earned against the old high-water can't be reused to shed before
+  the new record is R-replicated (was a pre-existing P4 under-replication/data-loss bug, surfaced
+  by [B1](DECISIONS.md)'s adversarial review).
 - **`owners()` distinct-R correctness under churn** — assert exactly R distinct owners
   across view changes (test → chaos backlog).
 - **[P3] Vnode count vs cluster size** (200/peer → 20k+ ring entries at 100s of
