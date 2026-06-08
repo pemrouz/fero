@@ -7,6 +7,13 @@ export { partitionOf }
 // The (origin,partition) composite key for scoped mode — \0-separated, shared with L2 so digests agree.
 export const originKey = (origin: string, partition: string): string => origin + '\x00' + partition
 
+// versionKey: the key a record contends on for LWW — `at` folded into the path → field-level LWW. Shared with L2 so compaction collapses EXACTLY the records L2 treats as one cell.
+export const versionKey = (record: ChangeRecord): string => {
+  const key = record.key
+  if (record.at !== undefined) return key.length === 0 ? record.at : key.join('\x00') + '\x00' + record.at
+  return key.length === 1 ? key[0] : key.join('\x00')
+}
+
 export type AppendListener = (record: ChangeRecord, partition: string, offset: number) => void
 
 // Log construction opts — `scoped` fixes the provenance-index granularity (full vs finite-R holding).
@@ -116,6 +123,51 @@ export class Log {
     if (this.#scoped)
       out.sort((a, b) => (a.origin! < b.origin! ? -1 : a.origin! > b.origin! ? 1 : (a.seq ?? 0) - (b.seq ?? 0)))
     return out
+  }
+
+  // Compact: collapse superseded same-key UPDATES per partition (latest-update-per-key); off the hot path. Returns records dropped.
+  compact({ min = 2 }: { min?: number } = {}): number {
+    let dropped = 0
+    for (const [p, seg] of this.#segments) {
+      if (seg.length < min) continue
+      let groups: Map<string, ChangeRecord[]> | undefined
+      let nestedRemove = false
+      for (const r of seg) {
+        if (r.type === 'remove' && r.key.length >= 2) { nestedRemove = true; break }
+        if (r.origin === undefined || r.type !== 'update' || r.key.length === 0) continue
+        const gk = r.origin + '\x00' + versionKey(r)
+        const g = (groups ??= new Map()).get(gk)
+        if (g) g.push(r)
+        else groups.set(gk, [r])
+      }
+      if (nestedRemove || !groups) continue
+      // mark each group's strictly-superseded updates (a higher-seq update with epoch ≥ it) for dropping.
+      let toDrop: Set<ChangeRecord> | undefined
+      for (const g of groups.values()) {
+        if (g.length < 2) continue
+        g.sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
+        let maxEpochAbove = -1
+        for (let i = g.length - 1; i >= 0; i--) {
+          const e = g[i].epoch ?? 0
+          if (maxEpochAbove >= e) (toDrop ??= new Set()).add(g[i])
+          if (e > maxEpochAbove) maxEpochAbove = e
+        }
+      }
+      if (!toDrop || toDrop.size === 0) continue
+      // rebuild the segment + the dropped records' index groups by object identity (order preserved → still seq-ascending).
+      this.#segments.set(p, seg.filter((r) => !toDrop!.has(r)))
+      const ikeys = new Set<string>()
+      for (const r of toDrop) ikeys.add(this.#key(r))
+      for (const ik of ikeys) {
+        const grp = this.#index.get(ik)
+        if (!grp) continue
+        const ng = grp.filter((r) => !toDrop!.has(r))
+        if (ng.length) this.#index.set(ik, ng)
+        else this.#index.delete(ik)
+      }
+      dropped += toDrop.size
+    }
+    return dropped
   }
 
   // Total record count across every partition segment.

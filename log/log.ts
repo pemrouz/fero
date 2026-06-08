@@ -47,6 +47,21 @@ export { partitionOf }
 // records a peer ships back agree on the key byte-for-byte.
 export const originKey = (origin: string, partition: string): string => origin + '\x00' + partition
 
+//! versionKey: the key a record contends on for LWW — `at` folded into the path → field-level LWW. Shared with L2 so compaction collapses EXACTLY the records L2 treats as one cell.
+// The key path a record contends on for last-writer-wins. An insert folds `at`
+// into the path so an insert and a later update to the same key contend as one
+// key; distinct leaves (k1 vs k1.score) are independent → field-level LWW. The
+// single-segment cases (top-level set, whether insert or update) reuse an existing
+// string — no `join` allocation on the hot path. Lives here (not L2) because
+// compaction's notion of "the same cell" MUST be byte-identical to L2's LWW key —
+// sharing the one definition is what guarantees they can never drift (a coarser
+// compaction key would over-collapse and lose data; see compact()).
+export const versionKey = (record: ChangeRecord): string => {
+  const key = record.key
+  if (record.at !== undefined) return key.length === 0 ? record.at : key.join('\x00') + '\x00' + record.at
+  return key.length === 1 ? key[0] : key.join('\x00')
+}
+
 export type AppendListener = (record: ChangeRecord, partition: string, offset: number) => void
 
 //! Log construction opts — `scoped` fixes the provenance-index granularity (full vs finite-R holding).
@@ -191,6 +206,86 @@ export class Log {
     if (this.#scoped)
       out.sort((a, b) => (a.origin! < b.origin! ? -1 : a.origin! > b.origin! ? 1 : (a.seq ?? 0) - (b.seq ?? 0)))
     return out
+  }
+
+  //! Compact: collapse superseded same-key UPDATES per partition (latest-update-per-key); off the hot path. Returns records dropped.
+  // Bound the log against high-churn keys: a key written N times accumulates N
+  // records even though only the latest value is live (under owner-routing those
+  // N records mostly share ONE origin — the owner — so this collapses them). We
+  // drop a record D ONLY when it is strictly superseded within its own origin's
+  // stream, leaving the proxy (the source of truth at L2) and seq-keyed catch-up
+  // exactly correct. The append path is untouched — this runs on an unref'd timer.
+  //
+  // WHY ONLY `update`s (the safety crux — three traps this avoids):
+  //  • An `insert` is POSITIONAL — two same-`at` array inserts are DISTINCT live
+  //    elements (each splices/shifts), not an overwrite, so collapsing them by
+  //    versionKey would delete a real element. Inserts are never dropped.
+  //  • A `remove` is a TOMBSTONE. data's res.remove of a NESTED path (key.length≥2)
+  //    THROWS when an ancestor is absent — and dropping any update that vivified that
+  //    ancestor (the dropped update can sit BEFORE a remove that re-removes the path
+  //    in a set/delete/set cycle) would leave the remove to replay against a missing
+  //    ancestor and crash catch-up. So a partition whose segment holds ANY nested
+  //    remove is left untouched this pass (below): with no nested remove, no replay
+  //    can hit an absent ancestor whatever we drop (a top-level remove of a missing
+  //    key is already a no-op). Removes themselves are never dropped.
+  //  • Two `update`s to the same path ARE an idempotent overwrite of one cell, and
+  //    a nested update auto-vivifies its ancestors on replay, so keeping just the
+  //    LWW winner reconstructs identical state. This is the collapsible case.
+  //
+  // SUPERSESSION is LWW dominance within an (origin,versionKey) group, NOT raw
+  // max-seq: drop D iff a HIGHER-seq update S with epoch ≥ D.epoch exists (same
+  // origin, so (epoch,seq) decides). The epoch guard matters on a stable-uuid
+  // restart, where the Lamport clock is restored but the view epoch resets — a
+  // higher-seq local write can then carry a LOWER epoch than a restored record, so
+  // it is NOT the winner; max-seq would drop the true winner. Because we drop only
+  // when a STRICTLY-higher-seq survivor exists, a group's overall-highest-seq record
+  // is never dropped — so marks() (= last index entry's seq) is preserved EXACTLY,
+  // and P4 shed-confirmation (which gates on log.marks()) is undisturbed.
+  compact({ min = 2 }: { min?: number } = {}): number {
+    let dropped = 0
+    for (const [p, seg] of this.#segments) {
+      if (seg.length < min) continue // nothing to collapse below a pair
+      // Group candidate records — origin-bearing real-path updates — by (origin,versionKey).
+      // A NESTED remove (key.length≥2) in this segment makes the whole partition
+      // non-compactable: dropping a vivifier of its ancestor would crash replay (see above).
+      let groups: Map<string, ChangeRecord[]> | undefined
+      let nestedRemove = false
+      for (const r of seg) {
+        if (r.type === 'remove' && r.key.length >= 2) { nestedRemove = true; break }
+        if (r.origin === undefined || r.type !== 'update' || r.key.length === 0) continue
+        const gk = r.origin + '\x00' + versionKey(r) // origin has no \0 → injective
+        const g = (groups ??= new Map()).get(gk)
+        if (g) g.push(r)
+        else groups.set(gk, [r])
+      }
+      if (nestedRemove || !groups) continue
+      //! mark each group's strictly-superseded updates (a higher-seq update with epoch ≥ it) for dropping.
+      let toDrop: Set<ChangeRecord> | undefined
+      for (const g of groups.values()) {
+        if (g.length < 2) continue
+        g.sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0)) // seqs are unique per origin; ascending
+        let maxEpochAbove = -1 // max epoch among strictly-higher-seq records seen so far
+        for (let i = g.length - 1; i >= 0; i--) {
+          const e = g[i].epoch ?? 0
+          if (maxEpochAbove >= e) (toDrop ??= new Set()).add(g[i]) // a higher-seq, ≥-epoch update dominates → dead
+          if (e > maxEpochAbove) maxEpochAbove = e
+        }
+      }
+      if (!toDrop || toDrop.size === 0) continue
+      //! rebuild the segment + the dropped records' index groups by object identity (order preserved → still seq-ascending).
+      this.#segments.set(p, seg.filter((r) => !toDrop!.has(r))) // never empties: each group keeps its max + all non-candidates survive
+      const ikeys = new Set<string>()
+      for (const r of toDrop) ikeys.add(this.#key(r)) // origin (full) or origin\0partition (scoped)
+      for (const ik of ikeys) {
+        const grp = this.#index.get(ik)
+        if (!grp) continue
+        const ng = grp.filter((r) => !toDrop!.has(r))
+        if (ng.length) this.#index.set(ik, ng)
+        else this.#index.delete(ik)
+      }
+      dropped += toDrop.size
+    }
+    return dropped
   }
 
   //! Total record count across every partition segment.

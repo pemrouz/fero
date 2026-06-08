@@ -41,7 +41,7 @@
 
 import { $, view as VIEWSYM } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
-import { Log, originKey } from '../log/log.ts'
+import { Log, originKey, versionKey } from '../log/log.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 import { ViewManager } from './membership.ts'
@@ -156,6 +156,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // scoped mode.
   const antiEntropyMs = typeof config.antiEntropy === 'number' ? (config.antiEntropy as number) : 1000
   delete (config as any).antiEntropy
+  //! compactMs: periodic log-compaction interval (collapse superseded same-key updates); 0 disables. Both replication modes.
+  // Log compaction interval (ms): periodically collapse a partition's superseded
+  // same-key updates so a high-churn key doesn't grow the log without bound (see
+  // Log.compact). Runs in BOTH full and scoped modes (every node's log accumulates
+  // its own + replicated writes) on an unref'd timer, OFF the write hot path. `compact:
+  // false` (or 0) disables it; default 30s — infrequent because it's an O(partitions)
+  // sweep and the win is steady-state memory, not latency. Extracted + deleted so it
+  // never reaches the transport.
+  const compactMs =
+    config.compact === false ? 0 : typeof config.compact === 'number' ? (config.compact as number) : 30_000
+  delete (config as any).compact
 
   //! ── 1 · replication core: state (proxy = truth, log = history) + provenance + dedup + LWW ──
   // ── 1 · replication core: state (proxy = truth, log = history) + provenance + dedup + LWW ──
@@ -199,17 +210,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const pending: ChangeRecord[] = []
   const MAX_PENDING = 10_000
 
-  //! versionKey: the key a record contends on for LWW — `at` folded into the path → field-level LWW.
-  // The key path a record contends on for LWW. An insert folds `at` into the
-  // path so an insert and a later update to the same key contend as one key;
-  // distinct leaves (k1 vs k1.score) are independent → field-level LWW. The
-  // single-segment cases (top-level set, whether insert or update) reuse an
-  // existing string — no `join` allocation on the hot path.
-  const versionKey = (record: ChangeRecord): string => {
-    const key = record.key
-    if (record.at !== undefined) return key.length === 0 ? record.at : key.join('\x00') + '\x00' + record.at
-    return key.length === 1 ? key[0] : key.join('\x00')
-  }
+  //! versionKey (imported from log/log.ts): the key a record contends on for LWW — shared with the log so compaction collapses EXACTLY the records LWW treats as one cell.
 
   //! seenKey: provenance key for dedup/catch-up — origin alone (full) or (origin,partition) (scoped).
   // The provenance key a record dedups / catches-up under (see `seen` above).
@@ -494,6 +495,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         }, antiEntropyMs)
       : undefined
   aeTimer?.unref?.()
+
+  //! compactTimer (both modes): periodic log compaction — collapse superseded same-key updates so a hot key can't grow the log unbounded.
+  // Periodic log compaction (Log.compact): collapse a partition's superseded same-key
+  // updates. Unlike aeTimer this runs in BOTH modes — every node's log accumulates the
+  // writes it holds (its own + replicated), and a high-churn key grows it without bound
+  // regardless of R. Unref'd + off the write hot path (the append path is untouched);
+  // the proxy stays the source of truth, so dropping dead log history never affects a
+  // read. Gated only on compactMs (0 = disabled).
+  const compactTimer = compactMs > 0 ? setInterval(() => void log.compact(), compactMs) : undefined
+  compactTimer?.unref?.()
 
   //! ── 4 · write path: capture sink → forward-to-owner | commit-local ──
   // ── 4 · write path: capture sink → forward-to-owner | commit-local ──
@@ -832,6 +843,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     destroy() {
       void writeHost // retain the sink host until teardown
       if (aeTimer) clearInterval(aeTimer)
+      if (compactTimer) clearInterval(compactTimer)
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
@@ -848,6 +860,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       drop: (address: string) => mesh.drop(address),
       isolate: (address: string) => mesh.isolate(address),
       heal: (address: string) => mesh.heal(address),
+      //! compact(): run a log-compaction pass NOW (the production cadence is the unref'd compactTimer); returns records dropped. Lets tests drive it deterministically.
+      compact: () => log.compact(),
+      //! logSize(): live record count across all partition segments — asserts compaction actually shrank the log.
+      logSize: () => log.size,
     },
   } as Fero
 }

@@ -1127,3 +1127,65 @@ as a separate bake-off ([IDEAS open question 8]).
 **Open follow-ups → [IDEAS](IDEAS.md):** bounded-LRU hash memo (P3, only if profiling demands it); the
 hash-function bake-off (open question 8); the `RecordView.key0` self-delivery / send-path micro-opts stay
 unbuilt by the same kept-path-decodes-anyway reasoning.
+
+## W — Log compaction: collapse superseded same-key updates · Adopted
+
+**Context.** The per-partition log ([log/log.ts](log/log.ts)) is append-only: a key written N times
+accumulates N records even though only the LATEST value is live. Under owner-routing ([F1](#f1--owner-routed-writes-via-forwarding-owner-re-sequencing-phase-1--adopted))
+a hot key's canonical records mostly share ONE origin (the owner), so a high-churn key grows the log —
+and every replica's log, and the catch-up it ships — without bound. This is the headline [P1] item of the
+"Bounded memory & compaction" workstream. Built design-first: an adversarial design-verification workflow
+(6 lenses + cross-checks) ran BEFORE any code and killed the naive rule three ways (below).
+
+**Decision — `Log.compact()`: drop only strictly-superseded same-origin `update`s.** Within each
+partition segment, group origin-bearing real-path (`key.length≥1`) **`update`** records by
+`(origin, versionKey)`; drop a record D iff a **strictly-higher-seq** update S in the same group has
+`epoch ≥ D.epoch` (same origin, so `(epoch,seq)` decides LWW). Rebuild the segment AND the dropped
+records' provenance-index groups by object identity (order preserved → still seq-ascending). Driven by an
+unref'd `compactTimer` (config `compact: <ms>|false`, default 30s) in BOTH replication modes — the append
+hot path is **untouched** (zero per-append bookkeeping; the R=∞ write path stays byte-identical, measured
+~119ms/10k vs the 150ms threshold). `versionKey` moved from L2 to [log/log.ts](log/log.ts) (shared, like
+`originKey`) so compaction's "same cell" is byte-identical to L2's LWW key and can never drift.
+
+**Why it's safe (the design review's three traps, all sidestepped by "updates only").**
+- **Arrays / positional inserts.** `versionKey` folds the positional `at` into the key, but two same-`at`
+  array inserts are DISTINCT live elements (each splices/shifts), not an overwrite. Collapsing them would
+  delete an element. → **Inserts are never dropped.**
+- **Nested-remove orphan.** `res.remove` of a NESTED path (`key.length≥2`) THROWS when an ancestor is
+  absent, so dropping any update that vivified that ancestor would crash a fresh joiner's catch-up. The
+  post-implementation review caught the precise trap: a `set / delete / set` cycle on a nested field
+  (`lock.held=true; delete lock.held; lock.held=false`) — the first update is value-dominated by the
+  third, but the `remove` sits BETWEEN them, so dropping the first strands the remove before any
+  vivifier. → **Removes are never dropped, AND a partition whose segment holds any nested remove is left
+  untouched this pass** — with no nested remove, no replay can hit an absent ancestor whatever we drop (a
+  top-level remove of a missing key is already a no-op). A nested `update` auto-vivifies its ancestors
+  (verified against `data`), so pure update-churn (no nested removes) collapses fully.
+- **Epoch inversion.** On a `{pinned uuid, storage}` restart the Lamport clock is restored but the view
+  epoch resets to 1, so a higher-seq local write can carry a LOWER epoch than a restored record — it is
+  NOT the LWW winner. Raw max-seq would drop the true (higher-epoch, lower-seq) winner. → The `epoch ≥`
+  dominance guard keeps both; nothing is lost. (The inversion is ALSO a pre-existing divergence bug,
+  independent of compaction — see [IDEAS → Bounded memory](IDEAS.md) / durable-epoch recovery.)
+
+**Why `marks()` / catch-up / shed stay correct.** Because we drop D only when a STRICTLY-higher-seq
+survivor exists, a group's overall-highest-seq record is **never** dropped — so `marks()` (= each index
+group's last seq) is preserved EXACTLY, P4 shed-confirmation (gates on `log.marks()`) is undisturbed, and
+seq-keyed `recordsSince` still converges any peer (a dropped record is strictly superseded by a same-origin
+higher-seq survivor the peer either receives or has already passed). The proxy is the source of truth
+([H](#h--proxy-as-source-arch-b-not-log-as-source-arch-a--adopted)), so dropping dead log history never
+affects a read. Compaction is intra-origin (a cross-origin loser lives in a different group → never
+dropped; LWW resolves it at the receiver). Shed/B1 lenses confirmed clean. A post-implementation
+adversarial code review caught the nested set/delete/set crash above (now fixed + regression-tested) and
+confirmed the suffix-max-epoch supersession loop, the segment/index identity rebuild, the config parsing,
+and the timer lifecycle otherwise clean.
+
+**Consequences.** A high-churn key collapses to ~1 record per owner-tenure (bounded by distinct owners, not
+write count) in both full and scoped modes; a 200×-rewritten key shrinks a 2-node cluster's logs from ≥200
+to ≤5 records, with the live state and a fresh joiner's catch-up unchanged (end-to-end test). Compaction is
+purely IN-MEMORY: the WAL ([C](#c--persistence-via-a-storage-seam--wal--adopted--980ead9)) still retains
+every record (restore dedups on load — correct, but restore cost is O(historical writes)); WAL compaction
+stays deferred. `compact: false` disables it.
+
+**Open follow-ups → [IDEAS](IDEAS.md):** insert/remove-churn collapse (re-insert/delete cycles, arrays —
+need element-identity, not positional `at`); a per-partition dirty-set so the timer is O(written) not
+O(partitions); WAL compaction (snapshot+truncate / `onCompact` hook) + durable shed; `versions`/`seen`
+tombstone GC with a safety horizon; durable view-epoch recovery (the stable-uuid-restart inversion).

@@ -2,7 +2,7 @@
 
 import { $, view as VIEWSYM } from '../../data/index.ts'
 import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
-import { Log, originKey } from '../log/log.ts'
+import { Log, originKey, versionKey } from '../log/log.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 import { ViewManager } from './membership.ts'
@@ -90,6 +90,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // antiEntropyMs: periodic anti-entropy interval driving scoped acquisition + drift healing (resync below).
   const antiEntropyMs = typeof config.antiEntropy === 'number' ? (config.antiEntropy as number) : 1000
   delete (config as any).antiEntropy
+  // compactMs: periodic log-compaction interval (collapse superseded same-key updates); 0 disables. Both replication modes.
+  const compactMs =
+    config.compact === false ? 0 : typeof config.compact === 'number' ? (config.compact as number) : 30_000
+  delete (config as any).compact
 
   // ── 1 · replication core: state (proxy = truth, log = history) + provenance + dedup + LWW ──
   const log = new Log({ scoped })
@@ -105,12 +109,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const pending: ChangeRecord[] = []
   const MAX_PENDING = 10_000
 
-  // versionKey: the key a record contends on for LWW — `at` folded into the path → field-level LWW.
-  const versionKey = (record: ChangeRecord): string => {
-    const key = record.key
-    if (record.at !== undefined) return key.length === 0 ? record.at : key.join('\x00') + '\x00' + record.at
-    return key.length === 1 ? key[0] : key.join('\x00')
-  }
+  // versionKey (imported from log/log.ts): the key a record contends on for LWW — shared with the log so compaction collapses EXACTLY the records LWW treats as one cell.
 
   // seenKey: provenance key for dedup/catch-up — origin alone (full) or (origin,partition) (scoped).
   const seenKey = scoped
@@ -122,7 +121,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // committingForward: guard so an applied forwarded write commits as-is, never re-evaluating ownership.
   let committingForward = false
 
-  // applyInbound: dedup → Lamport-merge → log → LWW-resolve → apply winner; shared by replication + restore replay.
+  // applyInbound: dedup → Lamport-merge → epoch-skip | log → LWW-resolve → apply winner; shared by replication + restore replay.
   const applyInbound = (record: ChangeRecord) => {
     const origin = record.origin
     if (origin !== undefined) {
@@ -131,11 +130,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (n <= (seen.get(sk) ?? 0)) return
       seen.set(sk, n)
       if (n > clock) clock = n
-      log.append(record)
       const e = record.epoch ?? 0
       const key = versionKey(record)
       const cur = versions.get(key)
-      // LWW resolve, lexicographic (epoch, seq, origin): epoch fences stale views, seq then origin decide; loser stays logged.
+      // Epoch-aware catch-up: a STRICTLY-lower-epoch record is a permanent loser (epoch fence) — skip logging AND applying.
+      if (cur && e < cur.epoch) return
+      log.append(record)
+      // LWW resolve, lexicographic (epoch, seq, origin): epoch fences stale views, seq then origin decide; a same-epoch loser stays logged.
       if (cur && !(e > cur.epoch || (e === cur.epoch && (n > cur.seq || (n === cur.seq && origin > cur.origin))))) return
       if (cur) {
         cur.epoch = e
@@ -261,6 +262,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       : undefined
   aeTimer?.unref?.()
 
+  // compactTimer (both modes): periodic log compaction — collapse superseded same-key updates so a hot key can't grow the log unbounded.
+  const compactTimer = compactMs > 0 ? setInterval(() => void log.compact(), compactMs) : undefined
+  compactTimer?.unref?.()
+
   // ── 4 · write path: capture sink → forward-to-owner | commit-local ──
   let primed = false
   const writeHost = data.connect({}, (change: ChangeRecord) => {
@@ -322,6 +327,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // shedConfirmed: mark an R-set peer caught up on each orphan from its digest; shed only when EVERY member is (never < R).
   const shedConfirmed = (peerMarks: Record<string, number>, peerMe: string) => {
     if (!scoped || me === undefined || !orphans.size) return
+    const shippable = log.marks()
     for (const p of [...orphans]) {
       if (holds(p)) {
         orphans.delete(p)
@@ -332,8 +338,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (!rset.includes(peerMe)) continue
       let caughtUp = true
       const suffix = '\x00' + p
-      for (const [key, seq] of seen) {
-        if (key.endsWith(suffix) && (peerMarks[key] ?? 0) < seq) {
+      for (const key in shippable) {
+        if (key.endsWith(suffix) && (peerMarks[key] ?? 0) < shippable[key]) {
           caughtUp = false
           break
         }
@@ -372,7 +378,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (scoped && R < viewSize()) {
       const rset = mesh.owners(p, R)
       mesh.replicateTo(rset, change)
-      if (!rset.includes(me!)) orphans.add(p)
+      if (!rset.includes(me!)) {
+        orphans.add(p)
+        shedReady.delete(p)
+      }
     } else mesh.broadcast(change)
   }
 
@@ -454,6 +463,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     destroy() {
       void writeHost
       if (aeTimer) clearInterval(aeTimer)
+      if (compactTimer) clearInterval(compactTimer)
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
@@ -464,6 +474,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       drop: (address: string) => mesh.drop(address),
       isolate: (address: string) => mesh.isolate(address),
       heal: (address: string) => mesh.heal(address),
+      // compact(): run a log-compaction pass NOW (the production cadence is the unref'd compactTimer); returns records dropped. Lets tests drive it deterministically.
+      compact: () => log.compact(),
+      // logSize(): live record count across all partition segments — asserts compaction actually shrank the log.
+      logSize: () => log.size,
     },
   } as Fero
 }
