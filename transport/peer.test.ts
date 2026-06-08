@@ -174,3 +174,52 @@ test('failure detector: a peer that keeps answering is never flagged suspect', a
   client.destroy()
   await srv.close()
 })
+
+test('failure detector: a WATCHDOG (non-originating) peer flags suspect on inbound starvation, without probing', async () => {
+  // Heartbeat-only dedup: the higher-uuid side WATCHDOGS — it sends no PING but must still detect a
+  // silently-dead peer via inbound-frame starvation. Model it with a server that sends NOTHING: the
+  // watchdog originates zero bytes yet flips suspect after misses × interval (its originator is "dead").
+  let bytes = 0
+  const sockets: net.Socket[] = []
+  const deaf = net.createServer((s) => { sockets.push(s); s.on('data', (c) => { bytes += c.length }) })
+  await new Promise<void>((r) => deaf.listen(0, '127.0.0.1', () => r()))
+  const port = (deaf.address() as net.AddressInfo).port
+
+  const client = new Peer({ host: '127.0.0.1', port, retries: { max: 0 }, heartbeat: { interval: 25, misses: 3 } })
+  client.setOriginate(false) // watchdog: never PING
+  client.connect()
+  try {
+    assert.ok(await until(() => client.status === STATUS.connected), 'connects')
+    assert.ok(await until(() => client.suspect === true, 2000), 'a watchdog flips suspect when no inbound frames arrive (originator presumed dead)')
+    assert.equal(bytes, 0, 'a watchdog originates ZERO probe traffic (the halving)')
+  } finally {
+    client.destroy()
+    sockets.forEach((s) => s.destroy())
+    await new Promise<void>((r) => deaf.close(() => r()))
+  }
+})
+
+test('failure detector: a watchdog stays healthy while its originator keeps probing', async () => {
+  // The healthy steady state after the election: the originator probes every interval; the watchdog
+  // (which tolerates misses × interval) gets proof-of-life each interval and never flips suspect. Both
+  // ends MUST share the interval (they do in production) — so the server here probes at the same 25ms.
+  const inbound: Peer[] = []
+  const srv = net.createServer((s) =>
+    inbound.push(new Peer({ host: s.remoteAddress ?? '127.0.0.1', port: s.remotePort ?? 0, socket: s, heartbeat: { interval: 25, misses: 3 }, onFrame: () => {} })),
+  )
+  await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()))
+  const port = (srv.address() as net.AddressInfo).port
+
+  const client = new Peer({ host: '127.0.0.1', port, retries: { max: 0 }, heartbeat: { interval: 25, misses: 3 } })
+  client.setOriginate(false) // watchdog
+  client.connect()
+  try {
+    assert.ok(await until(() => client.status === STATUS.connected))
+    await sleep(300) // 12× the interval; the originator's PINGs (every 25ms) keep resetting the watchdog
+    assert.equal(client.suspect, false, 'a watchdog with a live originator at the same interval is never flagged suspect')
+  } finally {
+    client.destroy()
+    inbound.forEach((p) => p.destroy())
+    await new Promise<void>((r) => srv.close(() => r()))
+  }
+})

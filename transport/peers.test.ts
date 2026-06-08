@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import net from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { Peers } from './peers.ts'
-import { STATUS, type Peer } from './peer.ts'
+import { STATUS, Peer } from './peer.ts'
 import { until, sleep, apply } from '#utils'
 
 // a server that applies inbound frames into a replica via the pool's accept()
@@ -104,4 +104,24 @@ test('broadcast fans out to connected peers; replica converges', async () => {
 
   client.destroy()
   await srv.close()
+})
+
+test('heartbeat election: identify() makes the lower-uuid side originate and the higher-uuid side watchdog', () => {
+  // Both ends compute the SAME min over the same two uuids, so exactly one side per socket probes.
+  const lo = new Peers({ uuid: 'aaa' })
+  const hi = new Peers({ uuid: 'bbb' })
+  const p1 = new Peer({ host: '127.0.0.1', port: 2, role: 'server' }) // lo's dialed peer to hi
+  const p2 = new Peer({ host: '127.0.0.1', port: 1, role: 'server' }) // hi's dialed peer to lo
+  lo.identify(p1, { uuid: 'bbb', role: 'server', listen: '127.0.0.1:2' })
+  hi.identify(p2, { uuid: 'aaa', role: 'server', listen: '127.0.0.1:1' })
+  assert.equal(p1.originate, true, 'lower-uuid node (aaa) originates probes')
+  assert.equal(p2.originate, false, 'higher-uuid node (bbb) watchdogs — does not originate')
+  // a pool with no uuid (raw Peers in the unit harness) keeps the default — both ends probe
+  const anon = new Peers()
+  const p3 = new Peer({ host: '127.0.0.1', port: 3, role: 'server' })
+  anon.identify(p3, { uuid: 'zzz', role: 'server', listen: '127.0.0.1:3' })
+  assert.equal(p3.originate, true, 'no self-uuid ⇒ no election ⇒ default originate (unchanged)')
+  lo.destroy()
+  hi.destroy()
+  anon.destroy()
 })

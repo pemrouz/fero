@@ -85,6 +85,10 @@ export class Peer {
   #heartbeat?: ReturnType<typeof setInterval>
   #hbInterval: number
   #hbMisses: number
+  // Heartbeat-only dedup: one side per pair ORIGINATES probes (sends PING), the other WATCHDOGS
+  // (never sends PING; flags suspect on inbound-frame starvation, since the originator's PINGs are
+  // proof-of-life). Default true = today's behavior (both ends probe) until identify() elects.
+  #originate = true
 
   //! Wire opts to fields; an injected (inbound) socket is attached already-connected and never redialed.
   constructor(opts: PeerOpts) {
@@ -112,6 +116,14 @@ export class Peer {
   // the side that initiates the handshake.
   get dialed() {
     return this.#dialed
+  }
+
+  //! Does this side originate heartbeat probes (vs watchdog)? Elected by uuid order in Peers.identify().
+  get originate() {
+    return this.#originate
+  }
+  setOriginate(v: boolean) {
+    this.#originate = v
   }
 
   //! Can a control frame be written RIGHT NOW? Callers that record subscribe-success gate on this, not status.
@@ -258,12 +270,16 @@ export class Peer {
     this.#setSuspect(false)
   }
 
-  //! One probe: flag suspect once misses pile up, then increment and send PING.
+  //! One beat: flag suspect once misses pile up, then increment; ORIGINATORS also send a PING.
+  // The miss-count + suspect logic is identical for both modes — only the PING write is gated. A
+  // WATCHDOG relies on the originator's PINGs (and any data) as proof-of-life: #onData resets #missed
+  // on every inbound frame, so a healthy link (the originator probing each interval) never trips;
+  // when the originator falls silent, #missed climbs to #hbMisses and the watchdog flags suspect too.
   #beat() {
     if (!this.#socket?.writable) return
-    if (this.#missed >= this.#hbMisses) this.#setSuspect(true) // probes went unanswered → likely dead
+    if (this.#missed >= this.#hbMisses) this.#setSuspect(true) // probes/PINGs went unanswered → likely dead
     this.#missed++
-    this.write(PING_FRAME)
+    if (this.#originate) this.write(PING_FRAME)
   }
 
   //! Queue a change record for delivery; coalesced into one frame per microtask.

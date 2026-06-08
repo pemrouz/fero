@@ -137,6 +137,12 @@ export class Peers {
       return
     }
     peer.uuid = id.uuid
+    // Heartbeat-only dedup: elect the heartbeat ORIGINATOR by uuid order — the lower-uuid node probes,
+    // the higher-uuid node watchdogs. Both ends of each socket compute the same min over the same two
+    // uuids, so exactly one side per socket originates (halving steady-state PING traffic). Both the
+    // dialed peer and its paired inbound shadow to the same listen address get the same value (same
+    // uuids). Pre-identify both originate (today's behavior); a pool with no uuid keeps that default.
+    if (this.#uuid) peer.setOriginate(this.#uuid < id.uuid)
     //! Dialed peer already owns a correctly-keyed row — just stamp its uuid.
     if (peer.dialed) {
       const row = this.peers[peer.address]
