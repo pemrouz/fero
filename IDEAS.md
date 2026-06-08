@@ -72,12 +72,20 @@ stable peer identity until the handshake. **Inbound re-key has landed**
 listen address on handshake DONE (uuid stamped on the `Peer` + row), so it no longer
 leaks a phantom ephemeral `client` row, and `onSubscribe`/reap key under a stable
 dialable address. The remaining items build on that identity:
-- **Dedup duplicate connections by uuid (connected-wins).** Each server pair still
-  holds two TCP sockets (A→B and B→A) — both load-bearing (one carries each
-  direction), so re-key keeps both and folds the inbound into a receive/serve *shadow*
-  rather than collapsing them. Collapse to one bidirectional conn post-handshake
-  (connected-wins by uuid; both ends must agree on the survivor or they both drop),
-  changing `broadcast`'s dialed-only gate to "send over the one surviving socket".
+- **Heartbeat-only dedup — LANDED** ([DECISIONS T4](DECISIONS.md)): per socket only the
+  lower-uuid node originates PINGs; the higher-uuid node watchdogs (flags suspect on
+  inbound starvation). Halves N² probe traffic — the constraint that actually bites at
+  scale — with zero membership/broadcast/isolate change. **Full socket dedup (collapse the
+  two sockets per pair to one) is DEFERRED** — a design pass found it has a *fatal* silent
+  R=∞ convergence regression (the loser goes `!dialed`, and catch-up is dialer-gated with no
+  periodic AE under full replication), re-opens the T/T3 `#published`/`#mirror`/`#prune`
+  invariants (the "promoted" survivor is `!dialed && published && row-owner`), breaks the
+  chaos `isolate`-both-dials partition seam, and has a formation flap. **Prerequisites before
+  full dedup:** (1) periodic anti-entropy under R=∞ *or* a non-dialer-gated catch-up trigger;
+  (2) subscription failover / re-dispatch (a promoted-peer bounce must re-subscribe); (3)
+  incarnation/epoch fencing. Plus a chaos `isolate`/`heal` rework and (the clean home) a
+  unified per-peer `link` abstraction. The promote-the-shadow blueprint is captured in the
+  design run for when those land. (transport: peer, peers; resource: catch-up/membership)
 - **Prune dead rows — LANDED** ([DECISIONS T3](DECISIONS.md)): a terminal departure (an
   inbound client / half-handshake close, or a dial that gives up) prunes the row + `#conns`
   entry via `onGone` → `#prune`; the self-reject row is pruned too; shadows self-prune from

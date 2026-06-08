@@ -926,3 +926,58 @@ bite-verified), perf 17/17.
 **Open follow-ups → [IDEAS](IDEAS.md):** a max=Infinity dial to a permanently-dead address still retries
 forever (row cycles, never gives up) — an eviction-driven explicit `forget(address)` (the view layer knows
 the peer is gone) or a TTL is the remaining lever; pairs with the reactive dial loop / dead-candidate backoff.
+
+### T4 — heartbeat-only dedup (full socket-collapse deferred) · Adopted
+
+**Context — full dedup is a NO-GO now (design pass).** The workstream's last item was connection-dedup:
+collapse each server pair's TWO TCP sockets (A→B + B→A) to ONE bidirectional socket, halving sockets +
+heartbeat traffic. A three-lens design workflow (membership-first / simplicity-first / race-first) +
+adversarial critiques verified two FATAL flaws in full socket-collapse, against the live code:
+- **Silent R=∞ convergence regression.** There is no periodic anti-entropy under full replication
+  (`resource/index.ts` `aeTimer` is armed only when `scoped`); convergence relies ENTIRELY on dialer-gated
+  `onConnect` catch-up (`transport/index.ts` `done` hook). Full dedup makes the "loser" `!dialed`, so its
+  catch-up never re-fires → silent divergence on the exact path CLAUDE.md protects. The fix (periodic AE
+  under R=∞) would itself change the protected steady state.
+- **It re-opens the T/T2/T3 seams.** A "promoted" survivor would be `!dialed && #published && row-owner` —
+  a shape `#published`/`#mirror`/`#prune` are built to make impossible — plus it breaks the chaos
+  `isolate`-both-dials partition invariant (→ false-green chaos tests) and has a verified formation FLAP
+  (the winner reaches its dedup precondition a round-trip before the loser and tears the loser's still-live
+  dial). Full dedup is a multi-week effort gated on three prerequisites; the promote-the-shadow blueprint is
+  staged in IDEAS.
+
+**Decision — ship the cheaper partial that captures the win that actually bites.** At 100s of peers the
+binding constraint is PROBE BANDWIDTH (N² PING/PONG every interval), not FD count. So: keep BOTH sockets,
+but per socket only ONE side ORIGINATES the heartbeat — the **lower-uuid** node — while the higher-uuid node
+**watchdogs** (sends no PING; still flags `suspect` on inbound-frame starvation). Both ends compute the same
+`this.#uuid < id.uuid` over the same two post-handshake uuids → exactly one originator per socket, no
+negotiation (a tie is impossible: T2 self-reject intercepts equal uuids before the election). The originator
+probes both its sockets to the peer; the watchdog reuses the EXISTING `#missed`/`#hbMisses` machinery — only
+the PING `write` is gated (`peer.ts` `#beat`), so suspect semantics are identical; `identify()` sets
+`peer.setOriginate(this.#uuid < id.uuid)` (a raw pool with no `#uuid` keeps the default → both probe).
+
+**Why it's safe where full dedup is not.** Bidirectional failure detection is preserved: the originator
+detects death via unanswered PINGs; the watchdog detects it via PING starvation (`#missed` climbs when the
+originator falls silent). The watchdog's row-owning socket carries NO data stream to mask a dead originator
+(data + served-sub RECORDS flow over the originator's dialed socket, landing on the watchdog's *shadow*, not
+its dialed row-owner), so starvation detection is clean. ZERO change to membership / broadcast / `#published`
+/ `#shadows` / `#reachable` / failover / isolate; the R=∞ data path is byte-identical (heartbeat is off it).
+Both nodes still dial → reciprocal catch-up preserved (no convergence regression). The suspect→eviction
+signal fires for both nodes (the lower-uuid via its dialed-peer originator, the higher-uuid via its
+dialed-peer watchdog — both own the peer's row).
+
+**Adversarial review (clean).** Traced the election (exactly one originator per socket; empty-`''`/no-uuid
+defaults to probe; equal-uuid intercepted by T2), bidirectional detection (originator-dies and watchdog-dies
+both detected), no idle false-trip (both ends share `#hbInterval`; 3-beat margin absorbs skew), reconnect
+re-election (idempotency guard doesn't skip a reconnected dialed peer), and the suspect→`#reachable` path.
+Tests 173/173 (3 new: watchdog-detects-starvation, watchdog-stays-healthy, election-by-uuid — bite-verified),
+perf 17/17.
+
+**Caveat (documented).** The watchdog's detection margin is bounded by PING *delivery* jitter (not a PONG
+round-trip). With default `misses=3` this is comfortable; at `misses=1` the watchdog would have tighter slack
+than an originator — fine at the defaults, noted for anyone tuning aggressively.
+
+**Open follow-ups → [IDEAS → Identity, dedup & connection hygiene](IDEAS.md):** FULL socket dedup
+(promote-the-shadow blueprint) staged behind its three prerequisites — (1) periodic anti-entropy under R=∞
+OR a non-dialer-gated catch-up trigger; (2) subscription failover / re-dispatch; (3) incarnation/epoch
+fencing — plus a chaos `isolate`/`heal` rework and (the clean long-term home) a unified per-peer `link`
+abstraction replacing the `#conns`/`#shadows`/`#published` trichotomy.
