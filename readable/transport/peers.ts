@@ -85,6 +85,7 @@ export class Peers {
       return
     }
     peer.uuid = id.uuid
+    if (this.#uuid) peer.setOriginate(this.#uuid < id.uuid)
     // Dialed peer already owns a correctly-keyed row — just stamp its uuid.
     if (peer.dialed) {
       const row = this.peers[peer.address]
