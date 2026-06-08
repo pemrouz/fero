@@ -1,0 +1,22 @@
+// Power-user escape hatch: re-export L0/L1 building blocks + wire codec, each independently usable.
+
+// L0 — transport
+export { transport } from './transport/index.ts'
+export type { Mesh, TransportOpts } from './transport/index.ts'
+export {
+  VERB,
+  partitionOf,
+  encodeFrame,
+  encodeFrames,
+  decodeFrame,
+  Framer,
+  Frame,
+  RecordView,
+} from './transport/message.ts'
+export type { ChangeRecord } from './transport/message.ts'
+
+// L1 — log + view
+export { log, view, distribute, applyRecord, Log } from './log/index.ts'
+export { originKey } from './log/log.ts'
+export type { DistributeOpts } from './log/index.ts'
+export type { LogOpts, AppendListener } from './log/log.ts'
