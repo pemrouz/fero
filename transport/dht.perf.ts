@@ -46,6 +46,24 @@ test('owners(key, R=3) — 100k R-set lookups over a 1000-entry ring', () => {
   ok(elapsed < 120, `100k R-set lookups took ${elapsed.toFixed(3)}ms (threshold 120ms)`)
 })
 
+test('holds(key, me, R=3) — 100k membership predicates over a 1000-entry ring', () => {
+  // The allocation-free predicate (resource holds() first-touch + the catch-up digest
+  // filter, neither of which is memoized for a foreign address). It answers the same
+  // yes/no as owners(key,3).includes(me) but materializes no array/Set, so it must be
+  // at LEAST as fast as owners() AND allocate nothing per call (GC pressure off the
+  // catch-up path). Threshold tracks owner()'s (50ms — holds is owner-cost: one hash +
+  // a short distinct-owner walk), NOT owners()' looser gate — no array/Set to build.
+  const dht = ring()
+  const me = '10.0.0.2:3000'
+  const elapsed = bench.time(() => {
+    let hits = 0
+    for (let i = 0; i < KEYS.length; i++) if (dht.holds(KEYS[i], me, 3)) hits++
+    if (hits < 0) throw new Error('sink')
+  })
+  console.log(`  100k holds(_,me,3): ${elapsed.toFixed(3)}ms (${((elapsed * 1000) / KEYS.length).toFixed(3)}µs each)`)
+  ok(elapsed < 50, `100k holds() took ${elapsed.toFixed(3)}ms (threshold 50ms)`)
+})
+
 test('rebuild on membership churn — add/remove a peer (5→6→5)', () => {
   const dht = ring()
   const elapsed = bench.time(() => {

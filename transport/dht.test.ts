@@ -69,6 +69,23 @@ test('remove updates ownership', () => {
   assert.ok(['a:1', 'c:1'].includes(dht.owner('whatever')!))
 })
 
+test('holds(key, addr, R) is exactly owners(key, R).includes(addr) — exhaustive', () => {
+  // The allocation-free predicate must match the array form for EVERY combination of
+  // membership size, R, key, and addr (members AND a non-member) — including the
+  // R≥members short-circuit and empty ring. Deterministic (no RNG): sweep the space.
+  const ks = keys(250)
+  for (let m = 0; m <= 8; m++) {
+    const dht = new DHT()
+    const members = Array.from({ length: m }, (_, i) => 'n' + i + ':1')
+    for (const a of members) dht.add(a)
+    const probes = [...members, 'nonmember:1'] // a non-member must always answer false
+    for (let R = 1; R <= m + 2; R++)
+      for (const k of ks)
+        for (const addr of probes)
+          assert.equal(dht.holds(k, addr, R), dht.owners(k, R).includes(addr), `m=${m} R=${R} k=${k} addr=${addr}`)
+  }
+})
+
 test('hash32 is deterministic and 32-bit unsigned', () => {
   assert.equal(hash32('user42'), hash32('user42'))
   assert.ok(hash32('user42') >= 0 && hash32('user42') <= 0xffffffff)

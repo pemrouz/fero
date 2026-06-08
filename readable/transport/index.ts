@@ -52,6 +52,7 @@ export type Mesh = {
   broadcast: (record: ChangeRecord) => void
   forward: (address: string, record: ChangeRecord) => boolean
   owners: (key: string, replicas?: number) => string[]
+  holds: (key: string, addr: string, replicas?: number) => boolean
   installView: (members: string[]) => void
   viewMembers: () => string[]
   viewPrepare: (address: string, value: unknown) => boolean
@@ -273,6 +274,8 @@ export function transport(opts: TransportOpts): Mesh {
     },
     broadcast: (record) => pool.broadcast(record),
     owners: (key, replicas) => dht.owners(key, replicas),
+    // holds: allocation-free `owners(key,R).includes(addr)` for the per-record held-gate / catch-up filter.
+    holds: (key, addr, replicas) => dht.holds(key, addr, replicas),
     // installView: rebuild the ring to EXACTLY the committed members — the ONLY ring mutation, so ownership is stable per epoch.
     installView: (members) => {
       view = members.slice()
