@@ -503,6 +503,40 @@ under-replication window during handoff and no data loss. The drained-ballot var
 commit on catch-up) is unnecessary given keep-until-confirmed, so it's dropped from the
 roadmap.
 
+### P4a — Invalidate stale shed-confirmations on an orphan high-water bump · Adopted
+
+**Context.** P4's `shedConfirmed` accumulates, per orphan partition, the set of R-set members
+confirmed caught up (`shedReady`), and sheds once EVERY member is in it — the multi-confirm
+safety that gives "no under-replication window". A confirmation was recorded against the orphan's
+high-water *at that moment* and never re-validated. But `commitLocal`'s **never-drop fallback** (a
+write whose owner is unreachable while we still hold quorum) appends a FRESH winner to an
+already-orphaned partition, RAISING its shippable high-water — and left `shedReady` untouched.
+
+**The bug (found by [B1](#b1--epoch-aware-catch-up-skip-log-permanent-epoch-losers--adopted)'s
+adversarial review, confirmed by a logic-mirror reproduction).** A member confirmed against the
+OLD (lower) mark stays in `shedReady`; after the high-water rises, another member confirming
+against the NEW mark completes the R-set and triggers `shed()` — even though the first member
+never received the new record (and, being the unreachable owner, couldn't have). The orphan drops
+with the new write on fewer than R replicas → under-replication, and permanent loss if the lone
+acquirer then fails. This defeats P4's own invariant, on exactly the owner-down condition P4
+exists to survive. It is **independent of B1** — the original `seen`-based gate grew the same way
+via `commitLocal`; B1 only changed the gate's *source* (`seen`→`log.marks()`), not this staleness.
+
+**Decision.** When `commitLocal` commits a record onto an orphan (`!rset.includes(me)`), clear
+`shedReady[p]`. The fresh winner raised the high-water, so every prior confirmation is stale —
+force ALL R-set members to re-confirm against the new mark before we shed. Conservative (the P4
+posture throughout): re-confirming costs at most a few anti-entropy rounds; the unreachable owner
+that forced the never-drop is exactly the member that must re-confirm, so it can't be skipped. The
+only growth path for an orphan's high-water is this never-drop commit (inbound records for a
+partition we don't hold are held-gated out before `applyInbound`), so this one site is the
+complete fix. Scoped-only; R=∞ never orphans.
+
+**Consequences.** A never-drop write into an orphan now converges to the full R-set and sheds only
+after every member (incl. the healed owner) re-confirms — no under-replication, no loss. A new test
+drives the never-drop-into-orphan path (which the other P4 tests never hit — they have no
+isolation, so every write forwards) via an isolated owner and asserts convergence + clean shed; the
+existing multi-confirm shed tests are unchanged.
+
 ## Q1 — Hold-relative reads (owner-routed `read` + `data.x` facade) · Adopted
 
 **Context.** With R-way holding, a node materializes only the partitions it replicates, so

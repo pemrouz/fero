@@ -473,6 +473,60 @@ test('P4: replicas:2 — a FULL R-set move (both old replicas dropped) sheds saf
   }
 })
 
+test('P4: a never-drop write to an orphan partition converges + sheds cleanly (shedReady re-confirmed on the high-water bump)', async () => {
+  // Exercises the never-drop fallback INTO an orphan — the path the B1 review's finding lives
+  // on, which the other P4 tests never hit (they have no isolation, so every write forwards).
+  // When a write's owner is unreachable, commitLocal commits it LOCALLY: a fresh winner
+  // appended to a partition this node does NOT replicate, RAISING its shippable high-water.
+  // The fix clears `shedReady[p]` there so a confirmation earned against the OLD mark can't be
+  // reused to shed before the new record is R-replicated. Here A writes a foreign key whose
+  // owner it has isolated; the value still reaches the full R-set (the owner heals via the
+  // reachable replica), and A sheds its orphan copy only AFTER the owner reconnects + confirms.
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150, view: { evictAfter: 100_000 } })
+  const A = await fero('p4-orphan-write', cfg(p1))
+  const B = await fero('p4-orphan-write', cfg(p2))
+  const C = await fero('p4-orphan-write', cfg(p3))
+  const all = [A, B, C]
+  const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+  const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  const v = (n: any, k: string) => (n.data[value] as any)?.[k]?.v
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed')
+    const keys = Array.from({ length: 30 }, (_, i) => 'k' + i)
+    for (const k of keys) node(A.cluster.owner(k)!).data[k] = { v: 0 } // each from its owner → lands on its R-set, no orphans
+    assert.ok(await until(() => keys.every((k) => A.cluster.replicas(k).every((a) => has(node(a), k))), 10000), 'every key on its R-set')
+
+    // a key A does NOT replicate; isolate BOTH ends of its OWNER↔A link so a write can't forward there.
+    const foreign = keys.find((k) => !A.cluster.replicas(k).includes(A.cluster.me))!
+    const owner = A.cluster.owner(foreign)!
+    ;(A as any)[diagnostics].isolate(owner)
+    ;(node(owner) as any)[diagnostics].isolate(A.cluster.me)
+
+    // Write the foreign key, RETRYING until it commits LOCALLY (the never-drop fallback) rather
+    // than racing the owner socket's teardown — once A holds it, commitLocal ran and orphaned it.
+    let landed = false
+    for (let i = 0; i < 25 && !landed; i++) {
+      A.data[foreign] = { v: 99 }
+      landed = await until(() => v(A, foreign) === 99, 500)
+    }
+    assert.ok(landed, 'A committed the foreign write locally via the never-drop fallback (orphan)')
+
+    // No loss: BOTH R-set replicas (the reachable one directly, the isolated owner via the
+    // reachable one's anti-entropy) converge to v:99 even while the owner↔A link is cut.
+    assert.ok(await until(() => A.cluster.replicas(foreign).every((a) => v(node(a), foreign) === 99), 12000), 'the full R-set converged to the never-drop write — no loss')
+
+    // Heal: the owner reconnects + confirms to A, so A can finally shed (exactly R), no loss.
+    ;(A as any)[diagnostics].heal(owner)
+    ;(node(owner) as any)[diagnostics].heal(A.cluster.me)
+    assert.ok(await until(() => !has(A, foreign), 12000), 'A sheds the orphan once every R-set member (incl. the healed owner) is confirmed')
+    assert.ok(A.cluster.replicas(foreign).every((a) => v(node(a), foreign) === 99), 'R-set still holds v:99 after the shed (no loss)')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
 test('Q1: a scoped server reads a partition it does NOT hold via owner-routed `await data.x`', async () => {
   // Hold-relative reads: a held key is local+sync; a non-held key is a remote handle
   // — `await data.x` fetches one-shot from the owner, `data.x.connect(...)` opens a
