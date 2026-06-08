@@ -11,8 +11,9 @@
     "#utils": "./utils/index.ts"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"transport/*.test.ts\" \"log/*.test.ts\" \"resource/*.test.ts\" \"tests/chaos/*.test.ts\"",
-    "perf": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"transport/*.perf.ts\" \"log/*.perf.ts\" \"resource/*.perf.ts\""
+    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"transport/*.test.ts\" \"log/*.test.ts\" \"resource/*.test.ts\" \"tools/*.test.ts\" \"tests/chaos/*.test.ts\"",
+    "perf": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"transport/*.perf.ts\" \"log/*.perf.ts\" \"resource/*.perf.ts\"",
+    "readable": "node --experimental-strip-types --no-warnings tools/readable.ts"
   },
   "author": "pemrouz",
   "license": "MIT"
