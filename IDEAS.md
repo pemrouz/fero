@@ -169,6 +169,11 @@ The structural perf redesign [DECISIONS G](DECISIONS.md) identified.
 
 ### Catch-up & anti-entropy hardening — [P2] (log, resource)
 Builds on [DECISIONS B](DECISIONS.md) and [DECISIONS P](DECISIONS.md) (the scoped digest).
+- **Epoch-aware catch-up — LANDED** ([DECISIONS B1](DECISIONS.md)): `applyInbound` now
+  SKIPS logging+applying a record whose key already holds a strictly-higher-epoch winner
+  (a permanent loser under epoch fencing) — `seen` still advances (sticky, no re-fetch),
+  `shedConfirmed` confirms against `log.marks()` not `seen`. Smaller logs + less re-ship
+  after an ownership change.
 - **Merkle/range digest.** Today's digest is O(keys): per-origin under full replication,
   per-(origin,partition) and O(held keys) under scoping ([DECISIONS P](DECISIONS.md) — the
   deferred "P3 compaction"), re-sent every `antiEntropy` ms by periodic AE. Replace with a

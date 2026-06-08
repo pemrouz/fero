@@ -180,7 +180,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // Dedup high-water, keyed by seenKey(origin, partition) below: per-origin under
   // full replication (compact digest), per-(origin,partition) under scoped holding
   // (Milestone P — so each partition's stream is independently complete). Doubles
-  // as the anti-entropy digest a node sends (Object.fromEntries(seen)).
+  // as the anti-entropy digest a node sends (Object.fromEntries(seen)). It advances
+  // even for a permanent epoch-loser applyInbound SKIPS logging, so it can EXCEED
+  // log.marks() (the shippable high-water) by exactly those dead seqs — that's why
+  // shedConfirmed compares peers against log.marks(), not seen.
   const seen = new Map<string, number>()
   //! versions: keyPath → current LWW winner stamp, MUTATED in place on re-write (zero steady-state alloc).
   // keyPath → current LWW winner. The {seq,origin} stamp is MUTATED in place on
@@ -219,41 +222,55 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   //! applying: guard set while applying an inbound record, so its sink re-emission isn't re-logged/re-broadcast.
   // Inbound records carry their origin's provenance. (1) Drop duplicates by
-  // per-origin high-water. (2) Log every accepted record (the full per-origin
-  // history catch-up forwards from). (3) Apply only LWW winners to the proxy —
-  // losers stay in the log but don't mutate state. The apply re-emits through
-  // the write-capture sink; the `applying` guard stops that re-emission from
-  // being re-logged or re-broadcast.
+  // per-origin high-water. (2) Log every accepted record EXCEPT a permanent
+  // epoch-loser (a key already holds a higher-epoch winner — see applyInbound's
+  // epoch-skip); the log is the per-origin history catch-up forwards from. (3) Apply
+  // only LWW winners to the proxy — a same-epoch loser stays logged, a lower-epoch
+  // loser is skipped entirely, neither mutates state. The apply re-emits through the
+  // write-capture sink; the `applying` guard stops that re-emission from being
+  // re-logged or re-broadcast.
   let applying = false
   //! committingForward: guard so an applied forwarded write commits as-is, never re-evaluating ownership.
   // Set while a FORWARDED write is being applied locally (see commitForwarded): the
   // sink commits it as-is instead of re-evaluating ownership, so it never bounces.
   let committingForward = false
 
-  //! applyInbound: dedup → Lamport-merge → log → LWW-resolve → apply winner; shared by replication + restore replay.
-  // Accept a record into local state: dedup by per-origin high-water, Lamport-
-  // merge the clock, log it (full per-origin history), LWW-resolve, and apply the
-  // winner to the proxy. Shared by inbound replication AND restore-from-storage
-  // replay — neither path broadcasts (the sink's `applying` guard keeps the
-  // re-emission from looping back out, and restore runs before any peer exists).
+  //! applyInbound: dedup → Lamport-merge → epoch-skip | log → LWW-resolve → apply winner; shared by replication + restore replay.
+  // Accept a record into local state: dedup by per-origin high-water, Lamport-merge
+  // the clock, SKIP a permanent epoch-loser (a key that already holds a higher-epoch
+  // winner — not logged), else log it (per-origin history), LWW-resolve, and apply the
+  // winner to the proxy. Shared by inbound replication AND restore-from-storage replay
+  // — neither path broadcasts (the sink's `applying` guard keeps the re-emission from
+  // looping back out, and restore runs before any peer exists).
   const applyInbound = (record: ChangeRecord) => {
     const origin = record.origin
     if (origin !== undefined) {
       const sk = seenKey(origin, partitionOf(record))
       const n = record.seq ?? 0
       if (n <= (seen.get(sk) ?? 0)) return // already have it (dedup, per seenKey granularity)
-      seen.set(sk, n)
+      seen.set(sk, n) // dedup high-water — advances even for the epoch-loser SKIPPED below, so anti-entropy never re-fetches that dead record
       if (n > clock) clock = n // Lamport merge (global)
-      log.append(record)
       const e = record.epoch ?? 0
       const key = versionKey(record)
       const cur = versions.get(key)
-      //! LWW resolve, lexicographic (epoch, seq, origin): epoch fences stale views, seq then origin decide; loser stays logged.
+      //! Epoch-aware catch-up: a STRICTLY-lower-epoch record is a permanent loser (epoch fence) — skip logging AND applying.
+      // We already hold + logged a higher-epoch winner for this key (cur.epoch > e), so
+      // this record can NEVER win LWW (Milestone V1d fences a superseded view). Logging
+      // it would only retain dead history that the next catch-up re-ships, so skip it
+      // entirely. SAFE by construction: we skip ONLY when we hold the dominating winner,
+      // so no live value is ever absent — only a superseded copy is dropped. And because
+      // each (origin,partition) stream arrives IN ORDER from its single owner, `seen`
+      // advancing past a skipped seq still honestly means "every live value ≤ this seq is
+      // present" (a live value below it was processed — and logged — earlier in the run).
+      if (cur && e < cur.epoch) return // epoch-fenced loser — NOT logged (unlike the same-epoch loser below)
+      log.append(record)
+      //! LWW resolve, lexicographic (epoch, seq, origin): epoch fences stale views, seq then origin decide; a same-epoch loser stays logged.
       // LWW, lexicographic (epoch, seq, origin): a write committed under a NEWER
       // membership view wins (epoch fencing — Milestone V1d), so a straggler from
       // a superseded view can't clobber the current one; within a view (constant
       // epoch) the Lamport seq decides; origin uuid breaks exact ties. Every node
-      // elects the same winner. Loser stays logged.
+      // elects the same winner. A SAME-epoch loser stays logged (per-origin history);
+      // a strictly-lower-epoch loser was already skipped above (never logged).
       if (cur && !(e > cur.epoch || (e === cur.epoch && (n > cur.seq || (n === cur.seq && origin > cur.origin))))) return
       if (cur) {
         cur.epoch = e
@@ -604,6 +621,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // digest (both legs), so orphans drain within a few anti-entropy rounds.
   const shedConfirmed = (peerMarks: Record<string, number>, peerMe: string) => {
     if (!scoped || me === undefined || !orphans.size) return
+    // Confirm against the LOG's shippable high-water, NOT `seen`: epoch-aware catch-up
+    // advances `seen` past records it SKIPS logging (permanent epoch-losers), so `seen`
+    // can claim seqs we can never re-ship — requiring a peer to reach them would hang the
+    // shed forever (no holder logged that dead record). log.marks() is exactly the live
+    // values we must confirm an R-set member holds before dropping our copy (shedding at
+    // the lower mark is safe: the skipped seqs are superseded — the peer has their winner).
+    const shippable = log.marks()
     for (const p of [...orphans]) {
       if (holds(p)) {
         orphans.delete(p) // we replicate it again (ring moved back) — not an orphan
@@ -614,8 +638,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (!rset.includes(peerMe)) continue // peer isn't a current R-set holder of p
       let caughtUp = true
       const suffix = '\x00' + p
-      for (const [key, seq] of seen) {
-        if (key.endsWith(suffix) && (peerMarks[key] ?? 0) < seq) {
+      for (const key in shippable) {
+        if (key.endsWith(suffix) && (peerMarks[key] ?? 0) < shippable[key]) {
           caughtUp = false
           break
         }

@@ -55,6 +55,59 @@ carried in the handshake frames.
 instead of allocating the tail; asymmetric reachability (catch-up over an
 inbound-only link); a partition-heal chaos test (L4).
 
+## B1 — Epoch-aware catch-up: skip-log permanent epoch-losers · Adopted
+
+**Context.** [B](#b--catch-up-on-reconnect-via-per-origin-digest--adopted--980ead9)
+folds catch-up records through the same `applyInbound` dedup+LWW path as live
+replication. With epoch-fenced LWW ([V1d](#v--view-synchronous-membership--adopted--5c45e61--1d8c533)),
+a record committed under a SUPERSEDED view (lower `epoch`) can never win — a newer
+view already wrote the key. Yet `applyInbound` still **logged** every such record
+("loser stays logged"), so a fresh joiner or a healing peer accumulated the full
+dead history of every key that changed hands across a view change, and re-shipped it
+on the next anti-entropy round. Pure waste — those records can only ever lose.
+
+**Decision.** In `applyInbound`, BEFORE `log.append`, short-circuit a record whose
+versionKey already holds a **strictly-higher-epoch** winner (`cur.epoch > record.epoch`):
+return WITHOUT logging it and WITHOUT applying it. The dedup high-water (`seen`) STILL
+advances, so anti-entropy never re-fetches the dead record (a sticky skip). A SAME-epoch
+loser is unchanged — it stays logged (it's part of the per-origin history a tie or
+another key may need).
+
+**Why it's safe (no data loss / no divergence).**
+- We skip ONLY when we already hold + logged the dominating winner (the skip condition
+  reads `versions`, set when a winner is applied). So every LIVE value stays present;
+  only a superseded copy is dropped. By construction the winner is always there to ship.
+- Each `(origin,partition)` stream arrives **in order** from its single owner (the
+  invariant the whole dedup/LWW core rests on — [F1](#f1--owner-routed-writes-via-forwarding-owner-re-sequencing-phase-1--adopted)).
+  So a live value below a skipped seq was processed — and logged — EARLIER in the run;
+  `seen` advancing past the skipped seq honestly still means "every live value ≤ this
+  seq is present." The log gains gaps only at dead seqs.
+- The log stays the complete history of WINNERS, so a peer catching up from us still
+  receives every live value (and gets each superseded key's winner, which we logged).
+
+**`seen` may now exceed `log.marks()`** by exactly the skipped seqs. The one consumer
+that conflated them — `shedConfirmed` (P4 orphan shedding) — now confirms an R-set
+member against `log.marks()` (the **shippable** high-water), NOT `seen`. Requiring a
+peer to reach a skipped seq we can never re-ship would hang the shed forever; shedding
+at the lower log mark is safe because the skipped seqs are superseded (the peer holds
+their winner). Outgoing digests stay `seen`-based (so peers don't re-ship us dead
+records).
+
+**Consequences.**
+- Smaller logs + less catch-up bandwidth on a cluster that has changed ownership — the
+  per-key dead history no longer rides along forever; it persists only at original-era
+  holders (further trimmable by the deferred log-compaction workstream).
+- Steady-state hot paths are untouched: a LOCAL write goes through `commitLocal` (not
+  `applyInbound`); `shedConfirmed` runs only on a digest when orphans exist. `index.perf`
+  / `log.perf` thresholds hold; the full suite + chaos (partition/heal, crash/recover,
+  churn, soak) converge. A deterministic restore-seam test drives the skip directly
+  (epoch-loser skipped from the log; same-epoch loser still logged).
+- Supersedes B/V1d's "loser stays logged" for the strictly-lower-epoch case ONLY.
+
+**Open follow-ups → [IDEAS](IDEAS.md):** the rest of the Catch-up & anti-entropy
+hardening workstream (Merkle/range digest, smarter peer-selection, stream the diff,
+asymmetric reachability) is unaffected.
+
 ## C — Persistence via a storage seam + WAL · Adopted · `980ead9`
 
 **Context.** State must survive a process restart.
