@@ -1041,6 +1041,41 @@ test('V1d: a write committed under a newer view-epoch wins (epoch-fenced LWW)', 
   }
 })
 
+test('V1d: epoch-aware catch-up SKIPS logging a record whose key already has a higher-epoch winner', async () => {
+  // Drive applyInbound deterministically via the storage seam (restore replays each
+  // loaded record through the same accept path as inbound replication / catch-up, in
+  // array order). We stage, per key, a higher-epoch WINNER first, then a stale record:
+  //   • key k — winner@epoch2, then a loser@epoch1 with a HIGHER seq: epoch dominates
+  //     seq (V1d), so it's a PERMANENT loser → skipped (NOT logged).
+  //   • key m — winner@epoch2 seq6, then a SAME-epoch loser@epoch2 seq3: a same-epoch
+  //     loser still belongs to the per-origin history → it STAYS logged (just not applied).
+  // A `_diag` method reaches Context.log (size + marks) to prove what was/wasn't logged.
+  const records = [
+    { type: 'update', key: ['k'], value: 'kw', origin: 'o-k-win', seq: 5, epoch: 2 },
+    { type: 'update', key: ['k'], value: 'kl', origin: 'o-k-lose', seq: 9, epoch: 1 },
+    { type: 'update', key: ['m'], value: 'mw', origin: 'o-m-win', seq: 6, epoch: 2 },
+    { type: 'update', key: ['m'], value: 'ml', origin: 'o-m-lose', seq: 3, epoch: 2 },
+  ] as any[]
+  const A = await fero('eskip', {
+    port: await ports.free(),
+    wait: 30,
+    storage: { load: async () => records, append: () => {} },
+    _diag: (_: any, c: any) => ({ size: c.log.size, marks: c.log.marks() }),
+  })
+  try {
+    const diag = await A.methods._diag()
+    // winners applied (epoch-fenced LWW elected them regardless of arrival order)
+    assert.equal(A.data.k[value], 'kw', `k = winner (got ${A.data.k[value]})`)
+    assert.equal(A.data.m[value], 'mw', `m = winner (got ${A.data.m[value]})`)
+    // 3 records logged: both winners + the same-epoch loser; the epoch-loser was SKIPPED.
+    assert.equal(diag.size, 3, `epoch-loser skipped, same-epoch loser kept (log.size ${diag.size})`)
+    assert.equal(diag.marks['o-k-lose'], undefined, 'the epoch-loser is NOT in the log (skipped, never appended)')
+    assert.equal(diag.marks['o-m-lose'], 3, 'the same-epoch loser IS logged (per-origin history)')
+  } finally {
+    A.destroy()
+  }
+})
+
 // ── Milestone V1e: write-gate (quorum-loss → read-only + buffer) ──
 
 test('V1e: a node that loses quorum goes read-only and buffers writes, flushing on recovery', async () => {
