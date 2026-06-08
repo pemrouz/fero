@@ -1,3 +1,4 @@
+//! L0 wire codec + framer — encode a batch of change records to a length-prefixed frame; decode to lazy RecordViews.
 // L0 wire codec + framer — the hottest file in the repo.
 //
 // fero's foundational hypothesis (proven by the day-0 spike): a `data` change record
@@ -21,18 +22,18 @@
 // varint (1 byte for the < 128 common case). Frame `bodyLen` is a fixed u32 so
 // the framer never loops to find a frame boundary.
 
-const MAGIC = 0xfe // protocol marker + version. v1 = 0xFE; bumped on wire change.
+const MAGIC = 0xfe //! protocol marker + version. v1 = 0xFE; bumped on wire change.
 
-// frame flags (byte 1)
+//! ── frame flags (byte 1) ──
 const FLAG_HAS_ID = 1 << 0 // a u48 stream/ack id follows the header
 const FLAG_COL = 1 << 1 // RESERVED — columnar body (not emitted in v1)
 const FLAG_UNIFORM = 1 << 2 // RESERVED — fixed-width batch (not emitted in v1)
-const FLAG_PROV = 1 << 3 // provenance: body opens with [origin str][baseSeq varint]
+const FLAG_PROV = 1 << 3 //! provenance: body opens with [origin str][baseSeq varint]
 // before the record count. Records in a prov frame are ONE origin's consecutive
 // writes (seq = baseSeq + index) — see peer.ts flush() (one tick, own writes
 // only, no relay). L1/L2 use this for dedup, anti-entropy catch-up, and LWW.
 
-// frame verbs (byte 2) — dense enum → flat dispatch, not this[command]
+//! frame verbs (byte 2) — dense enum → flat dispatch, not this[command]
 export const VERB = {
   RECORDS: 1,
   ACK: 2,
@@ -56,6 +57,7 @@ export const VERB = {
   // plain replication RECORDS frame, which carries no id)
 } as const
 
+//! record tag (byte 0 of each record): bits 0-1 type, bit2 hasAt, bit3 keyDelta (RESERVED), bits 4-7 vtype.
 // record tag (byte 0 of each record): bits 0-1 type, bit2 hasAt, bit3 keyDelta
 // (RESERVED), bits 4-7 vtype.
 const TYPE = { update: 0, insert: 1, remove: 2, move: 3 } as const
@@ -63,7 +65,7 @@ const TYPE_NAME = ['update', 'insert', 'remove', 'move'] as const
 const HAS_AT = 1 << 2
 // const KEY_DELTA = 1 << 3  // RESERVED for prefix-delta keys (deferred)
 
-// value-type nibble (tag bits 4-7). Scalars 0-3 carry zero value bytes.
+//! value-type nibble (tag bits 4-7). Scalars 0-3 carry zero value bytes.
 const VT = {
   null: 0,
   undefined: 1,
@@ -79,6 +81,7 @@ const HEADER = 7 // MAGIC + flags + verb + bodyLen:u32
 const ID_LEN = 6 // u48 stream/ack id (plain Number; no BigInt on the ack path)
 const EMPTY = Buffer.allocUnsafe(0)
 
+//! hard ceiling on a frame body — bound it so one bad header can't grow `carry` to OOM (overridable per-Framer).
 // Hard ceiling on a single frame's body. A hostile (or corrupt) header can claim
 // a ~4 GiB bodyLen; the framer would then buffer `carry` unbounded waiting for a
 // frame that never completes (OOM from a few bytes). Reject any frame whose body
@@ -86,6 +89,7 @@ const EMPTY = Buffer.allocUnsafe(0)
 // bad header can't exhaust memory. Overridable per-Framer for tests / tuning.
 const MAX_FRAME = 256 * 1024 * 1024
 
+//! wire-fault error — distinct type so the peer drops the connection without swallowing real handler/apply bugs.
 // Thrown by the framer/decoder on a malformed or hostile frame (bad magic,
 // oversized body, a count/length that overruns the buffer, a reserved value
 // type). A distinct type so the peer can drop the connection on a wire-level
@@ -97,6 +101,7 @@ export class FrameError extends Error {
   }
 }
 
+//! a `data` change record + optional provenance (origin/seq/epoch) — the in-memory shape the wire mirrors.
 export type ChangeRecord = {
   type: 'update' | 'insert' | 'remove' | 'move'
   key: string[]
@@ -107,14 +112,16 @@ export type ChangeRecord = {
   epoch?: number // provenance: the membership view-epoch this write was committed under (Milestone V); carried in prov frames, fenced at apply in V1d
 }
 
+//! partition of a record — top-level key, or `at` for a root insert (BI0); used to route + segment the log.
 // The partition a change record belongs to — its top-level key, or `at` for a
 // root insert (the BI0 first-write case, where the logical key lives in `at`).
 // Used by L0 to route to an owner and by L1 to segment the log.
 export const partitionOf = (record: { key: string[]; at?: string }): string =>
   record.key.length ? record.key[0] : (record.at ?? '')
 
-// ─────────────────────────────────────────── varint (LEB128, unsigned ≤ 2^32)
+//! ─────────────────────────────────────────── varint (LEB128, unsigned ≤ 2^32)
 
+//! byte count for a varint (precompute recLen so decode is an O(1) slice).
 const varintSize = (v: number) => {
   let n = 1
   while (v > 0x7f) {
@@ -124,7 +131,7 @@ const varintSize = (v: number) => {
   return n
 }
 
-// ─────────────────────────────────────────── Writer (growable encode buffer)
+//! ─────────────────────────────────────────── Writer (growable encode buffer)
 
 // A growable scratch buffer. The per-peer outbox path (peer.ts) will serialize
 // straight into a preallocated buffer with no growth; this Writer backs the
@@ -163,7 +170,7 @@ class Writer {
     this.buf.writeDoubleLE(v, this.off)
     this.off += 8
   }
-  // varint length-prefixed utf8. byteLen passed in to avoid recomputing it.
+  //! varint length-prefixed utf8. byteLen passed in to avoid recomputing it.
   str(s: string, byteLen: number) {
     this.varint(byteLen)
     this.ensure(byteLen)
@@ -172,8 +179,9 @@ class Writer {
   }
 }
 
-// ─────────────────────────────────────────── value codec (the swappable seam)
+//! ─────────────────────────────────────────── value codec (the swappable seam)
 
+//! pick a value's VT nibble — null/undef/bool/int/f64/str inline; everything else → obj (JSON seam).
 const classify = (v: unknown): number => {
   if (v === null) return VT.null
   if (v === undefined) return VT.undefined
@@ -189,11 +197,13 @@ const classify = (v: unknown): number => {
   }
 }
 
+//! zigzag map signed int ↔ unsigned varint so small negatives stay 1 byte.
 const zigzag = (n: number) => ((n << 1) ^ (n >> 31)) >>> 0
 const unzigzag = (z: number) => (z >>> 1) ^ -(z & 1)
 
-// ─────────────────────────────────────────── record sizing + write
+//! ─────────────────────────────────────────── record sizing + write
 
+//! encoded byte count of a key (segment count + per-segment len-prefixed utf8).
 const keySize = (key: string[]) => {
   let n = varintSize(key.length)
   for (let i = 0; i < key.length; i++) {
@@ -203,8 +213,9 @@ const keySize = (key: string[]) => {
   return n
 }
 
-// ─────────────────────────────────────────── encode a frame
+//! ─────────────────────────────────────────── encode a frame
 
+//! encode a batch into one frame — optional u48 id + provenance ext (origin/baseSeq/epoch), seq = base+index.
 // Encode change records into one RECORDS frame (one logical socket.write batch).
 // `id` (optional) writes a u48 stream/ack id into the header. Provenance
 // (`origin`+`seq`+`epoch`) is written when given explicitly OR carried on
@@ -222,7 +233,7 @@ export function encodeFrame(
   const hasId = id !== undefined
   const headerLen = HEADER + (hasId ? ID_LEN : 0)
   const w = new Writer(headerLen + 16 + records.length * 24)
-  w.off = headerLen // reserve the header; backfilled once bodyLen is known
+  w.off = headerLen //! reserve the header; backfilled once bodyLen is known
   if (hasProv) {
     w.str(provOrigin!, Buffer.byteLength(provOrigin!))
     w.varint(baseSeq)
@@ -239,6 +250,7 @@ export function encodeFrame(
     const at = hasAt ? '' + record.at : ''
     const atBl = hasAt ? Buffer.byteLength(at) : 0
 
+    //! size the record up front (tag + key + [at] + value) so recLen is written before the body — O(1) decode slice.
     // size: tag + key + [at] + value — so we can write recLen up front (O(1)
     // lazy slice on decode).
     let size = 1 + keySize(record.key)
@@ -279,6 +291,7 @@ export function encodeFrame(
   return b.subarray(0, w.off)
 }
 
+//! a CONTROL frame = one record whose value IS the payload — the shape every non-data verb uses (decode via Frame.value).
 // A CONTROL frame carries exactly one record whose value IS the payload — the
 // shape every non-data verb (CALL/RESOLVE/REJECT, SUBSCRIBE/UNSUBSCRIBE, DIGEST,
 // VIEW_*, JOIN_REQUEST) uses. This names that shape so callers stop hand-spelling
@@ -288,6 +301,7 @@ export function encodeFrame(
 export const controlFrame = (verb: number, value: unknown, id?: number): Buffer =>
   encodeFrame([{ type: 'update', key: [], value }], { verb, id })
 
+//! split a mixed-origin batch into the fewest frames each holding one origin's contiguous-seq, one-epoch run.
 // Encode a batch that may mix origins — splitting it into the fewest frames each
 // of which satisfies the single-origin, contiguous-seq invariant base+index
 // relies on. A run breaks when the origin changes or the seq isn't the previous
@@ -302,6 +316,7 @@ export function encodeFrames(records: ChangeRecord[]): Buffer[] {
     const epoch = records[i].epoch
     let j = i + 1
     if (origin === undefined) while (j < records.length && records[j].origin === undefined) j++
+    //! extend the run while same origin + seq == prev+1 + same epoch — break on any of the three.
     // A run is one origin's contiguous seqs within one epoch — break on origin
     // change, a Lamport-seq gap, OR an epoch change (catch-up may ship an origin's
     // records spanning several view-epochs; each frame carries one epoch).
@@ -312,8 +327,9 @@ export function encodeFrames(records: ChangeRecord[]): Buffer[] {
   return frames
 }
 
-// ─────────────────────────────────────────── Framer (receive, straddle-safe)
+//! ─────────────────────────────────────────── Framer (receive, straddle-safe)
 
+//! one per peer — push(chunk) returns complete frames; a split frame is held as `carry` (concat only on straddle).
 // One per peer. push(chunk) returns the complete frames in the stream so far;
 // a frame split across chunks is retained as `carry` (one subarray, no per-byte
 // copy) until the rest arrives. Concat happens only when a frame straddles.
@@ -330,7 +346,8 @@ export class Framer {
     while (buf.length - off >= HEADER) {
       if (buf[off] !== MAGIC) throw new FrameError(`bad frame magic 0x${buf[off].toString(16)}`)
       const flags = buf[off + 1]
-      const bodyLen = buf.readUInt32LE(off + 3) // ONE load, not four shift-adds
+      const bodyLen = buf.readUInt32LE(off + 3) //! ONE load, not four shift-adds
+      //! bound the body BEFORE the straddle check — else a huge-body header grows `carry` unbounded.
       // Bound the body BEFORE the straddle check — else a header claiming a huge
       // body makes `carry` grow unbounded waiting for bytes that never arrive.
       if (bodyLen > this.maxFrame) throw new FrameError(`frame body ${bodyLen} exceeds max ${this.maxFrame}`)
@@ -345,6 +362,7 @@ export class Framer {
   }
 }
 
+//! decode exactly one complete frame (test/handshake convenience); throws on more or fewer than one.
 // Decode a single complete frame (test/handshake convenience). Throws if `buf`
 // holds more or less than exactly one frame.
 export function decodeFrame(buf: Buffer): Frame {
@@ -353,6 +371,7 @@ export function decodeFrame(buf: Buffer): Frame {
   return f[0]
 }
 
+//! a zero-copy view over one frame's bytes — flags/verb/id/provenance read directly; records() parses lazily.
 export class Frame {
   buf: Buffer
   constructor(buf: Buffer) {
@@ -370,6 +389,7 @@ export class Frame {
   private get afterId() {
     return HEADER + (this.buf[1] & FLAG_HAS_ID ? ID_LEN : 0)
   }
+  //! parse + memoise the provenance ext (origin/baseSeq/epoch) and where the record count begins; none → off = afterId.
   // Parse the provenance ext ([origin str][baseSeq varint][epoch varint]) if
   // FLAG_PROV is set. Returns origin, base sequence, base epoch, and the offset
   // where the record count begins. No provenance → origin undefined, off = afterId.
@@ -418,6 +438,7 @@ export class Frame {
     return this.prov().epoch
   }
 
+  //! the single payload of a CONTROL frame: records()[0].value — inverse of controlFrame(); undefined when empty.
   // The single payload of a CONTROL frame: records()[0].value (the inverse of
   // controlFrame()). Ignores records[1..] — control frames carry exactly one
   // record; `undefined` for an empty frame (PING/PONG).
@@ -425,6 +446,7 @@ export class Frame {
     return this.records()[0]?.value
   }
 
+  //! lazily slice one RecordView per record (no key/value parse), stamping provenance origin + baseSeq+index.
   // Lazy: walk `count` recLen varints and slice a RecordView per record. No key
   // or value parse — that happens only when a RecordView field is read. When the frame
   // carries provenance, each RecordView is stamped with origin + (baseSeq + index).
@@ -441,6 +463,7 @@ export class Frame {
       shift += 7
     } while (b & 0x80)
     count >>>= 0
+    //! reject a count exceeding remaining bytes BEFORE `new Array(count)` — a hostile 2^28 count would allocate billions.
     // Each record needs at least its 1-byte recLen varint, so a count exceeding
     // the bytes remaining is impossible — reject before `new Array(count)` (a
     // hostile count = 2^28 would otherwise allocate / iterate billions). A
@@ -472,8 +495,9 @@ export class Frame {
   }
 }
 
-// ─────────────────────────────────────────── RecordView (lazy decoded record)
+//! ─────────────────────────────────────────── RecordView (lazy decoded record)
 
+//! mirrors a change record but parses on access — type is 1 byte; key/at/value decoded + memoised only when read.
 // Mirrors a `data` change record but parses on access. `type` is one byte;
 // `key`/`at`/`value` are decoded (and memoised) only when read. The terminal
 // res.update/insert/remove(value, key, at) call (replicate.ts) is the only
@@ -491,7 +515,7 @@ export class RecordView {
   #atEnd = 0
   #valStart = 0
 
-  // Provenance, stamped by Frame.records() when the frame carries it (else undefined).
+  //! provenance, stamped by Frame.records() when the frame carries it (else undefined).
   origin?: string
   seq?: number
   epoch?: number
@@ -504,6 +528,7 @@ export class RecordView {
     return (this.#type ??= TYPE_NAME[this.#buf[0] & 3])
   }
 
+  //! locate at/value field boundaries once (no utf8 decode, no value parse) so the getters know where to slice.
   // Locate field boundaries once (no utf8 decode, no value parse) so at/value
   // getters know where to slice.
   #scan() {
@@ -551,6 +576,7 @@ export class RecordView {
     this.#scanned = true
   }
 
+  //! decode + memoise the key segments (varint count, then len-prefixed utf8 per segment).
   get key(): string[] {
     if (this.#key) return this.#key
     const buf = this.#buf
@@ -588,6 +614,7 @@ export class RecordView {
     return (this.#at ??= this.#buf.toString('utf8', this.#atStart, this.#atEnd))
   }
 
+  //! decode + memoise the value by VT nibble — scalars are tag-only; int unzigzags, obj JSON-parses (bounds-checked).
   get value(): unknown {
     if (this.#valueParsed) return this.#value
     this.#scan()
@@ -648,26 +675,26 @@ export class RecordView {
         try {
           v = JSON.parse(buf.toString('utf8', off, off + l))
         } catch {
-          throw new FrameError('invalid JSON object value') // corrupt body → drop peer, don't crash
+          throw new FrameError('invalid JSON object value') //! corrupt body → drop peer, don't crash
         }
         break
       }
       default:
-        // vtype 7 and 9-15 are reserved/unused — a malformed or hostile frame.
+        //! vtype 7 and 9-15 are reserved/unused — a malformed or hostile frame.
         throw new FrameError(`reserved value type ${vtype}`)
     }
     this.#valueParsed = true
     return (this.#value = v)
   }
 
-  // Plain-object snapshot — the inverse of a `data` change record.
+  //! plain-object snapshot — the inverse of a `data` change record.
   toJSON(): ChangeRecord {
     const out: ChangeRecord = { type: this.type, key: this.key, value: this.value }
     if (this.at !== undefined) out.at = this.at
     if (this.origin !== undefined) {
       out.origin = this.origin
       out.seq = this.seq
-      if (this.epoch) out.epoch = this.epoch // omit the 0/unset default (pre-view records)
+      if (this.epoch) out.epoch = this.epoch //! omit the 0/unset default (pre-view records)
     }
     return out
   }

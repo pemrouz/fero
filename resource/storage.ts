@@ -1,3 +1,4 @@
+//! Built-in durable-log adapters for fero(name, { storage }): records ARE change records, so a WAL suffices.
 // Built-in durable-log adapters for fero(name, { storage }). A Storage is just
 // { load, append } (see ./index.ts) — restore the log at boot, persist each
 // accepted record. The records ARE change records (the wire/log/memory shape is
@@ -8,6 +9,7 @@ import { appendFileSync, readFileSync } from 'node:fs'
 import type { ChangeRecord } from '../transport/message.ts'
 import type { Storage } from './index.ts'
 
+//! Append-only file WAL: newline-delimited JSON records, synchronous fsync per write (simplest correct durability).
 // Append-only file WAL. `load` parses the newline-delimited records (a missing
 // file is an empty log); `append` writes one line per record. Synchronous fsync
 // per write — the simplest correct durability. Higher throughput (batched /
@@ -19,7 +21,7 @@ export function fileStorage(path: string): Storage {
       try {
         text = readFileSync(path, 'utf8')
       } catch {
-        return [] // ENOENT (or unreadable) → fresh log
+        return [] //! ENOENT (or unreadable) → fresh log
       }
       const out: ChangeRecord[] = []
       for (const line of text.split('\n')) if (line) out.push(JSON.parse(line) as ChangeRecord)

@@ -1,4 +1,4 @@
-// L1 public surface: log() + view(), and distribute() to put a log on an L0 mesh.
+//! L1 public surface: log() + view(), and distribute() to put a log on an L0 mesh.
 //
 //   log()              → an append-only Log (standalone, no network)
 //   view(log)          → a $() ViewProxy that materializes the log (the day-0
@@ -23,7 +23,7 @@ export function log(): Log {
   return new Log()
 }
 
-// Apply a change record to a root `res` — the inverse of the wire codec, the
+//! Apply a change record to a root `res` — the inverse of the wire codec, the
 // same terminal contract the day-0 spike proved. The one place records become
 // state. Shared with L2.
 export function applyRecord(res: any, record: ChangeRecord) {
@@ -32,7 +32,7 @@ export function applyRecord(res: any, record: ChangeRecord) {
   else if (record.type === 'remove') res.remove(record.key)
 }
 
-// Project a log into a $() ViewProxy: replay what's already there, then apply
+//! Project a log into a $() ViewProxy: replay what's already there, then apply
 // each future append. Pure read-side projection (log → view, one direction).
 export function view(log: Log): any {
   const data = $({})
@@ -44,7 +44,7 @@ export function view(log: Log): any {
 
 export type DistributeOpts = TransportOpts
 
-// A distributed log+view on an L0 mesh. Local appends (log.append) replicate to
+//! A distributed log+view on an L0 mesh. Local appends (log.append) replicate to
 // peers; inbound records append to the local log (→ the view projects them). The
 // `inbound` guard makes replication one-hop: a record we received is not
 // re-broadcast (no echo storm).
@@ -62,7 +62,7 @@ export function distribute(opts: DistributeOpts): { data: any; log: Log; mesh: M
     },
   })
 
-  // Local appends fan out to peers; inbound ones don't (guard breaks the loop).
+  //! Local appends fan out to peers; inbound ones don't (guard breaks the loop).
   theLog.onAppend((record) => {
     if (!inbound) mesh.broadcast(record)
   })

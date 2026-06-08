@@ -1,3 +1,4 @@
+//! The peer pool: ONE reactive proxy of truth (membership/status) + derived projections; sockets in a side Map.
 // The peer pool. The headline L0 rethink: fero-old kept SIX imperative arrays
 // (connected/disconnected/connecting/throttled/client/all) rebuilt on every
 // status transition (peers.js:17, peer.js:99,114). Here there is ONE source of
@@ -16,6 +17,7 @@ import { Peer, STATUS, type HeartbeatOpts } from './peer.ts'
 import type { Frame, ChangeRecord } from './message.ts'
 import type { RetryOpts } from './retries.ts'
 
+//! Pool config: own identity (me/uuid for self-reject), retry/heartbeat tuning, and the frame/connect/gone callbacks.
 export type PeersOpts = {
   me?: string // own address ("host:port") — rejected if added (no self-connect)
   uuid?: string // own stable identity — rejects a self-connect reached via an ALTERNATE address (uuid self-reject)
@@ -26,32 +28,36 @@ export type PeersOpts = {
   onPeerGone?: (peer: Peer) => void // fired when a peer transitions TO disconnected (socket close / destroy) — drives subscription reaping
 }
 
+//! A dialable peer address + role — the minimum to register/dial or wrap an accepted socket.
 export type PeerInfo = { host: string; port: number; role?: 'server' | 'client' }
 
+//! What the handshake teaches us about an accepted inbound peer (subset of Identity — stays decoupled from join).
 // What the handshake teaches us about an accepted inbound peer (a structural subset
 // of handshake.ts's Identity — Peers stays decoupled from the join protocol).
 export type PeerIdentity = { uuid: string; role?: 'server' | 'client'; listen?: string }
 
 export class Peers {
-  // cluster.peers — the reactive membership/status view, keyed by address.
+  //! cluster.peers — the reactive membership/status view, keyed by address.
   readonly peers: any = $({})
-  // Derived projections — incrementally maintained by `data`, no manual lists.
+  //! Derived projections — incrementally maintained by `data`, no manual lists.
   readonly connected: any = this.peers.filter((p: any) => p.status === STATUS.connected)
 
-  #conns = new Map<string, Peer>() // address → socket machinery
-  #blocked = new Set<string>() // addresses isolated by the chaos seam — refuse to (re)dial until healed
+  #conns = new Map<string, Peer>() //! address → socket machinery
+  #blocked = new Set<string>() //! addresses isolated by the chaos seam — refuse to (re)dial until healed
+  //! #published: a peer owns a cluster.peers row iff published — dialed peers + identified inbound clients only.
   // A peer OWNS a cluster.peers row iff it's published: every dialed peer, plus an inbound
   // CLIENT once the handshake identifies it. An inbound SERVER socket is instead a receive/
   // serve SHADOW (re-keyed to its listen address for stable onSubscribe/reap keys) whose
   // membership identity is the dialed row — so a half-handshake inbound never leaks a phantom
   // row, and the ring only ever sees dialed server rows.
   #published = new WeakSet<Peer>()
+  //! #shadows: identified inbound server sockets keyed by listen address — send fallback + teardown, never ringed.
   // Identified inbound server sockets, keyed by listen address. Two jobs: (1) a SEND fallback in
   // peer() so an inbound-only link (no successful dial back) is still reachable point-to-point; the
   // dialed peer to that address WINS when present. (2) the teardown set. NOT in #conns (so broadcast
   // — dialed-only — never double-sends) and never published (so the ring sees only dialed rows).
   #shadows = new Map<string, Peer>()
-  #selfAddrs = new Set<string>() // OUR own alternate addresses, learned by uuid at handshake — never (re)dial them
+  #selfAddrs = new Set<string>() //! OUR own alternate addresses, learned by uuid at handshake — never (re)dial them
   #me?: string
   #uuid?: string
   #retries?: RetryOpts
@@ -70,6 +76,7 @@ export class Peers {
     this.#onPeerGone = opts.onPeerGone
   }
 
+  //! Register & dial a server peer (from discovery/handshake); idempotent, with self/self-alt/isolated guards.
   // Register a server peer we should dial (from discovery/handshake) and dial it.
   // Idempotent: a re-announced address is a no-op (set semantics give dedup free).
   add({ host, port, role = 'server' }: PeerInfo): Peer | undefined {
@@ -86,6 +93,7 @@ export class Peers {
     return peer
   }
 
+  //! Wrap an inbound accepted socket as a connected peer (never redialed); owns no row until identify().
   // Wrap an inbound accepted socket as a connected peer (won't be redialed). It owns NO
   // cluster.peers row yet — an accepted socket is keyed by an undialable ephemeral port and
   // its role is unknown until the handshake. identify() (on handshake DONE) publishes a
@@ -95,6 +103,7 @@ export class Peers {
     return this.#make({ host, port, role, socket })
   }
 
+  //! Apply handshake identity: server inbound → re-keyed shadow, client inbound → published row, dial → uuid stamp.
   // Resolve an accepted inbound peer's real identity from the completed handshake (or stamp a
   // dialed peer's uuid). An inbound socket is accepted under an ephemeral port; the handshake
   // reveals uuid, role and (for a server) the listen address:
@@ -107,6 +116,7 @@ export class Peers {
   // prior ephemeral-client exclusion) — this just kills the phantom client row and gives the
   // sender a stable address. Connection-dedup to one socket + dead-row pruning stay open (IDEAS).
   identify(peer: Peer, id: PeerIdentity) {
+    //! Idempotency guard: skip an already-identified inbound peer so a replayed DONE can't re-key it twice.
     // Idempotent: a duplicate/replayed DONE (a retransmit, or a re-handshake triggered when a
     // suspect-flip re-fires #onConnect → re-initiate, or a buggy/hostile peer) must NOT re-key an
     // inbound peer twice. Once a shadow is re-keyed, peer.address === its listen address, and a
@@ -114,6 +124,7 @@ export class Peers {
     // that listen key (the real send target), stranding routing while the row still shows connected.
     // An already-identified inbound peer is in #shadows (server) or #published (client); skip it.
     if (this.#shadows.get(peer.address) === peer || (!peer.dialed && this.#published.has(peer))) return
+    //! Self-reject by uuid: a handshake carrying OUR uuid (alternate-address self) — prune, destroy, remember.
     // Self-reject by uuid: a dial to one of our OWN alternate addresses (multi-NIC, localhost vs
     // 127.0.0.1) — or a uuid collision — completes a handshake carrying OUR uuid. add()'s self-guard
     // is a host:port STRING compare, so it misses an alternate-address self; the uuid catches it.
@@ -126,11 +137,13 @@ export class Peers {
       return
     }
     peer.uuid = id.uuid
+    //! Dialed peer already owns a correctly-keyed row — just stamp its uuid.
     if (peer.dialed) {
       const row = this.peers[peer.address]
       if (row?.[VALUE]) row.uuid = id.uuid
       return
     }
+    //! No listen address ⇒ inbound CLIENT — publish a connected row under its ephemeral address.
     if (!id.listen) {
       peer.role = id.role ?? 'client'
       this.#published.add(peer)
@@ -138,6 +151,7 @@ export class Peers {
       return
     }
     if (id.listen === this.#me) return // self-addressed inbound: never re-key to `me` / stamp the self row (mirrors add()'s self-guard)
+    //! Inbound SERVER ⇒ re-key the ephemeral socket to its listen address as a shadow; the dialed peer owns the row.
     this.#conns.delete(peer.address) // drop the ephemeral key; the dialed peer owns `listen`
     peer.role = 'server'
     peer.address = id.listen
@@ -146,6 +160,7 @@ export class Peers {
     if (row?.[VALUE]) row.uuid = id.uuid
   }
 
+  //! Construct a Peer wired to the pool callbacks (status→#mirror, frame→onFrame, gone→#prune) and index it in #conns.
   #make(opts: PeerInfo & { socket?: any }): Peer {
     const peer = new Peer({
       ...opts,
@@ -159,6 +174,7 @@ export class Peers {
     return peer
   }
 
+  //! Drop a terminally-gone peer's #conns entry + row (identity-guarded so a shadow can't strand the live dial).
   // A peer is TERMINALLY gone (an inbound socket closed, or a dial gave up) — drop its bookkeeping
   // so a churned/departed peer doesn't leak a `disconnected` row forever. Guard the #conns delete on
   // identity: a server SHADOW's address is its LISTEN address, which is the DIALED peer's #conns key —
@@ -169,6 +185,7 @@ export class Peers {
     if (this.#published.delete(peer) && this.peers[peer.address]?.[VALUE]) this.peers[VIEW].res.remove([peer.address])
   }
 
+  //! Mirror a Peer's status/suspect into its row, writing only the changed field; fires onConnect/onPeerGone.
   // Reflect a Peer's connection state into the proxy. Both `status` and the
   // failure-detector `suspect` flag come through here; we write only the field
   // that actually changed (read the row snapshot first) so a suspect flip doesn't
@@ -192,6 +209,7 @@ export class Peers {
       if (peer.status === STATUS.connected && peer.dialed) this.#onConnect?.(peer)
       return
     }
+    //! Unpublished path: a disconnecting server shadow is the sole server-pair reap trigger — fire onPeerGone, drop it.
     // An unidentified inbound peer owns no row (nothing to mirror). An identified server SHADOW owns
     // no row either, but MUST still reap its served subscriptions on drop — keyed under the same
     // listen address onSubscribe saw (L2 opens a served sub only after a view commit, well after the
@@ -203,6 +221,7 @@ export class Peers {
     }
   }
 
+  //! Resolve an address to a send target — dialed peer wins, else its inbound shadow (point-to-point reachability).
   peer(address: string): Peer | undefined {
     // The dialed peer wins; an inbound-only server link (no dial back) is reachable via its shadow,
     // so point-to-point sends (deltaTo a served sub, forward, digest/catchup) still land. broadcast
@@ -210,12 +229,14 @@ export class Peers {
     return this.#conns.get(address) ?? this.#shadows.get(address)
   }
 
+  //! Fan-out primitives (owner-routing is the DHT's job): send to one address...
   // Fan-out helpers. Owner-routing (which peer) is the DHT's job (index.ts);
   // here we provide the primitives: one address, or every connected peer.
   sendTo(address: string, record: ChangeRecord) {
     this.#conns.get(address)?.send(record)
   }
 
+  //! ...or broadcast to every connected DIALED peer — outbound-only avoids double-delivery in a full mesh.
   // Send to every connected peer we DIALED (outbound). In a gossip-formed full
   // mesh every peer has exactly one outbound conn to every other, so this
   // delivers a record once per peer — avoiding the double-delivery that sending
@@ -225,7 +246,7 @@ export class Peers {
     for (const peer of this.#conns.values()) if (peer.dialed && peer.status === STATUS.connected) peer.send(record)
   }
 
-  // ── Fault injection (chaos harness): reversible link isolation ──────────────
+  //! ── Fault injection (chaos harness): reversible link isolation ──────────────
   // `drop` (transport) is terminal + one-directional; a faithful partition→heal
   // needs a REVERSIBLE cut. isolate(address) severs our dialed link to a peer AND
   // blocks any redial (direct retry or gossip-revival via handshake learn), so the
@@ -236,6 +257,7 @@ export class Peers {
   // them. Zero steady-state cost: the isolated peer leaves #conns, so broadcast /
   // sendTo skip it with no new check; #blocked is consulted only in the cold add()
   // dial path (empty Set ⇒ a no-op there in production).
+  //! isolate(): block redial + destroy the dialed link — a reversible cut (bidirectional when applied symmetrically).
   isolate(address: string) {
     this.#blocked.add(address)
     const peer = this.#conns.get(address)
@@ -245,7 +267,7 @@ export class Peers {
     }
   }
 
-  // Reverse isolate(): unblock and re-dial by listen address. The disconnected row
+  //! Reverse isolate(): unblock and re-dial by listen address. The disconnected row
   // still carries host/port, so reconnect → handshake → anti-entropy heals the
   // missed writes and the view re-admits the peer (a rejoin WITHOUT a restart).
   heal(address: string) {
@@ -255,6 +277,7 @@ export class Peers {
     if (row) this.add({ host: row.host, port: row.port, role: row.role ?? 'server' })
   }
 
+  //! Tear down every dialed conn AND every inbound server shadow (shadows aren't in #conns), then clear the maps.
   destroy() {
     for (const peer of this.#conns.values()) peer.destroy()
     for (const peer of this.#shadows.values()) peer.destroy() // re-keyed inbound server sockets (not in #conns)

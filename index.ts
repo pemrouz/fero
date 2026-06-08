@@ -1,3 +1,4 @@
+//! Package entry point: single import site for fero() + value + fileStorage (layers live under fero/internals).
 // The public entry point: `import { fero, value } from 'fero'`.
 //
 // The whole user-facing surface is one call — fero(name, opts) → { data,

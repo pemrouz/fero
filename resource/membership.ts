@@ -1,3 +1,4 @@
+//! View-synchronous membership: a Paxos-flavoured view-change state machine keeping ownership stable per view.
 // View-synchronous membership — the view-change state machine (Milestone V).
 //
 // Membership changes in lockstep: the cluster agrees on a sequence of numbered
@@ -31,8 +32,10 @@
 import { value as VALUE } from '../../data/index.ts'
 import { STATUS, type Mesh } from '../transport/index.ts' // L0 public seam — no reach into peer.ts/message.ts internals
 
+//! A numbered cluster view: a monotonic epoch + the set of member addresses ownership is computed from.
 export type View = { epoch: number; members: string[] }
 
+//! ViewManager construction options: identity, mesh seam, reachability source, timers, and L2 commit/writable hooks.
 export type ViewOpts = {
   me: string
   mesh: Mesh
@@ -45,8 +48,10 @@ export type ViewOpts = {
   onWritable?: (writable: boolean) => void // L2 hook: quorum reachability changed (the write-gate)
 }
 
+//! Equality of two already-sorted address lists (members compared in canonical order).
 const sortedEqual = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
 
+//! Drives the view-change ballot: coordinator proposes, members PREPARE/ACK, quorum commits a new view.
 export class ViewManager {
   epoch = 1
   members: string[]
@@ -61,6 +66,7 @@ export class ViewManager {
   #onCommit?: (v: View) => void
   #onWritable?: (w: boolean) => void
 
+  //! Ballot state: the highest (epoch, proposer) promised here, plus any proposal we're driving as coordinator.
   // Ballot state. `promised` is the highest (epoch, proposer) this node has
   // accepted a PREPARE for — it refuses to ack a different proposer at that epoch.
   #promisedEpoch = 0
@@ -72,6 +78,7 @@ export class ViewManager {
   #lastProposable = '' // debounce: the proposable set seen on the previous tick
   #unreachableSince = new Map<string, number>() // member → when it first went unreachable (eviction grace)
 
+  //! Boot as a solo view of self, install its ring, and start the coordinator tick.
   constructor(opts: ViewOpts) {
     this.#me = opts.me
     this.#mesh = opts.mesh
@@ -87,6 +94,7 @@ export class ViewManager {
     this.#tick.unref?.()
   }
 
+  //! Tear down: stop the tick and clear any in-flight ballot/promise timers.
   destroy() {
     if (this.#tick) clearInterval(this.#tick)
     if (this.#proposal?.timer) clearTimeout(this.#proposal.timer)
@@ -94,6 +102,7 @@ export class ViewManager {
     this.#proposal = undefined
   }
 
+  //! Reachable members = self + every dialed server peer that is connected and not suspect (V0's verdict).
   // Reachable cluster members: self + every dialed SERVER peer that is connected
   // and not suspect (the V0 failure detector's verdict). An inbound accepted server
   // socket folds into its dialed listen-address row (a receive shadow that owns no
@@ -109,12 +118,14 @@ export class ViewManager {
     return [...out]
   }
 
+  //! The coordinator is the lowest-address reachable node — everyone agrees, so no election is needed.
   #coordinator(reachable: string[]): string {
     let lo = reachable[0]
     for (const a of reachable) if (a < lo) lo = a
     return lo
   }
 
+  //! Coordinator tick: recompute the write-gate, then (if coordinator) propose admits/evicts once the set is stable.
   // Coordinator tick. The coordinator is the lowest-address REACHABLE node, so
   // when it dies the next-lowest takes over automatically (failover) — no separate
   // election. It proposes a view that ADMITS reachable non-members and EVICTS
@@ -132,7 +143,7 @@ export class ViewManager {
     if (this.#proposal) return // a ballot is already in flight
     const now = this.#now()
 
-    // Eviction-grace bookkeeping: track when each member first went unreachable.
+    //! Eviction-grace bookkeeping: track when each member first went unreachable.
     for (const m of this.members) {
       if (reachable.has(m)) this.#unreachableSince.delete(m)
       else if (!this.#unreachableSince.has(m)) this.#unreachableSince.set(m, now)
@@ -143,6 +154,7 @@ export class ViewManager {
       return // not the lowest reachable → not the coordinator
     }
 
+    //! Keep members that are reachable OR still within the eviction grace; drop expired; add new reachable servers.
     // Keep members that are reachable OR still within the eviction grace; drop
     // those unreachable past the grace; add newly-reachable servers.
     const kept = this.members.filter((m) => reachable.has(m) || now - (this.#unreachableSince.get(m) ?? now) < this.#evictAfter)
@@ -160,6 +172,7 @@ export class ViewManager {
   }
 
   #propose(members: string[]) {
+    //! Open a ballot at a fresh epoch, self-promise, PREPARE every member, and arm an abort-on-timeout.
     // Fresh ballot ABOVE anything we've committed, promised, or proposed — so a
     // retry or a failover proposal overrides a stuck promise left by a dead
     // proposer at the previous epoch (else same-epoch + different-proposer would
@@ -180,8 +193,9 @@ export class ViewManager {
     this.#tryCommit() // a single-new-member proposal may already be quorate via self
   }
 
-  // ── inbound view frames (wired to mesh.onViewPrepare/onViewAck/onViewCommit) ──
+  //! ── inbound view frames (wired to mesh.onViewPrepare/onViewAck/onViewCommit) ──
 
+  //! PREPARE handler: promise this ballot iff it's a higher epoch (or same epoch from the same proposer), then ACK.
   onPrepare(value: any) {
     const epoch = value?.epoch
     const members = value?.members
@@ -192,6 +206,7 @@ export class ViewManager {
     if (epoch === this.#promisedEpoch && proposer !== this.#promisedProposer) return // promised another proposer this epoch
     this.#promisedEpoch = epoch
     this.#promisedProposer = proposer
+    //! Arm a promise-release timer so a dead proposer's ballot can't block this epoch forever.
     // Release the promise if this ballot never commits — the proposer may have
     // died mid-2PC. Without this, we'd stay promised to a dead proposer and refuse
     // a new coordinator's ballot at this epoch forever. (A fresh higher ballot also
@@ -207,6 +222,7 @@ export class ViewManager {
     this.#mesh.viewAck(proposer, { epoch, proposer, member: this.#me })
   }
 
+  //! ACK handler: record a member's vote for our current ballot, then test for quorum.
   onAck(value: any) {
     const epoch = value?.epoch
     const proposer = value?.proposer
@@ -217,6 +233,7 @@ export class ViewManager {
     this.#tryCommit()
   }
 
+  //! Commit once acks form a majority of BOTH old and new views (joint consensus): broadcast COMMIT, then install.
   #tryCommit() {
     const p = this.#proposal
     if (!p) return
@@ -226,6 +243,7 @@ export class ViewManager {
     this.#install(p.epoch, p.members)
   }
 
+  //! COMMIT handler: adopt any newer view the coordinator decided.
   onCommit(value: any) {
     const epoch = value?.epoch
     const members = value?.members
@@ -234,11 +252,13 @@ export class ViewManager {
     this.#install(epoch, members)
   }
 
+  //! JOIN_REQUEST is a no-op in V1b (admission is reachability-driven); it becomes the rejoin path in V1f.
   onJoinRequest() {
     // V1b admits via reachability (the coordinator's tick), so an explicit
     // JOIN_REQUEST is a no-op here; it's the rejoin path in V1f.
   }
 
+  //! Adopt a committed view: clear ballot state, set epoch/members, rebuild the DHT ring, fire onCommit.
   #install(epoch: number, members: string[]) {
     if (this.#proposal?.timer) clearTimeout(this.#proposal.timer)
     if (this.#promiseTimer) clearTimeout(this.#promiseTimer)
@@ -254,12 +274,14 @@ export class ViewManager {
     this.#onCommit?.({ epoch: this.epoch, members: this.members })
   }
 
+  //! Strict majority: more than half of `set` appears in `acks`.
   #majority(set: string[], acks: Set<string>): boolean {
     let c = 0
     for (const m of set) if (acks.has(m)) c++
     return c * 2 > set.length
   }
 
+  //! Recompute the write-gate: writable iff I reach a majority of my view; a minority side must buffer, not commit.
   // Write-gate: can I reach a MAJORITY of my committed view? If not (a partition's
   // minority side, or a quorum-less remnant), writes must NOT commit — they buffer
   // until quorum returns — so two sides can't both accept writes and diverge. A

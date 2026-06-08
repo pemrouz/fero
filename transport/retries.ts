@@ -1,3 +1,4 @@
+//! Jittered, capped exponential backoff for server reconnection; next()→delay, reset() on success.
 // Jittered, capped exponential backoff for server reconnection. The one legacy
 // transport file (fero-old/retries.js) with no events and no JSON — a near
 // verbatim port, modernized to TS with the jitter source injectable so tests
@@ -8,6 +9,7 @@
 // `max` attempts, next() returns -1 — the caller destroys the peer (a client
 // that can't reach its server gives up; a server keeps its own policy).
 
+//! Tuning knobs: base/cap/max backoff plus jitter fraction and an injectable random for determinism.
 export type RetryOpts = {
   base?: number // first backoff, ms
   cap?: number // max backoff, ms (the plateau)
@@ -16,6 +18,7 @@ export type RetryOpts = {
   random?: () => number // injectable; defaults to Math.random
 }
 
+//! Stateful backoff counter: tracks attempt #, computes next delay, reports exhausted, resets on connect.
 export class Retries {
   #attempt = 0
   readonly base: number
@@ -40,6 +43,7 @@ export class Retries {
     return this.#attempt >= this.max
   }
 
+  //! Delay (ms) until the next retry, advancing the attempt counter; -1 once exhausted.
   // Delay (ms) until the next retry, advancing the attempt counter. Returns -1
   // once attempts are exhausted. base·2^n capped at `cap`, then ± jitter·backoff.
   next(): number {

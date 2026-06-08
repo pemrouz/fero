@@ -1,3 +1,4 @@
+//! L1 — per-partition append-only log of change records (durable history + replication source).
 // L1 — the per-partition append-only log of change records. A change record IS
 // a log entry (no translation), so the log is just ordered records segmented by
 // partition (top-level key). It is the durable history + the replication source:
@@ -39,6 +40,7 @@ import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 
 export { partitionOf }
 
+//! The (origin,partition) composite key for scoped mode — \0-separated, shared with L2 so digests agree.
 // The (origin,partition) composite key for scoped mode: origin is a uuid,
 // partition a top-level key — neither contains \0, the separator the resource's
 // versionKey also relies on. Shared with L2 so the digest a node sends and the
@@ -47,6 +49,7 @@ export const originKey = (origin: string, partition: string): string => origin +
 
 export type AppendListener = (record: ChangeRecord, partition: string, offset: number) => void
 
+//! Log construction opts — `scoped` fixes the provenance-index granularity (full vs finite-R holding).
 export type LogOpts = {
   // false (default): index by origin — full-replication anti-entropy (compact).
   // true: index by (origin,partition) — scoped-holding anti-entropy (Milestone P).
@@ -54,8 +57,8 @@ export type LogOpts = {
 }
 
 export class Log {
-  #segments = new Map<string, ChangeRecord[]>() // partition → ordered records
-  #index = new Map<string, ChangeRecord[]>() // provenance key (origin OR origin\0partition) → records, seq-ascending
+  #segments = new Map<string, ChangeRecord[]>() //! partition → ordered records
+  #index = new Map<string, ChangeRecord[]>() //! provenance key (origin OR origin\0partition) → records, seq-ascending
   #listeners = new Set<AppendListener>()
   #scoped: boolean
 
@@ -63,6 +66,7 @@ export class Log {
     this.#scoped = scoped
   }
 
+  //! The provenance-index key for a record: origin (full) or origin\0partition (scoped).
   // The provenance-index key for a record: origin (full) or origin\0partition
   // (scoped). Callers of marks()/recordsSince() build their vector with the same
   // granularity (full replication ⇒ per-origin; finite R ⇒ per-(origin,partition)).
@@ -70,6 +74,7 @@ export class Log {
     return this.#scoped ? originKey(record.origin!, partitionOf(record)) : record.origin!
   }
 
+  //! Append a record to its partition segment, thread it onto the provenance index, notify listeners; returns new head.
   // Append a record to its partition's segment; returns the partition's new head
   // (entry count). Notifies listeners synchronously. Records carrying provenance
   // are also threaded onto their seq-ordered provenance index (for recordsSince).
@@ -89,6 +94,7 @@ export class Log {
     return head
   }
 
+  //! Observe appends (the view + replicator subscribe here); returns an unsubscribe.
   // Observe appends. Returns an unsubscribe. (Internal plumbing, not a public
   // event — the view and the replicator subscribe here.)
   onAppend(fn: AppendListener): () => void {
@@ -96,11 +102,12 @@ export class Log {
     return () => this.#listeners.delete(fn)
   }
 
-  // Current head (entry count) of a partition.
+  //! Current head (entry count) of a partition.
   head(partition: string): number {
     return this.#segments.get(partition)?.length ?? 0
   }
 
+  //! The offset vector { partition → head } — a peer sends this, we reply with diff(theirHeads).
   // The offset vector: { partition → head } across all partitions. A peer sends
   // this; we reply with diff(theirHeads).
   heads(): Record<string, number> {
@@ -109,12 +116,13 @@ export class Log {
     return h
   }
 
-  // Records appended to `partition` at or after `offset` (the catch-up tail).
+  //! Records appended to `partition` at or after `offset` (the catch-up tail).
   since(partition: string, offset: number): ChangeRecord[] {
     const seg = this.#segments.get(partition)
     return seg ? seg.slice(offset) : []
   }
 
+  //! Full delta past the caller's per-partition offsets — partitions absent from `base` stream from 0.
   // Every record past the caller's per-partition offsets — the full delta to
   // bring a peer at `base` up to our head. Partitions the caller hasn't seen
   // (absent from base) stream from 0.
@@ -130,6 +138,7 @@ export class Log {
     return [...this.#segments.keys()]
   }
 
+  //! Shed a partition (segment + index entries) so it stops appearing in marks — scoped-only (P4).
   // Drop a partition entirely — its segment AND its provenance-index entries — when
   // a node SHEDS a partition it no longer replicates (Milestone P4). Scoped-only:
   // the index is keyed (origin,partition) so a partition's groups are removable; in
@@ -143,6 +152,7 @@ export class Log {
     for (const key of this.#index.keys()) if (key.endsWith(suffix)) this.#index.delete(key)
   }
 
+  //! This log's high-water marks { provenance-key → highest seq } — the digest a node sends for anti-entropy.
   // This log's high-water marks: { provenance-key → highest seq held }. The digest
   // a node sends a peer so the peer can compute what to ship back. Per-origin in
   // full mode, per-(origin,partition) in scoped mode (then naturally bounded to the
@@ -153,6 +163,7 @@ export class Log {
     return v
   }
 
+  //! Anti-entropy delta: every record whose seq exceeds the peer's mark (binary-search slice per index group).
   // The anti-entropy delta: every record whose seq exceeds the peer's high-water
   // for its provenance key. Keys the peer has never seen (absent from `vector`)
   // ship in full — so a partition acquired on rebalance re-syncs from the start.
@@ -176,11 +187,13 @@ export class Log {
       }
       for (let i = lo; i < recs.length; i++) out.push(recs[i])
     }
+    //! Scoped mode: re-sort by (origin,seq) so an origin's cross-partition records coalesce into the fewest frames.
     if (this.#scoped)
       out.sort((a, b) => (a.origin! < b.origin! ? -1 : a.origin! > b.origin! ? 1 : (a.seq ?? 0) - (b.seq ?? 0)))
     return out
   }
 
+  //! Total record count across every partition segment.
   get size(): number {
     let n = 0
     for (const seg of this.#segments.values()) n += seg.length

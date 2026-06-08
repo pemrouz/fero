@@ -1,3 +1,4 @@
+//! Consistent hashring: route a key to its owning peer + R-1 clockwise replicas — pure, zero-byte.
 // Consistent hashring: map a partition key to its owning peer, and the next
 // R-1 distinct peers clockwise for replication. A pure in-memory routing
 // function — emits no bytes.
@@ -14,8 +15,9 @@
 // Consumes the committed-view membership via installView (transport/index.ts) —
 // the ring changes only on a view commit, never on raw connect/disconnect.
 
-const VNODES = 200 // virtual nodes per peer — smooth distribution, ≈1/N move on churn
+const VNODES = 200 //! virtual nodes per peer — smooth distribution, ≈1/N move on churn
 
+//! djb2 hash + fmix32 finalizer — the avalanche step is required so a peer's vnodes don't cluster.
 // djb2 accumulation (seed 5381) + an fmix32 avalanche finalizer. The finalizer
 // is NOT optional: plain djb2 has poor diffusion on the trailing characters, so
 // an address's vnodes (`addr*0`…`addr*9`, differing only in the last char) hash
@@ -34,12 +36,14 @@ export const hash32 = (s: string): number => {
   return h >>> 0
 }
 
+//! Tunables: vnode count, injectable hash fn, and replication factor.
 export type DHTOpts = {
   vnodes?: number
   hash?: (s: string) => number
   replicas?: number
 }
 
+//! The ring: member set + two parallel sorted arrays (#hashes/#owners), rebuilt lazily on change.
 export class DHT {
   #vnodes: number
   #hash: (s: string) => number
@@ -79,7 +83,7 @@ export class DHT {
     return this.#members.size
   }
 
-  // Rebuild the sorted arrays from the member set. O(M log M); the cold path —
+  //! Rebuild the sorted arrays from the member set. O(M log M); the cold path —
   // membership change is rare relative to lookups.
   #rebuild() {
     const pairs: Array<[number, string]> = []
@@ -96,7 +100,7 @@ export class DHT {
     this.#dirty = false
   }
 
-  // First ring slot whose hash >= h, wrapping to 0 (clockwise-with-wraparound).
+  //! First ring slot whose hash >= h, wrapping to 0 (clockwise-with-wraparound).
   #search(h: number): number {
     const a = this.#hashes
     let lo = 0
@@ -109,17 +113,17 @@ export class DHT {
     return lo === a.length ? 0 : lo
   }
 
-  // The peer that owns `key` (the partition — typically a change record's key[0]).
+  //! The peer that owns `key` (the partition — typically a change record's key[0]).
   owner(key: string): string | undefined {
     if (this.#dirty) this.#rebuild()
     if (this.#hashes.length === 0) return undefined
-    // Sole member owns every key — skip the hash + binary search (the common
+    //! Sole member owns every key — skip the hash + binary search (the common
     // single-node case, and the per-write owner check on a solo server's hot path).
     if (this.#members.size === 1) return this.#owners[0]
     return this.#owners[this.#search(this.#hash(key))]
   }
 
-  // The owner + the next distinct peers clockwise, for R-way replication.
+  //! The owner + the next distinct peers clockwise, for R-way replication.
   owners(key: string, replicas = this.#replicas): string[] {
     if (this.#dirty) this.#rebuild()
     const n = this.#hashes.length

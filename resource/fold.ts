@@ -1,3 +1,4 @@
+//! resource/fold.ts — the distributed-aggregate registry (AGG) + per-instance fold ENGINE (makeFold).
 // resource/fold.ts — the distributed-aggregate registry + fold engine (Milestone Q2/Q3).
 //
 // Two parts. (1) The `AGG` registry: the "two halves of a decomposable aggregate" for every
@@ -20,6 +21,7 @@ import { type ChangeRecord } from '../transport/message.ts'
 import { type Mesh } from '../transport/index.ts'
 import { lazyHandle, FOLD_ONCE, FOLD_HANDLES, forWire } from './handle.ts'
 
+//! `Rule`: associative+commutative COMBINE folding N owner-scoped partials → the global answer.
 // Combine rules for distributed aggregates (Milestone Q2): how N owner-scoped
 // partials fold into the global answer. Each is associative + commutative so the
 // fold is order-independent across holders.
@@ -28,6 +30,7 @@ import { lazyHandle, FOLD_ONCE, FOLD_HANDLES, forWire } from './handle.ts'
 //               holder publishes undefined, and Math.max(undefined,x) is NaN), so
 //               all-undefined ⇒ undefined (matches data's own empty-set semantics).
 export type Rule = (values: unknown[]) => unknown
+//! `AggSpec`/`FoldSpec`: the serializable {op,col,val} spec that crosses the wire (never a closure).
 // The SERIALIZABLE aggregate spec that crosses the wire (never a closure): an op plus an optional
 // column/value. `FoldSpec` adds the `fold:true` flag a CLIENT sets so a server coordinator folds the
 // global rather than returning its own partial. Both narrow from the `unknown`/`any` a method arg
@@ -35,6 +38,7 @@ export type Rule = (values: unknown[]) => unknown
 // is a type, not three scattered prose notes.
 export type AggSpec = { op: string; col?: unknown; val?: unknown }
 export type FoldSpec = AggSpec & { fold?: true }
+//! sumRule: Σ partials with `?? 0` (absent=identity), NOT `|| 0` — so a NaN-poisoned shard propagates.
 // `?? 0` (null/undefined → identity), NOT `|| 0`: the only legitimate identity is an
 // ABSENT partial (undefined seed / a holder owning nothing). `|| 0` would ALSO swallow
 // a NaN partial — and data's SumValue (+v) poisons a holder's whole owner-scoped sum to
@@ -43,6 +47,7 @@ export type FoldSpec = AggSpec & { fold?: true }
 // propagates to the global, matching single-node. (count partials are always finite, so
 // this only affects sum's garbage-in case.)
 const sumRule: Rule = (vs) => vs.reduce((a: number, b) => a + (b == null ? 0 : (b as number)), 0)
+//! extremum (max/min): fold the DEFINED partials only, skipping undefined ⇒ all-undefined ⇒ undefined.
 // NOTE (garbage-in, documented): a non-numeric / NaN column value makes max/min
 // ORDER-DEPENDENT (the comparator does no coercion and NaN comparisons are always
 // false) — a known edge that resolves once the write path validates/coerces numerics;
@@ -54,6 +59,7 @@ const extremum =
     for (const v of vs) if (v !== undefined && (m === undefined || better(v as number, m))) m = v as number
     return m
   }
+//! avgRule: fold {sum,count} PAIRS, divide LAST (Σsum/Σcount) — exact, unlike average-of-averages.
 // avg folds the per-holder {sum, count} PAIRS and divides LAST (Σsum/Σcount) — exact,
 // unlike average-of-averages. Empty (Σcount === 0) ⇒ undefined, matching data's AvgValue.
 const avgRule: Rule = (vs) => {
@@ -67,19 +73,20 @@ const avgRule: Rule = (vs) => {
   for (const v of vs) if (v != null) { s += (v as any).sum ?? 0; c += (v as any).count ?? 0 }
   return c === 0 ? undefined : s / c
 }
-// some = OR: any holder with a match ⇒ Σ(match counts) > 0. Empty ⇒ 0 ⇒ false.
+//! some = OR: any holder with a match ⇒ Σ(match counts) > 0. Empty ⇒ 0 ⇒ false.
 const someRule: Rule = (vs) => {
   let s = 0
   for (const v of vs) if (v != null) s += (v as number) || 0
   return s > 0
 }
-// every = AND: all rows match ⇒ Σmatch === Σtotal across holders. Empty ⇒ 0===0 ⇒ true.
+//! every = AND: all rows match ⇒ Σmatch === Σtotal across holders. Empty ⇒ 0===0 ⇒ true.
 const everyRule: Rule = (vs) => {
   let m = 0
   let t = 0
   for (const v of vs) if (v != null) { m += (v as any).match || 0; t += (v as any).total || 0 }
   return m === t
 }
+//! unionRule (rows): Object.assign each holder's owner-scoped row-set by key — disjoint cover, idempotent.
 // rows = UNION (Milestone Q3): fold each holder's owner-scoped row-set OBJECT into the whole
 // resource. Object.assign by key — owner-scoping makes the keysets disjoint (no collision), and
 // even under transient ring disagreement (two holders briefly claiming a key) the merge is
@@ -89,7 +96,7 @@ const everyRule: Rule = (vs) => {
 // snapshot/stream holistic operators (sort/distinct/group/reduce) compute over locally.
 const unionRule: Rule = (vs) => Object.assign({}, ...vs.filter((o) => o != null && typeof o === 'object'))
 
-// ── Distributed aggregate registry (Milestone Q2/Q3) ──
+//! ── Distributed aggregate registry (Milestone Q2/Q3) ──
 // One entry per op pairs its owner-scoped PARTIAL builder with the associative COMBINE that
 // folds partials into the global answer — the two halves of a decomposable aggregate,
 // co-located so adding/changing an op is ONE edit. `combine` is stateless + module-level (a
@@ -129,13 +136,14 @@ export const AGG: Record<string, { partial: (c: PartialCtx) => any; combine: Rul
   rows: { partial: ({ owned }) => owned, combine: unionRule },
 }
 
-// ── The per-instance fold ENGINE (Milestone Q2b/Q2c/Q3) ──
+//! ── The per-instance fold ENGINE (Milestone Q2b/Q2c/Q3) ──
 // Built once per fero() node. The shared state it closes over is passed BY REFERENCE so the
 // composer's view-commit / anti-entropy loops and `destroy` stay coherent with what the engine
 // mutates (aggregateRebinds/aggregateReconciles/clientSubs). `invoke` is the in-process method
 // dispatcher (it runs the local `aggregate` method = buildPartial); it lives in the composer and
 // does NOT depend on this engine, so injecting it keeps construction linear (fold built before the
 // dispatch surface that consumes its entry points).
+//! `FoldDeps`: the fero() node's shared state the engine closes over BY REFERENCE + the injected `invoke`.
 export type FoldDeps = {
   data: any // the RAW $({}) source-of-truth proxy — ownedView filters it (never the dataFacade, which would recurse into remote handles)
   mesh: Mesh // L0 routing/membership: owner / viewMembers / subscribe / call
@@ -146,6 +154,7 @@ export type FoldDeps = {
   clientSubs: Set<() => void> // teardown callbacks drained by destroy (a fold handle's gatherLive close lands here)
 }
 
+//! `makeFold`: build the engine — local/global × one-shot/live, all owner-scoped so the union dedups.
 export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateReconciles, clientSubs }: FoldDeps) => {
   // The engine's functions split on two axes — LOCAL (this node's owned shard) vs GLOBAL gather
   // (fold across holders), and ONE-SHOT (await) vs LIVE (subscription):
@@ -159,8 +168,10 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
   // ONE owner, so scoping each holder's partial to the partitions it OWNS makes the union a DISJOINT
   // cover — every row counted once regardless of R. Filters the RAW `data` proxy; `data`'s filter
   // passes the key to its predicate, and ownership exactly partitions the keyspace.
+  //! ownedView: filter the RAW proxy to the keys THIS node owns — the disjoint per-shard scope.
   const ownedView = () => (data as any).filter((_v: unknown, k: string) => mesh.owner(k) === me)
 
+  //! composite: mirror two O(1) sub-views onto one object proxy (avg/every), aggRetain pinning them.
   // A COMPOSITE partial (avg's {sum,count}, every's {match,total}) mirrors two O(1) aggregate
   // sub-views onto one object ViewProxy. (1) A `data` ViewProxy is `typeof === 'function'`, so it
   // can't be a connect ANCHOR — we mirror via a plain anchor + assignment into `out`; (2) data's
@@ -180,6 +191,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
     return out
   }
 
+  //! buildPartial: this node's owner-scoped partial for a spec, dispatched through the AGG registry.
   // This node's owner-scoped PARTIAL for a serializable spec ({op,col,val}). Dispatches into the
   // AGG registry (above): each op pairs its owner-scoped PARTIAL builder with the associative
   // COMBINE. Owner-scoped over the RAW proxy via ownedView — so the union across holders is a
@@ -190,6 +202,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
     return entry.partial({ owned: ownedView(), col: spec?.col, val: spec?.val, composite })
   }
 
+  //! livePartial: stream the owner-scoped partial, re-scoping (via a GENERATION guard) on each commit.
   // A LIVE owner-scoped partial (Q2c): streams buildPartial(spec)'s value to `onValue` (initial +
   // every delta) and RE-SCOPES itself on a view commit (ownership re-evaluated over the new ring).
   // data's filter won't re-run its predicate on an ownership move under a stable row, and its prior
@@ -205,7 +218,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
     const build = () => {
       const myGen = ++gen
       proxy = buildPartial(spec)
-      // Emit the whole partial SNAPSHOT (not c.value): an OBJECT partial (avg/every) emits per-KEY
+      //! Emit the whole partial SNAPSHOT (not c.value): an OBJECT partial (avg/every) emits per-KEY
       // change records whose c.value is one field — only the snapshot carries the full {…}.
       host = proxy.connect({}, () => {
         if (gen === myGen) onValue(forWire(proxy))
@@ -224,6 +237,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
     }
   }
 
+  //! gatherOnce: local partial in-process + a call to every OTHER view member, folded once via `rule`.
   // One-shot distributed GATHER: the local owner-scoped partial in-process (self is not a wire
   // target — mesh.call(...,me) can't route to self) + a call to every OTHER view member, folded
   // once through the associative `rule`. A connected-but-unresponsive holder folds as the identity
@@ -237,6 +251,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
     return rule([local, ...remotes])
   }
 
+  //! gatherLive: a result proxy refolded on every partial delta — local livePartial + per-holder subs.
   // A LIVE fold: a result proxy whose root is refolded on every partial delta, with close() to tear
   // it down. The querier's OWN shard is an in-process livePartial (re-scopes on the querier's own
   // commit); remote holders are subscriptions in `subs`, each re-scoping its OWN served partial and
@@ -251,6 +266,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
     const recombine = () => applyRecord(liveRes, { type: 'update', key: [], value: rule([...partials.values()]) })
     let localPartial: { close: () => void } | undefined
     const subs = new Map<string, () => void>() // member → unsubscribe (only the ones actually subscribed)
+    //! reconcileMembers: drop departed holders, subscribe new ones, retry the admit race — never re-sub a stable holder.
     const reconcileMembers = () => {
       const members = new Set(mesh.viewMembers())
       for (const [m, unsub] of subs) if (!members.has(m)) { unsub(); subs.delete(m) } // departed → close the subscription
@@ -277,6 +293,7 @@ export const makeFold = ({ data, mesh, me, invoke, aggregateRebinds, aggregateRe
     return { proxy: live, close }
   }
 
+  //! foldAggregate: the lazy fold handle — await ⇒ gatherOnce, real access ⇒ gatherLive; FOLD_ONCE/FOLD_HANDLES wired for forWire().
   // The querying-side FOLD HANDLE (mirrors makeHandle): a lazyHandle that is a thenable (await ⇒
   // gatherOnce one-shot) AND a live ViewProxy (real access ⇒ open()s gatherLive and delegates). Exposes
   // the FOLD_ONCE resolver via extraGet (runs BEFORE lazyHandle's symbol-reject) so forWire() can

@@ -1,3 +1,4 @@
+//! Neutral L2 leaf: lazy remote-handle skeleton + wire-form reducer, shared by dispatch & fold (breaks the import cycle).
 // resource/handle.ts — the lazy remote-handle skeleton + the wire-form reducer (L2 leaf).
 //
 // The pieces fero's read/aggregate surfaces share but that hold NO per-instance state, so
@@ -10,9 +11,10 @@
 
 import { value as VALUE, view as VIEWSYM } from '../../data/index.ts'
 
-// noop target for the callable client-handle Proxy (mirrors data's ViewProxy).
+//! noop target for the callable client-handle Proxy (mirrors data's ViewProxy).
 const noop = () => {}
 
+//! lazyHandle: the Proxy(noop) both handles share — a thenable (one-shot resolve) AND a live ViewProxy (opens on first real access).
 // The shared skeleton for fero's two lazy remote handles — makeHandle (read / RPC) and
 // foldAggregate (distributed-aggregate / gather). Both are a `Proxy(noop)` that is BOTH a
 // thenable (`then` ⇒ a one-shot resolve — the ONLY access that does not open the live thing)
@@ -31,7 +33,7 @@ export const lazyHandle = (opts: {
 }): any => {
   let delegate: any // the live proxy, created (and the subscription/fold opened) on first real access
   return new Proxy(noop, {
-    // GUARD ORDER IS LOAD-BEARING — two Q3b defects came from reordering this. Keep 1→5:
+    //! GUARD ORDER IS LOAD-BEARING — two Q3b defects came from reordering this. Keep 1→5:
     get(_t, prop) {
       // 1 · extraGet FIRST — a caller's own symbol (foldAggregate's FOLD_ONCE) must resolve here,
       //     BEFORE step 3 would swallow it as an unknown symbol.
@@ -55,9 +57,10 @@ export const lazyHandle = (opts: {
   })
 }
 
-// Resolver tag on a foldAggregate/gather handle: `handle[FOLD_ONCE]` yields a `() => Promise<global>`
+//! Resolver tag on a foldAggregate/gather handle: `handle[FOLD_ONCE]` yields a `() => Promise<global>`
 // that resolves a ONE-SHOT gather WITHOUT opening the handle's live fold.
 export const FOLD_ONCE = Symbol('fero.gatherOnce')
+//! FOLD_HANDLES: identity WeakSet of live fold/gather handles — forWire probes it (no symbol read) to gatherOnce-resolve them.
 // Identity set of live fold/gather handles (foldAggregate's Proxies). Closed loop: SOLE writer is
 // foldAggregate (fold.ts); SOLE reader is forWire() (below). forWire() membership-checks this — a
 // side-effect-free WeakSet probe — to decide whether to resolve a returned handle via gatherOnce. We
@@ -65,11 +68,12 @@ export const FOLD_ONCE = Symbol('fero.gatherOnce')
 // ViewProxy throws "Cannot convert a Symbol value to a string" (Q3b review M2 fix).
 export const FOLD_HANDLES = new WeakSet<object>()
 
-// A `data` ViewProxy carries the view symbol; a plain value does not.
+//! A `data` ViewProxy carries the view symbol; a plain value does not.
 export function isViewProxy(v: unknown): boolean {
   return v != null && (typeof v === 'object' || typeof v === 'function') && (v as any)[VIEWSYM] !== undefined
 }
 
+//! forWire: collapse a method's return for the wire — fold handle → gatherOnce global, ViewProxy → [value] (unconditional), else passthrough.
 // Reduce a method's return value for the wire: a ViewProxy collapses to its
 // snapshot (its [value]); everything else passes through. Lets `await read()`
 // return a plain object across the network while a local server can hand back
@@ -80,6 +84,7 @@ export function isViewProxy(v: unknown): boolean {
 // an empty-holder partial crossed the wire as a serialized proxy and NaN-poisoned
 // the extremum fold; the read() path never hit it (its root is always an object).
 export function forWire(v: unknown): unknown {
+  //! Fold-handle branch: membership-check FOLD_HANDLES (not a symbol probe), resolve its one-shot global — never open the live fold.
   // A fold/gather HANDLE (foldAggregate) resolves its ONE-SHOT global via gatherOnce — detected by a
   // side-effect-free FOLD_HANDLES membership check (NOT by probing the FOLD_ONCE symbol on every
   // value: an unknown symbol read off a `data` ViewProxy throws "Cannot convert a Symbol to a

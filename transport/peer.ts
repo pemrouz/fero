@@ -1,3 +1,4 @@
+//! One peer: TCP socket lifecycle + a small connection state machine, zero events (injected callbacks).
 // One peer: the TCP socket lifecycle + a small connection state machine. NOT
 // framing (message.ts), NOT handshake (handshake.ts), NOT RPC dispatch (L2).
 // The legacy 461-line god-class (fero-old/peer.js) is decomposed to this.
@@ -16,6 +17,7 @@ import net from 'node:net'
 import { Framer, encodeFrame, encodeFrames, VERB, FrameError, type ChangeRecord, type Frame } from './message.ts'
 import { Retries, type RetryOpts } from './retries.ts'
 
+//! Heartbeat constants: app-level PING/PONG failure detector, since TCP close never fires on a half-open peer.
 // Failure detector. TCP `close` does NOT fire for a hard-crashed or
 // silently-partitioned peer, so a half-open connection looks alive forever. An
 // application-level heartbeat fixes that: every `interval` ms we send a PING; the
@@ -29,6 +31,7 @@ const PONG_FRAME = encodeFrame([], { verb: VERB.PONG })
 const HEARTBEAT_MS = 1000 // default probe interval
 const HEARTBEAT_MISSES = 3 // unanswered probes before flagging suspect
 
+//! Connection-state enum (orthogonal to `role`); the data path routes only on status===connected.
 export const STATUS = {
   disconnected: 0,
   connecting: 1,
@@ -39,6 +42,7 @@ export type Status = (typeof STATUS)[keyof typeof STATUS]
 
 export type HeartbeatOpts = { interval?: number; misses?: number }
 
+//! Peer construction opts: dial target + role + retry/heartbeat tuning + the injected lifecycle callbacks.
 export type PeerOpts = {
   host: string
   port: number
@@ -51,6 +55,7 @@ export type PeerOpts = {
   onGone?: (peer: Peer) => void // TERMINAL departure: an inbound socket closed (no redial) or a dial gave up (retries exhausted) — drives row pruning
 }
 
+//! The Peer: one socket, an outbox coalesced per microtask, a heartbeat, and reconnect/backoff state.
 export class Peer {
   readonly host: string
   readonly port: number
@@ -81,6 +86,7 @@ export class Peer {
   #hbInterval: number
   #hbMisses: number
 
+  //! Wire opts to fields; an injected (inbound) socket is attached already-connected and never redialed.
   constructor(opts: PeerOpts) {
     this.host = opts.host
     this.port = opts.port
@@ -96,18 +102,19 @@ export class Peer {
     if (opts.socket) this.#attach(opts.socket, true) // inbound — already connected
   }
 
-  // Likely-dead-but-socket-still-open (the failure detector's verdict). Distinct
+  //! Likely-dead-but-socket-still-open (the failure detector's verdict). Distinct
   // from `status`; the view layer treats this — not status — as "unreachable".
   get suspect() {
     return this.#suspect
   }
 
-  // Was this peer dialed by us (outbound) vs accepted (inbound)? The dialer is
+  //! Was this peer dialed by us (outbound) vs accepted (inbound)? The dialer is
   // the side that initiates the handshake.
   get dialed() {
     return this.#dialed
   }
 
+  //! Can a control frame be written RIGHT NOW? Callers that record subscribe-success gate on this, not status.
   // Can a control frame be written RIGHT NOW (socket exists and is writable)? A peer
   // row can exist while its socket is still connecting (status 'connecting') — write()
   // would silently drop the frame (it doesn't queue control frames). Callers that need a
@@ -119,19 +126,21 @@ export class Peer {
     return this.#socket?.writable ?? false
   }
 
+  //! Set status and mirror the change upward via onStatus — but only on an actual transition.
   #setStatus(s: Status) {
     if (this.status === s) return
     this.status = s
     this.#onStatus?.(this)
   }
 
+  //! Set suspect, mirroring upward on the same onStatus channel (peers.ts reflects both axes).
   #setSuspect(s: boolean) {
     if (this.#suspect === s) return
     this.#suspect = s
     this.#onStatus?.(this) // mirror upward (same channel as status; peers.ts reflects both)
   }
 
-  // Write a prebuilt frame immediately (control frames: handshake INIT/SYNC/DONE,
+  //! Write a prebuilt frame immediately (control frames: handshake INIT/SYNC/DONE,
   // acks). Data change records go via send()/the batched outbox instead.
   write(buf: Buffer): boolean {
     const s = this.#socket
@@ -139,7 +148,7 @@ export class Peer {
     return s.write(buf)
   }
 
-  // Outbound dial. Idempotent while a socket exists.
+  //! Outbound dial. Idempotent while a socket exists.
   connect() {
     if (this.#destroyed || this.#socket) return
     this.#setStatus(STATUS.connecting)
@@ -153,6 +162,7 @@ export class Peer {
     this.#attach(socket, false)
   }
 
+  //! Bind socket options + data/error/close listeners; swallow 'error' since 'close' always cleans up.
   #attach(socket: net.Socket, ready: boolean) {
     socket.setNoDelay(true)
     socket.setKeepAlive(true, this.#hbInterval) // OS-level backstop under the app heartbeat
@@ -166,6 +176,7 @@ export class Peer {
     }
   }
 
+  //! Decode inbound frames: bad framing → drop the peer; every frame is proof of life (clears suspect).
   #onData(chunk: Buffer) {
     let frames: Frame[]
     try {
@@ -178,6 +189,7 @@ export class Peer {
       // Any inbound frame is proof of life: reset the miss counter and clear suspicion.
       this.#missed = 0
       if (this.#suspect) this.#setSuspect(false)
+      //! PING/PONG are pure liveness traffic — answer PING, swallow PONG, never deliver upward.
       if (f.verb === VERB.PING) {
         this.write(PONG_FRAME) // liveness probe → answer it
         continue
@@ -186,6 +198,7 @@ export class Peer {
       try {
         this.#onFrame?.(f, this)
       } catch (e) {
+        //! Lazy-parse FrameError → drop the peer (like a framing fault); any other throw is a real bug, rethrow.
         // A malformed/hostile frame body surfaces as a FrameError only when the
         // consumer LAZILY parses it (count/length overrun, reserved vtype) — drop
         // the peer, mirroring the framer's structural-fault handling above. Any
@@ -199,6 +212,7 @@ export class Peer {
     }
   }
 
+  //! Socket closed: dialed peers reconnect with backoff; inbound peers are terminal → onGone prunes the row.
   #onClose() {
     this.#socket = undefined
     this.#stopHeartbeat()
@@ -208,6 +222,7 @@ export class Peer {
     else this.#onGone?.(this) // inbound socket closed and won't redial → terminal, prune its row
   }
 
+  //! Backoff-then-redial; a negative delay means retries exhausted → terminal, prune and destroy.
   #scheduleReconnect() {
     const delay = this.#retries.next()
     if (delay < 0) {
@@ -222,6 +237,7 @@ export class Peer {
     this.#reconnect.unref?.()
   }
 
+  //! Start the per-interval probe loop (unref'd so it never holds the process open).
   // Failure detector. One probe per interval; the peer's PONG (or any inbound
   // frame) resets the miss counter via #onData. After #hbMisses unanswered probes
   // we flag suspect — but keep probing, so a peer that recovers clears it.
@@ -232,6 +248,7 @@ export class Peer {
     this.#heartbeat.unref?.()
   }
 
+  //! Stop probing and clear suspicion (socket gone or destroyed).
   #stopHeartbeat() {
     if (this.#heartbeat) {
       clearInterval(this.#heartbeat)
@@ -241,6 +258,7 @@ export class Peer {
     this.#setSuspect(false)
   }
 
+  //! One probe: flag suspect once misses pile up, then increment and send PING.
   #beat() {
     if (!this.#socket?.writable) return
     if (this.#missed >= this.#hbMisses) this.#setSuspect(true) // probes went unanswered → likely dead
@@ -248,18 +266,20 @@ export class Peer {
     this.write(PING_FRAME)
   }
 
-  // Queue a change record for delivery; coalesced into one frame per microtask.
+  //! Queue a change record for delivery; coalesced into one frame per microtask.
   send(record: ChangeRecord) {
     this.#outbox.push(record)
     this.#schedule()
   }
 
+  //! Arm a single microtask flush (the per-tick coalescing point).
   #schedule() {
     if (this.#flushing) return
     this.#flushing = true
     queueMicrotask(() => this.flush())
   }
 
+  //! One write per tick via encodeFrames; not connected → records stay queued and flush on connect.
   // One write per tick. Own writes (one origin, contiguous seqs) coalesce into a
   // single frame; a relayed batch spanning origins splits into the fewest frames
   // that keep each frame's base+index provenance valid (encodeFrames). If not
@@ -275,6 +295,7 @@ export class Peer {
     for (const buf of encodeFrames(outbox)) socket.write(buf)
   }
 
+  //! Terminal teardown: cancel reconnect/heartbeat, kill the socket, mark disconnected (idempotent).
   destroy() {
     if (this.#destroyed) return
     this.#destroyed = true
