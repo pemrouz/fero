@@ -1,6 +1,6 @@
 // Join protocol INIT→SYNC→DONE (≤3 msgs): v1 exchanges identity + gossips server addrs into a full mesh
 
-import { controlFrame, VERB, type Frame } from './message.ts'
+import { controlFrame, VERB, FrameError, type Frame } from './message.ts'
 import type { Peer } from './peer.ts'
 
 // What a node advertises about itself: uuid, role, listen address, and the server addrs it knows
@@ -52,5 +52,20 @@ export function handle(frame: Frame, peer: Peer, hooks: HandshakeHooks): boolean
   }
 }
 
-// Pull the Identity carried as the frame's change-record value; fall back to a minimal client id if absent
-const identityOf = (frame: Frame): Identity => (frame.value as Identity) ?? { uuid: '', role: 'client', peers: [] }
+// Pull + VALIDATE the Identity carried as the frame's value: null/absent degrades to a minimal client id; a wrong-typed shape is a wire fault (FrameError → peer drop), never a TypeError.
+const identityOf = (frame: Frame): Identity => {
+  const v = frame.value as Record<string, unknown> | null | undefined
+  if (v == null) return { uuid: '', role: 'client', peers: [] }
+  if (
+    typeof v !== 'object' ||
+    Array.isArray(v) ||
+    typeof v.uuid !== 'string' ||
+    (v.role !== 'server' && v.role !== 'client') ||
+    (v.listen !== undefined && typeof v.listen !== 'string')
+  )
+    throw new FrameError('malformed handshake identity')
+  const peers = v.peers === undefined ? [] : v.peers
+  if (!Array.isArray(peers)) throw new FrameError('malformed handshake identity (peers is not a list)')
+  for (const p of peers) if (typeof p !== 'string') throw new FrameError('malformed handshake identity (non-string peer address)')
+  return { uuid: v.uuid, role: v.role, listen: v.listen as string | undefined, peers: peers as string[] }
+}

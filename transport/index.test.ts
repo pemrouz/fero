@@ -139,6 +139,38 @@ test('view-change frames route to their own hook, never to onRecord (Milestone V
   }
 })
 
+test('a hostile INIT identity (peers:[42]) drops the peer, never crashes the process', async () => {
+  // Regression for the one-frame remote kill: a structurally-VALID frame whose identity
+  // JSON carries wrong types used to TypeError inside learn() (addServer calls
+  // address.lastIndexOf on each gossiped peer address), unwind through the socket 'data'
+  // handler, and take the whole process down. identityOf now validates → FrameError → drop.
+  const p1 = await ports.free()
+  let records = 0
+  const mB = transport({ name: 'idseam', host: '127.0.0.1', port: p1, ports: [p1], wait: 200, onRecord: () => records++ })
+  await mB.ready
+  const sock = connect(p1, '127.0.0.1')
+  sock.on('error', () => {}) // the server resets us — expected
+  let closed = false
+  sock.on('close', () => (closed = true))
+  try {
+    await new Promise<void>((res, rej) => { sock.once('connect', () => res()); sock.once('error', rej) })
+    const hostile = { uuid: 'evil', role: 'server', listen: '127.0.0.1:1', peers: [42] }
+    sock.write(encodeFrame([{ type: 'update', key: [], value: hostile }], { verb: VERB.INIT }))
+    // the hostile peer must be DROPPED: the server closes its socket
+    assert.ok(await until(() => closed, 4000), 'the hostile socket was closed by the server')
+    // ...and the mesh survived: a fresh, well-behaved socket still replicates
+    const sock2 = connect(p1, '127.0.0.1')
+    sock2.on('error', () => {})
+    await new Promise<void>((res, rej) => { sock2.once('connect', () => res()); sock2.once('error', rej) })
+    sock2.write(encodeFrame([{ type: 'update', key: ['x'], value: 1 }]))
+    assert.ok(await until(() => records === 1, 4000), 'the mesh still accepts well-formed traffic after the attack')
+    sock2.destroy()
+  } finally {
+    sock.destroy()
+    mB.destroy()
+  }
+})
+
 test('an unrecognized verb is dropped (fail closed), never mis-applied as a record', async () => {
   // Regression: RECORDS is now a NAMED switch case and the dispatch default FAILS CLOSED. A
   // structurally-valid frame carrying an UNKNOWN verb must be DROPPED — not fall into the data path,

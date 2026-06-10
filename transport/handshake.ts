@@ -9,7 +9,7 @@
 // `{type:'update', key:[], value: Identity}` — through the same message.ts codec
 // the data path uses, just under a different frame verb. No second serializer.
 
-import { controlFrame, VERB, type Frame } from './message.ts'
+import { controlFrame, VERB, FrameError, type Frame } from './message.ts'
 import type { Peer } from './peer.ts'
 
 //! What a node advertises about itself: uuid, role, listen address, and the server addrs it knows
@@ -63,5 +63,27 @@ export function handle(frame: Frame, peer: Peer, hooks: HandshakeHooks): boolean
   }
 }
 
-//! Pull the Identity carried as the frame's change-record value; fall back to a minimal client id if absent
-const identityOf = (frame: Frame): Identity => (frame.value as Identity) ?? { uuid: '', role: 'client', peers: [] }
+//! Pull + VALIDATE the Identity carried as the frame's value: null/absent degrades to a minimal client id; a wrong-typed shape is a wire fault (FrameError → peer drop), never a TypeError.
+// The fields cross a trust boundary: downstream consumers call STRING methods on them
+// (addServer → address.lastIndexOf, identify → uuid comparisons), so a structurally-valid
+// frame whose JSON carries wrong types (`peers: [42]`, `listen: {}`) would otherwise throw
+// a TypeError that unwinds through the socket 'data' handler and crashes the PROCESS — a
+// one-frame remote kill. Wrong-typed identity is hostile-or-corrupt by definition: classify
+// it exactly like the R-hardening classifies malformed bytes — FrameError, drop the peer.
+// (Unknown EXTRA fields still pass, so a newer-version peer remains compatible.)
+const identityOf = (frame: Frame): Identity => {
+  const v = frame.value as Record<string, unknown> | null | undefined
+  if (v == null) return { uuid: '', role: 'client', peers: [] } // absent → minimal client id (legacy/anonymous dialer)
+  if (
+    typeof v !== 'object' ||
+    Array.isArray(v) ||
+    typeof v.uuid !== 'string' ||
+    (v.role !== 'server' && v.role !== 'client') ||
+    (v.listen !== undefined && typeof v.listen !== 'string')
+  )
+    throw new FrameError('malformed handshake identity')
+  const peers = v.peers === undefined ? [] : v.peers
+  if (!Array.isArray(peers)) throw new FrameError('malformed handshake identity (peers is not a list)')
+  for (const p of peers) if (typeof p !== 'string') throw new FrameError('malformed handshake identity (non-string peer address)')
+  return { uuid: v.uuid, role: v.role, listen: v.listen as string | undefined, peers: peers as string[] }
+}

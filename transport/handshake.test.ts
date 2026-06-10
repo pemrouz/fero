@@ -9,7 +9,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { initiate, handle, type Identity, type HandshakeHooks } from './handshake.ts'
-import { encodeFrame, decodeFrame, Framer, VERB } from './message.ts'
+import { encodeFrame, decodeFrame, Framer, VERB, FrameError } from './message.ts'
 import type { Peer } from './peer.ts'
 
 // A mock peer that just records the frames written to it (handshake only ever calls
@@ -106,21 +106,45 @@ test('a control frame straddled across TCP segments reassembles and routes', () 
   }
 })
 
-test('a malformed identity payload degrades gracefully (no crash, protocol still advances)', () => {
-  // identityOf falls back to a default for a null/absent value; a non-object value
-  // (a hostile/garbage payload) must not crash handle(), and a realistic learn() that
-  // reaches into id.listen / id.peers must be null-safe on it.
-  const transportLikeLearn = (id: Identity) => {
-    if (id.listen) void id.listen // would dial
-    for (const a of id.peers ?? []) void a // would gossip
+test('an ABSENT identity payload degrades gracefully (minimal client id, protocol still advances)', () => {
+  // null/absent is the one legitimate degenerate case (an anonymous/legacy dialer):
+  // identityOf falls back to { uuid:'', role:'client', peers:[] } and the exchange proceeds.
+  const { peer, last } = mockPeer()
+  const { hooks, learned } = spyHooks()
+  assert.doesNotThrow(() => {
+    assert.equal(handle(recv(VERB.INIT, null), peer, hooks), true)
+    assert.equal(last().verb, VERB.SYNC, 'still answers SYNC')
+  })
+  assert.deepEqual(learned, [{ uuid: '', role: 'client', peers: [] }])
+})
+
+test('a WRONG-TYPED identity payload is a wire fault: FrameError (→ peer drop), never a TypeError', () => {
+  // The identity fields cross a trust boundary — downstream consumers call string methods
+  // on them (addServer → address.lastIndexOf), so a structurally-valid frame whose JSON
+  // carries wrong types would TypeError through the socket handler and crash the PROCESS.
+  // Validation classifies it like malformed bytes (DECISIONS R): typed FrameError, drop.
+  const hostile = [
+    'garbage', // non-object
+    42,
+    [], // an array is not an identity
+    { role: 'server' }, // missing uuid
+    { uuid: 42, role: 'server' }, // non-string uuid
+    { uuid: 'u', role: 'admin' }, // unknown role
+    { uuid: 'u', role: 'server', listen: {} }, // non-string listen
+    { uuid: 'u', role: 'server', peers: 42 }, // peers not a list
+    { uuid: 'u', role: 'server', peers: [42] }, // non-string peer address — the one-frame remote kill
+    { uuid: 'u', role: 'server', peers: ['ok', null] },
+  ]
+  for (const bad of hostile) {
+    const { peer } = mockPeer()
+    const { hooks, learned } = spyHooks()
+    assert.throws(() => handle(recv(VERB.INIT, bad), peer, hooks), FrameError, `payload ${JSON.stringify(bad)} must throw FrameError`)
+    assert.equal(learned.length, 0, 'nothing was learned from a hostile identity')
   }
-  for (const bad of [null, 'garbage', 42, [], { role: 'server' } /* missing peers */]) {
-    const { peer, last } = mockPeer()
-    const { hooks } = spyHooks({ learn: transportLikeLearn })
-    assert.doesNotThrow(() => {
-      const consumed = handle(recv(VERB.INIT, bad), peer, hooks)
-      assert.equal(consumed, true)
-      assert.equal(last().verb, VERB.SYNC, 'still answers SYNC despite the bad payload')
-    }, `payload ${JSON.stringify(bad)}`)
-  }
+  // unknown EXTRA fields still pass — a newer-version peer remains compatible
+  const { peer, last } = mockPeer()
+  const { hooks, learned } = spyHooks()
+  assert.equal(handle(recv(VERB.INIT, { uuid: 'u', role: 'server', peers: ['h:1'], version: 9, extra: true }), peer, hooks), true)
+  assert.equal(last().verb, VERB.SYNC)
+  assert.equal(learned[0].uuid, 'u')
 })
