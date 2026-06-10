@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { $, value, view } from '../../data/index.ts'
-import { encodeFrame, decodeFrame, Framer, FrameError, VERB, type ChangeRecord } from './message.ts'
+import { encodeFrame, encodeFrames, decodeFrame, Framer, FrameError, VERB, type ChangeRecord } from './message.ts'
 
 // decode a single-frame buffer to plain records (via RecordView getters)
 const recordsOf = (buf: Buffer) => decodeFrame(buf).records().map((r) => r.toJSON())
@@ -377,4 +377,81 @@ test('apply contract: decoded records reconstruct source state in $()', () => {
   }
   assert.deepEqual(b[value], a[value])
   assert.deepEqual(b[value], { user42: { name: 'P', active: false }, events: [{ id: 1 }] })
+})
+
+// ── review hardening: truncated-varint loudness, unserializable values, frame-size bounds ──
+
+test('a truncated provenance varint throws FrameError, never silently decodes garbage seq/epoch', () => {
+  // baseSeq/epoch had no following bounds use, so a frame cut mid-varint silently produced a
+  // wrong seq (dedup corruption). Build a prov frame, then truncate THROUGH the epoch varint:
+  // bodyLen must stay consistent so the framer yields the frame and the prov scan does the cut.
+  const buf = encodeFrame([{ type: 'update', key: ['k'], value: 1 }], { origin: 'O', seq: 300, epoch: 70000 })
+  // find how many bytes the prov ext occupies: origin(1len+1) + baseSeq(2) + epoch(3) — cut inside it
+  for (let cut = 1; cut <= 3; cut++) {
+    const short = Buffer.from(buf.subarray(0, buf.length - (buf.length - 7 - 2 - 2 - cut))) // keep header+origin+partial varints
+    short.writeUInt32LE(short.length - 7, 3) // re-stamp bodyLen so the framer accepts the truncated body
+    short[short.length - 1] |= 0x80 // force a continuation bit on the LAST byte → varint runs off the end
+    const f = decodeFrame(short)
+    assert.throws(() => f.origin, FrameError, `cut ${cut}: truncated provenance must be loud`)
+  }
+})
+
+test('a truncated VT.int value throws FrameError like str/obj, never a silent wrong value', () => {
+  const buf = encodeFrame([{ type: 'update', key: ['k'], value: 1000000 }]) // multi-byte int varint
+  const records = decodeFrame(buf).records()
+  const whole = records[0].toJSON()
+  assert.equal(whole.value, 1000000) // sanity: intact decodes fine
+  // rebuild the frame with the record's LAST value byte chopped + recLen shrunk accordingly:
+  // simplest robust approach — flip the continuation bit on the final byte so the varint
+  // claims more bytes than the record holds
+  const corrupt = Buffer.from(buf)
+  corrupt[corrupt.length - 1] |= 0x80
+  const r = decodeFrame(corrupt).records()[0]
+  assert.throws(() => r.value, FrameError, 'truncated int value must be loud')
+})
+
+test('encodeFrames skips an unserializable record LOUDLY; the rest of the batch still ships', () => {
+  const big = { huge: 1n } as any // JSON.stringify throws on BigInt
+  const batch: ChangeRecord[] = [
+    { type: 'update', key: ['a'], value: 1, origin: 'O', seq: 1, epoch: 1 },
+    { type: 'update', key: ['poison'], value: big, origin: 'O', seq: 2, epoch: 1 },
+    { type: 'update', key: ['c'], value: 3, origin: 'O', seq: 3, epoch: 1 },
+  ]
+  const errors: string[] = []
+  const orig = console.error
+  console.error = (msg: string) => errors.push(String(msg))
+  let frames: Buffer[]
+  try {
+    frames = encodeFrames(batch)
+  } finally {
+    console.error = orig
+  }
+  // the two healthy records shipped (as single-record frames after the fallback), in order
+  const out = frames!.flatMap((b) => decodeFrame(b).records().map((r) => r.toJSON()))
+  assert.deepEqual(out.map((r) => r.key[0]), ['a', 'c'], 'healthy records still ship in order')
+  assert.deepEqual(out.map((r) => r.seq), [1, 3], 'each kept its own provenance (single-record frames)')
+  assert.equal(errors.length, 1, 'the poison was reported exactly once')
+  assert.ok(errors[0].includes('poison'), 'the report names the key')
+})
+
+test('encodeFrames caps a contiguous run at MAX_RUN records (no giant single frame)', () => {
+  const n = 10000 // > the 8192 run cap
+  const batch: ChangeRecord[] = Array.from({ length: n }, (_, i) => ({ type: 'update' as const, key: ['k' + i], value: i, origin: 'O', seq: i + 1, epoch: 1 }))
+  const frames = encodeFrames(batch)
+  assert.equal(frames.length, 2, 'one contiguous run splits at the cap')
+  const all = frames.flatMap((b) => decodeFrame(b).records().map((r) => r.toJSON()))
+  assert.equal(all.length, n, 'every record shipped')
+  assert.equal(all[0].seq, 1)
+  assert.equal(all[n - 1].seq, n, 'base+index provenance holds across the split')
+})
+
+test('encodeFrame fails loudly on a >MAX_FRAME body (encoder-side mirror of the receiver bound)', () => {
+  // one record whose value alone exceeds 256MiB would be rejected by every receiver and loop
+  // a reconnect; the encoder now throws a clear local error instead. Use a sparse giant string.
+  const giant = 'x'.repeat(257 * 1024 * 1024)
+  assert.throws(
+    () => encodeFrame([{ type: 'update', key: ['k'], value: giant }]),
+    /exceeds MAX_FRAME/,
+    'a clear encoder-side error, not a receiver-side peer drop',
+  )
 })

@@ -332,7 +332,13 @@ export function transport(opts: TransportOpts): Mesh {
     },
     // deltaTo: server → client — ship one subscription delta as a RECORDS frame tagged with its sub id.
     deltaTo(address, subId, record) {
-      pool.peer(address)?.write(encodeFrame([record], { verb: VERB.RECORDS, id: subId }))
+      const peer = pool.peer(address)
+      if (!peer) return
+      try {
+        peer.write(encodeFrame([record], { verb: VERB.RECORDS, id: subId }))
+      } catch (e) {
+        console.error(`fero/transport: dropping unserializable subscription delta (key=${JSON.stringify(record.key)}): ${(e as Error)?.message ?? e}`)
+      }
     },
     // drop: abruptly kill a peer's socket (no teardown frames) — fault injection that drives the onPeerGone reap path.
     drop(address) {
