@@ -30,6 +30,7 @@ export class Peers {
 
   #conns = new Map<string, Peer>() // address → socket machinery
   #blocked = new Set<string>() // addresses isolated by the chaos seam — refuse to (re)dial until healed
+  #closing = false // pool teardown in progress — destroy() bulk-clears the maps; per-peer prunes stay quiet
   // #published: a peer owns a cluster.peers row iff published — dialed peers + identified inbound clients only.
   #published = new WeakSet<Peer>()
   // #shadows: identified inbound server sockets keyed by listen address — send fallback + teardown, never ringed.
@@ -125,7 +126,9 @@ export class Peers {
 
   // Drop a terminally-gone peer's #conns entry + row (identity-guarded so a shadow can't strand the live dial).
   #prune(peer: Peer) {
+    if (this.#closing) return
     if (this.#conns.get(peer.address) === peer) this.#conns.delete(peer.address)
+    if (this.#blocked.has(peer.address)) return
     if (this.#published.delete(peer) && this.peers[peer.address]?.[VALUE]) this.peers[VIEW].res.remove([peer.address])
   }
 
@@ -185,6 +188,7 @@ export class Peers {
 
   // Tear down every dialed conn AND every inbound server shadow (shadows aren't in #conns), then clear the maps.
   destroy() {
+    this.#closing = true
     for (const peer of this.#conns.values()) peer.destroy()
     for (const peer of this.#shadows.values()) peer.destroy()
     this.#conns.clear()

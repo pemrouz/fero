@@ -125,3 +125,59 @@ test('heartbeat election: identify() makes the lower-uuid side originate and the
   hi.destroy()
   anon.destroy()
 })
+
+test('a destroy()ed dialed peer is pruned — no corpse blocking redial, no leaked row', async () => {
+  // Regression: destroy() (framing fault / FrameError / mesh.drop / self-reject) never fired
+  // onGone, and the socket 'close' that follows early-returns on the destroyed latch — so the
+  // dead Peer stayed in #conns forever: add() deduped against the corpse (permanently blocking
+  // any redial), peer() resolved to it (occluding a live shadow), its row leaked disconnected.
+  const srv = await serve()
+  const pool = new Peers({ retries: { max: 0 } })
+  const addr = `127.0.0.1:${srv.port}`
+  const p1 = pool.add({ host: '127.0.0.1', port: srv.port })!
+  assert.ok(await until(() => p1.status === STATUS.connected))
+
+  p1.destroy() // the framing-fault / drop() path — NOT a natural close
+  assert.ok(await until(() => pool.peers[value]?.[addr] === undefined), 'the row is pruned, not leaked')
+  assert.equal(pool.peer(addr), undefined, 'the corpse left #conns')
+
+  const p2 = pool.add({ host: '127.0.0.1', port: srv.port })!
+  assert.notEqual(p2, p1, 'a re-add dials a FRESH peer (the corpse no longer dedups it)')
+  assert.ok(await until(() => p2.status === STATUS.connected), 'and it connects')
+
+  pool.destroy()
+  await srv.close()
+})
+
+test('an isolated link KEEPS its row through the destroy — heal() can still re-dial it', async () => {
+  // isolate() destroys the dialed peer (which now prunes) but the chaos seam's contract is
+  // reversibility: the disconnected row must survive so heal() can read host/port off it.
+  const srv = await serve()
+  const pool = new Peers({ retries: { max: 0 } })
+  const addr = `127.0.0.1:${srv.port}`
+  const p1 = pool.add({ host: '127.0.0.1', port: srv.port })!
+  assert.ok(await until(() => p1.status === STATUS.connected))
+
+  pool.isolate(addr)
+  await sleep(20)
+  assert.ok(pool.peers[value]?.[addr], 'the isolated row survives (disconnected)')
+  assert.equal(pool.peers[addr].status[value], STATUS.disconnected)
+
+  pool.heal(addr)
+  assert.ok(await until(() => pool.peers[addr]?.status?.[value] === STATUS.connected, 4000), 'heal re-dialed off the surviving row')
+
+  pool.destroy()
+  await srv.close()
+})
+
+test('an unidentified inbound peer destroyed mid-handshake leaves no #conns corpse', async () => {
+  // An accepted socket destroyed before identify() (e.g. a hostile INIT → FrameError) owned no
+  // row, but its #conns entry (keyed by the undialable ephemeral address) leaked forever.
+  const pool = new Peers({ retries: { max: 0 } })
+  const fake = new net.Socket() // never connected — enough to exercise accept+destroy bookkeeping
+  const peer = pool.accept(fake, { host: '10.0.0.9', port: 54321 })
+  assert.equal(pool.peer('10.0.0.9:54321'), peer, 'accepted peer is indexed')
+  peer.destroy()
+  assert.ok(await until(() => pool.peer('10.0.0.9:54321') === undefined, 2000), 'the ephemeral #conns entry is pruned')
+  pool.destroy()
+})
