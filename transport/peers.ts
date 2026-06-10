@@ -44,6 +44,7 @@ export class Peers {
 
   #conns = new Map<string, Peer>() //! address → socket machinery
   #blocked = new Set<string>() //! addresses isolated by the chaos seam — refuse to (re)dial until healed
+  #closing = false //! pool teardown in progress — destroy() bulk-clears the maps; per-peer prunes stay quiet
   //! #published: a peer owns a cluster.peers row iff published — dialed peers + identified inbound clients only.
   // A peer OWNS a cluster.peers row iff it's published: every dialed peer, plus an inbound
   // CLIENT once the handshake identifies it. An inbound SERVER socket is instead a receive/
@@ -181,13 +182,20 @@ export class Peers {
   }
 
   //! Drop a terminally-gone peer's #conns entry + row (identity-guarded so a shadow can't strand the live dial).
-  // A peer is TERMINALLY gone (an inbound socket closed, or a dial gave up) — drop its bookkeeping
-  // so a churned/departed peer doesn't leak a `disconnected` row forever. Guard the #conns delete on
-  // identity: a server SHADOW's address is its LISTEN address, which is the DIALED peer's #conns key —
-  // deleting it would strand the live dial. (A shadow owns no row + isn't in #conns under that key, so
-  // #prune is a safe no-op for it; #mirror already drops it from #shadows on its own disconnect.)
+  // A peer is TERMINALLY gone (an inbound socket closed, a dial gave up, or it was destroy()ed —
+  // framing fault / hostile frame / mesh.drop / self-reject) — drop its bookkeeping so a churned/
+  // departed peer doesn't leak a `disconnected` row forever, and so the dead Peer can't sit in
+  // #conns as a CORPSE that dedups every future add() (permanently blocking redial) while its
+  // outbox grows. Guard the #conns delete on identity: a server SHADOW's address is its LISTEN
+  // address, which is the DIALED peer's #conns key — deleting it would strand the live dial. (A
+  // shadow owns no row + isn't in #conns under that key, so #prune is a safe no-op for it;
+  // #mirror already drops it from #shadows on its own disconnect.)
   #prune(peer: Peer) {
+    if (this.#closing) return // pool teardown bulk-clears the maps — no per-peer row removes
     if (this.#conns.get(peer.address) === peer) this.#conns.delete(peer.address)
+    // an ISOLATED link keeps its (disconnected) row: heal() re-dials from the row's host/port —
+    // the chaos seam's reversibility contract (the fresh add() there re-publishes a fresh Peer)
+    if (this.#blocked.has(peer.address)) return
     if (this.#published.delete(peer) && this.peers[peer.address]?.[VALUE]) this.peers[VIEW].res.remove([peer.address])
   }
 
@@ -285,6 +293,7 @@ export class Peers {
 
   //! Tear down every dialed conn AND every inbound server shadow (shadows aren't in #conns), then clear the maps.
   destroy() {
+    this.#closing = true // per-peer destroy() now fires onGone → #prune; stay quiet, bulk-clear below
     for (const peer of this.#conns.values()) peer.destroy()
     for (const peer of this.#shadows.values()) peer.destroy() // re-keyed inbound server sockets (not in #conns)
     this.#conns.clear()

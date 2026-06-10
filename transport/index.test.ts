@@ -266,7 +266,8 @@ test('a one-directional drop of the DIALED socket does NOT reap subs served over
     mB.subscribe('read', undefined, () => {}, a1) // served over A's inbound shadow, keyed a2
     // drop ONLY A's dialed socket to B (peer() prefers the dialed peer); A's inbound shadow stays alive
     assert.ok(mA.drop(a2), 'dropped A→B dialed socket')
-    assert.ok(await until(() => mA.peers[a2]?.status?.[value] === STATUS.disconnected), 'A→B dialed row went disconnected')
+    // drop() is TERMINAL: the dialed peer is destroyed and its row PRUNED (no corpse/leaked row)
+    assert.ok(await until(() => mA.peers[a2]?.[value] === undefined), 'A→B dialed row was pruned (terminal departure)')
     await sleep(40) // give any (wrongly) deferred onPeerGone a chance to fire
     assert.equal(gone.includes(a2), false, `a dialed-only drop must NOT reap the shadow's live subs (gone=${JSON.stringify(gone)})`)
   } finally {

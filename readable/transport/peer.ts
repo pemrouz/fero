@@ -50,6 +50,7 @@ export class Peer {
   #retries: Retries
   #dialed: boolean
   #destroyed = false
+  #gone = false
   #reconnect?: ReturnType<typeof setTimeout>
   #onStatus?: (peer: Peer) => void
   #onFrame?: (frame: Frame, peer: Peer) => void
@@ -181,6 +182,13 @@ export class Peer {
     }
   }
 
+  // Fire the terminal-departure signal EXACTLY once, whatever path got us here (inbound close, dial give-up, destroy()).
+  #fireGone() {
+    if (this.#gone) return
+    this.#gone = true
+    this.#onGone?.(this)
+  }
+
   // Socket closed: dialed peers reconnect with backoff; inbound peers are terminal → onGone prunes the row.
   #onClose() {
     this.#socket = undefined
@@ -188,14 +196,14 @@ export class Peer {
     if (this.#destroyed) return
     this.#setStatus(STATUS.disconnected)
     if (this.#dialed) this.#scheduleReconnect()
-    else this.#onGone?.(this)
+    else this.#fireGone()
   }
 
   // Backoff-then-redial; a negative delay means retries exhausted → terminal, prune and destroy.
   #scheduleReconnect() {
     const delay = this.#retries.next()
     if (delay < 0) {
-      this.#onGone?.(this)
+      this.#fireGone()
       return this.destroy()
     }
     this.#setStatus(STATUS.throttled)
@@ -256,7 +264,7 @@ export class Peer {
     for (const buf of encodeFrames(outbox)) socket.write(buf)
   }
 
-  // Terminal teardown: cancel reconnect/heartbeat, kill the socket, mark disconnected (idempotent).
+  // Terminal teardown: cancel reconnect/heartbeat, kill the socket, mark disconnected, fire gone (idempotent).
   destroy() {
     if (this.#destroyed) return
     this.#destroyed = true
@@ -265,5 +273,6 @@ export class Peer {
     this.#socket?.destroy()
     this.#socket = undefined
     this.#setStatus(STATUS.disconnected)
+    this.#fireGone()
   }
 }
