@@ -356,9 +356,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   delete (config as any).storage // L2 config — not a transport option
   const viewOpts = (config.view as Record<string, unknown>) ?? {}
   delete (config as any).view // L2 view-change tuning — not a transport option
+  let storageUnsub: (() => void) | undefined
   if (storage) {
     for (const record of await storage.load()) applyInbound(record)
-    log.onAppend((record) => storage.append(record))
+    storageUnsub = log.onAppend((record) => storage.append(record))
   }
 
   //! mesh: the L0 transport, wired with all the inbound hooks (record/digest/RPC/subscribe/write/view).
@@ -594,7 +595,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // risks the re-entrancy the `applying` guard prevents, plan §7) — ../IDEAS.md "Assignment ↔
   // methods.update parity".
   let primed = false
+  // destroyed: latched by destroy() — data's FunctionSink has no public detach (it is pinned via
+  // the anchor's lifetime), so without this gate a write AFTER destroy would still commit: bump
+  // the Lamport clock, mutate seen/versions, append to the log, and fsync to the WAL — silently,
+  // on a torn-down node. One predictable boolean branch alongside primed/applying.
+  let destroyed = false
   const writeHost = data.connect({}, (change: ChangeRecord) => {
+    //! 0) destroyed-skip: the node is torn down — a late write must not commit/persist.
+    if (destroyed) return
+
     //! 1) prime: swallow the empty attach-snapshot.
     // 1) prime: swallow the empty attach-snapshot.
     if (!primed) {
@@ -935,6 +944,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     cluster,
     destroy() {
       void writeHost // retain the sink host until teardown
+      destroyed = true // gate the write-capture sink: a late `r.data.x = y` must not commit, bump the clock, or fsync to the WAL
+      storageUnsub?.() // detach the WAL append hook (a gated sink can't append, but other log writers — e.g. a stray applyInbound — must not persist either)
       if (aeTimer) clearInterval(aeTimer)
       if (compactTimer) clearInterval(compactTimer)
       viewMgr?.destroy()
