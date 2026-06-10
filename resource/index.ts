@@ -47,6 +47,8 @@ import { partitionOf, type ChangeRecord } from '../transport/message.ts'
 import { ViewManager } from './membership.ts'
 import { makeFold } from './fold.ts'
 import { makeDispatch } from './dispatch.ts'
+import { makeSnapshot, peerValue, type InspectSnapshot } from './inspect.ts'
+import { makeObserve, type Observe, type ObserveOpts } from './observe.ts'
 
 export { value } from '../../data/index.ts'
 export { fileStorage } from './storage.ts'
@@ -168,6 +170,25 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     config.compact === false ? 0 : typeof config.compact === 'number' ? (config.compact as number) : 30_000
   delete (config as any).compact
 
+  //! observe: opt-in L4 diagnostics — registers the wire-reachable __inspect pull method (off by default; trust boundary in ../IDEAS.md).
+  // The L4 observer seam (plan.md L4). When set, register the `__inspect` method so a
+  // remote observer can pull this node's InspectSnapshot over the wire. OFF by default:
+  // a configured node discloses its full internals to any peer that can reach the
+  // (unauthenticated) fero port, so observation is opt-in — the open trust-boundary
+  // refinement (loopback-only / `peer.auth`) is tracked in ../IDEAS.md. The in-process
+  // diagnostics seam ([diagnostics].snapshot) is ALWAYS available (holding the object
+  // reference is already full trust); only the WIRE path is gated. Extracted + deleted
+  // here so it never reaches the transport. (true | an options object ⇒ on.)
+  const observeOpt = config.observe
+  delete (config as any).observe
+  const observeOn = observeOpt === true || (typeof observeOpt === 'object' && observeOpt !== null)
+  //! observeVerbose: also stream dedup-drops (the highest-frequency, least-useful event) — OFF by default even when observe is on (plan §6).
+  const observeVerbose = typeof observeOpt === 'object' && observeOpt !== null && (observeOpt as ObserveOpts).verbose === true
+  //! snapshot: forward-declared so `defaults.__inspect` can close over it; assigned after dispatch (its servedCount dep) exists.
+  let snapshot: () => InspectSnapshot = () => {
+    throw new Error('fero: inspect snapshot not ready')
+  }
+
   //! ── 1 · replication core: state (proxy = truth, log = history) + provenance + dedup + LWW ──
   // ── 1 · replication core: state (proxy = truth, log = history) + provenance + dedup + LWW ──
   // State: the proxy is the source of truth; the log records history.
@@ -236,6 +257,31 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // sink commits it as-is instead of re-evaluating ownership, so it never bounces.
   let committingForward = false
 
+  //! observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
+  // The contention/provenance push channel (resource/observe.ts). Built LAZILY on the
+  // first subscribe and nulled on the last detach, so the emit-sites below are a single
+  // `observe?.…` predicted-false branch whenever nobody is watching — the steady-state
+  // write path is untouched (guarded in observe.perf.ts).
+  let observe: Observe | undefined
+  //! buildObserve: lazily construct + arm the push-hook for ONE subscriber; returns the proxy to stream + the close that disarms the gate on the last detach.
+  // The close is per-subscriber IDEMPOTENT (a `closed` latch) and captures the INSTANCE
+  // it attached to — a stale closer that fires after the gate was disarmed and re-armed
+  // must not decrement the NEW instance's refcount (it would disarm the gate under a
+  // live subscriber) nor null a gate it doesn't own.
+  const buildObserve = () => {
+    const inst = (observe ??= makeObserve(typeof observeOpt === 'object' && observeOpt !== null ? (observeOpt as ObserveOpts) : {}))
+    inst.attach()
+    let closed = false
+    return {
+      proxy: inst.proxy,
+      close: () => {
+        if (closed) return // double-close (graceful UNSUBSCRIBE + socket-close, or a user double-call) is a no-op
+        closed = true
+        if (inst.detach() && observe === inst) observe = undefined // last subscriber gone → disarm OUR instance only
+      },
+    }
+  }
+
   //! applyInbound: dedup → Lamport-merge → epoch-skip | log → LWW-resolve → apply winner; shared by replication + restore replay.
   // Accept a record into local state: dedup by per-origin high-water, Lamport-merge
   // the clock, SKIP a permanent epoch-loser (a key that already holds a higher-epoch
@@ -248,7 +294,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (origin !== undefined) {
       const sk = seenKey(origin, partitionOf(record))
       const n = record.seq ?? 0
-      if (n <= (seen.get(sk) ?? 0)) return // already have it (dedup, per seenKey granularity)
+      if (n <= (seen.get(sk) ?? 0)) {
+        if (observeVerbose) observe?.onRecord(record, 'dropped') // verbose-only: the re-delivery firehose stays OFF the steady path (default off even when observe is on)
+        return // already have it (dedup, per seenKey granularity)
+      }
       seen.set(sk, n) // dedup high-water — advances even for the epoch-loser SKIPPED below, so anti-entropy never re-fetches that dead record
       if (n > clock) clock = n // Lamport merge (global)
       const e = record.epoch ?? 0
@@ -263,7 +312,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       // each (origin,partition) stream arrives IN ORDER from its single owner, `seen`
       // advancing past a skipped seq still honestly means "every live value ≤ this seq is
       // present" (a live value below it was processed — and logged — earlier in the run).
-      if (cur && e < cur.epoch) return // epoch-fenced loser — NOT logged (unlike the same-epoch loser below)
+      if (cur && e < cur.epoch) {
+        observe?.onRecord(record, 'lost', { we: cur.epoch, ws: cur.seq }) // epoch-fenced loser — NOT logged (unlike the same-epoch loser below)
+        return
+      }
       log.append(record)
       //! LWW resolve, lexicographic (epoch, seq, origin): epoch fences stale views, seq then origin decide; a same-epoch loser stays logged.
       // LWW, lexicographic (epoch, seq, origin): a write committed under a NEWER
@@ -272,12 +324,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       // epoch) the Lamport seq decides; origin uuid breaks exact ties. Every node
       // elects the same winner. A SAME-epoch loser stays logged (per-origin history);
       // a strictly-lower-epoch loser was already skipped above (never logged).
-      if (cur && !(e > cur.epoch || (e === cur.epoch && (n > cur.seq || (n === cur.seq && origin > cur.origin))))) return
+      if (cur && !(e > cur.epoch || (e === cur.epoch && (n > cur.seq || (n === cur.seq && origin > cur.origin))))) {
+        observe?.onRecord(record, 'lost', { we: cur.epoch, ws: cur.seq }) // LWW LOSER — stays logged but never applied; carry the winner stamp so the surface shows WHY
+        return
+      }
       if (cur) {
         cur.epoch = e
         cur.seq = n
         cur.origin = origin
       } else versions.set(key, { epoch: e, seq: n, origin })
+      observe?.onRecord(record, 'won') // an inbound replicated record that WON LWW (applied just below)
     } else {
       log.append(record) // provenance-less (handshake / non-fero) — apply verbatim
     }
@@ -467,13 +523,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
           mesh,
           peers: mesh.peers,
           ...viewOpts,
-          onWritable: (w) => w && flushPending(),
+          onWritable: (w) => {
+            if (w) flushPending()
+            observe?.onWritable(w) // CHAINED: surface the write-gate flip on the provenance ticker (off the per-record path)
+          },
           onCommit: () => {
             heldCache.clear() // the ring changed — invalidate the holds() memo
             markOrphans() // ring rebalanced → note partitions we no longer replicate (shed once handed off)
             resync() // ...and re-sync the ones we now acquire
             for (const rescope of aggregateRebinds) rescope() // re-scope live owner-scoped partials over the new ring (Q2c)
             for (const reconcile of aggregateReconciles) reconcile() // add/drop fold holders for the new membership
+            observe?.onView(viewEpoch(), viewSize()) // CHAINED: surface the new committed view on the provenance ticker
           },
         })
       : undefined
@@ -692,6 +752,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       cur.origin = uuid
     } else versions.set(key, { epoch: e, seq: n, origin: uuid })
     log.append(change)
+    // A committed write under OUR provenance. Forwarded writes funnel through here too
+    // (commitForwarded → sink → commitLocal), so `committingForward` distinguishes a
+    // peer-routed write from a genuinely-local one — emitting at BOTH sites would
+    // double-count every forward. Both are LWW winners (we are the sequencer).
+    observe?.onRecord(change, committingForward ? 'forwarded' : 'local')
     //! replicate: scoped R<members ⇒ send to the R-set only (orphan-mark if we're not in it); else broadcast to all.
     // Replicate to peers: scoped mode with R < members ships only to the OTHER
     // replicas in this partition's R-set (we already applied + logged it); otherwise
@@ -801,6 +866,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     insert: (chg, c) => setPath(c.data, norm(chg?.at ?? chg?.key), chg?.value),
     remove: (chg, c) => delPath(c.data, norm(chg?.key)),
   }
+  //! __inspect: gated L4 pull method — returns this node's InspectSnapshot to a remote observer (registered only when observe is on).
+  // Recognized by exact name on the existing CALL path (no new wire verb): an observer's
+  // mesh.call('__inspect', …) routes here → serveCall → invoke → snapshot(). A user method
+  // of the same name still overrides it (the {...defaults, ...methods} merge below). When
+  // observe is off it's simply absent, so a remote __inspect call rejects (unknown method)
+  // — that absence IS the gate.
+  if (observeOn) defaults.__inspect = () => snapshot()
   const allMethods: Record<string, Method> = { ...defaults, ...methods }
 
   const context: Context = { data, cluster, log, name, methods: undefined as any, peer: undefined }
@@ -832,7 +904,28 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // (makeDispatch). Built LAST: it consumes the fold engine's entry points + `invoke` by reference
   // (linear, no forward-ref), sets context.methods, and returns the surfaces the composer wires below
   // (the mesh hooks route to dispatch.serve*; the return exposes dispatch.dataFacade/methodSurface).
-  const dispatch = makeDispatch({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold })
+  const dispatch = makeDispatch({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold, onObserve: observeOn ? buildObserve : undefined })
+
+  //! Build the L4 pull snapshot now that all replication state + dispatch.servedCount exist; exposed via [diagnostics] (always) + __inspect (gated).
+  // Assigned to the forward-declared `snapshot` (so defaults.__inspect's closure resolves
+  // it). A pure read closure — reads seen/versions/log/mesh BY REFERENCE, materializing the
+  // object only when called (per observe poll), so it adds nothing to the write/replicate
+  // hot path. Always built (a harmless unused closure when observe is off).
+  snapshot = makeSnapshot({
+    name,
+    cluster,
+    ringSnapshot: mesh.ringSnapshot,
+    peers: () => mesh.peers[peerValue],
+    log,
+    seen,
+    versions,
+    pending,
+    orphans,
+    servedCount: dispatch.servedCount,
+    observing: () => observe !== undefined,
+    R,
+    scoped,
+  })
 
   await mesh.ready
 
@@ -847,16 +940,39 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
+      observe = undefined // drop the push-hook gate + its ring-buffer proxy (any served observe sub is reaped via the mesh teardown above)
     },
-    //! [diagnostics]: Symbol-keyed internals seam (off the public API) — served-sub count + drop/isolate/heal fault injection.
+    //! [diagnostics]: Symbol-keyed internals seam (off the public API) — pull snapshot + served-sub count + drop/isolate/heal fault injection.
     // Internals seam (Symbol-keyed, off the typed/enumerable public API): observability +
-    // fault-injection for tests and power users. `servedSubscriptions` is the count of live
-    // subscriptions this node serves (asserts the reap of a dropped peer); `drop` abruptly closes a
-    // peer's connection (no UNSUBSCRIBE — the way a real network drop looks) to exercise that reap;
-    // `isolate`/`heal` are the reversible partition primitive the chaos harness uses (isolate both
-    // sides for a true bidirectional cut that later heals and reconverges — see Peers.isolate).
+    // fault-injection for tests and power users. `snapshot()` is the L4 pull — this node's full
+    // InspectSnapshot (the in-process source the observer bridge reads directly for harness war
+    // games; ALWAYS available, unlike the gated wire-reachable __inspect method). `servedSubscriptions`
+    // is the count of live subscriptions this node serves (asserts the reap of a dropped peer);
+    // `drop` abruptly closes a peer's connection (no UNSUBSCRIBE — the way a real network drop looks)
+    // to exercise that reap; `isolate`/`heal` are the reversible partition primitive the chaos harness
+    // uses (isolate both sides for a true bidirectional cut that later heals and reconverges — see Peers.isolate).
     [diagnostics]: {
+      snapshot,
       servedSubscriptions: dispatch.servedCount,
+      //! observing(): is the push-hook armed (≥1 subscriber attached)? The leak-guard test asserts this returns to false after an ungraceful drop.
+      observing: () => observe !== undefined,
+      //! observe(onRecord): in-process provenance stream (harness war games + the demo) — attach a sink directly; the returned closer (idempotent) detaches + disarms on the last detach.
+      observe: (onRecord: (r: ChangeRecord) => void) => {
+        const o = buildObserve()
+        // `data` holds the FunctionSink only via the anchor's lifetime (no public detach), so a
+        // closed observer's sink can keep firing while OTHER subscribers hold the gate armed —
+        // gate delivery on `active` for a deterministic logical detach (GC reclaims the rest).
+        let active = true
+        let host: unknown = o.proxy.connect({}, (r: ChangeRecord) => {
+          if (active) onRecord(r)
+        })
+        return () => {
+          if (!active) return // idempotent — o.close() is too, but don't even re-enter it
+          active = false
+          host = undefined // drop the sink anchor so the FunctionSink can GC
+          o.close()
+        }
+      },
       drop: (address: string) => mesh.drop(address),
       isolate: (address: string) => mesh.isolate(address),
       heal: (address: string) => mesh.heal(address),

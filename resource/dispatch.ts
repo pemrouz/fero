@@ -40,10 +40,11 @@ export type DispatchDeps = {
   clientSubs: Set<() => void> // teardown callbacks drained by destroy — a remote-read subscription / fold close lands here
   invoke: (method: string, arg: unknown, peer?: string) => unknown // composer's in-process dispatcher (runs a handler with context)
   fold: Fold // the makeFold() engine: gatherOnce / gatherLive / livePartial / foldAggregate
+  onObserve?: () => { proxy: any; close: () => void } // L4 push-hook: build+attach a provenance stream for ONE subscriber + the disarm close (set only when observe is on)
 }
 
 //! Build the per-node dispatch surface; `me === undefined` marks a read-only client (no handlers, no listen port).
-export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold }: DispatchDeps) => {
+export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold, onObserve }: DispatchDeps) => {
   const isClient = me === undefined
 
   //! `gathersWholeRead` = scoped && default-read: a no-key read() must gather the whole resource (never swap a user's projection).
@@ -195,6 +196,21 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       } catch {
         // an unknown op throws in buildPartial — yield no stream (RPC path surfaces errors)
       }
+      return
+    }
+    //! L4 observe push-hook (subscription-only): stream this node's bounded provenance/contention buffer; attach on subscribe, disarm via the close on reap.
+    // Handled like the gather/fold branches (NOT via invoke): build+attach the ring-buffer
+    // proxy HERE and stream it with a close, so attach/detach is bound to THIS subscription's
+    // lifecycle and the disarm rides the existing serveUnsubscribe / reapPeer chokepoint (the
+    // leak fix — the default ViewProxy branch passes no close, so a method-via-invoke observe
+    // would never detach). Subscription-only: a one-shot CALL to __observe has no such method
+    // (it isn't in `defaults`), so it can never arm the gate without a live subscriber.
+    // Intercepted ONLY when observe is configured — on an unconfigured node the name falls
+    // through to normal dispatch, so a user-defined `__observe` method still streams there
+    // (when observe IS on, the built-in wins — the same precedence any gated default has).
+    if (method === '__observe' && onObserve) {
+      const o = onObserve()
+      streamProxy(address, subId, o.proxy, o.close)
       return
     }
     //! Default path: invoke the method — stream it if it returns a ViewProxy, else ship the plain value once.

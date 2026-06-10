@@ -387,6 +387,23 @@ Pure perf tail; gate each on a `*.perf.ts` threshold.
   **NUL (`\x00`) in a top-level key** over-matches the `versionKey`/`originKey`/shed
   suffix separators (an inherited library separator assumption — [DECISIONS P4](DECISIONS.md)).
 
+### Observability & devtools (L4) — [P2] (resource: inspect, observe; tools/observe)
+The network observer + standalone dashboard ([DECISIONS O](DECISIONS.md)). Shipped: [a] topology+ring,
+[b] live data + provenance/contention stream. The full devtools backlog (per-node drawer, ring zoom,
+ticker filter, replay scrubber, multi-cluster merge, contention heatmap, …) lives in its own
+[tools/observe/IDEAS.md](tools/observe/IDEAS.md). Cross-cutting open work:
+- **Trust boundary** — a configured node discloses internals to any peer on the unauthenticated fero port;
+  add a per-`__`-method caller allowlist (`observe:{ from:'localhost' | uuidList, remote:true }`), tightening
+  to real auth once `peer.auth` lands. The gate is one `startsWith` on the cold control-frame path.
+- **Cluster-side gather inspect** — for thousands of nodes, fan `__inspect` out over the cluster's own
+  gossip and return a rollup so the bridge dials ONE node (a drop-in source adapter; deliberately not v1 —
+  it goes blind during the partition the tool exists to show).
+- **Batched/off-tick emit** — shrink the ~3× watched-write overhead by buffering events in a plain ring and
+  flushing to the streamed proxy on a microtask (off the synchronous commit+replicate path).
+- **Scale tier / war games (Slice 5)** — view-group clusters, ring-movement heatmap, lag leaderboard,
+  convergence timeline; full converged/converging/partition-suspected semantics; deterministic split-brain
+  loser generation.
+
 ---
 
 ## Testing & chaos backlog (mostly L4)

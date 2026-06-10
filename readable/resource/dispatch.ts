@@ -23,10 +23,11 @@ export type DispatchDeps = {
   clientSubs: Set<() => void>
   invoke: (method: string, arg: unknown, peer?: string) => unknown
   fold: Fold
+  onObserve?: () => { proxy: any; close: () => void }
 }
 
 // Build the per-node dispatch surface; `me === undefined` marks a read-only client (no handlers, no listen port).
-export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold }: DispatchDeps) => {
+export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, R, viewSize, holds, data, clientSubs, invoke, fold, onObserve }: DispatchDeps) => {
   const isClient = me === undefined
 
   // `gathersWholeRead` = scoped && default-read: a no-key read() must gather the whole resource (never swap a user's projection).
@@ -104,6 +105,12 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
         addSub(address, subId, { close: lp.close })
       } catch {
       }
+      return
+    }
+    // L4 observe push-hook (subscription-only): stream this node's bounded provenance/contention buffer; attach on subscribe, disarm via the close on reap.
+    if (method === '__observe' && onObserve) {
+      const o = onObserve()
+      streamProxy(address, subId, o.proxy, o.close)
       return
     }
     // Default path: invoke the method — stream it if it returns a ViewProxy, else ship the plain value once.
