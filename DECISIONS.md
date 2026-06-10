@@ -68,10 +68,10 @@ on the next anti-entropy round. Pure waste — those records can only ever lose.
 
 **Decision.** In `applyInbound`, BEFORE `log.append`, short-circuit a record whose
 versionKey already holds a **strictly-higher-epoch** winner (`cur.epoch > record.epoch`):
-return WITHOUT logging it and WITHOUT applying it. The dedup high-water (`seen`) STILL
-advances, so anti-entropy never re-fetches the dead record (a sticky skip). A SAME-epoch
-loser is unchanged — it stays logged (it's part of the per-origin history a tie or
-another key may need).
+emit the `observe` `lost` event and return — **don't log it, don't apply it**. The
+dedup high-water (`seen`) STILL advances, so anti-entropy never re-fetches the dead
+record (a sticky skip). A SAME-epoch loser is unchanged — it stays logged (it's part
+of the per-origin history a tie or another key may need).
 
 **Why it's safe (no data loss / no divergence).**
 - We skip ONLY when we already hold + logged the dominating winner (the skip condition
@@ -91,7 +91,7 @@ member against `log.marks()` (the **shippable** high-water), NOT `seen`. Requiri
 peer to reach a skipped seq we can never re-ship would hang the shed forever; shedding
 at the lower log mark is safe because the skipped seqs are superseded (the peer holds
 their winner). Outgoing digests stay `seen`-based (so peers don't re-ship us dead
-records).
+records). The inspect `marks` field stays `seen` (it is, accurately, the dedup digest).
 
 **Consequences.**
 - Smaller logs + less catch-up bandwidth on a cluster that has changed ownership — the
@@ -101,7 +101,7 @@ records).
   `applyInbound`); `shedConfirmed` runs only on a digest when orphans exist. `index.perf`
   / `log.perf` thresholds hold; the full suite + chaos (partition/heal, crash/recover,
   churn, soak) converge. A deterministic restore-seam test drives the skip directly
-  (epoch-loser skipped from the log; same-epoch loser still logged).
+  (epoch-loser skipped-but-seen; same-epoch loser still logged).
 - Supersedes B/V1d's "loser stays logged" for the strictly-lower-epoch case ONLY.
 
 **Open follow-ups → [IDEAS](IDEAS.md):** the rest of the Catch-up & anti-entropy
@@ -1127,6 +1127,92 @@ as a separate bake-off ([IDEAS open question 8]).
 **Open follow-ups → [IDEAS](IDEAS.md):** bounded-LRU hash memo (P3, only if profiling demands it); the
 hash-function bake-off (open question 8); the `RecordView.key0` self-delivery / send-path micro-opts stay
 unbuilt by the same kept-path-decodes-anyway reasoning.
+
+## O — Observe: a pull-spine snapshot + one gated push-hook (the L4 network observer) · Adopted
+
+**Context.** A running cluster carries state invisible from outside — the DHT ring + ownership, the
+committed view (epoch/members/writable gate), per-origin high-water marks, LWW winners *and losers*,
+orphan/shed bookkeeping, and the live change-record stream with provenance. A plain read-only client sees
+only its hardcoded trinity + its projection. The goal (locked user decisions): a **standalone web
+dashboard** that **attaches from outside** a running cluster and covers three view families incrementally
+— [a] topology+ring, [b] live data + provenance/contention, [c] replication health. Hard constraint: the
+observe path stays OFF the steady-state replication hot path and costs ~zero when unwatched; the browser
+can't be a fero peer (transport is TCP), so a bridge is required.
+
+**Decision — two channels behind a uniform change-record contract, chosen over a new wire verb and over a browser-direct WebSocket.**
+
+- **Pull spine — `__inspect` + `makeSnapshot()` (families [a]/[c]).** A gated `__`-prefixed method returns a
+  per-node `InspectSnapshot` read BY REFERENCE from already-in-memory internals (`seen`/`versions`/`log`/
+  ring/`mesh.peers`), materialized only when called (~1/s poll). Pure read — cannot perturb LWW/dedup/
+  versions. Multi-node keyed by uuid. The DHT ring ships as a **scale-independent `coverage(k)` sampling**
+  (fixed K segments regardless of cluster size), not members×vnodes arcs.
+- **Push hook — `__observe` + `makeObserve()` (family [b]).** A gated method streams ONE bounded
+  drop-oldest ring-buffer ViewProxy carrying the live provenance/contention events. Fed only from the
+  EXISTING commit/apply call-sites (no second `data` sink, no `log.onAppend` listener): `lost` before the
+  LWW loser early-return (a loser never lands in a snapshot — the push channel exists for exactly this),
+  `won` after a winning inbound record, `local`/`forwarded` ONCE in `commitLocal` (distinguished by the
+  in-scope `committingForward` flag — forwarded writes funnel through `commitLocal`, so emitting at
+  `commitForwarded` too would DOUBLE-COUNT), `dropped` only under `observe:{verbose}`, plus `view`/
+  `writable` chained into the membership hooks. Each event is a FLAT scalar provenance record (origin/seq/
+  epoch/key) — never the value payload (that rides the poll snapshot).
+- **Bridge — SSE over a Node relay, not WebSocket.** A read-only fero client (or the in-process diagnostics
+  seam for harness war games) polls `__inspect` and subscribes `__observe`, relaying both to the browser
+  over `EventSource` (zero browser deps). The dashboard imports only `data/dist` and renders reactively.
+  Rejected: a `VERB.OBSERVE`/MAGIC wire bump (a real version change touching the two hottest files for a
+  debug feature, breaking mixed-version observability) and a browser-direct WS transport (a second from-
+  scratch wire codec + a `ws` dep + an unauthenticated reachable port).
+
+**Consequences.**
+- **Un-configured node = byte-identical** (no `__inspect`/`__observe` registered, gate `undefined`). A
+  **configured-but-UNWATCHED node** adds only predicted-false `observe?.…` branches at the four emit-sites:
+  optional chaining short-circuits before the args evaluate, so it does no real work. **Measured: unwatched/
+  plain write ratio 0.96–0.99× (within 15% gate); the L2 write-path gate (10k writes < 150ms) holds
+  unchanged at ~62ms.**
+- **Watched is real cost.** While a subscriber is attached, each write also builds a ProvRecord + a
+  data-proxy slot write + sink delivery — **~3× the bare local write (measured 2.8–2.9×)**, paid ONLY while
+  watching, with the ring buffer bounding memory. A batched/off-tick flush to shrink the active path is a
+  deferred optimization ([tools/observe/IDEAS.md](tools/observe/IDEAS.md)).
+- **Leak-as-perf-failure (the lifecycle guard).** `__observe` is **subscription-only** (handled in
+  `serveSubscribe`, never in the method table — an RPC call to it is unknown-method, so it can't arm the
+  gate without a live subscriber). The streamed proxy carries a `close` that fires via the existing
+  `serveUnsubscribe`/`reapPeer` chokepoint → refcounted `detach()` nulls the gate on the LAST observer.
+  A test attaches+drops a subscriber UNGRACEFULLY then times writes: if the gate leaked armed they'd be
+  ~3× and it goes red. **Confirmed: post-drop ratio 0.98×.**
+- **Trust boundary (open refinement).** A configured node discloses full internals to ANY peer that can
+  reach the unauthenticated fero TCP port — the `__` prefix and the localhost bridge bind are NOT access
+  boundaries (same posture as the data path, "servers trust each other"). The in-process `[diagnostics]`
+  seam (`snapshot`/`observe`/`observing`) is ALWAYS available (holding the ref is full trust); only the
+  WIRE methods are gated by `observe:`. **Non-goal:** fault-injection (`drop`/`isolate`/`heal`) stays
+  in-process via `[diagnostics]`, NEVER wire-reachable. A per-`__`-method caller allowlist
+  (`observe:{ from, remote }`, tightening once `peer.auth` lands) is tracked in [IDEAS](IDEAS.md).
+- **`lost`/`dropped` are rare BY DESIGN** (the write-gate stops a minority diverging; single-sequencer
+  ordering + digest-driven anti-entropy stop re-delivery — measured 0 drops under kill/restart churn).
+  Covered at the controller level; a deterministic split-brain loser is a Slice-5 war-game scenario.
+- Two adversarial multi-agent reviews ran before this landed. The first (26 agents: correctness / leak /
+  perf / bridge / trust) found no defects in the node-side slice. A second, full-project review (72 agents)
+  then surfaced SIX real defects — five in the bridge/closer layer, all **fixed in this same change**:
+  (1) the bridge armed the ~3× watched write tax on every server with zero dashboard viewers → push legs
+  now arm only while an SSE client is connected (idle ⇒ all subs dropped); (2) a socket bounce inside one
+  poll interval killed the push leg permanently (server reaped the sub, the bridge never re-subscribed) →
+  the snapshot now carries `observing` and the bridge re-subscribes when it holds a sub against
+  `observing:false` (blind spot: a SECOND bridge keeping the gate armed masks the first's dead leg —
+  [tools/observe/IDEAS.md](tools/observe/IDEAS.md)); (3) a same-address restart left the old uuid's
+  snapshot as a permanent ghost in the rollup (the address-keyed prune can't see it) → an addr→uuid map
+  prunes the predecessor; (4) the initial ring-buffer dump (and any replay) was re-accounted as fresh
+  events, corrupting rates/conflict counts on every (re)subscribe → the dump now only seeds a
+  per-subscription `t` watermark and deltas dedup against it; (5) the `[diagnostics].observe` closer was
+  not idempotent and read the CURRENT gate instead of its own instance — a double-close (or a stale closer
+  after a disarm/re-arm cycle) could disarm the gate under a live subscriber, and a closed observer kept
+  receiving callbacks while others held the gate armed → closers are latched, instance-guarded, and
+  delivery-gated. Plus smaller hardening: a fractional `observe:{buffer}` < 1 no longer collapses the ring
+  to one NaN slot; `__observe` no longer shadows a same-named user method when observe is OFF; the bridge's
+  static-file containment check is path-segment-aware; the saturated grid event buffer drops oldest in O(1)
+  instead of an O(N) splice per event. Each fix carries a regression test (observe.test.ts, bridge.test.ts).
+
+**Open follow-ups → [IDEAS](IDEAS.md) "Observability" + [tools/observe/IDEAS.md](tools/observe/IDEAS.md):**
+per-`__`-method auth allowlist; cluster-side gather inspect for thousands of nodes (a drop-in source
+adapter, deliberately not v1 — it goes blind during the partition the tool exists to show); batched
+off-tick emit; the Slice-5 scale tier (view-group clusters, lag leaderboard, convergence timeline).
 
 ## W — Log compaction: collapse superseded same-key updates · Adopted
 

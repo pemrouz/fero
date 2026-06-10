@@ -20,3 +20,7 @@ export { log, view, distribute, applyRecord, Log } from './log/index.ts'
 export { originKey, versionKey } from './log/log.ts'
 export type { DistributeOpts } from './log/index.ts'
 export type { LogOpts, AppendListener } from './log/log.ts'
+
+// L4 — observability pull spine (build a custom observer over a node's InspectSnapshot)
+export { makeSnapshot } from './resource/inspect.ts'
+export type { InspectSnapshot, InspectPeer, SnapshotDeps } from './resource/inspect.ts'
