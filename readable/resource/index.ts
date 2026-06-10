@@ -199,9 +199,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   delete (config as any).storage
   const viewOpts = (config.view as Record<string, unknown>) ?? {}
   delete (config as any).view
+  let storageUnsub: (() => void) | undefined
   if (storage) {
     for (const record of await storage.load()) applyInbound(record)
-    log.onAppend((record) => storage.append(record))
+    storageUnsub = log.onAppend((record) => storage.append(record))
   }
 
   // mesh: the L0 transport, wired with all the inbound hooks (record/digest/RPC/subscribe/write/view).
@@ -312,7 +313,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   // ── 4 · write path: capture sink → forward-to-owner | commit-local ──
   let primed = false
+  let destroyed = false
   const writeHost = data.connect({}, (change: ChangeRecord) => {
+    // 0) destroyed-skip: the node is torn down — a late write must not commit/persist.
+    if (destroyed) return
+
     // 1) prime: swallow the empty attach-snapshot.
     if (!primed) {
       primed = true
@@ -526,6 +531,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     cluster,
     destroy() {
       void writeHost
+      destroyed = true
+      storageUnsub?.()
       if (aeTimer) clearInterval(aeTimer)
       if (compactTimer) clearInterval(compactTimer)
       viewMgr?.destroy()

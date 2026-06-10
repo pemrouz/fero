@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import os from 'node:os'
 import { join } from 'node:path'
 import { rmSync } from 'node:fs'
+import { readFile, rm } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { value } from '../../data/index.ts'
 import { fero, fileStorage, diagnostics } from './index.ts'
@@ -2286,5 +2287,28 @@ test('log compaction: a high-churn key collapses in-memory; data + a fresh joine
     A.destroy()
     B.destroy()
     C?.destroy()
+  }
+})
+
+test('write-after-destroy is inert: no commit, no log growth, no WAL append', async () => {
+  // Regression: destroy() never detached the write-capture sink or the storage onAppend hook
+  // (data's FunctionSink has no public detach), so a late `r.data.x = y` still committed —
+  // bumping the Lamport clock, mutating seen/versions, appending to the log, and fsyncing to
+  // the WAL — silently, on a torn-down node.
+  const path = join(os.tmpdir(), `fero-late-${randomUUID()}.log`)
+  try {
+    const r: any = await fero('late-write', { port: await ports.free(), wait: 10, storage: fileStorage(path) })
+    r.data.a = { v: 1 }
+    await sleep(20)
+    const committed = r[diagnostics].logSize()
+    assert.ok(committed >= 1, 'the live write committed')
+    const walBefore = await readFile(path, 'utf8')
+    r.destroy()
+    r.data.b = { v: 2 } // late write on the torn-down node
+    await sleep(20)
+    assert.equal(r[diagnostics].logSize(), committed, 'the late write did NOT reach the log')
+    assert.equal(await readFile(path, 'utf8'), walBefore, 'the late write did NOT reach the WAL')
+  } finally {
+    await rm(path, { force: true })
   }
 })
