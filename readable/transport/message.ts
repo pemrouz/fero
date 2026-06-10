@@ -227,6 +227,8 @@ export function encodeFrame(
   }
 
   const bodyLen = w.off - headerLen
+  // encoder-side mirror of the framer's MAX_FRAME bound: fail HERE with a clear error, not on the receiver as a peer-drop.
+  if (bodyLen > MAX_FRAME) throw new Error(`fero: encoded frame body ${bodyLen} exceeds MAX_FRAME ${MAX_FRAME} — split the batch or shrink the value`)
   const b = w.buf
   b[0] = MAGIC
   b[1] = (hasId ? FLAG_HAS_ID : 0) | (hasProv ? FLAG_PROV : 0)
@@ -241,17 +243,33 @@ export const controlFrame = (verb: number, value: unknown, id?: number): Buffer 
   encodeFrame([{ type: 'update', key: [], value }], { verb, id })
 
 // split a mixed-origin batch into the fewest frames each holding one origin's contiguous-seq, one-epoch run.
+// cap a run's record count so one catch-up of a huge log can't build a frame past the receiver's MAX_FRAME bound.
+const MAX_RUN = 8192
+
 export function encodeFrames(records: ChangeRecord[]): Buffer[] {
   const frames: Buffer[] = []
   let i = 0
   while (i < records.length) {
     const origin = records[i].origin
     const epoch = records[i].epoch
+    const cap = i + MAX_RUN
     let j = i + 1
-    if (origin === undefined) while (j < records.length && records[j].origin === undefined) j++
-    // extend the run while same origin + seq == prev+1 + same epoch — break on any of the three.
-    else while (j < records.length && records[j].origin === origin && records[j].seq === (records[j - 1].seq ?? 0) + 1 && records[j].epoch === epoch) j++
-    frames.push(encodeFrame(records.slice(i, j), origin !== undefined ? { origin, seq: records[i].seq, epoch } : {}))
+    if (origin === undefined) while (j < cap && j < records.length && records[j].origin === undefined) j++
+    // extend the run while same origin + seq == prev+1 + same epoch — break on any of the three (or the size cap).
+    else while (j < cap && j < records.length && records[j].origin === origin && records[j].seq === (records[j - 1].seq ?? 0) + 1 && records[j].epoch === epoch) j++
+    const opts = origin !== undefined ? { origin, seq: records[i].seq, epoch } : {}
+    try {
+      frames.push(encodeFrame(records.slice(i, j), opts))
+    } catch (e) {
+      // a poisonous record (BigInt/Symbol value JSON.stringify rejects, or one giant value) must not crash the flush microtask or sink the whole batch.
+      for (let k = i; k < j; k++) {
+        try {
+          frames.push(encodeFrame([records[k]], records[k].origin !== undefined ? { origin: records[k].origin, seq: records[k].seq, epoch: records[k].epoch } : {}))
+        } catch (err) {
+          console.error(`fero/transport: dropping unserializable record (key=${JSON.stringify(records[k].key)}): ${(err as Error)?.message ?? err}`)
+        }
+      }
+    }
     i = j
   }
   return frames
@@ -345,6 +363,8 @@ export class Frame {
       epoch |= (b & 0x7f) << shift
       shift += 7
     } while (b & 0x80)
+    // a truncated varint reads past the body (undefined → 0 exits the loop silently) — one O(1) post-check makes it loud.
+    if (off > buf.length) throw new FrameError('truncated provenance varint')
     return (this.#prov = { origin, baseSeq: baseSeq >>> 0, epoch: epoch >>> 0, off })
   }
 
@@ -546,6 +566,8 @@ export class RecordView {
           z |= (b & 0x7f) << shift
           shift += 7
         } while (b & 0x80)
+        // the one value decode with no following bounds use — post-check so a truncated int is a FrameError like str/obj, not a silent wrong value.
+        if (off > buf.length) throw new FrameError('int value overruns record')
         v = unzigzag(z >>> 0)
         break
       }
