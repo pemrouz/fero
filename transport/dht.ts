@@ -183,4 +183,40 @@ export class DHT {
     return false
   }
 
+  //! snapshot(): cold-path ring accessor (the two parallel arrays + vnode count + members) for L4 observability.
+  // Expose the ring's internal shape for the observer/diagnostics surface (L4). The
+  // ring is a private implementation detail (#hashes/#owners), so this is the one
+  // sanctioned read of it — the building block a dashboard renders ownership arcs
+  // from. Rebuilds lazily on #dirty exactly like owner(), then returns the live
+  // arrays BY REFERENCE (cold path — called once per observe poll, never per routed
+  // record — so no defensive copy; the caller serializes promptly). The full arcs
+  // are large (members × vnodes), so callers ship them only on explicit request —
+  // mesh.ringSnapshot() returns just { members, vnodes } by default.
+  snapshot(): { hashes: Uint32Array; owners: string[]; vnodes: number; members: string[] } {
+    if (this.#dirty) this.#rebuild()
+    return { hashes: this.#hashes, owners: this.#owners, vnodes: this.#vnodes, members: [...this.#members.keys()] }
+  }
+
+  //! coverage(k): sample the ring at k evenly-spaced angles → the owning member-INDEX per segment — a scale-independent keyspace-ownership donut.
+  // The dashboard's ownership ring. Sampling at a FIXED k (not the members × vnodes
+  // arcs, which are O(20k) at 200 nodes) keeps the payload and render cost constant
+  // regardless of cluster size — each segment is "who owns the keyspace at this
+  // angle", so the donut shows each peer's share + how vnodes interleave. k binary
+  // searches over the warm ring; cold path (once per observe poll). segments[i] is an
+  // index into the returned `members` (−1 only for an empty ring).
+  coverage(k = 120): { members: string[]; segments: number[] } {
+    if (this.#dirty) this.#rebuild()
+    const members = [...this.#members.keys()]
+    const segments = new Array<number>(k)
+    if (this.#hashes.length === 0) {
+      segments.fill(-1)
+      return { members, segments }
+    }
+    const idx = new Map(members.map((m, i) => [m, i]))
+    for (let i = 0; i < k; i++) {
+      const h = Math.floor((i / k) * 0x1_0000_0000) // the hash at angle i/k around the ring
+      segments[i] = idx.get(this.#owners[this.#search(h)]) ?? -1
+    }
+    return { members, segments }
+  }
 }

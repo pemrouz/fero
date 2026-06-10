@@ -143,4 +143,26 @@ export class DHT {
     return false
   }
 
+  // snapshot(): cold-path ring accessor (the two parallel arrays + vnode count + members) for L4 observability.
+  snapshot(): { hashes: Uint32Array; owners: string[]; vnodes: number; members: string[] } {
+    if (this.#dirty) this.#rebuild()
+    return { hashes: this.#hashes, owners: this.#owners, vnodes: this.#vnodes, members: [...this.#members.keys()] }
+  }
+
+  // coverage(k): sample the ring at k evenly-spaced angles → the owning member-INDEX per segment — a scale-independent keyspace-ownership donut.
+  coverage(k = 120): { members: string[]; segments: number[] } {
+    if (this.#dirty) this.#rebuild()
+    const members = [...this.#members.keys()]
+    const segments = new Array<number>(k)
+    if (this.#hashes.length === 0) {
+      segments.fill(-1)
+      return { members, segments }
+    }
+    const idx = new Map(members.map((m, i) => [m, i]))
+    for (let i = 0; i < k; i++) {
+      const h = Math.floor((i / k) * 0x1_0000_0000)
+      segments[i] = idx.get(this.#owners[this.#search(h)]) ?? -1
+    }
+    return { members, segments }
+  }
 }

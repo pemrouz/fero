@@ -55,6 +55,13 @@ export type TransportOpts = {
   onJoinRequest?: (value: unknown, address: string) => void
 }
 
+//! RingSnapshot: the committed ring's shape for L4 observability — members + vnode count, optionally the full arcs.
+// What mesh.ringSnapshot() returns: the committed ring membership + per-peer vnode
+// count by default (a small, always-cheap summary the observer ships every poll),
+// plus the full parallel arcs (hashes/owners) ONLY when asked (opts.vnodes) — they
+// are members × vnodes entries, so a dashboard requests them on demand, not per poll.
+export type RingSnapshot = { members: string[]; vnodes: number; coverage?: number[]; hashes?: number[]; owners?: string[] }
+
 //! Mesh: the L0 seam — routing (send/replicate/forward/owners), view-change frames, RPC/subscriptions, chaos taps.
 export type Mesh = {
   peers: any // cluster.peers ViewProxy
@@ -67,6 +74,7 @@ export type Mesh = {
   forward: (address: string, record: ChangeRecord) => boolean // route a write-request to the owner; false if it isn't connected
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
   holds: (key: string, addr: string, replicas?: number) => boolean // owners(key,R).includes(addr) without materializing the owner set (per-record held-gate / catch-up filter)
+  ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot // L4 observability: committed ring membership + vnode count (+ a k-sampled ownership donut when coverage:k, + full arcs when vnodes:true) — cold path, off the routing hot path
   installView: (members: string[]) => void // adopt a committed view's membership (V1a: stored; V1b: drives the ring)
   viewMembers: () => string[] // the current committed view's members
   viewPrepare: (address: string, value: unknown) => boolean // view-change phase-1 proposal (a ballot); false if the peer isn't connected
@@ -338,6 +346,20 @@ export function transport(opts: TransportOpts): Mesh {
     owners: (key, replicas) => dht.owners(key, replicas),
     //! holds: allocation-free `owners(key,R).includes(addr)` for the per-record held-gate / catch-up filter.
     holds: (key, addr, replicas) => dht.holds(key, addr, replicas),
+    //! ringSnapshot: cold-path ring summary for the observer — { members, vnodes } by default; full arcs (as plain arrays) only on request.
+    // Wrap the DHT's cold-path snapshot() for L4 observability. Default ships just
+    // the committed members + per-peer vnode count (small, every poll). The full
+    // arcs are members × vnodes, so convert the Uint32Array to a plain number[]
+    // (JSON-friendly) and ship them ONLY when the dashboard explicitly asks
+    // (opts.vnodes) — keeping the steady poll payload tiny.
+    ringSnapshot: (opts) => {
+      const s = dht.snapshot()
+      const out: RingSnapshot = opts?.vnodes
+        ? { members: s.members, vnodes: s.vnodes, hashes: Array.from(s.hashes), owners: s.owners.slice() }
+        : { members: s.members, vnodes: s.vnodes }
+      if (opts?.coverage) out.coverage = dht.coverage(opts.coverage).segments // sampled ownership; member-index per segment (basis = out.members)
+      return out
+    },
     //! installView: rebuild the ring to EXACTLY the committed members — the ONLY ring mutation, so ownership is stable per epoch.
     // Adopt a committed view's membership: rebuild the DHT ring to EXACTLY these
     // members (add new, remove departed). This is the only thing that mutates the

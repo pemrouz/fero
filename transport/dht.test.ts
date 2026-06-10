@@ -91,3 +91,53 @@ test('hash32 is deterministic and 32-bit unsigned', () => {
   assert.ok(hash32('user42') >= 0 && hash32('user42') <= 0xffffffff)
   assert.notEqual(hash32('a'), hash32('b'))
 })
+
+test('snapshot() returns the ring shape — parallel sorted arrays + vnodes + members', () => {
+  // The L4 observability accessor. hashes (ascending) and owners must be aligned
+  // and the same length (= members × vnodes); each owner must be a real member.
+  // The dashboard renders ownership arcs from these, so they have to match the
+  // live routing (owner() reads the same two arrays).
+  const dht = new DHT({ vnodes: 8 })
+  for (const a of ['a:1', 'b:1', 'c:1']) dht.add(a)
+  const s = dht.snapshot()
+  assert.equal(s.vnodes, 8)
+  assert.deepEqual(s.members.slice().sort(), ['a:1', 'b:1', 'c:1'])
+  assert.equal(s.hashes.length, 3 * 8) // members × vnodes
+  assert.equal(s.owners.length, s.hashes.length)
+  for (let i = 1; i < s.hashes.length; i++) assert.ok(s.hashes[i] >= s.hashes[i - 1], 'hashes ascending')
+  for (const o of s.owners) assert.ok(s.members.includes(o), `owner ${o} is a member`)
+})
+
+test('snapshot() reflects membership lazily (rebuild on dirty, like owner())', () => {
+  const dht = new DHT({ vnodes: 4 })
+  dht.add('a:1')
+  assert.equal(dht.snapshot().members.length, 1)
+  dht.add('b:1') // marks dirty
+  const s = dht.snapshot() // forces the lazy rebuild
+  assert.equal(s.members.length, 2)
+  assert.equal(s.hashes.length, 2 * 4)
+})
+
+test('coverage(k) samples the ring into k member-indexed ownership segments', () => {
+  const dht = new DHT()
+  const nodes = ['a:1', 'b:1', 'c:1', 'd:1']
+  for (const a of nodes) dht.add(a)
+  const { members, segments } = dht.coverage(120)
+  assert.equal(segments.length, 120)
+  assert.equal(members.length, 4)
+  const counts = new Map<number, number>()
+  for (const s of segments) {
+    assert.ok(s >= 0 && s < members.length, `segment index ${s} in range`)
+    counts.set(s, (counts.get(s) ?? 0) + 1)
+  }
+  assert.equal(counts.size, 4, 'every member owns some of the keyspace')
+  // a sampled segment's owner agrees with owner() at that angle
+  const owner0 = dht.owner('') // hash('') — not the same angle, just sanity that owners are real members
+  assert.ok(members.includes(owner0!))
+})
+
+test('coverage() on an empty ring is all -1', () => {
+  const { members, segments } = new DHT().coverage(8)
+  assert.deepEqual(members, [])
+  assert.deepEqual(segments, [-1, -1, -1, -1, -1, -1, -1, -1])
+})

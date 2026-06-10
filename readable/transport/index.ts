@@ -41,6 +41,9 @@ export type TransportOpts = {
   onJoinRequest?: (value: unknown, address: string) => void
 }
 
+// RingSnapshot: the committed ring's shape for L4 observability — members + vnode count, optionally the full arcs.
+export type RingSnapshot = { members: string[]; vnodes: number; coverage?: number[]; hashes?: number[]; owners?: string[] }
+
 // Mesh: the L0 seam — routing (send/replicate/forward/owners), view-change frames, RPC/subscriptions, chaos taps.
 export type Mesh = {
   peers: any
@@ -53,6 +56,7 @@ export type Mesh = {
   forward: (address: string, record: ChangeRecord) => boolean
   owners: (key: string, replicas?: number) => string[]
   holds: (key: string, addr: string, replicas?: number) => boolean
+  ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot
   installView: (members: string[]) => void
   viewMembers: () => string[]
   viewPrepare: (address: string, value: unknown) => boolean
@@ -276,6 +280,15 @@ export function transport(opts: TransportOpts): Mesh {
     owners: (key, replicas) => dht.owners(key, replicas),
     // holds: allocation-free `owners(key,R).includes(addr)` for the per-record held-gate / catch-up filter.
     holds: (key, addr, replicas) => dht.holds(key, addr, replicas),
+    // ringSnapshot: cold-path ring summary for the observer — { members, vnodes } by default; full arcs (as plain arrays) only on request.
+    ringSnapshot: (opts) => {
+      const s = dht.snapshot()
+      const out: RingSnapshot = opts?.vnodes
+        ? { members: s.members, vnodes: s.vnodes, hashes: Array.from(s.hashes), owners: s.owners.slice() }
+        : { members: s.members, vnodes: s.vnodes }
+      if (opts?.coverage) out.coverage = dht.coverage(opts.coverage).segments
+      return out
+    },
     // installView: rebuild the ring to EXACTLY the committed members — the ONLY ring mutation, so ownership is stable per epoch.
     installView: (members) => {
       view = members.slice()

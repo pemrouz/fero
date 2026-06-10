@@ -75,3 +75,36 @@ test('rebuild on membership churn — add/remove a peer (5→6→5)', () => {
   console.log(`  add+rebuild+remove+rebuild: ${elapsed.toFixed(3)}ms`)
   ok(elapsed < 4, `churn rebuild took ${elapsed.toFixed(3)}ms (threshold 4ms)`)
 })
+
+test('coverage(120) — 10k samplings of the ownership donut over a 1000-entry ring', () => {
+  // The L4 ownership-donut sampler (once per observe poll). 120 binary searches + a
+  // small members→index Map per call — should track ~120× owner()'s per-lookup cost
+  // (owner ≈ 0.1µs, so ~12µs/call → ~120ms for 10k), with headroom. Scale-independent:
+  // the cost is fixed at k regardless of cluster size (that's the whole point of sampling
+  // vs shipping the members × vnodes arcs).
+  const dht = ring()
+  const elapsed = bench.time(() => {
+    let sink = 0
+    for (let i = 0; i < 10_000; i++) sink += dht.coverage(120).segments.length
+    if (sink === 0) throw new Error('sink')
+  })
+  console.log(`  10k coverage(120): ${elapsed.toFixed(3)}ms (${(elapsed * 1000 / 10_000).toFixed(2)}µs each)`)
+  ok(elapsed < 300, `10k coverage(120) took ${elapsed.toFixed(3)}ms (threshold 300ms)`)
+})
+
+test('snapshot() — 100k cold-path reads over a 1000-entry ring (must not regress owner())', () => {
+  // The L4 observe accessor is COLD path (once per observe poll, never per routed
+  // record), but it must add zero burden to the hot ring: snapshot() returns the
+  // arrays BY REFERENCE after the same lazy rebuild owner() does, so a warm ring
+  // makes it a near-free struct return (+ a small members[] copy). Guards that it
+  // never accidentally rebuilds or copies the big arrays per call — it should be
+  // FASTER than 100k owner() lookups (50ms), since there's no per-call hash+search.
+  const dht = ring()
+  const elapsed = bench.time(() => {
+    let sink = 0
+    for (let i = 0; i < KEYS.length; i++) sink += dht.snapshot().owners.length
+    if (sink === 0) throw new Error('sink')
+  })
+  console.log(`  100k snapshot() reads: ${elapsed.toFixed(3)}ms (${((elapsed * 1000) / KEYS.length).toFixed(3)}µs each)`)
+  ok(elapsed < 50, `100k snapshot() reads took ${elapsed.toFixed(3)}ms (threshold 50ms)`)
+})
