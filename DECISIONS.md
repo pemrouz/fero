@@ -1330,3 +1330,54 @@ view-lag / client / owner-crash interleaving.
 (needs per-partition owner lineage — still open, distinct from this same-node-lag fix); read-your-writes
 on a client whose forward is still in flight (it reads its optimistic local copy, correct, but a routed
 read could momentarily race the owner's commit).
+
+## Y — Membership reconciliation: periodic view re-announce (split-brain heal + missed-commit recovery) · Adopted
+
+**Context.** [V](#v--view-synchronous-membership--adopted--5c45e61--1d8c533)'s view state crossed the wire
+ONLY in the one-shot ballot (`PREPARE`/`ACK`/`COMMIT`). The full-project review found two failures that
+both end in a PERMANENT split — neither caught before because each needs a partition/heal or a dropped
+frame at a specific instant:
+
+- **Split-brain survives heal.** A view proposal fired only on a member-set DELTA (`sortedEqual(proposed,
+  members)` early-return). Partition `{A,B}|{C,D,E}` with eviction on: the majority commits `{C,D,E}@2`,
+  the minority (which holds the global-lowest address A) stays on `{A..E}@1`, write-gated. On heal A — the
+  merged-set coordinator — is back on its STALE 5-member view with reachable == members, so it saw NO
+  delta and never re-proposed; `{C,D,E}` went quiet the instant it saw A's lower address. Two committed
+  epochs, forever.
+- **A dropped `VIEW_COMMIT` strands a member.** `#tryCommit` ignored `viewCommit`'s boolean — a member
+  whose socket was momentarily un-writable (the admit race) missed the commit and stayed on the prior
+  epoch; nothing else carried view state, so it never caught up, and its writes were epoch-fenced.
+
+**Decision — re-announce the committed view, reuse `VIEW_COMMIT` (no new wire verb).** Every `announce`
+ms (default 600), the lowest-address reachable member of its OWN committed view re-broadcasts
+`{epoch, members}` to ALL reachable peers (not just members). One announcer per view (so each side of a
+partition speaks — the merged coordinator alone wouldn't surface the OTHER side's higher epoch). On the
+receiver, `onCommit`:
+- always advances `#seenEpoch` (the highest committed epoch heard from any reachable peer);
+- installs a higher epoch ONLY if its members INCLUDE us — this is both the real ballot commit AND the
+  missed-commit recovery; a node hearing a higher view it's EXCLUDED from does NOT self-orphan (its
+  coordinator merges it back in).
+The coordinator now re-proposes on a member-set delta **OR** when `#seenEpoch > epoch` — so the
+stale-side coordinator detects "a higher view exists" and proposes a fresh unifying view even when its own
+member set is unchanged. The reconciliation always lands at an epoch above BOTH prior views (the
+fresh-ballot rule), re-admitting the evicted minority.
+
+**Consequences.**
+- No new wire verb (mixed-version safe: an old node just ignores the extra `VIEW_COMMIT` re-sends). One
+  announcer per view × O(reachable) tiny control frames every 600ms — cold-path traffic, far under the
+  heartbeat budget; throttled independently of the 150ms coordinator tick.
+- Genuinely-evicted (crashed) nodes are unreachable, so they never receive the re-announce and stay
+  evicted — the reconcile fires ONLY when a stale node is reachable again (a heal), which is exactly when
+  re-admitting it is correct. Forcibly removing a still-running reachable node is the separate
+  explicit-eviction / reject-stale-epoch concern (still open in [IDEAS](IDEAS.md)).
+- Supersedes V's implicit "view state rides only the ballot" assumption; the ballot is unchanged
+  (PREPARE/ACK/COMMIT, joint-consensus quorum, soft coordinator) — this only adds a reconciling backstop.
+- Tests: a new deterministic `membership.test.ts` (5 cases: convergence, minority write-gate, the
+  split-brain-heal reconcile, missed-commit recovery, no-self-orphan) driving the state machine through a
+  mock mesh — the consensus-core unit gap the review flagged; plus an end-to-end chaos scenario
+  (eviction during a partition with the global-lowest in the minority → heal → one view).
+
+**Open follow-ups → [IDEAS](IDEAS.md):** incarnation/epoch fencing for a flapping rejoiner; explicit
+`forget(address)` / reject-stale-epoch from an intentionally-removed node (distinct from heal-reconcile);
+faster missed-commit recovery than the announce period (retry the specific un-acked members on the next
+tick).
