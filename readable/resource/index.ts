@@ -412,11 +412,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const n = ++clock
     change.origin = uuid
     change.seq = n
-    const e = (change.epoch = viewEpoch())
     const p = partitionOf(change)
-    seen.set(seenKey(uuid, p), n)
     const key = versionKey(change)
     const cur = versions.get(key)
+    // epoch-dominance stamp: never commit a key BELOW the epoch of the winner we already hold.
+    const ve = viewEpoch()
+    const e = (change.epoch = cur && cur.epoch > ve ? cur.epoch : ve)
+    seen.set(seenKey(uuid, p), n)
     if (cur) {
       cur.epoch = e
       cur.seq = n

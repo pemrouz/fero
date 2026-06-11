@@ -750,11 +750,20 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const n = ++clock
     change.origin = uuid
     change.seq = n
-    const e = (change.epoch = viewEpoch()) // the view this write commits under (carried on the wire + fenced in LWW)
     const p = partitionOf(change)
-    seen.set(seenKey(uuid, p), n)
     const key = versionKey(change)
     const cur = versions.get(key)
+    //! epoch-dominance stamp: never commit a key BELOW the epoch of the winner we already hold.
+    // A node whose committed view lags (a missed/in-flight VIEW_COMMIT, the join window) would
+    // otherwise stamp viewEpoch() < cur.epoch on a key it KNOWINGLY overwrites — every peer
+    // holding the newer-epoch winner then sticky-fences the record (B1 skip, seen advances), while
+    // we keep it locally: silent per-key divergence until the next write. A local write happening
+    // NOW against locally-known state is not a stale-view straggler (the thing V1d fences) — it
+    // deliberately supersedes cur, so it commits at max(view, cur.epoch); the merged Lamport seq
+    // (clock ≥ cur.seq, so n > cur.seq) wins LWW within that epoch on every replica.
+    const ve = viewEpoch()
+    const e = (change.epoch = cur && cur.epoch > ve ? cur.epoch : ve)
+    seen.set(seenKey(uuid, p), n)
     if (cur) {
       cur.epoch = e
       cur.seq = n
