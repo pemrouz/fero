@@ -95,6 +95,37 @@ test('chaos: network PARTITION then HEAL — majority writes, minority buffers, 
   }
 })
 
+test('chaos: SCOPED (R=2) partition then heal — disjoint holding stays correct; both sides reconverge on their R-sets', async () => {
+  // Every other chaos scenario runs full replication; this one exercises the SCOPED paths
+  // (owner-routing, R-way replicateTo, anti-entropy acquisition) under a real partition+heal —
+  // where the write-path hardening (ack-confirmed forward, epoch-dominance) and the membership
+  // reconcile all interact with disjoint holding. evictAfter huge so it stays a write-gate event
+  // (one 4-member view throughout), isolating the scoped-replication behaviour from eviction.
+  const c = await cluster({ n: 4, replicas: 2, antiEntropy: 200, wait: 350, evictAfter: 100000 })
+  try {
+    assert.ok(await c.formed(12000), 'scoped cluster formed')
+    assert.ok(await c.place(['ka', 'kb', 'kc', 'kd'], (k) => ({ k }), 12000), 'keys placed on their R-sets')
+    assert.ok(await c.heldOnReplicas(['ka', 'kb', 'kc', 'kd'], 12000), 'each key on exactly its 2-replica R-set, nowhere else')
+
+    const live = c.all()
+    const majority = live.slice(0, 3) // 3 of 4 keeps quorum
+    const minority = live.slice(3) // 1 of 4 → read-only
+    c.partition(majority, minority)
+    assert.ok(await until(() => minority.every((n) => n.cluster.writable === false), 12000), 'minority went read-only')
+
+    // a write on the majority side to a key the majority can own/route lands on its R-set
+    majority[0].data.ke = { k: 'ke' }
+    assert.ok(await until(() => { const reps = majority[0].cluster.replicas('ke').filter((a) => majority.some((m) => m.cluster.me === a)); return reps.length > 0 && reps.every((a) => has(c.node(a)!, 'ke')) }, 12000), 'majority-side scoped write replicated to its reachable R-set')
+
+    // HEAL: the minority regains quorum; anti-entropy re-syncs the scoped holding both ways
+    c.heal()
+    assert.ok(await c.heldOnReplicas(['ka', 'kb', 'kc', 'kd', 'ke'], 30000), 'after heal every key is back on exactly its R-set (no over- or under-replication)')
+    assert.equal(c.servedSubs(), 0, 'no served-subscription leak across the scoped partition/heal')
+  } finally {
+    c.destroy()
+  }
+})
+
 test('chaos: crash → recover — a killed node restarts from its WAL and catches up', async () => {
   // The kill/restart variant of node loss: the process dies (not just unreachable)
   // and comes back, restoring committed state from disk + healing the gap via catch-up.
@@ -157,6 +188,11 @@ test('chaos: membership CHURN — rapid join/leave re-agrees on one view and con
     assert.ok(c.all().every((n) => JSON.stringify(n.cluster.members) === mem), 'every node agrees on the same committed view')
     assert.ok(await until(() => c.all().every((n) => has(n, 'fromE') && has(n, 'fromF') && has(n, 'afterKill') && has(n, 'x')), 15000), 'all committed writes present')
     assert.ok(await c.converged(15000), 'converged after churn')
+    // leak guard (the harness exposes servedSubs() for exactly this): the churn opened no
+    // subscriptions, so after reap every node serves ZERO — a leaked sink/openFold would show here.
+    // (A peer-ROW leak assertion waits on the max=Infinity forget(address) item — a killed node is
+    // redialed forever, so its pool row legitimately persists; the VIEW excludes it, asserted above.)
+    assert.equal(c.servedSubs(), 0, 'no served-subscription leak across the churn')
   } finally {
     joined.forEach((n) => {
       try {
