@@ -90,7 +90,7 @@ sessions.cluster.epoch / .members / .writable            // view-synchronous mem
 The single `fero()` call is the only surface 95% of consumers see. Internally it is layers, each independently usable and testable:
 
 ```
-L4   tooling          CLI · devtools cluster tab · chaos tests        (deferred)
+L4   tooling          chaos harness + network observer/dashboard      (built; CLI deferred)
 L3   planner          distributed operator graph                      (deferred; Q2/Q3 slices live in L2 today)
 L2   resource         fero(name, opts) — the public API               → resource/
 L1   log + view       per-partition append-only log + $() projection  → log/
@@ -121,8 +121,9 @@ Ultra-low latency is a hard requirement, not an afterthought — fero is on the 
 ## Dev workflow
 
 ```bash
-npm test       # node --test over utils/transport/log/resource *.test.ts (TS run directly, no build step)
+npm test       # node --test over utils/transport/log/resource/tools/chaos *.test.ts (TS run directly, no build step)
 npm run perf   # median-of-5 perf assertions with hard thresholds
+npm run observe  # launch the L4 network observer + dashboard against a running cluster
 ```
 
 TypeScript is the source of truth; `*.js` is gitignored, tests run via `--experimental-strip-types`. Conventions, the layered build order, and the perf invariants are in [CLAUDE.md](CLAUDE.md). The design spec is [plan.md](plan.md); settled rationale is in [DECISIONS.md](DECISIONS.md) (append-only); open work, grouped by workstream, is in [IDEAS.md](IDEAS.md).

@@ -31,7 +31,8 @@ l.append({ type: 'update', key: ['user42', 'active'], value: true })
 | Export | What it is |
 |---|---|
 | `log()` | A fresh `Log` (full-replication granularity). |
-| `Log` | The class — `append` · `onAppend` · `head`/`heads`/`since`/`diff` · `marks`/`recordsSince` · `drop` · `partitions` · `size`. Construct scoped via `new Log({ scoped: true })`. |
+| `Log` | The class — `append` · `onAppend` · `head`/`heads`/`since`/`diff` · `marks`/`recordsSince` · `drop` · `compact` · `partitions` · `size`. Construct scoped via `new Log({ scoped: true })`. |
+| `versionKey(record)` | The LWW-contention key (`at` folded into the path). Shared with L2 so compaction collapses EXACTLY the records LWW treats as one cell. |
 | `view(log)` | A `$()` ViewProxy projecting the log: replays existing records, then applies each future append. Pure read-side (log → view, one direction). |
 | `applyRecord(res, record)` | The terminal apply contract — `update`/`insert`/`remove` onto a `data` `res`. The one place records become state; shared with L2. |
 | `distribute(opts)` | `{ data, log, mesh }` — a log+view wired to an L0 transport mesh. **Arch A** (log is the write API); the demonstrator, not the resource core (see Design notes). |
@@ -67,7 +68,7 @@ Only **one** index is ever maintained, so full replication pays nothing for scop
 
 Tracked in [IDEAS.md](../IDEAS.md), tagged `(log)`:
 
-- **Bounded memory & compaction [P1]** — segments grow forever; collapse to latest-value-per-key and/or snapshot+truncate. Shares one pass with the WAL and `versions`/`seen` maps. `heads()` allocates per call (cache + invalidate on append).
+- **Bounded memory & compaction [P1]** — in-memory `compact()` LANDED ([DECISIONS W](../DECISIONS.md)): collapses strictly-superseded same-origin updates on an unref'd timer (marks/catch-up/shed preserved), and the index rebuild is single-pass (one union over all partitions, not one rebuild per partition). Remaining: insert/remove-churn collapse + array element-identity; a per-partition dirty-set so the sweep is O(written); WAL snapshot+truncate; `versions`/`seen` tombstone GC. `heads()` still allocates per call (cache + invalidate on append).
 - **Catch-up & anti-entropy hardening [P2]** — Merkle/range digest (P3) to cut the per-origin-coarse comparison for huge logs; stream `diff()`/`recordsSince` instead of allocating the whole tail; verify asymmetric (inbound-only) reachability.
 - **Store encoded records in the log [P2]** — retain bytes / lazy `RecordView`s so the log needs no `sclone` and catch-up re-ships verbatim ([DECISIONS G](../DECISIONS.md)); gate retention behind a `durable`/`catchup` config.
 - **Surfaces / subset views [P2]** — `view(log, filter)` / single-partition projection so L2's per-client `read()` projections can derive from the log.

@@ -216,7 +216,7 @@ client ──(method call)──> connected server
                                                            into the local replica)
 ```
 
-Inside a handler, every `data.x = y` is intercepted: change record built, routed via DHT to the partition owner, committed to the log, replicated. **The handler awaits each commit's ack before continuing** — so the reply you `return` is post-commit.
+Inside a handler, every `data.x = y` is intercepted: change record built, routed via DHT to the partition owner, committed to the log, replicated. **The reply you `return` is post-commit** — but NOT because each assignment blocks (that framing was revised; see §11.1): assignments are fire-and-forget, and `return` is post-commit because pending writes are flushed-and-awaited on return (the flush-on-return barrier, still open work — [IDEAS](IDEAS.md) open question 1). A method-call write (`await methods.update(...)`) is individually ack'd today via the ack-confirmed owner-forward ([DECISIONS X](DECISIONS.md)).
 
 ### Consequences
 

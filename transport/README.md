@@ -84,12 +84,12 @@ The wire codec is exported directly (and under `fero/internals`): `VERB`, `Chang
 
 The matching workstreams in [IDEAS.md](../IDEAS.md):
 
-- **Identity, dedup & connection hygiene** [P1] — no stable peer identity until the handshake: re-key inbound peers off the learned listen address/uuid, dedup the two-socket-per-pair case (connected-wins), prune dead rows, uuid self-reject.
-- **Zero-copy send path** [P1] — replace the `encodeFrame`-per-tick outbox with a streaming `Outbox` into a reused per-peer buffer; add backpressure (honor `socket.write()`'s `false`) and a bounded outbox.
-- **Routing hot path** [P1] — `RecordView.key0` (decode only the partition segment), a hot-key hash memo, the hash bake-off, a self-delivery fast path.
-- **Robustness & lifecycle** [P1] — defensive decode against malformed/hostile frames (`records()` trusts `count` and each `recLen`; bound both against remaining body bytes).
+- **Identity, dedup & connection hygiene** [P1] — re-key inbound peers, prune dead rows (incl. the destroy()-corpse path), uuid self-reject, and heartbeat-only dedup all LANDED ([DECISIONS T/T2/T3/T4](../DECISIONS.md)). Remaining: full two-socket-per-pair collapse (deferred — has a fatal R=∞ convergence regression; prerequisites in IDEAS), and a `max=Infinity` redial to a permanently-dead address (an eviction-driven `forget(address)`).
+- **Zero-copy send path** [P1] — replace the `encodeFrame`-per-tick outbox with a streaming `Outbox` into a reused per-peer buffer; add backpressure (honor `socket.write()`'s `false`) and a bounded outbox. (Served-subscription deltas now ride the same per-peer outbox, coalesced one frame per sub per tick.)
+- **Routing hot path** [P2→P3] — the allocation-free `holds()` predicate LANDED; the hash memo + `key0` were measured-rejected ([DECISIONS U](../DECISIONS.md)). Remaining: the hash bake-off (#8), a bounded-LRU memo, a self-delivery fast path.
+- **Robustness & lifecycle** — defensive frame decode LANDED ([DECISIONS R](../DECISIONS.md)); handshake-identity type validation LANDED (a wrong-typed INIT was a one-frame remote process kill); encode-side `MAX_FRAME` bound + poison-tolerant `encodeFrames` LANDED. Remaining: surface swallowed socket `'error'` to L4.
 - **Value codec & wire evolution** [P2] — Buffer/typed-array values, nested NaN/Infinity; expose varint/zigzag as a shared `codec` seam; a `dispatch[verb]` table.
-- **Handshake / membership protocol** [P2] — commit on DONE not INIT; guards (drop INIT from a connected peer, version byte).
+- **Handshake / membership protocol** [P2] — commit on DONE not INIT; guards (drop INIT from a connected peer, version byte). Split-brain-heal + missed-commit reconcile LANDED ([DECISIONS Y](../DECISIONS.md)).
 - **Wire-format micro-optimizations** [P3] — the reserved `FLAG_COL`/`FLAG_UNIFORM`/`KEY_DELTA` bits (columnar body, prefix-delta keys) are placeholders, not yet built.
 
 Cross-cutting open questions: [#8 value codec](../IDEAS.md), [#9 hash function](../IDEAS.md).
