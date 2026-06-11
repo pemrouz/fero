@@ -242,7 +242,13 @@ export class Log {
   // is never dropped — so marks() (= last index entry's seq) is preserved EXACTLY,
   // and P4 shed-confirmation (which gates on log.marks()) is undisturbed.
   compact({ min = 2 }: { min?: number } = {}): number {
-    let dropped = 0
+    //! drops accumulate ACROSS partitions; each affected index group is rebuilt ONCE at the end.
+    // Under full replication #key(r) is the bare origin, so an origin's index group spans every
+    // partition it ever wrote — rebuilding it inside the per-partition loop re-filtered that
+    // whole group once PER compacted partition: K churned partitions × O(origin's total records)
+    // ≈ quadratic, synchronously inside the 30s timer tick. Deferring the index rebuild to one
+    // union-set pass makes the whole sweep O(total records), identical drops.
+    let allDrop: Set<ChangeRecord> | undefined
     for (const [p, seg] of this.#segments) {
       if (seg.length < min) continue // nothing to collapse below a pair
       // Group candidate records — origin-bearing real-path updates — by (origin,versionKey).
@@ -272,20 +278,23 @@ export class Log {
         }
       }
       if (!toDrop || toDrop.size === 0) continue
-      //! rebuild the segment + the dropped records' index groups by object identity (order preserved → still seq-ascending).
+      //! rebuild the segment now (order preserved → still seq-ascending); fold the drops into the union.
       this.#segments.set(p, seg.filter((r) => !toDrop!.has(r))) // never empties: each group keeps its max + all non-candidates survive
-      const ikeys = new Set<string>()
-      for (const r of toDrop) ikeys.add(this.#key(r)) // origin (full) or origin\0partition (scoped)
-      for (const ik of ikeys) {
-        const grp = this.#index.get(ik)
-        if (!grp) continue
-        const ng = grp.filter((r) => !toDrop!.has(r))
-        if (ng.length) this.#index.set(ik, ng)
-        else this.#index.delete(ik)
-      }
-      dropped += toDrop.size
+      if (allDrop) for (const r of toDrop) allDrop.add(r)
+      else allDrop = toDrop
     }
-    return dropped
+    if (!allDrop) return 0
+    //! one pass over the AFFECTED index groups — each filtered exactly once against the union, however many partitions fed it.
+    const ikeys = new Set<string>()
+    for (const r of allDrop) ikeys.add(this.#key(r)) // origin (full) or origin\0partition (scoped)
+    for (const ik of ikeys) {
+      const grp = this.#index.get(ik)
+      if (!grp) continue
+      const ng = grp.filter((r) => !allDrop.has(r))
+      if (ng.length) this.#index.set(ik, ng)
+      else this.#index.delete(ik)
+    }
+    return allDrop.size
   }
 
   //! Total record count across every partition segment.
