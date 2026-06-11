@@ -443,15 +443,21 @@ What's still open:
   backoff and give-up-then-destroy paths are not).
 - **Handshake** — **client refused before `ready`** (the guard isn't built yet — see the
   Handshake/membership workstream; straddle + malformed identity are covered).
-- **Membership** — a dedicated **two-established-cluster merge** (works via the
-  lowest-coordinator + epoch-ordering path, only chaos-adjacent tested);
-  **min-cluster-size** behaviour (a sub-quorum remnant stays read-only — the CP posture is
-  decided in [DECISIONS V](DECISIONS.md), the behaviour is untested); flapper-fencing once
-  incarnation numbers land.
-- **Churn leak** (peers) — the churn scenario asserts convergence + single-view
-  agreement, but a dropped peer still leaves a `disconnected` row forever; wire row
-  pruning (the "Prune dead rows" workstream) and an under-test for it. **dial-cap/jitter**
-  behaviour once the reactive dial loop lands.
+- **Membership** — the consensus core now has a deterministic unit suite
+  ([membership.test.ts](resource/membership.test.ts): convergence, minority write-gate,
+  split-brain-heal reconcile, missed-commit recovery, no-self-orphan), and the
+  eviction-during-partition→heal split-brain reconcile has an e2e chaos scenario
+  ([DECISIONS Y](DECISIONS.md)). Remaining: flapper-fencing once incarnation numbers land;
+  **min-cluster-size** (a sub-quorum remnant stays read-only — CP posture decided in
+  [DECISIONS V](DECISIONS.md), behaviour still only implicitly tested).
+- **Scoped (R-way) chaos — LANDED**: a scoped R=2 partition→heal chaos scenario asserts
+  disjoint holding stays on exactly its R-set across the fault (`heldOnReplicas`). Remaining:
+  scoped crash→recover + churn (shed/acquire under a kill, not just a partition).
+- **Served-sub leak under churn — LANDED**: the churn + scoped scenarios assert
+  `servedSubs() === 0` after reap (the harness accessor is now used). **Peer-ROW leak**
+  under-test still waits on the `max=Infinity` `forget(address)` item — a killed node is
+  redialed forever, so its pool row legitimately persists (the VIEW excludes it, asserted).
+  **dial-cap/jitter** behaviour once the reactive dial loop lands.
 - **DHT** — tighten distribution/movement bounds (deterministic hash + larger key
   set asserts the ~1/N movement law); `owners()` distinct-R under churn.
 - **Method-returns-ViewProxy** — snapshot (`await`) vs live (reactive) on one handle;
