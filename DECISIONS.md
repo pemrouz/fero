@@ -1275,3 +1275,58 @@ stays deferred. `compact: false` disables it.
 need element-identity, not positional `at`); a per-partition dirty-set so the timer is O(written) not
 O(partitions); WAL compaction (snapshot+truncate / `onCompact` hook) + durable shed; `versions`/`seen`
 tombstone GC with a safety horizon; durable view-epoch recovery (the stable-uuid-restart inversion).
+
+## X — Write-path consistency hardening: epoch-dominance stamp, client forwarding, ack-confirmed forwards · Adopted
+
+**Context.** A full-project adversarial review (72 agents) surfaced three write-path holes that all end in
+SILENT divergence or loss — none caught by the existing suite because each needs a specific
+view-lag / client / owner-crash interleaving.
+
+**Decision — three independent fixes, one consistency story.**
+
+- **Epoch-dominance stamp (supersedes part of [V1d](#v--view-synchronous-membership--adopted--5c45e61--1d8c533)).**
+  `commitLocal` stamped `viewEpoch()` UNCONDITIONALLY. A node whose committed view lags the epoch of a
+  winner it already holds for the key (a restored WAL, a missed/in-flight `VIEW_COMMIT`, the join window)
+  then committed its deliberate overwrite at the LOWER epoch — every peer holding the newer-epoch winner
+  sticky-fenced it ([B1](#b1) skip: `seen` advances so AE never re-ships), while the writer applied it
+  locally. Permanent per-key divergence until the next write touches the key. Fix: a local write happening
+  NOW against locally-known state is not the stale-view straggler V1d fences — it knowingly supersedes the
+  held winner, so it commits at `max(viewEpoch, cur.epoch)`; the merged Lamport seq (`clock ≥ cur.seq`)
+  wins LWW within that epoch on every replica. One compare on the write path (index.perf unchanged).
+- **Client writes forward, never commit-local ([F1](#f1--owner-routed-writes-via-forwarding-owner-re-sequencing-phase-1--adopted) extended to clients).**
+  A read-only client has no `ViewManager`, so `viewEpoch()` ≡ 1 and the F1 branch (which required
+  `me !== undefined`) never fired — `client.data.x = v` committed LOCALLY at epoch 1 and broadcast. Any
+  formed cluster (epoch ≥ 2) fenced every such record wherever a server-written winner existed, while the
+  client kept it locally: silent permanent divergence. Fix: a client routes the assignment to a picked
+  server (it re-sequences under its provenance/epoch via the `committingForward` guard — no re-route
+  ping-pong); the optimistic local copy stays (read-your-writes; the canonical view rides subscriptions).
+  Unreachable or unconfirmed ⇒ the write buffers (bounded drop-oldest, the V1e posture) and drains on
+  `onConnect` + a periodic unref'd sweep.
+- **Ack-confirmed forwards (closes the [Q1](#q1--hold-relative-reads-owner-routed-read--datax-facade--adopted) never-drop gap).**
+  `mesh.forward`'s boolean was socket-write success, NOT delivery: an owner crashing inside the
+  failure-detector lag accepts the frame into a dying kernel buffer, and a scoped non-holder had already
+  discarded its optimistic copy — the write then existed NOWHERE (silent loss, violating never-drop). Fix:
+  an id-tagged `WRITE` is `ACK`ed by the receiver AFTER its synchronous `onWrite` commit; `forward(addr,
+  rec, onOutcome)` arms a `callTimeout` fallback — no ack ⇒ `onOutcome(false)` ⇒ the caller commits under
+  its own provenance (a server: an orphan a non-holder P4-sheds once the R-set confirms; a client:
+  re-buffer). At-least-once: a duplicate (owner committed, ack lost) converges via LWW. The legacy
+  boolean `forward(addr, rec)` is unchanged (no `onOutcome` ⇒ no ack tracking), so the broadcast/digest
+  paths are untouched.
+
+**Consequences.**
+- Epoch can now differ across same-tick local writes — `encodeFrames` already splits a run on an epoch
+  change and compaction's dominance guard already handles epoch inversion (both pre-pinned by tests).
+- The client write path adds a `forwardToServer` + a bounded pending buffer + an unref'd flush timer
+  (client-only; a server's path is unchanged). `mesh.pickServer()` is now public (the client picks its
+  forward target the same way `call`/`subscribe` do).
+- Forward bookkeeping (`forwards` map: id → {timer, onOutcome}) is cleared on transport `destroy()` so a
+  torn-down node fires no late fallbacks.
+- Tests: a divergence repro per fix (restored-epoch-7 overwrite applies on a lagging-view peer; a client
+  assignment reaches a 2-server cluster and replicates instead of fencing; an offline client write buffers
+  then flushes on connect; a real owner ACKs `true` while a swallowing receiver times out to `false`).
+
+**Open follow-ups → [IDEAS](IDEAS.md):** preserve a buffered write's ORIGINAL attempt-epoch on flush
+(V deferral, now also relevant to the client buffer); the reject-stale-epoch fence from an EVICTED node
+(needs per-partition owner lineage — still open, distinct from this same-node-lag fix); read-your-writes
+on a client whose forward is still in flight (it reads its optimistic local copy, correct, but a routed
+read could momentarily race the owner's commit).

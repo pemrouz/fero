@@ -45,7 +45,10 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    sink today, bypassing the `update` method, so a custom `update` can't intercept
    plain assignments. Route assignments through the method (for an auth/validation
    hook) or keep them separate? A genuinely-open design point, not in plan §11
-   (it sits alongside the §11.1 write-paths). (resource)
+   (it sits alongside the §11.1 write-paths). (resource) *(Note: a CLIENT's
+   assignment now FORWARDS to a server rather than committing locally — [DECISIONS
+   X](DECISIONS.md) — so on a client the server's `update`/sink sees it; the parity
+   gap is now specifically a SERVER's own local assignment.)*
 7. **Value codec.** Adopt a CBOR / `data`-owned binary value form behind the
    `encodeValue`/`decodeValue` seam? `JSON.parse` of object values is ~85% of decode
    cost (~2.4ms vs ~0.35ms lazy-scan for 1000 object records) — decide with a perf
@@ -216,9 +219,13 @@ The routed/projected model (plan §5–6) has landed
 - **Reject-stale-epoch fence** (the open residue of F3) — REJECT a stale-epoch write
   from an evicted node; needs per-partition owner lineage + a uuid↔address map
   ([DECISIONS V/F2](DECISIONS.md)).
-- **Read-your-writes on a failed owner-forward.** When a write's owner-forward fails it
-  commits as a local orphan, but a subsequent read routes to the stale owner until
-  anti-entropy reconciles ([DECISIONS Q1](DECISIONS.md)) — tighten.
+- **Owner-forward never-drop — HARDENED** ([DECISIONS X](DECISIONS.md)): forwards are now
+  ACK-confirmed — socket-write success ≠ delivery, so an owner crashing inside the
+  failure-detector lag (frame into a dying kernel buffer) no longer silently loses the write;
+  no ACK within `callTimeout` ⇒ the caller commits under its own provenance (an orphan a
+  non-holder P4-sheds). Remaining: read-your-writes still routes a subsequent read to the
+  stale owner until AE reconciles; and preserving the buffered write's ORIGINAL attempt-epoch
+  on flush (V deferral).
 - **Stale shed-confirmation across an orphan write — LANDED** ([DECISIONS P4a](DECISIONS.md)):
   `commitLocal` now clears `shedReady[p]` when its never-drop fallback appends a fresh winner to
   an orphan, so a confirmation earned against the old high-water can't be reused to shed before
