@@ -5,10 +5,10 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { connect } from 'node:net'
+import { connect, createServer } from 'node:net'
 import { $, value, view } from '../../data/index.ts'
 import { transport, STATUS } from './index.ts'
-import { type ChangeRecord, encodeFrame, VERB } from './message.ts'
+import { type ChangeRecord, encodeFrame, Framer, VERB } from './message.ts'
 import { ports, until, connected, apply, sleep } from '#utils'
 
 // A storeless mesh needs somewhere to land records so the test can assert where
@@ -362,5 +362,56 @@ test('a dialed peer row is PRUNED when reconnect attempts are exhausted (gives u
     assert.ok(await until(() => !(a in (node.peers[value] ?? {})), 3000), 'the given-up peer’s row was pruned')
   } finally {
     node.destroy()
+  }
+})
+
+test('ack-confirmed forward: a real owner ACKs (true); a swallowing receiver times out into false', async () => {
+  // The never-drop seam (#4): socket-write success ≠ delivery. An owner crashing inside the
+  // failure-detector lag ACCEPTS the frame into a dying kernel buffer — the old boolean forward
+  // reported success and a scoped forwarder discarded its only copy. With onOutcome, the
+  // receiver acks AFTER its synchronous onWrite commit; no ack within callTimeout ⇒ false.
+  const [p1, p2, p3, p4] = [await ports.free(), await ports.free(), await ports.free(), await ports.free()]
+
+  // positive leg: a real mesh commits in onWrite and the transport acks the frame id
+  let got: any
+  const mB = transport({ name: 'wack', host: '127.0.0.1', port: p2, ports: [], wait: 50, onWrite: (r: any) => (got = r) })
+  const mA = transport({ name: 'wack', host: '127.0.0.1', port: p1, ports: [p2], wait: 200, callTimeout: 400 })
+  const outcomes: boolean[] = []
+  try {
+    assert.ok(await until(() => connected(mA, `127.0.0.1:${p2}`)), 'A dialed B')
+    assert.ok(mA.forward(`127.0.0.1:${p2}`, { type: 'update', key: ['x'], value: 1 }, (c) => outcomes.push(c)))
+    assert.ok(await until(() => outcomes.length === 1, 3000), 'the ACK settled the forward')
+    assert.deepEqual(outcomes, [true])
+    assert.equal(got.key[0], 'x', 'the owner received the write')
+  } finally {
+    mA.destroy()
+    mB.destroy()
+  }
+
+  // negative leg: a raw TCP "server" that completes the handshake but SWALLOWS WRITE frames —
+  // exactly the dying-owner shape (bytes accepted, commit never happens, no ack ever)
+  const swallowId = { uuid: 'swallow-uuid', role: 'server', listen: `127.0.0.1:${p3}`, peers: [] }
+  const swallow = createServer((socket) => {
+    const framer = new Framer()
+    socket.on('data', (chunk: Buffer) => {
+      for (const f of framer.push(chunk)) {
+        if (f.verb === VERB.INIT)
+          socket.write(encodeFrame([{ type: 'update', key: [], value: swallowId }], { verb: VERB.SYNC }))
+        // DONE / WRITE / PING — swallowed: never an ACK
+      }
+    })
+    socket.on('error', () => {})
+  })
+  await new Promise<void>((r) => swallow.listen(p3, '127.0.0.1', () => r()))
+  const mC = transport({ name: 'wack2', host: '127.0.0.1', port: p4, ports: [p3], wait: 200, callTimeout: 400 })
+  const failed: boolean[] = []
+  try {
+    assert.ok(await until(() => connected(mC, `127.0.0.1:${p3}`)), 'C dialed the swallower')
+    assert.ok(mC.forward(`127.0.0.1:${p3}`, { type: 'update', key: ['y'], value: 2 }, (c) => failed.push(c)), 'the socket write itself succeeded')
+    assert.ok(await until(() => failed.length === 1, 3000), 'the timeout fired')
+    assert.deepEqual(failed, [false], 'no ack ⇒ false ⇒ the caller runs its never-drop fallback')
+  } finally {
+    mC.destroy()
+    await new Promise<void>((r) => swallow.close(() => r()))
   }
 })

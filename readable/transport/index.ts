@@ -53,7 +53,7 @@ export type Mesh = {
   send: (record: ChangeRecord) => void
   replicateTo: (addresses: string[], record: ChangeRecord) => void
   broadcast: (record: ChangeRecord) => void
-  forward: (address: string, record: ChangeRecord) => boolean
+  forward: (address: string, record: ChangeRecord, onOutcome?: (committed: boolean) => void) => boolean
   owners: (key: string, replicas?: number) => string[]
   holds: (key: string, addr: string, replicas?: number) => boolean
   ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot
@@ -66,6 +66,7 @@ export type Mesh = {
   catchupTo: (address: string, records: ChangeRecord[]) => void
   call: (method: string, arg: unknown, to?: string) => Promise<unknown>
   hasServer: () => boolean
+  pickServer: () => string | undefined
   subscribe: (method: string, arg: unknown, onDelta: (record: ChangeRecord) => void, to?: string) => (() => void) | undefined
   deltaTo: (address: string, subId: number, record: ChangeRecord) => void
   drop: (address: string) => boolean
@@ -151,6 +152,8 @@ export function transport(opts: TransportOpts): Mesh {
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void; timer?: ReturnType<typeof setTimeout> }>()
   const subs = new Map<number, (record: ChangeRecord) => void>()
   const warnedVerbs = new Set<number>()
+  // forwards: in-flight ack-confirmed WRITE forwards — id → fallback timer + the outcome callback (the never-drop release).
+  const forwards = new Map<number, { timer: ReturnType<typeof setTimeout>; onOutcome: (committed: boolean) => void }>()
 
   // dispatch: the inbound frame router — handshake first, then fan each verb to its hook (fail-closed default).
   function dispatch(frame: Frame, peer: Peer) {
@@ -170,7 +173,18 @@ export function transport(opts: TransportOpts): Mesh {
       case VERB.WRITE:
         // WRITE: a forwarded write-request for a partition we own — L2 commits it, making us its sole sequencer.
         for (const record of frame.records()) opts.onWrite?.(record, peer.address)
+        // WRITE-ACK: confirm the commit back to the sender (socket-write success ≠ delivery).
+        if (frame.id !== undefined) peer.write(controlFrame(VERB.ACK, null, frame.id))
         return
+      case VERB.ACK: {
+        // ACK: an owner confirmed a forwarded write — settle the pending forward (clear its fallback timer).
+        const fw = forwards.get(frame.id!)
+        if (!fw) return
+        forwards.delete(frame.id!)
+        clearTimeout(fw.timer)
+        fw.onOutcome(true)
+        return
+      }
       // View-change frames: explicit cases so a VIEW_* frame never falls through to the onRecord data path.
       case VERB.VIEW_PREPARE:
         opts.onViewPrepare?.(frame.value, peer.address)
@@ -301,11 +315,24 @@ export function transport(opts: TransportOpts): Mesh {
     viewAck: (address, value) => sendViewFrame(address, VERB.VIEW_ACK, value),
     viewCommit: (address, value) => sendViewFrame(address, VERB.VIEW_COMMIT, value),
     // forward: route a write-request to the owner (point-to-point); false if the socket isn't writable so caller commits locally.
-    forward(address, record) {
+    // with onOutcome: ACK-CONFIRMED — socket-write success ≠ delivery (an owner crash inside the
+    forward(address, record, onOutcome) {
       const peer = pool.peer(address)
       if (!peer) return false
-      return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
+      if (!onOutcome) return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
+      const id = ++callId
+      const timer = setTimeout(() => {
+        if (forwards.delete(id)) onOutcome(false)
+      }, opts.callTimeout ?? 5000)
+      timer.unref?.()
+      forwards.set(id, { timer, onOutcome })
+      if (peer.write(encodeFrame([record], { verb: VERB.WRITE, id }))) return true
+      forwards.delete(id)
+      clearTimeout(timer)
+      return false
     },
+    // pickServer: the connected server an unaddressed client write/call routes to (undefined ⇒ unreachable).
+    pickServer: () => pickServer(),
     // digestTo/catchupTo: anti-entropy sent point-to-point (not the batched outbox) so it can't disturb its single-origin invariant.
     digestTo(address, vector) {
       pool.peer(address)?.write(controlFrame(VERB.DIGEST, vector))
@@ -360,9 +387,11 @@ export function transport(opts: TransportOpts): Mesh {
       })
     },
     ready,
-    // destroy: tear down — cancel the ready timer, close the pool and listener.
+    // destroy: tear down — cancel the ready timer + in-flight forward fallbacks, close the pool and listener.
     destroy() {
       clearTimeout(readyTimer)
+      for (const { timer } of forwards.values()) clearTimeout(timer)
+      forwards.clear()
       void candHost
       pool.destroy()
       server?.close()

@@ -71,7 +71,7 @@ export type Mesh = {
   send: (record: ChangeRecord) => void
   replicateTo: (addresses: string[], record: ChangeRecord) => void // scoped replication (Milestone P): send a committed record to the given R-set, excluding self (the committer already holds + logged it). Caller passes the precomputed owners(key,R) so the ring is walked once per write.
   broadcast: (record: ChangeRecord) => void
-  forward: (address: string, record: ChangeRecord) => boolean // route a write-request to the owner; false if it isn't connected
+  forward: (address: string, record: ChangeRecord, onOutcome?: (committed: boolean) => void) => boolean // route a write-request to the owner; false if it isn't connected. With onOutcome: ack-confirmed — false-outcome on timeout releases the caller's never-drop fallback
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
   holds: (key: string, addr: string, replicas?: number) => boolean // owners(key,R).includes(addr) without materializing the owner set (per-record held-gate / catch-up filter)
   ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot // L4 observability: committed ring membership + vnode count (+ a k-sampled ownership donut when coverage:k, + full arcs when vnodes:true) — cold path, off the routing hot path
@@ -84,6 +84,7 @@ export type Mesh = {
   catchupTo: (address: string, records: ChangeRecord[]) => void // ship records a peer lacks
   call: (method: string, arg: unknown, to?: string) => Promise<unknown> // RPC; to a specific peer (owner-routed reads — Q1) or a picked connected server
   hasServer: () => boolean // is there a connected server to call?
+  pickServer: () => string | undefined // the connected server an unaddressed client write/call routes to
   subscribe: (method: string, arg: unknown, onDelta: (record: ChangeRecord) => void, to?: string) => (() => void) | undefined // live subscription; to a specific peer or a picked server; returns an unsubscribe (or undefined if not connected)
   deltaTo: (address: string, subId: number, record: ChangeRecord) => void // server → client: ship one subscription delta
   drop: (address: string) => boolean // abruptly close a peer's connection (no UNSUBSCRIBE/teardown frames) — fault injection for chaos tests + the subscription-reap path; false if not connected
@@ -185,6 +186,8 @@ export function transport(opts: TransportOpts): Mesh {
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void; timer?: ReturnType<typeof setTimeout> }>()
   const subs = new Map<number, (record: ChangeRecord) => void>()
   const warnedVerbs = new Set<number>() // unrecognized verbs already warned about (fail-closed default, once per verb)
+  //! forwards: in-flight ack-confirmed WRITE forwards — id → fallback timer + the outcome callback (the never-drop release).
+  const forwards = new Map<number, { timer: ReturnType<typeof setTimeout>; onOutcome: (committed: boolean) => void }>()
 
   //! dispatch: the inbound frame router — handshake first, then fan each verb to its hook (fail-closed default).
   function dispatch(frame: Frame, peer: Peer) {
@@ -207,7 +210,21 @@ export function transport(opts: TransportOpts): Mesh {
         // record to L2, which commits it locally (its sink stamps origin=us and
         // replicates) — so we become the single sequencer for the partition.
         for (const record of frame.records()) opts.onWrite?.(record, peer.address)
+        //! WRITE-ACK: confirm the commit back to the sender (socket-write success ≠ delivery).
+        // onWrite committed synchronously above; an id-carrying WRITE gets an ACK so the
+        // sender can release its never-drop fallback. If onWrite threw, we never reach this —
+        // the sender times out and commits locally instead (at-least-once, never zero).
+        if (frame.id !== undefined) peer.write(controlFrame(VERB.ACK, null, frame.id))
         return
+      case VERB.ACK: {
+        //! ACK: an owner confirmed a forwarded write — settle the pending forward (clear its fallback timer).
+        const fw = forwards.get(frame.id!)
+        if (!fw) return // late ack after the timeout fallback already ran — the duplicate converges via LWW
+        forwards.delete(frame.id!)
+        clearTimeout(fw.timer)
+        fw.onOutcome(true)
+        return
+      }
       //! View-change frames: explicit cases so a VIEW_* frame never falls through to the onRecord data path.
       // Membership view-change frames (Milestone V) — explicit cases so they
       // route to their own hooks and never fall through to onRecord below.
@@ -382,11 +399,30 @@ export function transport(opts: TransportOpts): Mesh {
     // local commit rather than SILENTLY DROPPING the write. (peer.write returns
     // false only when the socket is gone — small control frames don't hit
     // backpressure — so a false here means the frame did not go out.)
-    forward(address, record) {
+    //
+    //! with onOutcome: ACK-CONFIRMED — socket-write success ≠ delivery (an owner crash inside the
+    // failure-detector lag accepts the bytes into a dying kernel buffer and the write vanishes;
+    // a scoped forwarder that discarded its optimistic copy then held NOTHING — silent loss
+    // violating never-drop). An id-tagged WRITE is acked by the receiver AFTER its synchronous
+    // commit; no ack within callTimeout → onOutcome(false) → the caller's never-drop fallback.
+    // A duplicate (owner committed, ack lost) converges via LWW — at-least-once, never zero.
+    forward(address, record, onOutcome) {
       const peer = pool.peer(address)
       if (!peer) return false
-      return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
+      if (!onOutcome) return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
+      const id = ++callId
+      const timer = setTimeout(() => {
+        if (forwards.delete(id)) onOutcome(false) // never confirmed → fallback (commit-local / re-buffer)
+      }, opts.callTimeout ?? 5000)
+      timer.unref?.()
+      forwards.set(id, { timer, onOutcome })
+      if (peer.write(encodeFrame([record], { verb: VERB.WRITE, id }))) return true
+      forwards.delete(id)
+      clearTimeout(timer)
+      return false
     },
+    //! pickServer: the connected server an unaddressed client write/call routes to (undefined ⇒ unreachable).
+    pickServer: () => pickServer(),
     //! digestTo/catchupTo: anti-entropy sent point-to-point (not the batched outbox) so it can't disturb its single-origin invariant.
     // Point-to-point. Sent as prebuilt frames straight to the peer's socket (not
     // the batched broadcast outbox), so catch-up traffic never disturbs the
@@ -463,9 +499,11 @@ export function transport(opts: TransportOpts): Mesh {
       })
     },
     ready,
-    //! destroy: tear down — cancel the ready timer, close the pool and listener.
+    //! destroy: tear down — cancel the ready timer + in-flight forward fallbacks, close the pool and listener.
     destroy() {
       clearTimeout(readyTimer)
+      for (const { timer } of forwards.values()) clearTimeout(timer) // a torn-down node must not fire never-drop fallbacks
+      forwards.clear()
       void candHost
       pool.destroy()
       server?.close()

@@ -865,6 +865,51 @@ test('client RPC: a client write routes to the server and replicates', async () 
   B.destroy()
 })
 
+test('client ASSIGNMENT routes to a server (epoch ≥ 2 cluster) — not stamped epoch 1 and fenced (#3)', async () => {
+  // Regression: a client has no ViewManager, so viewEpoch() ≡ 1 and the old sink committed
+  // `client.data.x = v` LOCALLY at epoch 1 and broadcast it. Any formed cluster commits at
+  // epoch ≥ 2, so every server-written key fenced the client's epoch-1 record (B1 skip) — the
+  // write was silently lost cluster-wide AND the client kept it locally (permanent divergence).
+  // The client must FORWARD the assignment to a server, which re-sequences it under its epoch.
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const a2 = `127.0.0.1:${p2}`
+  const A: any = await fero('cli-assign', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
+  const B: any = await fero('cli-assign', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  assert.ok(await until(() => connected(A.cluster, a2)), 'A↔B formed')
+  // wait for the VIEW to commit (connected() is only the socket) — that's what bumps the epoch past 1
+  assert.ok(await until(() => A.cluster.epoch >= 2 && B.cluster.epoch >= 2, 8000), `the cluster committed a view at epoch ≥2 (A=${A.cluster.epoch} B=${B.cluster.epoch})`)
+  const C: any = await fero('cli-assign', { host: '127.0.0.1', ports: [p1], wait: 200 })
+  assert.ok(await until(() => connected(C.cluster, `127.0.0.1:${p1}`), 4000), 'C connected to server A')
+
+  C.data.q = { v: 1 } // a plain assignment on the client (the facade set trap → sink)
+
+  // it must land on a server at the server's epoch AND replicate to the whole cluster
+  assert.ok(await until(() => A.data.q?.[value]?.v === 1, 6000), 'the client assignment reached server A')
+  assert.ok(await until(() => B.data.q?.[value]?.v === 1, 6000), 'and replicated to B (NOT epoch-1 fenced)')
+
+  C.destroy()
+  A.destroy()
+  B.destroy()
+})
+
+test('client write made OFFLINE buffers (bounded) and flushes when a server becomes reachable (#3)', async () => {
+  // No server reachable yet: the forward fails, so the write buffers (bounded drop-oldest)
+  // instead of committing at epoch 1. When a server appears, onConnect + the periodic sweep
+  // drain the buffer through the forward path.
+  const p1 = await ports.free()
+  const C: any = await fero('cli-offline', { host: '127.0.0.1', ports: [p1], wait: 100, antiEntropy: 150 })
+  C.data.early = { v: 1 } // written while NO server exists → buffered, not lost, not committed local-epoch-1
+  await sleep(60)
+  // now bring the server up on the port the client keeps redialing
+  const A: any = await fero('cli-offline', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    assert.ok(await until(() => A.data.early?.[value]?.v === 1, 8000), 'the buffered offline write flushed to the server once reachable')
+  } finally {
+    C.destroy()
+    A.destroy()
+  }
+})
+
 test('client RPC: an unknown method rejects', async () => {
   const p1 = await ports.free()
   const A = await fero('rpcerr', { host: '127.0.0.1', port: p1, wait: 50 })

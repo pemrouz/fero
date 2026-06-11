@@ -217,6 +217,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // onConnect: on handshake, a server sends its digest (reply:true) so catch-up heals both directions.
     onConnect: (address: string) => {
       if (me !== undefined) mesh.digestTo(address, { v: Object.fromEntries(seen), reply: true, me })
+      else flushClientPending()
     },
     // onDigest: ship the records the peer lacks (scoped: only partitions it replicates), confirm-shed, reply once.
     onDigest: (payload: any, address: string) => {
@@ -327,11 +328,22 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // 2) applying-skip: an inbound re-emission — already handled in onRecord.
     if (applying) return
 
-    // 3) F1 forward: not owner + owner reachable ⇒ hand off (a forwarded write skips this).
+    // 3) routing: a CLIENT forwards to a server; a server forwards to the owner (F1) — both ack-confirmed.
     if (!committingForward) {
       const p = partitionOf(change)
-      const owner = me !== undefined ? mesh.owner(p) : undefined
-      if (owner !== undefined && owner !== me && mesh.forward(owner, change)) {
+      // 3a) CLIENT (no ViewManager ⇒ viewEpoch ≡ 1): never commit under own provenance — forward to a server.
+      if (me === undefined) {
+        forwardToServer(change)
+        return
+      }
+      const owner = mesh.owner(p)
+      if (
+        owner !== undefined &&
+        owner !== me &&
+        mesh.forward(owner, change, (committed) => {
+          if (!committed) commitLocal(change)
+        })
+      ) {
         if (scoped && !holds(p)) discardOptimistic(p)
         return
       }
@@ -340,6 +352,30 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // 4) commit-local: stamp/log/replicate under our provenance.
     commitLocal(change)
   })
+
+  // ── client write path (#3): forward to a picked server; buffer (bounded) when unreachable/unconfirmed ──
+  const bufferClientWrite = (change: ChangeRecord) => {
+    if (pending.length >= MAX_PENDING) pending.shift()
+    pending.push(change)
+  }
+  const forwardToServer = (change: ChangeRecord) => {
+    const server = mesh.pickServer()
+    if (
+      server === undefined ||
+      !mesh.forward(server, change, (committed) => {
+        if (!committed) bufferClientWrite(change)
+      })
+    )
+      bufferClientWrite(change)
+  }
+  // flushClientPending: drain the client buffer once a server is reachable (onConnect + a periodic unref'd sweep).
+  const flushClientPending = () => {
+    if (me !== undefined || !pending.length || mesh.pickServer() === undefined) return
+    const batch = pending.splice(0)
+    for (const c of batch) forwardToServer(c)
+  }
+  const clientFlushTimer = me === undefined ? setInterval(flushClientPending, antiEntropyMs) : undefined
+  clientFlushTimer?.unref?.()
 
   // ── orphan shedding (P4, scoped): keep a no-longer-replicated partition until an R-set member is caught up, then drop ──
   // orphans / shedReady: partitions we hold but no longer replicate, + the R-set members confirmed caught up on each.
@@ -537,6 +573,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       storageUnsub?.()
       if (aeTimer) clearInterval(aeTimer)
       if (compactTimer) clearInterval(compactTimer)
+      if (clientFlushTimer) clearInterval(clientFlushTimer)
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
