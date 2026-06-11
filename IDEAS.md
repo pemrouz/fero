@@ -59,6 +59,14 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
 9. **Conflict-merge model.** Stay LWW-by-Lamport, or adopt CRDT / OR-set
    (intent-preserving merge vs simplicity)? And within LWW, refine the Lamport order
    with an HLC/wall-clock hybrid ([DECISIONS A](DECISIONS.md))? (resource, log)
+   - **Field-level LWW key-hierarchy aliasing.** `versionKey` makes a whole-object write
+     (`data.k = {…}`) and a nested-leaf write (`data.k.score = …`) INDEPENDENT LWW cells, so
+     two concurrent writes from different origins — one whole-object, one nested — resolve
+     per-cell: the version maps converge but the materialized proxy state can depend on apply
+     ORDER (the nested write may land on an object the whole-object write later replaces, or
+     vice-versa). Unordered convergence holds per-cell; cross-cell-hierarchy convergence does
+     not. A CRDT/OR-set or a hierarchy-aware LWW (a child write bumps its ancestor cell) would
+     close it; document the limitation until then. Surfaced by the full-project review. (resource)
 
 > The routed/partitioned model has landed ([DECISIONS F1/V/P/Q1/Q2/Q3](DECISIONS.md));
 > its open remainders live in the Partitioned ownership, Catch-up & anti-entropy,
@@ -270,6 +278,16 @@ Both halves of [open question 2], from [DECISIONS D + E](DECISIONS.md).
   arrives; a mid-handshake drop leaves a half-merged relationship.
 - **Guards & negotiation.** Drop INIT from an already-connected peer; refuse clients
   before `ready`; carry a protocol/version byte in INIT.
+- **Hostile-identity hardening — LANDED**: a wrong-typed INIT identity (`peers:[42]`) was a
+  one-frame remote process kill (TypeError in `learn`→`addServer` unwinding through the socket
+  handler); `identityOf` now validates → `FrameError` → peer drop.
+- **Split-brain heal + missed-commit reconcile — LANDED** ([DECISIONS Y](DECISIONS.md)): a
+  periodic view re-announce (reusing `VIEW_COMMIT`) lets a stale node's coordinator detect a
+  higher committed epoch and re-propose a unifying view, and a member that missed its
+  `VIEW_COMMIT` recovers. Remaining: incarnation/epoch fencing for a flapping rejoiner; an
+  explicit `forget(address)` / reject-stale-epoch from an intentionally-removed (still-reachable)
+  node — distinct from heal-reconcile, which correctly re-admits a reachable stale node; faster
+  missed-commit recovery than the announce period (retry un-acked members next tick).
 
 ### Method / RPC semantics — [P2] (resource; transport/peer)
 From [DECISIONS D + E](DECISIONS.md) and plan §5–6.

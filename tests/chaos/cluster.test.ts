@@ -52,10 +52,11 @@ test('chaos: network PARTITION then HEAL — majority writes, minority buffers, 
   // evictAfter is huge ON PURPOSE: the partition must NOT trigger an eviction →
   // re-admit view-change ballot. We want the cluster to stay in one 5-member view
   // while the minority simply can't reach a quorum — so the write-gate (V1e) makes
-  // it read-only. That isolates the alive-but-unreachable property cleanly AND keeps
-  // the test robust: the eviction/re-admit ballot livelocks under heavy CPU
-  // contention (PREPARE/ACK timeouts fire before starved ACKs arrive). The
-  // eviction + rejoin path is covered separately by V1c / V1f / the churn test.
+  // it read-only. That isolates the alive-but-unreachable property cleanly. The
+  // eviction-DURING-partition → heal reconcile (two distinct committed views merging
+  // back to one) is covered by the dedicated eviction-heal scenario below + the
+  // deterministic membership.test.ts (DECISIONS Y); eviction + rejoin in isolation by
+  // V1c / V1f / the churn test.
   const c = await cluster({ n: 5, wait: 350, evictAfter: 100000 })
   try {
     assert.ok(await c.formed(10000), 'cluster formed')
@@ -162,6 +163,48 @@ test('chaos: membership CHURN — rapid join/leave re-agrees on one view and con
         n.destroy()
       } catch {}
     })
+    c.destroy()
+  }
+})
+
+test('chaos: EVICTION during a partition then HEAL — two committed views reconcile to one (DECISIONS X #1)', async () => {
+  // The deadlock the full-project review found: with eviction ON, a partition makes the two
+  // sides commit DISTINCT views. Put the global-LOWEST address in the evicted minority — so on
+  // heal the merged coordinator is back on its STALE larger view with NO member-set delta
+  // (everyone reachable, all already in its view). Pre-fix it never re-proposed → two epochs
+  // forever. The view re-announce surfaces the majority's higher epoch so the coordinator
+  // re-proposes a unifying view that re-admits the minority. (Eviction is timing-real, so the
+  // budgets are generous; the re-announce continuously re-drives convergence, so heal is robust.)
+  const c = await cluster({ n: 5, wait: 350, heartbeat: { interval: 100, misses: 2 }, evictAfter: 600 })
+  try {
+    assert.ok(await c.formed(12000), 'cluster formed as one 5-member view')
+    assert.ok(await c.place(['seed'], (k) => ({ k }), 10000), 'seed placed')
+    const baseEpoch = c.all()[0].cluster.epoch
+
+    // minority = the TWO lowest addresses (so the global-lowest — the post-heal coordinator —
+    // is on the STALE side); majority = the three highest (keeps quorum, will evict the two).
+    const byAddr = c.all().slice().sort((a, b) => (a.cluster.me! < b.cluster.me! ? -1 : 1))
+    const minority = byAddr.slice(0, 2)
+    const majority = byAddr.slice(2)
+    c.partition(majority, minority)
+
+    // the majority evicts the minority → commits a NEW, smaller, higher-epoch view
+    assert.ok(
+      await until(() => majority.every((n) => n.cluster.members.length === 3 && n.cluster.epoch > baseEpoch), 20000),
+      'majority evicted the minority and committed a 3-member view at a higher epoch',
+    )
+    // the minority is a 2-of-5 remnant → write-gated, still on the stale 5-member view
+    assert.ok(minority.every((n) => n.cluster.writable === false), 'minority is read-only')
+    assert.ok(minority.every((n) => n.cluster.members.length === 5), 'minority still on the stale 5-member view (the split)')
+
+    // HEAL — the reconcile must re-admit the minority into ONE view at a fresh epoch.
+    c.heal()
+    assert.ok(
+      await until(() => { const ms = c.all().map((n) => n.cluster.members.length); const es = c.all().map((n) => n.cluster.epoch); return ms.every((m) => m === 5) && es.every((e) => e === es[0]) }, 30000),
+      'all five reconciled to ONE 5-member view at one epoch after heal (no permanent split-brain)',
+    )
+    assert.ok(await c.converged(20000), 'state reconverged')
+  } finally {
     c.destroy()
   }
 })

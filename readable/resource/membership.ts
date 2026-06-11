@@ -14,6 +14,7 @@ export type ViewOpts = {
   interval?: number
   ackTimeout?: number
   evictAfter?: number
+  announce?: number
   now?: () => number
   onCommit?: (view: View) => void
   onWritable?: (writable: boolean) => void
@@ -33,6 +34,9 @@ export class ViewManager {
   #peers: any
   #ackTimeout: number
   #evictAfter: number
+  #announce: number
+  #lastAnnounce = 0
+  #seenEpoch = 0
   #now: () => number
   #onCommit?: (v: View) => void
   #onWritable?: (w: boolean) => void
@@ -54,6 +58,7 @@ export class ViewManager {
     this.#peers = opts.peers
     this.#ackTimeout = opts.ackTimeout ?? 600
     this.#evictAfter = opts.evictAfter ?? 1500
+    this.#announce = opts.announce ?? 600
     this.#now = opts.now ?? Date.now
     this.#onCommit = opts.onCommit
     this.#onWritable = opts.onWritable
@@ -94,6 +99,7 @@ export class ViewManager {
     const reachableArr = this.#reachable()
     const reachable = new Set(reachableArr)
     this.#updateWritable(reachable)
+    this.#reannounce(reachableArr)
     if (this.#proposal) return
     const now = this.#now()
 
@@ -111,7 +117,8 @@ export class ViewManager {
     // Keep members that are reachable OR still within the eviction grace; drop expired; add new reachable servers.
     const kept = this.members.filter((m) => reachable.has(m) || now - (this.#unreachableSince.get(m) ?? now) < this.#evictAfter)
     const proposed = [...new Set([...kept, ...reachableArr])].sort()
-    if (sortedEqual(proposed, this.members)) {
+    // Propose on a member-set delta OR on epoch divergence — a higher committed epoch among reachable peers means a split healed and our two views must merge.
+    if (sortedEqual(proposed, this.members) && this.#seenEpoch <= this.epoch) {
       this.#lastProposable = ''
       return
     }
@@ -121,6 +128,18 @@ export class ViewManager {
       return
     }
     this.#propose(proposed)
+  }
+
+  // Re-broadcast our committed view to all reachable peers (throttled) — the backstop for split-brain heal + a dropped VIEW_COMMIT.
+  #reannounce(reachableArr: string[]) {
+    const now = this.#now()
+    if (now - this.#lastAnnounce < this.#announce) return
+    let lowestInView: string | undefined
+    for (const m of this.members) if (m === this.#me || reachableArr.includes(m)) { if (lowestInView === undefined || m < lowestInView) lowestInView = m }
+    if (lowestInView !== this.#me) return
+    this.#lastAnnounce = now
+    const payload = { epoch: this.epoch, members: this.members }
+    for (const a of reachableArr) if (a !== this.#me) this.#mesh.viewCommit(a, payload)
   }
 
   #propose(members: string[]) {
@@ -185,12 +204,14 @@ export class ViewManager {
     this.#install(p.epoch, p.members)
   }
 
-  // COMMIT handler: adopt any newer view the coordinator decided.
+  // COMMIT handler: adopt a newer view that INCLUDES us; record the epoch high-water either way.
   onCommit(value: any) {
     const epoch = value?.epoch
     const members = value?.members
     if (typeof epoch !== 'number' || !Array.isArray(members)) return
+    if (epoch > this.#seenEpoch) this.#seenEpoch = epoch
     if (epoch <= this.epoch) return
+    if (!members.includes(this.#me)) return
     this.#install(epoch, members)
   }
 
@@ -207,6 +228,7 @@ export class ViewManager {
     this.members = members.slice().sort()
     if (epoch > this.#promisedEpoch) this.#promisedEpoch = epoch
     if (epoch > this.#highestProposed) this.#highestProposed = epoch
+    if (epoch > this.#seenEpoch) this.#seenEpoch = epoch
     for (const m of [...this.#unreachableSince.keys()]) if (!this.members.includes(m)) this.#unreachableSince.delete(m)
     this.#mesh.installView(this.members)
     this.#onCommit?.({ epoch: this.epoch, members: this.members })

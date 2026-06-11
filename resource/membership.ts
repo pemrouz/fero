@@ -43,6 +43,7 @@ export type ViewOpts = {
   interval?: number // coordinator tick (default 150ms)
   ackTimeout?: number // abort a proposal that hasn't reached quorum within this (default 600ms)
   evictAfter?: number // grace before evicting a continuously-unreachable member (default 1500ms)
+  announce?: number // re-announce the committed view this often (default 600ms) — split-brain-heal reconcile + missed-commit recovery
   now?: () => number // injectable clock (tests); defaults to Date.now
   onCommit?: (view: View) => void // L2 hook: a new view committed (epoch/members changed)
   onWritable?: (writable: boolean) => void // L2 hook: quorum reachability changed (the write-gate)
@@ -62,6 +63,9 @@ export class ViewManager {
   #peers: any
   #ackTimeout: number
   #evictAfter: number
+  #announce: number
+  #lastAnnounce = 0 // last time we re-announced our committed view (throttle)
+  #seenEpoch = 0 // highest committed epoch heard from ANY reachable peer — drives split-brain-heal re-propose
   #now: () => number
   #onCommit?: (v: View) => void
   #onWritable?: (w: boolean) => void
@@ -85,6 +89,7 @@ export class ViewManager {
     this.#peers = opts.peers
     this.#ackTimeout = opts.ackTimeout ?? 600
     this.#evictAfter = opts.evictAfter ?? 1500
+    this.#announce = opts.announce ?? 600
     this.#now = opts.now ?? Date.now
     this.#onCommit = opts.onCommit
     this.#onWritable = opts.onWritable
@@ -140,6 +145,7 @@ export class ViewManager {
     const reachableArr = this.#reachable()
     const reachable = new Set(reachableArr)
     this.#updateWritable(reachable) // the write-gate — recomputed every tick, for ALL nodes
+    this.#reannounce(reachableArr) // gossip our committed view (split-brain-heal reconcile + missed-commit recovery)
     if (this.#proposal) return // a ballot is already in flight
     const now = this.#now()
 
@@ -159,9 +165,16 @@ export class ViewManager {
     // those unreachable past the grace; add newly-reachable servers.
     const kept = this.members.filter((m) => reachable.has(m) || now - (this.#unreachableSince.get(m) ?? now) < this.#evictAfter)
     const proposed = [...new Set([...kept, ...reachableArr])].sort()
-    if (sortedEqual(proposed, this.members)) {
+    //! Propose on a member-set delta OR on epoch divergence — a higher committed epoch among reachable peers means a split healed and our two views must merge.
+    // The member-set-unchanged early-return used to DEADLOCK a partition heal: after
+    // {A,B}|{C,D,E} heals, the merged coordinator A is back at its OLD view {A..E}@1 while
+    // {C,D,E} committed @2; A's reachable == its members, so it saw no delta and never
+    // re-proposed — two committed epochs forever. #seenEpoch (learned from the re-announce
+    // below) lets A detect "a higher view exists" and propose a fresh unifying view even
+    // when its own member set is unchanged.
+    if (sortedEqual(proposed, this.members) && this.#seenEpoch <= this.epoch) {
       this.#lastProposable = ''
-      return // membership unchanged
+      return // membership unchanged AND no higher epoch to reconcile
     }
     const key = proposed.join(',')
     if (key !== this.#lastProposable) {
@@ -169,6 +182,26 @@ export class ViewManager {
       return
     }
     this.#propose(proposed)
+  }
+
+  //! Re-broadcast our committed view to all reachable peers (throttled) — the backstop for split-brain heal + a dropped VIEW_COMMIT.
+  // Sent by the lowest-address reachable member of OUR OWN committed view (so each side of a
+  // partition has exactly one announcer — the merged-set coordinator alone wouldn't surface the
+  // OTHER side's higher epoch, since that side goes quiet once it sees a lower address). Reuses
+  // VIEW_COMMIT (idempotent via onCommit's epoch guard) — no new wire verb. Two effects on the
+  // receiver: a member that MISSED the original commit (its socket was momentarily un-writable)
+  // adopts the view now (recovery); a node BEHIND a higher epoch records #seenEpoch so its
+  // coordinator re-proposes a merge. O(reachable) frames every `announce` ms from ONE node per view.
+  #reannounce(reachableArr: string[]) {
+    const now = this.#now()
+    if (now - this.#lastAnnounce < this.#announce) return
+    // announce iff I'm the lowest-address reachable member of my own committed view
+    let lowestInView: string | undefined
+    for (const m of this.members) if (m === this.#me || reachableArr.includes(m)) { if (lowestInView === undefined || m < lowestInView) lowestInView = m }
+    if (lowestInView !== this.#me) return
+    this.#lastAnnounce = now
+    const payload = { epoch: this.epoch, members: this.members }
+    for (const a of reachableArr) if (a !== this.#me) this.#mesh.viewCommit(a, payload)
   }
 
   #propose(members: string[]) {
@@ -243,12 +276,21 @@ export class ViewManager {
     this.#install(p.epoch, p.members)
   }
 
-  //! COMMIT handler: adopt any newer view the coordinator decided.
+  //! COMMIT handler: adopt a newer view that INCLUDES us; record the epoch high-water either way.
+  // Doubles as the re-announce receiver (#reannounce reuses VIEW_COMMIT). Always advance
+  // #seenEpoch (the divergence signal the coordinator re-proposes on). Install only a higher
+  // epoch whose members INCLUDE us: a real ballot commit reaches its new members (the
+  // happy path AND the missed-commit re-announce recovery); a node hearing a higher view it's
+  // NOT in (the stale side of a healed partition) must NOT self-orphan into it — its
+  // coordinator proposes a merge that RE-ADMITS it. (A genuinely-evicted node is unreachable,
+  // so it never receives this; the write-gate already holds it read-only.)
   onCommit(value: any) {
     const epoch = value?.epoch
     const members = value?.members
     if (typeof epoch !== 'number' || !Array.isArray(members)) return
+    if (epoch > this.#seenEpoch) this.#seenEpoch = epoch
     if (epoch <= this.epoch) return
+    if (!members.includes(this.#me)) return // a higher view we're excluded from → let our coordinator merge us back in, don't self-orphan
     this.#install(epoch, members)
   }
 
@@ -267,6 +309,7 @@ export class ViewManager {
     this.members = members.slice().sort()
     if (epoch > this.#promisedEpoch) this.#promisedEpoch = epoch
     if (epoch > this.#highestProposed) this.#highestProposed = epoch
+    if (epoch > this.#seenEpoch) this.#seenEpoch = epoch // keep the divergence high-water at-or-above our own epoch
     // drop eviction-grace tracking for nodes no longer in the view; still-members
     // that remain unreachable keep their timer (the next tick re-evaluates).
     for (const m of [...this.#unreachableSince.keys()]) if (!this.members.includes(m)) this.#unreachableSince.delete(m)
