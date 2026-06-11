@@ -2312,3 +2312,26 @@ test('write-after-destroy is inert: no commit, no log growth, no WAL append', as
     await rm(path, { force: true })
   }
 })
+
+test('a local overwrite of a higher-epoch winner commits at the WINNER epoch — not the lagging view epoch', async () => {
+  // Regression: commitLocal stamped viewEpoch() unconditionally. A node whose committed view
+  // lags the epoch of a winner it already HOLDS (restored from storage, or a missed
+  // VIEW_COMMIT) then overwrote the key at the lower epoch — every peer holding the newer-epoch
+  // winner sticky-fenced the record (B1 skip) while the writer kept it locally: silent
+  // per-key divergence until the next write. A deliberate local overwrite is not a stale-view
+  // straggler — it must dominate: epoch = max(view, winner), seq = merged clock + 1.
+  const winner = { type: 'update' as const, key: ['k'], value: { v: 1 }, origin: 'REMOTE-ORIGIN', seq: 50, epoch: 7 }
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const A: any = await fero('epoch-dom', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, storage: { load: () => [winner], append: () => {} } })
+  const B: any = await fero('epoch-dom', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  try {
+    // B acquires the restored epoch-7 winner via catch-up
+    assert.ok(await until(() => B.data[value]?.k?.v === 1, 6000), 'B caught up to the restored winner')
+    assert.ok(A.cluster.epoch < 7, `precondition: A's view epoch (${A.cluster.epoch}) lags the winner epoch (7)`)
+    A.data.k = { v: 2 } // the deliberate overwrite — used to stamp the LAGGING epoch and fence at B forever
+    assert.ok(await until(() => B.data[value]?.k?.v === 2, 6000), 'B applied the overwrite — NOT epoch-fenced (this diverged permanently before the fix)')
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
