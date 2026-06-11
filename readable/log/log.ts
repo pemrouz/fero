@@ -127,7 +127,8 @@ export class Log {
 
   // Compact: collapse superseded same-key UPDATES per partition (latest-update-per-key); off the hot path. Returns records dropped.
   compact({ min = 2 }: { min?: number } = {}): number {
-    let dropped = 0
+    // drops accumulate ACROSS partitions; each affected index group is rebuilt ONCE at the end.
+    let allDrop: Set<ChangeRecord> | undefined
     for (const [p, seg] of this.#segments) {
       if (seg.length < min) continue
       let groups: Map<string, ChangeRecord[]> | undefined
@@ -154,20 +155,23 @@ export class Log {
         }
       }
       if (!toDrop || toDrop.size === 0) continue
-      // rebuild the segment + the dropped records' index groups by object identity (order preserved → still seq-ascending).
+      // rebuild the segment now (order preserved → still seq-ascending); fold the drops into the union.
       this.#segments.set(p, seg.filter((r) => !toDrop!.has(r)))
-      const ikeys = new Set<string>()
-      for (const r of toDrop) ikeys.add(this.#key(r))
-      for (const ik of ikeys) {
-        const grp = this.#index.get(ik)
-        if (!grp) continue
-        const ng = grp.filter((r) => !toDrop!.has(r))
-        if (ng.length) this.#index.set(ik, ng)
-        else this.#index.delete(ik)
-      }
-      dropped += toDrop.size
+      if (allDrop) for (const r of toDrop) allDrop.add(r)
+      else allDrop = toDrop
     }
-    return dropped
+    if (!allDrop) return 0
+    // one pass over the AFFECTED index groups — each filtered exactly once against the union, however many partitions fed it.
+    const ikeys = new Set<string>()
+    for (const r of allDrop) ikeys.add(this.#key(r))
+    for (const ik of ikeys) {
+      const grp = this.#index.get(ik)
+      if (!grp) continue
+      const ng = grp.filter((r) => !allDrop.has(r))
+      if (ng.length) this.#index.set(ik, ng)
+      else this.#index.delete(ik)
+    }
+    return allDrop.size
   }
 
   // Total record count across every partition segment.
