@@ -70,6 +70,7 @@ export class Peer {
   #socket?: net.Socket
   #framer = new Framer()
   #outbox: ChangeRecord[] = []
+  #deltaOutbox = new Map<number, ChangeRecord[]>() // subId → its tick's subscription deltas (one frame per sub per tick)
   #flushing = false
   #retries: Retries
   #dialed: boolean // outbound (we dial → redial on drop) vs inbound (accepted)
@@ -300,6 +301,18 @@ export class Peer {
     this.#schedule()
   }
 
+  //! Queue one subscription delta (id-tagged RECORDS); coalesced into ONE frame per subId per microtask.
+  // The served-subscription twin of send(): data sinks fire SYNCHRONOUSLY inside the writer's
+  // set trap, so an immediate encode+socket.write per delta put M × (frame + syscall) INLINE in
+  // every assignment a server with M live subscriptions made. Queued here, a tick's deltas for
+  // one sub flush as one frame — same per-tick coalescing the replication path always had.
+  sendDelta(subId: number, record: ChangeRecord) {
+    let q = this.#deltaOutbox.get(subId)
+    if (!q) this.#deltaOutbox.set(subId, (q = []))
+    q.push(record)
+    this.#schedule()
+  }
+
   //! Arm a single microtask flush (the per-tick coalescing point).
   #schedule() {
     if (this.#flushing) return
@@ -315,12 +328,34 @@ export class Peer {
   // backpressure handling: see ../IDEAS.md).
   flush() {
     this.#flushing = false
-    if (!this.#outbox.length) return
+    if (!this.#outbox.length && !this.#deltaOutbox.size) return
     const socket = this.#socket
     if (!socket?.writable || this.status !== STATUS.connected) return
-    const outbox = this.#outbox
-    this.#outbox = []
-    for (const buf of encodeFrames(outbox)) socket.write(buf)
+    if (this.#outbox.length) {
+      const outbox = this.#outbox
+      this.#outbox = []
+      for (const buf of encodeFrames(outbox)) socket.write(buf)
+    }
+    //! delta lane: one id-tagged RECORDS frame per subscription per tick (the client fans frame.records() back out by sub id).
+    if (this.#deltaOutbox.size) {
+      const deltas = this.#deltaOutbox
+      this.#deltaOutbox = new Map()
+      for (const [subId, records] of deltas) {
+        try {
+          socket.write(encodeFrame(records, { verb: VERB.RECORDS, id: subId }))
+        } catch (e) {
+          // an unserializable user value (BigInt/Symbol) — ship the rest one-by-one, skip the
+          // poison loudly (mirrors encodeFrames' fallback; a throw here is a microtask kill)
+          for (const r of records) {
+            try {
+              socket.write(encodeFrame([r], { verb: VERB.RECORDS, id: subId }))
+            } catch (err) {
+              console.error(`fero/transport: dropping unserializable subscription delta (key=${JSON.stringify(r.key)}): ${(err as Error)?.message ?? err}`)
+            }
+          }
+        }
+      }
+    }
   }
 
   //! Terminal teardown: cancel reconnect/heartbeat, kill the socket, mark disconnected, fire gone (idempotent).

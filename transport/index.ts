@@ -424,18 +424,13 @@ export function transport(opts: TransportOpts): Mesh {
         if (subs.delete(id)) peer.write(controlFrame(VERB.UNSUBSCRIBE, null, id))
       }
     },
-    //! deltaTo: server → client — ship one subscription delta as a RECORDS frame tagged with its sub id.
+    //! deltaTo: server → client — queue one subscription delta; the peer's outbox ships ONE id-tagged frame per sub per tick.
+    // Was an immediate encodeFrame + socket.write PER RECORD, synchronously inside the writer's
+    // sink chain — M live subscriptions made every assignment pay M × (encode + syscall) inline.
+    // sendDelta coalesces a tick's deltas per sub (and absorbs unserializable-value throws off
+    // the sink chain — the flush fallback skips only the poison, loudly).
     deltaTo(address, subId, record) {
-      const peer = pool.peer(address)
-      if (!peer) return
-      try {
-        peer.write(encodeFrame([record], { verb: VERB.RECORDS, id: subId }))
-      } catch (e) {
-        // an unserializable user value (BigInt/Symbol) — this runs synchronously inside the
-        // writer's sink chain, so a throw here would unwind into the WRITER's assignment and
-        // break unrelated sinks; skip the delta loudly instead (the value can never ship)
-        console.error(`fero/transport: dropping unserializable subscription delta (key=${JSON.stringify(record.key)}): ${(e as Error)?.message ?? e}`)
-      }
+      pool.peer(address)?.sendDelta(subId, record)
     },
     //! drop: abruptly kill a peer's socket (no teardown frames) — fault injection that drives the onPeerGone reap path.
     // Abruptly close a peer's connection — no UNSUBSCRIBE / teardown frames, the way a real network

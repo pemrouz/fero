@@ -223,3 +223,43 @@ test('failure detector: a watchdog stays healthy while its originator keeps prob
     await new Promise<void>((r) => srv.close(() => r()))
   }
 })
+
+test('subscription deltas coalesce: one id-tagged frame per sub per tick, order + routing preserved', async () => {
+  // Regression for the deltaTo bypass: each delta used to be an immediate encode + socket.write
+  // INSIDE the writer's sink chain (M subs ⇒ M syscalls per assignment). sendDelta queues into
+  // a per-sub lane flushed once per microtask — same coalescing the replication path always had.
+  const got: Array<{ id: number | undefined; keys: string[] }> = []
+  const inbound: Peer[] = []
+  const server = net.createServer((socket) => {
+    inbound.push(new Peer({
+      host: socket.remoteAddress ?? '127.0.0.1',
+      port: socket.remotePort ?? 0,
+      socket,
+      onFrame: (f) => got.push({ id: f.id, keys: f.records().map((r) => r.key[0] as string) }),
+    }))
+  })
+  const port = await new Promise<number>((r) => server.listen(0, '127.0.0.1', () => r((server.address() as net.AddressInfo).port)))
+  const client = new Peer({ host: '127.0.0.1', port })
+  client.connect()
+  assert.ok(await until(() => client.status === STATUS.connected))
+
+  // six same-tick deltas across TWO subs + one plain replication record
+  client.sendDelta(7, { type: 'update', key: ['a1'], value: 1 })
+  client.sendDelta(9, { type: 'update', key: ['b1'], value: 1 })
+  client.sendDelta(7, { type: 'update', key: ['a2'], value: 2 })
+  client.sendDelta(9, { type: 'update', key: ['b2'], value: 2 })
+  client.sendDelta(7, { type: 'update', key: ['a3'], value: 3 })
+  client.send({ type: 'update', key: ['r1'], value: 0 })
+
+  assert.ok(await until(() => got.length === 3, 4000), `3 frames (got ${got.length})`)
+  const sub7 = got.find((g) => g.id === 7)!
+  const sub9 = got.find((g) => g.id === 9)!
+  const repl = got.find((g) => g.id === undefined)!
+  assert.deepEqual(sub7.keys, ['a1', 'a2', 'a3'], 'sub 7: one frame, in order')
+  assert.deepEqual(sub9.keys, ['b1', 'b2'], 'sub 9: one frame, in order')
+  assert.deepEqual(repl.keys, ['r1'], 'replication lane untouched')
+
+  client.destroy()
+  inbound.forEach((p) => p.destroy())
+  await new Promise<void>((d) => server.close(() => d()))
+})

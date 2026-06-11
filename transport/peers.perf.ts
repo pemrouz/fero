@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import { ok, equal } from 'node:assert'
 import { value } from '../../data/index.ts'
 import { Peers } from './peers.ts'
-import { STATUS } from './peer.ts'
+import { STATUS, Peer } from './peer.ts'
 import { bench } from '#utils'
 
 const N = 2000
@@ -52,4 +52,19 @@ test(`status transition cost is flat in N (N=${N})`, () => {
   // real correctness check — this just catches an O(N)-per-transition regression.
   ok(elapsed < 25, `1000 transitions took ${elapsed.toFixed(3)}ms (threshold 25ms) — should be ~O(transitions), not O(transitions·N)`)
   p.destroy()
+})
+
+test('sendDelta: 10k same-tick subscription deltas queue in O(records) — the cost a writer pays inline', () => {
+  // Regression guard for the deltaTo outbox bypass: each served-subscription delta used to be
+  // an immediate encodeFrame + socket.write INSIDE the writer's sink chain (M subs ⇒ M frame
+  // encodes + M syscalls per assignment, inline). sendDelta makes the inline cost a queue push;
+  // the encode + ONE write per sub happens once per microtask flush (frame-count pinned in
+  // peer.test.ts). Measured disconnected so ONLY the synchronous queue cost is on the clock.
+  const peer = new Peer({ host: '10.255.0.1', port: 1, retries: { max: 0 } })
+  const elapsed = bench.time(() => {
+    for (let i = 0; i < 10_000; i++) peer.sendDelta(i & 7, { type: 'update', key: ['k'], value: i })
+  })
+  console.log(`  10k sendDelta queue: ${elapsed.toFixed(3)}ms`)
+  ok(elapsed < 10, `10k delta queues took ${elapsed.toFixed(3)}ms (threshold 10ms) — must stay a push, never an inline encode+write`)
+  peer.destroy()
 })
