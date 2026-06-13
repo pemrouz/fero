@@ -64,8 +64,8 @@ export type TransportOpts = {
 // are members × vnodes entries, so a dashboard requests them on demand, not per poll.
 export type RingSnapshot = { members: string[]; vnodes: number; coverage?: number[]; hashes?: number[]; owners?: string[] }
 
-//! WriteOutcome: L2's result for a forwarded write — committed (with the sequenced seq/epoch) or not (reason: withheld = quorum-less buffer, timeout = no ack). Carried on the WRITE-ACK so a forward learns the TRUE outcome, not just receipt.
-export type WriteOutcome = { committed: boolean; seq?: number; epoch?: number; reason?: string }
+//! WriteOutcome: L2's result for a forwarded write — committed (with the sequencer's origin + seq/epoch) or not (reason: withheld = quorum-less buffer, timeout = no ack). Carried on the WRITE-ACK so a forward learns the TRUE outcome (and, for confirm:'replicated', the (origin,seq) to probe the R-set with), not just receipt.
+export type WriteOutcome = { committed: boolean; seq?: number; epoch?: number; reason?: string; origin?: string }
 
 //! Mesh: the L0 seam — routing (send/replicate/forward/owners), view-change frames, RPC/subscriptions, chaos taps.
 export type Mesh = {
@@ -227,7 +227,7 @@ export function transport(opts: TransportOpts): Mesh {
         // back (at-least-once). A bare WRITE (no id, the legacy/digest path) is not acked.
         if (frame.id !== undefined) {
           const committed = outcome === undefined || outcome.committed
-          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch } : { ok: false, reason: 'withheld' }, frame.id))
+          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch, origin: outcome?.origin } : { ok: false, reason: 'withheld' }, frame.id))
         }
         return
       }
@@ -237,8 +237,8 @@ export function transport(opts: TransportOpts): Mesh {
         if (!fw) return // late ack after the timeout fallback already ran — the duplicate converges via LWW
         forwards.delete(frame.id!)
         clearTimeout(fw.timer)
-        const v = (frame.value as { ok?: boolean; seq?: number; epoch?: number; reason?: string } | null) ?? { ok: true }
-        fw.onOutcome({ committed: v.ok !== false, seq: v.seq, epoch: v.epoch, reason: v.reason }) // ok:false ⇒ withheld → the caller's never-drop fallback fires
+        const v = (frame.value as { ok?: boolean; seq?: number; epoch?: number; reason?: string; origin?: string } | null) ?? { ok: true }
+        fw.onOutcome({ committed: v.ok !== false, seq: v.seq, epoch: v.epoch, reason: v.reason, origin: v.origin }) // ok:false ⇒ withheld → the caller's never-drop fallback fires
         return
       }
       case VERB.REPL_PROBE:

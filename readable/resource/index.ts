@@ -140,6 +140,79 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // confirmHook: a one-shot resolver claimed by the NEXT write the sink routes — how `methods.update({…, confirm:'committed'})` learns its write's outcome.
   let confirmHook: ((outcome: WriteOutcome) => void) | undefined
 
+  // ── confirm:'replicated' — writer-side W-quorum probe of the R-set (ordering-safe; DECISIONS Z) ──
+  let replCid = 0
+  // replTally: cid → the in-flight W-quorum count for one replicated confirm (distinct replica acks; settle when `needed` reached or on timeout).
+  const replTally = new Map<number, { got: Set<string>; needed: number; settle: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
+  // pendingProbes: a replica's HELD probes (arrived before the record) keyed by seenKey — acked when applyInbound advances the high-water to seq; a bounded TTL drops a never-satisfied one.
+  const pendingProbes = new Map<string, { seq: number; cid: number; from: string; timer: ReturnType<typeof setTimeout> }[]>()
+  // replQuorum: W = majority of the effective replica count (min(R, view)) — the owner counts as 1 toward it; min() first so Infinity>>1 (=0) can't underflow it.
+  const replQuorum = (): number => (Math.min(R, viewSize() || 1) >> 1) + 1
+
+  // probeReplicated: phase 2 of confirm:'replicated' — count the owner (committed) + any local holder, probe the rest of the R-set, settle(true) at W, settle(false) on timeout (→ reject 'quorum').
+  const probeReplicated = (partition: string, origin: string, seq: number, settle: (ok: boolean) => void, timeoutMs: number) => {
+    const rset = mesh.owners(partition, R)
+    const ownerAddr = mesh.owner(partition)
+    const W = replQuorum()
+    let have = 0
+    const targets: string[] = []
+    for (const a of rset) {
+      if (a === ownerAddr || a === me) have++
+      else targets.push(a)
+    }
+    if (have >= W || targets.length === 0) return settle(have >= W)
+    const cid = ++replCid
+    const timer = setTimeout(() => {
+      if (replTally.delete(cid)) settle(false)
+    }, timeoutMs)
+    timer.unref?.()
+    replTally.set(cid, { got: new Set(), needed: W - have, settle, timer })
+    for (const a of targets) mesh.replProbe(a, cid, { origin, seq, partition })
+  }
+
+  // recvReplAck: a probed replica confirms it holds (origin,seq) — count distinct acks; at `needed` the W quorum is reached.
+  const recvReplAck = (cid: number, address: string) => {
+    const t = replTally.get(cid)
+    if (!t) return
+    t.got.add(address)
+    if (t.got.size >= t.needed) {
+      clearTimeout(t.timer)
+      replTally.delete(cid)
+      t.settle(true)
+    }
+  }
+
+  // recvReplProbe: ack now if our high-water already covers (origin,seq); else HOLD the probe (a TTL drops a never-satisfied one — by then the prober timed out).
+  const recvReplProbe = (cid: number, probe: { origin: string; seq: number; partition: string }, from: string) => {
+    const sk = seenKey(probe.origin, probe.partition)
+    if ((seen.get(sk) ?? 0) >= probe.seq) return void mesh.replAck(from, cid)
+    let list = pendingProbes.get(sk)
+    if (!list) pendingProbes.set(sk, (list = []))
+    const timer = setTimeout(() => {
+      const l = pendingProbes.get(sk)
+      if (!l) return
+      const i = l.findIndex((p) => p.cid === cid)
+      if (i >= 0) l.splice(i, 1)
+      if (!l.length) pendingProbes.delete(sk)
+    }, 30_000)
+    timer.unref?.()
+    list.push({ seq: probe.seq, cid, from, timer })
+  }
+
+  // probeReady: applyInbound advanced (origin,partition) to `n` — ack + drop every held probe now satisfied. Called only when pendingProbes is non-empty (zero-cost on the steady inbound path).
+  const probeReady = (sk: string, n: number) => {
+    const list = pendingProbes.get(sk)
+    if (!list) return
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i].seq <= n) {
+        clearTimeout(list[i].timer)
+        mesh.replAck(list[i].from, list[i].cid)
+        list.splice(i, 1)
+      }
+    }
+    if (!list.length) pendingProbes.delete(sk)
+  }
+
   // observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   let observe: Observe | undefined
   // buildObserve: lazily construct + arm the push-hook for ONE subscriber; returns the proxy to stream + the close that disarms the gate on the last detach.
@@ -168,6 +241,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         return
       }
       seen.set(sk, n)
+      if (pendingProbes.size) probeReady(sk, n)
       if (n > clock) clock = n
       const e = record.epoch ?? 0
       const key = versionKey(record)
@@ -244,6 +318,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     onPeerGone: (address: string) => dispatch.reapPeer(address),
     // onWrite: a forwarded write for a partition we own — commit it locally; we are its single sequencer.
     onWrite: (record: ChangeRecord) => commitForwarded(record),
+    // onReplProbe/onReplAck: confirm:'replicated' — answer a probe once caught up; tally a replica's ack toward the W quorum.
+    onReplProbe: (cid, probe, address) => recvReplProbe(cid, probe, address),
+    onReplAck: (cid, address) => recvReplAck(cid, address),
     // onView*: membership view-change frames (Milestone V) routed to the ViewManager state machine.
     onViewPrepare: (value: unknown) => viewMgr?.onPrepare(value),
     onViewAck: (value: unknown) => viewMgr?.onAck(value),
@@ -477,7 +554,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       cur.seq = n
       cur.origin = uuid
     } else versions.set(key, { epoch: e, seq: n, origin: uuid })
-    lastCommit = { committed: true, seq: n, epoch: e }
+    lastCommit = { committed: true, seq: n, epoch: e, origin: uuid }
     log.append(change)
     observe?.onRecord(change, committingForward ? 'forwarded' : 'local')
     // replicate: scoped R<members ⇒ send to the R-set only (orphan-mark if we're not in it); else broadcast to all.
@@ -533,7 +610,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     },
   }
 
-  // writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (applied locally), or 'committed' (owner-sequenced; rejects on withheld/timeout).
+  // writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (local apply), 'committed' (owner-sequenced), or 'replicated' (W of the R-set).
   const writeWithConfirm = (chg: any, doWrite: () => void): unknown => {
     const tier = chg && typeof chg === 'object' ? chg.confirm : undefined
     if (!tier) return doWrite()
@@ -542,36 +619,55 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       doWrite()
       return { tier: 'accepted', key }
     }
-    if (tier !== 'committed') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed')`)
+    if (tier !== 'committed' && tier !== 'replicated') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed' | 'replicated')`)
+    const replTimeout = typeof chg?.timeout === 'number' ? chg.timeout : 5000
     let done = false
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let settle!: (o: WriteOutcome) => void
-    const promise = new Promise((resolve, reject) => {
-      settle = (o) => {
-        if (done) return
-        done = true
-        if (timer) clearTimeout(timer)
-        if (o.committed) resolve({ tier: 'committed', key, seq: o.seq, epoch: o.epoch })
-        else
-          reject(
-            Object.assign(new Error(`fero: write not committed (${o.reason ?? 'unconfirmed'})`), {
-              requestedTier: 'committed',
-              reachedTier: o.seq !== undefined ? 'committed-local' : 'none',
-              reason: o.reason ?? 'unconfirmed',
-              localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
-            }),
-          )
-      }
+    let phase1 = false
+    let safety: ReturnType<typeof setTimeout> | undefined
+    let resolveP!: (v: unknown) => void
+    let rejectP!: (e: unknown) => void
+    const promise = new Promise((res, rej) => {
+      resolveP = res
+      rejectP = rej
     })
-    confirmHook = settle
+    const win = (o: WriteOutcome, reached: string) => {
+      if (done) return
+      done = true
+      if (safety) clearTimeout(safety)
+      resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch })
+    }
+    const fail = (o: WriteOutcome) => {
+      if (done) return
+      done = true
+      if (safety) clearTimeout(safety)
+      const quorum = o.reason === 'quorum'
+      rejectP(
+        Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${o.reason ?? 'unconfirmed'})`), {
+          requestedTier: tier,
+          reachedTier: quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none',
+          reason: o.reason ?? 'unconfirmed',
+          localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
+        }),
+      )
+    }
+    confirmHook = (o) => {
+      phase1 = true
+      if (safety) {
+        clearTimeout(safety)
+        safety = undefined
+      }
+      if (!o.committed) return fail(o)
+      if (tier === 'committed') return win(o, 'committed')
+      probeReplicated(String(key[0]), o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : fail({ committed: false, seq: o.seq, epoch: o.epoch, reason: 'quorum' })), replTimeout)
+    }
     try {
       doWrite()
     } finally {
       confirmHook = undefined
     }
-    if (!done) {
-      timer = setTimeout(() => settle({ committed: false, reason: 'timeout' }), typeof chg?.timeout === 'number' ? chg.timeout : 5000)
-      timer.unref?.()
+    if (!phase1) {
+      safety = setTimeout(() => fail({ committed: false, reason: 'timeout' }), replTimeout)
+      safety.unref?.()
     }
     return promise
   }

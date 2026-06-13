@@ -1056,6 +1056,41 @@ test('confirm: an unknown tier rejects (the tier guard)', async () => {
   }
 })
 
+test('confirm: replicated resolves immediately on a single node (W=1, no probe needed)', async () => {
+  const p1 = await ports.free()
+  const A: any = await fero('cf-rep1', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    const r: any = await A.methods.update({ key: ['k'], value: 1, confirm: 'replicated' })
+    assert.equal(r.tier, 'replicated', 'single-node W=1 ⇒ replicated == committed, resolves at once')
+    assert.equal(typeof r.seq, 'number')
+  } finally {
+    A.destroy()
+  }
+})
+
+test('confirm: replicated resolves once W of the R-set hold the write (owned + forwarded keys)', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250 })
+  const A: any = await fero('cf-rep', cfg(p1))
+  const B: any = await fero('cf-rep', cfg(p2))
+  const C: any = await fero('cf-rep', cfg(p3))
+  const all = [A, B, C]
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster committed a 3-member view (W = majority = 2)')
+    const keys = Array.from({ length: 100 }, (_, i) => 'r' + i)
+    const owned = keys.find((k) => A.cluster.owner(k) === A.cluster.me)! // A sequences locally → probes the R-set, needs 1 other ack
+    const foreign = keys.find((k) => A.cluster.owner(k) !== A.cluster.me)! // A forwards → owner ACKs (origin,seq) → A probes
+    const ro: any = await A.methods.update({ key: [owned], value: 1, confirm: 'replicated' })
+    assert.equal(ro.tier, 'replicated', 'owner-write replicated to W (a probed replica acked once caught up)')
+    const rf: any = await A.methods.update({ key: [foreign], value: 2, confirm: 'replicated' })
+    assert.equal(rf.tier, 'replicated', 'forwarded-write replicated to W (owner + this holder)')
+    assert.ok(await until(() => all.every((n) => n.data[owned]?.[value] === 1 && n.data[foreign]?.[value] === 2), 6000), 'both writes converged on the whole R-set')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
 test('client write made OFFLINE buffers (bounded) and flushes when a server becomes reachable (#3)', async () => {
   // No server reachable yet: the forward fails, so the write buffers (bounded drop-oldest)
   // instead of committing at epoch 1. When a server appears, onConnect + the periodic sweep
