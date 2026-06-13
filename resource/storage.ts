@@ -9,11 +9,17 @@ import { appendFileSync, readFileSync } from 'node:fs'
 import type { ChangeRecord } from '../transport/message.ts'
 import type { Storage } from './index.ts'
 
-//! Append-only file WAL: newline-delimited JSON records, synchronous fsync per write (simplest correct durability).
+//! Append-only file WAL: newline-delimited JSON records, one synchronous appendFileSync per write (PAGE-CACHE durable — survives a process crash, NOT power loss).
 // Append-only file WAL. `load` parses the newline-delimited records (a missing
-// file is an empty log); `append` writes one line per record. Synchronous fsync
-// per write — the simplest correct durability. Higher throughput (batched /
-// async / fsync-coalesced writes) and compaction are deferred — see ../IDEAS.md.
+// file is an empty log); `append` writes one line per record. The write is a
+// synchronous `appendFileSync` — it reaches the OS PAGE CACHE and returns; it does
+// NOT fsync, so it survives a process crash (the kernel still holds the bytes) but
+// NOT power loss. confirm:'persisted' built on this seam therefore means
+// "page-cache-durable on a W-quorum" — strictly stronger than 'replicated'
+// (in-memory only), weaker than a power-loss guarantee. A real-fsync variant (an
+// open fd + fsyncSync, returning a Promise) is a drop-in upgrade behind the async
+// seam contract — see ../IDEAS.md. Higher throughput (batched / coalesced) +
+// compaction are likewise deferred.
 export function fileStorage(path: string): Storage {
   return {
     load(): ChangeRecord[] {

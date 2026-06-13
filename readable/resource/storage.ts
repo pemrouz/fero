@@ -4,7 +4,7 @@ import { appendFileSync, readFileSync } from 'node:fs'
 import type { ChangeRecord } from '../transport/message.ts'
 import type { Storage } from './index.ts'
 
-// Append-only file WAL: newline-delimited JSON records, synchronous fsync per write (simplest correct durability).
+// Append-only file WAL: newline-delimited JSON records, one synchronous appendFileSync per write (PAGE-CACHE durable — survives a process crash, NOT power loss).
 export function fileStorage(path: string): Storage {
   return {
     load(): ChangeRecord[] {

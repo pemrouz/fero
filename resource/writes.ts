@@ -20,8 +20,8 @@
 
 import { $ } from '../../data/index.ts'
 
-//! WriteTier: the guarantee a write REQUESTED (the `confirm` value). 'accepted' is local-apply; 'committed'/'replicated' ride the network.
-export type WriteTier = 'accepted' | 'committed' | 'replicated'
+//! WriteTier: the guarantee a write REQUESTED (the `confirm` value). 'accepted' is local-apply; 'committed'/'replicated'/'persisted' ride the network ('persisted' = durable on a W-quorum).
+export type WriteTier = 'accepted' | 'committed' | 'replicated' | 'persisted'
 
 //! WriteState: where a tracked write is in its lifecycle — in flight, reached its bar, or fell short.
 export type WriteState = 'pending' | 'confirmed' | 'rejected'

@@ -1094,6 +1094,108 @@ test('confirm: replicated resolves once W of the R-set hold the write (owned + f
   }
 })
 
+// ── confirm:'persisted' — W of the R-set has DURABLY appended (storage.append resolved). DECISIONS Z. ──
+
+const persistWal = () => join(os.tmpdir(), `cf-persist-${randomUUID().slice(0, 8)}.log`)
+
+test('confirm: persisted requires a storage seam — rejects clearly without one', async () => {
+  const p1 = await ports.free()
+  const A: any = await fero('cf-pers-nostore', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    let err: any
+    try {
+      await A.methods.update({ key: ['k'], value: 1, confirm: 'persisted' })
+    } catch (e) {
+      err = e
+    }
+    assert.ok(err && /requires a storage seam/.test(err.message), 'persisted without storage fails fast + clearly (not a silent timeout)')
+  } finally {
+    A.destroy()
+  }
+})
+
+test('confirm: persisted resolves on a single node once its append is durable (sync seam, W=1)', async () => {
+  const wal = persistWal()
+  const p1 = await ports.free()
+  const A: any = await fero('cf-pers1', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100, storage: fileStorage(wal) })
+  try {
+    const r: any = await A.methods.update({ key: ['k'], value: 1, confirm: 'persisted' })
+    assert.equal(r.tier, 'persisted', 'single node W=1 + sync seam ⇒ persisted resolves')
+    assert.equal(typeof r.seq, 'number')
+    assert.equal(r.origin, A.cluster.uuid, 'full LWW coordinates, same as the other tiers')
+  } finally {
+    A.destroy()
+    rmSync(wal, { force: true })
+  }
+})
+
+test('confirm: persisted waits for the storage append to RESOLVE (async seam gates the resolution)', async () => {
+  const p1 = await ports.free()
+  let appended = 0
+  const seam = { load: () => [], append: () => ((appended++), new Promise<void>((res) => setTimeout(res, 150))) } // durable only after 150ms
+  const A: any = await fero('cf-pers-async', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100, storage: seam })
+  try {
+    const t0 = Date.now()
+    const r: any = await A.methods.update({ key: ['k'], value: 1, confirm: 'persisted' })
+    assert.equal(r.tier, 'persisted')
+    assert.ok(Date.now() - t0 >= 140, 'resolved ONLY after the async append settled — the durable high-water gated it, not the in-memory commit')
+    assert.equal(appended, 1, 'the record was appended exactly once')
+  } finally {
+    A.destroy()
+  }
+})
+
+test('confirm: persisted resolves once W of the R-set have DURABLY appended (owned + forwarded)', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const wals = [persistWal(), persistWal(), persistWal()]
+  const cfg = (port: number, i: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, storage: fileStorage(wals[i]) })
+  const A: any = await fero('cf-pers-multi', cfg(p1, 0))
+  const B: any = await fero('cf-pers-multi', cfg(p2, 1))
+  const C: any = await fero('cf-pers-multi', cfg(p3, 2))
+  const all = [A, B, C]
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster formed (W = majority = 2)')
+    const keys = Array.from({ length: 100 }, (_, i) => 'p' + i)
+    const owned = keys.find((k) => A.cluster.owner(k) === A.cluster.me)! // A sequences + durably appends locally, durable-probes the rest
+    const foreign = keys.find((k) => A.cluster.owner(k) !== A.cluster.me)! // A forwards; the owner persists, A also holds + persists
+    const ro: any = await A.methods.update({ key: [owned], value: 1, confirm: 'persisted' })
+    assert.equal(ro.tier, 'persisted', 'owned write durably persisted on a W-quorum of the R-set')
+    const rf: any = await A.methods.update({ key: [foreign], value: 2, confirm: 'persisted' })
+    assert.equal(rf.tier, 'persisted', 'forwarded write durably persisted on a W-quorum')
+  } finally {
+    all.forEach((n) => n.destroy())
+    wals.forEach((w) => rmSync(w, { force: true }))
+  }
+})
+
+test('confirm: persisted rejects quorum when a replica never durably appends (held but not durable)', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const wal = persistWal()
+  const stuck = { load: () => [], append: () => new Promise<void>(() => {}) } // applies in memory, NEVER becomes durable
+  const A: any = await fero('cf-pers-stuck', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 250, storage: fileStorage(wal) })
+  const B: any = await fero('cf-pers-stuck', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 250, storage: stuck })
+  const all = [A, B]
+  const formed = (n: any) => n.cluster.members.length === 2 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), '2-node cluster formed (W = 2)')
+    const owned = Array.from({ length: 100 }, (_, i) => 's' + i).find((k) => A.cluster.owner(k) === A.cluster.me)!
+    let err: any
+    try {
+      await A.methods.update({ key: [owned], value: 1, confirm: 'persisted', timeout: 1500 })
+    } catch (e) {
+      err = e
+    }
+    assert.ok(err, 'rejected (not resolved)')
+    assert.equal(err.reason, 'quorum', "B holds it in memory but its append never resolves → not persisted to W")
+    assert.equal(err.requestedTier, 'persisted')
+    assert.ok(await until(() => B.data[owned]?.[value] === 1, 4000), 'the write IS present on B in memory (replicated succeeded; only DURABILITY fell short)')
+  } finally {
+    all.forEach((n) => n.destroy())
+    rmSync(wal, { force: true })
+  }
+})
+
 // ── cluster.writes: the confirm-write introspection surface (DECISIONS Z; resource/writes.ts) ──
 
 test('cluster.writes: gated — a confirm write BEFORE first access is not recorded; after access it is', async () => {
