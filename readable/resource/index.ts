@@ -1,7 +1,7 @@
 // L2 public surface: fero(name, opts) → { data, methods, cluster, destroy } — the whole library in one call.
 
 import { $, view as VIEWSYM } from '../../data/index.ts'
-import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
+import { transport, type Mesh, type TransportOpts, type WriteOutcome } from '../transport/index.ts'
 import { Log, originKey, versionKey } from '../log/log.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
@@ -135,6 +135,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   let committingForward = false
   // discarding: partitions whose optimistic copy we're dropping (scoped non-holder) — a Set, NOT a boolean, because data DEFERS the re-entrant remove past a boolean guard's lifetime.
   const discarding = new Set<string>()
+  // lastCommit: the outcome of the most recent commitLocal — commitForwarded reads it to report committed/withheld + seq/epoch back to the forwarder (the honest WRITE-ACK).
+  let lastCommit: WriteOutcome | undefined
 
   // observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   let observe: Observe | undefined
@@ -346,8 +348,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (
         owner !== undefined &&
         owner !== me &&
-        mesh.forward(owner, change, (committed) => {
-          if (!committed) commitLocal(change)
+        mesh.forward(owner, change, (outcome) => {
+          if (!outcome.committed) commitLocal(change)
         })
       ) {
         if (scoped && !holds(p)) discardOptimistic(p)
@@ -368,8 +370,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const server = mesh.pickServer()
     if (
       server === undefined ||
-      !mesh.forward(server, change, (committed) => {
-        if (!committed) bufferClientWrite(change)
+      !mesh.forward(server, change, (outcome) => {
+        if (!outcome.committed) bufferClientWrite(change)
       })
     )
       bufferClientWrite(change)
@@ -445,6 +447,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (viewMgr && !viewMgr.canWrite) {
       if (pending.length >= MAX_PENDING) pending.shift()
       pending.push(change)
+      lastCommit = { committed: false }
       return
     }
     const n = ++clock
@@ -462,6 +465,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       cur.seq = n
       cur.origin = uuid
     } else versions.set(key, { epoch: e, seq: n, origin: uuid })
+    lastCommit = { committed: true, seq: n, epoch: e }
     log.append(change)
     observe?.onRecord(change, committingForward ? 'forwarded' : 'local')
     // replicate: scoped R<members ⇒ send to the R-set only (orphan-mark if we're not in it); else broadcast to all.
@@ -476,13 +480,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   }
 
   // commitForwarded: apply a forwarded write so the sink commits it as ours; committingForward stops a re-forward.
-  const commitForwarded = (record: ChangeRecord) => {
+  const commitForwarded = (record: ChangeRecord): WriteOutcome | undefined => {
     committingForward = true
+    lastCommit = undefined
     try {
       applyRecord(res, record)
     } finally {
       committingForward = false
     }
+    return lastCommit
   }
 
   // flushPending: quorum returned — re-commit the buffered writes in order (re-buffers if the gate closed again).

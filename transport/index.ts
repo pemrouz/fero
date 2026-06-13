@@ -46,7 +46,7 @@ export type TransportOpts = {
   onSubscribe?: (subId: number, method: string, arg: unknown, address: string) => void // a peer opened a live subscription
   onUnsubscribe?: (subId: number, address: string) => void // a peer closed one
   onPeerGone?: (address: string) => void // a peer's connection dropped (socket close / destroy) — reap its served subscriptions (it never sent UNSUBSCRIBE)
-  onWrite?: (record: ChangeRecord, address: string) => void // a peer forwarded a write-request for a partition we own
+  onWrite?: (record: ChangeRecord, address: string) => WriteOutcome | void // a peer forwarded a write-request for a partition we own; returns L2's commit outcome so the WRITE-ACK reports the TRUE result (committed/withheld), not mere receipt
   // Membership view-change control frames (Milestone V) — each routes to its own
   // hook so a view frame can NEVER fall through to onRecord (the data path).
   onViewPrepare?: (value: unknown, address: string) => void
@@ -62,6 +62,9 @@ export type TransportOpts = {
 // are members × vnodes entries, so a dashboard requests them on demand, not per poll.
 export type RingSnapshot = { members: string[]; vnodes: number; coverage?: number[]; hashes?: number[]; owners?: string[] }
 
+//! WriteOutcome: L2's result for a forwarded write — committed (with the sequenced seq/epoch) or withheld (the quorum-less write-gate buffered it). Carried on the WRITE-ACK so a forward learns the TRUE outcome, not just receipt.
+export type WriteOutcome = { committed: boolean; seq?: number; epoch?: number }
+
 //! Mesh: the L0 seam — routing (send/replicate/forward/owners), view-change frames, RPC/subscriptions, chaos taps.
 export type Mesh = {
   peers: any // cluster.peers ViewProxy
@@ -71,7 +74,7 @@ export type Mesh = {
   send: (record: ChangeRecord) => void
   replicateTo: (addresses: string[], record: ChangeRecord) => void // scoped replication (Milestone P): send a committed record to the given R-set, excluding self (the committer already holds + logged it). Caller passes the precomputed owners(key,R) so the ring is walked once per write.
   broadcast: (record: ChangeRecord) => void
-  forward: (address: string, record: ChangeRecord, onOutcome?: (committed: boolean) => void) => boolean // route a write-request to the owner; false if it isn't connected. With onOutcome: ack-confirmed — false-outcome on timeout releases the caller's never-drop fallback
+  forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void) => boolean // route a write-request to the owner; false if it isn't connected. With onOutcome: ACK-confirmed — the owner replies committed{seq,epoch} or withheld; a withheld/timeout outcome releases the caller's never-drop fallback
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
   holds: (key: string, addr: string, replicas?: number) => boolean // owners(key,R).includes(addr) without materializing the owner set (per-record held-gate / catch-up filter)
   ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot // L4 observability: committed ring membership + vnode count (+ a k-sampled ownership donut when coverage:k, + full arcs when vnodes:true) — cold path, off the routing hot path
@@ -187,7 +190,7 @@ export function transport(opts: TransportOpts): Mesh {
   const subs = new Map<number, (record: ChangeRecord) => void>()
   const warnedVerbs = new Set<number>() // unrecognized verbs already warned about (fail-closed default, once per verb)
   //! forwards: in-flight ack-confirmed WRITE forwards — id → fallback timer + the outcome callback (the never-drop release).
-  const forwards = new Map<number, { timer: ReturnType<typeof setTimeout>; onOutcome: (committed: boolean) => void }>()
+  const forwards = new Map<number, { timer: ReturnType<typeof setTimeout>; onOutcome: (outcome: WriteOutcome) => void }>()
 
   //! dispatch: the inbound frame router — handshake first, then fan each verb to its hook (fail-closed default).
   function dispatch(frame: Frame, peer: Peer) {
@@ -204,25 +207,34 @@ export function transport(opts: TransportOpts): Mesh {
       case VERB.UNSUBSCRIBE:
         opts.onUnsubscribe?.(frame.id!, peer.address)
         return
-      case VERB.WRITE:
+      case VERB.WRITE: {
         //! WRITE: a forwarded write-request for a partition we own — L2 commits it, making us its sole sequencer.
         // A peer forwarded a write-request for a partition we own. Hand each
         // record to L2, which commits it locally (its sink stamps origin=us and
         // replicates) — so we become the single sequencer for the partition.
-        for (const record of frame.records()) opts.onWrite?.(record, peer.address)
-        //! WRITE-ACK: confirm the commit back to the sender (socket-write success ≠ delivery).
-        // onWrite committed synchronously above; an id-carrying WRITE gets an ACK so the
-        // sender can release its never-drop fallback. If onWrite threw, we never reach this —
-        // the sender times out and commits locally instead (at-least-once, never zero).
-        if (frame.id !== undefined) peer.write(controlFrame(VERB.ACK, null, frame.id))
+        let outcome: WriteOutcome | void // L2's commit result (one record per id-tagged forward)
+        for (const record of frame.records()) outcome = opts.onWrite?.(record, peer.address)
+        //! WRITE-ACK / NACK: report the TRUE commit outcome — a quorum-less owner that BUFFERED the write must NOT falsely ack it (the acknowledged-loss bug).
+        // An id-tagged WRITE (the ack-confirmed forward) is answered with the L2 outcome:
+        // ACK {ok:true, seq, epoch} when committed, or {ok:false} when WITHHELD (the
+        // quorum-less write-gate buffered it — see commitLocal). A no-op apply (the value
+        // is already present — an idempotent re-forward after a lost ack) counts as
+        // committed. If onWrite threw, we never reach here — the sender times out and falls
+        // back (at-least-once). A bare WRITE (no id, the legacy/digest path) is not acked.
+        if (frame.id !== undefined) {
+          const committed = outcome === undefined || outcome.committed
+          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch } : { ok: false }, frame.id))
+        }
         return
+      }
       case VERB.ACK: {
-        //! ACK: an owner confirmed a forwarded write — settle the pending forward (clear its fallback timer).
+        //! ACK: an owner answered a forwarded write — settle the forward with its committed/withheld outcome (+ seq/epoch).
         const fw = forwards.get(frame.id!)
         if (!fw) return // late ack after the timeout fallback already ran — the duplicate converges via LWW
         forwards.delete(frame.id!)
         clearTimeout(fw.timer)
-        fw.onOutcome(true)
+        const v = (frame.value as { ok?: boolean; seq?: number; epoch?: number } | null) ?? { ok: true }
+        fw.onOutcome({ committed: v.ok !== false, seq: v.seq, epoch: v.epoch }) // ok:false ⇒ withheld → the caller's never-drop fallback fires
         return
       }
       //! View-change frames: explicit cases so a VIEW_* frame never falls through to the onRecord data path.
@@ -412,7 +424,7 @@ export function transport(opts: TransportOpts): Mesh {
       if (!onOutcome) return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
       const id = ++callId
       const timer = setTimeout(() => {
-        if (forwards.delete(id)) onOutcome(false) // never confirmed → fallback (commit-local / re-buffer)
+        if (forwards.delete(id)) onOutcome({ committed: false }) // never confirmed → fallback (commit-local / re-buffer)
       }, opts.callTimeout ?? 5000)
       timer.unref?.()
       forwards.set(id, { timer, onOutcome })
