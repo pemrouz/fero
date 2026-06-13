@@ -1442,11 +1442,22 @@ exists, and add an explicit await-for-guarantee API for when you DO care about d
   client no-sticky-copy regression; the transport ack test rewritten to the outcome contract
   + a withholding-NACK leg; 6 confirm tests. resource 82, transport 85, chaos 7.
 
-**Open follow-ups → [IDEAS](IDEAS.md):** the `replicated` + `persisted` tiers (a replica→
-owner ack/quorum layer pinned to the ViewManager quorum; a real `fsync(2)` — `appendFileSync`
-only reaches the page cache); `cluster.writes` reactive introspection of in-flight/unconfirmed
-writes; the flush-on-return escalation policy (escalate bare assignments to 'committed' only,
-never the network tiers); cid-dedup on the owner for non-idempotent retries (LWW value-sets
-are already idempotent); `origin` on the committed resolve for full LWW-supersession
-detection; the SERVER-local assignment auth-interception parity gap (#6) stays open by design
-(the re-entrancy guard).
+**`replicated` landed** (`0823a10`, `7c93b31`) — a WRITER-side W-quorum probe, NOT a tag on
+the replication stream: tagging would put an ack-id on an out-of-order point-to-point data
+frame and advance a replica's dedup high-water past a record it then drops (a silent gap).
+Instead the record replicates in-order untouched, and the writer probes the key's R-set with
+(origin, seq) via a separate REPL_PROBE control frame; a replica HOLDS a probe it can't yet
+satisfy until applyInbound advances its high-water to seq, then REPL_ACKs. W = majority of the
+effective replica count (the same majority the ViewManager uses); owner + local holder count
+toward it; timeout ⇒ reject 'quorum' (committed, just under-confirmed). Owner-write and
+forwarded-write unify (the committed-ACK carries the owner's origin so a forwarder can probe).
+
+**Open follow-ups → [IDEAS](IDEAS.md):** the `persisted` tier (a real `fsync(2)` —
+`appendFileSync` only reaches the page cache — plus durable-view-epoch recovery);
+`cluster.writes` reactive introspection of in-flight/unconfirmed writes; membership-change
+mid-probe (recount against the new R-set rather than relying on the 'quorum' timeout); the
+flush-on-return escalation policy (escalate bare assignments to 'committed' only, never the
+network tiers); cid-dedup on the owner for non-idempotent retries (LWW value-sets are already
+idempotent); surfacing `origin` on the committed/replicated resolve for full LWW-supersession
+detection (it already flows internally for the probe); the SERVER-local assignment
+auth-interception parity gap (#6) stays open by design (the re-entrancy guard).
