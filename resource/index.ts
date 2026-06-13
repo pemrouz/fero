@@ -640,16 +640,25 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     //! 3) routing: a CLIENT forwards to a server; a server forwards to the owner (F1) — both ack-confirmed.
     if (!committingForward) {
       const p = partitionOf(change)
-      //! 3a) CLIENT (no ViewManager ⇒ viewEpoch ≡ 1): never commit under own provenance — forward to a server.
+      //! 3a) CLIENT (no ViewManager ⇒ viewEpoch ≡ 1): never commit under own provenance — forward to a server, then DROP the optimistic copy.
       // A client committing locally stamps epoch 1 forever; any FORMED cluster (epoch ≥ 2)
       // sticky-fences such a record wherever a server-written winner exists (B1 skip), while
       // the client applies it locally — silent permanent divergence. Route the write to a
       // connected server instead: it re-sequences under ITS provenance/epoch (its
-      // committingForward guard commits as-is, no re-route ping-pong). The optimistic local
-      // copy stays (read-your-writes; the canonical view rides subscriptions). Unreachable or
+      // committingForward guard commits as-is, no re-route ping-pong). Unreachable or
       // unconfirmed ⇒ buffer (bounded drop-oldest), flushed on (re)connect + a periodic sweep.
+      // Then DISCARD the optimistic copy: a client holds NOTHING (no ViewManager, inbound-
+      // only, no replication/anti-entropy), and read subscriptions land on a SEPARATE proxy
+      // — so a kept copy is never reconciled and becomes a permanent client-local STALE READ
+      // on data[value]/operators after the cluster moves the key on. Keyed reads already
+      // route remotely (holds()≡false ⇒ remoteRead), so dropping it changes only the raw-
+      // snapshot/operator surface (stale → honestly-empty), not `await data.x`. Read-your-
+      // writes for a client is `await methods.update({…, confirm})` then read (the confirm
+      // surface), not a sticky local shadow. The discard rides `discarding` (2b), so the
+      // proxy remove is dropped locally and never forwarded to the server.
       if (me === undefined) {
         forwardToServer(change)
+        discardOptimistic(p)
         return
       }
       // 3b) F1 forward: not owner + owner reachable ⇒ hand off, CONFIRMED by WRITE-ACK.

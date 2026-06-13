@@ -926,6 +926,37 @@ test('client ASSIGNMENT routes to a server (epoch ≥ 2 cluster) — not stamped
   B.destroy()
 })
 
+test('client write leaves NO sticky optimistic copy — raw snapshot stays clean, reads route remotely (no permanent stale read)', async () => {
+  // Regression for the client never-reconciled STALE READ. A client holds nothing and is
+  // inbound-only, so an optimistic copy left on its raw `data` proxy after a forwarded
+  // write is NEVER reconciled — it stays at the written value forever even after the
+  // cluster changes the key, and contradicts `await client.data.x` (which routes
+  // remotely). The fix discards the client's optimistic copy on forward: data[value]
+  // stays clean, reads route remotely. (Keyed `await data.x` was already remote; only the
+  // raw-snapshot/operator surface changes — stale-forever → honestly-empty.)
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const A: any = await fero('cli-stale', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
+  const B: any = await fero('cli-stale', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  assert.ok(await until(() => A.cluster.epoch >= 2 && B.cluster.epoch >= 2, 8000), 'cluster committed a view')
+  const C: any = await fero('cli-stale', { host: '127.0.0.1', ports: [p1], wait: 200 })
+  assert.ok(await until(() => connected(C.cluster, `127.0.0.1:${p1}`), 4000), 'client C connected to A')
+  try {
+    C.data.q = { v: 1 } // forwarded to a server; the optimistic copy is dropped locally
+    assert.ok(await until(() => A.data.q?.[value]?.v === 1, 6000), 'client write reached the cluster')
+    assert.ok(!('q' in (C.data[value] ?? {})), 'client keeps NO optimistic copy of its own write')
+    A.data.q = { v: 2 } // the cluster moves the key on
+    assert.ok(await until(() => B.data.q?.[value]?.v === 2, 6000), 'cluster advanced q to v2')
+    assert.ok(!('q' in (C.data[value] ?? {})), 'client STILL holds no stale copy after the cluster advanced')
+    let got: any // a keyed read reflects the canonical (remote) value, never a stale local one
+    for (let i = 0; i < 40; i++) { got = await C.data.q; if (got?.v === 2) break; await sleep(150) }
+    assert.equal(got?.v, 2, 'client await data.q returns the canonical value (remote read)')
+  } finally {
+    C.destroy()
+    A.destroy()
+    B.destroy()
+  }
+})
+
 test('client write made OFFLINE buffers (bounded) and flushes when a server becomes reachable (#3)', async () => {
   // No server reachable yet: the forward fails, so the write buffers (bounded drop-oldest)
   // instead of committing at epoch 1. When a server appears, onConnect + the periodic sweep
