@@ -34,7 +34,7 @@ export type TransportOpts = {
   onSubscribe?: (subId: number, method: string, arg: unknown, address: string) => void
   onUnsubscribe?: (subId: number, address: string) => void
   onPeerGone?: (address: string) => void
-  onWrite?: (record: ChangeRecord, address: string) => void
+  onWrite?: (record: ChangeRecord, address: string) => WriteOutcome | void
   onViewPrepare?: (value: unknown, address: string) => void
   onViewAck?: (value: unknown, address: string) => void
   onViewCommit?: (value: unknown, address: string) => void
@@ -43,6 +43,9 @@ export type TransportOpts = {
 
 // RingSnapshot: the committed ring's shape for L4 observability — members + vnode count, optionally the full arcs.
 export type RingSnapshot = { members: string[]; vnodes: number; coverage?: number[]; hashes?: number[]; owners?: string[] }
+
+// WriteOutcome: L2's result for a forwarded write — committed (with the sequenced seq/epoch) or withheld (the quorum-less write-gate buffered it). Carried on the WRITE-ACK so a forward learns the TRUE outcome, not just receipt.
+export type WriteOutcome = { committed: boolean; seq?: number; epoch?: number }
 
 // Mesh: the L0 seam — routing (send/replicate/forward/owners), view-change frames, RPC/subscriptions, chaos taps.
 export type Mesh = {
@@ -53,7 +56,7 @@ export type Mesh = {
   send: (record: ChangeRecord) => void
   replicateTo: (addresses: string[], record: ChangeRecord) => void
   broadcast: (record: ChangeRecord) => void
-  forward: (address: string, record: ChangeRecord, onOutcome?: (committed: boolean) => void) => boolean
+  forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void) => boolean
   owners: (key: string, replicas?: number) => string[]
   holds: (key: string, addr: string, replicas?: number) => boolean
   ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot
@@ -153,7 +156,7 @@ export function transport(opts: TransportOpts): Mesh {
   const subs = new Map<number, (record: ChangeRecord) => void>()
   const warnedVerbs = new Set<number>()
   // forwards: in-flight ack-confirmed WRITE forwards — id → fallback timer + the outcome callback (the never-drop release).
-  const forwards = new Map<number, { timer: ReturnType<typeof setTimeout>; onOutcome: (committed: boolean) => void }>()
+  const forwards = new Map<number, { timer: ReturnType<typeof setTimeout>; onOutcome: (outcome: WriteOutcome) => void }>()
 
   // dispatch: the inbound frame router — handshake first, then fan each verb to its hook (fail-closed default).
   function dispatch(frame: Frame, peer: Peer) {
@@ -170,19 +173,25 @@ export function transport(opts: TransportOpts): Mesh {
       case VERB.UNSUBSCRIBE:
         opts.onUnsubscribe?.(frame.id!, peer.address)
         return
-      case VERB.WRITE:
+      case VERB.WRITE: {
         // WRITE: a forwarded write-request for a partition we own — L2 commits it, making us its sole sequencer.
-        for (const record of frame.records()) opts.onWrite?.(record, peer.address)
-        // WRITE-ACK: confirm the commit back to the sender (socket-write success ≠ delivery).
-        if (frame.id !== undefined) peer.write(controlFrame(VERB.ACK, null, frame.id))
+        let outcome: WriteOutcome | void
+        for (const record of frame.records()) outcome = opts.onWrite?.(record, peer.address)
+        // WRITE-ACK / NACK: report the TRUE commit outcome — a quorum-less owner that BUFFERED the write must NOT falsely ack it (the acknowledged-loss bug).
+        if (frame.id !== undefined) {
+          const committed = outcome === undefined || outcome.committed
+          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch } : { ok: false }, frame.id))
+        }
         return
+      }
       case VERB.ACK: {
-        // ACK: an owner confirmed a forwarded write — settle the pending forward (clear its fallback timer).
+        // ACK: an owner answered a forwarded write — settle the forward with its committed/withheld outcome (+ seq/epoch).
         const fw = forwards.get(frame.id!)
         if (!fw) return
         forwards.delete(frame.id!)
         clearTimeout(fw.timer)
-        fw.onOutcome(true)
+        const v = (frame.value as { ok?: boolean; seq?: number; epoch?: number } | null) ?? { ok: true }
+        fw.onOutcome({ committed: v.ok !== false, seq: v.seq, epoch: v.epoch })
         return
       }
       // View-change frames: explicit cases so a VIEW_* frame never falls through to the onRecord data path.
@@ -322,7 +331,7 @@ export function transport(opts: TransportOpts): Mesh {
       if (!onOutcome) return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
       const id = ++callId
       const timer = setTimeout(() => {
-        if (forwards.delete(id)) onOutcome(false)
+        if (forwards.delete(id)) onOutcome({ committed: false })
       }, opts.callTimeout ?? 5000)
       timer.unref?.()
       forwards.set(id, { timer, onOutcome })

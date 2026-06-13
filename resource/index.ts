@@ -40,7 +40,7 @@
 // + whole-resource gather (Q2/Q3) all ship here. Open work: ../IDEAS.md.
 
 import { $, view as VIEWSYM } from '../../data/index.ts'
-import { transport, type Mesh, type TransportOpts } from '../transport/index.ts'
+import { transport, type Mesh, type TransportOpts, type WriteOutcome } from '../transport/index.ts'
 import { Log, originKey, versionKey } from '../log/log.ts'
 import { applyRecord } from '../log/index.ts'
 import { partitionOf, type ChangeRecord } from '../transport/message.ts'
@@ -270,6 +270,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // cleared synchronously within the same outer cascade (transact drains _pending before
   // returning), so it can't swallow a later genuine remove of the same key.
   const discarding = new Set<string>()
+  //! lastCommit: the outcome of the most recent commitLocal — commitForwarded reads it to report committed/withheld + seq/epoch back to the forwarder (the honest WRITE-ACK).
+  // commitLocal runs INSIDE the write-capture sink, whose return value the data proxy
+  // discards — so commitForwarded can't read it directly. commitLocal stashes its outcome
+  // here on each run, and commitForwarded reads it right after the (synchronous, un-
+  // cascaded) apply. undefined ⇒ the apply was a no-op (the value was already present) ⇒
+  // idempotently committed.
+  let lastCommit: WriteOutcome | undefined
 
   //! observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   // The contention/provenance push channel (resource/observe.ts). Built LAZILY on the
@@ -672,8 +679,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (
         owner !== undefined &&
         owner !== me &&
-        mesh.forward(owner, change, (committed) => {
-          if (!committed) commitLocal(change)
+        mesh.forward(owner, change, (outcome) => {
+          if (!outcome.committed) commitLocal(change) // withheld (quorum-less owner) or timeout ⇒ never-drop fallback under OUR provenance
         })
       ) {
         // P2: forwarded a write for a partition we DON'T replicate — drop the optimistic value (the
@@ -700,8 +707,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const server = mesh.pickServer()
     if (
       server === undefined ||
-      !mesh.forward(server, change, (committed) => {
-        if (!committed) bufferClientWrite(change) // server died before confirming — retry via the flush sweep
+      !mesh.forward(server, change, (outcome) => {
+        if (!outcome.committed) bufferClientWrite(change) // withheld (quorum-less server) or timeout ⇒ re-buffer, retry via the flush sweep
       })
     )
       bufferClientWrite(change)
@@ -827,6 +834,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (viewMgr && !viewMgr.canWrite) {
       if (pending.length >= MAX_PENDING) pending.shift() // bounded: drop oldest
       pending.push(change)
+      lastCommit = { committed: false } // WITHHELD: quorum-less write-gate buffered it (not stamped/logged/replicated) — a forwarder's never-drop fallback must fire, not a false ack
       return
     }
     const n = ++clock
@@ -851,6 +859,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       cur.seq = n
       cur.origin = uuid
     } else versions.set(key, { epoch: e, seq: n, origin: uuid })
+    lastCommit = { committed: true, seq: n, epoch: e } // COMMITTED: stamped + about to log/replicate — the honest WRITE-ACK payload
     log.append(change)
     // A committed write under OUR provenance. Forwarded writes funnel through here too
     // (commitForwarded → sink → commitLocal), so `committingForward` distinguishes a
@@ -892,13 +901,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // write into our authoritative, sequenced one. `committingForward` tells the
   // sink to commit it as-is rather than re-evaluate ownership (no re-forward → no
   // ping-pong while ring views are still settling).
-  const commitForwarded = (record: ChangeRecord) => {
+  const commitForwarded = (record: ChangeRecord): WriteOutcome | undefined => {
     committingForward = true
+    lastCommit = undefined
     try {
       applyRecord(res, record)
     } finally {
       committingForward = false
     }
+    return lastCommit // {committed, seq, epoch} from commitLocal; undefined ⇒ no-op apply (value already present) ⇒ idempotently committed
   }
 
   //! flushPending: quorum returned — re-commit the buffered writes in order (re-buffers if the gate closed again).

@@ -365,31 +365,49 @@ test('a dialed peer row is PRUNED when reconnect attempts are exhausted (gives u
   }
 })
 
-test('ack-confirmed forward: a real owner ACKs (true); a swallowing receiver times out into false', async () => {
-  // The never-drop seam (#4): socket-write success ≠ delivery. An owner crashing inside the
-  // failure-detector lag ACCEPTS the frame into a dying kernel buffer — the old boolean forward
-  // reported success and a scoped forwarder discarded its only copy. With onOutcome, the
-  // receiver acks AFTER its synchronous onWrite commit; no ack within callTimeout ⇒ false.
-  const [p1, p2, p3, p4] = [await ports.free(), await ports.free(), await ports.free(), await ports.free()]
+test('ack-confirmed forward: a committed owner ACKs {committed,seq,epoch}; a withholding owner NACKs; a swallowing receiver times out — each non-commit releases the never-drop fallback', async () => {
+  // The never-drop seam (#4) + the honest-ACK fix: socket-write success ≠ delivery AND
+  // receipt ≠ commit. The owner replies with the TRUE outcome AFTER onWrite — ACK
+  // {committed,seq,epoch} when sequenced, {committed:false} when it WITHHELD (a quorum-less
+  // write-gate buffered it, NOT committed); no ack within callTimeout ⇒ {committed:false}.
+  // A non-committed outcome (NACK or timeout) releases the caller's never-drop fallback.
+  const [p1, p2, p3, p4, p5, p6] = [await ports.free(), await ports.free(), await ports.free(), await ports.free(), await ports.free(), await ports.free()]
 
-  // positive leg: a real mesh commits in onWrite and the transport acks the frame id
+  // committed leg: onWrite reports a sequenced commit; the transport acks with its seq/epoch
   let got: any
-  const mB = transport({ name: 'wack', host: '127.0.0.1', port: p2, ports: [], wait: 50, onWrite: (r: any) => (got = r) })
+  const mB = transport({ name: 'wack', host: '127.0.0.1', port: p2, ports: [], wait: 50, onWrite: (r: any) => { got = r; return { committed: true, seq: 7, epoch: 2 } } })
   const mA = transport({ name: 'wack', host: '127.0.0.1', port: p1, ports: [p2], wait: 200, callTimeout: 400 })
-  const outcomes: boolean[] = []
+  const outcomes: any[] = []
   try {
     assert.ok(await until(() => connected(mA, `127.0.0.1:${p2}`)), 'A dialed B')
-    assert.ok(mA.forward(`127.0.0.1:${p2}`, { type: 'update', key: ['x'], value: 1 }, (c) => outcomes.push(c)))
+    assert.ok(mA.forward(`127.0.0.1:${p2}`, { type: 'update', key: ['x'], value: 1 }, (o) => outcomes.push(o)))
     assert.ok(await until(() => outcomes.length === 1, 3000), 'the ACK settled the forward')
-    assert.deepEqual(outcomes, [true])
+    assert.equal(outcomes[0].committed, true, 'committed owner ⇒ committed:true')
+    assert.equal(outcomes[0].seq, 7, 'the ACK carries the sequenced seq')
+    assert.equal(outcomes[0].epoch, 2, 'and the view epoch')
     assert.equal(got.key[0], 'x', 'the owner received the write')
   } finally {
     mA.destroy()
     mB.destroy()
   }
 
-  // negative leg: a raw TCP "server" that completes the handshake but SWALLOWS WRITE frames —
-  // exactly the dying-owner shape (bytes accepted, commit never happens, no ack ever)
+  // withheld leg: onWrite reports a NON-commit (quorum-less buffer) → the transport NACKs → false
+  // outcome WITHOUT waiting for the timeout (the acknowledged-loss bug: this used to falsely ACK)
+  const mD = transport({ name: 'whold', host: '127.0.0.1', port: p6, ports: [], wait: 50, onWrite: () => ({ committed: false }) })
+  const mC2 = transport({ name: 'whold', host: '127.0.0.1', port: p5, ports: [p6], wait: 200, callTimeout: 4000 })
+  const withheld: any[] = []
+  try {
+    assert.ok(await until(() => connected(mC2, `127.0.0.1:${p6}`)), 'C dialed D')
+    assert.ok(mC2.forward(`127.0.0.1:${p6}`, { type: 'update', key: ['z'], value: 3 }, (o) => withheld.push(o)))
+    assert.ok(await until(() => withheld.length === 1, 1500), 'the NACK settled the forward promptly (not via the 4s timeout)')
+    assert.equal(withheld[0].committed, false, 'a withholding owner NACKs ⇒ committed:false ⇒ never-drop fallback fires')
+  } finally {
+    mC2.destroy()
+    mD.destroy()
+  }
+
+  // swallow leg: a raw TCP "server" that handshakes but SWALLOWS WRITE frames — the dying-owner
+  // shape (bytes accepted, commit never happens, no ack ever) ⇒ timeout into committed:false
   const swallowId = { uuid: 'swallow-uuid', role: 'server', listen: `127.0.0.1:${p3}`, peers: [] }
   const swallow = createServer((socket) => {
     const framer = new Framer()
@@ -403,15 +421,15 @@ test('ack-confirmed forward: a real owner ACKs (true); a swallowing receiver tim
     socket.on('error', () => {})
   })
   await new Promise<void>((r) => swallow.listen(p3, '127.0.0.1', () => r()))
-  const mC = transport({ name: 'wack2', host: '127.0.0.1', port: p4, ports: [p3], wait: 200, callTimeout: 400 })
-  const failed: boolean[] = []
+  const mE = transport({ name: 'wack2', host: '127.0.0.1', port: p4, ports: [p3], wait: 200, callTimeout: 400 })
+  const failed: any[] = []
   try {
-    assert.ok(await until(() => connected(mC, `127.0.0.1:${p3}`)), 'C dialed the swallower')
-    assert.ok(mC.forward(`127.0.0.1:${p3}`, { type: 'update', key: ['y'], value: 2 }, (c) => failed.push(c)), 'the socket write itself succeeded')
+    assert.ok(await until(() => connected(mE, `127.0.0.1:${p3}`)), 'E dialed the swallower')
+    assert.ok(mE.forward(`127.0.0.1:${p3}`, { type: 'update', key: ['y'], value: 2 }, (o) => failed.push(o)), 'the socket write itself succeeded')
     assert.ok(await until(() => failed.length === 1, 3000), 'the timeout fired')
-    assert.deepEqual(failed, [false], 'no ack ⇒ false ⇒ the caller runs its never-drop fallback')
+    assert.equal(failed[0].committed, false, 'no ack ⇒ committed:false ⇒ the caller runs its never-drop fallback')
   } finally {
-    mC.destroy()
+    mE.destroy()
     await new Promise<void>((r) => swallow.close(() => r()))
   }
 })
