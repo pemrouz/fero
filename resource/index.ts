@@ -1139,8 +1139,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (done) return
       done = true
       if (safety) clearTimeout(safety)
-      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: reached, seq: o.seq, epoch: o.epoch })
-      resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch })
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: reached, seq: o.seq, epoch: o.epoch, origin: o.origin })
+      // origin + seq + epoch are the committed record's FULL LWW coordinates — committed means
+      // SEQUENCED, not necessarily WON, so a caller can watch for a (epoch,seq,origin)-dominating
+      // later write superseding theirs. origin is the owner's provenance (this node for an owned
+      // write, the owner's uuid for a forwarded/client write — carried back on the WRITE-ACK).
+      resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch, origin: o.origin })
     }
     const fail = (o: WriteOutcome) => {
       if (done) return
@@ -1149,13 +1153,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       const quorum = o.reason === 'quorum' // phase-2 miss: committed but not replicated to W
       const reachedTier = quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none' // committed-local: a never-drop fallback committed under our provenance (durable, owner-unconfirmed)
       const reason = o.reason ?? 'unconfirmed'
-      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch })
+      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch, origin: o.origin })
       rejectP(
         Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${reason})`), {
           requestedTier: tier,
           reachedTier,
           reason,
-          localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
+          localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch, origin: o.origin } : null, // its full LWW coordinates so a retry can detect its own committed-but-unconfirmed write
         }),
       )
     }
@@ -1168,7 +1172,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (!o.committed) return fail(o) // withheld / never-drop timeout — never reached the committed bar
       if (tier === 'committed') return win(o, 'committed')
       // 'replicated' PHASE 2 — the owner sequenced it (origin, seq); probe the R-set for W
-      probeReplicated(String(key[0]), o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : fail({ committed: false, seq: o.seq, epoch: o.epoch, reason: 'quorum' })), replTimeout)
+      probeReplicated(String(key[0]), o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : fail({ committed: false, seq: o.seq, epoch: o.epoch, origin: o.origin, reason: 'quorum' })), replTimeout)
     }
     try {
       doWrite()

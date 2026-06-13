@@ -1479,10 +1479,17 @@ ring is bounded (drop-oldest, can't leak), and staying armed lets a late `await 
 the running history. Two perf guards: fire-and-forget is byte-for-byte untouched (it's confirm-only)
 and the armed recording cost stays bounded. resource 87 + writes 5, perf +2.
 
+**`origin` on the resolve landed** (this commit) — the resolve now carries
+`{tier,key,seq,epoch,origin}` (and the reject's `localCommit` + the cluster.writes record carry
+`origin` too). It already flowed internally — `lastCommit` stamps the owner's uuid, the WRITE-ACK
+relays it, the replicated probe keys on it — so this just exposes it. With `(epoch, seq, origin)`
+a caller has the committed record's FULL LWW coordinates and can detect a dominating later write
+superseding theirs (committed = SEQUENCED, not necessarily WON). origin is the OWNER's provenance
+(this node for an owned write, the owner's uuid for a forwarded/client write — NOT the forwarder's).
+
 **Open follow-ups → [IDEAS](IDEAS.md):** the `persisted` tier (a real `fsync(2)` —
 `appendFileSync` only reaches the page cache — plus durable-view-epoch recovery); the
 flush-on-return escalation policy (escalate bare assignments to 'committed' only, never the
 network tiers); cid-dedup on the owner for non-idempotent retries (LWW value-sets are already
-idempotent); surfacing `origin` on the committed/replicated resolve for full LWW-supersession
-detection (it already flows internally for the probe); the SERVER-local assignment
-auth-interception parity gap (#6) stays open by design (the re-entrancy guard).
+idempotent); the SERVER-local assignment auth-interception parity gap (#6) stays open by design
+(the re-entrancy guard).
