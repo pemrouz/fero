@@ -53,6 +53,8 @@ export const VERB = {
   VIEW_ACK: 16, // view-change phase 1 reply: a member promises the ballot (carries its high-water vector — V1d)
   VIEW_COMMIT: 17, // view-change phase 2: install the agreed { epoch, members }
   JOIN_REQUEST: 18, // a node asks to be admitted to the cluster (folded into the next view by the coordinator)
+  REPL_PROBE: 19, // confirm:'replicated' probe: id=cid, value={origin, seq, partition} — "REPL_ACK me once your high-water for (origin,partition) reaches seq"
+  REPL_ACK: 20, // reply to a REPL_PROBE: id=cid — the prober's per-cid tally counts distinct acks toward the W quorum
   // a RECORDS frame WITH a frame id is a subscription delta for that sub id (vs a
   // plain replication RECORDS frame, which carries no id)
 } as const

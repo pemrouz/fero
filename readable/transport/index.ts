@@ -35,6 +35,8 @@ export type TransportOpts = {
   onUnsubscribe?: (subId: number, address: string) => void
   onPeerGone?: (address: string) => void
   onWrite?: (record: ChangeRecord, address: string) => WriteOutcome | void
+  onReplProbe?: (cid: number, probe: { origin: string; seq: number; partition: string }, address: string) => void
+  onReplAck?: (cid: number, address: string) => void
   onViewPrepare?: (value: unknown, address: string) => void
   onViewAck?: (value: unknown, address: string) => void
   onViewCommit?: (value: unknown, address: string) => void
@@ -57,6 +59,8 @@ export type Mesh = {
   replicateTo: (addresses: string[], record: ChangeRecord) => void
   broadcast: (record: ChangeRecord) => void
   forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void) => boolean
+  replProbe: (address: string, cid: number, probe: { origin: string; seq: number; partition: string }) => boolean
+  replAck: (address: string, cid: number) => boolean
   owners: (key: string, replicas?: number) => string[]
   holds: (key: string, addr: string, replicas?: number) => boolean
   ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot
@@ -194,6 +198,14 @@ export function transport(opts: TransportOpts): Mesh {
         fw.onOutcome({ committed: v.ok !== false, seq: v.seq, epoch: v.epoch, reason: v.reason })
         return
       }
+      case VERB.REPL_PROBE:
+        // REPL_PROBE: a prober wants a REPL_ACK once our high-water for (origin,partition) reaches seq (confirm:'replicated'); L2 holds it until caught up.
+        opts.onReplProbe?.(frame.id!, frame.value as { origin: string; seq: number; partition: string }, peer.address)
+        return
+      case VERB.REPL_ACK:
+        // REPL_ACK: a probed replica confirms it holds (origin,seq) — feed the prober's W-quorum tally for this cid.
+        opts.onReplAck?.(frame.id!, peer.address)
+        return
       // View-change frames: explicit cases so a VIEW_* frame never falls through to the onRecord data path.
       case VERB.VIEW_PREPARE:
         opts.onViewPrepare?.(frame.value, peer.address)
@@ -300,6 +312,19 @@ export function transport(opts: TransportOpts): Mesh {
       for (const a of addresses) if (a !== me) pool.sendTo(a, record)
     },
     broadcast: (record) => pool.broadcast(record),
+    // replProbe/replAck: confirm:'replicated' point-to-point control frames (cid in the frame id) — NOT the data outbox, so they never disturb the single-origin-contiguous replication stream.
+    replProbe: (address, cid, probe) => {
+      const peer = pool.peer(address)
+      if (!peer) return false
+      peer.write(controlFrame(VERB.REPL_PROBE, probe, cid))
+      return true
+    },
+    replAck: (address, cid) => {
+      const peer = pool.peer(address)
+      if (!peer) return false
+      peer.write(controlFrame(VERB.REPL_ACK, null, cid))
+      return true
+    },
     owners: (key, replicas) => dht.owners(key, replicas),
     // holds: allocation-free `owners(key,R).includes(addr)` for the per-record held-gate / catch-up filter.
     holds: (key, addr, replicas) => dht.holds(key, addr, replicas),

@@ -47,6 +47,8 @@ export type TransportOpts = {
   onUnsubscribe?: (subId: number, address: string) => void // a peer closed one
   onPeerGone?: (address: string) => void // a peer's connection dropped (socket close / destroy) — reap its served subscriptions (it never sent UNSUBSCRIBE)
   onWrite?: (record: ChangeRecord, address: string) => WriteOutcome | void // a peer forwarded a write-request for a partition we own; returns L2's commit outcome so the WRITE-ACK reports the TRUE result (committed/withheld), not mere receipt
+  onReplProbe?: (cid: number, probe: { origin: string; seq: number; partition: string }, address: string) => void // a prober asks us to REPL_ACK once our high-water for (origin,partition) reaches seq (confirm:'replicated')
+  onReplAck?: (cid: number, address: string) => void // a replica confirmed it holds the probed (origin,seq) — count it toward the W quorum tally
   // Membership view-change control frames (Milestone V) — each routes to its own
   // hook so a view frame can NEVER fall through to onRecord (the data path).
   onViewPrepare?: (value: unknown, address: string) => void
@@ -75,6 +77,8 @@ export type Mesh = {
   replicateTo: (addresses: string[], record: ChangeRecord) => void // scoped replication (Milestone P): send a committed record to the given R-set, excluding self (the committer already holds + logged it). Caller passes the precomputed owners(key,R) so the ring is walked once per write.
   broadcast: (record: ChangeRecord) => void
   forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void) => boolean // route a write-request to the owner; false if it isn't connected. With onOutcome: ACK-confirmed — the owner replies committed{seq,epoch} or withheld; a withheld/timeout outcome releases the caller's never-drop fallback
+  replProbe: (address: string, cid: number, probe: { origin: string; seq: number; partition: string }) => boolean // confirm:'replicated' — ask a replica to REPL_ACK once it holds (origin,seq); false if not connected
+  replAck: (address: string, cid: number) => boolean // reply to a REPL_PROBE we can satisfy (our high-water reached seq); false if not connected
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
   holds: (key: string, addr: string, replicas?: number) => boolean // owners(key,R).includes(addr) without materializing the owner set (per-record held-gate / catch-up filter)
   ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot // L4 observability: committed ring membership + vnode count (+ a k-sampled ownership donut when coverage:k, + full arcs when vnodes:true) — cold path, off the routing hot path
@@ -237,6 +241,14 @@ export function transport(opts: TransportOpts): Mesh {
         fw.onOutcome({ committed: v.ok !== false, seq: v.seq, epoch: v.epoch, reason: v.reason }) // ok:false ⇒ withheld → the caller's never-drop fallback fires
         return
       }
+      case VERB.REPL_PROBE:
+        //! REPL_PROBE: a prober wants a REPL_ACK once our high-water for (origin,partition) reaches seq (confirm:'replicated'); L2 holds it until caught up.
+        opts.onReplProbe?.(frame.id!, frame.value as { origin: string; seq: number; partition: string }, peer.address)
+        return
+      case VERB.REPL_ACK:
+        //! REPL_ACK: a probed replica confirms it holds (origin,seq) — feed the prober's W-quorum tally for this cid.
+        opts.onReplAck?.(frame.id!, peer.address)
+        return
       //! View-change frames: explicit cases so a VIEW_* frame never falls through to the onRecord data path.
       // Membership view-change frames (Milestone V) — explicit cases so they
       // route to their own hooks and never fall through to onRecord below.
@@ -372,6 +384,19 @@ export function transport(opts: TransportOpts): Mesh {
       for (const a of addresses) if (a !== me) pool.sendTo(a, record)
     },
     broadcast: (record) => pool.broadcast(record),
+    //! replProbe/replAck: confirm:'replicated' point-to-point control frames (cid in the frame id) — NOT the data outbox, so they never disturb the single-origin-contiguous replication stream.
+    replProbe: (address, cid, probe) => {
+      const peer = pool.peer(address)
+      if (!peer) return false
+      peer.write(controlFrame(VERB.REPL_PROBE, probe, cid))
+      return true
+    },
+    replAck: (address, cid) => {
+      const peer = pool.peer(address)
+      if (!peer) return false
+      peer.write(controlFrame(VERB.REPL_ACK, null, cid))
+      return true
+    },
     owners: (key, replicas) => dht.owners(key, replicas),
     //! holds: allocation-free `owners(key,R).includes(addr)` for the per-record held-gate / catch-up filter.
     holds: (key, addr, replicas) => dht.holds(key, addr, replicas),

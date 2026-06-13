@@ -28,6 +28,8 @@ export const VERB = {
   VIEW_ACK: 16,
   VIEW_COMMIT: 17,
   JOIN_REQUEST: 18,
+  REPL_PROBE: 19,
+  REPL_ACK: 20,
 } as const
 
 // record tag (byte 0 of each record): bits 0-1 type, bit2 hasAt, bit3 keyDelta (RESERVED), bits 4-7 vtype.
