@@ -336,9 +336,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // 3) routing: a CLIENT forwards to a server; a server forwards to the owner (F1) — both ack-confirmed.
     if (!committingForward) {
       const p = partitionOf(change)
-      // 3a) CLIENT (no ViewManager ⇒ viewEpoch ≡ 1): never commit under own provenance — forward to a server.
+      // 3a) CLIENT (no ViewManager ⇒ viewEpoch ≡ 1): never commit under own provenance — forward to a server, then DROP the optimistic copy.
       if (me === undefined) {
         forwardToServer(change)
+        discardOptimistic(p)
         return
       }
       const owner = mesh.owner(p)
