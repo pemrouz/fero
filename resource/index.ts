@@ -286,6 +286,87 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // every fire-and-forget write (the default) and every inbound/forwarded apply.
   let confirmHook: ((outcome: WriteOutcome) => void) | undefined
 
+  //! ── confirm:'replicated' — writer-side W-quorum probe of the R-set (ordering-safe; DECISIONS Z) ──
+  // The record replicates normally (in-order, untouched hot path). To confirm it reached
+  // W replicas, the WRITER probes the key's R-set with (origin, seq) — the committed point
+  // yields both — and counts acks. Owner-write and forwarded-write unify: same probe phase
+  // after committed. A probe rides a point-to-point control frame (REPL_PROBE), NOT the
+  // ordered data stream, so it can't perturb replication; a replica HOLDS a probe it can't
+  // yet satisfy until applyInbound catches its high-water up to seq (so it's robust even if
+  // the record arrives later via anti-entropy). W is the majority of the effective replica
+  // count — the same majority the ViewManager view-change uses.
+  let replCid = 0
+  //! replTally: cid → the in-flight W-quorum count for one replicated confirm (distinct replica acks; settle when `needed` reached or on timeout).
+  const replTally = new Map<number, { got: Set<string>; needed: number; settle: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
+  //! pendingProbes: a replica's HELD probes (arrived before the record) keyed by seenKey — acked when applyInbound advances the high-water to seq; a bounded TTL drops a never-satisfied one.
+  const pendingProbes = new Map<string, { seq: number; cid: number; from: string; timer: ReturnType<typeof setTimeout> }[]>()
+  //! replQuorum: W = majority of the effective replica count (min(R, view)) — the owner counts as 1 toward it; min() first so Infinity>>1 (=0) can't underflow it.
+  const replQuorum = (): number => (Math.min(R, viewSize() || 1) >> 1) + 1
+
+  //! probeReplicated: phase 2 of confirm:'replicated' — count the owner (committed) + any local holder, probe the rest of the R-set, settle(true) at W, settle(false) on timeout (→ reject 'quorum').
+  const probeReplicated = (partition: string, origin: string, seq: number, settle: (ok: boolean) => void, timeoutMs: number) => {
+    const rset = mesh.owners(partition, R)
+    const ownerAddr = mesh.owner(partition)
+    const W = replQuorum()
+    let have = 0 // replicas known to hold it without a probe: the owner (committed-ACK) + us if we're a holder (the owner replicates the canonical record to the whole R-set)
+    const targets: string[] = []
+    for (const a of rset) {
+      if (a === ownerAddr || a === me) have++
+      else targets.push(a)
+    }
+    if (have >= W || targets.length === 0) return settle(have >= W) // already at W (single node / R=1 / small view) or nobody left to probe
+    const cid = ++replCid
+    const timer = setTimeout(() => {
+      if (replTally.delete(cid)) settle(false) // never reached W in time → reject 'quorum' (the write IS committed; only the stronger bar was missed)
+    }, timeoutMs)
+    timer.unref?.()
+    replTally.set(cid, { got: new Set(), needed: W - have, settle, timer })
+    for (const a of targets) mesh.replProbe(a, cid, { origin, seq, partition })
+  }
+
+  //! recvReplAck: a probed replica confirms it holds (origin,seq) — count distinct acks; at `needed` the W quorum is reached.
+  const recvReplAck = (cid: number, address: string) => {
+    const t = replTally.get(cid)
+    if (!t) return // already settled (quorum reached or timed out)
+    t.got.add(address)
+    if (t.got.size >= t.needed) {
+      clearTimeout(t.timer)
+      replTally.delete(cid)
+      t.settle(true)
+    }
+  }
+
+  //! recvReplProbe: ack now if our high-water already covers (origin,seq); else HOLD the probe (a TTL drops a never-satisfied one — by then the prober timed out).
+  const recvReplProbe = (cid: number, probe: { origin: string; seq: number; partition: string }, from: string) => {
+    const sk = seenKey(probe.origin, probe.partition)
+    if ((seen.get(sk) ?? 0) >= probe.seq) return void mesh.replAck(from, cid)
+    let list = pendingProbes.get(sk)
+    if (!list) pendingProbes.set(sk, (list = []))
+    const timer = setTimeout(() => {
+      const l = pendingProbes.get(sk)
+      if (!l) return
+      const i = l.findIndex((p) => p.cid === cid)
+      if (i >= 0) l.splice(i, 1)
+      if (!l.length) pendingProbes.delete(sk)
+    }, 30_000)
+    timer.unref?.()
+    list.push({ seq: probe.seq, cid, from, timer })
+  }
+
+  //! probeReady: applyInbound advanced (origin,partition) to `n` — ack + drop every held probe now satisfied. Called only when pendingProbes is non-empty (zero-cost on the steady inbound path).
+  const probeReady = (sk: string, n: number) => {
+    const list = pendingProbes.get(sk)
+    if (!list) return
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i].seq <= n) {
+        clearTimeout(list[i].timer)
+        mesh.replAck(list[i].from, list[i].cid)
+        list.splice(i, 1)
+      }
+    }
+    if (!list.length) pendingProbes.delete(sk)
+  }
+
   //! observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   // The contention/provenance push channel (resource/observe.ts). Built LAZILY on the
   // first subscribe and nulled on the last detach, so the emit-sites below are a single
@@ -328,6 +409,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         return // already have it (dedup, per seenKey granularity)
       }
       seen.set(sk, n) // dedup high-water — advances even for the epoch-loser SKIPPED below, so anti-entropy never re-fetches that dead record
+      if (pendingProbes.size) probeReady(sk, n) // confirm:'replicated' — our high-water for (origin,partition) advanced; ack any held probe it now satisfies (zero-cost when no probes held)
       if (n > clock) clock = n // Lamport merge (global)
       const e = record.epoch ?? 0
       const key = versionKey(record)
@@ -468,6 +550,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // Apply it as a LOCAL write so our sink commits it (stamps origin=us, logs,
     // replicates) — we are the single sequencer for the partition.
     onWrite: (record: ChangeRecord) => commitForwarded(record),
+    //! onReplProbe/onReplAck: confirm:'replicated' — answer a probe once caught up; tally a replica's ack toward the W quorum.
+    onReplProbe: (cid, probe, address) => recvReplProbe(cid, probe, address),
+    onReplAck: (cid, address) => recvReplAck(cid, address),
     //! onView*: membership view-change frames (Milestone V) routed to the ViewManager state machine.
     // Membership view-change frames (Milestone V) → the view-change state machine.
     onViewPrepare: (value: unknown) => viewMgr?.onPrepare(value),
@@ -877,7 +962,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       cur.seq = n
       cur.origin = uuid
     } else versions.set(key, { epoch: e, seq: n, origin: uuid })
-    lastCommit = { committed: true, seq: n, epoch: e } // COMMITTED: stamped + about to log/replicate — the honest WRITE-ACK payload
+    lastCommit = { committed: true, seq: n, epoch: e, origin: uuid } // COMMITTED: stamped + about to log/replicate — the honest WRITE-ACK payload (origin lets a confirm:'replicated' prober probe the R-set for (origin,seq))
     log.append(change)
     // A committed write under OUR provenance. Forwarded writes funnel through here too
     // (commitForwarded → sink → commitLocal), so `committingForward` distinguishes a
@@ -969,18 +1054,19 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     },
   }
 
-  //! writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (applied locally), or 'committed' (owner-sequenced; rejects on withheld/timeout).
-  // The confirm surface (DECISIONS — tiered write guarantees). A bare write (no `confirm`)
-  // is fire-and-forget — zero tracking, the steady hot path; `await` on it resolves on the
-  // next microtask with nothing meaningful. 'accepted' resolves once the value is applied
-  // on THIS node (the synchronous doWrite) — a read-your-write-on-this-node ack, NOT a
-  // durability/cluster claim. 'committed' claims confirmHook so the sink reports the write's
-  // terminal outcome: resolve {tier,key,seq,epoch} when the owner sequenced + logged it
-  // (committed = SEQUENCED, not necessarily the LWW winner — a higher-seq concurrent write
-  // can still supersede), reject {requestedTier,reachedTier,reason,localCommit} on a
-  // withheld (quorum-less owner) or timeout — carrying localCommit when a never-drop
-  // fallback committed it under our provenance (durable, just owner-unconfirmed) so a retry
-  // isn't blind. replicated/persisted are deferred (need a replica-ack layer / real fsync).
+  //! writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (local apply), 'committed' (owner-sequenced), or 'replicated' (W of the R-set).
+  // The confirm surface (DECISIONS Z — tiered write guarantees). A bare write (no `confirm`)
+  // is fire-and-forget — zero tracking, the steady hot path; `await` resolves on the next
+  // microtask with nothing meaningful. 'accepted' resolves once the value is applied on THIS
+  // node (the synchronous doWrite) — a read-your-write-on-this-node ack, NOT a durability
+  // claim. 'committed' and 'replicated' claim confirmHook so the sink reports the write's
+  // terminal outcome; both share PHASE 1 (committed = the owner sequenced + logged it, with
+  // its origin + seq), and 'replicated' adds PHASE 2 (probe the key's R-set for (origin,seq)
+  // and resolve at W). Resolve {tier,key,seq,epoch} (committed = SEQUENCED, not necessarily
+  // the LWW winner — a higher-seq concurrent write can still supersede); reject
+  // {requestedTier,reachedTier,reason,localCommit} on withheld / timeout / quorum — carrying
+  // localCommit when a never-drop fallback committed under our provenance (durable, just
+  // owner-unconfirmed) so a retry isn't blind. persisted is deferred (needs a real fsync).
   const writeWithConfirm = (chg: any, doWrite: () => void): unknown => {
     const tier = chg && typeof chg === 'object' ? chg.confirm : undefined
     if (!tier) return doWrite() // fire-and-forget (the default — no confirmation, zero overhead)
@@ -989,40 +1075,60 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       doWrite()
       return { tier: 'accepted', key } // applied on this node now (NOT a durability/cluster claim)
     }
-    if (tier !== 'committed') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed')`)
-    let done = false
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let settle!: (o: WriteOutcome) => void
-    const promise = new Promise((resolve, reject) => {
-      settle = (o) => {
-        if (done) return // one-shot: the sink fires it once (sync owner-commit / async ACK); the timer is the only other caller
-        done = true
-        if (timer) clearTimeout(timer)
-        if (o.committed) resolve({ tier: 'committed', key, seq: o.seq, epoch: o.epoch })
-        else
-          reject(
-            Object.assign(new Error(`fero: write not committed (${o.reason ?? 'unconfirmed'})`), {
-              requestedTier: 'committed',
-              reachedTier: o.seq !== undefined ? 'committed-local' : 'none', // committed-local: a never-drop fallback committed under our provenance (durable, owner-unconfirmed)
-              reason: o.reason ?? 'unconfirmed',
-              localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
-            }),
-          )
-      }
+    if (tier !== 'committed' && tier !== 'replicated') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed' | 'replicated')`)
+    const replTimeout = typeof chg?.timeout === 'number' ? chg.timeout : 5000
+    let done = false // the whole confirm settled
+    let phase1 = false // committed point reached (or rejected) — disarms the safety timer; phase 2 (replicated probe) may still run
+    let safety: ReturnType<typeof setTimeout> | undefined
+    let resolveP!: (v: unknown) => void
+    let rejectP!: (e: unknown) => void
+    const promise = new Promise((res, rej) => {
+      resolveP = res
+      rejectP = rej
     })
-    confirmHook = settle
+    const win = (o: WriteOutcome, reached: string) => {
+      if (done) return
+      done = true
+      if (safety) clearTimeout(safety)
+      resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch })
+    }
+    const fail = (o: WriteOutcome) => {
+      if (done) return
+      done = true
+      if (safety) clearTimeout(safety)
+      const quorum = o.reason === 'quorum' // phase-2 miss: committed but not replicated to W
+      rejectP(
+        Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${o.reason ?? 'unconfirmed'})`), {
+          requestedTier: tier,
+          reachedTier: quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none', // committed-local: a never-drop fallback committed under our provenance (durable, owner-unconfirmed)
+          reason: o.reason ?? 'unconfirmed',
+          localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
+        }),
+      )
+    }
+    confirmHook = (o) => {
+      phase1 = true
+      if (safety) {
+        clearTimeout(safety)
+        safety = undefined
+      }
+      if (!o.committed) return fail(o) // withheld / never-drop timeout — never reached the committed bar
+      if (tier === 'committed') return win(o, 'committed')
+      // 'replicated' PHASE 2 — the owner sequenced it (origin, seq); probe the R-set for W
+      probeReplicated(String(key[0]), o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : fail({ committed: false, seq: o.seq, epoch: o.epoch, reason: 'quorum' })), replTimeout)
+    }
     try {
       doWrite()
     } finally {
       confirmHook = undefined // claimed (and cleared) by the sink synchronously; clear here too in case no sink fire occurred
     }
-    // An owned write settles synchronously inside doWrite; a forward settles via its ACK (or
-    // the transport's own callTimeout). The safety timer covers a path that reaches NO
-    // confirm point — e.g. an offline client that only buffered the write (it stays buffered
-    // for the flush sweep; the await just stops waiting and rejects 'timeout').
-    if (!done) {
-      timer = setTimeout(() => settle({ committed: false, reason: 'timeout' }), typeof chg?.timeout === 'number' ? chg.timeout : 5000)
-      timer.unref?.()
+    // An owned write reaches phase 1 synchronously inside doWrite; a forward reaches it via
+    // its ACK (or the transport's own callTimeout). The safety timer covers a path that
+    // reaches NO confirm point — e.g. an offline client that only buffered the write (it
+    // stays buffered for the flush sweep; the await just stops waiting and rejects 'timeout').
+    if (!phase1) {
+      safety = setTimeout(() => fail({ committed: false, reason: 'timeout' }), replTimeout)
+      safety.unref?.()
     }
     return promise
   }
