@@ -336,6 +336,8 @@ test("chaos: confirm:'replicated' — probe targets stranded by a partition reje
     assert.ok(await until(() => peers.every((n) => n.cluster.writable === false), 12000), 'the two R-set peers went read-only')
     assert.ok(owner.cluster.writable === true, 'owner kept quorum (still writable)')
 
+    const w = owner.cluster.writes // arm the introspection surface before the write so it captures the reject
+
     // commit succeeds (owner is writable) but the R-set peers are unreachable → no probe ack.
     const t0 = Date.now()
     await assert.rejects(
@@ -351,6 +353,13 @@ test("chaos: confirm:'replicated' — probe targets stranded by a partition reje
     assert.ok(Date.now() - t0 < 6000, 'rejected via the timer, did not hang')
     assert.ok(has(owner, k), 'the write IS committed locally on the owner (only the replicated bar was missed)')
     assert.equal(tally(owner), 0, 'no writer-side probe-tally leak after the reject')
+
+    // cluster.writes mirrors the reject reactively: a rejected record with the reason + the durable commit seq.
+    const rej = (Object.values((w as any)[value]) as any[]).find((r) => r.key === k)
+    assert.ok(rej && rej.state === 'rejected', 'cluster.writes shows the write as rejected')
+    assert.equal(rej.reason, 'quorum', 'cluster.writes carries the reject reason')
+    assert.equal(rej.reachedTier, 'committed', 'cluster.writes shows it reached committed')
+    assert.equal(typeof rej.latency, 'number', 'cluster.writes stamps the time-to-reject')
 
     c.heal()
     assert.ok(await c.heldOnReplicas([k], 30000), 'after heal the write is back on exactly its R-set')

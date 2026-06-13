@@ -316,9 +316,10 @@ From [DECISIONS D + E](DECISIONS.md) and plan §5–6.
   await-or-not write semantics.
 
 ### Write-confirmation tiers — [P2] (resource; transport)
-The `confirm` surface landed with `accepted` + `committed` + `replicated`, and `replicated`
-is now churn-hardened (recount against the new R-set on a view-change mid-probe) ([DECISIONS Z](DECISIONS.md));
-`persisted` + operability are the remainder.
+The `confirm` surface landed with `accepted` + `committed` + `replicated`, `replicated` is now
+churn-hardened (recount against the new R-set on a view-change mid-probe), and `cluster.writes`
+gives reactive in-flight/latency introspection ([DECISIONS Z](DECISIONS.md)); `persisted` is the
+main remainder.
 - **`persisted` tier** — blocked: `fileStorage.append` uses `appendFileSync`, which
   reaches the OS page cache, NOT disk (survives process crash, not power loss). Needs a
   real `fsync(2)` (the comment claiming "synchronous fsync per write" is wrong) AND
@@ -326,10 +327,6 @@ is now churn-hardened (recount against the new R-set on a view-change mid-probe)
   `persisted` await can honestly resolve. Until then, do not expose it (or name it
   `durable-on-W` + document crash-not-power). Builds on the `replicated` probe (the
   replica would ack only after its storage.append fsync returns).
-- **`cluster.writes` introspection** — a gated ring-buffer ViewProxy (modeled on
-  `observe.ts` makeObserve: lazy-build on first subscribe, refcount, null on last detach)
-  exposing in-flight / unconfirmed writes + per-tier latency reactively. Answers the
-  "show how long each guarantee takes" operability ask without a firehose.
 - **cid-dedup on the owner** for non-idempotent retries — LWW value-sets are idempotent
   (a lost-ack retry converges), so this is only needed if/when non-idempotent ops exist;
   add the cid tag + owner-side dedup then.

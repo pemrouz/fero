@@ -1091,6 +1091,64 @@ test('confirm: replicated resolves once W of the R-set hold the write (owned + f
   }
 })
 
+// ── cluster.writes: the confirm-write introspection surface (DECISIONS Z; resource/writes.ts) ──
+
+test('cluster.writes: gated — a confirm write BEFORE first access is not recorded; after access it is', async () => {
+  const p1 = await ports.free()
+  const A: any = await fero('cw-gate', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    await A.methods.update({ key: ['x'], value: 1, confirm: 'committed' }) // unwatched → writesLog gate is null, nothing recorded
+    const w = A.cluster.writes // first access builds + arms the ring
+    assert.equal(Object.keys((w as any)[value]).length, 0, 'the pre-access confirm write was not recorded (zero-cost until introspected)')
+    await A.methods.update({ key: ['y'], value: 2, confirm: 'committed' }) // now armed → recorded
+    assert.ok(
+      await until(() => Object.values((w as any)[value]).some((r: any) => r.key === 'y' && r.state === 'confirmed'), 3000),
+      'a post-access confirm write is recorded and reaches confirmed',
+    )
+  } finally {
+    A.destroy()
+  }
+})
+
+test('cluster.writes: each confirm tier surfaces a confirmed record carrying its measured latency (the operability ask)', async () => {
+  const p1 = await ports.free()
+  const A: any = await fero('cw-life', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    const w = A.cluster.writes // arm before writing
+    await A.methods.update({ key: ['a'], value: 1, confirm: 'accepted' })
+    await A.methods.update({ key: ['b'], value: 2, confirm: 'committed' })
+    await A.methods.update({ key: ['c'], value: 3, confirm: 'replicated' }) // single node ⇒ W=1, resolves at the committed point
+    const rows = () => Object.values((w as any)[value]) as any[]
+    assert.ok(await until(() => rows().length === 3 && rows().every((r) => r.state === 'confirmed'), 3000), 'all three tiers recorded + confirmed')
+    const byTier = Object.fromEntries(rows().map((r) => [r.tier, r]))
+    assert.equal(byTier.accepted.reachedTier, 'accepted', 'accepted = local apply')
+    assert.equal(byTier.committed.reachedTier, 'committed', 'committed = owner sequenced')
+    assert.equal(byTier.replicated.reachedTier, 'replicated', 'replicated = W of the R-set')
+    for (const t of ['accepted', 'committed', 'replicated']) assert.equal(typeof byTier[t].latency, 'number', `${t} carries a numeric latency (how long the guarantee took)`)
+    assert.equal(typeof byTier.committed.seq, 'number', 'committed/replicated carry the owner seq')
+    // the surface is a real ViewProxy — per-tier latency folds reactively (the "how long each guarantee takes" query)
+    const avg = A.cluster.writes.filter('tier', 'replicated').avg('latency')
+    assert.equal(typeof (avg as any)[value], 'number', 'avg latency over a tier is a reactive scalar')
+  } finally {
+    A.destroy()
+  }
+})
+
+test('cluster.writes: a write is observable in flight — pending → confirmed via the change stream', async () => {
+  const p1 = await ports.free()
+  const A: any = await fero('cw-flight', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    const seen: string[] = []
+    A.cluster.writes.tap((c: any) => {
+      if (c.value && c.value.key === 'k') seen.push(c.value.state)
+    })
+    await A.methods.update({ key: ['k'], value: 1, confirm: 'committed' })
+    assert.ok(await until(() => seen.includes('pending') && seen.includes('confirmed'), 3000), `observed the in-flight lifecycle (states: ${seen.join('→')})`)
+  } finally {
+    A.destroy()
+  }
+})
+
 test('client write made OFFLINE buffers (bounded) and flushes when a server becomes reachable (#3)', async () => {
   // No server reachable yet: the forward fails, so the write buffers (bounded drop-oldest)
   // instead of committing at epoch 1. When a server appears, onConnect + the periodic sweep
