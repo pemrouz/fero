@@ -142,8 +142,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   // ── confirm:'replicated' — writer-side W-quorum probe of the R-set (ordering-safe; DECISIONS Z) ──
   let replCid = 0
-  // replTally: cid → the in-flight W-quorum count for one replicated confirm (distinct replica acks; settle when `needed` reached or on timeout).
-  const replTally = new Map<number, { got: Set<string>; needed: number; settle: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
+  // replTally: cid → the in-flight W-quorum count for one replicated confirm — probe context (partition/origin/seq) + the targets probed + distinct acks; settle when `needed` reached, on timeout, or on a view-change recount.
+  const replTally = new Map<number, { partition: string; origin: string; seq: number; probed: Set<string>; got: Set<string>; needed: number; settle: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
   // pendingProbes: a replica's HELD probes (arrived before the record) keyed by seenKey — acked when applyInbound advances the high-water to seq; a bounded TTL drops a never-satisfied one.
   const pendingProbes = new Map<string, { seq: number; cid: number; from: string; timer: ReturnType<typeof setTimeout> }[]>()
   // replQuorum: W = majority of the effective replica count (min(R, view)) — the owner counts as 1 toward it; min() first so Infinity>>1 (=0) can't underflow it.
@@ -166,8 +166,34 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (replTally.delete(cid)) settle(false)
     }, timeoutMs)
     timer.unref?.()
-    replTally.set(cid, { got: new Set(), needed: W - have, settle, timer })
+    replTally.set(cid, { partition, origin, seq, probed: new Set(targets), got: new Set(), needed: W - have, settle, timer })
     for (const a of targets) mesh.replProbe(a, cid, { origin, seq, partition })
+  }
+
+  // recountProbes: a view committed mid-probe — re-evaluate every in-flight replicated confirm against the NEW R-set/W instead of waiting on the per-cid timer.
+  const recountProbes = () => {
+    if (!replTally.size) return
+    for (const [cid, t] of replTally) {
+      const rset = new Set(mesh.owners(t.partition, R))
+      const ownerAddr = mesh.owner(t.partition)
+      let free = 0
+      for (const a of rset) if (a === ownerAddr || a === me) free++
+      t.got = new Set([...t.got].filter((a) => rset.has(a) && a !== ownerAddr && a !== me))
+      t.probed = new Set([...t.probed].filter((a) => rset.has(a) && a !== ownerAddr && a !== me))
+      const W = replQuorum()
+      t.needed = Math.max(0, W - free)
+      if (free + t.got.size >= W) {
+        clearTimeout(t.timer)
+        replTally.delete(cid)
+        t.settle(true)
+        continue
+      }
+      for (const a of rset)
+        if (a !== ownerAddr && a !== me && !t.probed.has(a)) {
+          t.probed.add(a)
+          mesh.replProbe(a, cid, { origin: t.origin, seq: t.seq, partition: t.partition })
+        }
+    }
   }
 
   // recvReplAck: a probed replica confirms it holds (origin,seq) — count distinct acks; at `needed` the W quorum is reached.
@@ -375,6 +401,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
             resync()
             for (const rescope of aggregateRebinds) rescope()
             for (const reconcile of aggregateReconciles) reconcile()
+            recountProbes()
             observe?.onView(viewEpoch(), viewSize())
           },
         })
@@ -761,6 +788,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       drop: (address: string) => mesh.drop(address),
       isolate: (address: string) => mesh.isolate(address),
       heal: (address: string) => mesh.heal(address),
+      // confirms(): in-flight confirm:'replicated' bookkeeping — {tally} = writer-side W-quorum probes awaiting acks, {held} = replica-side probes held until caught up. Both must drain to 0 (no leak after a partition/heal).
+      confirms: () => ({ tally: replTally.size, held: pendingProbes.size }),
       // compact(): run a log-compaction pass NOW (the production cadence is the unref'd compactTimer); returns records dropped. Lets tests drive it deterministically.
       compact: () => log.compact(),
       // logSize(): live record count across all partition segments — asserts compaction actually shrank the log.

@@ -296,8 +296,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // the record arrives later via anti-entropy). W is the majority of the effective replica
   // count — the same majority the ViewManager view-change uses.
   let replCid = 0
-  //! replTally: cid → the in-flight W-quorum count for one replicated confirm (distinct replica acks; settle when `needed` reached or on timeout).
-  const replTally = new Map<number, { got: Set<string>; needed: number; settle: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
+  //! replTally: cid → the in-flight W-quorum count for one replicated confirm — probe context (partition/origin/seq) + the targets probed + distinct acks; settle when `needed` reached, on timeout, or on a view-change recount.
+  const replTally = new Map<number, { partition: string; origin: string; seq: number; probed: Set<string>; got: Set<string>; needed: number; settle: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
   //! pendingProbes: a replica's HELD probes (arrived before the record) keyed by seenKey — acked when applyInbound advances the high-water to seq; a bounded TTL drops a never-satisfied one.
   const pendingProbes = new Map<string, { seq: number; cid: number; from: string; timer: ReturnType<typeof setTimeout> }[]>()
   //! replQuorum: W = majority of the effective replica count (min(R, view)) — the owner counts as 1 toward it; min() first so Infinity>>1 (=0) can't underflow it.
@@ -320,8 +320,44 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (replTally.delete(cid)) settle(false) // never reached W in time → reject 'quorum' (the write IS committed; only the stronger bar was missed)
     }, timeoutMs)
     timer.unref?.()
-    replTally.set(cid, { got: new Set(), needed: W - have, settle, timer })
+    replTally.set(cid, { partition, origin, seq, probed: new Set(targets), got: new Set(), needed: W - have, settle, timer })
     for (const a of targets) mesh.replProbe(a, cid, { origin, seq, partition })
+  }
+
+  //! recountProbes: a view committed mid-probe — re-evaluate every in-flight replicated confirm against the NEW R-set/W instead of waiting on the per-cid timer.
+  // Membership churn invalidates probeReplicated's one-time R-set snapshot: a probe
+  // target can be evicted (it'll never ack — the timer would otherwise be the only way
+  // out), and a NEW member can rotate into the R-set (never probed, so the only path to
+  // W is now unreachable without re-probing). For each tally: recompute the R-set, owner,
+  // and W under the new ring; drop acks/probes from members no longer in the R-set
+  // (durability is "W of the CURRENT R-set", so an evicted holder no longer counts);
+  // settle(true) at once if the survivors already meet W; otherwise probe the freshly-
+  // admitted R-set members (they acquire the partition via resync, then ack). The per-cid
+  // timer is left armed as the liveness backstop for the genuine can't-reach-W case.
+  const recountProbes = () => {
+    if (!replTally.size) return // zero-cost when no replicated confirm is in flight (the common case)
+    for (const [cid, t] of replTally) {
+      const rset = new Set(mesh.owners(t.partition, R))
+      const ownerAddr = mesh.owner(t.partition)
+      let free = 0 // R-set members known to hold it without a probe: the owner + us (if we're still a holder under the new ring)
+      for (const a of rset) if (a === ownerAddr || a === me) free++
+      // an ack/probe from a member the new R-set dropped no longer counts toward "W of the CURRENT R-set holds it"
+      t.got = new Set([...t.got].filter((a) => rset.has(a) && a !== ownerAddr && a !== me))
+      t.probed = new Set([...t.probed].filter((a) => rset.has(a) && a !== ownerAddr && a !== me))
+      const W = replQuorum()
+      t.needed = Math.max(0, W - free)
+      if (free + t.got.size >= W) {
+        clearTimeout(t.timer)
+        replTally.delete(cid)
+        t.settle(true) // the survivors already satisfy W under the new view — resolve now, don't wait for the timer
+        continue
+      }
+      for (const a of rset) // probe any newly-admitted R-set member (they'll acquire the partition via resync, then ack)
+        if (a !== ownerAddr && a !== me && !t.probed.has(a)) {
+          t.probed.add(a)
+          mesh.replProbe(a, cid, { origin: t.origin, seq: t.seq, partition: t.partition })
+        }
+    }
   }
 
   //! recvReplAck: a probed replica confirms it holds (origin,seq) — count distinct acks; at `needed` the W quorum is reached.
@@ -649,6 +685,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
             resync() // ...and re-sync the ones we now acquire
             for (const rescope of aggregateRebinds) rescope() // re-scope live owner-scoped partials over the new ring (Q2c)
             for (const reconcile of aggregateReconciles) reconcile() // add/drop fold holders for the new membership
+            recountProbes() // confirm:'replicated' — re-evaluate in-flight probes against the new R-set (evicted target → re-probe new members / settle now; not the timer)
             observe?.onView(viewEpoch(), viewSize()) // CHAINED: surface the new committed view on the provenance ticker
           },
         })
@@ -1272,6 +1309,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       drop: (address: string) => mesh.drop(address),
       isolate: (address: string) => mesh.isolate(address),
       heal: (address: string) => mesh.heal(address),
+      //! confirms(): in-flight confirm:'replicated' bookkeeping — {tally} = writer-side W-quorum probes awaiting acks, {held} = replica-side probes held until caught up. Both must drain to 0 (no leak after a partition/heal).
+      confirms: () => ({ tally: replTally.size, held: pendingProbes.size }),
       //! compact(): run a log-compaction pass NOW (the production cadence is the unref'd compactTimer); returns records dropped. Lets tests drive it deterministically.
       compact: () => log.compact(),
       //! logSize(): live record count across all partition segments — asserts compaction actually shrank the log.

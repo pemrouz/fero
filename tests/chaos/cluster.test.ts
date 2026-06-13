@@ -19,9 +19,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { value } from '../../../data/index.ts'
 import { cluster, sameState, type Node } from './harness.ts'
+import { diagnostics } from '../../resource/index.ts'
 import { until, sleep } from '#utils'
 
 const has = (n: Node, k: string) => k in ((n.data as any)[value] ?? {})
+//! tally(n): writer-side in-flight confirm:'replicated' probes on a node — must drain to 0 (no leak after a partition/heal).
+const tally = (n: Node) => (n as any)[diagnostics].confirms().tally as number
 
 test('chaos: 5-node full-mesh — concurrent writers from every node converge identically', async () => {
   const c = await cluster({ n: 5, wait: 300 })
@@ -297,6 +300,99 @@ test('chaos: randomized soak — interleave writes + faults, then heal/restore a
     assert.ok(keys.length > 0, 'the soak committed at least one write')
     assert.ok(await until(() => c.all().every((n) => keys.every((k) => has(n, k))), 45000), `all ${keys.length} committed keys present on every node`)
     assert.ok(await c.converged(45000), 'converged after the randomized soak')
+  } finally {
+    c.destroy()
+  }
+})
+
+// ── confirm:'replicated' under membership churn (DECISIONS Z; IDEAS Write-confirmation tiers) ──
+// `replicated` probes the key's R-set for (origin,seq) and resolves at W. A partition that
+// strands probe targets is the adversarial case: the write IS committed (the owner stayed
+// writable), but the stronger replicated bar can't be confirmed. These two scenarios pin
+// the two outcomes — reject promptly when W is genuinely unreachable, resolve when a view
+// change rotates fresh holders into the R-set — and assert the writer-side tally never leaks.
+
+test("chaos: confirm:'replicated' — probe targets stranded by a partition reject 'quorum' (no hang, no tally leak)", async () => {
+  // evictAfter huge ON PURPOSE: stays one 5-member view, so the R-set never shrinks and
+  // recount can't rescue it — the per-cid timer is the ONLY way out. R=3 ⇒ W=2; the owner
+  // needs 1 ack from its 2 R-set peers. Strand BOTH peers (minority) while keeping the owner
+  // in a 3-of-5 majority (owner + the 2 non-R-set nodes) so phase 1 still commits. The probe
+  // can never reach W ⇒ the await must REJECT 'quorum' (committed-but-not-replicated), bounded
+  // by the short timeout — not hang — and the in-flight tally must drain to 0.
+  const c = await cluster({ n: 5, replicas: 3, antiEntropy: 200, wait: 350, evictAfter: 100000 })
+  try {
+    assert.ok(await c.formed(12000), 'scoped R=3 cluster formed')
+
+    const k = 'rk'
+    const rset = c.replicasOf(k) // [owner, r1, r2]
+    assert.equal(rset.length, 3, 'R-set is the owner + 2 replicas')
+    const owner = c.node(rset[0])!
+    const peers = rset.slice(1).map((a) => c.node(a)!) // the 2 R-set peers to strand
+    const others = c.all().filter((n) => !rset.includes(n.cluster.me!)) // the 2 non-R-set nodes
+    assert.equal(others.length, 2, 'two nodes outside the R-set')
+
+    // owner + the 2 outsiders = 3 of 5 → keeps quorum (writable); the 2 R-set peers = 2 of 5 → read-only.
+    c.partition([owner, ...others], peers)
+    assert.ok(await until(() => peers.every((n) => n.cluster.writable === false), 12000), 'the two R-set peers went read-only')
+    assert.ok(owner.cluster.writable === true, 'owner kept quorum (still writable)')
+
+    // commit succeeds (owner is writable) but the R-set peers are unreachable → no probe ack.
+    const t0 = Date.now()
+    await assert.rejects(
+      owner.methods.update({ key: [k], value: { v: 1 }, confirm: 'replicated', timeout: 1500 }),
+      (err: any) => {
+        assert.equal(err.requestedTier, 'replicated', 'requested replicated')
+        assert.equal(err.reason, 'quorum', "rejected 'quorum' — committed but not replicated to W")
+        assert.equal(err.reachedTier, 'committed', 'reached the committed bar (the owner sequenced + logged it)')
+        assert.ok(err.localCommit && typeof err.localCommit.seq === 'number', 'localCommit carries the durable seq for a non-blind retry')
+        return true
+      },
+    )
+    assert.ok(Date.now() - t0 < 6000, 'rejected via the timer, did not hang')
+    assert.ok(has(owner, k), 'the write IS committed locally on the owner (only the replicated bar was missed)')
+    assert.equal(tally(owner), 0, 'no writer-side probe-tally leak after the reject')
+
+    c.heal()
+    assert.ok(await c.heldOnReplicas([k], 30000), 'after heal the write is back on exactly its R-set')
+    assert.equal(c.servedSubs(), 0, 'no served-subscription leak')
+  } finally {
+    c.destroy()
+  }
+})
+
+test("chaos: confirm:'replicated' — a view change re-probes the NEW R-set (recount resolves what an evicted target alone could not)", async () => {
+  // The recount path: short evictAfter so stranding the R-set peers triggers a view change.
+  // The owner writes confirm:'replicated' while its 2 R-set peers are partitioned away — the
+  // initial probe targets them and can never ack. The majority then evicts them and commits a
+  // new view; recount re-scopes the key's R-set onto the survivors (owner + the 2 ex-outsiders),
+  // probes those freshly-admitted holders, they acquire the partition via resync and ack — so
+  // the confirm RESOLVES 'replicated'. Without recount it would hang on the evicted peers until
+  // the (here generous) timeout and reject 'quorum'; resolving proves the re-probe fired.
+  const c = await cluster({ n: 5, replicas: 3, antiEntropy: 200, wait: 350, evictAfter: 800 })
+  try {
+    assert.ok(await c.formed(12000), 'scoped R=3 cluster formed')
+
+    const k = 'rk'
+    const rset = c.replicasOf(k) // [owner, r1, r2]
+    assert.equal(rset.length, 3, 'R-set is the owner + 2 replicas')
+    const owner = c.node(rset[0])!
+    const peers = rset.slice(1).map((a) => c.node(a)!) // the 2 R-set peers to strand (will be evicted)
+    const others = c.all().filter((n) => !rset.includes(n.cluster.me!)) // the 2 nodes that join the R-set after eviction
+    assert.equal(others.length, 2, 'two nodes outside the R-set')
+
+    c.partition([owner, ...others], peers)
+    assert.ok(await until(() => peers.every((n) => n.cluster.writable === false), 12000), 'the two original R-set peers went read-only')
+
+    // Generous timeout: if recount never re-probed the new R-set this hangs to the timeout and
+    // rejects 'quorum'; resolving (well before it) is the discriminator that recount fired.
+    const r: any = await owner.methods.update({ key: [k], value: { v: 2 }, confirm: 'replicated', timeout: 15000 })
+    assert.equal(r.tier, 'replicated', 'resolved replicated — the new R-set (post-eviction survivors) reached W via recount')
+    assert.equal(owner.cluster.members.length, 3, 'the majority committed a 3-member view (the peers were evicted)')
+    assert.equal(tally(owner), 0, 'no writer-side probe-tally leak after the resolve')
+
+    c.heal()
+    assert.ok(await until(() => c.all().every((n) => n.cluster.members.length === 5), 30000), 'all five re-merged after heal')
+    assert.ok(await until(() => c.all().every((n) => has(n, k) === c.replicasOf(k).includes(n.cluster.me!)), 30000), 'the write settles onto exactly its R-set after the re-merge')
   } finally {
     c.destroy()
   }
