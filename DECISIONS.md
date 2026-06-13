@@ -1452,10 +1452,22 @@ effective replica count (the same majority the ViewManager uses); owner + local 
 toward it; timeout ⇒ reject 'quorum' (committed, just under-confirmed). Owner-write and
 forwarded-write unify (the committed-ACK carries the owner's origin so a forwarder can probe).
 
+**Membership-churn recount landed** (this commit) — probeReplicated snapshots the R-set once
+at commit, so a view change mid-probe could strand it: an evicted target never acks (the per-cid
+timer was the only exit), and a freshly-admitted R-set member was never probed (the new path to W
+went unused). `recountProbes()`, chained off the ViewManager `onCommit` (after the ring installs,
+alongside markOrphans/resync), re-evaluates every in-flight tally against the NEW R-set/W: it
+drops acks/probes from members the new R-set no longer contains (durability is "W of the CURRENT
+R-set"), settles `true` at once if the survivors already meet W, and probes the freshly-admitted
+members (they acquire the partition via resync, then ack). The per-cid timer stays armed as the
+liveness backstop for the genuine can't-reach-W case. Two chaos tests pin both outcomes — stranded
+peers under a held view reject 'quorum' (timer, no hang, no tally leak); an eviction-driven view
+change re-probes the survivors and RESOLVES what an evicted target alone could not — and a
+`[diagnostics].confirms()` seam asserts the writer-side tally drains to 0. resource 84, chaos 9.
+
 **Open follow-ups → [IDEAS](IDEAS.md):** the `persisted` tier (a real `fsync(2)` —
 `appendFileSync` only reaches the page cache — plus durable-view-epoch recovery);
-`cluster.writes` reactive introspection of in-flight/unconfirmed writes; membership-change
-mid-probe (recount against the new R-set rather than relying on the 'quorum' timeout); the
+`cluster.writes` reactive introspection of in-flight/unconfirmed writes; the
 flush-on-return escalation policy (escalate bare assignments to 'committed' only, never the
 network tiers); cid-dedup on the owner for non-idempotent retries (LWW value-sets are already
 idempotent); surfacing `origin` on the committed/replicated resolve for full LWW-supersession
