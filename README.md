@@ -63,11 +63,12 @@ A bare assignment is **fire-and-forget** — it doesn't wait for the cluster (an
 ```js
 sessions.data.acct7 = balance                                      // fire-and-forget
 await sessions.methods.update({ key: ['acct7'], value: balance, confirm: 'accepted' })   // applied locally (~0)
-const r = await sessions.methods.update({ key: ['acct7'], value: balance, confirm: 'committed' }) // owner sequenced + logged (~1 RTT)
-// r = { tier:'committed', key, seq, epoch }   — rejects { reason:'withheld'|'timeout', localCommit } if it can't reach the bar
+await sessions.methods.update({ key: ['acct7'], value: balance, confirm: 'committed' })  // owner sequenced + logged (~1 RTT)
+const r = await sessions.methods.update({ key: ['acct7'], value: balance, confirm: 'replicated' }) // W of the R-set hold it (~2 RTT)
+// r = { tier, key, seq, epoch }   — rejects { reason:'withheld'|'timeout'|'quorum', reachedTier, localCommit } if it can't reach the bar
 ```
 
-`committed` means the partition owner **sequenced + logged** the write (durable on the owner; `seq`/`epoch` let you detect a later concurrent write superseding it). `replicated`/`persisted` (W-of-R replicas, fsync'd) are planned ([IDEAS](IDEAS.md) → Write-confirmation tiers).
+`committed` means the partition owner **sequenced + logged** the write (durable on the owner; `seq`/`epoch` let you detect a later concurrent write superseding it). `replicated` means a **W-quorum of the partition's R-set** holds it (survives the owner crashing). `persisted` (fsync'd on W) is planned ([IDEAS](IDEAS.md) → Write-confirmation tiers — `appendFileSync` only reaches the page cache today).
 
 Under R-way holding (`replicas: R`) a node materializes only the partitions it replicates, so reads are **hold-relative**: synchronous-and-local for a held partition, an `await`/subscribe **remote handle** for one it doesn't ([DECISIONS Q1](DECISIONS.md)). Whole-resource aggregates (`data.sum('value')`, `.count()`, `.max/min/avg`, `.some/every`) fan out to every holder and fold the partials ([DECISIONS Q2](DECISIONS.md)); holistic ops (sort, `distinct`, `group`, `reduce`) run **after** `methods.read()` — the explicit download — over the gathered resource ([DECISIONS Q3](DECISIONS.md)).
 

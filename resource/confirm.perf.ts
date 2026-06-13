@@ -53,10 +53,16 @@ test('confirm ladder: committed-FORWARDED costs an owner round-trip (the real ne
     const fwd = await bench.timeAsync(async () => {
       for (let i = 0; i < F; i++) await A.methods.update({ key: [foreign[i % foreign.length]], value: ++n, confirm: 'committed' })
     })
+    const repl = await bench.timeAsync(async () => {
+      for (let i = 0; i < F; i++) await A.methods.update({ key: [owned[i % owned.length]], value: ++n, confirm: 'replicated' })
+    })
     console.log(`  committed-local     : ${(local / F).toFixed(4)} ms/op`)
     console.log(`  committed-forwarded : ${(fwd / F).toFixed(4)} ms/op (one owner round-trip)`)
+    console.log(`  replicated (owned)  : ${(repl / F).toFixed(4)} ms/op (committed + a W-quorum probe RTT)`)
     ok(fwd / F < 5, `committed-forwarded ${(fwd / F).toFixed(4)}ms/op (threshold 5ms — a loopback owner round-trip)`)
+    ok(repl / F < 8, `replicated ${(repl / F).toFixed(4)}ms/op (threshold 8ms — committed + a probe RTT)`)
     ok(fwd > local, `the ladder is a real slope: forwarded (${(fwd / F).toFixed(4)}) > local (${(local / F).toFixed(4)}) ms/op`)
+    ok(repl > local, `replicated (${(repl / F).toFixed(4)}) > committed-local (${(local / F).toFixed(4)}) ms/op — the probe RTT is real`)
   } finally {
     A.destroy()
     B.destroy()

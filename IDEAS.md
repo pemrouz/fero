@@ -316,23 +316,20 @@ From [DECISIONS D + E](DECISIONS.md) and plan §5–6.
   await-or-not write semantics.
 
 ### Write-confirmation tiers — [P2] (resource; transport)
-The `confirm` surface landed with `accepted` + `committed` ([DECISIONS Z](DECISIONS.md));
-the stronger tiers and operability are the remainder.
-- **`replicated` tier** — resolve once W of the partition's R-set have ack'd applying +
-  logging the record. Replication is fire-and-forget today (`replicateTo`/`broadcast`
-  return void); needs a new replica→owner `REPL_ACK` verb + an owner-side per-cid quorum
-  tally (W default = majority of R), **gated to zero added cost on the inbound RECORDS
-  hot path when no cid is present**. Pin W to the EXISTING ViewManager view-change quorum
-  (don't run two quorum definitions); define what `replicated` means when membership is
-  moving mid-wait (recount against the new R-set or reject 'quorum'); evict-on-timeout-
-  and-REJECT so a cid orphaned by an owner eviction can't hang/leak — **must be chaos-
-  tested against the partition/heal suite**, not just unit-tested.
+The `confirm` surface landed with `accepted` + `committed` + `replicated` ([DECISIONS Z](DECISIONS.md));
+`persisted`, operability, and the membership-mid-probe edge are the remainder.
 - **`persisted` tier** — blocked: `fileStorage.append` uses `appendFileSync`, which
   reaches the OS page cache, NOT disk (survives process crash, not power loss). Needs a
   real `fsync(2)` (the comment claiming "synchronous fsync per write" is wrong) AND
   durable-view-epoch recovery (a restored node fsyncs at the wrong epoch) before a
   `persisted` await can honestly resolve. Until then, do not expose it (or name it
-  `durable-on-W` + document crash-not-power).
+  `durable-on-W` + document crash-not-power). Builds on the `replicated` probe (the
+  replica would ack only after its storage.append fsync returns).
+- **`replicated` under membership churn** — `replicated` landed with a single R-set
+  snapshot at commit time + a 'quorum' timeout. Refine: recount against the NEW R-set on a
+  view-change mid-probe (rather than relying on the timeout); a focused **chaos test** for
+  a probe whose target is evicted mid-flight (it should reject 'quorum', not hang — the
+  per-cid timer already guarantees liveness, but assert it under partition/heal).
 - **`cluster.writes` introspection** — a gated ring-buffer ViewProxy (modeled on
   `observe.ts` makeObserve: lazy-build on first subscribe, refcount, null on last detach)
   exposing in-flight / unconfirmed writes + per-tier latency reactively. Answers the
@@ -340,9 +337,10 @@ the stronger tiers and operability are the remainder.
 - **cid-dedup on the owner** for non-idempotent retries — LWW value-sets are idempotent
   (a lost-ack retry converges), so this is only needed if/when non-idempotent ops exist;
   add the cid tag + owner-side dedup then.
-- **`origin` on the committed resolve** — the resolve carries `{tier,key,seq,epoch}`;
-  add `origin` so a caller can fully detect LWW supersession (committed = SEQUENCED, not
-  necessarily WON). The forwarded ACK would need to carry the owner's origin uuid.
+- **surface `origin` on the resolve** — the resolve carries `{tier,key,seq,epoch}` and
+  `origin` already flows internally (the WRITE-ACK → the replicated probe). Expose it on
+  the resolve so a caller can fully detect LWW supersession (committed = SEQUENCED, not
+  necessarily WON).
 
 ### Value codec & wire evolution — [P2] (transport/message)
 Gated on [open question 7].
@@ -497,6 +495,12 @@ What's still open:
 - **Method-returns-ViewProxy** — snapshot (`await`) vs live (reactive) on one handle;
   **config-vs-method recognition** edge cases (class, async fn, opts key colliding
   with a default method name); **client (no-port) path**; `replicate()` to R owners.
+- **Flaky: Q3a gather re-arm** ([index.test.ts](resource/index.test.ts) "a reactive read()
+  opened at members≤R re-arms the gather when the cluster grows past R") fails ~1/8 under
+  full-suite load with `original key still present: undefined` — the live gather drops a key
+  during the cluster-grows-past-R re-arm (the gatherLive rebalance over/under-count transient
+  the full-project audit flagged). Harden the re-arm (or the test's settle wait) so a key
+  can't transiently vanish across the rescope. Unrelated to the confirm/replicated work.
 - **Perf coverage gaps** — a scalar-heavy batch (int/f64, no JSON) and an N=10k batch
   (catch superlinearity) in `message.perf.ts`.
 
