@@ -277,6 +277,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // cascaded) apply. undefined ⇒ the apply was a no-op (the value was already present) ⇒
   // idempotently committed.
   let lastCommit: WriteOutcome | undefined
+  //! confirmHook: a one-shot resolver claimed by the NEXT write the sink routes — how `methods.update({…, confirm:'committed'})` learns its write's outcome.
+  // writeWithConfirm sets this immediately before issuing a confirmed write; the sink
+  // claims it (clears it) for that one write and fires it with the terminal WriteOutcome:
+  // synchronously for an owned commit (commitLocal), or via the forward's onOutcome ACK.
+  // Single shared slot is safe — a write's apply→sink runs synchronously inside the
+  // issuing call (un-cascaded), so two confirmed writes never overlap. undefined for
+  // every fire-and-forget write (the default) and every inbound/forwarded apply.
+  let confirmHook: ((outcome: WriteOutcome) => void) | undefined
 
   //! observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   // The contention/provenance push channel (resource/observe.ts). Built LAZILY on the
@@ -644,6 +652,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // drop the record — it must never be forwarded as a write or committed-local.
     if (change.type === 'remove' && discarding.delete(partitionOf(change))) return
 
+    //! 2c) claim the confirm resolver for THIS write (the committed tier) — undefined for a fire-and-forget write; the discard-remove re-fire (2b) returns above, never reaching here.
+    const hook = confirmHook
+    confirmHook = undefined
+
     //! 3) routing: a CLIENT forwards to a server; a server forwards to the owner (F1) — both ack-confirmed.
     if (!committingForward) {
       const p = partitionOf(change)
@@ -664,7 +676,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       // surface), not a sticky local shadow. The discard rides `discarding` (2b), so the
       // proxy remove is dropped locally and never forwarded to the server.
       if (me === undefined) {
-        forwardToServer(change)
+        forwardToServer(change, hook)
         discardOptimistic(p)
         return
       }
@@ -680,7 +692,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         owner !== undefined &&
         owner !== me &&
         mesh.forward(owner, change, (outcome) => {
-          if (!outcome.committed) commitLocal(change) // withheld (quorum-less owner) or timeout ⇒ never-drop fallback under OUR provenance
+          if (outcome.committed) hook?.(outcome) // owner sequenced it ⇒ resolve the confirm with {seq, epoch}
+          else {
+            commitLocal(change) // withheld (quorum-less owner) or timeout ⇒ never-drop fallback under OUR provenance
+            hook?.({ committed: false, seq: lastCommit?.seq, epoch: lastCommit?.epoch, reason: outcome.reason }) // reject: committed-LOCALLY-but-unconfirmed when lastCommit.seq is set, else nothing committed (we're also quorum-less)
+          }
         })
       ) {
         // P2: forwarded a write for a partition we DON'T replicate — drop the optimistic value (the
@@ -696,6 +712,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     //! 4) commit-local: stamp/log/replicate under our provenance.
     // 4) commit-local: stamp/log/replicate under our provenance.
     commitLocal(change)
+    hook?.(lastCommit ?? { committed: true }) // an owned write committed synchronously (or a no-op apply ⇒ idempotently committed); withheld when quorum-less (lastCommit.committed false)
   })
 
   //! ── client write path (#3): forward to a picked server; buffer (bounded) when unreachable/unconfirmed ──
@@ -703,15 +720,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (pending.length >= MAX_PENDING) pending.shift() // bounded: drop oldest (same posture as the V1e write-gate buffer)
     pending.push(change)
   }
-  const forwardToServer = (change: ChangeRecord) => {
+  const forwardToServer = (change: ChangeRecord, hook?: (o: WriteOutcome) => void) => {
     const server = mesh.pickServer()
     if (
       server === undefined ||
       !mesh.forward(server, change, (outcome) => {
         if (!outcome.committed) bufferClientWrite(change) // withheld (quorum-less server) or timeout ⇒ re-buffer, retry via the flush sweep
+        hook?.(outcome) // resolve/reject a client confirm:'committed' on the server's outcome
       })
     )
-      bufferClientWrite(change)
+      bufferClientWrite(change) // no server reachable: buffered for the flush sweep; a confirm (if any) times out in writeWithConfirm
   }
   //! flushClientPending: drain the client buffer once a server is reachable (onConnect + a periodic unref'd sweep).
   const flushClientPending = () => {
@@ -951,6 +969,64 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     },
   }
 
+  //! writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (applied locally), or 'committed' (owner-sequenced; rejects on withheld/timeout).
+  // The confirm surface (DECISIONS — tiered write guarantees). A bare write (no `confirm`)
+  // is fire-and-forget — zero tracking, the steady hot path; `await` on it resolves on the
+  // next microtask with nothing meaningful. 'accepted' resolves once the value is applied
+  // on THIS node (the synchronous doWrite) — a read-your-write-on-this-node ack, NOT a
+  // durability/cluster claim. 'committed' claims confirmHook so the sink reports the write's
+  // terminal outcome: resolve {tier,key,seq,epoch} when the owner sequenced + logged it
+  // (committed = SEQUENCED, not necessarily the LWW winner — a higher-seq concurrent write
+  // can still supersede), reject {requestedTier,reachedTier,reason,localCommit} on a
+  // withheld (quorum-less owner) or timeout — carrying localCommit when a never-drop
+  // fallback committed it under our provenance (durable, just owner-unconfirmed) so a retry
+  // isn't blind. replicated/persisted are deferred (need a replica-ack layer / real fsync).
+  const writeWithConfirm = (chg: any, doWrite: () => void): unknown => {
+    const tier = chg && typeof chg === 'object' ? chg.confirm : undefined
+    if (!tier) return doWrite() // fire-and-forget (the default — no confirmation, zero overhead)
+    const key = norm(chg?.at ?? chg?.key)
+    if (tier === 'accepted') {
+      doWrite()
+      return { tier: 'accepted', key } // applied on this node now (NOT a durability/cluster claim)
+    }
+    if (tier !== 'committed') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed')`)
+    let done = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let settle!: (o: WriteOutcome) => void
+    const promise = new Promise((resolve, reject) => {
+      settle = (o) => {
+        if (done) return // one-shot: the sink fires it once (sync owner-commit / async ACK); the timer is the only other caller
+        done = true
+        if (timer) clearTimeout(timer)
+        if (o.committed) resolve({ tier: 'committed', key, seq: o.seq, epoch: o.epoch })
+        else
+          reject(
+            Object.assign(new Error(`fero: write not committed (${o.reason ?? 'unconfirmed'})`), {
+              requestedTier: 'committed',
+              reachedTier: o.seq !== undefined ? 'committed-local' : 'none', // committed-local: a never-drop fallback committed under our provenance (durable, owner-unconfirmed)
+              reason: o.reason ?? 'unconfirmed',
+              localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
+            }),
+          )
+      }
+    })
+    confirmHook = settle
+    try {
+      doWrite()
+    } finally {
+      confirmHook = undefined // claimed (and cleared) by the sink synchronously; clear here too in case no sink fire occurred
+    }
+    // An owned write settles synchronously inside doWrite; a forward settles via its ACK (or
+    // the transport's own callTimeout). The safety timer covers a path that reaches NO
+    // confirm point — e.g. an offline client that only buffered the write (it stays buffered
+    // for the flush sweep; the await just stops waiting and rejects 'timeout').
+    if (!done) {
+      timer = setTimeout(() => settle({ committed: false, reason: 'timeout' }), typeof chg?.timeout === 'number' ? chg.timeout : 5000)
+      timer.unref?.()
+    }
+    return promise
+  }
+
   //! defaults: read/aggregate/update/insert/remove (plan §6.3), each overridable by a same-named opts function.
   // Default methods (plan §6.3), overridable by same-named opts functions. Each
   // assigns to context.data → the write-capture sink replicates the result. A method
@@ -973,9 +1049,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // NB: plain assignments (`data.x = y`) bypass these — they commit straight through
     // the write-capture sink, not via these methods. See ../IDEAS.md "Assignment ↔
     // methods.update parity". Overriding `update` guards methods.update(...) calls only.
-    update: (chg, c) => setPath(c.data, norm(chg?.key), chg?.value),
-    insert: (chg, c) => setPath(c.data, norm(chg?.at ?? chg?.key), chg?.value),
-    remove: (chg, c) => delPath(c.data, norm(chg?.key)),
+    update: (chg, c) => writeWithConfirm(chg, () => setPath(c.data, norm(chg?.key), chg?.value)),
+    insert: (chg, c) => writeWithConfirm(chg, () => setPath(c.data, norm(chg?.at ?? chg?.key), chg?.value)),
+    remove: (chg, c) => writeWithConfirm(chg, () => delPath(c.data, norm(chg?.key))),
   }
   //! __inspect: gated L4 pull method — returns this node's InspectSnapshot to a remote observer (registered only when observe is on).
   // Recognized by exact name on the existing CALL path (no new wire verb): an observer's

@@ -28,6 +28,17 @@ export const bench = {
       return performance.now() - t0
     }))
   },
+  // timeAsync: the async sibling of time() — one untimed warmup + median-of-5 over an awaited fn (for round-trip latencies like the confirm ladder).
+  timeAsync: async (fn: () => Promise<void>): Promise<number> => {
+    await fn()
+    const samples: number[] = []
+    for (let i = 0; i < 5; i++) {
+      const t0 = performance.now()
+      await fn()
+      samples.push(performance.now() - t0)
+    }
+    return bench.median(samples)
+  },
 }
 
 // ── flat helpers ─────────────────────────────────────────────────────────────
