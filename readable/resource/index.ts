@@ -48,10 +48,10 @@ export type Fero = {
   destroy: () => void
 }
 
-// Storage: the durable-log seam (plan §4) — load() replays at boot, append() persists each accepted record.
+// Storage: the durable-log seam (plan §4) — load() replays at boot, append() persists each accepted record (sync OR async — confirm:'persisted' awaits the returned Promise).
 export type Storage = {
   load: () => ChangeRecord[] | Promise<ChangeRecord[]>
-  append: (record: ChangeRecord) => void
+  append: (record: ChangeRecord) => void | Promise<void>
 }
 
 // FeroOpts: method functions + resource config + transport opts (minus name/onRecord) + optional storage.
@@ -144,22 +144,27 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   // ── confirm:'replicated' — writer-side W-quorum probe of the R-set (ordering-safe; DECISIONS Z) ──
   let replCid = 0
-  // replTally: cid → the in-flight W-quorum count for one replicated confirm — probe context (partition/origin/seq) + the targets probed + distinct acks; settle when `needed` reached, on timeout, or on a view-change recount.
-  const replTally = new Map<number, { partition: string; origin: string; seq: number; probed: Set<string>; got: Set<string>; needed: number; settle: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
-  // pendingProbes: a replica's HELD probes (arrived before the record) keyed by seenKey — acked when applyInbound advances the high-water to seq; a bounded TTL drops a never-satisfied one.
-  const pendingProbes = new Map<string, { seq: number; cid: number; from: string; timer: ReturnType<typeof setTimeout> }[]>()
+  // replTally: cid → the in-flight W-quorum count for one replicated/persisted confirm — probe context (partition/origin/seq) + durable flag + the targets probed + distinct acks; settle when `needed` reached, on timeout, or on a view-change recount.
+  const replTally = new Map<number, { partition: string; origin: string; seq: number; durable: boolean; probed: Set<string>; got: Set<string>; needed: number; settle: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
+  // pendingProbes: a replica's HELD probes (arrived before the record) keyed by seenKey — acked when the matching high-water (seen for replicated, persisted for durable) advances to seq; a bounded TTL drops a never-satisfied one.
+  const pendingProbes = new Map<string, { seq: number; cid: number; from: string; durable: boolean; timer: ReturnType<typeof setTimeout> }[]>()
+  // persisted: per-seenKey DURABLE high-water — max seq whose storage.append RESOLVED (bumped in onPersisted). confirm:'persisted' keys its W-quorum off this; empty/unused without storage or persisted writes.
+  const persisted = new Map<string, number>()
+  // localPersistWaiters: this node's OWN confirm:'persisted' writes waiting on its local append to resolve before probing the rest of the R-set (drained by onPersisted; a per-waiter timeout fails the confirm).
+  const localPersistWaiters: { sk: string; seq: number; cb: () => void; timer: ReturnType<typeof setTimeout> }[] = []
   // replQuorum: W = majority of the effective replica count (min(R, view)) — the owner counts as 1 toward it; min() first so Infinity>>1 (=0) can't underflow it.
   const replQuorum = (): number => (Math.min(R, viewSize() || 1) >> 1) + 1
 
-  // probeReplicated: phase 2 of confirm:'replicated' — count the owner (committed) + any local holder, probe the rest of the R-set, settle(true) at W, settle(false) on timeout (→ reject 'quorum').
-  const probeReplicated = (partition: string, origin: string, seq: number, settle: (ok: boolean) => void, timeoutMs: number) => {
+  // probeReplicated: phase 2 of confirm:'replicated'/'persisted' — count what we already have, probe the rest of the R-set, settle(true) at W, settle(false) on timeout (→ reject 'quorum').
+  const probeReplicated = (partition: string, origin: string, seq: number, settle: (ok: boolean) => void, timeoutMs: number, durable = false) => {
     const rset = mesh.owners(partition, R)
     const ownerAddr = mesh.owner(partition)
     const W = replQuorum()
     let have = 0
     const targets: string[] = []
     for (const a of rset) {
-      if (a === ownerAddr || a === me) have++
+      if (a === me) have++
+      else if (a === ownerAddr && !durable) have++
       else targets.push(a)
     }
     if (have >= W || targets.length === 0) return settle(have >= W)
@@ -168,8 +173,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (replTally.delete(cid)) settle(false)
     }, timeoutMs)
     timer.unref?.()
-    replTally.set(cid, { partition, origin, seq, probed: new Set(targets), got: new Set(), needed: W - have, settle, timer })
-    for (const a of targets) mesh.replProbe(a, cid, { origin, seq, partition })
+    replTally.set(cid, { partition, origin, seq, durable, probed: new Set(targets), got: new Set(), needed: W - have, settle, timer })
+    for (const a of targets) mesh.replProbe(a, cid, { origin, seq, partition, durable })
   }
 
   // recountProbes: a view committed mid-probe — re-evaluate every in-flight replicated confirm against the NEW R-set/W instead of waiting on the per-cid timer.
@@ -178,10 +183,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     for (const [cid, t] of replTally) {
       const rset = new Set(mesh.owners(t.partition, R))
       const ownerAddr = mesh.owner(t.partition)
+      const isFree = (a: string) => a === me || (a === ownerAddr && !t.durable)
       let free = 0
-      for (const a of rset) if (a === ownerAddr || a === me) free++
-      t.got = new Set([...t.got].filter((a) => rset.has(a) && a !== ownerAddr && a !== me))
-      t.probed = new Set([...t.probed].filter((a) => rset.has(a) && a !== ownerAddr && a !== me))
+      for (const a of rset) if (isFree(a)) free++
+      t.got = new Set([...t.got].filter((a) => rset.has(a) && !isFree(a)))
+      t.probed = new Set([...t.probed].filter((a) => rset.has(a) && !isFree(a)))
       const W = replQuorum()
       t.needed = Math.max(0, W - free)
       if (free + t.got.size >= W) {
@@ -191,9 +197,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         continue
       }
       for (const a of rset)
-        if (a !== ownerAddr && a !== me && !t.probed.has(a)) {
+        if (!isFree(a) && !t.probed.has(a)) {
           t.probed.add(a)
-          mesh.replProbe(a, cid, { origin: t.origin, seq: t.seq, partition: t.partition })
+          mesh.replProbe(a, cid, { origin: t.origin, seq: t.seq, partition: t.partition, durable: t.durable })
         }
     }
   }
@@ -211,9 +217,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   }
 
   // recvReplProbe: ack now if our high-water already covers (origin,seq); else HOLD the probe (a TTL drops a never-satisfied one — by then the prober timed out).
-  const recvReplProbe = (cid: number, probe: { origin: string; seq: number; partition: string }, from: string) => {
+  const recvReplProbe = (cid: number, probe: { origin: string; seq: number; partition: string; durable?: boolean }, from: string) => {
     const sk = seenKey(probe.origin, probe.partition)
-    if ((seen.get(sk) ?? 0) >= probe.seq) return void mesh.replAck(from, cid)
+    const durable = probe.durable === true
+    const hw = durable ? (persisted.get(sk) ?? 0) : (seen.get(sk) ?? 0)
+    if (hw >= probe.seq) return void mesh.replAck(from, cid)
     let list = pendingProbes.get(sk)
     if (!list) pendingProbes.set(sk, (list = []))
     const timer = setTimeout(() => {
@@ -224,21 +232,49 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (!l.length) pendingProbes.delete(sk)
     }, 30_000)
     timer.unref?.()
-    list.push({ seq: probe.seq, cid, from, timer })
+    list.push({ seq: probe.seq, cid, from, durable, timer })
   }
 
-  // probeReady: applyInbound advanced (origin,partition) to `n` — ack + drop every held probe now satisfied. Called only when pendingProbes is non-empty (zero-cost on the steady inbound path).
-  const probeReady = (sk: string, n: number) => {
+  // probeReady: a high-water advanced (origin,partition) to `n` — ack + drop every held probe of the MATCHING kind now satisfied. `durable` selects which (seen→replicated, persisted→durable).
+  const probeReady = (sk: string, n: number, durable: boolean) => {
     const list = pendingProbes.get(sk)
     if (!list) return
     for (let i = list.length - 1; i >= 0; i--) {
-      if (list[i].seq <= n) {
+      if (list[i].durable === durable && list[i].seq <= n) {
         clearTimeout(list[i].timer)
         mesh.replAck(list[i].from, list[i].cid)
         list.splice(i, 1)
       }
     }
     if (!list.length) pendingProbes.delete(sk)
+  }
+
+  // onPersisted: storage.append for (origin,partition,seq) RESOLVED — advance the DURABLE high-water + release every durable probe / local waiter it now satisfies (confirm:'persisted').
+  const onPersisted = (sk: string, seq: number) => {
+    if (seq <= (persisted.get(sk) ?? 0)) return
+    persisted.set(sk, seq)
+    if (pendingProbes.size) probeReady(sk, seq, true)
+    for (let i = localPersistWaiters.length - 1; i >= 0; i--) {
+      const w = localPersistWaiters[i]
+      if (w.sk === sk && w.seq <= seq) {
+        clearTimeout(w.timer)
+        localPersistWaiters.splice(i, 1)
+        w.cb()
+      }
+    }
+  }
+
+  // awaitLocalPersist: confirm:'persisted' on a HOLDER — run `ready` once OUR local append for (sk,seq) resolves (immediately if already durable); `timedOut` if it never does within the budget.
+  const awaitLocalPersist = (sk: string, seq: number, timeoutMs: number, ready: () => void, timedOut: () => void) => {
+    if ((persisted.get(sk) ?? 0) >= seq) return ready()
+    const w = { sk, seq, cb: ready, timer: undefined as unknown as ReturnType<typeof setTimeout> }
+    w.timer = setTimeout(() => {
+      const i = localPersistWaiters.indexOf(w)
+      if (i >= 0) localPersistWaiters.splice(i, 1)
+      timedOut()
+    }, timeoutMs)
+    w.timer.unref?.()
+    localPersistWaiters.push(w)
   }
 
   // observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
@@ -271,7 +307,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         return
       }
       seen.set(sk, n)
-      if (pendingProbes.size) probeReady(sk, n)
+      if (pendingProbes.size) probeReady(sk, n, false)
       if (n > clock) clock = n
       const e = record.epoch ?? 0
       const key = versionKey(record)
@@ -312,7 +348,15 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   let storageUnsub: (() => void) | undefined
   if (storage) {
     for (const record of await storage.load()) applyInbound(record)
-    storageUnsub = log.onAppend((record) => storage.append(record))
+    storageUnsub = log.onAppend((record) => {
+      const r = storage.append(record)
+      const origin = record.origin
+      if (origin === undefined) return
+      const sk = seenKey(origin, partitionOf(record))
+      const seq = record.seq ?? 0
+      if (r && typeof (r as Promise<void>).then === 'function') (r as Promise<void>).then(() => onPersisted(sk, seq), () => {})
+      else onPersisted(sk, seq)
+    })
   }
 
   // mesh: the L0 transport, wired with all the inbound hooks (record/digest/RPC/subscribe/write/view).
@@ -657,7 +701,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: 'accepted' })
       return { tier: 'accepted', key }
     }
-    if (tier !== 'committed' && tier !== 'replicated') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed' | 'replicated')`)
+    if (tier !== 'committed' && tier !== 'replicated' && tier !== 'persisted') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed' | 'replicated' | 'persisted')`)
+    if (tier === 'persisted' && !storage) throw new Error("fero: confirm:'persisted' requires a storage seam (none configured) — use 'replicated' for an in-memory W-quorum")
     const replTimeout = typeof chg?.timeout === 'number' ? chg.timeout : 5000
     const wid = writesLog?.onStart(tier, keyStr)
     let done = false
@@ -701,7 +746,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       }
       if (!o.committed) return fail(o)
       if (tier === 'committed') return win(o, 'committed')
-      probeReplicated(String(key[0]), o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : fail({ committed: false, seq: o.seq, epoch: o.epoch, origin: o.origin, reason: 'quorum' })), replTimeout)
+      const part = String(key[0])
+      const quorumFail = () => fail({ committed: false, seq: o.seq, epoch: o.epoch, origin: o.origin, reason: 'quorum' })
+      if (tier === 'replicated')
+        return void probeReplicated(part, o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : quorumFail()), replTimeout)
+      const startProbe = () => probeReplicated(part, o.origin!, o.seq!, (ok) => (ok ? win(o, 'persisted') : quorumFail()), replTimeout, true)
+      if (holds(part)) awaitLocalPersist(seenKey(o.origin!, part), o.seq!, replTimeout, startProbe, quorumFail)
+      else startProbe()
     }
     try {
       doWrite()

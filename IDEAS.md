@@ -316,20 +316,21 @@ From [DECISIONS D + E](DECISIONS.md) and plan §5–6.
   await-or-not write semantics.
 
 ### Write-confirmation tiers — [P2] (resource; transport)
-The `confirm` surface landed with `accepted` + `committed` + `replicated`, `replicated` is now
-churn-hardened (recount against the new R-set on a view-change mid-probe), and `cluster.writes`
-gives reactive in-flight/latency introspection ([DECISIONS Z](DECISIONS.md)); `persisted` is the
-main remainder.
-- **`persisted` tier** — blocked: `fileStorage.append` uses `appendFileSync`, which
-  reaches the OS page cache, NOT disk (survives process crash, not power loss). Needs a
-  real `fsync(2)` (the comment claiming "synchronous fsync per write" is wrong) AND
-  durable-view-epoch recovery (a restored node fsyncs at the wrong epoch) before a
-  `persisted` await can honestly resolve. Until then, do not expose it (or name it
-  `durable-on-W` + document crash-not-power). Builds on the `replicated` probe (the
-  replica would ack only after its storage.append fsync returns).
+All four tiers landed — `accepted` + `committed` + `replicated` (churn-hardened: recount against
+the new R-set on a view-change mid-probe) + `persisted` (durable W-quorum on the async storage
+seam) — plus `origin` on the resolve and `cluster.writes` reactive introspection ([DECISIONS Z](DECISIONS.md)).
+Remaining is operability + a built-in-seam upgrade, not the tier set.
+- **real-fsync `fileStorage` variant** — the built-in seam uses `appendFileSync` (OS page cache:
+  survives a process crash, not power loss), so `persisted` on it is page-cache-durable. A power-loss
+  variant is a drop-in behind the now-async seam contract: keep an open fd, `fsyncSync` (or async
+  `fsync`) per write (or batched/coalesced), return a Promise — `persisted` already awaits it. Higher
+  throughput (batched groups) + compaction sit here too.
 - **cid-dedup on the owner** for non-idempotent retries — LWW value-sets are idempotent
   (a lost-ack retry converges), so this is only needed if/when non-idempotent ops exist;
   add the cid tag + owner-side dedup then.
+- **`persisted` recovery chaos test** — a holder crashes after acking persisted, restarts from its
+  WAL; assert the persisted record survives + reconverges (the design carries per-record epochs, so
+  this is a guard, not a gap).
 
 ### Value codec & wire evolution — [P2] (transport/message)
 Gated on [open question 7].

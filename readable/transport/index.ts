@@ -35,7 +35,7 @@ export type TransportOpts = {
   onUnsubscribe?: (subId: number, address: string) => void
   onPeerGone?: (address: string) => void
   onWrite?: (record: ChangeRecord, address: string) => WriteOutcome | void
-  onReplProbe?: (cid: number, probe: { origin: string; seq: number; partition: string }, address: string) => void
+  onReplProbe?: (cid: number, probe: { origin: string; seq: number; partition: string; durable?: boolean }, address: string) => void
   onReplAck?: (cid: number, address: string) => void
   onViewPrepare?: (value: unknown, address: string) => void
   onViewAck?: (value: unknown, address: string) => void
@@ -59,7 +59,7 @@ export type Mesh = {
   replicateTo: (addresses: string[], record: ChangeRecord) => void
   broadcast: (record: ChangeRecord) => void
   forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void) => boolean
-  replProbe: (address: string, cid: number, probe: { origin: string; seq: number; partition: string }) => boolean
+  replProbe: (address: string, cid: number, probe: { origin: string; seq: number; partition: string; durable?: boolean }) => boolean
   replAck: (address: string, cid: number) => boolean
   owners: (key: string, replicas?: number) => string[]
   holds: (key: string, addr: string, replicas?: number) => boolean
@@ -200,7 +200,7 @@ export function transport(opts: TransportOpts): Mesh {
       }
       case VERB.REPL_PROBE:
         // REPL_PROBE: a prober wants a REPL_ACK once our high-water for (origin,partition) reaches seq (confirm:'replicated'); L2 holds it until caught up.
-        opts.onReplProbe?.(frame.id!, frame.value as { origin: string; seq: number; partition: string }, peer.address)
+        opts.onReplProbe?.(frame.id!, frame.value as { origin: string; seq: number; partition: string; durable?: boolean }, peer.address)
         return
       case VERB.REPL_ACK:
         // REPL_ACK: a probed replica confirms it holds (origin,seq) — feed the prober's W-quorum tally for this cid.

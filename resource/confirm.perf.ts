@@ -2,14 +2,19 @@
 // the tiered-confirm API is about. Fire-and-forget and confirm:'accepted' are LOCAL (no
 // network); confirm:'committed' on an OWNED key resolves on a microtask (the owner
 // sequences synchronously); confirm:'committed' on a FORWARDED key costs one owner
-// round-trip. The ladder must be a real slope — committed-forwarded > committed-local ≈
-// accepted ≈ fire-and-forget. (replicated/persisted are deferred — a replica-ack layer /
-// a real fsync.) Thresholds are measured loopback floors + headroom, NOT guesses; never
-// widen one to pass — investigate the regression. Median-of-5 + warmup via bench.timeAsync.
+// round-trip; confirm:'replicated' adds a W-quorum probe RTT; confirm:'persisted' adds the
+// storage.append durable-probe on top. The ladder must be a real slope — committed-forwarded
+// > committed-local ≈ accepted ≈ fire-and-forget, and replicated/persisted > committed-local.
+// Thresholds are measured loopback floors + headroom, NOT guesses; never widen one to pass —
+// investigate the regression. Median-of-5 + warmup via bench.timeAsync.
 
 import { test } from 'node:test'
 import { ok } from 'node:assert'
-import { fero } from './index.ts'
+import os from 'node:os'
+import { join } from 'node:path'
+import { rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { fero, fileStorage } from './index.ts'
 import { ports, bench, until, connected } from '#utils'
 
 const M = 200 // local-tier ops per sample (no network)
@@ -66,5 +71,35 @@ test('confirm ladder: committed-FORWARDED costs an owner round-trip (the real ne
   } finally {
     A.destroy()
     B.destroy()
+  }
+})
+
+test('confirm ladder: persisted (durable W-quorum) exceeds committed-local in the SAME storage-backed cluster', async () => {
+  // persisted needs storage, and the built-in fileStorage does real file I/O, so measure it in a
+  // dedicated storage-backed cluster where committed and persisted both pay that I/O — isolating the
+  // durable-probe RTT as the delta. (Numbers here aren't comparable to the I/O-free ladder above.)
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const wals = [join(os.tmpdir(), `cperf-p-${randomUUID().slice(0, 8)}.log`), join(os.tmpdir(), `cperf-p-${randomUUID().slice(0, 8)}.log`)]
+  const A: any = await fero('cperf-pers', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200, storage: fileStorage(wals[0]) })
+  const B: any = await fero('cperf-pers', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200, storage: fileStorage(wals[1]) })
+  try {
+    ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2 && connected(A.cluster, B.cluster.me), 8000), 'A↔B committed a 2-member view')
+    const owned = Array.from({ length: 500 }, (_, i) => 'k' + i).filter((k) => A.cluster.owner(k) === A.cluster.me)
+    ok(owned.length > 0, 'A owns some keys')
+    let n = 0
+    const committed = await bench.timeAsync(async () => {
+      for (let i = 0; i < F; i++) await A.methods.update({ key: [owned[i % owned.length]], value: ++n, confirm: 'committed' })
+    })
+    const persisted = await bench.timeAsync(async () => {
+      for (let i = 0; i < F; i++) await A.methods.update({ key: [owned[i % owned.length]], value: ++n, confirm: 'persisted' })
+    })
+    console.log(`  committed-local (storage) : ${(committed / F).toFixed(4)} ms/op`)
+    console.log(`  persisted (durable W)     : ${(persisted / F).toFixed(4)} ms/op (committed + a durable-probe RTT)`)
+    ok(persisted / F < 12, `persisted ${(persisted / F).toFixed(4)}ms/op (threshold 12ms — committed + a durable-probe RTT over loopback + file I/O)`)
+    ok(persisted > committed, `persisted (${(persisted / F).toFixed(4)}) > committed-local (${(committed / F).toFixed(4)}) ms/op — the durable-probe RTT is real`)
+  } finally {
+    A.destroy()
+    B.destroy()
+    wals.forEach((w) => rmSync(w, { force: true }))
   }
 })

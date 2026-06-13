@@ -1487,9 +1487,25 @@ a caller has the committed record's FULL LWW coordinates and can detect a domina
 superseding theirs (committed = SEQUENCED, not necessarily WON). origin is the OWNER's provenance
 (this node for an owned write, the owner's uuid for a forwarded/client write — NOT the forwarder's).
 
-**Open follow-ups → [IDEAS](IDEAS.md):** the `persisted` tier (a real `fsync(2)` —
-`appendFileSync` only reaches the page cache — plus durable-view-epoch recovery); the
-flush-on-return escalation policy (escalate bare assignments to 'committed' only, never the
-network tiers); cid-dedup on the owner for non-idempotent retries (LWW value-sets are already
-idempotent); the SERVER-local assignment auth-interception parity gap (#6) stays open by design
-(the re-entrancy guard).
+**`persisted` tier landed** (this commit) — and the "blocked" framing was wrong: it conflated the
+TIER's design with the BUILT-IN seam's durability quality. The fix is to define `persisted`
+against the seam CONTRACT, not the fileStorage implementation. `Storage.append` widens to
+`(record) => void | Promise<void>` (backward-compatible — the one call site ignored the return);
+the L2 onAppend hook bumps a per-(origin,partition) DURABLE high-water when that append RESOLVES
+(now for a sync seam, on the Promise for an async one). `persisted` = `replicated`'s probe but
+each replica acks only once its append resolved (a `durable` flag on REPL_PROBE, answered from the
+durable high-water; held until it advances — exact analog of the replicated probe waiting on
+`seen`), and the issuing holder awaits its OWN append before counting toward W. So the guarantee's
+strength = the seam's: built-in fileStorage = page-cache (survives a process crash, not power
+loss — its old "fsync" comment was a lie, now corrected); an fsync'd/DB seam = power-loss-safe.
+The two original objections collapse: fsync is a swappable impl detail behind the async contract,
+and WAL replay already carries per-record epochs through the accept path (DECISIONS C) so a
+recovered persisted record participates in LWW correctly — no "wrong-epoch" blocker. Requires a
+storage seam (synchronous reject otherwise). 5 tests (sync W=1, async-gated, multi-node owned+
+forwarded, quorum-reject-when-not-durable, no-storage guard) + a perf rung. resource 92, perf +1.
+
+**Open follow-ups → [IDEAS](IDEAS.md):** a real-fsync `fileStorage` variant (power-loss durability
+for the built-in seam — a drop-in upgrade behind the now-async contract); the flush-on-return
+escalation policy (escalate bare assignments to 'committed' only, never the network tiers);
+cid-dedup on the owner for non-idempotent retries (LWW value-sets are already idempotent); the
+SERVER-local assignment auth-interception parity gap (#6) stays open by design (the re-entrancy guard).
