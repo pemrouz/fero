@@ -1381,3 +1381,72 @@ fresh-ballot rule), re-admitting the evicted minority.
 `forget(address)` / reject-stale-epoch from an intentionally-removed node (distinct from heal-reconcile);
 faster missed-commit recovery than the announce period (retry the specific un-acked members on the next
 tick).
+
+## Z — Optimistic apply narrowed + tiered write confirmation (the `confirm` surface) · Adopted · `3d5787a`→`9f0edd6`
+
+**Context.** A user question — "in which cases does fero do optimistic writes, and are they
+all safe?" — plus an adversarial audit found the optimistic local apply was doing three
+different jobs by role, and not all were safe:
+- A **scoped non-holder** write was a deterministic, silent, cluster-wide LOST WRITE. The
+  set-trap materialized the value, the sink forwarded it to the owner, then
+  `discardOptimistic` dropped the local copy via a proxy `remove` guarded by an `applying`
+  boolean. When `data` changed re-entrant writes from inline to a deferred `_pending` drain
+  (data `c870bde`), that boolean was already cleared by the time the deferred remove
+  re-emitted through the sink — so the remove leaked out as a FORWARDED delete and wiped the
+  just-written value on the owner + R-set. Two P2 tests were red on a clean tree; the
+  cross-repo seam (a fero invariant depending on data's execution-order, with no CI gate)
+  is itself a finding — see [IDEAS](IDEAS.md) "Testing & chaos backlog".
+- A **read-only client** kept a never-reconciled optimistic copy on its raw `data` proxy → a
+  permanent client-local STALE READ on `data[value]`/operators (keyed `await data.x` already
+  routed remotely, which masked it).
+- The **owner** apply is authoritative (not optimistic); the **holder** apply has a
+  reconciliation path (the canonical record reconciles via LWW). Both are fine.
+
+A judged design panel set the direction: NARROW optimism to where a reconciliation path
+exists, and add an explicit await-for-guarantee API for when you DO care about durability.
+
+**Decision.**
+1. **Narrow optimistic apply.** `discardOptimistic` rides a partition `Set` (`discarding`)
+   the sink consumes when the deferred remove drains — surviving data's cascade drain the
+   boolean did not (the lost-write fix). A **client** discards its optimistic copy on forward
+   (reads route remotely; `data[value]` is honestly-empty, not stale-forever). Owner + holder
+   apply unchanged — optimism survives only where a reconciliation path exists.
+2. **Honest WRITE-ACK.** The owner ACKs the TRUE outcome — `{committed, seq, epoch}`, or a
+   NACK `{reason:'withheld'}` when the quorum-less write-gate buffered it — not mere receipt
+   (closing a silent acknowledged-loss: a forwarder/client used to release its never-drop
+   fallback on a false ack). A non-commit (NACK or timeout) fires the existing never-drop
+   fallback. `WriteOutcome` is threaded onWrite → WRITE-handler → ACK → forward onOutcome.
+3. **Tiered `confirm` surface.** `methods.update({key, value, confirm?, timeout?})` (and
+   insert/remove). Default = fire-and-forget (zero tracking; the bare `data.x = v` assignment
+   is the same path). `confirm:'accepted'` resolves once applied locally (read-your-write on
+   this node, not a durability claim); `confirm:'committed'` resolves `{tier,key,seq,epoch}`
+   once the OWNER sequenced + logged it, rejecting `{requestedTier,reachedTier,reason,
+   localCommit}` on withheld/timeout (localCommit carries the seq when a never-drop fallback
+   committed it under our provenance, so a retry isn't blind). Confirmation rides `methods`,
+   NOT assignment, because `await (data.x = v)` awaits the RHS `v` per the JS spec — which
+   resolves the §11.1 / "Assignment ↔ `methods.update` parity" thread: it is the same write,
+   and the method form is the one you can await. `committed` = SEQUENCED, not necessarily the
+   LWW winner (a higher-seq concurrent write can supersede — hence seq/epoch on the resolve).
+
+**Consequences.**
+- Scoped-non-holder writes and client snapshot reads are correct; the discard rides a Set
+  robust to data's re-entrancy timing (no longer an implicit cross-repo execution-order
+  contract).
+- `committed` is a real durability claim (owner-sequenced + logged + owner-fsync when storage
+  is set); a quorum-less owner NACKs instead of falsely acking, so the never-drop fallback
+  keeps the write alive on the forwarder rather than only in volatile owner `pending`.
+- Fire-and-forget stays the zero-overhead hot path (the no-confirm method returns `doWrite()`
+  directly; `index.perf.ts` unchanged). The latency ladder is MEASURED (`confirm.perf.ts`):
+  accepted/committed-owner ~local (sub-ms), committed-forwarded ~1 owner RTT (~4× local).
+- Tests: P2 placement/convergence green again + a focused scoped-non-holder regression; a
+  client no-sticky-copy regression; the transport ack test rewritten to the outcome contract
+  + a withholding-NACK leg; 6 confirm tests. resource 82, transport 85, chaos 7.
+
+**Open follow-ups → [IDEAS](IDEAS.md):** the `replicated` + `persisted` tiers (a replica→
+owner ack/quorum layer pinned to the ViewManager quorum; a real `fsync(2)` — `appendFileSync`
+only reaches the page cache); `cluster.writes` reactive introspection of in-flight/unconfirmed
+writes; the flush-on-return escalation policy (escalate bare assignments to 'committed' only,
+never the network tiers); cid-dedup on the owner for non-idempotent retries (LWW value-sets
+are already idempotent); `origin` on the committed resolve for full LWW-supersession
+detection; the SERVER-local assignment auth-interception parity gap (#6) stays open by design
+(the re-entrancy guard).

@@ -24,12 +24,16 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
 §11.
 
 1. **Commit-ack / flush-on-return.** *Design resolved (plan §11.1):* method-call
-   writes are await-or-not (`await methods.update(...)` waits for the ack), plain
-   assignments (`data.x = y`) are inherently fire-and-forget — never `await data`
-   (it collides with the snapshot-read thenable). *Open:* implement flush-on-return
-   (a handler's `return` is post-commit because pending writes are flushed, not
-   because each assignment blocked) and decide whether to add an explicit barrier
-   handle (`await commit()` / `await data.flush()`). (resource)
+   writes are await-or-not, plain assignments (`data.x = y`) are inherently
+   fire-and-forget — never `await data` (it collides with the snapshot-read thenable).
+   The await-for-guarantee surface LANDED ([DECISIONS Z](DECISIONS.md)):
+   `methods.update({…, confirm:'accepted'|'committed'})`, default fire-and-forget.
+   *Open:* (a) the flush-on-return escalation policy — a handler's `return` should
+   flush pending bare assignments at the 'committed' tier ONLY, never the network
+   tiers (else every handler return pays ~1 RTT/assignment); decide whether to add an
+   explicit barrier handle (`await commit()` / `await data.flush()`); (b) the deferred
+   `replicated`/`persisted` tiers + `cluster.writes` introspection (see the
+   Write-confirmation tiers workstream). (resource)
 2. **Re-subscription / re-dispatch on failover.** When a client's connected server
    drops, where does it re-subscribe and re-route the call, and how is the
    projection re-bound? (plan §11.2) (resource)
@@ -41,14 +45,15 @@ plan.md §11 (noted inline) with only an implementation tail left. Not a 1:1 map
    `{host, port}` during the `fero(...)` await, before any peer connects. *Open:*
    expose it as a derived `cluster.me`/uuid row on the `cluster` ViewProxy (see the
    Surfaces workstream). (transport, resource)
-6. **Assignment ↔ `methods.update` parity.** `data.x = y` goes straight through the
-   sink today, bypassing the `update` method, so a custom `update` can't intercept
-   plain assignments. Route assignments through the method (for an auth/validation
-   hook) or keep them separate? A genuinely-open design point, not in plan §11
-   (it sits alongside the §11.1 write-paths). (resource) *(Note: a CLIENT's
-   assignment now FORWARDS to a server rather than committing locally — [DECISIONS
-   X](DECISIONS.md) — so on a client the server's `update`/sink sees it; the parity
-   gap is now specifically a SERVER's own local assignment.)*
+6. **Assignment ↔ `methods.update` parity.** The await-parity is RESOLVED
+   ([DECISIONS Z](DECISIONS.md)): `data.x = y` and `methods.update({key:['x'],value:y})`
+   are the SAME write (both enter the one write-capture sink); the method form is the
+   one you can `await` for a `confirm` guarantee (assignment can't — JS evaluates it to
+   the RHS). *Still open:* a custom `update` (auth/validation) intercepts only
+   `methods.update(...)` CALLS, not a SERVER's own bare `data.x = y` assignment —
+   routing assignments through the method would re-enter the `applying`/re-entrancy
+   guard, so they stay separate by design. Surface an explicit validation seam if the
+   auth-on-assignment gap matters. (resource)
 7. **Value codec.** Adopt a CBOR / `data`-owned binary value form behind the
    `encodeValue`/`decodeValue` seam? `JSON.parse` of object values is ~85% of decode
    cost (~2.4ms vs ~0.35ms lazy-scan for 1000 object records) — decide with a perf
@@ -309,6 +314,35 @@ From [DECISIONS D + E](DECISIONS.md) and plan §5–6.
 - **[P3]** Default `insert` nested key/`at` semantics (only top-level handled; nested
   works via direct assignment). `send()` returning a flush/ack handle to back
   await-or-not write semantics.
+
+### Write-confirmation tiers — [P2] (resource; transport)
+The `confirm` surface landed with `accepted` + `committed` ([DECISIONS Z](DECISIONS.md));
+the stronger tiers and operability are the remainder.
+- **`replicated` tier** — resolve once W of the partition's R-set have ack'd applying +
+  logging the record. Replication is fire-and-forget today (`replicateTo`/`broadcast`
+  return void); needs a new replica→owner `REPL_ACK` verb + an owner-side per-cid quorum
+  tally (W default = majority of R), **gated to zero added cost on the inbound RECORDS
+  hot path when no cid is present**. Pin W to the EXISTING ViewManager view-change quorum
+  (don't run two quorum definitions); define what `replicated` means when membership is
+  moving mid-wait (recount against the new R-set or reject 'quorum'); evict-on-timeout-
+  and-REJECT so a cid orphaned by an owner eviction can't hang/leak — **must be chaos-
+  tested against the partition/heal suite**, not just unit-tested.
+- **`persisted` tier** — blocked: `fileStorage.append` uses `appendFileSync`, which
+  reaches the OS page cache, NOT disk (survives process crash, not power loss). Needs a
+  real `fsync(2)` (the comment claiming "synchronous fsync per write" is wrong) AND
+  durable-view-epoch recovery (a restored node fsyncs at the wrong epoch) before a
+  `persisted` await can honestly resolve. Until then, do not expose it (or name it
+  `durable-on-W` + document crash-not-power).
+- **`cluster.writes` introspection** — a gated ring-buffer ViewProxy (modeled on
+  `observe.ts` makeObserve: lazy-build on first subscribe, refcount, null on last detach)
+  exposing in-flight / unconfirmed writes + per-tier latency reactively. Answers the
+  "show how long each guarantee takes" operability ask without a firehose.
+- **cid-dedup on the owner** for non-idempotent retries — LWW value-sets are idempotent
+  (a lost-ack retry converges), so this is only needed if/when non-idempotent ops exist;
+  add the cid tag + owner-side dedup then.
+- **`origin` on the committed resolve** — the resolve carries `{tier,key,seq,epoch}`;
+  add `origin` so a caller can fully detect LWW supersession (committed = SEQUENCED, not
+  necessarily WON). The forwarded ACK would need to carry the owner's origin uuid.
 
 ### Value codec & wire evolution — [P2] (transport/message)
 Gated on [open question 7].
