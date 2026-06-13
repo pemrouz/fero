@@ -133,6 +133,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   let applying = false
   // committingForward: guard so an applied forwarded write commits as-is, never re-evaluating ownership.
   let committingForward = false
+  // discarding: partitions whose optimistic copy we're dropping (scoped non-holder) — a Set, NOT a boolean, because data DEFERS the re-entrant remove past a boolean guard's lifetime.
+  const discarding = new Set<string>()
 
   // observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   let observe: Observe | undefined
@@ -328,6 +330,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // 2) applying-skip: an inbound re-emission — already handled in onRecord.
     if (applying) return
 
+    // 2b) discard-skip: a deferred optimistic-discard for a non-held partition — drop it silently (no forward, no commit). See `discarding`.
+    if (change.type === 'remove' && discarding.delete(partitionOf(change))) return
+
     // 3) routing: a CLIENT forwards to a server; a server forwards to the owner (F1) — both ack-confirmed.
     if (!committingForward) {
       const p = partitionOf(change)
@@ -382,14 +387,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const orphans = new Set<string>()
   const shedReady = new Map<string, Set<string>>()
 
-  // discardOptimistic: drop a forwarded-but-unheld partition we optimistically applied (guarded — no sink echo).
+  // discardOptimistic: drop a forwarded-but-unheld partition's optimistic value — via `discarding` (survives data's deferred re-entrant drain; the old `applying` boolean did not).
   const discardOptimistic = (partition: string) => {
-    applying = true
-    try {
-      applyRecord(res, { type: 'remove', key: [partition] })
-    } finally {
-      applying = false
-    }
+    discarding.add(partition)
+    applyRecord(res, { type: 'remove', key: [partition] })
   }
 
   // shed: fully drop an orphan from proxy/log/seen/versions — complete handoff, only after R-set confirmed caught up.
