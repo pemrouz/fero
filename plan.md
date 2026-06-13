@@ -370,15 +370,15 @@ Per the `feedback_rethink_not_reskin` and `feedback_serve_for_visual_progress` m
 
    The two write paths can't behave the same under `await`, for a hard JS reason:
 
-   - **Method-call writes** (`await methods.update(k, v)` vs `methods.update(k, v)`) — await-or-not works, because a *call* returns a library-controlled value, exactly like the client-side return-type dispatch. `await` ⇒ wait for the commit ack; no `await` ⇒ fire-and-forget. This is the path to reach for when you need durability confirmation mid-handler.
+   - **Method-call writes** (`methods.update({key, value, confirm})`) — a *call* returns a library-controlled value, so it can carry a confirmation. LANDED ([DECISIONS Z](DECISIONS.md)): the DEFAULT is fire-and-forget (await resolves with nothing — no per-write round-trip you didn't ask for); you opt into a guarantee with `confirm:'accepted'` (applied locally) or `confirm:'committed'` (owner sequenced + logged, `~1` RTT; resolves `{seq,epoch}`, rejects on withheld/timeout). This is the path to reach for when you need durability confirmation mid-handler. (`replicated`/`persisted` deferred.)
    - **Assignment writes** (`data.user42 = {…}`) — *inherently* fire-and-forget; there is nothing to await. An assignment expression always evaluates to the RHS (per spec), and the `data` proxy's `set` trap is synchronous and returns a boolean (it calls `res.update(...)`; can't substitute a Promise). So `await (data.x = v)` awaits `v` and resolves instantly — no hook for an ack. And `await data.x` is already the snapshot-read thenable trick in `data`, so it can't double as a write barrier either.
 
    Consequence: the old "default = await each commit before continuing" framing is **not achievable** for the assignment syntax it most wants to support — synchronous assignment can't suspend the handler, and per-write acks would serialize one network round-trip per write anyway. So:
 
    - Assignments are fire-and-forget by default. For ack-before-`return`, flush + await pending writes when the handler returns (the `return` value is post-commit because of the flush, not because each assignment blocked).
-   - When a handler needs an explicit mid-body confirmation, use the awaitable method form (`await methods.update(...)`), **not** a magic assignment. If a barrier is ever wanted, it must be a distinct handle (`await commit()` / `await data.flush()`) — never `await data`, which collides with the snapshot read.
+   - When a handler needs an explicit mid-body confirmation, use the awaitable method form (`await methods.update({…, confirm})`), **not** a magic assignment. If a barrier is ever wanted, it must be a distinct handle (`await commit()` / `await data.flush()`) — never `await data`, which collides with the snapshot read.
 
-   Nail down the flush-on-return mechanics during L2.
+   The `confirm` surface has landed ([DECISIONS Z](DECISIONS.md)); the flush-on-return mechanics (escalate pending assignments to 'committed' on `return`, never the network tiers) remain open work — [IDEAS](IDEAS.md) open question 1.
 
 2. **Re-subscription on connected-server failover.** When the connected server drops, the client reconnects to another and re-runs `read`. Not an API decision — part of chaos test coverage. Document failure semantics.
 
