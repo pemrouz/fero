@@ -10,6 +10,7 @@ import { makeFold } from './fold.ts'
 import { makeDispatch } from './dispatch.ts'
 import { makeSnapshot, peerValue, type InspectSnapshot } from './inspect.ts'
 import { makeObserve, type Observe, type ObserveOpts } from './observe.ts'
+import { makeWritesLog, type WritesLog } from './writes.ts'
 
 export { value } from '../../data/index.ts'
 export { fileStorage } from './storage.ts'
@@ -26,6 +27,7 @@ export type Cluster = {
   readonly epoch: number
   readonly members: string[]
   readonly writable: boolean
+  readonly writes: any
 }
 
 // Context: the second arg every method receives — data/cluster/methods/log/name + the calling peer (routed RPC).
@@ -241,6 +243,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   // observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   let observe: Observe | undefined
+  // writesLog: the cluster.writes gate — null until the first `cluster.writes` access builds it; the confirm emit-sites are a `writesLog?.…` predicted-false branch until then. Stays armed (bounded ring, off the steady path — see writes.ts).
+  let writesLog: WritesLog | undefined
   // buildObserve: lazily construct + arm the push-hook for ONE subscriber; returns the proxy to stream + the close that disarms the gate on the last detach.
   const buildObserve = () => {
     const inst = (observe ??= makeObserve(typeof observeOpt === 'object' && observeOpt !== null ? (observeOpt as ObserveOpts) : {}))
@@ -635,6 +639,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     get writable() {
       return viewMgr ? viewMgr.canWrite : true
     },
+    // writes: the confirm-write lifecycle ViewProxy — built lazily on first access (so an un-introspected node never allocates the ring), then armed for the lifetime of the instance (bounded, off the steady path).
+    get writes() {
+      return (writesLog ??= makeWritesLog()).proxy
+    },
   }
 
   // writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (local apply), 'committed' (owner-sequenced), or 'replicated' (W of the R-set).
@@ -642,12 +650,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const tier = chg && typeof chg === 'object' ? chg.confirm : undefined
     if (!tier) return doWrite()
     const key = norm(chg?.at ?? chg?.key)
+    const keyStr = key.join('.')
     if (tier === 'accepted') {
+      const wid = writesLog?.onStart('accepted', keyStr)
       doWrite()
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: 'accepted' })
       return { tier: 'accepted', key }
     }
     if (tier !== 'committed' && tier !== 'replicated') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed' | 'replicated')`)
     const replTimeout = typeof chg?.timeout === 'number' ? chg.timeout : 5000
+    const wid = writesLog?.onStart(tier, keyStr)
     let done = false
     let phase1 = false
     let safety: ReturnType<typeof setTimeout> | undefined
@@ -661,6 +673,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (done) return
       done = true
       if (safety) clearTimeout(safety)
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: reached, seq: o.seq, epoch: o.epoch })
       resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch })
     }
     const fail = (o: WriteOutcome) => {
@@ -668,11 +681,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       done = true
       if (safety) clearTimeout(safety)
       const quorum = o.reason === 'quorum'
+      const reachedTier = quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none'
+      const reason = o.reason ?? 'unconfirmed'
+      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch })
       rejectP(
-        Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${o.reason ?? 'unconfirmed'})`), {
+        Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${reason})`), {
           requestedTier: tier,
-          reachedTier: quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none',
-          reason: o.reason ?? 'unconfirmed',
+          reachedTier,
+          reason,
           localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
         }),
       )

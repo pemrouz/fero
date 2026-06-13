@@ -49,6 +49,7 @@ import { makeFold } from './fold.ts'
 import { makeDispatch } from './dispatch.ts'
 import { makeSnapshot, peerValue, type InspectSnapshot } from './inspect.ts'
 import { makeObserve, type Observe, type ObserveOpts } from './observe.ts'
+import { makeWritesLog, type WritesLog } from './writes.ts'
 
 export { value } from '../../data/index.ts'
 export { fileStorage } from './storage.ts'
@@ -65,6 +66,7 @@ export type Cluster = {
   readonly epoch: number // current committed view-epoch (Milestone V); 1 for a read-only client
   readonly members: string[] // current committed view membership (servers); [] for a client
   readonly writable: boolean // can this server reach a quorum of its view? false ⇒ read-only (writes buffer)
+  readonly writes: any // confirm-write lifecycle ViewProxy (in-flight + per-tier latency) — gated, lazily built on first access (resource/writes.ts); records ONLY confirm:'accepted'|'committed'|'replicated' writes, never fire-and-forget
 }
 
 //! Context: the second arg every method receives — data/cluster/methods/log/name + the calling peer (routed RPC).
@@ -409,6 +411,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // `observe?.…` predicted-false branch whenever nobody is watching — the steady-state
   // write path is untouched (guarded in observe.perf.ts).
   let observe: Observe | undefined
+  //! writesLog: the cluster.writes gate — null until the first `cluster.writes` access builds it; the confirm emit-sites are a `writesLog?.…` predicted-false branch until then. Stays armed (bounded ring, off the steady path — see writes.ts).
+  let writesLog: WritesLog | undefined
   //! buildObserve: lazily construct + arm the push-hook for ONE subscriber; returns the proxy to stream + the close that disarms the gate on the last detach.
   // The close is per-subscriber IDEMPOTENT (a `closed` latch) and captures the INSTANCE
   // it attached to — a stale closer that fires after the gate was disarmed and re-armed
@@ -1089,6 +1093,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     get writable() {
       return viewMgr ? viewMgr.canWrite : true
     },
+    //! writes: the confirm-write lifecycle ViewProxy — built lazily on first access (so an un-introspected node never allocates the ring), then armed for the lifetime of the instance (bounded, off the steady path).
+    get writes() {
+      return (writesLog ??= makeWritesLog()).proxy
+    },
   }
 
   //! writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (local apply), 'committed' (owner-sequenced), or 'replicated' (W of the R-set).
@@ -1108,12 +1116,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     const tier = chg && typeof chg === 'object' ? chg.confirm : undefined
     if (!tier) return doWrite() // fire-and-forget (the default — no confirmation, zero overhead)
     const key = norm(chg?.at ?? chg?.key)
+    const keyStr = key.join('.') // dotted path for the cluster.writes ticker (gated — undefined unless someone introspected it)
     if (tier === 'accepted') {
+      const wid = writesLog?.onStart('accepted', keyStr)
       doWrite()
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: 'accepted' }) // local apply — latency ≈ 0
       return { tier: 'accepted', key } // applied on this node now (NOT a durability/cluster claim)
     }
     if (tier !== 'committed' && tier !== 'replicated') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed' | 'replicated')`)
     const replTimeout = typeof chg?.timeout === 'number' ? chg.timeout : 5000
+    const wid = writesLog?.onStart(tier, keyStr) // cluster.writes: a `pending` record now; settled in win/fail with the measured latency (gated — undefined unless introspected)
     let done = false // the whole confirm settled
     let phase1 = false // committed point reached (or rejected) — disarms the safety timer; phase 2 (replicated probe) may still run
     let safety: ReturnType<typeof setTimeout> | undefined
@@ -1127,6 +1139,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (done) return
       done = true
       if (safety) clearTimeout(safety)
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: reached, seq: o.seq, epoch: o.epoch })
       resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch })
     }
     const fail = (o: WriteOutcome) => {
@@ -1134,11 +1147,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       done = true
       if (safety) clearTimeout(safety)
       const quorum = o.reason === 'quorum' // phase-2 miss: committed but not replicated to W
+      const reachedTier = quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none' // committed-local: a never-drop fallback committed under our provenance (durable, owner-unconfirmed)
+      const reason = o.reason ?? 'unconfirmed'
+      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch })
       rejectP(
-        Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${o.reason ?? 'unconfirmed'})`), {
+        Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${reason})`), {
           requestedTier: tier,
-          reachedTier: quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none', // committed-local: a never-drop fallback committed under our provenance (durable, owner-unconfirmed)
-          reason: o.reason ?? 'unconfirmed',
+          reachedTier,
+          reason,
           localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
         }),
       )

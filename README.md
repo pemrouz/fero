@@ -93,9 +93,19 @@ sessions.cluster.peers.filter('status', 'connected')
 sessions.cluster.me                                       // this server's listen address
 sessions.cluster.owner(key) / .replicas(key)             // DHT ownership / R-set
 sessions.cluster.epoch / .members / .writable            // view-synchronous membership state
+sessions.cluster.writes                                  // confirm-write lifecycle ViewProxy (in-flight + per-tier latency)
 ```
 
 `cluster.peers` is a ViewProxy, so peer "events" are just changes on it. (`cluster.partitions` and `cluster`-as-a-ViewProxy are tracked open work — see the Surfaces workstream in [IDEAS.md](IDEAS.md).)
+
+`cluster.writes` answers "how long does each guarantee actually take?" at runtime: a gated, bounded ViewProxy where every `confirm` write goes `pending` → `confirmed`/`rejected` carrying its measured `latency` (and `seq`/`epoch`, or a reject `reason`). It's reactive and queryable like any view —
+
+```js
+sessions.cluster.writes.filter('state', 'pending')                  // what's in flight right now
+sessions.cluster.writes.filter('tier', 'replicated').avg('latency') // how long the W-quorum bar costs
+```
+
+Fire-and-forget writes aren't recorded (no guarantee to time), and the surface is built lazily on first access — an un-introspected node allocates nothing ([DECISIONS Z](DECISIONS.md)).
 
 ## Layered architecture
 

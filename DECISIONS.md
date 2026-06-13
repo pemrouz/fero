@@ -1465,9 +1465,22 @@ peers under a held view reject 'quorum' (timer, no hang, no tally leak); an evic
 change re-probes the survivors and RESOLVES what an evicted target alone could not — and a
 `[diagnostics].confirms()` seam asserts the writer-side tally drains to 0. resource 84, chaos 9.
 
+**`cluster.writes` introspection landed** (this commit) — the operability answer to "show how
+long each guarantee takes", AT RUNTIME rather than only via the perf suite. A gated, bounded
+ring-buffer ViewProxy (resource/writes.ts): every `confirm` write shows up as a record that goes
+`pending` → `confirmed`/`rejected` carrying its measured `latency` + (committed/replicated)
+`seq`/`epoch` + (rejected) `reason`. Reactive, so `cluster.writes.filter('state','pending')` is
+what's in flight and `cluster.writes.filter('tier','replicated').avg('latency')` is how long the W
+bar costs — no firehose: fire-and-forget writes (the steady hot path) are NOT recorded (no
+guarantee to time). Built LAZILY on first `cluster.writes` access (an un-introspected node never
+allocates the ring; the emit-sites are `writesLog?.…` predicted-false branches until then) and —
+unlike observe — NOT nulled on detach: its emit-sites are already off the steady record path, the
+ring is bounded (drop-oldest, can't leak), and staying armed lets a late `await cluster.writes` see
+the running history. Two perf guards: fire-and-forget is byte-for-byte untouched (it's confirm-only)
+and the armed recording cost stays bounded. resource 87 + writes 5, perf +2.
+
 **Open follow-ups → [IDEAS](IDEAS.md):** the `persisted` tier (a real `fsync(2)` —
-`appendFileSync` only reaches the page cache — plus durable-view-epoch recovery);
-`cluster.writes` reactive introspection of in-flight/unconfirmed writes; the
+`appendFileSync` only reaches the page cache — plus durable-view-epoch recovery); the
 flush-on-return escalation policy (escalate bare assignments to 'committed' only, never the
 network tiers); cid-dedup on the owner for non-idempotent retries (LWW value-sets are already
 idempotent); surfacing `origin` on the committed/replicated resolve for full LWW-supersession
