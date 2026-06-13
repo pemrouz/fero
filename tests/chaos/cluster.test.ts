@@ -161,6 +161,39 @@ test('chaos: crash → recover — a killed node restarts from its WAL and catch
   }
 })
 
+test("chaos: confirm:'persisted' survives a FULL-CLUSTER crash — recovered from the WALs the ack guaranteed", async () => {
+  // The durability guard for confirm:'persisted' (DECISIONS Z). persisted resolves only once a
+  // W-quorum has RESOLVED storage.append, so AT THE MOMENT THE AWAIT RETURNS the record is durable
+  // on ≥W WALs — and therefore survives even a whole-cluster crash that wipes every in-memory copy.
+  // Storage on all nodes; persist a write, await its ack, kill EVERY node, restart them all from
+  // their WALs, and assert the record is recovered (replayed through the accept path with its
+  // original epoch — DECISIONS C) and the cluster reconverges. (A single-holder crash would recover
+  // a merely-'replicated' write too via the survivors; a FULL crash is what isolates durability.)
+  const c = await cluster({ n: 3, storage: true, antiEntropy: 200, wait: 350, heartbeat: { interval: 100, misses: 2 }, evictAfter: 400 })
+  try {
+    assert.ok(await c.formed(12000), 'storage-backed cluster formed')
+
+    const k = 'pk'
+    const owner = c.node(c.owner(k)!)!
+    const r: any = await owner.methods.update({ key: [k], value: { v: 42 }, confirm: 'persisted', timeout: 8000 })
+    assert.equal(r.tier, 'persisted', 'durably persisted on a W-quorum — so ≥W WALs hold it right now')
+    assert.ok(await c.converged(12000), 'all three hold it before the crash')
+
+    // FULL crash: every node down (all in-memory state gone — only the on-disk WALs remain).
+    const addrs = c.all().map((n) => n.cluster.me!)
+    for (const a of addrs) c.kill(a)
+    assert.equal(c.all().length, 0, 'every node is down (in-memory state wiped)')
+
+    // restart them all on their same ports + WALs — each restores its durable subset, then they re-form + reconcile.
+    await Promise.all(addrs.map((a) => c.restart(a)))
+    assert.ok(await c.formed(30000), 'cluster re-formed after the full-cluster restart')
+    assert.ok(await until(() => c.all().every((n) => (n.data as any)[value]?.[k]?.v === 42), 30000), 'the persisted write was recovered from the WALs across the whole cluster')
+    assert.ok(await c.converged(30000), 'all three reconverged with the persisted write')
+  } finally {
+    c.destroy()
+  }
+})
+
 test('chaos: membership CHURN — rapid join/leave re-agrees on one view and converges', async () => {
   const c = await cluster({ n: 3, wait: 350, heartbeat: { interval: 100, misses: 2 }, evictAfter: 400 })
   const joined: Node[] = []

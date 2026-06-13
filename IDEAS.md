@@ -328,9 +328,6 @@ Remaining is operability + a built-in-seam upgrade, not the tier set.
 - **cid-dedup on the owner** for non-idempotent retries — LWW value-sets are idempotent
   (a lost-ack retry converges), so this is only needed if/when non-idempotent ops exist;
   add the cid tag + owner-side dedup then.
-- **`persisted` recovery chaos test** — a holder crashes after acking persisted, restarts from its
-  WAL; assert the persisted record survives + reconverges (the design carries per-record epochs, so
-  this is a guard, not a gap).
 
 ### Value codec & wire evolution — [P2] (transport/message)
 Gated on [open question 7].

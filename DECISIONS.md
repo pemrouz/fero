@@ -1503,6 +1503,10 @@ and WAL replay already carries per-record epochs through the accept path (DECISI
 recovered persisted record participates in LWW correctly — no "wrong-epoch" blocker. Requires a
 storage seam (synchronous reject otherwise). 5 tests (sync W=1, async-gated, multi-node owned+
 forwarded, quorum-reject-when-not-durable, no-storage guard) + a perf rung. resource 92, perf +1.
+A FULL-CLUSTER-crash chaos test then closes the durability loop: persist a write, kill every node
+(all in-memory state wiped), restart them all from their WALs, and the record is recovered (replayed
+through the accept path with its original epoch) + reconverges — the proof that a persisted ack means
+durable-on-a-W-quorum right then, not just held. chaos 10.
 
 **Open follow-ups → [IDEAS](IDEAS.md):** a real-fsync `fileStorage` variant (power-loss durability
 for the built-in seam — a drop-in upgrade behind the now-async contract); the flush-on-return
