@@ -341,6 +341,40 @@ test('P2: replicas:2 — concurrent writes from every node converge to exactly t
   }
 })
 
+test('P2: a scoped non-holder write survives — discardOptimistic must not forward a spurious remove', async () => {
+  // Regression for the scoped-non-holder LOST WRITE. The set-trap materializes the value,
+  // the sink forwards the insert to the owner, then discardOptimistic drops the local
+  // copy. That drop writes a `remove` to the proxy, which re-emits through the write-
+  // capture sink; when data DEFERS the re-entrant write (its transact _pending drain
+  // runs after the issuing call returns), an `applying` boolean guard is already cleared
+  // — so the remove leaked out as a FORWARDED delete and wiped the value on the owner +
+  // R-set (silent cluster-wide loss). The fix tracks the discard in a partition Set that
+  // survives the drain. Here A writes ONE key it neither owns nor holds; it must land on
+  // its R-set and STAY (a spurious remove would arrive just after the insert).
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2 })
+  const A = await fero('p2-nonholder', cfg(p1))
+  const B = await fero('p2-nonholder', cfg(p2))
+  const C = await fero('p2-nonholder', cfg(p3))
+  const all = [A, B, C]
+  const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
+  const has = (n: any, k: string) => k in (n.data[value] ?? {})
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed')
+    // a key A neither owns nor replicates — the pure-foreign write, the broken case
+    const foreign = Array.from({ length: 200 }, (_, i) => 'k' + i).find((k) => !A.cluster.replicas(k).includes(A.cluster.me))!
+    A.data[foreign] = 'v'
+    const reps = A.cluster.replicas(foreign)
+    for (const addr of reps) assert.ok(await until(() => has(node(addr), foreign), 8000), `R-set member ${addr} receives ${foreign}`)
+    await sleep(300) // a spurious discard-remove would arrive shortly AFTER the insert
+    for (const addr of reps) assert.ok(has(node(addr), foreign), `R-set member ${addr} STILL holds ${foreign} (no spurious discard-remove)`)
+    assert.ok(!has(A, foreign), 'the non-holder A does not retain the optimistic copy')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
 test('P2: replicas:2 — a node that joins after writes ACQUIRES its share (durability heals to R)', async () => {
   // The acquisition path (Milestone P): when membership grows, the ring rebalances
   // partitions onto the joiner, which must back-fill their history via anti-entropy

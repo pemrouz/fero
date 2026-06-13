@@ -256,6 +256,20 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // Set while a FORWARDED write is being applied locally (see commitForwarded): the
   // sink commits it as-is instead of re-evaluating ownership, so it never bounces.
   let committingForward = false
+  //! discarding: partitions whose optimistic copy we're dropping (scoped non-holder) — a Set, NOT a boolean, because data DEFERS the re-entrant remove past a boolean guard's lifetime.
+  // discardOptimistic drops a foreign partition's optimistic value by writing a `remove`
+  // to the proxy. But data's transact DEFERS a re-entrant write — one issued from inside
+  // a cascade, which the write-capture sink IS — to a _pending drain that runs AFTER the
+  // issuing call returns. So an `applying = true` boolean set around that remove is back
+  // to false by the time the deferred remove re-emits through the sink: the guard misses
+  // it, the sink treats it as a genuine write, and forwards a spurious `remove` to the
+  // owner — deleting the just-written value cluster-wide (the scoped-non-holder lost
+  // write, surfaced when data switched re-entrant writes from inline to deferred). A Set
+  // keyed by partition SURVIVES the drain: the sink consumes the entry when the remove
+  // arrives (inline OR deferred), dropping it exactly once, never forwarding it. It is
+  // cleared synchronously within the same outer cascade (transact drains _pending before
+  // returning), so it can't swallow a later genuine remove of the same key.
+  const discarding = new Set<string>()
 
   //! observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   // The contention/provenance push channel (resource/observe.ts). Built LAZILY on the
@@ -616,6 +630,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // 2) applying-skip: an inbound re-emission — already handled in onRecord.
     if (applying) return
 
+    //! 2b) discard-skip: a deferred optimistic-discard for a non-held partition — drop it silently (no forward, no commit). See `discarding`.
+    // discardOptimistic issued this `remove` as local cleanup of an optimistic value we
+    // already forwarded to the owner; data deferred it past the `applying` boolean, so we
+    // catch it here by partition. Consume the entry (delete returns true iff present) and
+    // drop the record — it must never be forwarded as a write or committed-local.
+    if (change.type === 'remove' && discarding.delete(partitionOf(change))) return
+
     //! 3) routing: a CLIENT forwards to a server; a server forwards to the owner (F1) — both ack-confirmed.
     if (!committingForward) {
       const p = partitionOf(change)
@@ -701,17 +722,18 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // R-replicated WITHOUT us before we drop it.
   const shedReady = new Map<string, Set<string>>()
 
-  //! discardOptimistic: drop a forwarded-but-unheld partition we optimistically applied (guarded — no sink echo).
-  // Silently remove a foreign partition we optimistically applied but don't hold
-  // (after forwarding its write to the owner). Guarded by `applying` so the removal
-  // doesn't re-enter the sink — no echo, no spurious forwarded 'remove'.
+  //! discardOptimistic: drop a forwarded-but-unheld partition's optimistic value — via `discarding` (survives data's deferred re-entrant drain; the old `applying` boolean did not).
+  // Silently remove a foreign partition we optimistically applied but don't hold (after
+  // forwarding its write to the owner). Mark the partition in `discarding` FIRST, then
+  // write the proxy remove: whether data runs that remove inline (shed — called outside
+  // a cascade) or defers it (the write-capture sink — called inside the user-write
+  // cascade), the sink's discard-skip (2b) consumes the entry and drops it, so there's
+  // no echo and no spurious forwarded 'remove'. (The old `applying = true` wrapper missed
+  // the DEFERRED case, which forwarded the remove and deleted the just-written value
+  // cluster-wide — the scoped-non-holder lost write.)
   const discardOptimistic = (partition: string) => {
-    applying = true
-    try {
-      applyRecord(res, { type: 'remove', key: [partition] })
-    } finally {
-      applying = false
-    }
+    discarding.add(partition)
+    applyRecord(res, { type: 'remove', key: [partition] })
   }
 
   //! shed: fully drop an orphan from proxy/log/seen/versions — complete handoff, only after R-set confirmed caught up.
