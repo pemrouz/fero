@@ -36,6 +36,7 @@ export type WriteRecord = {
   reason?: string // rejected ⇒ 'withheld' | 'timeout' | 'quorum' | 'unconfirmed'
   seq?: number // the owner's Lamport seq once committed (durable detection of a later supersession)
   epoch?: number // the view epoch the write committed under
+  origin?: string // the owner's provenance uuid — with (epoch, seq) the committed record's FULL LWW coordinates
   startedAt: number // performance.now() at the call (ms) — the ring slot's birth
   settledAt?: number // performance.now() when it resolved/rejected (ms)
   latency?: number // settledAt − startedAt (ms) — "how long this guarantee took"

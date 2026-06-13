@@ -330,10 +330,6 @@ main remainder.
 - **cid-dedup on the owner** for non-idempotent retries — LWW value-sets are idempotent
   (a lost-ack retry converges), so this is only needed if/when non-idempotent ops exist;
   add the cid tag + owner-side dedup then.
-- **surface `origin` on the resolve** — the resolve carries `{tier,key,seq,epoch}` and
-  `origin` already flows internally (the WRITE-ACK → the replicated probe). Expose it on
-  the resolve so a caller can fully detect LWW supersession (committed = SEQUENCED, not
-  necessarily WON).
 
 ### Value codec & wire evolution — [P2] (transport/message)
 Gated on [open question 7].

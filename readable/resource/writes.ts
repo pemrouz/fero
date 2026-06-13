@@ -18,6 +18,7 @@ export type WriteRecord = {
   reason?: string
   seq?: number
   epoch?: number
+  origin?: string
   startedAt: number
   settledAt?: number
   latency?: number

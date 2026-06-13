@@ -673,8 +673,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (done) return
       done = true
       if (safety) clearTimeout(safety)
-      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: reached, seq: o.seq, epoch: o.epoch })
-      resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch })
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: reached, seq: o.seq, epoch: o.epoch, origin: o.origin })
+      resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch, origin: o.origin })
     }
     const fail = (o: WriteOutcome) => {
       if (done) return
@@ -683,13 +683,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       const quorum = o.reason === 'quorum'
       const reachedTier = quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none'
       const reason = o.reason ?? 'unconfirmed'
-      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch })
+      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch, origin: o.origin })
       rejectP(
         Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${reason})`), {
           requestedTier: tier,
           reachedTier,
           reason,
-          localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
+          localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch, origin: o.origin } : null,
         }),
       )
     }
@@ -701,7 +701,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       }
       if (!o.committed) return fail(o)
       if (tier === 'committed') return win(o, 'committed')
-      probeReplicated(String(key[0]), o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : fail({ committed: false, seq: o.seq, epoch: o.epoch, reason: 'quorum' })), replTimeout)
+      probeReplicated(String(key[0]), o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : fail({ committed: false, seq: o.seq, epoch: o.epoch, origin: o.origin, reason: 'quorum' })), replTimeout)
     }
     try {
       doWrite()

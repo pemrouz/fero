@@ -1001,6 +1001,7 @@ test('confirm: committed resolves {tier:committed,seq,epoch} when the OWNER sequ
     assert.deepEqual(r.key, ['acct'])
     assert.equal(typeof r.seq, 'number', 'carries the sequenced Lamport seq')
     assert.equal(typeof r.epoch, 'number', 'carries the view epoch')
+    assert.equal(r.origin, A.cluster.uuid, 'carries origin = this owner’s provenance (full LWW coordinates for supersession detection)')
     assert.deepEqual(A.data.acct?.[value], { bal: 100 })
   } finally {
     A.destroy()
@@ -1022,6 +1023,8 @@ test('confirm: committed resolves for a FORWARDED write — the owner ACKs with 
     assert.equal(r.tier, 'committed', 'the owner ACKed the forwarded write as committed')
     assert.equal(typeof r.seq, 'number', 'the ACK carried the owner-sequenced seq')
     const owner = all.find((n) => n.cluster.me === A.cluster.owner(k))!
+    assert.equal(r.origin, owner.cluster.uuid, 'origin on the resolve is the OWNER’s provenance (re-sequenced under it), not the forwarder’s')
+    assert.notEqual(r.origin, A.cluster.uuid, 'so it is NOT A’s uuid — A only forwarded')
     assert.ok(await until(() => owner.data[k]?.[value] === 7, 6000), 'the owner holds the value')
   } finally {
     all.forEach((n) => n.destroy())
@@ -1126,6 +1129,7 @@ test('cluster.writes: each confirm tier surfaces a confirmed record carrying its
     assert.equal(byTier.replicated.reachedTier, 'replicated', 'replicated = W of the R-set')
     for (const t of ['accepted', 'committed', 'replicated']) assert.equal(typeof byTier[t].latency, 'number', `${t} carries a numeric latency (how long the guarantee took)`)
     assert.equal(typeof byTier.committed.seq, 'number', 'committed/replicated carry the owner seq')
+    assert.equal(byTier.committed.origin, A.cluster.uuid, 'and the owner origin (full LWW coordinates, parity with the resolve)')
     // the surface is a real ViewProxy — per-tier latency folds reactively (the "how long each guarantee takes" query)
     const avg = A.cluster.writes.filter('tier', 'replicated').avg('latency')
     assert.equal(typeof (avg as any)[value], 'number', 'avg latency over a tier is a reactive scalar')
