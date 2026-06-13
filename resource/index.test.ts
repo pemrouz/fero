@@ -957,6 +957,105 @@ test('client write leaves NO sticky optimistic copy — raw snapshot stays clean
   }
 })
 
+// ── confirm surface: methods.update({…, confirm}) tiered write guarantees ──
+// Default is fire-and-forget (await resolves with nothing); confirm:'accepted' acks the
+// local apply; confirm:'committed' resolves {tier,key,seq,epoch} once the OWNER has
+// sequenced + logged the write. Fire-and-forget stays the bare `data.x = v` assignment.
+// replicated/persisted are deferred (need a replica-ack layer / a real fsync).
+
+test('confirm: default (no confirm) is fire-and-forget — the write replicates, await resolves with nothing', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const A: any = await fero('cf-ff', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
+  const B: any = await fero('cf-ff', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  try {
+    assert.ok(await until(() => connected(A.cluster, B.cluster.me) && connected(B.cluster, A.cluster.me), 6000), 'A↔B connected')
+    const r = await A.methods.update({ key: ['k1'], value: 1 }) // no confirm ⇒ fire-and-forget
+    assert.equal(r, undefined, 'no-confirm await resolves with nothing (no guarantee tracked)')
+    assert.ok(await until(() => B.data.k1?.[value] === 1, 6000), 'the write still replicated')
+  } finally {
+    A.destroy()
+    B.destroy()
+  }
+})
+
+test('confirm: accepted resolves {tier:accepted} once the value is applied locally', async () => {
+  const p1 = await ports.free()
+  const A: any = await fero('cf-acc', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    const r: any = await A.methods.update({ key: ['k'], value: 42, confirm: 'accepted' })
+    assert.equal(r.tier, 'accepted')
+    assert.deepEqual(r.key, ['k'])
+    assert.equal(A.data.k?.[value], 42, 'applied locally')
+  } finally {
+    A.destroy()
+  }
+})
+
+test('confirm: committed resolves {tier:committed,seq,epoch} when the OWNER sequences the write', async () => {
+  const p1 = await ports.free()
+  const A: any = await fero('cf-own', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    // a single node owns every key → commitLocal sequences synchronously
+    const r: any = await A.methods.update({ key: ['acct'], value: { bal: 100 }, confirm: 'committed' })
+    assert.equal(r.tier, 'committed')
+    assert.deepEqual(r.key, ['acct'])
+    assert.equal(typeof r.seq, 'number', 'carries the sequenced Lamport seq')
+    assert.equal(typeof r.epoch, 'number', 'carries the view epoch')
+    assert.deepEqual(A.data.acct?.[value], { bal: 100 })
+  } finally {
+    A.destroy()
+  }
+})
+
+test('confirm: committed resolves for a FORWARDED write — the owner ACKs with seq/epoch', async () => {
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250 })
+  const A: any = await fero('cf-fwd', cfg(p1))
+  const B: any = await fero('cf-fwd', cfg(p2))
+  const C: any = await fero('cf-fwd', cfg(p3))
+  const all = [A, B, C]
+  const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => all.every(formed), 8000), 'cluster formed')
+    const k = Array.from({ length: 100 }, (_, i) => 'f' + i).find((k) => A.cluster.owner(k) !== A.cluster.me)! // a key A does NOT own ⇒ A forwards to the owner
+    const r: any = await A.methods.update({ key: [k], value: 7, confirm: 'committed' })
+    assert.equal(r.tier, 'committed', 'the owner ACKed the forwarded write as committed')
+    assert.equal(typeof r.seq, 'number', 'the ACK carried the owner-sequenced seq')
+    const owner = all.find((n) => n.cluster.me === A.cluster.owner(k))!
+    assert.ok(await until(() => owner.data[k]?.[value] === 7, 6000), 'the owner holds the value')
+  } finally {
+    all.forEach((n) => n.destroy())
+  }
+})
+
+test('confirm: a client confirm:committed resolves via the RPC (the server commits, the reply carries the outcome)', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const A: any = await fero('cf-cli', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
+  const B: any = await fero('cf-cli', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  assert.ok(await until(() => A.cluster.epoch >= 2 && B.cluster.epoch >= 2, 8000), 'cluster committed a view')
+  const C: any = await fero('cf-cli', { host: '127.0.0.1', ports: [p1], wait: 200 })
+  assert.ok(await until(() => connected(C.cluster, `127.0.0.1:${p1}`), 4000), 'client connected to A')
+  try {
+    const r: any = await C.methods.update({ key: ['ck'], value: 9, confirm: 'committed' })
+    assert.equal(r.tier, 'committed', 'client await resolved committed via the server')
+    assert.ok(await until(() => A.data.ck?.[value] === 9 || B.data.ck?.[value] === 9, 6000), 'the write landed on the cluster')
+  } finally {
+    C.destroy()
+    A.destroy()
+    B.destroy()
+  }
+})
+
+test('confirm: an unknown tier rejects (the tier guard)', async () => {
+  const p1 = await ports.free()
+  const A: any = await fero('cf-bad', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
+  try {
+    await assert.rejects(async () => A.methods.update({ key: ['k'], value: 1, confirm: 'nope' }), /unknown confirm tier/)
+  } finally {
+    A.destroy()
+  }
+})
+
 test('client write made OFFLINE buffers (bounded) and flushes when a server becomes reachable (#3)', async () => {
   // No server reachable yet: the forward fails, so the write buffers (bounded drop-oldest)
   // instead of committing at epoch 1. When a server appears, onConnect + the periodic sweep

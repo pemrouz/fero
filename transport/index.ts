@@ -62,8 +62,8 @@ export type TransportOpts = {
 // are members × vnodes entries, so a dashboard requests them on demand, not per poll.
 export type RingSnapshot = { members: string[]; vnodes: number; coverage?: number[]; hashes?: number[]; owners?: string[] }
 
-//! WriteOutcome: L2's result for a forwarded write — committed (with the sequenced seq/epoch) or withheld (the quorum-less write-gate buffered it). Carried on the WRITE-ACK so a forward learns the TRUE outcome, not just receipt.
-export type WriteOutcome = { committed: boolean; seq?: number; epoch?: number }
+//! WriteOutcome: L2's result for a forwarded write — committed (with the sequenced seq/epoch) or not (reason: withheld = quorum-less buffer, timeout = no ack). Carried on the WRITE-ACK so a forward learns the TRUE outcome, not just receipt.
+export type WriteOutcome = { committed: boolean; seq?: number; epoch?: number; reason?: string }
 
 //! Mesh: the L0 seam — routing (send/replicate/forward/owners), view-change frames, RPC/subscriptions, chaos taps.
 export type Mesh = {
@@ -223,7 +223,7 @@ export function transport(opts: TransportOpts): Mesh {
         // back (at-least-once). A bare WRITE (no id, the legacy/digest path) is not acked.
         if (frame.id !== undefined) {
           const committed = outcome === undefined || outcome.committed
-          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch } : { ok: false }, frame.id))
+          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch } : { ok: false, reason: 'withheld' }, frame.id))
         }
         return
       }
@@ -233,8 +233,8 @@ export function transport(opts: TransportOpts): Mesh {
         if (!fw) return // late ack after the timeout fallback already ran — the duplicate converges via LWW
         forwards.delete(frame.id!)
         clearTimeout(fw.timer)
-        const v = (frame.value as { ok?: boolean; seq?: number; epoch?: number } | null) ?? { ok: true }
-        fw.onOutcome({ committed: v.ok !== false, seq: v.seq, epoch: v.epoch }) // ok:false ⇒ withheld → the caller's never-drop fallback fires
+        const v = (frame.value as { ok?: boolean; seq?: number; epoch?: number; reason?: string } | null) ?? { ok: true }
+        fw.onOutcome({ committed: v.ok !== false, seq: v.seq, epoch: v.epoch, reason: v.reason }) // ok:false ⇒ withheld → the caller's never-drop fallback fires
         return
       }
       //! View-change frames: explicit cases so a VIEW_* frame never falls through to the onRecord data path.
@@ -424,7 +424,7 @@ export function transport(opts: TransportOpts): Mesh {
       if (!onOutcome) return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
       const id = ++callId
       const timer = setTimeout(() => {
-        if (forwards.delete(id)) onOutcome({ committed: false }) // never confirmed → fallback (commit-local / re-buffer)
+        if (forwards.delete(id)) onOutcome({ committed: false, reason: 'timeout' }) // never confirmed → fallback (commit-local / re-buffer)
       }, opts.callTimeout ?? 5000)
       timer.unref?.()
       forwards.set(id, { timer, onOutcome })

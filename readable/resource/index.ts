@@ -137,6 +137,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   const discarding = new Set<string>()
   // lastCommit: the outcome of the most recent commitLocal — commitForwarded reads it to report committed/withheld + seq/epoch back to the forwarder (the honest WRITE-ACK).
   let lastCommit: WriteOutcome | undefined
+  // confirmHook: a one-shot resolver claimed by the NEXT write the sink routes — how `methods.update({…, confirm:'committed'})` learns its write's outcome.
+  let confirmHook: ((outcome: WriteOutcome) => void) | undefined
 
   // observe: the L4 push-hook gate — null until the first __observe subscriber arms it, nulled again when the last one leaves (zero-cost when unwatched).
   let observe: Observe | undefined
@@ -335,12 +337,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // 2b) discard-skip: a deferred optimistic-discard for a non-held partition — drop it silently (no forward, no commit). See `discarding`.
     if (change.type === 'remove' && discarding.delete(partitionOf(change))) return
 
+    // 2c) claim the confirm resolver for THIS write (the committed tier) — undefined for a fire-and-forget write; the discard-remove re-fire (2b) returns above, never reaching here.
+    const hook = confirmHook
+    confirmHook = undefined
+
     // 3) routing: a CLIENT forwards to a server; a server forwards to the owner (F1) — both ack-confirmed.
     if (!committingForward) {
       const p = partitionOf(change)
       // 3a) CLIENT (no ViewManager ⇒ viewEpoch ≡ 1): never commit under own provenance — forward to a server, then DROP the optimistic copy.
       if (me === undefined) {
-        forwardToServer(change)
+        forwardToServer(change, hook)
         discardOptimistic(p)
         return
       }
@@ -349,7 +355,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         owner !== undefined &&
         owner !== me &&
         mesh.forward(owner, change, (outcome) => {
-          if (!outcome.committed) commitLocal(change)
+          if (outcome.committed) hook?.(outcome)
+          else {
+            commitLocal(change)
+            hook?.({ committed: false, seq: lastCommit?.seq, epoch: lastCommit?.epoch, reason: outcome.reason })
+          }
         })
       ) {
         if (scoped && !holds(p)) discardOptimistic(p)
@@ -359,6 +369,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
     // 4) commit-local: stamp/log/replicate under our provenance.
     commitLocal(change)
+    hook?.(lastCommit ?? { committed: true })
   })
 
   // ── client write path (#3): forward to a picked server; buffer (bounded) when unreachable/unconfirmed ──
@@ -366,12 +377,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     if (pending.length >= MAX_PENDING) pending.shift()
     pending.push(change)
   }
-  const forwardToServer = (change: ChangeRecord) => {
+  const forwardToServer = (change: ChangeRecord, hook?: (o: WriteOutcome) => void) => {
     const server = mesh.pickServer()
     if (
       server === undefined ||
       !mesh.forward(server, change, (outcome) => {
         if (!outcome.committed) bufferClientWrite(change)
+        hook?.(outcome)
       })
     )
       bufferClientWrite(change)
@@ -521,15 +533,58 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     },
   }
 
+  // writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (applied locally), or 'committed' (owner-sequenced; rejects on withheld/timeout).
+  const writeWithConfirm = (chg: any, doWrite: () => void): unknown => {
+    const tier = chg && typeof chg === 'object' ? chg.confirm : undefined
+    if (!tier) return doWrite()
+    const key = norm(chg?.at ?? chg?.key)
+    if (tier === 'accepted') {
+      doWrite()
+      return { tier: 'accepted', key }
+    }
+    if (tier !== 'committed') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed')`)
+    let done = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let settle!: (o: WriteOutcome) => void
+    const promise = new Promise((resolve, reject) => {
+      settle = (o) => {
+        if (done) return
+        done = true
+        if (timer) clearTimeout(timer)
+        if (o.committed) resolve({ tier: 'committed', key, seq: o.seq, epoch: o.epoch })
+        else
+          reject(
+            Object.assign(new Error(`fero: write not committed (${o.reason ?? 'unconfirmed'})`), {
+              requestedTier: 'committed',
+              reachedTier: o.seq !== undefined ? 'committed-local' : 'none',
+              reason: o.reason ?? 'unconfirmed',
+              localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch } : null,
+            }),
+          )
+      }
+    })
+    confirmHook = settle
+    try {
+      doWrite()
+    } finally {
+      confirmHook = undefined
+    }
+    if (!done) {
+      timer = setTimeout(() => settle({ committed: false, reason: 'timeout' }), typeof chg?.timeout === 'number' ? chg.timeout : 5000)
+      timer.unref?.()
+    }
+    return promise
+  }
+
   // defaults: read/aggregate/update/insert/remove (plan §6.3), each overridable by a same-named opts function.
   const defaults: Record<string, Method> = {
     // read() → whole data; read(key) → that key's child view (Q1 keyed read, server side of a remote read).
     read: (arg, c) => (typeof arg === 'string' ? c.data[arg] : c.data),
     // aggregate(spec) → this node's owner-scoped PARTIAL; the querying node fans out + folds the disjoint cover (Q2).
     aggregate: (spec) => fold.buildPartial(spec),
-    update: (chg, c) => setPath(c.data, norm(chg?.key), chg?.value),
-    insert: (chg, c) => setPath(c.data, norm(chg?.at ?? chg?.key), chg?.value),
-    remove: (chg, c) => delPath(c.data, norm(chg?.key)),
+    update: (chg, c) => writeWithConfirm(chg, () => setPath(c.data, norm(chg?.key), chg?.value)),
+    insert: (chg, c) => writeWithConfirm(chg, () => setPath(c.data, norm(chg?.at ?? chg?.key), chg?.value)),
+    remove: (chg, c) => writeWithConfirm(chg, () => delPath(c.data, norm(chg?.key))),
   }
   // __inspect: gated L4 pull method — returns this node's InspectSnapshot to a remote observer (registered only when observe is on).
   if (observeOn) defaults.__inspect = () => snapshot()
