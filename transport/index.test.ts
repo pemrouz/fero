@@ -433,3 +433,24 @@ test('ack-confirmed forward: a committed owner ACKs {committed,seq,epoch}; a wit
     await new Promise<void>((r) => swallow.close(() => r()))
   }
 })
+
+test('repl-probe/ack: a probe round-trips with its cid + payload (the confirm:replicated wire primitive)', async () => {
+  const [p1, p2] = [await ports.free(), await ports.free()]
+  const probes: any[] = []
+  const acks: any[] = []
+  const mB = transport({ name: 'rp', host: '127.0.0.1', port: p2, ports: [], wait: 50, onReplProbe: (cid, probe, addr) => probes.push({ cid, probe, addr }) })
+  const mA = transport({ name: 'rp', host: '127.0.0.1', port: p1, ports: [p2], wait: 200, onReplAck: (cid, addr) => acks.push({ cid, addr }) })
+  try {
+    assert.ok(await until(() => connected(mA, `127.0.0.1:${p2}`)), 'A dialed B')
+    assert.ok(mA.replProbe(`127.0.0.1:${p2}`, 42, { origin: 'origin-uuid', seq: 7, partition: 'k1' }), 'probe sent')
+    assert.ok(await until(() => probes.length === 1, 3000), 'B received the probe')
+    assert.equal(probes[0].cid, 42, 'cid preserved')
+    assert.deepEqual(probes[0].probe, { origin: 'origin-uuid', seq: 7, partition: 'k1' }, 'payload preserved')
+    assert.ok(mB.replAck(probes[0].addr, probes[0].cid), 'B acks back to A by address') // probes[0].addr = A (re-keyed on handshake DONE)
+    assert.ok(await until(() => acks.length === 1, 3000), 'A received the ack')
+    assert.equal(acks[0].cid, 42, 'the ack carries the same cid → feeds the prober tally')
+  } finally {
+    mA.destroy()
+    mB.destroy()
+  }
+})
