@@ -241,6 +241,69 @@ export function foldSubs(file: DebugFile, subsByNode: Map<string, InspectSub[]>)
   return file
 }
 
+//! foldLive: fold a set of ALREADY-PULLED InspectSnapshots into a DebugFile with NO drill calls — the remote/over-the-wire path (the observer bridge's ~1/s poll payload).
+// captureInProcess is the in-process path: it has live ring authority (cluster.owner) and can issue the
+// version-sample drill for divergence. The BRIDGE has neither — it's a read-only client holding only the
+// poll payload (members, ring, log.heads, viewHistory, subs, the versions COUNT). So foldLive rebuilds the
+// owner lookup from the freshest committed view's members (a DHT ring, exactly as foldOwnership does), runs
+// the folds that need only the poll payload (ownership history + subscription topology), and OMITS
+// divergence — that needs the two-pass version-sample drill, which the steady ~1/s poll deliberately does
+// not pay (it's the forensic capture's job). The viewer degrades gracefully (no divergence flagged live).
+export function foldLive(snaps: InspectSnapshot[], capturedAt?: string, ringCache?: Map<string, DHT>): DebugFile {
+  // A DHT build is O(members × vnodes) — far too expensive to repeat per epoch per poll (16 rebuilds of
+  // a 200-member ring measured ~680ms). So MEMOIZE rings by member-set signature: epochs sharing a member
+  // set (the common case — a stable cluster's recent history is one or few sets) collapse to ONE build,
+  // and the SAME ring backs both the owner/replicas lookup and foldOwnership's history. The bridge passes
+  // a PERSISTENT cache across polls → steady state rebuilds nothing; a one-shot caller (a test) gets a
+  // fresh per-call cache (still collapses within the call). owner() is replica-count-independent, so it
+  // agrees with the live cluster.owner under the default DHT config (foldOwnership's guard re-checks this).
+  const cache = ringCache ?? new Map<string, DHT>()
+  const dhtFor = (members: string[]): DHT => {
+    const sig = members.length + '|' + [...members].sort().join(',') // order-independent: a committed view's member order may vary across nodes
+    let d = cache.get(sig)
+    if (!d) {
+      d = new DHT()
+      for (const m of members) d.add(m)
+      cache.set(sig, d)
+    }
+    return d
+  }
+
+  // per resource: the freshest committed view is the authoritative membership; its ring answers owner/replicas
+  const freshest = new Map<string, InspectSnapshot>()
+  for (const s of snaps) {
+    if (s.role !== 'server') continue
+    const cur = freshest.get(s.name)
+    if (!cur || s.epoch > cur.epoch) freshest.set(s.name, s)
+  }
+  const ringByResource = new Map<string, { owner: (k: string) => string | undefined; replicas: (k: string) => string[] }>()
+  for (const [name, s] of freshest) {
+    const R = s.ring.replicas ?? s.members.length // null ⇒ full replication ⇒ every member holds it
+    const dht = dhtFor(s.members)
+    ringByResource.set(name, { owner: (k) => dht.owner(k), replicas: (k) => dht.owners(k, R) })
+  }
+  const lookup: OwnerLookup = {
+    owner: (resource, k) => ringByResource.get(resource)?.owner(k),
+    replicas: (resource, k) => ringByResource.get(resource)?.replicas(k),
+  }
+  const file = foldSnapshots(snaps, lookup, capturedAt)
+
+  // ownership history — same merge as captureInProcess round 3 (a committed view is globally agreed, so
+  // same epoch ⇒ same members); buildRing goes through the SAME memoized cache (no per-epoch rebuild)
+  const viewsByEpoch = new Map<number, string[]>()
+  for (const s of snaps) for (const v of s.viewHistory ?? []) if (!viewsByEpoch.has(v.epoch)) viewsByEpoch.set(v.epoch, v.members)
+  const buildRing = (members: string[]) => {
+    const d = dhtFor(members)
+    return (k: string) => d.owner(k)
+  }
+  foldOwnership(file, viewsByEpoch, buildRing)
+
+  // subscription topology — fold each server's served-sub sample (carried in the poll payload)
+  const subsByNode = new Map<string, InspectSub[]>()
+  for (const s of snaps) if (s.role === 'server' && s.me && s.subs?.length) subsByNode.set(s.me, s.subs)
+  return foldSubs(file, subsByNode)
+}
+
 //! captureInProcess: snapshot a live in-process cluster — pull each node's
 //! [diagnostics].snapshot() + resolve authoritative ownership off a server's ring.
 // The always-available diagnostics seam (no observe:true gate, no added
