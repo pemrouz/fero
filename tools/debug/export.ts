@@ -24,7 +24,7 @@
 // already replaces the hand-authored rows with live data.
 // ════════════════════════════════════════════════════════════════════════
 
-import type { InspectSnapshot } from '../../resource/inspect.ts'
+import type { InspectSnapshot, InspectSub } from '../../resource/inspect.ts'
 import { diagnostics, type Fero } from '../../resource/index.ts'
 import { DHT } from '../../transport/dht.ts'
 
@@ -33,7 +33,12 @@ export type DebugReplica = { addr: string; lag?: number; stuckAt?: string; stale
 export type DebugNode = { addr: string; keys?: number; status?: string; note?: string }
 export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string; replicas?: DebugReplica[]; ownerByEpoch?: Record<string, string> }
 export type DebugEpoch = { id: string; members: number; current?: boolean }
-export type DebugResource = { name: string; members: string[]; R: number; nodes: DebugNode[]; partitions: DebugPartition[]; epochs?: DebugEpoch[] }
+//! DebugSub / DebugClient: the subscription-topology rows the viewer renders (a downstream consumer + the subs it holds).
+// No head/delivered: the delta stream carries no provenance, so a seq-lag isn't honestly measurable — the
+// viewer's normalize() degrades its lag column to '0' when those are absent (a gap, not a fabricated rate). [P3]
+export type DebugSub = { key: string; owner?: string; kind?: string }
+export type DebugClient = { id: string; role?: string; server?: string; status?: string; note?: string; subs: DebugSub[] }
+export type DebugResource = { name: string; members: string[]; R: number; nodes: DebugNode[]; partitions: DebugPartition[]; epochs?: DebugEpoch[]; clients?: DebugClient[] }
 export type DebugFile = { 'fero.debug': 1; _about: string; capturedAt?: string; view: string; resources: DebugResource[] }
 
 //! VersionStamp / VersionSample: one node's per-key LWW stamps (from snapshot({sample})) — the divergence input.
@@ -47,12 +52,14 @@ export type OwnerLookup = {
 }
 
 const ABOUT =
-  'Captured from a live cluster via the [diagnostics] seam (debug viewer P1+P2+P4). REAL: committed ' +
+  'Captured from a live cluster via the [diagnostics] seam (debug viewer P1+P2+P3+P4). REAL: committed ' +
   'members + R, per-node key count (LWW winners) + health, per-partition owner + replica-set + held ' +
   '(under-replication), per-replica DIVERGENCE (a replica parked on a lower (epoch,seq) than its owner ' +
-  'is flagged stuck — via the version-sample drill), and ownerByEpoch HISTORY (re-derived by rebuilding ' +
-  'the ring from each past committed view). PENDING (no seam yet): per-partition keys/wps, the ' +
-  'change-record log, and per-subscription lag (P3).'
+  'is flagged stuck — via the version-sample drill), ownerByEpoch HISTORY (re-derived by rebuilding ' +
+  'the ring from each past committed view), and the live SUBSCRIPTION TOPOLOGY (who subscribes to what, ' +
+  'served by whom, of what kind — forwarded reads reveal the client→relay→owner chain). PENDING (no seam ' +
+  'yet): per-partition keys/wps, the change-record log, and per-subscription seq-lag (the delta stream ' +
+  'carries no provenance, so a seq-lag is not honestly measurable — topology is shipped instead).'
 
 //! foldSnapshots: pure fold of per-node InspectSnapshots (+ owner lookup) → the store-once debug file.
 export function foldSnapshots(snaps: InspectSnapshot[], lookup: OwnerLookup = {}, capturedAt?: string): DebugFile {
@@ -206,6 +213,34 @@ export function foldOwnership(
   return file
 }
 
+//! foldSubs: fold each node's served-subscription topology into per-resource client→sub rows.
+// Each snapshot carries `subs` (who this node serves, of what kind). We group (servingNode, sub) by the
+// downstream `to` address into a client row, within the server's resource (a node serves exactly one).
+// A forwarded read shows up TWICE — the real client served by the relay, AND the relay served by the
+// owner (role 'server') — which faithfully reveals the forward chain (client → relay → owner). No
+// head/delivered (not honestly measurable; see DebugSub) — the viewer's lag column degrades gracefully.
+export function foldSubs(file: DebugFile, subsByNode: Map<string, InspectSub[]>): DebugFile {
+  // map each serving-node addr → its resource (a node belongs to exactly one)
+  const resOf = new Map<string, DebugResource>()
+  for (const r of file.resources) for (const n of r.nodes) resOf.set(n.addr, r)
+
+  const clientsOf = new Map<DebugResource, Map<string, DebugClient>>()
+  for (const [serving, subs] of subsByNode) {
+    const r = resOf.get(serving)
+    if (!r) continue
+    let clients = clientsOf.get(r)
+    if (!clients) clientsOf.set(r, (clients = new Map()))
+    for (const s of subs) {
+      let c = clients.get(s.to)
+      // role: a downstream that is itself a committed member is a server (a relay's upstream); else a reader
+      if (!c) clients.set(s.to, (c = { id: s.to, role: r.members.includes(s.to) ? 'server' : 'reader', server: serving, subs: [] }))
+      c.subs.push({ key: s.key ?? s.kind, owner: s.owner ?? serving, kind: s.kind })
+    }
+  }
+  for (const [r, clients] of clientsOf) if (clients.size) r.clients = [...clients.values()]
+  return file
+}
+
 //! captureInProcess: snapshot a live in-process cluster — pull each node's
 //! [diagnostics].snapshot() + resolve authoritative ownership off a server's ring.
 // The always-available diagnostics seam (no observe:true gate, no added
@@ -258,5 +293,11 @@ export function captureInProcess(nodes: Fero[], capturedAt = new Date().toISOStr
     for (const m of members) ring.add(m)
     return (k: string) => ring.owner(k)
   }
-  return foldOwnership(file, viewsByEpoch, buildRing)
+  foldOwnership(file, viewsByEpoch, buildRing)
+
+  // round 4: subscription topology — fold each server's served-sub sample into client→sub rows
+  // (captured at subscribe, so this read perturbs nothing the live path)
+  const subsByNode = new Map<string, InspectSub[]>()
+  for (const snap of snaps) if (snap.role === 'server' && snap.me && snap.subs?.length) subsByNode.set(snap.me, snap.subs)
+  return foldSubs(file, subsByNode)
 }

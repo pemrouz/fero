@@ -8,10 +8,10 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { InspectSnapshot } from '../../resource/inspect.ts'
+import type { InspectSnapshot, InspectSub } from '../../resource/inspect.ts'
 import { fero } from '../../resource/index.ts'
 import { ports, until } from '#utils'
-import { foldSnapshots, foldDivergence, foldOwnership, captureInProcess, type VersionSample } from './export.ts'
+import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, captureInProcess, type VersionSample } from './export.ts'
 // @ts-ignore — shape.js is the untyped browser/Node shared seam
 import { normalize } from './mockups/shape.js'
 
@@ -174,6 +174,47 @@ test('foldOwnership skips when the rebuilt ring disagrees with cluster.owner (co
   assert.equal(file.resources[0].epochs, undefined)
 })
 
+//! foldSubs folds served-sub topology into client→sub rows, revealing the forward chain
+test('foldSubs groups served subs into client rows (and surfaces the client→relay→owner chain)', () => {
+  const file = foldSnapshots(fixture(), LOOKUP) // members :49801/:49803/:49805
+  // :49801 (owner of user42) serves the relay :49803; :49803 relays a forwarded read to a real client :60000
+  const subsByNode = new Map<string, InspectSub[]>([
+    [':49801', [{ to: ':49803', method: 'read', key: 'user42', kind: 'forward', owner: ':49801' }]],
+    [':49803', [
+      { to: ':60000', method: 'read', key: 'user42', kind: 'forward', owner: ':49801' },
+      { to: ':60000', method: 'aggregate', key: 'sum', kind: 'fold' },
+    ]],
+  ])
+  foldSubs(file, subsByNode)
+  const r = file.resources[0]
+  const clients = r.clients!
+  // two distinct downstreams: the member :49803 (a relay — role server) and the real reader :60000
+  assert.equal(clients.length, 2)
+  const relay = clients.find((c) => c.id === ':49803')!
+  assert.equal(relay.role, 'server') // a committed member appearing as a downstream = a relay's upstream
+  assert.equal(relay.subs.length, 1)
+  assert.equal(relay.subs[0].owner, ':49801')
+  const reader = clients.find((c) => c.id === ':60000')!
+  assert.equal(reader.role, 'reader') // not a member → a real read-only client
+  assert.equal(reader.subs.length, 2)
+  assert.ok(reader.subs.some((s) => s.kind === 'forward' && s.key === 'user42'))
+  assert.ok(reader.subs.some((s) => s.kind === 'fold'))
+
+  // round-trips through the viewer: clients render with their subs (lag degrades to '0', no fabrication)
+  const model = normalize(file)
+  const mReader = model.resources[0].clients.find((c: any) => c.id === ':60000')
+  assert.ok(mReader, 'the reader renders as a client row')
+  assert.equal(mReader.subs.length, 2)
+  assert.equal(mReader.subs[0].lag, '0') // no head/delivered → honest default, not a fabricated rate
+})
+
+//! no served subs → no clients array (a quiet cluster renders without fabricated rows)
+test('foldSubs leaves clients undefined when nothing is subscribed', () => {
+  const file = foldSnapshots(fixture(), LOOKUP)
+  foldSubs(file, new Map())
+  assert.equal(file.resources[0].clients, undefined)
+})
+
 //! the live path: capture a real in-process cluster; ownership must match ground truth
 test('captureInProcess snapshots a live 3-node cluster with authoritative ownership', async () => {
   const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
@@ -226,6 +267,22 @@ test('captureInProcess snapshots a live 3-node cluster with authoritative owners
     for (const p of r.partitions) {
       assert.ok(p.ownerByEpoch, `ownerByEpoch derived for ${p.name}`)
       assert.equal(p.ownerByEpoch![file.view], p.owner, `ownerByEpoch[${file.view}] matches owner for ${p.name}`)
+    }
+
+    // P3: open a real reactive subscription and confirm the capture surfaces the topology
+    const reader: any = await fero('exp-live', { ports: [p1, p2, p3], wait: 200 })
+    try {
+      reader.methods.read().connect([], () => {}) // a server-pushed whole-resource subscription
+      assert.ok(await until(() => {
+        const cs = captureInProcess([A, B, C]).resources.find((x) => x.name === 'exp-live')?.clients
+        return !!cs && cs.some((c) => c.subs.length >= 1)
+      }, 8000), 'the live subscription shows up as a client→sub row in the capture')
+      const cap = captureInProcess([A, B, C]).resources.find((x) => x.name === 'exp-live')!
+      const client = cap.clients!.find((c) => c.subs.some((s) => s.kind === 'projection' || s.kind === 'gather'))
+      assert.ok(client, 'the read subscription is captured (projection under full replication)')
+      assert.ok(client!.server, 'the serving node is recorded')
+    } finally {
+      reader.destroy()
     }
   } finally {
     A.destroy(); B.destroy(); C.destroy()

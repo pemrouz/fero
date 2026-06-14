@@ -810,6 +810,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     pending,
     orphans,
     servedCount: dispatch.servedCount,
+    servedSubs: dispatch.servedSubs,
     observing: () => observe !== undefined,
     R,
     scoped,

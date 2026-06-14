@@ -11,6 +11,9 @@ export const RING_SEGMENTS = 120
 // VERSION_SAMPLE_CAP: max per-key stamps a requested versionSample returns — bounds the drill-down payload (the version map can be huge).
 export const VERSION_SAMPLE_CAP = 200
 
+// InspectSub: one served subscription's TOPOLOGY — who we serve it to (downstream addr), the method/key, its kind, and (forwarded reads) the owner we relay from.
+export type InspectSub = { to: string; method: string; key?: string; kind: string; owner?: string }
+
 // InspectPeer: one row of a node's OWN peer table (its view of who it can reach) — the network observer can't see this otherwise.
 export type InspectPeer = {
   address: string
@@ -41,6 +44,7 @@ export type InspectSnapshot = {
   pending: number
   orphans: string[]
   subscriptions: number
+  subs?: InspectSub[]
   observing: boolean
   peers: Record<string, InspectPeer>
 }
@@ -58,6 +62,7 @@ export type SnapshotDeps = {
   pending: { length: number }
   orphans: Set<string>
   servedCount: () => number
+  servedSubs?: () => InspectSub[]
   observing: () => boolean
   R: number
   scoped: boolean
@@ -65,7 +70,7 @@ export type SnapshotDeps = {
 
 // makeSnapshot: build the pure-read closure once (construction-time, zero hot-path cost); each call is a fresh point-in-time read.
 export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }) => InspectSnapshot) => {
-  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, observing, R, scoped } = deps
+  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, servedSubs, observing, R, scoped } = deps
   return (opts) => {
     // Copy out the node's own peer rows as plain scalars (decoupled from data's backing object; truthful point-in-time).
     const raw = peers() ?? {}
@@ -115,6 +120,9 @@ export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }
     // viewHistory: the committed-view ring, when this node runs membership (servers) — absent on a client.
     const vh = viewHistory?.()
     if (vh && vh.length) out.viewHistory = vh
+    // subs: the bounded subscription-topology sample, when this node serves ≥1 sub — absent otherwise (keeps the steady poll lean).
+    const ss = servedSubs?.()
+    if (ss && ss.length) out.subs = ss
     return out
   }
 }
