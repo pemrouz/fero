@@ -294,7 +294,7 @@
 <!-- ── command bar: identity (resource › partition) · context · health · search · scenario ── -->
 <div class="bar">
   <div class="id">
-    <a class="res" href="../ia-map.html">cluster</a><span class="chev">›</span>
+    <a class="res" href="resources.html">cluster</a><span class="chev">›</span>
     <a class="res" href="inbox.html">sessions</a><span class="chev">›</span>
     <span class="res">partition</span><span class="nm"><span class="mono">user42</span></span>
   </div>
@@ -382,7 +382,7 @@
 const KEY_AUTOPSY   = '../key-autopsy/happy.html';
 const KEY_DIVERGED  = '../key-autopsy/happy.html#diverged';
 const COMMIT_RECORD = '../write-traces.html';
-const OWNER_NODE    = '../node-doctor.html';
+const OWNER_NODE    = 'node.html';
 
 /* ── log model ──────────────────────────────────────────────────────────
    THE LOG is the centerpiece: the partition's commit stream, newest first,
@@ -789,7 +789,7 @@ function renderVitals(){
       `</dl></div>`+
     // drill actions
     `<div class="actions">`+
-      `<a class="btn" href="${OWNER_NODE}">open owner :49801 (node doctor) <span class="ar">→</span></a>`+
+      `<a class="btn" href="${OWNER_NODE}">open owner :49801 (node) <span class="ar">→</span></a>`+
       `<a class="btn" href="${KEY_DIVERGED}">open user42.score autopsy <span class="kc">↵</span></a>`+
     `</div>`;
 }

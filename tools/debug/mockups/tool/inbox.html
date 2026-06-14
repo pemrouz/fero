@@ -33,8 +33,10 @@
   /* ── top command bar ───────────────────────────────────────────────── */
   .bar{display:flex;align-items:center;gap:0;height:38px;background:var(--rail);
     border-bottom:1px solid var(--line);padding:0 10px;flex:0 0 auto;font-size:12.5px}
-  .bar .id{display:flex;align-items:baseline;gap:7px;padding-right:12px}
-  .bar .id .res{color:var(--soft)} .bar .id .nm{font-weight:600;color:var(--ink)}
+  .bar .id{display:flex;align-items:baseline;gap:7px;padding-right:12px;white-space:nowrap}
+  .bar .id .res{color:var(--soft)} .bar .id a.res:hover{color:var(--dim)}
+  .bar .id .chev{color:var(--faint)}
+  .bar .id .nm{font-weight:600;color:var(--ink)}
   .bar .id .nm .mono{color:#fff}
   .bar .sep{width:1px;height:18px;background:var(--line-2);margin:0 12px}
   .bar .ctx{display:flex;gap:14px;color:var(--dim)}
@@ -79,6 +81,8 @@
   .rail .v[aria-current=true] .cnt{color:#cfe2f2}
   .rail .v .cnt.crit{color:var(--crit);font-weight:600} .rail .v .cnt.warn{color:var(--warn);font-weight:600}
   .rail .v.dis{opacity:.45;cursor:default} .rail .v.dis:hover{background:none;color:var(--dim)}
+  /* drill rows are anchors (navigate to a child level), not filters — never underline */
+  .rail a.v:hover{text-decoration:none} .rail a.v .ar{margin-left:auto;color:var(--faint)} .rail a.v:hover .ar{color:var(--soft)}
   .rail .part-bar{flex:1 1 auto;height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:0 2px}
   .rail .part-bar i{display:block;height:100%;background:var(--ok)}
   .rail .part-bar i.bad{background:var(--crit)}
@@ -200,11 +204,14 @@
 
 <!-- ── command bar: identity · context · health · search · scenario ── -->
 <div class="bar">
-  <div class="id"><span class="res">resource</span><span class="nm"><span class="mono">"sessions"</span></span></div>
+  <div class="id">
+    <a class="res" href="resources.html">cluster</a><span class="chev">›</span>
+    <span class="res">resource</span><span class="nm"><span class="mono">"sessions"</span></span>
+  </div>
   <span class="sep"></span>
   <div class="ctx">
     <span><span class="mono">1,284</span> keys</span>
-    <span><span class="mono">8</span> partitions</span>
+    <span><span class="mono">16</span> partitions</span>
     <span>view <span class="mono">e4</span></span>
     <span><span class="mono">5</span> members</span>
   </div>
@@ -277,10 +284,14 @@ const SCEN = {
     writes:142, conflicts:'0', writesSpark:[6,5,7,6,8,6,7,6,9,7],
     hot:[['user42.score',38],['cart7.items',21],['order7.lines',14],['user43.name',9]],
     parts:[
-      {n:'user42',o:':49801',rep:'5/5',ok:true},{n:'cart7',o:':49805',rep:'5/5',ok:true},
-      {n:'order7',o:':49803',rep:'5/5',ok:true},{n:'user43',o:':49809',rep:'5/5',ok:true},
-      {n:'billing',o:':49807',rep:'5/5',ok:true},{n:'session',o:':49801',rep:'5/5',ok:true},
+      {n:'user42',o:':49801',rep:'5/5',ok:true},{n:'billing',o:':49807',rep:'3/3',ok:true},
+      {n:'order7',o:':49803',rep:'5/5',ok:true},{n:'cart9',o:':49803',rep:'5/5',ok:true},
+      {n:'cart7',o:':49805',rep:'5/5',ok:true},{n:'session',o:':49801',rep:'5/5',ok:true},
       {n:'audit',o:':49805',rep:'5/5',ok:true},{n:'prefs',o:':49809',rep:'5/5',ok:true},
+      {n:'user43',o:':49809',rep:'5/5',ok:true},{n:'inventory',o:':49805',rep:'5/5',ok:true},
+      {n:'catalog',o:':49801',rep:'5/5',ok:true},{n:'search',o:':49803',rep:'5/5',ok:true},
+      {n:'notif',o:':49807',rep:'5/5',ok:true},{n:'geo',o:':49809',rep:'5/5',ok:true},
+      {n:'metrics',o:':49805',rep:'5/5',ok:true},{n:'cart8',o:':49807',rep:'5/5',ok:true},
     ],
     issues:[],
   },
@@ -290,10 +301,14 @@ const SCEN = {
     writes:168, conflicts:'0.4', writesSpark:[7,6,8,7,9,7,8,16,11,18],
     hot:[['order7.lines',61],['user42.score',40],['cart7.items',19],['cart9.total',11]],
     parts:[
-      {n:'user42',o:':49801',rep:'5/5',ok:true},{n:'cart7',o:':49805',rep:'5/5',ok:true},
+      {n:'user42',o:':49801',rep:'5/5',ok:true},{n:'billing',o:':49807',rep:'2/3',ok:false},
       {n:'order7',o:':49803',rep:'5/5',ok:true},{n:'cart9',o:':49803',rep:'5/5',ok:true},
-      {n:'billing',o:':49807',rep:'2/3',ok:false},{n:'session',o:':49801',rep:'5/5',ok:true},
+      {n:'cart7',o:':49805',rep:'5/5',ok:true},{n:'session',o:':49801',rep:'5/5',ok:true},
       {n:'audit',o:':49805',rep:'5/5',ok:true},{n:'prefs',o:':49809',rep:'5/5',ok:true},
+      {n:'user43',o:':49809',rep:'5/5',ok:true},{n:'inventory',o:':49805',rep:'5/5',ok:true},
+      {n:'catalog',o:':49801',rep:'5/5',ok:true},{n:'search',o:':49803',rep:'5/5',ok:true},
+      {n:'notif',o:':49807',rep:'5/5',ok:true},{n:'geo',o:':49809',rep:'5/5',ok:true},
+      {n:'metrics',o:':49805',rep:'5/5',ok:true},{n:'cart8',o:':49807',rep:'5/5',ok:true},
     ],
     issues:[
       { id:'user42.score', kind:'key', part:'user42', sev:'crit', age:64, filter:'diverged', tag:'diverged', href:KEY_DIVERGED,
@@ -388,7 +403,24 @@ function railViews(s){
 function renderRail(){
   const s = SCEN[scen];
   const rv = railViews(s);
-  let h = '<div class="grp"><div class="grp-h">Saved views</div>';
+  // ── Drill into ── the four co-equal children of a resource (data spine:
+  // partitions; physical spine: server + client nodes; metrics cross-cut).
+  // These are anchors, not filter views — they navigate one level down, and
+  // carry the resource's current scenario (#healthy / #attention) into the child.
+  const sx = '#'+scen;
+  const drills = [
+    ['partitions.html'+sx, '◧', 'Partitions',   s.parts.length],
+    ['nodes.html'+sx,      '▢', 'Server nodes',  5],
+    ['clients.html'+sx,    '○', 'Client nodes',  scen==='attention'?7:6],
+    ['metrics.html'+sx,    '▦', 'Metrics',       ''],
+  ];
+  let h = '<div class="grp"><div class="grp-h">Drill into</div>';
+  for (const [href,ic,lab,cnt] of drills){
+    h += `<a class="v" href="${href}"><span class="ic">${ic}</span><span class="lab">${lab}</span>`+
+         (cnt!==''?`<span class="cnt">${cnt}</span>`:'<span class="ar">›</span>')+`</a>`;
+  }
+  h += '</div>';
+  h += '<div class="grp"><div class="grp-h">Saved views</div>';
   for (const v of rv.saved){
     const cur = v.id===view;
     const badge = v.dis ? `<span class="cnt">${v.cnt.toLocaleString()}</span>`
