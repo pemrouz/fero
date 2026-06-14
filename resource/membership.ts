@@ -52,6 +52,9 @@ export type ViewOpts = {
 //! Equality of two already-sorted address lists (members compared in canonical order).
 const sortedEqual = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
 
+//! VIEW_HISTORY_CAP: how many past committed views to retain for L4 introspection — a bounded ring, oldest dropped.
+const VIEW_HISTORY_CAP = 16
+
 //! Drives the view-change ballot: coordinator proposes, members PREPARE/ACK, quorum commits a new view.
 export class ViewManager {
   epoch = 1
@@ -66,6 +69,7 @@ export class ViewManager {
   #announce: number
   #lastAnnounce = 0 // last time we re-announced our committed view (throttle)
   #seenEpoch = 0 // highest committed epoch heard from ANY reachable peer — drives split-brain-heal re-propose
+  #history: View[] = [] // bounded ring of committed views (current + past), newest last — L4 introspection only (P4)
   #now: () => number
   #onCommit?: (v: View) => void
   #onWritable?: (w: boolean) => void
@@ -307,6 +311,12 @@ export class ViewManager {
     this.#proposal = undefined
     this.epoch = epoch
     this.members = members.slice().sort()
+    // record into the bounded view-history ring (L4 introspection) — dedup idempotent
+    // re-installs of the same epoch (a re-announce commits the same view again)
+    if (!this.#history.length || this.#history[this.#history.length - 1].epoch !== epoch) {
+      this.#history.push({ epoch, members: this.members })
+      if (this.#history.length > VIEW_HISTORY_CAP) this.#history.shift()
+    }
     if (epoch > this.#promisedEpoch) this.#promisedEpoch = epoch
     if (epoch > this.#highestProposed) this.#highestProposed = epoch
     if (epoch > this.#seenEpoch) this.#seenEpoch = epoch // keep the divergence high-water at-or-above our own epoch
@@ -315,6 +325,11 @@ export class ViewManager {
     for (const m of [...this.#unreachableSince.keys()]) if (!this.members.includes(m)) this.#unreachableSince.delete(m)
     this.#mesh.installView(this.members) // rebuild the DHT ring to exactly this view
     this.#onCommit?.({ epoch: this.epoch, members: this.members })
+  }
+
+  //! history(): the bounded ring of committed views (current + past), newest last — copies, for L4 introspection (P4).
+  history(): View[] {
+    return this.#history.map((v) => ({ epoch: v.epoch, members: v.members.slice() }))
   }
 
   //! Strict majority: more than half of `set` appears in `acks`.

@@ -32,6 +32,7 @@ export type InspectSnapshot = {
   epoch: number
   members: string[]
   writable: boolean
+  viewHistory?: { epoch: number; members: string[] }[]
   ring: RingSnapshot & { replicas: number | null; scoped: boolean }
   log: { size: number; partitions: number; heads: Record<string, number> }
   marks: Record<string, number>
@@ -48,6 +49,7 @@ export type InspectSnapshot = {
 export type SnapshotDeps = {
   name: string
   cluster: Cluster
+  viewHistory?: () => { epoch: number; members: string[] }[]
   ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot
   peers: () => Record<string, any>
   log: Log
@@ -63,7 +65,7 @@ export type SnapshotDeps = {
 
 // makeSnapshot: build the pure-read closure once (construction-time, zero hot-path cost); each call is a fresh point-in-time read.
 export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }) => InspectSnapshot) => {
-  const { name, cluster, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, observing, R, scoped } = deps
+  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, observing, R, scoped } = deps
   return (opts) => {
     // Copy out the node's own peer rows as plain scalars (decoupled from data's backing object; truthful point-in-time).
     const raw = peers() ?? {}
@@ -110,6 +112,9 @@ export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }
       }
       out.versionSample = sample
     }
+    // viewHistory: the committed-view ring, when this node runs membership (servers) — absent on a client.
+    const vh = viewHistory?.()
+    if (vh && vh.length) out.viewHistory = vh
     return out
   }
 }

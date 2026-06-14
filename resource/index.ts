@@ -1350,6 +1350,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   snapshot = makeSnapshot({
     name,
     cluster,
+    viewHistory: () => viewMgr?.history() ?? [],
     ringSnapshot: mesh.ringSnapshot,
     peers: () => mesh.peers[peerValue],
     log,

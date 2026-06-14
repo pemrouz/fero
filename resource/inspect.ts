@@ -56,6 +56,10 @@ export type InspectSnapshot = {
   epoch: number
   members: string[]
   writable: boolean
+  // viewHistory: bounded ring of committed views (current + past, newest last) — present on
+  // servers that run membership. The replay / owner-by-epoch primitive: re-deriving the DHT
+  // ring from each past view's members recovers who owned what at that epoch (P4).
+  viewHistory?: { epoch: number; members: string[] }[]
   // ownership / ring — { members, vnodes, coverage } + the replication factor (null ⇒ full replication, R=∞) and scoped flag.
   // `coverage[i]` is the member-INDEX (into ring.members) owning the i-th of K evenly-spaced keyspace segments — the ownership donut.
   ring: RingSnapshot & { replicas: number | null; scoped: boolean }
@@ -80,6 +84,7 @@ export type InspectSnapshot = {
 export type SnapshotDeps = {
   name: string
   cluster: Cluster // live getters: uuid / me / epoch / members / writable
+  viewHistory?: () => { epoch: number; members: string[] }[] // ViewManager.history (servers only; absent on a client)
   ringSnapshot: (opts?: { vnodes?: boolean; coverage?: number }) => RingSnapshot // mesh.ringSnapshot
   peers: () => Record<string, any> // () => mesh.peers[value] (the raw backing row map)
   log: Log
@@ -102,7 +107,7 @@ export type SnapshotDeps = {
 // O(origins + partitions + peers) and happen ONCE PER POLL, never per write — so
 // they sit firmly off the replication hot path.
 export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }) => InspectSnapshot) => {
-  const { name, cluster, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, observing, R, scoped } = deps
+  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, observing, R, scoped } = deps
   return (opts) => {
     //! Copy out the node's own peer rows as plain scalars (decoupled from data's backing object; truthful point-in-time).
     const raw = peers() ?? {}
@@ -151,6 +156,9 @@ export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }
       }
       out.versionSample = sample
     }
+    //! viewHistory: the committed-view ring, when this node runs membership (servers) — absent on a client.
+    const vh = viewHistory?.()
+    if (vh && vh.length) out.viewHistory = vh
     return out
   }
 }
