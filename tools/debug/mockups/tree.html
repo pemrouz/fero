@@ -73,6 +73,8 @@
     padding:3px 9px;cursor:pointer;font-family:var(--mono);white-space:nowrap;flex:0 0 auto}
   .bar .loadb:hover{color:var(--ink);border-color:var(--soft)}
   .scope .srcname{color:var(--soft);font-family:var(--mono);font-size:11px}
+  .scope .srcname .liveDot{color:var(--ok);animation:livePulse 1.6s ease-in-out infinite}
+  @keyframes livePulse{0%,100%{opacity:1}50%{opacity:.35}}
   .scope .srcname b{color:var(--dim);font-weight:600}
 
   /* ── the current-view scope line (shows what the filter pruned to) ─── */
@@ -751,12 +753,39 @@ $('file').addEventListener('change', e => { const f = e.target.files[0]; if(f) r
 // drop a .fero.json debug file anywhere on the page
 document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if(f) readFile(f); });
-// boot: fetch the bundled sample; if it can't be fetched (e.g. file://), prompt to drop one
+
+/* ── LIVE MODE — the SAME normalize() seam, fed by the observer bridge over SSE.
+   When served by the bridge (tools/observe/bridge.ts at /debug/), an EventSource
+   on /events delivers a `debug` event each poll carrying a store-once DebugFile
+   (foldLive over the bridge's held snapshots). liveUpdate() re-normalizes it but
+   PRESERVES the user's expansion + selection across ticks (a live tree mustn't
+   collapse under you), so the file-drop and live paths converge on one renderer. */
+let LIVE = false;
+function liveUpdate(file){
+  let model; try{ model = normalize(file); } catch{ return; } // a partial/garbled frame → skip this tick
+  MODEL = model;
+  FOREST = MODEL.resources.map(resourceNode);
+  const first = MODEL.resources[0];
+  if(!expanded || !expanded.size) expanded = new Set(first ? [first.id] : []); // seed once; keep the user's tree thereafter
+  if(!selKey) selKey = first ? first.id : '';
+  LIVE = true;
+  const sn = $('srcName'); if(sn) sn.innerHTML = `<b class="liveDot">●</b> live · ${MODEL.view} · ${MODEL.resources.length} resource${MODEL.resources.length!==1?'s':''}`;
+  render();
+}
+function connectLive(){
+  if(typeof EventSource === 'undefined') return;
+  let es; try{ es = new EventSource('/events'); } catch{ return; }
+  es.addEventListener('debug', e => { try{ liveUpdate(JSON.parse(e.data)); }catch{} });
+  // no /events here (viewer opened standalone, not via the bridge) → stay in file mode silently
+  es.addEventListener('error', () => { if(!LIVE) es.close(); });
+}
+// boot: try the live bridge feed AND fetch the bundled sample; the first `debug` event supersedes the sample.
 (async function boot(){
+  connectLive();
   try{ const r = await fetch(DEFAULT_FILE); if(!r.ok) throw new Error('HTTP '+r.status);
-       loadSnapshot(await r.json(), DEFAULT_FILE); }
-  catch(e){ $('tree').innerHTML = `<div class="empty2">Couldn't load <b>${DEFAULT_FILE}</b> (${e.message}).<br>`+
-    `Drop a <b>.fero.json</b> debug file anywhere, or use <b>⤓ file</b> in the bar.</div>`; }
+       if(!LIVE) loadSnapshot(await r.json(), DEFAULT_FILE); }
+  catch(e){ if(!LIVE) $('tree').innerHTML = `<div class="empty2">Couldn't load <b>${DEFAULT_FILE}</b> (${e.message}).<br>`+
+    `Drop a <b>.fero.json</b> debug file anywhere, use <b>⤓ file</b>, or serve via the observer bridge for a <b>live</b> feed.</div>`; }
 })();
 </script>
 </body>

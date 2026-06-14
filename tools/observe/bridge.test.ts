@@ -17,6 +17,7 @@ const readSSE = (port: number) => {
   const recs: any[] = []
   const aggs: any[] = []
   const provs: any[] = []
+  const debugs: any[] = []
   const req = http.get({ host: '127.0.0.1', port, path: '/events' }, (res) => {
     res.setEncoding('utf8')
     let buf = ''
@@ -38,6 +39,7 @@ const readSSE = (port: number) => {
           else if (ev === 'records') for (const r of JSON.parse(data)) recs.push(r)
           else if (ev === 'aggregate') aggs.push(JSON.parse(data))
           else if (ev === 'provagg') provs.push(JSON.parse(data))
+          else if (ev === 'debug') debugs.push(JSON.parse(data))
         } catch {
           /* partial — ignore */
         }
@@ -45,7 +47,7 @@ const readSSE = (port: number) => {
     })
   })
   req.on('error', () => {})
-  return { got, recs, aggs, provs, close: () => req.destroy() }
+  return { got, recs, aggs, provs, debugs, close: () => req.destroy() }
 }
 
 //! Fabricate an InspectSnapshot — the bridge aggregation is source-agnostic over this shape, so a stub source of these validates the rollup (and 200-node scale) WITHOUT a real mesh.
@@ -91,6 +93,65 @@ test('in-process source: snapshots of every node reach an SSE client', async () 
     await b.close()
     A.destroy()
     B.destroy()
+  }
+})
+
+//! P5 live mode: the bridge ships a `debug` DebugFile each poll, consumable through the SAME normalize() the file-fed viewer uses
+test('live debug feed: the bridge relays a store-once DebugFile that the viewer normalize() accepts', async () => {
+  const p1 = await ports.free()
+  const p2 = await ports.free()
+  const A = await fero('obs-dbg', { host: '127.0.0.1', port: p1, ports: [p1, p2], wait: 200 })
+  const B = await fero('obs-dbg', { host: '127.0.0.1', port: p2, ports: [p1, p2], wait: 200 })
+  assert.ok(await until(() => A.cluster.members.length === 2 && B.cluster.members.length === 2, 8000), 'a 2-member view committed')
+  A.data.alpha = { v: 1 }
+  B.data.beta = { v: 2 }
+  const b = await bridge({ source: inProcessSource([A, B]), port: 0, poll: 100 })
+  const sse = readSSE(b.port)
+  try {
+    const ready = (f: any) => { const r = f.resources?.find((x: any) => x.name === 'obs-dbg'); return r?.members?.length === 2 && r?.partitions?.length >= 2 }
+    assert.ok(await until(() => sse.debugs.some(ready), 6000), 'a debug file with the committed 2-member view and the written partitions arrived')
+    const file = [...sse.debugs].reverse().find(ready)
+    assert.equal(file['fero.debug'], 1)
+    const r = file.resources.find((x: any) => x.name === 'obs-dbg')
+    assert.ok(r, 'the resource is present')
+    assert.equal(r.members.length, 2)
+    // owner is authoritative — the live debug owner matches cluster.owner ground truth
+    for (const p of r.partitions) assert.equal(p.owner, A.cluster.owner(p.name), `live owner of ${p.name} matches cluster.owner`)
+    // and it round-trips through the viewer's normalize() (the one seam both feeds share)
+    const { normalize } = await import('../debug/mockups/shape.js')
+    const model = normalize(file)
+    assert.equal(model.resources.find((x: any) => x.id === 'obs-dbg').members, 2)
+  } finally {
+    sse.close()
+    await b.close()
+    A.destroy()
+    B.destroy()
+  }
+})
+
+//! P5: the promoted debug viewer is served same-origin at /debug/ so it can EventSource /events
+test('the bridge serves the debug viewer at /debug/ (same-origin with the live feed)', async () => {
+  const A = await fero('obs-serve', { port: await ports.free(), wait: 10 })
+  const b = await bridge({ source: inProcessSource([A]), port: 0, poll: 200 })
+  try {
+    const get = (path: string): Promise<{ status: number; body: string }> =>
+      new Promise((resolve) => {
+        http.get({ host: '127.0.0.1', port: b.port, path }, (res) => {
+          let body = ''
+          res.setEncoding('utf8')
+          res.on('data', (c) => (body += c))
+          res.on('end', () => resolve({ status: res.statusCode!, body }))
+        })
+      })
+    const tree = await get('/debug/')
+    assert.equal(tree.status, 200)
+    assert.match(tree.body, /import \{ normalize/, 'serves tree.html (the normalize-driven viewer)')
+    const shape = await get('/debug/shape.js')
+    assert.equal(shape.status, 200)
+    assert.match(shape.body, /export function normalize/, 'serves the shared shape.js seam')
+  } finally {
+    await b.close()
+    A.destroy()
   }
 })
 

@@ -11,7 +11,8 @@ import assert from 'node:assert/strict'
 import type { InspectSnapshot, InspectSub } from '../../resource/inspect.ts'
 import { fero } from '../../resource/index.ts'
 import { ports, until } from '#utils'
-import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, captureInProcess, type VersionSample } from './export.ts'
+import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, foldLive, captureInProcess, type VersionSample } from './export.ts'
+import { DHT } from '../../transport/dht.ts'
 // @ts-ignore — shape.js is the untyped browser/Node shared seam
 import { normalize } from './mockups/shape.js'
 
@@ -21,6 +22,7 @@ function snap(o: {
   role?: 'server' | 'client'; writable?: boolean; replicas?: number | null
   heads?: Record<string, number>; versions?: number; orphans?: string[]
   pending?: number; subscriptions?: number
+  viewHistory?: { epoch: number; members: string[] }[]; subs?: InspectSub[]
 }): InspectSnapshot {
   return {
     at: 0, name: o.name, uuid: o.me, me: o.me, role: o.role ?? 'server',
@@ -29,7 +31,7 @@ function snap(o: {
     log: { size: 0, partitions: Object.keys(o.heads ?? {}).length, heads: o.heads ?? {} },
     marks: {}, versions: o.versions ?? 0, pending: o.pending ?? 0,
     orphans: o.orphans ?? [], subscriptions: o.subscriptions ?? 0,
-    observing: false, peers: {},
+    observing: false, peers: {}, viewHistory: o.viewHistory, subs: o.subs,
   } as InspectSnapshot
 }
 
@@ -213,6 +215,50 @@ test('foldSubs leaves clients undefined when nothing is subscribed', () => {
   const file = foldSnapshots(fixture(), LOOKUP)
   foldSubs(file, new Map())
   assert.equal(file.resources[0].clients, undefined)
+})
+
+//! foldLive folds the bridge's poll payload (no drill calls) into the same DebugFile — owner re-derived from the freshest view
+test('foldLive folds already-pulled snapshots into a DebugFile via a rebuilt ring (the bridge path)', () => {
+  const M = [':5001', ':5002', ':5003']
+  const vh = [{ epoch: 3, members: [':5001', ':5002'] }, { epoch: 4, members: M }]
+  const snaps = M.map((me) => snap({
+    name: 'sess', me, epoch: 4, members: M, replicas: 3,
+    heads: { user42: 12, order7: 7, billing: 3 }, versions: 100,
+    viewHistory: vh,
+    subs: me === ':5001' ? [{ to: ':60000', method: 'read', key: 'user42', kind: 'forward', owner: ':5001' }] : undefined,
+  }))
+  const file = foldLive(snaps)
+  const r = file.resources[0]
+  assert.equal(file.view, 'e4')
+  assert.equal(r.members.length, 3)
+
+  // owner is re-derived from the rebuilt ring (the same DHT the cluster uses) — assert it's self-consistent
+  const ref = new DHT()
+  for (const m of M) ref.add(m)
+  for (const p of r.partitions) assert.equal(p.owner, ref.owner(p.name), `${p.name} owner matches a rebuilt ring`)
+
+  // ownership history re-derived from viewHistory; epochs present; latest matches the current owner
+  assert.deepEqual(r.epochs!.map((e) => e.id), ['e3', 'e4'])
+  for (const p of r.partitions) assert.equal(p.ownerByEpoch!['e4'], p.owner)
+
+  // subscription topology folded — the forwarded read to :60000 surfaced as a client row
+  const reader = r.clients!.find((c) => c.id === ':60000')!
+  assert.equal(reader.role, 'reader')
+  assert.equal(reader.subs[0].kind, 'forward')
+
+  // and the whole thing round-trips through the viewer's normalize()
+  const model = normalize(file)
+  assert.equal(model.resources[0].members, 3)
+  assert.ok(model.resources[0].clients.find((c: any) => c.id === ':60000'))
+})
+
+//! foldLive OMITS divergence (no sample drill in the poll payload) — partitions keep their P1 status, never falsely 'diverged'
+test('foldLive omits divergence (the drill is the in-process capture path, not the live poll)', () => {
+  const file = foldLive(fixture().filter((s) => s.role === 'server'))
+  for (const p of file.resources[0].partitions) {
+    assert.notEqual(p.status, 'diverged') // never flagged live — divergence needs the version-sample drill
+    assert.equal(p.replicas, undefined)
+  }
 })
 
 //! the live path: capture a real in-process cluster; ownership must match ground truth

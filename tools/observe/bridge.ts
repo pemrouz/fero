@@ -28,6 +28,8 @@ import { diagnostics, type Fero } from '../../resource/index.ts'
 import type { InspectSnapshot } from '../../resource/inspect.ts'
 import type { ProvRecord } from '../../resource/observe.ts'
 import type { ChangeRecord } from '../../transport/message.ts'
+import { foldLive } from '../debug/export.ts'
+import type { DHT } from '../../transport/dht.ts'
 
 //! ProvEvent: a flattened provenance record the bridge relays, tagged with `by` (the address of the node that observed it).
 export type ProvEvent = ProvRecord & { by: string }
@@ -35,6 +37,8 @@ import { value } from '../../../data/index.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, 'web') //! the static dashboard lives here (Slice 1+; a placeholder serves before it exists)
+//! The promoted debug viewer (tree.html + shape.js + sample), served same-origin at /debug/ so it can EventSource the bridge's /events live feed. [P5]
+const DEBUG_WEB = join(HERE, '..', 'debug', 'mockups')
 //! The sibling `data` lib's built ESM, mounted at /vendor/data/ so the browser dashboard can `import 'data'` (dist lives OUTSIDE the web root).
 const DATA_DIST = join(HERE, '..', '..', '..', 'data', 'dist')
 
@@ -318,6 +322,10 @@ export const bridge = (opts: {
   // view-group blobs. The mode change is hysteretic (a kill/restart crosses the
   // threshold every few seconds; it must not flap).
   const latest = new Map<string, InspectSnapshot>() // uuid → most recent snapshot (the merge key, stable across restart-on-same-port unlike address)
+  // P5: persistent per-view DHT ring cache for foldLive's ownership derivation — built once per distinct
+  // member set, reused across polls (a fresh build is O(members×vnodes)). Bounded below so churn can't leak it.
+  const debugRings = new Map<string, DHT>()
+  const DEBUG_RING_CAP = 32
   const addrUuid = new Map<string, string>() // address → the uuid last seen there: detects a same-address restart (new uuid) so the old uuid's ghost row is pruned
   const aggregateAbove = opts.aggregateAbove ?? 24
   let aggMode: 'grid' | 'blobs' = 'grid'
@@ -503,6 +511,16 @@ export const bridge = (opts: {
       for (const a of [...addrUuid.keys()]) if (!live.has(a)) addrUuid.delete(a)
       // always ship the compact rollup (guarded by the deaf-client discard, like flushEvents)
       if (clients.size) sse('aggregate', deriveSnapshotAgg(aggMode, suppressed))
+      // P5: ship the store-once DEBUG file too (the promoted hierarchical viewer at /debug/ consumes
+      // it through the SAME normalize() the file-fed viewer uses). foldLive folds the held poll payload
+      // with no extra drill calls; `debugRings` memoizes the per-view DHT rings ACROSS polls so the
+      // steady state rebuilds nothing (a fresh build is O(members×vnodes) — see bridge.perf.ts).
+      if (clients.size) {
+        sse('debug', foldLive([...latest.values()], undefined, debugRings))
+        // bound the cache: keep recent view-rings (working set ≤ the 16-deep history + current); evict
+        // oldest-inserted past that so churn can't grow it unbounded (an evicted ring just rebuilds if seen again)
+        while (debugRings.size > DEBUG_RING_CAP) debugRings.delete(debugRings.keys().next().value as string)
+      }
     } finally {
       polling = false
     }
@@ -528,6 +546,14 @@ export const bridge = (opts: {
         res.writeHead(404)
         res.end(`data dist not found — run \`cd ../data && npm run build\` (looked in ${DATA_DIST})`)
       }
+      return
+    }
+    // the promoted debug viewer is mounted at /debug/ (its own root) so it's same-origin with /events
+    if (urlPath === '/debug' || urlPath.startsWith('/debug/')) {
+      const drel = urlPath === '/debug' || urlPath === '/debug/' ? 'tree.html' : urlPath.slice('/debug/'.length)
+      if (await serveFrom(DEBUG_WEB, drel, res)) return
+      res.writeHead(404)
+      res.end('not found')
       return
     }
     const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '')
