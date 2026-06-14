@@ -448,6 +448,48 @@ ticker filter, replay scrubber, multi-cluster merge, contention heatmap, …) li
   convergence timeline; full converged/converging/partition-suspected semantics; deterministic split-brain
   loser generation.
 
+### Debug viewer: capture & live data (L4) — [P2] (tools/debug; resource: inspect, dispatch, membership; tools/observe)
+The single-page outline+inspector viewer ([tools/debug/mockups/tree.html](tools/debug/mockups/tree.html))
++ its readable *store-once* snapshot format ([debug/sessions.fero.json](tools/debug/mockups/debug/sessions.fero.json))
+have LANDED as the promoted primary surface (earlier mockups retired to `tools/debug/mockups/old/`). The
+viewer's `normalize(snap)` — store-once facts in, every cross-cut DERIVED (node ownership, lag, epoch
+layouts, rollup counts) — is the SEAM the real tool builds on: **one `normalize()`, two feeds** (file
+capture + live stream), so file-format == live-format and counts can't disagree. Adjacent to the
+network-observer workstream above — shares `inspect.ts`/`observe.ts`/`bridge.ts`. Grounded gap analysis:
+`cluster.peers/.owner/.replicas/.epoch/.members/.writable/.writes`, `__inspect`, `__observe`, the `log.*`
+accessors and the DHT ring snapshot already exist; the route-correlation handle ALREADY exists too
+(`cluster.writes` carries `id`/`origin`/`seq`/`epoch` — [DECISIONS Z](DECISIONS.md)). Open work, phased
+(strictly ordered; each phase ships a real subset, not a stub):
+- **P0 — extract the seam.** Lift `normalize()` out of tree.html into `tools/debug/shape.ts` (imported by
+  viewer + producers) + a round-trip test asserting ONLY the intersection backed by a real seam today
+  (epoch/members/peers/marks/versions-COUNT/orphans/ring). The file schema is a SUPERSET of `InspectSnapshot`,
+  so log/per-sub/ownerByEpoch/per-replica fields get asserted as their accessor lands. Pure refactor, no hot
+  path. (tools/debug)
+- **P1 — first real capture.** `tools/debug/export.ts` as an IN-PROCESS diagnostics client (the always-available
+  `[diagnostics]` seam — `observe:true` gates only the WIRE `__inspect`/`__observe`); pull + fold by INVERTING
+  normalize() (store each fact once on its owner, emit nothing the viewer re-derives) over the subset that exists
+  today. Replaces the hand-authored healthy rows with live data. `export.perf.ts`. (tools/debug; resource: inspect)
+- **P2 — version sample (cap K).** `__inspect` ships only the versions COUNT (deliberate — the map is huge under
+  churn); add a SAMPLED per-key LWW-stamp accessor (cap K) for agreement/divergence + per-replica stuck. MUST be
+  pull-only, never on the write path; needs an `inspect.perf.ts` threshold. Unblocks key-autopsy / divergence
+  rows. (resource: inspect)
+- **P3 — per-sub head/delivered.** Only an aggregate `subscriptions` COUNT exists; client lag (head−delivered)
+  needs per-sub counters threaded through the per-delta served-sub send path ([dispatch.ts](resource/dispatch.ts)
+  streamProxy/deltaTo) — ON the hot path, so its OWN perf sibling + an emit-site count, not a hand-waved "single
+  int". Unblocks client/sub lag. (resource: dispatch)
+- **P4 — view / ownership history (`ownerByEpoch`).** `ViewManager` keeps only the CURRENT epoch/members
+  ([membership.ts](resource/membership.ts)); replay + owner-by-epoch timelines need a BOUNDED ring of past
+  `{epoch,members}` captured AFTER `#install` + per-historical-view DHT re-derivation to recover `ownerByEpoch`.
+  From-scratch structure, its own slice. Unblocks cluster-replay + owner-by-epoch. (resource: membership; transport: dht)
+- **P5 — live mode + route JOIN.** Viewer over `EventSource` → the existing [bridge.ts](tools/observe/bridge.ts)
+  SSE → the SAME `normalize()` each tick; the write-route timeline is a JOIN over `cluster.writes` + `__observe`
+  ProvRecords (existing data, not new instrumentation). EXTEND the existing `bridge.perf.ts` — never widen its
+  thresholds. (tools/debug; tools/observe; resource)
+- **Cross-cutting discipline:** every phase ships a teardown contract mirroring `bridge.close()` (clear timers,
+  unsub observe legs, REAP served subs via the dispatch reap so a long-running exporter can't leak server-side
+  sinks — the `reapPeer` leak); introspection NEVER perturbs the hot path (pull/sampled over always-on; extend
+  existing perf siblings, don't widen). A DECISIONS record lands when P0/P1 do.
+
 ---
 
 ## Testing & chaos backlog (mostly L4)
