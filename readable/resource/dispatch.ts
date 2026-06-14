@@ -58,20 +58,23 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
   }
 
   // One served subscription's retained handles: host (sink pin), src (source-proxy pin), unsub (upstream close), close (fold/gather teardown).
-  type ServedSub = { host?: object; src?: object; unsub?: () => void; close?: () => void }
+  // Plus `to`/`meta`: the L4 subscription-topology tags (downstream addr + method/key/kind/owner) — set ONCE at subscribe, never on the per-delta send path.
+  type SubMeta = { method: string; key?: string; kind: string; owner?: string }
+  type ServedSub = { host?: object; src?: object; unsub?: () => void; close?: () => void; to?: string; meta?: SubMeta }
   const subscriptions = new Map<string, ServedSub>()
   // Reverse index address → its open subIds so an ungraceful disconnect can reap served subs instead of leaking them.
   const subsByPeer = new Map<string, Set<number>>()
   const addSub = (address: string, subId: number, entry: ServedSub) => {
+    entry.to = address
     subscriptions.set(`${address}:${subId}`, entry)
     let ids = subsByPeer.get(address)
     if (!ids) subsByPeer.set(address, (ids = new Set()))
     ids.add(subId)
   }
   // Stream a live ViewProxy to a subscriber: connect a delta sink and retain host + src + optional close under (address, subId).
-  const streamProxy = (address: string, subId: number, proxy: any, close?: () => void) => {
+  const streamProxy = (address: string, subId: number, proxy: any, close?: () => void, meta?: SubMeta) => {
     const host = proxy.connect({}, (change: ChangeRecord) => mesh.deltaTo(address, subId, change))
-    addSub(address, subId, { host, src: proxy, close })
+    addSub(address, subId, { host, src: proxy, close, meta })
   }
   // Inbound subscribe: read-forward / live whole-read gather / live client aggregate fold / served partial / projection stream.
   const serveSubscribe = (subId: number, method: string, arg: unknown, address: string) => {
@@ -79,13 +82,13 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     const fwd = forwardTarget(method, arg)
     if (fwd !== undefined) {
       const unsub = mesh.subscribe('read', arg, (record: ChangeRecord) => mesh.deltaTo(address, subId, record), fwd)
-      if (unsub) addSub(address, subId, { unsub })
+      if (unsub) addSub(address, subId, { unsub, meta: { method: 'read', key: arg as string, kind: 'forward', owner: fwd } })
       return
     }
     // Reactive no-key read() under scoping → live gather streamed to the client; ungated on R (re-arms per commit, never goes silently partial).
     if (method === 'read' && arg == null && gathersWholeRead) {
       const g = fold.gatherLive({ op: 'rows' }, AGG.rows.combine)
-      streamProxy(address, subId, g.proxy, g.close)
+      streamProxy(address, subId, g.proxy, g.close, { method: 'read', kind: 'gather' })
       return
     }
     // Reactive client aggregate {fold:true} → build the fold here and stream the live global result (torn down on unsubscribe).
@@ -93,7 +96,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       try {
         const s = stripFold(arg)
         const f = fold.gatherLive(s, AGG[s.op]?.combine)
-        streamProxy(address, subId, f.proxy, f.close)
+        streamProxy(address, subId, f.proxy, f.close, { method: 'aggregate', key: s.op, kind: 'fold' })
       } catch {
       }
       return
@@ -102,7 +105,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     if (method === 'aggregate') {
       try {
         const lp = fold.livePartial(arg as AggSpec, (v) => mesh.deltaTo(address, subId, { type: 'update', key: [], value: v }))
-        addSub(address, subId, { close: lp.close })
+        addSub(address, subId, { close: lp.close, meta: { method: 'aggregate', key: (arg as AggSpec)?.op, kind: 'partial' } })
       } catch {
       }
       return
@@ -110,7 +113,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     // L4 observe push-hook (subscription-only): stream this node's bounded provenance/contention buffer; attach on subscribe, disarm via the close on reap.
     if (method === '__observe' && onObserve) {
       const o = onObserve()
-      streamProxy(address, subId, o.proxy, o.close)
+      streamProxy(address, subId, o.proxy, o.close, { method: '__observe', kind: 'observe' })
       return
     }
     // Default path: invoke the method — stream it if it returns a ViewProxy, else ship the plain value once.
@@ -121,7 +124,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
       return
     }
     if (isViewProxy(result)) {
-      streamProxy(address, subId, result)
+      streamProxy(address, subId, result, undefined, { method, key: typeof arg === 'string' ? arg : undefined, kind: 'projection' })
     } else {
       mesh.deltaTo(address, subId, { type: 'update', key: [], value: result })
     }
@@ -243,6 +246,18 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
         })
       : data
 
+  // servedSubs: a bounded snapshot of the live subscription topology — {to, method, key?, kind, owner?} per sub.
+  const SUBS_CAP = 100
+  const servedSubs = (): { to: string; method: string; key?: string; kind: string; owner?: string }[] => {
+    const out: { to: string; method: string; key?: string; kind: string; owner?: string }[] = []
+    for (const s of subscriptions.values()) {
+      if (!s.meta || s.to === undefined) continue
+      out.push({ to: s.to, method: s.meta.method, key: s.meta.key, kind: s.meta.kind, owner: s.meta.owner })
+      if (out.length >= SUBS_CAP) break
+    }
+    return out
+  }
+
   return {
     serveCall,
     serveSubscribe,
@@ -252,6 +267,7 @@ export const makeDispatch = ({ allMethods, defaults, context, mesh, me, scoped, 
     methodSurface,
     dataFacade,
     servedCount: () => subscriptions.size,
+    servedSubs,
   }
 }
 

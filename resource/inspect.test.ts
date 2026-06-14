@@ -31,6 +31,10 @@ const synthetic = (over: Partial<SnapshotDeps> = {}): SnapshotDeps => ({
   pending: { length: 2 },
   orphans: new Set(['pX']),
   servedCount: () => 4,
+  servedSubs: () => [
+    { to: ':9001', method: 'read', key: 'user42', kind: 'forward', owner: 'h:2' },
+    { to: ':9002', method: 'read', kind: 'gather' },
+  ],
   observing: () => true,
   R: 3,
   scoped: true,
@@ -61,6 +65,10 @@ test('makeSnapshot() maps every field through (scoped node)', () => {
   assert.equal(s.pending, 2)
   assert.deepEqual(s.orphans, ['pX'])
   assert.equal(s.subscriptions, 4)
+  assert.deepEqual(s.subs, [
+    { to: ':9001', method: 'read', key: 'user42', kind: 'forward', owner: 'h:2' },
+    { to: ':9002', method: 'read', kind: 'gather' },
+  ]) // the bounded subscription-topology sample (who we serve, of what kind) rides the poll
   assert.equal(s.observing, true) // the push-gate state rides the poll (a bridge detects its dead push leg with it)
   assert.equal(s.peers['h:1'].status, 3)
   assert.equal(s.peers['h:1'].uuid, 'U')
@@ -85,6 +93,11 @@ test('viewHistory is absent when the node runs no membership (a client)', () => 
   assert.equal(s.viewHistory, undefined)
   // an empty history is omitted too (not an empty array)
   assert.equal(makeSnapshot(synthetic({ viewHistory: () => [] }))().viewHistory, undefined)
+})
+
+test('subs is absent when the node serves no subscriptions (no empty array on the steady poll)', () => {
+  assert.equal(makeSnapshot(synthetic({ servedSubs: undefined }))().subs, undefined) // no accessor (e.g. a client)
+  assert.equal(makeSnapshot(synthetic({ servedSubs: () => [] }))().subs, undefined) // serves nothing → omitted, not []
 })
 
 test('versionSample is capped at VERSION_SAMPLE_CAP', () => {
@@ -144,4 +157,25 @@ test('the [diagnostics].snapshot seam works even WITHOUT observe (only the wire 
   assert.equal(typeof s.uuid, 'string')
   assert.equal(s.role, 'server')
   r.destroy()
+})
+
+test('snapshot.subs reflects a live served subscription (the topology, captured at subscribe)', async () => {
+  const port = await ports.free()
+  const server: any = await fero('subs-topo', { port, wait: 10 })
+  const client: any = await fero('subs-topo', { ports: [port], wait: 10 })
+  try {
+    // a read-only client opens a reactive whole-resource read() → a server-pushed projection sub
+    client.methods.read().connect([], () => {})
+    await sleep(40)
+    const s = server[diagnostics].snapshot()
+    assert.ok(s.subs && s.subs.length >= 1, 'the server reports the served sub in its topology sample')
+    const sub = s.subs.find((x: any) => x.method === 'read')
+    assert.ok(sub, 'the read subscription appears')
+    assert.equal(sub.kind, 'projection') // full replication → no-key read streams the local projection
+    assert.ok(sub.to, 'the downstream address is recorded')
+    assert.equal(s.subs.length, s.subscriptions, 'topology sample size tracks the served count (under the cap)')
+  } finally {
+    server.destroy()
+    client.destroy()
+  }
 })

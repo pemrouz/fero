@@ -32,6 +32,12 @@ export const RING_SEGMENTS = 120
 //! VERSION_SAMPLE_CAP: max per-key stamps a requested versionSample returns — bounds the drill-down payload (the version map can be huge).
 export const VERSION_SAMPLE_CAP = 200
 
+//! InspectSub: one served subscription's TOPOLOGY — who we serve it to (downstream addr), the method/key, its kind, and (forwarded reads) the owner we relay from.
+// NO lag/seq field: a subscription delta is a synthetic proxy record ({type,key,value}) carrying no
+// provenance, so a seq-based sub-lag isn't honestly measurable — this is the live subscription topology,
+// not a rate. kind ∈ forward | gather | fold | partial | observe | projection. [P3 — see DECISIONS O1]
+export type InspectSub = { to: string; method: string; key?: string; kind: string; owner?: string }
+
 //! InspectPeer: one row of a node's OWN peer table (its view of who it can reach) — the network observer can't see this otherwise.
 export type InspectPeer = {
   address: string
@@ -76,6 +82,10 @@ export type InspectSnapshot = {
   pending: number // write-gate buffer depth (writes held while quorum-less)
   orphans: string[] // scoped: partitions held but no longer replicated (awaiting confirmed shed)
   subscriptions: number // served-subscription count
+  // subs: a bounded sample of the live subscription TOPOLOGY (who we serve, of what kind) — present
+  // when this node serves ≥1 sub. The descriptive companion to `subscriptions` (the count); the viewer
+  // folds these into client→sub rows. Captured at subscribe (cold), so it costs the per-delta path nothing.
+  subs?: InspectSub[]
   observing: boolean // is the __observe push gate armed (≥1 live subscriber)? A bridge holding a sub against observing:false knows its push leg died (e.g. a socket bounce reaped it server-side) and re-subscribes
   peers: Record<string, InspectPeer> // this node's own peer table
 }
@@ -93,6 +103,7 @@ export type SnapshotDeps = {
   pending: { length: number } // the write-gate buffer
   orphans: Set<string>
   servedCount: () => number // dispatch.servedCount
+  servedSubs?: () => InspectSub[] // dispatch.servedSubs — the bounded subscription-topology sample (absent on a client, which serves nothing)
   observing: () => boolean // is the push gate armed? (() => observe !== undefined)
   R: number // replication factor (Infinity ⇒ full replication)
   scoped: boolean
@@ -107,7 +118,7 @@ export type SnapshotDeps = {
 // O(origins + partitions + peers) and happen ONCE PER POLL, never per write — so
 // they sit firmly off the replication hot path.
 export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }) => InspectSnapshot) => {
-  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, observing, R, scoped } = deps
+  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, servedSubs, observing, R, scoped } = deps
   return (opts) => {
     //! Copy out the node's own peer rows as plain scalars (decoupled from data's backing object; truthful point-in-time).
     const raw = peers() ?? {}
@@ -159,6 +170,9 @@ export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }
     //! viewHistory: the committed-view ring, when this node runs membership (servers) — absent on a client.
     const vh = viewHistory?.()
     if (vh && vh.length) out.viewHistory = vh
+    //! subs: the bounded subscription-topology sample, when this node serves ≥1 sub — absent otherwise (keeps the steady poll lean).
+    const ss = servedSubs?.()
+    if (ss && ss.length) out.subs = ss
     return out
   }
 }

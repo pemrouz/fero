@@ -7,7 +7,8 @@ import { test } from 'node:test'
 import { ok } from 'node:assert/strict'
 import { bench } from '#utils'
 import type { InspectSnapshot } from '../../resource/inspect.ts'
-import { foldSnapshots, foldDivergence, foldOwnership, type VersionSample } from './export.ts'
+import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, type VersionSample } from './export.ts'
+import type { InspectSub } from '../../resource/inspect.ts'
 import { DHT } from '../../transport/dht.ts'
 
 //! build N server snapshots that each hold all M partitions (the heaviest fold: full holder bookkeeping)
@@ -73,4 +74,22 @@ test('foldOwnership stays bounded over the full view-history cap', () => {
   console.log(`  foldOwnership ${EPOCHS}×${M}: ${t.toFixed(2)}ms`)
   ok(file.resources[0].epochs!.length === EPOCHS, 'all epochs derived')
   ok(t < 30, `foldOwnership ${EPOCHS}×${M} took ${t.toFixed(2)}ms (threshold 30ms)`)
+})
+
+//! foldSubs groups (servingNode, sub) by downstream addr into client rows — O(total subs), once per capture
+// 24 nodes each serving the SUBS_CAP (100) → 2400 served subs grouped into client rows. COLD path (once
+// per capture, never on the data hot path); quiet median well under a frame. Threshold 15ms (generous,
+// per the cold-path philosophy) flags a gross/superlinear regression without flaking on a loaded box.
+test('foldSubs stays cheap folding a cluster-wide subscription topology', () => {
+  const N = 24, M = 200, PER = 100
+  const file = foldSnapshots(cluster(N, M), { owner, replicas })
+  const subsByNode = new Map<string, InspectSub[]>()
+  for (let i = 0; i < N; i++) {
+    const me = ':' + (5000 + i)
+    subsByNode.set(me, Array.from({ length: PER }, (_, j) => ({ to: ':' + (6000 + (j % 50)), method: 'read', key: 'p' + j, kind: 'forward', owner: me })))
+  }
+  const ms = bench.time(() => { foldSubs(file, subsByNode) })
+  console.log(`  foldSubs ${N}×${PER}: ${ms.toFixed(2)}ms`)
+  ok(file.resources[0].clients!.length > 0, 'client rows derived')
+  ok(ms < 15, `foldSubs ${N}×${PER} took ${ms.toFixed(2)}ms (threshold 15ms)`)
 })

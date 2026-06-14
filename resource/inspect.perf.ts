@@ -50,7 +50,11 @@ const bigDeps = (): SnapshotDeps => {
     versions,
     pending: { length: 0 },
     orphans: new Set<string>(),
-    servedCount: () => 3,
+    servedCount: () => 100,
+    // worst case: a node serving SUBS_CAP (100) subscriptions — servedSubs builds the capped sample
+    // FRESH each poll (as dispatch's accessor does), so the assembly threshold below honestly covers
+    // the per-poll subscription-topology cost too (it's the only new per-poll work P3 adds).
+    servedSubs: () => Array.from({ length: 100 }, (_, i) => ({ to: '10.0.1.' + i + ':5000', method: 'read', key: 'k' + i, kind: 'forward', owner: members[i % PEERS] })),
     observing: () => false,
     R: 3,
     scoped: true,
