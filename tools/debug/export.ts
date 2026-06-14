@@ -9,25 +9,32 @@
 // or the gated __inspect over the wire) plus an authoritative owner/replica
 // lookup (cluster.owner(key) / cluster.replicas(key)), and produces the file.
 //
-// P1 emits only the subset with a REAL seam today:
-//   • resource — members, R (committed view + ring)
-//   • node     — keys (LWW-winner count), health derived from writable / pending
-//                / orphans / a stale view epoch
-//   • partition— owner + R-set + held-count, so UNDER-REPLICATION is real
-// Deliberately NOT emitted (no seam yet — arrive in P2-P4, the IDEAS workstream):
-//   per-partition keys/wps, replica lag/stuck, the change-record log, ownerByEpoch.
-// The viewer renders the gaps gracefully (normalize fills defaults), so a P1
-// capture already replaces the hand-authored healthy rows with live data.
+// Emitted from a REAL seam today:
+//   • resource — members, R (committed view + ring)                            [P1]
+//   • node     — keys (LWW-winner count), health (writable/pending/orphans/    [P1]
+//                stale epoch)
+//   • partition— owner + R-set + held-count, so UNDER-REPLICATION is real      [P1]
+//   • replica  — DIVERGENCE: a holder parked on a lower (epoch,seq) than its    [P2]
+//                owner is flagged stuck, via foldDivergence over the version-sample drill
+// Deliberately NOT emitted (no seam yet — arrive in P3-P4, the IDEAS workstream):
+//   per-partition keys/wps, the change-record log, ownerByEpoch history.
+// The viewer renders the gaps gracefully (normalize fills defaults), so a capture
+// already replaces the hand-authored rows with live data.
 // ════════════════════════════════════════════════════════════════════════
 
 import type { InspectSnapshot } from '../../resource/inspect.ts'
 import { diagnostics, type Fero } from '../../resource/index.ts'
 
-//! DebugFile: the store-once snapshot shape (the subset P1 can fill); shape.js#normalize consumes it.
+//! DebugFile: the store-once snapshot shape (the subset P1/P2 can fill); shape.js#normalize consumes it.
+export type DebugReplica = { addr: string; lag?: number; stuckAt?: string; stale?: boolean; missing?: boolean; note?: string }
 export type DebugNode = { addr: string; keys?: number; status?: string; note?: string }
-export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string }
+export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string; replicas?: DebugReplica[] }
 export type DebugResource = { name: string; members: string[]; R: number; nodes: DebugNode[]; partitions: DebugPartition[] }
 export type DebugFile = { 'fero.debug': 1; _about: string; capturedAt?: string; view: string; resources: DebugResource[] }
+
+//! VersionStamp / VersionSample: one node's per-key LWW stamps (from snapshot({sample})) — the divergence input.
+export type VersionStamp = { epoch: number; seq: number; origin: string }
+export type VersionSample = Record<string, VersionStamp>
 
 //! OwnerLookup: authoritative routing for a partition key — cluster.owner / cluster.replicas, per resource.
 export type OwnerLookup = {
@@ -35,11 +42,12 @@ export type OwnerLookup = {
   replicas?: (resource: string, key: string) => string[] | undefined
 }
 
-const P1_ABOUT =
-  'Captured from a live cluster via the [diagnostics] seam (debug viewer P1). REAL: committed ' +
-  'members + R, per-node key count (LWW winners) and health, per-partition owner + replica-set + ' +
-  'held-count (so under-replication is a real signal). PENDING (no seam yet — P2-P4): per-partition ' +
-  'keys/wps, replica lag, the change-record log, and ownerByEpoch history.'
+const ABOUT =
+  'Captured from a live cluster via the [diagnostics] seam (debug viewer P1+P2). REAL: committed ' +
+  'members + R, per-node key count (LWW winners) + health, per-partition owner + replica-set + held ' +
+  '(under-replication), and per-replica DIVERGENCE — a replica parked on a lower (epoch,seq) than its ' +
+  "owner is flagged stuck (P2, via the version-sample drill). PENDING (no seam yet — P3-P4): per-partition " +
+  'keys/wps, the change-record log, and ownerByEpoch history.'
 
 //! foldSnapshots: pure fold of per-node InspectSnapshots (+ owner lookup) → the store-once debug file.
 export function foldSnapshots(snaps: InspectSnapshot[], lookup: OwnerLookup = {}, capturedAt?: string): DebugFile {
@@ -101,7 +109,59 @@ export function foldSnapshots(snaps: InspectSnapshot[], lookup: OwnerLookup = {}
     resources.push({ name, members, R, nodes, partitions })
   }
 
-  return { 'fero.debug': 1, _about: P1_ABOUT, capturedAt, view: 'e' + maxEpochAll, resources }
+  return { 'fero.debug': 1, _about: ABOUT, capturedAt, view: 'e' + maxEpochAll, resources }
+}
+
+//! stamp comparison + display: a replica is BEHIND the owner at (epoch, seq), lexicographic (epoch fences seq).
+const behindStamp = (r: VersionStamp, o: VersionStamp) => r.epoch < o.epoch || (r.epoch === o.epoch && r.seq < o.seq)
+const dispKey = (k: string) => k.split('\x00').join('.')
+
+//! foldDivergence: cross-node version-sample diff → real per-partition replica divergence.
+// For each partition, the OWNER holds the authoritative LWW winner per key; any holder
+// whose sampled stamp for a key is BEHIND the owner's is stuck (the user42.score-on-:49807
+// case). We flag the worst-behind key per replica with its parked (epoch·seq) + the seq gap
+// as lag, and mark the partition diverged. Pure over (file, the per-node samples) — the drill
+// that produced the samples lives in captureInProcess; here it's just the comparison.
+export function foldDivergence(file: DebugFile, sampleByNode: Map<string, VersionSample>): DebugFile {
+  for (const r of file.resources) {
+    for (const p of r.partitions) {
+      if (!p.owner) continue
+      const ownerSample = sampleByNode.get(p.owner)
+      if (!ownerSample) continue
+      const keysOfP = Object.keys(ownerSample).filter((k) => k === p.name || k.startsWith(p.name + '\x00'))
+      if (!keysOfP.length) continue
+
+      const replicas: DebugReplica[] = []
+      for (const [addr, sample] of sampleByNode) {
+        if (addr === p.owner) continue
+        // a holder of p shares at least one of p's keys; nodes that don't replicate p
+        // simply never sampled its keys, so they're skipped (not false-flagged)
+        let holds = false
+        let worst: { key: string; stamp: VersionStamp; gap: number } | null = null
+        for (const k of keysOfP) {
+          const rv = sample[k]
+          if (!rv) continue
+          holds = true
+          const ov = ownerSample[k]
+          if (behindStamp(rv, ov)) {
+            const gap = (ov.epoch - rv.epoch) * 1e9 + (ov.seq - rv.seq)
+            if (!worst || gap > worst.gap) worst = { key: k, stamp: rv, gap }
+          }
+        }
+        if (holds && worst) {
+          const ov = ownerSample[worst.key]
+          replicas.push({ addr, lag: Math.max(1, ov.seq - worst.stamp.seq), stuckAt: `e${worst.stamp.epoch}·s${worst.stamp.seq}`, stale: true, note: `behind on ${dispKey(worst.key)}` })
+        }
+      }
+
+      if (replicas.length) {
+        p.replicas = replicas
+        p.status = 'diverged'
+        p.note = [p.note, `${replicas.length} replica${replicas.length > 1 ? 's' : ''} behind`].filter(Boolean).join(' · ')
+      }
+    }
+  }
+  return file
 }
 
 //! captureInProcess: snapshot a live in-process cluster — pull each node's
@@ -111,7 +171,9 @@ export function foldSnapshots(snaps: InspectSnapshot[], lookup: OwnerLookup = {}
 // are pure ring lookups. So a capture perturbs nothing — it's the harness / embedded
 // path. (A networkSource-backed CLI over the gated __inspect is a later bite.)
 export function captureInProcess(nodes: Fero[], capturedAt = new Date().toISOString()): DebugFile {
+  // round 1: blanket snapshots (topology + holders) — no sample, so the cheap per-poll read
   const snaps: InspectSnapshot[] = []
+  const instByAddr = new Map<string, any>()
   const ringByResource = new Map<string, { owner: (k: string) => string | undefined; replicas: (k: string) => string[] }>()
   for (const n of nodes) {
     const snap = (n as any)[diagnostics]?.snapshot?.() as InspectSnapshot | undefined
@@ -120,11 +182,28 @@ export function captureInProcess(nodes: Fero[], capturedAt = new Date().toISOStr
     // a server (cluster.me defined) carries ring authority for its resource; the
     // first one we see per resource answers owner/replicas for that resource
     const cl = (n as any).cluster
-    if (cl?.me !== undefined && !ringByResource.has(snap.name)) ringByResource.set(snap.name, cl)
+    if (cl?.me !== undefined) {
+      instByAddr.set(cl.me, n)
+      if (!ringByResource.has(snap.name)) ringByResource.set(snap.name, cl)
+    }
   }
   const lookup: OwnerLookup = {
     owner: (resource, k) => ringByResource.get(resource)?.owner(k),
     replicas: (resource, k) => ringByResource.get(resource)?.replicas(k),
   }
-  return foldSnapshots(snaps, lookup, capturedAt)
+  const file = foldSnapshots(snaps, lookup, capturedAt)
+
+  // round 2: divergence drill — ONE sample call per node over the partitions it holds
+  // (the O(versions) scan rides this drill, not the per-poll round 1), then diff stamps
+  const sampleByNode = new Map<string, VersionSample>()
+  for (const snap of snaps) {
+    if (snap.role !== 'server' || !snap.me) continue
+    const inst = instByAddr.get(snap.me)
+    if (!inst) continue
+    const parts = Object.keys(snap.log.heads)
+    if (!parts.length) continue
+    const drilled = (inst[diagnostics].snapshot({ sample: parts }) as InspectSnapshot).versionSample
+    if (drilled) sampleByNode.set(snap.me, drilled)
+  }
+  return foldDivergence(file, sampleByNode)
 }

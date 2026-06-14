@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import type { InspectSnapshot } from '../../resource/inspect.ts'
 import { fero } from '../../resource/index.ts'
 import { ports, until } from '#utils'
-import { foldSnapshots, captureInProcess } from './export.ts'
+import { foldSnapshots, foldDivergence, captureInProcess, type VersionSample } from './export.ts'
 // @ts-ignore — shape.js is the untyped browser/Node shared seam
 import { normalize } from './mockups/shape.js'
 
@@ -112,6 +112,43 @@ test('fold works without an owner lookup (held still derived)', () => {
   assert.equal(billing.status, 'under')
 })
 
+//! cross-node version diff flags the stuck replica (the user42.score-on-:49807 case)
+test('foldDivergence flags a replica parked on a lower (epoch,seq) than its owner', () => {
+  const file = foldSnapshots(fixture(), LOOKUP)
+  const owner: VersionSample = { user42: { epoch: 4, seq: 1287, origin: 'A' }, 'user42\x00score': { epoch: 4, seq: 1290, origin: 'A' } }
+  const current: VersionSample = { user42: { epoch: 4, seq: 1287, origin: 'A' }, 'user42\x00score': { epoch: 4, seq: 1290, origin: 'A' } }
+  const stuck: VersionSample = { user42: { epoch: 4, seq: 1287, origin: 'A' }, 'user42\x00score': { epoch: 3, seq: 1241, origin: 'X' } }
+  const samples = new Map([[':49801', owner], [':49803', current], [':49805', stuck]])
+
+  foldDivergence(file, samples)
+  const r = file.resources[0]
+  const u42 = r.partitions.find((p) => p.name === 'user42')!
+  assert.equal(u42.status, 'diverged')
+  assert.equal(u42.replicas!.length, 1)              // only the stuck one, not the current replica
+  const rep = u42.replicas![0]
+  assert.equal(rep.addr, ':49805')
+  assert.equal(rep.stuckAt, 'e3·s1241')
+  assert.equal(rep.stale, true)
+  assert.equal(rep.lag, 49)                          // 1290 − 1241
+  assert.match(rep.note!, /user42\.score/)
+
+  // billing had no version sample → its P1 under-replication status is left intact
+  assert.equal(r.partitions.find((p) => p.name === 'billing')!.status, 'under')
+
+  // and it round-trips through the viewer as diverged
+  assert.equal(normalize(file).resources[0].parts.find((p: any) => p.id === 'user42').st, 'diverged')
+})
+
+//! a fully caught-up cluster shows NO divergence (no false positives)
+test('foldDivergence flags nothing when every replica matches the owner', () => {
+  const file = foldSnapshots(fixture(), LOOKUP)
+  const same: VersionSample = { user42: { epoch: 4, seq: 1287, origin: 'A' }, 'user42\x00score': { epoch: 4, seq: 1290, origin: 'A' } }
+  foldDivergence(file, new Map([[':49801', same], [':49803', { ...same }], [':49805', { ...same }]]))
+  const u42 = file.resources[0].partitions.find((p) => p.name === 'user42')!
+  assert.equal(u42.replicas, undefined)
+  assert.notEqual(u42.status, 'diverged')
+})
+
 //! the live path: capture a real in-process cluster; ownership must match ground truth
 test('captureInProcess snapshots a live 3-node cluster with authoritative ownership', async () => {
   const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
@@ -133,6 +170,13 @@ test('captureInProcess snapshots a live 3-node cluster with authoritative owners
       const names = new Set((r?.partitions ?? []).map((p) => p.name))
       return names.has('alpha') && names.has('beta') && names.has('gamma')
     }, 8000), 'all three partitions visible in the capture')
+
+    // full replication applies every record on every node → replicas converge, so the
+    // divergence drill must flag NOTHING (no false positives on a healthy cluster)
+    assert.ok(await until(() => {
+      const r = captureInProcess([A, B, C]).resources.find((x) => x.name === 'exp-live')
+      return !!r && r.partitions.every((p) => p.status !== 'diverged')
+    }, 8000), 'replicas converge — capture shows no divergence')
 
     const file = captureInProcess([A, B, C])
     assert.equal(file['fero.debug'], 1)
