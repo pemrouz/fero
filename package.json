@@ -11,8 +11,8 @@
     "#utils": "./utils/index.ts"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"transport/*.test.ts\" \"log/*.test.ts\" \"resource/*.test.ts\" \"tools/*.test.ts\" \"tools/observe/*.test.ts\" \"tools/debug/mockups/*.test.ts\" \"tests/chaos/*.test.ts\"",
-    "perf": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"transport/*.perf.ts\" \"log/*.perf.ts\" \"resource/*.perf.ts\" \"tools/observe/*.perf.ts\"",
+    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"transport/*.test.ts\" \"log/*.test.ts\" \"resource/*.test.ts\" \"tools/*.test.ts\" \"tools/observe/*.test.ts\" \"tools/debug/*.test.ts\" \"tools/debug/mockups/*.test.ts\" \"tests/chaos/*.test.ts\"",
+    "perf": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"transport/*.perf.ts\" \"log/*.perf.ts\" \"resource/*.perf.ts\" \"tools/observe/*.perf.ts\" \"tools/debug/*.perf.ts\"",
     "readable": "node --experimental-strip-types --no-warnings tools/readable.ts",
     "observe": "node --experimental-strip-types --no-warnings tools/observe/index.ts"
   },
