@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key Autopsy — design directions</title>
+<style>
+  :root{
+    --bg:#0c0d10; --panel:#141519; --line:#23252d; --fg:#d3d6dd; --dim:#828794; --accent:#9aa7ff;
+    font-size:15px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:1rem/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  header{padding:1.7rem 2rem 1.2rem;border-bottom:1px solid var(--line)}
+  header h1{margin:0 0 .3rem;font-size:1.25rem;font-weight:650}
+  header h1 b{color:var(--accent);font-weight:650}
+  header p{margin:0;color:var(--dim);max-width:74ch;font-size:.92rem}
+  header .back{display:inline-block;margin-top:.7rem;font-size:.82rem;color:var(--dim);text-decoration:none}
+  header .back:hover{color:var(--accent)}
+  .featured{margin:1.3rem 2rem 0}
+  .featured .card{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+  .featured .lead{padding:.85rem 1rem 0;color:var(--dim);font-size:.86rem;max-width:80ch}
+  .featured .lead b{color:var(--fg)}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(540px,1fr));gap:1.1rem;padding:1.3rem 2rem 2.5rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+  .card .head{display:flex;align-items:baseline;gap:.7rem;padding:.85rem 1rem .2rem}
+  .card .tag{font:.7rem/1 ui-monospace,Menlo,monospace;color:var(--bg);background:var(--accent);
+    border-radius:4px;padding:.2rem .45rem;font-weight:700}
+  .card h2{margin:0;font-size:1rem;font-weight:650}
+  .card h2 a{color:var(--fg);text-decoration:none}
+  .card h2 a:hover{color:var(--accent)}
+  .card .desc{margin:.1rem 0 .7rem;padding:0 1rem;color:var(--dim);font-size:.83rem}
+  .frame{height:430px;overflow:hidden;position:relative;border-top:1px solid var(--line)}
+  .frame a.cover{position:absolute;inset:0;z-index:2;display:block}
+  .frame a.cover:hover{outline:2px solid var(--accent);outline-offset:-2px}
+  .frame iframe{border:0;background:var(--bg);transform:scale(.5);transform-origin:0 0;width:200%;height:860px;pointer-events:none}
+  footer{padding:0 2rem 2rem;color:var(--dim);font-size:.82rem;max-width:90ch}
+  footer code{font-family:ui-monospace,Menlo,monospace;color:var(--fg)}
+</style>
+</head>
+<body>
+<header>
+  <h1><b>Key Autopsy</b> — four design directions</h1>
+  <p>The same forensic view — <em>why does this key hold this value, and is any node diverged?</em> — in four
+     different visual languages and information architectures. Same data, same honest data-sources footnote;
+     a deliberately serious register (no pills, glow, candy colors, or emoji). Opens on <code>user42.score</code>,
+     the divergence anomaly. Click a card to open it full-page.</p>
+  <a class="back" href="../index.html">← back to the four view directions</a>
+</header>
+
+<section class="featured">
+  <div class="card">
+    <div class="head"><span class="tag" style="background:#e5645c">RETHINK</span><h2><a href="guided.html">Answer-first &amp; narrative</a></h2></div>
+    <p class="lead">The four below differ in <em>style</em>; this one differs in <b>information design</b>. It inverts the reading
+       order — plain-English answer → one "who agrees" picture → the causal story in sentences → what it means → and the raw
+       data (stamps, records, ownership) collapsed behind <b>"show evidence"</b>. Built in response to "it's hard to make sense
+       of all the data": lead with the conclusion, demote the evidence.</p>
+    <div class="frame"><a class="cover" href="guided.html"></a><iframe src="guided.html" loading="lazy" title="Answer-first"></iframe></div>
+  </div>
+</section>
+
+<main>
+  <div class="card">
+    <div class="head"><span class="tag">1</span><h2><a href="report.html">Forensic Report</a></h2></div>
+    <p class="desc">Reads like a written autopsy / postmortem — typographic hierarchy, prose, hairline rules. Sober near-monochrome.</p>
+    <div class="frame"><a class="cover" href="report.html"></a><iframe src="report.html" loading="lazy" title="Forensic Report"></iframe></div>
+  </div>
+  <div class="card">
+    <div class="head"><span class="tag">2</span><h2><a href="terminal.html">Terminal Log</a></h2></div>
+    <p class="desc"><code>git log --graph</code> / debugger transcript — monospace, box-drawing lineage graph, foreground-only color.</p>
+    <div class="frame"><a class="cover" href="terminal.html"></a><iframe src="terminal.html" loading="lazy" title="Terminal Log"></iframe></div>
+  </div>
+  <div class="card">
+    <div class="head"><span class="tag">3</span><h2><a href="grid.html">Ops Grid</a></h2></div>
+    <p class="desc">Bloomberg/Datadog dense console — node×attribute matrix, tight tables, muted graphite, hairline borders.</p>
+    <div class="frame"><a class="cover" href="grid.html"></a><iframe src="grid.html" loading="lazy" title="Ops Grid"></iframe></div>
+  </div>
+  <div class="card">
+    <div class="head"><span class="tag">4</span><h2><a href="inspector.html">Debugger Inspector</a></h2></div>
+    <p class="desc">Two-pane VSCode "Run &amp; Debug" — key tree + watch/variables property grid + editor JSON view with syntax tokens.</p>
+    <div class="frame"><a class="cover" href="inspector.html"></a><iframe src="inspector.html" loading="lazy" title="Debugger Inspector"></iframe></div>
+  </div>
+</main>
+<footer>
+  Mockups · static fake data. Each maps every panel to its real source (<code>InspectSnapshot</code> · <code>__observe</code> stream ·
+  log accessor · bridge-derived) or an explicit <code>⚠ NEW instrumentation</code> flag in its data-sources footnote.
+  Pick a direction (and, separately, a skin) and I'll take it forward.
+</footer>
+</body>
+</html>

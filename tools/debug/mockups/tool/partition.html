@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sessions · user42 — partition log · fero</title>
+<style>
+  /* ────────────────────────────────────────────────────────────────────
+     IDIOM: issue-DETAIL / event-stream register (Sentry issue page /
+     Linear project view), applied to a PARTITION. This is the same app as
+     inbox.html — identical graphite palette, three-pane shell, command bar
+     (identity · health pill · is: filter), bottom hotkey bar, data-sources
+     popover. Here the CENTRE is THE LOG (the per-partition commit stream,
+     newest first), the LEFT RAIL is partitions + the current one's keys as
+     filters, the RIGHT is the partition's VITALS (replica lag + owner-by-
+     epoch). Colour stays FUNCTIONAL — losses/conflicts/fences are severity-
+     coloured, clean commits are calm.
+     ──────────────────────────────────────────────────────────────────── */
+  :root{
+    --bg:#101216; --rail:#13151a; --pane:#15181e; --line:#22262e; --line-2:#2b303a;
+    --ink:#d6dae2; --dim:#8a909c; --soft:#5a606b; --faint:#3f444e;
+    --sel:#1d3a52; --sel-line:#3d7fb8; --hover:#1a1e25;
+    --crit:#e8615a; --crit-bg:#2a1816; --warn:#d6a247; --warn-bg:#251f12;
+    --ok:#5cba8a; --ok-bg:#16241c; --info:#5b9fe0;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 var(--ui);
+    -webkit-font-smoothing:antialiased;overflow:hidden}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
+  ::selection{background:var(--sel)}
+
+  /* ── top command bar ───────────────────────────────────────────────── */
+  .bar{display:flex;align-items:center;gap:0;height:38px;background:var(--rail);
+    border-bottom:1px solid var(--line);padding:0 10px;flex:0 0 auto;font-size:12.5px}
+  .bar .id{display:flex;align-items:baseline;gap:6px;padding-right:12px;white-space:nowrap}
+  .bar .id .res{color:var(--soft)} .bar .id a.res:hover{color:var(--dim)}
+  .bar .id .chev{color:var(--faint)}
+  .bar .id .nm{font-weight:600;color:var(--ink)} .bar .id .nm .mono{color:#fff}
+  .bar .sep{width:1px;height:18px;background:var(--line-2);margin:0 12px}
+  .bar .ctx{display:flex;gap:14px;color:var(--dim);white-space:nowrap}
+  .bar .ctx .mono{color:var(--ink)}
+  .bar .health{display:flex;align-items:center;gap:7px;margin-left:auto;padding-right:4px;white-space:nowrap}
+  .bar .health .dot{width:8px;height:8px;border-radius:50%}
+  .bar .health .txt{font-weight:600;letter-spacing:.02em}
+  .bar .health.ok .dot{background:var(--ok)} .bar .health.ok .txt{color:var(--ok)}
+  .bar .health.crit .dot{background:var(--crit);box-shadow:0 0 0 3px var(--crit-bg)}
+  .bar .health.crit .txt{color:var(--crit)}
+  .bar .search{display:flex;align-items:center;gap:6px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:5px;padding:3px 9px;margin-left:12px;width:240px}
+  .bar .search input{background:none;border:0;outline:0;color:var(--ink);font:inherit;width:100%;
+    font-family:var(--mono);font-size:12px}
+  .bar .search input::placeholder{color:var(--soft);font-family:var(--ui)}
+  .bar .search .pre{color:var(--soft)}
+  .bar .scen{display:flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden;margin-left:10px}
+  .bar .scen button{background:#0c0e12;border:0;color:var(--dim);font:inherit;font-size:11.5px;font-weight:600;
+    padding:4px 11px;cursor:pointer;border-right:1px solid var(--line);white-space:nowrap}
+  .bar .scen button:last-child{border-right:0}
+  .bar .scen button:hover{color:var(--ink)}
+  .bar .scen button[aria-pressed=true]{background:var(--sel);color:#fff}
+  .bar .mock{margin-left:10px;color:var(--soft);font-size:10.5px;border:1px solid var(--line);
+    border-radius:3px;padding:2px 7px;letter-spacing:.03em;white-space:nowrap}
+
+  /* ── HEALTH LEAD: the triage one-liner, worst thing first ──────────── */
+  .lead{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);
+    background:var(--rail);flex:0 0 auto;font-size:12.5px}
+  .lead .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg);flex:0 0 auto}
+  .lead.ok .sd{background:var(--ok)} .lead.crit .sd{background:var(--crit)}
+  .lead .ltxt{color:var(--ink)} .lead .ltxt b{font-weight:650;color:#fff}
+  .lead.ok .ltxt b{color:var(--ok)} .lead.crit .ltxt b{color:var(--crit)}
+  .lead .ltxt .mono{color:var(--ink)} .lead .ltxt .bad{color:var(--crit)}
+  .lead .pills{margin-left:auto;display:flex;gap:7px;font-size:11px}
+  .lead .pill{display:flex;align-items:center;gap:5px;border:1px solid var(--line-2);border-radius:4px;
+    padding:2px 8px;color:var(--dim);background:#0c0e12;font-variant-numeric:tabular-nums}
+  .lead .pill b{color:var(--ink);font-weight:600}
+  .lead .pill.crit{border-color:#4a2622;color:var(--crit)} .lead .pill.crit b{color:var(--crit)}
+  .lead .pill.warn{border-color:#443613;color:var(--warn)} .lead .pill.warn b{color:var(--warn)}
+  .lead .pill.ok{border-color:#1f3a2c;color:var(--ok)} .lead .pill.ok b{color:var(--ok)}
+
+  /* ── 3-pane body ───────────────────────────────────────────────────── */
+  .body{display:grid;grid-template-columns:212px minmax(0,1fr) 320px;flex:1 1 auto;min-height:0}
+
+  /* ── LEFT RAIL: this partition's KEY INDEX — every key with its winning
+       stamp + replica agreement (n/N). The sibling-partitions list is NOT
+       duplicated here; it lives on its own page (partitions.html). Selecting
+       a key scopes the log; opening drills to the per-key autopsy. ──────── */
+  .rail{background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;padding:10px 0}
+  .rail .grp{padding:0 6px}
+  .rail .grp-h{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--soft);
+    padding:4px 10px 6px;display:flex;justify-content:space-between}
+  .rail .grp-h .gc{color:var(--faint);font-weight:600;letter-spacing:0}
+  .rail .v{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:5px;cursor:pointer;color:var(--dim)}
+  .rail .v:hover{background:var(--hover);color:var(--ink)}
+  .rail .v[aria-current=true]{background:var(--sel);color:#fff}
+  .rail .v[aria-current=true] .ic{color:#fff}
+  .rail .v .ic{width:13px;text-align:center;color:var(--soft);font-family:var(--mono);font-size:12px;flex:0 0 auto}
+  .rail .v .lab{flex:1 1 auto;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}
+  .rail .v .tot{font-family:var(--mono);font-size:11px;color:var(--soft);font-variant-numeric:tabular-nums}
+  .rail .v[aria-current=true] .tot{color:#cfe2f2}
+  /* a key row is two lines: name + agree badge, over its winning stamp */
+  .rail .keyrow{align-items:flex-start;padding:6px 10px}
+  .rail .keyrow .ic{margin-top:1px;color:var(--soft)}
+  .rail .keyrow[data-sev=crit] .ic{color:var(--crit)}
+  .rail .keyrow[aria-current=true] .ic{color:#fff}
+  .rail .kmeta{flex:1 1 auto;min-width:0}
+  .rail .kn{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+    font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+  .rail .keyrow[aria-current=true] .kn{color:#fff}
+  .rail .kn .knm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  /* agree stays QUIET when unanimous (calm); it lights only on a split */
+  .rail .agree{font-family:var(--mono);font-size:10.5px;color:var(--soft);font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .rail .agree.bad{color:var(--crit);font-weight:600} .rail .agree.warn{color:var(--warn);font-weight:600}
+  .rail .keyrow[aria-current=true] .agree.bad{color:#ffb3ad}
+  .rail .kstamp{font-family:var(--mono);font-size:10.5px;color:var(--soft);margin-top:1px;white-space:nowrap}
+  .rail .kstamp .split{color:var(--crit);font-weight:600}
+  .rail .keyrow[aria-current=true] .kstamp{color:#9fb2c4}
+  /* in-situ glossary: defines stamp / agree right where they're first shown */
+  .rail .gloss{margin:10px 12px 2px;padding:10px 0 2px;border-top:1px solid var(--line);color:var(--soft);
+    font-size:10.5px;line-height:1.6}
+  .rail .gloss b{color:var(--dim);font-weight:600;font-family:var(--mono)}
+  .rail .gloss .mono{font-family:var(--mono)} .rail .gloss .bad{color:var(--crit)}
+
+  /* ── CENTRE: THE LOG — the partition's commit stream ───────────────── */
+  .log{overflow-y:auto;background:var(--bg);min-width:0;display:flex;flex-direction:column}
+  .log .lh{display:flex;align-items:center;gap:10px;height:30px;padding:0 12px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--bg);z-index:3;color:var(--soft);font-size:11px}
+  .log .lh .ttl{color:var(--dim);font-weight:600;font-size:12px}
+  .log .lh .ttl .mono{color:var(--ink)}
+  .log .lh .cnt{color:var(--soft)}
+  .log .lh .sort{margin-left:auto;font-size:11px} .log .lh .sort b{color:var(--dim);font-weight:600}
+  /* the is: chip filter row — Sentry query style */
+  .log .chips{display:flex;align-items:center;gap:6px;padding:6px 12px;border-bottom:1px solid var(--line);
+    position:sticky;top:30px;background:var(--bg);z-index:3;flex-wrap:wrap;font-size:11px}
+  .log .chips .cl{color:var(--soft);margin-right:2px}
+  .log .chips .chip{font-family:var(--mono);font-size:11px;border:1px solid var(--line-2);border-radius:4px;
+    padding:2px 8px;color:var(--dim);cursor:pointer;background:#0c0e12;white-space:nowrap}
+  .log .chips .chip:hover{color:var(--ink);border-color:var(--soft)}
+  .log .chips .chip[aria-pressed=true]{background:var(--sel);border-color:var(--sel-line);color:#fff}
+  .log .chips .chip .n{color:var(--soft);margin-left:5px} .log .chips .chip[aria-pressed=true] .n{color:#cfe2f2}
+  .log .chips .clear{margin-left:auto;color:var(--soft);cursor:pointer;font-size:11px}
+  .log .chips .clear:hover{color:var(--ink)}
+
+  .rows{flex:1 1 auto}
+  /* column grid: stamp · origin · key · type · value · outcome  */
+  .lr{display:grid;grid-template-columns:3px 92px 116px minmax(120px,1fr) 56px minmax(96px,150px) 122px;
+    align-items:center;border-bottom:1px solid var(--line);cursor:pointer;background:var(--bg);
+    font-family:var(--mono);font-size:12px;height:31px}
+  .lr:hover{background:var(--hover)}
+  .lr[aria-selected=true]{background:var(--sel)}
+  .lr .sev{width:3px;height:100%} .lr[data-sev=crit] .sev{background:var(--crit)} .lr[data-sev=warn] .sev{background:var(--warn)}
+  .lr .stamp{color:var(--dim);padding-left:9px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .lr .stamp .e{color:var(--soft)}
+  .lr[aria-selected=true] .stamp{color:#c4cdd9}
+  .lr .origin{color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+  .lr .origin .rep{display:inline-block;width:13px;color:var(--dim);font-weight:600}
+  .lr .key{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+  .lr[aria-selected=true] .key{color:#fff}
+  /* inline stuck-node marker — makes the divergence visible without a hover */
+  .lr .stuck{font-family:var(--ui);font-size:9.5px;font-weight:700;letter-spacing:.03em;
+    color:var(--warn);background:var(--warn-bg);border:1px solid #443613;border-radius:3px;
+    padding:0 5px;margin-left:8px;white-space:nowrap;vertical-align:1px}
+  .lr .type{font-family:var(--ui);font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--soft);text-align:center}
+  .lr .val{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:10px;text-align:right}
+  .lr[data-sev=crit] .val{color:var(--crit)} .lr[aria-selected=true] .val{color:#dfe6ee}
+  .lr .out{display:flex;align-items:center;gap:5px;padding-right:10px;justify-content:flex-end;white-space:nowrap}
+  .lr .out .od{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:0 0 auto}
+  .lr .out .ot{font-family:var(--ui);font-size:11px;color:var(--ok)}
+  .lr .out.local .od{background:var(--info)} .lr .out.local .ot{color:var(--info)}
+  .lr .out.won .od{background:var(--ok)} .lr .out.won .ot{color:var(--ok)}
+  .lr .out.fwd .od{background:var(--dim)} .lr .out.fwd .ot{color:var(--dim)}
+  .lr .out.drop .od{background:var(--soft)} .lr .out.drop .ot{color:var(--soft)}
+  .lr .out.lost .od{background:var(--warn)} .lr .out.lost .ot{color:var(--warn)}
+  .lr .out.conflict .od{background:var(--crit)} .lr .out.conflict .ot{color:var(--crit);font-weight:600}
+
+  /* view divider between epochs — a Sentry-style stream rule */
+  .vd{display:flex;align-items:center;gap:10px;padding:5px 12px;background:#0c0e12;border-bottom:1px solid var(--line);
+    color:var(--soft);font-size:10.5px;letter-spacing:.02em}
+  .vd .vdr{flex:1 1 auto;height:1px;background:var(--line-2)}
+  .vd .vdl{font-family:var(--mono);color:var(--dim);white-space:nowrap}
+  .vd .vdl b{color:var(--ink);font-weight:600}
+  .vd .vdl .mv{color:var(--warn)}
+
+  /* empty / calm filtered state */
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;
+    color:var(--soft);gap:12px;padding:40px;text-align:center}
+  .empty .chk{width:42px;height:42px;border-radius:50%;border:2px solid var(--line-2);display:flex;
+    align-items:center;justify-content:center;color:var(--ok);font-size:20px}
+  /* a filtered-but-still-unhealthy partition must NOT borrow the calm green ✓ */
+  .empty.filtered .chk.none{color:var(--soft);font-size:18px}
+  .empty .e1{font-size:14px;color:var(--ink);font-weight:600}
+  .empty .e2{font-size:12px;max-width:300px;line-height:1.6}
+  /* footer note: calm = neutral; still-unhealthy = amber, so the empty state never lies */
+  .empty .e3{font-family:var(--mono);font-size:11px;color:var(--soft);margin-top:4px;
+    border-top:1px solid var(--line);padding-top:12px}
+  .empty.filtered .e3{color:var(--warn);border-top-color:var(--line-2)}
+
+  /* ── RIGHT: VITALS sidebar — replica health + owner-by-epoch ───────── */
+  .vitals{background:var(--pane);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+  .vitals .vh{padding:11px 14px 10px;border-bottom:1px solid var(--line)}
+  .vitals .vh .vt{font-family:var(--mono);font-size:14px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+  .vitals .vh .vt .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg)}
+  .vitals .vh.ok .vt .sd{background:var(--ok)} .vitals .vh.crit .vt .sd{background:var(--crit)}
+  .vitals .vh .vsub{margin-top:5px;color:var(--dim);font-size:11.5px;line-height:1.45}
+  .vitals .vh .vsub .mono{color:var(--ink)} .vitals .vh .vsub .bad{color:var(--crit)}
+  .vitals .seg{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .vitals .seg .st{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);
+    margin-bottom:10px;display:flex;justify-content:space-between}
+  .vitals .seg .st .stn{color:var(--faint);font-weight:600;letter-spacing:0}
+
+  /* replica lag table */
+  .rep{display:flex;flex-direction:column;gap:7px}
+  .rep .rr{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;font-family:var(--mono);font-size:12px}
+  .rep .rr .rn{color:var(--ink);white-space:nowrap}
+  .rep .rr .rn .ow{color:var(--info);font-family:var(--ui);font-size:9px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.04em;margin-left:6px;border:1px solid #234866;border-radius:2px;padding:0 4px;vertical-align:1px}
+  .rep .rr .bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden}
+  .rep .rr .bar i{display:block;height:100%;background:var(--ok)}
+  .rep .rr .bar i.bad{background:var(--crit)} .rep .rr .bar i.warn{background:var(--warn)}
+  .rep .rr .lg{text-align:right;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .rep .rr .lg.bad{color:var(--crit);font-weight:600} .rep .rr .lg.ok{color:var(--ok)}
+  .rep .rr.crit .rn{color:var(--crit)}
+  .rep .rstate{font-family:var(--ui);font-size:10.5px;color:var(--soft);margin-top:5px;padding-left:1px}
+  .rep .rstate.bad{color:var(--warn)}
+
+  /* owner-by-epoch timeline */
+  .own{display:flex;flex-direction:column;gap:0;font-family:var(--mono);font-size:12px}
+  .own .er{display:grid;grid-template-columns:30px 1fr auto;gap:9px;align-items:center;padding:5px 0;
+    border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+  .own .er:last-child{border-bottom:0}
+  .own .er .ep{color:var(--soft)} .own .er.cur .ep{color:var(--ink);font-weight:600}
+  .own .er .ono{color:var(--ink)} .own .er.cur .ono{color:#fff}
+  .own .er .badge{font-family:var(--ui);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+    padding:0 5px;border-radius:2px}
+  .own .er.cur .badge{color:var(--ok);background:var(--ok-bg)}
+  .own .er.moved .badge{color:var(--warn);background:var(--warn-bg)}
+  .own .mv{color:var(--warn);font-size:11px;padding:3px 0 1px;font-family:var(--ui)}
+  .own .mv .mono{color:var(--ink)}
+
+  /* simple key/value facts */
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12px}
+  .kv dt{color:var(--soft)} .kv dd{margin:0;color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+  .kv dd.bad{color:var(--crit)} .kv dd.warn{color:var(--warn)} .kv dd.ok{color:var(--ok)}
+
+  .vitals .actions{margin-top:auto;padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  .btn{display:inline-flex;align-items:center;justify-content:space-between;gap:7px;
+    background:#0c0e12;border:1px solid var(--line-2);border-radius:5px;color:var(--ink);font:inherit;font-size:12px;
+    font-weight:600;padding:7px 11px;cursor:pointer;text-align:left}
+  .btn:hover{border-color:var(--soft);background:var(--hover);text-decoration:none}
+  .btn .kc{font-family:var(--mono);font-size:10px;color:var(--soft);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+  .btn .ar{color:var(--soft)}
+
+  /* selected-commit popover at bottom of log column (record drill peek) */
+  .recpeek{flex:0 0 auto;border-top:1px solid var(--line-2);background:var(--pane);padding:10px 14px;
+    display:none;font-size:12px;position:sticky;bottom:0;z-index:2}
+  .recpeek.show{display:block}
+  .recpeek .rk{font-family:var(--mono);font-size:12.5px;color:#fff;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .recpeek .rk .sd{width:8px;height:8px;border-radius:2px;transform:rotate(45deg);background:var(--ok)}
+  .recpeek[data-sev=crit] .rk .sd{background:var(--crit)} .recpeek[data-sev=warn] .rk .sd{background:var(--warn)}
+  .recpeek .rrec{font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.6;white-space:pre-wrap;
+    background:#0c0e12;border:1px solid var(--line);border-radius:5px;padding:8px 10px}
+  .recpeek .rrec .kk{color:var(--info)} .recpeek .rrec .vv{color:var(--ink)} .recpeek .rrec .bad{color:var(--crit)}
+  .recpeek .rwhy{color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:7px}
+  .recpeek .rwhy b{color:var(--ink);font-weight:600}
+  .recpeek .ract{margin-top:8px;display:flex;gap:8px}
+  .recpeek .ract a{font-size:11.5px;color:var(--info)}
+
+  /* ── bottom hotkey bar ─────────────────────────────────────────────── */
+  .keys{display:flex;align-items:center;gap:0;height:24px;background:var(--rail);border-top:1px solid var(--line);
+    padding:0 12px;flex:0 0 auto;font-size:11px;color:var(--soft)}
+  .keys .k{display:flex;align-items:center;gap:5px;padding:0 13px 0 0}
+  .keys .k kbd{font-family:var(--mono);font-size:10px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:3px;padding:1px 5px;color:var(--dim)}
+  .keys .right{margin-left:auto;font-family:var(--mono);color:var(--soft)}
+
+  /* data-sources popover */
+  .src{display:none;position:fixed;bottom:30px;left:220px;width:560px;background:var(--pane);
+    border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;font-size:11.5px;line-height:1.65;color:var(--dim);
+    box-shadow:0 8px 30px #000a;z-index:20}
+  .src.show{display:block}
+  .src h4{margin:0 0 8px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+  .src p{margin:7px 0} .src b{color:var(--ink);font-weight:600} .src .mono{color:var(--ink)}
+  .src .new{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:10px;border:1px solid #443613;
+    border-radius:3px;padding:1px 5px;margin-right:3px;background:var(--warn-bg)}
+  .keys .srcbtn{cursor:pointer;color:var(--dim);padding:0 13px 0 0;display:flex;align-items:center;gap:5px}
+  .keys .srcbtn:hover{color:var(--ink)} .keys .srcbtn .new{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<!-- ── command bar: identity (resource › partition) · context · health · search · scenario ── -->
+<div class="bar">
+  <div class="id">
+    <a class="res" href="../ia-map.html">cluster</a><span class="chev">›</span>
+    <a class="res" href="inbox.html">sessions</a><span class="chev">›</span>
+    <span class="res">partition</span><span class="nm"><span class="mono">user42</span></span>
+  </div>
+  <span class="sep"></span>
+  <div class="ctx">
+    <span><span class="mono">4</span> keys</span>
+    <span><span class="mono" id="ctxLog">312</span> log</span>
+    <span>view <span class="mono">e4</span></span>
+    <span><span class="mono">5</span> members · R=5</span>
+  </div>
+  <div class="health" id="health"><span class="dot"></span><span class="txt" id="healthTxt">Healthy</span></div>
+  <div class="search"><span class="pre mono">⌕</span><input id="q" spellcheck="false" placeholder="is:lost  is:conflict  key:user42.score" autocomplete="off"></div>
+  <div class="scen" id="scen"></div>
+  <span class="mock">MOCKUP · static</span>
+</div>
+
+<!-- ── HEALTH LEAD: the triage one-liner, worst thing first ── -->
+<div class="lead" id="lead">
+  <span class="sd"></span><span class="ltxt" id="leadTxt"></span>
+  <span class="pills" id="leadPills"></span>
+</div>
+
+<div class="body" id="bodyGrid">
+
+  <!-- ── LEFT RAIL: partitions + this partition's keys as filters ── -->
+  <nav class="rail" id="rail"></nav>
+
+  <!-- ── CENTRE: THE LOG ── -->
+  <section class="log">
+    <div class="lh">
+      <span class="ttl">partition <span class="mono">user42</span> · log</span>
+      <span class="cnt" id="logCount"></span>
+      <span class="sort">newest first · <b>e·s</b> stamp</span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="rows" id="rows"></div>
+    <!-- selected-commit record peek (drill to the commit's record/route) -->
+    <div class="recpeek" id="recpeek"></div>
+  </section>
+
+  <!-- ── RIGHT: VITALS — replica health + owner-by-epoch ── -->
+  <aside class="vitals" id="vitals"></aside>
+</div>
+
+<!-- ── bottom hotkey bar ── -->
+<div class="keys">
+  <span class="k"><kbd>j</kbd><kbd>k</kbd> move</span>
+  <span class="k"><kbd>↵</kbd> open record</span>
+  <span class="k"><kbd>l</kbd> losses</span>
+  <span class="k"><kbd>c</kbd> conflicts</span>
+  <span class="k"><kbd>1</kbd>/<kbd>2</kbd> scenario</span>
+  <span class="k"><kbd>/</kbd> filter</span>
+  <span class="srcbtn" id="srcBtn"><span class="new">⚠</span> data sources</span>
+  <span class="right" id="statusRight"></span>
+</div>
+
+<!-- data-sources popover (the honest footnote) -->
+<div class="src" id="src">
+  <h4>Data sources — how this partition view is assembled</h4>
+  <p><b>The log (centre).</b> The per-partition change-record log via <span class="mono">log.recordsSince</span> /
+     a <span class="mono">__dump</span> RPC for committed values [C]. Outcomes (local / won / lost·fence / lost·conflict /
+     dropped / forwarded) are the records' own commit classifications. View dividers come from the epoch boundaries in the stamps.</p>
+  <p><b>Key index (left).</b> Each key's <b>stamp</b> (its winning <span class="mono">e·s</span> across replicas) and <b>agree</b>
+     (how many of the R replicas hold that stamp) come from the <span class="new">⚠ NEW</span> per-key version sample
+     <span class="mono">__inspect{versions:K}</span>, cross-merged on node uuid [A]. <b>agree &lt; R</b> is a split; when the holdout
+     also serves reads, those reads return the stale value — that's the divergence the log explains below.</p>
+  <p><b>Contention vs fence.</b> A lost write's class comes from <b>__observe</b>'s lost event, which carries the
+     <b>winning</b> epoch/seq as <span class="mono">we/ws</span> (the value that beat it). Compare against the lost write's own
+     epoch <span class="mono">wr.e</span>: <span class="mono">wr.e == we</span> ⇒ same-epoch <b>conflict</b> (true contention,
+     it lost LWW to a higher seq); <span class="mono">wr.e &lt; we</span> ⇒ <b>fence</b> (a stale-view write rejected — DECISIONS X) [B].
+     The record peek prints the lost write's own stamp as <span class="mono">wr.e·wr.s</span> and the winner as <span class="mono">we·ws</span> — the same vocabulary, never overloaded.</p>
+  <p><b>Replica health / lag (right).</b> Per-replica lag from the snapshot <span class="mono">marks</span>/<span class="mono">heads</span>
+     vs the most-caught-up floor — <b>live origins only</b> [A]. Which node is stuck (divergence) from the
+     <span class="new">⚠ NEW</span> per-key version sample <span class="mono">__inspect{versions:K}</span> [A].</p>
+  <p><b>Owner by epoch.</b> <span class="new">⚠ NEW</span> instrumentation — fero retains current ring state, <b>not</b> historical
+     ownership layouts, so the e2→e3→e4 ownership history is newly recorded; today only the current owner is derivable from
+     <span class="mono">ring.coverage</span>.</p>
+</div>
+
+<script>
+'use strict';
+/* ── drill targets ──────────────────────────────────────────────────────
+   A key → its autopsy lens; a commit row → its record/route; the owner node
+   → node-doctor; the resource breadcrumb → inbox; cluster → ia-map. */
+const KEY_AUTOPSY   = '../key-autopsy/happy.html';
+const KEY_DIVERGED  = '../key-autopsy/happy.html#diverged';
+const COMMIT_RECORD = '../write-traces.html';
+const OWNER_NODE    = '../node-doctor.html';
+
+/* ── log model ──────────────────────────────────────────────────────────
+   THE LOG is the centerpiece: the partition's commit stream, newest first,
+   interleaved across all keys. Each commit carries its outcome. View dividers
+   (type:'view') mark epoch boundaries. Severity colours losses/conflicts/
+   fences; clean local/won commits are calm. */
+
+// outcome → label + class on the row (functional colour only)
+const OUT = {
+  local:    {cls:'local', txt:'local',         sev:null},
+  won:      {cls:'won',   txt:'won',           sev:null},
+  fwd:      {cls:'fwd',   txt:'forwarded',     sev:null},
+  drop:     {cls:'drop',  txt:'dropped·dedup', sev:null},
+  fence:    {cls:'lost',  txt:'lost·fence',    sev:'warn'},
+  conflict: {cls:'conflict', txt:'lost·conflict', sev:'crit'},
+};
+
+/* ATTENTION log — STRICTLY newest first by (epoch, seq). Keys score/name/
+   streak/lastSeen interleaved. View dividers fall at every epoch boundary, so
+   each commit's e·s stamp is monotonically non-increasing as you read down.
+   record peek + why are revealed on row select (drill to the commit). */
+const LOG_ATTN = [
+  // ── e4 band: 1287 > 1283 > 1271 > 1265 > 902 (descending, no out-of-order seq) ──
+  {e:4,s:1287,origin:'A',addr:':49801',key:'user42.score',type:'update',val:'8',out:'local',
+   why:'Owner <b>:49801</b> committed this at <b>e4·s1287</b> — the <b>current winner</b> for user42.score across the caught-up replicas.'},
+  {e:4,s:1283,origin:'A',addr:':49801',key:'user42.name',type:'update',val:'"kai"',out:'won',
+   why:'Replica apply of the owner\'s commit — accepted (won) on this node\'s view of the log.'},
+  {e:4,s:1271,origin:'A',addr:':49801',key:'user42.streak',type:'update',val:'12',out:'won'},
+  {e:4,s:1265,origin:'A',addr:':49801',key:'user42.score',type:'update',val:'6',out:'won',
+   why:'The same-epoch write that beat <span class="mono">e4·s902</span> (B) under LWW — higher seq under the same epoch wins.'},
+  {e:4,s:902,origin:'B',addr:':49803',key:'user42.score',type:'update',val:'7',out:'conflict',
+   why:'<b>True same-epoch contention.</b> This write is stamped <b>e4</b> (<span class="mono">we=epoch</span>) and lost last-writer-wins to <b>e4·s1265</b> committed by A. A genuine concurrent write, not handoff churn.'},
+  // ── e3→e4 view change: owner handoff :49803 → :49801 ──
+  {type:'view',from:'e3',to:'e4',ownerFrom:':49803',ownerTo:':49801',members:5},
+  // ── e3 band ──
+  {e:3,s:1241,origin:'C',addr:':49805',key:'user42.score',type:'update',val:'5',out:'won',stuck:true,
+   why:'<b>:49807 is STUCK on this stamp.</b> It applied <b>e3·s1241</b> ("5") and has advanced no further for this key — it never adopted the e4 view, so reads it serves are stale.'},
+  {e:3,s:1238,origin:'C',addr:':49805',key:'user42.lastSeen',type:'update',val:'"t91"',out:'won'},
+  {e:3,s:1203,origin:'C',addr:':49805',key:'user42.score',type:'update',val:'4',out:'won'},
+  // ── e2→e3 view change ──
+  {type:'view',from:'e2',to:'e3',ownerFrom:':49803',ownerTo:':49803',members:5},
+  // ── e2 band ──
+  {e:2,s:851,origin:'B',addr:':49803',key:'user42.score',type:'update',val:'4',out:'fence',
+   why:'A <b>stale-view write during churn</b>, fenced because it carried the e2 view after the ring had moved on (<span class="mono">epoch&lt;we</span>). Expected during a rebalance — not a divergence.'},
+  // ── e1→e2 view change ──
+  {type:'view',from:'e1',to:'e2',ownerFrom:':49803',ownerTo:':49803',members:5},
+  // ── e1 band: the stranded client fence now sits in its correct (oldest) band ──
+  {e:1,s:87,origin:'CLI',addr:'client',key:'user42.score',type:'update',val:'99',out:'fence',
+   why:'An <b>epoch-1 client-local commit</b>, fenced on every replica because its view (e1) is older than the current epoch — <span class="mono">epoch&lt;we</span> (DECISIONS X). A client write that lost the ownership race; never applied.'},
+];
+
+/* HEALTHY log — the SAME stream minus the conflict / fence / stuck rows:
+   a clean run of local/won commits, all replicas +0, owner stable. */
+const LOG_HEALTHY = [
+  {e:4,s:1287,origin:'A',addr:':49801',key:'user42.score',type:'update',val:'8',out:'local',
+   why:'Owner <b>:49801</b> committed the current value for user42.score at <b>e4·s1287</b>; every replica has it.'},
+  {e:4,s:1283,origin:'A',addr:':49801',key:'user42.name',type:'update',val:'"kai"',out:'won'},
+  {e:4,s:1271,origin:'A',addr:':49801',key:'user42.streak',type:'update',val:'12',out:'won'},
+  {e:4,s:1265,origin:'A',addr:':49801',key:'user42.score',type:'update',val:'6',out:'won'},
+  {type:'view',from:'e3',to:'e4',ownerFrom:':49803',ownerTo:':49801',members:5},
+  {e:3,s:1241,origin:'C',addr:':49805',key:'user42.score',type:'update',val:'5',out:'won'},
+  {e:3,s:1238,origin:'C',addr:':49805',key:'user42.lastSeen',type:'update',val:'"t91"',out:'won'},
+  {e:3,s:1203,origin:'C',addr:':49805',key:'user42.score',type:'update',val:'4',out:'won'},
+];
+
+/* ── per-scenario partition state ── */
+const SCEN = {
+  healthy:{
+    level:'ok',
+    healthTxt:'Healthy',
+    logSize:308,
+    lead:'<b>Partition healthy</b> · 5/5 replicas caught up · owner stable since e4',
+    pills:[{cls:'ok',t:'replicas',v:'5/5 +0'},{cls:'ok',t:'conflicts',v:'0'},{cls:'ok',t:'owner',v:'stable'}],
+    log:LOG_HEALTHY,
+    // owner-by-epoch: same history, framed as stable. The e3→e4 handoff settled
+    // long ago and every replica adopted it, so e4 reads as the calm CURRENT
+    // owner — NO amber `moved` badge (that would undercut the 'stable' lead/pill).
+    owners:[
+      {ep:'e2',owner:':49803'},
+      {ep:'e3',owner:':49803'},
+      {ep:'e4',owner:':49801',cur:true},
+    ],
+    // R=5, 5 members, every replica caught up to the floor
+    replicas:[
+      {addr:':49801',owner:true,lag:0},
+      {addr:':49803',lag:0},
+      {addr:':49805',lag:0},
+      {addr:':49809',lag:0},
+      {addr:':49807',lag:0},
+    ],
+    repState:null,
+    vitalsSub:'5 of 5 replicas at the log floor · owner <span class="mono">:49801</span> stable · no losses in window',
+    keys:[
+      {k:'user42.score',   sev:null, stamp:'e4·s1287', agree:'5/5'},
+      {k:'user42.name',    sev:null, stamp:'e4·s1283', agree:'5/5'},
+      {k:'user42.streak',  sev:null, stamp:'e4·s1271', agree:'5/5'},
+      {k:'user42.lastSeen',sev:null, stamp:'e3·s1238', agree:'5/5'},
+    ],
+  },
+  attention:{
+    level:'crit',
+    healthTxt:'Attention',
+    logSize:312,
+    lead:'<b>Attention</b> · <span class="mono bad">:49807</span> <span class="bad">420 behind</span> · 1 same-epoch conflict · owner moved <span class="mono">e3→e4</span>',
+    pills:[{cls:'crit',t:':49807',v:'+420 behind'},{cls:'crit',t:'conflict',v:'1 same-epoch'},{cls:'warn',t:'owner',v:'moved e3→e4'}],
+    log:LOG_ATTN,
+    owners:[
+      {ep:'e2',owner:':49803'},
+      {ep:'e3',owner:':49803'},
+      {ep:'e4',owner:':49801',cur:true,moved:true,note:'moved <span class="mono">:49803</span>→<span class="mono">:49801</span> at the e3→e4 view change'},
+    ],
+    replicas:[
+      {addr:':49801',owner:true,lag:0},
+      {addr:':49803',lag:0},
+      {addr:':49805',lag:0},
+      {addr:':49809',lag:0},
+      {addr:':49807',lag:420,crit:true,stuckAt:'e3·s1241'},
+    ],
+    repState:'<span class="mono">:49807</span> is <b>420 records behind</b>, draining ~12s — stuck on <span class="mono">e3·s1241</span>; it never adopted the e4 view.',
+    vitalsSub:'4 of 5 at the floor · <span class="bad">:49807 +420</span>, draining · owner moved <span class="mono">e3→e4</span>',
+    keys:[
+      {k:'user42.score',   sev:'crit', stamp:'e4·s1287', agree:'4/5', split:true},
+      {k:'user42.name',    sev:null,   stamp:'e4·s1283', agree:'5/5'},
+      {k:'user42.streak',  sev:null,   stamp:'e4·s1271', agree:'5/5'},
+      {k:'user42.lastSeen',sev:null,   stamp:'e3·s1238', agree:'5/5'},
+    ],
+  },
+};
+const SCEN_ORDER = ['healthy','attention'];
+
+/* ── is: chip filters over the log (Sentry query style) ── */
+const CHIPS = [
+  {id:'all',      lab:'all'},
+  {id:'lost',     lab:'is:lost'},
+  {id:'conflict', lab:'is:conflict'},
+  {id:'fence',    lab:'is:fence'},
+  {id:'won',      lab:'is:won'},
+  {id:'local',    lab:'is:local'},
+];
+// which outcomes each chip admits
+const CHIP_MATCH = {
+  all:     () => true,
+  lost:    o => o==='fence' || o==='conflict',
+  conflict:o => o==='conflict',
+  fence:   o => o==='fence',
+  won:     o => o==='won',
+  local:   o => o==='local',
+};
+
+/* ── live state ── */
+let scen = 'healthy';
+let chip = 'all';        // active is: chip
+let keyFilter = null;    // active key: filter (left rail / key: term)
+let query = '';          // free-text + key: parse target
+let selIdx = -1;         // selected commit index within the visible (non-divider) rows
+let visible = [];        // current visible commit rows (excludes dividers), for j/k
+
+const $ = id => document.getElementById(id);
+
+/* ── parse the search line: `is:x` sets the chip, `key:foo` sets keyFilter,
+   bare text is a key substring. ── */
+function parseQuery(raw){
+  let c = null, kf = null, terms = [];
+  for (const tok of raw.toLowerCase().split(/\s+/).filter(Boolean)){
+    if (tok.startsWith('is:')){ const v = tok.slice(3); if (CHIP_MATCH[v]) c = v; }
+    else if (tok.startsWith('key:')) kf = tok.slice(4);
+    else terms.push(tok);
+  }
+  return {chip:c, keyFilter:kf, text:terms.join(' ')};
+}
+
+/* ── header health pill + lead + context ── */
+function renderHead(){
+  const s = SCEN[scen];
+  const el = $('health'); el.className = 'health '+s.level;
+  $('healthTxt').textContent = s.healthTxt;
+  $('ctxLog').textContent = s.logSize;
+  const lead = $('lead'); lead.className = 'lead '+s.level;
+  $('leadTxt').innerHTML = s.lead;
+  $('leadPills').innerHTML = s.pills.map(p=>
+    `<span class="pill ${p.cls}">${p.t} <b>${p.v}</b></span>`).join('');
+}
+
+/* ── left rail: THIS partition's KEY INDEX ──────────────────────────────
+   No sibling-partitions list (that's partitions.html). Each key carries its
+   winning stamp + replica agreement (n/N) — the per-key facts that live one
+   level below the partitions table. Selecting a key scopes the log below;
+   the record peek / vitals drill to the per-key autopsy. */
+function renderRail(){
+  const s = SCEN[scen];
+  let h = `<div class="grp"><div class="grp-h"><span>user42 · keys</span><span class="gc">${s.keys.length}</span></div>`;
+  // all-keys reset row clears the key scope
+  h += `<div class="v" data-key="" ${!keyFilter?'aria-current="true"':''}>`+
+       `<span class="ic">▤</span><span class="lab">all keys</span>`+
+       `<span class="tot">${s.keys.length}</span></div>`;
+  for (const k of s.keys){
+    const cur = keyFilter===k.k;
+    const short = k.k.replace('user42.','·');
+    const agreeCls = k.sev==='crit' ? 'bad' : k.sev==='warn' ? 'warn' : '';
+    const split = k.split ? `<span class="split"> · split</span>` : '';
+    h += `<div class="v keyrow" data-key="${k.k}" data-sev="${k.sev||''}" ${cur?'aria-current="true"':''} title="${k.k}">`+
+         `<span class="ic">${k.sev?'◆':'·'}</span>`+
+         `<div class="kmeta">`+
+           `<div class="kn"><span class="knm">${short}</span><span class="agree ${agreeCls}">${k.agree}</span></div>`+
+           `<div class="kstamp">${k.stamp}${split}</div>`+
+         `</div></div>`;
+  }
+  h += `</div>`;
+  // in-situ glossary — answers "what is stamp / agree" right where they appear
+  h += `<div class="gloss">`+
+       `<b>stamp</b> — the key's winning <span class="mono">e·s</span> (epoch·seq); higher wins.<br>`+
+       `<b>agree</b> — replicas holding that stamp, out of R. <span class="bad">&lt; R</span> ⇒ a split — open the key for the per-replica autopsy.`+
+       `</div>`;
+  $('rail').innerHTML = h;
+}
+
+/* ── centre: THE LOG ── */
+function renderChips(){
+  const s = SCEN[scen];
+  // count per chip over the scenario's commit rows
+  const commits = s.log.filter(r=>r.type!=='view');
+  const count = id => commits.filter(r=>CHIP_MATCH[id](r.out)).length;
+  $('chips').innerHTML =
+    `<span class="cl">filter</span>` +
+    CHIPS.map(c=>{
+      const n = c.id==='all' ? commits.length : count(c.id);
+      return `<span class="chip" data-chip="${c.id}" ${c.id===chip?'aria-pressed="true"':''}>`+
+        `${c.lab}<span class="n">${n}</span></span>`;
+    }).join('') +
+    (keyFilter ? `<span class="chip" data-chip="all" aria-pressed="false" style="border-color:var(--sel-line);color:#cfe2f2" data-clearkey="1">key:${keyFilter} ✕</span>` : '') +
+    `<span class="clear" id="clearF">clear</span>`;
+}
+
+function rowMatches(r){
+  if (!CHIP_MATCH[chip](r.out)) return false;
+  if (keyFilter && r.key !== keyFilter) return false;
+  return true;
+}
+
+function renderLog(){
+  const s = SCEN[scen];
+  visible = [];
+  // A view divider is only meaningful when at least one MATCHING commit row
+  // sits on its newer side (above it). Always-drawing strands a rule with no
+  // rows beneath it under is:conflict / is:fence / is:won. So: emit each
+  // divider lazily — hold it until the next matching row confirms the band
+  // above it was non-empty. When a key/chip filter is active we additionally
+  // suppress no-move boundaries (ownerFrom===ownerTo) to keep the stream tight.
+  const filtering = chip!=='all' || keyFilter;
+  let html = '';
+  let vix = 0;              // running index into visible[] (commit rows only)
+  let shownAny = false;
+  let pendingDivider = null;  // a view row awaiting a matching commit below it
+  for (const r of s.log){
+    if (r.type==='view'){
+      // defer: only render once a matching commit appears under it
+      pendingDivider = r;
+      continue;
+    }
+    if (!rowMatches(r)) continue;
+    // a matching row arrived — flush any deferred divider now that we know the
+    // newer band actually has rows. Skip a divider that records no owner move
+    // while filtering (it would read as noise between sparse filtered rows).
+    if (pendingDivider){
+      const v = pendingDivider; pendingDivider = null;
+      const moved = v.ownerFrom !== v.ownerTo;
+      if (!(filtering && !moved)){
+        const ownerCell = moved
+          ? `owner <span class="mv">${v.ownerFrom} → ${v.ownerTo}</span> · `
+          : `owner <b>${v.ownerTo}</b> held · `;
+        html += `<div class="vd"><span class="vdl">— view <b>${v.from} → ${v.to}</b> · ${ownerCell}${v.members} members —</span><span class="vdr"></span></div>`;
+      }
+    }
+    shownAny = true;
+    const o = OUT[r.out];
+    const sev = o.sev ? ` data-sev="${o.sev}"` : '';
+    const repBadge = r.origin==='CLI' ? '<span class="rep">⌁</span>' : `<span class="rep">${r.origin}</span>`;
+    // stuck node attribution must be visible WITHOUT hover (screenshots / kbd
+    // nav don't surface title=). Mark the offending node inline on the row.
+    const stuck = r.stuck ? ' title="⚠ :49807 is stuck consuming this stamp"' : '';
+    const stuckTag = r.stuck ? '<span class="stuck">⚠ :49807 stuck here</span>' : '';
+    const ix = vix++;
+    visible.push(r);
+    html += `<div class="lr" data-ix="${ix}"${sev} ${ix===selIdx?'aria-selected="true"':''} tabindex="0"${stuck}>`+
+      `<span class="sev"></span>`+
+      `<span class="stamp"><span class="e">e${r.e}·</span>s${r.s}</span>`+
+      `<span class="origin">${repBadge}${r.addr}</span>`+
+      `<span class="key">${r.key}${stuckTag}</span>`+
+      `<span class="type">${r.type}</span>`+
+      `<span class="val">= ${r.val}</span>`+
+      `<span class="out ${o.cls}"><span class="od"></span><span class="ot">${o.txt}</span></span></div>`;
+  }
+  // any divider still pending here had no matching rows beneath it — drop it.
+
+  // count line in header
+  $('logCount').innerHTML = `<span style="color:var(--soft)">${visible.length} commit${visible.length===1?'':'s'} shown</span>`;
+
+  if (!shownAny){
+    // Two empty states, mirroring inbox.html:
+    //  - partition is genuinely healthy AND unfiltered → calm green ✓
+    //  - rows just don't match the active chip/key in a still-unhealthy
+    //    partition → neutral ∅, NO green claim, + an honest "still unhealthy"
+    //    footer (a filtered view must never borrow calm it hasn't earned).
+    const healthy = SCEN[scen].level==='ok';
+    const unfiltered = (chip==='all' && !keyFilter);
+    const calm = healthy && unfiltered;        // derived from health, not just the filter
+    const losses = s.log.filter(r=>r.out==='fence'||r.out==='conflict').length;
+    const footer = calm
+      ? `partition converged · 5/5 replicas at the floor · 0 losses in window`
+      : (healthy
+          ? `partition is healthy — clear the filter to see the full ${s.log.filter(r=>r.type!=='view').length}-commit stream`
+          : `partition still unhealthy · ${losses} lost in window · :49807 +420 behind — clear the filter to see them`);
+    html = `<div class="empty ${calm?'':'filtered'}">`+
+      (calm ? `<div class="chk">✓</div>` : `<div class="chk none">∅</div>`)+
+      `<div class="e1">${calm?'No problems':'No matching commits'}</div>`+
+      `<div class="e2">Nothing in this partition's log matches <span class="mono">${[chip==='all'?'':'is:'+chip, keyFilter?'key:'+keyFilter:''].filter(Boolean).join(' ')||'this view'}</span>. Clear the filter to see the full stream.</div>`+
+      `<div class="e3">${footer}</div></div>`;
+    $('rows').innerHTML = html;
+    selIdx = -1; renderPeek(); return;
+  }
+  $('rows').innerHTML = html;
+  if (selIdx>=0 && selIdx<visible.length) renderPeek(); else { selIdx = Math.min(selIdx, visible.length-1); renderPeek(); }
+}
+
+/* ── selected-commit record peek (drill to the commit's record/route) ── */
+function renderPeek(){
+  const pk = $('recpeek');
+  if (selIdx<0 || selIdx>=visible.length){ pk.classList.remove('show'); return; }
+  const r = visible[selIdx];
+  const o = OUT[r.out];
+  pk.className = 'recpeek show' + (o.sev?` `:''); pk.setAttribute('data-sev', o.sev||'');
+  // raw change record (the wire format) + the lost-write classification.
+  // VOCAB (matches the data-sources popover exactly, no overloaded symbol):
+  //   wr.e·wr.s = the LOST WRITE's OWN stamp (this selected row, r.e·r.s)
+  //   we·ws     = the WINNER's stamp (the value that beat it under LWW)
+  //   wr.e == we ⇒ same-epoch CONFLICT  ·  wr.e < we ⇒ FENCE (stale-view write)
+  const VIEW_EPOCH = 4;            // current view is e4 across this partition
+  const isLoss = r.out==='conflict' || r.out==='fence';
+  // the winner: a conflict loses LWW to e4·s1265; a fence is rejected by the
+  // current view epoch itself (we=view epoch, no single competing seq).
+  const winner = r.out==='conflict' ? {e:4,s:1265} : (r.out==='fence' ? {e:VIEW_EPOCH,s:null} : null);
+  const stampLabel = isLoss ? `wr.e${r.e}·wr.s${r.s}` : `e${r.e}·s${r.s}`;
+  const recLine = `{ type:<span class="vv">'${r.type}'</span>, key:<span class="kk">'${r.key}'</span>, `+
+    `value:<span class="vv">${r.val}</span> }  <span style="color:var(--soft)">@ ${stampLabel} · origin ${r.addr}</span>`;
+  const lostLine = isLoss
+    ? `\n<span class="${r.out==='conflict'?'bad':''}">lost · wr.e=${r.e} wr.s=${r.s} vs we=${winner.e}`
+        + (r.out==='conflict'
+            ? ` ws=${winner.s} (wr.e == we) → same-epoch conflict — lost LWW to the winner e${winner.e}·s${winner.s}`
+            : ` (wr.e &lt; we) → fence — stale-view write rejected by view e${winner.e}`)
+        + `</span>`
+    : '';
+  const why = r.why || `Clean ${o.txt} commit — applied to this partition's log at <b>e${r.e}·s${r.s}</b>; no contention, no fence.`;
+  pk.innerHTML =
+    `<div class="rk"><span class="sd"></span>e${r.e}·s${r.s} · ${r.key} <span style="color:var(--soft);font-family:var(--ui);font-size:11px;margin-left:auto">${o.txt}</span></div>`+
+    `<div class="rrec">${recLine}${lostLine}</div>`+
+    `<div class="rwhy">${why}</div>`+
+    `<div class="ract"><a href="${COMMIT_RECORD}">open record &amp; route →</a>`+
+      `<a href="${r.key==='user42.score'?KEY_DIVERGED:KEY_AUTOPSY}">open ${r.key} autopsy →</a></div>`;
+}
+
+/* ── right: VITALS — replica health + owner-by-epoch ── */
+function renderVitals(){
+  const s = SCEN[scen];
+  // floor = most-caught-up; lag is vs that floor (here floor=0)
+  const maxLag = Math.max(1, ...s.replicas.map(r=>r.lag));
+  const repRows = s.replicas.map(r=>{
+    const pct = r.lag===0 ? 100 : Math.max(8, 100 - Math.round(r.lag/maxLag*88));
+    const cls = r.lag===0 ? '' : (r.lag>=300?'bad':'warn');
+    const lagTxt = r.lag===0 ? '+0' : `+${r.lag}`;
+    return `<div class="rr ${r.crit?'crit':''}">`+
+      `<span class="rn">${r.addr}${r.owner?'<span class="ow">owner</span>':''}</span>`+
+      `<span class="bar"><i class="${cls}" style="width:${pct}%"></i></span>`+
+      `<span class="lg ${r.lag===0?'ok':'bad'}">${lagTxt}</span></div>`;
+  }).join('');
+  const repState = s.repState ? `<div class="rstate bad">${s.repState}</div>`
+    : `<div class="rstate">all replicas at the floor — fully drained.</div>`;
+
+  // owner-by-epoch timeline (⚠ NEW)
+  const ownRows = s.owners.map(o=>
+    `<div class="er ${o.cur?'cur':''} ${o.moved?'moved':''}">`+
+      `<span class="ep">${o.ep}</span><span class="ono">${o.owner}</span>`+
+      `<span class="badge">${o.cur?'current':o.moved?'':'owner'}</span></div>`+
+    (o.note?`<div class="mv">↳ ${o.note}</div>`:'')
+  ).join('');
+
+  const vh = SCEN[scen].level;
+  $('vitals').innerHTML =
+    `<div class="vh ${vh}"><div class="vt"><span class="sd"></span>vitals · user42</div>`+
+      `<div class="vsub">${s.vitalsSub}</div></div>`+
+    // replica health / lag
+    `<div class="seg"><div class="st"><span>Replica health · lag</span><span class="stn">vs floor · R=5</span></div>`+
+      `<div class="rep">${repRows}${repState}</div></div>`+
+    // owner by epoch
+    `<div class="seg"><div class="st"><span>Owner by epoch</span><span class="stn">⚠ NEW</span></div>`+
+      `<div class="own">${ownRows}</div></div>`+
+    // counts
+    `<div class="seg"><div class="st"><span>Partition</span></div>`+
+      `<dl class="kv">`+
+        `<dt>keys</dt><dd>4</dd>`+
+        `<dt>log size</dt><dd>${s.logSize}</dd>`+
+        `<dt>members</dt><dd>5 · R=5</dd>`+
+        `<dt>current owner</dt><dd>:49801</dd>`+
+        `<dt>view epoch</dt><dd>e4</dd>`+
+      `</dl></div>`+
+    // drill actions
+    `<div class="actions">`+
+      `<a class="btn" href="${OWNER_NODE}">open owner :49801 (node doctor) <span class="ar">→</span></a>`+
+      `<a class="btn" href="${KEY_DIVERGED}">open user42.score autopsy <span class="kc">↵</span></a>`+
+    `</div>`;
+}
+
+/* ── status-line right side ── */
+function renderStatus(){
+  const s = SCEN[scen];
+  const commits = s.log.filter(r=>r.type!=='view');
+  const losses = commits.filter(r=>r.out==='fence'||r.out==='conflict').length;
+  const cfl = commits.filter(r=>r.out==='conflict').length;
+  const lossTxt = losses ? `<span style="color:var(--crit)">${losses} lost</span>` : `<span style="color:var(--ok)">0 lost</span>`;
+  $('statusRight').innerHTML =
+    `log ${s.logSize}  ·  shown ${visible.length}/${commits.length}  ·  ${lossTxt} (${cfl} conflict)`;
+}
+
+/* ── full render ── */
+function render(){
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===scen));
+  renderHead(); renderRail(); renderChips(); renderLog(); renderVitals(); renderStatus();
+  try{ history.replaceState(null,'','#'+scen); }catch{}
+}
+
+/* ── interactions ─────────────────────────────────────────────────────── */
+// scenario toggle
+const scenWrap = $('scen');
+for (const id of SCEN_ORDER){
+  const b = document.createElement('button'); b.dataset.id=id;
+  b.textContent = id==='healthy' ? 'Healthy' : 'Needs attention';
+  b.onclick = ()=>{ scen=id; chip='all'; keyFilter=null; selIdx=-1; query=''; $('q').value=''; render(); };
+  scenWrap.appendChild(b);
+}
+// left-rail: partition row (sibling) is decorative here except current; key rows scope the log
+$('rail').addEventListener('click', e=>{
+  const kr = e.target.closest('[data-key]');
+  if (kr){ const k = kr.dataset.key; keyFilter = k || null; selIdx=-1; render(); return; }
+});
+// chip filter row
+$('chips').addEventListener('click', e=>{
+  const ck = e.target.closest('[data-clearkey]');
+  if (ck){ keyFilter=null; selIdx=-1; render(); return; }
+  if (e.target.id==='clearF'){ chip='all'; keyFilter=null; query=''; $('q').value=''; selIdx=-1; render(); return; }
+  const c = e.target.closest('[data-chip]'); if(!c) return;
+  chip = c.dataset.chip; selIdx=-1; renderChips(); renderLog(); renderStatus();
+});
+// commit row select → reveal record peek (Enter / link to drill)
+$('rows').addEventListener('click', e=>{
+  const row = e.target.closest('.lr'); if(!row) return;
+  selIdx = +row.dataset.ix; renderLog(); renderStatus();
+});
+// search / filter line (is: / key: / free text)
+$('q').addEventListener('input', e=>{
+  query = e.target.value.trim();
+  const p = parseQuery(query);
+  chip = p.chip || 'all';
+  keyFilter = p.keyFilter || (p.text ? matchKeyByText(p.text) : null);
+  selIdx=-1; renderChips(); renderLog(); renderStatus(); renderRail();
+});
+function matchKeyByText(t){
+  const s = SCEN[scen]; const hit = s.keys.find(k=>k.k.toLowerCase().includes(t)); return hit?hit.k:null;
+}
+// data-sources popover
+$('srcBtn').onclick = ()=>$('src').classList.toggle('show');
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#src') && !e.target.closest('#srcBtn')) $('src').classList.remove('show');
+});
+
+// keyboard: j/k move · ↵ open record · l losses · c conflicts · 1/2 scenario · / filter
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT'){ if (e.key==='Escape') e.target.blur(); return; }
+  const k = e.key;
+  if (k==='j' || k==='ArrowDown'){ e.preventDefault(); if(visible.length){ selIdx=Math.min(visible.length-1, selIdx+1); renderLog(); renderStatus(); scrollSel(); } }
+  else if (k==='k' || k==='ArrowUp'){ e.preventDefault(); if(visible.length){ selIdx=Math.max(0, selIdx-1); renderLog(); renderStatus(); scrollSel(); } }
+  else if (k==='Enter'){ if(selIdx>=0 && visible[selIdx]) location.href = COMMIT_RECORD; }
+  else if (k==='l'){ chip='lost'; selIdx=-1; renderChips(); renderLog(); renderStatus(); }
+  else if (k==='c'){ chip='conflict'; selIdx=-1; renderChips(); renderLog(); renderStatus(); }
+  else if (k==='a'){ chip='all'; keyFilter=null; selIdx=-1; render(); }
+  else if (k==='1'){ scen='healthy'; chip='all'; keyFilter=null; selIdx=-1; query=''; $('q').value=''; render(); }
+  else if (k==='2'){ scen='attention'; chip='all'; keyFilter=null; selIdx=-1; query=''; $('q').value=''; render(); }
+  else if (k==='/'){ e.preventDefault(); $('q').focus(); }
+  else if (k==='Escape'){ selIdx=-1; renderLog(); renderStatus(); }
+});
+function scrollSel(){ const el=document.querySelector('.lr[aria-selected=true]'); if(el) el.scrollIntoView({block:'nearest'}); }
+
+// boot — honour deep-link hash, default healthy
+const fromHash = location.hash.slice(1);
+if (SCEN[fromHash]) scen = fromHash;
+render();
+</script>
+</body>
+</html>

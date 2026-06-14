@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fero · key autopsy — happy path + layered states</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#16181d; --panel-2:#1b1e25; --line:#262932;
+    --ink:#dde1e9; --dim:#8b919e; --soft:#5b616c;
+    --accent:#6cb6ff; --bad:#e5645c; --warn:#d6a44c; --good:#5bbf91;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  b{font-weight:650;color:#fff}
+  main{max-width:880px;margin:0 auto;padding:0 24px 80px}
+
+  /* ---- top chrome + scenario switcher (the demonstrator control) ---- */
+  header{max-width:880px;margin:0 auto;padding:22px 24px 0}
+  .crumb{color:var(--soft);font-size:12px}.crumb b{color:var(--dim);font-weight:600}
+  .mock{float:right;color:var(--soft);font-size:11px;border:1px solid var(--line);border-radius:3px;padding:2px 8px}
+  .scen{margin:18px 0 4px}
+  .scen .lbl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);margin-bottom:9px}
+  .scen .opts{display:flex;gap:8px;flex-wrap:wrap}
+  .scen button{display:flex;flex-direction:column;gap:3px;background:var(--panel);border:1px solid var(--line);
+    border-radius:6px;color:var(--dim);font:inherit;font-size:13px;font-weight:600;padding:7px 12px;cursor:pointer;text-align:left}
+  .scen button:hover{color:var(--ink);border-color:var(--soft)}
+  .scen button[aria-pressed=true]{color:var(--ink);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
+  .scen button .tier{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--soft)}
+  .scen button[aria-pressed=true] .tier{color:var(--accent)}
+
+  /* ---- cluster-level banner (Tier 4 — reads FIRST, above everything) ---- */
+  #banner{display:none;margin:24px 0 0;border:1px solid color-mix(in srgb,var(--bad) 55%,var(--line));
+    border-left:3px solid var(--bad);background:color-mix(in srgb,var(--bad) 9%,var(--panel));border-radius:7px;padding:12px 15px}
+  #banner.on{display:block}
+  #banner .bw{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bad);margin-bottom:4px}
+  #banner .bt{font-size:14px;color:var(--ink)}
+
+  /* ---- the key card (the canvas) ---- */
+  .card{margin-top:26px;transition:none}
+  .card.dim .value,.card.dim .facts{opacity:.5}        /* Tier 4 greys the possibly-stale data */
+  .health{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+  .health .word{font-size:13px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--good)}
+  .health .word.warn{color:var(--warn)} .health .word.crit{color:var(--bad)}
+  .health .dotline{flex:1;height:1px;background:var(--line)}
+  .health .ago{color:var(--soft);font-size:12px}
+
+  .value{font-size:15px;color:var(--dim);margin-bottom:6px}
+  .value .vk{font-size:17px;color:var(--ink)} .value .eq{color:var(--soft);margin:0 6px}
+  .value .vv{font-size:30px;font-weight:650;color:#fff;letter-spacing:-.01em;vertical-align:-3px}
+  .vmark{display:inline-block;margin-left:12px;font-size:12px;color:var(--warn);vertical-align:6px}
+  .vmark.crit{color:var(--bad)}
+
+  /* ---- the fact lines — each anomaly attaches to the line it concerns ---- */
+  .facts{margin-top:20px;border-top:1px solid var(--line)}
+  .line{display:grid;grid-template-columns:128px 1fr;gap:16px;padding:13px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+  .line .k{color:var(--soft);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding-top:3px}
+  .line .v{color:var(--ink);font-size:14.5px}
+  .line .v .sub{color:var(--dim)}
+  .line .note{margin-top:5px;font-size:12.5px;color:var(--soft)}
+  .line .note.benign{color:var(--warn)}
+  .line.warn{box-shadow:inset 2px 0 0 var(--warn);padding-left:14px;margin-left:-14px}
+  .line.crit{box-shadow:inset 2px 0 0 var(--bad);padding-left:14px;margin-left:-14px}
+
+  /* agreement: the calm line that splits when nodes disagree */
+  .agree-all{color:var(--good)}
+  .agree-split{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+  .grp{display:flex;flex-direction:column;gap:6px}
+  .grp .gl{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--dim)}
+  .grp.dis .gl{color:var(--bad)}
+  .nodes{display:flex;gap:6px;flex-wrap:wrap}
+  .nd{font-size:12px;border:1px solid var(--line);border-radius:5px;padding:3px 8px}
+  .nd .nv{color:var(--ink);font-weight:650} .nd .na{color:var(--dim);margin-left:6px}
+  .nd.stale{border-left:2px solid var(--bad);color:var(--bad)} .nd.stale .nv,.nd.stale .na{color:var(--bad)}
+  .nd.lag{border-left:2px solid var(--warn)} .nd.lag .na{color:var(--warn)}
+
+  /* attached callout — sits directly under the element it explains */
+  .callout{margin-top:11px;border-left:2px solid var(--warn);background:color-mix(in srgb,var(--warn) 6%,var(--panel));
+    border-radius:0 6px 6px 0;padding:10px 14px}
+  .callout.crit{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--panel))}
+  .callout .ct{font-weight:650;color:var(--ink);font-size:13.5px}
+  .callout .cb{color:var(--dim);font-size:13px;margin-top:3px}
+  .callout .ca{color:var(--ink);font-size:12.5px;margin-top:7px}
+  .callout .ca b{color:#fff}
+
+  .t{border-bottom:1px dotted var(--dim);cursor:help;color:inherit}.t:hover{border-bottom-color:var(--accent)}
+
+  /* ---- evidence (still collapsed, still drill-down) ---- */
+  details.ev{margin-top:30px;border-top:1px solid var(--line);padding-top:6px}
+  details.ev>summary{cursor:pointer;color:var(--dim);font-size:13px;font-weight:600;list-style:none;padding:10px 0}
+  details.ev>summary::-webkit-details-marker{display:none}
+  details.ev .evbody{color:var(--soft);font-size:13px;padding:2px 0 4px}
+
+  /* ---- the meta panel: explains the LAYERING for the current scenario ---- */
+  .how{margin-top:34px;border:1px dashed var(--line);border-radius:8px;background:var(--panel);padding:14px 16px}
+  .how h3{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin:0 0 9px}
+  .how dl{display:grid;grid-template-columns:88px 1fr;gap:7px 14px;margin:0;font-size:13px}
+  .how dt{color:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+  .how dd{margin:0;color:var(--dim)} .how dd b{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="mock">MOCKUP · static data</span>
+  <div class="crumb"><b>observe</b> › <b>key autopsy</b> › <code class="mono">user42.score</code></div>
+  <div class="scen">
+    <div class="lbl">scenario — watch each unhappy path layer onto the same healthy canvas</div>
+    <div class="opts" id="scen"></div>
+  </div>
+</header>
+
+<main>
+  <div id="banner"><div class="bw" id="bw"></div><div class="bt" id="bt"></div></div>
+
+  <div class="card" id="card">
+    <div class="health">
+      <span class="word" id="word">Converged</span>
+      <span class="dotline"></span>
+      <span class="ago" id="ago"></span>
+    </div>
+    <div class="value">
+      <span class="vk mono">user42.score</span><span class="eq">=</span><span class="vv mono" id="vv">8</span><span class="vmark" id="vmark"></span>
+    </div>
+
+    <div class="facts">
+      <div class="line" id="ln-conv"><span class="k">agreement</span><span class="v" id="conv"></span></div>
+      <div class="line" id="ln-prov"><span class="k">last write</span><span class="v" id="prov"></span></div>
+      <div class="line" id="ln-own"><span class="k">ownership</span><span class="v" id="own"></span></div>
+      <div class="line" id="ln-act"><span class="k">recent activity</span><span class="v" id="act"></span></div>
+    </div>
+
+    <details class="ev"><summary>▸ Show the evidence — version history · raw records · write route · data sources</summary>
+      <div class="evbody">The full per-version timeline, raw ProvRecord/ChangeRecord, ownership ring and the honest
+        <span class="t" title="every panel maps to a real source (InspectSnapshot / __observe stream / log) or an explicit ⚠ NEW-instrumentation flag">data-sources footnote</span>
+        live here — drill-down, not the front door. (Same content as the other Key Autopsy mockups; collapsed by design.)</div>
+    </details>
+  </div>
+
+  <div class="how">
+    <h3>How this is layered</h3>
+    <dl>
+      <dt>Tier</dt><dd id="h-tier"></dd>
+      <dt>Layered</dt><dd id="h-what"></dd>
+      <dt>Attached to</dt><dd id="h-where"></dd>
+    </dl>
+  </div>
+</main>
+
+<script>
+'use strict';
+/* The HAPPY PATH is the canvas. Each scenario adds only the overlays its anomaly needs, attached to the
+   element that anomaly concerns, with visual weight scaled to severity (tier). Healthy = no overlays at all. */
+const G = {
+  fence:'epoch-fence — a write stamped with an older view is rejected automatically, so a node that fell behind can\'t overwrite newer data. Expected during an ownership move.',
+  conflict:'two writes committed under the SAME epoch; the lower seq lost by last-writer-wins. A real concurrent write, not handoff churn.',
+  lag:'a replica has applied an older value and is still catching up — behind, but not yet diverged.',
+  viewcommit:'VIEW_COMMIT — the message that finalises a new view. Missing it strands a node on the old view (DECISIONS Y).',
+  quorum:'a view needs a majority of members reachable to accept writes; without it the write-gate closes and writes buffer.',
+};
+const term=(k,l)=>`<abbr class="t" title="${G[k].replace(/"/g,'&quot;')}">${l}</abbr>`;
+
+// shared canvas defaults (a healthy user42.score = 8, owned by :49801)
+const BASE = {
+  word:'Converged', level:'ok', ago:'last changed 25s ago', vv:'8', vmark:null, dim:false, banner:null,
+  conv:{mode:'all'}, prov:'committed by <b>:49801</b> (owner) · <span class="mono">e4·s1287</span>',
+  own:'partition <span class="mono">user42</span> · owner <b>:49801</b> · <span class="sub">fully replicated (R=∞) · stable since e2</span>',
+  act:'<b>3</b> writes in the last 60s — <span class="sub">all applied cleanly</span>',
+  ownNote:null, ownLevel:null, actNote:null, actLevel:null, provNote:null, provLevel:null, convLevel:null, callout:null,
+};
+const AGREE_ALL = `<span class="agree-all">all <b>5</b> servers agree</span>`;
+
+const SCEN = {
+  healthy:{ tier:'T0 · baseline', label:'Healthy', tname:'baseline',
+    over:{}, how:{tier:'<b>0 — baseline.</b> The steady state.', what:'Nothing. A healthy key needs no overlays.',
+      where:'—. The calm card <b>is</b> the signal: no marks anywhere means nothing to investigate.'} },
+
+  move:{ tier:'T1 · benign', label:'Recent move', tname:'benign context',
+    over:{ ownNote:`moved 1m ago · e3→e4 · :49803 → :49801`,
+           actNote:`includes <b>1</b> ${term('fence','fenced')} write during the move — expected churn, not a conflict`, actLevel:'benign' },
+    how:{tier:'<b>1 — benign context.</b> Health stays <b>Converged</b>.', what:'Two muted footnotes — a recent ownership move and an expected fenced write.',
+      where:'The <b>ownership</b> and <b>recent-activity</b> lines. Quiet text; the card doesn\'t escalate. You only see it if you look.'} },
+
+  contention:{ tier:'T1 · resolved', label:'Contention', tname:'resolved conflict',
+    over:{ vmark:{level:'warn', text:`1 ${term('conflict','same-epoch conflict')} in last 60s`},
+           act:'<b>4</b> writes in the last 60s — <span class="sub">1 lost to contention</span>', actNote:`a real concurrent write lost by last-writer-wins (<span class="mono">e4·s1287</span> beat <span class="mono">e4·s902</span>)`, actLevel:'benign' },
+    how:{tier:'<b>1–2 — resolved conflict.</b> Converged, but contended.', what:'An amber marker noting a genuine concurrent write was lost (correctly, by LWW).',
+      where:'The <b>value</b> itself — because that\'s what the conflict was over. Not a separate alert you\'d have to map back.'} },
+
+  lag:{ tier:'T2 · warn', label:'Replica lag', tname:'converging',
+    over:{ word:'Converging', level:'warn', convLevel:'warn',
+           conv:{mode:'lag'},
+           callout:{level:'warn', title:'One replica is behind', body:`:49807 has applied an older value and is <b>420 records behind</b>, draining (~12s to converge). It\'s ${term('lag','catching up')}, not diverged — the value will match once it drains.`, action:'<b>No action</b> — watch that "behind" trends down. If it stalls or climbs, escalate.'} },
+    how:{tier:'<b>2 — warn / converging.</b> Health → <b>Converging</b> (amber).', what:'The agreement line escalates to "4 agree · 1 catching up" and grows an attached detail.',
+      where:'The <b>agreement</b> line — the one line the problem is about. Everything else stays calm; the eye goes straight to the deviation.'} },
+
+  diverged:{ tier:'T3 · critical', label:'Divergence', tname:'critical',
+    over:{ word:'Diverged', level:'crit', convLevel:'crit', vmark:{level:'crit', text:'1 of 5 disagrees'},
+           conv:{mode:'split'},
+           callout:{level:'crit', title:':49807 is stuck on a stale value', body:`It shows <b>5</b> (<span class="mono">e3·s1241</span>) while the other four hold <b>8</b> (<span class="mono">e4·s1287</span>). It has applied <b>no update</b> for this key in 64s — most likely it dropped the ${term('viewcommit','VIEW_COMMIT')} for epoch 4.`, action:`Check :49807\'s log for the epoch-4 view-commit, or restart it to force a fresh catch-up. The other four are consistent, so reads they serve are correct.`} },
+    how:{tier:'<b>3 — critical.</b> Health → <b>Diverged</b> (red).', what:'The agreement line breaks its calm form into <b>agree</b> / <b>diverged</b> groups, plus a red callout with cause + next step.',
+      where:'The <b>agreement</b> line (it changes shape + colour) and a callout <b>directly beneath it</b>. The rest of the card stays calm — only the broken thing is loud.'} },
+
+  noquorum:{ tier:'T4 · banner', label:'No quorum', tname:'cluster-level',
+    over:{ word:'Write-gated', level:'crit', dim:true,
+           banner:{text:`Writes to this key are currently <b>rejected</b> — owner :49801\'s view lost ${term('quorum','quorum')} (3 of 5 members reachable). The value below may be stale; the last accepted write was 64s ago.`},
+           provNote:'no writes accepted since quorum lost 64s ago · <b>2</b> client writes buffered', provLevel:'crit' },
+    how:{tier:'<b>4 — cluster-level takeover.</b>', what:'A banner above the value; the now-possibly-stale data is greyed.',
+      where:'<b>Above everything</b> — because losing quorum changes how you read the <i>entire</i> card (the value may be stale). Cluster-level conditions outrank per-key ones, so they read first.'} },
+};
+const ORDER = ['healthy','move','contention','lag','diverged','noquorum'];
+
+const $ = id => document.getElementById(id);
+function render(id){
+  const s = {...BASE, ...SCEN[id].over};
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===id));
+  try{ history.replaceState(null,'','#'+id); }catch{}
+
+  // banner (Tier 4)
+  $('banner').classList.toggle('on', !!s.banner);
+  if (s.banner){ $('bw').textContent='write-gate closed · cluster-level'; $('bt').innerHTML=s.banner.text; }
+
+  // health + value
+  $('word').textContent = s.word; $('word').className = 'word ' + (s.level==='ok'?'':s.level);
+  $('ago').textContent = s.ago;
+  $('vv').textContent = s.vv;
+  $('vmark').innerHTML = s.vmark ? s.vmark.text : ''; $('vmark').className = 'vmark' + (s.vmark&&s.vmark.level==='crit'?' crit':'');
+  $('card').className = 'card' + (s.dim?' dim':'');
+
+  // agreement line (the one that splits)
+  const conv = $('conv');
+  if (s.conv.mode==='all') conv.innerHTML = AGREE_ALL;
+  else if (s.conv.mode==='lag') conv.innerHTML =
+    `<span><b>4</b> agree · <span style="color:var(--warn)"><b>1</b> catching up</span></span>`+
+    `<div class="agree-split" style="margin-top:9px">`+
+      `<div class="grp"><span class="gl">on 8 · current</span><div class="nodes">${nd('8',':49801',1)+nd('8',':49803')+nd('8',':49805')+nd('8',':49809')}</div></div>`+
+      `<div class="grp"><span class="gl" style="color:var(--warn)">catching up</span><div class="nodes">${nd('—',':49807',0,'lag','420 behind')}</div></div>`+
+    `</div>`;
+  else conv.innerHTML =
+    `<div class="agree-split">`+
+      `<div class="grp"><span class="gl">agree · 4 · on 8</span><div class="nodes">${nd('8',':49801',1)+nd('8',':49803')+nd('8',':49805')+nd('8',':49809')}</div></div>`+
+      `<div class="grp dis"><span class="gl">diverged · 1</span><div class="nodes">${nd('5',':49807',0,'stale','e3·s1241')}</div></div>`+
+    `</div>`;
+  setLine('ln-conv', s.convLevel);
+  // attach the callout under the agreement line (that's where lag/divergence live)
+  let co = $('ln-conv').querySelector('.callout'); if (co) co.remove();
+  if (s.callout){
+    co = document.createElement('div'); co.className='callout'+(s.callout.level==='crit'?' crit':'');
+    co.innerHTML = `<div class="ct">${s.callout.title}</div><div class="cb">${s.callout.body}</div><div class="ca">${s.callout.action}</div>`;
+    $('ln-conv').querySelector('.v').appendChild(co);
+  }
+
+  // provenance / ownership / activity lines + their optional attached notes
+  setVN('prov', s.prov, s.provNote, s.provLevel, 'ln-prov');
+  setVN('own',  s.own,  s.ownNote,  s.ownLevel,  'ln-own');
+  setVN('act',  s.act,  s.actNote,  s.actLevel,  'ln-act');
+
+  // meta: how it's layered
+  const h = SCEN[id].how; $('h-tier').innerHTML=h.tier; $('h-what').innerHTML=h.what; $('h-where').innerHTML=h.where;
+}
+function nd(v, addr, owner, cls, extra){
+  return `<span class="nd${cls?' '+cls:''}"><span class="nv mono">${v}</span><span class="na mono">${addr}${owner?' · owner':extra?' · '+extra:''}</span></span>`;
+}
+function setVN(id, html, note, level, lineId){
+  $(id).innerHTML = html + (note?`<div class="note${level==='benign'?' benign':''}">${note}</div>`:'');
+  setLine(lineId, note?level:null);
+}
+function setLine(lineId, level){
+  const ln = $(lineId); ln.classList.remove('warn','crit');
+  if (level==='warn'||level==='crit') ln.classList.add(level);
+}
+
+// build the scenario switcher
+const sc = $('scen');
+for (const id of ORDER){
+  const b = document.createElement('button'); b.dataset.id=id;
+  b.innerHTML = `<span>${SCEN[id].label}</span><span class="tier">${SCEN[id].tier}</span>`;
+  b.onclick = ()=>render(id);
+  sc.appendChild(b);
+}
+const fromHash = location.hash.slice(1);
+render(SCEN[fromHash] ? fromHash : 'healthy');
+</script>
+</body>
+</html>

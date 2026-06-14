@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fero · SIGNAL ANALYZER — sessions</title>
+<style>
+/* =====================================================================
+   ART DIRECTION: a 1970s/80s laboratory STORAGE OSCILLOSCOPE / signal
+   analyzer — a Tektronix-meets-HP bench instrument. Brushed dark-metal
+   bezel, engraved silk-screen labels, slotted screws, a phosphor screen
+   behind a graticule, segmented-LCD readouts, throw switches & knobs.
+   Health is read off the TRACE: a clean steady GREEN line = converged; a sharp
+   RED spike or flat RED dropout = a diverged key; an AMBER ringing burst = a
+   contended key. The trace is drawn as overlaid per-region coloured paths and the
+   glitches are NAMED by on-screen callouts pinning each to its key. No web "cards".
+   ===================================================================== */
+:root{
+  /* instrument metalwork */
+  --case:#23262b;            /* outer case metal */
+  --case-hi:#33373d;         /* brushed highlight */
+  --case-lo:#15171a;         /* brushed shadow */
+  --bezel:#0c0d0f;           /* screen bezel */
+  --engrave:#9aa0a6;         /* silk-screen text */
+  --engrave-lo:#5b6066;      /* dimmer silk-screen */
+  --plate:#2b2f35;           /* sub-panel plate */
+  --plate-lo:#1c1f23;
+  --screw:#3a3e44;
+  /* phosphor */
+  --p-green:#46ff7a;         /* P31 phosphor green */
+  --p-green-dim:#1f8c45;
+  --p-amber:#ffb43a;         /* contention / caution trace */
+  --p-red:#ff5a4d;           /* fault trace */
+  --p-cyan:#5fe6ff;          /* graticule cursor */
+  --screen-bg:#04150a;       /* CRT face */
+  --screen-bg2:#072512;
+  --gratic:rgba(70,255,122,.13);
+  --lcd-on:#ff6a2c;          /* segmented LCD: nixie/amber readout */
+  --lcd-off:rgba(255,106,44,.07);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; color:var(--engrave);
+  font:14px/1.5 "Helvetica Neue",Arial,system-ui,sans-serif;
+  letter-spacing:.01em;
+  /* the bench: dark room, instrument sits on it */
+  background:
+    radial-gradient(120% 90% at 50% -10%, #1a1c1f 0%, #0a0b0d 60%, #060708 100%);
+  -webkit-font-smoothing:antialiased;
+  padding:26px 18px 60px;
+}
+.mono{font-family:"Courier New",ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+
+/* ---------- the instrument case ---------- */
+.instrument{
+  max-width:1080px; margin:0 auto;
+  background:
+    linear-gradient(180deg,var(--case-hi) 0%, var(--case) 7%, var(--case) 93%, var(--case-lo) 100%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px); /* brushed metal */
+  border-radius:10px;
+  border:1px solid #3c4047;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 -2px 4px rgba(0,0,0,.6),
+    0 26px 60px rgba(0,0,0,.7),
+    0 2px 0 #000;
+  padding:18px 18px 22px;
+  position:relative;
+}
+/* slotted screws in the four corners */
+.screw{position:absolute;width:15px;height:15px;border-radius:50%;
+  background:radial-gradient(circle at 38% 32%, #54585e, #2a2d32 60%, #16181b);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.25), 0 1px 2px rgba(0,0,0,.7);}
+.screw::after{content:"";position:absolute;inset:0;margin:auto;width:9px;height:1.5px;
+  background:#0c0d0f;border-radius:1px;transform:rotate(34deg);box-shadow:0 1px 0 rgba(255,255,255,.08)}
+.screw.tl{top:9px;left:9px}.screw.tr{top:9px;right:9px}.screw.bl{bottom:9px;left:9px}.screw.br{bottom:9px;right:9px}
+
+/* ---------- nameplate header ---------- */
+.nameplate{display:flex;align-items:flex-end;gap:16px;padding:2px 22px 14px;border-bottom:1px solid #000;
+  box-shadow:0 1px 0 rgba(255,255,255,.05)}
+.maker{font-weight:800;letter-spacing:.28em;font-size:13px;color:#cdd2d8;
+  text-shadow:0 1px 0 #000}
+.model{font-family:"Courier New",monospace;font-size:11px;color:var(--engrave-lo);letter-spacing:.18em}
+.title{margin-left:6px;font-weight:700;letter-spacing:.34em;font-size:12px;color:var(--engrave);text-transform:uppercase}
+.subtitle{font-size:10.5px;letter-spacing:.2em;color:var(--engrave-lo);text-transform:uppercase}
+.nameplate .target{margin-left:auto;text-align:right}
+.nameplate .target .ch{font-family:"Courier New",monospace;color:var(--p-green);font-size:13px;
+  letter-spacing:.1em;text-shadow:0 0 6px rgba(70,255,122,.5)}
+.nameplate .target a{color:var(--engrave-lo);text-decoration:none;font-size:10px;letter-spacing:.12em}
+.nameplate .target a:hover{color:var(--p-cyan)}
+.mockstamp{position:absolute;top:14px;right:46px;font-family:"Courier New",monospace;font-size:9px;
+  letter-spacing:.18em;color:#6a4a2a;border:1px solid #4a3520;padding:2px 7px;border-radius:2px;
+  transform:rotate(-3deg);background:rgba(60,40,20,.25)}
+
+/* ---------- main bench layout: screen left, control column right ---------- */
+.deck{display:grid;grid-template-columns:1.55fr .95fr;gap:18px;padding:18px 22px 0;align-items:start}
+@media(max-width:880px){.deck{grid-template-columns:1fr}}
+
+/* ===================== THE CRT SCREEN ===================== */
+.crt-housing{position:relative;background:var(--bezel);border-radius:14px;padding:14px;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.05);
+  border:1px solid #000}
+.crt-label{position:absolute;top:-9px;left:18px;background:var(--case);padding:0 8px;font-size:9px;
+  letter-spacing:.22em;color:var(--engrave-lo)}
+.screen{position:relative;height:330px;border-radius:30px/22px;overflow:hidden;
+  background:
+    radial-gradient(120% 130% at 50% 45%, var(--screen-bg2) 0%, var(--screen-bg) 62%, #020a05 100%);
+  box-shadow:inset 0 0 60px rgba(0,0,0,.9), inset 0 0 16px rgba(70,255,122,.06);
+  border:1px solid #061a0d}
+/* graticule grid drawn in CSS */
+.screen .graticule{position:absolute;inset:14px;
+  background-image:
+    linear-gradient(var(--gratic) 1px, transparent 1px),
+    linear-gradient(90deg, var(--gratic) 1px, transparent 1px);
+  background-size:calc(100%/10) calc(100%/8), calc(100%/10) calc(100%/8);}
+/* brighter centre cross-hair lines with tick marks */
+.screen .axis-h{position:absolute;left:14px;right:14px;top:50%;height:1px;background:rgba(70,255,122,.28)}
+.screen .axis-v{position:absolute;top:14px;bottom:14px;left:50%;width:1px;background:rgba(70,255,122,.28)}
+/* CRT scanlines + curvature vignette overlay */
+.screen .scan{position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+  border-radius:30px/22px}
+.screen .vignette{position:absolute;inset:0;pointer-events:none;border-radius:30px/22px;
+  box-shadow:inset 0 0 90px rgba(0,0,0,.85)}
+.screen svg{position:absolute;inset:14px;width:calc(100% - 28px);height:calc(100% - 28px);overflow:visible}
+/* the waveform is drawn as several overlaid <path>s so each FAULT region can carry
+   its own phosphor colour — green base, amber for contention ringing, red for a
+   divergence spike / dropout. currentColor drives the bloom so each segment glows in-hue. */
+.trace{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 0 4px currentColor) drop-shadow(0 0 9px currentColor)}
+.trace.green{color:var(--p-green);stroke:var(--p-green)}
+.trace.amber{color:var(--p-amber);stroke:var(--p-amber);stroke-width:2.4}
+.trace.red{color:var(--p-red);stroke:var(--p-red);stroke-width:2.6}
+/* fault callouts pinned over the phosphor — a dotted leader drops to the trace
+   region and the key label sits above it, in the fault's own hue (red diverged /
+   amber contended), so the scope itself names what diverged. */
+.callouts{position:absolute;inset:14px;pointer-events:none}
+.callout{position:absolute;transform:translateX(-50%);text-align:center;
+  font-family:"Courier New",monospace;font-size:9.5px;letter-spacing:.03em;line-height:1.3;
+  display:flex;flex-direction:column;align-items:center}
+/* dotted phosphor leader from the tag to the trace; up-callouts put it above the tag */
+.callout .lead{width:0;height:13px;border-left:1px dotted currentColor;opacity:.7}
+.callout.down .lead{margin-top:1px} .callout.up .lead{margin-bottom:1px}
+.callout .tag{white-space:nowrap}
+.callout .tag .pr{font-size:8px;letter-spacing:.12em;text-transform:uppercase;opacity:.9}
+.callout.red{color:var(--p-red);text-shadow:0 0 6px rgba(255,90,77,.6)}
+.callout.amber{color:var(--p-amber);text-shadow:0 0 6px rgba(255,180,58,.55)}
+/* the moving beam dot */
+.beamdot{r:3.2;filter:drop-shadow(0 0 6px var(--p-green)) drop-shadow(0 0 12px var(--p-green))}
+/* on-screen readout, top-left corner, like a real scope's character readout */
+.osd{position:absolute;top:22px;left:24px;font-family:"Courier New",monospace;font-size:11px;
+  line-height:1.7;color:var(--p-green);text-shadow:0 0 6px rgba(70,255,122,.55);letter-spacing:.04em}
+.osd .hl{color:#bfffce}
+.osd b{color:var(--p-amber);font-weight:400;text-shadow:0 0 6px rgba(255,180,58,.6)}
+.osd b.fault{color:var(--p-red);text-shadow:0 0 6px rgba(255,90,77,.6)}
+/* status legend bottom-left on the phosphor */
+.osd-status{position:absolute;bottom:20px;left:24px;font-family:"Courier New",monospace;font-size:11px;
+  letter-spacing:.06em;text-shadow:0 0 6px currentColor}
+.osd-status.lock{color:var(--p-green)}
+.osd-status.trig{color:var(--p-amber)}
+/* sweep marker bottom-right */
+.osd-sweep{position:absolute;bottom:20px;right:24px;font-family:"Courier New",monospace;font-size:10px;
+  color:var(--p-green-dim);letter-spacing:.1em}
+
+/* ===================== SEGMENTED-LCD READOUT STRIP ===================== */
+.lcd-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.lcd{background:linear-gradient(180deg,#0a0c0a,#050605);border:1px solid #000;border-radius:5px;
+  padding:9px 11px 8px;box-shadow:inset 0 2px 6px rgba(0,0,0,.8), inset 0 0 0 1px rgba(255,255,255,.02)}
+.lcd .cap{font-size:8.5px;letter-spacing:.16em;color:var(--engrave-lo);text-transform:uppercase}
+.lcd .digits{font-family:"Courier New",monospace;font-weight:700;font-size:23px;line-height:1.15;margin-top:3px;
+  color:var(--lcd-on);text-shadow:0 0 8px rgba(255,106,44,.55);letter-spacing:.02em;
+  /* segmented look: faint 'off' segments ghost behind via text-stroke-ish glow only */
+  font-variant-numeric:tabular-nums}
+.lcd .digits.green{color:var(--p-green);text-shadow:0 0 8px rgba(70,255,122,.5)}
+.lcd .digits.amber{color:var(--p-amber);text-shadow:0 0 8px rgba(255,180,58,.55)}
+.lcd .digits.red{color:var(--p-red);text-shadow:0 0 9px rgba(255,90,77,.6)}
+.lcd .unit{font-size:9px;letter-spacing:.1em;color:var(--engrave-lo);margin-top:1px}
+
+/* ===================== RIGHT CONTROL COLUMN ===================== */
+.control-col{display:flex;flex-direction:column;gap:16px}
+
+/* engraved sub-panel plate */
+.plate{background:linear-gradient(180deg,var(--plate) 0%, var(--plate-lo) 100%);
+  border:1px solid #000;border-radius:7px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 2px 4px rgba(0,0,0,.5);
+  padding:13px 14px 15px;position:relative}
+/* engraved silk-screen plate legend — mixed-case, debossed (light shadow below +
+   dark above) like the nameplate maker mark, NOT a letter-spaced section header */
+.plate>.plabel{color:#aeb4ba;font-weight:600;font-size:11px;letter-spacing:.01em;
+  text-shadow:0 1px 0 rgba(255,255,255,.07), 0 -1px 0 rgba(0,0,0,.55);
+  padding-bottom:9px;margin-bottom:11px;border-bottom:1px solid #000;
+  box-shadow:0 1px 0 rgba(255,255,255,.05);display:flex;align-items:center;gap:8px}
+.plate>.plabel .dot{width:6px;height:6px;border-radius:50%;background:var(--engrave-lo)}
+.plate>.plabel .right{margin-left:auto;color:var(--engrave-lo);font-size:9px;letter-spacing:.06em;
+  font-family:"Courier New",monospace;font-weight:400;text-shadow:none}
+
+/* the MODE switch (scenario toggle) styled as a metal throw-switch with two engraved detents */
+.switch-rail{display:flex;background:#0c0d0f;border-radius:24px;padding:4px;border:1px solid #000;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.8)}
+.switch-rail button{flex:1;background:transparent;border:none;cursor:pointer;
+  font:inherit;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--engrave-lo);padding:9px 4px;border-radius:20px;transition:none;position:relative}
+.switch-rail button .led{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;
+  vertical-align:middle;background:#0a0a0a;box-shadow:inset 0 0 2px #000}
+.switch-rail button[aria-pressed=true]{
+  background:linear-gradient(180deg,#3a3e44,#26292e);color:#e6eaef;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18), 0 1px 3px rgba(0,0,0,.6)}
+.switch-rail button[data-id=healthy][aria-pressed=true] .led{background:var(--p-green);box-shadow:0 0 7px var(--p-green)}
+.switch-rail button[data-id=attention][aria-pressed=true] .led{background:var(--p-red);box-shadow:0 0 7px var(--p-red)}
+.switch-note{font-size:9.5px;color:var(--engrave-lo);letter-spacing:.05em;margin-top:9px;line-height:1.45}
+
+/* hot keys = "frequency markers" — a real 3-col spectrum-marker table:
+   label · bar · reading. The reading sits in its own reserved right track. */
+.marker{display:grid;grid-template-columns:108px 1fr 58px;gap:9px;align-items:center;padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.04)}
+.marker:last-child{border-bottom:none}
+.marker .mk{font-family:"Courier New",monospace;font-size:11px;color:#c9cdd2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.marker .mbar{height:6px;background:#0a0c0a;border-radius:1px;position:relative;overflow:hidden;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
+.marker .mbar i{position:absolute;left:0;top:0;bottom:0;background:var(--p-green-dim);
+  box-shadow:0 0 5px var(--p-green)}
+.marker .mhz{font-family:"Courier New",monospace;font-size:9.5px;color:var(--p-green);text-align:right;
+  text-shadow:0 0 5px rgba(70,255,122,.4);white-space:nowrap}
+
+/* partition channel meters */
+.chan{display:grid;grid-template-columns:74px 1fr 52px;gap:9px;align-items:center;padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.04);font-size:11.5px}
+.chan:last-child{border-bottom:none}
+.chan .cn{font-family:"Courier New",monospace;color:#d3d7dc}
+.chan .co{font-family:"Courier New",monospace;color:var(--engrave-lo);font-size:10px}
+.chan .crep{font-family:"Courier New",monospace;text-align:right;color:var(--p-green);font-size:11px;
+  text-shadow:0 0 4px rgba(70,255,122,.4)}
+.chan .level{height:8px;background:#0a0c0a;border-radius:1px;position:relative;overflow:hidden;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.8);display:flex;gap:1px;padding:1px}
+.chan .level span{flex:1;background:var(--p-green-dim);opacity:.85}
+.chan.under .level span{background:#3a2410}
+.chan.under .level span.lit{background:var(--p-amber);box-shadow:0 0 4px var(--p-amber)}
+.chan.under .crep{color:var(--p-amber);text-shadow:0 0 5px rgba(255,180,58,.5)}
+.chan.under .cn::after{content:" ⚠";color:var(--p-amber)}
+
+/* ===================== CAPTURED EVENTS (needs-attention) ===================== */
+.captures{padding:20px 22px 4px}
+.cap-head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid #000;
+  box-shadow:0 1px 0 rgba(255,255,255,.05);padding-bottom:9px;margin-bottom:14px}
+.cap-head .ttl{font-size:14px;color:#bcc2c8;font-weight:600;letter-spacing:.01em;
+  text-shadow:0 1px 0 rgba(255,255,255,.07), 0 -1px 0 rgba(0,0,0,.55)}
+.cap-head .reg{font-family:"Courier New",monospace;font-size:9.5px;color:var(--engrave-lo);letter-spacing:.06em}
+.cap-head .count{margin-left:auto;font-family:"Courier New",monospace;font-size:10px;color:var(--engrave-lo);
+  letter-spacing:.1em}
+
+/* the all-clear (healthy) screen-print */
+.allclear{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px dashed #163d22;
+  border-radius:5px;background:rgba(70,255,122,.04)}
+.allclear .ok{font-family:"Courier New",monospace;font-size:13px;letter-spacing:.1em;color:var(--p-green);
+  text-shadow:0 0 8px rgba(70,255,122,.5)}
+.allclear .sub{font-size:11px;color:var(--engrave-lo);letter-spacing:.04em}
+
+/* each captured event = an oscilloscope "stored event" ticket */
+.event{display:grid;grid-template-columns:84px 168px 1fr 92px;gap:14px;align-items:center;
+  padding:11px 13px;border:1px solid #000;border-left:3px solid var(--sev,#444);border-radius:4px;
+  background:linear-gradient(180deg, rgba(255,255,255,.018), transparent);margin-bottom:9px;cursor:pointer}
+.event:hover{background:linear-gradient(180deg, rgba(95,230,255,.06), rgba(95,230,255,.01));
+  border-left-color:var(--p-cyan)}
+.event[data-sev=crit]{--sev:var(--p-red)}
+.event[data-sev=warn]{--sev:var(--p-amber)}
+.event .ts{font-family:"Courier New",monospace;font-size:10px;color:var(--engrave-lo);letter-spacing:.04em}
+.event .ts .clk{display:block;color:var(--p-green);font-size:11px;text-shadow:0 0 5px rgba(70,255,122,.35)}
+.event .key{font-family:"Courier New",monospace;font-size:13px;color:#e6eaef;font-weight:700}
+.event .badge{display:inline-block;margin-top:5px;font-family:"Courier New",monospace;font-size:8.5px;
+  letter-spacing:.16em;text-transform:uppercase;padding:2px 7px;border-radius:2px;border:1px solid var(--sev);
+  color:var(--sev)}
+.event .why{font-size:12px;color:#aab0b6;line-height:1.45}
+.event .why .mono{color:#e0e4e9}
+/* drill affordance lit at rest in dim phosphor green so the work-list obviously
+   tunes into a key without hover discovery; hover brightens to the cyan cursor */
+.event .open{text-align:right;font-family:"Courier New",monospace;font-size:10px;letter-spacing:.08em;
+  color:var(--p-green-dim);text-shadow:0 0 4px rgba(70,255,122,.25)}
+.event:hover .open{color:var(--p-cyan);text-shadow:0 0 6px rgba(95,230,255,.4)}
+.event .open .arrow{display:block;font-size:15px;margin-top:2px}
+@media(max-width:720px){
+  .event{grid-template-columns:1fr auto;gap:6px}
+  .event .why{grid-column:1/-1}
+  .event .open{display:none}
+}
+
+/* ===================== PROVENANCE (data sources) ===================== */
+.prov{margin:22px 22px 0;border-top:1px solid #000;box-shadow:0 -1px 0 rgba(255,255,255,.04);padding-top:12px}
+.prov summary{cursor:pointer;list-style:none;font-size:11px;letter-spacing:.01em;font-weight:600;
+  color:#9aa0a6;padding:6px 0;display:flex;align-items:center;gap:9px;
+  text-shadow:0 1px 0 rgba(255,255,255,.06), 0 -1px 0 rgba(0,0,0,.5)}
+.prov summary::-webkit-details-marker{display:none}
+.prov summary::before{content:"◣";font-size:8px;color:var(--engrave-lo);transition:none}
+.prov[open] summary::before{content:"◢"}
+.prov .body{font-size:11px;line-height:1.7;color:var(--engrave-lo);padding:4px 2px 10px;max-width:780px}
+.prov .body p{margin:7px 0}
+.prov .body b{color:var(--engrave);font-weight:600}
+.prov .new{color:var(--p-amber);font-family:"Courier New",monospace;font-weight:700;
+  text-shadow:0 0 6px rgba(255,180,58,.35)}
+.prov .body .mono{color:#c9cdd2}
+.prov .body .t{border-bottom:1px dotted var(--engrave-lo);cursor:help}
+
+/* footer engraving */
+.foot{text-align:center;font-family:"Courier New",monospace;font-size:9px;letter-spacing:.2em;
+  color:#3c4047;margin-top:22px}
+</style>
+</head>
+<body>
+
+<div class="instrument">
+  <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+  <span class="mockstamp">MOCKUP · STATIC SIGNAL</span>
+
+  <!-- engraved nameplate -->
+  <div class="nameplate">
+    <span class="maker">FERO</span>
+    <span class="model">/ TYPE 1284-R</span>
+    <span class="title">Signal&nbsp;Analyzer</span>
+    <span class="subtitle">· Resource Storage Scope</span>
+    <span class="target">
+      <span class="ch">CH: sessions</span><br>
+      <a href="../resource.html">◄ STANDARD READOUT</a> &nbsp;·&nbsp; <a href="../ia-map.html">CLUSTER ◄</a>
+    </span>
+  </div>
+
+  <!-- bench deck: screen + control column -->
+  <div class="deck">
+
+    <!-- ============ LEFT: CRT + LCD readouts ============ -->
+    <div>
+      <div class="crt-housing">
+        <span class="crt-label">DISPLAY · CONVERGENCE TRACE · P31</span>
+        <div class="screen">
+          <div class="graticule"></div>
+          <div class="axis-h"></div><div class="axis-v"></div>
+
+          <!-- the waveform: one green base path + per-fault coloured overlay paths,
+               injected by render() so divergence is SHOWN on the trace (red spike /
+               red dropout / amber ringing), not just told on the LCD. -->
+          <svg viewBox="0 0 600 280" preserveAspectRatio="none" id="scopeSvg">
+            <g id="traces"></g>
+            <circle class="beamdot" id="beamdot" cx="0" cy="140" fill="#46ff7a"></circle>
+          </svg>
+          <!-- fault callouts: HTML overlay (so text isn't stretched by the scope's
+               non-uniform aspect) pinning each glitch region to the key it diverged on -->
+          <div class="callouts" id="callouts"></div>
+
+          <!-- on-screen character readout (the scope's own annotations) -->
+          <div class="osd" id="osd"></div>
+          <div class="osd-status lock" id="statusLine">● SIGNAL LOCKED</div>
+          <div class="osd-sweep">TIME/DIV 8s &nbsp; SWEEP→</div>
+
+          <div class="scan"></div>
+          <div class="vignette"></div>
+        </div>
+      </div>
+
+      <!-- segmented-LCD readout strip -->
+      <div class="lcd-strip" id="lcdStrip"></div>
+    </div>
+
+    <!-- ============ RIGHT: control column ============ -->
+    <div class="control-col">
+
+      <!-- MODE throw-switch (scenario toggle) -->
+      <div class="plate">
+        <div class="plabel"><span class="dot"></span>Mode Select<span class="right">FRONT PANEL</span></div>
+        <div class="switch-rail" id="switch"></div>
+        <div class="switch-note">A resource holds a clean trace until a key diverges. Throw the switch to inject the captured fault scenario.</div>
+      </div>
+
+      <!-- ACTIVITY: writes / conflicts as instrument lamps + hot keys as freq markers -->
+      <div class="plate">
+        <div class="plabel"><span class="dot"></span>Activity Monitor<span class="right">__observe [B]</span></div>
+        <div id="markers"></div>
+      </div>
+
+      <!-- PARTITION CHANNELS -->
+      <div class="plate">
+        <div class="plabel"><span class="dot"></span>Partition Channels<span class="right">8 · OWN/REP</span></div>
+        <div id="chans"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CAPTURED EVENTS (the needs-attention work list) ============ -->
+  <div class="captures">
+    <div class="cap-head">
+      <span class="ttl">Captured Events</span>
+      <span class="reg">STORAGE REGISTER · WORST-FIRST</span>
+      <span class="count" id="capCount"></span>
+    </div>
+    <div id="captures"></div>
+  </div>
+
+  <!-- ============ PROVENANCE ============ -->
+  <details class="prov">
+    <summary>Source &amp; calibration notes</summary>
+    <div class="body">
+      <p><b>Trace &amp; captured-event register</b> — divergence per key is sampled from the <span class="new">⚠ NEW</span> per-key version probe (<span class="mono">__inspect{versions:K}</span>, scoped to this resource) cross-merged on node <b>uuid</b> [A]; contention counts come from the <b>__observe</b> stream's <b>lost</b> events at <b>we=epoch</b> (same-epoch) [B]. The register is the <span class="t" title="worst-first; you reach it from a cluster alarm or by tuning to this resource — not by guessing key names">work queue</span> — select an event to open its key autopsy.</p>
+      <p><b>Activity lamps / frequency markers</b> — per-second write &amp; conflict rollup from the bridge, plus top-K hot keys from <b>__observe</b> [B], scoped to this resource (the shipped dashboard's hot-keys panel is cluster-wide; this readout is resource-scoped and tunes into keys).</p>
+      <p><b>Partition channels</b> — owner from <b>ring.coverage</b>; replica count vs <b>R</b>; under-replication / orphan from snapshot <b>orphans</b> + the cover diff [A][E]; log size from <b>log.size</b> [A].</p>
+    </div>
+  </details>
+
+  <div class="foot">FERO INSTRUMENTS · MADE FOR BENCH USE · CAL 2026-06</div>
+</div>
+
+<script>
+'use strict';
+/* drill target: the Key autopsy page (worst event → #diverged) */
+const KEY = '../key-autopsy/happy.html';
+
+/* ---- the two captured scenarios ---- content identical to the standard readout, re-voiced for the scope ---- */
+const SCEN = {
+  healthy:{
+    word:'CONVERGED', level:'ok',
+    meta:'1,284 keys · 8 part · view e4 · 5 mem',
+    lcd:[
+      {cap:'KEY COUNT', v:'1,284', u:'keys', cls:'green'},
+      {cap:'PARTITIONS', v:'8', u:'view e4', cls:'green'},
+      {cap:'WRITES', v:'142', u:'per sec', cls:'green'},
+      {cap:'CONFLICTS', v:'0.0', u:'per sec', cls:'green'},
+    ],
+    osd:[
+      ['RES','sessions'],['VIEW','e4 · 5 mem'],
+      ['CONV','1,284 / 1,284'],['DIVERG','0',''],['CONTEND','0  (60s)',''],
+    ],
+    status:{cls:'lock', txt:'● SIGNAL LOCKED · TRACE STABLE'},
+    waveform:'clean',
+    captures:[],
+    markers:[ ['user42.score',38,1], ['cart7.items',21,.55], ['order7.lines',14,.37], ['user43.name',9,.24] ],
+    chans:[
+      {n:'user42', o:':49801', rep:'5/5', lit:5, of:5}, {n:'cart7', o:':49805', rep:'5/5', lit:5, of:5},
+      {n:'order7', o:':49803', rep:'5/5', lit:5, of:5}, {n:'user43', o:':49809', rep:'5/5', lit:5, of:5},
+      {n:'billing', o:':49807', rep:'5/5', lit:5, of:5}, {n:'session', o:':49801', rep:'5/5', lit:5, of:5},
+      {n:'audit', o:':49805', rep:'5/5', lit:5, of:5}, {n:'prefs', o:':49809', rep:'5/5', lit:5, of:5},
+    ],
+  },
+  attention:{
+    word:'FAULT', level:'crit',
+    meta:'1,284 keys · 8 part · view e4 · 5 mem',
+    lcd:[
+      {cap:'KEY COUNT', v:'1,284', u:'keys', cls:'green'},
+      {cap:'DIVERGED', v:'2', u:'fault', cls:'red'},
+      {cap:'WRITES', v:'168', u:'per sec', cls:'green'},
+      {cap:'CONFLICTS', v:'0.4', u:'per sec', cls:'red'},
+    ],
+    osd:[
+      ['RES','sessions'],['VIEW','e4 · 5 mem'],
+      ['CONV','1,281 / 1,284'],['DIVERG','2','fault'],['CONTEND','1  (60s)','warn'],
+    ],
+    status:{cls:'trig', txt:'▲ TRIGGERED · 2 FAULTS HELD'},
+    waveform:'fault',
+    captures:[
+      {ts:'t−64s', key:'user42.score', sev:'crit', badge:'diverged', href:KEY+'#diverged',
+        why:'<span class="mono">:49807</span> stuck on <span class="mono">e3·s1241</span> ("5") while 4 hold <span class="mono">e4·s1287</span> ("8")'},
+      {ts:'t−12s', key:'cart9.total', sev:'crit', badge:'diverged', href:KEY,
+        why:'<span class="mono">:49803</span> missed the <span class="mono">e4</span> commit · 12s behind, not yet draining'},
+      {ts:'t−60s', key:'order7.lines', sev:'warn', badge:'contended', href:KEY,
+        why:'<span class="mono">3</span> same-epoch conflicts in 60s — a real write-write hotspot, not rebalance churn'},
+      {ts:'e4 reb', part:'billing', sev:'crit', badge:'under-repl', href:'#',
+        why:'partition held on <span class="mono">2 of 3</span> replicas since the e4 rebalance — orphan awaiting confirmed shed'},
+    ],
+    markers:[ ['order7.lines',61,1], ['user42.score',40,.66], ['cart7.items',19,.31], ['cart9.total',11,.18] ],
+    chans:[
+      {n:'user42', o:':49801', rep:'5/5', lit:5, of:5}, {n:'cart7', o:':49805', rep:'5/5', lit:5, of:5},
+      {n:'order7', o:':49803', rep:'5/5', lit:5, of:5}, {n:'cart9', o:':49803', rep:'5/5', lit:5, of:5},
+      {n:'billing', o:':49807', rep:'2/3', lit:2, of:3, under:true}, {n:'session', o:':49801', rep:'5/5', lit:5, of:5},
+      {n:'audit', o:':49805', rep:'5/5', lit:5, of:5}, {n:'prefs', o:':49809', rep:'5/5', lit:5, of:5},
+    ],
+  },
+};
+const ORDER = ['healthy','attention'];
+const $ = id => document.getElementById(id);
+
+/* ---- waveform geometry ----
+   The scope's whole conceit is that health is READ OFF THE TRACE. So the fault
+   geometry is exaggerated and, crucially, COLOURED per region: a sharp tall RED
+   divergence spike, a clear flat RED baseline dropout, and an AMBER contention
+   ringing burst. We compute one array of {x,y} samples plus, for each fault, the
+   sample index range + colour + callout label. buildSegments() then slices the
+   sample array into per-colour <path> runs (green base + coloured fault runs that
+   overlap their neighbours by one sample so the stroke joins seamlessly). */
+const W=600, H=280, MID=H/2, N=240;
+
+// fault regions for the 'fault' scenario — index ranges into the sample array,
+// the phosphor colour they paint, and the key/probe each glitch is.
+const FAULTS=[
+  {a:66, b:90,  col:'red',   key:'user42.score', pr:'diverged'},   // sharp tall spike ~32%
+  {a:124,b:158, col:'red',   key:'cart9.total',  pr:'missed e4'},  // flat baseline dropout ~56%
+  {a:170,b:208, col:'amber', key:'order7.lines', pr:'contended'},  // amber ringing burst ~78%
+];
+
+function samples(kind){
+  const pts=[];
+  for(let i=0;i<=N;i++){
+    const x=(i/N)*W;
+    // calm low-amplitude carrier riding the centre graticule line
+    let y=MID + Math.sin(i*0.13)*22 + Math.sin(i*0.41+1.1)*7;
+    if(kind==='fault'){
+      // #1 hard divergence — a sharp, tall red excursion (clipping near the top rail)
+      const d1=i-78; if(Math.abs(d1)<10) y=MID - 118*Math.exp(-(d1*d1)/9);
+      // #2 dropout — beam slams to a clear flat baseline (missed commit), barely ripples
+      if(i>=128 && i<=154) y=MID + 104;
+      // #3 contention — a strong amber ringing burst that decays
+      const d3=i-189; if(Math.abs(d3)<20) y += Math.sin(i*1.35)*40*Math.exp(-(d3*d3)/150);
+    }
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+// turn a sample array into coloured <path> runs. Each fault range is painted in its
+// colour; the gaps between faults stay green. Runs overlap by one sample to join.
+function buildSegments(pts, kind){
+  const runs=[];
+  if(kind!=='fault'){ runs.push({col:'green', from:0, to:pts.length-1}); return runs; }
+  const sorted=[...FAULTS].sort((p,q)=>p.a-q.a);
+  let cur=0;
+  for(const f of sorted){
+    if(f.a>cur) runs.push({col:'green', from:cur, to:f.a});       // green up to the fault
+    runs.push({col:f.col, from:f.a, to:f.b});                     // the coloured fault run
+    cur=f.b;
+  }
+  if(cur<pts.length-1) runs.push({col:'green', from:cur, to:pts.length-1});
+  return runs;
+}
+// one coloured run → an SVG path 'd' string over its sample slice
+const seg = (pts,from,to) => 'M'+pts.slice(from,to+1).map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L');
+
+// Sweep beam: rides the real sample array (no string round-trip). One interval,
+// cleared on re-render; suspended when the page is hidden so it isn't a perpetual
+// off-screen repaint of the SVG bloom filter (the repo's perf culture frowns on that).
+let sweepTimer=null, beamPts=null, beamI=0;
+function tickBeam(){
+  const dot=$('beamdot'); const p=beamPts && beamPts[beamI%beamPts.length];
+  if(p){ dot.setAttribute('cx',p[0].toFixed(1)); dot.setAttribute('cy',p[1].toFixed(1)); }
+  beamI++;
+}
+function startBeam(){ if(!sweepTimer && !document.hidden) sweepTimer=setInterval(tickBeam,30); }
+function stopBeam(){ clearInterval(sweepTimer); sweepTimer=null; }
+function animateBeam(pts){ beamPts=pts; beamI=0; stopBeam(); startBeam(); }
+document.addEventListener('visibilitychange',()=> document.hidden ? stopBeam() : startBeam());
+
+function render(id){
+  const s=SCEN[id];
+  document.querySelectorAll('#switch button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===id));
+  try{ history.replaceState(null,'','#'+id); }catch{}
+
+  // --- waveform: paint coloured per-fault path runs so divergence is SHOWN ---
+  const fault = s.waveform==='fault';
+  const pts = samples(s.waveform);
+  const runs = buildSegments(pts, s.waveform);
+  $('traces').innerHTML = runs.map(r=>
+    `<path class="trace ${r.col}" d="${seg(pts,r.from,r.to)}"></path>`).join('');
+  const dot=$('beamdot');
+  dot.setAttribute('fill', fault ? '#ff5a4d' : '#46ff7a');
+  dot.style.filter = fault
+    ? 'drop-shadow(0 0 6px #ff5a4d) drop-shadow(0 0 12px #ff5a4d)'
+    : 'drop-shadow(0 0 6px #46ff7a) drop-shadow(0 0 12px #46ff7a)';
+  animateBeam(pts);
+
+  // --- fault callouts: pin each coloured glitch region to the key it diverged on ---
+  // The tag sits just clear of the glitch with a short dotted leader bridging to the
+  // trace, so the scope itself NAMES which key diverged at that point on the sweep.
+  if(fault){
+    $('callouts').innerHTML = FAULTS.map(f=>{
+      const mid=(f.a+f.b)/2, xPct=(mid/N)*100;            // x over the phosphor
+      const ys=pts.slice(f.a,f.b+1).map(p=>p[1]);
+      const spike = f.key==='user42.score';               // the only fault that points UP
+      const ext = spike ? Math.min(...ys) : Math.max(...ys);
+      const extPct=(ext/H)*100;
+      const tag = spike
+        ? `${f.key}<br><span class="pr">${f.pr}</span>`     // spike: key first, prob below
+        : `<span class="pr">${f.pr}</span><br>${f.key}`;
+      // spike points up: anchor BELOW its tip (top), leader rises to it.
+      // dropout/ringing sit low: anchor ABOVE the trace point (bottom), leader drops to it.
+      const pos = spike ? `top:${extPct+2}%` : `bottom:${100-extPct+2}%`;
+      return `<div class="callout ${f.col} ${spike?'up':'down'}" style="left:${xPct}%;${pos}">`+
+        (spike ? `<span class="lead"></span><span class="tag">${tag}</span>`
+               : `<span class="tag">${tag}</span><span class="lead"></span>`)+
+        `</div>`;
+    }).join('');
+  } else {
+    $('callouts').innerHTML = '';
+  }
+
+  // --- on-screen readout (character generator) ---
+  $('osd').innerHTML = s.osd.map(([k,v,flag])=>{
+    const val = flag==='fault' ? `<b class="fault">${v}</b>` : flag==='warn' ? `<b>${v}</b>` : `<span class="hl">${v}</span>`;
+    return `${k.padEnd(8,' ')} ${val}`;
+  }).join('<br>');
+  $('statusLine').className = 'osd-status '+(s.status.cls);
+  $('statusLine').textContent = s.status.txt;
+
+  // --- segmented LCD strip ---
+  $('lcdStrip').innerHTML = s.lcd.map(d=>
+    `<div class="lcd"><div class="cap">${d.cap}</div>`+
+    `<div class="digits ${d.cls}">${d.v}</div><div class="unit">${d.u}</div></div>`
+  ).join('');
+
+  // --- activity frequency markers (hot keys) — label · bar · reading, 3-col table ---
+  $('markers').innerHTML = s.markers.map(([k,wps,frac])=>
+    `<div class="marker"><span class="mk">${k}</span>`+
+    `<div class="mbar"><i style="width:${Math.round(frac*100)}%"></i></div>`+
+    `<span class="mhz">${wps} w/s</span></div>`
+  ).join('');
+
+  // --- partition channels (replica level meters) ---
+  $('chans').innerHTML = s.chans.map(c=>{
+    const cells = Array.from({length:c.of},(_,i)=>
+      `<span class="${i<c.lit?'lit':''}"></span>`).join('');
+    return `<div class="chan ${c.under?'under':''}">`+
+      `<span class="cn">${c.n}</span>`+
+      `<span class="level">${cells}</span>`+
+      `<span class="crep">${c.rep}</span></div>`;
+  }).join('');
+
+  // --- captured events register (the work list) ---
+  const caps=s.captures;
+  $('capCount').textContent = caps.length ? `${caps.length} HELD` : 'REGISTER EMPTY';
+  if(!caps.length){
+    $('captures').innerHTML =
+      `<div class="allclear"><span class="ok">✓ ALL 1,284 KEYS CONVERGED</span>`+
+      `<span class="sub">no faults captured — the trace holds the centre line. This register fills only when a key diverges, a channel under-replicates, or contention triggers.</span></div>`;
+  } else {
+    $('captures').innerHTML = caps.map(c=>{
+      const label = c.key ? c.key : `partition ${c.part}`;
+      const open = c.href!=='#' ? 'OPEN AUTOPSY' : 'PARTITION PG';
+      return `<div class="event" data-sev="${c.sev}" data-href="${c.href}">`+
+        `<span class="ts">CAPTURED<span class="clk">${c.ts}</span></span>`+
+        `<span><span class="key">${label}</span><br><span class="badge">${c.badge}</span></span>`+
+        `<span class="why">${c.why}</span>`+
+        `<span class="open">${open}<span class="arrow">▸</span></span></div>`;
+    }).join('');
+  }
+}
+
+/* select a captured event → drill into the key page */
+$('captures').addEventListener('click', e=>{
+  const row=e.target.closest('.event');
+  if(row && row.dataset.href && row.dataset.href!=='#') location.href=row.dataset.href;
+});
+
+/* build the mode throw-switch */
+const sw=$('switch');
+for(const id of ORDER){
+  const b=document.createElement('button');
+  b.dataset.id=id;
+  b.innerHTML = `<span class="led"></span>${id==='healthy'?'CONVERGED':'FAULT INJECT'}`;
+  b.onclick=()=>render(id);
+  sw.appendChild(b);
+}
+
+const fromHash=location.hash.slice(1);
+render(SCEN[fromHash] ? fromHash : 'healthy');
+</script>
+</body>
+</html>

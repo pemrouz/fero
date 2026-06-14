@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fero · key autopsy · inspector</title>
+<style>
+  /* ---------- restrained editor dark theme ----------
+     One cool accent (--accent), one alert hue (--bad), optional --amber.
+     Color carries meaning only: divergence (red gutter / red text), current winner (accent).
+     Syntax tokens appear ONLY inside the code editor. No pills, no glow, no animation. */
+  :root{
+    --bg:#1b1d23;            /* editor background */
+    --bg-side:#191b20;       /* sidebar slightly deeper */
+    --bg-panel:#1e2128;      /* property grid / editor surface */
+    --bg-raise:#23262e;      /* hovered / selected rows */
+    --line:#2c2f38;          /* hairline separators */
+    --line-soft:#262932;
+    --ink:#c8ccd4;           /* primary text */
+    --ink-strong:#e6e9ef;    /* headings, emphasised values */
+    --dim:#7a808e;           /* secondary text */
+    --faint:#565c69;         /* tertiary / disabled */
+    --accent:#6cb6ff;        /* the one cool accent — current winner, selection */
+    --bad:#e5534b;           /* the one alert hue — divergence */
+    --amber:#d6a44c;         /* single secondary status (fence) */
+    /* editor syntax tokens — restrained, each a single muted hue */
+    --tok-key:#9aa7c7;       /* property keys */
+    --tok-str:#a3c293;       /* strings */
+    --tok-num:#cda06b;       /* numbers */
+    --tok-punct:#6b7180;     /* braces, commas, colons */
+    --tok-kw:#b78fc2;        /* true/false/null */
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:13px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-variant-numeric:tabular-nums}
+  .uc{text-transform:uppercase; letter-spacing:.07em; font-size:10px; font-weight:600; color:var(--dim)}
+
+  /* ---------- shell: activity stripe | sidebar | main ---------- */
+  .shell{display:grid; grid-template-columns:4px 308px 1fr; height:100vh; min-height:0}
+  /* left gutter is a structural hairline rail, not a colored accent — color stays reserved for meaning */
+  .activitybar{background:var(--line); border-right:1px solid var(--line-soft)}
+
+  /* ---------- sidebar ---------- */
+  .side{background:var(--bg-side); border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; overflow:hidden}
+  .side .brand{padding:11px 14px 10px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:8px}
+  .side .brand .b1{font-weight:700; color:var(--ink-strong); font-size:13px; letter-spacing:.02em}
+  .side .brand .b2{color:var(--dim); font-size:11px}
+  .side .brand .mock{margin-left:auto; font-size:9px; letter-spacing:.08em; color:var(--faint); border:1px solid var(--line); border-radius:2px; padding:2px 5px; text-transform:uppercase}
+
+  .sec-h{display:flex; align-items:center; gap:6px; padding:9px 12px 7px; border-bottom:1px solid var(--line-soft)}
+  .sec-h .tw{color:var(--faint); font-size:9px; width:9px; display:inline-block}
+  .sec-h .count{margin-left:auto; color:var(--faint); font-size:10px}
+
+  /* DIVERGENT KEYS tree */
+  .keytree{padding:2px 0 6px; border-bottom:1px solid var(--line)}
+  .ktrow{display:grid; grid-template-columns:26px 1fr auto; gap:7px; align-items:center; padding:5px 12px 5px 8px; cursor:pointer; border-left:2px solid transparent}
+  .ktrow:hover{background:var(--bg-raise)}
+  .ktrow.sel{background:var(--bg-raise); border-left-color:var(--accent)}
+  .ktrow.diverged{border-left-color:var(--bad)}
+  /* glyph column carries an unambiguous text marker, never a bare punctuation mark */
+  .ktrow .gl{color:var(--faint); font-size:9px; letter-spacing:.04em; text-align:center; font-family:ui-monospace, Menlo, monospace}
+  .ktrow.diverged .gl{color:var(--bad); font-weight:700}
+  .ktrow .knm{color:var(--ink); font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .ktrow.sel .knm{color:var(--ink-strong)}
+  .ktrow .st{font-size:10px; letter-spacing:.04em; white-space:nowrap; color:var(--dim)}
+  .ktrow.diverged .st{color:var(--bad); font-weight:600}
+  .ktrow .st.fence{color:var(--amber)}
+
+  /* VERSIONS — call stack */
+  .stackwrap{flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden}
+  .stack{overflow-y:auto; flex:1; min-height:0; padding:2px 0 10px}
+  .frame{display:block; width:100%; text-align:left; cursor:pointer; padding:6px 12px 6px 10px; border:0; background:none; color:inherit;
+    border-left:2px solid transparent; border-bottom:1px solid var(--line-soft); font:inherit}
+  .frame:hover{background:var(--bg-raise)}
+  .frame.sel{background:var(--bg-raise); border-left-color:var(--accent)}
+  .frame.top{border-left-color:var(--accent)}
+  .frame .fl1{display:flex; align-items:baseline; gap:8px}
+  .frame .outc{font-size:10px; font-weight:700; letter-spacing:.05em; font-family:ui-monospace, Menlo, monospace}
+  .frame .outc.local{color:var(--accent)}
+  .frame .outc.won{color:var(--ink-strong)}
+  .frame .outc.fence{color:var(--amber)}
+  .frame .outc.conflict{color:var(--bad)}
+  .frame .outc.dropped{color:var(--faint)}
+  .frame .outc.forwarded{color:var(--dim)}
+  .frame .curtag{margin-left:auto; font-size:9px; letter-spacing:.06em; color:var(--accent)}
+  .frame .stuktag{margin-left:auto; font-size:9px; letter-spacing:.05em; color:var(--bad); font-weight:600}
+  .frame .fl2{display:flex; gap:10px; margin-top:3px; color:var(--dim); font-size:11px; font-family:ui-monospace, Menlo, monospace}
+  .frame .fl2 .origin{color:var(--faint)}
+  .frame.divider{cursor:default; background:transparent; border-left-color:transparent; padding:8px 12px 7px}
+  .frame.divider:hover{background:transparent}
+  .frame.divider .vd{display:flex; align-items:center; gap:8px; color:var(--dim); font-size:10px; letter-spacing:.04em}
+  .frame.divider .vd::before,.frame.divider .vd::after{content:''; height:1px; background:var(--line); flex:1}
+  .stackfoot{padding:7px 12px; color:var(--faint); font-size:10px; border-top:1px solid var(--line)}
+  .stackfilt{display:flex; gap:4px; padding:6px 10px; border-bottom:1px solid var(--line)}
+  .ftog{font:inherit; font-size:10px; letter-spacing:.04em; cursor:pointer; color:var(--dim); background:transparent;
+    border:1px solid var(--line); border-radius:3px; padding:2px 8px; text-transform:uppercase}
+  .ftog:hover{color:var(--ink)}
+  .ftog[aria-pressed=true]{color:var(--ink-strong); border-color:var(--accent); background:var(--bg-raise)}
+
+  /* ---------- main ---------- */
+  .main{display:flex; flex-direction:column; min-height:0; overflow:hidden}
+  .crumb{display:flex; align-items:center; gap:7px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--bg-side); font-size:12px; color:var(--dim)}
+  .crumb .sep{color:var(--faint)}
+  .crumb .cur{color:var(--ink-strong); font-family:ui-monospace, Menlo, monospace}
+  .crumb .purpose{margin-left:auto; color:var(--faint); font-size:11px; max-width:46ch; text-align:right; line-height:1.35}
+
+  /* verdict strip — flat, gutter color only */
+  .verdict{padding:11px 16px; border-bottom:1px solid var(--line); border-left:3px solid var(--faint); background:var(--bg-panel)}
+  .verdict.crit{border-left-color:var(--bad)}
+  .verdict.ok{border-left-color:var(--accent)}
+  .verdict .vh{font-weight:700; font-size:12px; letter-spacing:.04em; color:var(--ink-strong)}
+  .verdict.crit .vh{color:var(--bad)}
+  .verdict .vb{color:var(--dim); font-size:12px; margin-top:3px; max-width:120ch}
+  .verdict .vb .mono{color:var(--ink)}
+
+  .scroll{overflow-y:auto; flex:1; min-height:0}
+  .section{border-bottom:1px solid var(--line)}
+  .section>.sh{display:flex; align-items:center; gap:8px; padding:8px 16px; background:var(--bg-side); border-bottom:1px solid var(--line-soft)}
+  .section>.sh .ttl{font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; color:var(--dim)}
+  .section>.sh .note{margin-left:auto; color:var(--faint); font-size:10px; font-family:ui-monospace, Menlo, monospace}
+  .section>.bd{padding:6px 0}
+
+  /* property grid (VARIABLES) */
+  .pgrid{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px}
+  .prow{display:grid; grid-template-columns:18px 168px 1fr; align-items:start; padding:4px 16px; border-left:3px solid transparent}
+  .prow .tw{color:var(--faint); cursor:pointer; user-select:none; font-size:10px; line-height:1.6}
+  .prow .pk{color:var(--tok-key)}
+  .prow .pv{color:var(--ink-strong); word-break:break-word}
+  .prow .pv .dim{color:var(--dim)}
+  .prow .pv .num{color:var(--tok-num)}
+  .prow .pv .str{color:var(--tok-str)}
+  .prow.group{cursor:pointer}
+  .prow.group:hover{background:var(--bg-raise)}
+  .prow.group .pk{color:var(--ink)}
+  .prow.child{padding-left:30px}
+  .prow.child .pk{padding-left:14px}
+  /* the diverged node — red DIFF GUTTER edge + red text, NOT a pill */
+  .prow.divnode{border-left-color:var(--bad); background:linear-gradient(90deg, color-mix(in srgb,var(--bad) 7%, transparent), transparent 60%); cursor:pointer}
+  .prow.divnode .pk,.prow.divnode .pv{color:var(--bad)}
+  .prow.divnode .pv .num,.prow.divnode .pv .str{color:var(--bad)}
+  .prow.divnode:hover{background:linear-gradient(90deg, color-mix(in srgb,var(--bad) 12%, transparent), transparent 60%)}
+  .prow.okgut{border-left-color:transparent}
+  .prow .badge{color:var(--accent); font-size:10px; letter-spacing:.05em}
+  .prow.divnode .badge{color:var(--bad)}
+  .hide{display:none}
+
+  /* editor JSON view (PROVENANCE) */
+  .editor{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; line-height:1.55; background:var(--bg-panel)}
+  .ed-tabbar{display:flex; align-items:center; gap:0; border-bottom:1px solid var(--line); background:var(--bg-side)}
+  .ed-tab{padding:6px 14px; font-size:11px; color:var(--dim); border-right:1px solid var(--line-soft); border-bottom:1px solid transparent; cursor:default; font-family:ui-monospace, Menlo, monospace}
+  .ed-tab.active{color:var(--ink-strong); background:var(--bg-panel); border-bottom-color:var(--accent)}
+  .ed-meta{margin-left:auto; padding:0 14px; color:var(--faint); font-size:10px}
+  .code{display:grid; grid-template-columns:42px 1fr; padding:8px 0 12px}
+  .code .ln{text-align:right; padding-right:14px; color:var(--faint); user-select:none; white-space:pre}
+  .code .src{white-space:pre; overflow-x:auto; padding-right:16px}
+  .t-key{color:var(--tok-key)} .t-str{color:var(--tok-str)} .t-num{color:var(--tok-num)}
+  .t-punct{color:var(--tok-punct)} .t-kw{color:var(--tok-kw)}
+  .code .cmt{color:var(--faint); font-style:normal}
+
+  /* ownership + route */
+  .colsplit{display:grid; grid-template-columns:1fr 1fr; gap:0}
+  @media (max-width:1100px){.colsplit{grid-template-columns:1fr}}
+  .colsplit>div+div{border-left:1px solid var(--line)}
+  @media (max-width:1100px){.colsplit>div+div{border-left:none; border-top:1px solid var(--line)}}
+
+  .kv{display:grid; grid-template-columns:120px 1fr; gap:5px 14px; padding:10px 16px; font-size:12px}
+  .kv .k{color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.06em; padding-top:2px}
+  .kv .v{font-family:ui-monospace, Menlo, monospace; color:var(--ink)}
+  .kv .v .mv{color:var(--ink-strong)}
+  .kv .v.moved-warn{color:var(--amber)}
+  .kv .v.moved-ok{color:var(--dim)}
+  .segline{display:flex; align-items:center; gap:1px; padding:4px 16px 24px; position:relative}
+  .segline .seg{flex:1; height:9px; background:var(--line-soft); min-width:1px}
+  .segline .seg.hit{background:var(--accent); position:relative}
+  /* a 1/120-width cell is too narrow to host a centered label without overlapping its neighbours —
+     anchor the hit caption to the panel's left edge instead so it can't collide at any width */
+  .segline .hitlabel{position:absolute; left:16px; bottom:6px; white-space:nowrap; color:var(--accent); font-size:9px; font-family:ui-monospace, Menlo, monospace}
+  .ownfoot{padding:14px 16px 12px; color:var(--faint); font-size:10px}
+  .ownfoot a{color:var(--accent); text-decoration:none}
+  .ownfoot a:hover{text-decoration:underline}
+
+  .route{padding:10px 16px 14px; font-family:ui-monospace, Menlo, monospace; font-size:12px}
+  .hop{display:grid; grid-template-columns:96px 1fr; gap:10px; padding:7px 0}
+  .hop .stg{color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.05em; padding-top:2px}
+  .hop .det .who{color:var(--ink-strong)}
+  .hop .det .sub{color:var(--faint); font-size:11px; margin-top:2px; line-height:1.4; white-space:normal}
+  .arrow{color:var(--faint); padding-left:8px}
+  .fan{padding:6px 0 0}
+  .fan .ttl{color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.05em; margin-bottom:5px}
+  .fan .nodes{display:flex; flex-wrap:wrap; gap:6px 14px}
+  .fan .fn{font-size:11px; color:var(--dim)}
+  .fan .fn .ok{color:var(--ink)}
+  .fan .fn .mark{color:var(--accent); font-weight:700}
+  .fan .fn.miss{color:var(--bad)}
+  .fan .fn.miss .mark{color:var(--bad)}
+
+  /* footnote */
+  .footnote{padding:14px 16px 28px; font-size:11px; color:var(--dim); border-top:1px solid var(--line)}
+  .footnote h2{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:0 0 10px; font-weight:700}
+  .footnote .src{display:grid; grid-template-columns:180px 1fr; gap:6px 16px}
+  .footnote .src b{color:var(--ink); font-weight:600}
+  .footnote .src .l{color:var(--ink); font-weight:600}
+  .footnote .new{color:var(--amber); font-weight:600}
+  .footnote code{font-family:ui-monospace, Menlo, monospace; color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="activitybar"></div>
+
+  <!-- ============ LEFT SIDEBAR ============ -->
+  <aside class="side">
+    <div class="brand">
+      <span class="b1">fero</span><span class="b2">debug inspector</span>
+      <span class="mock">mockup · static</span>
+    </div>
+
+    <!-- DIVERGENT KEYS (worst first) -->
+    <div class="sec-h"><span class="tw">v</span><span class="uc">divergent keys</span><span class="count" id="keyCount"></span></div>
+    <div class="keytree" id="keytree"></div>
+
+    <!-- VERSIONS as a call stack (newest frame on top) -->
+    <div class="stackwrap">
+      <div class="sec-h"><span class="tw">v</span><span class="uc">versions · call stack</span><span class="count" id="verCount"></span></div>
+      <div class="stackfilt" id="stackfilt">
+        <button class="ftog" data-f="all" aria-pressed="true">all</button>
+        <button class="ftog" data-f="losers" aria-pressed="false">losers</button>
+        <button class="ftog" data-f="fence" aria-pressed="false">fence</button>
+        <button class="ftog" data-f="conflict" aria-pressed="false">conflict</button>
+        <button class="ftog" data-f="dedup" aria-pressed="false">dedup</button>
+      </div>
+      <div class="stack" id="stack"></div>
+      <div class="stackfoot" id="stackfoot"></div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN PANE ============ -->
+  <main class="main">
+    <div class="crumb">
+      <span>observe</span><span class="sep">&rsaquo;</span>
+      <span>key autopsy</span><span class="sep">&rsaquo;</span>
+      <span class="cur" id="crumbKey">user42.score</span>
+      <span class="purpose">Why does this key hold its value — who won, who lost and why (epoch-fence / seq-contention / dedup-drop), and whether any node diverges.</span>
+    </div>
+
+    <div class="verdict" id="verdict">
+      <div class="vh" id="vh"></div>
+      <div class="vb" id="vb"></div>
+    </div>
+
+    <div class="scroll">
+      <!-- VARIABLES / WATCH — property grid for the winner stamp -->
+      <section class="section">
+        <div class="sh"><span class="ttl">variables</span><span class="note" id="varNote"></span></div>
+        <div class="bd"><div class="pgrid" id="pgrid"></div></div>
+      </section>
+
+      <!-- PROVENANCE — editor JSON view of the selected version's raw record -->
+      <section class="section">
+        <div class="sh"><span class="ttl">provenance</span><span class="note">selected version → raw ProvRecord + ChangeRecord · click a call-stack frame to load</span></div>
+        <div class="editor">
+          <div class="ed-tabbar">
+            <span class="ed-tab active" id="edTab">record.json</span>
+            <span class="ed-meta" id="edMeta"></span>
+          </div>
+          <div class="code"><div class="ln" id="edLn"></div><div class="src" id="edSrc"></div></div>
+        </div>
+      </section>
+
+      <div class="colsplit">
+        <!-- OWNERSHIP -->
+        <section class="section" style="border-bottom:none">
+          <div class="sh"><span class="ttl">ownership</span><span class="note" id="ownNote"></span></div>
+          <div class="bd" style="padding:0">
+            <div class="kv" id="ownKv"></div>
+            <div class="segline" id="segline"></div>
+            <div class="ownfoot" id="ownFoot"></div>
+          </div>
+        </section>
+
+        <!-- WRITE ROUTE -->
+        <section class="section" style="border-bottom:none">
+          <div class="sh"><span class="ttl">write route</span><span class="note" id="routeNote"></span></div>
+          <div class="bd" style="padding:0"><div class="route" id="route"></div></div>
+        </section>
+      </div>
+
+      <!-- data sources footnote (claims preserved verbatim in substance) -->
+      <section class="footnote">
+        <h2>data sources</h2>
+        <div class="src">
+          <span class="l">divergent keys list</span><span>derived from the same <span class="new">&#9888; NEW versions:K</span> sample below: per-key cross-node stamp diff, worst divergence first &mdash; the inspector&rsquo;s entry point. The dashboard hot-keys panel rows deep-link here (key in the URL hash).</span>
+          <span class="l">variables &middot; winner stamp by node</span><span><span class="new">&#9888; NEW instrumentation:</span> per-key version sample &mdash; snapshot ships <b>versions</b> COUNT only today; a gated <b>__inspect {versions:K}</b> variant returns {keyPath &rarr; {epoch, seq, origin}} from the LWW versions Map (seam: SnapshotDeps already holds the Map by reference; one opt-in copy per poll). Cross-node merge keyed on snapshot <b>uuid</b> [A]. The per-node group lists one stamp per node; the diverged node is marked by the red diff gutter, not a tag &mdash; constant-size past 24 nodes (blobs mode suppresses per-node snapshots); per-node detail on demand via the same gated per-uuid __inspect pull.</span>
+          <span class="l">winner value row</span><span><span class="new">&#9888; NEW instrumentation:</span> stamps never carry values &mdash; value read via a gated <b>__dump(partition, offset, limit)</b> RPC over the existing <b>Log.since()</b> slice [C].</span>
+          <span class="l">versions call stack</span><span>observe stream [B]: kinds <b>won / lost / local / forwarded</b> (+ <b>dropped</b> with verbose:true) &mdash; all five render as frames. Loss reason from the loser&rsquo;s epoch vs winner&rsquo;s <b>we/ws</b> &mdash; epoch &lt; we &rArr; epoch-fence, epoch = we &rArr; same-epoch seq contention. Winner ORIGIN on &ldquo;beaten by&rdquo; lines is a best-effort join of (we,ws) against a <b>won</b> event still inside the 256-slot prov ring &mdash; seq is per-origin, so the join is window-limited and not unique in principle; absent a hit, only we/ws would show. <b>t</b> is each makeObserve vantage&rsquo;s own monotonic counter (resets per instance) &mdash; this mock normalises to one sequence; a live merge must key rows (vantage uuid, t). View dividers from <b>kind:view</b>. <span class="new">&#9888; NEW:</span> wall-clock ages &mdash; live frames show bridge receive-time only; ring-history frames delivered on initial subscribe have NO derivable age and render t-only, until ProvRecords carry timing (plausibly-addable). <span class="new">&#9888; NEW:</span> window beyond the 256-slot prov ring &mdash; retained provenance history, /history?since=t (seam: bridge account() already sees every ProvEvent). Value summaries: <span class="new">&#9888; NEW</span> &mdash; ProvRecords deliberately never ship values; same __dump seam as above.</span>
+          <span class="l">ownership</span><span>snapshot [A]: this key&rsquo;s segment = its <b>ring.coverage</b> index; owner + &ldquo;owner moved&rdquo; from the bridge cover diff across ticks [E]. The strip is deliberately neutral &mdash; per-segment owner colors are the shipped ownership heatmap&rsquo;s job (linked below), not re-rendered here.</span>
+          <span class="l">write route</span><span>correlates <b>forwarded</b> (writer) &rarr; <b>local</b> (owner commit, restamped origin=owner) &rarr; <b>won</b> (each replica) [B]. The forward TARGET is inferred from the forwarded event&rsquo;s <b>by</b> vantage &mdash; the record does not carry it. Forward ACK status: <span class="new">&#9888; NEW</span> &mdash; not observable anywhere today; rendered &ldquo;ack: unknown&rdquo; until a per-write trace id exists (client-stamped correlation id on the ChangeRecord + a reserved frame FLAG bit, bits 4+ free, carried into the ProvRecord) [D], which also upgrades today&rsquo;s heuristic (key, value-time proximity) join to exact.</span>
+          <span class="l">replica apply marks</span><span><b>won</b> events per vantage node (&ldquo;by&rdquo; address) [B]; a missing node is detectable only if a bridge can see it &mdash; single-bridge blindness during partition is the known multi-vantage-merge gap.</span>
+          <span class="l">verdict</span><span>derived: any per-node stamp &ne; consensus stamp &rArr; divergence (needs the NEW version sample above); fence-vs-conflict-vs-dedup tallies from [B].</span>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+'use strict';
+/* ---------- mock cluster (shapes per the observable-data inventory; verbatim from spec) ---------- */
+const N = {
+  A:  { uuid:'3f8a1c2e-9b4d-4e7a-8c1f-2d5e6a7b8c9d', addr:'127.0.0.1:49801' },
+  B:  { uuid:'9d2b7f4a-1c3e-4b8d-9e2f-7a6c5d4e311a', addr:'127.0.0.1:49803' },
+  C:  { uuid:'6c1e9a3b-5d7f-4c2a-8b9e-3f4d2a1c7e5b', addr:'127.0.0.1:49805' },
+  D:  { uuid:'b4e2d8f6-3a1c-4d9b-8e7f-5c6a9b2d4f8e', addr:'127.0.0.1:49807' },
+  E:  { uuid:'e7a93c5d-8f2b-4a6e-9c1d-4b7e6f3a2d9c', addr:'127.0.0.1:49809' },
+  CLI:{ uuid:'2d5f8b1a-7c4e-4f9a-b3d6-8e1c2a5f7b3d', addr:null, client:true },
+};
+const MEMBERS = ['A','B','C','D','E'];
+const short = u => u.slice(0,4) + '…' + u.slice(-3);
+const portOf = k => N[k].addr ? N[k].addr.split(':')[1] : '—';
+const idOf = k => N[k].client ? short(N[k].uuid) + ' client' : N[k].addr + ' ' + short(N[k].uuid);
+
+/* ---------- per-key mock stories (verbatim from spec) ---------- */
+const KEYS = {
+  'user42.score': {
+    partition:'user42', segment:73, owner:'A', epoch:4,
+    replicas:'∞ — full replication (ring.replicas = null); all 5 members hold every partition',
+    moved:{ text:'moved 48s ago · e3→e4 · 49803 → 49801', state:'warn' },
+    consensus:{ e:4, s:1287, o:'A', v:'8', n:4, total:5 },
+    verdict:{ state:'crit', head:'DIVERGENCE — 1 / 5 nodes',
+      body:'127.0.0.1:49807 still holds e3·s1241 ("5", origin 6c1e…e5b) while the other 4 hold e4·s1287 ("8"). ' +
+           '49807 has applied nothing for partition user42 since the e3→e4 view change — sticky pre-fence stamp.' },
+    winners:[
+      { n:'A', e:4, s:1287, o:'A', v:'8', ok:true },
+      { n:'B', e:4, s:1287, o:'A', v:'8', ok:true },
+      { n:'C', e:4, s:1287, o:'A', v:'8', ok:true },
+      { n:'D', e:3, s:1241, o:'C', v:'5', ok:false, jump:2640,
+        sub:'DIVERGED — no won apply for this partition since view e3→e4 (64s) · click to load the stamp it is stuck on' },
+      { n:'E', e:4, s:1287, o:'A', v:'8', ok:true },
+    ],
+    timeline:[
+      { t:2841, out:'local', o:'A', s:1287, e:4, val:8, rx:'12s', cur:true,
+        note:'owner commit of the forwarded client write (restamped origin = owner) — current winner' },
+      { t:2840, out:'dropped', o:'CLI', s:88, e:4, val:8, rx:'12s',
+        note:'duplicate delivery — client retried the forward (no ack visibility), origin-seq 88 already applied → dedup-dropped (verbose:true only)' },
+      { t:2839, out:'forwarded', o:'CLI', s:88, e:4, val:8, rx:'12s',
+        note:'forward observed at 49803 (the event’s "by" vantage — target inferred, not carried) → owner-forward → 49801 · ack: unknown (needs NEW trace id)' },
+      { t:2802, out:'conflict', o:'B', s:902, e:4, val:7, rx:'31s', by:{ e:4, s:1265, o:'A' },
+        note:'same-epoch seq contention — a true concurrent write, NOT rebalance churn' },
+      { t:2798, out:'won', o:'A', s:1265, e:4, val:6, rx:'34s' },
+      { t:2771, out:'fence', o:'CLI', s:87, e:1, val:99, rx:'41s', by:{ e:4, s:1265, o:'A' },
+        note:'epoch-1 client-local commit, fenced on every replica (the DECISIONS X bug class)' },
+      { view:true, rx:'48s', note:'view e3 → e4 · 5 members · segment 73 owner moved 49803 → 49801' },
+      { t:2640, out:'won', o:'C', s:1241, e:3, val:5,
+        pin:'127.0.0.1:49807 is stuck on this stamp' },
+      { t:2588, out:'fence', o:'B', s:851, e:2, val:4, by:{ e:3, s:1203, o:'C' },
+        note:'write under a stale view during churn — expected epoch fence' },
+      { t:2541, out:'won', o:'C', s:1203, e:3, val:4 },
+      { t:2410, out:'won', o:'B', s:1198, e:3, val:3, type:'insert' },
+    ],
+    route:{ ago:'12s', desc:'user42.score = 8',
+      hops:[
+        { stage:'client write', n:'CLI', sub:'read-only client · attempt epoch 4 · client seq 88' },
+        { stage:'forward',      n:'B',   sub:'client → connected server (target inferred from the "by" vantage) · ack: unknown — needs NEW per-write trace id' },
+        { stage:'owner commit', n:'A',   sub:'owner-forward → restamped origin 3f8a…c9d · seq 1287 · epoch 4' },
+      ],
+      fan:{ sub:'3 / 4 won applies observed', peers:[
+        { n:'B', ok:true }, { n:'C', ok:true }, { n:'E', ok:true },
+        { n:'D', ok:false, note:'no won' } ] } },
+  },
+
+  'user43.name': {
+    partition:'user43', segment:17, owner:'E', epoch:4,
+    replicas:'∞ — full replication (ring.replicas = null); all 5 members hold every partition',
+    moved:{ text:'stable since e2 · no recent move', state:'ok' },
+    consensus:{ e:4, s:212, o:'E', v:'"amara"', n:5, total:5 },
+    verdict:{ state:'ok', head:'CONVERGED — 5 / 5 nodes',
+      body:'All 5 servers hold e4·s212 ("amara", origin e7a9…d9c). No losers in the observed window.' },
+    winners: MEMBERS.map(n => ({ n, e:4, s:212, o:'E', v:'"amara"', ok:true })),
+    timeline:[
+      { t:2756, out:'local', o:'E', s:212, e:4, val:'amara', rx:'25s', cur:true, note:'current winner — local commit on the owner' },
+      { t:2691, out:'won', o:'E', s:198, e:4, val:'amy', rx:'58s' },
+      { t:2240, out:'won', o:'A', s:1102, e:3, val:'am', type:'insert' },
+    ],
+    route:{ ago:'25s', desc:'user43.name = "amara"',
+      hops:[
+        { stage:'local write',  n:'E', sub:'writer is a member · no forward needed' },
+        { stage:'owner commit', n:'E', sub:'committed local · origin e7a9…d9c · seq 212 · epoch 4' },
+      ],
+      fan:{ sub:'4 / 4 won applies observed', peers:[
+        { n:'A', ok:true }, { n:'B', ok:true }, { n:'C', ok:true }, { n:'D', ok:true } ] } },
+  },
+
+  'cart7.items': {
+    partition:'cart7', segment:41, owner:'C', epoch:4,
+    replicas:'∞ — full replication (ring.replicas = null); all 5 members hold every partition',
+    moved:{ text:'moved 48s ago · e3→e4 · 49809 → 49805', state:'warn' },
+    consensus:{ e:4, s:977, o:'C', v:'[3 items]', n:5, total:5 },
+    verdict:{ state:'ok', head:'CONVERGED — 5 / 5 nodes',
+      body:'All 5 servers hold e4·s977. 1 epoch-fenced write during the e3→e4 rebalance — expected churn, not a conflict.' },
+    winners: MEMBERS.map(n => ({ n, e:4, s:977, o:'C', v:'[3 items]', ok:true })),
+    timeline:[
+      { t:2811, out:'local', o:'C', s:977, e:4, val:['sku882','sku101','sku204'], rx:'19s', cur:true,
+        note:'owner commit — current winner' },
+      { t:2701, out:'fence', o:'D', s:412, e:3, val:['sku882'], rx:'46s', by:{ e:4, s:951, o:'C' },
+        note:'write under the stale e3 view during rebalance — expected epoch fence' },
+      { t:2688, out:'won', o:'C', s:951, e:4, val:['sku882','sku101'], rx:'47s' },
+      { view:true, rx:'48s', note:'view e3 → e4 · 5 members · segment 41 owner moved 49809 → 49805' },
+      { t:2305, out:'won', o:'D', s:401, e:3, val:['sku882'], type:'insert' },
+    ],
+    route:{ ago:'19s', desc:'cart7.items = [3 items]',
+      hops:[
+        { stage:'client write', n:'CLI', sub:'read-only client · attempt epoch 4 · client seq 91' },
+        { stage:'forward',      n:'C',   sub:'connected server is already the owner — single hop · ack: unknown (NEW trace id)' },
+        { stage:'owner commit', n:'C',   sub:'restamped origin 6c1e…e5b · seq 977 · epoch 4' },
+      ],
+      fan:{ sub:'4 / 4 won applies observed', peers:[
+        { n:'A', ok:true }, { n:'B', ok:true }, { n:'D', ok:true }, { n:'E', ok:true } ] } },
+  },
+};
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const keyOf = K => Object.keys(KEYS).find(k => KEYS[k] === K);
+
+/* outcome word + frame class (no pills, no emoji) */
+const OUT = {
+  local:    'LOCAL',
+  won:      'WON',
+  fence:    'LOST·FENCE',
+  conflict: 'LOST·CONFLICT',
+  dropped:  'DROP·DEDUP',
+  forwarded:'FORWARDED',
+};
+
+let cur = { key:null, K:null, selT:null };
+let filter = 'all';
+
+/* ---------- raw ProvRecord/ChangeRecord → editor-tokenised JSON ----------
+   Editor-grade syntax tokens replace pills: keys, strings, numbers, punctuation each one restrained hue. */
+function buildRecord(r, K){
+  const kind = r.out === 'fence' || r.out === 'conflict' ? 'lost' : r.out;
+  const prov = { t:r.t, kind, origin:N[r.o].uuid, seq:r.s, epoch:r.e, key:keyOf(K) };
+  if (r.by){ prov.we = r.by.e; prov.ws = r.by.s; }
+  const record = { type:r.type || 'update', key:keyOf(K).split('.'), value:r.val, origin:N[r.o].uuid, seq:r.s, epoch:r.e };
+  return { prov, record };
+}
+
+/* recursive JSON pretty-printer that emits class-tagged spans for each token type */
+function tokenize(value, indent){
+  const pad = '  '.repeat(indent), pad2 = '  '.repeat(indent + 1);
+  if (value === null) return '<span class="t-kw">null</span>';
+  if (typeof value === 'boolean') return `<span class="t-kw">${value}</span>`;
+  if (typeof value === 'number') return `<span class="t-num">${value}</span>`;
+  if (typeof value === 'string') return `<span class="t-str">"${esc(value)}"</span>`;
+  if (Array.isArray(value)){
+    if (!value.length) return '<span class="t-punct">[]</span>';
+    const items = value.map(v => pad2 + tokenize(v, indent + 1));
+    return '<span class="t-punct">[</span>\n' + items.join('<span class="t-punct">,</span>\n') + '\n' + pad + '<span class="t-punct">]</span>';
+  }
+  // object
+  const keys = Object.keys(value);
+  if (!keys.length) return '<span class="t-punct">{}</span>';
+  const rows = keys.map(k =>
+    pad2 + `<span class="t-key">"${esc(k)}"</span><span class="t-punct">:</span> ` + tokenize(value[k], indent + 1));
+  return '<span class="t-punct">{</span>\n' + rows.join('<span class="t-punct">,</span>\n') + '\n' + pad + '<span class="t-punct">}</span>';
+}
+
+function renderEditor(r, K){
+  if (!r){
+    $('edSrc').innerHTML = '<span class="cmt">// select a version frame in the call stack to load its raw record</span>';
+    $('edLn').textContent = '1';
+    $('edMeta').textContent = '';
+    return;
+  }
+  const rec = buildRecord(r, K);
+  const html = tokenize(rec, 0);
+  $('edSrc').innerHTML = html;
+  // line numbers from rendered line count
+  const lines = html.split('\n').length;
+  $('edLn').textContent = Array.from({ length:lines }, (_, i) => i + 1).join('\n');
+  $('edMeta').textContent = `t${r.t} · kind:${rec.prov.kind} · ${rec.prov.we != null ? 'beaten by we' + rec.prov.we + '/ws' + rec.prov.ws : 'winner'}`;
+}
+
+/* ---------- sidebar: divergent keys tree ---------- */
+function buildKeyTree(){
+  const order = Object.keys(KEYS).map(key => {
+    const K = KEYS[key];
+    const dissent = K.winners.filter(w => !w.ok).length;
+    const losses = K.timeline.filter(r => r.out === 'fence' || r.out === 'conflict' || r.out === 'dropped').length;
+    return { key, dissent, losses, total:K.winners.length };
+  }).sort((a, b) => b.dissent - a.dissent || b.losses - a.losses);
+
+  $('keyCount').textContent = order.length;
+  const tree = $('keytree'); tree.innerHTML = '';
+  for (const o of order){
+    const row = el('button', 'ktrow' + (o.dissent ? ' diverged' : ''));
+    row.dataset.key = o.key;
+    const st = o.dissent ? `${o.dissent}/${o.total} DIVERGED`
+      : o.losses ? `<span class="st fence">CONVERGED · ${o.losses} LOST</span>`
+      : 'CONVERGED';
+    row.innerHTML =
+      `<span class="gl">${o.dissent ? 'DIV' : 'OK'}</span>` +
+      `<span class="knm">${esc(o.key)}</span>` +
+      `<span class="st">${st}</span>`;
+    row.onclick = () => show(o.key);
+    tree.appendChild(row);
+  }
+  return order;
+}
+
+/* ---------- sidebar: VERSIONS call stack (newest frame on top) ---------- */
+function renderStack(K){
+  const stack = $('stack'); stack.innerHTML = '';
+  let frameN = 0;
+  K.timeline.forEach(r => {
+    if (r.view){
+      const d = el('div', 'frame divider');
+      d.innerHTML = `<div class="vd">${esc(r.note)}</div>`;
+      stack.appendChild(d);
+      return;
+    }
+    frameN++;
+    const fr = el('button', 'frame ' + r.out + (r.cur ? ' top' : ''));
+    fr.dataset.t = r.t;
+    fr.dataset.out = r.out;
+    const valTxt = Array.isArray(r.val) ? `[${r.val.length} items]` : JSON.stringify(r.val);
+    const right = r.cur ? `<span class="curtag">CURRENT</span>`
+      : (K.winners.some(w => !w.ok && w.jump === r.t) ? `<span class="stuktag">&larr; STUCK HERE</span>` : '');
+    fr.innerHTML =
+      `<div class="fl1"><span class="outc ${r.out}">${OUT[r.out]}</span>` +
+      `<span style="color:var(--dim);font-family:ui-monospace,Menlo,monospace;font-size:11px">e${r.e}·s${r.s}</span>${right}</div>` +
+      `<div class="fl2"><span class="origin">@ ${esc(N[r.o].addr ? portOf(r.o) : 'client')}</span>` +
+      `<span>= ${esc(valTxt)}</span></div>`;
+    fr.onclick = () => selectFrame(r.t);
+    stack.appendChild(fr);
+  });
+  $('verCount').textContent = frameN;
+  $('stackfoot').innerHTML = 'frames beyond the 256-slot prov ring need retained history (see data sources)';
+  applyFilter();
+}
+
+function selectFrame(t){
+  cur.selT = t;
+  const r = cur.K.timeline.find(x => x.t === t);
+  document.querySelectorAll('#stack .frame').forEach(f => f.classList.toggle('sel', f.dataset.t === String(t)));
+  renderEditor(r, cur.K);
+}
+
+/* jump from a diverged property-grid node → load that frame; clear filter so it's visible */
+function jumpTo(t){
+  if (filter !== 'all') setFilter('all');
+  selectFrame(t);
+  const f = document.querySelector(`#stack .frame[data-t="${t}"]`);
+  if (f) f.scrollIntoView({ block:'center' });
+}
+
+/* ---------- stack filter ---------- */
+function applyFilter(){
+  const match = {
+    all:() => true,
+    losers:o => o === 'fence' || o === 'conflict' || o === 'dropped',
+    fence:o => o === 'fence',
+    conflict:o => o === 'conflict',
+    dedup:o => o === 'dropped',
+  }[filter];
+  document.querySelectorAll('#stack .frame').forEach(f => {
+    if (f.classList.contains('divider')){ f.style.display = filter === 'all' ? '' : 'none'; return; }
+    f.style.display = match(f.dataset.out) ? '' : 'none';
+  });
+}
+function setFilter(f){
+  filter = f;
+  document.querySelectorAll('#stackfilt .ftog').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === f));
+  applyFilter();
+}
+$('stackfilt').onclick = e => { const b = e.target.closest('.ftog'); if (b) setFilter(b.dataset.f); };
+
+/* ---------- verdict ---------- */
+function renderVerdict(K){
+  const v = $('verdict');
+  v.className = 'verdict ' + (K.verdict.state === 'crit' ? 'crit' : 'ok');
+  $('vh').textContent = K.verdict.head;
+  // wrap stamps/values in mono spans for the body (multi-digit epochs too: e\d+·s\d+)
+  $('vb').innerHTML = esc(K.verdict.body)
+    .replace(/(e\d+·s\d+)/g, '<span class="mono">$1</span>');
+}
+
+/* ---------- VARIABLES property grid (winner stamp + per-node group) ---------- */
+function pvNum(x){ return `<span class="num">${x}</span>`; }
+function renderVars(K, key){
+  const c = K.consensus;
+  $('varNote').textContent = `__inspect {versions:K} · servers only · winner stamp + per-node`;
+  const g = $('pgrid'); g.innerHTML = '';
+
+  // winner stamp top-level rows
+  const top = [
+    ['key', `<span class="str">"${esc(key)}"</span>`],
+    ['epoch', pvNum(c.e)],
+    ['seq', pvNum(c.s)],
+    ['origin', `<span class="dim">${esc(N[c.o].addr)}</span> ${esc(short(N[c.o].uuid))}`],
+    ['value', /^[\[\"]/.test(c.v) ? `<span class="str">${esc(c.v)}</span>` : `<span class="num">${esc(c.v)}</span>`],
+  ];
+  for (const [k, v] of top){
+    const row = el('div', 'prow okgut');
+    row.innerHTML = `<span class="tw"></span><span class="pk">${k}</span><span class="pv">${v}</span>`;
+    g.appendChild(row);
+  }
+
+  // expandable per-node group
+  const agreeCount = K.winners.filter(w => w.ok).length;
+  const groupExpanded = K.winners.some(w => !w.ok); // auto-expand when diverged
+  const gr = el('div', 'prow group okgut');
+  gr.dataset.expanded = groupExpanded ? '1' : '0';
+  const gtw = () => gr.dataset.expanded === '1' ? 'v' : '>';
+  gr.innerHTML =
+    `<span class="tw">${gtw()}</span>` +
+    `<span class="pk">perNode</span>` +
+    `<span class="pv"><span class="dim">{${K.winners.length} stamps · ${agreeCount}/${K.winners.length} agree consensus}</span>` +
+    (groupExpanded ? ` <span class="badge">DIVERGENCE</span>` : ``) + `</span>`;
+  g.appendChild(gr);
+
+  const childRows = [];
+  for (const w of K.winners){
+    const row = el('div', 'prow child ' + (w.ok ? 'okgut' : 'divnode'));
+    if (!groupExpanded) row.classList.add('hide');
+    const stamp = `e${w.e}·s${w.s}`;
+    const valSpan = /^[\[\"]/.test(w.v) ? `<span class="str">${esc(w.v)}</span>` : `<span class="num">${esc(w.v)}</span>`;
+    row.innerHTML =
+      `<span class="tw"></span>` +
+      `<span class="pk">${esc(portOf(w.n))}</span>` +
+      `<span class="pv">${stamp} <span class="dim">origin ${esc(short(N[w.o].uuid))}</span> = ${valSpan}` +
+      (w.ok ? '' : ` &nbsp;<span class="badge">${esc(w.sub || 'DIVERGED')}</span>`) + `</span>`;
+    if (!w.ok && w.jump != null){ row.onclick = () => jumpTo(w.jump); }
+    g.appendChild(row);
+    childRows.push(row);
+  }
+  gr.onclick = () => {
+    const open = gr.dataset.expanded === '1';
+    gr.dataset.expanded = open ? '0' : '1';
+    gr.querySelector('.tw').textContent = open ? '>' : 'v';
+    childRows.forEach(r => r.classList.toggle('hide', open));
+  };
+}
+
+/* ---------- OWNERSHIP ---------- */
+function renderOwnership(K){
+  $('ownNote').textContent = `ring.coverage index · epoch ${K.epoch}`;
+  const kv = $('ownKv'); kv.innerHTML =
+    `<span class="k">partition</span><span class="v"><span class="mv">${esc(K.partition)}</span> <span style="color:var(--faint)">(top-level key)</span></span>` +
+    `<span class="k">segment</span><span class="v">${K.segment} / 120</span>` +
+    `<span class="k">owner</span><span class="v"><span class="mv">${esc(N[K.owner].addr)}</span> ${esc(short(N[K.owner].uuid))}</span>` +
+    `<span class="k">replica set</span><span class="v" style="color:var(--dim)">${esc(K.replicas)}</span>` +
+    `<span class="k">ownership</span><span class="v moved-${K.moved.state}">${esc(K.moved.text)}</span>`;
+
+  const strip = $('segline'); strip.innerHTML = '';
+  for (let i = 0; i < 120; i++){
+    const s = el('div', 'seg' + (i === K.segment ? ' hit' : ''));
+    if (i === K.segment){ s.title = `seg ${K.segment} → ${N[K.owner].addr}`; }
+    strip.appendChild(s);
+  }
+  // caption anchored to the panel edge (not the tiny hit cell) so it never overlaps neighbours
+  strip.appendChild(el('div', 'hitlabel', `seg ${K.segment} / 120`));
+  $('ownFoot').innerHTML =
+    `neutral position strip — owner colors for all 120 segments live in the ` +
+    `<a href="../../observe/web/index.html">dashboard ownership heatmap</a>`;
+}
+
+/* ---------- WRITE ROUTE ---------- */
+function renderRoute(K){
+  $('routeNote').textContent = `${K.route.desc} · ${K.route.ago} ago`;
+  const box = $('route'); box.innerHTML = '';
+  K.route.hops.forEach((h, i) => {
+    if (i) box.appendChild(el('div', 'arrow', '│'));
+    const hop = el('div', 'hop');
+    hop.innerHTML =
+      `<span class="stg">${esc(h.stage)}</span>` +
+      `<span class="det"><span class="who">${esc(idOf(h.n))}</span><span class="sub">${esc(h.sub)}</span></span>`;
+    box.appendChild(hop);
+  });
+  box.appendChild(el('div', 'arrow', '│'));
+  const fan = el('div', 'fan');
+  fan.innerHTML =
+    `<div class="ttl">replica fan-out · ${esc(K.route.fan.sub)}</div>` +
+    `<div class="nodes">` + K.route.fan.peers.map(p =>
+      `<span class="fn ${p.ok ? '' : 'miss'}" title="${esc(N[p.n].uuid)}">` +
+      `<span class="mark">${p.ok ? 'WON' : 'NO WON'}</span> <span class="ok">${esc(portOf(p.n))}</span>` +
+      (p.note ? ` <span style="color:var(--bad)">· ${esc(p.note)}</span>` : '') + `</span>`
+    ).join('') + `</div>`;
+  box.appendChild(fan);
+}
+
+/* ---------- orchestration ---------- */
+function show(key){
+  const K = KEYS[key];
+  if (!K) return;
+  cur.key = key; cur.K = K; cur.selT = null;
+  $('crumbKey').textContent = key;
+  document.querySelectorAll('#keytree .ktrow').forEach(r => r.classList.toggle('sel', r.dataset.key === key));
+  try { history.replaceState(null, '', '#' + encodeURIComponent(key)); } catch {}
+  renderVerdict(K);
+  renderVars(K, key);
+  renderStack(K);
+  renderOwnership(K);
+  renderRoute(K);
+  // default selected frame = the current winner (top of stack)
+  const top = K.timeline.find(r => r.cur) || K.timeline.find(r => !r.view);
+  if (top) selectFrame(top.t); else renderEditor(null, K);
+}
+
+buildKeyTree();
+window.addEventListener('hashchange', () => {
+  const k = decodeURIComponent(location.hash.slice(1));
+  if (KEYS[k]) show(k);
+});
+const fromHash = decodeURIComponent(location.hash.slice(1));
+show(KEYS[fromHash] ? fromHash : 'user42.score');
+</script>
+</body>
+</html>

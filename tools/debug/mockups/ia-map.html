@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fero · debugging — information architecture map</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#16181d; --panel-2:#1b1e25; --line:#262932;
+    --ink:#dde1e9; --dim:#8b919e; --soft:#5b616c;
+    --data:#6cb6ff;        /* data spine (resource → partition → key) */
+    --phys:#e0a356;        /* physical spine (nodes) */
+    --both:#dde1e9;        /* convergence / leaves */
+    --epoch:#a78bfa;       /* epoch / view dimension */
+    --metric:#4fb6a3;      /* metrics cross-cut */
+    --good:#5bbf91; --bad:#e5645c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  b{font-weight:650;color:#fff}
+  a{color:var(--data);text-decoration:none} a:hover{text-decoration:underline}
+
+  header{padding:22px 26px 16px;border-bottom:1px solid var(--line)}
+  header .crumb{color:var(--soft);font-size:12px;margin-bottom:8px}
+  header h1{margin:0 0 6px;font-size:18px;font-weight:680}
+  header h1 em{color:var(--data);font-style:normal}
+  header p{margin:0 0 6px;color:var(--dim);font-size:13.5px;max-width:94ch}
+  header p .mono{color:var(--ink)}
+  header .note{color:var(--soft);font-size:12px;max-width:94ch}
+  header .note b{color:var(--dim)}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:11px 26px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+  .legend .it{display:inline-flex;align-items:center;gap:7px}
+  .legend .sw{width:10px;height:10px;border-radius:2px;flex:none}
+
+  .layout{display:grid;grid-template-columns:minmax(440px,1.1fr) minmax(380px,1fr)}
+  @media(max-width:980px){.layout{grid-template-columns:1fr}}
+  .map{padding:24px 22px;border-right:1px solid var(--line)}
+  @media(max-width:980px){.map{border-right:0;border-bottom:1px solid var(--line)}}
+
+  .tier{display:flex;justify-content:center;margin:0}
+  .tier.four{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:stretch}
+  .lbl{text-align:center;color:var(--soft);font-size:11px;letter-spacing:.03em;padding:9px 0}
+  .flow{text-align:center;color:var(--soft);font-size:12px;padding:3px 0}
+  .node{position:relative;width:100%;max-width:330px;margin:0 auto;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid var(--c,var(--line));border-radius:7px;padding:9px 12px;cursor:pointer;text-align:left}
+  .tier.four .node{max-width:none}
+  .node:hover{border-color:var(--soft);border-left-color:var(--c)}
+  .node[aria-current=true]{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,var(--panel));box-shadow:0 0 0 1px var(--c)}
+  .node .nt{font-size:13px;font-weight:700;letter-spacing:.01em;color:var(--ink)}
+  .node .nt .ex{font-weight:400;color:var(--soft);font-size:11.5px;margin-left:5px}
+  .node small{display:block;color:var(--dim);font-size:11px;margin-top:2px;line-height:1.4}
+  .node[data-spine=data]{--c:var(--data)} .node[data-spine=phys]{--c:var(--phys)}
+  .node[data-spine=both]{--c:var(--both)} .node[data-spine=epoch]{--c:var(--epoch);border-style:dashed}
+  .node[data-spine=metric]{--c:var(--metric)}
+  .spacer{}
+
+  .detail{padding:24px 26px}
+  .detail .dcrumb{font-size:12px;color:var(--soft);margin-bottom:12px}
+  .detail .dcrumb span{color:var(--dim)} .detail .dcrumb b{color:var(--ink)}
+  .detail .spine-tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,var(--line));border-radius:3px;padding:2px 8px;margin-bottom:10px}
+  .detail h2{margin:0 0 2px;font-size:20px;font-weight:680}
+  .detail h2 .ex{font-weight:400;color:var(--soft);font-size:14px;margin-left:8px}
+  .detail .sub{color:var(--dim);font-size:13px;margin:0 0 16px}
+  .detail .q{font-size:14.5px;color:var(--ink);border-left:2px solid var(--c);padding:3px 0 3px 14px;margin:0 0 16px}
+  .detail h3{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:16px 0 8px}
+  .detail ul{margin:0;padding:0;list-style:none}
+  .detail ul li{padding:4px 0 4px 16px;position:relative;color:var(--dim);font-size:13px}
+  .detail ul li::before{content:'';position:absolute;left:0;top:10px;width:5px;height:5px;border-radius:1px;background:var(--c);opacity:.6}
+  .detail ul li b{color:var(--ink)} .detail ul li .new{color:var(--epoch);font-weight:600}
+  .detail .realized{font-size:13px;color:var(--dim)}
+  .detail .realized .pill{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:2px 8px;margin-left:4px}
+  .detail .realized .pill.todo{color:var(--soft)}
+  .rels{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+  .rel{display:grid;grid-template-columns:74px 1fr;gap:10px;align-items:start}
+  .rel .rl{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--soft);padding-top:5px}
+  .rel .rc{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:12px;font-weight:600;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);
+    border-left:2px solid var(--c2,var(--line));border-radius:5px;padding:4px 9px;cursor:pointer}
+  .chip:hover{border-color:var(--soft)}
+  .chip[data-spine=data]{--c2:var(--data)} .chip[data-spine=phys]{--c2:var(--phys)}
+  .chip[data-spine=both]{--c2:var(--both)} .chip[data-spine=epoch]{--c2:var(--epoch)} .chip[data-spine=metric]{--c2:var(--metric)}
+
+  footer{padding:15px 26px 40px;color:var(--soft);font-size:12px;border-top:1px solid var(--line)}
+  footer code{font-family:ui-monospace,Menlo,monospace;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="crumb">observe › debugging · information architecture (v2 — refined hierarchy)</div>
+  <h1><em>fero</em> debugging — information architecture map</h1>
+  <p>The atom is one <b>commit</b> (change record <span class="mono">{type, key, value, origin, seq, epoch}</span>). A <b>partition</b> = the top-level
+     segment of a dotted key (<span class="mono">user42</span> for <span class="mono">user42.score</span>) and holds many keys; the <b>log</b>, ownership and
+     replication are all <b>per-partition</b> — so the partition page <i>is</i> the log, and a <b>key</b> is a lens on it.</p>
+  <p class="note"><b>Two co-equal spines</b> from a resource: <b>data</b> (partitions → log) and <b>physical</b> (server + client nodes), which meet at the
+     partition page. <b>Epoch</b> is a dimension across ownership/node views (now, expandable to prior epochs). <b>Metrics</b> cross-cut every level.
+     Several levels need <span style="color:var(--epoch)">NEW instrumentation</span> (historical-epoch layouts, per-partition latency/throughput) — flagged per level.</p>
+</header>
+
+<div class="legend">
+  <span class="it"><span class="sw" style="background:var(--data)"></span>data spine (partition → log → key)</span>
+  <span class="it"><span class="sw" style="background:var(--phys)"></span>physical spine (nodes)</span>
+  <span class="it"><span class="sw" style="background:var(--metric)"></span>metrics (cross-cut)</span>
+  <span class="it"><span class="sw" style="background:var(--epoch)"></span>epoch dimension</span>
+  <span class="it"><span class="sw" style="background:var(--both)"></span>leaf / convergence</span>
+</div>
+
+<div class="layout">
+  <div class="map">
+    <div class="tier"><button class="node" data-id="resources" data-spine="data">
+      <span class="nt">RESOURCES</span><small>list (later map) of every <span class="mono">fero(name)</span> running</small></button></div>
+    <div class="flow">↓</div>
+    <div class="tier"><button class="node" data-id="resource" data-spine="data">
+      <span class="nt">RESOURCE <span class="ex">"sessions"</span></span><small>one resource — the hub you drill four ways from</small></button></div>
+    <div class="lbl">from a resource you drill four ways ↓</div>
+    <div class="tier four">
+      <button class="node" data-id="partitions" data-spine="data">
+        <span class="nt">PARTITIONS</span><small>key namespaces in the resource</small></button>
+      <button class="node" data-id="servers" data-spine="phys">
+        <span class="nt">SERVER NODES</span><small>members forming it · by epoch</small></button>
+      <button class="node" data-id="clients" data-spine="phys">
+        <span class="nt">CLIENT NODES</span><small>read-only clients + metrics</small></button>
+      <button class="node" data-id="metrics" data-spine="metric">
+        <span class="nt">METRICS</span><small>throughput · latency · requests</small></button>
+    </div>
+    <div class="tier four">
+      <button class="node" data-id="partition" data-spine="data">
+        <span class="nt">PARTITION <span class="ex">user42</span></span><small>centers on THE LOG · replica lag · owner-by-epoch</small></button>
+      <button class="node" data-id="node" data-spine="phys">
+        <span class="nt">NODE <span class="ex">:49807</span></span><small>partitions it owns (→ partition) · by epoch</small></button>
+      <div class="spacer"></div><div class="spacer"></div>
+    </div>
+    <div class="lbl">a node's owned partitions open the partition page →   ·   a key is a lens on the partition log ↓</div>
+    <div class="tier"><button class="node" data-id="key" data-spine="data">
+      <span class="nt">KEY <span class="ex">user42.score</span></span><small>the log filtered to one key + its LWW-resolved value</small></button></div>
+    <div class="flow">↓</div>
+    <div class="tier"><button class="node" data-id="commit" data-spine="both">
+      <span class="nt">COMMIT <span class="ex">e4·s1287</span></span><small>one change record — provenance &amp; route (leaf)</small></button></div>
+    <div class="lbl" style="margin-top:14px">— epoch dimension · re-runs ownership/node/partition views at any prior view —</div>
+    <div class="tier"><button class="node" data-id="epoch" data-spine="epoch">
+      <span class="nt">EPOCH / VIEW</span><small>now → prior epochs · what the layout was then</small></button></div>
+  </div>
+
+  <div class="detail" id="detail"></div>
+</div>
+
+<script>
+'use strict';
+const NEW = '<span class="new">⚠ NEW</span>';
+const L = {
+  resources:{ spine:'data', title:'Resources', ex:'all running', sub:'The top of the tree — every resource in the cluster.',
+    q:'What resources are running, and which need attention?',
+    shows:['<b>One row per <span class="mono">fero(name)</span></b> — node count, health (converged / attention), write rate','<b>Worst-first</b> — resources with diverged keys or under-replication surface','Later: a <b>map</b> view (resources × the nodes that serve them)'],
+    realized:{label:'to build (top entry · "list later map")', todo:true},
+    down:['resource'] },
+
+  resource:{ spine:'data', title:'Resource', ex:'"sessions"', sub:'The hub — drill four ways: partitions (data), server nodes, client nodes, metrics.',
+    q:'For this resource, is it healthy — and where do I go next?',
+    shows:['Health rollup + worst-first <b>needs-attention</b> list (drills to a key)','Four drills: <b>partitions</b> · <b>server nodes</b> · <b>client nodes</b> · <b>metrics</b>','Resource-scoped activity (writes/s, conflicts/s, hot keys)'],
+    realized:{label:'Resource overview — in 3 tool idioms', href:'tool/index.html', todo:false},
+    up:['resources'], down:['partitions','servers','clients','metrics'] },
+
+  partitions:{ spine:'data', title:'Partitions', ex:'in the resource', sub:'Data spine · the list of partitions (key namespaces).',
+    q:'How is the resource sharded, and which partitions are unhealthy?',
+    shows:['<b>One row per partition</b> — owner, replica health (held / R), log size, key count','Under-replicated / orphaned partitions flagged worst-first','A partition = the top-level key segment — it holds many keys'],
+    realized:{label:'Partitions / Keys list — browse table (triage idiom)', href:'tool/partitions.html', todo:false},
+    up:['resource'], down:['partition'], cross:['metrics'] },
+
+  partition:{ spine:'data', title:'Partition', ex:'user42', sub:'Data spine · THE CENTERPIECE — the partition is its log.',
+    q:'What happened in this shard, who owns it, and are the replicas healthy?',
+    shows:['<b>THE LOG</b> — the append-only commit stream for every key in the partition (the page centers here)','<b>Replica health / lag</b> — per replica: behind by N, draining / stalled','<b>Owner by epoch</b> — ownership history across view changes (who held it when) ' + NEW,'The <b>keys</b> in the partition — selecting one filters the log (→ key lens)'],
+    realized:{label:'Partition page — the log (triage idiom)', href:'tool/partition.html', todo:false},
+    up:['partitions','node'], down:['key','commit'], cross:['epoch','metrics'] },
+
+  key:{ spine:'data', title:'Key', ex:'user42.score', sub:'Data spine · a LENS on the partition log, scoped to one key.',
+    q:'What is this key, what is its history, and is any node diverged?',
+    shows:['The partition log <b>filtered to this key</b> — just its commits','<b>LWW-resolved current value</b> + which nodes agree (divergence)','Annotations on rows — won / lost·fence / lost·conflict / dropped'],
+    realized:{label:'Key Autopsy — happy-path canvas', href:'key-autopsy/happy.html', todo:false},
+    up:['partition'], down:['commit'] },
+
+  commit:{ spine:'both', title:'Commit', ex:'e4·s1287', sub:'The leaf — one change record, from the log.',
+    q:'What exactly was this one write?',
+    shows:['The full record — type, key, value, origin, seq, epoch','Provenance — won / lost / forwarded / local, and WHY','Route — client → forward → owner commit → replica fan-out → acks'],
+    realized:{label:'Write Traces (follow one write)', href:'write-traces.html', todo:false},
+    up:['key','partition'], cross:['epoch'] },
+
+  servers:{ spine:'phys', title:'Server nodes', ex:'forming the resource', sub:'Physical spine · the member servers — current epoch first, prior epochs expandable.',
+    q:'Which servers form this resource, and what was the layout (now & before)?',
+    shows:['<b>Current epoch</b> first — members, gate, lag, partitions owned','<b>Expand to prior epochs</b> — membership & ownership layout at e3, e2… ' + NEW,'Per-node request / throughput metrics (cross-link)'],
+    realized:{label:'to build (node list · per-epoch)', todo:true},
+    up:['resource'], down:['node'], cross:['epoch','metrics'] },
+
+  node:{ spine:'phys', title:'Node', ex:':49807', sub:'Physical spine · one server — meets the data spine via the partitions it owns.',
+    q:'What does this server own and believe — now and at prior epochs?',
+    shows:['<b>Partitions it OWNS</b> → each opens the partition page','<b>Owned-by-epoch</b> — what it held at other epochs (ownership churn) ' + NEW,'Its view / gate / lag / peers / marks · pass-warn-fail verdict'],
+    realized:{label:'Node Doctor', href:'node-doctor.html', todo:false},
+    up:['servers'], down:['partition'], cross:['epoch','metrics'] },
+
+  clients:{ spine:'phys', title:'Client nodes', ex:'read-only', sub:'Physical spine · the clients reading from the resource.',
+    q:'Who is reading this resource, and how are the clients doing?',
+    shows:['<b>One row per client</b> — address, which server it\'s connected to','Request rate · read latency · subscriptions held ' + NEW,'Re-dial / disconnect churn (failover health)'],
+    realized:{label:'to build', todo:true},
+    up:['resource'], cross:['metrics'] },
+
+  metrics:{ spine:'metric', title:'Metrics', ex:'throughput · latency · requests', sub:'Cross-cut · sliceable per resource / partition / node.',
+    q:'What are the throughput, latency and request rates — and where is the hotspot?',
+    shows:['<b>Per resource / per partition / per node</b> — writes/s, reads/s, requests/s','<b>Latency</b> — commit / replicate / read p50·p99 ' + NEW + ' (not instrumented today)','Time series sliceable by epoch — overlay view changes'],
+    realized:{label:'to build (mostly NEW instrumentation)', todo:true},
+    up:['resource'], cross:['partition','node'] },
+
+  epoch:{ spine:'epoch', title:'Epoch / view', ex:'the time dimension', sub:'A dimension, not a page — re-runs ownership/node/partition views at a chosen view.',
+    q:'What did the layout look like at a prior epoch — and how did it change?',
+    shows:['Default = <b>current epoch</b>; expand to prior epochs','Re-projects <b>owner-by-epoch</b>, membership, and the log at view T','Belief-at-T per node, grouped by committed view (a partition splits the groups)'],
+    realized:{label:'Cluster Replay (temporal lens)', href:'cluster-replay.html', todo:false},
+    cross:['partition','node','servers'] },
+};
+const CRUMB = { resources:['resources'], resource:['resources','resource'],
+  partitions:['resources','resource','partitions'], partition:['resources','resource','partitions','partition'],
+  key:['resources','resource','partitions','partition','key'], commit:['resources','resource','partitions','partition','key','commit'],
+  servers:['resources','resource','servers'], node:['resources','resource','servers','node'],
+  clients:['resources','resource','clients'], metrics:['resources','resource','metrics'], epoch:['epoch'] };
+
+const $ = id => document.getElementById(id);
+const chip = id => `<button class="chip" data-go="${id}" data-spine="${L[id].spine}">${L[id].title}<span style="color:var(--soft);font-weight:400"> ${L[id].ex}</span></button>`;
+
+function select(id){
+  const d = L[id];
+  document.querySelectorAll('.map .node').forEach(n=>n.setAttribute('aria-current', n.dataset.id===id));
+  try{ history.replaceState(null,'','#'+id); }catch{}
+  const crumb = CRUMB[id].map((c,i,a)=> i===a.length-1 ? `<b>${L[c].title}</b>` : `<span>${L[c].title}</span>`).join(' › ');
+  const r = d.realized;
+  const realizedHtml = r.href
+    ? `realized by <a href="${r.href}">${r.label}</a> <span class="pill">mockup</span>`
+    : `<span style="color:var(--ink)">${r.label.split('(')[0].trim()}</span> <span class="pill todo">${r.label.includes('(')?r.label.match(/\(([^)]+)\)/)[1]:'to build'}</span>`;
+  const relRow = (label, ids) => ids&&ids.length
+    ? `<div class="rel"><span class="rl">${label}</span><span class="rc">${ids.map(chip).join('')}</span></div>` : '';
+  $('detail').style.setProperty('--c', `var(--${d.spine==='both'?'both':d.spine})`);
+  $('detail').innerHTML =
+    `<div class="dcrumb">${crumb}</div>`+
+    `<span class="spine-tag">${d.spine==='both'?'leaf':d.spine==='epoch'?'epoch dimension':d.spine==='metric'?'metrics':d.spine+' spine'}</span>`+
+    `<h2>${d.title}<span class="ex">${d.ex}</span></h2>`+
+    `<p class="sub">${d.sub}</p>`+
+    `<p class="q">${d.q}</p>`+
+    `<h3>Shows — the primitives at this level</h3><ul>${d.shows.map(s=>`<li>${s}</li>`).join('')}</ul>`+
+    `<h3>Realized by</h3><p class="realized">${realizedHtml}</p>`+
+    `<h3>Navigate</h3><div class="rels">`+ relRow('↑ up', d.up)+ relRow('↓ down', d.down)+ relRow('↔ cross', d.cross)+ `</div>`;
+}
+
+document.querySelector('.map').addEventListener('click', e=>{ const n=e.target.closest('.node'); if(n) select(n.dataset.id); });
+$('detail').addEventListener('click', e=>{ const c=e.target.closest('.chip'); if(c) select(c.dataset.go); });
+const fromHash = location.hash.slice(1);
+select(L[fromHash] ? fromHash : 'resources');
+</script>
+</body>
+</html>

@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>fero replay — cluster rewind</title>
+<style>
+:root{
+  --bg:#0b0e14; --panel:#141925; --panel-2:#1b2230; --line:#232c3d;
+  --ink:#cbd5e1; --dim:#7587a3; --accent:#7dd3fc; --ok:#34d399; --warn:#fbbf24;
+  --bad:#f87171; --idle:#475569; --view:#a78bfa; --gate:#22d3ee;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:13px/1.5 ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;-webkit-font-smoothing:antialiased}
+main.app{max-width:1400px;margin:0 auto;padding:16px 20px}
+b,.num{font-variant-numeric:tabular-nums}
+/* ---- header ---- */
+header.top{display:flex;align-items:baseline;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:16px;flex-wrap:wrap}
+header.top h1{font-size:16px;font-weight:700}
+header.top h1 em{color:var(--accent);font-style:normal}
+.purpose{color:var(--dim);font-size:12px;max-width:760px}
+.rec{margin-left:auto;color:var(--dim);font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
+.rec b{color:var(--ink)}
+/* ---- panel chrome ---- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.phead{display:flex;align-items:baseline;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.phead .meta{margin-left:auto;color:var(--dim);font-weight:400;font-size:11px;font-variant-numeric:tabular-nums}
+/* ---- timeline ---- */
+.tl{padding:14px 14px 8px;position:relative}
+/* the state band IS the shipped convergence-timeline ribbon (tools/observe/web app.css .tlband/.tlseg —
+   same solid segments + opacities), with a dark tick lane overlaid on top instead of a re-drawn band */
+.band{position:relative;height:52px;border:1px solid var(--line);border-radius:6px;background:var(--panel-2);cursor:crosshair;overflow:hidden;touch-action:none}
+.tlseg{position:absolute;top:20px;bottom:0;background:var(--s)}
+.tlseg[data-state=ok]{opacity:.85}
+.tlseg[data-state=warn],.tlseg[data-state=crit]{opacity:1}
+[data-state=ok]{--s:var(--ok)}[data-state=warn]{--s:var(--warn)}[data-state=crit]{--s:var(--bad)}
+.tick{position:absolute;top:3px;bottom:3px;width:2px;margin-left:-1px;background:var(--k);box-shadow:0 0 0 1px rgba(11,14,20,.7);opacity:.95;cursor:pointer}
+.tick:hover{box-shadow:0 0 8px var(--k),0 0 0 1px rgba(11,14,20,.7);opacity:1}
+[data-k=view]{--k:var(--view)} [data-k=gate]{--k:var(--gate)} [data-k=kill]{--k:var(--bad)}
+[data-k=suspect]{--k:var(--warn)} [data-k=join],[data-k=heal]{--k:var(--ok)} [data-k=flag],[data-k=lost]{--k:var(--bad)}
+[data-k=rebal]{--k:var(--accent)} [data-k=mark]{--k:var(--idle)}
+.playhead{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--ink);box-shadow:0 0 10px color-mix(in srgb,var(--accent) 60%,transparent);pointer-events:none}
+.pinmark{position:absolute;top:0;margin-left:-7px;width:14px;text-align:center;font-size:9px;font-weight:700;color:#0b0e14;background:var(--accent);border-radius:0 0 4px 4px;pointer-events:none;line-height:13px}
+.pinmark.b{background:var(--view)}
+.pinmark.stack{top:14px;border-radius:4px}  /* pins at (nearly) the same instant stack instead of overlapping */
+.axis{position:relative;height:16px;color:var(--dim);font-size:10px;margin-top:2px}
+.axis span{position:absolute;transform:translateX(-50%);font-variant-numeric:tabular-nums}
+.tip{position:absolute;pointer-events:none;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:11px;z-index:9;display:none;max-width:360px;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+.tip .tt{color:var(--dim);font-variant-numeric:tabular-nums}
+.controls{display:flex;gap:8px;padding:10px 14px 14px;align-items:center;flex-wrap:wrap}
+.controls .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+button{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:border-color .2s,color .2s,background .2s}
+button:hover{border-color:var(--accent)}
+button[data-on="1"]{border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--accent)}
+.clock{margin-left:auto;color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
+.clock b{color:var(--ink);font-size:13px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:0 14px 12px;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--k);margin-right:4px;vertical-align:-1px}
+/* ---- verdict + belief groups ---- */
+.verdict{display:flex;gap:10px;align-items:center;margin:16px 0 10px;flex-wrap:wrap}
+.vpill{border-radius:999px;padding:4px 12px;font-weight:600;font-size:12px;color:var(--s);background:color-mix(in srgb,var(--s) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--s) 45%,transparent)}
+.vpill .pdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--s);margin-right:7px;vertical-align:0}
+[data-state=crit] .pdot{animation:pulse 1.1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.gchip{border-radius:999px;padding:3px 11px;font-size:11px;font-weight:600;color:var(--m);background:color-mix(in srgb,var(--m) 9%,var(--panel));border:1px solid color-mix(in srgb,var(--m) 40%,transparent)}
+[data-mood=ok]{--m:var(--ok)}[data-mood=warn]{--m:var(--warn)}[data-mood=crit]{--m:var(--bad)}[data-mood=dead]{--m:var(--idle)}[data-mood=idle]{--m:var(--idle)}
+.hint{font-size:11px;color:var(--dim)}
+.groups{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+.vgroup{flex:1 1 300px;background:var(--panel);border:1px solid var(--line);border-radius:10px;transition:border-color .3s,box-shadow .3s}
+.vgroup[data-mood=warn]{border-color:color-mix(in srgb,var(--warn) 45%,var(--line));box-shadow:0 0 12px color-mix(in srgb,var(--warn) 12%,transparent)}
+.vgroup[data-mood=crit]{border-color:color-mix(in srgb,var(--bad) 55%,var(--line));box-shadow:0 0 16px color-mix(in srgb,var(--bad) 16%,transparent)}
+.vgroup[data-mood=dead]{border-style:dashed;opacity:.7;flex:0 1 250px}
+.ghead{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-bottom:1px solid var(--line);font-size:11px;color:var(--dim);flex-wrap:wrap}
+.glabel{color:var(--ink);font-weight:700;font-size:12px}
+.gw{font-weight:600}.gw[data-on=true]{color:var(--ok)}.gw[data-on=false]{color:var(--warn)}
+.gmaj{margin-left:auto;font-weight:600;color:var(--m)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:10px;padding:12px}
+/* belief cards reuse the shipped topology node-card contract (tools/observe/web app.css .node-card):
+   same head (wdot / uuid / addr / role), same metric row + wbadge — time-parameterized, so a node
+   looks identical live and in replay. Replay-only extras (lag bar, note, expand) hang below. */
+.node-card{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:opacity .3s,border-color .2s}
+.node-card:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.node-card.readonly{border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.node-card.stale{opacity:.4;filter:grayscale(.6);border-style:dashed;cursor:default}
+.node-card[data-chg]{outline:1px solid color-mix(in srgb,var(--warn) 60%,transparent);outline-offset:1px}
+.card-head{display:flex;align-items:center;gap:8px;font-size:12px}
+.wdot{width:9px;height:9px;border-radius:50%;background:var(--idle);flex:none}
+.wdot[data-writable=true]{background:var(--ok);box-shadow:0 0 8px color-mix(in srgb,var(--ok) 70%,transparent)}
+.wdot[data-writable=false]{background:var(--bad);box-shadow:0 0 8px color-mix(in srgb,var(--bad) 70%,transparent)}
+.uuid{color:var(--accent);font-weight:700}
+.addr{color:var(--ink)}
+.role{color:var(--dim);margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+.card-view{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.metric{display:inline-flex;flex-direction:column;line-height:1.25}
+.mlabel{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+.mval{color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums}
+.mval.pend{color:var(--warn);font-weight:600}
+.wbadge{margin-left:auto;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;background:var(--panel);color:var(--dim)}
+.wbadge[data-writable=true]{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--panel))}
+.wbadge[data-writable=false]{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--panel))}
+.crow{display:flex;gap:7px;align-items:center}
+.crow.lag{font-size:10px;color:var(--dim)}
+.lagbar{flex:1;height:4px;background:var(--panel);border-radius:2px;overflow:hidden}
+.lagbar i{display:block;height:100%;background:var(--ok);transition:width .3s}
+.lagbar i[data-sev=warn]{background:var(--warn)}.lagbar i[data-sev=bad]{background:var(--bad)}
+.lagn{min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.note{font-size:10px;color:var(--warn);margin-top:4px}
+.exp{border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:11px;color:var(--dim)}
+.xl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--idle);margin:5px 0 2px}
+.mchip{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:0 5px;margin:1px 2px 1px 0;font-size:10px}
+.mk{display:flex;gap:8px;justify-content:space-between;font-variant-numeric:tabular-nums}
+.deadtag{color:var(--idle);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+/* ---- lower columns ---- */
+.cols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:14px;margin-top:16px}
+@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.scroll{height:340px;overflow-y:auto;overflow-anchor:none}
+.empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--dim);font-size:12px}
+.chrow{display:grid;grid-template-columns:72px 1fr;gap:8px;padding:4px 12px;font-size:12px;border-left:2px solid var(--v);align-items:baseline}
+[data-sev=ok]{--v:var(--ok)}[data-sev=warn]{--v:var(--warn)}[data-sev=bad]{--v:var(--bad)}[data-sev=dim]{--v:var(--idle)}
+.chrow .cat{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+.chrow[data-sev=bad] span:last-child{color:var(--bad)}
+.evrow{display:grid;grid-template-columns:56px 10px 1fr;gap:8px;padding:5px 12px 5px 10px;font-size:12px;cursor:pointer;border-left:2px solid transparent;transition:opacity .2s}
+.evrow:hover{background:color-mix(in srgb,var(--accent) 4%,transparent)}
+.evrow .t{color:var(--dim);font-variant-numeric:tabular-nums;font-size:11px}
+.evrow .kdot{width:7px;height:7px;border-radius:2px;background:var(--k);margin-top:5px}
+.evrow .d{grid-column:3;font-size:10px;color:var(--dim)}
+.evrow.future{opacity:.32}
+.evrow.cur{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+/* ---- data sources ---- */
+.sources{margin-top:18px;border-top:1px solid var(--line);padding-top:12px;font-size:11px;color:var(--dim)}
+.sources h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink);margin-bottom:8px}
+.sources dt{color:var(--ink);font-weight:600;margin-top:8px}
+.sources dd{margin-left:0}
+.new{color:var(--warn);font-weight:600}
+kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:10px;background:var(--panel-2)}
+</style>
+</head>
+<body>
+<main class="app">
+
+  <header class="top">
+    <div>
+      <h1><em>fero</em> replay <span style="color:var(--idle)">·</span> cluster rewind</h1>
+      <p class="purpose">Rewind recorded cluster history to the moment something diverged and step through what each node believed — committed views, write-gates, lag — as the incident unfolded.</p>
+    </div>
+    <div class="rec">recording <b>rec-0611-1402</b> · resource <b>"sessions"</b><br>2026-06-11 14:02:07 · <b>90.0s</b> · 6 nodes · 22 events<br>story: kill → rejoin blip → stranded VIEW_COMMIT → heal</div>
+  </header>
+
+  <!-- ============ master timeline ============ -->
+  <section class="panel">
+    <div class="phead">timeline <span class="meta" id="zoomMeta">0s – 90s · wheel to zoom · drag to scrub · click a tick to jump</span></div>
+    <div class="tl">
+      <div class="band" id="band"></div>
+      <div class="axis" id="axis"></div>
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="controls">
+      <button id="btnPrev" title="previous event (←)">⏮ prev</button>
+      <button id="btnPlay" title="play / pause (space)">▶ play</button>
+      <button id="btnNext" title="next event (→)">next ⏭</button>
+      <button id="btnSpeed" title="playback speed">1×</button>
+      <span class="sep"></span>
+      <button id="btnZoomIn">+ zoom</button>
+      <button id="btnZoomOut">− zoom</button>
+      <button id="btnZoomReset">⟲ fit</button>
+      <span class="sep"></span>
+      <button id="btnPinA" title="pin moment A for the diff">pin A @ T</button>
+      <button id="btnPinB" title="pin moment B for the diff">pin B @ T</button>
+      <span class="clock" id="clock"></span>
+    </div>
+    <div class="legend">
+      <span><i data-k="view"></i>view ballot/commit</span><span><i data-k="gate"></i>write-gate</span>
+      <span><i data-k="kill"></i>kill</span><span><i data-k="suspect"></i>suspect</span>
+      <span><i data-k="join"></i>join / heal</span><span><i data-k="flag"></i>divergence flag</span>
+      <span><i data-k="rebal"></i>rebalance</span><span><i data-k="mark"></i>marker</span>
+    </div>
+  </section>
+
+  <!-- ============ cluster belief at T ============ -->
+  <div class="verdict" id="verdict"></div>
+  <div class="groups" id="groups"></div>
+
+  <!-- ============ diff + event log ============ -->
+  <div class="cols">
+    <section class="panel">
+      <div class="phead">what changed A → B <span class="meta" id="diffMeta"></span></div>
+      <div class="scroll" id="diff"></div>
+    </section>
+    <section class="panel">
+      <div class="phead">event log <span class="meta">annotated · past full / future dim · click to jump</span></div>
+      <div class="scroll" id="evlog"></div>
+    </section>
+  </div>
+
+  <!-- ============ data sources ============ -->
+  <footer class="sources">
+    <h2>data sources (per panel)</h2>
+    <dl>
+      <dt>Timeline event ticks</dt>
+      <dd>view commits + gate flips: observe-stream kinds <b>'view'</b>/<b>'writable'</b> [B]. Kills/joins/suspect: snapshot <b>peers.status / peers.suspect</b> transitions [A], sampled per poll. Divergence flag: bridge <b>conv</b> classification [E]. A few ticks are <b>hindsight inferences</b>, not frame-level observations — and labelled as such on the tick: the dropped <i>VIEW_COMMIT e9</i> is inferred from :49807 never advancing past e8 in any later snapshot (exactly how DECISIONS Y was diagnosed); the <i>periodic re-announce</i> is inferred from the commit that follows it; the JOIN handshake shows only as a <b>peers.status</b> transition. <span class="new">⚠ NEW instrumentation:</span> the recorded history itself — the bridge keeps only a 4000-event in-memory ring and 1s aggregates are thrown away; replay needs a retained, queryable history window (seam: bridge <b>account()</b> sees every ProvEvent + a /history?since=t endpoint — inventory PLAUSIBLY-ADDABLE #3).</dd>
+      <dt>VIEW_PREPARE / VIEW_ACK ballot ticks</dt>
+      <dd><span class="new">⚠ NEW instrumentation:</span> in-flight ballot state (#proposal / #promisedEpoch) is private with no accessors — the backlog "Paxos in-flight-ballot view". Only VIEW_COMMIT outcomes are visible today (observe kind 'view').</dd>
+      <dt>PING-miss → suspect tick</dt>
+      <dd><span class="new">⚠ NEW instrumentation:</span> failure-detector internals (PING origination, miss counters, suspect transitions) have no accessors; snapshot <b>peers.suspect</b> [A] only exposes the per-poll result.</dd>
+      <dt>Per-node belief cards</dt>
+      <dd><b>epoch / members / writable / pending / uuid / me / role</b> straight off InspectSnapshot [A]; card expand: <b>marks</b> (seen digest, incl. dead-origin debris) + <b>log.heads</b> [A]. <span class="new">⚠ NEW instrumentation:</span> a timestamped snapshot <i>history</i> to scrub (backlog "snapshot capture/export") — today only the live 1s poll exists.</dd>
+      <dt>Lag vs floor (card bars)</dt>
+      <dd>bridge <b>topLag</b> computation (live-origin frontier, floor-relative, tol=16) [E] — needs per-tick retention via the same NEW history store.</dd>
+      <dt>View-group split + majority math (verdict strip)</dt>
+      <dd>bridge 'aggregate' <b>groups</b> (epoch + member-set-hash sig, size, writable) and <b>conv</b> writable-majority rule [E].</dd>
+      <dt>Diff changelog</dt>
+      <dd>epoch / gate / uuid / pending per node: snapshot [A]; per-partition heads: snapshot <b>log.heads</b> [A]; ring owner moves: bridge <b>cover</b> diff [E]; members: committed-view member sets [A]. All diffed between two retained snapshots (same NEW history dependency).</dd>
+      <dt>"3 writes flushed @e1 → fenced" annotations</dt>
+      <dd>observe kind <b>'lost'</b> with <b>we/ws</b> winner stamps [B] — distinguishes epoch-fence from same-epoch conflict. Buffered-write <i>keys</i> at the gate-close tick: <span class="new">⚠ NEW instrumentation:</span> pending-buffer sample (snapshot ships depth only; seam: the <b>pending</b> array already in SnapshotDeps — PLAUSIBLY-ADDABLE #7).</dd>
+    </dl>
+    <p style="margin-top:10px">mockup · static fake data · keys: <kbd>←</kbd>/<kbd>→</kbd> step events · <kbd>space</kbd> play/pause</p>
+  </footer>
+</main>
+
+<script>
+'use strict';
+/* ================= fixtures: one recorded 90s incident ================= */
+const DUR = 90;
+const NODES = [
+  {id:'A', addr:'127.0.0.1:49801', uuid:'3f8a1c2e-9b4d-4e7a-8c1f-2d5e6a7b8c9d'},
+  {id:'B', addr:'127.0.0.1:49803', uuid:'9d2b7f41-1c6e-4a02-b3d8-5e09c4f211aa'},
+  {id:'C', addr:'127.0.0.1:49807', uuid:'b61e0d9c-44f2-4c1b-9a77-0e3d8b21c4f5'},
+  {id:'D', addr:'127.0.0.1:49809', uuid:'71c4aa08-2d5b-4f96-8e13-c79f02d6b384'},
+  {id:'E', addr:'127.0.0.1:49815', uuid:'e8401b6f-7a3d-4d28-92c5-1f6b09e7d2ac', uuid2:'2c9f7e51-08b4-4ab1-bd60-93a4e1c87f02'},
+  {id:'F', addr:'127.0.0.1:49818', uuid:'5a07d3e9-c1f8-4b62-a94d-7e218c053b6f'},
+];
+const byId = Object.fromEntries(NODES.map(n=>[n.id,n]));
+const M6 = ['A','B','C','D','E','F'], M5 = ['A','B','C','D','F'];
+const port = id => ':' + byId[id].addr.split(':')[1];
+
+// The incident script. Every tick is annotated; the log panel renders these verbatim.
+const EV = [
+  {t:0.0,  k:'mark',    label:'recording starts — epoch 7, 6 members, converged', d:'all nodes writable @e7, single committed view'},
+  {t:8.2,  k:'suspect', label:':49815 suspected — 3 consecutive PING misses', d:'failure detector on :49801 marks peer suspect'},
+  {t:9.0,  k:'kill',    label:'node :49815 killed (process death)', d:'socket drop seen by 5 peers · last origin seq 1287'},
+  {t:11.4, k:'view',    label:'VIEW_PREPARE e8 (coordinator :49801)', d:'proposal #8.1 fanned to 4 peers'},
+  {t:11.7, k:'view',    label:'VIEW_ACK ×4 — quorum reached', d:'acks: :49803 :49807 :49809 :49818'},
+  {t:11.9, k:'view',    label:'VIEW_COMMIT e8 — 5 members', d:':49815 removed · ring rebalances 38/120 segments'},
+  {t:12.3, k:'rebal',   label:'rebalance — :49809 receiving moved history', d:'lag vs floor on :49809 jumps to 1,840'},
+  {t:26.0, k:'rebal',   label:':49809 caught up — rebalance lag drained', d:'frontier-vs-floor back under tol=16'},
+  {t:30.1, k:'join',    label:':49815 restarts — same address, NEW uuid', d:'e8401b6f… → 2c9f7e51… (uuid is per-process)'},
+  {t:30.2, k:'gate',    label:':49815 write-gate CLOSED (quorum-less boot)', d:'3 client writes buffered: user42.score, cart7.items, session19.seen'},
+  {t:30.4, k:'view',    label:':49815 boots SOLO view e1 [self] — writable', d:'snapshot shows epoch=1 / members=[self]: the rejoin blip — 2 writable views, but solo ≠ majority'},
+  {t:30.5, k:'gate',    label:':49815 gate OPEN — flushes 3 buffered writes @e1', d:'committed at epoch 1 — epoch-fence risk (DECISIONS X)'},
+  {t:31.0, k:'join',    label:':49815 peer link re-established to :49801', d:'peers.status connecting→connected [A] — the JOIN handshake itself is below the snapshot'},
+  {t:33.2, k:'view',    label:'VIEW_PREPARE e9 — 6 members', d:'proposal #9.1 (⚠ inferred — in-flight ballots have no accessor)'},
+  {t:33.4, k:'view',    label:'VIEW_COMMIT e9 — 5/6 nodes apply it', d:':49807 never advances past e8 in any later snapshot ⇒ INFERRED dropped commit (how DECISIONS Y was diagnosed)'},
+  {t:33.5, k:'view',    label:':49815 commits e9 — rejoin blip over (3.1s)', d:'solo view lasted 3.1s · catch-up begins 2,210 behind'},
+  {t:38.1, k:'lost',    label:":49815's epoch-1 writes fenced — 3 × kind:'lost'", d:'winner we=9 > epoch 1 ⇒ epoch-fence, not a conflict'},
+  {t:52.0, k:'flag',    label:'DIVERGED — :49807 stuck @e8 past debounce', d:'2 committed views held 18.5s · e8 side writable but minority ⇒ stranded member, not split-brain'},
+  {t:70.3, k:'heal',    label:'periodic view re-announce (inferred)', d:'the re-announce itself has no observable — inferred from the e9 commit that lands on :49807 next (DECISIONS Y fix)'},
+  {t:70.4, k:'heal',    label:':49807 commits e9 — views reconverge', d:'one committed view × 6 nodes'},
+  {t:88.0, k:'mark',    label:':49815 fully caught up — lag 0', d:''},
+  {t:90.0, k:'mark',    label:'recording ends — converged @e9', d:'6/6 writable, single view'},
+];
+
+// classification segments for the band (what the verdict says at any T)
+const CLS = [
+  [0,    8.2, 'ok',   'CONVERGED @e7 — one committed view, 6/6 writable'],
+  [8.2, 11.9, 'warn', 'VIEW CHANGE — :49815 lost, e8 ballot in flight'],
+  [11.9,30.4, 'ok',   'CONVERGED @e8 — 5 members (rebalance settling)'],
+  [30.4,33.5, 'warn', 'REJOIN BLIP — 2 writable views; solo joiner is not a majority ⇒ benign'],
+  [33.5,52.0, 'warn', 'DIVERGING — 2 committed views, debounce running ({dur}s)'],
+  [52.0,70.4, 'crit', 'DIVERGED — :49807 stranded @e8 for {dur}s (missed VIEW_COMMIT e9)'],
+  [70.4,90.1, 'ok',   'CONVERGED @e9 — healed by periodic view re-announce'],
+];
+// the divergence onset (C fails to apply the e9 commit the others do) — the debounce/stranded clock runs from here
+const DIVERGENCE_T0 = 33.4;
+const subDur = (l,t) => l.includes('{dur}') ? l.replace('{dur}', (t-DIVERGENCE_T0).toFixed(1)) : l;
+const classAt = t => { for (const [a,b,s,l] of CLS) if (t>=a && t<b) return {s,l:subDur(l,t)}; return {s:'ok',l:CLS[CLS.length-1][3]}; };
+const epochLead = t => t<11.9 ? 7 : t<33.4 ? 8 : 9;
+
+/* ---- per-node belief reconstruction at time t (piecewise from the script) ---- */
+const lerp = (t, pts) => {
+  if (t<=pts[0][0]) return pts[0][1];
+  for (let i=1;i<pts.length;i++) if (t<=pts[i][0]) { const [a,va]=pts[i-1],[b,vb]=pts[i]; return va+(vb-va)*(t-a)/(b-a); }
+  return pts[pts.length-1][1];
+};
+function stateAt (t) {
+  const lead = epochLead(t);
+  return NODES.map((n,i) => {
+    const s = {id:n.id, addr:n.addr, uuid:n.uuid, alive:true, epoch:lead,
+               members: lead===8?M5:M6, writable:true, pending:0,
+               // healthy steady-state lag: nodes trail the owners by the in-flight pipeline, roughly UNIFORM
+               // and BELOW the leaderboard tol (16) — so a healthy node never flickers amber (matches bridge topLag semantics)
+               lag: Math.round((i*7 + Math.floor(t*1.3)) % 14), note:''};
+    if (n.id==='D' && t>=12.3 && t<26)
+      { s.lag = Math.round(lerp(t,[[12.3,1840],[26,0]])); s.note='rebalance catch-up (moved history)'; }
+    if (n.id==='C' && t>=33.4 && t<70.4)
+      { s.epoch=8; s.members=M5; s.note='missed VIEW_COMMIT e9 — stranded';
+        s.lag = Math.round(lerp(t,[[33.4,8],[52,140],[70.4,180]])); }
+    if (n.id==='E') {
+      if (t>=9.0 && t<30.1) { s.alive=false; s.writable=false; s.epoch=null; s.members=[]; s.lag=0; s.note='killed T+9.0s'; }
+      else if (t>=30.1) {
+        s.uuid = n.uuid2;
+        if (t<30.4)      { s.epoch=1; s.members=['E']; s.writable=false; s.pending=Math.min(3,Math.ceil((t-30.1)*12)); s.note='quorum-less boot — buffering writes'; }
+        else if (t<33.5) { s.epoch=1; s.members=['E']; s.writable=true; s.note='SOLO view — 3 writes committed @e1 (fence risk)'; }
+        else             { s.lag=Math.round(lerp(t,[[33.5,2210],[70,420],[88,0]])); if (s.lag>16) s.note='catching up — missed the e8 era'; }
+      }
+    }
+    return s;
+  });
+}
+
+/* ---- derived fixtures for diff + card expand ---- */
+const PARTS = {user42:[14,.35], user43:[2,.1], orders:[31,1.1], cart7:[6,.2], session19:[9,.5]};
+const headsAt = t => Object.fromEntries(Object.entries(PARTS).map(([k,[b,r]])=>[k,Math.floor(b+r*t)]));
+const MOVES = {'7>8':38, '8>9':38, '7>9':0, '8>7':38, '9>8':38, '9>7':0};
+const OWNER_SAMPLES = {
+  '7>8': ['user42: :49815 → :49801', 'cart7: :49815 → :49818'],
+  '8>9': ['user42: :49801 → :49815', 'cart7: :49818 → :49815'],
+};
+function marksAt (t) {                       // seen digest sample (incl. dead-origin debris)
+  const rows = [['3f8a1c2e…', Math.floor(800+9.5*t), false], ['9d2b7f41…', Math.floor(300+4.2*t), false]];
+  // E's ORIGINAL origin: a dead origin can mint no new seqs — it freezes at its death seq (1287) forever and is
+  // dead-origin debris from the kill at T+9 onward (the per-origin-debris teaching moment; cf. "thousands behind").
+  rows.push(['e8401b6f…', t<9 ? Math.floor(1107+20*t) : 1287, t>=9]);
+  // the 3 flushed boot writes + ongoing catch-up accrue ONLY to E's NEW post-restart origin.
+  if (t>=30.5) rows.push(['2c9f7e51…', Math.max(3, Math.floor(3+Math.max(0,t-33.5)*5.5)), false]);
+  return rows;
+}
+const sig = m => { let h=0; for (const c of m.join('')) h=(h*31+c.charCodeAt(0))>>>0; return ('0000'+h.toString(16)).slice(-4); };
+const fmt = n => n.toLocaleString('en-US');
+const wall = t => { const s=7+t, m=2+Math.floor(s/60); return `14:0${m}:${String(Math.floor(s%60)).padStart(2,'0')}.${Math.floor((s%1)*10)}`; };
+
+/* ================= state ================= */
+let T = 54.0;                                 // open ON the anomaly
+let view = {t0:0, t1:DUR};
+let pinA = 30.0, pinB = 54.0;                 // pre-pinned: before rejoin vs mid-divergence (diff is always live)
+let playing = false, speed = 1;
+const expanded = new Set();
+
+const $ = id => document.getElementById(id);
+const band=$('band'), axis=$('axis'), tip=$('tip'), verdict=$('verdict'), groupsEl=$('groups'),
+      diffEl=$('diff'), diffMeta=$('diffMeta'), evlog=$('evlog'), clock=$('clock'), zoomMeta=$('zoomMeta');
+
+/* ================= render: timeline ================= */
+const X = t => (t-view.t0)/(view.t1-view.t0)*100;
+function renderBand () {
+  let h = '';
+  for (const [a,b,s] of CLS) {
+    if (b<view.t0 || a>view.t1) continue;
+    const l=Math.max(0,X(a)), w=Math.min(100,X(b))-l;
+    h += `<div class="tlseg" data-state="${s}" style="left:${l}%;width:${w}%"></div>`;
+  }
+  EV.forEach((e,i)=>{ if (e.t>=view.t0 && e.t<=view.t1)
+    h += `<div class="tick" data-k="${e.k}" data-i="${i}" style="left:${X(e.t)}%"></div>`; });
+  if (pinA!=null && pinA>=view.t0 && pinA<=view.t1) h += `<div class="pinmark" style="left:${X(pinA)}%">A</div>`;
+  if (pinB!=null && pinB>=view.t0 && pinB<=view.t1) h += `<div class="pinmark b" style="left:${X(pinB)}%">B</div>`;
+  h += `<div class="playhead" style="left:${X(T)}%"></div>`;
+  band.innerHTML = h;
+  const span=view.t1-view.t0, step = span>50?10 : span>20?5 : span>8?2 : 1;
+  let ax=''; for (let t=Math.ceil(view.t0/step)*step; t<=view.t1+1e-9; t+=step) ax += `<span style="left:${X(t)}%">${t}s</span>`;
+  axis.innerHTML = ax;
+  zoomMeta.textContent = `${view.t0.toFixed(0)}s – ${view.t1.toFixed(0)}s · wheel to zoom · drag to scrub · click a tick to jump`;
+}
+
+/* ================= render: belief cards grouped by committed view ================= */
+function renderMoment () {
+  // belief cards ALWAYS reflect the scrubbed moment T (no mode); the A↔B diff is a separate, always-live panel.
+  const tt = T;
+  const st = stateAt(tt), alive = st.filter(s=>s.alive).length;
+  const cls = classAt(tt);
+  // amber ring = nodes whose belief DIFFERS between the two pinned moments (what the diff panel is about),
+  // surfaced on the cards so the eye lands on the involved nodes while you scrub.
+  const chg = new Set();
+  if (pinA!=null && pinB!=null) {
+    const A = stateAt(Math.min(pinA,pinB)), B = stateAt(Math.max(pinA,pinB));
+    B.forEach((b,i)=>{ const a=A[i];
+      if (a.alive!==b.alive || a.epoch!==b.epoch || a.writable!==b.writable || a.uuid!==b.uuid || a.pending!==b.pending) chg.add(b.id); });
+  }
+  // group by (epoch, member-set) — a partition renders as the cards splitting
+  const gs = {};
+  st.forEach(s => {
+    const k = s.alive ? `${s.epoch}|${s.members.join('')}` : 'off';
+    (gs[k] ??= {key:k, epoch:s.epoch, members:s.members, nodes:[]}).nodes.push(s);
+  });
+  const order = Object.values(gs).sort((a,b)=>(a.key==='off')-(b.key==='off') || b.nodes.length-a.nodes.length);
+  const mood = g => g.key==='off' ? 'dead'
+    : g.nodes.length>alive/2 ? 'ok'
+    : g.nodes.every(n=>n.writable) ? (cls.s==='crit'?'crit':'warn') : 'idle';
+
+  verdict.innerHTML =
+    `<span class="vpill" data-state="${cls.s}"><span class="pdot"></span>${cls.l}</span>` +
+    order.map(g => g.key==='off'
+      ? `<span class="gchip" data-mood="dead">offline ×${g.nodes.length}</span>`
+      : `<span class="gchip" data-mood="${mood(g)}">e${g.epoch} · ${g.nodes.length}/${alive}${g.nodes.every(n=>n.writable)?' · writable':' · gated'} · ${g.nodes.length>alive/2?'MAJORITY':'minority'}</span>`
+    ).join('') +
+    (pinA!=null && pinB!=null ? `<span class="hint">amber ring = changed between pins A↔B</span>` : '');
+
+  // belief card = the shipped topology node-card contract (wdot / uuid / addr / role + metric row + wbadge),
+  // time-parameterized so a node looks identical live and in replay; replay-only extras (lag bar, note, expand) hang below.
+  const card = s => {
+    const sev = s.lag<=16?'ok' : s.lag<800?'warn' : 'bad';
+    const cls = 'node-card' + (s.alive ? (s.writable?'':' readonly') : ' stale');
+    return `<div class="${cls}" data-id="${s.id}" ${chg.has(s.id)?'data-chg':''}>
+      <div class="card-head">
+        <span class="wdot" data-writable="${s.alive?s.writable:''}"></span>
+        <span class="uuid">${s.uuid.slice(0,8)}…</span><span class="addr">${s.addr}</span>
+        <span class="role">${s.alive?'server':'dead'}</span></div>
+      <div class="card-view">
+        <span class="metric"><span class="mlabel">epoch</span><span class="mval">${s.alive?'e'+s.epoch:'—'}</span></span>
+        <span class="metric"><span class="mlabel">pending</span><span class="mval${s.pending?' pend':''}">${s.alive?s.pending:'—'}</span></span>
+        <span class="wbadge" data-writable="${s.alive?s.writable:''}">${s.alive?(s.writable?'writable':'gated'):'✕ dead'}</span></div>
+      ${s.alive ? `<div class="crow lag"><span>lag</span><span class="lagbar"><i data-sev="${sev}" style="width:${Math.min(100,s.lag/2400*100)}%"></i></span><span class="lagn">${fmt(s.lag)}</span></div>` : ''}
+      ${s.note ? `<div class="note">${s.note}</div>` : ''}
+      ${expanded.has(s.id) && s.alive ? expand(s,tt) : ''}</div>`;
+  };
+  groupsEl.innerHTML = order.map(g => `<div class="vgroup" data-mood="${mood(g)}"><div class="ghead">${
+    g.key==='off' ? `<span class="glabel">offline</span><span>${g.nodes.length} node</span>`
+    : `<span class="glabel">view e${g.epoch}</span><span>sig ${sig(g.members)}</span><span>${g.members.length} members</span>`
+      + `<span class="gw" data-on="${g.nodes.every(n=>n.writable)}">${g.nodes.every(n=>n.writable)?'writable':'gated'}</span>`
+      + `<span class="gmaj">${g.nodes.length>alive/2?'majority':'minority'} ${g.nodes.length}/${alive}</span>`
+  }</div><div class="cards">${g.nodes.map(card).join('')}</div></div>`).join('');
+}
+function expand (s, t) {
+  const h = headsAt(t);
+  return `<div class="exp">
+    <div class="xl">committed members</div><div>${s.members.map(port).map(p=>`<span class="mchip">${p}</span>`).join('')||'—'}</div>
+    <div class="xl">marks — seen digest (per origin)</div>
+    ${marksAt(t).map(([o,v,dead])=>`<div class="mk"><span>${o}</span><span>${fmt(v)}${dead?' <span class="deadtag">dead origin</span>':''}</span></div>`).join('')}
+    <div class="xl">log heads (sample)</div>
+    <div class="mk"><span>user42</span><span>${h.user42}</span></div>
+    <div class="mk"><span>orders</span><span>${h.orders}</span></div></div>`;
+}
+
+/* ================= render: diff changelog ================= */
+function diffAt (ta, tb) {
+  const A=stateAt(ta), B=stateAt(tb), rows=[];
+  const la=epochLead(ta), lb=epochLead(tb);
+  B.forEach((b,i) => { const a=A[i];
+    if (a.alive!==b.alive) rows.push({cat:'node', sev:b.alive?'ok':'bad', txt:`${b.addr} ${a.alive?'online → OFFLINE':'offline → online (rejoined)'}`});
+    if (a.uuid!==b.uuid) rows.push({cat:'identity', sev:'warn', txt:`${b.addr} uuid ${a.uuid.slice(0,8)}… → ${b.uuid.slice(0,8)}… (process restarted; old origin becomes dead-origin debris)`});
+    if (a.alive&&b.alive) {
+      if (a.epoch!==b.epoch) rows.push({cat:'view', sev:'ok', txt:`${b.addr} committed epoch ${a.epoch} → ${b.epoch}`});
+      else if (la!==lb && b.epoch!==lb) rows.push({cat:'view', sev:'bad', txt:`${b.addr} epoch ${b.epoch} → ${b.epoch} — UNCHANGED while the leading view advanced to e${lb} ⇒ stranded (missed VIEW_COMMIT?)`});
+      if (a.writable!==b.writable) rows.push({cat:'gate', sev:b.writable?'ok':'warn', txt:`${b.addr} write-gate ${a.writable?'open → CLOSED':'closed → OPEN'}`});
+      if (a.pending!==b.pending) rows.push({cat:'gate', sev:b.pending>a.pending?'warn':'dim', txt:`${b.addr} pending buffer ${a.pending} → ${b.pending}`});
+      if (Math.abs(a.lag-b.lag)>50) rows.push({cat:'lag', sev:b.lag>a.lag?'warn':'ok', txt:`${b.addr} behind ${fmt(a.lag)} → ${fmt(b.lag)} (${b.lag>a.lag?'+':''}${fmt(b.lag-a.lag)})`});
+    }
+  });
+  const ma = la===8?M5:M6, mb = lb===8?M5:M6;
+  mb.filter(x=>!ma.includes(x)).forEach(x=>rows.push({cat:'members', sev:'ok', txt:`leading view: + ${byId[x].addr} joined`}));
+  ma.filter(x=>!mb.includes(x)).forEach(x=>rows.push({cat:'members', sev:'warn', txt:`leading view: − ${byId[x].addr} removed`}));
+  const mv = MOVES[`${la}>${lb}`] ?? 0;
+  if (mv) {
+    rows.push({cat:'owners', sev:'warn', txt:`ring: ${mv}/120 segments changed owner (e${la} → e${lb})`});
+    (OWNER_SAMPLES[`${la}>${lb}`]||[]).forEach(s=>rows.push({cat:'owners', sev:'dim', txt:s}));
+  }
+  const ha=headsAt(ta), hb=headsAt(tb);
+  for (const k of Object.keys(PARTS)) { const d=hb[k]-ha[k]; if (d) rows.push({cat:'heads', sev:'dim', txt:`${k}: head ${ha[k]} → ${hb[k]} (+${d})`}); }
+  return rows;
+}
+function renderDiff () {
+  if (pinA==null || pinB==null) { diffEl.innerHTML='<div class="empty">pin two moments (A, B) to diff</div>'; diffMeta.textContent=''; return; }
+  const a=Math.min(pinA,pinB), b=Math.max(pinA,pinB);
+  const rows = diffAt(a,b);
+  diffMeta.textContent = `A T+${a.toFixed(1)}s → B T+${b.toFixed(1)}s · ${rows.length} changes`;
+  diffEl.innerHTML = rows.length
+    ? rows.map(r=>`<div class="chrow" data-sev="${r.sev}"><span class="cat">${r.cat}</span><span>${r.txt}</span></div>`).join('')
+    : '<div class="empty" style="color:var(--ok)">no differences — identical cluster belief</div>';
+}
+
+/* ================= render: event log ================= */
+function buildLog () {
+  evlog.innerHTML = EV.map((e,i) =>
+    `<div class="evrow" data-k="${e.k}" data-i="${i}"><span class="t">+${e.t.toFixed(1)}s</span><i class="kdot"></i><span>${e.label}</span>${e.d?`<span class="d">${e.d}</span>`:''}</div>`).join('');
+}
+function renderLog () {
+  let cur=-1; EV.forEach((e,i)=>{ if (e.t<=T+1e-6) cur=i; });
+  [...evlog.children].forEach((r,i)=>{ r.classList.toggle('future', EV[i].t>T+1e-6); r.classList.toggle('cur', i===cur); });
+  // keep the current event in view as the playhead moves — the log is the narrative spine, it must track T
+  if (cur>=0) {
+    const row = evlog.children[cur], rRow = row.getBoundingClientRect(), rBox = evlog.getBoundingClientRect();
+    if (rRow.top < rBox.top) evlog.scrollTop += rRow.top - rBox.top - 8;
+    else if (rRow.bottom > rBox.bottom) evlog.scrollTop += rRow.bottom - rBox.bottom + 8;
+  }
+}
+
+/* ================= render all ================= */
+function renderAll () {
+  renderBand(); renderMoment(); renderDiff(); renderLog();
+  clock.innerHTML = `<b>T+${T.toFixed(1)}s</b> · ${wall(T)}`;
+  $('btnPlay').textContent = playing ? '⏸ pause' : '▶ play';
+  $('btnSpeed').textContent = speed + '×';
+}
+
+/* ================= interactions ================= */
+const setT = t => { T = Math.max(0, Math.min(DUR, t)); renderAll(); };
+const tFromX = e => { const r=band.getBoundingClientRect(); return view.t0 + (e.clientX-r.left)/r.width*(view.t1-view.t0); };
+let dragging = false;
+band.addEventListener('pointerdown', e => {
+  const tk = e.target.closest('.tick');
+  if (tk) { setT(EV[+tk.dataset.i].t); return; }
+  dragging = true; band.setPointerCapture(e.pointerId); setT(tFromX(e));
+});
+band.addEventListener('pointermove', e => {
+  if (dragging) setT(tFromX(e));
+  const tk = e.target.closest('.tick');
+  if (tk) { const ev=EV[+tk.dataset.i]; const r=band.parentElement.getBoundingClientRect();
+    tip.innerHTML = `<span class="tt">T+${ev.t.toFixed(1)}s</span> ${ev.label}${ev.d?`<br><span class="tt">${ev.d}</span>`:''}`;
+    tip.style.display='block';
+    tip.style.left = Math.min(e.clientX-r.left+12, r.width-370)+'px';
+    tip.style.top = (e.clientY-r.top+16)+'px';
+  } else tip.style.display='none';
+});
+band.addEventListener('pointerup', ()=>dragging=false);
+band.addEventListener('pointerleave', ()=>{ tip.style.display='none'; });
+band.addEventListener('wheel', e => {                     // zoom around cursor
+  e.preventDefault();
+  const c = tFromX(e), f = Math.pow(1.2, e.deltaY>0?1:-1);
+  let t0 = c-(c-view.t0)*f, t1 = c+(view.t1-c)*f;
+  if (t1-t0 < 4) return; t0=Math.max(0,t0); t1=Math.min(DUR,t1);
+  view={t0,t1}; renderAll();
+}, {passive:false});
+
+const zoom = f => { const c=T, t0=Math.max(0,c-(c-view.t0)*f), t1=Math.min(DUR,c+(view.t1-c)*f);
+  if (t1-t0>=4) view={t0,t1}; renderAll(); };
+$('btnZoomIn').onclick = ()=>zoom(1/1.6);
+$('btnZoomOut').onclick = ()=>zoom(1.6);
+$('btnZoomReset').onclick = ()=>{ view={t0:0,t1:DUR}; renderAll(); };
+
+const nextEv = () => { const e=EV.find(e=>e.t>T+0.05); if (e) setT(e.t); };
+const prevEv = () => { const past=EV.filter(e=>e.t<T-0.05); if (past.length) setT(past[past.length-1].t); };
+$('btnNext').onclick = nextEv;
+$('btnPrev').onclick = prevEv;
+$('btnPlay').onclick = ()=>{ playing=!playing; if (playing&&T>=DUR) T=0; renderAll(); };
+$('btnSpeed').onclick = ()=>{ speed = speed===1?10:1; renderAll(); };
+$('btnPinA').onclick = ()=>{ pinA=T; renderAll(); };
+$('btnPinB').onclick = ()=>{ pinB=T; renderAll(); };
+evlog.addEventListener('click', e => { const r=e.target.closest('.evrow'); if (r) setT(EV[+r.dataset.i].t); });
+groupsEl.addEventListener('click', e => { const c=e.target.closest('.node-card');
+  if (c && !c.classList.contains('stale')) { const id=c.dataset.id; expanded.has(id)?expanded.delete(id):expanded.add(id); renderMoment(); } });
+document.addEventListener('keydown', e => {
+  if (e.key==='ArrowRight') { nextEv(); e.preventDefault(); }
+  else if (e.key==='ArrowLeft') { prevEv(); e.preventDefault(); }
+  else if (e.key===' ') { playing=!playing; if (playing&&T>=DUR) T=0; renderAll(); e.preventDefault(); }
+});
+setInterval(()=>{ if (!playing) return; T=Math.min(DUR, T+0.06*speed); if (T>=DUR) playing=false; renderAll(); }, 60);
+
+buildLog();
+renderAll();
+</script>
+</body>
+</html>

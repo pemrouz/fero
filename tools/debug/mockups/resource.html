@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fero · resource — sessions</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#16181d; --panel-2:#1b1e25; --line:#262932;
+    --ink:#dde1e9; --dim:#8b919e; --soft:#5b616c;
+    --accent:#6cb6ff; --bad:#e5645c; --warn:#d6a44c; --good:#5bbf91;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  b{font-weight:650;color:#fff}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  main{max-width:920px;margin:0 auto;padding:0 24px 80px}
+
+  header{max-width:920px;margin:0 auto;padding:22px 24px 0}
+  .crumb{color:var(--soft);font-size:12px}.crumb b{color:var(--dim);font-weight:600}
+  .mock{float:right;color:var(--soft);font-size:11px;border:1px solid var(--line);border-radius:3px;padding:2px 8px}
+  .scen{margin:18px 0 4px}
+  .scen .lbl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);margin-bottom:9px}
+  .scen .opts{display:flex;gap:8px}
+  .scen button{background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--dim);
+    font:inherit;font-size:13px;font-weight:600;padding:7px 13px;cursor:pointer}
+  .scen button:hover{color:var(--ink);border-color:var(--soft)}
+  .scen button[aria-pressed=true]{color:var(--ink);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
+
+  /* ---- summary band (the one reassuring/alarming line) ---- */
+  .summary{margin-top:26px}
+  .health{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+  .health .word{font-size:13px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--good)}
+  .health .word.warn{color:var(--warn)} .health .word.crit{color:var(--bad)}
+  .health .name{font-size:20px;font-weight:680;color:#fff}
+  .health .name .mono{font-size:18px}
+  .health .dotline{flex:1;height:1px;background:var(--line)}
+  .health .meta{color:var(--soft);font-size:12px}
+  .rollup{display:flex;gap:22px;flex-wrap:wrap;color:var(--dim);font-size:14px}
+  .rollup .stat{display:flex;flex-direction:column;line-height:1.25}
+  .rollup .stat .n{font-size:22px;font-weight:680;color:var(--ink);font-variant-numeric:tabular-nums}
+  .rollup .stat .n.bad{color:var(--bad)} .rollup .stat .n.warn{color:var(--warn)} .rollup .stat .n.ok{color:var(--good)}
+  .rollup .stat .l{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft)}
+  .rollup .sep{width:1px;background:var(--line)}
+
+  /* ---- the work list (the focus): keys that need attention, worst-first ---- */
+  section.block{margin-top:34px}
+  .h{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+  .h h2{font-size:13px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);margin:0}
+  .h .sub{color:var(--soft);font-size:12px;margin-left:auto}
+  .empty{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:18px;color:var(--good);font-size:14px}
+  .empty .s{color:var(--soft);font-size:12.5px;margin-top:3px}
+
+  .att{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .att .row{display:grid;grid-template-columns:200px 110px 1fr 70px;gap:14px;align-items:center;
+    padding:11px 15px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);cursor:pointer;
+    border-left:2px solid var(--c,transparent)}
+  .att .row:last-child{border-bottom:none}
+  .att .row:hover{background:var(--panel-2)}
+  .att .row[data-sev=crit]{--c:var(--bad)} .att .row[data-sev=warn]{--c:var(--warn)}
+  .att .row .key{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:650;color:var(--ink);font-size:14px}
+  .att .row .prob{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .att .row[data-sev=crit] .prob{color:var(--bad)} .att .row[data-sev=warn] .prob{color:var(--warn)}
+  .att .row .why{color:var(--dim);font-size:13px} .att .row .why .mono{color:var(--ink)}
+  .att .row .go{color:var(--soft);font-size:12px;text-align:right}
+  .att .row:hover .go{color:var(--accent)}
+  @media(max-width:760px){.att .row{grid-template-columns:1fr auto;gap:5px}.att .row .why{grid-column:1/-1}.att .row .go{display:none}}
+
+  /* ---- two-up: activity + partitions ---- */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:34px}
+  @media(max-width:760px){.cols{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+  .panel .pt{padding:9px 14px;border-bottom:1px solid var(--line);font-size:11px;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .panel .pb{padding:12px 14px}
+  .rate{display:flex;gap:24px;margin-bottom:12px}
+  .rate .r .n{font-size:21px;font-weight:680;color:var(--ink);font-variant-numeric:tabular-nums}
+  .rate .r .n.bad{color:var(--bad)} .rate .r .n.ok{color:var(--good)}
+  .rate .r .l{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft)}
+  .hot{font-size:13px}
+  .hot .hk{display:flex;justify-content:space-between;padding:4px 0;color:var(--dim);border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+  .hot .hk:last-child{border-bottom:none}
+  .hot .hk .k{font-family:ui-monospace,Menlo,monospace;color:var(--ink)} .hot .hk .v{color:var(--soft);font-variant-numeric:tabular-nums}
+  .part{font-size:13px}
+  .part .pr{display:grid;grid-template-columns:1fr 70px 64px;gap:8px;align-items:center;padding:5px 0;
+    border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+  .part .pr:last-child{border-bottom:none}
+  .part .pr .pn{font-family:ui-monospace,Menlo,monospace;color:var(--ink)}
+  .part .pr .po{color:var(--soft);font-size:12px;font-family:ui-monospace,Menlo,monospace}
+  .part .pr .rep{font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
+  .part .pr.under{box-shadow:inset 2px 0 0 var(--bad);padding-left:8px;margin-left:-8px}
+  .part .pr.under .rep{color:var(--bad);font-weight:650}
+  .part .pr.under .pn::after{content:' · under-replicated';color:var(--bad);font-family:inherit;font-size:11px}
+
+  details.ev{margin-top:34px;border-top:1px solid var(--line);padding-top:6px}
+  details.ev>summary{cursor:pointer;color:var(--dim);font-size:13px;font-weight:600;list-style:none;padding:10px 0}
+  details.ev>summary::-webkit-details-marker{display:none}
+  .sources{font-size:12px;color:var(--soft);line-height:1.7;padding-bottom:4px}
+  .sources b{color:var(--dim);font-weight:600}.sources .new{color:var(--warn)}.sources p{margin:6px 0}
+  .t{border-bottom:1px dotted var(--dim);cursor:help;color:inherit}.t:hover{border-bottom-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="mock">MOCKUP · static data</span>
+  <div class="crumb"><a href="ia-map.html"><b>cluster</b></a> › <b>resource</b> › <code class="mono">sessions</code></div>
+  <div class="scen">
+    <div class="lbl">scenario — a resource is calm until a key needs you</div>
+    <div class="opts" id="scen"></div>
+  </div>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="health">
+      <span class="word" id="word">Healthy</span>
+      <span class="name">resource <span class="mono">"sessions"</span></span>
+      <span class="dotline"></span>
+      <span class="meta" id="meta"></span>
+    </div>
+    <div class="rollup" id="rollup"></div>
+  </section>
+
+  <!-- THE FOCUS: which keys need attention, worst first → each drills into the Key page -->
+  <section class="block">
+    <div class="h"><h2>Needs attention</h2><span class="sub" id="attSub"></span></div>
+    <div id="att"></div>
+  </section>
+
+  <div class="cols">
+    <section class="panel">
+      <div class="pt">Activity</div>
+      <div class="pb">
+        <div class="rate" id="rate"></div>
+        <div class="hot" id="hot"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="pt">Partitions <span style="color:var(--soft);font-weight:400;text-transform:none;letter-spacing:0">· 8 · owner &amp; replica health</span></div>
+      <div class="pb"><div class="part" id="parts"></div></div>
+    </section>
+  </div>
+
+  <details class="ev"><summary>▸ Data sources</summary>
+    <div class="sources">
+      <p><b>Key-state rollup &amp; needs-attention list</b> — divergence per key needs the <span class="new">⚠ NEW</span> per-key version sample (<span class="mono">__inspect{versions:K}</span>, scoped to this resource) cross-merged on node <b>uuid</b> [A]; contention counts from the <b>__observe</b> stream's <b>lost</b> events with <b>we=epoch</b> (same-epoch) [B]. The list is the <span class="t" title="worst-first; you arrive here from a cluster alarm or by opening the resource — not by guessing key names">work queue</span> — click a key to open its autopsy.</p>
+      <p><b>Activity rates / hot keys</b> — the bridge's per-second write/conflict rollup + top-K hot keys from <b>__observe</b> [B], scoped to this resource (the shipped dashboard's hot-keys panel is cluster-wide; this is resource-scoped and links into keys).</p>
+      <p><b>Partition health</b> — owner from <b>ring.coverage</b>; replica count vs <b>R</b>; under-replication / orphan from snapshot <b>orphans</b> + the cover diff [A][E]. Log size from <b>log.size</b> [A].</p>
+    </div>
+  </details>
+</main>
+
+<script>
+'use strict';
+const KEYPAGE = 'key-autopsy/happy.html';     // drill-down target (the Key level)
+const fmt = n => n.toLocaleString('en-US');
+
+/* A resource is just all its keys (all their commits) rolled up. Healthy = every key converged → the page is
+   calm and the work list is empty. Trouble surfaces ONLY as a worst-first list that drills into the Key page. */
+const SCEN = {
+  healthy:{
+    word:'Healthy', level:'ok',
+    meta:'1,284 keys · 8 partitions · last view e4 · 5 members',
+    rollup:[ {n:'1,284', l:'keys', cls:''}, {n:'1,284', l:'converged', cls:'ok'},
+             {n:'0', l:'diverged', cls:''}, {n:'0', l:'contended (60s)', cls:''} ],
+    att:[],
+    rate:[ {n:'142', l:'writes / s', cls:''}, {n:'0', l:'conflicts / s', cls:'ok'} ],
+    hot:[ ['user42.score','38 w/s'], ['cart7.items','21 w/s'], ['order7.lines','14 w/s'], ['user43.name','9 w/s'] ],
+    parts:[
+      {n:'user42', o:':49801', rep:'5/5'}, {n:'cart7', o:':49805', rep:'5/5'}, {n:'order7', o:':49803', rep:'5/5'},
+      {n:'user43', o:':49809', rep:'5/5'}, {n:'billing', o:':49807', rep:'5/5'}, {n:'session', o:':49801', rep:'5/5'},
+      {n:'audit', o:':49805', rep:'5/5'}, {n:'prefs', o:':49809', rep:'5/5'},
+    ],
+  },
+  attention:{
+    word:'Needs attention', level:'crit',
+    meta:'1,284 keys · 8 partitions · last view e4 · 5 members',
+    rollup:[ {n:'1,284', l:'keys', cls:''}, {n:'1,281', l:'converged', cls:''},
+             {n:'2', l:'diverged', cls:'bad'}, {n:'1', l:'contended (60s)', cls:'warn'} ],
+    att:[
+      {key:'user42.score', sev:'crit', prob:'diverged', href:KEYPAGE+'#diverged',
+        why:'<span class="mono">:49807</span> stuck on <span class="mono">e3·s1241</span> ("5") while 4 hold <span class="mono">e4·s1287</span> ("8") · 64s'},
+      {key:'cart9.total', sev:'crit', prob:'diverged', href:KEYPAGE,
+        why:'<span class="mono">:49803</span> missed the <span class="mono">e4</span> commit · 12s behind, not yet draining'},
+      {key:'order7.lines', sev:'warn', prob:'contended', href:KEYPAGE,
+        why:'<span class="mono">3</span> same-epoch conflicts in 60s — a real write-write hotspot, not rebalance churn'},
+      {part:'billing', sev:'crit', prob:'under-repl', href:'#',
+        why:'partition held on <span class="mono">2 of 3</span> replicas since the e4 rebalance — orphan awaiting confirmed shed'},
+    ],
+    rate:[ {n:'168', l:'writes / s', cls:''}, {n:'0.4', l:'conflicts / s', cls:'bad'} ],
+    hot:[ ['order7.lines','61 w/s'], ['user42.score','40 w/s'], ['cart7.items','19 w/s'], ['cart9.total','11 w/s'] ],
+    parts:[
+      {n:'user42', o:':49801', rep:'5/5'}, {n:'cart7', o:':49805', rep:'5/5'}, {n:'order7', o:':49803', rep:'5/5'},
+      {n:'cart9', o:':49803', rep:'5/5'}, {n:'billing', o:':49807', rep:'2/3', under:true}, {n:'session', o:':49801', rep:'5/5'},
+      {n:'audit', o:':49805', rep:'5/5'}, {n:'prefs', o:':49809', rep:'5/5'},
+    ],
+  },
+};
+const ORDER = ['healthy','attention'];
+
+const $ = id => document.getElementById(id);
+function render(id){
+  const s = SCEN[id];
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===id));
+  try{ history.replaceState(null,'','#'+id); }catch{}
+
+  $('word').textContent = s.word; $('word').className = 'word ' + (s.level==='ok'?'':s.level);
+  $('meta').textContent = s.meta;
+  $('rollup').innerHTML = s.rollup.map((r,i)=>
+    (i?'<span class="sep"></span>':'')+`<span class="stat"><span class="n ${r.cls}">${r.n}</span><span class="l">${r.l}</span></span>`
+  ).join('');
+
+  // the work list (or the calm empty state)
+  $('attSub').textContent = s.att.length ? `${s.att.length} item${s.att.length>1?'s':''} · worst first · click to open` : 'nothing pending';
+  if (!s.att.length){
+    $('att').innerHTML = `<div class="empty">✓ all 1,284 keys converged — nothing needs attention.<div class="s">A healthy resource is quiet by design; this list fills only when a key diverges, a partition under-replicates, or contention spikes.</div></div>`;
+  } else {
+    $('att').innerHTML = `<div class="att">` + s.att.map(a=>{
+      const label = a.key ? `<span class="key">${a.key}</span>` : `<span class="key">partition ${a.part}</span>`;
+      const go = a.href!=='#' ? 'open →' : 'partition page';
+      return `<div class="row" data-sev="${a.sev}" data-href="${a.href}">`+
+        `${label}<span class="prob">${a.prob}</span><span class="why">${a.why}</span><span class="go">${go}</span></div>`;
+    }).join('') + `</div>`;
+  }
+
+  $('rate').innerHTML = s.rate.map(r=>`<div class="r"><div class="n ${r.cls}">${r.n}</div><div class="l">${r.l}</div></div>`).join('');
+  $('hot').innerHTML = s.hot.map(([k,v])=>`<div class="hk"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+  $('parts').innerHTML = s.parts.map(p=>
+    `<div class="pr ${p.under?'under':''}"><span class="pn">${p.n}</span><span class="po">${p.o}</span><span class="rep">${p.rep}</span></div>`
+  ).join('');
+}
+
+$('att').addEventListener('click', e=>{ const r=e.target.closest('.row'); if(r && r.dataset.href!=='#') location.href=r.dataset.href; });
+
+const sc = $('scen');
+for (const id of ORDER){
+  const b = document.createElement('button'); b.dataset.id=id;
+  b.textContent = id==='healthy'?'Healthy':'Needs attention';
+  b.onclick = ()=>render(id);
+  sc.appendChild(b);
+}
+const fromHash = location.hash.slice(1);
+render(SCEN[fromHash] ? fromHash : 'healthy');
+</script>
+</body>
+</html>
