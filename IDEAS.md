@@ -459,16 +459,12 @@ network-observer workstream above — shares `inspect.ts`/`observe.ts`/`bridge.t
 `cluster.peers/.owner/.replicas/.epoch/.members/.writable/.writes`, `__inspect`, `__observe`, the `log.*`
 accessors and the DHT ring snapshot already exist; the route-correlation handle ALREADY exists too
 (`cluster.writes` carries `id`/`origin`/`seq`/`epoch` — [DECISIONS Z](DECISIONS.md)). Open work, phased
-(strictly ordered; each phase ships a real subset, not a stub):
-- **P0 — extract the seam.** Lift `normalize()` out of tree.html into `tools/debug/shape.ts` (imported by
-  viewer + producers) + a round-trip test asserting ONLY the intersection backed by a real seam today
-  (epoch/members/peers/marks/versions-COUNT/orphans/ring). The file schema is a SUPERSET of `InspectSnapshot`,
-  so log/per-sub/ownerByEpoch/per-replica fields get asserted as their accessor lands. Pure refactor, no hot
-  path. (tools/debug)
-- **P1 — first real capture.** `tools/debug/export.ts` as an IN-PROCESS diagnostics client (the always-available
-  `[diagnostics]` seam — `observe:true` gates only the WIRE `__inspect`/`__observe`); pull + fold by INVERTING
-  normalize() (store each fact once on its owner, emit nothing the viewer re-derives) over the subset that exists
-  today. Replaces the hand-authored healthy rows with live data. `export.perf.ts`. (tools/debug; resource: inspect)
+(strictly ordered; each ships a real subset). **P0 + P1 have LANDED** ([DECISIONS O1](DECISIONS.md),
+`47f75bc`+`3726db3`): `normalize()` extracted into [tools/debug/mockups/shape.js](tools/debug/mockups/shape.js)
+(the one seam — browser + Node — round-trip tested), and [tools/debug/export.ts](tools/debug/export.ts)
+`foldSnapshots()`/`captureInProcess()` capture a live in-process cluster (members/R, per-node keys+health,
+per-partition owner/R-set/held → real under-replication) by INVERTING normalize over the `[diagnostics]`
+seam, `export.perf.ts`-guarded. Remaining:
 - **P2 — version sample (cap K).** `__inspect` ships only the versions COUNT (deliberate — the map is huge under
   churn); add a SAMPLED per-key LWW-stamp accessor (cap K) for agreement/divergence + per-replica stuck. MUST be
   pull-only, never on the write path; needs an `inspect.perf.ts` threshold. Unblocks key-autopsy / divergence
@@ -488,7 +484,8 @@ accessors and the DHT ring snapshot already exist; the route-correlation handle 
 - **Cross-cutting discipline:** every phase ships a teardown contract mirroring `bridge.close()` (clear timers,
   unsub observe legs, REAP served subs via the dispatch reap so a long-running exporter can't leak server-side
   sinks — the `reapPeer` leak); introspection NEVER perturbs the hot path (pull/sampled over always-on; extend
-  existing perf siblings, don't widen). A DECISIONS record lands when P0/P1 do.
+  existing perf siblings, don't widen). The seam + capture decision is recorded in [DECISIONS O1](DECISIONS.md);
+  P2+ extend it.
 
 ---
 
