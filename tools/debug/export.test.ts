@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import type { InspectSnapshot } from '../../resource/inspect.ts'
 import { fero } from '../../resource/index.ts'
 import { ports, until } from '#utils'
-import { foldSnapshots, foldDivergence, captureInProcess, type VersionSample } from './export.ts'
+import { foldSnapshots, foldDivergence, foldOwnership, captureInProcess, type VersionSample } from './export.ts'
 // @ts-ignore — shape.js is the untyped browser/Node shared seam
 import { normalize } from './mockups/shape.js'
 
@@ -149,6 +149,31 @@ test('foldDivergence flags nothing when every replica matches the owner', () => 
   assert.notEqual(u42.status, 'diverged')
 })
 
+//! ownerByEpoch is re-derived by rebuilding the ring from each past committed view
+test('foldOwnership re-derives ownerByEpoch from the view history', () => {
+  const file: any = {
+    'fero.debug': 1, _about: '', view: 'e3',
+    resources: [{ name: 'r', members: ['A', 'B', 'C'], R: 3, nodes: [], partitions: [{ name: 'user42', owner: 'C' }, { name: 'order7', owner: 'A' }] }],
+  }
+  const views = new Map([[1, ['A']], [2, ['A', 'B']], [3, ['A', 'B', 'C']]])
+  // fake ring: user42 → the LAST member, order7 → the FIRST (so user42 changes hands each view)
+  const buildRing = (m: string[]) => (k: string) => (k === 'user42' ? m[m.length - 1] : m[0])
+  foldOwnership(file, views, buildRing)
+  const r = file.resources[0]
+  assert.deepEqual(r.partitions.find((p: any) => p.name === 'user42').ownerByEpoch, { e1: 'A', e2: 'B', e3: 'C' })
+  assert.deepEqual(r.partitions.find((p: any) => p.name === 'order7').ownerByEpoch, { e1: 'A', e2: 'A', e3: 'A' })
+  assert.deepEqual(r.epochs, [{ id: 'e1', members: 1, current: false }, { id: 'e2', members: 2, current: false }, { id: 'e3', members: 3, current: true }])
+})
+
+//! the config guard: if the rebuilt ring disagrees with the authoritative owner, emit nothing
+test('foldOwnership skips when the rebuilt ring disagrees with cluster.owner (config guard)', () => {
+  const file: any = { 'fero.debug': 1, _about: '', view: 'e2', resources: [{ name: 'r', members: ['A', 'B'], R: 2, nodes: [], partitions: [{ name: 'k', owner: 'WRONG' }] }] }
+  const views = new Map([[1, ['A']], [2, ['A', 'B']]])
+  foldOwnership(file, views, (m) => () => m[0]) // latest ring → 'A', but owner says 'WRONG'
+  assert.equal(file.resources[0].partitions[0].ownerByEpoch, undefined)
+  assert.equal(file.resources[0].epochs, undefined)
+})
+
 //! the live path: capture a real in-process cluster; ownership must match ground truth
 test('captureInProcess snapshots a live 3-node cluster with authoritative ownership', async () => {
   const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
@@ -193,6 +218,15 @@ test('captureInProcess snapshots a live 3-node cluster with authoritative owners
     // per-node keys is the real LWW-winner count, and the capture round-trips
     for (const n of r.nodes) assert.equal(typeof n.keys, 'number')
     assert.equal(normalize(file).resources.find((x: any) => x.id === 'exp-live').members, 3)
+
+    // P4: real ownership history — committed views became epochs, and the current-epoch
+    // owner re-derived from the ring matches the authoritative owner (the guard passed)
+    assert.ok(r.epochs && r.epochs.length >= 1, 'view history → epochs')
+    assert.ok(r.epochs!.some((e) => e.current), 'a current epoch is marked')
+    for (const p of r.partitions) {
+      assert.ok(p.ownerByEpoch, `ownerByEpoch derived for ${p.name}`)
+      assert.equal(p.ownerByEpoch![file.view], p.owner, `ownerByEpoch[${file.view}] matches owner for ${p.name}`)
+    }
   } finally {
     A.destroy(); B.destroy(); C.destroy()
   }

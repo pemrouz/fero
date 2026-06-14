@@ -7,7 +7,8 @@ import { test } from 'node:test'
 import { ok } from 'node:assert/strict'
 import { bench } from '#utils'
 import type { InspectSnapshot } from '../../resource/inspect.ts'
-import { foldSnapshots, foldDivergence, type VersionSample } from './export.ts'
+import { foldSnapshots, foldDivergence, foldOwnership, type VersionSample } from './export.ts'
+import { DHT } from '../../transport/dht.ts'
 
 //! build N server snapshots that each hold all M partitions (the heaviest fold: full holder bookkeeping)
 function cluster(N: number, M: number): InspectSnapshot[] {
@@ -35,8 +36,10 @@ test('foldSnapshots stays cheap over a large cluster', () => {
 })
 
 //! foldDivergence over a healthy cluster scans every partition × node but flags nothing — the common case
-// Each node's sample is the version-sample-CAP worth of keys (the drill bounds it), so the
-// comparison is bounded by the cap, not the total keyspace. Measured ~1ms; threshold 8ms.
+// Each node's sample is the version-sample-CAP worth of keys (the drill bounds it), so the comparison
+// is bounded by the cap, not the total keyspace. COLD path (once per capture, never on the data hot
+// path), so — per the inspect.perf philosophy — the threshold flags a GROSS regression, not a tight
+// latency budget. Quiet median ~3.3ms; threshold 15ms (~4-5x) tolerates a loaded box without flaking.
 test('foldDivergence stays cheap over a converged cluster', () => {
   const N = 24, M = 200
   const file = foldSnapshots(cluster(N, M), { owner, replicas })
@@ -47,6 +50,27 @@ test('foldDivergence stays cheap over a converged cluster', () => {
   for (let i = 0; i < N; i++) samples.set(':' + (5000 + i), sample)
   // owner is ':5000' for every partition → its sample is the reference
   const ms = bench.time(() => { foldDivergence(file, samples) })
+  console.log(`  foldDivergence ${N}×${M}: ${ms.toFixed(2)}ms`)
   ok(file.resources[0].partitions.every((p) => p.status !== 'diverged'), 'healthy → no divergence')
-  ok(ms < 8, `foldDivergence ${N}×${M} took ${ms.toFixed(2)}ms (threshold 8ms)`)
+  ok(ms < 15, `foldDivergence ${N}×${M} took ${ms.toFixed(2)}ms (threshold 15ms)`)
+})
+
+//! foldOwnership rebuilds a REAL ring per past view (the dominant cost) then derives owner per partition
+// 16 views (the history cap) × a real DHT build (members × 200 vnodes) + M owner() lookups each. Bounded
+// by the cap. COLD path (once per capture); quiet median ~10.5ms; threshold 30ms (~3x) so the per-view
+// DHT-build cost doesn't flake on a loaded box while still catching a gross/superlinear regression.
+test('foldOwnership stays bounded over the full view-history cap', () => {
+  const N = 5, M = 200, EPOCHS = 16
+  const members = Array.from({ length: N }, (_, i) => ':' + (5000 + i))
+  const file = foldSnapshots(cluster(N, M), { owner, replicas })
+  // pin every partition's owner to the default ring's verdict so the guard passes (real derivation)
+  const ref = new DHT(); for (const m of members) ref.add(m)
+  for (const p of file.resources[0].partitions) p.owner = ref.owner(p.name)
+  const views = new Map<number, string[]>()
+  for (let e = 1; e <= EPOCHS; e++) views.set(e, members)
+  const buildRing = (ms2: string[]) => { const ring = new DHT(); for (const m of ms2) ring.add(m); return (k: string) => ring.owner(k) }
+  const t = bench.time(() => { foldOwnership(file, views, buildRing) })
+  console.log(`  foldOwnership ${EPOCHS}×${M}: ${t.toFixed(2)}ms`)
+  ok(file.resources[0].epochs!.length === EPOCHS, 'all epochs derived')
+  ok(t < 30, `foldOwnership ${EPOCHS}×${M} took ${t.toFixed(2)}ms (threshold 30ms)`)
 })
