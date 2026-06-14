@@ -3,470 +3,827 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>fero debug — write traces</title>
+<title>sessions · user42 · user42.score — write trace · fero</title>
 <style>
+  /* ────────────────────────────────────────────────────────────────────
+     IDIOM: the COMMIT level — follow ONE write end to end. This is the same
+     app as partition.html / inbox.html / clients.html: identical graphite
+     palette, three-pane shell, command bar (breadcrumb identity · health
+     pill · search · scenario toggle), a health-lead one-liner, bottom hotkey
+     bar + the honest data-sources popover. Where the partition page is THE
+     LOG (the whole commit stream) and the key autopsy is ONE KEY across
+     replicas, THIS page is ONE WRITE across NODES:
+       LEFT  = a selectable list of recent writes (stamp e·s + key + outcome chip)
+       CENTRE= the selected write's full change record as a code block, then
+               its ROUTE as a vertical timeline (the clients.html .tl pattern):
+               client → forwarding server → owner commit → replica fan-out → acks
+       RIGHT = provenance / why (won/lost/forwarded/local + the reason),
+               the ack roster (which replicas acked, lag) + a data-sources note.
+     Colour stays FUNCTIONAL — only severity (loss/fence/conflict) is coloured;
+     clean local/won writes are calm. Same fence-vs-conflict vocabulary as the
+     partition page: wr.e/wr.s = the loser's own stamp, we/ws = the winner's;
+     wr.e==we ⇒ same-epoch CONFLICT, wr.e<we ⇒ FENCE (stale-view write).
+     ──────────────────────────────────────────────────────────────────── */
   :root{
-    --bg:#0b0e14; --panel:#141925; --panel-2:#1b2230; --line:#232c3d;
-    --ink:#cbd5e1; --dim:#7587a3; --accent:#7dd3fc; --ok:#34d399;
-    --warn:#fbbf24; --bad:#f87171; --idle:#475569; --violet:#a78bfa; --cyan:#22d3ee;
+    --bg:#101216; --rail:#13151a; --pane:#15181e; --line:#22262e; --line-2:#2b303a;
+    --ink:#d6dae2; --dim:#8a909c; --soft:#5a606b; --faint:#3f444e;
+    --sel:#1d3a52; --sel-line:#3d7fb8; --hover:#1a1e25;
+    --crit:#e8615a; --crit-bg:#2a1816; --warn:#d6a247; --warn-bg:#251f12;
+    --ok:#5cba8a; --ok-bg:#16241c; --info:#5b9fe0; --info-bg:#13212f;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
   *{box-sizing:border-box}
-  body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font:13px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;
-  }
-  main.app{max-width:1400px; margin:0 auto; padding:16px 20px}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 var(--ui);
+    -webkit-font-smoothing:antialiased;overflow:hidden}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
+  ::selection{background:var(--sel)}
 
-  /* ---- topbar ---- */
-  .topbar{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; padding:10px 0 12px; border-bottom:1px solid var(--line)}
-  .topbar h1{font-size:16px; font-weight:700; margin:0; white-space:nowrap}
-  .topbar h1 .lo{color:var(--dim); font-weight:400}
-  .purpose{margin:0; color:var(--dim); font-size:12px; flex:1 1 420px; min-width:280px}
-  .mocktag{font-size:11px; font-weight:600; color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 45%, transparent);
-    background:color-mix(in srgb, var(--warn) 10%, var(--panel)); border-radius:999px; padding:3px 10px; white-space:nowrap}
+  /* ── top command bar ───────────────────────────────────────────────── */
+  .bar{display:flex;align-items:center;gap:0;height:38px;background:var(--rail);
+    border-bottom:1px solid var(--line);padding:0 10px;flex:0 0 auto;font-size:12.5px}
+  .bar .id{display:flex;align-items:baseline;gap:6px;padding-right:12px;white-space:nowrap}
+  .bar .id .res{color:var(--soft)} .bar .id a.res:hover{color:var(--dim)}
+  .bar .id .chev{color:var(--faint)}
+  .bar .id .nm{font-weight:600;color:var(--ink)} .bar .id .nm .mono{color:#fff}
+  .bar .sep{width:1px;height:18px;background:var(--line-2);margin:0 12px}
+  .bar .ctx{display:flex;gap:14px;color:var(--dim);white-space:nowrap}
+  .bar .ctx .mono{color:var(--ink)}
+  .bar .health{display:flex;align-items:center;gap:7px;margin-left:auto;padding-right:4px;white-space:nowrap}
+  .bar .health .dot{width:8px;height:8px;border-radius:50%}
+  .bar .health .txt{font-weight:600;letter-spacing:.02em}
+  .bar .health.ok .dot{background:var(--ok)} .bar .health.ok .txt{color:var(--ok)}
+  .bar .health.crit .dot{background:var(--crit);box-shadow:0 0 0 3px var(--crit-bg)}
+  .bar .health.crit .txt{color:var(--crit)}
+  .bar .search{display:flex;align-items:center;gap:6px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:5px;padding:3px 9px;margin-left:12px;width:240px}
+  .bar .search input{background:none;border:0;outline:0;color:var(--ink);font:inherit;width:100%;
+    font-family:var(--mono);font-size:12px}
+  .bar .search input::placeholder{color:var(--soft);font-family:var(--ui)}
+  .bar .search .pre{color:var(--soft)}
+  .bar .scen{display:flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden;margin-left:10px}
+  .bar .scen button{background:#0c0e12;border:0;color:var(--dim);font:inherit;font-size:11.5px;font-weight:600;
+    padding:4px 11px;cursor:pointer;border-right:1px solid var(--line);white-space:nowrap}
+  .bar .scen button:last-child{border-right:0}
+  .bar .scen button:hover{color:var(--ink)}
+  .bar .scen button[aria-pressed=true]{background:var(--sel);color:#fff}
+  .bar .mock{margin-left:10px;color:var(--soft);font-size:10.5px;border:1px solid var(--line);
+    border-radius:3px;padding:2px 7px;letter-spacing:.03em;white-space:nowrap}
 
-  /* ---- aggregate stat strip ---- */
-  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin:16px 0}
-  .stat{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; position:relative; --s:var(--idle)}
-  .stat[data-tone=ok]{--s:var(--ok)} .stat[data-tone=warn]{--s:var(--warn)}
-  .stat[data-tone=bad]{--s:var(--bad)} .stat[data-tone=run]{--s:var(--accent)}
-  .stat .lab{font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim)}
-  .stat .num{font-size:22px; font-weight:700; color:var(--s); margin:2px 0 0}
-  .stat .sub{font-size:11px; color:var(--dim)}
-  .stat[data-tone=bad] .num{text-shadow:0 0 14px color-mix(in srgb, var(--bad) 55%, transparent)}
-  .stat[data-go]{cursor:pointer}
-  .stat[data-go]:hover{border-color:color-mix(in srgb, var(--accent) 45%, transparent)}
-  .prov{position:absolute; top:8px; right:10px; font-size:11px; font-weight:600; color:var(--dim); cursor:help}
-  .prov b{color:var(--warn); font-weight:600}
-  .prov[data-kind=new]{color:var(--warn)}
+  /* ── HEALTH LEAD: the triage one-liner, worst thing first ──────────── */
+  .lead{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);
+    background:var(--rail);flex:0 0 auto;font-size:12.5px}
+  .lead .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg);flex:0 0 auto}
+  .lead.ok .sd{background:var(--ok)} .lead.crit .sd{background:var(--crit)}
+  .lead .ltxt{color:var(--ink)} .lead .ltxt b{font-weight:650;color:#fff}
+  .lead.ok .ltxt b{color:var(--ok)} .lead.crit .ltxt b{color:var(--crit)}
+  .lead .ltxt .mono{color:var(--ink)} .lead .ltxt .bad{color:var(--crit)}
+  .lead .pills{margin-left:auto;display:flex;gap:7px;font-size:11px}
+  .lead .pill{display:flex;align-items:center;gap:5px;border:1px solid var(--line-2);border-radius:4px;
+    padding:2px 8px;color:var(--dim);background:#0c0e12;font-variant-numeric:tabular-nums}
+  .lead .pill b{color:var(--ink);font-weight:600}
+  .lead .pill.crit{border-color:#4a2622;color:var(--crit)} .lead .pill.crit b{color:var(--crit)}
+  .lead .pill.warn{border-color:#443613;color:var(--warn)} .lead .pill.warn b{color:var(--warn)}
+  .lead .pill.ok{border-color:#1f3a2c;color:var(--ok)} .lead .pill.ok b{color:var(--ok)}
 
-  /* ---- panels ---- */
-  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; margin:0 0 16px; overflow:hidden}
-  .phead{display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap}
-  .phead .title{font-size:13px; font-weight:700}
-  .phead .meta{margin-left:auto; color:var(--dim); font-size:11px}
-  .badge-new{font-size:10px; font-weight:600; color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 40%, transparent);
-    background:color-mix(in srgb, var(--warn) 8%, var(--panel)); border-radius:6px; padding:1px 6px; cursor:help}
+  /* ── 3-pane body ───────────────────────────────────────────────────── */
+  .body{display:grid;grid-template-columns:248px minmax(0,1fr) 340px;flex:1 1 auto;min-height:0}
 
-  /* ---- filters ---- */
-  .chips{display:flex; gap:6px; align-items:center}
-  .chip{font:inherit; font-size:11px; font-weight:600; color:var(--dim); background:var(--panel-2);
-    border:1px solid var(--line); border-radius:999px; padding:3px 11px; cursor:pointer; transition:color .2s,border-color .2s}
-  .chip:hover{color:var(--ink)}
-  .chip[data-on]{color:var(--accent); border-color:color-mix(in srgb, var(--accent) 50%, transparent);
-    background:color-mix(in srgb, var(--accent) 10%, var(--panel))}
-  .chip .n{color:var(--dim); font-weight:400}
-  #keyfilter{font:inherit; font-size:11px; color:var(--ink); background:var(--panel-2); border:1px solid var(--line);
-    border-radius:6px; padding:3px 9px; width:170px; outline:none}
-  #keyfilter:focus{border-color:color-mix(in srgb, var(--accent) 50%, transparent)}
-  #keyfilter::placeholder{color:var(--idle)}
+  /* ── LEFT RAIL: the recent-writes list ──────────────────────────────
+       Each row is ONE write: its e·s stamp + key + outcome chip. Selecting
+       a row drives the centre (record + route) and the right (why + acks).
+       Worst-first within the list is NOT enforced (it's a recency stream),
+       but the outcome chip is severity-coloured so losses jump out. ───── */
+  .rail{background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;padding:10px 0}
+  .rail .grp{padding:0 6px}
+  .rail .grp-h{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--soft);
+    padding:4px 10px 6px;display:flex;justify-content:space-between}
+  .rail .grp-h .gc{color:var(--faint);font-weight:600;letter-spacing:0}
+  /* a write row: two lines — stamp + outcome chip, over key = value */
+  .rail .w{display:flex;flex-direction:column;gap:2px;padding:6px 10px;border-radius:5px;cursor:pointer;
+    color:var(--dim);border-left:2px solid transparent}
+  .rail .w:hover{background:var(--hover);color:var(--ink)}
+  .rail .w[aria-current=true]{background:var(--sel);color:#fff}
+  .rail .w[data-sev=crit]{border-left-color:var(--crit)} .rail .w[data-sev=warn]{border-left-color:var(--warn)}
+  .rail .w .l1{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .rail .w .stamp{font-family:var(--mono);font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rail .w .stamp .e{color:var(--soft)}
+  .rail .w[aria-current=true] .stamp{color:#c4cdd9}
+  /* the outcome chip — the only colour in the rail; calm for local/won/fwd */
+  .rail .w .oc{font-family:var(--ui);font-size:9.5px;font-weight:700;letter-spacing:.03em;
+    padding:0 5px;border-radius:3px;white-space:nowrap;flex:0 0 auto}
+  .rail .w .oc.local{color:var(--info);background:var(--info-bg)}
+  .rail .w .oc.won{color:var(--ok);background:var(--ok-bg)}
+  .rail .w .oc.fwd{color:var(--dim);background:#1c1f26}
+  .rail .w .oc.drop{color:var(--soft);background:#1c1f26}
+  .rail .w .oc.fence{color:var(--warn);background:var(--warn-bg)}
+  .rail .w .oc.conflict{color:var(--crit);background:var(--crit-bg)}
+  .rail .w .l2{font-family:var(--mono);font-size:12px;color:var(--ink);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .rail .w[aria-current=true] .l2{color:#fff}
+  .rail .w .l2 .vv{color:var(--dim)} .rail .w[aria-current=true] .l2 .vv{color:#dfe6ee}
+  .rail .w[data-sev=crit] .l2 .vv{color:var(--crit)} .rail .w[data-sev=warn] .l2 .vv{color:var(--warn)}
+  /* in-situ glossary — defines stamp / outcome right where they appear */
+  .rail .gloss{margin:12px 12px 2px;padding:10px 0 2px;border-top:1px solid var(--line);color:var(--soft);
+    font-size:10.5px;line-height:1.6}
+  .rail .gloss b{color:var(--dim);font-weight:600;font-family:var(--mono)}
+  .rail .gloss .mono{font-family:var(--mono)} .rail .gloss .bad{color:var(--crit)} .rail .gloss .warn{color:var(--warn)}
 
-  /* ---- trace table ---- */
-  .tbody{max-height:380px; overflow-y:auto; overflow-anchor:none}
-  .trow, .thead-row{display:grid; grid-template-columns:92px minmax(0,1fr) 178px 112px 118px 48px 96px; gap:10px; align-items:center; padding:5px 14px}
-  .thead-row{font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); border-bottom:1px solid var(--line); padding-top:8px; padding-bottom:8px}
-  .trow{cursor:pointer; border-left:2px solid var(--k,transparent); font-size:12px; transition:background .2s}
-  .trow[data-out=won]{--k:var(--ok)} .trow[data-out=fence]{--k:var(--warn)}
-  .trow[data-out=conflict]{--k:var(--bad)} .trow[data-out=pending]{--k:var(--accent)}
-  .trow:hover{background:color-mix(in srgb, var(--accent) 5%, transparent)}
-  .trow[data-sel]{background:color-mix(in srgb, var(--accent) 9%, transparent)}
-  .trow .id{color:var(--dim)} .trow[data-sel] .id{color:var(--accent)}
-  .trow .key{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .trow .org{color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .glyph{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:baseline; background:var(--g,var(--idle))}
-  .glyph.sq{border-radius:2px}
-  .out{font-size:11px; font-weight:600; border-radius:6px; padding:1px 8px; display:inline-block;
-    color:var(--k); background:color-mix(in srgb, var(--k) 10%, var(--panel)); border:1px solid color-mix(in srgb, var(--k) 42%, transparent)}
-  .lat,.hopn,.age{text-align:right; color:var(--ink)}
-  .lat[data-slow]{color:var(--warn)} .age[data-stale]{color:var(--bad); font-weight:600}
-  .lsem{font-size:10px; color:var(--dim)}
-  .pinned{font-size:10px; color:var(--accent); padding-left:2px}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-  .pulse{animation:pulse 1.1s infinite}
+  /* ── CENTRE: the write — record (code block) + route (vertical timeline) ── */
+  .trace{overflow-y:auto;background:var(--bg);min-width:0;display:flex;flex-direction:column}
+  .trace .th{display:flex;align-items:center;gap:10px;height:34px;padding:0 14px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--bg);z-index:3;color:var(--soft);font-size:11px}
+  .trace .th .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg);flex:0 0 auto;background:var(--ok)}
+  .trace .th[data-sev=crit] .sd{background:var(--crit)} .trace .th[data-sev=warn] .sd{background:var(--warn)}
+  .trace .th .ttl{color:var(--ink);font-weight:600;font-size:13px;font-family:var(--mono)}
+  .trace .th .oc{font-family:var(--ui);font-size:10px;font-weight:700;letter-spacing:.03em;
+    padding:1px 7px;border-radius:3px}
+  .trace .th .oc.local{color:var(--info);background:var(--info-bg);border:1px solid #234055}
+  .trace .th .oc.won{color:var(--ok);background:var(--ok-bg);border:1px solid #1f3a2c}
+  .trace .th .oc.fwd{color:var(--dim);background:#1c1f26;border:1px solid var(--line-2)}
+  .trace .th .oc.fence{color:var(--warn);background:var(--warn-bg);border:1px solid #443613}
+  .trace .th .oc.conflict{color:var(--crit);background:var(--crit-bg);border:1px solid #4a2622}
+  .trace .th .meta{margin-left:auto;font-family:var(--mono);color:var(--soft)}
 
-  /* ---- detail / waterfall ---- */
-  .dhead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; padding:12px 14px 4px}
-  .dhead .tid{font-weight:700; color:var(--accent)}
-  .dhead .dkey{color:var(--ink)} .dhead .dmeta{color:var(--dim); font-size:11px}
-  .verdict{margin:6px 14px 10px; font-size:12px; color:var(--ink); border-left:2px solid var(--k,var(--idle)); padding:6px 12px;
-    background:color-mix(in srgb, var(--k,var(--idle)) 6%, var(--panel-2)); border-radius:0 6px 6px 0}
-  .verdict b{font-weight:700; color:var(--k)}
-  .stamps{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 14px 12px; font-size:11px}
-  .stamps .slab{color:var(--dim); text-transform:uppercase; font-size:10px; letter-spacing:.05em}
-  .stamp{border:1px solid var(--line); background:var(--panel-2); border-radius:6px; padding:2px 8px; color:var(--ink)}
-  .stamp[data-bad]{color:var(--bad); border-color:color-mix(in srgb, var(--bad) 40%, transparent); background:color-mix(in srgb, var(--bad) 8%, var(--panel))}
-  .stamps .arr{color:var(--idle)}
-  .wf{padding:4px 14px 12px}
-  .hop{display:grid; grid-template-columns:200px minmax(0,1fr) 84px; gap:10px; align-items:center; padding:3px 0}
-  .hop .hl{font-size:11px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .hop .hl .act{color:var(--dim)}
-  .track{position:relative; height:14px; background:var(--panel-2); border-radius:3px}
-  .bar{position:absolute; top:2px; bottom:2px; border-radius:2px; min-width:3px; background:var(--b,var(--ok))}
-  .bar[data-st=ok]{--b:color-mix(in srgb, var(--ok) 75%, var(--panel))}
-  .bar[data-st=warn]{--b:var(--warn)} .bar[data-st=bad]{--b:var(--bad)}
-  .bar[data-st=run]{--b:var(--accent); border-right:2px dashed var(--accent); animation:pulse 1.1s infinite}
-  .mark{position:absolute; top:-3px; bottom:-3px; width:0; border-left:1px dashed var(--violet)}
-  .hop .dur{font-size:11px; color:var(--dim); text-align:right}
-  .hop .dur[data-st=warn]{color:var(--warn)} .hop .dur[data-st=bad]{color:var(--bad)} .hop .dur[data-st=run]{color:var(--accent)}
-  .hnote{grid-column:1/-1; font-size:11px; color:var(--dim); padding:0 94px 3px 210px}
-  .hnote[data-st=bad]{color:color-mix(in srgb, var(--bad) 75%, var(--ink))}
-  .hnote[data-st=warn]{color:color-mix(in srgb, var(--warn) 70%, var(--ink))}
-  .axis{display:grid; grid-template-columns:200px minmax(0,1fr) 84px; gap:10px; padding:2px 0 0}
-  .axis .ax{display:flex; justify-content:space-between; font-size:10px; color:var(--idle); border-top:1px solid var(--line); padding-top:3px}
-  .mlegend{font-size:10px; color:var(--violet); padding:6px 14px 0; }
+  .trace .seg{padding:13px 16px;border-bottom:1px solid var(--line)}
+  .trace .st{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);
+    margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .trace .st .stn{margin-left:auto;color:var(--faint);font-weight:600;letter-spacing:0;font-family:var(--mono)}
 
-  /* ---- data sources ---- */
-  .src{font-size:11px}
-  .srow{display:grid; grid-template-columns:280px minmax(0,1fr); gap:12px; padding:6px 14px; border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent)}
-  .srow:first-of-type{border-top:none}
-  .srow .sp{color:var(--ink)} .srow .ss{color:var(--dim)}
-  .srow[data-new] .ss{color:color-mix(in srgb, var(--warn) 70%, var(--ink))}
-  .srow[data-new] .sp::before{content:"⚠ "; color:var(--warn)}
-  .empty{padding:24px; text-align:center; color:var(--ok); font-size:12px}
-  @media (max-width:900px){
-    .trow,.thead-row{grid-template-columns:80px minmax(0,1fr) 110px 70px 60px}
-    .org,.hopn,.lsem, .thead-row :nth-child(3), .thead-row :nth-child(6){display:none}
-    .hop{grid-template-columns:140px minmax(0,1fr) 70px} .hnote{padding-left:150px}
-    .axis{grid-template-columns:140px minmax(0,1fr) 70px}
-  }
+  /* the change record — the wire format, as a code block */
+  .rec{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--dim);
+    background:#0c0e12;border:1px solid var(--line);border-radius:6px;padding:12px 14px;white-space:pre-wrap}
+  .rec .kk{color:var(--info)} .rec .vv{color:var(--ink)} .rec .bad{color:var(--crit)} .rec .warn{color:var(--warn)}
+  .rec .cm{color:var(--soft)}
+  /* the stamp strip under the record: client stamp → owner restamp → winner */
+  .stamps{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:11px;font-size:11px}
+  .stamps .slab{color:var(--soft);text-transform:uppercase;font-size:9.5px;letter-spacing:.05em;font-family:var(--ui)}
+  .stamps .stamp{font-family:var(--mono);border:1px solid var(--line-2);background:#0c0e12;border-radius:4px;
+    padding:2px 8px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .stamps .stamp.bad{color:var(--crit);border-color:#4a2622;background:var(--crit-bg)}
+  .stamps .stamp.warn{color:var(--warn);border-color:#443613;background:var(--warn-bg)}
+  .stamps .stamp .sl{color:var(--soft);margin-right:4px}
+  .stamps .arr{color:var(--faint)}
+
+  /* the route — a vertical timeline (clients.html .tl pattern, extended with
+     a right-aligned per-hop status). Each li is one hop: client → forwarder →
+     owner commit → replica fan-out → W-quorum acks. A hop that stops the route
+     (fence at the owner) is the last node; nothing fans out below it. */
+  .route{list-style:none;margin:0;padding:0 0 0 2px}
+  .route li{position:relative;padding:0 0 14px 22px;font-size:12px;line-height:1.5;color:var(--dim)}
+  .route li:last-child{padding-bottom:0}
+  .route li::before{content:'';position:absolute;left:3px;top:4px;width:9px;height:9px;border-radius:50%;
+    background:var(--faint);border:2px solid var(--bg);z-index:1}
+  .route li::after{content:'';position:absolute;left:7px;top:13px;bottom:-1px;width:1px;background:var(--line-2)}
+  .route li:last-child::after{display:none}
+  /* hop status colours the node: done=ok, move/warn, stop=crit, run=info(in flight) */
+  .route li.done::before{background:var(--ok)}
+  .route li.fan::before{background:var(--ok)}
+  .route li.warn::before{background:var(--warn)}
+  .route li.stop::before{background:var(--crit);box-shadow:0 0 0 3px var(--crit-bg)}
+  .route li.now::before{background:var(--info)}
+  .route li .hl{display:flex;align-items:baseline;gap:8px}
+  .route li .hn{font-family:var(--mono);color:var(--ink);font-weight:600}
+  .route li.stop .hn{color:var(--crit)} .route li.warn .hn{color:var(--warn)}
+  .route li .hs{margin-left:auto;font-family:var(--ui);font-size:10.5px;font-weight:600;color:var(--soft);white-space:nowrap}
+  .route li.done .hs,.route li.fan .hs{color:var(--ok)}
+  .route li.warn .hs{color:var(--warn)} .route li.stop .hs{color:var(--crit)} .route li.now .hs{color:var(--info)}
+  .route li .hd{color:var(--dim);font-size:11.5px;margin-top:2px}
+  .route li .hd .mono{color:var(--ink)} .route li .hd .bad{color:var(--crit)} .route li .hd .warn{color:var(--warn)}
+  /* a hop carrying a stamp prints it inline under the description */
+  .route li .hstamp{font-family:var(--mono);font-size:10.5px;color:var(--soft);margin-top:3px}
+  .route li .hstamp b{color:var(--ink);font-weight:600}
+  /* the W-quorum bar — a one-line ack tally rendered as a fan-out summary */
+  .quorum{display:flex;align-items:center;gap:9px;margin-top:5px;font-family:var(--mono);font-size:11px}
+  .quorum .qbar{flex:1 1 auto;height:6px;background:var(--line);border-radius:3px;overflow:hidden;max-width:160px}
+  .quorum .qbar i{display:block;height:100%;background:var(--ok)}
+  .quorum .qbar i.warn{background:var(--warn)} .quorum .qbar i.bad{background:var(--crit)}
+  .quorum .qn{color:var(--ink);font-variant-numeric:tabular-nums}
+  .quorum .qn.ok{color:var(--ok)} .quorum .qn.warn{color:var(--warn)} .quorum .qn.bad{color:var(--crit)}
+
+  /* ── RIGHT: provenance / why + ack roster + data-sources note ──────── */
+  .why{background:var(--pane);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+  .why .wh{padding:12px 14px 11px;border-bottom:1px solid var(--line)}
+  .why .wh .wt{font-family:var(--mono);font-size:14px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+  .why .wh .wt .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg);background:var(--ok)}
+  .why .wh[data-sev=crit] .wt .sd{background:var(--crit)} .why .wh[data-sev=warn] .wt .sd{background:var(--warn)}
+  .why .wh .wsub{margin-top:5px;color:var(--dim);font-size:11.5px;line-height:1.45}
+  .why .wh .wsub .mono{color:var(--ink)} .why .wh .wsub .bad{color:var(--crit)} .why .wh .wsub .warn{color:var(--warn)}
+  .why .seg{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .why .st{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);
+    margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  /* inline NEW chip — instrumentation that doesn't exist in fero today */
+  .newc{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:9px;border:1px solid #443613;
+    border-radius:3px;padding:0 4px;background:var(--warn-bg);letter-spacing:.02em;text-transform:none}
+  /* the verdict reason prose */
+  .why .reason{font-size:12px;line-height:1.55;color:var(--dim)}
+  .why .reason b{color:var(--ink);font-weight:600}
+  .why .reason .bad{color:var(--crit)} .why .reason .warn{color:var(--warn)} .why .reason .mono{color:var(--ink);font-family:var(--mono)}
+  /* the lost-write classification line: wr.e/wr.s vs we/ws */
+  .verdict{font-family:var(--mono);font-size:11.5px;line-height:1.6;background:#0c0e12;border:1px solid var(--line);
+    border-radius:5px;padding:9px 11px;margin-top:10px;color:var(--dim)}
+  .verdict.bad{border-color:#4a2622} .verdict.warn{border-color:#443613}
+  .verdict .vk{color:var(--info)} .verdict .vc{color:var(--crit)} .verdict .vw{color:var(--warn)} .verdict b{color:var(--ink);font-weight:600}
+
+  /* ack roster — reuse partition.html's replica-lag table shape */
+  .rep{display:flex;flex-direction:column;gap:8px}
+  .rep .rr{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;font-family:var(--mono);font-size:12px}
+  .rep .rr .rn{color:var(--ink);white-space:nowrap}
+  .rep .rr .rn .ow{color:var(--info);font-family:var(--ui);font-size:9px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.04em;margin-left:6px;border:1px solid #234866;border-radius:2px;padding:0 4px;vertical-align:1px}
+  .rep .rr .ackd{font-family:var(--ui);font-size:11px;color:var(--soft)}
+  .rep .rr .ackd.ok{color:var(--ok)} .rep .rr .ackd.warn{color:var(--warn)} .rep .rr .ackd.bad{color:var(--crit)}
+  .rep .rr .lg{text-align:right;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .rep .rr .lg.bad{color:var(--crit);font-weight:600} .rep .rr .lg.ok{color:var(--soft)}
+  .rep .rstate{font-family:var(--ui);font-size:10.5px;color:var(--soft);margin-top:6px;padding-left:1px}
+  .rep .rstate.bad{color:var(--warn)}
+
+  /* simple key/value facts */
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12px}
+  .kv dt{color:var(--soft)} .kv dd{margin:0;color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+  .kv dd.bad{color:var(--crit)} .kv dd.warn{color:var(--warn)} .kv dd.ok{color:var(--ok)}
+  .kv dd a{font-family:var(--mono)}
+
+  /* the in-pane data-sources note (honest footnote, scoped to this write) */
+  .why .note{font-size:11px;line-height:1.6;color:var(--soft)}
+  .why .note b{color:var(--dim);font-weight:600} .why .note .mono{color:var(--ink);font-family:var(--mono)}
+  .why .note .nw{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:9.5px;border:1px solid #443613;
+    border-radius:3px;padding:0 4px;background:var(--warn-bg);margin-right:3px}
+
+  .why .actions{margin-top:auto;padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  .btn{display:inline-flex;align-items:center;justify-content:space-between;gap:7px;
+    background:#0c0e12;border:1px solid var(--line-2);border-radius:5px;color:var(--ink);font:inherit;font-size:12px;
+    font-weight:600;padding:7px 11px;cursor:pointer;text-align:left}
+  .btn:hover{border-color:var(--soft);background:var(--hover);text-decoration:none}
+  .btn .kc{font-family:var(--mono);font-size:10px;color:var(--soft);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+  .btn .ar{color:var(--soft)}
+
+  /* ── bottom hotkey bar ─────────────────────────────────────────────── */
+  .keys{display:flex;align-items:center;gap:0;height:24px;background:var(--rail);border-top:1px solid var(--line);
+    padding:0 12px;flex:0 0 auto;font-size:11px;color:var(--soft)}
+  .keys .k{display:flex;align-items:center;gap:5px;padding:0 13px 0 0}
+  .keys .k kbd{font-family:var(--mono);font-size:10px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:3px;padding:1px 5px;color:var(--dim)}
+  .keys .right{margin-left:auto;font-family:var(--mono);color:var(--soft)}
+
+  /* data-sources popover (the honest footnote) */
+  .src{display:none;position:fixed;bottom:30px;left:14px;width:580px;background:var(--pane);
+    border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;font-size:11.5px;line-height:1.65;color:var(--dim);
+    box-shadow:0 8px 30px #000a;z-index:20}
+  .src.show{display:block}
+  .src h4{margin:0 0 8px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+  .src p{margin:7px 0} .src b{color:var(--ink);font-weight:600} .src .mono{color:var(--ink)}
+  .src .new{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:10px;border:1px solid #443613;
+    border-radius:3px;padding:1px 5px;margin-right:3px;background:var(--warn-bg)}
+  .keys .srcbtn{cursor:pointer;color:var(--dim);padding:0 13px 0 0;display:flex;align-items:center;gap:5px}
+  .keys .srcbtn:hover{color:var(--ink)} .keys .srcbtn .new{color:var(--warn)}
 </style>
 </head>
 <body>
-<main class="app">
 
-  <header class="topbar">
-    <h1>fero <span class="lo">debug ·</span> write traces</h1>
-    <p class="purpose">Follow one write end-to-end — client → forward → owner commit → replica fan-out → acks — and see exactly where it stalled, was fenced, or died.</p>
-    <span class="mocktag">mockup · static fixture · argues for trace-id instrumentation</span>
-  </header>
+<!-- ── command bar: identity (cluster › sessions › user42 › key › commit) · context · health · search · scenario ── -->
+<div class="bar">
+  <div class="id">
+    <a class="res" href="tool/resources.html">cluster</a><span class="chev">›</span>
+    <a class="res" href="tool/inbox.html">sessions</a><span class="chev">›</span>
+    <a class="res" href="tool/partition.html">user42</a><span class="chev">›</span>
+    <a class="res" href="key-autopsy/happy.html">key <span class="mono">user42.score</span></a><span class="chev">›</span>
+    <span class="nm">commit</span>
+  </div>
+  <span class="sep"></span>
+  <div class="ctx">
+    <span><span class="mono" id="ctxWrites">8</span> writes</span>
+    <span>view <span class="mono">e4</span></span>
+    <span><span class="mono">5</span> members · R=5</span>
+  </div>
+  <div class="health" id="health"><span class="dot"></span><span class="txt" id="healthTxt">Healthy</span></div>
+  <div class="search"><span class="pre mono">⌕</span><input id="q" spellcheck="false" placeholder="is:won  is:fence  is:conflict  key:user42.score" autocomplete="off"></div>
+  <div class="scen" id="scen"></div>
+  <span class="mock">MOCKUP · static</span>
+</div>
 
-  <!-- glanceable layer: aggregates over the trace window -->
-  <section class="stats" id="stats"></section>
+<!-- ── HEALTH LEAD: the triage one-liner, worst thing first ── -->
+<div class="lead" id="lead">
+  <span class="sd"></span><span class="ltxt" id="leadTxt"></span>
+  <span class="pills" id="leadPills"></span>
+</div>
 
-  <!-- recent traces: bounded, newest pinned at top, filterable — not a firehose -->
-  <section class="panel">
-    <div class="phead">
-      <span class="title">Recent write traces</span>
-      <span class="badge-new" title="Hop stitching + latency need NEW trace-id instrumentation — see Data sources">NEW data</span>
-      <span class="chips" id="chips"></span>
-      <input id="keyfilter" placeholder="filter key…" spellcheck="false">
-      <span class="meta">showing newest 12 of 247 captured · ring · drop-oldest · newest pinned, no auto-scroll</span>
-    </div>
-    <div class="thead-row">
-      <span>trace</span><span>key</span><span>origin</span><span>outcome</span>
-      <span style="text-align:right">latency</span><span style="text-align:right">hops</span><span style="text-align:right">age</span>
-    </div>
-    <div class="tbody" id="tbody"></div>
+<div class="body" id="bodyGrid">
+
+  <!-- ── LEFT RAIL: recent writes (stamp + key + outcome chip) ── -->
+  <nav class="rail" id="rail"></nav>
+
+  <!-- ── CENTRE: the selected write — record + route ── -->
+  <section class="trace">
+    <div class="th" id="traceHead"></div>
+    <div id="traceBody"></div>
   </section>
 
-  <!-- drill-down: one write's waterfall -->
-  <section class="panel" id="detail">
-    <div class="phead">
-      <span class="title">Trace waterfall</span>
-      <span class="badge-new" title="Per-hop spans require NEW per-write trace id + wall-clock timing — see Data sources">NEW data</span>
-      <span class="meta" id="dpath"></span>
-    </div>
-    <div id="dbody"></div>
-  </section>
+  <!-- ── RIGHT: provenance / why + ack roster + data-sources note ── -->
+  <aside class="why" id="why"></aside>
+</div>
 
-  <!-- honesty footnote: every panel mapped to its real source, or flagged NEW -->
-  <section class="panel src">
-    <div class="phead"><span class="title">Data sources</span>
-      <span class="meta">real = derivable today · ⚠ / superscript ³⁻⁷ = NEW instrumentation (inventory #) this page argues for</span></div>
-    <div class="srow"><span class="sp">Outcome won / lost (fence vs conflict)</span>
-      <span class="ss">real — observe stream [B] kinds 'won' / 'lost' / 'local' / 'forwarded'; fence vs same-epoch conflict decided from the loser's we/ws winner stamp.</span></div>
-    <div class="srow"><span class="sp">Stamps (origin · epoch · seq) and owner restamp</span>
-      <span class="ss">real — ProvRecord origin/seq/epoch; the owner-restamp hop mirrors commitLocal's restamp (resource/index.ts:735). Per-trace capture of the BEFORE stamp rides the new trace id.</span></div>
-    <div class="srow"><span class="sp">In-flight depth (count only)</span>
-      <span class="ss">real — snapshot [A].pending ships the write-gate buffer depth per node.</span></div>
-    <div class="srow" data-new><span class="sp">Hop stitching — one row per write across nodes</span>
-      <span class="ss">NEW instrumentation: client-stamped correlation id carried WRITE → owner commit → replication → 'won'/'lost' emits. Seam: optional ChangeRecord field + a reserved frame flag bit (FLAG bits 4+ free); ProvRecord gains the id. (inventory #4)</span></div>
-    <div class="srow" data-new><span class="sp">Per-hop durations, waterfall, p50/p99 commit latency</span>
-      <span class="ss">NEW instrumentation: wall-clock ms in the prov frame ext; receiver computes skew-adjusted deltas at applyInbound; per-origin EWMA lands in the snapshot. Header p50/p99 are streaming estimates over all writes (1,483 in the 5m window) — NOT derived from the 247-trace ring. (inventory #5)</span></div>
-    <div class="srow" data-new><span class="sp">View-change marker inside a write's waterfall</span>
-      <span class="ss">NEW instrumentation: VIEW_COMMIT's epoch already flows through the bridge, but pinning its wall-clock position inside one write's ms timeline rides the same skew-adjusted timing as the hop spans. (inventory #5)</span></div>
-    <div class="srow" data-new><span class="sp">Forward ACK / timeout / retry flags</span>
-      <span class="ss">NEW instrumentation: WRITE→ACK matching + reconnect/timeout counters per peer. Seam: per-Peer counters in Framer.push/flush, copied into InspectPeer rows. (inventory #6)</span></div>
-    <div class="srow" data-new><span class="sp">Pending-buffer contents + age ("buffered, never dropped")</span>
-      <span class="ss">NEW instrumentation: sample first/last buffered ChangeRecord keys + age — the pending array already sits in SnapshotDeps. (inventory #7)</span></div>
-    <div class="srow" data-new><span class="sp">Trace retention (247-ring) + fenced-write rate window</span>
-      <span class="ss">NEW instrumentation: a queryable trace window beyond the bridge's in-memory 4000-event ring; seam: bridge account() already sees every flattened ProvEvent. (inventory #3)</span></div>
-  </section>
+<!-- ── bottom hotkey bar ── -->
+<div class="keys">
+  <span class="k"><kbd>j</kbd><kbd>k</kbd> move</span>
+  <span class="k"><kbd>↵</kbd> open key autopsy</span>
+  <span class="k"><kbd>w</kbd> won</span>
+  <span class="k"><kbd>l</kbd> losses</span>
+  <span class="k"><kbd>1</kbd>/<kbd>2</kbd> scenario</span>
+  <span class="k"><kbd>/</kbd> filter</span>
+  <span class="srcbtn" id="srcBtn"><span class="new">⚠</span> data sources</span>
+  <span class="right" id="statusRight"></span>
+</div>
 
-</main>
+<!-- data-sources popover (the honest footnote) -->
+<div class="src" id="src">
+  <h4>Data sources — how this write trace is assembled</h4>
+  <p><b>The change record (centre).</b> The committed write's own <span class="mono">{type, key, value, origin, seq, epoch}</span>
+     ChangeRecord — the wire format itself [C]. The client stamp, the owner restamp (the value's origin is replaced by the
+     owner at <span class="mono">commitLocal</span>), and the winner stamp are real <span class="mono">ProvRecord</span> fields.</p>
+  <p><b>Outcome (local / won / forwarded / dropped·dedup / lost·fence / lost·conflict).</b> The record's own commit
+     classification from the <b>__observe</b> stream's <b>local</b> / <b>won</b> / <b>forwarded</b> / <b>lost</b> events [B].
+     A lost event carries the <b>winning</b> epoch/seq as <span class="mono">we/ws</span>; compared against the lost write's own
+     <span class="mono">wr.e</span>: <span class="mono">wr.e == we</span> ⇒ same-epoch <b>conflict</b>;
+     <span class="mono">wr.e &lt; we</span> ⇒ <b>fence</b> (stale-view write rejected — DECISIONS X).</p>
+  <p><b>The route — one row across nodes <span class="new">⚠ NEW</span>.</b> Stitching the hops client → forwarder → owner →
+     replicas into ONE write needs a client-stamped correlation id carried WRITE → owner commit → replication → won/lost emits.
+     The hops themselves are real (transport WRITE/ACK, <span class="mono">commitLocal</span> restamp, RECORDS fan-out), but
+     joining them on one identity is proposed instrumentation.</p>
+  <p><b>Ack roster &amp; W-quorum.</b> Which replicas acknowledged the commit + their lag comes from the snapshot
+     <span class="mono">marks</span>/<span class="mono">heads</span> vs the floor [A]; the per-write WRITE→ACK match
+     (forward confirmed / timed out) is the same <span class="new">⚠ NEW</span> correlation id.
+     The confirm threshold (W-quorum on the async storage seam) is real (DECISIONS — confirm:'persisted').</p>
+</div>
+
 <script>
 'use strict';
-//! Static fixture — one consistent story: a 4-server + 1-client cluster that just
-//! rebalanced e6→e7 (user42 moved n1→n3). The data plants three anomalies the page
-//! must make obvious: (1) a write fenced mid-fan-out by the view change, (2) a forward
-//! that timed out into a dying socket and is still retrying (DECISIONS X), (3) a slow
-//! replica ack driving p99, plus the one screamer: a same-epoch LWW conflict.
+/* ── drill targets ──────────────────────────────────────────────────────
+   This file lives in mockups/, so: tool pages → tool/<x>.html, sibling
+   key-autopsy → key-autopsy/happy.html, cluster IA map → ia-map.html.
+   A write's key → its autopsy (the diverged key lands on #diverged); the
+   owner / replica nodes → node-doctor; breadcrumbs are already wired above. */
+const KEY_AUTOPSY  = 'key-autopsy/happy.html';
+const KEY_DIVERGED = 'key-autopsy/happy.html#diverged';
+const OWNER_NODE   = 'tool/node.html';
 
-const PAL = ['#7dd3fc','#fbbf24','#f472b6','#34d399','#a78bfa','#fb923c','#22d3ee','#f87171','#a3e635','#60a5fa','#facc15','#c084fc'];
-const hue = a => PAL[[...a].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,0)%PAL.length];
-
-const NODES = {
-  c1:{uuid:'3f8a1c2e-9b4d-4e7a-8c1f-2d5e6a7b8c9d', addr:null,              role:'client'},
-  n1:{uuid:'9d2bf3a1-7c44-4b0e-a2d1-58e0c4b711a4', addr:'127.0.0.1:49801', role:'server'},
-  n2:{uuid:'5b1e88f0-2a3c-4d77-9e02-c61f0a9d34e2', addr:'127.0.0.1:49802', role:'server'},
-  n3:{uuid:'e47c09d2-91ab-4f3e-b8a6-0d72f5c813b9', addr:'127.0.0.1:49803', role:'server'},
-  n4:{uuid:'ab39d6c5-04e1-4c28-8b7f-93a2d10fe6c7', addr:'127.0.0.1:49804', role:'server'},
+/* ── outcome vocabulary ─────────────────────────────────────────────────
+   The SAME taxonomy as the partition log, expressed at the commit level.
+   Functional colour only: local/won/forwarded are calm; fence is warn (a
+   stale-view write, expected during churn); conflict is crit (true
+   same-epoch contention). */
+const OUT = {
+  local:    {cls:'local',    txt:'local',         short:'LOCAL', sev:null},
+  won:      {cls:'won',      txt:'won',           short:'WON',   sev:null},
+  fwd:      {cls:'fwd',      txt:'forwarded',     short:'FWD',   sev:null},
+  drop:     {cls:'drop',     txt:'dropped·dedup', short:'DROP',  sev:null},
+  fence:    {cls:'fence',    txt:'lost · fence',  short:'FENCE', sev:'warn'},
+  conflict: {cls:'conflict', txt:'lost · conflict', short:'CONFLICT', sev:'crit'},
 };
-const short = k => NODES[k].role==='client' ? NODES[k].uuid.slice(0,8)+'… client' : ':'+NODES[k].addr.split(':')[1]+' '+k;
-const ident = k => NODES[k].addr ?? NODES[k].uuid;
 
-//! span: {n: actor, d: action, t0,t1 ms offsets, st: ok|warn|bad|run, stamp?, note?}
-//! srv(): generator for routine server-local won traces (commit + fan-out to 2 replicas)
-const srv = (id,key,age,owner,reps,ep,seq,ms) => ({
-  id, key, part:key.split('.')[0], origin:owner, out:'won', ms, age,
-  stamps:[{l:'committed', v:owner+' · e'+ep+'·s'+seq}],
-  verdict:`Clean local-owner write: committed on <b>${owner}</b> under e${ep}, applied (won) on both replicas in ${ms}ms.`,
-  spans:[
-    {n:'owner '+owner, d:'commitLocal '+key, t0:0, t1:ms*.15, st:'ok', stamp:owner+' · e'+ep+'·s'+seq},
-    {n:owner+' ⇒ '+reps.join(','), d:'replica fan-out (RECORDS)', t0:ms*.15, t1:ms*.4, st:'ok'},
-    {n:'replica '+reps[0], d:'apply → won', t0:ms*.4, t1:ms*.78, st:'ok'},
-    {n:'replica '+reps[1], d:'apply → won', t0:ms*.4, t1:ms, st:'ok'},
-  ]});
+/* ── the write model ─────────────────────────────────────────────────────
+   Each WRITE carries: its change record (type/key/value/origin/seq/epoch),
+   its outcome, the stamp chain (client → owner restamp → winner), the ROUTE
+   (an ordered list of hops, each a node + status + description), the ack
+   roster (per-replica acked? + lag), and the verdict/why prose.
 
-const TRACES = [
-{ //! anomaly 2 — the DECISIONS-X stall: forward into a dying socket, no ACK, retrying
-  id:'tr-22fe09', key:'user42.score', part:'user42', origin:'c1', out:'pending', ms:5200, age:'5.2s', stale:true,
-  stamps:[{l:'client', v:'c1 · s4521'},{l:'owner', v:'— not committed yet', bad:true}],
-  verdict:'<b>Stalled at the first hop.</b> Forward to n4 timed out (no ACK in 3000ms — socket died mid-flush); the write was re-buffered and retried to n2, still awaiting ACK after 5.2s. Never dropped — but nothing is committed anywhere yet.',
-  spans:[
-    {n:'client 3f8a1c2e…', d:'write user42.score = 44 · stamp + buffer', t0:0, t1:8, st:'ok', stamp:'c1 · s4521'},
-    {n:'c1 → n4 :49804', d:'WRITE forward — TIMEOUT, no ACK', t0:8, t1:3000, st:'bad',
-     note:'no ACK in 3000ms — socket died mid-flush. Pre-X this write "existed NOWHERE" (DECISIONS X); ack-confirmed owner-forward keeps it buffered.'},
-    {n:'client c1', d:'re-buffer · pending depth 3', t0:3000, t1:3060, st:'warn',
-     note:'snapshot.pending=3 on c1 — buffered keys + age need the NEW pending-buffer sample (#7)'},
-    {n:'c1 → n2 :49802', d:'retry WRITE forward — awaiting ACK', t0:3060, t1:5200, st:'run',
-     note:'attempt 2 · backoff 1s · in flight 5.2s and counting'},
-  ]},
-{ //! routine post-rebalance write
-  ...srv('tr-0a9c61','user91.bio','12s','n2',['n1','n3'],7,9117,6.3) },
-{ //! healthy client write — the baseline the anomalies are judged against
-  id:'tr-7f3a91', key:'user42.score', part:'user42', origin:'c1', out:'won', ms:8.4, age:'18s',
-  stamps:[{l:'client', v:'c1 · s4520'},{l:'owner restamp', v:'n3 · e7·s2214'}],
-  verdict:'Clean end-to-end path: forwarded with ACK-confirmed handoffs on both legs (never-drop), committed on owner <b>n3</b> under e7, applied (won) on both replicas — 8.4ms total.',
-  spans:[
-    {n:'client 3f8a1c2e…', d:'write user42.score = 43 · stamp + buffer', t0:0, t1:0.1, st:'ok', stamp:'c1 · s4520'},
-    {n:'c1 → n4 :49804', d:'WRITE forward', t0:0.1, t1:0.6, st:'ok'},
-    {n:'n4 → c1', d:'ACK — handoff confirmed (never-drop)', t0:0.6, t1:1.1, st:'ok'},
-    {n:'n4 → n3 :49803', d:'owner-forward (ring: user42 → n3 @ e7)', t0:1.1, t1:1.9, st:'ok'},
-    {n:'n3 → n4', d:'ACK — owner handoff confirmed (never-drop)', t0:1.9, t1:2.5, st:'ok'},
-    {n:'owner n3', d:'commitLocal — restamped origin=owner', t0:1.9, t1:3.0, st:'ok', stamp:'n3 · e7·s2214'},
-    {n:'n3 ⇒ n1,n2', d:'replica fan-out (RECORDS)', t0:3.0, t1:4.1, st:'ok'},
-    {n:'replica n1', d:'apply → won', t0:4.1, t1:5.8, st:'ok'},
-    {n:'replica n2', d:'apply → won', t0:4.1, t1:8.4, st:'ok'},
-  ]},
-{ //! the screamer — same-epoch LWW conflict: two owners committed under e7
-  id:'tr-b3d5f8', key:'cfg.flags', part:'cfg', origin:'n4', out:'conflict', ms:3.1, age:'25s',
-  stamps:[{l:'committed', v:'n4 · e7·s771'},{l:'lost to', v:'n1 · e7·s18249', bad:true}],
-  verdict:'<b>Same-epoch LWW loss under e7</b> — n4 and n1 both committed cfg.flags as owner. Dual-writable overlap during the e6→e7 handover; if this recurs outside a view change it is split-brain — check the view history, not this key.',
-  spans:[
-    {n:'owner n4 :49804', d:'commitLocal cfg.flags', t0:0, t1:0.4, st:'ok', stamp:'n4 · e7·s771'},
-    {n:'n4 ⇒ n1,n2', d:'replica fan-out (RECORDS)', t0:0.4, t1:1.2, st:'ok'},
-    {n:'replica n1', d:'apply → LOST (same-epoch)', t0:1.2, t1:2.2, st:'bad',
-     note:'winner e7·s18249 (origin n1) — SAME epoch ⇒ true conflict, not fence: two writers raced. LWW tiebreak by (seq, origin).'},
-    {n:'replica n2', d:'apply → LOST (same-epoch)', t0:1.2, t1:3.1, st:'bad'},
-  ]},
-{ //! routine local write
-  ...srv('tr-d18b77','user7.cart','31s','n4',['n2','n3'],7,765,2.1) },
-{ //! anomaly 3 — slow replica ack drives p99; committed fast, durability lagged
-  id:'tr-66a1c3', key:'user91.profile.name', part:'user91', origin:'n2', out:'won', ms:312, age:'37s', slow:true,
-  stamps:[{l:'committed', v:'n2 · e7·s9102'}],
-  verdict:'Committed fast; durability lagged — <b>n3 acked 311ms late</b> while draining its post-rebalance catch-up backlog (cf. observe → topLag). p99 driver, not a stall.',
-  spans:[
-    {n:'owner n2 :49802', d:'commitLocal user91.profile.name', t0:0, t1:0.4, st:'ok', stamp:'n2 · e7·s9102'},
-    {n:'n2 ⇒ n1,n3', d:'replica fan-out (RECORDS)', t0:0.4, t1:1.3, st:'ok'},
-    {n:'replica n1', d:'apply → won', t0:1.3, t1:6.0, st:'ok'},
-    {n:'replica n3', d:'apply → won · ACK +311ms', t0:1.3, t1:312, st:'warn',
-     note:'ack 311ms — n3 is draining post-rebalance catch-up; correlate with replication-health lag, not a write-path bug'},
-  ]},
-{ //! anomaly 1 — committed under e6, fenced everywhere by the e7 winner mid-fan-out
-  id:'tr-9c04e2', key:'user42.score', part:'user42', origin:'c1', out:'fence', ms:41, age:'44s',
-  marker:{t:6.0, label:'VIEW_COMMIT e6→e7'},
-  stamps:[{l:'client', v:'c1 · s4519'},{l:'owner restamp', v:'n1 · e6·s18233'},{l:'fenced by', v:'n3 · e7·s2210', bad:true}],
-  verdict:'Committed on owner n1 under e6; <b>VIEW_COMMIT e6→e7 landed during fan-out</b> — every replica fenced it behind winner n3 e7·s2210 (loser epoch &lt; winner epoch ⇒ fence, not a conflict). Expected rebalance churn: a re-issue under e7 wins.',
-  spans:[
-    {n:'client 3f8a1c2e…', d:'write user42.score = 41 · stamp + buffer', t0:0, t1:0.1, st:'ok', stamp:'c1 · s4519'},
-    {n:'c1 → n4 :49804', d:'WRITE forward', t0:0.1, t1:0.8, st:'ok'},
-    {n:'n4 → c1', d:'ACK — handoff confirmed', t0:0.8, t1:1.6, st:'ok'},
-    {n:'n4 → n1 :49801', d:'owner-forward (ring: user42 → n1 @ e6)', t0:1.6, t1:2.4, st:'ok'},
-    {n:'n1 → n4', d:'ACK — owner handoff confirmed (never-drop)', t0:2.4, t1:3.1, st:'ok'},
-    {n:'owner n1', d:'commitLocal — restamped origin=owner', t0:2.4, t1:3.9, st:'ok', stamp:'n1 · e6·s18233',
-     note:'restamp at resource/index.ts:735 — the client stamp is replaced by the owner stamp; committed under e6'},
-    {n:'n1 ⇒ n2,n3', d:'replica fan-out (RECORDS)', t0:3.9, t1:9.2, st:'ok'},
-    {n:'replica n2', d:'apply → LOST (epoch-fence)', t0:9.2, t1:24, st:'warn',
-     note:"winner e7·s2210 (origin n3) — 'lost' we/ws shows winner epoch 7 &gt; loser epoch 6 ⇒ epoch-fence"},
-    {n:'replica n3', d:'apply → LOST (epoch-fence)', t0:9.2, t1:41, st:'warn'},
-  ]},
-{ ...srv('tr-f57e30','user7.qty','58s','n4',['n2','n3'],6,758,5.6) },
-{ ...srv('tr-4db8a2','sess.k7f2','1m06s','n2',['n1','n4'],6,9084,3.6) },
-{ ...srv('tr-c90f15','orders.1093','1m14s','n4',['n2','n3'],6,742,4.2) },
-{ ...srv('tr-8e62d4','user13.status','1m21s','n1',['n2','n4'],6,18227,2.8) },
-{ //! oldest in window — client write committed pre-rebalance under e6
-  id:'tr-31aa07', key:'user42.name', part:'user42', origin:'c1', out:'won', ms:9.7, age:'1m38s',
-  stamps:[{l:'client', v:'c1 · s4517'},{l:'owner restamp', v:'n1 · e6·s18221'}],
-  verdict:'Clean pre-rebalance path: committed on then-owner <b>n1</b> under e6, won on both replicas in 9.7ms.',
-  spans:[
-    {n:'client 3f8a1c2e…', d:'write user42.name · stamp + buffer', t0:0, t1:0.1, st:'ok', stamp:'c1 · s4517'},
-    {n:'c1 → n4 :49804', d:'WRITE forward', t0:0.1, t1:0.7, st:'ok'},
-    {n:'n4 → c1', d:'ACK — handoff confirmed', t0:0.7, t1:1.3, st:'ok'},
-    {n:'n4 → n1 :49801', d:'owner-forward (ring: user42 → n1 @ e6)', t0:1.3, t1:2.2, st:'ok'},
-    {n:'n1 → n4', d:'ACK — owner handoff confirmed (never-drop)', t0:2.2, t1:2.8, st:'ok'},
-    {n:'owner n1', d:'commitLocal — restamped origin=owner', t0:2.2, t1:3.4, st:'ok', stamp:'n1 · e6·s18221'},
-    {n:'n1 ⇒ n2,n3', d:'replica fan-out (RECORDS)', t0:3.4, t1:4.6, st:'ok'},
-    {n:'replica n2', d:'apply → won', t0:4.6, t1:7.1, st:'ok'},
-    {n:'replica n3', d:'apply → won', t0:4.6, t1:9.7, st:'ok'},
-  ]},
-];
+   A hop status maps to a route-node colour:
+     done = applied/acked (ok)   · fan = fan-out leg (ok)
+     warn = stale/churn          · stop = the route ends here (crit, a fence)
+     now  = in flight (info)
+   A FENCE write's route STOPS at the owner — nothing fans out below it. */
 
-const OUT = { won:{txt:'won'}, fence:{txt:'lost · fence'}, conflict:{txt:'lost · conflict'}, pending:{txt:'pending'} };
-const fmt = ms => ms>=1000 ? (ms/1000).toFixed(1)+'s' : ms>=10 ? Math.round(ms)+'ms' : ms.toFixed(1)+'ms';
+/* ──────────────────────────── the canonical writes ─────────────────────── */
 
-//! aggregate header — the glanceable layer; numbers consistent with the table story.
-//! Provenance per stat: real = derivable today, superscript = the Data-sources
-//! inventory # it needs. go = click-through: set the matching chip, clear the key
-//! filter, select the exemplar trace — the stat, chip, and waterfall layers agree.
-const STATS = [
-  {lab:'p50 commit', num:'5.6ms', sub:'last 5m · 1,483 writes · streaming', tone:'ok', fn:5,
-   title:'NEW — streaming per-origin quantiles (inventory #5); not derivable from the 247-trace ring'},
-  {lab:'p99 commit', num:'312ms', sub:'← n3 slow replica ack', tone:'warn', fn:5,
-   title:'NEW — streaming quantiles (inventory #5) · click: open the p99-driver trace',
-   go:{chip:'all', trace:'tr-66a1c3'}},
-  {lab:'in-flight depth', num:'3', sub:'1 stalled · oldest 5.2s', tone:'bad', real:true, fn:7,
-   title:'depth 3 is real (snapshot.pending — here all on c1); the oldest-age needs the pending-buffer sample (#7) and per-write identity the trace id (#4) · click: open the stalled trace',
-   go:{chip:'pending', trace:'tr-22fe09'}},
-  {lab:'fenced rate', num:'0.8%', sub:'12 fenced / 1,483 · rebalance churn', tone:'idle', fn:3,
-   title:'NEW — fenced-write rate window (inventory #3) · click: open the fenced exemplar',
-   go:{chip:'lost', trace:'tr-9c04e2'}},
-  {lab:'same-epoch conflicts', num:'1', sub:'cfg.flags — investigate', tone:'bad', real:true,
-   title:"real: observe 'lost' we/ws — same epoch ⇒ true conflict. Same signal as the shipped Activity conflicts alarm, scoped to the trace window and split fence-vs-conflict · click: open the conflict trace",
-   go:{chip:'lost', trace:'tr-b3d5f8'}},
-  {lab:'traced', num:'247', sub:'ring · newest 12 shown below', tone:'run', fn:3,
-   title:'NEW — queryable trace window beyond the bridge ring (inventory #3)'},
-];
-const SUP = {3:'³',4:'⁴',5:'⁵',6:'⁶',7:'⁷'};
-const prov = s => s.real
-  ? `<span class="prov" title="${s.title}">real${s.fn ? '·<b>'+SUP[s.fn]+'</b>' : ''}</span>`
-  : `<span class="prov" data-kind="new" title="${s.title}">${SUP[s.fn]}</span>`;
-const statsEl = document.getElementById('stats');
-statsEl.innerHTML = STATS.map((s,i) =>
-  `<div class="stat" data-tone="${s.tone}" data-i="${i}"${s.go ? ' data-go' : ''}>
-     ${prov(s)}
-     <div class="lab">${s.lab}</div><div class="num">${s.num}</div><div class="sub">${s.sub}</div>
-   </div>`).join('');
-//! stat → table → waterfall: a stat with an exemplar navigates instead of making
-//! the user visually hunt the matching red/amber row
-statsEl.addEventListener('click', e => {
-  const d = e.target.closest('.stat[data-go]'); if (!d) return;
-  const s = STATS[+d.dataset.i];
-  outFilter = s.go.chip; keyFilter = ''; document.getElementById('keyfilter').value = '';
-  selected = s.go.trace;
-  renderChips(); renderTable();
-});
+//! the clean WON write — user42.score=8 @ e4·s1287 (the current winner). This
+//! is the Healthy scenario's whole story and the Attention list's calm baseline.
+const W_WON = {
+  id:'w-1287', e:4, s:1287, key:'user42.score', type:'update', val:'8',
+  origin:':49801', out:'won',
+  record:{type:'update', key:'user42.score', value:'8', origin:':49801', seq:1287, epoch:4},
+  stamps:[
+    {l:'client', v:':49803-cli · s71'},
+    {l:'owner restamp', v:':49801 · e4·s1287'},
+  ],
+  route:[
+    {cls:'done', hn:'client',          hs:'stamped',   hd:'a writer connected to <span class="mono">:49803</span> issued <span class="mono">data.user42.score = 8</span> — stamped client-local and buffered (never dropped).'},
+    {cls:'done', hn:':49803',          hs:'forwarded', hd:'the connected server is <b>not</b> the owner of <span class="mono">user42</span> @ e4 — it forwards the write to the ring owner <span class="mono">:49801</span>, ACK-confirmed.', sub:'owner-forward (ring: user42 → :49801 @ e4)'},
+    {cls:'done', hn:':49801',          hs:'committed', hd:'owner <b>:49801</b> committed at <b>e4·s1287</b> — origin restamped to the owner. This is the <b>current winner</b> for user42.score.', stamp:'committed <b>:49801 · e4·s1287</b>'},
+    {cls:'fan',  hn:':49801 ⇒ 4 replicas', hs:'fan-out', hd:'RECORDS fan-out to the other four members — <span class="mono">:49803 :49805 :49807 :49809</span>.'},
+    {cls:'done', hn:'W-quorum',        hs:'5/5 ack',   hd:'all five members acked the commit; the write is durably W-quorum committed (DECISIONS — confirm:\'persisted\').', quorum:{n:5, of:5, cls:'ok'}},
+  ],
+  acks:[
+    {addr:':49801', owner:true, ackd:'committed', cls:'ok',   lag:0},
+    {addr:':49803', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49805', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49807', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49809', ackd:'acked', cls:'ok', lag:0},
+  ],
+  ackState:'5/5 replicas acked — fully fanned out, no holdout.',
+  reason:'A clean forwarded write: the client wrote to <b>:49803</b>, which forwarded to the ring owner <b>:49801</b> at <b>e4</b> (ACK-confirmed, never dropped). The owner committed at <b>e4·s1287</b>, restamped origin to itself, fanned out to the other four, and all five acked. This is the <b>current winning value</b> for user42.score across the caught-up replicas.',
+};
 
-//! filters — outcome chips ('lost' folds fence+conflict) + key substring
-let outFilter = 'all', keyFilter = '', selected = 'tr-9c04e2';
-const matches = t => (outFilter==='all' || (outFilter==='lost' ? (t.out==='fence'||t.out==='conflict') : t.out===outFilter))
-                  && (!keyFilter || t.key.includes(keyFilter));
+//! routine same-key won writes that precede the winner (descending seq).
+const W_1265 = {
+  id:'w-1265', e:4, s:1265, key:'user42.score', type:'update', val:'6',
+  origin:':49801', out:'won',
+  record:{type:'update', key:'user42.score', value:'6', origin:':49801', seq:1265, epoch:4},
+  stamps:[
+    {l:'client', v:':49803-cli · s64'},
+    {l:'owner restamp', v:':49801 · e4·s1265'},
+  ],
+  route:[
+    {cls:'done', hn:'client',   hs:'stamped',   hd:'writer on <span class="mono">:49803</span> issued <span class="mono">user42.score = 6</span>.'},
+    {cls:'done', hn:':49803',   hs:'forwarded', hd:'forwarded to owner <span class="mono">:49801</span>, ACK-confirmed.'},
+    {cls:'done', hn:':49801',   hs:'committed', hd:'owner committed at <b>e4·s1265</b>. This write <b>beat</b> the same-epoch <span class="mono">e4·s902</span> under LWW (higher seq, same epoch).', stamp:'committed <b>:49801 · e4·s1265</b>'},
+    {cls:'fan',  hn:':49801 ⇒ 4 replicas', hs:'fan-out', hd:'RECORDS fan-out to the other four members.'},
+    {cls:'done', hn:'W-quorum', hs:'5/5 ack', hd:'all five acked; later superseded by <span class="mono">e4·s1287</span>.', quorum:{n:5, of:5, cls:'ok'}},
+  ],
+  acks:[
+    {addr:':49801', owner:true, ackd:'committed', cls:'ok', lag:0},
+    {addr:':49803', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49805', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49807', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49809', ackd:'acked', cls:'ok', lag:0},
+  ],
+  ackState:'5/5 acked — later superseded by e4·s1287.',
+  reason:'A same-epoch winner: committed at <b>e4·s1265</b>, it beat <span class="mono">e4·s902</span> ("7") under last-writer-wins (same epoch, higher seq). It was itself superseded by <b>e4·s1287</b> ("8") shortly after. All five replicas acked — convergence intact.',
+};
 
-const CHIPS = [
-  {v:'all', n:TRACES.length},
-  {v:'won', n:TRACES.filter(t=>t.out==='won').length},
-  {v:'lost', n:TRACES.filter(t=>t.out==='fence'||t.out==='conflict').length},
-  {v:'pending', n:TRACES.filter(t=>t.out==='pending').length},
-];
-const chipsEl = document.getElementById('chips');
-chipsEl.innerHTML = CHIPS.map(c =>
-  `<button class="chip" data-v="${c.v}">${c.v} <span class="n">${c.n}</span></button>`).join('');
-chipsEl.addEventListener('click', e => {
-  const b = e.target.closest('.chip'); if (!b) return;
-  outFilter = b.dataset.v; renderChips(); renderTable();
-});
-const renderChips = () => chipsEl.querySelectorAll('.chip').forEach(b =>
-  b.dataset.v===outFilter ? b.setAttribute('data-on','') : b.removeAttribute('data-on'));
-renderChips();
-document.getElementById('keyfilter').addEventListener('input', e => {
-  keyFilter = e.target.value.trim(); renderTable();
-});
+//! the same-epoch CONFLICT — e4·s902="7" origin :49803, lost LWW to e4·s1265.
+const W_CONFLICT = {
+  id:'w-902', e:4, s:902, key:'user42.score', type:'update', val:'7',
+  origin:':49803', out:'conflict',
+  record:{type:'update', key:'user42.score', value:'7', origin:':49803', seq:902, epoch:4},
+  // a loser carries BOTH its own stamp (wr) and the winner's (we/ws)
+  loser:{e:4, s:902}, winner:{e:4, s:1265, origin:':49801'},
+  stamps:[
+    {l:'this write (wr)', v:':49803 · e4·s902', warn:false, bad:true},
+    {l:'lost to (we·ws)', v:':49801 · e4·s1265', bad:true},
+  ],
+  route:[
+    {cls:'done', hn:'client',   hs:'stamped',   hd:'a concurrent writer on <span class="mono">:49803</span> issued <span class="mono">user42.score = 7</span> — genuinely concurrent with the s1265 write, not handoff churn.'},
+    {cls:'done', hn:':49803',   hs:'forwarded', hd:'forwarded to owner <span class="mono">:49801</span> @ e4, ACK-confirmed.'},
+    {cls:'done', hn:':49801',   hs:'committed', hd:'owner committed it at <b>e4·s902</b> — restamped to the owner; a valid commit at the time.', stamp:'committed <b>:49801 · e4·s902</b>'},
+    {cls:'fan',  hn:':49801 ⇒ 4 replicas', hs:'fan-out', hd:'fanned out — but a higher-seq same-epoch write arrived.'},
+    {cls:'warn', hn:'LWW resolve', hs:'lost · conflict', hd:'<b>same-epoch contention</b>: <span class="mono">e4·s1265</span> ("6") has a higher seq under the <b>same epoch</b>, so it wins LWW. This write is dropped on apply — a real concurrent loss, not a fence.'},
+  ],
+  acks:[
+    {addr:':49801', owner:true, ackd:'superseded', cls:'warn', lag:0},
+    {addr:':49803', ackd:'superseded', cls:'warn', lag:0},
+    {addr:':49805', ackd:'superseded', cls:'warn', lag:0},
+    {addr:':49807', ackd:'superseded', cls:'warn', lag:0},
+    {addr:':49809', ackd:'superseded', cls:'warn', lag:0},
+  ],
+  ackState:'committed then superseded on every replica by the higher-seq e4·s1265 — convergence held, the loss was resolved correctly.',
+  reason:'<b>True same-epoch contention.</b> This write is stamped <b>e4</b> (<span class="mono">wr.e == we</span>) and lost last-writer-wins to <b>e4·s1265</b> committed by <b>:49801</b>. Two genuinely concurrent writes raced under the same epoch; the higher seq won. This is a real conflict, <b>not</b> a fence — it is not handoff churn and not a stale view. Convergence is intact; the lost write was resolved correctly under LWW.',
+};
 
-//! trace table — bounded list, newest pinned first; row click drives the waterfall.
-//! When the active filters hide the selected trace, the first visible row is auto-
-//! selected so the waterfall is never orphaned on an invisible row. The latency
-//! column is disambiguated per outcome: 'to won' vs 'to loss' vs 'in flight'.
-const tbody = document.getElementById('tbody');
-function renderTable(){
-  const rows = TRACES.filter(matches);
-  if (rows.length && !rows.some(t => t.id===selected)) selected = rows[0].id;
-  tbody.innerHTML = rows.length ? rows.map((t,i) => {
-    const g = NODES[t.origin].role==='server' ? 'glyph sq' : 'glyph';
-    const sem = t.out==='won' ? 'to won' : t.out==='pending' ? 'in flight' : 'to loss';
-    return `<div class="trow" data-id="${t.id}" data-out="${t.out}" ${t.id===selected?'data-sel':''}>
-      <span class="id">${t.id}${i===0&&outFilter==='all'&&!keyFilter?' <span class="pinned">◂ newest</span>':''}</span>
-      <span class="key">${t.key}</span>
-      <span class="org"><span class="${g}" style="--g:${hue(ident(t.origin))}"></span>${short(t.origin)}</span>
-      <span><span class="out" data-out="${t.out}" style="--k:var(--${t.out==='won'?'ok':t.out==='fence'?'warn':t.out==='conflict'?'bad':'accent'})">${OUT[t.out].txt}</span></span>
-      <span class="lat" ${t.slow?'data-slow':''}>${t.out==='pending' ? `<span class="pulse">${fmt(t.ms)} ↻</span>` : fmt(t.ms)} <span class="lsem">${sem}</span></span>
-      <span class="hopn">${t.spans.length}</span>
-      <span class="age" ${t.stale?'data-stale':''}>${t.age}</span>
-    </div>`;
-  }).join('') : `<div class="empty">no traces match — clear filters</div>`;
-  renderDetail(rows.length ? null : 'no trace matches the filters — the waterfall follows the selected row');
-}
-tbody.addEventListener('click', e => {
-  const r = e.target.closest('.trow'); if (!r) return;
-  selected = r.dataset.id; renderTable();
-});
+//! the FENCED e1 client write — user42.score=99, rejected by the epoch fence
+//! (DECISIONS X). The route STOPS at the owner; nothing fans out.
+const W_FENCE = {
+  id:'w-87', e:1, s:87, key:'user42.score', type:'update', val:'99',
+  origin:'client', out:'fence',
+  record:{type:'update', key:'user42.score', value:'99', origin:'client', seq:87, epoch:1},
+  loser:{e:1, s:87}, winner:{e:4, s:null}, // fenced by the dominating VIEW epoch, not one seq
+  stamps:[
+    {l:'this write (wr)', v:'client · e1·s87', bad:true},
+    {l:'fenced by (we)', v:'view e4 · current', bad:true},
+  ],
+  route:[
+    {cls:'done', hn:'client',   hs:'stamped',   hd:'a client pinned to a <b>stale view (e1)</b> issued <span class="mono">data.user42.score = 99</span>, stamped at the stale <span class="mono">e1</span> epoch and forwarded.'},
+    {cls:'done', hn:':49801',   hs:'received',  hd:'the current owner of <span class="mono">user42</span> @ e4 received the forwarded write carrying the stale <b>e1</b> stamp.'},
+    {cls:'stop', hn:':49801 · epoch fence', hs:'lost · fence', hd:'the owner <b>fenced</b> it: the write\'s view (<span class="mono">e1</span>) is older than the current epoch (<span class="mono">wr.e &lt; we</span>) — a view-lagged overwrite cannot stick (<b>DECISIONS X</b>). The route <b>ends here</b>.'},
+  ],
+  acks:[
+    {addr:':49801', owner:true, ackd:'fenced — not applied', cls:'bad', lag:0},
+    {addr:':49803', ackd:'never reached', cls:'bad', lag:0},
+    {addr:':49805', ackd:'never reached', cls:'bad', lag:0},
+    {addr:':49807', ackd:'never reached', cls:'bad', lag:0},
+    {addr:':49809', ackd:'never reached', cls:'bad', lag:0},
+  ],
+  ackState:'0/5 — the write never committed, so there was nothing to fan out or ack. The fence rejected it at the owner.',
+  reason:'An <b>epoch-1 client write</b>, <b>fenced</b> at the owner because its view (<span class="mono">e1</span>) is older than the current epoch (<span class="mono">wr.e &lt; we</span> ⇒ FENCE, not a conflict). The client lost the ownership race while pinned to a stale view; the owner rejected the overwrite to protect convergence (<b>DECISIONS X</b>). The write was never applied anywhere — it is <b>not</b> the source of the user42.score divergence (that is replica <span class="mono">:49807</span> stuck on e3·s1241). Have the client refresh its view and re-issue under e4.',
+};
 
-//! waterfall detail — per-hop spans on one shared linear time scale; the timeout
-//! trace deliberately compresses hops 1–3 to slivers: "everything was instant, then the stall"
-function renderDetail(emptyMsg){
-  if (emptyMsg){
-    document.getElementById('dpath').textContent = '';
-    document.getElementById('dbody').innerHTML = `<div class="empty" style="color:var(--dim)">${emptyMsg}</div>`;
-    return;
+//! a routine forwarded-but-deduped write — shows the FWD/DROP outcomes exist
+//! in the same taxonomy (a duplicate retry that the owner already committed).
+const W_DEDUP = {
+  id:'w-1283', e:4, s:1283, key:'user42.name', type:'update', val:'"kai"',
+  origin:':49801', out:'won',
+  record:{type:'update', key:'user42.name', value:'"kai"', origin:':49801', seq:1283, epoch:4},
+  stamps:[
+    {l:'client', v:':49801-cli · s70'},
+    {l:'owner restamp', v:':49801 · e4·s1283'},
+  ],
+  route:[
+    {cls:'done', hn:'client',   hs:'stamped',   hd:'writer on <span class="mono">:49801</span> issued <span class="mono">user42.name = "kai"</span> — connected directly to the owner (no forward hop).'},
+    {cls:'done', hn:':49801',   hs:'committed', hd:'owner committed locally at <b>e4·s1283</b>.', stamp:'committed <b>:49801 · e4·s1283</b>'},
+    {cls:'fan',  hn:':49801 ⇒ 4 replicas', hs:'fan-out', hd:'RECORDS fan-out to the other four members.'},
+    {cls:'done', hn:'W-quorum', hs:'5/5 ack', hd:'all five acked; durably committed.', quorum:{n:5, of:5, cls:'ok'}},
+  ],
+  acks:[
+    {addr:':49801', owner:true, ackd:'committed', cls:'ok', lag:0},
+    {addr:':49803', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49805', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49807', ackd:'acked', cls:'ok', lag:0},
+    {addr:':49809', ackd:'acked', cls:'ok', lag:0},
+  ],
+  ackState:'5/5 acked — a clean owner-local commit (no forward hop).',
+  reason:'A clean owner-local write: the client was connected directly to the owner <b>:49801</b>, so there is no forward hop — the owner committed at <b>e4·s1283</b> and fanned out to the other four, all acked. The <b>local</b> vs <b>forwarded</b> distinction is just whether the writer\'s server is the ring owner.',
+};
+
+/* ── per-scenario write list + default selection ───────────────────────── */
+const SCEN = {
+  // HEALTHY: just the clean WON write, told end to end. No losses in window.
+  healthy:{
+    level:'ok',
+    healthTxt:'Healthy',
+    lead:'<b>Write committed cleanly</b> · client → <span class="mono">:49803</span> forwards → owner <span class="mono">:49801</span> commits → 5/5 ack',
+    pills:[{cls:'ok',t:'outcome',v:'won'},{cls:'ok',t:'acks',v:'5/5'},{cls:'ok',t:'route',v:'5 hops'}],
+    writes:[W_WON, W_DEDUP, W_1265],
+    def:'w-1287',
+  },
+  // ATTENTION: the interesting writes added, defaulting to the FENCED e1 client
+  // write — the route that stops at the owner. The same-epoch CONFLICT is right
+  // below it. The clean winner stays in the list as the contrast.
+  attention:{
+    level:'crit',
+    healthTxt:'Attention',
+    lead:'<b>Attention</b> · a client write was <span class="mono bad">FENCED</span> at the owner · 1 same-epoch <span class="bad">conflict</span> on user42.score',
+    pills:[{cls:'crit',t:'fenced',v:'e1·s87'},{cls:'crit',t:'conflict',v:'e4·s902'},{cls:'ok',t:'winner',v:'e4·s1287'}],
+    writes:[W_FENCE, W_CONFLICT, W_WON, W_1265],
+    def:'w-87',
+  },
+};
+const SCEN_ORDER = ['healthy','attention'];
+
+/* ── live state ── */
+let scen = 'healthy';
+let sel  = null;          // selected write id
+let outFilter = 'all';    // is: chip filter over outcomes
+let keyFilter = '';       // key: substring filter
+let visible = [];         // current visible writes (for j/k)
+
+const $ = id => document.getElementById(id);
+
+/* ── parse the search line: is:x sets the outcome filter, key:foo the key
+   filter, bare text is a key substring. ── */
+const IS_FILTER = {won:'won', local:'won', fwd:'won', forwarded:'won',
+                   fence:'fence', conflict:'conflict', lost:'lost', all:'all'};
+function parseQuery(raw){
+  let f = null, kf = '', terms = [];
+  for (const tok of raw.toLowerCase().split(/\s+/).filter(Boolean)){
+    if (tok.startsWith('is:')){ const v = tok.slice(3); if (IS_FILTER[v]) f = IS_FILTER[v]; }
+    else if (tok.startsWith('key:')) kf = tok.slice(4);
+    else terms.push(tok);
   }
-  const t = TRACES.find(x => x.id===selected);
-  const total = Math.max(...t.spans.map(s=>s.t1));
-  const tone = t.out==='won'?'ok':t.out==='fence'?'warn':t.out==='conflict'?'bad':'accent';
-  document.getElementById('dpath').textContent =
-    `partition ${t.part} · ${t.spans.length} hops · ${t.out==='pending' ? 'in flight '+fmt(t.ms) : (t.out==='won' ? 'to won ' : 'to loss ')+fmt(t.ms)}`;
-  const pct = v => (v/total*100).toFixed(2)+'%';
-  document.getElementById('dbody').innerHTML = `
-    <div class="dhead">
-      <span class="tid">${t.id}</span><span class="dkey">${t.key}</span>
-      <span class="out" data-out="${t.out}" style="--k:var(--${tone})">${OUT[t.out].txt}</span>
-      <span class="dmeta">origin ${short(t.origin)} · ${t.age} ago</span>
-    </div>
-    <div class="verdict" style="--k:var(--${tone})">${t.verdict}</div>
-    <div class="stamps"><span class="slab">stamp</span>
-      ${t.stamps.map((s,i)=>`${i?'<span class="arr">→</span>':''}
-        <span class="stamp" ${s.bad?'data-bad':''}>${s.l}: ${s.v}</span>`).join('')}
-    </div>
-    ${t.marker ? `<div class="mlegend">┆ dashed rule = ${t.marker.label} at +${fmt(t.marker.t)}</div>` : ''}
-    <div class="wf">
-      ${t.spans.map(s => `
-        <div class="hop">
-          <span class="hl">${s.n} <span class="act">· ${s.d}</span></span>
-          <span class="track">
-            ${t.marker ? `<span class="mark" style="left:${pct(t.marker.t)}"></span>` : ''}
-            <span class="bar" data-st="${s.st}" style="left:${pct(s.t0)};width:${pct(s.t1-s.t0)}"
-                  title="+${fmt(s.t0)} → +${fmt(s.t1)}${s.stamp ? ' · '+s.stamp : ''}"></span>
-          </span>
-          <span class="dur" data-st="${s.st}">${s.st==='run' ? fmt(s.t1-s.t0)+' ↻' : fmt(s.t1-s.t0)}</span>
-          ${s.stamp ? `<div class="hnote">stamp ${s.stamp}</div>` : ''}
-          ${s.note ? `<div class="hnote" data-st="${s.st}">${s.note}</div>` : ''}
-        </div>`).join('')}
-      <div class="axis"><span></span>
-        <span class="ax"><span>0</span><span>${fmt(total/2)}</span><span>${fmt(total)}</span></span><span></span>
-      </div>
-    </div>`;
+  return {filter:f, keyFilter:kf || terms.join(' ')};
 }
 
-renderTable(); // renders the detail too — the waterfall always tracks the table
+/* a write matches the active outcome filter ('lost' folds fence+conflict). */
+function matches(w){
+  const okOut = outFilter==='all'
+    ? true
+    : outFilter==='lost' ? (w.out==='fence' || w.out==='conflict')
+    : outFilter==='won'  ? (w.out==='won' || w.out==='local' || w.out==='fwd')
+    : w.out===outFilter;
+  const okKey = !keyFilter || w.key.toLowerCase().includes(keyFilter);
+  return okOut && okKey;
+}
+
+/* ── header health pill + lead + context ── */
+function renderHead(){
+  const s = SCEN[scen];
+  const el = $('health'); el.className = 'health '+s.level;
+  $('healthTxt').textContent = s.healthTxt;
+  $('ctxWrites').textContent = s.writes.length;
+  const lead = $('lead'); lead.className = 'lead '+s.level;
+  $('leadTxt').innerHTML = s.lead;
+  $('leadPills').innerHTML = s.pills.map(p=>
+    `<span class="pill ${p.cls}">${p.t} <b>${p.v}</b></span>`).join('');
+}
+
+/* ── left rail: the recent-writes list ── */
+function renderRail(){
+  const s = SCEN[scen];
+  visible = s.writes.filter(matches);
+  let h = `<div class="grp"><div class="grp-h"><span>recent writes</span><span class="gc">${visible.length}</span></div>`;
+  for (const w of visible){
+    const o = OUT[w.out];
+    const cur = w.id===sel;
+    h += `<div class="w" data-id="${w.id}" data-sev="${o.sev||''}" ${cur?'aria-current="true"':''} title="${w.key} = ${w.val}">`+
+         `<div class="l1"><span class="stamp"><span class="e">e${w.e}·</span>s${w.s}</span>`+
+           `<span class="oc ${o.cls}">${o.short}</span></div>`+
+         `<div class="l2">${w.key} <span class="vv">= ${w.val}</span></div>`+
+         `</div>`;
+  }
+  h += `</div>`;
+  // in-situ glossary — answers "what is the stamp / the chip" right here
+  h += `<div class="gloss">`+
+       `<b>e·s</b> — the write's stamp (epoch·seq); the owner restamps on commit.<br>`+
+       `<b>WON/LOCAL/FWD</b> — committed (calm).<br>`+
+       `<b class="warn">FENCE</b> — stale-view write rejected (<span class="mono">wr.e &lt; we</span>).<br>`+
+       `<b class="bad">CONFLICT</b> — same-epoch LWW loss (<span class="mono">wr.e == we</span>).`+
+       `</div>`;
+  $('rail').innerHTML = h;
+}
+
+/* ── centre: the selected write — record + route ── */
+function curWrite(){ return SCEN[scen].writes.find(w=>w.id===sel) || visible[0] || SCEN[scen].writes[0]; }
+
+/* render the change record as a code block + the stamp strip. */
+function recordBlock(w){
+  const r = w.record;
+  const sev = OUT[w.out].sev;
+  // the value is severity-coloured when the write lost (so the losing value reads as a loss)
+  const valCls = sev==='crit' ? 'bad' : sev==='warn' ? 'warn' : 'vv';
+  const rec =
+    `{\n`+
+    `  <span class="kk">type</span>:   <span class="vv">'${r.type}'</span>,\n`+
+    `  <span class="kk">key</span>:    <span class="vv">'${r.key}'</span>,\n`+
+    `  <span class="kk">value</span>:  <span class="${valCls}">${r.value}</span>,\n`+
+    `  <span class="kk">origin</span>: <span class="vv">'${r.origin}'</span>,  <span class="cm">// restamped to the owner on commit</span>\n`+
+    `  <span class="kk">seq</span>:    <span class="vv">${r.seq}</span>,\n`+
+    `  <span class="kk">epoch</span>:  <span class="vv">${r.epoch}</span>\n`+
+    `}`;
+  const stampStrip = `<div class="stamps"><span class="slab">stamp chain</span>`+
+    w.stamps.map((st,i)=>{
+      const cls = st.bad ? 'bad' : st.warn ? 'warn' : '';
+      return `${i?'<span class="arr">→</span>':''}<span class="stamp ${cls}"><span class="sl">${st.l}</span>${st.v}</span>`;
+    }).join('')+`</div>`;
+  return `<div class="seg"><div class="st">Change record <span class="stn">the wire format · {type, key, value, origin, seq, epoch}</span></div>`+
+    `<div class="rec">${rec}</div>${stampStrip}</div>`;
+}
+
+/* render the route as a vertical timeline of hops. */
+function routeBlock(w){
+  const items = w.route.map(hop=>{
+    let inner = `<div class="hl"><span class="hn">${hop.hn}</span><span class="hs">${hop.hs}</span></div>`+
+      `<div class="hd">${hop.hd}</div>`;
+    if (hop.stamp) inner += `<div class="hstamp">${hop.stamp}</div>`;
+    if (hop.quorum){
+      const q = hop.quorum; const pct = Math.round(q.n/q.of*100);
+      inner += `<div class="quorum"><span class="qbar"><i class="${q.cls==='ok'?'':q.cls}" style="width:${pct}%"></i></span>`+
+        `<span class="qn ${q.cls}">${q.n}/${q.of} acked</span></div>`;
+    }
+    return `<li class="${hop.cls}">${inner}</li>`;
+  }).join('');
+  return `<div class="seg"><div class="st">Route <span class="newc">NEW</span> <span style="margin-left:auto;color:var(--faint);font-weight:600;letter-spacing:0;font-family:var(--mono);text-transform:none">client → forwarder → owner → replicas → acks</span></div>`+
+    `<ul class="route">${items}</ul></div>`;
+}
+
+function renderTrace(){
+  const w = curWrite();
+  sel = w.id;
+  const o = OUT[w.out];
+  // header
+  $('traceHead').setAttribute('data-sev', o.sev||'');
+  $('traceHead').innerHTML =
+    `<span class="sd"></span>`+
+    `<span class="ttl">e${w.e}·s${w.s} · ${w.key}</span>`+
+    `<span class="oc ${o.cls}">${o.txt}</span>`+
+    `<span class="meta">origin ${w.origin} · type ${w.type}</span>`;
+  // body: record + route
+  $('traceBody').innerHTML = recordBlock(w) + routeBlock(w);
+}
+
+/* ── right: provenance / why + ack roster + data-sources note ── */
+function renderWhy(){
+  const w = curWrite();
+  const o = OUT[w.out];
+  // the lost-write classification line, in the SAME vocabulary as the partition page
+  let verdict = '';
+  if (w.out==='conflict'){
+    verdict = `<div class="verdict bad">`+
+      `<span class="vc">lost · conflict</span> · wr.e=${w.loser.e} wr.s=${w.loser.s} <b>vs</b> we=${w.winner.e} ws=${w.winner.s}\n`+
+      `(<span class="vc">wr.e == we</span>) → same-epoch CONFLICT — lost LWW to <b>e${w.winner.e}·s${w.winner.s}</b> (${w.winner.origin})`+
+      `</div>`;
+  } else if (w.out==='fence'){
+    verdict = `<div class="verdict warn">`+
+      `<span class="vw">lost · fence</span> · wr.e=${w.loser.e} wr.s=${w.loser.s} <b>vs</b> we=${w.winner.e} (current view)\n`+
+      `(<span class="vw">wr.e &lt; we</span>) → FENCE — stale-view write rejected by view <b>e${w.winner.e}</b> (DECISIONS X)`+
+      `</div>`;
+  } else {
+    verdict = `<div class="verdict">`+
+      `<span class="vk">${o.txt}</span> · committed at <b>e${w.e}·s${w.s}</b> · origin ${w.origin}\n`+
+      `no contention, no fence — applied across the W-quorum`+
+      `</div>`;
+  }
+
+  // ack roster — reuse the replica-lag table shape
+  const acked = w.acks.filter(a=>a.cls==='ok').length;
+  const ackRows = w.acks.map(a=>
+    `<div class="rr">`+
+      `<span class="rn">${a.addr}${a.owner?'<span class="ow">owner</span>':''}</span>`+
+      `<span class="ackd ${a.cls}">${a.ackd}</span>`+
+      `<span class="lg ${a.lag===0?'ok':'bad'}">${a.lag===0?'+0':'+'+a.lag}</span>`+
+    `</div>`).join('');
+  const ackState = w.out==='fence' || w.out==='conflict'
+    ? `<div class="rstate bad">${w.ackState}</div>`
+    : `<div class="rstate">${w.ackState}</div>`;
+
+  $('why').innerHTML =
+    `<div class="wh" data-sev="${o.sev||''}"><div class="wt"><span class="sd"></span>why · ${o.txt}</div>`+
+      `<div class="wsub">${w.key} = ${w.val} @ <span class="mono">e${w.e}·s${w.s}</span> · origin <span class="mono">${w.origin}</span></div></div>`+
+    // verdict prose
+    `<div class="seg"><div class="st">Provenance</div>`+
+      `<div class="reason">${w.reason}</div>${verdict}</div>`+
+    // ack roster
+    `<div class="seg"><div class="st">Ack roster · W-quorum <span style="margin-left:auto;color:var(--faint);font-weight:600;letter-spacing:0;font-family:var(--mono);text-transform:none">${acked}/${w.acks.length}</span></div>`+
+      `<div class="rep">${ackRows}${ackState}</div></div>`+
+    // commit facts
+    `<div class="seg"><div class="st">Commit</div>`+
+      `<dl class="kv">`+
+        `<dt>key</dt><dd>${w.key}</dd>`+
+        `<dt>stamp</dt><dd class="${o.sev==='crit'?'bad':o.sev==='warn'?'warn':''}">e${w.e}·s${w.s}</dd>`+
+        `<dt>outcome</dt><dd class="${o.sev==='crit'?'bad':o.sev==='warn'?'warn':'ok'}">${o.txt}</dd>`+
+        `<dt>owner @ e4</dt><dd>:49801</dd>`+
+        `<dt>view epoch</dt><dd>e4</dd>`+
+      `</dl></div>`+
+    // honest per-write data-sources note
+    `<div class="seg"><div class="st">Sources</div>`+
+      `<div class="note"><b>Record &amp; outcome</b> are real — the ChangeRecord wire format [C] + the <span class="mono">__observe</span> commit class [B]. `+
+      `The <span class="nw">⚠ NEW</span> <b>route</b> stitches the hops into one write via a client-stamped correlation id; the hops themselves (WRITE/ACK, restamp, fan-out) exist today, the join does not.</div></div>`+
+    // drills
+    `<div class="actions">`+
+      `<a class="btn" href="${w.key==='user42.score'?KEY_DIVERGED:KEY_AUTOPSY}">open ${w.key} autopsy <span class="kc">↵</span></a>`+
+      `<a class="btn" href="${OWNER_NODE}">open owner :49801 (node) <span class="ar">→</span></a>`+
+    `</div>`;
+}
+
+/* ── status-line right side ── */
+function renderStatus(){
+  const s = SCEN[scen];
+  const losses = s.writes.filter(w=>w.out==='fence'||w.out==='conflict').length;
+  const cfl = s.writes.filter(w=>w.out==='conflict').length;
+  const lossTxt = losses ? `<span style="color:var(--crit)">${losses} lost</span>` : `<span style="color:var(--ok)">0 lost</span>`;
+  $('statusRight').innerHTML =
+    `writes ${s.writes.length}  ·  shown ${visible.length}  ·  ${lossTxt} (${cfl} conflict)`;
+}
+
+/* ── full render ── */
+function render(){
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===scen));
+  // ensure selection is valid for the scenario + filter
+  const s = SCEN[scen];
+  visible = s.writes.filter(matches);
+  if (!visible.some(w=>w.id===sel)) sel = visible.length ? visible[0].id : s.def;
+  renderHead(); renderRail(); renderTrace(); renderWhy(); renderStatus();
+  try{ history.replaceState(null,'','#'+scen); }catch{}
+}
+
+/* ── interactions ─────────────────────────────────────────────────────── */
+// scenario toggle — built in JS (the shared pattern)
+const scenWrap = $('scen');
+for (const id of SCEN_ORDER){
+  const b = document.createElement('button'); b.dataset.id=id;
+  b.textContent = id==='healthy' ? 'Healthy' : 'Needs attention';
+  b.onclick = ()=>{ scen=id; outFilter='all'; keyFilter=''; $('q').value=''; sel=SCEN[id].def; render(); };
+  scenWrap.appendChild(b);
+}
+// left-rail: select a write
+$('rail').addEventListener('click', e=>{
+  const row = e.target.closest('[data-id]'); if(!row) return;
+  sel = row.dataset.id; render();
+});
+// search / filter line (is: / key: / free text)
+$('q').addEventListener('input', e=>{
+  const p = parseQuery(e.target.value.trim());
+  outFilter = p.filter || 'all';
+  keyFilter = p.keyFilter;
+  render();
+});
+// data-sources popover
+$('srcBtn').onclick = ()=>$('src').classList.toggle('show');
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#src') && !e.target.closest('#srcBtn')) $('src').classList.remove('show');
+});
+
+// keyboard: j/k move · ↵ open key autopsy · w won · l losses · 1/2 scenario · / filter
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT'){ if (e.key==='Escape') e.target.blur(); return; }
+  const k = e.key;
+  const idx = visible.findIndex(w=>w.id===sel);
+  if (k==='j' || k==='ArrowDown'){ e.preventDefault(); if(visible.length){ sel=visible[Math.min(visible.length-1, idx+1)].id; render(); scrollSel(); } }
+  else if (k==='k' || k==='ArrowUp'){ e.preventDefault(); if(visible.length){ sel=visible[Math.max(0, idx-1)].id; render(); scrollSel(); } }
+  else if (k==='Enter'){ const w=curWrite(); location.href = w.key==='user42.score'?KEY_DIVERGED:KEY_AUTOPSY; }
+  else if (k==='w'){ outFilter='won'; keyFilter=''; $('q').value=''; render(); }
+  else if (k==='l'){ outFilter='lost'; keyFilter=''; $('q').value=''; render(); }
+  else if (k==='a'){ outFilter='all'; keyFilter=''; $('q').value=''; render(); }
+  else if (k==='1'){ scen='healthy'; outFilter='all'; keyFilter=''; $('q').value=''; sel=SCEN.healthy.def; render(); }
+  else if (k==='2'){ scen='attention'; outFilter='all'; keyFilter=''; $('q').value=''; sel=SCEN.attention.def; render(); }
+  else if (k==='/'){ e.preventDefault(); $('q').focus(); }
+});
+function scrollSel(){ const el=document.querySelector('.rail .w[aria-current=true]'); if(el) el.scrollIntoView({block:'nearest'}); }
+
+// boot — honour deep-link hash (#healthy / #attention), default healthy
+const fromHash = location.hash.slice(1);
+if (SCEN[fromHash]) scen = fromHash;
+sel = SCEN[scen].def;
+render();
 </script>
 </body>
 </html>

@@ -3,285 +3,815 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>fero · key autopsy — happy path + layered states</title>
+<title>sessions · user42 · user42.score — key autopsy · fero</title>
 <style>
+  /* ────────────────────────────────────────────────────────────────────
+     IDIOM: the partition-LOG register (partition.html) narrowed to a
+     SINGLE KEY — the issue-detail / event-stream lineage (Sentry issue /
+     Linear). This is the SAME app as partition.html and inbox.html:
+     identical graphite palette, three-pane shell, command bar (identity ·
+     health pill · search), the scenario toggle, the bottom hotkey bar and
+     the honest data-sources popover. The difference is SCOPE — every pane
+     is locked to user42.score:
+       LEFT  = the key's identity + version-history glossary (no sibling-key
+               index; this IS the leaf).
+       CENTRE = the partition log FILTERED TO user42.score — just this key's
+               commits, newest first, each carrying its outcome.
+       RIGHT  = the DIVERGENCE view (the decode pane from inbox.html): a
+               per-node version SAMPLE table, the LWW-resolved current value,
+               agreement n/N, a why-it-diverged reason + a next action.
+     Colour stays FUNCTIONAL — losses / conflicts / fences / a stuck replica
+     are severity-coloured; clean won/local commits are calm.
+     ──────────────────────────────────────────────────────────────────── */
   :root{
-    --bg:#0e1014; --panel:#16181d; --panel-2:#1b1e25; --line:#262932;
-    --ink:#dde1e9; --dim:#8b919e; --soft:#5b616c;
-    --accent:#6cb6ff; --bad:#e5645c; --warn:#d6a44c; --good:#5bbf91;
+    --bg:#101216; --rail:#13151a; --pane:#15181e; --line:#22262e; --line-2:#2b303a;
+    --ink:#d6dae2; --dim:#8a909c; --soft:#5a606b; --faint:#3f444e;
+    --sel:#1d3a52; --sel-line:#3d7fb8; --hover:#1a1e25;
+    --crit:#e8615a; --crit-bg:#2a1816; --warn:#d6a247; --warn-bg:#251f12;
+    --ok:#5cba8a; --ok-bg:#16241c; --info:#5b9fe0;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
-  b{font-weight:650;color:#fff}
-  main{max-width:880px;margin:0 auto;padding:0 24px 80px}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 var(--ui);
+    -webkit-font-smoothing:antialiased;overflow:hidden}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
+  ::selection{background:var(--sel)}
 
-  /* ---- top chrome + scenario switcher (the demonstrator control) ---- */
-  header{max-width:880px;margin:0 auto;padding:22px 24px 0}
-  .crumb{color:var(--soft);font-size:12px}.crumb b{color:var(--dim);font-weight:600}
-  .mock{float:right;color:var(--soft);font-size:11px;border:1px solid var(--line);border-radius:3px;padding:2px 8px}
-  .scen{margin:18px 0 4px}
-  .scen .lbl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);margin-bottom:9px}
-  .scen .opts{display:flex;gap:8px;flex-wrap:wrap}
-  .scen button{display:flex;flex-direction:column;gap:3px;background:var(--panel);border:1px solid var(--line);
-    border-radius:6px;color:var(--dim);font:inherit;font-size:13px;font-weight:600;padding:7px 12px;cursor:pointer;text-align:left}
-  .scen button:hover{color:var(--ink);border-color:var(--soft)}
-  .scen button[aria-pressed=true]{color:var(--ink);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
-  .scen button .tier{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--soft)}
-  .scen button[aria-pressed=true] .tier{color:var(--accent)}
+  /* ── top command bar ───────────────────────────────────────────────── */
+  .bar{display:flex;align-items:center;gap:0;height:38px;background:var(--rail);
+    border-bottom:1px solid var(--line);padding:0 10px;flex:0 0 auto;font-size:12.5px}
+  .bar .id{display:flex;align-items:baseline;gap:6px;padding-right:12px;white-space:nowrap}
+  .bar .id .res{color:var(--soft)} .bar .id a.res:hover{color:var(--dim)}
+  .bar .id .chev{color:var(--faint)}
+  .bar .id .nm{font-weight:600;color:var(--ink)} .bar .id .nm .mono{color:#fff}
+  .bar .id .cur{color:var(--soft);font-size:10px;font-weight:600;letter-spacing:.04em;
+    border:1px solid var(--line-2);border-radius:3px;padding:1px 5px;margin-left:6px}
+  .bar .sep{width:1px;height:18px;background:var(--line-2);margin:0 12px}
+  .bar .ctx{display:flex;gap:14px;color:var(--dim);white-space:nowrap}
+  .bar .ctx .mono{color:var(--ink)}
+  .bar .health{display:flex;align-items:center;gap:7px;margin-left:auto;padding-right:4px;white-space:nowrap}
+  .bar .health .dot{width:8px;height:8px;border-radius:50%}
+  .bar .health .txt{font-weight:600;letter-spacing:.02em}
+  .bar .health.ok .dot{background:var(--ok)} .bar .health.ok .txt{color:var(--ok)}
+  .bar .health.crit .dot{background:var(--crit);box-shadow:0 0 0 3px var(--crit-bg)}
+  .bar .health.crit .txt{color:var(--crit)}
+  .bar .search{display:flex;align-items:center;gap:6px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:5px;padding:3px 9px;margin-left:12px;width:230px}
+  .bar .search input{background:none;border:0;outline:0;color:var(--ink);font:inherit;width:100%;
+    font-family:var(--mono);font-size:12px}
+  .bar .search input::placeholder{color:var(--soft);font-family:var(--ui)}
+  .bar .search .pre{color:var(--soft)}
+  .bar .scen{display:flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden;margin-left:10px}
+  .bar .scen button{background:#0c0e12;border:0;color:var(--dim);font:inherit;font-size:11.5px;font-weight:600;
+    padding:4px 11px;cursor:pointer;border-right:1px solid var(--line);white-space:nowrap}
+  .bar .scen button:last-child{border-right:0}
+  .bar .scen button:hover{color:var(--ink)}
+  .bar .scen button[aria-pressed=true]{background:var(--sel);color:#fff}
+  .bar .mock{margin-left:10px;color:var(--soft);font-size:10.5px;border:1px solid var(--line);
+    border-radius:3px;padding:2px 7px;letter-spacing:.03em;white-space:nowrap}
 
-  /* ---- cluster-level banner (Tier 4 — reads FIRST, above everything) ---- */
-  #banner{display:none;margin:24px 0 0;border:1px solid color-mix(in srgb,var(--bad) 55%,var(--line));
-    border-left:3px solid var(--bad);background:color-mix(in srgb,var(--bad) 9%,var(--panel));border-radius:7px;padding:12px 15px}
-  #banner.on{display:block}
-  #banner .bw{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bad);margin-bottom:4px}
-  #banner .bt{font-size:14px;color:var(--ink)}
+  /* ── HEALTH LEAD: the triage one-liner, worst thing first ──────────── */
+  .lead{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);
+    background:var(--rail);flex:0 0 auto;font-size:12.5px}
+  .lead .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg);flex:0 0 auto}
+  .lead.ok .sd{background:var(--ok)} .lead.crit .sd{background:var(--crit)}
+  .lead .ltxt{color:var(--ink)} .lead .ltxt b{font-weight:650;color:#fff}
+  .lead.ok .ltxt b{color:var(--ok)} .lead.crit .ltxt b{color:var(--crit)}
+  .lead .ltxt .mono{color:var(--ink)} .lead .ltxt .bad{color:var(--crit)}
+  .lead .pills{margin-left:auto;display:flex;gap:7px;font-size:11px}
+  .lead .pill{display:flex;align-items:center;gap:5px;border:1px solid var(--line-2);border-radius:4px;
+    padding:2px 8px;color:var(--dim);background:#0c0e12;font-variant-numeric:tabular-nums}
+  .lead .pill b{color:var(--ink);font-weight:600}
+  .lead .pill.crit{border-color:#4a2622;color:var(--crit)} .lead .pill.crit b{color:var(--crit)}
+  .lead .pill.warn{border-color:#443613;color:var(--warn)} .lead .pill.warn b{color:var(--warn)}
+  .lead .pill.ok{border-color:#1f3a2c;color:var(--ok)} .lead .pill.ok b{color:var(--ok)}
 
-  /* ---- the key card (the canvas) ---- */
-  .card{margin-top:26px;transition:none}
-  .card.dim .value,.card.dim .facts{opacity:.5}        /* Tier 4 greys the possibly-stale data */
-  .health{display:flex;align-items:center;gap:11px;margin-bottom:14px}
-  .health .word{font-size:13px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--good)}
-  .health .word.warn{color:var(--warn)} .health .word.crit{color:var(--bad)}
-  .health .dotline{flex:1;height:1px;background:var(--line)}
-  .health .ago{color:var(--soft);font-size:12px}
+  /* ── 3-pane body ───────────────────────────────────────────────────── */
+  .body{display:grid;grid-template-columns:228px minmax(0,1fr) 340px;flex:1 1 auto;min-height:0}
 
-  .value{font-size:15px;color:var(--dim);margin-bottom:6px}
-  .value .vk{font-size:17px;color:var(--ink)} .value .eq{color:var(--soft);margin:0 6px}
-  .value .vv{font-size:30px;font-weight:650;color:#fff;letter-spacing:-.01em;vertical-align:-3px}
-  .vmark{display:inline-block;margin-left:12px;font-size:12px;color:var(--warn);vertical-align:6px}
-  .vmark.crit{color:var(--bad)}
+  /* ── LEFT RAIL: the KEY's identity + history glossary ────────────────
+       This is the leaf — there is no sibling-key index (that lives on
+       partition.html). Instead the rail anchors WHAT we are looking at:
+       the key, its partition/owner, the LWW-resolved current value, the
+       agreement n/N — then a small glossary of the vocabulary the log and
+       the version sample use (stamp / outcome / conflict vs fence). ───── */
+  .rail{background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;padding:12px 0}
+  .rail .grp{padding:0 12px;margin-bottom:14px}
+  .rail .grp-h{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--soft);
+    padding:0 0 8px}
+  /* the key headline card */
+  .keycard{border:1px solid var(--line);border-radius:6px;background:#0c0e12;padding:10px 11px}
+  .keycard .kn{font-family:var(--mono);font-size:13px;color:#fff;font-weight:600;display:flex;align-items:center;gap:7px}
+  .keycard .kn .sd{width:8px;height:8px;border-radius:2px;transform:rotate(45deg)}
+  .keycard.ok .kn .sd{background:var(--ok)} .keycard.crit .kn .sd{background:var(--crit)}
+  .keycard .kv{margin-top:9px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11.5px}
+  .keycard .kv dt{color:var(--soft)} .keycard .kv dd{margin:0;color:var(--ink);font-family:var(--mono);
+    font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  .keycard .kv dd.bad{color:var(--crit)} .keycard .kv dd.ok{color:var(--ok)} .keycard .kv dd.warn{color:var(--warn)}
+  .keycard .kv dd a{color:var(--info)}
+  /* the resolved value, big, with a stale/agree marker */
+  .keycard .resolved{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+    display:flex;align-items:baseline;gap:8px}
+  .keycard .resolved .rl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}
+  .keycard .resolved .rv{font-family:var(--mono);font-size:22px;font-weight:650;color:#fff;line-height:1}
+  .keycard .resolved .ra{margin-left:auto;font-family:var(--mono);font-size:10.5px;font-variant-numeric:tabular-nums;color:var(--soft)}
+  .keycard .resolved .ra.bad{color:var(--crit);font-weight:600} .keycard .resolved .ra.ok{color:var(--ok)}
 
-  /* ---- the fact lines — each anomaly attaches to the line it concerns ---- */
-  .facts{margin-top:20px;border-top:1px solid var(--line)}
-  .line{display:grid;grid-template-columns:128px 1fr;gap:16px;padding:13px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
-  .line .k{color:var(--soft);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding-top:3px}
-  .line .v{color:var(--ink);font-size:14.5px}
-  .line .v .sub{color:var(--dim)}
-  .line .note{margin-top:5px;font-size:12.5px;color:var(--soft)}
-  .line .note.benign{color:var(--warn)}
-  .line.warn{box-shadow:inset 2px 0 0 var(--warn);padding-left:14px;margin-left:-14px}
-  .line.crit{box-shadow:inset 2px 0 0 var(--bad);padding-left:14px;margin-left:-14px}
+  /* in-situ glossary — defines stamp / outcome / conflict-vs-fence where first read */
+  .rail .gloss{color:var(--soft);font-size:10.5px;line-height:1.6}
+  .rail .gloss .gr{padding:6px 0;border-top:1px solid var(--line)}
+  .rail .gloss .gr:first-child{border-top:0}
+  .rail .gloss b{color:var(--dim);font-weight:600;font-family:var(--mono)}
+  .rail .gloss .mono{font-family:var(--mono);color:var(--dim)} .rail .gloss .bad{color:var(--crit)}
+  .rail .gloss .warn{color:var(--warn)} .rail .gloss .ok{color:var(--ok)}
 
-  /* agreement: the calm line that splits when nodes disagree */
-  .agree-all{color:var(--good)}
-  .agree-split{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
-  .grp{display:flex;flex-direction:column;gap:6px}
-  .grp .gl{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--dim)}
-  .grp.dis .gl{color:var(--bad)}
-  .nodes{display:flex;gap:6px;flex-wrap:wrap}
-  .nd{font-size:12px;border:1px solid var(--line);border-radius:5px;padding:3px 8px}
-  .nd .nv{color:var(--ink);font-weight:650} .nd .na{color:var(--dim);margin-left:6px}
-  .nd.stale{border-left:2px solid var(--bad);color:var(--bad)} .nd.stale .nv,.nd.stale .na{color:var(--bad)}
-  .nd.lag{border-left:2px solid var(--warn)} .nd.lag .na{color:var(--warn)}
+  /* ── CENTRE: THE LOG — partition stream filtered to user42.score ───── */
+  .log{overflow-y:auto;background:var(--bg);min-width:0;display:flex;flex-direction:column}
+  .log .lh{display:flex;align-items:center;gap:10px;height:30px;padding:0 12px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--bg);z-index:3;color:var(--soft);font-size:11px}
+  .log .lh .ttl{color:var(--dim);font-weight:600;font-size:12px}
+  .log .lh .ttl .mono{color:var(--ink)}
+  .log .lh .cnt{color:var(--soft)}
+  .log .lh .sort{margin-left:auto;font-size:11px} .log .lh .sort b{color:var(--dim);font-weight:600}
+  /* the is: chip filter row — Sentry query style */
+  .log .chips{display:flex;align-items:center;gap:6px;padding:6px 12px;border-bottom:1px solid var(--line);
+    position:sticky;top:30px;background:var(--bg);z-index:3;flex-wrap:wrap;font-size:11px}
+  .log .chips .cl{color:var(--soft);margin-right:2px}
+  .log .chips .chip{font-family:var(--mono);font-size:11px;border:1px solid var(--line-2);border-radius:4px;
+    padding:2px 8px;color:var(--dim);cursor:pointer;background:#0c0e12;white-space:nowrap}
+  .log .chips .chip:hover{color:var(--ink);border-color:var(--soft)}
+  .log .chips .chip[aria-pressed=true]{background:var(--sel);border-color:var(--sel-line);color:#fff}
+  .log .chips .chip .n{color:var(--soft);margin-left:5px} .log .chips .chip[aria-pressed=true] .n{color:#cfe2f2}
+  .log .chips .clear{margin-left:auto;color:var(--soft);cursor:pointer;font-size:11px}
+  .log .chips .clear:hover{color:var(--ink)}
 
-  /* attached callout — sits directly under the element it explains */
-  .callout{margin-top:11px;border-left:2px solid var(--warn);background:color-mix(in srgb,var(--warn) 6%,var(--panel));
-    border-radius:0 6px 6px 0;padding:10px 14px}
-  .callout.crit{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--panel))}
-  .callout .ct{font-weight:650;color:var(--ink);font-size:13.5px}
-  .callout .cb{color:var(--dim);font-size:13px;margin-top:3px}
-  .callout .ca{color:var(--ink);font-size:12.5px;margin-top:7px}
-  .callout .ca b{color:#fff}
+  .rows{flex:1 1 auto}
+  /* column grid: stamp · origin · type · value · outcome  (key column dropped
+     — every row is user42.score, so naming it on each row is redundant) */
+  .lr{display:grid;grid-template-columns:3px 96px 132px 60px minmax(70px,1fr) 138px;
+    align-items:center;border-bottom:1px solid var(--line);cursor:pointer;background:var(--bg);
+    font-family:var(--mono);font-size:12px;height:33px}
+  .lr:hover{background:var(--hover)}
+  .lr[aria-selected=true]{background:var(--sel)}
+  .lr .sev{width:3px;height:100%} .lr[data-sev=crit] .sev{background:var(--crit)} .lr[data-sev=warn] .sev{background:var(--warn)}
+  .lr .stamp{color:var(--dim);padding-left:9px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .lr .stamp .e{color:var(--soft)}
+  .lr[aria-selected=true] .stamp{color:#c4cdd9}
+  /* the winning stamp gets a quiet marker so the current value is locatable at a glance */
+  .lr.winner .stamp{color:var(--ok)} .lr.winner .stamp .e{color:var(--ok)}
+  .lr[aria-selected=true].winner .stamp{color:#bfe6cf}
+  .lr .origin{color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+  .lr .origin .rep{display:inline-block;width:13px;color:var(--dim);font-weight:600}
+  /* inline stuck-node marker — makes the divergence visible without a hover */
+  .lr .stuck{font-family:var(--ui);font-size:9.5px;font-weight:700;letter-spacing:.03em;
+    color:var(--warn);background:var(--warn-bg);border:1px solid #443613;border-radius:3px;
+    padding:0 5px;margin-left:6px;white-space:nowrap;vertical-align:1px}
+  .lr .type{font-family:var(--ui);font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--soft);text-align:center}
+  .lr .val{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:10px;text-align:right}
+  .lr.winner .val{color:#fff;font-weight:650} .lr[data-sev=crit] .val{color:var(--crit)}
+  .lr[aria-selected=true] .val{color:#dfe6ee}
+  .lr .out{display:flex;align-items:center;gap:5px;padding-right:10px;justify-content:flex-end;white-space:nowrap}
+  .lr .out .od{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:0 0 auto}
+  .lr .out .ot{font-family:var(--ui);font-size:11px;color:var(--ok)}
+  .lr .out.local .od{background:var(--info)} .lr .out.local .ot{color:var(--info)}
+  .lr .out.won .od{background:var(--ok)} .lr .out.won .ot{color:var(--ok)}
+  .lr .out.fwd .od{background:var(--dim)} .lr .out.fwd .ot{color:var(--dim)}
+  .lr .out.drop .od{background:var(--soft)} .lr .out.drop .ot{color:var(--soft)}
+  .lr .out.lost .od{background:var(--warn)} .lr .out.lost .ot{color:var(--warn)}
+  .lr .out.conflict .od{background:var(--crit)} .lr .out.conflict .ot{color:var(--crit);font-weight:600}
 
-  .t{border-bottom:1px dotted var(--dim);cursor:help;color:inherit}.t:hover{border-bottom-color:var(--accent)}
+  /* view divider between epochs — a Sentry-style stream rule */
+  .vd{display:flex;align-items:center;gap:10px;padding:5px 12px;background:#0c0e12;border-bottom:1px solid var(--line);
+    color:var(--soft);font-size:10.5px;letter-spacing:.02em}
+  .vd .vdr{flex:1 1 auto;height:1px;background:var(--line-2)}
+  .vd .vdl{font-family:var(--mono);color:var(--dim);white-space:nowrap}
+  .vd .vdl b{color:var(--ink);font-weight:600}
+  .vd .vdl .mv{color:var(--warn)}
 
-  /* ---- evidence (still collapsed, still drill-down) ---- */
-  details.ev{margin-top:30px;border-top:1px solid var(--line);padding-top:6px}
-  details.ev>summary{cursor:pointer;color:var(--dim);font-size:13px;font-weight:600;list-style:none;padding:10px 0}
-  details.ev>summary::-webkit-details-marker{display:none}
-  details.ev .evbody{color:var(--soft);font-size:13px;padding:2px 0 4px}
+  /* the stuck-replica marker line — pinned just under the row the holdout is
+     parked on, so the log itself shows WHERE :49807 stalled */
+  .stuckline{display:flex;align-items:center;gap:8px;padding:4px 12px 5px 20px;background:var(--warn-bg);
+    border-bottom:1px solid var(--line);color:var(--warn);font-size:10.5px}
+  .stuckline .sb{font-family:var(--ui);font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    border:1px solid #443613;border-radius:2px;padding:0 5px;background:#0c0e12}
+  .stuckline .mono{color:var(--ink)}
 
-  /* ---- the meta panel: explains the LAYERING for the current scenario ---- */
-  .how{margin-top:34px;border:1px dashed var(--line);border-radius:8px;background:var(--panel);padding:14px 16px}
-  .how h3{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin:0 0 9px}
-  .how dl{display:grid;grid-template-columns:88px 1fr;gap:7px 14px;margin:0;font-size:13px}
-  .how dt{color:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
-  .how dd{margin:0;color:var(--dim)} .how dd b{color:var(--ink);font-weight:600}
+  /* empty / calm filtered state */
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;
+    color:var(--soft);gap:12px;padding:40px;text-align:center}
+  .empty .chk{width:42px;height:42px;border-radius:50%;border:2px solid var(--line-2);display:flex;
+    align-items:center;justify-content:center;color:var(--ok);font-size:20px}
+  .empty.filtered .chk.none{color:var(--soft);font-size:18px}
+  .empty .e1{font-size:14px;color:var(--ink);font-weight:600}
+  .empty .e2{font-size:12px;max-width:300px;line-height:1.6}
+  .empty .e3{font-family:var(--mono);font-size:11px;color:var(--soft);margin-top:4px;
+    border-top:1px solid var(--line);padding-top:12px}
+  .empty.filtered .e3{color:var(--warn);border-top-color:var(--line-2)}
+
+  /* selected-commit record peek (drill to the commit's write trace) */
+  .recpeek{flex:0 0 auto;border-top:1px solid var(--line-2);background:var(--pane);padding:10px 14px;
+    display:none;font-size:12px;position:sticky;bottom:0;z-index:2}
+  .recpeek.show{display:block}
+  .recpeek .rk{font-family:var(--mono);font-size:12.5px;color:#fff;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .recpeek .rk .sd{width:8px;height:8px;border-radius:2px;transform:rotate(45deg);background:var(--ok)}
+  .recpeek[data-sev=crit] .rk .sd{background:var(--crit)} .recpeek[data-sev=warn] .rk .sd{background:var(--warn)}
+  .recpeek .rrec{font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.6;white-space:pre-wrap;
+    background:#0c0e12;border:1px solid var(--line);border-radius:5px;padding:8px 10px}
+  .recpeek .rrec .kk{color:var(--info)} .recpeek .rrec .vv{color:var(--ink)} .recpeek .rrec .bad{color:var(--crit)}
+  .recpeek .rwhy{color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:7px}
+  .recpeek .rwhy b{color:var(--ink);font-weight:600}
+  .recpeek .ract{margin-top:8px;display:flex;gap:8px}
+  .recpeek .ract a{font-size:11.5px;color:var(--info)}
+
+  /* ── RIGHT: VITALS / DECODE — the divergence view ────────────────────
+       Reuses inbox.html's decode pane verbatim: a header, a State kv block,
+       the per-node version SAMPLE table (.vt), then the "why it diverged"
+       reason + a "next" action box, and drill buttons at the bottom. ──── */
+  .vitals{background:var(--pane);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+  .vitals .dh{padding:12px 14px 11px;border-bottom:1px solid var(--line)}
+  .vitals .dh .dk{font-family:var(--mono);font-size:15px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+  .vitals .dh .dk .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg)}
+  .vitals .dh.ok .dk .sd{background:var(--ok)} .vitals .dh.crit .dk .sd{background:var(--crit)}
+  .vitals .dh .dsub{margin-top:5px;color:var(--dim);font-size:12px;line-height:1.45}
+  .vitals .dh .dsub .mono{color:var(--ink)} .vitals .dh .dsub .bad{color:var(--crit)}
+  .vitals .seg{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .vitals .seg .st{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);
+    margin-bottom:9px;display:flex;justify-content:space-between}
+  .vitals .seg .st .stn{color:var(--faint);font-weight:600;letter-spacing:0}
+  .vitals .kv{display:grid;grid-template-columns:104px 1fr;gap:5px 12px;font-size:12px}
+  .vitals .kv dt{color:var(--soft)} .vitals .kv dd{margin:0;color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .vitals .kv dd.bad{color:var(--crit)} .vitals .kv dd.warn{color:var(--warn)} .vitals .kv dd.ok{color:var(--ok)}
+  .vitals .kv dd a{color:var(--info)}
+  /* version-sample decode table — the "decode pane" tool convention */
+  .vt{font-family:var(--mono);font-size:11.5px;width:100%;border-collapse:collapse}
+  .vt th{text-align:left;color:var(--soft);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.04em;
+    padding:0 0 5px;border-bottom:1px solid var(--line)}
+  .vt td{padding:5px 0;border-bottom:1px solid var(--line);color:var(--ink);font-variant-numeric:tabular-nums}
+  .vt tr:last-child td{border-bottom:0}
+  .vt td.node{color:var(--dim)} .vt .min{color:var(--crit)} .vt .maj{color:var(--ok)}
+  .vt .bdg{font-family:var(--ui);font-size:9px;font-weight:700;padding:0 4px;border-radius:2px;margin-left:5px}
+  .vt .bdg.lag{background:var(--crit-bg);color:var(--crit)} .vt .bdg.cur{background:#16241c;color:var(--ok)}
+  .vitals .reason{font-size:12px;line-height:1.55;color:var(--dim)}
+  .vitals .reason b{color:var(--ink);font-weight:600}
+  .vitals .next{display:flex;gap:8px;align-items:flex-start;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:5px;padding:9px 11px;font-size:12px;line-height:1.5;color:var(--ink);margin-top:10px}
+  .vitals .next .arr{color:var(--warn);font-weight:700}
+  .vitals .next.ok .arr{color:var(--ok)}
+  .vitals .actions{margin-top:auto;padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  .btn{display:inline-flex;align-items:center;justify-content:space-between;gap:7px;
+    background:#0c0e12;border:1px solid var(--line-2);border-radius:5px;color:var(--ink);font:inherit;font-size:12px;
+    font-weight:600;padding:7px 11px;cursor:pointer;text-align:left}
+  .btn:hover{border-color:var(--soft);background:var(--hover);text-decoration:none}
+  .btn .kc{font-family:var(--mono);font-size:10px;color:var(--soft);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+  .btn .ar{color:var(--soft)}
+
+  /* ── bottom hotkey bar ─────────────────────────────────────────────── */
+  .keys{display:flex;align-items:center;gap:0;height:24px;background:var(--rail);border-top:1px solid var(--line);
+    padding:0 12px;flex:0 0 auto;font-size:11px;color:var(--soft)}
+  .keys .k{display:flex;align-items:center;gap:5px;padding:0 13px 0 0}
+  .keys .k kbd{font-family:var(--mono);font-size:10px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:3px;padding:1px 5px;color:var(--dim)}
+  .keys .right{margin-left:auto;font-family:var(--mono);color:var(--soft)}
+
+  /* data-sources popover */
+  .src{display:none;position:fixed;bottom:30px;left:240px;width:560px;background:var(--pane);
+    border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;font-size:11.5px;line-height:1.65;color:var(--dim);
+    box-shadow:0 8px 30px #000a;z-index:20}
+  .src.show{display:block}
+  .src h4{margin:0 0 8px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+  .src p{margin:7px 0} .src b{color:var(--ink);font-weight:600} .src .mono{color:var(--ink)}
+  .src .new{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:10px;border:1px solid #443613;
+    border-radius:3px;padding:1px 5px;margin-right:3px;background:var(--warn-bg)}
+  .keys .srcbtn{cursor:pointer;color:var(--dim);padding:0 13px 0 0;display:flex;align-items:center;gap:5px}
+  .keys .srcbtn:hover{color:var(--ink)} .keys .srcbtn .new{color:var(--warn)}
 </style>
 </head>
 <body>
 
-<header>
-  <span class="mock">MOCKUP · static data</span>
-  <div class="crumb"><b>observe</b> › <b>key autopsy</b> › <code class="mono">user42.score</code></div>
-  <div class="scen">
-    <div class="lbl">scenario — watch each unhappy path layer onto the same healthy canvas</div>
-    <div class="opts" id="scen"></div>
+<!-- ── command bar: identity (cluster › sessions › partitions › user42 › key) · context · health · search · scenario ── -->
+<div class="bar">
+  <div class="id">
+    <a class="res" href="../tool/resources.html">cluster</a><span class="chev">›</span>
+    <a class="res" href="../tool/inbox.html">sessions</a><span class="chev">›</span>
+    <a class="res" href="../tool/partitions.html">partitions</a><span class="chev">›</span>
+    <a class="res" href="../tool/partition.html">user42</a><span class="chev">›</span>
+    <span class="res">key</span><span class="nm"><span class="mono">user42.score</span></span>
+    <span class="cur">current</span>
   </div>
-</header>
-
-<main>
-  <div id="banner"><div class="bw" id="bw"></div><div class="bt" id="bt"></div></div>
-
-  <div class="card" id="card">
-    <div class="health">
-      <span class="word" id="word">Converged</span>
-      <span class="dotline"></span>
-      <span class="ago" id="ago"></span>
-    </div>
-    <div class="value">
-      <span class="vk mono">user42.score</span><span class="eq">=</span><span class="vv mono" id="vv">8</span><span class="vmark" id="vmark"></span>
-    </div>
-
-    <div class="facts">
-      <div class="line" id="ln-conv"><span class="k">agreement</span><span class="v" id="conv"></span></div>
-      <div class="line" id="ln-prov"><span class="k">last write</span><span class="v" id="prov"></span></div>
-      <div class="line" id="ln-own"><span class="k">ownership</span><span class="v" id="own"></span></div>
-      <div class="line" id="ln-act"><span class="k">recent activity</span><span class="v" id="act"></span></div>
-    </div>
-
-    <details class="ev"><summary>▸ Show the evidence — version history · raw records · write route · data sources</summary>
-      <div class="evbody">The full per-version timeline, raw ProvRecord/ChangeRecord, ownership ring and the honest
-        <span class="t" title="every panel maps to a real source (InspectSnapshot / __observe stream / log) or an explicit ⚠ NEW-instrumentation flag">data-sources footnote</span>
-        live here — drill-down, not the front door. (Same content as the other Key Autopsy mockups; collapsed by design.)</div>
-    </details>
+  <span class="sep"></span>
+  <div class="ctx">
+    <span>owner <span class="mono">:49801</span></span>
+    <span><span class="mono" id="ctxCommits">6</span> commits</span>
+    <span>view <span class="mono">e4</span></span>
+    <span><span class="mono">5</span> members · R=5</span>
   </div>
+  <div class="health" id="health"><span class="dot"></span><span class="txt" id="healthTxt">Converged</span></div>
+  <div class="search"><span class="pre mono">⌕</span><input id="q" spellcheck="false" placeholder="is:lost  is:conflict  is:won" autocomplete="off"></div>
+  <div class="scen" id="scen"></div>
+  <span class="mock">MOCKUP · static</span>
+</div>
 
-  <div class="how">
-    <h3>How this is layered</h3>
-    <dl>
-      <dt>Tier</dt><dd id="h-tier"></dd>
-      <dt>Layered</dt><dd id="h-what"></dd>
-      <dt>Attached to</dt><dd id="h-where"></dd>
-    </dl>
-  </div>
-</main>
+<!-- ── HEALTH LEAD: the triage one-liner, worst thing first ── -->
+<div class="lead" id="lead">
+  <span class="sd"></span><span class="ltxt" id="leadTxt"></span>
+  <span class="pills" id="leadPills"></span>
+</div>
+
+<div class="body" id="bodyGrid">
+
+  <!-- ── LEFT RAIL: the key's identity + history glossary ── -->
+  <nav class="rail" id="rail"></nav>
+
+  <!-- ── CENTRE: THE LOG, scoped to user42.score ── -->
+  <section class="log">
+    <div class="lh">
+      <span class="ttl"><span class="mono">user42.score</span> · log</span>
+      <span class="cnt" id="logCount"></span>
+      <span class="sort">newest first · <b>e·s</b> stamp</span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="rows" id="rows"></div>
+    <!-- selected-commit record peek (drill to the commit's write trace) -->
+    <div class="recpeek" id="recpeek"></div>
+  </section>
+
+  <!-- ── RIGHT: VITALS / DECODE — the divergence view ── -->
+  <aside class="vitals" id="vitals"></aside>
+</div>
+
+<!-- ── bottom hotkey bar ── -->
+<div class="keys">
+  <span class="k"><kbd>j</kbd><kbd>k</kbd> move</span>
+  <span class="k"><kbd>↵</kbd> open trace</span>
+  <span class="k"><kbd>l</kbd> losses</span>
+  <span class="k"><kbd>c</kbd> conflicts</span>
+  <span class="k"><kbd>1</kbd>/<kbd>2</kbd> scenario</span>
+  <span class="k"><kbd>/</kbd> filter</span>
+  <span class="srcbtn" id="srcBtn"><span class="new">⚠</span> data sources</span>
+  <span class="right" id="statusRight"></span>
+</div>
+
+<!-- data-sources popover (the honest footnote) -->
+<div class="src" id="src">
+  <h4>Data sources — how this key autopsy is assembled</h4>
+  <p><b>The log (centre).</b> The per-partition change-record log via <span class="mono">log.recordsSince</span> /
+     a <span class="mono">__dump</span> RPC, filtered to <span class="mono">key === 'user42.score'</span> [C]. Outcomes
+     (local / won / lost·fence / lost·conflict) are the records' own commit classifications. View dividers come from the
+     epoch boundaries in the stamps. This is the partition log of <a href="../tool/partition.html">user42</a>, narrowed to one key.</p>
+  <p><b>Version sample / divergence (right).</b> The per-node value + stamp comes from the <span class="new">⚠ NEW</span>
+     per-key version sample <span class="mono">__inspect{versions:5}</span>, cross-merged on node <b>uuid</b> [A]. The
+     <b>CURRENT</b> / <b>LAGS</b> badge is each node's stamp compared to the LWW-resolved winner; <b>agreement n/N</b> is how
+     many of the R replicas hold the winning stamp. <b>n &lt; R</b> is a split — and because the holdout (<span class="mono">:49807</span>)
+     also serves reads, those reads return its stale value. That's the divergence the log explains.</p>
+  <p><b>Conflict vs fence.</b> A lost write's class comes from <b>__observe</b>'s lost event, which carries the
+     <b>winning</b> epoch/seq as <span class="mono">we/ws</span>. Compare against the lost write's own epoch <span class="mono">wr.e</span>:
+     <span class="mono">wr.e == we</span> ⇒ same-epoch <b>conflict</b> (true contention — it lost LWW to a higher seq);
+     <span class="mono">wr.e &lt; we</span> ⇒ <b>fence</b> (a stale-view write rejected — DECISIONS X) [B]. The record peek prints the
+     lost write's own stamp as <span class="mono">wr.e·wr.s</span> and the winner as <span class="mono">we·ws</span> — same vocabulary, never overloaded.</p>
+  <p><b>Resolved value &amp; lag.</b> The current value is the highest <span class="mono">e·s</span> across live replicas (LWW).
+     <span class="mono">:49807</span>'s lag (+420, not draining) is from the snapshot <span class="mono">marks</span>/<span class="mono">heads</span>
+     vs the caught-up floor — live origins only [A].</p>
+</div>
 
 <script>
 'use strict';
-/* The HAPPY PATH is the canvas. Each scenario adds only the overlays its anomaly needs, attached to the
-   element that anomaly concerns, with visual weight scaled to severity (tier). Healthy = no overlays at all. */
-const G = {
-  fence:'epoch-fence — a write stamped with an older view is rejected automatically, so a node that fell behind can\'t overwrite newer data. Expected during an ownership move.',
-  conflict:'two writes committed under the SAME epoch; the lower seq lost by last-writer-wins. A real concurrent write, not handoff churn.',
-  lag:'a replica has applied an older value and is still catching up — behind, but not yet diverged.',
-  viewcommit:'VIEW_COMMIT — the message that finalises a new view. Missing it strands a node on the old view (DECISIONS Y).',
-  quorum:'a view needs a majority of members reachable to accept writes; without it the write-gate closes and writes buffer.',
-};
-const term=(k,l)=>`<abbr class="t" title="${G[k].replace(/"/g,'&quot;')}">${l}</abbr>`;
+/* ── drill targets ──────────────────────────────────────────────────────
+   This file lives in mockups/key-autopsy/, so links to the tool pages use
+   ../tool/<x>.html and to siblings use ../<x>.html.
+     a commit row → its full write trace (../write-traces.html)
+     owner :49801 → node-doctor (../tool/node.html)
+     the partition → partition.html (the parent log)  */
+const COMMIT_TRACE = '../write-traces.html';
+const OWNER_NODE    = '../tool/node.html';
+const PARTITION     = '../tool/partition.html';
 
-// shared canvas defaults (a healthy user42.score = 8, owned by :49801)
-const BASE = {
-  word:'Converged', level:'ok', ago:'last changed 25s ago', vv:'8', vmark:null, dim:false, banner:null,
-  conv:{mode:'all'}, prov:'committed by <b>:49801</b> (owner) · <span class="mono">e4·s1287</span>',
-  own:'partition <span class="mono">user42</span> · owner <b>:49801</b> · <span class="sub">fully replicated (R=∞) · stable since e2</span>',
-  act:'<b>3</b> writes in the last 60s — <span class="sub">all applied cleanly</span>',
-  ownNote:null, ownLevel:null, actNote:null, actLevel:null, provNote:null, provLevel:null, convLevel:null, callout:null,
-};
-const AGREE_ALL = `<span class="agree-all">all <b>5</b> servers agree</span>`;
+/* ── the key's commit log ───────────────────────────────────────────────
+   THE CENTRE is the partition log narrowed to user42.score — every commit
+   touching THIS key, newest first by (epoch, seq). Each carries its outcome.
+   View dividers (type:'view') mark the epoch boundaries that moved the key's
+   ownership. Severity colours losses / conflicts / fences; clean won/local
+   commits are calm. The history matches the SHARED DATA NARRATIVE exactly:
 
+     e4·s1287 "8"  — won, owner :49801, the CURRENT winner across caught-up replicas
+     e4·s1265 "6"  — won (same-epoch write that beat s902 under LWW)
+     e4·s902  "7"  — origin :49803, lost·conflict (same-epoch, lost LWW to e4·s1265)
+     e3·s1241 "5"  — the stamp :49807 is STUCK on
+     e2·s851  "4"  — lost·fence (stale-view write during churn)
+     e1·s87   "99" — client write, lost·fence (stale e1 view rejected — DECISIONS X)  */
+
+// outcome → label + class on the row (functional colour only)
+const OUT = {
+  local:    {cls:'local',    txt:'local',         sev:null},
+  won:      {cls:'won',      txt:'won',           sev:null},
+  fwd:      {cls:'fwd',      txt:'forwarded',     sev:null},
+  drop:     {cls:'drop',     txt:'dropped·dedup', sev:null},
+  fence:    {cls:'lost',     txt:'lost·fence',    sev:'warn'},
+  conflict: {cls:'conflict', txt:'lost·conflict', sev:'crit'},
+};
+
+/* ATTENTION log — the split / diverged history. Strictly newest-first by
+   (epoch, seq); view dividers fall at every epoch boundary that moved the
+   key's owner. winner:true tags the row that holds the current value. */
+const LOG_ATTN = [
+  // ── e4 band: 1287 (winner) > 1265 > 902 ──
+  {e:4,s:1287,origin:'A',addr:':49801',type:'update',val:'"8"',out:'won',winner:true,
+   why:'Owner <b>:49801</b> committed this at <b>e4·s1287</b> — the <b>current winner</b> for user42.score across the four caught-up replicas. This is the value reads should return.'},
+  {e:4,s:1265,origin:'A',addr:':49801',type:'update',val:'"6"',out:'won',
+   why:'A same-epoch write that beat <span class="mono">e4·s902</span> under LWW — higher seq under the same epoch wins. Later superseded by <span class="mono">e4·s1287</span>.'},
+  {e:4,s:902,origin:'B',addr:':49803',type:'update',val:'"7"',out:'conflict',
+   why:'<b>True same-epoch contention.</b> Stamped <b>e4</b> (<span class="mono">wr.e == we</span>) and lost last-writer-wins to <b>e4·s1265</b> committed by :49801. A genuine concurrent write, not handoff churn.'},
+  // ── e3→e4 view change: owner handoff :49803 → :49801 (the narrative move) ──
+  {type:'view',from:'e3',to:'e4',ownerFrom:':49803',ownerTo:':49801',members:5},
+  // ── e3 band — :49807 is parked on the head of this band ──
+  {e:3,s:1241,origin:'C',addr:':49805',type:'update',val:'"5"',out:'won',stuck:true,
+   why:'<b>:49807 is STUCK on this stamp.</b> It applied <b>e3·s1241</b> ("5") and has advanced no further for this key — it never adopted the e4 view, so the reads it serves are stale.'},
+  // ── e2→e3 view change (no owner move) ──
+  {type:'view',from:'e2',to:'e3',ownerFrom:':49803',ownerTo:':49803',members:5},
+  // ── e2 band ──
+  {e:2,s:851,origin:'B',addr:':49803',type:'update',val:'"4"',out:'fence',
+   why:'A <b>stale-view write during churn</b>, fenced because it carried the e2 view after the ring had moved on (<span class="mono">wr.e &lt; we</span>). Expected during a rebalance — not a divergence.'},
+  // ── e1→e2 view change ──
+  {type:'view',from:'e1',to:'e2',ownerFrom:':49803',ownerTo:':49803',members:5},
+  // ── e1 band — the stranded client fence sits in its correct (oldest) band ──
+  {e:1,s:87,origin:'CLI',addr:'client',type:'update',val:'"99"',out:'fence',
+   why:'An <b>epoch-1 client-local commit</b>, fenced on every replica because its view (e1) is older than the current epoch — <span class="mono">wr.e &lt; we</span> (DECISIONS X). A client write that lost the ownership race; never applied.'},
+];
+
+/* HEALTHY log — the SAME stream minus the conflict / fence / stuck context:
+   a clean run of won/local commits, every replica converged on e4·s1287. */
+const LOG_HEALTHY = [
+  {e:4,s:1287,origin:'A',addr:':49801',type:'update',val:'"8"',out:'local',winner:true,
+   why:'Owner <b>:49801</b> committed the current value for user42.score at <b>e4·s1287</b>; all five replicas hold it.'},
+  {e:4,s:1265,origin:'A',addr:':49801',type:'update',val:'"6"',out:'won',
+   why:'A clean prior commit, superseded by <span class="mono">e4·s1287</span>. No contention.'},
+  {type:'view',from:'e3',to:'e4',ownerFrom:':49803',ownerTo:':49801',members:5},
+  {e:3,s:1241,origin:'C',addr:':49805',type:'update',val:'"5"',out:'won',
+   why:'A clean e3 commit. Every replica adopted the e4 view that followed; nothing is parked here.'},
+];
+
+/* ── per-scenario key state ─────────────────────────────────────────────
+   HASH CONTRACT (other pages link in): default boot = healthy; #diverged
+   MUST boot the diverged/attention view; #healthy / #attention also accepted.
+   The two scenarios are the SAME key, converged vs split. */
 const SCEN = {
-  healthy:{ tier:'T0 · baseline', label:'Healthy', tname:'baseline',
-    over:{}, how:{tier:'<b>0 — baseline.</b> The steady state.', what:'Nothing. A healthy key needs no overlays.',
-      where:'—. The calm card <b>is</b> the signal: no marks anywhere means nothing to investigate.'} },
-
-  move:{ tier:'T1 · benign', label:'Recent move', tname:'benign context',
-    over:{ ownNote:`moved 1m ago · e3→e4 · :49803 → :49801`,
-           actNote:`includes <b>1</b> ${term('fence','fenced')} write during the move — expected churn, not a conflict`, actLevel:'benign' },
-    how:{tier:'<b>1 — benign context.</b> Health stays <b>Converged</b>.', what:'Two muted footnotes — a recent ownership move and an expected fenced write.',
-      where:'The <b>ownership</b> and <b>recent-activity</b> lines. Quiet text; the card doesn\'t escalate. You only see it if you look.'} },
-
-  contention:{ tier:'T1 · resolved', label:'Contention', tname:'resolved conflict',
-    over:{ vmark:{level:'warn', text:`1 ${term('conflict','same-epoch conflict')} in last 60s`},
-           act:'<b>4</b> writes in the last 60s — <span class="sub">1 lost to contention</span>', actNote:`a real concurrent write lost by last-writer-wins (<span class="mono">e4·s1287</span> beat <span class="mono">e4·s902</span>)`, actLevel:'benign' },
-    how:{tier:'<b>1–2 — resolved conflict.</b> Converged, but contended.', what:'An amber marker noting a genuine concurrent write was lost (correctly, by LWW).',
-      where:'The <b>value</b> itself — because that\'s what the conflict was over. Not a separate alert you\'d have to map back.'} },
-
-  lag:{ tier:'T2 · warn', label:'Replica lag', tname:'converging',
-    over:{ word:'Converging', level:'warn', convLevel:'warn',
-           conv:{mode:'lag'},
-           callout:{level:'warn', title:'One replica is behind', body:`:49807 has applied an older value and is <b>420 records behind</b>, draining (~12s to converge). It\'s ${term('lag','catching up')}, not diverged — the value will match once it drains.`, action:'<b>No action</b> — watch that "behind" trends down. If it stalls or climbs, escalate.'} },
-    how:{tier:'<b>2 — warn / converging.</b> Health → <b>Converging</b> (amber).', what:'The agreement line escalates to "4 agree · 1 catching up" and grows an attached detail.',
-      where:'The <b>agreement</b> line — the one line the problem is about. Everything else stays calm; the eye goes straight to the deviation.'} },
-
-  diverged:{ tier:'T3 · critical', label:'Divergence', tname:'critical',
-    over:{ word:'Diverged', level:'crit', convLevel:'crit', vmark:{level:'crit', text:'1 of 5 disagrees'},
-           conv:{mode:'split'},
-           callout:{level:'crit', title:':49807 is stuck on a stale value', body:`It shows <b>5</b> (<span class="mono">e3·s1241</span>) while the other four hold <b>8</b> (<span class="mono">e4·s1287</span>). It has applied <b>no update</b> for this key in 64s — most likely it dropped the ${term('viewcommit','VIEW_COMMIT')} for epoch 4.`, action:`Check :49807\'s log for the epoch-4 view-commit, or restart it to force a fresh catch-up. The other four are consistent, so reads they serve are correct.`} },
-    how:{tier:'<b>3 — critical.</b> Health → <b>Diverged</b> (red).', what:'The agreement line breaks its calm form into <b>agree</b> / <b>diverged</b> groups, plus a red callout with cause + next step.',
-      where:'The <b>agreement</b> line (it changes shape + colour) and a callout <b>directly beneath it</b>. The rest of the card stays calm — only the broken thing is loud.'} },
-
-  noquorum:{ tier:'T4 · banner', label:'No quorum', tname:'cluster-level',
-    over:{ word:'Write-gated', level:'crit', dim:true,
-           banner:{text:`Writes to this key are currently <b>rejected</b> — owner :49801\'s view lost ${term('quorum','quorum')} (3 of 5 members reachable). The value below may be stale; the last accepted write was 64s ago.`},
-           provNote:'no writes accepted since quorum lost 64s ago · <b>2</b> client writes buffered', provLevel:'crit' },
-    how:{tier:'<b>4 — cluster-level takeover.</b>', what:'A banner above the value; the now-possibly-stale data is greyed.',
-      where:'<b>Above everything</b> — because losing quorum changes how you read the <i>entire</i> card (the value may be stale). Cluster-level conditions outrank per-key ones, so they read first.'} },
+  healthy:{
+    level:'ok', healthTxt:'Converged',
+    commits:4,
+    lead:'<b>Converged</b> · all 5 replicas hold <span class="mono">e4·s1287</span> "8" · owner <span class="mono">:49801</span> stable since e4',
+    pills:[{cls:'ok',t:'agreement',v:'5/5'},{cls:'ok',t:'value',v:'"8"'},{cls:'ok',t:'conflicts',v:'0'}],
+    log:LOG_HEALTHY,
+    resolved:'"8"', resolvedStamp:'e4·s1287', agree:'5/5', agreeCls:'ok',
+    // per-node version sample — all five caught up on the winning stamp
+    versions:[
+      {node:':49801',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur',owner:true},
+      {node:':49803',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur'},
+      {node:':49805',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur'},
+      {node:':49807',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur'},
+      {node:':49809',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur'},
+    ],
+    vitalsSub:'All 5 replicas hold <span class="mono">e4·s1287</span> — converged, no split, no lag.',
+    kv:[['owner','<a href="'+OWNER_NODE+'">:49801</a>'],['view epoch','e4'],['resolved','"8"','ok'],
+        ['winning stamp','e4·s1287'],['agreement','5 of 5','ok'],['source','__inspect{versions:5}']],
+    reason:'Every replica has applied <b>e4·s1287</b> ("8") — the owner\'s latest commit. No replica is parked on an older stamp, no same-epoch write is outstanding. Reads from any node return the same, current value.',
+    next:'Nothing to do. user42.score is converged; this is the steady state.', nextCls:'ok',
+  },
+  attention:{
+    level:'crit', healthTxt:'Diverged',
+    commits:6,
+    lead:'<b>Diverged</b> · <span class="mono bad">:49807</span> stuck on <span class="mono">e3·s1241</span> "5" while 4 hold <span class="mono">e4·s1287</span> "8" · serves <span class="bad">stale reads</span>',
+    pills:[{cls:'crit',t:'agreement',v:'4/5'},{cls:'crit',t:':49807',v:'+420 stuck'},{cls:'warn',t:'conflict',v:'1 same-epoch'}],
+    log:LOG_ATTN,
+    resolved:'"8"', resolvedStamp:'e4·s1287', agree:'4/5', agreeCls:'bad',
+    // per-node version sample — :49807 is the lone holdout on the e3 stamp
+    versions:[
+      {node:':49807',val:'"5"',ver:'e3·s1241',cls:'min',bdg:'lag'},
+      {node:':49801',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur',owner:true},
+      {node:':49803',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur'},
+      {node:':49805',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur'},
+      {node:':49809',val:'"8"',ver:'e4·s1287',cls:'maj',bdg:'cur'},
+    ],
+    vitalsSub:'4 of 5 hold <span class="mono">e4·s1287</span> "8"; <span class="bad">:49807</span> holds <span class="mono">e3·s1241</span> "5" and serves stale reads.',
+    kv:[['owner','<a href="'+OWNER_NODE+'">:49801</a>'],['stuck node',':49807','bad'],['view epoch','e4'],
+        ['resolved','"8"','ok'],['winning stamp','e4·s1287'],['agreement','4 of 5','bad'],
+        ['holdout lag','+420, not draining','bad'],['source','__inspect{versions:5}']],
+    reason:'Replica <b>:49807</b> hosts user42.score and is parked on <b>e3·s1241</b> ("5"). It never adopted the <b>e4</b> view, so it has advanced no further for this key — lag <b>+420 and not draining</b>. Owner <b>:49801</b> and three other replicas hold <b>e4·s1287</b> ("8"). Because <b>:49807</b> still serves reads, those reads return the stale e3 value — a true split, not in-flight replication.',
+    next:'Open <span class="mono">:49807</span> (node) to confirm it dropped the e4 view-commit, then drain it or force a view re-announce so it adopts <span class="mono">e4·s1287</span>. The other four are consistent — reads they serve are correct.', nextCls:null,
+  },
 };
-const ORDER = ['healthy','move','contention','lag','diverged','noquorum'];
+const SCEN_ORDER = ['healthy','attention'];
+
+/* ── is: chip filters over the log (Sentry query style) ── */
+const CHIPS = [
+  {id:'all',      lab:'all'},
+  {id:'lost',     lab:'is:lost'},
+  {id:'conflict', lab:'is:conflict'},
+  {id:'fence',    lab:'is:fence'},
+  {id:'won',      lab:'is:won'},
+];
+// which outcomes each chip admits
+const CHIP_MATCH = {
+  all:     () => true,
+  lost:    o => o==='fence' || o==='conflict',
+  conflict:o => o==='conflict',
+  fence:   o => o==='fence',
+  won:     o => o==='won' || o==='local',
+};
+
+/* ── live state ── */
+let scen = 'healthy';
+let chip = 'all';        // active is: chip
+let selIdx = -1;         // selected commit index within the visible (non-divider) rows
+let visible = [];        // current visible commit rows (excludes dividers), for j/k
 
 const $ = id => document.getElementById(id);
-function render(id){
-  const s = {...BASE, ...SCEN[id].over};
-  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===id));
-  try{ history.replaceState(null,'','#'+id); }catch{}
 
-  // banner (Tier 4)
-  $('banner').classList.toggle('on', !!s.banner);
-  if (s.banner){ $('bw').textContent='write-gate closed · cluster-level'; $('bt').innerHTML=s.banner.text; }
+/* ── parse the search line: `is:x` sets the chip; bare text is ignored here
+   (one key — nothing else to scope to). ── */
+function parseQuery(raw){
+  let c = null;
+  for (const tok of raw.toLowerCase().split(/\s+/).filter(Boolean)){
+    if (tok.startsWith('is:')){ const v = tok.slice(3); if (CHIP_MATCH[v]) c = v; }
+  }
+  return {chip:c};
+}
 
-  // health + value
-  $('word').textContent = s.word; $('word').className = 'word ' + (s.level==='ok'?'':s.level);
-  $('ago').textContent = s.ago;
-  $('vv').textContent = s.vv;
-  $('vmark').innerHTML = s.vmark ? s.vmark.text : ''; $('vmark').className = 'vmark' + (s.vmark&&s.vmark.level==='crit'?' crit':'');
-  $('card').className = 'card' + (s.dim?' dim':'');
+/* ── header health pill + lead + context ── */
+function renderHead(){
+  const s = SCEN[scen];
+  const el = $('health'); el.className = 'health '+s.level;
+  $('healthTxt').textContent = s.healthTxt;
+  $('ctxCommits').textContent = s.commits;
+  const lead = $('lead'); lead.className = 'lead '+s.level;
+  $('leadTxt').innerHTML = s.lead;
+  $('leadPills').innerHTML = s.pills.map(p=>
+    `<span class="pill ${p.cls}">${p.t} <b>${p.v}</b></span>`).join('');
+}
 
-  // agreement line (the one that splits)
-  const conv = $('conv');
-  if (s.conv.mode==='all') conv.innerHTML = AGREE_ALL;
-  else if (s.conv.mode==='lag') conv.innerHTML =
-    `<span><b>4</b> agree · <span style="color:var(--warn)"><b>1</b> catching up</span></span>`+
-    `<div class="agree-split" style="margin-top:9px">`+
-      `<div class="grp"><span class="gl">on 8 · current</span><div class="nodes">${nd('8',':49801',1)+nd('8',':49803')+nd('8',':49805')+nd('8',':49809')}</div></div>`+
-      `<div class="grp"><span class="gl" style="color:var(--warn)">catching up</span><div class="nodes">${nd('—',':49807',0,'lag','420 behind')}</div></div>`+
-    `</div>`;
-  else conv.innerHTML =
-    `<div class="agree-split">`+
-      `<div class="grp"><span class="gl">agree · 4 · on 8</span><div class="nodes">${nd('8',':49801',1)+nd('8',':49803')+nd('8',':49805')+nd('8',':49809')}</div></div>`+
-      `<div class="grp dis"><span class="gl">diverged · 1</span><div class="nodes">${nd('5',':49807',0,'stale','e3·s1241')}</div></div>`+
-    `</div>`;
-  setLine('ln-conv', s.convLevel);
-  // attach the callout under the agreement line (that's where lag/divergence live)
-  let co = $('ln-conv').querySelector('.callout'); if (co) co.remove();
-  if (s.callout){
-    co = document.createElement('div'); co.className='callout'+(s.callout.level==='crit'?' crit':'');
-    co.innerHTML = `<div class="ct">${s.callout.title}</div><div class="cb">${s.callout.body}</div><div class="ca">${s.callout.action}</div>`;
-    $('ln-conv').querySelector('.v').appendChild(co);
+/* ── left rail: the KEY's identity card + history glossary ───────────────
+   No sibling-key index (this is the leaf). The card states what we're
+   looking at — key, partition, owner, the LWW-resolved value + agreement —
+   and the glossary defines the vocabulary the log and the version sample use. */
+function renderRail(){
+  const s = SCEN[scen];
+  const lvl = s.level;
+  let h = '';
+  // ── identity card ──
+  h += `<div class="grp"><div class="grp-h">Key</div>`;
+  h += `<div class="keycard ${lvl}">`+
+       `<div class="kn"><span class="sd"></span>user42.score</div>`+
+       `<dl class="kv">`+
+         `<dt>partition</dt><dd><a href="${PARTITION}">user42</a></dd>`+
+         `<dt>owner</dt><dd><a href="${OWNER_NODE}">:49801</a></dd>`+
+         `<dt>view</dt><dd>e4 · R=5</dd>`+
+         `<dt>agreement</dt><dd class="${s.agreeCls}">${s.agree}</dd>`+
+       `</dl>`+
+       `<div class="resolved">`+
+         `<span class="rl">value</span>`+
+         `<span class="rv">${s.resolved}</span>`+
+         `<span class="ra ${s.agreeCls}">${s.resolvedStamp}</span>`+
+       `</div>`+
+       `</div></div>`;
+  // ── history glossary — defines stamp / outcome / conflict vs fence in situ ──
+  h += `<div class="grp"><div class="grp-h">Reading the log</div>`+
+       `<div class="gloss">`+
+         `<div class="gr"><b>stamp</b> — a commit's <span class="mono">e·s</span> (epoch·seq). Higher wins under LWW; the <span class="ok">green</span> stamp is the current value.</div>`+
+         `<div class="gr"><b>won·local</b> — applied to the log. <span class="ok">local</span> = committed here; <span class="ok">won</span> = accepted on apply.</div>`+
+         `<div class="gr"><b>lost·conflict</b> — <span class="bad">same-epoch</span> (<span class="mono">wr.e == we</span>): true contention, lost LWW to a higher seq.</div>`+
+         `<div class="gr"><b>lost·fence</b> — <span class="warn">stale-view</span> (<span class="mono">wr.e &lt; we</span>): a write on an older view, rejected. Expected during churn.</div>`+
+       `</div></div>`;
+  $('rail').innerHTML = h;
+}
+
+/* ── centre: THE LOG ── */
+function renderChips(){
+  const s = SCEN[scen];
+  const commits = s.log.filter(r=>r.type!=='view');
+  const count = id => commits.filter(r=>CHIP_MATCH[id](r.out)).length;
+  $('chips').innerHTML =
+    `<span class="cl">filter</span>` +
+    CHIPS.map(c=>{
+      const n = c.id==='all' ? commits.length : count(c.id);
+      return `<span class="chip" data-chip="${c.id}" ${c.id===chip?'aria-pressed="true"':''}>`+
+        `${c.lab}<span class="n">${n}</span></span>`;
+    }).join('') +
+    `<span class="clear" id="clearF">clear</span>`;
+}
+
+function rowMatches(r){ return CHIP_MATCH[chip](r.out); }
+
+function renderLog(){
+  const s = SCEN[scen];
+  visible = [];
+  // A view divider is only meaningful when a MATCHING commit sits on its newer
+  // side. Always-drawing strands a rule under is:conflict / is:won, so we emit
+  // each divider lazily — hold it until the next matching row confirms the band
+  // above was non-empty. While filtering we also drop no-move boundaries
+  // (ownerFrom===ownerTo) to keep the stream tight.
+  const filtering = chip!=='all';
+  let html = '';
+  let vix = 0;
+  let shownAny = false;
+  let pendingDivider = null;
+  for (const r of s.log){
+    if (r.type==='view'){ pendingDivider = r; continue; }
+    if (!rowMatches(r)) continue;
+    if (pendingDivider){
+      const v = pendingDivider; pendingDivider = null;
+      const moved = v.ownerFrom !== v.ownerTo;
+      if (!(filtering && !moved)){
+        const ownerCell = moved
+          ? `owner <span class="mv">${v.ownerFrom} → ${v.ownerTo}</span> · `
+          : `owner <b>${v.ownerTo}</b> held · `;
+        html += `<div class="vd"><span class="vdl">— view <b>${v.from} → ${v.to}</b> · ${ownerCell}${v.members} members —</span><span class="vdr"></span></div>`;
+      }
+    }
+    shownAny = true;
+    const o = OUT[r.out];
+    const sev = o.sev ? ` data-sev="${o.sev}"` : '';
+    const repBadge = r.origin==='CLI' ? '<span class="rep">⌁</span>' : `<span class="rep">${r.origin}</span>`;
+    // stuck-node attribution must read WITHOUT hover (screenshots / kbd nav don't
+    // surface title=) — so we pin a marker line directly under the parked row (below).
+    const ix = vix++;
+    visible.push(r);
+    html += `<div class="lr ${r.winner?'winner':''}" data-ix="${ix}"${sev} ${ix===selIdx?'aria-selected="true"':''} tabindex="0">`+
+      `<span class="sev"></span>`+
+      `<span class="stamp"><span class="e">e${r.e}·</span>s${r.s}</span>`+
+      `<span class="origin">${repBadge}${r.addr}</span>`+
+      `<span class="type">${r.type}</span>`+
+      `<span class="val">= ${r.val}</span>`+
+      `<span class="out ${o.cls}"><span class="od"></span><span class="ot">${o.txt}</span></span></div>`;
+    // pin the stuck-replica marker directly under the row it's parked on
+    if (r.stuck){
+      html += `<div class="stuckline"><span class="sb">stuck</span>`+
+        `<span><span class="mono">:49807</span> has advanced no further for this key — <span class="mono">+420</span> behind, not draining. It serves <b>stale reads</b>.</span></div>`;
+    }
   }
 
-  // provenance / ownership / activity lines + their optional attached notes
-  setVN('prov', s.prov, s.provNote, s.provLevel, 'ln-prov');
-  setVN('own',  s.own,  s.ownNote,  s.ownLevel,  'ln-own');
-  setVN('act',  s.act,  s.actNote,  s.actLevel,  'ln-act');
+  $('logCount').innerHTML = `<span style="color:var(--soft)">${visible.length} commit${visible.length===1?'':'s'} shown</span>`;
 
-  // meta: how it's layered
-  const h = SCEN[id].how; $('h-tier').innerHTML=h.tier; $('h-what').innerHTML=h.what; $('h-where').innerHTML=h.where;
-}
-function nd(v, addr, owner, cls, extra){
-  return `<span class="nd${cls?' '+cls:''}"><span class="nv mono">${v}</span><span class="na mono">${addr}${owner?' · owner':extra?' · '+extra:''}</span></span>`;
-}
-function setVN(id, html, note, level, lineId){
-  $(id).innerHTML = html + (note?`<div class="note${level==='benign'?' benign':''}">${note}</div>`:'');
-  setLine(lineId, note?level:null);
-}
-function setLine(lineId, level){
-  const ln = $(lineId); ln.classList.remove('warn','crit');
-  if (level==='warn'||level==='crit') ln.classList.add(level);
+  if (!shownAny){
+    // calm = the key is genuinely converged AND unfiltered; otherwise neutral ∅
+    const healthy = SCEN[scen].level==='ok';
+    const calm = healthy && chip==='all';
+    const losses = s.log.filter(r=>r.out==='fence'||r.out==='conflict').length;
+    const footer = calm
+      ? `user42.score converged · 5/5 replicas hold e4·s1287 · 0 losses in window`
+      : (healthy
+          ? `key is converged — clear the filter to see the full ${s.log.filter(r=>r.type!=='view').length}-commit history`
+          : `key still diverged · ${losses} lost in window · :49807 +420 stuck — clear the filter to see them`);
+    html = `<div class="empty ${calm?'':'filtered'}">`+
+      (calm ? `<div class="chk">✓</div>` : `<div class="chk none">∅</div>`)+
+      `<div class="e1">${calm?'No problems':'No matching commits'}</div>`+
+      `<div class="e2">Nothing in user42.score's history matches <span class="mono">${chip==='all'?'this view':'is:'+chip}</span>. Clear the filter to see the full history.</div>`+
+      `<div class="e3">${footer}</div></div>`;
+    $('rows').innerHTML = html;
+    selIdx = -1; renderPeek(); return;
+  }
+  $('rows').innerHTML = html;
+  if (selIdx>=0 && selIdx<visible.length) renderPeek(); else { selIdx = Math.min(selIdx, visible.length-1); renderPeek(); }
 }
 
-// build the scenario switcher
-const sc = $('scen');
-for (const id of ORDER){
+/* ── selected-commit record peek (drill to the commit's write trace) ──────
+   VOCAB (matches the data-sources popover exactly, no overloaded symbol):
+     wr.e·wr.s = the LOST WRITE's OWN stamp (this selected row, r.e·r.s)
+     we·ws     = the WINNER's stamp (the value that beat it under LWW)
+     wr.e == we ⇒ same-epoch CONFLICT  ·  wr.e < we ⇒ FENCE (stale-view write) */
+function renderPeek(){
+  const pk = $('recpeek');
+  if (selIdx<0 || selIdx>=visible.length){ pk.classList.remove('show'); return; }
+  const r = visible[selIdx];
+  const o = OUT[r.out];
+  pk.className = 'recpeek show'; pk.setAttribute('data-sev', o.sev||'');
+  const VIEW_EPOCH = 4;
+  const isLoss = r.out==='conflict' || r.out==='fence';
+  // a conflict loses LWW to e4·s1265; a fence is rejected by the current view epoch.
+  const winner = r.out==='conflict' ? {e:4,s:1265} : (r.out==='fence' ? {e:VIEW_EPOCH,s:null} : null);
+  const stampLabel = isLoss ? `wr.e${r.e}·wr.s${r.s}` : `e${r.e}·s${r.s}`;
+  const recLine = `{ type:<span class="vv">'${r.type}'</span>, key:<span class="kk">'user42.score'</span>, `+
+    `value:<span class="vv">${r.val}</span> }  <span style="color:var(--soft)">@ ${stampLabel} · origin ${r.addr}</span>`;
+  const lostLine = isLoss
+    ? `\n<span class="${r.out==='conflict'?'bad':''}">lost · wr.e=${r.e} wr.s=${r.s} vs we=${winner.e}`
+        + (r.out==='conflict'
+            ? ` ws=${winner.s} (wr.e == we) → same-epoch conflict — lost LWW to the winner e${winner.e}·s${winner.s}`
+            : ` (wr.e &lt; we) → fence — stale-view write rejected by view e${winner.e}`)
+        + `</span>`
+    : '';
+  const why = r.why || `Clean ${o.txt} commit — applied to the log at <b>e${r.e}·s${r.s}</b>; no contention, no fence.`;
+  pk.innerHTML =
+    `<div class="rk"><span class="sd"></span>e${r.e}·s${r.s} · user42.score <span style="color:var(--soft);font-family:var(--ui);font-size:11px;margin-left:auto">${o.txt}</span></div>`+
+    `<div class="rrec">${recLine}${lostLine}</div>`+
+    `<div class="rwhy">${why}</div>`+
+    `<div class="ract"><a href="${COMMIT_TRACE}">open write trace &amp; route →</a>`+
+      (r.addr.startsWith(':') ? `<a href="${OWNER_NODE}">open ${r.addr} (node) →</a>` : '')+`</div>`;
+}
+
+/* ── right: VITALS / DECODE — the divergence view (inbox.html decode pane) ── */
+function renderVitals(){
+  const s = SCEN[scen];
+  const lvl = s.level;
+  const kv = s.kv.map(([k,v,c])=>`<dt>${k}</dt><dd class="${c||''}">${v}</dd>`).join('');
+  // per-node version SAMPLE table — the heart of the divergence view
+  const vrows = s.versions.map(v=>
+    `<tr><td class="node">${v.node}${v.owner?'<span class="bdg cur" style="background:#16241c;color:var(--ok)">OWNER</span>':''}</td>`+
+    `<td class="${v.cls}">${v.val}<span class="bdg ${v.bdg}">${v.bdg==='lag'?'LAGS':'CURRENT'}</span></td>`+
+    `<td>${v.ver}</td></tr>`).join('');
+  $('vitals').innerHTML =
+    `<div class="dh ${lvl}"><div class="dk"><span class="sd"></span>user42.score</div>`+
+      `<div class="dsub">${s.vitalsSub}</div></div>`+
+    // resolved-state kv
+    `<div class="seg"><div class="st"><span>State</span><span class="stn">LWW-resolved</span></div>`+
+      `<dl class="kv">${kv}</dl></div>`+
+    // per-node version sample
+    `<div class="seg"><div class="st"><span>Version sample</span><span class="stn">⚠ NEW · __inspect{versions:5}</span></div>`+
+      `<table class="vt"><thead><tr><th>node</th><th>value</th><th>stamp</th></tr></thead><tbody>${vrows}</tbody></table></div>`+
+    // why it diverged + next action
+    `<div class="seg"><div class="st"><span>${lvl==='ok'?'Why it is healthy':'Why it diverged'}</span></div>`+
+      `<div class="reason">${s.reason}</div>`+
+      `<div class="next ${s.nextCls||''}"><span class="arr">→</span><span>${s.next}</span></div></div>`+
+    // drill actions
+    `<div class="actions">`+
+      `<a class="btn" href="${OWNER_NODE}">open owner :49801 (node) <span class="ar">→</span></a>`+
+      `<a class="btn" href="${PARTITION}">open partition user42 (log) <span class="ar">→</span></a>`+
+    `</div>`;
+}
+
+/* ── status-line right side ── */
+function renderStatus(){
+  const s = SCEN[scen];
+  const commits = s.log.filter(r=>r.type!=='view');
+  const losses = commits.filter(r=>r.out==='fence'||r.out==='conflict').length;
+  const cfl = commits.filter(r=>r.out==='conflict').length;
+  const lossTxt = losses ? `<span style="color:var(--crit)">${losses} lost</span>` : `<span style="color:var(--ok)">0 lost</span>`;
+  $('statusRight').innerHTML =
+    `agree ${s.agree}  ·  shown ${visible.length}/${commits.length}  ·  ${lossTxt} (${cfl} conflict)`;
+}
+
+/* ── full render ── */
+function render(){
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===scen));
+  renderHead(); renderRail(); renderChips(); renderLog(); renderVitals(); renderStatus();
+  try{ history.replaceState(null,'','#'+scen); }catch{}
+}
+
+/* ── interactions ─────────────────────────────────────────────────────── */
+// scenario toggle
+const scenWrap = $('scen');
+for (const id of SCEN_ORDER){
   const b = document.createElement('button'); b.dataset.id=id;
-  b.innerHTML = `<span>${SCEN[id].label}</span><span class="tier">${SCEN[id].tier}</span>`;
-  b.onclick = ()=>render(id);
-  sc.appendChild(b);
+  b.textContent = id==='healthy' ? 'Healthy' : 'Needs attention';
+  b.onclick = ()=>{ scen=id; chip='all'; selIdx=-1; $('q').value=''; render(); };
+  scenWrap.appendChild(b);
 }
-const fromHash = location.hash.slice(1);
-render(SCEN[fromHash] ? fromHash : 'healthy');
+// chip filter row
+$('chips').addEventListener('click', e=>{
+  if (e.target.id==='clearF'){ chip='all'; $('q').value=''; selIdx=-1; render(); return; }
+  const c = e.target.closest('[data-chip]'); if(!c) return;
+  chip = c.dataset.chip; selIdx=-1; renderChips(); renderLog(); renderStatus();
+});
+// commit row select → reveal record peek (Enter / link to drill)
+$('rows').addEventListener('click', e=>{
+  const row = e.target.closest('.lr'); if(!row) return;
+  selIdx = +row.dataset.ix; renderLog(); renderStatus();
+});
+// search / filter line (is: chips only)
+$('q').addEventListener('input', e=>{
+  const p = parseQuery(e.target.value.trim());
+  chip = p.chip || 'all';
+  selIdx=-1; renderChips(); renderLog(); renderStatus();
+});
+// data-sources popover
+$('srcBtn').onclick = ()=>$('src').classList.toggle('show');
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#src') && !e.target.closest('#srcBtn')) $('src').classList.remove('show');
+});
+
+// keyboard: j/k move · ↵ open trace · l losses · c conflicts · 1/2 scenario · / filter
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT'){ if (e.key==='Escape') e.target.blur(); return; }
+  const k = e.key;
+  if (k==='j' || k==='ArrowDown'){ e.preventDefault(); if(visible.length){ selIdx=Math.min(visible.length-1, selIdx+1); renderLog(); renderStatus(); scrollSel(); } }
+  else if (k==='k' || k==='ArrowUp'){ e.preventDefault(); if(visible.length){ selIdx=Math.max(0, selIdx-1); renderLog(); renderStatus(); scrollSel(); } }
+  else if (k==='Enter'){ if(selIdx>=0 && visible[selIdx]) location.href = COMMIT_TRACE; }
+  else if (k==='l'){ chip='lost'; selIdx=-1; renderChips(); renderLog(); renderStatus(); }
+  else if (k==='c'){ chip='conflict'; selIdx=-1; renderChips(); renderLog(); renderStatus(); }
+  else if (k==='a'){ chip='all'; selIdx=-1; render(); }
+  else if (k==='1'){ scen='healthy'; chip='all'; selIdx=-1; $('q').value=''; render(); }
+  else if (k==='2'){ scen='attention'; chip='all'; selIdx=-1; $('q').value=''; render(); }
+  else if (k==='/'){ e.preventDefault(); $('q').focus(); }
+  else if (k==='Escape'){ selIdx=-1; renderLog(); renderStatus(); }
+});
+function scrollSel(){ const el=document.querySelector('.lr[aria-selected=true]'); if(el) el.scrollIntoView({block:'nearest'}); }
+
+// boot — honour the deep-link hash, default healthy.
+// HASH CONTRACT: #diverged and #attention both map to the split view; #healthy to converged.
+const HASH = {healthy:'healthy', attention:'attention', diverged:'attention'};
+const fromHash = HASH[location.hash.slice(1)];
+if (fromHash) scen = fromHash;
+render();
 </script>
 </body>
 </html>
