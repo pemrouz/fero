@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cluster — explorer · fero</title>
+<style>
+  /* ────────────────────────────────────────────────────────────────────
+     IDIOM: outline + inspector (Chrome DevTools elements tree / Linear /
+     Finder column view), on the SAME graphite design system as the rest of
+     the tool. ONE page, ONE data model — the whole cluster encoded once, so
+     the cross-page data drift the multi-page version had to audit for (8 vs
+     16 partitions, R=∞) is structurally impossible here.
+       LEFT  = a filterable TREE. Resources expand to their four children
+               (partitions · server nodes · client nodes · epochs); each row
+               expands further (partition→commits, node→owned partitions,
+               client→subscriptions, epoch→per-node layout). The data is a
+               DAG, not a tree — a partition appears under BOTH its resource
+               AND its owning node, each showing the relationship-relevant
+               stats. Every row carries level-appropriate stats + a status pill.
+       TOP   = ONE global filter that PRUNES the whole hierarchy at once
+               (is:diverged collapses the tree to just the bad branches across
+               every resource) — the triage superpower a per-page filter can't
+               match. The bar shows the current view + the selected path.
+       RIGHT = the INSPECTOR — the selected row's rich leaf view (the partition
+               LOG, the divergence decode, the write route, the epoch map),
+               the content the multi-page "leaves" held, now in a pane.
+     Colour stays FUNCTIONAL (severity only).
+     ──────────────────────────────────────────────────────────────────── */
+  :root{
+    --bg:#101216; --rail:#13151a; --pane:#15181e; --line:#22262e; --line-2:#2b303a;
+    --ink:#d6dae2; --dim:#8a909c; --soft:#5a606b; --faint:#3f444e;
+    --sel:#1d3a52; --sel-line:#3d7fb8; --hover:#1a1e25;
+    --crit:#e8615a; --crit-bg:#2a1816; --warn:#d6a247; --warn-bg:#251f12;
+    --ok:#5cba8a; --ok-bg:#16241c; --info:#5b9fe0; --info-bg:#13212f;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 var(--ui);
+    -webkit-font-smoothing:antialiased;overflow:hidden}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
+  ::selection{background:var(--sel)}
+
+  /* ── top command bar ───────────────────────────────────────────────── */
+  .bar{display:flex;align-items:center;gap:0;height:38px;background:var(--rail);
+    border-bottom:1px solid var(--line);padding:0 10px;flex:0 0 auto;font-size:12.5px}
+  .bar .id{display:flex;align-items:baseline;gap:6px;padding-right:12px;white-space:nowrap;overflow:hidden}
+  .bar .id .res{color:var(--soft)} .bar .id a.res:hover{color:var(--dim)}
+  .bar .id .chev{color:var(--faint)} .bar .id .nm{font-weight:600;color:var(--ink)} .bar .id .nm .mono{color:#fff}
+  .bar .id .pathseg{color:var(--dim)} .bar .id .pathseg.cur{color:var(--ink);font-weight:600}
+  .bar .sep{width:1px;height:18px;background:var(--line-2);margin:0 12px;flex:0 0 auto}
+  .bar .health{display:flex;align-items:center;gap:7px;margin-left:auto;padding-right:4px;white-space:nowrap;flex:0 0 auto}
+  .bar .health .dot{width:8px;height:8px;border-radius:50%}
+  .bar .health .txt{font-weight:600;letter-spacing:.02em}
+  .bar .health.ok .dot{background:var(--ok)} .bar .health.ok .txt{color:var(--ok)}
+  .bar .health.crit .dot{background:var(--crit);box-shadow:0 0 0 3px var(--crit-bg)} .bar .health.crit .txt{color:var(--crit)}
+  .bar .search{display:flex;align-items:center;gap:6px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:5px;padding:3px 9px;margin-left:12px;width:300px;flex:0 0 auto}
+  .bar .search input{background:none;border:0;outline:0;color:var(--ink);font:inherit;width:100%;font-family:var(--mono);font-size:12px}
+  .bar .search input::placeholder{color:var(--soft);font-family:var(--ui)}
+  .bar .search .pre{color:var(--soft)} .bar .search .mc{color:var(--soft);font-size:11px;white-space:nowrap}
+  .bar .scen{display:flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden;margin-left:10px;flex:0 0 auto}
+  .bar .scen button{background:#0c0e12;border:0;color:var(--dim);font:inherit;font-size:11.5px;font-weight:600;
+    padding:4px 11px;cursor:pointer;border-right:1px solid var(--line);white-space:nowrap}
+  .bar .scen button:last-child{border-right:0}
+  .bar .scen button:hover{color:var(--ink)} .bar .scen button[aria-pressed=true]{background:var(--sel);color:#fff}
+  .bar .mock{margin-left:10px;color:var(--soft);font-size:10.5px;border:1px solid var(--line);
+    border-radius:3px;padding:2px 7px;letter-spacing:.03em;white-space:nowrap;flex:0 0 auto}
+  .bar .loadb{margin-left:10px;color:var(--dim);font-size:11px;border:1px solid var(--line-2);border-radius:5px;
+    padding:3px 9px;cursor:pointer;font-family:var(--mono);white-space:nowrap;flex:0 0 auto}
+  .bar .loadb:hover{color:var(--ink);border-color:var(--soft)}
+  .scope .srcname{color:var(--soft);font-family:var(--mono);font-size:11px}
+  .scope .srcname b{color:var(--dim);font-weight:600}
+
+  /* ── the current-view scope line (shows what the filter pruned to) ─── */
+  .scope{display:flex;align-items:center;gap:10px;height:28px;padding:0 14px;border-bottom:1px solid var(--line);
+    background:var(--rail);flex:0 0 auto;font-size:11.5px;color:var(--soft)}
+  .scope .chips{display:flex;gap:6px}
+  .scope .chip{font-family:var(--mono);font-size:11px;border:1px solid var(--line-2);border-radius:4px;
+    padding:1px 8px;color:var(--dim);cursor:pointer;background:#0c0e12;white-space:nowrap}
+  .scope .chip:hover{color:var(--ink);border-color:var(--soft)}
+  .scope .chip[aria-pressed=true]{background:var(--sel);border-color:var(--sel-line);color:#fff}
+  .scope .now{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .scope .now b{color:var(--dim);font-weight:600} .scope .now .fl{color:var(--warn);font-weight:600}
+
+  /* ── 2-pane body: tree | inspector ─────────────────────────────────── */
+  .body{display:grid;grid-template-columns:minmax(0,1fr) 396px;flex:1 1 auto;min-height:0}
+
+  /* ── TREE ──────────────────────────────────────────────────────────── */
+  .tree{overflow:auto;background:var(--bg);min-width:0;padding:3px 0}
+  .trow{display:flex;align-items:center;gap:6px;height:27px;padding-right:12px;cursor:pointer;white-space:nowrap;position:relative}
+  .trow:hover{background:var(--hover)}
+  .trow[aria-selected=true]{background:var(--sel)}
+  .trow.dim{opacity:.42}
+  .trow .tw{width:15px;text-align:center;color:var(--soft);flex:0 0 auto;font-size:9px}
+  .trow .tw.leaf{visibility:hidden}
+  .trow .sd{width:7px;height:7px;border-radius:2px;transform:rotate(45deg);flex:0 0 auto;background:transparent}
+  .trow[data-sev=crit] .sd{background:var(--crit)} .trow[data-sev=warn] .sd{background:var(--warn)} .trow[data-sev=info] .sd{background:var(--info)}
+  .trow .ic{width:14px;text-align:center;color:var(--soft);flex:0 0 auto;font-family:var(--mono);font-size:11px}
+  .trow .lab{font-family:var(--mono);font-size:12.5px;color:var(--ink);flex:0 0 auto}
+  .trow[aria-selected=true] .lab{color:#fff}
+  .trow[data-sev=crit] .lab{color:#f0a39c} .trow[aria-selected=true][data-sev=crit] .lab{color:#fff}
+  .trow[data-type=group] .lab{font-family:var(--ui);font-weight:700;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}
+  .trow[data-type=group] .gc{color:var(--faint);font-size:11px;margin-left:5px;font-family:var(--mono)}
+  .trow[data-type=resource] .lab{font-size:13px;font-weight:600}
+  .trow .grow{flex:1 1 auto;min-width:10px}
+  .trow .meta{font-family:var(--mono);font-size:11px;color:var(--soft);font-variant-numeric:tabular-nums}
+  .trow .meta .bad{color:var(--crit);font-weight:600} .trow .meta .warnt{color:var(--warn);font-weight:600} .trow .meta .x{color:var(--faint)}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:700;letter-spacing:.03em;
+    text-transform:uppercase;padding:1px 7px;border-radius:3px;white-space:nowrap;flex:0 0 auto}
+  .pill .pd{width:5px;height:5px;border-radius:50%;flex:0 0 auto}
+  .pill.ok{color:var(--ok);background:var(--ok-bg);border:1px solid #1f3a2c} .pill.ok .pd{background:var(--ok)}
+  .pill.crit{color:var(--crit);background:var(--crit-bg);border:1px solid #4a2622} .pill.crit .pd{background:var(--crit)}
+  .pill.warn{color:var(--warn);background:var(--warn-bg);border:1px solid #443613} .pill.warn .pd{background:var(--warn)}
+  .pill.info{color:var(--info);background:var(--info-bg);border:1px solid #234055} .pill.info .pd{background:var(--info)}
+  .pill.calm{color:var(--soft);background:#0c0e12;border:1px solid var(--line)} .pill.calm .pd{background:var(--faint)}
+  /* the guide line down the indentation */
+  .trow .guide{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
+
+  /* ── INSPECTOR (right) ─────────────────────────────────────────────── */
+  .insp{background:var(--pane);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+  .insp .ih{padding:12px 14px 11px;border-bottom:1px solid var(--line)}
+  .insp .ih .ik{font-family:var(--mono);font-size:15px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+  .insp .ih .ik .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg)}
+  .insp .ih.ok .ik .sd{background:var(--ok)} .insp .ih.crit .ik .sd{background:var(--crit)} .insp .ih.warn .ik .sd{background:var(--warn)} .insp .ih.info .ik .sd{background:var(--info)}
+  .insp .ih .kind{font-family:var(--ui);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);margin-left:auto}
+  .insp .ih .isub{margin-top:5px;color:var(--dim);font-size:11.5px;line-height:1.45}
+  .insp .ih .isub .mono{color:var(--ink)} .insp .ih .isub .bad{color:var(--crit)} .insp .ih .isub .warnt{color:var(--warn)}
+  .insp .seg{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .insp .seg .st{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin-bottom:9px;display:flex;gap:7px;align-items:center}
+  .insp .seg .st .new{color:var(--warn);font-family:var(--mono);font-size:9px;border:1px solid #443613;border-radius:3px;padding:0 5px;background:var(--warn-bg);letter-spacing:0}
+  .insp .seg .st .stn{margin-left:auto;color:var(--faint);font-weight:600;letter-spacing:0}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12px}
+  .kv dt{color:var(--soft)} .kv dd{margin:0;color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+  .kv dd.bad{color:var(--crit)} .kv dd.warn{color:var(--warn)} .kv dd.ok{color:var(--ok)}
+  /* mini log */
+  .mlog{display:flex;flex-direction:column;font-family:var(--mono);font-size:11.5px}
+  .mlog .mr{display:grid;grid-template-columns:64px 1fr auto;gap:9px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
+  .mlog .mr:last-child{border-bottom:0}
+  .mlog .mr .stp{color:var(--soft)} .mlog .mr .stp .e{color:var(--faint)}
+  .mlog .mr .kvv{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mlog .mr .kvv .kk{color:var(--dim)}
+  .mlog .mr .oc{font-size:10px;font-weight:700;text-transform:uppercase}
+  .mlog .mr .oc.won,.mlog .mr .oc.local{color:var(--ok)} .mlog .mr .oc.fwd{color:var(--dim)} .mlog .mr .oc.fence{color:var(--warn)} .mlog .mr .oc.conflict{color:var(--crit)}
+  .mlog .mr.stuck{background:var(--warn-bg)} .mlog .mr .stuckb{color:var(--warn);font-size:9px;font-weight:700;text-transform:uppercase}
+  /* replica lag bars */
+  .reps{display:flex;flex-direction:column;gap:7px;font-family:var(--mono);font-size:12px}
+  .reps .rr{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center}
+  .reps .rr .rn{color:var(--ink)} .reps .rr .rn .ow{color:var(--info);font-family:var(--ui);font-size:9px;font-weight:700;text-transform:uppercase;margin-left:5px;border:1px solid #234866;border-radius:2px;padding:0 4px}
+  .reps .rr .bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden}
+  .reps .rr .bar i{display:block;height:100%;background:var(--ok)} .reps .rr .bar i.bad{background:var(--crit)}
+  .reps .rr .lg{text-align:right;color:var(--soft)} .reps .rr .lg.bad{color:var(--crit);font-weight:600}
+  /* owner-by-epoch / layout list */
+  .ebe{display:flex;flex-direction:column;font-family:var(--mono);font-size:12px}
+  .ebe .er{display:grid;grid-template-columns:34px 1fr auto;gap:9px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
+  .ebe .er:last-child{border-bottom:0} .ebe .er .ep{color:var(--soft)} .ebe .er.cur .ep{color:var(--ink);font-weight:600}
+  .ebe .er .ono{color:var(--ink)} .ebe .er .bdg{font-family:var(--ui);font-size:9px;font-weight:700;text-transform:uppercase;padding:0 5px;border-radius:2px}
+  .ebe .er.cur .bdg{color:var(--ok);background:var(--ok-bg)} .ebe .er.moved .bdg{color:var(--warn);background:var(--warn-bg)}
+  /* version sample table */
+  .vt{font-family:var(--mono);font-size:11.5px;width:100%;border-collapse:collapse}
+  .vt th{text-align:left;color:var(--soft);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:0 0 5px;border-bottom:1px solid var(--line)}
+  .vt td{padding:5px 0;border-bottom:1px solid var(--line);color:var(--ink)} .vt tr:last-child td{border-bottom:0}
+  .vt td.node{color:var(--dim)} .vt .min{color:var(--crit)} .vt .maj{color:var(--ok)}
+  .vt .bdg{font-family:var(--ui);font-size:9px;font-weight:700;padding:0 4px;border-radius:2px;margin-left:5px}
+  .vt .bdg.lag{background:var(--crit-bg);color:var(--crit)} .vt .bdg.cur{background:var(--ok-bg);color:var(--ok)}
+  /* route timeline */
+  .tl{list-style:none;margin:0;padding:0 0 0 2px}
+  .tl li{position:relative;padding:0 0 11px 18px;font-size:11.5px;line-height:1.5;color:var(--dim)}
+  .tl li:last-child{padding-bottom:0}
+  .tl li::before{content:'';position:absolute;left:3px;top:4px;width:7px;height:7px;border-radius:50%;background:var(--faint);border:2px solid var(--pane);z-index:1}
+  .tl li::after{content:'';position:absolute;left:6px;top:11px;bottom:-1px;width:1px;background:var(--line-2)} .tl li:last-child::after{display:none}
+  .tl li.done::before{background:var(--ok)} .tl li.move::before{background:var(--warn)} .tl li.now::before{background:var(--info)} .tl li.bad::before{background:var(--crit)}
+  .tl li .ep{font-family:var(--mono);color:var(--ink);font-weight:600;margin-right:6px} .tl li .mono{color:var(--ink)} .tl li b{color:var(--ink)} .tl li .bad{color:var(--crit)}
+  .reason{font-size:12px;line-height:1.55;color:var(--dim)} .reason b{color:var(--ink);font-weight:600}
+  .next{display:flex;gap:8px;align-items:flex-start;background:#0c0e12;border:1px solid var(--line-2);border-radius:5px;padding:9px 11px;font-size:12px;line-height:1.5;color:var(--ink);margin-top:10px}
+  .next .arr{color:var(--warn);font-weight:700}
+  .reclist{display:flex;flex-direction:column;gap:6px}
+  .recitem{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:baseline;font-family:var(--mono);font-size:12px;cursor:pointer;padding:3px 6px;border-radius:4px;margin:0 -6px}
+  .recitem:hover{background:var(--hover)} .recitem .rk{color:var(--ink)} .recitem .rd{color:var(--soft);font-size:11px} .recitem .rsev{width:6px;height:6px;border-radius:2px;transform:rotate(45deg)}
+  .recitem[data-sev=crit] .rsev{background:var(--crit)} .recitem[data-sev=warn] .rsev{background:var(--warn)} .recitem[data-sev=ok] .rsev{background:var(--faint)}
+  .empty2{padding:30px 16px;color:var(--soft);font-size:12px;line-height:1.6;text-align:center}
+  .recd{font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.6;white-space:pre-wrap;background:#0c0e12;border:1px solid var(--line);border-radius:5px;padding:9px 11px}
+  .recd .kk{color:var(--info)} .recd .vv{color:var(--ink)} .recd .bad{color:var(--crit)}
+
+  /* ── bottom hotkey bar ─────────────────────────────────────────────── */
+  .keys{display:flex;align-items:center;gap:0;height:24px;background:var(--rail);border-top:1px solid var(--line);
+    padding:0 12px;flex:0 0 auto;font-size:11px;color:var(--soft)}
+  .keys .k{display:flex;align-items:center;gap:5px;padding:0 13px 0 0}
+  .keys .k kbd{font-family:var(--mono);font-size:10px;background:#0c0e12;border:1px solid var(--line-2);border-radius:3px;padding:1px 5px;color:var(--dim)}
+  .keys .right{margin-left:auto;font-family:var(--mono);color:var(--soft)}
+  .src{display:none;position:fixed;bottom:30px;left:14px;width:560px;background:var(--pane);border:1px solid var(--line-2);
+    border-radius:6px;padding:14px 16px;font-size:11.5px;line-height:1.65;color:var(--dim);box-shadow:0 8px 30px #000a;z-index:20}
+  .src.show{display:block}
+  .src h4{margin:0 0 8px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+  .src p{margin:7px 0} .src b{color:var(--ink);font-weight:600} .src .mono{color:var(--ink)}
+  .src .new{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:10px;border:1px solid #443613;border-radius:3px;padding:1px 5px;margin-right:3px;background:var(--warn-bg)}
+  .keys .srcbtn{cursor:pointer;color:var(--dim);padding:0 13px 0 0;display:flex;align-items:center;gap:5px}
+  .keys .srcbtn:hover{color:var(--ink)} .keys .srcbtn .new{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<!-- ── command bar: cluster identity + live selected-path breadcrumb · health · global filter · scenario ── -->
+<div class="bar">
+  <div class="id" id="path"></div>
+  <div class="health" id="health"><span class="dot"></span><span class="txt" id="healthTxt">Healthy</span></div>
+  <div class="search"><span class="pre mono">⌕</span>
+    <input id="q" spellcheck="false" placeholder="filter the whole tree — is:diverged  is:under  is:slow  · or a name" autocomplete="off">
+    <span class="mc" id="matchCount"></span></div>
+  <div class="scen" id="scen"></div>
+  <label class="loadb" title="load a debug snapshot (.json) — or drop one anywhere">⤓ file<input type="file" id="file" accept=".json,application/json" hidden></label>
+  <span class="mock">MOCKUP · static</span>
+</div>
+
+<!-- ── scope line: source · quick is: chips · the current-view rollup ── -->
+<div class="scope">
+  <span class="srcname" id="srcName"></span>
+  <div class="chips" id="chips"></div>
+  <span class="now" id="now"></span>
+</div>
+
+<div class="body">
+  <!-- ── LEFT: the tree ── -->
+  <div class="tree" id="tree"></div>
+  <!-- ── RIGHT: the inspector ── -->
+  <aside class="insp" id="insp"></aside>
+</div>
+
+<!-- ── bottom hotkey bar ── -->
+<div class="keys">
+  <span class="k"><kbd>j</kbd><kbd>k</kbd> move</span>
+  <span class="k"><kbd>h</kbd><kbd>l</kbd> collapse / expand</span>
+  <span class="k"><kbd>↵</kbd> inspect</span>
+  <span class="k"><kbd>g</kbd> diverged</span>
+  <span class="k"><kbd>1</kbd>/<kbd>2</kbd> scenario</span>
+  <span class="k"><kbd>/</kbd> filter</span>
+  <span class="srcbtn" id="srcBtn"><span class="new">⚠</span> data sources</span>
+  <span class="right" id="statusRight"></span>
+</div>
+
+<div class="src" id="src">
+  <h4>Data sources — one model, every level</h4>
+  <p><b>This page renders the whole cluster from a SINGLE dataset</b> — resources, partitions, nodes, clients, epochs and
+     commits are one graph, so a stat can't disagree with itself across views (the cross-page drift the multi-page tool
+     had to audit for is impossible here).</p>
+  <p><b>Per level.</b> Resources from the DHT registry; partitions/ownership from <span class="mono">ring.coverage</span>;
+     replica lag from snapshot <span class="mono">marks</span>/<span class="mono">heads</span> vs the floor; the log from
+     <span class="mono">log.recordsSince</span>; divergence from the <span class="new">⚠ NEW</span> per-key version sample
+     <span class="mono">__inspect{versions:K}</span>; contention from <span class="mono">__observe</span> lost events.</p>
+  <p><b>Filtering</b> prunes the tree to branches containing a match and auto-expands to reveal them — one query spanning
+     every resource/partition/node at once. <b>Per-client telemetry</b> and <b>owner-by-epoch history</b> are
+     <span class="new">⚠ NEW</span> (not retained today).</p>
+</div>
+
+<script>
+'use strict';
+/* ════════════════════════════════════════════════════════════════════════
+   ONE DATA MODEL — the whole cluster, encoded once. The tree is a projection
+   of this; the inspector reads from it. Sessions is the fully-detailed
+   resource (the e3→e4 incident); the others are light & healthy, so a
+   is:diverged filter correctly prunes the tree down to just sessions.
+   ════════════════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+
+// status → pill class + label (FUNCTIONAL colour only)
+const ST = {
+  diverged:{cls:'crit',lab:'diverged'}, under:{cls:'crit',lab:'under-replicated'},
+  contended:{cls:'warn',lab:'contended'}, lagging:{cls:'warn',lab:'lagging'},
+  slow:{cls:'crit',lab:'slow consumer'}, stale:{cls:'warn',lab:'stale view'},
+  resub:{cls:'warn',lab:'re-subscribing'}, gone:{cls:'info',lab:'disconnected'},
+  healthy:{cls:'ok',lab:'healthy'}, ok:{cls:'ok',lab:'ok'},
+};
+const SEV = {crit:'crit', warn:'warn', info:'info', ok:''};
+const sevOf = st => SEV[(ST[st]||ST.healthy).cls];
+
+/* ── derivation helpers over a normalized resource ──────────────────────
+   ownership at view T = the partition's owner at that epoch (re-projected
+   from its ownerByEpoch history, falling back to the current owner). */
+function deriveOwnerAt(p, ep){ return (p.ownerByEpoch && p.ownerByEpoch[ep]) || p.owner; }
+function layoutAt(res, ep){
+  const at = {}; for(const n of res.nodes) at[n.id] = [];
+  for(const p of res.parts){ const o = deriveOwnerAt(p, ep); (at[o] = at[o] || []).push(p.id); }
+  return at;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   NORMALIZE — turn a loaded debug-file snapshot into the internal model the
+   tree + inspector read. Each FACT lives once in the file; here we DERIVE the
+   cross-cuts so they can't drift: counts (partitions/keys) from the arrays;
+   node ownership, max-lag and hosted-replica lists from the partitions; epoch
+   layouts + moves from per-partition ownerByEpoch; client/sub lag from
+   head−delivered. Missing fields get sensible defaults, so a terse file — or
+   an arbitrary one dropped onto the page — still renders.
+   ════════════════════════════════════════════════════════════════════════ */
+function normalize(snap){
+  const view = snap.view || 'e4';
+  const resources = (snap.resources || []).map(R => {
+    const members = Array.isArray(R.members) ? R.members : [];
+    const Rdef = R.R || 5;
+
+    // partitions — the source of truth; fill log / replicas / owner-history defaults
+    const parts = (R.partitions || []).map(p => {
+      const Rp = p.R || Rdef;
+      const held = p.held != null ? p.held : Rp;
+      const raw = p.replicas || [];
+      const lagBy = {}, missingAddrs = [];
+      for(const r of raw){ if(r.lag) lagBy[r.addr] = r.lag; if(r.missing) missingAddrs.push(r.addr); }
+      const order = [p.owner, ...members.filter(m=>m!==p.owner)].filter(a=>!missingAddrs.includes(a)).slice(0, held);
+      const reps = [ ...order.map(addr => ({addr, owner:addr===p.owner, lag:lagBy[addr]||0})),
+                     ...missingAddrs.map(addr => ({addr, missing:true})) ];
+      let owners;
+      if(p.ownerByEpoch){ const eps = Object.keys(p.ownerByEpoch);
+        owners = eps.map((ep,i) => ({ep, o:p.ownerByEpoch[ep], cur:ep===view,
+          moved: i>0 && p.ownerByEpoch[ep] !== p.ownerByEpoch[eps[i-1]]})); }
+      else owners = [{ep:'e3',o:p.owner},{ep:view,o:p.owner,cur:true}];
+      let log = (p.log || []).map(c => ({e:c.e,s:c.s,key:c.key,origin:c.by||c.origin,val:c.val,out:c.out,winner:c.winner,stuck:c.stuck}));
+      if(!log.length) log = [{e:4,s:1200,key:p.name+'.v',origin:p.owner,val:'…',out:'local',winner:true},
+                             {e:4,s:1180,key:p.name+'.meta',origin:p.owner,val:'…',out:'won'}];
+      return {id:p.name, owner:p.owner, R:Rp, held, keys:p.keys||0, wps:p.wps||0,
+        st:p.status||'healthy', note:p.note||'', log, reps, owners, ownerByEpoch:p.ownerByEpoch||null};
+    });
+
+    // nodes — derive owns / max-lag / hosted replicas from the partitions
+    const nodeSpecs = R.nodes || members.map(a => ({addr:a}));
+    const nodes = nodeSpecs.map(n => {
+      let lag = 0; const hosts = [];
+      for(const p of parts) for(const r of p.reps)
+        if(r.addr===n.addr && !r.owner && !r.missing){ if(r.lag>lag) lag=r.lag; if(r.lag) hosts.push({id:p.id,owner:p.owner,lag:r.lag}); }
+      for(const p of parts){ if(hosts.length>=4) break; if(p.owner!==n.addr && !hosts.some(h=>h.id===p.id)) hosts.push({id:p.id,owner:p.owner,lag:0}); }
+      return {id:n.addr, keys:n.keys!=null?n.keys:null, wps:n.wps!=null?n.wps:null, lag,
+        hosts:hosts.slice(0,4), st:n.status || (lag>0?'lagging':'healthy'), note:n.note||''};
+    });
+
+    // clients — derive per-sub lag (head − delivered) + the client's max lag
+    const clients = (R.clients || []).map(c => {
+      const subs = (c.subs || []).map(s => {
+        const d = (s.head!=null && s.delivered!=null) ? (s.head - s.delivered) : 0;
+        return {sub:s.key, own:s.owner, head:'s'+fmt(s.head), deliv:'s'+fmt(s.delivered),
+          lag: s.released?'released':(d>0?'+'+fmt(d):'0'), cls: d>0?'min':'maj', released:!!s.released};
+      });
+      const maxLag = Math.max(0, ...(c.subs||[]).map(s => (s.head!=null&&s.delivered!=null)?(s.head-s.delivered):0));
+      return {id:c.id, role:c.role||'reader', srv:c.server, lag:c.lag!=null?c.lag:maxLag,
+        st:c.status||'healthy', note:c.note||'', view:c.view||view, subs};
+    });
+
+    // epochs — derive the ownership moves at each transition from ownerByEpoch
+    const epSpecs = R.epochs || [{id:'e3'},{id:view,current:true}];
+    const epochs = epSpecs.map(e => {
+      const moves = [];
+      for(const p of parts){ if(!p.ownerByEpoch) continue; const ks=Object.keys(p.ownerByEpoch); const i=ks.indexOf(e.id);
+        if(i>0 && p.ownerByEpoch[ks[i]] !== p.ownerByEpoch[ks[i-1]]) moves.push([p.id, p.ownerByEpoch[ks[i-1]], p.ownerByEpoch[ks[i]]]); }
+      return {ep:e.id, cur:!!e.current || e.id===view, members:e.members!=null?e.members:members.length, note:e.note||'', moves};
+    });
+
+    // rollup counts DERIVE from the arrays — they can never disagree with the children
+    const keys = parts.reduce((a,p)=>a+(p.keys||0), 0);
+    const wps  = parts.reduce((a,p)=>a+(p.wps||0), 0);
+    return {id:R.name, members:members.length, parts, nodes, clients, epochs, keys, wps};
+  });
+  return {view, resources};
+}
+let MODEL = null;
+
+/* ════════════════════════════════════════════════════════════════════════
+   TREE BUILD — turn the model into nested tree nodes. The DAG is embraced:
+   a partition appears under its resource's Partitions group AND under its
+   owner node's "owns" — each occurrence keyed by its path, each showing the
+   relationship-relevant meta, both inspecting the same entity.
+   ════════════════════════════════════════════════════════════════════════ */
+const fmt = n => typeof n==='number' ? n.toLocaleString() : n;
+const klog = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+'k' : ''+n;
+
+// a tree node: {key,type,label,icon,st,meta(html),entity,kids:[]}
+function commitNodes(p, prefix){
+  return p.log.map(c => ({
+    key:prefix+'/c/'+c.e+'.'+c.s+'.'+c.key, type:'commit', label:'e'+c.e+'·s'+c.s, icon:'·',
+    st: c.out==='conflict'?'diverged':c.out==='fence'?'lagging':'healthy',
+    metaRaw:`<span class="x">${c.key}</span> = ${c.val} · <span class="oc ${c.out}">${c.out}</span>`,
+    entity:{kind:'commit', c, p}, kids:[]
+  }));
+}
+function partitionNode(p, prefix, rel){
+  // rel: 'res' (under resource) or {host:addr,lag} (under a node as owned/hosted)
+  const meta = rel==='res'
+    ? `${p.owner} · ${p.held}/${p.R} · ${p.wps} w/s · ${klog(p.log)} log`
+    : `${p.held}/${p.R} · ${p.keys} keys · ${p.wps} w/s`;
+  return {key:prefix+'/p/'+p.id, type:'partition', label:p.id, icon:'◧', st:p.st,
+    metaRaw:meta, entity:{kind:'partition', p}, kids:commitNodes(p, prefix+'/p/'+p.id)};
+}
+function nodeNode(n, res, prefix){
+  const ownsParts = res.parts.filter(p=>p.owner===n.id);
+  const kids = ownsParts.map(p => partitionNode(p, prefix+'/n/'+n.id, {host:n.id}));
+  const km = n.keys!=null ? fmt(n.keys)+' keys' : '—', wm = n.wps!=null ? n.wps+' w/s' : '';
+  const meta = `owns ${ownsParts.length} · ${km}${wm?' · '+wm:''}${n.lag?` · <span class="bad">+${n.lag} lag</span>`:''}`;
+  return {key:prefix+'/n/'+n.id, type:'node', label:n.id, icon:'▢', st:n.st, metaRaw:meta,
+    entity:{kind:'node', n, res}, kids};
+}
+function clientNode(c, prefix){
+  const kids = c.subs.map((s,i)=>({key:prefix+'/cl/'+c.id+'/s/'+i, type:'sub', label:s.sub, icon:'↳', st:'healthy',
+    metaRaw:`→ ${s.own} · head ${s.head} · ${s.lag==='0'?'<span class="x">+0</span>':s.lag==='released'?'<span class="x">released</span>':'<span class="'+(s.cls==='min'?'bad':'')+'">'+s.lag+'</span>'}`,
+    entity:{kind:'sub', s, c}, kids:[]}));
+  const meta = `${c.srv} · ${c.role} · ${c.subs.length} sub${c.subs.length>1?'s':''}${c.lag?` · <span class="${c.st==='slow'?'bad':'warnt'}">+${c.lag}</span>`:''}`;
+  return {key:prefix+'/cl/'+c.id, type:'client', label:c.id, icon:'○', st:c.st, metaRaw:meta,
+    entity:{kind:'client', c}, kids};
+}
+function epochNode(e, res, prefix){
+  const at = layoutAt(res, e.ep);
+  const kids = res.nodes.map(n=>{
+    const owns = at[n.id] || [];
+    return {key:prefix+'/e/'+e.ep+'/n/'+n.id, type:'epochnode', label:n.id, icon:'▢', st:'healthy',
+      metaRaw:`owns ${owns.length} · <span class="x">${owns.slice(0,4).join(', ')||'—'}${owns.length>4?'…':''}</span>`,
+      entity:{kind:'epochnode', n, owns, ep:e.ep}, kids:[]};
+  });
+  return {key:prefix+'/e/'+e.ep, type:'epoch', label:e.ep, icon:'◷', st:'healthy',
+    metaRaw:`${e.members} members${e.moves.length?` · <span class="warnt">${e.moves.length} move${e.moves.length>1?'s':''}</span>`:' · stable'}${e.cur?' · current':''}`,
+    entity:{kind:'epoch', e, res}, kids};
+}
+function groupNode(label, icon, kids, key){
+  return {key, type:'group', label, icon, st:'healthy', metaRaw:'', gcount:kids.length, entity:null, kids};
+}
+function resourceNode(res){
+  const pre = res.id;
+  // child keys NEST under their group's key (sessions/g/parts/p/user42) so the
+  // ancestor chain is recoverable by key prefix — that's what revealKey() walks
+  // to auto-expand down to a jumped-to / filtered entity.
+  const gP=pre+'/g/parts', gN=pre+'/g/nodes', gC=pre+'/g/clients', gE=pre+'/g/epochs';
+  const groups = [
+    groupNode('Partitions','◧', res.parts.map(p=>partitionNode(p, gP, 'res')), gP),
+    groupNode('Server nodes','▢', res.nodes.map(n=>nodeNode(n, res, gN)), gN),
+    groupNode('Client nodes','○', res.clients.map(c=>clientNode(c, gC)), gC),
+    groupNode('Epochs','◷', res.epochs.map(e=>epochNode(e, res, gE)), gE),
+  ];
+  const meta = `${res.members} nodes · ${res.parts.length} part · ${klog(res.keys)} keys · ${fmt(res.wps)} w/s`;
+  return {key:pre, type:'resource', label:res.id, icon:'▦', st:resStatus(res), metaRaw:meta, entity:{kind:'resource', res}, kids:groups};
+}
+// a resource is as unhealthy as its worst child (rolled up) — computed, not stored
+function resStatus(res){
+  const bad = [...res.parts, ...res.nodes, ...res.clients].map(x=>x.st).filter(s=>s&&s!=='healthy');
+  if(!bad.length) return 'healthy';
+  const rank = {diverged:0,under:1,slow:2,contended:3,lagging:4,stale:5,resub:6,gone:7};
+  return bad.sort((a,b)=>(rank[a]??9)-(rank[b]??9))[0];
+}
+let FOREST = [];   // built from MODEL on load (see boot)
+
+/* ════════════════════════════════════════════════════════════════════════
+   STATE + RENDER
+   ════════════════════════════════════════════════════════════════════════ */
+let scen = 'attention';                 // open on the interesting state
+let expanded = new Set(['sessions']);   // sessions open one level by default
+let selKey = 'sessions';                // inspector subject
+let filter = '';                        // global filter text
+let flat = [];                          // current visible rows (for j/k)
+
+// is: tokens → status buckets; bare text → label substring
+const IS = {diverged:'diverged',under:'under',contended:'contended',lagging:'lagging',slow:'slow',
+  stale:'stale',resub:'resub',resubscribing:'resub',disconnected:'gone',gone:'gone',healthy:'healthy'};
+const CHIPS = [['all','all'],['is:diverged','diverged'],['is:under','under'],['is:contended','contended'],
+  ['is:lagging','lagging'],['is:slow','slow']];
+
+function statusOf(node){ return scen==='attention' ? (node.st||'healthy') : 'healthy'; }
+function parseFilter(raw){
+  let st=null, terms=[];
+  for(const tok of raw.toLowerCase().split(/\s+/).filter(Boolean)){
+    const m = tok.startsWith('is:') ? tok.slice(3) : (IS[tok]?tok:null);
+    if(m && IS[m]) st = IS[m]; else terms.push(tok);
+  }
+  return {st, text:terms.join(' ')};
+}
+// does a node itself match the active filter?
+function selfMatch(node, f){
+  if(!f.st && !f.text) return true;
+  let ok = true;
+  if(f.st) ok = ok && statusOf(node)===f.st;
+  if(f.text) ok = ok && node.label.toLowerCase().includes(f.text);
+  return ok;
+}
+// does the node or any descendant match? (drives prune + auto-expand)
+function subtreeMatch(node, f){
+  if(selfMatch(node, f)) return true;
+  return (node.kids||[]).some(k=>subtreeMatch(k, f));
+}
+
+/* flatten the forest into the visible row list, honouring expand + filter.
+   With a filter active: prune non-matching branches and AUTO-EXPAND ancestors
+   of matches so the hits reveal themselves. */
+function flatten(){
+  const f = parseFilter(filter);
+  const filtering = !!(f.st || f.text);
+  flat = [];
+  const walk = (nodes, depth) => {
+    for(const n of nodes){
+      if(filtering && !subtreeMatch(n, f)) continue;                 // prune
+      const self = selfMatch(n, f);
+      const hasKids = (n.kids||[]).length>0;
+      const open = filtering ? (hasKids && (n.kids).some(k=>subtreeMatch(k,f)) || expanded.has(n.key))
+                             : expanded.has(n.key);
+      flat.push({n, depth, open, hasKids, dim: filtering && !self});
+      if(open && hasKids) walk(n.kids, depth+1);
+    }
+  };
+  walk(FOREST, 0);
+}
+
+function rowHTML(row, i){
+  const {n, depth, open, hasKids, dim} = row;
+  const st = statusOf(n);
+  const sev = n.type==='group' ? '' : sevOf(st);
+  const tw = hasKids ? (open?'▾':'▸') : '';
+  const ind = 10 + depth*15;
+  const pill = (n.type!=='group' && n.type!=='sub' && n.type!=='epochnode' && n.type!=='commit' && st!=='healthy')
+    ? `<span class="pill ${ST[st].cls}"><span class="pd"></span>${ST[st].lab}</span>` : '';
+  const gc = n.type==='group' ? `<span class="gc">${n.gcount}</span>` : '';
+  const sd = (sev && n.type!=='group') ? `<span class="sd"></span>` : `<span class="sd"></span>`;
+  return `<div class="trow${dim?' dim':''}" data-i="${i}" data-type="${n.type}" data-sev="${sev}" `+
+    `${n.key===selKey?'aria-selected="true"':''} style="padding-left:${ind}px">`+
+    `<span class="tw ${hasKids?'':'leaf'}">${tw}</span>`+
+    sd+
+    `<span class="ic">${n.icon}</span>`+
+    `<span class="lab">${n.label}${gc}</span>`+
+    `<span class="grow"></span>`+
+    `<span class="meta">${n.metaRaw||''}</span>`+
+    pill+`</div>`;
+}
+
+function renderTree(){
+  flatten();
+  $('tree').innerHTML = flat.map(rowHTML).join('') || `<div class="empty2">No rows match this filter.</div>`;
+}
+
+/* ── header: live selected-path breadcrumb + cluster health ── */
+function pathOf(key){
+  // reconstruct a friendly path from the key (sessions/g/parts/p/user42/c/…)
+  const parts = key.split('/');
+  const out = ['cluster', parts[0]];
+  const node = findNode(key);
+  if(node && node.type==='partition') out.push(node.label);
+  else if(node && node.type==='node') out.push(node.label);
+  else if(node && node.type==='client') out.push(node.label);
+  else if(node && node.type==='epoch') out.push(node.label);
+  else if(node && node.type==='commit'){ const pp=parts.find((x,idx)=>parts[idx-1]==='p'); if(pp)out.push(pp); out.push(node.label); }
+  else if(node && node.type==='sub'){ const cc=parts.find((x,idx)=>parts[idx-1]==='cl'); if(cc)out.push(cc); out.push(node.label); }
+  return out;
+}
+function findNode(key, nodes=FOREST){
+  for(const n of nodes){ if(n.key===key) return n; const f=n.kids&&findNode(key,n.kids); if(f) return f; }
+  return null;
+}
+function renderHeader(){
+  const segs = pathOf(selKey);
+  $('path').innerHTML = segs.map((s,i)=> i===0
+    ? `<span class="res">${s}</span>`
+    : `<span class="chev">›</span><span class="pathseg ${i===segs.length-1?'cur':''}">${s}</span>`).join('');
+  // cluster health = flagged resources (attention only)
+  const flagged = scen==='attention' ? FOREST.filter(r=>resStatus(r.entity.res)!=='healthy').length : 0;
+  $('health').className = 'health '+(flagged?'crit':'ok');
+  $('healthTxt').textContent = flagged ? `${flagged} flagged` : 'Healthy';
+}
+
+/* ── scope line: chips + current-view rollup ── */
+function renderScope(){
+  const f = parseFilter(filter);
+  const active = f.st || (filter===''?'all':'all');
+  $('chips').innerHTML = CHIPS.map(([lab,id])=>{
+    const on = (id==='all' && !f.st) || id===f.st;
+    return `<span class="chip" data-chip="${id}" ${on?'aria-pressed="true"':''}>${lab}</span>`;
+  }).join('');
+  // count matching leaf-ish rows currently shown
+  const shown = flat.length;
+  const matches = filter ? flat.filter(r=>!r.dim).length : 0;
+  $('now').innerHTML = filter
+    ? `<span class="fl">${matches}</span> match${matches===1?'':'es'} · <b>${shown}</b> rows shown`
+    : `<b>${FOREST.length}</b> resources · expand or filter to drill`;
+  $('matchCount').textContent = filter ? `${matches}` : '';
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   INSPECTOR — the selected row's rich leaf view
+   ════════════════════════════════════════════════════════════════════════ */
+const seg = (title, body, extra='') => `<div class="seg"><div class="st">${title}${extra}</div>${body}</div>`;
+const kv  = rows => `<dl class="kv">${rows.map(([k,v,c])=>`<dt>${k}</dt><dd class="${c||''}">${v}</dd>`).join('')}</dl>`;
+
+function renderInspector(){
+  const node = findNode(selKey);
+  if(!node || !node.entity){ $('insp').innerHTML = `<div class="empty2">Select a row to inspect it.</div>`; return; }
+  const e = node.entity;
+  const calm = scen!=='attention';
+  let html = '';
+  if(e.kind==='resource')  html = inspResource(e.res, calm);
+  else if(e.kind==='partition') html = inspPartition(e.p, calm);
+  else if(e.kind==='node') html = inspNode(e.n, e.res, calm);
+  else if(e.kind==='client') html = inspClient(e.c, calm);
+  else if(e.kind==='epoch') html = inspEpoch(e.e, e.res);
+  else if(e.kind==='epochnode') html = inspEpochNode(e);
+  else if(e.kind==='commit') html = inspCommit(e.c, e.p);
+  else if(e.kind==='sub') html = inspSub(e.s, e.c, calm);
+  $('insp').innerHTML = html;
+}
+function ihead(title, kind, st, sub){
+  return `<div class="ih ${sevOf(st)||'ok'}"><div class="ik"><span class="sd"></span>${title}<span class="kind">${kind}</span></div>`+
+    `<div class="isub">${sub}</div></div>`;
+}
+function inspResource(res, calm){
+  const st = calm?'healthy':resStatus(res);
+  const flagged = calm?[]:[...res.parts,...res.nodes,...res.clients].filter(x=>x.st&&x.st!=='healthy');
+  const sub = calm ? `${res.parts.length} partitions · ${res.members} members · all converged`
+    : `${flagged.length} item${flagged.length===1?'':'s'} need attention across partitions / nodes / clients`;
+  const attn = flagged.length ? seg('Needs attention', `<div class="reclist">`+
+    flagged.map(x=>`<div class="recitem" data-sev="${sevOf(x.st)}"><span class="rsev"></span>`+
+      `<span class="rk">${x.id}</span><span class="rd">${ST[x.st].lab}${x.note?' · '+x.note:''}</span></div>`).join('')+`</div>`) : '';
+  return ihead(res.id, 'resource', st, sub)+
+    seg('Rollup', kv([['members',res.members],['partitions',res.parts.length],['keys',fmt(res.keys)],
+      ['writes/s',res.wps],['conflicts/s', calm?'0':(res.id==='sessions'?'0.4':'0'), calm?'ok':(res.id==='sessions'?'warn':'ok')]]))+
+    attn;
+}
+function inspPartition(p, calm){
+  const st = calm?'healthy':p.st;
+  const reps = p.reps, mx = Math.max(1,...reps.map(r=>calm?0:(r.lag||0)));
+  const sub = calm ? `owner <span class="mono">${p.owner}</span> · ${p.keys} keys · all replicas at the floor`
+    : (p.st==='diverged'?`a replica serves stale reads — ${p.note}`
+      : p.st==='under'?`held on only ${p.held}/${p.R} — ${p.note}`
+      : `owner <span class="mono">${p.owner}</span> · ${p.note||p.keys+' keys'}`);
+  const log = p.log;
+  const logHtml = `<div class="mlog">`+log.slice(0,8).map(c=>{
+    const stuck = !calm && c.stuck;
+    return `<div class="mr ${stuck?'stuck':''}"><span class="stp"><span class="e">e${c.e}·</span>s${c.s}</span>`+
+      `<span class="kvv"><span class="kk">${c.key.replace('user42.','·')}</span> = ${c.val}${stuck?' <span class="stuckb">:49807 stuck</span>':''}</span>`+
+      `<span class="oc ${calm&&(c.out==='conflict'||c.out==='fence')?'won':c.out}">${calm&&(c.out==='conflict'||c.out==='fence')?'won':c.out}</span></div>`;
+  }).join('')+`</div>`;
+  const repHtml = `<div class="reps">`+reps.map(r=>{
+    if(r.missing && !calm) return `<div class="rr"><span class="rn">${r.addr}</span>`+
+      `<span class="bar"><i class="bad" style="width:0%"></i></span><span class="lg bad">missing</span></div>`;
+    const lag = calm?0:(r.lag||0); const pct = lag===0?100:Math.max(10,100-Math.round(lag/mx*86));
+    return `<div class="rr"><span class="rn">${r.addr}${r.owner?'<span class="ow">owner</span>':''}</span>`+
+      `<span class="bar"><i class="${lag?'bad':''}" style="width:${pct}%"></i></span>`+
+      `<span class="lg ${lag?'bad':''}">+${lag}</span></div>`;
+  }).join('')+`</div>`;
+  const owners = p.owners;
+  const ownHtml = `<div class="ebe">`+owners.map(o=>`<div class="er ${o.cur?'cur':''} ${o.moved&&!calm?'moved':''}">`+
+    `<span class="ep">${o.ep}</span><span class="ono">${o.o}</span>`+
+    `<span class="bdg">${o.cur?'current':o.moved&&!calm?'moved':''}</span></div>`).join('')+`</div>`;
+  return ihead(p.id, 'partition', st, sub)+
+    seg('The log · newest first', logHtml, `<span class="stn">${p.id} · ${klog(p.log)}</span>`)+
+    seg('Replica health · lag', repHtml, `<span class="stn">R=${p.R}</span>`)+
+    seg('Owner by epoch', ownHtml, `<span class="new">⚠ NEW</span>`);
+}
+function inspNode(n, res, calm){
+  const st = calm?'healthy':n.st;
+  const owns = res.parts.filter(p=>p.owner===n.id);
+  const hosts = n.hosts || [];
+  const sub = calm ? `owns ${owns.length} · all hosted replicas at the floor`
+    : (n.note || `owns ${owns.length} partitions`);
+  const ownsHtml = `<div class="reps">`+owns.map(p=>`<div class="rr"><span class="rn">${p.id}</span>`+
+    `<span class="bar"><i style="width:100%"></i></span><span class="lg">${p.wps} w/s</span></div>`).join('')+`</div>`;
+  const hostHtml = hosts.length ? seg('Replicates · hosted copies', `<div class="reps">`+hosts.map(h=>{
+    const lag = calm?0:h.lag;
+    return `<div class="rr"><span class="rn">${h.id}<span class="ow" style="color:var(--soft);border-color:var(--line)">owner ${h.owner}</span></span>`+
+      `<span class="bar"><i class="${lag?'bad':''}" style="width:${lag?20:100}%"></i></span><span class="lg ${lag?'bad':''}">+${lag}</span></div>`;
+  }).join('')+`</div>`) : '';
+  return ihead(n.id, 'server node', st, sub)+
+    seg('Footprint', kv([['owns',owns.length+' partitions'],['keys', n.keys!=null?fmt(n.keys):'—'],['writes/s', n.wps!=null?n.wps:'—'],
+      ['max lag', '+'+(calm?0:n.lag), (calm?0:n.lag)?'bad':'ok'],['view','e4']]))+
+    seg('Owns @ e4', ownsHtml)+ hostHtml;
+}
+function inspClient(c, calm){
+  const st = calm?'healthy':c.st;
+  const sub = calm ? `connected to <span class="mono">${c.srv}</span> · ${c.role} · caught up`
+    : c.note;
+  const rows = c.subs.map(s=>`<tr><td class="node">${s.sub} <span style="color:var(--soft)">→ ${s.own}</span></td>`+
+    `<td>${s.head}</td><td class="${calm?'maj':s.cls}">${calm&&s.lag!=='released'?'0':s.lag}`+
+    `<span class="bdg ${calm||s.cls==='maj'?'cur':'lag'}">${calm||s.cls==='maj'?'CURR':'BEHIND'}</span></td></tr>`).join('');
+  return ihead(c.id, 'client', st, sub)+
+    seg('Connection', kv([['connected to',c.srv],['role',c.role],['subscriptions',c.subs.length],
+      ['client view', c.st==='stale'&&!calm?'e1':'e4', c.st==='stale'&&!calm?'bad':'ok'],
+      ['max sub lag','+'+(calm?0:c.lag), (calm?0:c.lag)?'bad':'ok']]))+
+    seg('Subscriptions · cursor', `<table class="vt"><thead><tr><th>subscription → owner</th><th>head</th><th>lag</th></tr></thead><tbody>${rows}</tbody></table>`, `<span class="new">⚠ NEW</span>`);
+}
+function inspEpoch(e, res){
+  const moves = e.moves.length ? `<ul class="tl">`+e.moves.map(m=>
+    `<li class="move"><span class="ep">${e.ep}</span><b>${m[0]}</b> ownership moved <span class="mono">${m[1]}→${m[2]}</span></li>`).join('')+`</ul>`
+    : `<div class="reason">No ownership changes at this view — stable membership and layout.</div>`;
+  const at = layoutAt(res, e.ep);
+  const layout = at ? `<div class="ebe">`+res.nodes.map(n=>{
+    const owns = at[n.id] || [];
+    return `<div class="er"><span class="ep">${n.id}</span><span class="ono" style="text-align:left;font-size:11px">${owns.join(', ')}</span><span class="bdg">${owns.length}</span></div>`;
+  }).join('')+`</div>` : `<div class="reason">${res.members} members.</div>`;
+  return ihead(e.ep+(e.cur?' · current':''), 'epoch / view', 'healthy',
+    `${e.members} members · ${e.note}`)+
+    seg('View change', moves, `<span class="new">⚠ NEW</span>`)+
+    seg('Ownership layout at '+e.ep, layout);
+}
+function inspEpochNode(e){
+  return ihead(e.n.id+' @ '+e.ep, 'node @ epoch', 'healthy', `owned ${e.owns.length} partitions at view ${e.ep}`)+
+    seg('Owned at '+e.ep, `<div class="reason">${e.owns.map(o=>`<span class="mono" style="color:var(--ink)">${o}</span>`).join(' · ')||'—'}</div>`);
+}
+function inspCommit(c, p){
+  const OUTW = {local:'committed locally by the owner',won:'replica-applied, accepted',
+    conflict:'lost last-writer-wins — same-epoch conflict',fence:'rejected by the epoch fence (stale view)'};
+  const sev = c.out==='conflict'?'diverged':c.out==='fence'?'lagging':'healthy';
+  const route = c.out==='fence'
+    ? [['done','client','forwarded write '+c.key+'='+c.val+' stamped at the stale e'+c.e],
+       ['bad','owner','<b>FENCED</b> — view e'+c.e+' is older than the cluster view; rejected (DECISIONS X)']]
+    : c.out==='conflict'
+    ? [['done','client','write '+c.key+'='+c.val+' forwarded to owner'],
+       ['move','owner','committed at e'+c.e+'·s'+c.s+' — but a higher seq won LWW'],
+       ['bad','resolve','<b>lost·conflict</b> — superseded by e4·s1265 same epoch']]
+    : [['done','client','write '+c.key+'='+c.val],
+       ['done','forward','routed to owner '+p.owner+' via the ring'],
+       ['done','owner','committed at e'+c.e+'·s'+c.s],
+       ['now','replicas','fan-out → 5/5 acked (W-quorum)']];
+  const recd = `{ type:<span class="vv">'update'</span>, key:<span class="kk">'${c.key}'</span>, `+
+    `value:<span class="vv">${c.val}</span> }\n<span style="color:var(--soft)">@ e${c.e}·s${c.s} · origin ${c.origin==='CLI'?'client':c.origin}</span>`;
+  return ihead('e'+c.e+'·s'+c.s, 'commit', sev, `<span class="mono">${c.key}</span> = ${c.val} · ${OUTW[c.out]}`)+
+    seg('Change record', `<div class="recd">${recd}</div>`)+
+    seg('Route', `<ul class="tl">`+route.map(r=>`<li class="${r[0]}"><span class="ep">${r[1]}</span>${r[2]}</li>`).join('')+`</ul>`)+
+    seg('Provenance', `<div class="reason">Outcome <b>${c.out}</b>. ${OUTW[c.out]}.</div>`);
+}
+function inspSub(s, c, calm){
+  return ihead(s.sub, 'subscription', calm?'healthy':(s.cls==='min'?'lagging':'healthy'),
+    `subscribed via owner <span class="mono">${s.own}</span> · client <span class="mono">${c.id}</span>`)+
+    seg('Cursor', kv([['owner',s.own],['log head',s.head],['delivered',s.deliv],
+      ['lag', calm&&s.lag!=='released'?'0':s.lag, calm?'ok':(s.cls==='min'?'bad':'ok')]]), `<span class="new">⚠ NEW</span>`);
+}
+
+/* ── status line ── */
+function renderStatus(){
+  if(scen==='attention'){
+    const flagged = FOREST.filter(r=>resStatus(r.entity.res)!=='healthy').length;
+    $('statusRight').innerHTML = `<span style="color:var(--crit)">${flagged} resource flagged</span> · sessions: 2 diverged · 1 under · 1 contended · 1 slow`;
+  } else {
+    $('statusRight').innerHTML = `${FOREST.length} resources · <span style="color:var(--ok)">all converged</span>`;
+  }
+}
+
+function render(){
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===scen));
+  renderTree(); renderHeader(); renderScope(); renderInspector(); renderStatus();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   INTERACTIONS
+   ════════════════════════════════════════════════════════════════════════ */
+function selectRow(i){ const r=flat[i]; if(!r) return; selKey=r.n.key; render(); }
+function toggle(key){ if(expanded.has(key)) expanded.delete(key); else expanded.add(key); render(); }
+
+$('tree').addEventListener('click', e=>{
+  const row = e.target.closest('.trow'); if(!row) return;
+  const i = +row.dataset.i; const r = flat[i];
+  if(e.target.closest('.tw') && r.hasKids){ toggle(r.n.key); return; }
+  selKey = r.n.key;
+  // clicking a row with kids also toggles it open (DevTools-ish), but keep selection
+  if(r.hasKids && !r.open) expanded.add(r.n.key);
+  render();
+});
+// inspector "needs attention" items → jump to that entity in the tree
+$('insp').addEventListener('click', e=>{
+  const it = e.target.closest('.recitem'); if(!it) return;
+  const id = it.querySelector('.rk').textContent;
+  // find a partition/node/client node with that label and select+reveal it
+  const target = findByLabel(id); if(target){ revealKey(target.key); selKey=target.key; render(); }
+});
+function findByLabel(label, nodes=FOREST){
+  for(const n of nodes){ if(n.label===label && n.type!=='group' && n.type!=='resource') return n;
+    const f=n.kids&&findByLabel(label,n.kids); if(f) return f; }
+  return null;
+}
+function revealKey(key){ // expand all ancestors of key
+  const parts = key.split('/'); let acc='';
+  for(let i=0;i<parts.length;i++){ acc = i?acc+'/'+parts[i]:parts[i]; if(findNode(acc)) expanded.add(acc); }
+}
+
+// scope chips
+$('chips').addEventListener('click', e=>{
+  const c = e.target.closest('[data-chip]'); if(!c) return;
+  const id = c.dataset.chip;
+  filter = id==='all' ? '' : 'is:'+id; $('q').value = filter; render();
+});
+// global filter
+$('q').addEventListener('input', e=>{ filter = e.target.value.trim(); render(); });
+// scenario toggle
+const sw = $('scen');
+for(const id of ['healthy','attention']){
+  const b=document.createElement('button'); b.dataset.id=id;
+  b.textContent = id==='healthy'?'Healthy':'Needs attention';
+  b.onclick = ()=>{ scen=id; render(); };
+  sw.appendChild(b);
+}
+$('srcBtn').onclick = (e)=>{ e.stopPropagation(); $('src').classList.toggle('show'); };
+document.addEventListener('click', e=>{ if(!e.target.closest('#src')&&!e.target.closest('#srcBtn')) $('src').classList.remove('show'); });
+
+// keyboard: j/k move · h/l collapse-expand · Enter inspect · g diverged · 1/2 scenario · / filter
+document.addEventListener('keydown', e=>{
+  if(e.target.tagName==='INPUT'){ if(e.key==='Escape') e.target.blur(); return; }
+  const k=e.key;
+  const cur = flat.findIndex(r=>r.n.key===selKey);
+  if(k==='j'||k==='ArrowDown'){ e.preventDefault(); selectRow(Math.min(flat.length-1,(cur<0?0:cur+1))); scrollSel(); }
+  else if(k==='k'||k==='ArrowUp'){ e.preventDefault(); selectRow(Math.max(0,(cur<0?0:cur-1))); scrollSel(); }
+  else if(k==='l'||k==='ArrowRight'){ e.preventDefault(); const r=flat[cur]; if(r&&r.hasKids&&!r.open){expanded.add(r.n.key);render();} }
+  else if(k==='h'||k==='ArrowLeft'){ e.preventDefault(); const r=flat[cur]; if(r&&r.hasKids&&r.open){expanded.delete(r.n.key);render();} }
+  else if(k==='Enter'){ const r=flat[cur]; if(r&&r.hasKids) toggle(r.n.key); }
+  else if(k==='g'){ filter='is:diverged'; $('q').value=filter; render(); }
+  else if(k==='a'){ filter=''; $('q').value=''; render(); }
+  else if(k==='1'){ scen='healthy'; render(); }
+  else if(k==='2'){ scen='attention'; render(); }
+  else if(k==='/'){ e.preventDefault(); $('q').focus(); }
+});
+function scrollSel(){ const el=document.querySelector('.trow[aria-selected=true]'); if(el) el.scrollIntoView({block:'nearest'}); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   LOAD — fetch the bundled sample snapshot by default; accept any debug file
+   dropped onto the page or opened via the ⤓ file control. The viewer is just
+   a projection of whatever snapshot is loaded.
+   ════════════════════════════════════════════════════════════════════════ */
+const DEFAULT_FILE = 'debug/sessions.fero.json';
+let SOURCE = '';
+function loadSnapshot(snap, name){
+  try{ MODEL = normalize(snap); }
+  catch(err){ $('tree').innerHTML = `<div class="empty2">Could not read <b>${name}</b>: ${err.message}</div>`; return; }
+  FOREST = MODEL.resources.map(resourceNode);
+  const first = MODEL.resources[0];
+  expanded = new Set(first ? [first.id] : []);
+  selKey = first ? first.id : '';
+  SOURCE = name;
+  const sn = $('srcName'); if(sn) sn.innerHTML = `<b>source</b> ${name.split('/').pop()}`;
+  render();
+}
+function readFile(file){
+  const r = new FileReader();
+  r.onload = () => { try{ loadSnapshot(JSON.parse(r.result), file.name); }
+    catch(e){ $('tree').innerHTML = `<div class="empty2"><b>${file.name}</b> is not valid JSON: ${e.message}</div>`; } };
+  r.readAsText(file);
+}
+$('file').addEventListener('change', e => { const f = e.target.files[0]; if(f) readFile(f); });
+// drop a .fero.json debug file anywhere on the page
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if(f) readFile(f); });
+// boot: fetch the bundled sample; if it can't be fetched (e.g. file://), prompt to drop one
+(async function boot(){
+  try{ const r = await fetch(DEFAULT_FILE); if(!r.ok) throw new Error('HTTP '+r.status);
+       loadSnapshot(await r.json(), DEFAULT_FILE); }
+  catch(e){ $('tree').innerHTML = `<div class="empty2">Couldn't load <b>${DEFAULT_FILE}</b> (${e.message}).<br>`+
+    `Drop a <b>.fero.json</b> debug file anywhere, or use <b>⤓ file</b> in the bar.</div>`; }
+})();
+</script>
+</body>
+</html>
