@@ -2,5 +2,6 @@ node_modules/
 *.js
 !examples/**/*.js
 !tools/observe/web/*.js
+!tools/debug/mockups/*.js
 dist/
 .DS_Store
