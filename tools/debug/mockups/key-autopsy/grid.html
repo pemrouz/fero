@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fero · key autopsy · ops grid</title>
+<style>
+  /* ---- Ops Grid: a dense operations console in the Bloomberg/Datadog register.
+         Muted graphite/slate, one cool accent (steel-cyan) for headers + selection,
+         red (+ amber) for status only — as hairline borders / 4px squares, never pills.
+         11–12px type, hairline 1px rules, monospace tabular numerics, snapped to a grid.
+         DARK-ONLY BY DESIGN: a terminal ops console reads as a dark surface; a light token
+         set would dilute the register, so no prefers-color-scheme fallback is provided. ---- */
+  :root{
+    --bg:#0c0e12;          /* terminal black-slate */
+    --surface:#11141a;     /* panel surface */
+    --surface-2:#161a22;   /* header bars / striped rows */
+    --line:#262b35;        /* hairline */
+    --line-soft:#1d222b;   /* softer inner hairline */
+    --ink:#c4ccd8;         /* primary text */
+    --ink-2:#8b96a8;       /* secondary */
+    --dim:#5c6779;         /* labels / muted */
+    --faint:#3c4452;       /* faintest */
+    --accent:#5aa9c4;      /* the single cool accent: headers, selection */
+    --accent-dim:#2f5a6b;
+    --bad:#d2544b;         /* divergence / conflict — alert hue */
+    --bad-dim:#5a2a28;
+    --amber:#c79a3e;       /* secondary status: fence churn */
+    --amber-dim:#54461f;
+    --ok:#5c6779;          /* "good" reads as neutral graphite, not green candy */
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:12px/1.45 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;
+  }
+  .num{font-variant-numeric:tabular-nums; text-align:right}
+  .mono{font-family:inherit}
+  a{color:var(--accent); text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ---- top status bar ---- */
+  .statusbar{
+    display:flex; align-items:center; gap:16px; height:30px; padding:0 12px;
+    background:var(--surface-2); border-bottom:1px solid var(--line); font-size:11px;
+  }
+  .statusbar .brand{font-weight:700; letter-spacing:.04em; color:var(--ink)}
+  .statusbar .brand .seg{color:var(--accent)}
+  .statusbar .crumb{color:var(--dim); text-transform:uppercase; letter-spacing:.1em; font-size:10px}
+  .statusbar .spacer{flex:1}
+  .statusbar .stat{color:var(--dim); text-transform:uppercase; letter-spacing:.08em; font-size:10px}
+  .statusbar .stat b{color:var(--ink-2); font-weight:600}
+  .statusbar .mock{color:var(--dim); border:1px solid var(--line); padding:1px 7px; letter-spacing:.08em; font-size:10px; border-radius:2px}
+
+  /* ---- layout: fixed left rail + main ---- */
+  .shell{display:grid; grid-template-columns:300px 1fr; height:calc(100% - 30px)}
+  .rail{border-right:1px solid var(--line); background:var(--surface); overflow-y:auto}
+  .work{overflow-y:auto; padding:0}
+
+  /* ---- section bar (used in rail + panels) ---- */
+  .secbar{
+    display:flex; align-items:center; gap:8px; height:24px; padding:0 10px;
+    background:var(--surface-2); border-bottom:1px solid var(--line);
+    text-transform:uppercase; letter-spacing:.1em; font-size:10px; font-weight:700; color:var(--accent);
+    position:sticky; top:0; z-index:2;
+  }
+  .secbar .right{margin-left:auto; color:var(--dim); font-weight:600; letter-spacing:.06em; text-transform:none}
+
+  /* ---- left rail: sortable-looking key table ---- */
+  table.keys{width:100%; border-collapse:collapse}
+  table.keys thead th{
+    position:sticky; top:24px; background:var(--surface); z-index:1;
+    text-align:left; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); font-weight:600;
+    padding:5px 8px; border-bottom:1px solid var(--line); cursor:default; user-select:none;
+  }
+  table.keys thead th.n{text-align:right}
+  table.keys thead th .ind{color:var(--faint); font-size:9px; margin-left:3px}
+  table.keys tbody tr{cursor:pointer; border-bottom:1px solid var(--line-soft)}
+  table.keys tbody tr:hover{background:var(--surface-2)}
+  table.keys tbody td{padding:6px 8px; font-size:11px; border-left:2px solid transparent}
+  table.keys tbody td.k{color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px}
+  table.keys tbody td.n{text-align:right; color:var(--ink-2)}
+  table.keys tbody td.n.zero{color:var(--faint)}
+  table.keys tbody td.n.bad{color:var(--bad); font-weight:600}
+  table.keys tbody td.n.amber{color:var(--amber); font-weight:600}
+  table.keys tbody tr[aria-selected=true]{background:var(--surface-2)}
+  table.keys tbody tr[aria-selected=true] td:first-child{border-left:2px solid var(--accent)}
+  table.keys tbody tr[aria-selected=true] td.k{color:var(--ink); font-weight:600}
+  .sq{display:inline-block; width:4px; height:4px; vertical-align:middle; margin-right:6px}
+  .sq.bad{background:var(--bad)} .sq.amber{background:var(--amber)} .sq.ok{background:var(--faint)}
+
+  .rail .lookup{padding:8px 10px; border-bottom:1px solid var(--line)}
+  .rail .lookup label{display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:4px}
+  .rail .lookup input{
+    width:100%; background:var(--bg); border:1px solid var(--line); color:var(--ink);
+    font:inherit; font-size:11px; padding:4px 7px; outline:none; border-radius:2px;
+  }
+  .rail .lookup input:focus{border-color:var(--accent-dim)}
+  .rail .miss{color:var(--amber); font-size:10px; margin-top:4px; display:none}
+  .rail .railnote{padding:8px 10px; color:var(--dim); font-size:10px; line-height:1.5; border-top:1px solid var(--line-soft)}
+
+  /* ---- main: stacked compact panels ---- */
+  .panel{border-bottom:1px solid var(--line)}
+  .panel .pbody{padding:0}
+  .panel .pad{padding:8px 12px}
+
+  /* ---- verdict strip ---- */
+  .verdict{
+    display:flex; align-items:stretch; border-left:2px solid var(--faint);
+    background:var(--surface); border-bottom:1px solid var(--line);
+  }
+  .verdict[data-state=crit]{border-left-color:var(--bad)}
+  .verdict[data-state=ok]{border-left-color:var(--faint)}
+  .verdict .vtag{
+    flex:none; width:130px; padding:10px 12px; border-right:1px solid var(--line-soft);
+    display:flex; flex-direction:column; gap:3px; justify-content:center;
+  }
+  .verdict .vtag .lbl{font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim)}
+  .verdict .vtag .state{font-size:13px; font-weight:700; letter-spacing:.02em; display:flex; align-items:center; gap:7px}
+  .verdict[data-state=crit] .vtag .state{color:var(--bad)}
+  .verdict[data-state=ok] .vtag .state{color:var(--ink-2)}
+  .verdict .vbody{padding:10px 14px; font-size:11.5px; color:var(--ink-2); display:flex; align-items:center; line-height:1.5}
+  .verdict .vbody b{color:var(--ink)}
+  .verdict .vbody .hot{color:var(--bad)}
+
+  /* ---- consensus roll-up line ---- */
+  .consensus{
+    display:flex; align-items:center; gap:18px; padding:6px 12px;
+    background:var(--surface-2); border-bottom:1px solid var(--line-soft); font-size:11px;
+  }
+  .consensus .field{display:flex; gap:6px; align-items:baseline}
+  .consensus .field .lbl{font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim)}
+  .consensus .field .v{color:var(--ink)}
+  .consensus .agree{margin-left:auto; font-weight:700; letter-spacing:.04em}
+  .consensus .agree.ok{color:var(--ink-2)}
+  .consensus .agree.bad{color:var(--bad)}
+
+  /* ---- data tables (matrix, timeline, kv) ---- */
+  table.grid{width:100%; border-collapse:collapse; font-size:11px}
+  table.grid thead th{
+    text-align:left; font-size:9.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); font-weight:600;
+    padding:5px 10px; border-bottom:1px solid var(--line); background:var(--surface-2); white-space:nowrap;
+  }
+  /* only the timeline header sticks — it lives in its own scroll wrapper (.tlwrap), so it
+     can't collide with the panel .secbar; the matrix/foot tables scroll with .work, so a
+     sticky header there would slide UNDER their section bar. z-index stays below .secbar (2). */
+  table.tl thead th{position:sticky; top:0; z-index:1}
+  table.grid thead th.n{text-align:right}
+  table.grid tbody td{padding:5px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top; white-space:nowrap}
+  table.grid tbody td.n{text-align:right}
+  table.grid tbody tr:last-child td{border-bottom:none}
+  .uuid{color:var(--ink-2)}
+  .addr{color:var(--ink); letter-spacing:-.01em}
+  .stamp{color:var(--ink); letter-spacing:.02em}
+  .val{color:var(--ink)}
+  .dimt{color:var(--dim)}
+  /* timeline t-only / ring / age-suffix markers: legibility-sensitive labels on near-black,
+     so they ride --dim (not --faint, which is reserved for the literal zero glyphs in the rail). */
+  .faintt{color:var(--dim)}
+
+  /* node×attr matrix: diverged row flagged by 2px red left-border + red mono + 4px square */
+  table.matrix tbody td:first-child{border-left:2px solid transparent}
+  /* the whole diverged row (data row + its colspan sub-row) is the click target → jump to the
+     stuck stamp; every cell shows the pointer, not just the bordered first td. */
+  table.matrix tbody tr.diverged td{color:var(--bad); cursor:pointer}
+  table.matrix tbody tr.diverged td:first-child{border-left:2px solid var(--bad)}
+  table.matrix tbody tr.diverged td .stamp,
+  table.matrix tbody tr.diverged td .val{color:var(--bad)}
+  table.matrix tbody tr.diverged:hover td{background:var(--bad-dim)}
+  table.matrix tbody tr td .nodecode{color:var(--ink); font-weight:600}
+  .status-cell{letter-spacing:.06em; font-weight:600}
+  .status-cell.ok{color:var(--dim)}
+  .status-cell.bad{color:var(--bad)}
+  .matrix .dsub{font-size:10px; color:var(--bad); white-space:normal; padding-top:2px; cursor:pointer}
+
+  /* ---- timeline table ---- */
+  .tlwrap{max-height:520px; overflow-y:auto}
+  table.tl tbody td:first-child{border-left:2px solid var(--edge,transparent)}
+  table.tl tbody tr.r{cursor:pointer}
+  table.tl tbody tr.r:hover td{background:var(--surface-2)}
+  table.tl tbody tr[data-out=won]{--edge:var(--accent-dim)}
+  table.tl tbody tr[data-out=local]{--edge:var(--accent)}
+  table.tl tbody tr[data-out=fence]{--edge:var(--amber)}
+  table.tl tbody tr[data-out=conflict]{--edge:var(--bad)}
+  table.tl tbody tr[data-out=forwarded]{--edge:var(--accent-dim)}
+  table.tl tbody tr[data-out=dropped]{--edge:var(--faint)}
+  table.tl tbody tr.superseded td .val,
+  table.tl tbody tr.superseded td .stamp{color:var(--ink-2)}
+  table.tl tbody tr.cur td{background:var(--surface-2)}
+  /* outcome tag: squared (≤2px radius), hairline border, uppercase — NOT a pill */
+  .tag{
+    display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    padding:1px 5px; border:1px solid var(--tc,var(--faint)); color:var(--tc,var(--dim)); border-radius:2px;
+    background:transparent; white-space:nowrap;
+  }
+  .tag.local{--tc:var(--accent)}
+  .tag.won{--tc:var(--accent-dim); color:var(--ink-2)}
+  .tag.fence{--tc:var(--amber)}
+  .tag.conflict{--tc:var(--bad)}
+  .tag.dropped{--tc:var(--faint)}
+  .tag.forwarded{--tc:var(--accent-dim); color:var(--ink-2)}
+  .tag.cur{margin-left:5px; --tc:var(--accent); color:var(--accent)}
+  /* view divider row */
+  table.tl tbody tr.viewrow td{
+    background:var(--bg); color:var(--ink-2); font-size:10px; letter-spacing:.04em;
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:4px 10px;
+  }
+  table.tl tbody tr.viewrow td .vk{color:var(--accent); text-transform:uppercase; letter-spacing:.1em; font-weight:700; margin-right:8px}
+  /* beaten-by / note subrows */
+  table.tl tbody tr.sub td{padding:2px 10px 5px 10px; border-bottom:1px solid var(--line-soft); white-space:normal}
+  table.tl tbody tr.sub.beat td{color:var(--ink-2); font-size:10px}
+  table.tl tbody tr.sub.beat td .why{color:var(--dim)}
+  table.tl tbody tr.sub.note td{color:var(--dim); font-size:10px}
+  table.tl tbody tr.sub.pin td{color:var(--bad); font-size:10px}
+  table.tl tbody tr.sub.pin td::before{content:'└─ '; color:var(--bad)}
+  table.tl tbody tr.raw td{padding:0; border-bottom:1px solid var(--line-soft)}
+  table.tl tbody tr.raw pre{
+    margin:0; padding:8px 12px 8px 22px; background:var(--bg); color:var(--ink-2); font-size:10px;
+    white-space:pre-wrap; word-break:break-all; border-left:2px solid var(--line);
+  }
+  .tlfilters{display:flex; gap:0; margin-left:auto}
+  .tlfilters button{
+    font:inherit; font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+    background:transparent; color:var(--dim); border:1px solid var(--line); border-right:none; padding:2px 8px;
+  }
+  .tlfilters button:last-child{border-right:1px solid var(--line)}
+  .tlfilters button[aria-pressed=true]{color:var(--accent); background:var(--surface); border-color:var(--accent-dim)}
+  .ago{color:var(--dim)}
+
+  /* ---- ownership: kv grid + 1px micro strips ---- */
+  table.kv{width:100%; border-collapse:collapse; font-size:11px}
+  table.kv td{padding:4px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top}
+  table.kv td.k{width:120px; color:var(--dim); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap}
+  table.kv tr:last-child td{border-bottom:none}
+  .move{font-size:10px}
+  .move .sq{margin-right:5px}
+  .ownstrip{display:flex; gap:0; height:6px; margin:8px 12px 4px; border:1px solid var(--line-soft)}
+  .ownstrip span{flex:1; min-width:0; background:var(--surface-2)}
+  .ownstrip span.hit{background:var(--accent)}
+  .stripaxis{display:flex; justify-content:space-between; margin:0 12px 8px; color:var(--faint); font-size:9px}
+  .stripcap{margin:0 12px 8px; color:var(--dim); font-size:10px}
+
+  /* version-density bar: thin 1px-tall bars per outcome over the window */
+  .densbar{display:flex; align-items:flex-end; gap:1px; height:18px; margin:6px 12px 2px}
+  .densbar span{flex:1; min-width:2px; background:var(--c,var(--faint))}
+  .denskey{margin:0 12px 8px; color:var(--dim); font-size:9.5px; display:flex; gap:14px; flex-wrap:wrap}
+  .denskey .k i{display:inline-block; width:8px; height:4px; vertical-align:middle; margin-right:4px; background:var(--c)}
+
+  /* ---- route table ---- */
+  table.route{width:100%; border-collapse:collapse; font-size:11px}
+  table.route td{padding:5px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top}
+  table.route tr:last-child td{border-bottom:none}
+  table.route td.stage{width:120px; color:var(--accent); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap}
+  table.route td.arrow{width:14px; color:var(--faint); text-align:center}
+  table.route td.who{white-space:nowrap}
+  table.route td.sub{color:var(--dim); font-size:10px; white-space:normal}
+  .fanrow{padding:6px 12px 8px}
+  .fanrow .lbl{color:var(--dim); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:5px}
+  .fan{display:flex; flex-wrap:wrap; gap:0}
+  .fan .cell{
+    border:1px solid var(--line); border-right:none; padding:2px 9px; font-size:10.5px; color:var(--ink-2);
+    display:flex; align-items:center; gap:6px;
+  }
+  .fan .cell:last-child{border-right:1px solid var(--line)}
+  .fan .cell.bad{color:var(--bad); border-color:var(--bad-dim)}
+  .fan .cell .st{font-size:9px; letter-spacing:.06em; color:var(--dim)}
+  .fan .cell.bad .st{color:var(--bad)}
+
+  /* ---- two-up layout: left timeline panel + right side-stack (a div wrapping 3 panels) ---- */
+  .cols{display:grid; grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr); gap:0}
+  /* left timeline panel carries the column divider; both columns end flush (no trailing bottom rule) */
+  .cols > .panel{border-bottom:none; border-right:1px solid var(--line)}
+  .cols > .stack > .panel:last-child{border-bottom:none}
+  @media (max-width:1080px){
+    .cols{grid-template-columns:1fr}
+    .cols > .panel{border-right:none; border-bottom:1px solid var(--line)}
+    .cols > .stack > .panel:last-child{border-bottom:1px solid var(--line)}
+  }
+
+  /* ---- footnote ---- */
+  .foot{padding:0}
+  table.foot{width:100%; border-collapse:collapse; font-size:10.5px}
+  table.foot td{padding:6px 12px; border-bottom:1px solid var(--line-soft); vertical-align:top; line-height:1.5}
+  table.foot tr:last-child td{border-bottom:none}
+  table.foot td.src{width:170px; color:var(--ink-2); font-weight:600; white-space:nowrap}
+  table.foot td.body{color:var(--dim)}
+  table.foot td.body b{color:var(--ink-2); font-weight:600}
+  .newflag{color:var(--amber); font-weight:600}
+  .scrollnote{padding:6px 12px; color:var(--faint); font-size:10px; border-bottom:1px solid var(--line-soft)}
+</style>
+</head>
+<body>
+
+<div class="statusbar">
+  <span class="brand">fero <span class="seg">observe</span></span>
+  <span class="crumb">/ key autopsy</span>
+  <span class="spacer"></span>
+  <span class="stat">cluster <b id="sbMembers"></b></span>
+  <span class="stat">epoch <b id="sbEpoch"></b></span>
+  <span class="stat">divergent <b id="sbDiv"></b></span>
+  <span class="mock">MOCKUP · STATIC</span>
+</div>
+
+<div class="shell">
+  <!-- LEFT RAIL: sortable-looking key table, worst first -->
+  <aside class="rail">
+    <div class="secbar">divergent keys<span class="right">worst first</span></div>
+    <table class="keys">
+      <thead>
+        <tr>
+          <th>key</th>
+          <th class="n">dissent<span class="ind">▾</span></th>
+          <th class="n">lost</th>
+          <th class="n">epoch</th>
+        </tr>
+      </thead>
+      <tbody id="keyRows"></tbody>
+    </table>
+    <div class="lookup">
+      <label for="keyInput">lookup</label>
+      <input id="keyInput" list="keyList" value="user42.score" spellcheck="false" autocomplete="off">
+      <datalist id="keyList"></datalist>
+      <div class="miss" id="keymiss">no data for that key — mockup ships 3 keys</div>
+    </div>
+    <div class="railnote">
+      Entry point. Deep-linked from the dashboard hot-keys rows (#key in the URL hash). Sort proxy is per-key
+      cross-node stamp diff — worst divergence first.
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="work">
+
+    <!-- VERDICT -->
+    <section class="verdict" id="verdict" data-state="crit">
+      <div class="vtag">
+        <span class="lbl">verdict</span>
+        <span class="state" id="vstate"><span class="sq bad" id="vsq"></span><span id="vhead"></span></span>
+      </div>
+      <div class="vbody" id="vbody"></div>
+    </section>
+
+    <!-- WINNER STAMP MATRIX -->
+    <section class="panel">
+      <div class="secbar">winner stamp · node × attribute matrix<span class="right" id="winMeta"></span></div>
+      <div class="consensus" id="consensus"></div>
+      <table class="grid matrix">
+        <thead>
+          <tr>
+            <th>node</th><th>addr</th><th>id</th>
+            <th class="n">epoch</th><th class="n">seq</th><th>origin</th><th>value</th><th>status</th>
+          </tr>
+        </thead>
+        <tbody id="matrix"></tbody>
+      </table>
+    </section>
+
+    <div class="cols">
+      <!-- VERSION TIMELINE -->
+      <section class="panel">
+        <div class="secbar">
+          version timeline
+          <span class="tlfilters" id="tlFilters">
+            <button data-f="all" aria-pressed="true">all</button>
+            <button data-f="losers" aria-pressed="false">losers</button>
+            <button data-f="fence" aria-pressed="false">fence</button>
+            <button data-f="conflict" aria-pressed="false">conflict</button>
+            <button data-f="dedup" aria-pressed="false">dedup</button>
+          </span>
+        </div>
+        <div class="tlwrap">
+          <table class="grid tl">
+            <thead>
+              <tr>
+                <th>time</th><th>outcome</th><th>origin</th><th>stamp</th><th>value</th><th>note</th>
+              </tr>
+            </thead>
+            <tbody id="timeline"></tbody>
+          </table>
+          <div class="scrollnote">└─ older history beyond the 256-slot prov ring — needs retained provenance history (see data sources)</div>
+        </div>
+      </section>
+
+      <!-- SIDE STACK: ownership + route -->
+      <div class="stack">
+        <section class="panel">
+          <div class="secbar">ownership<span class="right" id="ownMeta"></span></div>
+          <div class="pbody">
+            <table class="kv"><tbody id="ownKv"></tbody></table>
+            <div class="ownstrip" id="ownStrip" title="ring.coverage · 120 segments"></div>
+            <div class="stripaxis"><span>seg 0</span><span id="stripMid"></span><span>seg 119</span></div>
+            <div class="stripcap" id="stripCap"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="secbar">last write · route<span class="right" id="routeMeta"></span></div>
+          <div class="pbody">
+            <table class="route"><tbody id="route"></tbody></table>
+            <div class="fanrow">
+              <div class="lbl" id="fanLbl"></div>
+              <div class="fan" id="fan"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="secbar">version density · observed window</div>
+          <div class="pbody">
+            <div class="densbar" id="densBar"></div>
+            <div class="denskey" id="densKey"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- FOOTNOTE -->
+    <section class="panel foot">
+      <div class="secbar">data sources</div>
+      <table class="foot">
+        <tbody>
+          <tr><td class="src">divergent keys</td><td class="body">derived from the same <span class="newflag">[NEW] versions:K</span> sample below: per-key cross-node stamp diff, worst divergence first — the page's entry point. The dashboard hot-keys panel rows deep-link here (key in the URL hash).</td></tr>
+          <tr><td class="src">winner stamp matrix</td><td class="body"><span class="newflag">[NEW] instrumentation:</span> per-key version sample — snapshot ships <b>versions</b> COUNT only today; a gated <b>__inspect {versions:K}</b> variant returns {keyPath -&gt; {epoch, seq, origin}} from the LWW versions Map (seam: SnapshotDeps already holds the Map by reference; one opt-in copy per poll). Cross-node merge keyed on snapshot <b>uuid</b> [A]. Rendered as a full node row each (constant-size past 24 nodes; blobs mode suppresses per-node snapshots — per-node detail then on demand via the same gated per-uuid __inspect pull).</td></tr>
+          <tr><td class="src">value column</td><td class="body"><span class="newflag">[NEW] instrumentation:</span> stamps never carry values — value read via a gated <b>__dump(partition, offset, limit)</b> RPC over the existing <b>Log.since()</b> slice [C].</td></tr>
+          <tr><td class="src">version timeline</td><td class="body">observe stream [B]: kinds <b>won / lost / local / forwarded</b> (+ <b>dropped</b> with verbose:true) — all five render above. Loss reason from the loser's epoch vs winner's <b>we/ws</b> — epoch &lt; we =&gt; epoch-fence, epoch = we =&gt; same-epoch seq contention. Winner ORIGIN on "beaten by" lines is a best-effort join of (we,ws) against a <b>won</b> event still inside the 256-slot prov ring — seq is per-origin, so the join is window-limited and not unique in principle; absent a hit, only we/ws would show. <b>t</b> is each makeObserve vantage's own monotonic counter (resets per instance) — this mock normalises to one sequence; a live merge must key rows (vantage uuid, t). View dividers from <b>kind:view</b>. <span class="newflag">[NEW]</span> wall-clock ages — live rows show bridge receive-time only; ring-history rows delivered on initial subscribe have NO derivable age and render t-only, until ProvRecords carry timing (plausibly-addable). <span class="newflag">[NEW]</span> window beyond the 256-slot prov ring — retained provenance history, /history?since=t (seam: bridge account() already sees every ProvEvent). Value summaries: <span class="newflag">[NEW]</span> — ProvRecords deliberately never ship values; same __dump seam as above.</td></tr>
+          <tr><td class="src">ownership strip</td><td class="body">snapshot [A]: this key's segment = its <b>ring.coverage</b> index; owner + "owner moved" from the bridge cover diff across ticks [E]. The strip is deliberately neutral — per-segment owner colors are the shipped ownership heatmap's job (linked from the panel), not re-rendered here.</td></tr>
+          <tr><td class="src">last write route</td><td class="body">correlates <b>forwarded</b> (writer) -&gt; <b>local</b> (owner commit, restamped origin=owner) -&gt; <b>won</b> (each replica) [B]. The forward TARGET is inferred from the forwarded event's <b>by</b> vantage — the record does not carry it. Forward ACK status: <span class="newflag">[NEW]</span> — not observable anywhere today; rendered "ack: unknown" until a per-write trace id exists (client-stamped correlation id on the ChangeRecord + a reserved frame FLAG bit, bits 4+ free, carried into the ProvRecord) [D], which also upgrades today's heuristic (key, value-time proximity) join to exact.</td></tr>
+          <tr><td class="src">replica apply marks</td><td class="body"><b>won</b> events per vantage node ("by" address) [B]; a missing node is detectable only if a bridge can see it — single-bridge blindness during partition is the known multi-vantage-merge gap.</td></tr>
+          <tr><td class="src">verdict</td><td class="body">derived: any per-node stamp != consensus stamp =&gt; divergence (needs the NEW version sample above); fence-vs-conflict-vs-dedup tallies from [B].</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+</div>
+
+<script>
+'use strict';
+/* ---------- mock cluster (shapes per the observable-data inventory) ----------
+   Node identity is its mono short-uuid + :port — NOT a colored swatch (ops-grid: no rainbow). */
+const N = {
+  A:  { uuid:'3f8a1c2e-9b4d-4e7a-8c1f-2d5e6a7b8c9d', addr:'127.0.0.1:49801' },
+  B:  { uuid:'9d2b7f4a-1c3e-4b8d-9e2f-7a6c5d4e311a', addr:'127.0.0.1:49803' },
+  C:  { uuid:'6c1e9a3b-5d7f-4c2a-8b9e-3f4d2a1c7e5b', addr:'127.0.0.1:49805' },
+  D:  { uuid:'b4e2d8f6-3a1c-4d9b-8e7f-5c6a9b2d4f8e', addr:'127.0.0.1:49807' },
+  E:  { uuid:'e7a93c5d-8f2b-4a6e-9c1d-4b7e6f3a2d9c', addr:'127.0.0.1:49809' },
+  CLI:{ uuid:'2d5f8b1a-7c4e-4f9a-b3d6-8e1c2a5f7b3d', addr:null, client:true },
+};
+const MEMBERS = ['A','B','C','D','E'];
+const short = u => u.slice(0,4) + '…' + u.slice(-3);
+const port = k => N[k].addr ? N[k].addr.split(':')[1] : 'client';
+
+/* ---------- per-key mock stories (verbatim shapes from the spec) ---------- */
+const KEYS = {
+  /* THE anomaly: one node diverged — stuck on a pre-fence stamp (DECISIONS X class) */
+  'user42.score': {
+    partition:'user42', segment:73, owner:'A', epoch:4,
+    replicas:'∞ — full replication (ring.replicas = null); all 5 members hold every partition',
+    moved:{ text:'moved 48s ago · e3→e4 · 49803 → 49801', state:'amber' },
+    consensus:{ e:4, s:1287, o:'A', v:'8', n:4, total:5 },
+    verdict:{ state:'crit', head:'DIVERGENCE',
+      body:'1 / 5 nodes diverged. <span class="hot">127.0.0.1:49807</span> still holds <b>e3·s1241</b> ("5", origin 6c1e…e5b) while the other 4 hold <b>e4·s1287</b> ("8"). 49807 has applied nothing for partition user42 since the e3→e4 view change — sticky pre-fence stamp.' },
+    winners:[
+      { n:'A', e:4, s:1287, o:'A', v:'8', ok:true },
+      { n:'B', e:4, s:1287, o:'A', v:'8', ok:true },
+      { n:'C', e:4, s:1287, o:'A', v:'8', ok:true },
+      { n:'D', e:3, s:1241, o:'C', v:'5', ok:false, jump:2640,
+        sub:'DIVERGED — no won apply for this partition since view e3→e4 (64s) · click row to jump to the stamp it is stuck on' },
+      { n:'E', e:4, s:1287, o:'A', v:'8', ok:true },
+    ],
+    timeline:[
+      { t:2841, out:'local', o:'A', s:1287, e:4, val:8, rx:'12s', cur:true,
+        note:'owner commit of the forwarded client write (restamped origin = owner) — current winner' },
+      { t:2840, out:'dropped', o:'CLI', s:88, e:4, val:8, rx:'12s',
+        note:'duplicate delivery — client retried the forward (no ack visibility), origin-seq 88 already applied → dedup-dropped (verbose:true only)' },
+      { t:2839, out:'forwarded', o:'CLI', s:88, e:4, val:8, rx:'12s',
+        note:'forward observed at 49803 (the event’s "by" vantage — target inferred, not carried) → owner-forward → 49801 · ack: unknown (needs NEW trace id)' },
+      { t:2802, out:'conflict', o:'B', s:902, e:4, val:7, rx:'31s', by:{ e:4, s:1265, o:'A' },
+        note:'same-epoch seq contention — a true concurrent write, NOT rebalance churn' },
+      { t:2798, out:'won', o:'A', s:1265, e:4, val:6, rx:'34s' },
+      { t:2771, out:'fence', o:'CLI', s:87, e:1, val:99, rx:'41s', by:{ e:4, s:1265, o:'A' },
+        note:'epoch-1 client-local commit, fenced on every replica (the DECISIONS X bug class)' },
+      { view:true, rx:'48s', note:'view e3 → e4 · 5 members · segment 73 owner moved 49803 → 49801' },
+      { t:2640, out:'won', o:'C', s:1241, e:3, val:5,
+        pin:'127.0.0.1:49807 is stuck on this stamp' },
+      { t:2588, out:'fence', o:'B', s:851, e:2, val:4, by:{ e:3, s:1203, o:'C' },
+        note:'write under a stale view during churn — expected epoch fence' },
+      { t:2541, out:'won', o:'C', s:1203, e:3, val:4 },
+      { t:2410, out:'won', o:'B', s:1198, e:3, val:3, type:'insert' },
+    ],
+    route:{ ago:'12s', desc:'user42.score = 8',
+      hops:[
+        { stage:'client write', n:'CLI', sub:'read-only client · attempt epoch 4 · client seq 88' },
+        { stage:'forward',      n:'B',   sub:'client → connected server (target inferred from the "by" vantage) · ack: unknown — needs NEW per-write trace id' },
+        { stage:'owner commit', n:'A',   sub:'owner-forward → restamped origin 3f8a…c9d · seq 1287 · epoch 4' },
+      ],
+      fan:{ sub:'3 / 4 won applies observed', peers:[
+        { n:'B', ok:true }, { n:'C', ok:true }, { n:'E', ok:true },
+        { n:'D', ok:false, note:'no won' } ] } },
+  },
+
+  /* calm contrast: full agreement reads quietly */
+  'user43.name': {
+    partition:'user43', segment:17, owner:'E', epoch:4,
+    replicas:'∞ — full replication (ring.replicas = null); all 5 members hold every partition',
+    moved:{ text:'stable since e2 · no recent move', state:'ok' },
+    consensus:{ e:4, s:212, o:'E', v:'"amara"', n:5, total:5 },
+    verdict:{ state:'ok', head:'CONVERGED',
+      body:'5 / 5 nodes agree. All servers hold <b>e4·s212</b> ("amara", origin e7a9…d9c). No losers in the observed window.' },
+    winners: MEMBERS.map(n => ({ n, e:4, s:212, o:'E', v:'"amara"', ok:true })),
+    timeline:[
+      { t:2756, out:'local', o:'E', s:212, e:4, val:'amara', rx:'25s', cur:true, note:'current winner — local commit on the owner' },
+      { t:2691, out:'won', o:'E', s:198, e:4, val:'amy', rx:'58s' },
+      { t:2240, out:'won', o:'A', s:1102, e:3, val:'am', type:'insert' },
+    ],
+    route:{ ago:'25s', desc:'user43.name = "amara"',
+      hops:[
+        { stage:'local write',  n:'E', sub:'writer is a member · no forward needed' },
+        { stage:'owner commit', n:'E', sub:'committed local · origin e7a9…d9c · seq 212 · epoch 4' },
+      ],
+      fan:{ sub:'4 / 4 won applies observed', peers:[
+        { n:'A', ok:true }, { n:'B', ok:true }, { n:'C', ok:true }, { n:'D', ok:true } ] } },
+  },
+
+  /* middle state: converged, but fenced churn during the last rebalance */
+  'cart7.items': {
+    partition:'cart7', segment:41, owner:'C', epoch:4,
+    replicas:'∞ — full replication (ring.replicas = null); all 5 members hold every partition',
+    moved:{ text:'moved 48s ago · e3→e4 · 49809 → 49805', state:'amber' },
+    consensus:{ e:4, s:977, o:'C', v:'[3 items]', n:5, total:5 },
+    verdict:{ state:'ok', head:'CONVERGED',
+      body:'5 / 5 nodes agree. All servers hold <b>e4·s977</b>. 1 epoch-fenced write during the e3→e4 rebalance — expected churn, not a conflict.' },
+    winners: MEMBERS.map(n => ({ n, e:4, s:977, o:'C', v:'[3 items]', ok:true })),
+    timeline:[
+      { t:2811, out:'local', o:'C', s:977, e:4, val:['sku882','sku101','sku204'], rx:'19s', cur:true,
+        note:'owner commit — current winner' },
+      { t:2701, out:'fence', o:'D', s:412, e:3, val:['sku882'], rx:'46s', by:{ e:4, s:951, o:'C' },
+        note:'write under the stale e3 view during rebalance — expected epoch fence' },
+      { t:2688, out:'won', o:'C', s:951, e:4, val:['sku882','sku101'], rx:'47s' },
+      { view:true, rx:'48s', note:'view e3 → e4 · 5 members · segment 41 owner moved 49809 → 49805' },
+      { t:2305, out:'won', o:'D', s:401, e:3, val:['sku882'], type:'insert' },
+    ],
+    route:{ ago:'19s', desc:'cart7.items = [3 items]',
+      hops:[
+        { stage:'client write', n:'CLI', sub:'read-only client · attempt epoch 4 · client seq 91' },
+        { stage:'forward',      n:'C',   sub:'connected server is already the owner — single hop · ack: unknown (NEW trace id)' },
+        { stage:'owner commit', n:'C',   sub:'restamped origin 6c1e…e5b · seq 977 · epoch 4' },
+      ],
+      fan:{ sub:'4 / 4 won applies observed', peers:[
+        { n:'A', ok:true }, { n:'B', ok:true }, { n:'D', ok:true }, { n:'E', ok:true } ] } },
+  },
+};
+
+/* ---------- DOM helpers ---------- */
+const $ = id => document.getElementById(id);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const stamp = (e, s) => `<span class="stamp">e${e}·s${s}</span>`;
+const valTxt = v => Array.isArray(v) ? `[${v.length} items]` : JSON.stringify(v);
+
+/* outcome → tag class + label (squared uppercase tag — never a pill) */
+const OUT = {
+  local:    { label:'LOCAL',    cls:'local'    },
+  won:      { label:'WON',      cls:'won'      },
+  fence:    { label:'LOST·FENCE',    cls:'fence'    },
+  conflict: { label:'LOST·CONF',     cls:'conflict' },
+  dropped:  { label:'DROP·DEDUP',    cls:'dropped'  },
+  forwarded:{ label:'FWD',      cls:'forwarded'},
+};
+
+/* ---------- renderers ---------- */
+function renderVerdict(K){
+  const v = $('verdict');
+  v.dataset.state = K.verdict.state;
+  $('vsq').className = 'sq ' + (K.verdict.state === 'crit' ? 'bad' : 'ok');
+  $('vhead').textContent = K.verdict.head;
+  $('vbody').innerHTML = K.verdict.body;
+}
+
+function renderConsensus(K, key){
+  const c = K.consensus;
+  $('winMeta').textContent = `__inspect {versions:K} · servers only · ${c.total} nodes`;
+  $('consensus').innerHTML =
+    `<span class="field"><span class="lbl">key</span><span class="v">${esc(key)}</span></span>` +
+    `<span class="field"><span class="lbl">consensus</span><span class="v">${stamp(c.e, c.s)}</span></span>` +
+    `<span class="field"><span class="lbl">origin</span><span class="v uuid">${short(N[c.o].uuid)}</span></span>` +
+    `<span class="field"><span class="lbl">value</span><span class="v val">${esc(c.v)}</span></span>` +
+    `<span class="agree ${c.n === c.total ? 'ok' : 'bad'}">${c.n} / ${c.total} AGREE` +
+      (c.n === c.total ? '' : `<span class="sq bad" style="margin-left:8px"></span>`) + `</span>`;
+}
+
+function renderMatrix(K){
+  const c = K.consensus, body = $('matrix'); body.innerHTML = '';
+  for (const w of K.winners){
+    const n = N[w.n], diverged = !w.ok;
+    const tr = el('tr', diverged ? 'diverged' : '');
+    tr.innerHTML =
+      `<td><span class="nodecode">${w.n}</span></td>` +
+      `<td class="addr">${n.addr}</td>` +
+      `<td class="uuid" title="${n.uuid}">${short(n.uuid)}</td>` +
+      `<td class="n stamp">${w.e}</td>` +
+      `<td class="n stamp">${w.s}</td>` +
+      `<td class="uuid">${short(N[w.o].uuid)}</td>` +
+      `<td class="val">${esc(w.v)}</td>` +
+      `<td><span class="status-cell ${diverged ? 'bad' : 'ok'}">` +
+        (diverged ? `<span class="sq bad"></span>BEHIND ${c.e - w.e}e` : 'OK') + `</span></td>`;
+    body.appendChild(tr);
+    if (diverged && w.sub){
+      const sub = el('tr', 'diverged');
+      sub.innerHTML = `<td></td><td colspan="7" class="dsub">└─ ${esc(w.sub)}</td>`;
+      if (w.jump != null){ tr.onclick = () => jumpTo(w.jump); sub.onclick = () => jumpTo(w.jump); }
+      body.appendChild(sub);
+    }
+  }
+}
+
+function provJSON(r, K){
+  const kind = r.out === 'fence' || r.out === 'conflict' ? 'lost' : r.out;
+  const prov = { t:r.t, kind, origin:N[r.o].uuid, seq:r.s, epoch:r.e, key:Object.keys(KEYS).find(k => KEYS[k] === K) };
+  if (r.by) { prov.we = r.by.e; prov.ws = r.by.s; }
+  const record = { type:r.type || 'update', key:prov.key.split('.'), value:r.val, origin:N[r.o].uuid, seq:r.s, epoch:r.e };
+  return JSON.stringify({ prov, record }, null, 1).replace(/\n\s*/g, '\n  ');
+}
+
+function renderTimeline(K){
+  const body = $('timeline'); body.innerHTML = '';
+  for (const r of K.timeline){
+    if (r.view){
+      const vr = el('tr', 'viewrow');
+      vr.innerHTML = `<td colspan="6"><span class="vk">view</span>${esc(r.note)} <span class="faintt">· ${r.rx} ago</span></td>`;
+      body.appendChild(vr);
+      continue;
+    }
+    const o = OUT[r.out];
+    const tr = el('tr', 'r' + ((r.out === 'won' || r.out === 'local') && !r.cur ? ' superseded' : '') + (r.cur ? ' cur' : ''));
+    tr.dataset.out = r.out;
+    tr.dataset.t = r.t;
+    const age = r.rx
+      ? `<span class="ago" title="bridge receive-time — true write-time needs NEW timing on ProvRecords">${r.rx} <span class="faintt">t${r.t}</span></span>`
+      : `<span class="ago" title="delivered in the initial 256-slot ring history — no derivable age without NEW timing">t${r.t} <span class="faintt">ring</span></span>`;
+    tr.innerHTML =
+      `<td>${age}</td>` +
+      `<td><span class="tag ${o.cls}">${o.label}</span>${r.cur ? '<span class="tag cur">CURRENT</span>' : ''}</td>` +
+      `<td class="uuid" title="${N[r.o].uuid}">${short(N[r.o].uuid)}</td>` +
+      `<td>${stamp(r.e, r.s)}</td>` +
+      `<td class="val">${esc(valTxt(r.val))}</td>` +
+      `<td class="dimt">${r.type === 'insert' ? 'insert' : ''}</td>`;
+    tr.onclick = () => toggleRaw(tr);
+    body.appendChild(tr);
+
+    if (r.by){
+      const why = r.out === 'fence' ? 'epoch-fence (loser epoch &lt; winner epoch)' : 'same-epoch seq contention';
+      const b = el('tr', 'sub beat');
+      b.innerHTML = `<td></td><td colspan="5">├─ beaten by ${stamp(r.by.e, r.by.s)} origin ${short(N[r.by.o].uuid)} — ${why} <span class="why">· origin joined via we/ws ↔ ring won event (window-limited)</span></td>`;
+      body.appendChild(b);
+    }
+    if (r.note){
+      const nr = el('tr', 'sub note');
+      nr.innerHTML = `<td></td><td colspan="5">├─ ${esc(r.note)}</td>`;
+      body.appendChild(nr);
+    }
+    if (r.pin){
+      const pr = el('tr', 'sub pin');
+      pr.innerHTML = `<td></td><td colspan="5">${esc(r.pin)}</td>`;
+      body.appendChild(pr);
+    }
+    const raw = el('tr', 'raw');
+    raw.style.display = 'none';
+    raw.innerHTML = `<td colspan="6"><pre>${esc(provJSON(r, K))}</pre></td>`;
+    tr._raw = raw;
+    body.appendChild(raw);
+  }
+  applyFilter();
+}
+
+function toggleRaw(tr){
+  const raw = tr._raw; if (!raw) return;
+  raw.style.display = raw.style.display === 'none' ? '' : 'none';
+}
+
+/* jump always lands: reset filter first so the target row can't be display:none */
+function jumpTo(t){
+  if (filter !== 'all') setFilter('all');
+  const tr = document.querySelector(`#timeline tr.r[data-t="${t}"]`);
+  if (!tr) return;
+  tr.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+let filter = 'all';
+function applyFilter(){
+  const match = {
+    all:() => true,
+    losers:o => o === 'fence' || o === 'conflict' || o === 'dropped',
+    fence:o => o === 'fence',
+    conflict:o => o === 'conflict',
+    dedup:o => o === 'dropped',
+  }[filter];
+  // walk the tbody; a .r row decides visibility for itself + following sub/raw rows until next .r/.viewrow
+  let show = true;
+  document.querySelectorAll('#timeline tr').forEach(tr => {
+    if (tr.classList.contains('r')){ show = match(tr.dataset.out); tr.style.display = show ? '' : 'none'; }
+    else if (tr.classList.contains('viewrow')){ tr.style.display = filter === 'all' ? '' : 'none'; }
+    else if (tr.classList.contains('raw')){ tr.style.display = 'none'; } // collapse raw on filter change
+    else { tr.style.display = show ? '' : 'none'; } // sub rows follow their .r
+  });
+}
+function setFilter(f){
+  filter = f;
+  document.querySelectorAll('#tlFilters button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === f));
+  applyFilter();
+}
+$('tlFilters').onclick = e => { const b = e.target.closest('button'); if (b) setFilter(b.dataset.f); };
+
+function renderOwnership(K){
+  $('ownMeta').textContent = `ring.coverage · epoch e${K.epoch}`;
+  $('ownKv').innerHTML =
+    `<tr><td class="k">partition</td><td><b style="color:var(--ink)">${esc(K.partition)}</b> <span class="dimt">(top-level key of the dotted path)</span></td></tr>` +
+    `<tr><td class="k">segment</td><td class="stamp">${K.segment} <span class="dimt">/ 120</span></td></tr>` +
+    `<tr><td class="k">owner</td><td>${N[K.owner].addr} <span class="uuid">${short(N[K.owner].uuid)}</span></td></tr>` +
+    `<tr><td class="k">replica set</td><td class="dimt">${esc(K.replicas)}</td></tr>` +
+    `<tr><td class="k">ownership</td><td class="move"><span class="sq ${K.moved.state}"></span>${esc(K.moved.text)}</td></tr>`;
+  // 1px-tall 120-cell ownership strip — only this key's segment is lit (neutral, per spec)
+  const strip = $('ownStrip'); strip.innerHTML = '';
+  for (let i = 0; i < 120; i++){
+    const s = el('span');
+    if (i === K.segment){ s.className = 'hit'; s.title = `seg ${K.segment} → ${N[K.owner].addr}`; }
+    strip.appendChild(s);
+  }
+  $('stripMid').textContent = 'seg ' + K.segment;
+  $('stripCap').innerHTML =
+    `neutral position strip — owner colors for all 120 segments live in the ` +
+    `<a href="../../observe/web/index.html" title="shipped cluster dashboard">dashboard ownership heatmap</a>`;
+}
+
+function renderRoute(K){
+  $('routeMeta').textContent = `${K.route.desc} · ${K.route.ago} ago`;
+  const body = $('route'); body.innerHTML = '';
+  K.route.hops.forEach((h, i) => {
+    const tr = el('tr');
+    const n = N[h.n], who = n.client ? `${short(n.uuid)} <span class="dimt">client</span>` : `${n.addr} <span class="uuid">${short(n.uuid)}</span>`;
+    tr.innerHTML =
+      `<td class="stage">${esc(h.stage)}</td>` +
+      `<td class="arrow">${i ? '→' : ''}</td>` +
+      `<td class="who">${who}</td>`;
+    body.appendChild(tr);
+    const sub = el('tr');
+    sub.innerHTML = `<td></td><td class="arrow"></td><td class="sub">${esc(h.sub)}</td>`;
+    body.appendChild(sub);
+  });
+  // replica fan-out
+  $('fanLbl').textContent = 'replicate · ' + K.route.fan.sub;
+  $('fan').innerHTML = K.route.fan.peers.map(p =>
+    `<span class="cell${p.ok ? '' : ' bad'}" title="${N[p.n].uuid}">${port(p.n)} ` +
+    `<span class="st">${p.ok ? 'WON' : 'NO WON'}</span>${p.note ? ' <span class="st">' + esc(p.note) + '</span>' : ''}</span>`
+  ).join('');
+}
+
+function renderDensity(K){
+  // thin version-density bar: one cell per timeline event (excl. view dividers), colored by outcome edge
+  const COL = { local:'var(--accent)', won:'var(--accent-dim)', fence:'var(--amber)', conflict:'var(--bad)', dropped:'var(--faint)', forwarded:'var(--accent-dim)' };
+  const evs = K.timeline.filter(r => !r.view);
+  const bar = $('densBar'); bar.innerHTML = '';
+  // oldest → newest left-to-right (reverse of the newest-first table)
+  [...evs].reverse().forEach(r => {
+    const s = el('span'); s.style.setProperty('--c', COL[r.out]);
+    s.style.height = (r.out === 'local' || r.out === 'won' ? 18 : 11) + 'px';
+    s.title = `${OUT[r.out].label} · e${r.e}·s${r.s}`;
+    bar.appendChild(s);
+  });
+  const tally = {};
+  evs.forEach(r => tally[r.out] = (tally[r.out] || 0) + 1);
+  const ORDER2 = ['local','won','conflict','fence','dropped','forwarded'];
+  $('densKey').innerHTML = ORDER2.filter(o => tally[o]).map(o =>
+    `<span class="k" style="--c:${COL[o]}"><i></i>${OUT[o].label.toLowerCase()} ${tally[o]}</span>`
+  ).join('');
+}
+
+/* ---------- entry: rail key table (worst first) + lookup ---------- */
+function show(key){
+  const K = KEYS[key];
+  $('keymiss').style.display = K ? 'none' : '';
+  if (!K) return;
+  $('keyInput').value = key;
+  try { history.replaceState(null, '', '#' + encodeURIComponent(key)); } catch {}
+  document.querySelectorAll('#keyRows tr').forEach(tr => tr.setAttribute('aria-selected', tr.dataset.key === key));
+  filter = 'all';
+  document.querySelectorAll('#tlFilters button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === 'all'));
+  renderVerdict(K); renderConsensus(K, key); renderMatrix(K);
+  renderTimeline(K); renderOwnership(K); renderRoute(K); renderDensity(K);
+  // status bar derives from the model, not hard-coded markup: server count + this key's epoch
+  $('sbMembers').textContent = MEMBERS.length + ' srv';
+  $('sbEpoch').textContent = 'e' + K.epoch;
+}
+
+// sort proxy: per-key cross-node stamp diff, worst first
+const ORDER = Object.keys(KEYS).map(key => {
+  const K = KEYS[key];
+  const dissent = K.winners.filter(w => !w.ok).length;
+  const losses = K.timeline.filter(r => r.out === 'fence' || r.out === 'conflict' || r.out === 'dropped').length;
+  return { key, dissent, losses, total: K.winners.length, epoch: K.epoch };
+}).sort((a, b) => b.dissent - a.dissent || b.losses - a.losses);
+
+const rows = $('keyRows');
+for (const o of ORDER){
+  $('keyList').appendChild(el('option', null)).value = o.key;
+  const tr = el('tr');
+  tr.dataset.key = o.key;
+  const dCls = o.dissent ? 'bad' : 'zero';
+  const lCls = o.losses ? 'amber' : 'zero';
+  const sq = o.dissent ? '<span class="sq bad"></span>' : o.losses ? '<span class="sq amber"></span>' : '<span class="sq ok"></span>';
+  tr.innerHTML =
+    `<td class="k" title="${esc(o.key)}">${sq}${esc(o.key)}</td>` +
+    `<td class="n ${dCls}">${o.dissent ? o.dissent + '/' + o.total : '0'}</td>` +
+    `<td class="n ${lCls}">${o.losses || '0'}</td>` +
+    `<td class="n">e${o.epoch}</td>`;
+  tr.onclick = () => show(o.key);
+  rows.appendChild(tr);
+}
+
+// status bar tallies
+$('sbDiv').textContent = ORDER.filter(o => o.dissent).length;
+
+$('keyInput').addEventListener('change', e => show(e.target.value.trim()));
+$('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') show(e.target.value.trim()); });
+window.addEventListener('hashchange', () => {
+  const k = decodeURIComponent(location.hash.slice(1));
+  if (KEYS[k]) show(k);
+});
+const fromHash = decodeURIComponent(location.hash.slice(1));
+show(KEYS[fromHash] ? fromHash : ORDER[0].key);
+</script>
+</body>
+</html>

@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RESOURCE LEDGER · sessions · folio 4</title>
+<style>
+  /* ============================================================
+     ART DIRECTION: the accounting LEDGER / hospital chart.
+     Warm manila paper, red-rule margin + ruled feint lines,
+     typewriter face, red-and-black ink ONLY, rubber-stamp status.
+     Deliberately analog — the opposite of a dark dashboard.
+     ============================================================ */
+  :root{
+    --paper:#f4ead2;            /* manila / cream stock        */
+    --paper-2:#efe2c4;          /* darker fibre for the band   */
+    --ink:#26211a;             /* near-black iron-gall ink    */
+    --ink-soft:#5c5345;        /* faded pencil / aged ink     */
+    --ink-faint:#8a7f6b;       /* marginalia                  */
+    --red:#9c2b1f;             /* ledger red rule + stamp ink */
+    --red-soft:#b8584c;
+    --rule:#c9b78f;            /* feint horizontal rule       */
+    --rule-blue:#9fb0bd;       /* the pale blue feint line    */
+    --green-stamp:#3d5e3a;     /* "ENTERED" / paid green ink  */
+  }
+  *{box-sizing:border-box}
+  html{background:#2a2620}
+  body{
+    margin:0;color:var(--ink);
+    font:15px/1.62 "Courier New",Courier,"Nimbus Mono PS",monospace;
+    /* paper: warm base + faint fibre mottle + age vignette */
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.22), transparent 60%),
+      radial-gradient(150% 120% at 50% 120%, rgba(120,80,30,.16), transparent 55%),
+      repeating-linear-gradient(0deg, transparent 0 3px, rgba(120,90,40,.012) 3px 4px),
+      repeating-linear-gradient(90deg, transparent 0 5px, rgba(120,90,40,.010) 5px 6px),
+      var(--paper);
+    -webkit-font-smoothing:antialiased;
+  }
+  .serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif}
+  b{font-weight:700;color:var(--ink)}
+  a{color:var(--red);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* the bound page — a tall sheet with a guttered red margin rule */
+  .sheet{
+    max-width:880px;margin:30px auto 70px;background:transparent;position:relative;
+    padding:0 40px 56px 84px;
+    /* the classic double red margin rule down the left + a faint right rule */
+    background-image:
+      linear-gradient(90deg, transparent 60px, var(--red) 60px 61px, transparent 61px 65px, var(--red-soft) 65px 65.7px, transparent 65.7px),
+      linear-gradient(90deg, transparent calc(100% - 22px), var(--rule-blue) calc(100% - 22px) calc(100% - 21.3px), transparent calc(100% - 21.3px));
+    box-shadow:0 2px 0 rgba(0,0,0,.04), 0 20px 60px -22px rgba(0,0,0,.55);
+    border:1px solid rgba(120,90,40,.25);
+  }
+  /* punch holes down the gutter — chart-binder feel */
+  .holes{position:absolute;left:24px;top:0;bottom:0;width:18px;pointer-events:none}
+  .holes i{position:absolute;left:0;width:15px;height:15px;border-radius:50%;
+    background:radial-gradient(circle at 38% 34%, #d8c79f, #b39f74 60%, #8d7c54);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.35)}
+
+  /* ===== LOGBOOK HEADER (the summary as a chart masthead) ===== */
+  header{position:relative;padding-top:28px}
+  .stamp-mock{position:absolute;right:0;top:18px;transform:rotate(6deg);
+    color:var(--ink-faint);border:2px solid var(--ink-faint);border-radius:3px;
+    font-size:10px;letter-spacing:.18em;padding:3px 8px;opacity:.6;font-weight:700}
+  .crumb{font-size:12px;color:var(--ink-soft);letter-spacing:.04em}
+  .crumb a{color:var(--ink-soft);border-bottom:1px dotted var(--ink-faint)}
+  .crumb a:hover{color:var(--red)}
+
+  .masthead{margin-top:14px;border-top:3px double var(--ink);border-bottom:3px double var(--ink);padding:12px 2px 14px}
+  .masthead .title{font-family:"Iowan Old Style",Palatino,Georgia,serif;
+    font-size:30px;font-weight:700;letter-spacing:.02em;line-height:1.05;color:var(--ink)}
+  .masthead .title .res{font-style:italic}
+  .masthead .folio{float:right;text-align:right;font-size:12px;color:var(--ink-soft);line-height:1.5;letter-spacing:.03em}
+  .masthead .folio .big{font-family:"Iowan Old Style",Palatino,serif;font-size:18px;color:var(--ink);font-weight:700}
+  .masthead .subline{margin-top:6px;font-size:13px;color:var(--ink-soft);letter-spacing:.02em}
+
+  /* the disposition stamp that sits on the masthead */
+  .stamp{display:inline-block;font-family:"Iowan Old Style",Palatino,serif;font-weight:800;
+    letter-spacing:.06em;text-transform:uppercase;border:3px solid currentColor;border-radius:5px;
+    padding:5px 13px 6px;line-height:1;color:var(--green-stamp);transform:rotate(-7deg);
+    box-shadow:inset 0 0 0 1px currentColor;position:relative;font-size:19px;
+    /* ink-bleed mottle so it reads as rubber, not a button */
+    -webkit-mask-image:radial-gradient(circle at 20% 30%, #000 92%, transparent 0),
+      radial-gradient(circle at 80% 70%, #000 90%, transparent 0), linear-gradient(#000,#000);
+    mask-composite:add}
+  .stamp.bad{color:var(--red);transform:rotate(-9deg)}
+  .stamp::after{content:"";position:absolute;inset:-2px;border:1px solid currentColor;border-radius:6px;opacity:.35}
+  .stamp .sub{display:block;font-family:"Courier New",monospace;font-size:9px;font-weight:700;
+    letter-spacing:.22em;margin-top:3px;text-align:center}
+  .stamprow{margin-top:16px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .stamprow .verdict{font-size:13px;color:var(--ink-soft);max-width:430px}
+  .stamprow .verdict b{color:var(--ink)}
+
+  /* ===== the ledger TALLY strip (rollup) — columns ruled like a cashbook ===== */
+  .tally{margin-top:20px;display:grid;grid-template-columns:repeat(5,1fr);
+    border:1.5px solid var(--ink);background:rgba(255,255,255,.16)}
+  .tally .cell{padding:9px 12px 10px;border-right:1px solid var(--rule)}
+  .tally .cell:last-child{border-right:none}
+  .tally .cap{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);
+    border-bottom:1px solid var(--rule);padding-bottom:4px;margin-bottom:6px}
+  .tally .fig{font-family:"Iowan Old Style",Palatino,serif;font-size:25px;font-weight:700;color:var(--ink)}
+  .tally .fig.red{color:var(--red)} .tally .fig.muted{color:var(--ink-soft)}
+  .tally .unit{font-size:11px;color:var(--ink-soft);margin-top:1px}
+
+  /* ===== SCENARIO selector — a chart "circle one" toggle ===== */
+  .scen{margin-top:26px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .scen .ask{font-size:12px;color:var(--ink-soft);font-style:italic;font-family:"Iowan Old Style",Palatino,serif}
+  .scen .opts{display:flex;gap:0;border:1.5px solid var(--ink)}
+  .scen button{background:transparent;border:none;border-right:1.5px solid var(--ink);
+    font:inherit;font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft);
+    padding:7px 16px;cursor:pointer;position:relative}
+  .scen button:last-child{border-right:none}
+  .scen button:hover{color:var(--ink)}
+  .scen button[aria-pressed=true]{color:var(--paper);background:var(--ink)}
+  .scen button[aria-pressed=true]::after{content:"✓";margin-left:7px;color:var(--paper)}
+
+  /* ===== section headings — chart rubrics with a hand-ruled underline ===== */
+  .rubric{margin-top:38px;display:flex;align-items:baseline;gap:12px;
+    border-bottom:2px solid var(--ink);padding-bottom:4px}
+  .rubric h2{margin:0;font-family:"Iowan Old Style",Palatino,Georgia,serif;
+    font-size:19px;font-weight:700;letter-spacing:.01em;color:var(--ink)}
+  .rubric .no{font-size:12px;color:var(--red);font-weight:700}
+  .rubric .note{margin-left:auto;font-size:12px;color:var(--ink-soft);font-style:italic}
+
+  /* ===== THE LEDGER ENTRIES (needs-attention, worst-first) ===== */
+  .ledger{margin-top:6px}
+  /* the column heads, like a cashbook */
+  .lhead{display:grid;grid-template-columns:78px 168px 1fr 150px;gap:0;
+    font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);
+    border-bottom:1.5px solid var(--ink);padding:0 0 4px}
+  .lhead span{padding:0 10px;border-right:1px solid var(--rule)}.lhead span:last-child{border-right:none}
+  /* each entry row sits on a feint ruled line, columns divided by faint verticals */
+  .entry{display:grid;grid-template-columns:78px 168px 1fr 150px;align-items:center;
+    cursor:pointer;text-decoration:none;color:inherit;
+    background:repeating-linear-gradient(0deg, transparent 0 30px, var(--rule) 30px 31px);
+    min-height:62px}
+  .entry>div{padding:9px 10px;border-right:1px solid var(--rule);align-self:stretch;display:flex;flex-direction:column;justify-content:center}
+  .entry>div:last-child{border-right:none}
+  .entry:hover{background:rgba(156,43,31,.06)}
+  .entry:hover .col-do{color:var(--red)}
+  .entry .col-age{font-size:12px;color:var(--ink-soft)}
+  .entry .col-age .d{color:var(--ink);font-weight:700}
+  .entry .col-key{font-weight:700;color:var(--ink);font-size:15px;word-break:break-all}
+  .entry .col-key .seg{display:block;font-size:11px;font-weight:400;color:var(--ink-soft);font-style:italic;font-family:"Iowan Old Style",Palatino,serif}
+  .entry .col-note{font-size:13px;color:var(--ink-soft);line-height:1.5}
+  .entry .col-note b{color:var(--ink)} .entry .col-note .v{color:var(--red);font-weight:700}
+  .entry .col-do{font-size:12px;color:var(--ink-soft);display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  .entry .col-do .open{border-bottom:1px solid currentColor}
+
+  /* small inline disposition stamp inside an entry */
+  .estamp{align-self:flex-start;font-family:"Iowan Old Style",Palatino,serif;font-weight:800;
+    font-size:12px;letter-spacing:.05em;text-transform:uppercase;border:2px solid currentColor;
+    border-radius:3px;padding:2px 7px;line-height:1.05;transform:rotate(-4deg);color:var(--red)}
+  .estamp.warn{color:#9a6a14;transform:rotate(3deg)}
+
+  /* ALL-CLEAR (healthy) — a struck-through "no entries this folio" line */
+  .allclear{margin-top:10px;border:1.5px solid var(--ink);padding:22px 24px;
+    background:repeating-linear-gradient(0deg, transparent 0 30px, var(--rule) 30px 31px)}
+  .allclear .big{font-family:"Iowan Old Style",Palatino,serif;font-size:20px;color:var(--green-stamp);font-weight:700}
+  .allclear .big .nil{font-family:"Courier New",monospace;font-style:italic;color:var(--ink-soft);font-weight:400;font-size:15px}
+  .allclear .sub{margin-top:6px;font-size:12.5px;color:var(--ink-soft);font-style:italic;max-width:560px;line-height:1.55;font-family:"Iowan Old Style",Palatino,serif}
+  .nilstamp{float:right;color:var(--green-stamp);border:2.5px solid currentColor;border-radius:4px;
+    font-family:"Iowan Old Style",serif;font-weight:800;letter-spacing:.1em;font-size:15px;
+    padding:5px 11px;transform:rotate(7deg);text-transform:uppercase}
+
+  /* ===== two facing columns: DAY-BOOK (activity) + REGISTER (partitions) ===== */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:8px}
+  @media(max-width:720px){.cols{grid-template-columns:1fr}}
+  .rate{display:flex;gap:30px;margin:10px 0 16px;border-bottom:1px solid var(--rule);padding-bottom:12px}
+  .rate .r .fig{font-family:"Iowan Old Style",Palatino,serif;font-size:26px;font-weight:700;color:var(--ink)}
+  .rate .r .fig.red{color:var(--red)} .rate .r .fig.green{color:var(--green-stamp)}
+  .rate .r .lab{font-size:11px;letter-spacing:.04em;color:var(--ink-soft);text-transform:uppercase}
+  .hot{font-size:13px}
+  .hot .hr{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;
+    border-bottom:1px dotted var(--rule)}
+  .hot .hr:last-child{border-bottom:none}
+  .hot .hr .k{color:var(--ink);font-weight:700}
+  .hot .hr .leader{flex:1;border-bottom:1px dotted var(--ink-faint);margin:0 8px 4px}
+  .hot .hr .v{color:var(--ink-soft);font-variant-numeric:tabular-nums}
+
+  /* partition register: ruled book rows, owner & replica tally */
+  .reg{font-size:13px;margin-top:6px}
+  .reg .rh{display:grid;grid-template-columns:1fr 78px 70px;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink-soft);border-bottom:1.5px solid var(--ink);padding-bottom:3px}
+  .reg .rr{display:grid;grid-template-columns:1fr 78px 70px;align-items:center;padding:6px 2px;
+    border-bottom:1px solid var(--rule)}
+  .reg .rr:last-child{border-bottom:none}
+  .reg .rr .pn{color:var(--ink);font-weight:700}
+  .reg .rr .po{color:var(--ink-soft);font-size:12px}
+  .reg .rr .rep{text-align:right;color:var(--ink-soft);font-variant-numeric:tabular-nums;font-weight:700}
+  .reg .rr.under{background:rgba(156,43,31,.07)}
+  .reg .rr.under .pn{color:var(--red)}
+  .reg .rr.under .rep{color:var(--red)}
+  .reg .rr.under .flag{display:block;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--red);
+    text-transform:uppercase;font-family:"Iowan Old Style",serif;transform:rotate(-2deg)}
+
+  /* ===== footer furniture: recorded-by line + provenance marginalia ===== */
+  .footer{margin-top:42px;border-top:3px double var(--ink);padding-top:12px;
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px}
+  .recorded{font-size:12px;color:var(--ink-soft);font-style:italic;font-family:"Iowan Old Style",Palatino,serif}
+  .recorded .sig{font-family:"Iowan Old Style",Palatino,serif;font-size:22px;color:var(--ink);
+    font-style:italic;border-bottom:1px solid var(--ink);padding-bottom:1px}
+  .folionum{font-size:12px;color:var(--ink-soft);letter-spacing:.1em}
+
+  /* provenance — fine-print "notes on the entries" in marginalia voice */
+  details.notes{margin-top:26px}
+  details.notes>summary{cursor:pointer;list-style:none;font-style:italic;color:var(--ink-soft);
+    font-size:13px;border-bottom:1px dotted var(--ink-faint);display:inline-block;padding-bottom:2px}
+  details.notes>summary::-webkit-details-marker{display:none}
+  details.notes>summary::before{content:"§ ";color:var(--red);font-style:normal;font-weight:700}
+  .prov{font-size:12px;color:var(--ink-soft);line-height:1.65;margin-top:12px;max-width:740px;
+    padding-left:18px;border-left:2px solid var(--rule)}
+  .prov p{margin:9px 0;position:relative}
+  .prov p::before{content:"—";position:absolute;left:-18px;color:var(--ink-faint)}
+  .prov b{color:var(--ink)} .prov .mono{font-family:"Courier New",monospace;background:rgba(120,90,40,.1);padding:0 3px}
+  .prov .newflag{color:var(--red);font-weight:700;border:1.5px solid var(--red);border-radius:3px;
+    padding:0 5px;font-size:11px;letter-spacing:.08em;transform:rotate(-2deg);display:inline-block}
+  .prov .t{border-bottom:1px dotted var(--ink-faint);cursor:help}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="holes" id="holes"></div>
+
+  <header>
+    <div class="stamp-mock">MOCKUP · STATIC ENTRIES</div>
+    <div class="crumb"><a href="../ia-map.html">Cluster Book</a> &nbsp;»&nbsp; Resource Ledger &nbsp;»&nbsp; folio: <b>sessions</b></div>
+
+    <div class="masthead">
+      <div class="folio">
+        recorded <span class="big" id="viewE">e4</span> &nbsp;·&nbsp; <span id="memN">5</span> members<br>
+        folio no. <b>4</b> &nbsp;·&nbsp; ledger of record
+      </div>
+      <div class="title">Resource Ledger<br><span class="res" id="resName">"sessions"</span></div>
+    </div>
+
+    <div class="stamprow">
+      <span class="stamp" id="bigStamp">Balanced<span class="sub" id="stampSub">ALL ACCOUNTS RECONCILED</span></span>
+      <span class="verdict" id="verdict"></span>
+    </div>
+
+    <div class="tally" id="tally"></div>
+
+    <div class="scen">
+      <span class="ask">Examiner — circle the condition of this folio:</span>
+      <div class="opts" id="scen"></div>
+    </div>
+  </header>
+
+  <!-- THE FOCUS: ledger entries needing disposition, worst debt first -->
+  <div class="rubric"><span class="no">I.</span><h2>Entries Outstanding</h2><span class="note" id="ledgerNote"></span></div>
+  <div id="att"></div>
+
+  <div class="cols">
+    <section>
+      <div class="rubric"><span class="no">II.</span><h2>Day-book</h2><span class="note">posted / minute</span></div>
+      <div class="rate" id="rate"></div>
+      <div style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;border-bottom:1px solid var(--ink);padding-bottom:3px">Keys most posted</div>
+      <div class="hot" id="hot"></div>
+    </section>
+    <section>
+      <div class="rubric"><span class="no">III.</span><h2>Partition Register</h2><span class="note">8 ledgers</span></div>
+      <div class="reg">
+        <div class="rh"><span>Sub-ledger</span><span style="text-align:left;padding-left:4px">Keeper</span><span style="text-align:right">Copies</span></div>
+        <div id="parts"></div>
+      </div>
+    </section>
+  </div>
+
+  <details class="notes"><summary>Notes on the entries (provenance of figures)</summary>
+    <div class="prov" id="prov"></div>
+  </details>
+
+  <div class="footer">
+    <div class="recorded">Entered &amp; reconciled by node <span class="sig">:49801</span>,&nbsp; keeper of the ring.</div>
+    <div class="folionum">FOLIO 4 — sessions — pp. 1</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const KEYPAGE = '../key-autopsy/happy.html';   // drill target — the Key autopsy
+
+/* A resource ledger is the sum of every key's account. Balanced = every account reconciled,
+   so the page reads calm and Entries Outstanding is a struck "nil" line. Trouble surfaces ONLY
+   as outstanding entries, worst debt first, each drilling into the key's autopsy folio. */
+const SCEN = {
+  healthy:{
+    label:'Balanced',
+    stampWord:'Balanced', stampSub:'ALL ACCOUNTS RECONCILED', stampBad:false,
+    viewE:'e4', memN:'5',
+    verdict:'<b>1,284 of 1,284</b> accounts reconciled at view <b>e4</b>. No divergence, no contention, all sub-ledgers at full copy. A quiet folio.',
+    tally:[
+      {cap:'keys on folio', fig:'1,284', cls:'', unit:'accounts'},
+      {cap:'reconciled', fig:'1,284', cls:'', unit:'converged'},
+      {cap:'in dispute', fig:'0', cls:'muted', unit:'diverged'},
+      {cap:'contended', fig:'0', cls:'muted', unit:'last 60s'},
+      {cap:'sub-ledgers', fig:'8', cls:'', unit:'partitions'},
+    ],
+    att:[],
+    rate:[ {fig:'142', lab:'writes / s', cls:''}, {fig:'0', lab:'conflicts / s', cls:'green'} ],
+    hot:[ ['user42.score','38 w/s'], ['cart7.items','21 w/s'], ['order7.lines','14 w/s'], ['user43.name','9 w/s'] ],
+    parts:[
+      {n:'user42', o:':49801', rep:'5/5'}, {n:'cart7', o:':49805', rep:'5/5'}, {n:'order7', o:':49803', rep:'5/5'},
+      {n:'user43', o:':49809', rep:'5/5'}, {n:'billing', o:':49807', rep:'5/5'}, {n:'session', o:':49801', rep:'5/5'},
+      {n:'audit', o:':49805', rep:'5/5'}, {n:'prefs', o:':49809', rep:'5/5'},
+    ],
+  },
+  attention:{
+    label:'Needs attention',
+    stampWord:'In Arrears', stampSub:'ACCOUNTS UNRECONCILED', stampBad:true,
+    viewE:'e4', memN:'5',
+    verdict:'<b>3 accounts unreconciled</b> at view <b>e4</b>: two in dispute, one contended, and a sub-ledger short a copy. Settle the worst debt first.',
+    tally:[
+      {cap:'keys on folio', fig:'1,284', cls:'', unit:'accounts'},
+      {cap:'reconciled', fig:'1,281', cls:'', unit:'converged'},
+      {cap:'in dispute', fig:'2', cls:'red', unit:'diverged'},
+      {cap:'contended', fig:'1', cls:'red', unit:'last 60s'},
+      {cap:'sub-ledgers', fig:'8', cls:'', unit:'1 short'},
+    ],
+    att:[
+      {age:'64s', key:'user42.score', seg:'sessions › key', stamp:'Diverged', warn:false, href:KEYPAGE+'#diverged',
+        note:'Keeper <b>:49807</b> still posts <b>e3·s1241</b> ("<span class="v">5</span>") while four replicas hold <b>e4·s1287</b> ("<span class="v">8</span>"). Stale entry, not yet superseded.'},
+      {age:'12s', key:'cart9.total', seg:'sessions › key', stamp:'Diverged', warn:false, href:KEYPAGE,
+        note:'Keeper <b>:49803</b> missed the <b>e4</b> posting — <span class="v">12s behind</span> and not yet draining its backlog.'},
+      {age:'60s', key:'order7.lines', seg:'sessions › key', stamp:'Contended', warn:true, href:KEYPAGE,
+        note:'<span class="v">3</span> same-epoch conflicts in 60s — a genuine write-write hotspot, not rebalance churn.'},
+      {age:'e4', key:'billing', seg:'partition · sub-ledger', stamp:'Under-Repl.', warn:false, href:'#',
+        note:'Held on <b>2 of 3</b> copies since the <b>e4</b> rebalance — an orphan awaiting confirmed shed.'},
+    ],
+    rate:[ {fig:'168', lab:'writes / s', cls:''}, {fig:'0.4', lab:'conflicts / s', cls:'red'} ],
+    hot:[ ['order7.lines','61 w/s'], ['user42.score','40 w/s'], ['cart7.items','19 w/s'], ['cart9.total','11 w/s'] ],
+    parts:[
+      {n:'user42', o:':49801', rep:'5/5'}, {n:'cart7', o:':49805', rep:'5/5'}, {n:'order7', o:':49803', rep:'5/5'},
+      {n:'cart9', o:':49803', rep:'5/5'}, {n:'billing', o:':49807', rep:'2/3', under:true}, {n:'session', o:':49801', rep:'5/5'},
+      {n:'audit', o:':49805', rep:'5/5'}, {n:'prefs', o:':49809', rep:'5/5'},
+    ],
+  },
+};
+const ORDER = ['healthy','attention'];
+const $ = id => document.getElementById(id);
+
+// punch a column of binder holes down the gutter
+(function(){ let h=''; for(let i=0;i<26;i++) h+=`<i style="top:${26+i*32}px"></i>`; $('holes').innerHTML=h; })();
+
+const PROV = `
+  <p><b>Reconciliation tally &amp; outstanding entries.</b> Dispute per account is read from the
+  <span class="newflag">⚠ NEW</span> per-key version sample (<span class="mono">__inspect{versions:K}</span>,
+  scoped to this folio) cross-merged on node <b>uuid</b> [A]; contention is tallied from the
+  <span class="mono">__observe</span> stream's <b>lost</b> postings carrying <b>we=epoch</b> (same-epoch) [B].
+  The outstanding list is the <span class="t" title="worst debt first — you arrive by an alarm or by opening the folio, never by guessing key names">work queue</span>:
+  strike an entry by opening its key autopsy.</p>
+  <p><b>Day-book rates &amp; most-posted keys.</b> The bridge's per-minute write / conflict roll-up plus
+  the top-K busiest keys from <span class="mono">__observe</span> [B], scoped to this folio. (The shipped
+  dashboard's hot-keys panel is cluster-wide; this register is folio-scoped and posts straight into keys.)</p>
+  <p><b>Partition register (keeper &amp; copies).</b> Keeper drawn from <span class="mono">ring.coverage</span>;
+  copies counted against <b>R</b>; under-replication / orphan from snapshot <b>orphans</b> plus the cover diff [A][E].
+  Ledger size from <span class="mono">log.size</span> [A].</p>
+`;
+
+function render(id){
+  const s = SCEN[id];
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===id));
+  try{ history.replaceState(null,'','#'+id); }catch{}
+
+  $('viewE').textContent = s.viewE; $('memN').textContent = s.memN;
+  const st = $('bigStamp');
+  st.className = 'stamp' + (s.stampBad?' bad':'');
+  st.firstChild.nodeValue = s.stampWord;
+  $('stampSub').textContent = s.stampSub;
+  $('verdict').innerHTML = s.verdict;
+
+  $('tally').innerHTML = s.tally.map(t=>
+    `<div class="cell"><div class="cap">${t.cap}</div><div class="fig ${t.cls}">${t.fig}</div><div class="unit">${t.unit}</div></div>`
+  ).join('');
+
+  // Entries Outstanding (or the struck nil line)
+  if (!s.att.length){
+    $('ledgerNote').textContent = 'nothing carried forward';
+    $('att').innerHTML = `<div class="allclear">
+      <span class="nilstamp">NIL</span>
+      <div class="big">No entries outstanding. &nbsp;<span class="nil">— all 1,284 accounts reconciled —</span></div>
+      <div class="sub">A reconciled folio is meant to be empty. Entries are posted here only when an account
+      falls into dispute, a sub-ledger drops below full copy, or contention spikes.</div>
+    </div>`;
+  } else {
+    $('ledgerNote').textContent = `${s.att.length} carried forward · worst debt first`;
+    let body = `<div class="ledger"><div class="lhead"><span>Age</span><span>Account</span><span>Entry</span><span>Disposition</span></div>`;
+    body += s.att.map(a=>{
+      const isPart = a.key && a.seg.indexOf('partition')===0;
+      const doText = a.href!=='#'
+        ? `<span class="estamp ${a.warn?'warn':''}">${a.stamp}</span><span class="col-do-go open">open autopsy →</span>`
+        : `<span class="estamp ${a.warn?'warn':''}">${a.stamp}</span><span class="col-do-go">partition page</span>`;
+      return `<a class="entry" href="${a.href}" data-href="${a.href}">`+
+        `<div class="col-age"><span class="d">${a.age}</span><span style="font-size:10px;color:var(--ink-faint)">ago / since</span></div>`+
+        `<div class="col-key">${a.key}<span class="seg">${a.seg}</span></div>`+
+        `<div class="col-note">${a.note}</div>`+
+        `<div class="col-do">${doText}</div>`+
+      `</a>`;
+    }).join('');
+    body += `</div>`;
+    $('att').innerHTML = body;
+  }
+
+  $('rate').innerHTML = s.rate.map(r=>`<div class="r"><div class="fig ${r.cls}">${r.fig}</div><div class="lab">${r.lab}</div></div>`).join('');
+  $('hot').innerHTML = s.hot.map(([k,v])=>`<div class="hr"><span class="k">${k}</span><span class="leader"></span><span class="v">${v}</span></div>`).join('');
+  $('parts').innerHTML = s.parts.map(p=>
+    `<div class="rr ${p.under?'under':''}"><span class="pn">${p.n}${p.under?'<span class="flag">⟶ short one copy</span>':''}</span><span class="po">${p.o}</span><span class="rep">${p.rep}</span></div>`
+  ).join('');
+}
+
+// row → drill into the key autopsy (prevent the # placeholder from jumping)
+$('att').addEventListener('click', e=>{
+  const a = e.target.closest('.entry'); if(!a) return;
+  if (a.dataset.href === '#'){ e.preventDefault(); }
+});
+
+const sc = $('scen');
+for (const id of ORDER){
+  const b = document.createElement('button'); b.dataset.id=id;
+  b.textContent = id==='healthy' ? 'Balanced' : 'Needs attention';
+  b.onclick = ()=>render(id);
+  sc.appendChild(b);
+}
+$('prov').innerHTML = PROV;
+const fromHash = location.hash.slice(1);
+render(SCEN[fromHash] ? fromHash : 'healthy');
+</script>
+</body>
+</html>
