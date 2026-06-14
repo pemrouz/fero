@@ -106,7 +106,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // observeVerbose: also stream dedup-drops (the highest-frequency, least-useful event) — OFF by default even when observe is on (plan §6).
   const observeVerbose = typeof observeOpt === 'object' && observeOpt !== null && (observeOpt as ObserveOpts).verbose === true
   // snapshot: forward-declared so `defaults.__inspect` can close over it; assigned after dispatch (its servedCount dep) exists.
-  let snapshot: () => InspectSnapshot = () => {
+  let snapshot: (opts?: { sample?: string[] }) => InspectSnapshot = () => {
     throw new Error('fero: inspect snapshot not ready')
   }
 
@@ -777,7 +777,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     remove: (chg, c) => writeWithConfirm(chg, () => delPath(c.data, norm(chg?.key))),
   }
   // __inspect: gated L4 pull method — returns this node's InspectSnapshot to a remote observer (registered only when observe is on).
-  if (observeOn) defaults.__inspect = () => snapshot()
+  if (observeOn) defaults.__inspect = (arg) => snapshot(arg as { sample?: string[] } | undefined)
   const allMethods: Record<string, Method> = { ...defaults, ...methods }
 
   const context: Context = { data, cluster, log, name, methods: undefined as any, peer: undefined }

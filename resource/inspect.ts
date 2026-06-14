@@ -29,6 +29,9 @@ import type { RingSnapshot } from '../transport/index.ts'
 //! RING_SEGMENTS: the fixed sampling resolution of the ownership donut — constant payload/render cost regardless of cluster size.
 export const RING_SEGMENTS = 120
 
+//! VERSION_SAMPLE_CAP: max per-key stamps a requested versionSample returns — bounds the drill-down payload (the version map can be huge).
+export const VERSION_SAMPLE_CAP = 200
+
 //! InspectPeer: one row of a node's OWN peer table (its view of who it can reach) — the network observer can't see this otherwise.
 export type InspectPeer = {
   address: string
@@ -59,7 +62,13 @@ export type InspectSnapshot = {
   // replication / log
   log: { size: number; partitions: number; heads: Record<string, number> }
   marks: Record<string, number> // the dedup high-water digest (raw seenKey granularity: origin, or origin\x00partition when scoped)
-  versions: number // count of LWW-winner entries (the full map can be large; a sample is a later slice)
+  versions: number // count of LWW-winner entries (the full map can be large; request a per-key sample via opts.sample)
+  // versionSample: present ONLY when a drill-down requested it (opts.sample = partition keys) — per-key LWW
+  // stamps for those partitions (k === p OR k.startsWith(p\x00)), capped at VERSION_SAMPLE_CAP. The cross-node
+  // divergence / stuck-replica primitive: comparable because every node returns the SAME keys for the same
+  // partition request, so a replica parked on a lower (epoch,seq) is visible. Off the steady poll, so the
+  // O(versions) scan it costs never rides the per-poll path.
+  versionSample?: Record<string, { epoch: number; seq: number; origin: string }>
   pending: number // write-gate buffer depth (writes held while quorum-less)
   orphans: string[] // scoped: partitions held but no longer replicated (awaiting confirmed shed)
   subscriptions: number // served-subscription count
@@ -75,7 +84,7 @@ export type SnapshotDeps = {
   peers: () => Record<string, any> // () => mesh.peers[value] (the raw backing row map)
   log: Log
   seen: Map<string, number> // dedup high-water (the digest)
-  versions: Map<string, unknown> // LWW winners (we ship the count)
+  versions: Map<string, { epoch: number; seq: number; origin: string }> // LWW winner stamps (we ship the count; a requested sample reads the stamps)
   pending: { length: number } // the write-gate buffer
   orphans: Set<string>
   servedCount: () => number // dispatch.servedCount
@@ -92,9 +101,9 @@ export type SnapshotDeps = {
 // Allocations here (Object.fromEntries(seen), log.heads(), the peer copy) are
 // O(origins + partitions + peers) and happen ONCE PER POLL, never per write — so
 // they sit firmly off the replication hot path.
-export const makeSnapshot = (deps: SnapshotDeps): (() => InspectSnapshot) => {
+export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }) => InspectSnapshot) => {
   const { name, cluster, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, observing, R, scoped } = deps
-  return () => {
+  return (opts) => {
     //! Copy out the node's own peer rows as plain scalars (decoupled from data's backing object; truthful point-in-time).
     const raw = peers() ?? {}
     const peerOut: Record<string, InspectPeer> = {}
@@ -103,7 +112,7 @@ export const makeSnapshot = (deps: SnapshotDeps): (() => InspectSnapshot) => {
       if (!r) continue
       peerOut[a] = { address: r.address, host: r.host, port: r.port, role: r.role, status: r.status, suspect: r.suspect, uuid: r.uuid }
     }
-    return {
+    const out: InspectSnapshot = {
       at: Date.now(),
       name,
       uuid: cluster.uuid,
@@ -123,6 +132,26 @@ export const makeSnapshot = (deps: SnapshotDeps): (() => InspectSnapshot) => {
       observing: observing(),
       peers: peerOut,
     }
+    //! versionSample (DRILL-DOWN ONLY): per-key LWW stamps for the requested partitions, capped. The
+    // O(versions) scan rides this branch alone — when no sample is requested the snapshot is unchanged,
+    // so the steady poll never pays it. Same partition-prefix matching as shed (k === p | k\x00…).
+    if (opts?.sample?.length) {
+      const want = opts.sample
+      const sample: Record<string, { epoch: number; seq: number; origin: string }> = {}
+      let n = 0
+      scan: for (const [k, v] of versions) {
+        for (let i = 0; i < want.length; i++) {
+          const p = want[i]
+          if (k === p || k.startsWith(p + '\x00')) {
+            sample[k] = { epoch: v.epoch, seq: v.seq, origin: v.origin }
+            if (++n >= VERSION_SAMPLE_CAP) break scan
+            break
+          }
+        }
+      }
+      out.versionSample = sample
+    }
+    return out
   }
 }
 

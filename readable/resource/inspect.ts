@@ -8,6 +8,9 @@ import type { RingSnapshot } from '../transport/index.ts'
 // RING_SEGMENTS: the fixed sampling resolution of the ownership donut — constant payload/render cost regardless of cluster size.
 export const RING_SEGMENTS = 120
 
+// VERSION_SAMPLE_CAP: max per-key stamps a requested versionSample returns — bounds the drill-down payload (the version map can be huge).
+export const VERSION_SAMPLE_CAP = 200
+
 // InspectPeer: one row of a node's OWN peer table (its view of who it can reach) — the network observer can't see this otherwise.
 export type InspectPeer = {
   address: string
@@ -33,6 +36,7 @@ export type InspectSnapshot = {
   log: { size: number; partitions: number; heads: Record<string, number> }
   marks: Record<string, number>
   versions: number
+  versionSample?: Record<string, { epoch: number; seq: number; origin: string }>
   pending: number
   orphans: string[]
   subscriptions: number
@@ -48,7 +52,7 @@ export type SnapshotDeps = {
   peers: () => Record<string, any>
   log: Log
   seen: Map<string, number>
-  versions: Map<string, unknown>
+  versions: Map<string, { epoch: number; seq: number; origin: string }>
   pending: { length: number }
   orphans: Set<string>
   servedCount: () => number
@@ -58,9 +62,9 @@ export type SnapshotDeps = {
 }
 
 // makeSnapshot: build the pure-read closure once (construction-time, zero hot-path cost); each call is a fresh point-in-time read.
-export const makeSnapshot = (deps: SnapshotDeps): (() => InspectSnapshot) => {
+export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }) => InspectSnapshot) => {
   const { name, cluster, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, observing, R, scoped } = deps
-  return () => {
+  return (opts) => {
     // Copy out the node's own peer rows as plain scalars (decoupled from data's backing object; truthful point-in-time).
     const raw = peers() ?? {}
     const peerOut: Record<string, InspectPeer> = {}
@@ -69,7 +73,7 @@ export const makeSnapshot = (deps: SnapshotDeps): (() => InspectSnapshot) => {
       if (!r) continue
       peerOut[a] = { address: r.address, host: r.host, port: r.port, role: r.role, status: r.status, suspect: r.suspect, uuid: r.uuid }
     }
-    return {
+    const out: InspectSnapshot = {
       at: Date.now(),
       name,
       uuid: cluster.uuid,
@@ -89,6 +93,24 @@ export const makeSnapshot = (deps: SnapshotDeps): (() => InspectSnapshot) => {
       observing: observing(),
       peers: peerOut,
     }
+    // versionSample (DRILL-DOWN ONLY): per-key LWW stamps for the requested partitions, capped. The
+    if (opts?.sample?.length) {
+      const want = opts.sample
+      const sample: Record<string, { epoch: number; seq: number; origin: string }> = {}
+      let n = 0
+      scan: for (const [k, v] of versions) {
+        for (let i = 0; i < want.length; i++) {
+          const p = want[i]
+          if (k === p || k.startsWith(p + '\x00')) {
+            sample[k] = { epoch: v.epoch, seq: v.seq, origin: v.origin }
+            if (++n >= VERSION_SAMPLE_CAP) break scan
+            break
+          }
+        }
+      }
+      out.versionSample = sample
+    }
+    return out
   }
 }
 

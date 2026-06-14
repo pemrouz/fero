@@ -11,7 +11,7 @@
 
 import { test } from 'node:test'
 import { ok } from 'node:assert'
-import { makeSnapshot, type SnapshotDeps } from './inspect.ts'
+import { makeSnapshot, VERSION_SAMPLE_CAP, type SnapshotDeps } from './inspect.ts'
 import { bench } from '#utils'
 
 const ORIGINS = 1000
@@ -35,8 +35,8 @@ const bigDeps = (): SnapshotDeps => {
     peers[a] = { address: a, host: '10.0.0.' + i, port: 3000, role: 'server', status: 3, uuid: 'u' + i }
     members.push(a)
   }
-  const versions = new Map<string, unknown>()
-  for (let i = 0; i < ORIGINS; i++) versions.set('k' + i, {})
+  const versions = new Map<string, { epoch: number; seq: number; origin: string }>()
+  for (let i = 0; i < ORIGINS; i++) versions.set('k' + i, { epoch: 4, seq: i, origin: 'o0' })
   // coverage is pre-built ONCE: this test measures snapshot ASSEMBLY, not the ring-sampling
   // cost (that's guarded directly in transport/dht.perf.ts via coverage()).
   const cov = Array.from({ length: 120 }, (_, i) => i % PEERS)
@@ -75,4 +75,24 @@ test('makeSnapshot() — 1000 polls over a large node (1000 origins · 200 peers
   // carries generous headroom to flag a true 2× blowup (>~800µs) without flaking on a
   // loaded dev box — it is NOT a tight latency target (cold path doesn't need one).
   ok(elapsed < 700, `1000 large snapshots took ${elapsed.toFixed(3)}ms (threshold 700ms)`)
+})
+
+test('makeSnapshot({sample}) — a drill-down over a large version map stays bounded', () => {
+  // The sample is a DRILL-DOWN (forensic), not the steady poll. Worst case it scans the
+  // whole version map to collect a partition's keys, capped at VERSION_SAMPLE_CAP — so the
+  // cost is O(versions) scan + O(cap) allocation, paid only when a sample is requested.
+  const deps = bigDeps()
+  for (let i = 0; i < VERSION_SAMPLE_CAP * 2; i++) deps.versions.set('hot\x00f' + i, { epoch: 4, seq: i, origin: 'oH' })
+  const snap = makeSnapshot(deps)
+  // the cap holds no matter how many keys match
+  ok(Object.keys(snap({ sample: ['hot'] }).versionSample!).length === VERSION_SAMPLE_CAP, 'sample capped')
+  const elapsed = bench.time(() => {
+    let sink = 0
+    for (let i = 0; i < 1000; i++) sink += snap({ sample: ['hot'] }).versionSample ? 1 : 0
+    if (sink === 0) throw new Error('sink')
+  })
+  console.log(`  1000 sampled drills (cap ${VERSION_SAMPLE_CAP} over ${ORIGINS + VERSION_SAMPLE_CAP * 2} keys): ${elapsed.toFixed(3)}ms`)
+  // 1000 drills × (~1200-entry scan + 200 small allocs). Drill-down path, so generous
+  // headroom over the assembly threshold; flags a real superlinear regression, not box drift.
+  ok(elapsed < 1200, `1000 sampled drills took ${elapsed.toFixed(3)}ms (threshold 1200ms)`)
 })
