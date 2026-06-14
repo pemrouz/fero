@@ -1513,3 +1513,42 @@ for the built-in seam — a drop-in upgrade behind the now-async contract); the 
 escalation policy (escalate bare assignments to 'committed' only, never the network tiers);
 cid-dedup on the owner for non-idempotent retries (LWW value-sets are already idempotent); the
 SERVER-local assignment auth-interception parity gap (#6) stays open by design (the re-entrancy guard).
+
+## O1 — Debug viewer: one `normalize()` seam, capture by inverting it · Adopted · `47f75bc` (P0) → `3726db3` (P1)
+
+**Context.** The L4 debugging/admin viewer ([tools/debug/mockups/tree.html](tools/debug/mockups/tree.html))
+was prototyped as a static outline+inspector over a hand-authored snapshot file, then promoted to the
+primary surface (`8183970`; earlier explorations retired to `old/`). To drive it from a real cluster it
+needs a producer — but a producer that re-derives counts independently would drift from the viewer (a
+hand-authored "1,284 keys" rollup had already diverged from its own partitions, which summed to 2,838).
+The pull-snapshot spine from [O](#o--observe-a-pull-spine-snapshot--one-gated-push-hook-the-l4-network-observer--adopted)
+(`InspectSnapshot` via the always-available `[diagnostics].snapshot()` seam) already exposes the facts.
+
+**Decision.** One `normalize(snapshot)` is the seam, and capture is its inverse.
+- **`normalize()` lives once** in [tools/debug/mockups/shape.js](tools/debug/mockups/shape.js) — a pure,
+  DOM-free ESM module the browser viewer imports over http AND Node producers/tests import. Store-once
+  facts in, every cross-cut DERIVED (node ownership, max-lag, hosted replicas, epoch layouts/moves, sub
+  lag, all rollup counts). So file-mode and live-mode converge on ONE contract and a count cannot disagree
+  with its children. Un-ignored per the `tools/observe/web` precedent; round-trip tested in Node.
+- **Capture = invert `normalize()`** ([tools/debug/export.ts](tools/debug/export.ts)): `foldSnapshots()`
+  takes per-node `InspectSnapshot[]` + an authoritative `cluster.owner/replicas` lookup and emits ONLY
+  the facts, each once on its natural owner. `captureInProcess(nodes)` is the embedded/harness path —
+  reads `[diagnostics].snapshot()` directly (no `observe:true` gate, zero added connections, off the
+  replication hot path: `makeSnapshot` reads by reference and materialises only on call).
+- **Phased to what has a seam today.** P1 emits committed members + R, per-node key count (LWW winners)
+  + health, and per-partition owner + R-set + held-count — so under-replication (`held < |R-set|`) is a
+  REAL signal. Per-partition keys/wps, replica lag, the change-record log, and `ownerByEpoch` history have
+  no seam yet; the file's `_about` says so and the round-trip test asserts the boundary (derived
+  `resource.keys === 0` until P2), so the gap is explicit rather than faked.
+
+**Consequences.**
+- The viewer is fed by fero's own introspection (dogfooding); the file format IS the live format.
+- The DRY class of bug (a rollup disagreeing with its parts) is structurally impossible — the inconsistency
+  the single model surfaced can't recur.
+- Capture is a tooling path (~1/poll), perf-guarded (`export.perf.ts`: fold 24×500 ~8ms); it never perturbs
+  the data hot path.
+
+**Open follow-ups → [IDEAS](IDEAS.md) (Debug viewer workstream):** P2 sampled per-key version accessor
+(cap K) on `__inspect` → real per-partition keys + divergence; P3 per-sub `head`/`delivered` counters; P4
+view/ownership history (`ownerByEpoch`); P5 live SSE mode + the write-route JOIN over `cluster.writes` +
+`__observe`; a `networkSource`-backed CLI over the gated `__inspect` for remote (non-embedded) capture.
