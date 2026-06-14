@@ -199,3 +199,25 @@ test('membership: a node hearing a higher view it is NOT in does not self-orphan
     h.destroy()
   }
 })
+
+test('membership: ViewManager retains a bounded, deduped view-history ring (P4)', () => {
+  // synchronous body: the coordinator's setTimeout ticks don't fire mid-test, so the only
+  // installs are the ones we drive — deterministic history.
+  const h = harness(['10.0.0.1:1', '10.0.0.2:1'])
+  try {
+    const a = h.vm('10.0.0.1:1')
+    a.onCommit({ epoch: 5, members: ['10.0.0.1:1', '10.0.0.2:1'] })
+    a.onCommit({ epoch: 5, members: ['10.0.0.1:1', '10.0.0.2:1'] }) // idempotent re-announce → must NOT duplicate
+    a.onCommit({ epoch: 6, members: ['10.0.0.1:1'] })
+    const hist = a.history()
+    assert.equal(hist.length, 2)                                    // e5 (once) + e6
+    assert.equal(hist[0].epoch, 5)
+    assert.equal(hist[1].epoch, 6)                                  // newest last
+    assert.deepEqual(hist[1].members, ['10.0.0.1:1'])
+    // returned copies don't alias internal state
+    hist[1].members.push('x')
+    assert.deepEqual(a.history()[1].members, ['10.0.0.1:1'])
+  } finally {
+    h.destroy()
+  }
+})

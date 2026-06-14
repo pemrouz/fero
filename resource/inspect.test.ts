@@ -15,6 +15,7 @@ import { ports, sleep } from '#utils'
 const synthetic = (over: Partial<SnapshotDeps> = {}): SnapshotDeps => ({
   name: 'res',
   cluster: { uuid: 'U', me: 'h:1', epoch: 7, members: ['h:1', 'h:2'], writable: true } as any,
+  viewHistory: () => [{ epoch: 6, members: ['h:1', 'h:2'] }, { epoch: 7, members: ['h:1', 'h:2', 'h:3'] }],
   ringSnapshot: () => ({ members: ['h:1', 'h:2'], vnodes: 200, coverage: [0, 1, 0, 1, 0, 1] }),
   peers: () => ({
     'h:1': { address: 'h:1', host: 'h', port: 1, role: 'server', status: 3, uuid: 'U' },
@@ -56,6 +57,7 @@ test('makeSnapshot() maps every field through (scoped node)', () => {
   assert.deepEqual(s.marks, { o1: 5, 'o2\x00p': 3 }) // raw seenKey granularity — NOT collapsed to per-origin
   assert.equal(s.versions, 3)
   assert.equal(s.versionSample, undefined) // no drill requested → absent, steady poll unchanged
+  assert.deepEqual(s.viewHistory, [{ epoch: 6, members: ['h:1', 'h:2'] }, { epoch: 7, members: ['h:1', 'h:2', 'h:3'] }])
   assert.equal(s.pending, 2)
   assert.deepEqual(s.orphans, ['pX'])
   assert.equal(s.subscriptions, 4)
@@ -76,6 +78,13 @@ test('makeSnapshot({sample}) returns per-key LWW stamps for the requested partit
     'user42\x00score': { epoch: 4, seq: 1290, origin: 'U' },
   })
   assert.ok(!('billing' in s.versionSample!))
+})
+
+test('viewHistory is absent when the node runs no membership (a client)', () => {
+  const s = makeSnapshot(synthetic({ viewHistory: undefined }))()
+  assert.equal(s.viewHistory, undefined)
+  // an empty history is omitted too (not an empty array)
+  assert.equal(makeSnapshot(synthetic({ viewHistory: () => [] }))().viewHistory, undefined)
 })
 
 test('versionSample is capped at VERSION_SAMPLE_CAP', () => {
