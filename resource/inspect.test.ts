@@ -8,7 +8,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fero, diagnostics } from './index.ts'
-import { makeSnapshot, type SnapshotDeps } from './inspect.ts'
+import { makeSnapshot, VERSION_SAMPLE_CAP, type SnapshotDeps } from './inspect.ts'
 import { ports, sleep } from '#utils'
 
 //! Synthetic deps — a fake cluster/log/state, so the shape assertions are deterministic and network-free.
@@ -22,7 +22,11 @@ const synthetic = (over: Partial<SnapshotDeps> = {}): SnapshotDeps => ({
   }),
   log: { size: 42, partitions: () => ['p1', 'p2'], heads: () => ({ p1: 10, p2: 32 }) } as any,
   seen: new Map([['o1', 5], ['o2\x00p', 3]]),
-  versions: new Map([['k1', {}], ['k2', {}]]),
+  versions: new Map<string, { epoch: number; seq: number; origin: string }>([
+    ['user42', { epoch: 4, seq: 1287, origin: 'U' }],
+    ['user42\x00score', { epoch: 4, seq: 1290, origin: 'U' }],
+    ['billing', { epoch: 3, seq: 842, origin: 'V' }],
+  ]),
   pending: { length: 2 },
   orphans: new Set(['pX']),
   servedCount: () => 4,
@@ -50,7 +54,8 @@ test('makeSnapshot() maps every field through (scoped node)', () => {
   assert.equal(s.log.partitions, 2)
   assert.deepEqual(s.log.heads, { p1: 10, p2: 32 })
   assert.deepEqual(s.marks, { o1: 5, 'o2\x00p': 3 }) // raw seenKey granularity — NOT collapsed to per-origin
-  assert.equal(s.versions, 2)
+  assert.equal(s.versions, 3)
+  assert.equal(s.versionSample, undefined) // no drill requested → absent, steady poll unchanged
   assert.equal(s.pending, 2)
   assert.deepEqual(s.orphans, ['pX'])
   assert.equal(s.subscriptions, 4)
@@ -59,6 +64,25 @@ test('makeSnapshot() maps every field through (scoped node)', () => {
   assert.equal(s.peers['h:1'].uuid, 'U')
   assert.equal(s.peers['h:2'].port, 2)
   assert.ok(Date.now() - s.at < 1000)
+})
+
+test('makeSnapshot({sample}) returns per-key LWW stamps for the requested partitions only', () => {
+  const make = makeSnapshot(synthetic())
+  assert.equal(make().versionSample, undefined) // no sample → absent
+  // drill into partition 'user42' → its own key + the nested key, NOT billing
+  const s = make({ sample: ['user42'] })
+  assert.deepEqual(s.versionSample, {
+    user42: { epoch: 4, seq: 1287, origin: 'U' },
+    'user42\x00score': { epoch: 4, seq: 1290, origin: 'U' },
+  })
+  assert.ok(!('billing' in s.versionSample!))
+})
+
+test('versionSample is capped at VERSION_SAMPLE_CAP', () => {
+  const versions = new Map<string, { epoch: number; seq: number; origin: string }>()
+  for (let i = 0; i < VERSION_SAMPLE_CAP + 50; i++) versions.set('hot\x00f' + i, { epoch: 4, seq: i, origin: 'U' })
+  const s = makeSnapshot(synthetic({ versions }))({ sample: ['hot'] })
+  assert.equal(Object.keys(s.versionSample!).length, VERSION_SAMPLE_CAP)
 })
 
 test('makeSnapshot() is a LIVE read — a later mutation shows up in the next snapshot', () => {
