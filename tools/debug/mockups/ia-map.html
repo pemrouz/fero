@@ -155,7 +155,7 @@ const L = {
   resources:{ spine:'data', title:'Resources', ex:'all running', sub:'The top of the tree — every resource in the cluster.',
     q:'What resources are running, and which need attention?',
     shows:['<b>One row per <span class="mono">fero(name)</span></b> — node count, health (converged / attention), write rate','<b>Worst-first</b> — resources with diverged keys or under-replication surface','Later: a <b>map</b> view (resources × the nodes that serve them)'],
-    realized:{label:'to build (top entry · "list later map")', todo:true},
+    realized:{label:'Resources — browse table (triage idiom)', href:'tool/resources.html', todo:false},
     down:['resource'] },
 
   resource:{ spine:'data', title:'Resource', ex:'"sessions"', sub:'The hub — drill four ways: partitions (data), server nodes, client nodes, metrics.',
@@ -191,25 +191,25 @@ const L = {
   servers:{ spine:'phys', title:'Server nodes', ex:'forming the resource', sub:'Physical spine · the member servers — current epoch first, prior epochs expandable.',
     q:'Which servers form this resource, and what was the layout (now & before)?',
     shows:['<b>Current epoch</b> first — members, gate, lag, partitions owned','<b>Expand to prior epochs</b> — membership & ownership layout at e3, e2… ' + NEW,'Per-node request / throughput metrics (cross-link)'],
-    realized:{label:'to build (node list · per-epoch)', todo:true},
+    realized:{label:'Server nodes — browse table (triage idiom)', href:'tool/nodes.html', todo:false},
     up:['resource'], down:['node'], cross:['epoch','metrics'] },
 
   node:{ spine:'phys', title:'Node', ex:':49807', sub:'Physical spine · one server — meets the data spine via the partitions it owns.',
     q:'What does this server own and believe — now and at prior epochs?',
     shows:['<b>Partitions it OWNS</b> → each opens the partition page','<b>Owned-by-epoch</b> — what it held at other epochs (ownership churn) ' + NEW,'Its view / gate / lag / peers / marks · pass-warn-fail verdict'],
-    realized:{label:'Node Doctor', href:'node-doctor.html', todo:false},
+    realized:{label:'Node page — owned partitions by epoch (triage idiom)', href:'tool/node.html', todo:false},
     up:['servers'], down:['partition'], cross:['epoch','metrics'] },
 
   clients:{ spine:'phys', title:'Client nodes', ex:'read-only', sub:'Physical spine · the clients reading from the resource.',
     q:'Who is reading this resource, and how are the clients doing?',
     shows:['<b>One row per client</b> — address, which server it\'s connected to','Request rate · read latency · subscriptions held ' + NEW,'Re-dial / disconnect churn (failover health)'],
-    realized:{label:'to build', todo:true},
+    realized:{label:'Client nodes — triage inbox (connection/delivery)', href:'tool/clients.html', todo:false},
     up:['resource'], cross:['metrics'] },
 
   metrics:{ spine:'metric', title:'Metrics', ex:'throughput · latency · requests', sub:'Cross-cut · sliceable per resource / partition / node.',
     q:'What are the throughput, latency and request rates — and where is the hotspot?',
     shows:['<b>Per resource / per partition / per node</b> — writes/s, reads/s, requests/s','<b>Latency</b> — commit / replicate / read p50·p99 ' + NEW + ' (not instrumented today)','Time series sliceable by epoch — overlay view changes'],
-    realized:{label:'to build (mostly NEW instrumentation)', todo:true},
+    realized:{label:'Metrics — dashboard (resource/partition/node slices)', href:'tool/metrics.html', todo:false},
     up:['resource'], cross:['partition','node'] },
 
   epoch:{ spine:'epoch', title:'Epoch / view', ex:'the time dimension', sub:'A dimension, not a page — re-runs ownership/node/partition views at a chosen view.',
