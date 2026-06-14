@@ -2,549 +2,761 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>fero replay — cluster rewind</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sessions — cluster replay · epoch · fero</title>
 <style>
-:root{
-  --bg:#0b0e14; --panel:#141925; --panel-2:#1b2230; --line:#232c3d;
-  --ink:#cbd5e1; --dim:#7587a3; --accent:#7dd3fc; --ok:#34d399; --warn:#fbbf24;
-  --bad:#f87171; --idle:#475569; --view:#a78bfa; --gate:#22d3ee;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font:13px/1.5 ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;-webkit-font-smoothing:antialiased}
-main.app{max-width:1400px;margin:0 auto;padding:16px 20px}
-b,.num{font-variant-numeric:tabular-nums}
-/* ---- header ---- */
-header.top{display:flex;align-items:baseline;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:16px;flex-wrap:wrap}
-header.top h1{font-size:16px;font-weight:700}
-header.top h1 em{color:var(--accent);font-style:normal}
-.purpose{color:var(--dim);font-size:12px;max-width:760px}
-.rec{margin-left:auto;color:var(--dim);font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
-.rec b{color:var(--ink)}
-/* ---- panel chrome ---- */
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
-.phead{display:flex;align-items:baseline;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
-.phead .meta{margin-left:auto;color:var(--dim);font-weight:400;font-size:11px;font-variant-numeric:tabular-nums}
-/* ---- timeline ---- */
-.tl{padding:14px 14px 8px;position:relative}
-/* the state band IS the shipped convergence-timeline ribbon (tools/observe/web app.css .tlband/.tlseg —
-   same solid segments + opacities), with a dark tick lane overlaid on top instead of a re-drawn band */
-.band{position:relative;height:52px;border:1px solid var(--line);border-radius:6px;background:var(--panel-2);cursor:crosshair;overflow:hidden;touch-action:none}
-.tlseg{position:absolute;top:20px;bottom:0;background:var(--s)}
-.tlseg[data-state=ok]{opacity:.85}
-.tlseg[data-state=warn],.tlseg[data-state=crit]{opacity:1}
-[data-state=ok]{--s:var(--ok)}[data-state=warn]{--s:var(--warn)}[data-state=crit]{--s:var(--bad)}
-.tick{position:absolute;top:3px;bottom:3px;width:2px;margin-left:-1px;background:var(--k);box-shadow:0 0 0 1px rgba(11,14,20,.7);opacity:.95;cursor:pointer}
-.tick:hover{box-shadow:0 0 8px var(--k),0 0 0 1px rgba(11,14,20,.7);opacity:1}
-[data-k=view]{--k:var(--view)} [data-k=gate]{--k:var(--gate)} [data-k=kill]{--k:var(--bad)}
-[data-k=suspect]{--k:var(--warn)} [data-k=join],[data-k=heal]{--k:var(--ok)} [data-k=flag],[data-k=lost]{--k:var(--bad)}
-[data-k=rebal]{--k:var(--accent)} [data-k=mark]{--k:var(--idle)}
-.playhead{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--ink);box-shadow:0 0 10px color-mix(in srgb,var(--accent) 60%,transparent);pointer-events:none}
-.pinmark{position:absolute;top:0;margin-left:-7px;width:14px;text-align:center;font-size:9px;font-weight:700;color:#0b0e14;background:var(--accent);border-radius:0 0 4px 4px;pointer-events:none;line-height:13px}
-.pinmark.b{background:var(--view)}
-.pinmark.stack{top:14px;border-radius:4px}  /* pins at (nearly) the same instant stack instead of overlapping */
-.axis{position:relative;height:16px;color:var(--dim);font-size:10px;margin-top:2px}
-.axis span{position:absolute;transform:translateX(-50%);font-variant-numeric:tabular-nums}
-.tip{position:absolute;pointer-events:none;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:11px;z-index:9;display:none;max-width:360px;box-shadow:0 4px 14px rgba(0,0,0,.5)}
-.tip .tt{color:var(--dim);font-variant-numeric:tabular-nums}
-.controls{display:flex;gap:8px;padding:10px 14px 14px;align-items:center;flex-wrap:wrap}
-.controls .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
-button{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:border-color .2s,color .2s,background .2s}
-button:hover{border-color:var(--accent)}
-button[data-on="1"]{border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--accent)}
-.clock{margin-left:auto;color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
-.clock b{color:var(--ink);font-size:13px}
-.legend{display:flex;gap:12px;flex-wrap:wrap;padding:0 14px 12px;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
-.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--k);margin-right:4px;vertical-align:-1px}
-/* ---- verdict + belief groups ---- */
-.verdict{display:flex;gap:10px;align-items:center;margin:16px 0 10px;flex-wrap:wrap}
-.vpill{border-radius:999px;padding:4px 12px;font-weight:600;font-size:12px;color:var(--s);background:color-mix(in srgb,var(--s) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--s) 45%,transparent)}
-.vpill .pdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--s);margin-right:7px;vertical-align:0}
-[data-state=crit] .pdot{animation:pulse 1.1s infinite}
-@keyframes pulse{50%{opacity:.25}}
-.gchip{border-radius:999px;padding:3px 11px;font-size:11px;font-weight:600;color:var(--m);background:color-mix(in srgb,var(--m) 9%,var(--panel));border:1px solid color-mix(in srgb,var(--m) 40%,transparent)}
-[data-mood=ok]{--m:var(--ok)}[data-mood=warn]{--m:var(--warn)}[data-mood=crit]{--m:var(--bad)}[data-mood=dead]{--m:var(--idle)}[data-mood=idle]{--m:var(--idle)}
-.hint{font-size:11px;color:var(--dim)}
-.groups{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
-.vgroup{flex:1 1 300px;background:var(--panel);border:1px solid var(--line);border-radius:10px;transition:border-color .3s,box-shadow .3s}
-.vgroup[data-mood=warn]{border-color:color-mix(in srgb,var(--warn) 45%,var(--line));box-shadow:0 0 12px color-mix(in srgb,var(--warn) 12%,transparent)}
-.vgroup[data-mood=crit]{border-color:color-mix(in srgb,var(--bad) 55%,var(--line));box-shadow:0 0 16px color-mix(in srgb,var(--bad) 16%,transparent)}
-.vgroup[data-mood=dead]{border-style:dashed;opacity:.7;flex:0 1 250px}
-.ghead{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-bottom:1px solid var(--line);font-size:11px;color:var(--dim);flex-wrap:wrap}
-.glabel{color:var(--ink);font-weight:700;font-size:12px}
-.gw{font-weight:600}.gw[data-on=true]{color:var(--ok)}.gw[data-on=false]{color:var(--warn)}
-.gmaj{margin-left:auto;font-weight:600;color:var(--m)}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:10px;padding:12px}
-/* belief cards reuse the shipped topology node-card contract (tools/observe/web app.css .node-card):
-   same head (wdot / uuid / addr / role), same metric row + wbadge — time-parameterized, so a node
-   looks identical live and in replay. Replay-only extras (lag bar, note, expand) hang below. */
-.node-card{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:opacity .3s,border-color .2s}
-.node-card:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
-.node-card.readonly{border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
-.node-card.stale{opacity:.4;filter:grayscale(.6);border-style:dashed;cursor:default}
-.node-card[data-chg]{outline:1px solid color-mix(in srgb,var(--warn) 60%,transparent);outline-offset:1px}
-.card-head{display:flex;align-items:center;gap:8px;font-size:12px}
-.wdot{width:9px;height:9px;border-radius:50%;background:var(--idle);flex:none}
-.wdot[data-writable=true]{background:var(--ok);box-shadow:0 0 8px color-mix(in srgb,var(--ok) 70%,transparent)}
-.wdot[data-writable=false]{background:var(--bad);box-shadow:0 0 8px color-mix(in srgb,var(--bad) 70%,transparent)}
-.uuid{color:var(--accent);font-weight:700}
-.addr{color:var(--ink)}
-.role{color:var(--dim);margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
-.card-view{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-.metric{display:inline-flex;flex-direction:column;line-height:1.25}
-.mlabel{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.06em}
-.mval{color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums}
-.mval.pend{color:var(--warn);font-weight:600}
-.wbadge{margin-left:auto;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;background:var(--panel);color:var(--dim)}
-.wbadge[data-writable=true]{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--panel))}
-.wbadge[data-writable=false]{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--panel))}
-.crow{display:flex;gap:7px;align-items:center}
-.crow.lag{font-size:10px;color:var(--dim)}
-.lagbar{flex:1;height:4px;background:var(--panel);border-radius:2px;overflow:hidden}
-.lagbar i{display:block;height:100%;background:var(--ok);transition:width .3s}
-.lagbar i[data-sev=warn]{background:var(--warn)}.lagbar i[data-sev=bad]{background:var(--bad)}
-.lagn{min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
-.note{font-size:10px;color:var(--warn);margin-top:4px}
-.exp{border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:11px;color:var(--dim)}
-.xl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--idle);margin:5px 0 2px}
-.mchip{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:0 5px;margin:1px 2px 1px 0;font-size:10px}
-.mk{display:flex;gap:8px;justify-content:space-between;font-variant-numeric:tabular-nums}
-.deadtag{color:var(--idle);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
-/* ---- lower columns ---- */
-.cols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:14px;margin-top:16px}
-@media(max-width:900px){.cols{grid-template-columns:1fr}}
-.scroll{height:340px;overflow-y:auto;overflow-anchor:none}
-.empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--dim);font-size:12px}
-.chrow{display:grid;grid-template-columns:72px 1fr;gap:8px;padding:4px 12px;font-size:12px;border-left:2px solid var(--v);align-items:baseline}
-[data-sev=ok]{--v:var(--ok)}[data-sev=warn]{--v:var(--warn)}[data-sev=bad]{--v:var(--bad)}[data-sev=dim]{--v:var(--idle)}
-.chrow .cat{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
-.chrow[data-sev=bad] span:last-child{color:var(--bad)}
-.evrow{display:grid;grid-template-columns:56px 10px 1fr;gap:8px;padding:5px 12px 5px 10px;font-size:12px;cursor:pointer;border-left:2px solid transparent;transition:opacity .2s}
-.evrow:hover{background:color-mix(in srgb,var(--accent) 4%,transparent)}
-.evrow .t{color:var(--dim);font-variant-numeric:tabular-nums;font-size:11px}
-.evrow .kdot{width:7px;height:7px;border-radius:2px;background:var(--k);margin-top:5px}
-.evrow .d{grid-column:3;font-size:10px;color:var(--dim)}
-.evrow.future{opacity:.32}
-.evrow.cur{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
-/* ---- data sources ---- */
-.sources{margin-top:18px;border-top:1px solid var(--line);padding-top:12px;font-size:11px;color:var(--dim)}
-.sources h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink);margin-bottom:8px}
-.sources dt{color:var(--ink);font-weight:600;margin-top:8px}
-.sources dd{margin-left:0}
-.new{color:var(--warn);font-weight:600}
-kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:10px;background:var(--panel-2)}
+  /* ────────────────────────────────────────────────────────────────────
+     IDIOM: the SAME graphite "tool" app as partition.html / inbox.html —
+     identical palette, command bar (identity · context · health pill ·
+     scenario), three-pane shell, bottom hotkey bar + data-sources popover.
+     Here the SUBJECT is the EPOCH dimension: a TEMPORAL lens that RE-PROJECTS
+     the cluster AT a chosen view e1→e2→e3→e4. The PRIMARY CONTROL is the
+     epoch scrubber (a segmented control in the command bar AND a left
+     timeline rail). Selecting an epoch re-draws:
+       CENTRE  = the ownership map at view T — 5 members × the partitions
+                 each owns, gains/losses vs the prior epoch highlighted.
+       RIGHT   = the view-change summary for the transition into T + the
+                 "belief at T" notes.
+     Colour stays FUNCTIONAL — only severity (gain/loss = warn, divergence =
+     crit) lights up; everything calm stays graphite.
+     ──────────────────────────────────────────────────────────────────── */
+  :root{
+    --bg:#101216; --rail:#13151a; --pane:#15181e; --line:#22262e; --line-2:#2b303a;
+    --ink:#d6dae2; --dim:#8a909c; --soft:#5a606b; --faint:#3f444e;
+    --sel:#1d3a52; --sel-line:#3d7fb8; --hover:#1a1e25;
+    --crit:#e8615a; --crit-bg:#2a1816; --warn:#d6a247; --warn-bg:#251f12;
+    --ok:#5cba8a; --ok-bg:#16241c; --info:#5b9fe0;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 var(--ui);
+    -webkit-font-smoothing:antialiased;overflow:hidden}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
+  ::selection{background:var(--sel)}
+
+  /* ── top command bar ───────────────────────────────────────────────── */
+  .bar{display:flex;align-items:center;gap:0;height:38px;background:var(--rail);
+    border-bottom:1px solid var(--line);padding:0 10px;flex:0 0 auto;font-size:12.5px}
+  .bar .id{display:flex;align-items:baseline;gap:6px;padding-right:12px;white-space:nowrap}
+  .bar .id .res{color:var(--soft)} .bar .id a.res:hover{color:var(--dim)}
+  .bar .id .chev{color:var(--faint)}
+  .bar .id .nm{font-weight:600;color:var(--ink)} .bar .id .nm .mono{color:#fff}
+  .bar .sep{width:1px;height:18px;background:var(--line-2);margin:0 12px}
+  .bar .ctx{display:flex;gap:14px;color:var(--dim);white-space:nowrap}
+  .bar .ctx .mono{color:var(--ink)}
+  .bar .health{display:flex;align-items:center;gap:7px;margin-left:auto;padding-right:4px;white-space:nowrap}
+  .bar .health .dot{width:8px;height:8px;border-radius:50%}
+  .bar .health .txt{font-weight:600;letter-spacing:.02em}
+  .bar .health.ok .dot{background:var(--ok)} .bar .health.ok .txt{color:var(--ok)}
+  .bar .health.crit .dot{background:var(--crit);box-shadow:0 0 0 3px var(--crit-bg)}
+  .bar .health.crit .txt{color:var(--crit)}
+
+  /* the EPOCH SCRUBBER — the page's primary axis, a segmented control built
+     in the .scen idiom but labelled as the epoch lens (own colour for the
+     "current" epoch so it reads as a live anchor, not just a tab) */
+  .bar .epochlab{color:var(--soft);font-size:11px;margin-left:4px;padding-right:7px;letter-spacing:.02em}
+  .bar .epochs{display:flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden}
+  .bar .epochs button{background:#0c0e12;border:0;color:var(--dim);font:inherit;font-size:12px;font-weight:600;
+    font-family:var(--mono);padding:4px 12px;cursor:pointer;border-right:1px solid var(--line);white-space:nowrap}
+  .bar .epochs button:last-child{border-right:0}
+  .bar .epochs button:hover{color:var(--ink)}
+  .bar .epochs button[aria-pressed=true]{background:var(--sel);color:#fff}
+  .bar .epochs button .cur{font-family:var(--ui);font-size:8.5px;font-weight:700;letter-spacing:.04em;
+    color:var(--ok);margin-left:5px;vertical-align:1px}
+  .bar .epochs button[aria-pressed=true] .cur{color:#9be0bb}
+
+  .bar .scen{display:flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden;margin-left:10px}
+  .bar .scen button{background:#0c0e12;border:0;color:var(--dim);font:inherit;font-size:11.5px;font-weight:600;
+    padding:4px 11px;cursor:pointer;border-right:1px solid var(--line);white-space:nowrap}
+  .bar .scen button:last-child{border-right:0}
+  .bar .scen button:hover{color:var(--ink)}
+  .bar .scen button[aria-pressed=true]{background:var(--sel);color:#fff}
+  .bar .mock{margin-left:10px;color:var(--soft);font-size:10.5px;border:1px solid var(--line);
+    border-radius:3px;padding:2px 7px;letter-spacing:.03em;white-space:nowrap}
+
+  /* ── HEALTH LEAD: the one-liner about the view at the selected epoch ─── */
+  .lead{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);
+    background:var(--rail);flex:0 0 auto;font-size:12.5px}
+  .lead .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg);flex:0 0 auto}
+  .lead.ok .sd{background:var(--ok)} .lead.crit .sd{background:var(--crit)} .lead.warn .sd{background:var(--warn)}
+  .lead .ltxt{color:var(--ink)} .lead .ltxt b{font-weight:650;color:#fff}
+  .lead.ok .ltxt b{color:var(--ok)} .lead.crit .ltxt b{color:var(--crit)} .lead.warn .ltxt b{color:var(--warn)}
+  .lead .ltxt .mono{color:var(--ink)} .lead .ltxt .bad{color:var(--crit)} .lead .ltxt .mv{color:var(--warn)}
+  .lead .pills{margin-left:auto;display:flex;gap:7px;font-size:11px}
+  .lead .pill{display:flex;align-items:center;gap:5px;border:1px solid var(--line-2);border-radius:4px;
+    padding:2px 8px;color:var(--dim);background:#0c0e12;font-variant-numeric:tabular-nums}
+  .lead .pill b{color:var(--ink);font-weight:600}
+  .lead .pill.crit{border-color:#4a2622;color:var(--crit)} .lead .pill.crit b{color:var(--crit)}
+  .lead .pill.warn{border-color:#443613;color:var(--warn)} .lead .pill.warn b{color:var(--warn)}
+  .lead .pill.ok{border-color:#1f3a2c;color:var(--ok)} .lead .pill.ok b{color:var(--ok)}
+
+  /* ── 3-pane body ───────────────────────────────────────────────────── */
+  .body{display:grid;grid-template-columns:168px minmax(0,1fr) 340px;flex:1 1 auto;min-height:0}
+
+  /* ── LEFT RAIL: the EPOCH TIMELINE — the scrubber as a vertical rail ───
+       e1 (oldest) → e4 (current, bottom). Each step shows the transition
+       and whether ownership moved at that boundary. Selecting re-projects
+       the centre + right at that view. Mirrors the command-bar segmented
+       control; either drives the same `epoch` state. */
+  .rail{background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;padding:10px 0;
+    display:flex;flex-direction:column}
+  .rail .grp-h{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--soft);
+    padding:4px 14px 8px;display:flex;justify-content:space-between}
+  .rail .grp-h .gc{color:var(--faint);font-weight:600;letter-spacing:0}
+  /* a vertical spine the epoch nodes sit on */
+  .tline{position:relative;padding:2px 10px 2px}
+  .tline:before{content:'';position:absolute;left:24px;top:14px;bottom:14px;width:2px;background:var(--line-2)}
+  .ep{position:relative;display:flex;align-items:flex-start;gap:11px;padding:8px 6px 8px 4px;border-radius:6px;
+    cursor:pointer;color:var(--dim)}
+  .ep:hover{background:var(--hover);color:var(--ink)}
+  .ep[aria-current=true]{background:var(--sel);color:#fff}
+  .ep .node{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:var(--rail);border:2px solid var(--soft);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--dim);
+    z-index:1;margin-top:1px}
+  .ep[aria-current=true] .node{border-color:var(--sel-line);background:var(--sel);color:#fff}
+  .ep[data-cur=true] .node{border-color:var(--ok);color:var(--ok)}
+  .ep[aria-current=true][data-cur=true] .node{color:#fff}
+  /* a boundary that moved ownership gets an amber ring on the node below */
+  .ep[data-moved=true] .node{box-shadow:0 0 0 3px var(--warn-bg)}
+  .ep .emeta{flex:1 1 auto;min-width:0}
+  .ep .etop{display:flex;align-items:baseline;gap:6px}
+  .ep .enm{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink)}
+  .ep[aria-current=true] .enm{color:#fff}
+  .ep .ecur{font-family:var(--ui);font-size:8.5px;font-weight:700;letter-spacing:.04em;color:var(--ok);
+    border:1px solid #1f3a2c;border-radius:2px;padding:0 4px;vertical-align:1px}
+  .ep .esub{font-size:10.5px;color:var(--soft);margin-top:1px;line-height:1.45}
+  .ep[aria-current=true] .esub{color:#9fb2c4}
+  .ep .esub .mv{color:var(--warn)} .ep .esub .bad{color:var(--crit)}
+  .ep .ehold{font-size:10.5px;color:var(--faint)}
+  /* in-situ note: this whole page is reconstructed history */
+  .rail .gloss{margin:auto 12px 2px;padding:10px 0 2px;border-top:1px solid var(--line);color:var(--soft);
+    font-size:10.5px;line-height:1.6}
+  .rail .gloss b{color:var(--dim);font-weight:600}
+  .rail .gloss .new{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:9.5px;border:1px solid #443613;
+    border-radius:3px;padding:0 4px;background:var(--warn-bg)}
+
+  /* ── CENTRE: THE OWNERSHIP MAP at view T ───────────────────────────────
+       5 member rows; each holds the partitions it owns at the selected
+       epoch. Gains (+) and losses (−) vs the prior epoch are severity-
+       coloured chips. A diverged member at e4 (when the scenario is on)
+       carries a crit overlay. This IS the re-projection — the whole point. */
+  .map{overflow-y:auto;background:var(--bg);min-width:0;display:flex;flex-direction:column}
+  .map .mh{display:flex;align-items:center;gap:10px;height:30px;padding:0 14px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--bg);z-index:3;color:var(--soft);font-size:11px}
+  .map .mh .ttl{color:var(--dim);font-weight:600;font-size:12px}
+  .map .mh .ttl .mono{color:var(--ink)}
+  .map .mh .leg{margin-left:auto;display:flex;gap:12px;font-size:10.5px}
+  .map .mh .leg span{display:flex;align-items:center;gap:5px}
+  .map .mh .leg .ch{font-family:var(--mono);font-size:10px;border-radius:3px;padding:0 4px;font-weight:700}
+  .map .mh .leg .ch.g{color:var(--ok);background:var(--ok-bg);border:1px solid #1f3a2c}
+  .map .mh .leg .ch.l{color:var(--warn);background:var(--warn-bg);border:1px solid #443613}
+
+  .members{padding:12px 14px 16px;display:flex;flex-direction:column;gap:10px}
+  /* a member row: addr + role + the partition chips it owns at T */
+  .mem{border:1px solid var(--line);border-radius:8px;background:var(--pane);overflow:hidden}
+  .mem.diverged{border-color:#4a2622;box-shadow:0 0 0 1px var(--crit-bg) inset}
+  .mem .mhd{display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--line);
+    background:#0c0e12;cursor:pointer}
+  .mem .mhd:hover{background:var(--hover)}
+  .mem .mhd .wdot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:0 0 auto}
+  .mem.diverged .mhd .wdot{background:var(--crit);box-shadow:0 0 0 3px var(--crit-bg)}
+  .mem .mhd .addr{font-family:var(--mono);font-size:13px;font-weight:600;color:#fff}
+  .mem .mhd .role{font-size:10px;color:var(--soft);text-transform:uppercase;letter-spacing:.05em}
+  .mem .mhd .belief{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--dim);
+    display:flex;align-items:center;gap:8px}
+  .mem .mhd .belief .ve{color:var(--ink)}
+  .mem.diverged .mhd .belief .ve{color:var(--crit);font-weight:600}
+  .mem .mhd .belief .own{color:var(--soft)}
+  /* the stuck/diverged inline marker on a member head */
+  .mem .mhd .flag{font-family:var(--ui);font-size:9.5px;font-weight:700;letter-spacing:.03em;
+    color:var(--crit);background:var(--crit-bg);border:1px solid #4a2622;border-radius:3px;padding:0 6px}
+  .mem .own-h{font-size:10px;color:var(--soft);padding:8px 12px 0;letter-spacing:.04em}
+  .mem .own-h .cnt{color:var(--faint)}
+  .mem .chips{display:flex;flex-wrap:wrap;gap:6px;padding:7px 12px 12px}
+  /* a partition chip — clickable, drills to tool/partition.html */
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;
+    border:1px solid var(--line-2);border-radius:5px;padding:3px 9px;color:var(--ink);cursor:pointer;
+    background:#0c0e12;white-space:nowrap}
+  .chip:hover{border-color:var(--soft);background:var(--hover);text-decoration:none}
+  /* a chip just GAINED at this epoch (came from another member) — calm-ok accent */
+  .chip.gain{border-color:#234d38;color:var(--ok);background:var(--ok-bg)}
+  .chip.gain .mk{color:var(--ok)}
+  /* a chip the member LOST going INTO this epoch — shown as a faded "left" ghost */
+  .chip.loss{border-style:dashed;border-color:#443613;color:var(--warn);background:var(--warn-bg);opacity:.92}
+  .chip.loss .mk{color:var(--warn)}
+  /* the diverged partition (user42 on :49807 @e4 scenario) */
+  .chip.diverged{border-color:#4a2622;color:var(--crit);background:var(--crit-bg)}
+  .chip.diverged .mk{color:var(--crit)}
+  .chip .mk{font-family:var(--ui);font-size:11px;font-weight:700;line-height:1}
+  .chip .from{color:var(--soft);font-size:10px}
+  .mem .empty-own{padding:4px 12px 12px;color:var(--soft);font-size:11px;font-style:italic}
+
+  /* ── RIGHT: VIEW-CHANGE SUMMARY + belief at T ──────────────────────── */
+  .panel{background:var(--pane);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+  .panel .ph{padding:11px 14px 10px;border-bottom:1px solid var(--line)}
+  .panel .ph .pt{font-family:var(--mono);font-size:14px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+  .panel .ph .pt .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg)}
+  .panel .ph.ok .pt .sd{background:var(--ok)} .panel .ph.warn .pt .sd{background:var(--warn)} .panel .ph.crit .pt .sd{background:var(--crit)}
+  .panel .ph .psub{margin-top:5px;color:var(--dim);font-size:11.5px;line-height:1.45}
+  .panel .ph .psub .mono{color:var(--ink)} .panel .ph .psub .mv{color:var(--warn)} .panel .ph .psub .bad{color:var(--crit)}
+  .panel .seg{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .panel .seg .st{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);
+    margin-bottom:10px;display:flex;justify-content:space-between}
+  .panel .seg .st .stn{color:var(--faint);font-weight:600;letter-spacing:0}
+
+  /* the ownership-move list for the transition into T */
+  .moves{display:flex;flex-direction:column;gap:8px;font-size:12px}
+  .moves .mv{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:baseline}
+  .moves .mv .pk{font-family:var(--mono);font-size:12px;color:var(--ink);white-space:nowrap}
+  .moves .mv .arr{font-family:var(--mono);color:var(--dim);font-size:11.5px}
+  .moves .mv .arr .a{color:var(--warn)}
+  .moves .mv .arr b{color:var(--ink);font-weight:600}
+  .moves .none{color:var(--soft);font-style:italic;font-size:11.5px}
+
+  /* membership diff */
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12px}
+  .kv dt{color:var(--soft)} .kv dd{margin:0;color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+  .kv dd.bad{color:var(--crit)} .kv dd.warn{color:var(--warn)} .kv dd.ok{color:var(--ok)}
+
+  /* "why / belief at T" reasoning block */
+  .reason{font-size:12px;line-height:1.55;color:var(--dim)}
+  .reason b{color:var(--ink);font-weight:600} .reason .mono{color:var(--ink)} .reason .bad{color:var(--crit)} .reason .mv{color:var(--warn)}
+  .belief-note{display:flex;gap:8px;align-items:flex-start;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:5px;padding:9px 11px;font-size:11.5px;line-height:1.5;color:var(--ink);margin-top:10px}
+  .belief-note .arr{flex:0 0 auto} .belief-note.warn .arr{color:var(--warn)} .belief-note.crit .arr{color:var(--crit)} .belief-note.ok .arr{color:var(--ok)}
+  .belief-note .mono{color:var(--ink)} .belief-note .bad{color:var(--crit)}
+
+  .panel .actions{margin-top:auto;padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  .btn{display:inline-flex;align-items:center;justify-content:space-between;gap:7px;
+    background:#0c0e12;border:1px solid var(--line-2);border-radius:5px;color:var(--ink);font:inherit;font-size:12px;
+    font-weight:600;padding:7px 11px;cursor:pointer;text-align:left}
+  .btn:hover{border-color:var(--soft);background:var(--hover);text-decoration:none}
+  .btn .ar{color:var(--soft)}
+  .btn .kc{font-family:var(--mono);font-size:10px;color:var(--soft);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+
+  /* ── bottom hotkey bar ─────────────────────────────────────────────── */
+  .keys{display:flex;align-items:center;gap:0;height:24px;background:var(--rail);border-top:1px solid var(--line);
+    padding:0 12px;flex:0 0 auto;font-size:11px;color:var(--soft)}
+  .keys .k{display:flex;align-items:center;gap:5px;padding:0 13px 0 0}
+  .keys .k kbd{font-family:var(--mono);font-size:10px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:3px;padding:1px 5px;color:var(--dim)}
+  .keys .right{margin-left:auto;font-family:var(--mono);color:var(--soft)}
+
+  /* data-sources popover */
+  .src{display:none;position:fixed;bottom:30px;left:176px;width:580px;background:var(--pane);
+    border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;font-size:11.5px;line-height:1.65;color:var(--dim);
+    box-shadow:0 8px 30px #000a;z-index:20}
+  .src.show{display:block}
+  .src h4{margin:0 0 8px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+  .src p{margin:7px 0} .src b{color:var(--ink);font-weight:600} .src .mono{color:var(--ink)}
+  .src .new{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:10px;border:1px solid #443613;
+    border-radius:3px;padding:1px 5px;margin-right:3px;background:var(--warn-bg)}
+  .keys .srcbtn{cursor:pointer;color:var(--dim);padding:0 13px 0 0;display:flex;align-items:center;gap:5px}
+  .keys .srcbtn:hover{color:var(--ink)} .keys .srcbtn .new{color:var(--warn)}
 </style>
 </head>
 <body>
-<main class="app">
 
-  <header class="top">
-    <div>
-      <h1><em>fero</em> replay <span style="color:var(--idle)">·</span> cluster rewind</h1>
-      <p class="purpose">Rewind recorded cluster history to the moment something diverged and step through what each node believed — committed views, write-gates, lag — as the incident unfolded.</p>
-    </div>
-    <div class="rec">recording <b>rec-0611-1402</b> · resource <b>"sessions"</b><br>2026-06-11 14:02:07 · <b>90.0s</b> · 6 nodes · 22 events<br>story: kill → rejoin blip → stranded VIEW_COMMIT → heal</div>
-  </header>
+<!-- ── command bar: identity (resource › replay) · context · health · EPOCH scrubber · scenario ── -->
+<div class="bar">
+  <div class="id">
+    <a class="res" href="tool/resources.html">cluster</a><span class="chev">›</span>
+    <a class="res" href="tool/inbox.html">sessions</a><span class="chev">›</span>
+    <span class="res">replay</span><span class="nm">·&nbsp;epoch&nbsp;<span class="mono" id="navEpoch">e4</span></span>
+  </div>
+  <span class="sep"></span>
+  <div class="ctx">
+    <span><span class="mono">16</span> partitions</span>
+    <span><span class="mono">1,284</span> keys</span>
+    <span><span class="mono">5</span> members · R=5</span>
+    <span id="ctxViews">views <span class="mono">e1→e4</span></span>
+  </div>
+  <div class="health" id="health"><span class="dot"></span><span class="txt" id="healthTxt">Healthy</span></div>
+  <!-- the EPOCH SCRUBBER is the primary axis — segmented control in the bar -->
+  <span class="epochlab">view</span>
+  <div class="epochs" id="epochs"></div>
+  <div class="scen" id="scen"></div>
+  <span class="mock">MOCKUP · static</span>
+</div>
 
-  <!-- ============ master timeline ============ -->
-  <section class="panel">
-    <div class="phead">timeline <span class="meta" id="zoomMeta">0s – 90s · wheel to zoom · drag to scrub · click a tick to jump</span></div>
-    <div class="tl">
-      <div class="band" id="band"></div>
-      <div class="axis" id="axis"></div>
-      <div class="tip" id="tip"></div>
+<!-- ── HEALTH LEAD: a one-liner about the view at the selected epoch ── -->
+<div class="lead" id="lead">
+  <span class="sd"></span><span class="ltxt" id="leadTxt"></span>
+  <span class="pills" id="leadPills"></span>
+</div>
+
+<div class="body" id="bodyGrid">
+
+  <!-- ── LEFT RAIL: the epoch timeline (scrubber as a vertical rail) ── -->
+  <nav class="rail">
+    <div class="grp-h"><span>epoch timeline</span><span class="gc">e1 → e4</span></div>
+    <div class="tline" id="tline"></div>
+    <div class="gloss">
+      <span class="new">⚠ NEW</span> The whole page is reconstructed history — fero retains only the
+      <b>current</b> ring, not past layouts. Select an epoch to re-project the cluster at that view.
     </div>
-    <div class="controls">
-      <button id="btnPrev" title="previous event (←)">⏮ prev</button>
-      <button id="btnPlay" title="play / pause (space)">▶ play</button>
-      <button id="btnNext" title="next event (→)">next ⏭</button>
-      <button id="btnSpeed" title="playback speed">1×</button>
-      <span class="sep"></span>
-      <button id="btnZoomIn">+ zoom</button>
-      <button id="btnZoomOut">− zoom</button>
-      <button id="btnZoomReset">⟲ fit</button>
-      <span class="sep"></span>
-      <button id="btnPinA" title="pin moment A for the diff">pin A @ T</button>
-      <button id="btnPinB" title="pin moment B for the diff">pin B @ T</button>
-      <span class="clock" id="clock"></span>
+  </nav>
+
+  <!-- ── CENTRE: the OWNERSHIP MAP at view T ── -->
+  <section class="map">
+    <div class="mh">
+      <span class="ttl">ownership at view <span class="mono" id="mapEpoch">e4</span></span>
+      <span class="cnt" id="mapCount" style="color:var(--soft)"></span>
+      <span class="leg">
+        <span><span class="ch g">+gain</span> took ownership here</span>
+        <span><span class="ch l">−loss</span> handed off here</span>
+      </span>
     </div>
-    <div class="legend">
-      <span><i data-k="view"></i>view ballot/commit</span><span><i data-k="gate"></i>write-gate</span>
-      <span><i data-k="kill"></i>kill</span><span><i data-k="suspect"></i>suspect</span>
-      <span><i data-k="join"></i>join / heal</span><span><i data-k="flag"></i>divergence flag</span>
-      <span><i data-k="rebal"></i>rebalance</span><span><i data-k="mark"></i>marker</span>
-    </div>
+    <div class="members" id="members"></div>
   </section>
 
-  <!-- ============ cluster belief at T ============ -->
-  <div class="verdict" id="verdict"></div>
-  <div class="groups" id="groups"></div>
+  <!-- ── RIGHT: view-change summary + belief at T ── -->
+  <aside class="panel" id="panel"></aside>
+</div>
 
-  <!-- ============ diff + event log ============ -->
-  <div class="cols">
-    <section class="panel">
-      <div class="phead">what changed A → B <span class="meta" id="diffMeta"></span></div>
-      <div class="scroll" id="diff"></div>
-    </section>
-    <section class="panel">
-      <div class="phead">event log <span class="meta">annotated · past full / future dim · click to jump</span></div>
-      <div class="scroll" id="evlog"></div>
-    </section>
-  </div>
+<!-- ── bottom hotkey bar ── -->
+<div class="keys">
+  <span class="k"><kbd>,</kbd><kbd>.</kbd> step epoch</span>
+  <span class="k"><kbd>j</kbd><kbd>k</kbd> member</span>
+  <span class="k"><kbd>↵</kbd> open partition</span>
+  <span class="k"><kbd>1</kbd>/<kbd>2</kbd> scenario</span>
+  <span class="k"><kbd>e</kbd> latest</span>
+  <span class="srcbtn" id="srcBtn"><span class="new">⚠</span> data sources</span>
+  <span class="right" id="statusRight"></span>
+</div>
 
-  <!-- ============ data sources ============ -->
-  <footer class="sources">
-    <h2>data sources (per panel)</h2>
-    <dl>
-      <dt>Timeline event ticks</dt>
-      <dd>view commits + gate flips: observe-stream kinds <b>'view'</b>/<b>'writable'</b> [B]. Kills/joins/suspect: snapshot <b>peers.status / peers.suspect</b> transitions [A], sampled per poll. Divergence flag: bridge <b>conv</b> classification [E]. A few ticks are <b>hindsight inferences</b>, not frame-level observations — and labelled as such on the tick: the dropped <i>VIEW_COMMIT e9</i> is inferred from :49807 never advancing past e8 in any later snapshot (exactly how DECISIONS Y was diagnosed); the <i>periodic re-announce</i> is inferred from the commit that follows it; the JOIN handshake shows only as a <b>peers.status</b> transition. <span class="new">⚠ NEW instrumentation:</span> the recorded history itself — the bridge keeps only a 4000-event in-memory ring and 1s aggregates are thrown away; replay needs a retained, queryable history window (seam: bridge <b>account()</b> sees every ProvEvent + a /history?since=t endpoint — inventory PLAUSIBLY-ADDABLE #3).</dd>
-      <dt>VIEW_PREPARE / VIEW_ACK ballot ticks</dt>
-      <dd><span class="new">⚠ NEW instrumentation:</span> in-flight ballot state (#proposal / #promisedEpoch) is private with no accessors — the backlog "Paxos in-flight-ballot view". Only VIEW_COMMIT outcomes are visible today (observe kind 'view').</dd>
-      <dt>PING-miss → suspect tick</dt>
-      <dd><span class="new">⚠ NEW instrumentation:</span> failure-detector internals (PING origination, miss counters, suspect transitions) have no accessors; snapshot <b>peers.suspect</b> [A] only exposes the per-poll result.</dd>
-      <dt>Per-node belief cards</dt>
-      <dd><b>epoch / members / writable / pending / uuid / me / role</b> straight off InspectSnapshot [A]; card expand: <b>marks</b> (seen digest, incl. dead-origin debris) + <b>log.heads</b> [A]. <span class="new">⚠ NEW instrumentation:</span> a timestamped snapshot <i>history</i> to scrub (backlog "snapshot capture/export") — today only the live 1s poll exists.</dd>
-      <dt>Lag vs floor (card bars)</dt>
-      <dd>bridge <b>topLag</b> computation (live-origin frontier, floor-relative, tol=16) [E] — needs per-tick retention via the same NEW history store.</dd>
-      <dt>View-group split + majority math (verdict strip)</dt>
-      <dd>bridge 'aggregate' <b>groups</b> (epoch + member-set-hash sig, size, writable) and <b>conv</b> writable-majority rule [E].</dd>
-      <dt>Diff changelog</dt>
-      <dd>epoch / gate / uuid / pending per node: snapshot [A]; per-partition heads: snapshot <b>log.heads</b> [A]; ring owner moves: bridge <b>cover</b> diff [E]; members: committed-view member sets [A]. All diffed between two retained snapshots (same NEW history dependency).</dd>
-      <dt>"3 writes flushed @e1 → fenced" annotations</dt>
-      <dd>observe kind <b>'lost'</b> with <b>we/ws</b> winner stamps [B] — distinguishes epoch-fence from same-epoch conflict. Buffered-write <i>keys</i> at the gate-close tick: <span class="new">⚠ NEW instrumentation:</span> pending-buffer sample (snapshot ships depth only; seam: the <b>pending</b> array already in SnapshotDeps — PLAUSIBLY-ADDABLE #7).</dd>
-    </dl>
-    <p style="margin-top:10px">mockup · static fake data · keys: <kbd>←</kbd>/<kbd>→</kbd> step events · <kbd>space</kbd> play/pause</p>
-  </footer>
-</main>
+<!-- data-sources popover (the honest footnote) -->
+<div class="src" id="src">
+  <h4>Data sources — how this replay view is assembled</h4>
+  <p><span class="new">⚠ NEW</span> <b>This entire page is new instrumentation.</b> fero keeps only the
+     <b>current</b> ring (<span class="mono">ring.coverage</span> derives the live owner per partition) — it does
+     <b>not</b> retain historical ownership layouts. Re-projecting the cluster at a <b>past</b> view (e1 / e2 / e3)
+     requires a retained, queryable <b>view history</b>: each committed view's epoch, member set, and the ring it
+     produced, recorded at commit time. Today only <b>e4</b> (the current view) is derivable from live state; e1→e3
+     are reconstructed from the recorded transitions.</p>
+  <p><b>Ownership map (centre).</b> The owner-per-partition at view T comes from re-running the consistent-hash ring
+     for that view's member set against the 16 partition keys [E, with the NEW history store]. Gains/losses are the
+     diff against the prior epoch's projection — the same <b>cover diff</b> the live tooling computes between two
+     snapshots, applied between two retained views instead.</p>
+  <p><b>View-change summary (right).</b> What moved, membership delta, and the reason come from the recorded
+     <b>VIEW_COMMIT</b> events (observe kind <span class="mono">'view'</span> [B]) plus the cover diff between the
+     two views. The <b>e3→e4</b> moves shown — <span class="mono">user42</span> :49803→:49801 and
+     <span class="mono">billing</span> :49809→:49807 — are the recorded transition.</p>
+  <p><b>Belief at T / divergence overlay.</b> The "Needs attention" toggle overlays the current divergence at e4:
+     replica <span class="mono">:49807</span> hosts <span class="mono">user42</span> but is stuck on
+     <span class="mono">e3·s1241</span> and never adopted e4 — from the <span class="new">⚠ NEW</span> per-key
+     version sample <span class="mono">__inspect{versions:K}</span>, cross-merged on node uuid [A]. It is a
+     present-tense fact projected onto the e4 frame, not reconstructed history.</p>
+</div>
 
 <script>
 'use strict';
-/* ================= fixtures: one recorded 90s incident ================= */
-const DUR = 90;
-const NODES = [
-  {id:'A', addr:'127.0.0.1:49801', uuid:'3f8a1c2e-9b4d-4e7a-8c1f-2d5e6a7b8c9d'},
-  {id:'B', addr:'127.0.0.1:49803', uuid:'9d2b7f41-1c6e-4a02-b3d8-5e09c4f211aa'},
-  {id:'C', addr:'127.0.0.1:49807', uuid:'b61e0d9c-44f2-4c1b-9a77-0e3d8b21c4f5'},
-  {id:'D', addr:'127.0.0.1:49809', uuid:'71c4aa08-2d5b-4f96-8e13-c79f02d6b384'},
-  {id:'E', addr:'127.0.0.1:49815', uuid:'e8401b6f-7a3d-4d28-92c5-1f6b09e7d2ac', uuid2:'2c9f7e51-08b4-4ab1-bd60-93a4e1c87f02'},
-  {id:'F', addr:'127.0.0.1:49818', uuid:'5a07d3e9-c1f8-4b62-a94d-7e218c053b6f'},
-];
-const byId = Object.fromEntries(NODES.map(n=>[n.id,n]));
-const M6 = ['A','B','C','D','E','F'], M5 = ['A','B','C','D','F'];
-const port = id => ':' + byId[id].addr.split(':')[1];
+/* ── drill targets ──────────────────────────────────────────────────────
+   This file lives in mockups/, so tool pages are under tool/. A partition
+   chip → the partition log; a member head → node-doctor; the breadcrumb
+   resource → inbox; cluster → resources; the whole map sits beside ia-map. */
+const PARTITION = 'tool/partition.html';
+const NODE      = 'tool/node.html';
 
-// The incident script. Every tick is annotated; the log panel renders these verbatim.
-const EV = [
-  {t:0.0,  k:'mark',    label:'recording starts — epoch 7, 6 members, converged', d:'all nodes writable @e7, single committed view'},
-  {t:8.2,  k:'suspect', label:':49815 suspected — 3 consecutive PING misses', d:'failure detector on :49801 marks peer suspect'},
-  {t:9.0,  k:'kill',    label:'node :49815 killed (process death)', d:'socket drop seen by 5 peers · last origin seq 1287'},
-  {t:11.4, k:'view',    label:'VIEW_PREPARE e8 (coordinator :49801)', d:'proposal #8.1 fanned to 4 peers'},
-  {t:11.7, k:'view',    label:'VIEW_ACK ×4 — quorum reached', d:'acks: :49803 :49807 :49809 :49818'},
-  {t:11.9, k:'view',    label:'VIEW_COMMIT e8 — 5 members', d:':49815 removed · ring rebalances 38/120 segments'},
-  {t:12.3, k:'rebal',   label:'rebalance — :49809 receiving moved history', d:'lag vs floor on :49809 jumps to 1,840'},
-  {t:26.0, k:'rebal',   label:':49809 caught up — rebalance lag drained', d:'frontier-vs-floor back under tol=16'},
-  {t:30.1, k:'join',    label:':49815 restarts — same address, NEW uuid', d:'e8401b6f… → 2c9f7e51… (uuid is per-process)'},
-  {t:30.2, k:'gate',    label:':49815 write-gate CLOSED (quorum-less boot)', d:'3 client writes buffered: user42.score, cart7.items, session19.seen'},
-  {t:30.4, k:'view',    label:':49815 boots SOLO view e1 [self] — writable', d:'snapshot shows epoch=1 / members=[self]: the rejoin blip — 2 writable views, but solo ≠ majority'},
-  {t:30.5, k:'gate',    label:':49815 gate OPEN — flushes 3 buffered writes @e1', d:'committed at epoch 1 — epoch-fence risk (DECISIONS X)'},
-  {t:31.0, k:'join',    label:':49815 peer link re-established to :49801', d:'peers.status connecting→connected [A] — the JOIN handshake itself is below the snapshot'},
-  {t:33.2, k:'view',    label:'VIEW_PREPARE e9 — 6 members', d:'proposal #9.1 (⚠ inferred — in-flight ballots have no accessor)'},
-  {t:33.4, k:'view',    label:'VIEW_COMMIT e9 — 5/6 nodes apply it', d:':49807 never advances past e8 in any later snapshot ⇒ INFERRED dropped commit (how DECISIONS Y was diagnosed)'},
-  {t:33.5, k:'view',    label:':49815 commits e9 — rejoin blip over (3.1s)', d:'solo view lasted 3.1s · catch-up begins 2,210 behind'},
-  {t:38.1, k:'lost',    label:":49815's epoch-1 writes fenced — 3 × kind:'lost'", d:'winner we=9 > epoch 1 ⇒ epoch-fence, not a conflict'},
-  {t:52.0, k:'flag',    label:'DIVERGED — :49807 stuck @e8 past debounce', d:'2 committed views held 18.5s · e8 side writable but minority ⇒ stranded member, not split-brain'},
-  {t:70.3, k:'heal',    label:'periodic view re-announce (inferred)', d:'the re-announce itself has no observable — inferred from the e9 commit that lands on :49807 next (DECISIONS Y fix)'},
-  {t:70.4, k:'heal',    label:':49807 commits e9 — views reconverge', d:'one committed view × 6 nodes'},
-  {t:88.0, k:'mark',    label:':49815 fully caught up — lag 0', d:''},
-  {t:90.0, k:'mark',    label:'recording ends — converged @e9', d:'6/6 writable, single view'},
-];
+/* ── the cluster, the partitions, and ownership BY EPOCH ─────────────────
+   Five members, sixteen partitions of `sessions`. ownership@e4 is the
+   canonical present (matches partition.html / inbox.html). Earlier epochs
+   are the reconstructed history: e3→e4 moved user42 :49803→:49801 and
+   billing :49809→:49807 (the two recorded transitions). e1→e2 and e2→e3
+   held ownership steady (membership-stable epochs; the churn that produced
+   the e2 fence touched seqs, not the ring). */
+const MEMBERS = [':49801', ':49803', ':49805', ':49807', ':49809'];
 
-// classification segments for the band (what the verdict says at any T)
-const CLS = [
-  [0,    8.2, 'ok',   'CONVERGED @e7 — one committed view, 6/6 writable'],
-  [8.2, 11.9, 'warn', 'VIEW CHANGE — :49815 lost, e8 ballot in flight'],
-  [11.9,30.4, 'ok',   'CONVERGED @e8 — 5 members (rebalance settling)'],
-  [30.4,33.5, 'warn', 'REJOIN BLIP — 2 writable views; solo joiner is not a majority ⇒ benign'],
-  [33.5,52.0, 'warn', 'DIVERGING — 2 committed views, debounce running ({dur}s)'],
-  [52.0,70.4, 'crit', 'DIVERGED — :49807 stranded @e8 for {dur}s (missed VIEW_COMMIT e9)'],
-  [70.4,90.1, 'ok',   'CONVERGED @e9 — healed by periodic view re-announce'],
-];
-// the divergence onset (C fails to apply the e9 commit the others do) — the debounce/stranded clock runs from here
-const DIVERGENCE_T0 = 33.4;
-const subDur = (l,t) => l.includes('{dur}') ? l.replace('{dur}', (t-DIVERGENCE_T0).toFixed(1)) : l;
-const classAt = t => { for (const [a,b,s,l] of CLS) if (t>=a && t<b) return {s,l:subDur(l,t)}; return {s:'ok',l:CLS[CLS.length-1][3]}; };
-const epochLead = t => t<11.9 ? 7 : t<33.4 ? 8 : 9;
-
-/* ---- per-node belief reconstruction at time t (piecewise from the script) ---- */
-const lerp = (t, pts) => {
-  if (t<=pts[0][0]) return pts[0][1];
-  for (let i=1;i<pts.length;i++) if (t<=pts[i][0]) { const [a,va]=pts[i-1],[b,vb]=pts[i]; return va+(vb-va)*(t-a)/(b-a); }
-  return pts[pts.length-1][1];
+/* OWN[epoch][member] = partitions that member owns at that view. Read e4 as
+   the present; walk backwards to see who held what before each handoff. */
+const OWN = {
+  e1:{
+    ':49801':['session','catalog'],
+    ':49803':['user42','order7','cart9','search'],
+    ':49805':['cart7','audit','inventory','metrics'],
+    ':49807':['notif','cart8'],
+    ':49809':['prefs','user43','geo','billing'],
+  },
+  e2:{ // membership-stable — same layout as e1 (the e1→e2 change was a churn that fenced a stale write, not a ring move)
+    ':49801':['session','catalog'],
+    ':49803':['user42','order7','cart9','search'],
+    ':49805':['cart7','audit','inventory','metrics'],
+    ':49807':['notif','cart8'],
+    ':49809':['prefs','user43','geo','billing'],
+  },
+  e3:{ // still :49803 owns user42, :49809 owns billing — the moves happen AT e3→e4
+    ':49801':['session','catalog'],
+    ':49803':['user42','order7','cart9','search'],
+    ':49805':['cart7','audit','inventory','metrics'],
+    ':49807':['notif','cart8'],
+    ':49809':['prefs','user43','geo','billing'],
+  },
+  e4:{ // CANONICAL present: user42 → :49801, billing → :49807
+    ':49801':['user42','session','catalog'],
+    ':49803':['order7','cart9','search'],
+    ':49805':['cart7','audit','inventory','metrics'],
+    ':49807':['notif','cart8','billing'],
+    ':49809':['prefs','user43','geo'],
+  },
 };
-function stateAt (t) {
-  const lead = epochLead(t);
-  return NODES.map((n,i) => {
-    const s = {id:n.id, addr:n.addr, uuid:n.uuid, alive:true, epoch:lead,
-               members: lead===8?M5:M6, writable:true, pending:0,
-               // healthy steady-state lag: nodes trail the owners by the in-flight pipeline, roughly UNIFORM
-               // and BELOW the leaderboard tol (16) — so a healthy node never flickers amber (matches bridge topLag semantics)
-               lag: Math.round((i*7 + Math.floor(t*1.3)) % 14), note:''};
-    if (n.id==='D' && t>=12.3 && t<26)
-      { s.lag = Math.round(lerp(t,[[12.3,1840],[26,0]])); s.note='rebalance catch-up (moved history)'; }
-    if (n.id==='C' && t>=33.4 && t<70.4)
-      { s.epoch=8; s.members=M5; s.note='missed VIEW_COMMIT e9 — stranded';
-        s.lag = Math.round(lerp(t,[[33.4,8],[52,140],[70.4,180]])); }
-    if (n.id==='E') {
-      if (t>=9.0 && t<30.1) { s.alive=false; s.writable=false; s.epoch=null; s.members=[]; s.lag=0; s.note='killed T+9.0s'; }
-      else if (t>=30.1) {
-        s.uuid = n.uuid2;
-        if (t<30.4)      { s.epoch=1; s.members=['E']; s.writable=false; s.pending=Math.min(3,Math.ceil((t-30.1)*12)); s.note='quorum-less boot — buffering writes'; }
-        else if (t<33.5) { s.epoch=1; s.members=['E']; s.writable=true; s.note='SOLO view — 3 writes committed @e1 (fence risk)'; }
-        else             { s.lag=Math.round(lerp(t,[[33.5,2210],[70,420],[88,0]])); if (s.lag>16) s.note='catching up — missed the e8 era'; }
-      }
-    }
-    return s;
-  });
-}
+const EPOCHS = ['e1','e2','e3','e4'];
+const CURRENT = 'e4';
 
-/* ---- derived fixtures for diff + card expand ---- */
-const PARTS = {user42:[14,.35], user43:[2,.1], orders:[31,1.1], cart7:[6,.2], session19:[9,.5]};
-const headsAt = t => Object.fromEntries(Object.entries(PARTS).map(([k,[b,r]])=>[k,Math.floor(b+r*t)]));
-const MOVES = {'7>8':38, '8>9':38, '7>9':0, '8>7':38, '9>8':38, '9>7':0};
-const OWNER_SAMPLES = {
-  '7>8': ['user42: :49815 → :49801', 'cart7: :49815 → :49818'],
-  '8>9': ['user42: :49801 → :49815', 'cart7: :49818 → :49815'],
+/* per-epoch view metadata: the transition INTO this epoch + belief notes.
+   `moves` are the partitions that changed owner at that boundary (from→to).
+   `members` is the committed member set (here always 5 — no membership
+   churn across e1→e4; the moves are ring re-balances within a stable set). */
+const VIEW = {
+  e1:{
+    members:5, moved:false, prior:null,
+    phLevel:'ok', phTitle:'view e1 · genesis',
+    phSub:'The first committed view — 5 members, the initial ring. No prior view to diff against.',
+    moves:[],
+    membership:'5 members joined at genesis · R=5 (billing R=3)',
+    reason:'<b>e1</b> is the genesis view: the cluster\'s first committed membership and the ring it produced. '+
+      'A stranded <span class="mono">e1</span> client write to <span class="mono">user42.score="99"</span> was later '+
+      '<b class="bad">fenced</b> when the view moved on (<span class="mono">epoch&lt;we</span>, DECISIONS X) — visible in the partition log, not here.',
+    belief:{lvl:'ok', txt:'At e1 every member agreed on one view. The ring below is the genesis layout; <span class="mono">user42</span> and <span class="mono">billing</span> sit on their original owners (<span class="mono">:49803</span> / <span class="mono">:49809</span>).'},
+  },
+  e2:{
+    members:5, moved:false, prior:'e1',
+    phLevel:'warn', phTitle:'view e1 → e2 · no ring move',
+    phSub:'Membership stable at 5 · the ring held · a stale-view write was fenced during the churn.',
+    moves:[],
+    membership:'5 members · unchanged · R=5',
+    reason:'The <b>e1 → e2</b> view change re-committed the <b>same</b> member set, so the ring did not move — no '+
+      'partition changed owner. The transition is in the record because a <b>stale-view write</b> '+
+      '(<span class="mono">user42.score="4"</span> @ e2·s851) was <b class="bad">fenced</b> during the brief churn '+
+      '(<span class="mono">epoch&lt;we</span>) — expected during a rebalance, not a divergence.',
+    belief:{lvl:'ok', txt:'At e2 the layout is identical to e1. <span class="mono">:49803</span> still owns <span class="mono">user42</span>; <span class="mono">:49809</span> still owns <span class="mono">billing</span>.'},
+  },
+  e3:{
+    members:5, moved:false, prior:'e2',
+    phLevel:'ok', phTitle:'view e2 → e3 · no ring move',
+    phSub:'Membership stable at 5 · ownership held · the last calm view before the e3→e4 handoffs.',
+    moves:[],
+    membership:'5 members · unchanged · R=5',
+    reason:'The <b>e2 → e3</b> view change again held the member set, so ownership did not move. This is the last '+
+      'view in which <span class="mono">:49803</span> owns <span class="mono">user42</span> and '+
+      '<span class="mono">:49809</span> owns <span class="mono">billing</span> — the stamp <span class="mono">e3·s1241</span> '+
+      '(<span class="mono">user42.score="5"</span>) committed here is the one replica <span class="mono">:49807</span> later gets stuck on.',
+    belief:{lvl:'ok', txt:'At e3 the cluster is converged on one view. The next transition (e3 → e4) is where <span class="mono">user42</span> and <span class="mono">billing</span> change hands — select <span class="mono">e4</span> to see the moves.'},
+  },
+  e4:{
+    members:5, moved:true, prior:'e3',
+    phLevel:'warn', phTitle:'view e3 → e4 · 2 partitions moved',
+    phSub:'Two ownership handoffs within a stable 5-member set — the current view.',
+    moves:[
+      {pk:'user42',  from:':49803', to:':49801', note:'re-balanced to :49801'},
+      {pk:'billing', from:':49809', to:':49807', note:'re-balanced to :49807 (R=3)'},
+    ],
+    membership:'5 members · unchanged · R=5 (billing R=3)',
+    reason:'The <b>e3 → e4</b> view change re-balanced two partitions within the same 5-member set: '+
+      '<span class="mono">user42</span> moved <span class="mv">:49803 → :49801</span> and '+
+      '<span class="mono">billing</span> moved <span class="mv">:49809 → :49807</span>. The owner '+
+      '<span class="mono">:49801</span> now holds <span class="mono">user42.score = e4·s1287 ("8")</span>; '+
+      'every caught-up replica agrees.',
+    belief:{lvl:'ok', txt:'At e4 the adopted view is one ring, 5 members, agreement 5/5. This is the present — the only view fero can derive from live state without the history store.'},
+    // the divergence overlay only applies to the e4 frame when scenario=attention
+    overlay:{
+      member:':49807', part:'user42',
+      flag:'STUCK @e3', beliefEpoch:'e3',
+      lvl:'crit',
+      txt:'Replica <span class="mono">:49807</span> <b>hosts</b> <span class="mono">user42</span> (R=5) but never adopted <b>e4</b> — it is stuck on <b class="bad">e3·s1241</b> (<span class="mono">"5"</span>) while owner <span class="mono">:49801</span> and 3 others hold <b>e4·s1287</b> (<span class="mono">"8"</span>). Agreement <b class="bad">4/5</b>; it serves <b class="bad">stale reads</b>, lag <span class="mono bad">+420</span>, not draining.',
+    },
+  },
 };
-function marksAt (t) {                       // seen digest sample (incl. dead-origin debris)
-  const rows = [['3f8a1c2e…', Math.floor(800+9.5*t), false], ['9d2b7f41…', Math.floor(300+4.2*t), false]];
-  // E's ORIGINAL origin: a dead origin can mint no new seqs — it freezes at its death seq (1287) forever and is
-  // dead-origin debris from the kill at T+9 onward (the per-origin-debris teaching moment; cf. "thousands behind").
-  rows.push(['e8401b6f…', t<9 ? Math.floor(1107+20*t) : 1287, t>=9]);
-  // the 3 flushed boot writes + ongoing catch-up accrue ONLY to E's NEW post-restart origin.
-  if (t>=30.5) rows.push(['2c9f7e51…', Math.max(3, Math.floor(3+Math.max(0,t-33.5)*5.5)), false]);
-  return rows;
-}
-const sig = m => { let h=0; for (const c of m.join('')) h=(h*31+c.charCodeAt(0))>>>0; return ('0000'+h.toString(16)).slice(-4); };
-const fmt = n => n.toLocaleString('en-US');
-const wall = t => { const s=7+t, m=2+Math.floor(s/60); return `14:0${m}:${String(Math.floor(s%60)).padStart(2,'0')}.${Math.floor((s%1)*10)}`; };
 
-/* ================= state ================= */
-let T = 54.0;                                 // open ON the anomaly
-let view = {t0:0, t1:DUR};
-let pinA = 30.0, pinB = 54.0;                 // pre-pinned: before rejoin vs mid-divergence (diff is always live)
-let playing = false, speed = 1;
-const expanded = new Set();
+/* ── per-scenario framing — Healthy vs Needs-attention ───────────────────
+   Scenario does NOT change the ring (epochs are facts). It changes the
+   OVERLAY: "Needs attention" projects the present divergence onto the e4
+   frame (replica :49807 stuck), and lights the health pill. On any epoch
+   before e4 the overlay is irrelevant (the divergence is a present-tense e4
+   condition), so the page reads calm there regardless of scenario. */
+const SCEN = {
+  healthy:{
+    level:'ok', healthTxt:'Healthy',
+    overlay:false,
+  },
+  attention:{
+    level:'crit', healthTxt:'1 diverged',
+    overlay:true,
+  },
+};
+const SCEN_ORDER = ['healthy','attention'];
+
+/* ── live state ── */
+let scen  = 'healthy';   // Healthy / Needs-attention (drives the overlay only)
+let epoch = CURRENT;     // the selected view — the primary axis
+let selMem = -1;         // selected member row (j/k)
 
 const $ = id => document.getElementById(id);
-const band=$('band'), axis=$('axis'), tip=$('tip'), verdict=$('verdict'), groupsEl=$('groups'),
-      diffEl=$('diff'), diffMeta=$('diffMeta'), evlog=$('evlog'), clock=$('clock'), zoomMeta=$('zoomMeta');
 
-/* ================= render: timeline ================= */
-const X = t => (t-view.t0)/(view.t1-view.t0)*100;
-function renderBand () {
+/* ── is the divergence overlay active right now? Only on the e4 frame, only
+   when the scenario is "needs attention". Earlier epochs are pre-divergence. */
+function overlayOn(){ return scen==='attention' && epoch===CURRENT; }
+
+/* ── header: health pill + context ─────────────────────────────────────── */
+function renderHead(){
+  const s = SCEN[scen];
+  // health reflects the OVERLAY (a present condition), surfaced only on e4
+  const lvl = overlayOn() ? 'crit' : 'ok';
+  const txt = overlayOn() ? '1 diverged @e4' : 'Healthy';
+  const el = $('health'); el.className = 'health '+lvl;
+  $('healthTxt').textContent = txt;
+  $('navEpoch').textContent = epoch;
+  $('mapEpoch').textContent = epoch;
+}
+
+/* ── HEALTH LEAD: a one-liner about the selected view ──────────────────── */
+function renderLead(){
+  const v = VIEW[epoch];
+  const lead = $('lead'); const lt = $('leadTxt'); const lp = $('leadPills');
+  if (overlayOn()){
+    // e4 + attention: lead the divergence (worst thing first)
+    const o = VIEW.e4.overlay;
+    lead.className = 'lead crit';
+    lt.innerHTML = `<b>view e4 · diverged</b> — <span class="mono bad">${o.member}</span> hosts `+
+      `<span class="mono">${o.part}</span> but is <span class="bad">stuck on e3·s1241</span>; it never adopted e4 · `+
+      `2 partitions re-balanced <span class="mv">e3→e4</span>`;
+    lp.innerHTML =
+      `<span class="pill crit">${o.member} <b>+420 behind</b></span>`+
+      `<span class="pill crit">agree <b>4/5</b></span>`+
+      `<span class="pill warn">moved <b>2 parts</b></span>`;
+    return;
+  }
+  // otherwise: frame the transition into this view, calm
+  lead.className = 'lead '+(v.moved?'warn':'ok');
+  if (v.moved){
+    lt.innerHTML = `<b>view ${epoch}</b> · ${v.prior} → ${epoch} re-balanced <span class="mv">2 partitions</span> — `+
+      `<span class="mono">user42</span> <span class="mv">:49803→:49801</span>, `+
+      `<span class="mono">billing</span> <span class="mv">:49809→:49807</span> · 5 members, agreement 5/5`;
+    lp.innerHTML =
+      `<span class="pill warn">moves <b>2</b></span>`+
+      `<span class="pill ok">members <b>5</b></span>`+
+      `<span class="pill ok">agree <b>5/5</b></span>`;
+  } else {
+    const transition = v.prior ? `${v.prior} → ${epoch} held ownership` : `genesis view`;
+    lt.innerHTML = `<b>view ${epoch}</b> · ${transition} — no partition changed owner · 5 members, one committed view`;
+    lp.innerHTML =
+      `<span class="pill ok">moves <b>0</b></span>`+
+      `<span class="pill ok">members <b>5</b></span>`+
+      `<span class="pill ok">agree <b>5/5</b></span>`;
+  }
+}
+
+/* ── command-bar epoch scrubber (segmented) — the primary control ──────── */
+function renderEpochs(){
+  $('epochs').innerHTML = EPOCHS.map(e=>{
+    const cur = e===CURRENT ? '<span class="cur">CURRENT</span>' : '';
+    return `<button data-ep="${e}" ${e===epoch?'aria-pressed="true"':''}>${e}${cur}</button>`;
+  }).join('');
+}
+
+/* ── LEFT RAIL: the epoch timeline (the same axis, vertical) ───────────── */
+function renderTline(){
+  // walk e1→e4; each node annotated with the transition into it
   let h = '';
-  for (const [a,b,s] of CLS) {
-    if (b<view.t0 || a>view.t1) continue;
-    const l=Math.max(0,X(a)), w=Math.min(100,X(b))-l;
-    h += `<div class="tlseg" data-state="${s}" style="left:${l}%;width:${w}%"></div>`;
+  for (const e of EPOCHS){
+    const v = VIEW[e];
+    const cur = e===CURRENT;
+    const sub = v.prior
+      ? (v.moved
+          ? `${v.prior}→${e} · <span class="mv">2 moved</span>`
+          : `${v.prior}→${e} · <span class="ehold">ring held</span>`)
+      : `genesis · 5 members`;
+    h += `<div class="ep" data-ep="${e}" data-cur="${cur}" data-moved="${v.moved}" ${e===epoch?'aria-current="true"':''}>`+
+      `<span class="node">${e.slice(1)}</span>`+
+      `<div class="emeta">`+
+        `<div class="etop"><span class="enm">${e}</span>${cur?'<span class="ecur">CURRENT</span>':''}</div>`+
+        `<div class="esub">${sub}</div>`+
+      `</div></div>`;
   }
-  EV.forEach((e,i)=>{ if (e.t>=view.t0 && e.t<=view.t1)
-    h += `<div class="tick" data-k="${e.k}" data-i="${i}" style="left:${X(e.t)}%"></div>`; });
-  if (pinA!=null && pinA>=view.t0 && pinA<=view.t1) h += `<div class="pinmark" style="left:${X(pinA)}%">A</div>`;
-  if (pinB!=null && pinB>=view.t0 && pinB<=view.t1) h += `<div class="pinmark b" style="left:${X(pinB)}%">B</div>`;
-  h += `<div class="playhead" style="left:${X(T)}%"></div>`;
-  band.innerHTML = h;
-  const span=view.t1-view.t0, step = span>50?10 : span>20?5 : span>8?2 : 1;
-  let ax=''; for (let t=Math.ceil(view.t0/step)*step; t<=view.t1+1e-9; t+=step) ax += `<span style="left:${X(t)}%">${t}s</span>`;
-  axis.innerHTML = ax;
-  zoomMeta.textContent = `${view.t0.toFixed(0)}s – ${view.t1.toFixed(0)}s · wheel to zoom · drag to scrub · click a tick to jump`;
+  $('tline').innerHTML = h;
 }
 
-/* ================= render: belief cards grouped by committed view ================= */
-function renderMoment () {
-  // belief cards ALWAYS reflect the scrubbed moment T (no mode); the A↔B diff is a separate, always-live panel.
-  const tt = T;
-  const st = stateAt(tt), alive = st.filter(s=>s.alive).length;
-  const cls = classAt(tt);
-  // amber ring = nodes whose belief DIFFERS between the two pinned moments (what the diff panel is about),
-  // surfaced on the cards so the eye lands on the involved nodes while you scrub.
-  const chg = new Set();
-  if (pinA!=null && pinB!=null) {
-    const A = stateAt(Math.min(pinA,pinB)), B = stateAt(Math.max(pinA,pinB));
-    B.forEach((b,i)=>{ const a=A[i];
-      if (a.alive!==b.alive || a.epoch!==b.epoch || a.writable!==b.writable || a.uuid!==b.uuid || a.pending!==b.pending) chg.add(b.id); });
-  }
-  // group by (epoch, member-set) — a partition renders as the cards splitting
-  const gs = {};
-  st.forEach(s => {
-    const k = s.alive ? `${s.epoch}|${s.members.join('')}` : 'off';
-    (gs[k] ??= {key:k, epoch:s.epoch, members:s.members, nodes:[]}).nodes.push(s);
+/* ── CENTRE: THE OWNERSHIP MAP at view T ───────────────────────────────── */
+function renderMap(){
+  const v   = VIEW[epoch];
+  const own = OWN[epoch];
+  const prior = v.prior ? OWN[v.prior] : null;
+  // for gain/loss we need, per partition, who owned it BEFORE this epoch
+  const priorOwnerOf = {};
+  if (prior) for (const m of MEMBERS) for (const p of prior[m]) priorOwnerOf[p] = m;
+
+  let totalGains = 0, totalLosses = 0;
+  let html = '';
+  MEMBERS.forEach((m, ix)=>{
+    const parts = own[m];
+    // partitions this member LOST going into this epoch (had at prior, not now)
+    const lost = prior ? prior[m].filter(p => !parts.includes(p)) : [];
+    const diverged = overlayOn() && m===VIEW.e4.overlay.member;
+    const beliefEpoch = diverged ? VIEW.e4.overlay.beliefEpoch : epoch;
+
+    // owned chips (current at this epoch), with gain markers
+    let chips = parts.map(p=>{
+      const gained = prior && priorOwnerOf[p] && priorOwnerOf[p]!==m;
+      if (gained) totalGains++;
+      const isDiv = diverged && p===VIEW.e4.overlay.part;
+      const cls = isDiv ? 'diverged' : (gained ? 'gain' : '');
+      const mk  = isDiv ? '<span class="mk">◆</span>'
+                : gained ? `<span class="mk">+</span><span class="from">from ${priorOwnerOf[p]}</span>` : '';
+      const tip = isDiv ? `title="${VIEW.e4.overlay.member} stuck on e3 — serves stale reads for ${p}"` : `title="open ${p} partition log"`;
+      return `<a class="chip ${cls}" href="${PARTITION}" data-part="${p}" ${tip}>${p}${mk}</a>`;
+    }).join('');
+    // ghost chips for partitions handed OFF here (shown so the loss is legible)
+    chips += lost.map(p=>{ totalLosses++;
+      return `<span class="chip loss" title="${m} handed ${p} off at ${v.prior}→${epoch}"><span class="mk">−</span>${p}<span class="from">left</span></span>`;
+    }).join('');
+
+    const beliefStr = diverged
+      ? `<span class="ve">${beliefEpoch}</span><span class="own">stuck · ${parts.length} owned</span>`
+      : `<span class="ve">${epoch}</span><span class="own">${parts.length} owned</span>`;
+    const flag = diverged ? `<span class="flag">${VIEW.e4.overlay.flag}</span>` : '';
+
+    html += `<div class="mem ${diverged?'diverged':''}" data-mix="${ix}" ${ix===selMem?'data-sel="1"':''}>`+
+      `<div class="mhd" data-node="${m}">`+
+        `<span class="wdot"></span><span class="addr">${m}</span><span class="role">server</span>`+
+        flag+
+        `<span class="belief">view ${beliefStr}</span>`+
+      `</div>`+
+      `<div class="own-h">owns at ${epoch} <span class="cnt">· ${parts.length} partition${parts.length===1?'':'s'}${lost.length?` · ${lost.length} handed off`:''}</span></div>`+
+      (chips ? `<div class="chips">${chips}</div>` : `<div class="empty-own">no partitions at this view</div>`)+
+    `</div>`;
   });
-  const order = Object.values(gs).sort((a,b)=>(a.key==='off')-(b.key==='off') || b.nodes.length-a.nodes.length);
-  const mood = g => g.key==='off' ? 'dead'
-    : g.nodes.length>alive/2 ? 'ok'
-    : g.nodes.every(n=>n.writable) ? (cls.s==='crit'?'crit':'warn') : 'idle';
-
-  verdict.innerHTML =
-    `<span class="vpill" data-state="${cls.s}"><span class="pdot"></span>${cls.l}</span>` +
-    order.map(g => g.key==='off'
-      ? `<span class="gchip" data-mood="dead">offline ×${g.nodes.length}</span>`
-      : `<span class="gchip" data-mood="${mood(g)}">e${g.epoch} · ${g.nodes.length}/${alive}${g.nodes.every(n=>n.writable)?' · writable':' · gated'} · ${g.nodes.length>alive/2?'MAJORITY':'minority'}</span>`
-    ).join('') +
-    (pinA!=null && pinB!=null ? `<span class="hint">amber ring = changed between pins A↔B</span>` : '');
-
-  // belief card = the shipped topology node-card contract (wdot / uuid / addr / role + metric row + wbadge),
-  // time-parameterized so a node looks identical live and in replay; replay-only extras (lag bar, note, expand) hang below.
-  const card = s => {
-    const sev = s.lag<=16?'ok' : s.lag<800?'warn' : 'bad';
-    const cls = 'node-card' + (s.alive ? (s.writable?'':' readonly') : ' stale');
-    return `<div class="${cls}" data-id="${s.id}" ${chg.has(s.id)?'data-chg':''}>
-      <div class="card-head">
-        <span class="wdot" data-writable="${s.alive?s.writable:''}"></span>
-        <span class="uuid">${s.uuid.slice(0,8)}…</span><span class="addr">${s.addr}</span>
-        <span class="role">${s.alive?'server':'dead'}</span></div>
-      <div class="card-view">
-        <span class="metric"><span class="mlabel">epoch</span><span class="mval">${s.alive?'e'+s.epoch:'—'}</span></span>
-        <span class="metric"><span class="mlabel">pending</span><span class="mval${s.pending?' pend':''}">${s.alive?s.pending:'—'}</span></span>
-        <span class="wbadge" data-writable="${s.alive?s.writable:''}">${s.alive?(s.writable?'writable':'gated'):'✕ dead'}</span></div>
-      ${s.alive ? `<div class="crow lag"><span>lag</span><span class="lagbar"><i data-sev="${sev}" style="width:${Math.min(100,s.lag/2400*100)}%"></i></span><span class="lagn">${fmt(s.lag)}</span></div>` : ''}
-      ${s.note ? `<div class="note">${s.note}</div>` : ''}
-      ${expanded.has(s.id) && s.alive ? expand(s,tt) : ''}</div>`;
-  };
-  groupsEl.innerHTML = order.map(g => `<div class="vgroup" data-mood="${mood(g)}"><div class="ghead">${
-    g.key==='off' ? `<span class="glabel">offline</span><span>${g.nodes.length} node</span>`
-    : `<span class="glabel">view e${g.epoch}</span><span>sig ${sig(g.members)}</span><span>${g.members.length} members</span>`
-      + `<span class="gw" data-on="${g.nodes.every(n=>n.writable)}">${g.nodes.every(n=>n.writable)?'writable':'gated'}</span>`
-      + `<span class="gmaj">${g.nodes.length>alive/2?'majority':'minority'} ${g.nodes.length}/${alive}</span>`
-  }</div><div class="cards">${g.nodes.map(card).join('')}</div></div>`).join('');
-}
-function expand (s, t) {
-  const h = headsAt(t);
-  return `<div class="exp">
-    <div class="xl">committed members</div><div>${s.members.map(port).map(p=>`<span class="mchip">${p}</span>`).join('')||'—'}</div>
-    <div class="xl">marks — seen digest (per origin)</div>
-    ${marksAt(t).map(([o,v,dead])=>`<div class="mk"><span>${o}</span><span>${fmt(v)}${dead?' <span class="deadtag">dead origin</span>':''}</span></div>`).join('')}
-    <div class="xl">log heads (sample)</div>
-    <div class="mk"><span>user42</span><span>${h.user42}</span></div>
-    <div class="mk"><span>orders</span><span>${h.orders}</span></div></div>`;
+  $('members').innerHTML = html;
+  $('mapCount').textContent = `5 members · ${totalGains} gain${totalGains===1?'':'s'} · ${totalLosses} loss${totalLosses===1?'':'es'} vs ${v.prior||'—'}`;
 }
 
-/* ================= render: diff changelog ================= */
-function diffAt (ta, tb) {
-  const A=stateAt(ta), B=stateAt(tb), rows=[];
-  const la=epochLead(ta), lb=epochLead(tb);
-  B.forEach((b,i) => { const a=A[i];
-    if (a.alive!==b.alive) rows.push({cat:'node', sev:b.alive?'ok':'bad', txt:`${b.addr} ${a.alive?'online → OFFLINE':'offline → online (rejoined)'}`});
-    if (a.uuid!==b.uuid) rows.push({cat:'identity', sev:'warn', txt:`${b.addr} uuid ${a.uuid.slice(0,8)}… → ${b.uuid.slice(0,8)}… (process restarted; old origin becomes dead-origin debris)`});
-    if (a.alive&&b.alive) {
-      if (a.epoch!==b.epoch) rows.push({cat:'view', sev:'ok', txt:`${b.addr} committed epoch ${a.epoch} → ${b.epoch}`});
-      else if (la!==lb && b.epoch!==lb) rows.push({cat:'view', sev:'bad', txt:`${b.addr} epoch ${b.epoch} → ${b.epoch} — UNCHANGED while the leading view advanced to e${lb} ⇒ stranded (missed VIEW_COMMIT?)`});
-      if (a.writable!==b.writable) rows.push({cat:'gate', sev:b.writable?'ok':'warn', txt:`${b.addr} write-gate ${a.writable?'open → CLOSED':'closed → OPEN'}`});
-      if (a.pending!==b.pending) rows.push({cat:'gate', sev:b.pending>a.pending?'warn':'dim', txt:`${b.addr} pending buffer ${a.pending} → ${b.pending}`});
-      if (Math.abs(a.lag-b.lag)>50) rows.push({cat:'lag', sev:b.lag>a.lag?'warn':'ok', txt:`${b.addr} behind ${fmt(a.lag)} → ${fmt(b.lag)} (${b.lag>a.lag?'+':''}${fmt(b.lag-a.lag)})`});
-    }
-  });
-  const ma = la===8?M5:M6, mb = lb===8?M5:M6;
-  mb.filter(x=>!ma.includes(x)).forEach(x=>rows.push({cat:'members', sev:'ok', txt:`leading view: + ${byId[x].addr} joined`}));
-  ma.filter(x=>!mb.includes(x)).forEach(x=>rows.push({cat:'members', sev:'warn', txt:`leading view: − ${byId[x].addr} removed`}));
-  const mv = MOVES[`${la}>${lb}`] ?? 0;
-  if (mv) {
-    rows.push({cat:'owners', sev:'warn', txt:`ring: ${mv}/120 segments changed owner (e${la} → e${lb})`});
-    (OWNER_SAMPLES[`${la}>${lb}`]||[]).forEach(s=>rows.push({cat:'owners', sev:'dim', txt:s}));
-  }
-  const ha=headsAt(ta), hb=headsAt(tb);
-  for (const k of Object.keys(PARTS)) { const d=hb[k]-ha[k]; if (d) rows.push({cat:'heads', sev:'dim', txt:`${k}: head ${ha[k]} → ${hb[k]} (+${d})`}); }
-  return rows;
-}
-function renderDiff () {
-  if (pinA==null || pinB==null) { diffEl.innerHTML='<div class="empty">pin two moments (A, B) to diff</div>'; diffMeta.textContent=''; return; }
-  const a=Math.min(pinA,pinB), b=Math.max(pinA,pinB);
-  const rows = diffAt(a,b);
-  diffMeta.textContent = `A T+${a.toFixed(1)}s → B T+${b.toFixed(1)}s · ${rows.length} changes`;
-  diffEl.innerHTML = rows.length
-    ? rows.map(r=>`<div class="chrow" data-sev="${r.sev}"><span class="cat">${r.cat}</span><span>${r.txt}</span></div>`).join('')
-    : '<div class="empty" style="color:var(--ok)">no differences — identical cluster belief</div>';
+/* ── RIGHT: view-change summary for the transition into T + belief at T ── */
+function renderPanel(){
+  const v = VIEW[epoch];
+  const div = overlayOn();
+  const phLvl = div ? 'crit' : v.phLevel;
+
+  // ownership-move list
+  const movesHtml = v.moves.length
+    ? v.moves.map(mv =>
+        `<div class="mv"><span class="pk">${mv.pk}</span>`+
+        `<span class="arr"><b>${mv.from}</b> <span class="a">→</span> <b>${mv.to}</b><br><span style="color:var(--soft)">${mv.note}</span></span></div>`
+      ).join('')
+    : `<div class="none">No partition changed owner at this transition — the ring held across a stable member set.</div>`;
+
+  // belief at T: calm by default; the divergence overlay (e4 + attention) wins
+  const belief = div ? VIEW.e4.overlay : v.belief;
+  const beliefLvl = div ? 'crit' : belief.lvl;
+  const beliefArr = beliefLvl==='crit' ? '✕' : beliefLvl==='warn' ? '!' : '✓';
+
+  $('panel').innerHTML =
+    `<div class="ph ${phLvl}"><div class="pt"><span class="sd"></span>${div?'view e4 · diverged':v.phTitle}</div>`+
+      `<div class="psub">${div
+        ? `Two partitions re-balanced <span class="mv">e3→e4</span>, and replica <span class="mono">:49807</span> never adopted the new view.`
+        : v.phSub}</div></div>`+
+    // what moved
+    `<div class="seg"><div class="st"><span>Ownership moves into ${epoch}</span><span class="stn">${v.moves.length} of 16</span></div>`+
+      `<div class="moves">${movesHtml}</div></div>`+
+    // membership
+    `<div class="seg"><div class="st"><span>Membership</span><span class="stn">view ${epoch}</span></div>`+
+      `<dl class="kv">`+
+        `<dt>members</dt><dd>5</dd>`+
+        `<dt>vs prior</dt><dd>${v.prior?'unchanged':'genesis'}</dd>`+
+        `<dt>replication</dt><dd>R=5 · billing R=3</dd>`+
+        `<dt>partitions</dt><dd>16</dd>`+
+        `<dt>agreement</dt><dd class="${div?'bad':'ok'}">${div?'4 / 5':'5 / 5'}</dd>`+
+      `</dl></div>`+
+    // why this transition / reason
+    `<div class="seg"><div class="st"><span>${v.prior?'Why this view changed':'About this view'}</span></div>`+
+      `<div class="reason">${v.reason}</div></div>`+
+    // belief at T
+    `<div class="seg"><div class="st"><span>Belief at ${epoch}</span><span class="stn">${div?'+ divergence overlay':'reconstructed'}</span></div>`+
+      `<div class="belief-note ${beliefLvl}"><span class="arr">${beliefArr}</span><span>${belief.txt}</span></div></div>`+
+    // drills
+    `<div class="actions">`+
+      (div
+        ? `<a class="btn" href="${PARTITION}">open user42 partition (diverged) <span class="ar">→</span></a>`+
+          `<a class="btn" href="${NODE}">open :49807 node (stuck) <span class="kc">↵</span></a>`
+        : `<a class="btn" href="${PARTITION}">open a partition log <span class="ar">→</span></a>`+
+          `<a class="btn" href="ia-map.html">cluster map (all levels) <span class="ar">→</span></a>`)+
+    `</div>`;
 }
 
-/* ================= render: event log ================= */
-function buildLog () {
-  evlog.innerHTML = EV.map((e,i) =>
-    `<div class="evrow" data-k="${e.k}" data-i="${i}"><span class="t">+${e.t.toFixed(1)}s</span><i class="kdot"></i><span>${e.label}</span>${e.d?`<span class="d">${e.d}</span>`:''}</div>`).join('');
-}
-function renderLog () {
-  let cur=-1; EV.forEach((e,i)=>{ if (e.t<=T+1e-6) cur=i; });
-  [...evlog.children].forEach((r,i)=>{ r.classList.toggle('future', EV[i].t>T+1e-6); r.classList.toggle('cur', i===cur); });
-  // keep the current event in view as the playhead moves — the log is the narrative spine, it must track T
-  if (cur>=0) {
-    const row = evlog.children[cur], rRow = row.getBoundingClientRect(), rBox = evlog.getBoundingClientRect();
-    if (rRow.top < rBox.top) evlog.scrollTop += rRow.top - rBox.top - 8;
-    else if (rRow.bottom > rBox.bottom) evlog.scrollTop += rRow.bottom - rBox.bottom + 8;
-  }
+/* ── status-line right side ── */
+function renderStatus(){
+  const v = VIEW[epoch];
+  const div = overlayOn();
+  const state = div
+    ? `<span style="color:var(--crit)">diverged</span> · :49807 stuck @e3`
+    : (v.moved ? `<span style="color:var(--warn)">2 moves</span> at ${v.prior}→${epoch}` : `<span style="color:var(--ok)">converged</span>`);
+  $('statusRight').innerHTML = `view ${epoch}/${CURRENT}  ·  5 members  ·  ${state}`;
 }
 
-/* ================= render all ================= */
-function renderAll () {
-  renderBand(); renderMoment(); renderDiff(); renderLog();
-  clock.innerHTML = `<b>T+${T.toFixed(1)}s</b> · ${wall(T)}`;
-  $('btnPlay').textContent = playing ? '⏸ pause' : '▶ play';
-  $('btnSpeed').textContent = speed + '×';
+/* ── full render ── */
+function render(){
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===scen));
+  renderHead(); renderLead(); renderEpochs(); renderTline(); renderMap(); renderPanel(); renderStatus();
+  // hash carries the scenario (#healthy / #attention) as the other tool pages do
+  try{ history.replaceState(null,'','#'+scen); }catch{}
 }
 
-/* ================= interactions ================= */
-const setT = t => { T = Math.max(0, Math.min(DUR, t)); renderAll(); };
-const tFromX = e => { const r=band.getBoundingClientRect(); return view.t0 + (e.clientX-r.left)/r.width*(view.t1-view.t0); };
-let dragging = false;
-band.addEventListener('pointerdown', e => {
-  const tk = e.target.closest('.tick');
-  if (tk) { setT(EV[+tk.dataset.i].t); return; }
-  dragging = true; band.setPointerCapture(e.pointerId); setT(tFromX(e));
+/* ── interactions ─────────────────────────────────────────────────────── */
+// command-bar epoch scrubber
+$('epochs').addEventListener('click', e=>{
+  const b = e.target.closest('[data-ep]'); if(!b) return;
+  epoch = b.dataset.ep; selMem=-1; render();
 });
-band.addEventListener('pointermove', e => {
-  if (dragging) setT(tFromX(e));
-  const tk = e.target.closest('.tick');
-  if (tk) { const ev=EV[+tk.dataset.i]; const r=band.parentElement.getBoundingClientRect();
-    tip.innerHTML = `<span class="tt">T+${ev.t.toFixed(1)}s</span> ${ev.label}${ev.d?`<br><span class="tt">${ev.d}</span>`:''}`;
-    tip.style.display='block';
-    tip.style.left = Math.min(e.clientX-r.left+12, r.width-370)+'px';
-    tip.style.top = (e.clientY-r.top+16)+'px';
-  } else tip.style.display='none';
+// left-rail epoch timeline (same axis)
+$('tline').addEventListener('click', e=>{
+  const ep = e.target.closest('[data-ep]'); if(!ep) return;
+  epoch = ep.dataset.ep; selMem=-1; render();
 });
-band.addEventListener('pointerup', ()=>dragging=false);
-band.addEventListener('pointerleave', ()=>{ tip.style.display='none'; });
-band.addEventListener('wheel', e => {                     // zoom around cursor
-  e.preventDefault();
-  const c = tFromX(e), f = Math.pow(1.2, e.deltaY>0?1:-1);
-  let t0 = c-(c-view.t0)*f, t1 = c+(view.t1-c)*f;
-  if (t1-t0 < 4) return; t0=Math.max(0,t0); t1=Math.min(DUR,t1);
-  view={t0,t1}; renderAll();
-}, {passive:false});
-
-const zoom = f => { const c=T, t0=Math.max(0,c-(c-view.t0)*f), t1=Math.min(DUR,c+(view.t1-c)*f);
-  if (t1-t0>=4) view={t0,t1}; renderAll(); };
-$('btnZoomIn').onclick = ()=>zoom(1/1.6);
-$('btnZoomOut').onclick = ()=>zoom(1.6);
-$('btnZoomReset').onclick = ()=>{ view={t0:0,t1:DUR}; renderAll(); };
-
-const nextEv = () => { const e=EV.find(e=>e.t>T+0.05); if (e) setT(e.t); };
-const prevEv = () => { const past=EV.filter(e=>e.t<T-0.05); if (past.length) setT(past[past.length-1].t); };
-$('btnNext').onclick = nextEv;
-$('btnPrev').onclick = prevEv;
-$('btnPlay').onclick = ()=>{ playing=!playing; if (playing&&T>=DUR) T=0; renderAll(); };
-$('btnSpeed').onclick = ()=>{ speed = speed===1?10:1; renderAll(); };
-$('btnPinA').onclick = ()=>{ pinA=T; renderAll(); };
-$('btnPinB').onclick = ()=>{ pinB=T; renderAll(); };
-evlog.addEventListener('click', e => { const r=e.target.closest('.evrow'); if (r) setT(EV[+r.dataset.i].t); });
-groupsEl.addEventListener('click', e => { const c=e.target.closest('.node-card');
-  if (c && !c.classList.contains('stale')) { const id=c.dataset.id; expanded.has(id)?expanded.delete(id):expanded.add(id); renderMoment(); } });
-document.addEventListener('keydown', e => {
-  if (e.key==='ArrowRight') { nextEv(); e.preventDefault(); }
-  else if (e.key==='ArrowLeft') { prevEv(); e.preventDefault(); }
-  else if (e.key===' ') { playing=!playing; if (playing&&T>=DUR) T=0; renderAll(); e.preventDefault(); }
+// scenario toggle (Healthy / Needs attention) — overlay only
+const scenWrap = $('scen');
+for (const id of SCEN_ORDER){
+  const b = document.createElement('button'); b.dataset.id=id;
+  b.textContent = id==='healthy' ? 'Healthy' : 'Needs attention';
+  b.onclick = ()=>{ scen=id; selMem=-1; render(); };
+  scenWrap.appendChild(b);
+}
+// member head → node-doctor; chip click already an anchor to partition
+$('members').addEventListener('click', e=>{
+  const head = e.target.closest('[data-node]');
+  if (head && !e.target.closest('.chip')){ location.href = NODE; }
 });
-setInterval(()=>{ if (!playing) return; T=Math.min(DUR, T+0.06*speed); if (T>=DUR) playing=false; renderAll(); }, 60);
 
-buildLog();
-renderAll();
+// data-sources popover
+$('srcBtn').onclick = ()=>$('src').classList.toggle('show');
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#src') && !e.target.closest('#srcBtn')) $('src').classList.remove('show');
+});
+
+// keyboard: , / . step epoch · e jump to current · j/k member · ↵ open · 1/2 scenario
+function stepEpoch(d){
+  const i = EPOCHS.indexOf(epoch);
+  const ni = Math.max(0, Math.min(EPOCHS.length-1, i+d));
+  if (ni!==i){ epoch = EPOCHS[ni]; selMem=-1; render(); }
+}
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT'){ if (e.key==='Escape') e.target.blur(); return; }
+  const k = e.key;
+  if (k===',' || k==='[' || k==='ArrowLeft'){ e.preventDefault(); stepEpoch(-1); }
+  else if (k==='.' || k===']' || k==='ArrowRight'){ e.preventDefault(); stepEpoch(1); }
+  else if (k==='e'){ epoch=CURRENT; selMem=-1; render(); }
+  else if (k==='j' || k==='ArrowDown'){ e.preventDefault(); selMem=Math.min(MEMBERS.length-1, selMem+1); render(); scrollSel(); }
+  else if (k==='k' || k==='ArrowUp'){ e.preventDefault(); selMem=Math.max(0, selMem-1); render(); scrollSel(); }
+  else if (k==='Enter'){ location.href = PARTITION; }
+  else if (k==='1'){ scen='healthy'; selMem=-1; render(); }
+  else if (k==='2'){ scen='attention'; selMem=-1; render(); }
+  else if (k==='Escape'){ selMem=-1; render(); }
+});
+function scrollSel(){ const el=document.querySelector('.mem[data-sel="1"]'); if(el) el.scrollIntoView({block:'nearest'}); }
+
+// boot — honour deep-link hash (#healthy / #attention), default healthy on e4
+const fromHash = location.hash.slice(1);
+if (SCEN[fromHash]) scen = fromHash;
+render();
 </script>
 </body>
 </html>
