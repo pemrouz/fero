@@ -1514,7 +1514,7 @@ escalation policy (escalate bare assignments to 'committed' only, never the netw
 cid-dedup on the owner for non-idempotent retries (LWW value-sets are already idempotent); the
 SERVER-local assignment auth-interception parity gap (#6) stays open by design (the re-entrancy guard).
 
-## O1 — Debug viewer: one `normalize()` seam, capture by inverting it · Adopted · `47f75bc` (P0) → `3726db3` (P1)
+## O1 — Debug viewer: one `normalize()` seam, capture by inverting it · Adopted · `47f75bc` (P0) → `e8f973c` (P5)
 
 **Context.** The L4 debugging/admin viewer ([tools/debug/mockups/tree.html](tools/debug/mockups/tree.html))
 was prototyped as a static outline+inspector over a hand-authored snapshot file, then promoted to the
@@ -1548,7 +1548,35 @@ The pull-snapshot spine from [O](#o--observe-a-pull-spine-snapshot--one-gated-pu
 - Capture is a tooling path (~1/poll), perf-guarded (`export.perf.ts`: fold 24×500 ~8ms); it never perturbs
   the data hot path.
 
-**Open follow-ups → [IDEAS](IDEAS.md) (Debug viewer workstream):** P2 sampled per-key version accessor
-(cap K) on `__inspect` → real per-partition keys + divergence; P3 per-sub `head`/`delivered` counters; P4
-view/ownership history (`ownerByEpoch`); P5 live SSE mode + the write-route JOIN over `cluster.writes` +
-`__observe`; a `networkSource`-backed CLI over the gated `__inspect` for remote (non-embedded) capture.
+**P2–P5 landings — the seam extended (each a real subset, all perf-guarded).**
+- **P2 — sampled version drill + real divergence** (`5acd583`+`8530b22`). `__inspect` ships only the versions
+  COUNT (the LWW map is huge under churn); a `{sample:[partitions]}` arg adds a cap-K (`VERSION_SAMPLE_CAP`)
+  per-key LWW-stamp scan, OFF the steady poll (`inspect.perf`: the no-sample path stays byte-identical).
+  `foldDivergence` diffs each replica's stamps against the owner's → a holder parked on a lower `(epoch,seq)`
+  is flagged stuck. The exporter issues the drill as a 2nd round in `captureInProcess`.
+- **P4 — view/ownership history** (`7f29a3b` seam + `9bee00c` derivation). `ViewManager` keeps a BOUNDED
+  (`VIEW_HISTORY_CAP=16`) ring of committed `{epoch,members}` pushed at the single `#install` mutation point;
+  `foldOwnership` rebuilds the DHT ring per past view to recover `ownerByEpoch`. A VALIDATION GUARD re-derives
+  the latest view's owners with a default ring and compares to the authoritative `cluster.owner` — emits the
+  history only if they agree (a custom hash/vnodes config → skip: "a gap, not a lie").
+- **P3 — subscription TOPOLOGY, NOT lag** (`5298c84`). The phase was scoped as per-sub `head`/`delivered` lag;
+  grounding the wire path REFUTED the premise — a subscription delta is a synthetic proxy record
+  (`{type,key,value}`) carrying no provenance (`sendDelta`/`encodeFrame` write no origin/seq ext), and a
+  delivered COUNT is in different units from the owner's log head. So a seq-lag is not honestly measurable
+  without fabrication. Shipped the honest signal instead: the live subscription topology (`{to,method,key,kind,owner}`
+  per served sub), captured at SUBSCRIBE time → ZERO hot-path cost (the per-delta send path is untouched). A
+  forwarded read surfaces twice, revealing the client→relay→owner chain. (Evaluate-features-against-purpose:
+  prefer an honest gap over a fabricated rate.)
+- **P5 — live mode through the same seam** (`e8f973c`). `foldLive(snaps, _, ringCache?)` folds the observer
+  bridge's already-pulled poll payload into a `DebugFile` with NO drill calls (the remote path; `captureInProcess`
+  stays the in-process drill path); the bridge ships it as a `debug` SSE event each poll and serves the viewer
+  same-origin at `/debug/`, so `tree.html` goes live through the SAME `normalize()` the file path uses (one seam,
+  three feeds: file, in-process capture, live SSE). Perf: a naive 16-ring-rebuild-per-poll cost ~680ms was fixed
+  by MEMOIZING rings by member-set signature (within-call + a persistent across-poll cache the bridge passes,
+  bounded) — NOT by widening a threshold; warm steady-state 4.46ms/poll, on par with `deriveAggregate`.
+
+**Open follow-ups → [IDEAS](IDEAS.md) (Debug viewer workstream):** divergence in LIVE mode (`foldLive` omits
+it — the version-sample drill is too heavy for the steady ~1/s poll; a slower-cadence/on-demand `{sample}`
+drill would light it up); the write-route JOIN over `cluster.writes` + the `__observe` ProvRecords the bridge
+already streams (existing data; `cluster.writes` isn't in the poll payload yet); a `networkSource`-backed CLI
+over the gated `__inspect` for remote (non-embedded) capture.

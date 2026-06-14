@@ -459,28 +459,29 @@ network-observer workstream above — shares `inspect.ts`/`observe.ts`/`bridge.t
 `cluster.peers/.owner/.replicas/.epoch/.members/.writable/.writes`, `__inspect`, `__observe`, the `log.*`
 accessors and the DHT ring snapshot already exist; the route-correlation handle ALREADY exists too
 (`cluster.writes` carries `id`/`origin`/`seq`/`epoch` — [DECISIONS Z](DECISIONS.md)). Open work, phased
-(strictly ordered; each ships a real subset). **P0 + P1 have LANDED** ([DECISIONS O1](DECISIONS.md),
-`47f75bc`+`3726db3`): `normalize()` extracted into [tools/debug/mockups/shape.js](tools/debug/mockups/shape.js)
-(the one seam — browser + Node — round-trip tested), and [tools/debug/export.ts](tools/debug/export.ts)
-`foldSnapshots()`/`captureInProcess()` capture a live in-process cluster (members/R, per-node keys+health,
-per-partition owner/R-set/held → real under-replication) by INVERTING normalize over the `[diagnostics]`
-seam, `export.perf.ts`-guarded. Remaining:
-- **P2 — version sample (cap K).** `__inspect` ships only the versions COUNT (deliberate — the map is huge under
-  churn); add a SAMPLED per-key LWW-stamp accessor (cap K) for agreement/divergence + per-replica stuck. MUST be
-  pull-only, never on the write path; needs an `inspect.perf.ts` threshold. Unblocks key-autopsy / divergence
-  rows. (resource: inspect)
-- **P3 — per-sub head/delivered.** Only an aggregate `subscriptions` COUNT exists; client lag (head−delivered)
-  needs per-sub counters threaded through the per-delta served-sub send path ([dispatch.ts](resource/dispatch.ts)
-  streamProxy/deltaTo) — ON the hot path, so its OWN perf sibling + an emit-site count, not a hand-waved "single
-  int". Unblocks client/sub lag. (resource: dispatch)
-- **P4 — view / ownership history (`ownerByEpoch`).** `ViewManager` keeps only the CURRENT epoch/members
-  ([membership.ts](resource/membership.ts)); replay + owner-by-epoch timelines need a BOUNDED ring of past
-  `{epoch,members}` captured AFTER `#install` + per-historical-view DHT re-derivation to recover `ownerByEpoch`.
-  From-scratch structure, its own slice. Unblocks cluster-replay + owner-by-epoch. (resource: membership; transport: dht)
-- **P5 — live mode + route JOIN.** Viewer over `EventSource` → the existing [bridge.ts](tools/observe/bridge.ts)
-  SSE → the SAME `normalize()` each tick; the write-route timeline is a JOIN over `cluster.writes` + `__observe`
-  ProvRecords (existing data, not new instrumentation). EXTEND the existing `bridge.perf.ts` — never widen its
-  thresholds. (tools/debug; tools/observe; resource)
+(strictly ordered; each ships a real subset). **P0–P5 have LANDED** ([DECISIONS O1](DECISIONS.md)):
+`normalize()` extracted into [tools/debug/mockups/shape.js](tools/debug/mockups/shape.js) (the one seam —
+browser + Node, round-trip tested); [tools/debug/export.ts](tools/debug/export.ts) folds a live cluster by
+INVERTING it — `foldSnapshots`/`captureInProcess` (P0/P1: members/R, per-node keys+health, per-partition
+owner/R-set/held → real under-replication), `foldDivergence` over a SAMPLED per-key LWW-stamp drill (P2
+`5acd583`+`8530b22`: cap-K `versionSample` on `__inspect`, off the write path, `inspect.perf`-guarded),
+`foldOwnership` re-deriving `ownerByEpoch` from a BOUNDED `viewHistory` ring rebuilt per past view (P4
+`7f29a3b`+`9bee00c`), `foldSubs` folding the live subscription TOPOLOGY (P3 `5298c84`), and `foldLive` +
+a `debug` SSE event + `/debug/` serving so the viewer goes LIVE through the SAME `normalize()` (P5
+`e8f973c`) — all `export.perf`/`bridge.perf`-guarded. Remaining (open follow-ons):
+- **[P3] Divergence in LIVE mode.** `foldLive` OMITS divergence — it needs the two-pass version-sample drill,
+  which the bridge's steady ~1/s poll deliberately doesn't pay. A `networkSource` that issues the `{sample}`
+  drill on a slower cadence (or on demand) would light up live divergence too. (tools/observe; resource: inspect)
+- **[P3] Write-route JOIN.** The write-route timeline — correlate a write's `origin`/`key` with the partition
+  OWNER (a `forwarded` write origin→owner) — JOINs `cluster.writes` ([DECISIONS Z](DECISIONS.md)) with the
+  `__observe` ProvRecords the bridge already streams (`provagg`). Existing data, not new instrumentation;
+  `cluster.writes` isn't in the poll payload yet. (resource; tools/observe)
+- **[P3] `networkSource`-backed CLI** over the gated `__inspect` for remote (non-embedded) capture — the
+  embedded `captureInProcess` + the live bridge cover in-process today. (tools/debug; tools/observe)
+- **Note — seq-based per-sub LAG is NOT feasible** (resolved, not deferred): grounding the wire path showed
+  subscription deltas are synthetic proxy records carrying NO provenance (`sendDelta` writes no origin/seq
+  ext), so "lag = head−delivered" can't be measured without fabrication. P3 shipped the honest signal —
+  subscription TOPOLOGY (who serves what, of which kind) — instead.
 - **Cross-cutting discipline:** every phase ships a teardown contract mirroring `bridge.close()` (clear timers,
   unsub observe legs, REAP served subs via the dispatch reap so a long-running exporter can't leak server-side
   sinks — the `reapPeer` leak); introspection NEVER perturbs the hot path (pull/sampled over always-on; extend
