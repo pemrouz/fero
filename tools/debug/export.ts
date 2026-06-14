@@ -16,20 +16,24 @@
 //   • partition— owner + R-set + held-count, so UNDER-REPLICATION is real      [P1]
 //   • replica  — DIVERGENCE: a holder parked on a lower (epoch,seq) than its    [P2]
 //                owner is flagged stuck, via foldDivergence over the version-sample drill
-// Deliberately NOT emitted (no seam yet — arrive in P3-P4, the IDEAS workstream):
-//   per-partition keys/wps, the change-record log, ownerByEpoch history.
+//   • epoch    — ownerByEpoch HISTORY: rebuild the ring from each past committed   [P4]
+//                view (snapshot.viewHistory) to recover who owned what, when
+// Deliberately NOT emitted (no seam yet — the IDEAS workstream):
+//   per-partition keys/wps, the change-record log, per-subscription lag (P3).
 // The viewer renders the gaps gracefully (normalize fills defaults), so a capture
 // already replaces the hand-authored rows with live data.
 // ════════════════════════════════════════════════════════════════════════
 
 import type { InspectSnapshot } from '../../resource/inspect.ts'
 import { diagnostics, type Fero } from '../../resource/index.ts'
+import { DHT } from '../../transport/dht.ts'
 
 //! DebugFile: the store-once snapshot shape (the subset P1/P2 can fill); shape.js#normalize consumes it.
 export type DebugReplica = { addr: string; lag?: number; stuckAt?: string; stale?: boolean; missing?: boolean; note?: string }
 export type DebugNode = { addr: string; keys?: number; status?: string; note?: string }
-export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string; replicas?: DebugReplica[] }
-export type DebugResource = { name: string; members: string[]; R: number; nodes: DebugNode[]; partitions: DebugPartition[] }
+export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string; replicas?: DebugReplica[]; ownerByEpoch?: Record<string, string> }
+export type DebugEpoch = { id: string; members: number; current?: boolean }
+export type DebugResource = { name: string; members: string[]; R: number; nodes: DebugNode[]; partitions: DebugPartition[]; epochs?: DebugEpoch[] }
 export type DebugFile = { 'fero.debug': 1; _about: string; capturedAt?: string; view: string; resources: DebugResource[] }
 
 //! VersionStamp / VersionSample: one node's per-key LWW stamps (from snapshot({sample})) — the divergence input.
@@ -43,11 +47,12 @@ export type OwnerLookup = {
 }
 
 const ABOUT =
-  'Captured from a live cluster via the [diagnostics] seam (debug viewer P1+P2). REAL: committed ' +
+  'Captured from a live cluster via the [diagnostics] seam (debug viewer P1+P2+P4). REAL: committed ' +
   'members + R, per-node key count (LWW winners) + health, per-partition owner + replica-set + held ' +
-  '(under-replication), and per-replica DIVERGENCE — a replica parked on a lower (epoch,seq) than its ' +
-  "owner is flagged stuck (P2, via the version-sample drill). PENDING (no seam yet — P3-P4): per-partition " +
-  'keys/wps, the change-record log, and ownerByEpoch history.'
+  '(under-replication), per-replica DIVERGENCE (a replica parked on a lower (epoch,seq) than its owner ' +
+  'is flagged stuck — via the version-sample drill), and ownerByEpoch HISTORY (re-derived by rebuilding ' +
+  'the ring from each past committed view). PENDING (no seam yet): per-partition keys/wps, the ' +
+  'change-record log, and per-subscription lag (P3).'
 
 //! foldSnapshots: pure fold of per-node InspectSnapshots (+ owner lookup) → the store-once debug file.
 export function foldSnapshots(snaps: InspectSnapshot[], lookup: OwnerLookup = {}, capturedAt?: string): DebugFile {
@@ -164,6 +169,43 @@ export function foldDivergence(file: DebugFile, sampleByNode: Map<string, Versio
   return file
 }
 
+//! foldOwnership: re-derive ownerByEpoch by rebuilding the ring from each PAST view's members.
+// The committed-view history (snapshot.viewHistory, P4a) gives {epoch, members} per epoch;
+// rebuilding the DHT ring from a view's members and querying owner(partition) recovers who
+// owned what at that epoch — the cluster-replay / owner-timeline primitive. A buildRing factory
+// is injected (the live path uses a default DHT; tests inject a deterministic ring).
+//
+// VALIDATION GUARD: re-deriving the LATEST view must reproduce the authoritative owner P1 set
+// (cluster.owner). If any partition disagrees, the live ring config differs from the default we
+// rebuild with — so we SKIP rather than emit misleading history (better a gap than a lie).
+export function foldOwnership(
+  file: DebugFile,
+  viewsByEpoch: Map<number, string[]>,
+  buildRing: (members: string[]) => (key: string) => string | undefined,
+): DebugFile {
+  if (!viewsByEpoch.size) return file
+  const epochs = [...viewsByEpoch.keys()].sort((a, b) => a - b)
+  const latest = epochs[epochs.length - 1]
+  // build one ring per distinct view, reused across all partitions
+  const ringByEpoch = new Map<number, (k: string) => string | undefined>()
+  for (const e of epochs) ringByEpoch.set(e, buildRing(viewsByEpoch.get(e)!))
+
+  for (const r of file.resources) {
+    const latestRing = ringByEpoch.get(latest)!
+    if (!r.partitions.every((p) => !p.owner || latestRing(p.name) === p.owner)) continue // config mismatch → skip
+    for (const p of r.partitions) {
+      const obe: Record<string, string> = {}
+      for (const e of epochs) {
+        const o = ringByEpoch.get(e)!(p.name)
+        if (o) obe['e' + e] = o
+      }
+      if (Object.keys(obe).length) p.ownerByEpoch = obe
+    }
+    r.epochs = epochs.map((e) => ({ id: 'e' + e, members: viewsByEpoch.get(e)!.length, current: e === latest }))
+  }
+  return file
+}
+
 //! captureInProcess: snapshot a live in-process cluster — pull each node's
 //! [diagnostics].snapshot() + resolve authoritative ownership off a server's ring.
 // The always-available diagnostics seam (no observe:true gate, no added
@@ -205,5 +247,16 @@ export function captureInProcess(nodes: Fero[], capturedAt = new Date().toISOStr
     const drilled = (inst[diagnostics].snapshot({ sample: parts }) as InspectSnapshot).versionSample
     if (drilled) sampleByNode.set(snap.me, drilled)
   }
-  return foldDivergence(file, sampleByNode)
+  foldDivergence(file, sampleByNode)
+
+  // round 3: ownership history — merge every node's committed-view ring (a committed view is
+  // globally agreed, so same epoch ⇒ same members) and re-derive owner per epoch off a default ring
+  const viewsByEpoch = new Map<number, string[]>()
+  for (const snap of snaps) for (const v of snap.viewHistory ?? []) if (!viewsByEpoch.has(v.epoch)) viewsByEpoch.set(v.epoch, v.members)
+  const buildRing = (members: string[]) => {
+    const ring = new DHT()
+    for (const m of members) ring.add(m)
+    return (k: string) => ring.owner(k)
+  }
+  return foldOwnership(file, viewsByEpoch, buildRing)
 }
