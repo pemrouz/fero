@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sessions — client nodes · fero</title>
+<style>
+  /* ────────────────────────────────────────────────────────────────────
+     IDIOM: issue-triage inbox (Sentry / Linear / PagerDuty lineage), the
+     CLIENT-NODES view — a co-equal child under a resource, sibling of
+     Partitions (data spine) and Server nodes (physical spine). A fero
+     CLIENT is a read-only consumer OR a writer, connected to ONE server
+     node; its subscriptions are live ViewProxies. A client's story has
+     BOTH axes — WHERE it is connected / did it re-subscribe, AND is it
+     keeping up — so the triage taxonomy is connection/delivery shaped:
+     slow-consumer, re-subscribing, stale, disconnected.
+
+     Same app / graphite design system as inbox.html (CSS reused verbatim)
+     with nodes.html's breadcrumb command bar. Left rail = saved views +
+     a By-server group (where each client is connected, scopable); centre =
+     dense worst-first client list; right = a connection-first decode pane.
+     Healthy = a calm, converged, empty inbox; unhappy signals layer ON TOP,
+     attached to the client they concern, each tied to the e3→e4 epoch story.
+     Colour is FUNCTIONAL (severity only). Additions over inbox.html are
+     functional severity extensions only: an info tier (disconnected), a
+     per-subscriber cursor table (reused .vt), a re-subscribe timeline (.tl),
+     and an inline NEW chip — no new look.
+     ──────────────────────────────────────────────────────────────────── */
+  :root{
+    --bg:#101216; --rail:#13151a; --pane:#15181e; --line:#22262e; --line-2:#2b303a;
+    --ink:#d6dae2; --dim:#8a909c; --soft:#5a606b; --faint:#3f444e;
+    --sel:#1d3a52; --sel-line:#3d7fb8; --hover:#1a1e25;
+    --crit:#e8615a; --crit-bg:#2a1816; --warn:#d6a247; --warn-bg:#251f12;
+    --ok:#5cba8a; --ok-bg:#16241c; --info:#5b9fe0; --info-bg:#13212f;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 var(--ui);
+    -webkit-font-smoothing:antialiased;overflow:hidden}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
+  ::selection{background:var(--sel)}
+
+  /* ── top command bar ───────────────────────────────────────────────── */
+  .bar{display:flex;align-items:center;gap:0;height:38px;background:var(--rail);
+    border-bottom:1px solid var(--line);padding:0 10px;flex:0 0 auto;font-size:12.5px}
+  .bar .id{display:flex;align-items:baseline;gap:6px;padding-right:12px;white-space:nowrap}
+  .bar .id .res{color:var(--soft)} .bar .id a.res:hover{color:var(--dim)}
+  .bar .id .chev{color:var(--faint)}
+  .bar .id .nm{font-weight:600;color:var(--ink)} .bar .id .nm .mono{color:#fff}
+  .bar .sep{width:1px;height:18px;background:var(--line-2);margin:0 12px}
+  .bar .ctx{display:flex;gap:14px;color:var(--dim);white-space:nowrap}
+  .bar .ctx .mono{color:var(--ink)}
+  .bar .health{display:flex;align-items:center;gap:7px;margin-left:auto;padding-right:4px;white-space:nowrap}
+  .bar .health .dot{width:8px;height:8px;border-radius:50%}
+  .bar .health .txt{font-weight:600;letter-spacing:.02em}
+  .bar .health.ok .dot{background:var(--ok)} .bar .health.ok .txt{color:var(--ok)}
+  .bar .health.crit .dot{background:var(--crit);box-shadow:0 0 0 3px var(--crit-bg)}
+  .bar .health.crit .txt{color:var(--crit)}
+  .bar .search{display:flex;align-items:center;gap:6px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:5px;padding:3px 9px;margin-left:12px;width:250px}
+  .bar .search input{background:none;border:0;outline:0;color:var(--ink);font:inherit;width:100%;
+    font-family:var(--mono);font-size:12px}
+  .bar .search input::placeholder{color:var(--soft);font-family:var(--ui)}
+  .bar .search .pre{color:var(--soft)}
+  .bar .scen{display:flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden;margin-left:10px}
+  .bar .scen button{background:#0c0e12;border:0;color:var(--dim);font:inherit;font-size:11.5px;font-weight:600;
+    padding:4px 11px;cursor:pointer;border-right:1px solid var(--line);white-space:nowrap}
+  .bar .scen button:last-child{border-right:0}
+  .bar .scen button:hover{color:var(--ink)}
+  .bar .scen button[aria-pressed=true]{background:var(--sel);color:#fff}
+  .bar .mock{margin-left:10px;color:var(--soft);font-size:10.5px;border:1px solid var(--line);
+    border-radius:3px;padding:2px 7px;letter-spacing:.03em;white-space:nowrap}
+
+  /* ── 3-pane body ───────────────────────────────────────────────────── */
+  .body{display:grid;grid-template-columns:236px minmax(0,1fr) 372px;flex:1 1 auto;min-height:0}
+  .body.no-detail{grid-template-columns:236px minmax(0,1fr) 0}
+
+  /* ── LEFT RAIL: saved views + By-server group with live counts ─────── */
+  .rail{background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;padding:10px 0}
+  .rail .grp{padding:0 6px;margin-bottom:14px}
+  .rail .grp-h{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--soft);
+    padding:4px 10px 6px}
+  .rail .v{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:5px;cursor:pointer;color:var(--dim)}
+  .rail .v:hover{background:var(--hover);color:var(--ink)}
+  .rail .v[aria-current=true]{background:var(--sel);color:#fff}
+  .rail .v[aria-current=true] .ic{color:#fff}
+  .rail .v .ic{width:13px;text-align:center;color:var(--soft);font-family:var(--mono);font-size:12px;flex:0 0 auto}
+  .rail .v .lab{flex:1 1 auto;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rail .v .cnt{font-family:var(--mono);font-size:11.5px;color:var(--soft);font-variant-numeric:tabular-nums}
+  .rail .v[aria-current=true] .cnt{color:#cfe2f2}
+  .rail .v .cnt.crit{color:var(--crit);font-weight:600} .rail .v .cnt.warn{color:var(--warn);font-weight:600}
+  .rail .v .cnt.info{color:var(--info);font-weight:600}
+  .rail .v.dis{opacity:.45;cursor:default} .rail .v.dis:hover{background:none;color:var(--dim)}
+  /* By-server backpressure meter — reused inbox/nodes .part-bar, now a per-server delivery-load gauge */
+  .rail .part-bar{flex:1 1 auto;height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:0 2px}
+  .rail .part-bar i{display:block;height:100%;background:var(--ok)}
+  .rail .part-bar i.warn{background:var(--warn)}
+  .rail .part-bar i.bad{background:var(--crit)}
+
+  /* ── CENTRE: dense client list ─────────────────────────────────────── */
+  .list{overflow-y:auto;background:var(--bg);min-width:0}
+  .list .lh{display:flex;align-items:center;gap:10px;height:30px;padding:0 12px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--bg);z-index:2;color:var(--soft);font-size:11px}
+  .list .lh .ttl{color:var(--dim);font-weight:600;font-size:12px}
+  .list .lh .sort{margin-left:auto;font-size:11px}
+  .list .lh .sort b{color:var(--dim);font-weight:600}
+
+  .iss{display:grid;grid-template-columns:3px 18px 1fr auto;gap:0;align-items:stretch;
+    border-bottom:1px solid var(--line);cursor:pointer;background:var(--bg)}
+  .iss:hover{background:var(--hover)}
+  .iss[aria-selected=true]{background:var(--sel)}
+  .iss .sev{width:3px}
+  .iss[data-sev=crit] .sev{background:var(--crit)} .iss[data-sev=warn] .sev{background:var(--warn)}
+  .iss[data-sev=info] .sev{background:var(--info)}
+  .iss .gut{display:flex;align-items:flex-start;justify-content:center;padding-top:11px}
+  .iss .gut .sd{width:8px;height:8px;border-radius:2px;transform:rotate(45deg)}
+  .iss[data-sev=crit] .gut .sd{background:var(--crit)} .iss[data-sev=warn] .gut .sd{background:var(--warn)}
+  .iss[data-sev=info] .gut .sd{background:var(--info)}
+  .iss .main{padding:8px 6px 9px 2px;min-width:0}
+  .iss .l1{display:flex;align-items:baseline;gap:8px}
+  .iss .key{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap}
+  .iss[aria-selected=true] .key{color:#fff}
+  /* role suffix on the id line — reader/writer, dim, not a label-pill */
+  .iss .role{font-family:var(--ui);font-size:11px;font-weight:400;color:var(--soft)}
+  .iss[aria-selected=true] .role{color:#9fb0c2}
+  .iss .tag{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;
+    border-radius:3px;flex:0 0 auto}
+  .iss[data-sev=crit] .tag{color:var(--crit);background:var(--crit-bg);border:1px solid #4a2622}
+  .iss[data-sev=warn] .tag{color:var(--warn);background:var(--warn-bg);border:1px solid #443613}
+  .iss[data-sev=info] .tag{color:var(--info);background:var(--info-bg);border:1px solid #234055}
+  .iss .l2{margin-top:3px;color:var(--dim);font-size:12px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .iss .l2 .mono{color:var(--ink)} .iss[aria-selected=true] .l2{color:#c4cdd9}
+  .iss .l2 .mono.bad{color:var(--crit)} .iss .l2 .mono.warn{color:var(--warn)}
+  .iss .meta{display:flex;align-items:center;gap:0;padding:9px 12px 0 8px;flex:0 0 auto}
+  .iss .meta .col{display:flex;flex-direction:column;align-items:flex-end;padding:0 11px;
+    border-left:1px solid var(--line);min-width:64px}
+  .iss .meta .col:first-child{border-left:0}
+  .iss .meta .col .mv{font-family:var(--mono);font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .iss .meta .col .mv.bad{color:var(--crit)} .iss .meta .col .mv.warn{color:var(--warn)}
+  .iss .meta .col .mv.info{color:var(--info)} .iss .meta .col .mv.ok{color:var(--soft)}
+  /* sentence-case inline column captions, not the uppercase-micro-label motif */
+  .iss .meta .col .ml{font-size:10.5px;color:var(--soft);margin-top:1px}
+
+  /* empty inbox = satisfying calm */
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;
+    color:var(--soft);gap:14px;padding:40px;text-align:center}
+  .empty .chk{width:46px;height:46px;border-radius:50%;border:2px solid var(--line-2);display:flex;
+    align-items:center;justify-content:center;color:var(--ok);font-size:22px}
+  /* a filtered-but-still-unhealthy inbox must NOT borrow the calm green ✓ */
+  .empty.filtered .chk.none{color:var(--soft);font-size:20px}
+  .empty.filtered .e3{color:var(--warn);border-top-color:var(--line-2)}
+  .empty .e1{font-size:15px;color:var(--ink);font-weight:600}
+  .empty .e2{font-size:12.5px;max-width:330px;line-height:1.6}
+  .empty .e3{font-family:var(--mono);font-size:11.5px;color:var(--soft);margin-top:6px;
+    border-top:1px solid var(--line);padding-top:14px}
+
+  /* ── RIGHT: connection-first decode pane ───────────────────────────── */
+  .detail{background:var(--pane);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+  .detail.hide{display:none}
+  .detail .dh{padding:12px 14px 11px;border-bottom:1px solid var(--line)}
+  .detail .dh .dk{font-family:var(--mono);font-size:15px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+  .detail .dh .dk .sd{width:9px;height:9px;border-radius:2px;transform:rotate(45deg)}
+  .detail .dh[data-sev=crit] .dk .sd{background:var(--crit)} .detail .dh[data-sev=warn] .dk .sd{background:var(--warn)}
+  .detail .dh[data-sev=info] .dk .sd{background:var(--info)}
+  .detail .dh .drole{font-family:var(--ui);font-size:11px;font-weight:400;color:var(--soft);margin-left:2px}
+  .detail .dh .dsub{margin-top:5px;color:var(--dim);font-size:12px;line-height:1.45}
+  .detail .dh .dsub .mono{color:var(--ink)}
+  .detail .seg{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .detail .seg .st{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);
+    margin-bottom:9px;display:flex;align-items:center;gap:7px}
+  /* inline NEW chip — instrumentation that does not exist in fero today */
+  .newc{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:9px;border:1px solid #443613;
+    border-radius:3px;padding:0 4px;background:var(--warn-bg);letter-spacing:.02em;text-transform:none}
+  .detail .kv{display:grid;grid-template-columns:104px 1fr;gap:5px 12px;font-size:12px}
+  .detail .kv dt{color:var(--soft)} .detail .kv dd{margin:0;color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .detail .kv dd.bad{color:var(--crit)} .detail .kv dd.warn{color:var(--warn)} .detail .kv dd.ok{color:var(--ok)} .detail .kv dd.info{color:var(--info)}
+  .detail .kv dd a{font-family:var(--mono)}
+  /* per-subscriber cursor table — the version-sample .vt decode table, reused */
+  .vt{font-family:var(--mono);font-size:11.5px;width:100%;border-collapse:collapse}
+  .vt th{text-align:left;color:var(--soft);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.04em;
+    padding:0 0 5px;border-bottom:1px solid var(--line)}
+  .vt th.num{text-align:right}
+  .vt td{padding:5px 0;border-bottom:1px solid var(--line);color:var(--ink);font-variant-numeric:tabular-nums}
+  .vt td.num{text-align:right}
+  .vt tr:last-child td{border-bottom:0}
+  .vt td.sub{color:var(--ink)} .vt td.sub .own{color:var(--soft)}
+  .vt td.lag .ok{color:var(--soft)} .vt td.lag .bad{color:var(--crit);font-weight:600} .vt td.lag .warn{color:var(--warn);font-weight:600}
+  .vt .bdg{font-family:var(--ui);font-size:9px;font-weight:700;padding:0 4px;border-radius:2px;margin-left:5px}
+  .vt .bdg.behind{background:var(--crit-bg);color:var(--crit)} .vt .bdg.syncing{background:var(--warn-bg);color:var(--warn)} .vt .bdg.cur{background:var(--ok-bg);color:var(--ok)}
+
+  /* re-subscribe timeline — an epoch-pinned failover history (functional, not ornament) */
+  .tl{list-style:none;margin:0;padding:0 0 0 2px}
+  .tl li{position:relative;padding:0 0 11px 18px;font-size:11.5px;line-height:1.5;color:var(--dim)}
+  .tl li:last-child{padding-bottom:0}
+  .tl li::before{content:'';position:absolute;left:3px;top:4px;width:7px;height:7px;border-radius:50%;
+    background:var(--faint);border:2px solid var(--pane);z-index:1}
+  .tl li::after{content:'';position:absolute;left:6px;top:11px;bottom:-1px;width:1px;background:var(--line-2)}
+  .tl li:last-child::after{display:none}
+  .tl li.done::before{background:var(--ok)} .tl li.move::before{background:var(--warn)} .tl li.now::before{background:var(--info)}
+  .tl li .ep{font-family:var(--mono);color:var(--ink);font-weight:600;margin-right:6px}
+  .tl li .mono{color:var(--ink)} .tl li .bad{color:var(--crit)} .tl li b{color:var(--ink);font-weight:600}
+
+  /* delivery-vs-write spark = tiny activity micro-chart (functional, not decorative) */
+  .spkwrap{font-size:11px;color:var(--soft)}
+  .spkcap{display:flex;justify-content:space-between;margin-bottom:7px}
+  .spkcap .mono{color:var(--ink)} .spkcap .bad{color:var(--crit)}
+  .spark{display:flex;align-items:flex-end;gap:2px;height:30px}
+  .spark i{width:6px;background:var(--faint);border-radius:1px} .spark i.hi{background:var(--info)} .spark i.bad{background:var(--crit)}
+  .spark .head{align-self:stretch;width:0;border-left:1px dashed var(--crit);margin:0 1px;opacity:.7}
+
+  .detail .reason{font-size:12px;line-height:1.55;color:var(--dim)}
+  .detail .reason b{color:var(--ink);font-weight:600}
+  .detail .next{display:flex;gap:8px;align-items:flex-start;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:5px;padding:9px 11px;font-size:12px;line-height:1.5;color:var(--ink);margin-top:10px}
+  .detail .next .arr{color:var(--warn);font-weight:700}
+  .detail .actions{margin-top:auto;padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+  .btn{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    background:#0c0e12;border:1px solid var(--line-2);border-radius:5px;color:var(--ink);font:inherit;font-size:12.5px;
+    font-weight:600;padding:8px 12px;cursor:pointer;text-align:center}
+  .btn:hover{border-color:var(--soft);background:var(--hover);text-decoration:none}
+  .btn.prim{background:var(--sel);border-color:var(--sel-line);color:#fff}
+  .btn.prim:hover{background:#234866}
+  .btn .kc{font-family:var(--mono);font-size:10px;color:var(--soft);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+  .btn.prim .kc{color:#9fc4e2;border-color:#2f5774}
+
+  /* ── bottom hotkey bar ─────────────────────────────────────────────── */
+  .keys{display:flex;align-items:center;gap:0;height:24px;background:var(--rail);border-top:1px solid var(--line);
+    padding:0 12px;flex:0 0 auto;font-size:11px;color:var(--soft)}
+  .keys .k{display:flex;align-items:center;gap:5px;padding:0 13px 0 0}
+  .keys .k kbd{font-family:var(--mono);font-size:10px;background:#0c0e12;border:1px solid var(--line-2);
+    border-radius:3px;padding:1px 5px;color:var(--dim)}
+  .keys .right{margin-left:auto;font-family:var(--mono);color:var(--soft)}
+
+  /* data-sources popover — the honest footnote (nodes.html variant: left:14px over the rail) */
+  .src{display:none;position:fixed;bottom:30px;left:14px;width:580px;background:var(--pane);
+    border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;font-size:11.5px;line-height:1.65;color:var(--dim);
+    box-shadow:0 8px 30px #000a;z-index:20}
+  .src.show{display:block}
+  .src h4{margin:0 0 8px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+  .src p{margin:7px 0} .src b{color:var(--ink);font-weight:600} .src .mono{color:var(--ink)}
+  .src .new{color:var(--warn);font-weight:700;font-family:var(--mono);font-size:10px;border:1px solid #443613;
+    border-radius:3px;padding:1px 5px;margin-right:3px;background:var(--warn-bg)}
+  .keys .srcbtn{cursor:pointer;color:var(--dim);padding:0 13px 0 0;display:flex;align-items:center;gap:5px}
+  .keys .srcbtn:hover{color:var(--ink)} .keys .srcbtn .new{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<!-- ── command bar: identity (cluster › sessions › clients) · context · health · search · scenario ── -->
+<div class="bar">
+  <div class="id">
+    <a class="res" href="resources.html">cluster</a><span class="chev">›</span>
+    <a class="res" href="inbox.html">sessions</a><span class="chev">›</span>
+    <span class="nm">clients</span>
+  </div>
+  <span class="sep"></span>
+  <div class="ctx">
+    <span><span class="mono">5</span> members</span>
+    <span><span class="mono">16</span> partitions</span>
+    <span>view <span class="mono">e4</span></span>
+    <span>R=5 <span style="color:var(--soft)">(billing R=3)</span></span>
+  </div>
+  <div class="health" id="health"><span class="dot"></span><span class="txt" id="healthTxt">Healthy</span></div>
+  <div class="search"><span class="pre mono">⌕</span><input id="q" spellcheck="false" placeholder="is:slow  is:resubscribing  is:stale  · or a client id" autocomplete="off"></div>
+  <div class="scen" id="scen"></div>
+  <span class="mock">MOCKUP · static</span>
+</div>
+
+<div class="body" id="bodyGrid">
+
+  <!-- ── LEFT RAIL: saved views & By-server group, live counts ── -->
+  <nav class="rail" id="rail"></nav>
+
+  <!-- ── CENTRE: worst-first client list ── -->
+  <section class="list">
+    <div class="lh">
+      <span class="ttl" id="listTtl">All clients</span>
+      <span id="listCount"></span>
+      <span class="sort">sorted by <b>severity ↓</b> then <b>sub lag</b></span>
+    </div>
+    <div id="issues"></div>
+  </section>
+
+  <!-- ── RIGHT: connection-first decode pane ── -->
+  <aside class="detail hide" id="detail"></aside>
+</div>
+
+<!-- ── bottom hotkey bar (k9s / lazygit convention) ── -->
+<div class="keys">
+  <span class="k"><kbd>j</kbd><kbd>k</kbd> move</span>
+  <span class="k"><kbd>↵</kbd> open drill</span>
+  <span class="k"><kbd>s</kbd> slow</span>
+  <span class="k"><kbd>r</kbd> re-subscribing</span>
+  <span class="k"><kbd>1</kbd>/<kbd>2</kbd> scenario</span>
+  <span class="k"><kbd>/</kbd> filter</span>
+  <span class="srcbtn" id="srcBtn"><span class="new">⚠</span> data sources</span>
+  <span class="right" id="statusRight"></span>
+</div>
+
+<!-- data-sources popover (the honest footnote, as a status-line popover) -->
+<div class="src" id="src">
+  <h4>Data sources — how this client view is assembled</h4>
+  <p><b>All per-client telemetry is <span class="new">⚠ NEW</span>.</b> fero keeps no per-client registry today; this whole page is
+     proposed instrumentation, assembled from the transport's live connections plus the per-subscriber push cursor.</p>
+  <p><b>Roster &amp; connection.</b> Client list, role (reader/writer), connected-server and last-seen heartbeat come from the
+     <b>transport</b>'s live connections per member, plus the fenced-write ack path (DECISIONS X) [D].</p>
+  <p><b>Subscription lag (slow-consumer).</b> Per-subscriber cursor from the <b>__observe</b> push stream — lag is the subscribed
+     key's log head minus the client's delivered seq <span class="new">⚠ NEW</span>; delivery-vs-write rate is derived the same way [B].
+     Log <b>head</b> positions are also available from the <span class="mono">log accessor</span>/<span class="mono">__dump</span> but are not the primary feed here [C].</p>
+  <p><b>Re-subscribe churn.</b> Bridge-derived: joins the <span class="mono">e3→e4 VIEW_COMMIT</span> to each client's subscription
+     re-target events <span class="new">⚠ NEW</span> — re-target events are not recorded today [E].
+     <b>Stale view.</b> Client view epoch vs cluster <span class="mono">e4</span> from the <b>InspectSnapshot</b> poll (~1s) [A].</p>
+</div>
+
+<script>
+'use strict';
+/* ── drill targets ──────────────────────────────────────────────────────
+   A client's subscription → the key/partition it reads (partition.html, or
+   the key autopsy); the connected server → node.html; the resource
+   breadcrumb → inbox; the cluster breadcrumb → ia-map. Hash deep-links
+   (#attention) boot the target page straight into its attention scenario. */
+const PARTITION_ATT = 'partition.html#attention';            // order7 firehose
+const NODE_ATT      = 'node.html#attention';                 // :49801 / :49807 attention
+const KEY_DIVERGED  = '../key-autopsy/happy.html#diverged';  // user42 fenced write
+
+/* ── scenario model ─────────────────────────────────────────────────────
+   A fero client = a read-only consumer OR a writer, connected to ONE server,
+   carrying live ViewProxy subscriptions. Healthy = a calm, all-connected,
+   all-caught-up roster (empty inbox). Trouble = a worst-first list whose
+   taxonomy spans BOTH axes — slow-consumer (delivery behind a hot view),
+   re-subscribing (followed an ownership MOVE), stale (old epoch, fenced
+   write), disconnected (gone) — each tied to the e3→e4 epoch story. ── */
+const SCEN = {
+  healthy:{
+    level:'ok', healthTxt:'Healthy · all connected',
+    // roster rollup: connected/total + per-bucket counts; deliver = aggregate delivered records/s
+    roster:{total:6, connected:6, slow:0, resub:0, stale:0, gone:0, subs:11, deliver:142},
+    // By-server: clients-on-server count + a delivery-load / backpressure meter (0..1)
+    servers:[
+      {addr:':49801', clients:2, load:0.32, lvl:'ok'},
+      {addr:':49803', clients:1, load:0.41, lvl:'ok'},
+      {addr:':49805', clients:1, load:0.18, lvl:'ok'},
+      {addr:':49807', clients:1, load:0.22, lvl:'ok'},
+      {addr:':49809', clients:1, load:0.12, lvl:'ok'},
+    ],
+    issues:[],
+  },
+  attention:{
+    level:'crit', healthTxt:'1 critical · 2 re-subscribing',
+    roster:{total:7, connected:6, slow:1, resub:2, stale:1, gone:1, subs:14, deliver:118},
+    servers:[
+      // :49807 carries the slow consumer + a re-subscriber → red bar, crit; :49803 owns
+      // order7 @61 w/s feeding the slow consumer → amber bar; :49809 lost a client → ○.
+      {addr:':49801', clients:2, load:0.34, lvl:'ok'},
+      {addr:':49803', clients:1, load:0.74, lvl:'warn'},
+      {addr:':49805', clients:1, load:0.18, lvl:'ok'},
+      {addr:':49807', clients:2, load:0.93, lvl:'bad'},
+      {addr:':49809', clients:0, load:0.0,  lvl:'gone'},
+    ],
+    issues:[
+      /* ── crit · slow consumer: delivery can't keep up with the order7.lines firehose ── */
+      { id:'cli-7f3a', role:'writer', srv:':49807', sev:'crit', lag:1840, filter:'slow', tag:'slow consumer', href:PARTITION_ATT,
+        title:'subscription delivery cannot keep up with order7.lines (61 w/s) — +1,840 behind, backpressure building',
+        l2:'subscribed to <span class="mono">order7.lines</span> — delivers ~12/s against <span class="mono warn">61 w/s</span>, lag <span class="mono bad">+1,840</span> and falling',
+        meta:[{v:'+1,840',l:'sub lag',cls:'bad'},{v:':49807',l:'server'},{v:'48s',l:'falling',cls:'bad'}],
+        detail:{
+          headerSub:'subscription delivery cannot keep up with <span class="mono">order7.lines</span> — head is outrunning the cursor',
+          kv:[['connected',':49807','',NODE_ATT],['role','writer · 3 subs'],['client view','e4 (current)','ok'],
+              ['max sub lag','+1,840','bad'],['delivery','~12/s vs 61 w/s','bad'],['since','falling 48s','bad'],
+              ['source','__observe cursor [B]']],
+          subsTitle:'Subscriptions · __observe cursor', subsNew:true,
+          subs:[
+            {sub:'order7.lines', own:':49803', head:'s9,210', deliv:'s7,370', lag:'+1,840', bdg:'behind', cls:'bad', href:PARTITION_ATT},
+            {sub:'order7.totals',own:':49803', head:'s3,118', deliv:'s3,044', lag:'+74',    bdg:'syncing',cls:'warn'},
+            {sub:'audit.tail',   own:':49805', head:'s1,902', deliv:'s1,902', lag:'0',      bdg:'cur',    cls:'ok'},
+          ],
+          // delivery-vs-write spark: bars (delivered/s) fall short as the head pulls ahead at 61 w/s
+          spark:{cap:'delivered/s vs order7.lines write rate', headLbl:'head 61 w/s',
+                 bars:[11,12,12,11,12,12,11,12,12,11], head:5},
+          reason:'<b>cli-7f3a</b> subscribes to <b>order7.lines</b>, the contended write hotspot owned by <b>:49803</b> at <b>61 w/s</b>. Its <b>__observe</b> cursor delivers only ~<b>12/s</b>, so the log head outruns the delivered seq: lag has grown to <b>+1,840</b> and is still falling (48s). This is genuine backpressure on a single hot view, not a transport stall — the other two subscriptions are current.',
+          next:'Open the <span class="mono">order7</span> partition to see the write firehose, then narrow the ViewProxy (a tighter filter/projection) or batch deliveries so the cursor can keep pace.',
+          act:{label:'open order7 partition', href:PARTITION_ATT},
+        } },
+
+      /* ── warn · re-subscribing: followed user42's e3→e4 ownership MOVE (the headline failover) ── */
+      { id:'cli-2b91', role:'reader', srv:':49801', sev:'warn', lag:3, filter:'resub', tag:'re-subscribing', href:NODE_ATT,
+        title:'followed user42 :49803→:49801 at e4 — re-targeting its ViewProxy at the new owner',
+        l2:'followed <span class="mono">user42</span> move <span class="mono">:49803→:49801</span> at <span class="mono">e4</span> — re-targeting, <span class="mono warn">+3</span> draining',
+        meta:[{v:'+3',l:'sub lag',cls:'warn'},{v:':49801',l:'server'},{v:'3s',l:'re-target',cls:'warn'}],
+        detail:{
+          headerSub:'followed <span class="mono">user42</span> from old owner <span class="mono">:49803</span> to new owner <span class="mono">:49801</span> at the <span class="mono">e4</span> VIEW_COMMIT',
+          kv:[['connected',':49801','',NODE_ATT],['role','reader · 2 subs'],['client view','e4 (current)','ok'],
+              ['max sub lag','+3','warn'],['re-target','3s ago','warn'],['since','e3→e4 move','warn'],
+              ['source','bridge / VIEW_COMMIT [E]']],
+          subsTitle:'Subscriptions · __observe cursor', subsNew:true,
+          subs:[
+            {sub:'user42', own:':49801', head:'s1,287', deliv:'s1,284', lag:'+3', bdg:'syncing', cls:'warn', href:KEY_DIVERGED},
+            {sub:'user42.score', own:':49801', head:'s1,287', deliv:'s1,287', lag:'0', bdg:'cur', cls:'ok', href:KEY_DIVERGED},
+          ],
+          // epoch-pinned re-subscribe history — the headline failover
+          timeline:[
+            {cls:'done', ep:'e3', txt:'subscribed to <b>user42</b> via owner <span class="mono">:49803</span> — delivered to <span class="mono">s1,281</span>'},
+            {cls:'move', ep:'e4', txt:'<b>VIEW_COMMIT</b> moved <b>user42</b> ownership <span class="mono">:49803→:49801</span> — old owner stopped serving'},
+            {cls:'now',  ep:'e4', txt:'re-targeted ViewProxy at <span class="mono">:49801</span>, resuming from last delivered <span class="mono">s1,281</span> — <span class="mono">+3</span> draining'},
+          ],
+          reason:'At the <b>e3→e4</b> view change, <b>user42</b> ownership moved <b>:49803→:49801</b>. <b>cli-2b91</b> was subscribed via the old owner, so its ViewProxy had to <b>re-target</b> at the new owner and resume from the last delivered seq. This is expected failover churn: the <b>+3</b> gap is already draining (3s) and the client view is current at <b>e4</b>.',
+          next:'No action needed — re-target completes on its own. If lag does not reach 0 within a view tick, open the new owner to confirm it is serving user42 reads.',
+          act:{label:'open server :49801', href:NODE_ATT},
+        } },
+
+      /* ── warn · re-subscribing: followed billing :49809→:49807 (new owner under-replicated) ── */
+      { id:'cli-5e08', role:'writer', srv:':49807', sev:'warn', lag:0, filter:'resub', tag:'re-subscribing', href:NODE_ATT,
+        title:'followed billing :49809→:49807 at e4 — sub current, but the new owner is under-replicated 2/3',
+        l2:'followed <span class="mono">billing</span> move <span class="mono">:49809→:49807</span> — sub current at <span class="mono">s842</span>, new owner <span class="mono warn">2/3</span>',
+        meta:[{v:'+0',l:'sub lag',cls:'ok'},{v:':49807',l:'server'},{v:'5s',l:'re-target',cls:'warn'}],
+        detail:{
+          headerSub:'followed <span class="mono">billing</span> from old owner <span class="mono">:49809</span> to new owner <span class="mono">:49807</span> at <span class="mono">e4</span> — sub caught up, but <span class="mono">:49807</span> holds billing on only 2/3 replicas',
+          kv:[['connected',':49807','',NODE_ATT],['role','writer · 2 subs'],['client view','e4 (current)','ok'],
+              ['max sub lag','+0','ok'],['re-target','5s ago','warn'],['owner state','billing 2/3','warn'],
+              ['source','bridge / VIEW_COMMIT [E]']],
+          subsTitle:'Subscriptions · __observe cursor', subsNew:true,
+          subs:[
+            {sub:'billing', own:':49807', head:'s842', deliv:'s842', lag:'0', bdg:'cur', cls:'ok', href:NODE_ATT},
+            {sub:'billing.balance', own:':49807', head:'s842', deliv:'s842', lag:'0', bdg:'cur', cls:'ok', href:NODE_ATT},
+          ],
+          timeline:[
+            {cls:'done', ep:'e3', txt:'subscribed to <b>billing</b> via owner <span class="mono">:49809</span> — delivered to <span class="mono">s842</span>'},
+            {cls:'move', ep:'e4', txt:'<b>VIEW_COMMIT</b> moved <b>billing</b> ownership <span class="mono">:49809→:49807</span>'},
+            {cls:'now',  ep:'e4', txt:'re-targeted at <span class="mono">:49807</span>, current at <span class="mono">s842</span> — but new owner is <span class="bad">under-replicated 2/3</span>'},
+          ],
+          reason:'At <b>e3→e4</b>, <b>billing</b> ownership moved <b>:49809→:49807</b>. <b>cli-5e08</b> re-targeted cleanly — its sub is <b>current at s842</b>, no delivery lag. The flag is not the client: the <b>new owner :49807 holds billing on only 2/3 replicas</b>, so a single failure there would interrupt this writer. The client is healthy; the partition under it is not.',
+          next:'Open <span class="mono">:49807</span> to restore billing to R=3 (confirm the orphan shed on :49809 or promote a replica). The client needs no change.',
+          act:{label:'open server :49807', href:NODE_ATT},
+        } },
+
+      /* ── warn · stale: on an old view; its forwarded write was FENCED (DECISIONS X) ── */
+      { id:'cli-1a04', role:'writer', srv:':49801', sev:'warn', lag:127, filter:'stale', tag:'stale view', href:KEY_DIVERGED,
+        title:'on view e1 vs cluster e4 — its forwarded write user42.score=99 was FENCED',
+        l2:'client view <span class="mono bad">e1</span> vs cluster <span class="mono">e4</span> — write <span class="mono">user42.score=99</span> was <b class="mono bad">FENCED</b>',
+        meta:[{v:'e1 / e4',l:'view',cls:'bad'},{v:':49801',l:'server'},{v:'+127',l:'read lag',cls:'warn'}],
+        detail:{
+          headerSub:'pinned to an old view (<span class="mono">e1</span>); a forwarded write was rejected by the epoch fence — its reads are stale',
+          kv:[['connected',':49801','',NODE_ATT],['role','writer · 1 sub'],['client view','e1','bad'],
+              ['cluster view','e4'],['fenced write','user42.score=99','bad'],['read sub lag','+127','warn'],
+              ['source','InspectSnapshot [A] + ack [D]']],
+          subsTitle:'Subscriptions · __observe cursor', subsNew:true,
+          subs:[
+            {sub:'user42.score', own:':49801', head:'s1,287', deliv:'s1,160', lag:'+127', bdg:'behind', cls:'bad', href:KEY_DIVERGED},
+          ],
+          timeline:[
+            {cls:'done', ep:'e1', txt:'connected with a stale view <span class="mono">e1</span>; subscribed to <b>user42.score</b>'},
+            {cls:'move', ep:'e4', txt:'forwarded write <b>user42.score=99</b> stamped at the stale <span class="mono">e1</span> epoch'},
+            {cls:'now',  ep:'e4', txt:'owner rejected it — <span class="bad">FENCED</span> by the dominating epoch (<b>DECISIONS X</b>); read sub still <span class="mono">+127</span> behind'},
+          ],
+          reason:'<b>cli-1a04</b> is pinned to view <b>e1</b> while the cluster is at <b>e4</b>. It forwarded <b>user42.score=99</b> stamped with the stale <b>e1</b> epoch; the owner <b>fenced</b> it (DECISIONS X) so a view-lagged overwrite cannot stick. Its read subscription is also <b>+127</b> behind because it has not adopted <b>e4</b>. The fence protected convergence — the client just needs to refresh its view.',
+          next:'The write was correctly rejected. Open the user42 autopsy to see the fenced overwrite, then have the client reconnect / re-fetch the snapshot to adopt e4 before retrying.',
+          act:{label:'open user42 autopsy', href:KEY_DIVERGED},
+        } },
+
+      /* ── info · disconnected: gone, last seen 42s ago, subs released ── */
+      { id:'cli-9c77', role:'reader', srv:':49809', sev:'info', lag:0, filter:'gone', tag:'disconnected', href:NODE_ATT,
+        title:'disconnected from :49809 — last seen 42s ago, 2 subscriptions released',
+        l2:'gone — last heartbeat <span class="mono">42s</span> ago on <span class="mono">:49809</span>; <span class="mono">2</span> subs (prefs.theme, session.token) released',
+        meta:[{v:'42s',l:'last seen',cls:'info'},{v:':49809',l:'was on'},{v:'2',l:'subs freed',cls:'info'}],
+        detail:{
+          headerSub:'transport heartbeat lost — the client is gone and its subscriptions have been torn down',
+          kv:[['was on',':49809','',NODE_ATT],['role','reader · 0 subs'],['client view','e4 (last seen)','ok'],
+              ['last heartbeat','42s ago','info'],['subs released','2','info'],['since','clean disconnect'],
+              ['source','transport [D]']],
+          subsTitle:'Released subscriptions · transport', subsNew:true,
+          subs:[
+            {sub:'prefs.theme',   own:':49809', head:'s611',   deliv:'s611',   lag:'released', bdg:'cur', cls:'ok'},
+            {sub:'session.token', own:':49801', head:'s1,287', deliv:'s1,287', lag:'released', bdg:'cur', cls:'ok'},
+          ],
+          timeline:[
+            {cls:'done', ep:'e4', txt:'connected to <span class="mono">:49809</span>, caught up at <span class="mono">e4</span>; 2 subscriptions delivering'},
+            {cls:'now',  ep:'e4', txt:'transport heartbeat lost — last seen <span class="mono">42s</span> ago; both subscriptions <b>released</b> by the server'},
+          ],
+          reason:'<b>cli-9c77</b> stopped sending transport heartbeats <b>42s</b> ago; the connected server <b>:49809</b> released its 2 subscriptions (prefs.theme, session.token). It was caught up at <b>e4</b> when it left, so this is a clean disconnect, not a stuck or fenced client — informational, kept on the roster until it ages out.',
+          next:'No action unless this client is expected to be live. Open <span class="mono">:49809</span> to confirm the connection was released, or wait for it to reconnect and re-subscribe.',
+          act:{label:'open server :49809', href:NODE_ATT},
+        } },
+    ],
+  },
+};
+const SCEN_ORDER = ['healthy','attention'];
+
+/* ── live state ── */
+let scen = 'healthy';
+let view = 'all';        // active saved view / filter (incl. srv:<addr> scoping)
+let query = '';          // search filter text
+let selIdx = -1;         // selected client index (within filtered set)
+let filtered = [];       // current filtered+sorted client list
+
+const $ = id => document.getElementById(id);
+// info tier sorts after warn so disconnected sits below the actionable rows
+const SEV_RANK = {crit:0, warn:1, info:2};
+// map the advertised `is:` predicates onto the underlying filter buckets
+const IS_FILTER = {slow:'slow', resubscribing:'resub', resub:'resub', stale:'stale',
+                   disconnected:'gone', gone:'gone', open:'all', connected:'connected'};
+
+/* ── left-rail view definitions; counts derive from the active scenario ── */
+function railViews(s){
+  const r = s.roster;
+  const cnt = f => s.issues.filter(i=>i.filter===f).length;
+  return {
+    saved:[
+      {id:'all',   ic:'▤', lab:'All clients',     cnt:r.slow+r.resub+r.stale+r.gone, total:r.total},
+      {id:'slow',  ic:'◆', lab:'Slow consumers',  cnt:cnt('slow'),  cls:cnt('slow')?'crit':''},
+      {id:'resub', ic:'⇄', lab:'Re-subscribing',  cnt:cnt('resub'), cls:cnt('resub')?'warn':''},
+      {id:'stale', ic:'◷', lab:'Stale view',      cnt:cnt('stale'), cls:cnt('stale')?'warn':''},
+      {id:'gone',  ic:'○', lab:'Disconnected',    cnt:cnt('gone'),  cls:cnt('gone')?'info':''},
+      {id:'connected', ic:'✓', lab:'Connected · OK', cnt:r.connected - (r.slow+r.resub+r.stale), dis:true},
+    ],
+    servers:s.servers,
+  };
+}
+
+function renderRail(){
+  const s = SCEN[scen];
+  const rv = railViews(s);
+  let h = '<div class="grp"><div class="grp-h">Saved views</div>';
+  for (const v of rv.saved){
+    const cur = v.id===view;
+    const badge = v.dis ? `<span class="cnt">${v.cnt.toLocaleString()}</span>`
+                        : `<span class="cnt ${v.cls||''}">${v.cnt}</span>`;
+    h += `<div class="v ${v.dis?'dis':''}" ${v.dis?'':`data-view="${v.id}"`} ${cur?'aria-current="true"':''}>`+
+         `<span class="ic">${v.ic}</span><span class="lab">${v.lab}</span>${badge}</div>`;
+  }
+  h += '</div>';
+  // By-server group: where each client is connected, scopable; bar = per-server
+  // delivery-load / backpressure meter; ○ marks a server a client disconnected from.
+  h += `<div class="grp"><div class="grp-h">By server · ${rv.servers.length}</div>`;
+  for (const srv of rv.servers){
+    const cur = view==='srv:'+srv.addr;
+    const gone = srv.lvl==='gone';
+    const w = Math.round(srv.load*100);
+    const ic = gone ? '○' : '·';
+    const barCls = srv.lvl==='bad' ? 'bad' : srv.lvl==='warn' ? 'warn' : '';
+    const cntCls = srv.lvl==='bad' ? 'crit' : srv.lvl==='warn' ? 'warn' : '';
+    h += `<div class="v" data-view="srv:${srv.addr}" ${cur?'aria-current="true"':''} title="${srv.clients} client${srv.clients===1?'':'s'} · delivery load ${w}%">`+
+         `<span class="ic">${ic}</span><span class="lab">${srv.addr}</span>`+
+         `<span class="part-bar"><i class="${barCls}" style="width:${gone?0:Math.max(w,4)}%"></i></span>`+
+         `<span class="cnt ${cntCls}">${srv.clients}</span></div>`;
+  }
+  h += '</div>';
+  $('rail').innerHTML = h;
+}
+
+/* ── parse the `is:` query line: `is:slow` etc set the bucket (Sentry-style),
+   bare text stays a client-id substring match. Returns the predicate filter
+   (or null) + the leftover free-text term. ── */
+function parseQuery(raw){
+  let filter = null, terms = [];
+  for (const tok of raw.toLowerCase().split(/\s+/).filter(Boolean)){
+    const m = tok.startsWith('is:') ? tok.slice(3) : (IS_FILTER[tok]!==undefined ? tok : null);
+    if (m && IS_FILTER[m]!==undefined) filter = IS_FILTER[m];
+    else terms.push(tok);
+  }
+  return {filter, text:terms.join(' ')};
+}
+
+/* ── compute filtered + sorted client set for the active view + query ──
+   Scoping is real: a srv: view keeps clients whose connected server matches
+   (mirrors inbox's part: scoping), not "all clients". ── */
+function computeFiltered(){
+  const s = SCEN[scen];
+  const {filter:qFilter, text} = parseQuery(query);
+  let arr = s.issues.slice();
+  if (view.startsWith('srv:')){ const a=view.slice(4); arr = arr.filter(i=>i.srv===a); }
+  else if (view!=='all') arr = arr.filter(i=>i.filter===view);
+  if (qFilter && qFilter!=='all') arr = arr.filter(i=>i.filter===qFilter);
+  if (text) arr = arr.filter(i=>i.id.toLowerCase().includes(text));
+  // worst-first, then largest sub-lag within a severity tier — connection/failover-first
+  arr.sort((a,b)=> (SEV_RANK[a.sev]-SEV_RANK[b.sev]) || ((b.lag||0)-(a.lag||0)));
+  return arr;
+}
+
+function renderList(){
+  filtered = computeFiltered();
+  const s = SCEN[scen];
+  const titles = {all:'All clients', slow:'Slow consumers', resub:'Re-subscribing', stale:'Stale view', gone:'Disconnected'};
+  const {filter:qFilter} = parseQuery(query);
+  // an `is:` predicate in the query line owns the title (Sentry-style); else the rail view does
+  let ttl = (qFilter && titles[qFilter]) || titles[view] || (view.startsWith('srv:')?'On '+view.slice(4):'Clients');
+  $('listTtl').textContent = ttl;
+  $('listCount').innerHTML = filtered.length
+    ? `<span style="color:var(--soft)">${filtered.length} open</span>`
+    : '';
+
+  if (!filtered.length){
+    // Two empty states:
+    //  - the roster genuinely has no client trouble → calm green ✓ (only when unfiltered)
+    //  - rows just don't match the current view/query in a still-troubled roster
+    //    → neutral, NO green health claim (it isn't healthy).
+    const r = s.roster;
+    const openCnt = r.slow+r.resub+r.stale+r.gone;
+    const unfiltered = (view==='all') && !qFilter && !query;
+    const calm = openCnt===0 && unfiltered;   // derived, not hardcoded
+    const footer = calm
+      ? `${r.connected}/${r.total} clients connected · 0 slow · 0 re-subscribing · 0 churn/min`
+      : `roster still has ${r.slow} slow · ${r.resub} re-subscribing · ${r.stale} stale · ${r.gone} disconnected`;
+    $('issues').innerHTML =
+      `<div class="empty ${calm?'':'filtered'}">`+
+        (calm ? `<div class="chk">✓</div>` : `<div class="chk none">∅</div>`)+
+      `<div class="e1">${calm?'No client trouble':'No matching clients'}</div>`+
+      `<div class="e2">${calm
+        ? `Every client is connected, on the current view, and caught up to its subscriptions. A healthy roster is a quiet inbox.`
+        : `Nothing open matches this view. Clear the filter to see the ${openCnt} open issue${openCnt===1?'':'s'} still pending.`}</div>`+
+      `<div class="e3">${footer}</div></div>`;
+    selIdx = -1; closeDetail(); return;
+  }
+
+  $('issues').innerHTML = filtered.map((i,ix)=>{
+    const metaCols = i.meta.map(m=>
+      `<div class="col"><span class="mv ${m.cls||''}">${m.v}</span><span class="ml">${m.l}</span></div>`).join('');
+    return `<div class="iss" data-sev="${i.sev}" data-ix="${ix}" ${ix===selIdx?'aria-selected="true"':''} tabindex="0">`+
+      `<span class="sev"></span>`+
+      `<span class="gut"><span class="sd"></span></span>`+
+      `<div class="main"><div class="l1"><span class="key">${i.id}</span>`+
+        `<span class="role">· ${i.role}</span><span class="tag">${i.tag}</span></div>`+
+      `<div class="l2">${i.l2}</div></div>`+
+      `<div class="meta">${metaCols}</div></div>`;
+  }).join('');
+
+  if (selIdx>=0 && selIdx<filtered.length) renderDetail(filtered[selIdx]);
+}
+
+/* ── right connection-first decode pane ──
+   Opens with the conclusion (client id · role · triage title), then a
+   Connection & state .kv, the per-subscriber __observe cursor table, then
+   EITHER an epoch-pinned re-subscribe timeline OR a delivery-vs-write spark
+   (whichever the issue carries), then why-it's-open + the drill action. ── */
+function renderDetail(i){
+  const grid = $('bodyGrid'); grid.classList.remove('no-detail');
+  const d = i.detail;
+
+  // Connection & state — answer-first facts; the connected server links to node.html
+  const kv = d.kv.map(([k,v,c,href])=>{
+    const val = href ? `<a href="${href}">${v}</a>` : v;
+    return `<dt>${k}</dt><dd class="${c||''}">${val}</dd>`;
+  }).join('');
+
+  // per-subscriber cursor table (reused .vt): subscription→owner · head · delivered · lag+badge
+  const BDG = {behind:'BEHIND', syncing:'SYNCING', cur:'CURRENT'};
+  const subRows = d.subs.map(v=>{
+    const sub = v.href ? `<a href="${v.href}">${v.sub}</a>` : v.sub;
+    return `<tr><td class="sub">${sub} <span class="own">→ ${v.own}</span></td>`+
+      `<td class="num">${v.head}</td><td class="num">${v.deliv}</td>`+
+      `<td class="num lag"><span class="${v.cls}">${v.lag}</span>`+
+      `<span class="bdg ${v.bdg}">${BDG[v.bdg]}</span></td></tr>`;
+  }).join('');
+  const subsSeg =
+    `<div class="seg"><div class="st">${d.subsTitle}${d.subsNew?'<span class="newc">NEW</span>':''}</div>`+
+    `<table class="vt"><thead><tr><th>subscription → owner</th><th class="num">head</th>`+
+    `<th class="num">delivered</th><th class="num">lag</th></tr></thead><tbody>${subRows}</tbody></table></div>`;
+
+  // EITHER a re-subscribe timeline OR a delivery-vs-write spark
+  let evidence = '';
+  if (d.timeline){
+    const items = d.timeline.map(t=>`<li class="${t.cls}"><span class="ep">${t.ep}</span>${t.txt}</li>`).join('');
+    evidence = `<div class="seg"><div class="st">Re-subscribe history<span class="newc">NEW</span></div><ul class="tl">${items}</ul></div>`;
+  } else if (d.spark){
+    const mx = Math.max(...d.spark.bars, 1);
+    let bars = '';
+    d.spark.bars.forEach((v,ix)=>{
+      if (ix===d.spark.head) bars += `<span class="head"></span>`;
+      const hgt = Math.max(3, Math.round(v/mx*30));
+      bars += `<i class="bad" style="height:${hgt}px"></i>`;
+    });
+    evidence = `<div class="seg"><div class="st">Delivery vs write rate<span class="newc">NEW</span></div>`+
+      `<div class="spkwrap"><div class="spkcap"><span>${d.spark.cap}</span><span class="bad">${d.spark.headLbl}</span></div>`+
+      `<div class="spark">${bars}</div></div></div>`;
+  }
+
+  $('detail').innerHTML =
+    `<div class="dh" data-sev="${i.sev}"><div class="dk"><span class="sd"></span>${i.id}`+
+      `<span class="drole">· ${i.role}</span></div>`+
+      `<div class="dsub">${d.headerSub}</div></div>`+
+    `<div class="seg"><div class="st">Connection &amp; state<span class="newc">NEW</span></div><dl class="kv">${kv}</dl></div>`+
+    subsSeg+
+    evidence+
+    `<div class="seg"><div class="st">Why it is open</div><div class="reason">${d.reason}</div>`+
+      `<div class="next"><span class="arr">→</span><span>${d.next}</span></div></div>`+
+    `<div class="actions">`+
+      `<a class="btn prim" href="${d.act.href}">${d.act.label} <span class="kc">↵</span></a>`+
+      `<button class="btn" id="dismiss">snooze</button>`+
+    `</div>`;
+  $('detail').classList.remove('hide');
+  const dm = $('dismiss'); if (dm) dm.onclick = ()=>{ closeDetail(); selIdx=-1; renderList(); };
+}
+function closeDetail(){ $('detail').classList.add('hide'); $('bodyGrid').classList.add('no-detail'); }
+
+/* ── status-line right side: roster rollup (connected / keeping-up / deliver) ── */
+function renderStatus(){
+  const s = SCEN[scen]; const r = s.roster;
+  if (s.level!=='crit'){
+    $('statusRight').innerHTML =
+      `${r.connected}/${r.total} connected  ·  <span style="color:var(--ok)">all caught up</span>  ·  deliver ${r.deliver}/s`;
+  } else {
+    const parts = [];
+    if (r.slow)  parts.push(`<span style="color:var(--crit)">${r.slow} slow</span>`);
+    if (r.resub) parts.push(`<span style="color:var(--warn)">${r.resub} re-subscribing</span>`);
+    if (r.gone)  parts.push(`<span style="color:var(--info)">${r.gone} gone</span>`);
+    $('statusRight').innerHTML =
+      `${r.connected}/${r.total} connected  ·  ${parts.join('  ·  ')}  ·  deliver ${r.deliver}/s`;
+  }
+}
+
+/* ── header health pill ── */
+function renderHealth(){
+  const s = SCEN[scen];
+  const el = $('health'); el.className = 'health '+s.level;
+  $('healthTxt').textContent = s.healthTxt;
+}
+
+/* ── full render ── */
+function render(){
+  document.querySelectorAll('#scen button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===scen));
+  renderHealth(); renderRail(); renderList(); renderStatus();
+  try{ history.replaceState(null,'','#'+scen); }catch{}
+}
+
+/* ── interactions ─────────────────────────────────────────────────────── */
+// left-rail view selection (saved view OR srv: scope)
+$('rail').addEventListener('click', e=>{
+  const v = e.target.closest('[data-view]'); if(!v) return;
+  view = v.dataset.view; selIdx = -1; query=''; $('q').value=''; render();
+});
+// client row select → reveal detail; second activation handled by Enter / button
+$('issues').addEventListener('click', e=>{
+  const row = e.target.closest('.iss'); if(!row) return;
+  selIdx = +row.dataset.ix; renderList();
+});
+// scenario toggle
+const scenWrap = $('scen');
+for (const id of SCEN_ORDER){
+  const b = document.createElement('button'); b.dataset.id=id;
+  b.textContent = id==='healthy' ? 'Healthy' : 'Needs attention';
+  b.onclick = ()=>{ scen=id; view='all'; selIdx=-1; query=''; $('q').value=''; render(); };
+  scenWrap.appendChild(b);
+}
+// search / filter
+$('q').addEventListener('input', e=>{ query=e.target.value.trim(); selIdx=-1; renderList(); });
+// data-sources popover
+$('srcBtn').onclick = ()=>$('src').classList.toggle('show');
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#src') && !e.target.closest('#srcBtn')) $('src').classList.remove('show');
+});
+
+// keyboard: j/k navigate, Enter open drill, s/r jump-filter, 1/2 scenario, / focus search
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT'){
+    if (e.key==='Escape'){ e.target.blur(); }
+    return;
+  }
+  const k = e.key;
+  if (k==='j' || k==='ArrowDown'){ e.preventDefault(); if(filtered.length){ selIdx=Math.min(filtered.length-1, selIdx+1); renderList(); scrollSel(); } }
+  else if (k==='k' || k==='ArrowUp'){ e.preventDefault(); if(filtered.length){ selIdx=Math.max(0, selIdx-1); renderList(); scrollSel(); } }
+  else if (k==='Enter'){ if(selIdx>=0 && filtered[selIdx]) location.href = filtered[selIdx].detail.act.href; }
+  else if (k==='s'){ view='slow';  selIdx=-1; query=''; $('q').value=''; render(); }
+  else if (k==='r'){ view='resub'; selIdx=-1; query=''; $('q').value=''; render(); }
+  else if (k==='a'){ view='all';   selIdx=-1; query=''; $('q').value=''; render(); }
+  else if (k==='1'){ scen='healthy';   view='all'; selIdx=-1; query=''; $('q').value=''; render(); }
+  else if (k==='2'){ scen='attention'; view='all'; selIdx=-1; query=''; $('q').value=''; render(); }
+  else if (k==='/'){ e.preventDefault(); $('q').focus(); }
+  else if (k==='Escape'){ closeDetail(); selIdx=-1; renderList(); }
+});
+function scrollSel(){ const el=document.querySelector('.iss[aria-selected=true]'); if(el) el.scrollIntoView({block:'nearest'}); }
+
+// boot — honour deep-link hash, default healthy
+const fromHash = location.hash.slice(1);
+if (SCEN[fromHash]) scen = fromHash;
+render();
+</script>
+</body>
+</html>
