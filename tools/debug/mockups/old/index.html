@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fero · debugging page — design directions</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #11151f;
+    --line: #1e2433;
+    --fg: #d6dbe6;
+    --dim: #7d8699;
+    --accent: #5cc8ff;
+    --ok: #3fd68f;
+    --warn: #ffc24b;
+    --crit: #ff5d6c;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 1rem/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    padding: 1.6rem 2rem 1.2rem;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { margin: 0 0 .25rem; font-size: 1.3rem; font-weight: 650; }
+  header h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--dim); max-width: 70ch; }
+  main {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(560px, 1fr));
+    gap: 1.2rem;
+    padding: 1.4rem 2rem 2.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .card .head {
+    display: flex;
+    align-items: baseline;
+    gap: .7rem;
+    padding: .8rem 1rem .15rem;
+  }
+  .card .head .tag {
+    font: .72rem/1 ui-monospace, "Cascadia Mono", Menlo, monospace;
+    color: var(--bg);
+    background: var(--accent);
+    border-radius: 4px;
+    padding: .2rem .45rem;
+    font-weight: 700;
+  }
+  .card h2 { margin: 0; font-size: 1.05rem; font-weight: 650; }
+  .card h2 a { color: var(--fg); text-decoration: none; }
+  .card h2 a:hover { color: var(--accent); }
+  .card .purpose {
+    margin: .15rem 0 .7rem;
+    padding: 0 1rem;
+    color: var(--dim);
+    font-size: .86rem;
+  }
+  .card iframe {
+    width: 100%;
+    height: 420px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+    /* scale the page down so the mockup reads as a thumbnail */
+    transform: scale(.55);
+    transform-origin: 0 0;
+    width: 181.8%;
+    height: 763px;
+    pointer-events: none;
+  }
+  .card .frame { height: 420px; overflow: hidden; position: relative; }
+  .card .frame a.cover {
+    position: absolute; inset: 0; z-index: 2;
+    display: block;
+  }
+  .card .frame a.cover:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
+  footer { padding: 0 2rem 2rem; color: var(--dim); font-size: .82rem; }
+  footer code { font-family: ui-monospace, Menlo, monospace; color: var(--fg); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>fero</span> · debugging page — four design directions</h1>
+  <p>Mockups only — static fake data, no backend. Each direction answers a different forensic question
+     the monitoring dashboard deliberately doesn't. Click a card to open it full-page.</p>
+</header>
+<main>
+  <div class="card">
+    <div class="head"><span class="tag">A</span><h2><a href="key-autopsy.html">Key Autopsy</a></h2></div>
+    <p class="purpose">Why does this key hold this value? Every write attempt, who won/lost and why
+       (epoch-fence vs seq-contention), and whether any node diverges.</p>
+    <div class="frame"><a class="cover" href="key-autopsy.html" aria-label="open Key Autopsy"></a>
+      <iframe src="key-autopsy.html" loading="lazy" title="Key Autopsy preview"></iframe></div>
+  </div>
+  <div class="card">
+    <div class="head"><span class="tag">B</span><h2><a href="write-traces.html">Write Traces</a></h2></div>
+    <p class="purpose">Follow one write end-to-end — client, forward, owner commit, replica fan-out, acks —
+       and see exactly where it stalled, was fenced, or died.</p>
+    <div class="frame"><a class="cover" href="write-traces.html" aria-label="open Write Traces"></a>
+      <iframe src="write-traces.html" loading="lazy" title="Write Traces preview"></iframe></div>
+  </div>
+  <div class="card">
+    <div class="head"><span class="tag">C</span><h2><a href="cluster-replay.html">Cluster Replay</a></h2></div>
+    <p class="purpose">Rewind the cluster to the moment something diverged and step through what each node
+       believed (views, gates, lag) as the incident unfolded.</p>
+    <div class="frame"><a class="cover" href="cluster-replay.html" aria-label="open Cluster Replay"></a>
+      <iframe src="cluster-replay.html" loading="lazy" title="Cluster Replay preview"></iframe></div>
+  </div>
+  <div class="card">
+    <div class="head"><span class="tag">D</span><h2><a href="node-doctor.html">Node Doctor</a></h2></div>
+    <p class="purpose">"What is wrong with THIS node" in one glance — an opinionated pass/warn/fail diagnosis
+       with the evidence inline, not raw state to interpret.</p>
+    <div class="frame"><a class="cover" href="node-doctor.html" aria-label="open Node Doctor"></a>
+      <iframe src="node-doctor.html" loading="lazy" title="Node Doctor preview"></iframe></div>
+  </div>
+</main>
+<footer>
+  Each mockup carries a <code>Data sources</code> footnote mapping every panel to its real source
+  (<code>InspectSnapshot</code> field · <code>__observe</code> stream · log accessor · bridge-derived) —
+  or an explicit <code>⚠ NEW instrumentation</code> flag where the data doesn't exist yet.
+</footer>
+</body>
+</html>
