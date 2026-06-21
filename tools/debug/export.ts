@@ -25,13 +25,16 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import type { InspectSnapshot, InspectSub } from '../../resource/inspect.ts'
+import type { ProvRecord } from '../../resource/observe.ts'
 import { diagnostics, type Fero } from '../../resource/index.ts'
 import { DHT } from '../../transport/dht.ts'
 
 //! DebugFile: the store-once snapshot shape (the subset P1/P2 can fill); shape.js#normalize consumes it.
 export type DebugReplica = { addr: string; lag?: number; stuckAt?: string; stale?: boolean; missing?: boolean; note?: string }
 export type DebugNode = { addr: string; keys?: number; status?: string; note?: string }
-export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string; replicas?: DebugReplica[]; ownerByEpoch?: Record<string, string>; bornAt?: string }
+//! DebugOutcome: one REJECTED write — a fence (stale-view reject) or a same-epoch conflict-loser; never a committed record.
+export type DebugOutcome = { key: string; origin?: string; seq?: number; epoch?: number; out: 'fence' | 'conflict'; winner?: string }
+export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string; replicas?: DebugReplica[]; ownerByEpoch?: Record<string, string>; bornAt?: string; outcomes?: DebugOutcome[] }
 export type DebugEpoch = { id: string; members: number; current?: boolean }
 //! DebugSub / DebugClient: the subscription-topology rows the viewer renders (a downstream consumer + the subs it holds).
 // No head/delivered: the delta stream carries no provenance, so a seq-lag isn't honestly measurable — the
@@ -260,6 +263,40 @@ export function foldSubs(file: DebugFile, subsByNode: Map<string, InspectSub[]>)
     }
   }
   for (const [r, clients] of clientsOf) if (clients.size) r.clients = [...clients.values()]
+  return file
+}
+
+//! foldOutcomes: fold the observe `lost` push-stream into per-partition REJECTED-write rows (fence vs conflict).
+// The viewer's most telling rows — fences (a stale-view write rejected) and conflict-losers (a same-epoch LWW
+// loss) — are never committed records, so they're absent from the snapshot/log. But applyInbound ALREADY emits
+// them on the __observe stream as kind:'lost', carrying the WINNER's epoch (`we`) + seq (`ws`) — exactly the
+// "why". So no new instrumentation, no hot-path cost: we just classify (record epoch < winner epoch ⇒ FENCE /
+// stale view; equal ⇒ same-epoch CONFLICT), group by partition (the key's first dotted segment) within the
+// resource of the node that observed it (`by`), dedup the same logical write seen on several replicas
+// (origin,seq,key), and attach a bounded newest-first list. Pure over (file, events). Grid-mode only — blobs
+// mode keeps the windowed conflict/rebalance COUNTERS, not the raw events.
+export function foldOutcomes(file: DebugFile, events: (ProvRecord & { by: string })[], cap = 8): DebugFile {
+  const resOf = new Map<string, DebugResource>()
+  for (const r of file.resources) for (const n of r.nodes) resOf.set(n.addr, r)
+  const partOf = new Map<DebugResource, Map<string, DebugPartition>>()
+  for (const r of file.resources) partOf.set(r, new Map(r.partitions.map((p) => [p.name, p])))
+  const seen = new Set<string>() // (origin,seq,key) — the same rejected write loses on every replica that holds it
+  for (let i = events.length - 1; i >= 0; i--) {
+    // newest-first
+    const e = events[i]
+    if (e.kind !== 'lost' || !e.key) continue
+    const r = resOf.get(e.by)
+    if (!r) continue
+    const p = partOf.get(r)!.get(e.key.split('.')[0]) // partition = the top-level key (first dotted segment)
+    if (!p) continue
+    const sig = (e.origin ?? '') + '|' + (e.seq ?? 0) + '|' + e.key
+    if (seen.has(sig)) continue
+    seen.add(sig)
+    const list = (p.outcomes ??= [])
+    if (list.length >= cap) continue
+    const fenced = e.we !== undefined && e.epoch !== undefined && e.epoch < e.we // stale view: lost to a NEWER-epoch winner
+    list.push({ key: e.key, origin: e.origin, seq: e.seq, epoch: e.epoch, out: fenced ? 'fence' : 'conflict', winner: e.we !== undefined ? 'e' + e.we + '·s' + (e.ws ?? 0) : undefined })
+  }
   return file
 }
 
