@@ -478,6 +478,43 @@ a `debug` SSE event + `/debug/` serving so the viewer goes LIVE through the SAME
   `cluster.writes` isn't in the poll payload yet. (resource; tools/observe)
 - **[P3] `networkSource`-backed CLI** over the gated `__inspect` for remote (non-embedded) capture — the
   embedded `captureInProcess` + the live bridge cover in-process today. (tools/debug; tools/observe)
+- **Owner-timeline must anchor at BIRTH, not the earliest retained view.** `foldOwnership` back-projects the
+  CURRENT partition set onto every past view's ring and counts `owner(e)≠owner(e-1)` as a MOVE — so a partition
+  created at e registers as a move from its COUNTERFACTUAL pre-birth slot (and every earlier ring-change
+  phantom-moves it too). A "move" should mean an actual handoff (data existed at e-1), distinct from a
+  PLACEMENT (born at e). Fix: gate each partition's `ownerByEpoch` at its first-seen epoch; split the epoch
+  badge into "M moved · K placed". Needs the per-partition birth epoch — NOT in the live snapshot (`log.heads`
+  is the HEAD seq; compaction can raise the floor), so it comes from the WAL (next item) or a tracked
+  first-insert epoch on the inspect seam. Until then the badge over-reads on a churny/forming cluster.
+  (tools/debug: export, shape.js; resource: inspect)
+- **Debug history over the WAL — one append-only journal, three record kinds.** The durable WAL
+  ([resource/storage.ts](resource/storage.ts) `fileStorage`) already keeps EVERY accepted change record
+  uncompacted on disk (DECISIONS C; the in-memory log compacts, the WAL doesn't), so it's the accurate-history
+  substrate the reconstruction lacks. `foldWal` ([tools/debug/wal.ts](tools/debug/wal.ts), LANDED: per-partition
+  births + ordered log over `fileStorage.load()`) is slice 1 and feeds the birth-anchoring above. To make the
+  viewer a PURE projection over the journal, two more record kinds get appended at their natural moments (data
+  records stay byte-identical → hot path untouched; both new kinds are RARE):
+  - **`view`** — on each committed view (membership.ts `#install`): `{k:'view',epoch,members,ring:{vnodes,hash,replicas},admitted,evicted}`.
+    The RING CONFIG makes owner-replay EXACT and retires foldOwnership's "config mismatch → skip" guard.
+  - **`outcome`** — at the dispatch/fold DECISION point for REJECTED writes (fences, conflict-losers): they
+    never become committed records, so they're absent from log+WAL today, yet they're the viewer's most
+    interesting rows (`out:'fence'|'conflict'`), currently only hand-authored in the sample. Gate behind a
+    debug flag (the steady path needn't pay it).
+  **Source — DECOUPLED from `storage`.** Debug history must NOT depend on the user's durability `storage`:
+  it's OPTIONAL and DATA-records-only (`{load,append}` typed `ChangeRecord` — [index.ts](resource/index.ts)),
+  a custom adapter may compact away births (the contract only promises enough to rebuild current state), and
+  the `view`/`outcome` kinds aren't ChangeRecords so `storage.append`-ing them would pollute a user's durable
+  log AND replay into `applyInbound` on restart (state corruption). So the journal is its OWN opt-in sink
+  (`fero(name,{debug})`, a bounded rolling window, fed off `log.onAppend` + the membership/decision hooks).
+  `foldWal` is already source-agnostic (folds any `ChangeRecord[]`), so a history-preserving storage
+  (fileStorage, or an adapter advertising a `historic` capability) is an OPPORTUNISTIC source for the DATA
+  half only; with neither, the viewer degrades to today's live reconstruction.
+  **Open question — retention.** "Uncompacted" ≠ forever (the WAL already grows unbounded — the deferred
+  WAL-compaction item above). The debug sink wants a ROLLING WINDOW (last K `view` records + their data
+  span), not full retention. **Fork:** if placement ever stops being a pure fn of (view,ring) — load-aware
+  rebalancing, sticky/pinned ownership, hinted handoff — ownership becomes a RECORDED fact (its own record
+  kind), not a derivation; today it's pure consistent hashing, so derive it. (tools/debug: wal, export,
+  shape.js; resource: storage, membership, dispatch, fold)
 - **Note — seq-based per-sub LAG is NOT feasible** (resolved, not deferred): grounding the wire path showed
   subscription deltas are synthetic proxy records carrying NO provenance (`sendDelta` writes no origin/seq
   ext), so "lag = head−delivered" can't be measured without fabrication. P3 shipped the honest signal —

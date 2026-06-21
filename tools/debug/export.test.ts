@@ -12,6 +12,7 @@ import type { InspectSnapshot, InspectSub } from '../../resource/inspect.ts'
 import { fero } from '../../resource/index.ts'
 import { ports, until } from '#utils'
 import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, foldLive, captureInProcess, type VersionSample } from './export.ts'
+import { foldWal, birthEpochs } from './wal.ts'
 import { DHT } from '../../transport/dht.ts'
 // @ts-ignore — shape.js is the untyped browser/Node shared seam
 import { normalize } from './mockups/shape.js'
@@ -165,6 +166,40 @@ test('foldOwnership re-derives ownerByEpoch from the view history', () => {
   assert.deepEqual(r.partitions.find((p: any) => p.name === 'user42').ownerByEpoch, { e1: 'A', e2: 'B', e3: 'C' })
   assert.deepEqual(r.partitions.find((p: any) => p.name === 'order7').ownerByEpoch, { e1: 'A', e2: 'A', e3: 'A' })
   assert.deepEqual(r.epochs, [{ id: 'e1', members: 1, current: false }, { id: 'e2', members: 2, current: false }, { id: 'e3', members: 3, current: true }])
+})
+
+//! BIRTH-GATING (slice 1b): WAL-derived births anchor the owner-timeline at first-write — no
+//! fabricated pre-birth owner, and the birth is stamped bornAt (a placement, not a move)
+test('foldOwnership birth-gates the owner-timeline and stamps bornAt', () => {
+  const file: any = {
+    'fero.debug': 1, _about: '', view: 'e3',
+    resources: [{ name: 'r', members: ['A', 'B', 'C'], R: 3, nodes: [], partitions: [{ name: 'user42', owner: 'C' }, { name: 'order7', owner: 'A' }] }],
+  }
+  const views = new Map([[1, ['A']], [2, ['A', 'B']], [3, ['A', 'B', 'C']]])
+  const buildRing = (m: string[]) => (k: string) => (k === 'user42' ? m[m.length - 1] : m[0])
+  foldOwnership(file, views, buildRing, { user42: 2, order7: 1 }) // user42 first written at e2
+  const u42 = file.resources[0].partitions.find((p: any) => p.name === 'user42')
+  assert.deepEqual(u42.ownerByEpoch, { e2: 'B', e3: 'C' }) // e1 gated out — user42 didn't exist then (no fabricated A→B move)
+  assert.equal(u42.bornAt, 'e2')
+  const o7 = file.resources[0].partitions.find((p: any) => p.name === 'order7')
+  assert.deepEqual(o7.ownerByEpoch, { e1: 'A', e2: 'A', e3: 'A' }) // born e1 → full timeline retained
+  assert.equal(o7.bornAt, 'e1')
+})
+
+//! the WAL → births → owner-timeline path end-to-end: foldWal supplies the first-seen epochs foldOwnership gates on
+test('foldWal births feed foldOwnership (the decoupled source path)', () => {
+  const wal = [
+    { type: 'update', key: ['user42', 'score'], origin: 'B', seq: 5, epoch: 2 },
+    { type: 'update', key: ['order7'], origin: 'A', seq: 1, epoch: 1 },
+    { type: 'update', key: ['user42', 'score'], origin: 'C', seq: 9, epoch: 3 },
+  ] as any
+  const births = birthEpochs(foldWal(wal))
+  assert.deepEqual(births, { user42: 2, order7: 1 })
+  const file: any = { 'fero.debug': 1, _about: '', view: 'e3', resources: [{ name: 'r', members: ['A', 'B', 'C'], R: 3, nodes: [], partitions: [{ name: 'user42', owner: 'C' }, { name: 'order7', owner: 'A' }] }] }
+  foldOwnership(file, new Map([[1, ['A']], [2, ['A', 'B']], [3, ['A', 'B', 'C']]]), (m) => (k) => (k === 'user42' ? m[m.length - 1] : m[0]), births)
+  const u42 = file.resources[0].partitions.find((p: any) => p.name === 'user42')
+  assert.equal(u42.bornAt, 'e2')
+  assert.equal(u42.ownerByEpoch.e1, undefined) // no pre-birth owner fabricated from the e1 ring
 })
 
 //! the config guard: if the rebuilt ring disagrees with the authoritative owner, emit nothing
