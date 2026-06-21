@@ -494,12 +494,16 @@ a `debug` SSE event + `/debug/` serving so the viewer goes LIVE through the SAME
   births + ordered log over `fileStorage.load()`) is slice 1 and feeds the birth-anchoring above. To make the
   viewer a PURE projection over the journal, two more record kinds get appended at their natural moments (data
   records stay byte-identical → hot path untouched; both new kinds are RARE):
-  - **`view`** — on each committed view (membership.ts `#install`): `{k:'view',epoch,members,ring:{vnodes,hash,replicas},admitted,evicted}`.
-    The RING CONFIG makes owner-replay EXACT and retires foldOwnership's "config mismatch → skip" guard.
-  - **`outcome`** — at the dispatch/fold DECISION point for REJECTED writes (fences, conflict-losers): they
-    never become committed records, so they're absent from log+WAL today, yet they're the viewer's most
-    interesting rows (`out:'fence'|'conflict'`), currently only hand-authored in the sample. Gate behind a
-    debug flag (the steady path needn't pay it).
+  - **`view`** — DEPRIORITIZED (derivable today): `{k:'view',epoch,members,ring:{vnodes,hash,replicas},admitted,evicted}`
+    on each committed view. The ring config is CONSTANT today (vnodes/hash fixed, R per resource) so foldOwnership's
+    config-guard already passes, and `viewHistory` already carries `{epoch,members}`; the only non-derivable bit is
+    `admitted`/`evicted`, itself a diff of consecutive member sets. Revisit when the ring config can actually vary.
+  - **`outcome`** — REJECTED writes (fences, conflict-losers). LANDED differently than planned: applyInbound ALREADY
+    emits these on the `__observe` stream as `kind:'lost'` (carrying the winner `we`/`ws`), so no journal record kind
+    and NO hot-path change were needed — `foldOutcomes` ([export.ts](tools/debug/export.ts)) classifies fence (`epoch<we`)
+    vs conflict (`epoch==we`), groups per partition, dedups across replicas, and the bridge attaches them to the live
+    DebugFile (grid-mode; blobs keeps the provagg counters). Remaining: the viewer renders `partition.outcomes` (rides
+    the in-flight tree.html restyle, like the moved/placed badge).
   **Source — DECOUPLED from `storage`.** Debug history must NOT depend on the user's durability `storage`:
   it's OPTIONAL and DATA-records-only (`{load,append}` typed `ChangeRecord` — [index.ts](resource/index.ts)),
   a custom adapter may compact away births (the contract only promises enough to rebuild current state), and

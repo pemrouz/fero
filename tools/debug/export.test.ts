@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import type { InspectSnapshot, InspectSub } from '../../resource/inspect.ts'
 import { fero, diagnostics } from '../../resource/index.ts'
 import { ports, until } from '#utils'
-import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, foldLive, captureInProcess, birthsOf, type VersionSample } from './export.ts'
+import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, foldLive, foldOutcomes, captureInProcess, birthsOf, type VersionSample } from './export.ts'
 import { foldWal, birthEpochs } from './wal.ts'
 import { DHT } from '../../transport/dht.ts'
 // @ts-ignore — shape.js is the untyped browser/Node shared seam
@@ -283,6 +283,34 @@ test('foldSubs leaves clients undefined when nothing is subscribed', () => {
   const file = foldSnapshots(fixture(), LOOKUP)
   foldSubs(file, new Map())
   assert.equal(file.resources[0].clients, undefined)
+})
+
+//! foldOutcomes: classify the observe 'lost' stream into per-partition fence (stale view) vs conflict (same-epoch) rows
+test('foldOutcomes folds the observe lost-stream into per-partition fence/conflict rows', () => {
+  const file: any = {
+    'fero.debug': 1, _about: '', view: 'e4',
+    resources: [{ name: 'r', members: [':A'], R: 1, nodes: [{ addr: ':A' }, { addr: ':B' }], partitions: [{ name: 'user42', owner: ':A' }, { name: 'order7', owner: ':A' }] }],
+  }
+  const events: any = [
+    { by: ':A', kind: 'lost', key: 'user42.score', origin: 'X', seq: 5, epoch: 2, we: 4, ws: 9 }, // epoch 2 < winner 4 → FENCE (stale view)
+    { by: ':B', kind: 'lost', key: 'user42.score', origin: 'X', seq: 5, epoch: 2, we: 4, ws: 9 }, // SAME write seen on another replica → deduped
+    { by: ':A', kind: 'lost', key: 'order7.lines', origin: 'Y', seq: 9208, epoch: 4, we: 4, ws: 9210 }, // epoch == winner → CONFLICT
+    { by: ':A', kind: 'won', key: 'user42.name', origin: 'X', seq: 6, epoch: 4 }, // not 'lost' → ignored
+    { by: ':Z', kind: 'lost', key: 'user42.x', origin: 'Q', seq: 1, epoch: 1, we: 4, ws: 9 }, // unknown observing node → skipped
+  ]
+  foldOutcomes(file, events)
+  const p = (n: string) => file.resources[0].partitions.find((x: any) => x.name === n)
+  assert.equal(p('user42').outcomes.length, 1) // deduped to one despite two observers
+  assert.equal(p('user42').outcomes[0].out, 'fence')
+  assert.equal(p('user42').outcomes[0].winner, 'e4·s9')
+  assert.equal(p('order7').outcomes[0].out, 'conflict')
+})
+
+//! foldOutcomes attaches nothing when the stream carries no losers (a healthy cluster)
+test('foldOutcomes leaves partitions untouched when there are no lost events', () => {
+  const file: any = { 'fero.debug': 1, _about: '', view: 'e4', resources: [{ name: 'r', members: [':A'], R: 1, nodes: [{ addr: ':A' }], partitions: [{ name: 'user42', owner: ':A' }] }] }
+  foldOutcomes(file, [{ by: ':A', kind: 'won', key: 'user42.score', origin: 'X', seq: 5, epoch: 4 }] as any)
+  assert.equal(file.resources[0].partitions[0].outcomes, undefined)
 })
 
 //! foldLive folds the bridge's poll payload (no drill calls) into the same DebugFile — owner re-derived from the freshest view

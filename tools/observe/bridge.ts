@@ -28,7 +28,7 @@ import { diagnostics, type Fero } from '../../resource/index.ts'
 import type { InspectSnapshot } from '../../resource/inspect.ts'
 import type { ProvRecord } from '../../resource/observe.ts'
 import type { ChangeRecord } from '../../transport/message.ts'
-import { foldLive } from '../debug/export.ts'
+import { foldLive, foldOutcomes } from '../debug/export.ts'
 import type { DHT } from '../../transport/dht.ts'
 
 //! ProvEvent: a flattened provenance record the bridge relays, tagged with `by` (the address of the node that observed it).
@@ -516,7 +516,9 @@ export const bridge = (opts: {
       // with no extra drill calls; `debugRings` memoizes the per-view DHT rings ACROSS polls so the
       // steady state rebuilds nothing (a fresh build is O(members×vnodes) — see bridge.perf.ts).
       if (clients.size) {
-        sse('debug', foldLive([...latest.values()], undefined, debugRings))
+        const debugFile = foldLive([...latest.values()], undefined, debugRings)
+        foldOutcomes(debugFile, events) // attach recent rejected-write rows (fence/conflict) from the held 'lost' stream — grid-mode only (blobs keeps counters)
+        sse('debug', debugFile)
         // bound the cache: keep recent view-rings (working set ≤ the 16-deep history + current); evict
         // oldest-inserted past that so churn can't grow it unbounded (an evicted ring just rebuilds if seen again)
         while (debugRings.size > DEBUG_RING_CAP) debugRings.delete(debugRings.keys().next().value as string)

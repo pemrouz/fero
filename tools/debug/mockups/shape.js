@@ -69,7 +69,8 @@ export function normalize(snap){
       if(!log.length) log = [{e:4,s:1200,key:p.name+'.v',origin:p.owner,val:'…',out:'local',winner:true},
                              {e:4,s:1180,key:p.name+'.meta',origin:p.owner,val:'…',out:'won'}];
       return {id:p.name, owner:p.owner, R:Rp, held, keys:p.keys||0, wps:p.wps||0,
-        st:p.status||'healthy', note:p.note||'', log, reps, owners, ownerByEpoch:p.ownerByEpoch||null, bornAt:p.bornAt||null};
+        st:p.status||'healthy', note:p.note||'', log, reps, owners, ownerByEpoch:p.ownerByEpoch||null, bornAt:p.bornAt||null,
+        outcomes:p.outcomes||null};   // rejected-write rows (fence/conflict) folded from the observe 'lost' stream — null when none
     });
 
     // nodes — derive owns / max-lag / hosted replicas from the partitions
