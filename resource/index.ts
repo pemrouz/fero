@@ -565,6 +565,23 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   delete (config as any).storage // L2 config — not a transport option
   const viewOpts = (config.view as Record<string, unknown>) ?? {}
   delete (config as any).view // L2 view-change tuning — not a transport option
+
+  // DEBUG SINK (opt-in `fero(name,{debug})`, DECOUPLED from `storage`): track each partition's
+  // FIRST-seen epoch, set-once, off log.onAppend. Exact + compaction-proof — every accepted record
+  // (local, inbound, OR storage-replayed) passes through onAppend, so a partition's birth is captured
+  // as it happens and this map is never touched by log compaction. The L4 owner-timeline reads it
+  // (snapshot.births) to ANCHOR a partition's history at its birth (a PLACEMENT) rather than
+  // back-projecting a counterfactual owner (a phantom MOVE). OFF by default ⇒ no listener attached ⇒
+  // zero hot-path cost. Attached BEFORE storage replay so a restored partition's birth is captured too.
+  const debugOn = !!config.debug
+  delete (config as any).debug
+  const births = debugOn ? new Map<string, number>() : undefined
+  let birthsUnsub: (() => void) | undefined
+  if (births) birthsUnsub = log.onAppend((record) => {
+    const p = partitionOf(record)
+    if (!births.has(p)) births.set(p, record.epoch ?? 0)
+  })
+
   let storageUnsub: (() => void) | undefined
   if (storage) {
     for (const record of await storage.load()) applyInbound(record)
@@ -1361,6 +1378,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     servedCount: dispatch.servedCount,
     servedSubs: dispatch.servedSubs,
     observing: () => observe !== undefined,
+    births: births ? () => Object.fromEntries(births) : undefined,
     R,
     scoped,
   })
@@ -1375,6 +1393,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       void writeHost // retain the sink host until teardown
       destroyed = true // gate the write-capture sink: a late `r.data.x = y` must not commit, bump the clock, or fsync to the WAL
       storageUnsub?.() // detach the WAL append hook (a gated sink can't append, but other log writers — e.g. a stray applyInbound — must not persist either)
+      birthsUnsub?.() // detach the debug first-seen-epoch listener
       if (aeTimer) clearInterval(aeTimer)
       if (compactTimer) clearInterval(compactTimer)
       if (clientFlushTimer) clearInterval(clientFlushTimer)

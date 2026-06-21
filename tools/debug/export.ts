@@ -225,6 +225,16 @@ export function foldOwnership(
   return file
 }
 
+//! birthsOf: merge per-node snapshot.births into one partition → EARLIEST-epoch map — the live owner-timeline anchor.
+// A partition's birth is the lowest first-seen epoch any node reports for it (debug-on nodes carry
+// `births`; nodes without it contribute nothing). Empty when no node ran with `debug`, in which case
+// foldOwnership back-projects as before — the honest degrade, never a fabricated placement.
+export function birthsOf(snaps: InspectSnapshot[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const s of snaps) for (const [p, e] of Object.entries(s.births ?? {})) if (out[p] === undefined || e < out[p]) out[p] = e
+  return out
+}
+
 //! foldSubs: fold each node's served-subscription topology into per-resource client→sub rows.
 // Each snapshot carries `subs` (who this node serves, of what kind). We group (servingNode, sub) by the
 // downstream `to` address into a client row, within the server's resource (a node serves exactly one).
@@ -308,7 +318,7 @@ export function foldLive(snaps: InspectSnapshot[], capturedAt?: string, ringCach
     const d = dhtFor(members)
     return (k: string) => d.owner(k)
   }
-  foldOwnership(file, viewsByEpoch, buildRing)
+  foldOwnership(file, viewsByEpoch, buildRing, birthsOf(snaps)) // birth-anchor from debug-on nodes' snapshot.births (empty ⇒ back-project)
 
   // subscription topology — fold each server's served-sub sample (carried in the poll payload)
   const subsByNode = new Map<string, InspectSub[]>()
@@ -371,7 +381,7 @@ export function captureInProcess(nodes: Fero[], capturedAt = new Date().toISOStr
     for (const m of members) ring.add(m)
     return (k: string) => ring.owner(k)
   }
-  foldOwnership(file, viewsByEpoch, buildRing, births)
+  foldOwnership(file, viewsByEpoch, buildRing, { ...birthsOf(snaps), ...births }) // debug-on nodes self-report births; an explicit WAL-derived map overrides
 
   // round 4: subscription topology — fold each server's served-sub sample into client→sub rows
   // (captured at subscribe, so this read perturbs nothing the live path)

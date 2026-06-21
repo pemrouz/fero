@@ -87,6 +87,10 @@ export type InspectSnapshot = {
   // folds these into client→sub rows. Captured at subscribe (cold), so it costs the per-delta path nothing.
   subs?: InspectSub[]
   observing: boolean // is the __observe push gate armed (≥1 live subscriber)? A bridge holding a sub against observing:false knows its push leg died (e.g. a socket bounce reaped it server-side) and re-subscribes
+  // births: per-partition FIRST-seen epoch ({ partition → epoch }), present only on a node opened with
+  // fero(name,{debug}). The owner-timeline anchor — foldOwnership gates each partition's history at its
+  // birth so a placement isn't miscounted as a move. Exact + compaction-proof (set-once off log.onAppend).
+  births?: Record<string, number>
   peers: Record<string, InspectPeer> // this node's own peer table
 }
 
@@ -105,6 +109,7 @@ export type SnapshotDeps = {
   servedCount: () => number // dispatch.servedCount
   servedSubs?: () => InspectSub[] // dispatch.servedSubs — the bounded subscription-topology sample (absent on a client, which serves nothing)
   observing: () => boolean // is the push gate armed? (() => observe !== undefined)
+  births?: () => Record<string, number> // debug-only: per-partition first-seen epoch (absent unless fero(name,{debug}))
   R: number // replication factor (Infinity ⇒ full replication)
   scoped: boolean
 }
@@ -118,7 +123,7 @@ export type SnapshotDeps = {
 // O(origins + partitions + peers) and happen ONCE PER POLL, never per write — so
 // they sit firmly off the replication hot path.
 export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }) => InspectSnapshot) => {
-  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, servedSubs, observing, R, scoped } = deps
+  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, servedSubs, observing, births, R, scoped } = deps
   return (opts) => {
     //! Copy out the node's own peer rows as plain scalars (decoupled from data's backing object; truthful point-in-time).
     const raw = peers() ?? {}
@@ -173,6 +178,9 @@ export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }
     //! subs: the bounded subscription-topology sample, when this node serves ≥1 sub — absent otherwise (keeps the steady poll lean).
     const ss = servedSubs?.()
     if (ss && ss.length) out.subs = ss
+    //! births: per-partition first-seen epoch, when this node is opened with fero(name,{debug}) — the owner-timeline anchor.
+    const bo = births?.()
+    if (bo && Object.keys(bo).length) out.births = bo
     return out
   }
 }

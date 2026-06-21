@@ -9,9 +9,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { InspectSnapshot, InspectSub } from '../../resource/inspect.ts'
-import { fero } from '../../resource/index.ts'
+import { fero, diagnostics } from '../../resource/index.ts'
 import { ports, until } from '#utils'
-import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, foldLive, captureInProcess, type VersionSample } from './export.ts'
+import { foldSnapshots, foldDivergence, foldOwnership, foldSubs, foldLive, captureInProcess, birthsOf, type VersionSample } from './export.ts'
 import { foldWal, birthEpochs } from './wal.ts'
 import { DHT } from '../../transport/dht.ts'
 // @ts-ignore — shape.js is the untyped browser/Node shared seam
@@ -200,6 +200,39 @@ test('foldWal births feed foldOwnership (the decoupled source path)', () => {
   const u42 = file.resources[0].partitions.find((p: any) => p.name === 'user42')
   assert.equal(u42.bornAt, 'e2')
   assert.equal(u42.ownerByEpoch.e1, undefined) // no pre-birth owner fabricated from the e1 ring
+})
+
+//! birthsOf merges per-node snapshot.births to the EARLIEST epoch (the live source slice 2 wires in)
+test('birthsOf merges per-node snapshot births to the earliest epoch', () => {
+  const snaps = [
+    { births: { user42: 4, order7: 2 } },
+    { births: { user42: 3, billing: 5 } }, // user42 first seen earlier (e3) on this node — the min wins
+    {}, // a non-debug node contributes no births
+  ] as any
+  assert.deepEqual(birthsOf(snaps), { user42: 3, order7: 2, billing: 5 })
+})
+
+//! the debug sink: a fero(name,{debug}) node self-reports per-partition births on its snapshot; a plain node does not
+test('a debug node exposes snapshot.births (set-once); a non-debug node omits it', async () => {
+  const port = await ports.free()
+  const dbg: any = await fero('births-dbg', { host: '127.0.0.1', port, ports: [port], wait: 100, debug: true })
+  try {
+    dbg.data.alpha = { v: 1 }
+    dbg.data.beta = { v: 2 }
+    dbg.data.alpha = { v: 3 } // a rewrite must NOT move alpha's first-seen epoch (set-once)
+    assert.ok(await until(() => { const b = dbg[diagnostics].snapshot().births; return b && 'alpha' in b && 'beta' in b }, 4000), 'births populated')
+    const b = dbg[diagnostics].snapshot().births
+    assert.equal(typeof b.alpha, 'number')
+    assert.equal(typeof b.beta, 'number')
+  } finally { dbg.destroy() }
+
+  const port2 = await ports.free()
+  const plain: any = await fero('births-off', { host: '127.0.0.1', port: port2, ports: [port2], wait: 100 })
+  try {
+    plain.data.alpha = { v: 1 }
+    assert.ok(await until(() => plain[diagnostics].snapshot().log.partitions >= 1, 4000), 'partition appended')
+    assert.equal(plain[diagnostics].snapshot().births, undefined, 'no births without debug')
+  } finally { plain.destroy() }
 })
 
 //! the config guard: if the rebuilt ring disagrees with the authoritative owner, emit nothing

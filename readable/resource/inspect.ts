@@ -46,6 +46,7 @@ export type InspectSnapshot = {
   subscriptions: number
   subs?: InspectSub[]
   observing: boolean
+  births?: Record<string, number>
   peers: Record<string, InspectPeer>
 }
 
@@ -64,13 +65,14 @@ export type SnapshotDeps = {
   servedCount: () => number
   servedSubs?: () => InspectSub[]
   observing: () => boolean
+  births?: () => Record<string, number>
   R: number
   scoped: boolean
 }
 
 // makeSnapshot: build the pure-read closure once (construction-time, zero hot-path cost); each call is a fresh point-in-time read.
 export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }) => InspectSnapshot) => {
-  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, servedSubs, observing, R, scoped } = deps
+  const { name, cluster, viewHistory, ringSnapshot, peers, log, seen, versions, pending, orphans, servedCount, servedSubs, observing, births, R, scoped } = deps
   return (opts) => {
     // Copy out the node's own peer rows as plain scalars (decoupled from data's backing object; truthful point-in-time).
     const raw = peers() ?? {}
@@ -123,6 +125,9 @@ export const makeSnapshot = (deps: SnapshotDeps): ((opts?: { sample?: string[] }
     // subs: the bounded subscription-topology sample, when this node serves ≥1 sub — absent otherwise (keeps the steady poll lean).
     const ss = servedSubs?.()
     if (ss && ss.length) out.subs = ss
+    // births: per-partition first-seen epoch, when this node is opened with fero(name,{debug}) — the owner-timeline anchor.
+    const bo = births?.()
+    if (bo && Object.keys(bo).length) out.births = bo
     return out
   }
 }
