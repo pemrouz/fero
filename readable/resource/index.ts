@@ -345,6 +345,16 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   delete (config as any).storage
   const viewOpts = (config.view as Record<string, unknown>) ?? {}
   delete (config as any).view
+
+  const debugOn = !!config.debug
+  delete (config as any).debug
+  const births = debugOn ? new Map<string, number>() : undefined
+  let birthsUnsub: (() => void) | undefined
+  if (births) birthsUnsub = log.onAppend((record) => {
+    const p = partitionOf(record)
+    if (!births.has(p)) births.set(p, record.epoch ?? 0)
+  })
+
   let storageUnsub: (() => void) | undefined
   if (storage) {
     for (const record of await storage.load()) applyInbound(record)
@@ -812,6 +822,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     servedCount: dispatch.servedCount,
     servedSubs: dispatch.servedSubs,
     observing: () => observe !== undefined,
+    births: births ? () => Object.fromEntries(births) : undefined,
     R,
     scoped,
   })
@@ -826,6 +837,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       void writeHost
       destroyed = true
       storageUnsub?.()
+      birthsUnsub?.()
       if (aeTimer) clearInterval(aeTimer)
       if (compactTimer) clearInterval(compactTimer)
       if (clientFlushTimer) clearInterval(clientFlushTimer)
