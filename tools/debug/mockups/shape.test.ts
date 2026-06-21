@@ -112,3 +112,38 @@ test('normalize is deterministic', () => {
   assert.deepEqual(a.resources.map((r: any) => [r.id, r.keys, r.wps]),
                    b.resources.map((r: any) => [r.id, r.keys, r.wps]));
 });
+
+//! birth-aware (slice 1b): a partition stamped bornAt (from the WAL via foldOwnership) is a
+//! PLACEMENT at that view, counted separately from a MOVE — a birth is never miscounted as a move
+test('a placement (bornAt) is counted separately from a move', () => {
+  const snap = {
+    view: 'e3',
+    resources: [{
+      name: 'r', members: ['A', 'B', 'C'], R: 3,
+      epochs: [{ id: 'e1' }, { id: 'e2' }, { id: 'e3', current: true }],
+      partitions: [
+        { name: 'user42', owner: 'C', bornAt: 'e2', ownerByEpoch: { e2: 'B', e3: 'C' } }, // born e2, handed B→C at e3
+        { name: 'order7', owner: 'A', bornAt: 'e1', ownerByEpoch: { e1: 'A', e2: 'A', e3: 'A' } },
+      ],
+    }],
+  };
+  const r = normalize(snap).resources[0];
+  const e = (id: string) => r.epochs.find((x: any) => x.ep === id)!;
+  // born at e2 → PLACED at e2, and NOT moved (no fabricated e1→e2 handoff — the bug this fixes)
+  assert.deepEqual(e('e2').placed, ['user42']);
+  assert.equal(e('e2').moves.length, 0);
+  // its genuine handoff B→C is a MOVE at e3, never a placement
+  assert.equal(e('e3').moves.length, 1);
+  assert.deepEqual(e('e3').placed, []);
+  // e1 records order7's birth as a placement (and user42 has no pre-birth row)
+  assert.deepEqual(e('e1').placed, ['order7']);
+  // the per-partition owner rows flag the birth row as placed
+  assert.equal(r.parts.find((p: any) => p.id === 'user42').owners.find((o: any) => o.ep === 'e2').placed, true);
+});
+
+//! without bornAt (no WAL source) behaviour is unchanged — placements stay empty, moves as before
+test('no bornAt → no placements (graceful degrade preserves existing move counts)', () => {
+  const sessions = normalize(sample).resources.find((r: any) => r.id === 'sessions')!;
+  for (const e of sessions.epochs) assert.deepEqual(e.placed, []);
+  assert.equal(sessions.epochs.find((e: any) => e.ep === 'e4')!.moves.length, 2); // the existing e3→e4 contract holds
+});

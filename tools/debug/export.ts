@@ -31,7 +31,7 @@ import { DHT } from '../../transport/dht.ts'
 //! DebugFile: the store-once snapshot shape (the subset P1/P2 can fill); shape.js#normalize consumes it.
 export type DebugReplica = { addr: string; lag?: number; stuckAt?: string; stale?: boolean; missing?: boolean; note?: string }
 export type DebugNode = { addr: string; keys?: number; status?: string; note?: string }
-export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string; replicas?: DebugReplica[]; ownerByEpoch?: Record<string, string> }
+export type DebugPartition = { name: string; owner?: string; R?: number; held?: number; status?: string; note?: string; replicas?: DebugReplica[]; ownerByEpoch?: Record<string, string>; bornAt?: string }
 export type DebugEpoch = { id: string; members: number; current?: boolean }
 //! DebugSub / DebugClient: the subscription-topology rows the viewer renders (a downstream consumer + the subs it holds).
 // No head/delivered: the delta stream carries no provenance, so a seq-lag isn't honestly measurable — the
@@ -185,10 +185,19 @@ export function foldDivergence(file: DebugFile, sampleByNode: Map<string, Versio
 // VALIDATION GUARD: re-deriving the LATEST view must reproduce the authoritative owner P1 set
 // (cluster.owner). If any partition disagrees, the live ring config differs from the default we
 // rebuild with — so we SKIP rather than emit misleading history (better a gap than a lie).
+//
+// BIRTH-GATING: `births` (partition → first-seen epoch, from the WAL via foldWal) anchors each
+// partition's owner-timeline at the view it was first written. WITHOUT it we back-project the
+// CURRENT partition set onto every past view, so a partition created at e6 gets a fabricated owner
+// at e2…e5 — a counterfactual ("where this key WOULD have hashed") the viewer miscounts as a MOVE.
+// Gating skips those pre-birth epochs and stamps `bornAt`, so the viewer can show the birth as a
+// PLACEMENT, not a move. births is OPTIONAL: with no WAL source (the live bridge), gating is off and
+// behaviour is exactly today's full back-projection (lossy but always available).
 export function foldOwnership(
   file: DebugFile,
   viewsByEpoch: Map<number, string[]>,
   buildRing: (members: string[]) => (key: string) => string | undefined,
+  births: Record<string, number> = {},
 ): DebugFile {
   if (!viewsByEpoch.size) return file
   const epochs = [...viewsByEpoch.keys()].sort((a, b) => a - b)
@@ -201,12 +210,15 @@ export function foldOwnership(
     const latestRing = ringByEpoch.get(latest)!
     if (!r.partitions.every((p) => !p.owner || latestRing(p.name) === p.owner)) continue // config mismatch → skip
     for (const p of r.partitions) {
+      const born = births[p.name] // first-seen epoch (from the WAL), or undefined when no source
       const obe: Record<string, string> = {}
       for (const e of epochs) {
+        if (born !== undefined && e < born) continue // pre-birth → don't fabricate a counterfactual owner
         const o = ringByEpoch.get(e)!(p.name)
         if (o) obe['e' + e] = o
       }
       if (Object.keys(obe).length) p.ownerByEpoch = obe
+      if (born !== undefined) p.bornAt = 'e' + born // the view this partition first appeared — a PLACEMENT, not a move
     }
     r.epochs = epochs.map((e) => ({ id: 'e' + e, members: viewsByEpoch.get(e)!.length, current: e === latest }))
   }
@@ -310,7 +322,10 @@ export function foldLive(snaps: InspectSnapshot[], capturedAt?: string, ringCach
 // connections) reads state the hot path already maintains; cluster.owner/replicas
 // are pure ring lookups. So a capture perturbs nothing — it's the harness / embedded
 // path. (A networkSource-backed CLI over the gated __inspect is a later bite.)
-export function captureInProcess(nodes: Fero[], capturedAt = new Date().toISOString()): DebugFile {
+// `births` (partition → first-seen epoch) is OPTIONAL: a caller holding the WAL passes
+// `birthEpochs(foldWal(records))` to birth-anchor the owner-timeline; absent it, ownership history
+// back-projects as before (the snapshot carries no birth — log.heads is the HEAD seq, not the floor).
+export function captureInProcess(nodes: Fero[], capturedAt = new Date().toISOString(), births: Record<string, number> = {}): DebugFile {
   // round 1: blanket snapshots (topology + holders) — no sample, so the cheap per-poll read
   const snaps: InspectSnapshot[] = []
   const instByAddr = new Map<string, any>()
@@ -356,7 +371,7 @@ export function captureInProcess(nodes: Fero[], capturedAt = new Date().toISOStr
     for (const m of members) ring.add(m)
     return (k: string) => ring.owner(k)
   }
-  foldOwnership(file, viewsByEpoch, buildRing)
+  foldOwnership(file, viewsByEpoch, buildRing, births)
 
   // round 4: subscription topology — fold each server's served-sub sample into client→sub rows
   // (captured at subscribe, so this read perturbs nothing the live path)

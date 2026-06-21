@@ -62,13 +62,14 @@ export function normalize(snap){
       let owners;
       if(p.ownerByEpoch){ const eps = Object.keys(p.ownerByEpoch);
         owners = eps.map((ep,i) => ({ep, o:p.ownerByEpoch[ep], cur:ep===view,
+          placed: ep===p.bornAt,                                            // born at this view → a PLACEMENT (bornAt from the WAL via foldOwnership)
           moved: i>0 && p.ownerByEpoch[ep] !== p.ownerByEpoch[eps[i-1]]})); }
       else owners = [{ep:'e3',o:p.owner},{ep:view,o:p.owner,cur:true}];
       let log = (p.log || []).map(c => ({e:c.e,s:c.s,key:c.key,origin:c.by||c.origin,val:c.val,out:c.out,winner:c.winner,stuck:c.stuck}));
       if(!log.length) log = [{e:4,s:1200,key:p.name+'.v',origin:p.owner,val:'…',out:'local',winner:true},
                              {e:4,s:1180,key:p.name+'.meta',origin:p.owner,val:'…',out:'won'}];
       return {id:p.name, owner:p.owner, R:Rp, held, keys:p.keys||0, wps:p.wps||0,
-        st:p.status||'healthy', note:p.note||'', log, reps, owners, ownerByEpoch:p.ownerByEpoch||null};
+        st:p.status||'healthy', note:p.note||'', log, reps, owners, ownerByEpoch:p.ownerByEpoch||null, bornAt:p.bornAt||null};
     });
 
     // nodes — derive owns / max-lag / hosted replicas from the partitions
@@ -97,10 +98,13 @@ export function normalize(snap){
     // epochs — derive the ownership moves at each transition from ownerByEpoch
     const epSpecs = R.epochs || [{id:'e3'},{id:view,current:true}];
     const epochs = epSpecs.map(e => {
-      const moves = [];
-      for(const p of parts){ if(!p.ownerByEpoch) continue; const ks=Object.keys(p.ownerByEpoch); const i=ks.indexOf(e.id);
-        if(i>0 && p.ownerByEpoch[ks[i]] !== p.ownerByEpoch[ks[i-1]]) moves.push([p.id, p.ownerByEpoch[ks[i-1]], p.ownerByEpoch[ks[i]]]); }
-      return {ep:e.id, cur:!!e.current || e.id===view, members:e.members!=null?e.members:members.length, note:e.note||'', moves};
+      const moves = [], placed = [];
+      for(const p of parts){
+        if(p.bornAt === e.id) placed.push(p.id);                            // born at this view — a PLACEMENT, not a move (disjoint: a birth is the FIRST ownerByEpoch key, never an i>0 move)
+        if(!p.ownerByEpoch) continue; const ks=Object.keys(p.ownerByEpoch); const i=ks.indexOf(e.id);
+        if(i>0 && p.ownerByEpoch[ks[i]] !== p.ownerByEpoch[ks[i-1]]) moves.push([p.id, p.ownerByEpoch[ks[i-1]], p.ownerByEpoch[ks[i]]]);
+      }
+      return {ep:e.id, cur:!!e.current || e.id===view, members:e.members!=null?e.members:members.length, note:e.note||'', moves, placed};
     });
 
     // rollup counts DERIVE from the arrays — they can never disagree with the children
