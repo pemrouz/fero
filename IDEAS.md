@@ -242,36 +242,36 @@ The routed/projected model (plan §5–6) has landed
   non-holder P4-sheds). Remaining: read-your-writes still routes a subsequent read to the
   stale owner until AE reconciles; and preserving the buffered write's ORIGINAL attempt-epoch
   on flush (V deferral — also a conflict-closer #3, see below).
-- **Conflict-elimination program (4 parts) — VALIDATED, DEFERRED** ([DECISIONS AA](DECISIONS.md)).
+- **Conflict-elimination program (4 parts) — #1 LANDED, #2/#3/#4 OPEN** ([DECISIONS AA](DECISIONS.md)).
   The design-review hypothesis (the never-drop fallback is the *single* source of `commit:conflict`,
   so removing it makes conflict structurally impossible) was rigorously **REFUTED**. A `conflict` is
   a violation of the single-writer invariant ("at most one origin stamps a partition's records per
   epoch"); the fallback is the DOMINANT violator but **not the only one**. So `commit:conflict` /
-  `key:has-conflict` / `ProvKind lost` (NOT fence-only) **stay in the model** — only closing ALL FOUR
-  sources makes conflict impossible:
-  1. **Transparent forwarder retry** (replaces the never-drop LOCAL commit, F1/X). Forwarder never
-     commits under own provenance; RETRIES the forward (re-resolving `owner(key)` each attempt,
-     bounded budget spanning the failover window, per-attempt `forwardTimeout` ≪ the 5s `callTimeout`),
-     then REJECTS (confirmed) / DROPS+escalates-suspicion (fire-and-forget) on exhaustion. VALIDATED
-     sound + perf-neutral (cold-path only); the lost-ACK re-forward is a *same-origin* owner supersede
-     (not a conflict). But RELAXES durability (volatile until an owner ACKs — a forwarder crash
-     mid-retry loses an unconfirmed fire-and-forget write the fallback salvaged) and changes the
-     confirmed-reject shape (no `localCommit.seq`); needs a forward→failure-detector `setSuspect`
-     linkage (none today). (resource: index; transport)
-  2. **`commitForwarded` ownership/epoch recheck.** It commits a forwarded write with NO validation
-     (`committingForward` bypasses the sink owner-check, the transport WRITE handler checks nothing),
-     so in the asymmetric VIEW_COMMIT install window a forwarder ahead at E+1 makes the new owner
-     (still at E) commit under its origin at E, colliding with the old owner's epoch-E commit (F1
-     explicitly blesses "commit at a not-yet-true owner, converge by LWW" = a same-epoch conflict).
-     Reject/re-forward a write whose target isn't `owner(p)` at the receiver's epoch — pairs with the
-     reject-stale-epoch fence above. (resource: index, membership; transport)
-  3. **Preserve the buffered write's attempt-epoch in `flushPending`** — the V deferral above, now
-     also a conflict-closer (a quorum-less node's buffered own-write is flushed at the CURRENT epoch;
-     epoch-dominance can lift it to a moved-on owner's epoch under this node's origin). (resource: index)
-  4. **Restore the view-epoch on a pinned-uuid+storage boot** — the "Durable view-epoch recovery" item
-     under Bounded memory (booting `ViewManager` at epoch 1 with restored high-epoch `versions` lets a
-     solo-owner local write epoch-dominance-stamp at the restored epoch under this node's origin).
-     (resource, membership)
+  `key:has-conflict` / `ProvKind lost` (NOT fence-only) **stay in the model** until ALL FOUR sources close:
+  1. **Transparent forwarder retry — LANDED** (`d953e7b`, [DECISIONS AA.1](DECISIONS.md)). Replaces the
+     never-drop LOCAL commit (F1/X): the forwarder never commits under own provenance; `sendForward` +
+     a bounded `fwdRetry` buffer + an unref'd re-forward sweep re-resolve `owner(key)` each attempt
+     (owner eviction / view change re-targets transparently; `owner===me` ⇒ commit as the legit owner).
+     Durable once an owner ACKs (same-origin, no conflict); volatile until then (relaxed fire-and-forget
+     durability, Z). Removes conflict source #1 (the dominant one). *Open tail:* the forward→failure-
+     detector `setSuspect` linkage (faster eviction on exhaustion — none today); a same-cell buffer
+     dedup (efficiency, not correctness). (resource: index; transport)
+  2. **`commitForwarded` ownership/epoch recheck — OPEN (deeper than first framed, [AA.2](DECISIONS.md)).**
+     A bare "NACK if not `owner(p)===me`" does NOT close #2 — the new owner O2, still at epoch E in the
+     VIEW_COMMIT install lag, genuinely IS owner at its epoch E and commits the stale write. Closing it
+     needs the FORWARDER's epoch ON the WRITE frame + a NACK when `forwarderEpoch > myEpoch` (catch up,
+     don't commit) — the same machinery as the deferred reject-stale-epoch fence; land them together.
+     Must be tested against formation + churn + soak (the F1 ping-pong / formation-stall risk
+     `committingForward` guards, now bounded by view-synchrony). (resource: index, membership; transport)
+  3. **Preserve the buffered write's attempt-epoch in `flushPending` — OPEN ([AA.2](DECISIONS.md)).** The
+     V deferral, also a conflict-closer. Stamping the attempt epoch isn't enough: it must OVERRIDE
+     epoch-dominance (X) for the buffered-flush path (a stale replay, not a knowing supersede) so a stale
+     buffered write FENCES instead of conflicting — without regressing the X tests. (resource: index)
+  4. **Restore the view-epoch on a pinned-uuid+storage boot — OPEN ([AA.2](DECISIONS.md)).** The
+     "Durable view-epoch recovery" item below. `max(restored)` fixes the divergence bug but NOT the
+     conflict — a restored solo node still writes at the restored epoch, colliding with the live owner.
+     Closing it needs the restored-with-peers node to NOT be a solo writable owner until it rejoins a
+     view ≥ the cluster epoch (a real solo-bootstrap-vs-rejoin semantic call). (resource, membership)
 - **Stale shed-confirmation across an orphan write — LANDED** ([DECISIONS P4a](DECISIONS.md)):
   `commitLocal` now clears `shedReady[p]` when its never-drop fallback appends a fresh winner to
   an orphan, so a confirmation earned against the old high-water can't be reused to shed before

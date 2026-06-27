@@ -1732,6 +1732,69 @@ an ownership/epoch recheck in `commitForwarded` (#2) + preserve a buffered write
 cid-dedup on the owner for non-idempotent ops (whose priority retry raises) and the forward→failure-
 detector suspicion linkage retry needs.
 
+### AA.1 — Part 1 LANDED (transparent forwarder retry) · Adopted · `d953e7b`
+
+**What.** The never-drop LOCAL commit (both sub-paths — the `onOutcome(false)` callback and the
+branch-3b `&&`-fallthrough) is GONE. A non-owner forwarding a write now NEVER commits under its own
+provenance. Branch 3b calls `sendForward` (ack-confirmed, a short per-attempt `forwardTimeout` added to
+`mesh.forward`); a withheld/timeout/not-connected outcome buffers into a bounded `fwdRetry` and an
+unref'd `flushForwardRetry` sweep re-forwards, **re-resolving `owner(p)` every attempt** so a mid-retry
+view change / owner eviction re-targets the new owner (`owner===me` ⇒ commit as the legitimate owner via
+`commitForwarded`). The structural twin of the existing client forward+buffer+flush path.
+
+**Guarantee + costs (as designed above).** Durable once an owner ACKs (under the OWNER's origin — a
+same-origin record, never a conflict); volatile in the buffer until then (a forwarder crash mid-retry
+loses an unconfirmed fire-and-forget write — the relaxed durability of the fire-and-forget contract, Z).
+Confirmed-reject shape change: no `localCommit.seq` on a non-quorum reject (the dead `committed-local`
+tier removed; only the `quorum` phase-2 miss carries a seq now). Ordering: a buffered write re-forwarded
+after a later same-key write gets a higher owner-seq and wins LWW — no worse than the old fallback (which
+also reordered, under two origins ⇒ a conflict), now convergent under one origin (a same-cell buffer
+dedup is a deferred efficiency refinement, not correctness). Perf: the lone-server hot path
+(`owner===me` ⇒ branch 4) is unchanged; the sweep is an unref'd idle-early-return timer.
+
+**Tests.** The old never-drop-orphan test → two Part 1 tests (re-forward on heal: no local commit /
+orphan / loss; owner CRASH → evict → re-target to the new owner). 86 transport, 131 resource (incl.
+P2/P4/membership convergence), 10 chaos (partition/heal, eviction/heal, crash/recover, soak) all green.
+
+**Removes conflict source #1 (the dominant one).** #2/#3/#4 remain → `conflict` is NOT yet impossible.
+
+### AA.2 — Parts #2/#3/#4 are each deeper than the first framing (design notes before implementing)
+
+The Part-1 implementation + a closer read show each remaining closer is entangled with a LOAD-BEARING
+consensus mechanism — none is a one-line guard, and a naive version risks a worse bug than the narrow
+conflict window it closes. Capture before anyone implements:
+
+- **#2 `commitForwarded` recheck needs epoch-ON-THE-WRITE-PATH, not just `owner(p)===me`.** A bare
+  "NACK if I'm not `owner(p)` at my epoch" does NOT close #2: the new owner O2, still at epoch E during
+  the VIEW_COMMIT install lag, genuinely IS `owner(p)` at ITS epoch E, so it commits the forwarded write
+  at E — exactly the stale-epoch commit that collides with old-owner O1's E commit. To close it, the
+  FORWARDER's view-epoch must travel on the WRITE frame and the receiver must NACK when
+  `forwarderEpoch > myEpoch` (I am behind a newer view — don't commit, catch up). This is the same
+  machinery as the deferred "reject-stale-epoch fence" (IDEAS) and should land WITH it. A bare
+  owner-recheck also risks the F1 ping-pong / formation stall (`committingForward` exists to avoid it) —
+  view-synchrony (V) bounds the disagreement to the install lag, and Part-1 retry replaces the bounce
+  with a retry-from-origin, but it must be tested against formation + churn + soak, not assumed safe.
+- **#3 `flushPending` attempt-epoch must OVERRIDE epoch-dominance for buffered flushes.** Stamping the
+  attempt epoch at buffer time isn't enough: `commitLocal`'s epoch-dominance (X) re-lifts a flushed write
+  to `cur.epoch` when a newer winner is already held — back to the conflict. A buffered flush is a stale
+  replay (NOT a knowing supersede, which is what dominance protects), so for the buffered-flush path the
+  stamp must be the attempt epoch WITHOUT dominance — so a stale buffered write FENCES (loses) instead of
+  conflicting. This touches the load-bearing X stamp; the X regression tests (restored-epoch overwrite,
+  lagging-view) must stay green.
+- **#4 is entangled with solo-bootstrap vs rejoin write-gating, not just a boot-epoch init.** Restoring
+  the view-epoch to `max(restored)` fixes the DIVERGENCE bug (the node's own writes fenced for booting at
+  epoch 1) but NOT the conflict: a restored solo node at epoch 5 still writes key k at epoch 5, colliding
+  with the live owner's epoch-5 record. Closing the conflict needs the restored node to NOT act as a solo
+  WRITABLE owner until it rejoins a view ≥ the cluster's epoch (today a solo node is a self-majority ⇒
+  writable). That's a real semantic call (a restored-with-peers node isn't "first"), gated on the
+  durable-view-epoch-recovery work (Bounded memory, IDEAS).
+
+**Net:** Part 1 removes the dominant, common conflict source and is the bulk of the practical benefit.
+#2/#3/#4 close NARROW, RARE latent windows and each warrants its own design + adversarial review + tests
+(the discipline every V/P/Q/X/Y consensus change got) — they are not safe to batch-land under time
+pressure. `conflict` stays in the model until all four land + a proof that no same-epoch two-origin path
+remains.
+
 ## AB — Provenance kinds audit: keep `local` / `forwarded` / `won` (forwarded retained as a not-yet-surfaced fact) · Investigated · (no code)
 
 > **This record is the authoritative provenance-kind reference.** The canonical per-kind definition
