@@ -894,39 +894,27 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         discardOptimistic(p)
         return
       }
-      // 3b) F1 forward: not owner + owner reachable ⇒ hand off, CONFIRMED by WRITE-ACK.
-      // Socket-write success ≠ delivery: an owner crash inside the failure-detector lag accepts
-      // the frame into a dying kernel buffer — and a scoped non-holder had already discarded its
-      // optimistic copy, so the write held NOTHING anywhere (silent loss, the never-drop
-      // violation). The ack-confirmed forward keeps a never-drop fallback armed: no ACK within
-      // callTimeout ⇒ commit under OUR provenance (an orphan on a non-holder — P4 sheds it once
-      // the R-set confirms; a duplicate when only the ack was lost converges via LWW).
-      // CONFLICT NOTE (DECISIONS AA): this fallback — committing under OUR (a non-owner's) provenance
-      // at the current epoch — is the DOMINANT source of the same-epoch `conflict` outcome (owner
-      // alive + committed + ACK lost ⇒ two origins at one epoch). It is being replaced by transparent
-      // forwarder retry (part 1 of the four-part conflict-elimination program, DECISIONS AA): retry
-      // alone does NOT eliminate `conflict` (three other same-epoch/two-origin paths — #2/#3/#4 —
-      // remain), so the four parts land together. Until part 1 lands the fallback is the backstop.
+      // 3b) F1 forward → owner(p), ack-confirmed; on FAILURE re-forward, NEVER commit under our
+      // provenance (Part 1, DECISIONS AA — transparent forwarder retry, replacing F1/X's never-drop
+      // LOCAL commit). The old fallback committed a non-owned write under OUR uuid at the current
+      // epoch on no-ACK — the DOMINANT source of same-epoch `conflict` (owner alive + ACK lost ⇒ two
+      // origins at one epoch). Instead `sendForward` re-forwards, re-resolving owner(p) on each retry
+      // so a mid-retry view change (the unreachable owner getting evicted → a NEW owner) re-targets
+      // the new owner. The write is durable once an owner ACKs it (sequenced under the OWNER's origin —
+      // a same-origin record, never a conflict); volatile in the retry buffer until then (lost on a
+      // forwarder crash mid-retry — the relaxed durability of the fire-and-forget contract, Z).
       const owner = mesh.owner(p)
-      if (
-        owner !== undefined &&
-        owner !== me &&
-        mesh.forward(owner, change, (outcome) => {
-          if (outcome.committed) hook?.(outcome) // owner sequenced it ⇒ resolve the confirm with {seq, epoch}
-          else {
-            commitLocal(change) // withheld (quorum-less owner) or timeout ⇒ never-drop fallback under OUR provenance
-            hook?.({ committed: false, seq: lastCommit?.seq, epoch: lastCommit?.epoch, reason: outcome.reason }) // reject: committed-LOCALLY-but-unconfirmed when lastCommit.seq is set, else nothing committed (we're also quorum-less)
-          }
-        })
-      ) {
+      if (owner !== undefined && owner !== me) {
         // P2: forwarded a write for a partition we DON'T replicate — drop the optimistic value (the
         // owner replicates to the R-set, not us; reading this key is a Q1 remote read). Full
-        // replication keeps it: the canonical record returns and reconciles. (The never-drop
-        // fallback above logs/replicates WITHOUT re-applying — a non-held partition stays
-        // un-materialized locally by design.)
+        // replication keeps it (the canonical owner record returns and reconciles). Discard ONCE here,
+        // not on each re-forward (the sweep re-materialises it via commitForwarded if we become owner).
         if (scoped && !holds(p)) discardOptimistic(p)
+        sendForward(change, owner, hook)
         return
       }
+      // owner === me (we own it) OR owner === undefined (no committed view yet / solo) ⇒ fall through
+      // to branch 4 commitLocal — a LEGITIMATE owned/solo commit, NOT the never-drop fallback.
     }
 
     //! 4) commit-local: stamp/log/replicate under our provenance.
@@ -959,6 +947,67 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   }
   const clientFlushTimer = me === undefined ? setInterval(flushClientPending, antiEntropyMs) : undefined
   clientFlushTimer?.unref?.()
+
+  //! ── server forward-retry (Part 1, DECISIONS AA): re-forward to owner(p) on failure; NEVER commit under our provenance ──
+  // The structural twin of the client write path above (forward → buffer-on-failure → periodic flush),
+  // for a SERVER forwarding a non-owned write to owner(p). Replaces F1/X's never-drop LOCAL commit:
+  // that committed the write under OUR (a non-owner's) uuid at the current epoch on no-ACK — the
+  // DOMINANT source of same-epoch `conflict` (owner alive + ACK lost ⇒ two origins at one epoch). Now
+  // the forwarder RE-FORWARDS instead, re-resolving owner(key) each attempt (so the unreachable owner
+  // getting EVICTED → a new owner re-targets transparently), buffering between attempts and draining on
+  // an unref'd sweep. Durable once an owner ACKs (under the OWNER's origin — a same-origin record,
+  // never a conflict); volatile until then (a forwarder crash mid-retry loses an unconfirmed
+  // fire-and-forget write the fallback would have salvaged — the relaxed durability of DECISIONS Z).
+  // ORDERING: a buffered write re-forwarded AFTER a later same-key write already committed gets a
+  // HIGHER owner-seq and wins LWW (a per-key reorder during owner-flapping). No worse than the old
+  // fallback (which ALSO reordered, under two origins ⇒ a `conflict`); here both land under the
+  // owner's single origin ⇒ convergent, no conflict — consistent with LWW-by-Lamport (DECISIONS A,
+  // not wall-clock). A same-cell buffer-dedup (keep only the latest per versionKey) is a deferred
+  // efficiency refinement, not a correctness need.
+  const FORWARD_TIMEOUT = typeof viewOpts.forwardTimeout === 'number' ? (viewOpts.forwardTimeout as number) : 1000
+  //! fwdRetry: bounded buffer of forwards awaiting a re-attempt (owner unreachable / withheld / timed out). Each carries its confirm hook.
+  const fwdRetry: { change: ChangeRecord; hook?: (o: WriteOutcome) => void }[] = []
+  //! bufferForwardRetry: queue a failed forward for the sweep; drop-oldest when full (bounded — the relaxed fire-and-forget durability).
+  const bufferForwardRetry = (change: ChangeRecord, hook?: (o: WriteOutcome) => void) => {
+    if (fwdRetry.length >= MAX_PENDING) {
+      const dropped = fwdRetry.shift()! // bounded: drop-oldest (same posture as the V1e / client buffers)
+      dropped.hook?.({ committed: false, reason: 'dropped' }) // a confirmed write whose slot was evicted rejects honestly (not a silent loss)
+    }
+    fwdRetry.push({ change, hook })
+  }
+  //! sendForward: forward a write to the given owner, ack-confirmed (short per-attempt timeout); a non-commit outcome re-buffers for the sweep — never commit-local.
+  const sendForward = (change: ChangeRecord, owner: string, hook?: (o: WriteOutcome) => void) => {
+    if (
+      !mesh.forward(
+        owner,
+        change,
+        (outcome) => {
+          if (outcome.committed) hook?.(outcome) // owner sequenced it ⇒ resolve the confirm with {seq,epoch,origin}
+          else bufferForwardRetry(change, hook) // withheld (quorum-less owner) or timeout ⇒ re-forward (re-resolve owner — maybe a new one) on the sweep
+        },
+        FORWARD_TIMEOUT,
+      )
+    )
+      bufferForwardRetry(change, hook) // owner not a connected peer right now ⇒ re-forward on the sweep
+  }
+  //! flushForwardRetry: the sweep — re-resolve owner(p) per buffered write and re-forward; owner===me (a view change made US the owner) ⇒ commit as the LEGITIMATE owner via commitForwarded.
+  const flushForwardRetry = () => {
+    if (!fwdRetry.length) return
+    const batch = fwdRetry.splice(0)
+    for (const { change, hook } of batch) {
+      const owner = mesh.owner(partitionOf(change))
+      if (owner === undefined || owner === me) {
+        // The unreachable owner was evicted and the ring re-pointed at US (or there's no view): commit
+        // as the legitimate owner. commitForwarded re-APPLIES the value (re-materialising a discarded
+        // optimistic copy) AND commits it under our (now-owner) provenance via the write-capture sink —
+        // a genuine owned commit, not the never-drop fallback (we ARE the owner now).
+        const o = commitForwarded(change)
+        hook?.(o ?? { committed: true })
+      } else sendForward(change, owner, hook) // still a remote owner ⇒ re-forward; failures re-buffer
+    }
+  }
+  const fwdRetryTimer = setInterval(flushForwardRetry, antiEntropyMs)
+  fwdRetryTimer?.unref?.()
 
   //! ── orphan shedding (P4, scoped): keep a no-longer-replicated partition until an R-set member is caught up, then drop ──
   // ── orphan shedding (P4, scoped): keep a no-longer-replicated partition until a
@@ -1059,18 +1108,20 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
-  //! commitLocal: stamp under our provenance, record as LWW winner, log, replicate — owned writes + never-drop fallback.
+  //! commitLocal: stamp under our provenance, record as LWW winner, log, replicate — owned/solo writes, forwarded-write commits, buffered-write flushes.
   // Commit a record under OUR provenance: stamp (origin=us, Lamport seq), record
-  // it as the LWW winner for its key, log it, and replicate. Used for partitions
-  // we own and as the never-drop fallback when an owner is unreachable.
+  // it as the LWW winner for its key, log it, and replicate. Reached for partitions
+  // we own (or solo / no-view-yet), for forwarded writes we own (commitForwarded,
+  // incl. the forward-retry sweep when a view change made us the owner), and for
+  // flushed buffered writes (the V1e write-gate + the forward-retry buffer).
   // CONFLICT INVARIANT (DECISIONS AA): a `conflict` happens iff some node stamps a record at an
   // epoch it does NOT solely own. This function is the single stamp site (change.origin = uuid).
-  // It's safe when we ARE owner(p) at our epoch; it MANUFACTURES a same-epoch second origin (⇒ a
-  // logged `conflict` loser) when reached for a partition we don't solely own at the stamped
-  // epoch — via the never-drop fallback (3b), a flushPending replay re-stamped at a moved-on epoch
-  // (the attempt-epoch deferral), or a restored solo-owner write epoch-dominance-lifted to a
-  // foreign epoch (the epoch-1-boot bug). The latter two stamp at `e = max(viewEpoch, cur.epoch)`
-  // below; see DECISIONS AA for the full source list + the four-part elimination program.
+  // It's safe when we ARE owner(p) at our epoch. Part 1 REMOVED the dominant violator — the
+  // never-drop fallback no longer commits a non-owned write here (the forwarder re-forwards instead,
+  // sendForward/flushForwardRetry). The remaining (rare, latent) violators close in parts #3/#4: a
+  // flushPending replay re-stamped at a moved-on epoch (the attempt-epoch deferral) and a restored
+  // solo-owner write epoch-dominance-lifted to a foreign epoch (the epoch-1-boot bug) — both stamp at
+  // `e = max(viewEpoch, cur.epoch)` below. See DECISIONS AA for the full source list + the program.
   function commitLocal(change: ChangeRecord) {
     //! write-gate chokepoint (V1e): no quorum ⇒ buffer instead of commit, so a minority can't diverge.
     // Write-gate chokepoint (V1e): without a reachable quorum we are read-only —
@@ -1267,8 +1318,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (done) return
       done = true
       if (safety) clearTimeout(safety)
-      const quorum = o.reason === 'quorum' // phase-2 miss: committed but not replicated to W
-      const reachedTier = quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none' // committed-local: a never-drop fallback committed under our provenance (durable, owner-unconfirmed)
+      const quorum = o.reason === 'quorum' // phase-2 miss: the owner committed it but it didn't replicate to W
+      // Part 1 (DECISIONS AA): the never-drop LOCAL commit is GONE — a non-owner forward never commits
+      // under our provenance, so a non-quorum reject carries NO local seq (it reached 'none'). The old
+      // 'committed-local' tier (a durable-but-owner-unconfirmed fallback commit) is therefore
+      // unreachable. Only the quorum phase-2 miss is 'committed' (the owner DID sequence it).
+      const reachedTier = quorum ? 'committed' : 'none'
       const reason = o.reason ?? 'unconfirmed'
       if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch, origin: o.origin })
       rejectP(
@@ -1276,7 +1331,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
           requestedTier: tier,
           reachedTier,
           reason,
-          localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch, origin: o.origin } : null, // its full LWW coordinates so a retry can detect its own committed-but-unconfirmed write
+          localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch, origin: o.origin } : null, // only the quorum phase-2 miss carries a seq now (committed at the owner, just under-replicated) — a retry can see it WAS sequenced
         }),
       )
     }
@@ -1420,6 +1475,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (aeTimer) clearInterval(aeTimer)
       if (compactTimer) clearInterval(compactTimer)
       if (clientFlushTimer) clearInterval(clientFlushTimer)
+      clearInterval(fwdRetryTimer) // Part 1: stop the forward-retry sweep so a torn-down node re-forwards nothing
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()

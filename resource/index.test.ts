@@ -288,8 +288,9 @@ test('P2: replicas:2 — each partition lands on exactly its R replicas, nowhere
   const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
   const has = (n: any, k: string) => k in (n.data[value] ?? {})
   // Fully formed = committed 3-view AND full mesh — so a forwarded write reaches a
-  // connected owner (no never-drop fallback → no transient orphan to confuse the
-  // immediate non-replica assertion below).
+  // connected owner and lands promptly (Part 1: an unreachable owner would BUFFER the
+  // forward for the retry sweep, not commit locally — no transient orphan, but the
+  // non-replica assertion below wants the write actually landed first).
   const formed = (n: any) => n.cluster.members.length === 3 && all.every((x) => x === n || connected(n.cluster, x.cluster.me))
   try {
     assert.ok(await until(() => all.every(formed), 8000), 'cluster fully formed (view + full mesh)')
@@ -508,20 +509,21 @@ test('P4: replicas:2 — a FULL R-set move (both old replicas dropped) sheds saf
   }
 })
 
-test('P4: a never-drop write to an orphan partition converges + sheds cleanly (shedReady re-confirmed on the high-water bump)', async () => {
-  // Exercises the never-drop fallback INTO an orphan — the path the B1 review's finding lives
-  // on, which the other P4 tests never hit (they have no isolation, so every write forwards).
-  // When a write's owner is unreachable, commitLocal commits it LOCALLY: a fresh winner
-  // appended to a partition this node does NOT replicate, RAISING its shippable high-water.
-  // The fix clears `shedReady[p]` there so a confirmation earned against the OLD mark can't be
-  // reused to shed before the new record is R-replicated. Here A writes a foreign key whose
-  // owner it has isolated; the value still reaches the full R-set (the owner heals via the
-  // reachable replica), and A sheds its orphan copy only AFTER the owner reconnects + confirms.
+test('Part 1: a write to an UNREACHABLE owner buffers + re-forwards on heal — no local commit, no orphan, no loss (DECISIONS AA)', async () => {
+  // Transparent forwarder retry REPLACES the never-drop LOCAL commit. When a write's owner is
+  // unreachable, the forwarder does NOT commit under its own provenance (the old fallback — the
+  // DOMINANT same-epoch `conflict` source: owner alive + ACK lost ⇒ two origins). Instead it
+  // BUFFERS the forward and re-forwards on an unref'd sweep, re-resolving owner each attempt. Here
+  // A writes a foreign key whose owner it has isolated (huge evictAfter ⇒ the owner is NOT evicted,
+  // so the retry target stays that owner): the write sits buffered, A holds NOTHING for it (the
+  // optimistic copy is discarded, never committed → no orphan, no second origin), and the R-set
+  // keeps its prior value. On heal A re-forwards → the owner sequences it under ITS origin → the
+  // R-set converges to v:99. No conflict, no loss.
   const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
-  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150, view: { evictAfter: 100_000 } })
-  const A = await fero('p4-orphan-write', cfg(p1))
-  const B = await fero('p4-orphan-write', cfg(p2))
-  const C = await fero('p4-orphan-write', cfg(p3))
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, replicas: 2, antiEntropy: 150, view: { evictAfter: 100_000, forwardTimeout: 150 } })
+  const A = await fero('p1-retry-isolate', cfg(p1))
+  const B = await fero('p1-retry-isolate', cfg(p2))
+  const C = await fero('p1-retry-isolate', cfg(p3))
   const all = [A, B, C]
   const node = (addr: string) => all.find((n) => n.cluster.me === addr)!
   const has = (n: any, k: string) => k in (n.data[value] ?? {})
@@ -539,26 +541,55 @@ test('P4: a never-drop write to an orphan partition converges + sheds cleanly (s
     ;(A as any)[diagnostics].isolate(owner)
     ;(node(owner) as any)[diagnostics].isolate(A.cluster.me)
 
-    // Write the foreign key, RETRYING until it commits LOCALLY (the never-drop fallback) rather
-    // than racing the owner socket's teardown — once A holds it, commitLocal ran and orphaned it.
-    let landed = false
-    for (let i = 0; i < 25 && !landed; i++) {
-      A.data[foreign] = { v: 99 }
-      landed = await until(() => v(A, foreign) === 99, 500)
-    }
-    assert.ok(landed, 'A committed the foreign write locally via the never-drop fallback (orphan)')
+    // A writes the foreign key while its owner is unreachable. The optimistic copy is applied then
+    // DISCARDED (scoped non-holder); the forward buffers + retries. A must NEVER hold it (no
+    // local commit = no orphan), and the R-set must KEEP v:0 (A's write can't reach the owner).
+    A.data[foreign] = { v: 99 }
+    await sleep(1500) // let several retry sweeps run against the unreachable owner
+    assert.ok(!has(A, foreign), 'A does not hold the foreign key — no never-drop local commit, no orphan')
+    assert.ok(A.cluster.replicas(foreign).every((a) => v(node(a), foreign) === 0), 'the R-set still reads v:0 — the buffered write never reached a second origin')
 
-    // No loss: BOTH R-set replicas (the reachable one directly, the isolated owner via the
-    // reachable one's anti-entropy) converge to v:99 even while the owner↔A link is cut.
-    assert.ok(await until(() => A.cluster.replicas(foreign).every((a) => v(node(a), foreign) === 99), 12000), 'the full R-set converged to the never-drop write — no loss')
-
-    // Heal: the owner reconnects + confirms to A, so A can finally shed (exactly R), no loss.
+    // Heal: A re-forwards the buffered write → the owner sequences it under ITS origin → R-set converges.
     ;(A as any)[diagnostics].heal(owner)
     ;(node(owner) as any)[diagnostics].heal(A.cluster.me)
-    assert.ok(await until(() => !has(A, foreign), 12000), 'A sheds the orphan once every R-set member (incl. the healed owner) is confirmed')
-    assert.ok(A.cluster.replicas(foreign).every((a) => v(node(a), foreign) === 99), 'R-set still holds v:99 after the shed (no loss)')
+    assert.ok(await until(() => A.cluster.replicas(foreign).every((a) => v(node(a), foreign) === 99), 12000), 'the R-set converges to v:99 via re-forward on heal — no loss')
+    assert.ok(!has(A, foreign), 'A still holds nothing for the foreign key (committed under the owner, not A — no orphan)')
   } finally {
     all.forEach((n) => n.destroy())
+  }
+})
+
+test('Part 1: a write whose owner CRASHES survives — buffered, then re-forwarded to the NEW owner after eviction (never-drop via retry)', async () => {
+  // The core never-drop guarantee under an owner CRASH (not just an isolated link). A 3-node cluster
+  // (so the surviving majority keeps quorum — a 2-node cluster losing one is read-only by CP). A
+  // writes a key owned by B, then B dies. The forward fails; A buffers + retries. The failure
+  // detector evicts B (~evictAfter) → a view change re-points owner(k) at a survivor → A's sweep
+  // re-resolves the NEW owner and the write lands there (under that owner's origin — no conflict),
+  // never committed under a non-owner's provenance, never lost.
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 250, antiEntropy: 150, view: { evictAfter: 500, forwardTimeout: 150 } })
+  const A = await fero('p1-retry-crash', cfg(p1))
+  const B = await fero('p1-retry-crash', cfg(p2))
+  const C = await fero('p1-retry-crash', cfg(p3))
+  const survivors = [A, C]
+  const v = (n: any, k: string) => (n.data[value] as any)?.[k]?.v
+  const formed = (n: any) => n.cluster.members.length === 3 && [A, B, C].every((x) => x === n || connected(n.cluster, x.cluster.me))
+  try {
+    assert.ok(await until(() => [A, B, C].every(formed), 8000), 'cluster formed')
+    // a key B owns (full replication ⇒ everyone holds it, but B is the sequencer A forwards to)
+    const k = Array.from({ length: 40 }, (_, i) => 'k' + i).find((x) => A.cluster.owner(x) === B.cluster.me)!
+    B.data[k] = { v: 1 }
+    assert.ok(await until(() => v(A, k) === 1 && v(C, k) === 1, 8000), 'baseline: the B-owned key replicated to the cluster')
+
+    B.destroy() // owner crash — the forward target vanishes
+    // A writes the B-owned key while B is dead: forward fails → buffered → retried. The survivors
+    // {A,C} keep quorum, evict B, and re-elect owner(k); A's sweep re-forwards to the new owner.
+    A.data[k] = { v: 2 }
+    assert.ok(await until(() => survivors.every((n) => n.cluster.members.length === 2) && survivors.every((n) => v(n, k) === 2), 14000), 'the write survives the owner crash: re-forwarded to the new owner after eviction — never dropped, converges to v:2')
+  } finally {
+    A.destroy()
+    B.destroy()
+    C.destroy()
   }
 })
 

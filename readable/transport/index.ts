@@ -58,7 +58,7 @@ export type Mesh = {
   send: (record: ChangeRecord) => void
   replicateTo: (addresses: string[], record: ChangeRecord) => void
   broadcast: (record: ChangeRecord) => void
-  forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void) => boolean
+  forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void, timeoutMs?: number) => boolean
   replProbe: (address: string, cid: number, probe: { origin: string; seq: number; partition: string; durable?: boolean }) => boolean
   replAck: (address: string, cid: number) => boolean
   owners: (key: string, replicas?: number) => string[]
@@ -350,14 +350,14 @@ export function transport(opts: TransportOpts): Mesh {
     viewCommit: (address, value) => sendViewFrame(address, VERB.VIEW_COMMIT, value),
     // forward: route a write-request to the owner (point-to-point); false if the socket isn't writable so caller commits locally.
     // with onOutcome: ACK-CONFIRMED — socket-write success ≠ delivery (an owner crash inside the
-    forward(address, record, onOutcome) {
+    forward(address, record, onOutcome, timeoutMs) {
       const peer = pool.peer(address)
       if (!peer) return false
       if (!onOutcome) return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
       const id = ++callId
       const timer = setTimeout(() => {
         if (forwards.delete(id)) onOutcome({ committed: false, reason: 'timeout' })
-      }, opts.callTimeout ?? 5000)
+      }, timeoutMs ?? opts.callTimeout ?? 5000)
       timer.unref?.()
       forwards.set(id, { timer, onOutcome })
       if (peer.write(encodeFrame([record], { verb: VERB.WRITE, id }))) return true
