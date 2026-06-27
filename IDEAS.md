@@ -507,10 +507,16 @@ a `debug` SSE event + `/debug/` serving so the viewer goes LIVE through the SAME
 - **[P3] Divergence in LIVE mode.** `foldLive` OMITS divergence — it needs the two-pass version-sample drill,
   which the bridge's steady ~1/s poll deliberately doesn't pay. A `networkSource` that issues the `{sample}`
   drill on a slower cadence (or on demand) would light up live divergence too. (tools/observe; resource: inspect)
-- **[P3] Write-route JOIN.** The write-route timeline — correlate a write's `origin`/`key` with the partition
-  OWNER (a `forwarded` write origin→owner) — JOINs `cluster.writes` ([DECISIONS Z](DECISIONS.md)) with the
-  `__observe` ProvRecords the bridge already streams (`provagg`). Existing data, not new instrumentation;
-  `cluster.writes` isn't in the poll payload yet. (resource; tools/observe)
+- **[P3] Write-route JOIN.** The write-route timeline — show a forwarded write's ORIGINAL caller → partition
+  OWNER hop. **NEEDS NEW INSTRUMENTATION** (corrected by the provenance audit, [DECISIONS AB](DECISIONS.md)):
+  the original caller identity is preserved NOWHERE today — `cluster.writes.origin`, the committed
+  `ChangeRecord`, and the `__observe` ProvRecord are ALL owner-restamped at `commitLocal`
+  (`change.origin = uuid`), so `cluster.writes.origin == owner(key)` always holds for a normal forward and
+  the once-assumed "derive forwarded-ness as `origin != owner(key)`" shortcut is structurally broken. To
+  draw the hop, carry the caller uuid onto the forwarded write (a new field) and JOIN it against
+  `owner(key)`. The `__observe` `forwarded` ProvKind already marks WHICH commits were routed (retained for
+  exactly this, [DECISIONS AB](DECISIONS.md)) but is writer-anonymous — it answers "how much routing", not
+  "from whom". `cluster.writes` also isn't in the poll payload yet. (resource; tools/observe)
 - **[P3] `networkSource`-backed CLI** over the gated `__inspect` for remote (non-embedded) capture — the
   embedded `captureInProcess` + the live bridge cover in-process today. (tools/debug; tools/observe)
 - **Owner-timeline must anchor at BIRTH, not the earliest retained view.** `foldOwnership` back-projects the

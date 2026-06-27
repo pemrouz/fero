@@ -3,7 +3,7 @@
 import { $ } from '../../data/index.ts'
 import { type ChangeRecord } from '../transport/message.ts'
 
-// ProvKind: the contention tag the dashboard colours by — a committed/forwarded write, an LWW loser, a dedup drop, or a membership transition.
+// ProvKind: the provenance/contention tag the dashboard colours by — three ACCEPTED kinds (local=owner-authored · forwarded=owner-routed · won=inbound LWW-winner applied), the LWW loser `lost`, the dedup `dropped`, and the membership transitions `view`/`writable`. All three accepted kinds audited & KEPT — DECISIONS AB.
 export type ProvKind = 'won' | 'lost' | 'forwarded' | 'local' | 'dropped' | 'view' | 'writable'
 
 // ProvRecord: one flat provenance event — scalars only (no cloned value), so an emit is cheap and the streamed frame is tiny.
