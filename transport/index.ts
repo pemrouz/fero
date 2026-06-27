@@ -76,7 +76,7 @@ export type Mesh = {
   send: (record: ChangeRecord) => void
   replicateTo: (addresses: string[], record: ChangeRecord) => void // scoped replication (Milestone P): send a committed record to the given R-set, excluding self (the committer already holds + logged it). Caller passes the precomputed owners(key,R) so the ring is walked once per write.
   broadcast: (record: ChangeRecord) => void
-  forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void) => boolean // route a write-request to the owner; false if it isn't connected. With onOutcome: ACK-confirmed — the owner replies committed{seq,epoch} or withheld; a withheld/timeout outcome releases the caller's never-drop fallback
+  forward: (address: string, record: ChangeRecord, onOutcome?: (outcome: WriteOutcome) => void, timeoutMs?: number) => boolean // route a write-request to the owner; false if it isn't connected. With onOutcome: ACK-confirmed — the owner replies committed{seq,epoch} or withheld; a withheld/timeout outcome drives the caller's transparent retry (re-resolve owner + re-forward, DECISIONS AA). timeoutMs: a short per-attempt timeout for the retry path (defaults to callTimeout)
   replProbe: (address: string, cid: number, probe: { origin: string; seq: number; partition: string; durable?: boolean }) => boolean // confirm:'replicated'/'persisted' — ask a replica to REPL_ACK once it holds (origin,seq) (durable ⇒ once storage.append resolved); false if not connected
   replAck: (address: string, cid: number) => boolean // reply to a REPL_PROBE we can satisfy (our high-water reached seq); false if not connected
   owners: (key: string, replicas?: number) => string[] // the owner + next R-1 replicas clockwise
@@ -443,14 +443,14 @@ export function transport(opts: TransportOpts): Mesh {
     // violating never-drop). An id-tagged WRITE is acked by the receiver AFTER its synchronous
     // commit; no ack within callTimeout → onOutcome(false) → the caller's never-drop fallback.
     // A duplicate (owner committed, ack lost) converges via LWW — at-least-once, never zero.
-    forward(address, record, onOutcome) {
+    forward(address, record, onOutcome, timeoutMs) {
       const peer = pool.peer(address)
       if (!peer) return false
       if (!onOutcome) return peer.write(encodeFrame([record], { verb: VERB.WRITE }))
       const id = ++callId
       const timer = setTimeout(() => {
-        if (forwards.delete(id)) onOutcome({ committed: false, reason: 'timeout' }) // never confirmed → fallback (commit-local / re-buffer)
-      }, opts.callTimeout ?? 5000)
+        if (forwards.delete(id)) onOutcome({ committed: false, reason: 'timeout' }) // never confirmed → caller re-resolves owner + re-forwards (transparent retry, DECISIONS AA part 1)
+      }, timeoutMs ?? opts.callTimeout ?? 5000) // a short per-attempt forwardTimeout for the retry path; defaults to callTimeout when omitted
       timer.unref?.()
       forwards.set(id, { timer, onOutcome })
       if (peer.write(encodeFrame([record], { verb: VERB.WRITE, id }))) return true

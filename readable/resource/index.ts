@@ -513,18 +513,9 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         return
       }
       const owner = mesh.owner(p)
-      if (
-        owner !== undefined &&
-        owner !== me &&
-        mesh.forward(owner, change, (outcome) => {
-          if (outcome.committed) hook?.(outcome)
-          else {
-            commitLocal(change)
-            hook?.({ committed: false, seq: lastCommit?.seq, epoch: lastCommit?.epoch, reason: outcome.reason })
-          }
-        })
-      ) {
+      if (owner !== undefined && owner !== me) {
         if (scoped && !holds(p)) discardOptimistic(p)
+        sendForward(change, owner, hook)
         return
       }
     }
@@ -558,6 +549,48 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   }
   const clientFlushTimer = me === undefined ? setInterval(flushClientPending, antiEntropyMs) : undefined
   clientFlushTimer?.unref?.()
+
+  // ── server forward-retry (Part 1, DECISIONS AA): re-forward to owner(p) on failure; NEVER commit under our provenance ──
+  const FORWARD_TIMEOUT = typeof viewOpts.forwardTimeout === 'number' ? (viewOpts.forwardTimeout as number) : 1000
+  // fwdRetry: bounded buffer of forwards awaiting a re-attempt (owner unreachable / withheld / timed out). Each carries its confirm hook.
+  const fwdRetry: { change: ChangeRecord; hook?: (o: WriteOutcome) => void }[] = []
+  // bufferForwardRetry: queue a failed forward for the sweep; drop-oldest when full (bounded — the relaxed fire-and-forget durability).
+  const bufferForwardRetry = (change: ChangeRecord, hook?: (o: WriteOutcome) => void) => {
+    if (fwdRetry.length >= MAX_PENDING) {
+      const dropped = fwdRetry.shift()!
+      dropped.hook?.({ committed: false, reason: 'dropped' })
+    }
+    fwdRetry.push({ change, hook })
+  }
+  // sendForward: forward a write to the given owner, ack-confirmed (short per-attempt timeout); a non-commit outcome re-buffers for the sweep — never commit-local.
+  const sendForward = (change: ChangeRecord, owner: string, hook?: (o: WriteOutcome) => void) => {
+    if (
+      !mesh.forward(
+        owner,
+        change,
+        (outcome) => {
+          if (outcome.committed) hook?.(outcome)
+          else bufferForwardRetry(change, hook)
+        },
+        FORWARD_TIMEOUT,
+      )
+    )
+      bufferForwardRetry(change, hook)
+  }
+  // flushForwardRetry: the sweep — re-resolve owner(p) per buffered write and re-forward; owner===me (a view change made US the owner) ⇒ commit as the LEGITIMATE owner via commitForwarded.
+  const flushForwardRetry = () => {
+    if (!fwdRetry.length) return
+    const batch = fwdRetry.splice(0)
+    for (const { change, hook } of batch) {
+      const owner = mesh.owner(partitionOf(change))
+      if (owner === undefined || owner === me) {
+        const o = commitForwarded(change)
+        hook?.(o ?? { committed: true })
+      } else sendForward(change, owner, hook)
+    }
+  }
+  const fwdRetryTimer = setInterval(flushForwardRetry, antiEntropyMs)
+  fwdRetryTimer?.unref?.()
 
   // ── orphan shedding (P4, scoped): keep a no-longer-replicated partition until an R-set member is caught up, then drop ──
   // orphans / shedReady: partitions we hold but no longer replicate, + the R-set members confirmed caught up on each.
@@ -615,7 +648,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     }
   }
 
-  // commitLocal: stamp under our provenance, record as LWW winner, log, replicate — owned writes + never-drop fallback.
+  // commitLocal: stamp under our provenance, record as LWW winner, log, replicate — owned/solo writes, forwarded-write commits, buffered-write flushes.
   function commitLocal(change: ChangeRecord) {
     // write-gate chokepoint (V1e): no quorum ⇒ buffer instead of commit, so a minority can't diverge.
     if (viewMgr && !viewMgr.canWrite) {
@@ -736,7 +769,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       done = true
       if (safety) clearTimeout(safety)
       const quorum = o.reason === 'quorum'
-      const reachedTier = quorum ? 'committed' : o.seq !== undefined ? 'committed-local' : 'none'
+      const reachedTier = quorum ? 'committed' : 'none'
       const reason = o.reason ?? 'unconfirmed'
       if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch, origin: o.origin })
       rejectP(
@@ -841,6 +874,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (aeTimer) clearInterval(aeTimer)
       if (compactTimer) clearInterval(compactTimer)
       if (clientFlushTimer) clearInterval(clientFlushTimer)
+      clearInterval(fwdRetryTimer)
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
