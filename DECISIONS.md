@@ -1580,3 +1580,154 @@ it — the version-sample drill is too heavy for the steady ~1/s poll; a slower-
 drill would light it up); the write-route JOIN over `cluster.writes` + the `__observe` ProvRecords the bridge
 already streams (existing data; `cluster.writes` isn't in the poll payload yet); a `networkSource`-backed CLI
 over the gated `__inspect` for remote (non-embedded) capture.
+
+## AA — Write path & conflict/fence semantics; the single-writer invariant & its four-part conflict-elimination program · Investigated → Adopting · (code in progress)
+
+> **This record is the authoritative write-path reference.** It answers, in one read: how writes
+> route, the lost-ACK ambiguity, the EXACT fence-vs-conflict triggers and when each fires, the
+> never-drop policy (and the validated-but-deferred replacement), the write-gate, view-synchronous
+> fencing, and the COMPLETE list of `conflict` sources. If you came here to re-derive "can a
+> conflict still happen" — the answer is **yes**, and §"The conflict invariant" says exactly when.
+
+**Context.** A design review proposed replacing the **never-drop local-commit fallback** with
+**transparent forwarder retry**, on the hypothesis that the fallback is the *single* source of the
+`conflict` write-outcome — so removing it would make `conflict` STRUCTURALLY IMPOSSIBLE (a real
+simplification: single-writer-per-partition guarantee, one fewer outcome, `ProvKind lost` → fence-only).
+This record is the rigorous validation (a multi-agent adversarial workflow: parallel conflict-source
+tracers + diverse adversarial skeptics + synthesis, every claim re-verified against current code).
+
+**The write path (how a write routes).** A partition is a top-level key (`partitionOf = key[0]`); each
+partition has a SINGLE OWNER per epoch (`mesh.owner(p)`), the sole sequencer for its keys (F1). A write
+on `data.x` runs the write-capture sink ([resource/index.ts](resource/index.ts) ~847-930): if WE own the
+partition (or are a solo node) it commits locally under our provenance (`commitLocal`); otherwise it is
+FORWARDED to the owner (`mesh.forward`, ack-confirmed — X), which commits it under ITS OWN provenance
+(`commitForwarded` → sink → `commitLocal`, `committingForward` guard) and replicates the canonical record
+back. A client (no `me`) forwards to a picked server and discards its optimistic copy (X). So in the happy
+path **exactly one origin — the owner — ever stamps a partition's records**, in seq order over one
+connection: the in-order-per-`(origin,partition)` invariant the dedup/LWW core rests on.
+
+**The lost-ACK ambiguity.** An owner-forward is confirmed by a WRITE-ACK ([transport](transport/index.ts)
+~446-460). Socket-write success ≠ delivery (an owner can crash inside the failure-detector lag, taking the
+frame into a dying kernel buffer). No ACK within `callTimeout` (5000ms) is **ambiguous**: the owner may
+have (a) never received it, or (b) committed it and only the ACK was lost. The forwarder cannot tell the
+two apart — this ambiguity is the root of both the never-drop policy and the retry proposal.
+
+**The never-drop fallback (current policy).** On a non-commit outcome — `withheld` (quorum-less owner
+NACK) or `timeout` (no ACK) — OR a synchronous `mesh.forward` returning false (owner not a connected
+peer) — the forwarder commits the write under ITS OWN provenance via `commitLocal` (the two sub-paths:
+the `onOutcome(false)` callback ~index.ts:911, and the branch-3b `&&` short-circuit fallthrough ~:928).
+So a write is NEVER silently dropped. The cost, made precise below, is exactly the `conflict` outcome (+
+an orphan on a non-replica, which P4 sheds).
+
+**Fence vs conflict — the EXACT triggers** (both emit `observe 'lost'` with the winner stamp `{we,ws}`;
+`foldOutcomes` ([tools/debug/export.ts](tools/debug/export.ts) ~297) classifies them by comparing epochs):
+- **fence** — `applyInbound`, an inbound record with `cur && record.epoch < cur.epoch` (strictly LOWER
+  view-epoch than the winner we already hold): a permanent epoch-loser under V1d view-fencing. **NOT
+  logged**, `seen` still advances (B1 sticky skip). [index.ts:524-527]. *Trigger in words:* a write
+  stamped under a SUPERSEDED membership view — a straggler from an old epoch, an evicted/lagging node, a
+  view-change handoff where the new owner already wrote under a higher epoch.
+- **conflict** — `applyInbound`, an inbound record with `cur && record.epoch === cur.epoch` that LOSES the
+  lexicographic `(seq, origin)` tie-break (`!(n > cur.seq || (n === cur.seq && origin > cur.origin))`).
+  **STAYS logged** (per-origin history). [index.ts:536-539]. *Trigger in words:* TWO DISTINCT ORIGINS
+  produced a record for ONE key at the SAME epoch — the loser by `(seq,origin)`.
+
+**The conflict invariant (the load-bearing synthesis).** A `conflict` is, by definition, a violation of
+the single-writer invariant: **"for any partition p and epoch E, at most one origin ever stamps a record
+for p at E."** When it holds, two records for one key at one epoch necessarily share an origin, so they
+resolve by `seq` WITHIN that origin — an idempotent value-update supersede, never a cross-origin conflict.
+A `conflict` can occur ONLY where some node stamps a record at an epoch it does not SOLELY own.
+
+**VERDICT — retry does NOT eliminate `conflict`.** The central hypothesis is **false**: the never-drop
+fallback is the *dominant and most common* invariant-violator, but **not the only one**. The validation
+found FOUR violators (each re-verified against code); removing the fallback closes only the first:
+1. **Never-drop fallback (dominant).** Owner alive + committed (origin=owner, epoch E) + ACK lost +
+   forwarder falls back under its own uuid at the same epoch E ⇒ two origins at E ⇒ conflict. Fires on
+   *every* lost-ACK/unreachable-owner write — the common case. (resource/index.ts:911, :928, :1073).
+2. **`commitForwarded` validates nothing.** It commits a forwarded write with NO ownership/epoch recheck
+   (`committingForward` bypasses the sink's owner check at index.ts:874; the transport WRITE handler does
+   none either, transport:220). In the asymmetric VIEW_COMMIT install window (`#tryCommit` sends
+   VIEW_COMMIT to peers THEN self-installs, [membership.ts](resource/membership.ts):279-280), a forwarder
+   already at E+1 routes to the NEW owner O2 while O2 is still at epoch E and commits the forwarded write
+   under origin=O2 at E — colliding at epoch E with the OLD owner O1's legitimate commit. **This is
+   blessed by F1's own record** ("at worst commits at a not-yet-true owner, which still broadcasts and
+   converges by LWW" — i.e. a same-epoch logged loser). Independent of the fallback.
+3. **`flushPending` re-stamps at the current epoch.** The V1e write-gate buffers a quorum-less node's own
+   local write UN-stamped (commitLocal returns at :1066-1070 BEFORE the stamp at :1073/:1086-1087);
+   `flushPending` re-commits it via `commitLocal` at FLUSH-time (:1156). If ownership moved to B (which
+   committed key k at the new epoch E+1) and this node received B's E+1 record before the flush,
+   epoch-dominance (`cur.epoch > ve` :1087) lifts the flushed write to E+1 under THIS node's origin ⇒ a
+   second origin at E+1. The comment at :1150-1152 concedes the current-epoch re-stamp; the fix is the
+   deferred "preserve attempt-epoch" item (V/F2 deferral, [IDEAS](IDEAS.md)). Independent of the fallback.
+4. **Durable-restore epoch-1 boot (open bug).** A `{pinned uuid, storage}` node restores high-epoch
+   `versions` via `storage.load()` (:587) but boots `ViewManager` at epoch 1 (membership.ts:60,100) as a
+   solo OWNER of every partition. A post-restart local write hits branch-4 `commitLocal` (NOT the
+   fallback); epoch-dominance lifts the stamp back to the restored epoch under this node's origin,
+   colliding with a live same-epoch owner's record during catch-up. The known "Durable view-epoch
+   recovery" bug ([IDEAS](IDEAS.md)). Independent of the fallback.
+
+Mechanistically #2 is "commitForwarded validates no view"; #3/#4 are "epoch-dominance stamps a LOCAL
+write at a FOREIGN epoch under the local origin when this node isn't the sole owner at that epoch"; #1 is
+"a non-owner commits under its own origin at the current epoch." All four = a non-sole-owner stamping a
+record at an epoch it doesn't solely own. **So `conflict` stays in the model**: `commit:conflict`,
+`key:has-conflict`, and `ProvKind lost` remain (lost is NOT fence-only). To make conflict structurally
+impossible you must close ALL FOUR — retry (#1) + an ownership/epoch recheck in `commitForwarded` (#2) +
+attempt-epoch preservation in `flushPending` (#3) + restore-epoch recovery (#4) — a four-part program,
+not a single commit; #2/#3/#4 are each already tracked in [IDEAS](IDEAS.md).
+
+**Transparent forwarder retry IS a sound replacement (just not a conflict-eliminator).** Validated:
+- **New never-drop guarantee (precise).** The forwarder NEVER commits under its own provenance; it RETRIES
+  the forward transparently, **re-resolving `owner(key)` on each attempt** (a mid-retry view change
+  re-targets the NEW owner), for a bounded budget spanning the owner-crash failover window (~detect 3s +
+  `evictAfter` 1.5s + a 2PC view commit ⇒ a budget comfortably > 5s, with a per-attempt `forwardTimeout`
+  of ~1 RTT, NOT the 5s `callTimeout`). The write becomes durable ONLY once an owner ACKs it (sequenced +
+  logged + replicated). On exhaustion: REJECT for confirmed tiers (`{reason:'no owner accepted'}`, no
+  `localCommit.seq`); DROP + ESCALATE owner-suspicion (feed `setSuspect`, a linkage that does not exist on
+  the forward path today) for fire-and-forget. This RELAXES durability vs the fallback: the write lives
+  only in the forwarder's volatile buffer until an owner accepts, so a forwarder crash mid-retry loses an
+  unconfirmed fire-and-forget write the fallback would have salvaged — acceptable under the fire-and-forget
+  no-durability contract (Z), but a real change confirmed callers must not rely on `localCommit.seq` for.
+- **Dedup story (why retry avoids conflict on the common case).** A re-forwarded (lost-ACK) write is NOT
+  deduped at the owner (`seen[]` dedups REPLICATED records in `applyInbound`; a forward is an un-sequenced
+  request applied via `commitForwarded`, which never consults `seen`). So a retry re-commits at the owner
+  — but under the SAME origin (the owner's uuid) with a FRESH higher seq, i.e. a same-origin, same-epoch
+  LWW SUPERSEDE, never a second distinct origin. The value is identical (a retry of the same write), so
+  materialized state is unchanged; only an extra (compactible) log record. This is precisely why retry
+  removes the FALLBACK's conflict (a forwarder-origin record) and replaces it with an owner-origin
+  supersede. (Residual: non-idempotent ops would double-apply; cid-dedup on the owner is the
+  already-deferred remedy, [IDEAS](IDEAS.md) — retry raises its priority by making re-forwards routine.)
+- **Perf — neutral on the steady path.** The lone-server perf workload (`index.perf.ts`, <150ms/10k) hits
+  the single-member `owner()` fast path → branch-3b is skipped, the forward/retry machinery never
+  allocated. The clustered steady state (owner reachable, ACK first try) already pays one
+  `peer.write`+`setTimeout`+`forwards.set` per forward TODAY; the ACK clears the timer without entering
+  `commitLocal`. Retry touches ONLY the predicted-false failure branches, PROVIDED its state is kept cold
+  (allocated inside the failure branch, never per successful forward). Guard gap: no transport perf test
+  covers the forward→ACK round-trip; a 2-node owner-routed forward-throughput perf test is the right guard.
+
+**Decision — implement the full four-part program (close ALL four sources, so the single-writer
+invariant holds and `conflict` becomes structurally impossible).** Retry in isolation would trade the
+durability backstop for an *incomplete* conflict reduction (3 of 4 sources remain) — not worth shipping
+alone. Done as the complete program, retry's relaxed-durability trade is paid for by the structural
+single-writer guarantee: once every node only ever stamps a partition it solely owns at its epoch,
+`commit:conflict` can no longer occur and the model genuinely loses an outcome. This record is the SPEC;
+each part lands as its own commit with tests + perf (and flips this record's status toward Adopted as it
+does). The ordering is retry first (#1, the dominant source + the new never-drop guarantee), then the
+recheck/epoch fixes (#2/#3/#4, each a narrow latent window). Until all four land, `conflict` stays in the
+model and the never-drop fallback remains the durability backstop; this record is where the semantics are
+answerable from — no re-derivation from code required.
+
+**Consequences.**
+- Supersedes nothing in code; it CORRECTS the framing that the fallback is the sole conflict source (it is
+  the dominant one) and makes the complete source list authoritative. F1's never-drop-local-commit and X's
+  ack-confirmed-forward rationale stand unchanged.
+- `commit:conflict` / `key:has-conflict` / `ProvKind lost` (both fence and conflict) STAY in the grammar
+  ([tools/debug/filter-grammar.md](tools/debug/filter-grammar.md)) — the exact triggers above are now
+  documented there.
+- The retry design (the new guarantee, the dedup story, the perf mandate, the edge cases) is captured for
+  the eventual implementation, gated on the conflict-elimination decision.
+
+**Open follow-ups → [IDEAS](IDEAS.md) (Partitioned ownership & routing; Bounded memory):** the four-part
+conflict-elimination program — transparent forwarder retry (#1, replacing the never-drop local commit) +
+an ownership/epoch recheck in `commitForwarded` (#2) + preserve a buffered write's attempt-epoch in
+`flushPending` (#3) + restore the view-epoch to `max(restored)` on a pinned-uuid+storage boot (#4); plus
+cid-dedup on the owner for non-idempotent ops (whose priority retry raises) and the forward→failure-
+detector suspicion linkage retry needs.

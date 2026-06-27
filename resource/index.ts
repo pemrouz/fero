@@ -901,6 +901,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       // violation). The ack-confirmed forward keeps a never-drop fallback armed: no ACK within
       // callTimeout ⇒ commit under OUR provenance (an orphan on a non-holder — P4 sheds it once
       // the R-set confirms; a duplicate when only the ack was lost converges via LWW).
+      // CONFLICT NOTE (DECISIONS AA): this fallback — committing under OUR (a non-owner's) provenance
+      // at the current epoch — is the DOMINANT source of the same-epoch `conflict` outcome (owner
+      // alive + committed + ACK lost ⇒ two origins at one epoch). It is being replaced by transparent
+      // forwarder retry (part 1 of the four-part conflict-elimination program, DECISIONS AA): retry
+      // alone does NOT eliminate `conflict` (three other same-epoch/two-origin paths — #2/#3/#4 —
+      // remain), so the four parts land together. Until part 1 lands the fallback is the backstop.
       const owner = mesh.owner(p)
       if (
         owner !== undefined &&
@@ -1057,6 +1063,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // Commit a record under OUR provenance: stamp (origin=us, Lamport seq), record
   // it as the LWW winner for its key, log it, and replicate. Used for partitions
   // we own and as the never-drop fallback when an owner is unreachable.
+  // CONFLICT INVARIANT (DECISIONS AA): a `conflict` happens iff some node stamps a record at an
+  // epoch it does NOT solely own. This function is the single stamp site (change.origin = uuid).
+  // It's safe when we ARE owner(p) at our epoch; it MANUFACTURES a same-epoch second origin (⇒ a
+  // logged `conflict` loser) when reached for a partition we don't solely own at the stamped
+  // epoch — via the never-drop fallback (3b), a flushPending replay re-stamped at a moved-on epoch
+  // (the attempt-epoch deferral), or a restored solo-owner write epoch-dominance-lifted to a
+  // foreign epoch (the epoch-1-boot bug). The latter two stamp at `e = max(viewEpoch, cur.epoch)`
+  // below; see DECISIONS AA for the full source list + the four-part elimination program.
   function commitLocal(change: ChangeRecord) {
     //! write-gate chokepoint (V1e): no quorum ⇒ buffer instead of commit, so a minority can't diverge.
     // Write-gate chokepoint (V1e): without a reachable quorum we are read-only —
@@ -1133,6 +1147,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // write into our authoritative, sequenced one. `committingForward` tells the
   // sink to commit it as-is rather than re-evaluate ownership (no re-forward → no
   // ping-pong while ring views are still settling).
+  // CONFLICT SOURCE #2 (DECISIONS AA): committing as-is with NO ownership/epoch recheck is the
+  // F1-blessed "commit at a not-yet-true owner, converge by LWW" — but in the asymmetric
+  // VIEW_COMMIT install window that convergence is a same-epoch `conflict` (a forwarder ahead at
+  // E+1 makes us, still at E and not yet the owner, stamp under our origin at E, colliding with the
+  // old owner's E commit). An ownership/epoch recheck (reject/re-forward when we're not owner(p) at
+  // our epoch) would close it — paired with the reject-stale-epoch fence (IDEAS).
   const commitForwarded = (record: ChangeRecord): WriteOutcome | undefined => {
     committingForward = true
     lastCommit = undefined
@@ -1149,7 +1169,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // read-only, in order. commitLocal re-checks canWrite, so anything that can't go
   // out (gate closed again) simply re-buffers. (Buffered writes flush under the
   // CURRENT epoch — a known V1e semantic; preserving the attempt-epoch is an F2
-  // refinement.)
+  // refinement. This current-epoch re-stamp is conflict-source #3 (DECISIONS AA):
+  // if ownership moved while we were quorum-less, epoch-dominance in commitLocal can
+  // stamp the flushed write at the new owner's epoch under OUR origin — a same-epoch
+  // `conflict`. Preserving the attempt-epoch closes it.)
   function flushPending() {
     if (!pending.length) return
     const batch = pending.splice(0)

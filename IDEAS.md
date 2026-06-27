@@ -194,7 +194,10 @@ Several unbounded structures interlock. **In-memory log compaction has LANDED**
   epoch-fenced (V1d), so it diverges from peers and doesn't reconverge. Surfaced by the W
   design review (it's also what forces W's `epoch ≥` dominance guard). Restore the view epoch
   to `max(restored)` on boot (or floor a fresh node's local-write epoch above the restored
-  max). Only affects pinned-uuid + storage. (resource, membership)
+  max). Only affects pinned-uuid + storage. Also conflict-closer #4 ([DECISIONS AA](DECISIONS.md)):
+  the epoch-1 boot lets a solo-owner local write epoch-dominance-stamp at the restored epoch under
+  this node's origin, colliding with the live owner's same-epoch record (a `conflict`, not just a
+  fence). (resource, membership)
 - **[P3]** `log()` storage-adapter / compaction-policy options; `heads()` allocates
   per call (cache + invalidate on append).
 
@@ -238,7 +241,37 @@ The routed/projected model (plan §5–6) has landed
   no ACK within `callTimeout` ⇒ the caller commits under its own provenance (an orphan a
   non-holder P4-sheds). Remaining: read-your-writes still routes a subsequent read to the
   stale owner until AE reconciles; and preserving the buffered write's ORIGINAL attempt-epoch
-  on flush (V deferral).
+  on flush (V deferral — also a conflict-closer #3, see below).
+- **Conflict-elimination program (4 parts) — VALIDATED, DEFERRED** ([DECISIONS AA](DECISIONS.md)).
+  The design-review hypothesis (the never-drop fallback is the *single* source of `commit:conflict`,
+  so removing it makes conflict structurally impossible) was rigorously **REFUTED**. A `conflict` is
+  a violation of the single-writer invariant ("at most one origin stamps a partition's records per
+  epoch"); the fallback is the DOMINANT violator but **not the only one**. So `commit:conflict` /
+  `key:has-conflict` / `ProvKind lost` (NOT fence-only) **stay in the model** — only closing ALL FOUR
+  sources makes conflict impossible:
+  1. **Transparent forwarder retry** (replaces the never-drop LOCAL commit, F1/X). Forwarder never
+     commits under own provenance; RETRIES the forward (re-resolving `owner(key)` each attempt,
+     bounded budget spanning the failover window, per-attempt `forwardTimeout` ≪ the 5s `callTimeout`),
+     then REJECTS (confirmed) / DROPS+escalates-suspicion (fire-and-forget) on exhaustion. VALIDATED
+     sound + perf-neutral (cold-path only); the lost-ACK re-forward is a *same-origin* owner supersede
+     (not a conflict). But RELAXES durability (volatile until an owner ACKs — a forwarder crash
+     mid-retry loses an unconfirmed fire-and-forget write the fallback salvaged) and changes the
+     confirmed-reject shape (no `localCommit.seq`); needs a forward→failure-detector `setSuspect`
+     linkage (none today). (resource: index; transport)
+  2. **`commitForwarded` ownership/epoch recheck.** It commits a forwarded write with NO validation
+     (`committingForward` bypasses the sink owner-check, the transport WRITE handler checks nothing),
+     so in the asymmetric VIEW_COMMIT install window a forwarder ahead at E+1 makes the new owner
+     (still at E) commit under its origin at E, colliding with the old owner's epoch-E commit (F1
+     explicitly blesses "commit at a not-yet-true owner, converge by LWW" = a same-epoch conflict).
+     Reject/re-forward a write whose target isn't `owner(p)` at the receiver's epoch — pairs with the
+     reject-stale-epoch fence above. (resource: index, membership; transport)
+  3. **Preserve the buffered write's attempt-epoch in `flushPending`** — the V deferral above, now
+     also a conflict-closer (a quorum-less node's buffered own-write is flushed at the CURRENT epoch;
+     epoch-dominance can lift it to a moved-on owner's epoch under this node's origin). (resource: index)
+  4. **Restore the view-epoch on a pinned-uuid+storage boot** — the "Durable view-epoch recovery" item
+     under Bounded memory (booting `ViewManager` at epoch 1 with restored high-epoch `versions` lets a
+     solo-owner local write epoch-dominance-stamp at the restored epoch under this node's origin).
+     (resource, membership)
 - **Stale shed-confirmation across an orphan write — LANDED** ([DECISIONS P4a](DECISIONS.md)):
   `commitLocal` now clears `shedReady[p]` when its never-drop fallback appends a fresh winner to
   an orphan, so a confirmation earned against the old high-water can't be reused to shed before
@@ -259,6 +292,8 @@ Both halves of [open question 2], from [DECISIONS D + E](DECISIONS.md).
 - **Preserve a buffered write's attempt-epoch on flush.** V1e buffers writes when
   quorum-less and flushes them under the *current* epoch (so they win LWW on rejoin);
   preserving the original attempt-epoch is the refinement ([DECISIONS V](DECISIONS.md)).
+  Also conflict-closer #3 ([DECISIONS AA](DECISIONS.md)): the current-epoch re-stamp can
+  put a second origin on a partition at a moved-on owner's epoch (a same-epoch `conflict`).
 
 ### Dial scheduling & discovery — [P1] (transport: peers, retries, discovery)
 - **[P1] `multicast.ts`** — LAN zero-config UDP multicast discovery (plan §9), not

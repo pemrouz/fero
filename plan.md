@@ -225,6 +225,7 @@ Inside a handler, every `data.x = y` is intercepted: change record built, routed
 - **Subscriptions returned from methods are server-local.** The connected server peer holds the projection's incremental state and pipes deltas to the client. If that server drops, the client reconnects to another and re-subscribes (hard failure for v1; reconnect machinery comes with chaos tests).
 - **No cross-partition atomicity.** Two writes in one handler targeting different partitions hit different owners. Same constraint as old fero; document, don't paper over.
 - **Methods themselves don't need a partition key.** The writes inside them are partitioned by `change.key[0]` (configurable). Methods themselves run anywhere.
+- **Owner = sole sequencer; lost-ACK, fence vs conflict, the never-drop policy.** The exact write-path semantics — how a write routes to `owner(key)`, the lost-ACK ambiguity, the precise fence vs conflict triggers and when each fires, the write-gate, view-synchronous fencing, the never-drop fallback (and the validated-but-deferred transparent-forwarder-retry replacement), and the COMPLETE list of `conflict` sources — are the authoritative reference in [DECISIONS AA](DECISIONS.md). `conflict` is a violation of the single-writer-per-(partition,epoch) invariant; it is **not** eliminated by removing the never-drop fallback (that was validated and refuted).
 
 ---
 
