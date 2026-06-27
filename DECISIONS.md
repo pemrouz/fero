@@ -1731,3 +1731,99 @@ an ownership/epoch recheck in `commitForwarded` (#2) + preserve a buffered write
 `flushPending` (#3) + restore the view-epoch to `max(restored)` on a pinned-uuid+storage boot (#4); plus
 cid-dedup on the owner for non-idempotent ops (whose priority retry raises) and the forward→failure-
 detector suspicion linkage retry needs.
+
+## AB — Provenance kinds audit: keep `local` / `forwarded` / `won` (forwarded retained as a not-yet-surfaced fact) · Investigated · (no code)
+
+> **This record is the authoritative provenance-kind reference.** The canonical per-kind definition
+> lives on the `ProvKind` type itself ([resource/observe.ts](resource/observe.ts):24); this record is
+> the *why* behind keeping all three accepted kinds, with the consumer / derivability / cost / fallback
+> evidence. If you came here to ask "do we still need `local` vs `forwarded` vs `won`" — the answer is
+> **yes, all three**, for the reasons below.
+
+**Context.** fero tags every committed/applied record on the `__observe` stream with a `ProvKind`
+([DECISIONS O](#o--observe-a-pull-spine-snapshot--one-gated-push-hook-the-l4-network-observer--adopted)).
+Three are "accepted" provenance: `local` (an owner committing its OWN write), `forwarded` (an owner
+committing a peer's ROUTED write — `commitForwarded` → `committingForward`), and `won` (a replica
+APPLYING an inbound replicated record that won LWW). The question: do all three earn their keep, or can
+any be collapsed / dropped / derived? Decided per-kind via a multi-agent audit (parallel consumer-trace +
+derivability + cost-with-perf + purpose/fallback tracers, then adversarial skeptics refuting each
+verdict; every claim re-verified against current code).
+
+**A note on timing.** The audit ran as the **transparent-forwarder-retry** change (AA Part 1) landed in
+the tree, so the verdicts factor in that the **never-drop fallback is gone** — `local` is now (mostly)
+"owner-authored," not "any node's own-provenance commit." This *sharpened* the `local`/`forwarded` split
+rather than blurring it.
+
+**VERDICT — keep all three. None is merged, dropped, or derived.**
+
+- **`won` → KEEP** (and the proposed `applied` rename is **declined**). It is the sole replication-apply
+  signal: the `repl/s` rate ([tools/observe/bridge.ts](../tools/observe/bridge.ts) `prov.won++`;
+  [tools/observe/web/app.js](../tools/observe/web/app.js) `rates.repl`) and the per-replica apply trace a
+  pull snapshot structurally cannot show (a poll never sees an applied-then-superseded record). **Not
+  derivable** from `ProvRecord` scalars: `won` is the LWW outcome decided against the held per-key version
+  (`index.ts` `applyInbound` ~536), which a downstream consumer holding only `{origin,seq,epoch,key}`
+  cannot recompute. `origin !== me` separates won from local/forwarded (inbound records keep the sender
+  origin) but NOT from `lost`/`dropped` (all inbound share it). The rename is net churn (the rename-fragile
+  literal-keyed `stats` at app.js:67/98, bridge counters, the grammar `commit:won` / `replica:won`) for no
+  clarity gain — `won`/`lost` is already the precise LWW-outcome antonym pair.
+
+- **`local` → KEEP.** Drives `writes/s` + the hot-keys working set + top-origins boards (bridge.ts ~355,
+  app.js ~109/173). Realized and load-bearing.
+
+- **`forwarded` → KEEP** (a deliberate call, not a default — the alternative was merging it into `local`).
+  Today **no live consumer branches on `local` vs `forwarded`**: every site sums them (bridge.ts:355
+  `local || forwarded → writes++`; app.js:109/173 sum them); the only place they differ is a cosmetic CSS
+  hue ([app.css](../tools/observe/web/app.css):170). By the repo's "a distinction driving no decision is a
+  merge candidate" principle that is a merge candidate — and the merge is perf-neutral (the
+  `committingForward ? 'forwarded' : 'local'` ternary is short-circuited when unwatched, sub-nanosecond when
+  watched; `committingForward` stays regardless — it gates the re-forward skip at `index.ts` ~874). It is
+  kept anyway, for two findings the merge would discard:
+  1. **It is the ONLY capture of "this owner-commit was routed-in," and that fact is recoverable from no
+     other stored signal.** A forwarded write's `origin` is RE-STAMPED to the owner at `commitLocal`
+     (`change.origin = uuid`), so `origin === me` holds for BOTH `local` and `forwarded`; the original
+     caller identity is preserved nowhere — not on the committed `ChangeRecord`, not on `cluster.writes`
+     (its `origin` is the owner — [DECISIONS Z](#z--optimistic-apply-narrowed--tiered-write-confirmation-the-confirm-surface--adopted-3d5787a9f0edd6)),
+     not on the `ProvRecord`. The discriminator is purely the transient `committingForward` flag at emit.
+     This also **corrects a stale IDEAS note**: the "Write-route JOIN" cannot derive forwarded-ness as
+     `cluster.writes.origin != owner(key)` — that predicate is always false for a normal forward; showing
+     the origin→owner hop needs NEW caller-origin instrumentation (tracked in IDEAS).
+  2. **The fallback removal just made it a clean fact** ("owner-authored" vs "owner-routed") and the
+     observability layer is being built to surface exactly these provenance facts (it is a documented
+     "◦ observe-only" token in the [filter grammar](../tools/debug/filter-grammar.md) `commit:` rows; its
+     consumer is the planned forward-traffic / write-route view). Keeping a clean, zero-cost,
+     uniquely-captured, planned signal is the higher-integrity call; the "drop-if-no-decision" principle
+     targets *cost and firehoses*, and `forwarded` is neither.
+  **Merge-eligible iff the forward-traffic view is abandoned** — re-addable in ~1 line (`committingForward`
+  stays). The decision to keep was the user's, given the roadmap intent.
+
+**Fallback interaction (factored in, changes no verdict).** Removing the never-drop fallback (AA Part 1,
+landed) removes the dominant path by which a NON-owner emitted `local`, so `local` collapses toward
+"owner-authored." It is not airtight: three residual same-epoch/two-origin paths (AA #2 `commitForwarded`
+missing recheck, #3 `flushPending` current-epoch re-stamp, #4 durable epoch-1 boot) still reach
+`commitLocal` with `committingForward === false`, i.e. still emit `local` from a non-sole-owner, until the
+full four-part program lands. Either way no live consumer distinguishes `local` from `forwarded`, so the
+precise meaning of `local` drives no decision; the fallback governs `conflict`/`lost` semantics (AA), not
+whether these kinds earn their keep.
+
+**Cost (perf-backed).** The emit is not a measurable per-record cost. Unwatched: `observe?.onRecord(...)`
+short-circuits before its args evaluate (the ternary is never even computed) — `observe.perf.ts` Test I:
+configured-unwatched/plain = 1.005–1.020× (threshold <1.15). Watched: ~2.4–2.65× the bare write
+(Test II, threshold <4.5), dominated by the `push()` ProvRecord build + the data-proxy slot write, not the
+kind selection. Merging or dropping a kind saves nothing measurable on the hot path; `dropped` is already
+verbose-gated off the steady path. (The `index.perf.ts` 150ms absolute gate trips on this loaded WSL2 box
+— pre-existing flakiness, not this change; the ratio tests, which cancel that drift, pass clean.)
+
+**Derivability summary.** Only the `local`/`forwarded`-vs-`won` split is cleanly derivable (`origin === me`
+vs `≠ me`). `won` is partial (the apply half is exact; ownership isn't on the ProvRecord). `local` vs
+`forwarded` is NOT post-hoc derivable from any stored field — it lives solely in the transient
+`committingForward` flag, and the ProvRecord deliberately drops the original writer origin.
+
+**Consequences / no code change.** All three kinds, both emit sites
+([resource/index.ts](resource/index.ts) `commitLocal` ~1159 and `applyInbound` ~545), and the grammar's
+`commit:` / `replica:` rows stand. The emit-site comments are already accurate; the `ProvKind` type comment
+is enriched to be the canonical per-kind model.
+
+**Open follow-ups → [IDEAS](IDEAS.md):** the **Write-route JOIN** note is corrected (it needs
+caller-origin instrumentation, not a derivation); a small grammar breadcrumb (mark the `commit:` won/local/
+forwarded rows "audited: keep, DECISIONS AB") rides the in-flight `filter-grammar.md` restyle. Revisit
+`forwarded` for a merge only if the forward-traffic view is dropped from the roadmap.

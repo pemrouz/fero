@@ -20,7 +20,31 @@
 import { $ } from '../../data/index.ts'
 import { type ChangeRecord } from '../transport/message.ts'
 
-//! ProvKind: the contention tag the dashboard colours by — a committed/forwarded write, an LWW loser, a dedup drop, or a membership transition.
+//! ProvKind: the provenance/contention tag the dashboard colours by — three ACCEPTED kinds (local=owner-authored · forwarded=owner-routed · won=inbound LWW-winner applied), the LWW loser `lost`, the dedup `dropped`, and the membership transitions `view`/`writable`. All three accepted kinds audited & KEPT — DECISIONS AB.
+// The three "accepted" kinds split a committed/applied record by WHERE it was sequenced. Audited
+// against every consumer + derivability + cost + the fallback interaction; all three KEPT (DECISIONS AB):
+//   • local     — this node committed a write under its OWN provenance because it owns the partition
+//                 (or is solo). Drives writes/s + the hot-keys / top-origins boards. After DECISIONS-AA
+//                 Part 1 (the never-drop fallback is gone) `local` ≈ "owner-authored"; three residual
+//                 paths (AA #2–#4) keep that from being airtight until the full four-part program lands.
+//   • forwarded — this OWNER committed a write ROUTED here from another node (commitForwarded → sink →
+//                 commitLocal, the `committingForward` guard). SAME wire shape as `local`: origin is
+//                 RE-STAMPED to us at commitLocal, so a forwarded record's `origin === me`, and the
+//                 original writer's identity is preserved NOWHERE (not here, not on the committed record,
+//                 not on `cluster.writes`). The ONLY discriminator is the transient `committingForward`
+//                 flag — NOT a record field — so forwarded-ness is recoverable from no other stored
+//                 signal. KEPT for that reason even though no consumer surfaces it yet (its consumer is
+//                 the planned forward-traffic view, IDEAS Write-route JOIN); writer-anonymous, so it
+//                 answers "how much routing" not "from whom". Merge-eligible only if that view is
+//                 abandoned — re-addable in ~1 line since `committingForward` stays (the re-forward guard).
+//   • won       — an inbound REPLICATED record this node applied as the LWW winner (applyInbound). origin
+//                 is the SENDER/owner (≠ me). Drives repl/s — the per-replica apply signal a pull snapshot
+//                 structurally cannot show. NOT derivable from ProvRecord scalars (the LWW outcome needs
+//                 the held version history a downstream consumer lacks). Antonym of `lost` (kept that name;
+//                 `applied` rename declined — won/lost is the precise LWW-outcome pair, DECISIONS AB).
+// lost = an LWW loser — fence (epoch < winner) or conflict (same-epoch (seq,origin) loser); the {we,ws}
+// winner stamp lets a surface tell the two apart. dropped = a dedup re-delivery (verbose-only, off the
+// steady path). view/writable = membership transitions, emitted off the per-record path.
 export type ProvKind = 'won' | 'lost' | 'forwarded' | 'local' | 'dropped' | 'view' | 'writable'
 
 //! ProvRecord: one flat provenance event — scalars only (no cloned value), so an emit is cheap and the streamed frame is tiny.
