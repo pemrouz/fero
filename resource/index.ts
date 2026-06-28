@@ -677,7 +677,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // Inbound write-request: a peer forwarded a write for a partition we own.
     // Apply it as a LOCAL write so our sink commits it (stamps origin=us, logs,
     // replicates) — we are the single sequencer for the partition.
-    onWrite: (record: ChangeRecord) => commitForwarded(record),
+    onWrite: (record: ChangeRecord, address: string) => commitForwarded(record, address),
     //! onReplProbe/onReplAck: confirm:'replicated' — answer a probe once caught up; tally a replica's ack toward the W quorum.
     onReplProbe: (cid, probe, address) => recvReplProbe(cid, probe, address),
     onReplAck: (cid, address) => recvReplAck(cid, address),
@@ -1198,13 +1198,38 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // write into our authoritative, sequenced one. `committingForward` tells the
   // sink to commit it as-is rather than re-evaluate ownership (no re-forward → no
   // ping-pong while ring views are still settling).
-  // CONFLICT SOURCE #2 (DECISIONS AA): committing as-is with NO ownership/epoch recheck is the
-  // F1-blessed "commit at a not-yet-true owner, converge by LWW" — but in the asymmetric
-  // VIEW_COMMIT install window that convergence is a same-epoch `conflict` (a forwarder ahead at
-  // E+1 makes us, still at E and not yet the owner, stamp under our origin at E, colliding with the
-  // old owner's E commit). An ownership/epoch recheck (reject/re-forward when we're not owner(p) at
-  // our epoch) would close it — paired with the reject-stale-epoch fence (IDEAS).
-  const commitForwarded = (record: ChangeRecord): WriteOutcome | undefined => {
+  //! Part 2 (DECISIONS AA #2): NACK a forwarded write for a partition we do NOT own at OUR CURRENT epoch.
+  // F1 made committingForward commit a forward AS-IS (no ownership recheck) to dodge a pre-V ping-pong:
+  // back then the ring came from LIVE CONNECTIONS, churned constantly, and a receiver re-FORWARDING to
+  // its own computed owner bounced the write between nodes "until membership converges" (multi-second
+  // stalls). That blessed "commit at a not-yet-true owner, converge by LWW" — which, in the asymmetric
+  // VIEW_COMMIT install window, IS the same-epoch `conflict` (#2): a forwarder ahead at E+1 forwards to
+  // the new owner O2, still at epoch E, which would stamp the write under ITS origin at E, colliding
+  // with the OLD owner O1's legitimate E commit. The fix is a LOCAL recheck — NACK if we are not
+  // `owner(p)` at our current epoch — safe NOW because view-synchrony (V) makes the ring a pure
+  // function of (committed members, epoch), so a node's current-epoch ring has EXACTLY ONE owner per
+  // partition: O2 at epoch E computes `owner(p) = O1` (p's E-owner — O2 only owns p in the E+1 ring),
+  // so it NACKs instead of stamping a stale-epoch second origin. The forwarder's Part-1 retry
+  // re-resolves owner + re-forwards (bounded by O2's sub-second install lag, NOT the unbounded pre-V
+  // churn — and it returns to the ORIGINAL forwarder, not a node-to-node bounce). A solo / not-yet-
+  // joined node owns EVERY partition (`owner===me`) so it still ACCEPTS (no formation stall); a stale
+  // commit it makes at the low epoch is FENCED (not a conflict) once the real view's owner writes.
+  const commitForwarded = (record: ChangeRecord, fromAddress?: string): WriteOutcome | undefined => {
+    if (me !== undefined && mesh.owner(partitionOf(record)) !== me) {
+      // We do NOT own p at our current epoch — committing here would stamp a stale-epoch second origin
+      // (#2). Two sender kinds, two handlings:
+      //  • a SERVER (a committed-view member) forwards to owner(p) per ITS ring, so a mismatch means its
+      //    ring is momentarily stale (the handoff window) — NACK so it re-resolves + retries via its own
+      //    ring (and a confirm gets the TRUE outcome from the real owner, not a routing ack).
+      //  • a CLIENT has NO ring: it forwarded to a PICKED server (us), not the owner — it can't
+      //    re-resolve, so WE route it to the owner via Part 1 sendForward (buffers + retries) and ACK
+      //    accepted. A client CONFIRM write takes the RPC path (serveCall → methods.update), not this
+      //    forward, so no owner-outcome relay is needed here; client assignments are fire-and-forget.
+      if (fromAddress !== undefined && mesh.viewMembers().includes(fromAddress)) return { committed: false, reason: 'not-owner' }
+      const owner = mesh.owner(partitionOf(record))
+      if (owner !== undefined && owner !== me) sendForward(record, owner) // route to the real owner on the client's behalf
+      return { committed: true } // accepted for routing (we took responsibility via sendForward)
+    }
     committingForward = true
     lastCommit = undefined
     try {

@@ -184,7 +184,7 @@ export function transport(opts: TransportOpts): Mesh {
         // WRITE-ACK / NACK: report the TRUE commit outcome — a quorum-less owner that BUFFERED the write must NOT falsely ack it (the acknowledged-loss bug).
         if (frame.id !== undefined) {
           const committed = outcome === undefined || outcome.committed
-          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch, origin: outcome?.origin } : { ok: false, reason: 'withheld' }, frame.id))
+          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch, origin: outcome?.origin } : { ok: false, reason: (outcome && outcome.reason) || 'withheld' }, frame.id))
         }
         return
       }

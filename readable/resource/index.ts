@@ -401,7 +401,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
     // onPeerGone: reap a dropped peer's served subscriptions so a gone client doesn't leak sinks/openFolds.
     onPeerGone: (address: string) => dispatch.reapPeer(address),
     // onWrite: a forwarded write for a partition we own — commit it locally; we are its single sequencer.
-    onWrite: (record: ChangeRecord) => commitForwarded(record),
+    onWrite: (record: ChangeRecord, address: string) => commitForwarded(record, address),
     // onReplProbe/onReplAck: confirm:'replicated' — answer a probe once caught up; tally a replica's ack toward the W quorum.
     onReplProbe: (cid, probe, address) => recvReplProbe(cid, probe, address),
     onReplAck: (cid, address) => recvReplAck(cid, address),
@@ -687,7 +687,14 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   }
 
   // commitForwarded: apply a forwarded write so the sink commits it as ours; committingForward stops a re-forward.
-  const commitForwarded = (record: ChangeRecord): WriteOutcome | undefined => {
+  // Part 2 (DECISIONS AA #2): NACK a forwarded write for a partition we do NOT own at OUR CURRENT epoch.
+  const commitForwarded = (record: ChangeRecord, fromAddress?: string): WriteOutcome | undefined => {
+    if (me !== undefined && mesh.owner(partitionOf(record)) !== me) {
+      if (fromAddress !== undefined && mesh.viewMembers().includes(fromAddress)) return { committed: false, reason: 'not-owner' }
+      const owner = mesh.owner(partitionOf(record))
+      if (owner !== undefined && owner !== me) sendForward(record, owner)
+      return { committed: true }
+    }
     committingForward = true
     lastCommit = undefined
     try {

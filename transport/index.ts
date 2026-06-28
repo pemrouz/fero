@@ -227,7 +227,7 @@ export function transport(opts: TransportOpts): Mesh {
         // back (at-least-once). A bare WRITE (no id, the legacy/digest path) is not acked.
         if (frame.id !== undefined) {
           const committed = outcome === undefined || outcome.committed
-          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch, origin: outcome?.origin } : { ok: false, reason: 'withheld' }, frame.id))
+          peer.write(controlFrame(VERB.ACK, committed ? { ok: true, seq: outcome?.seq, epoch: outcome?.epoch, origin: outcome?.origin } : { ok: false, reason: (outcome && outcome.reason) || 'withheld' }, frame.id)) // relay the TRUE non-commit reason (withheld = quorum-less buffer, not-owner = we don't own p at our epoch — Part 2); either way the forwarder retries
         }
         return
       }
