@@ -339,7 +339,7 @@ export const bridge = (opts: {
   // the raw fan-out. Grid mode keeps the raw stream (the small-cluster ticker/hot-keys drill-down).
   // Accumulators are O(1)/event, reset each window; bounded by distinct keys/origins seen (top-K slices the rest).
   const PROV_TOPK = 12
-  const provReset = () => ({ writes: 0, won: 0, conflicts: 0, rebalance: 0, keys: new Map<string, number>(), origins: new Map<string, number>(), since: Date.now() })
+  const provReset = () => ({ writes: 0, applied: 0, conflicts: 0, rebalance: 0, keys: new Map<string, number>(), origins: new Map<string, number>(), since: Date.now() })
   let prov = provReset()
 
   //! Emit one SSE event to every connected client.
@@ -356,7 +356,7 @@ export const bridge = (opts: {
       prov.writes++
       if (e.origin) prov.origins.set(e.origin, (prov.origins.get(e.origin) ?? 0) + 1) // hot owners = top committing nodes
       if (e.key) prov.keys.set(e.key, (prov.keys.get(e.key) ?? 0) + 1)
-    } else if (e.kind === 'won') prov.won++
+    } else if (e.kind === 'applied') prov.applied++
     else if (e.kind === 'lost') {
       // same split as the dashboard: a stale-view loser (epoch < winner epoch) is EXPECTED rebalance
       // churn; a same-epoch loser is a TRUE conflict (the alarm) and a genuinely contended hot key.
@@ -451,7 +451,7 @@ export const bridge = (opts: {
     const out = {
       at: Date.now(),
       window: elapsed,
-      rates: { writes: perSec(prov.writes), repl: perSec(prov.won), conflicts: prov.conflicts, rebalance: prov.rebalance },
+      rates: { writes: perSec(prov.writes), repl: perSec(prov.applied), conflicts: prov.conflicts, rebalance: prov.rebalance },
       keys: topK(prov.keys, PROV_TOPK).map(([key, n]) => ({ key, n })),
       origins: topK(prov.origins, PROV_TOPK).map(([origin, n]) => ({ origin, n })),
       nodes: observeSubs.size, // # of node streams this rollup folds (it's an aggregate, not one node — surfaced for honesty)

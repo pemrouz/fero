@@ -20,7 +20,7 @@
 import { $ } from '../../data/index.ts'
 import { type ChangeRecord } from '../transport/message.ts'
 
-//! ProvKind: the provenance/contention tag the dashboard colours by — three ACCEPTED kinds (local=owner-authored · forwarded=owner-routed · won=inbound LWW-winner applied), the LWW loser `lost`, the dedup `dropped`, and the membership transitions `view`/`writable`. All three accepted kinds audited & KEPT — DECISIONS AB.
+//! ProvKind: the provenance/contention tag the dashboard colours by — three ACCEPTED kinds (local=owner-authored · forwarded=owner-routed · applied=inbound record applied here), the LWW loser `lost`, the dedup `dropped`, and the membership transitions `view`/`writable`. All three accepted kinds audited & KEPT (`won`→`applied`) — DECISIONS AB.
 // The three "accepted" kinds split a committed/applied record by WHERE it was sequenced. Audited
 // against every consumer + derivability + cost + the fallback interaction; all three KEPT (DECISIONS AB):
 //   • local     — this node committed a write under its OWN provenance because it owns the partition
@@ -37,15 +37,16 @@ import { type ChangeRecord } from '../transport/message.ts'
 //                 the planned forward-traffic view, IDEAS Write-route JOIN); writer-anonymous, so it
 //                 answers "how much routing" not "from whom". Merge-eligible only if that view is
 //                 abandoned — re-addable in ~1 line since `committingForward` stays (the re-forward guard).
-//   • won       — an inbound REPLICATED record this node applied as the LWW winner (applyInbound). origin
-//                 is the SENDER/owner (≠ me). Drives repl/s — the per-replica apply signal a pull snapshot
-//                 structurally cannot show. NOT derivable from ProvRecord scalars (the LWW outcome needs
-//                 the held version history a downstream consumer lacks). Antonym of `lost` (kept that name;
-//                 `applied` rename declined — won/lost is the precise LWW-outcome pair, DECISIONS AB).
+//   • applied   — an inbound REPLICATED record this node applied to local state (applyInbound, after it
+//                 won LWW). origin is the SENDER/owner (≠ me). Drives repl/s — the per-replica apply signal
+//                 a pull snapshot structurally cannot show. NOT derivable from ProvRecord scalars (the LWW
+//                 outcome needs the held version history a downstream consumer lacks). Named for the ACTION
+//                 (like local/forwarded — the accepted trio reads by where-the-record-was-sequenced); `won`
+//                 over-implied contention (most applies are uncontested), so `won`→`applied` (DECISIONS AB).
 // lost = an LWW loser — fence (epoch < winner) or conflict (same-epoch (seq,origin) loser); the {we,ws}
 // winner stamp lets a surface tell the two apart. dropped = a dedup re-delivery (verbose-only, off the
 // steady path). view/writable = membership transitions, emitted off the per-record path.
-export type ProvKind = 'won' | 'lost' | 'forwarded' | 'local' | 'dropped' | 'view' | 'writable'
+export type ProvKind = 'applied' | 'lost' | 'forwarded' | 'local' | 'dropped' | 'view' | 'writable'
 
 //! ProvRecord: one flat provenance event — scalars only (no cloned value), so an emit is cheap and the streamed frame is tiny.
 export type ProvRecord = {

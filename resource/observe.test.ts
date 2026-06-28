@@ -3,7 +3,7 @@
 //     idempotent), the bounded drop-oldest ring buffer, and that every emit-site kind maps
 //     through to a flat ProvRecord on the streamed proxy.
 //   • a REAL observe server: the provenance kinds that ARE deterministic — `local` (an owned
-//     write), `won` (a replicated record applied on a peer), `forwarded` (a scoped write routed
+//     write), `applied` (a replicated record applied on a peer), `forwarded` (a scoped write routed
 //     to its owner), and the `view`/`writable` membership transitions — plus the observing()
 //     gate arming/disarming.
 //   • the LEAK GUARD: a wire subscriber dropped UNGRACEFULLY must reap AND disarm the gate
@@ -42,10 +42,10 @@ test('makeObserve(): refcount attach/detach — clamps at 0, TRUE only on the la
 
 test('makeObserve(): onRecord flattens provenance into the streamed proxy (kind + origin/seq/epoch/key, no value)', () => {
   const o = makeObserve()
-  o.onRecord(rec({ key: ['user', '42'], origin: 'U', seq: 7, epoch: 3 }), 'won')
+  o.onRecord(rec({ key: ['user', '42'], origin: 'U', seq: 7, epoch: 3 }), 'applied')
   const buf = (o.proxy as any)[value]
   const e = buf['0']
-  assert.equal(e.kind, 'won')
+  assert.equal(e.kind, 'applied')
   assert.equal(e.origin, 'U')
   assert.equal(e.seq, 7)
   assert.equal(e.epoch, 3)
@@ -60,14 +60,14 @@ test('makeObserve(): every emit-site kind maps through, and `at` folds into the 
   o.onRecord(rec({}), 'lost')
   o.onRecord(rec({}), 'forwarded')
   o.onRecord(rec({}), 'dropped')
-  o.onRecord(rec({ key: ['list'], at: 'id9' }), 'won') // insert → `at` folded in
+  o.onRecord(rec({ key: ['list'], at: 'id9' }), 'applied') // insert → `at` folded in
   o.onView(5, 4)
   o.onWritable(false)
   const buf = (o.proxy as any)[value]
   const kinds = Object.keys(buf)
     .sort()
     .map((k) => buf[k].kind)
-  assert.deepEqual(kinds, ['local', 'lost', 'forwarded', 'dropped', 'won', 'view', 'writable'])
+  assert.deepEqual(kinds, ['local', 'lost', 'forwarded', 'dropped', 'applied', 'view', 'writable'])
   assert.equal(buf['4'].key, 'list.id9')
   assert.equal(buf['5'].members, 4) // view event
   assert.equal(buf['6'].writable, false) // writable event
@@ -75,7 +75,7 @@ test('makeObserve(): every emit-site kind maps through, and `at` folds into the 
 
 test('makeObserve(): bounded drop-oldest ring — slot reused past cap, t keeps climbing', () => {
   const o = makeObserve({ buffer: 4 })
-  for (let i = 0; i < 6; i++) o.onRecord(rec({ seq: i }), 'won')
+  for (let i = 0; i < 6; i++) o.onRecord(rec({ seq: i }), 'applied')
   const buf = (o.proxy as any)[value]
   assert.equal(Object.keys(buf).length, 4) // only `cap` slots ever exist
   // slots 0 and 1 were overwritten by events 5 and 6 (t = 5, 6); 2 and 3 still hold t = 3, 4
@@ -126,16 +126,16 @@ const watchCluster = (c: any) => {
   return { got, close: () => closers.forEach((f: any) => f()) }
 }
 
-test('observe cluster: a replicated record surfaces `won` on the peers that applied it', async () => {
+test('observe cluster: a replicated record surfaces `applied` on the peers that applied it', async () => {
   const c = await cluster({ n: 3, wait: 250, extra: { observe: true } }) // full replication
   await c.formed()
   const w = watchCluster(c)
   const k = 'k1'
   const owner = c.node(c.owner(k)!)
   owner.data[k] = { v: 1 }
-  await until(() => w.got.filter((e) => e.kind === 'won').length >= 2, 4000) // the 2 non-owner replicas
-  const won = w.got.filter((e) => e.kind === 'won' && e.key === k)
-  assert.ok(won.length >= 2, `full-rep write ⇒ won on the other replicas (got ${won.length})`)
+  await until(() => w.got.filter((e) => e.kind === 'applied').length >= 2, 4000) // the 2 non-owner replicas
+  const applied = w.got.filter((e) => e.kind === 'applied' && e.key === k)
+  assert.ok(applied.length >= 2, `full-rep write ⇒ applied on the other replicas (got ${applied.length})`)
   assert.ok(
     w.got.some((e) => e.kind === 'local' && e.key === k && e.by === owner.cluster.me),
     'the owner reports it as local',
@@ -231,8 +231,8 @@ test('leak guard: a wire __observe subscriber dropped UNGRACEFULLY reaps the sub
 
 test('makeObserve(): a fractional 0<buffer<1 falls back to the default cap (no NaN slot)', () => {
   const o = makeObserve({ buffer: 0.5 }) // would floor to 0 → `count % 0` = NaN without the guard
-  o.onRecord(rec({ seq: 1 }), 'won')
-  o.onRecord(rec({ seq: 2 }), 'won')
+  o.onRecord(rec({ seq: 1 }), 'applied')
+  o.onRecord(rec({ seq: 2 }), 'applied')
   const buf = (o.proxy as any)[value]
   assert.equal('NaN' in buf, false, 'no NaN slot')
   assert.equal(buf['0'].t, 1)

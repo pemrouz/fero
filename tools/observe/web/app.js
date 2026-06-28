@@ -59,12 +59,12 @@ const ingest = (s) => {
 // The panel answers three questions, NOT "show me every record":
 //   • is data flowing, and is it healthy?  → `rates` (writes/s, repl/s) + `stats` (forwards, CONFLICTS)
 //   • what's being written, and where's contention?  → `keys` (hot working set + per-key conflict flag)
-//   • what NOTABLE things happened?  → `notable` (conflicts / view / writable only — the won/local
+//   • what NOTABLE things happened?  → `notable` (conflicts / view / writable only — the applied/local
 //     write-flow is summarised by the rates, so the log stays calm and high-signal, empty when healthy)
 const stream = $({
   notable: {},
   keys: {},
-  stats: { events: 0, won: 0, local: 0, forwarded: 0, lost: 0, view: 0, writable: 0, dropped: 0 },
+  stats: { events: 0, applied: 0, local: 0, forwarded: 0, lost: 0, view: 0, writable: 0, dropped: 0 },
   rates: { writes: 0, repl: 0, conflicts: 0, rebalance: 0 },
   spark: { points: '' }, // writes/s history → a sparkline (driven by the grid interval, or by 'provagg' at scale)
   headline: '0 records', // the activity-panel header note — "N records" (grid) or "aggregated · K nodes" (blobs)
@@ -164,14 +164,14 @@ const onEvent = (ev) => {
 }
 
 // per-second rates: snapshot the cumulative counters each tick and diff (writes = local+forwarded,
-// repl = won). Rates answer "is it flowing?" at a glance — far more legible than a scrolling firehose.
+// repl = applied). Rates answer "is it flowing?" at a glance — far more legible than a scrolling firehose.
 let lastSnap = { w: 0, r: 0 }
 setInterval(() => {
   if (frozen) return // freeze: hold the rates/sparkline
   if (aggMode === 'blobs' && aggSeen) return // at scale the raw firehose is suppressed → 'provagg' drives the rates + sparkline
   const s = stream.stats[value] ?? {}
   const w = (s.local ?? 0) + (s.forwarded ?? 0)
-  const r = s.won ?? 0
+  const r = s.applied ?? 0
   const writes = w - lastSnap.w
   stream.rates.writes = writes
   stream.rates.repl = r - lastSnap.r
