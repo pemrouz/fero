@@ -78,10 +78,17 @@ test('chaos: network PARTITION then HEAL — majority writes, minority buffers, 
     assert.ok(await until(() => majority.every((n) => n.cluster.writable === true), 12000), 'majority stayed writable')
 
     // a write on the majority side lands across the majority but NOT on the minority.
-    majority[0].data.maj = 'from-majority'
-    assert.ok(await until(() => majority.every((n) => (n.data as any)[value]?.maj === 'from-majority'), 12000), 'majority took the write')
+    // Pick a key the MAJORITY owns: under Part 1 (no never-drop fallback, DECISIONS AA.1) a write to
+    // a MINORITY-owned key can't commit during this partition — its single owner is unreachable and
+    // evictAfter is huge, so no new owner is elected to sequence it (the write buffers + retries until
+    // heal). That's the correct CP semantic (the old fallback committed it locally as a conflict);
+    // this scenario isolates the WRITE-GATE, so it writes a key the majority can actually sequence.
+    const majAddrs = new Set(majority.map((n) => n.cluster.me))
+    const majKey = Array.from({ length: 64 }, (_, i) => 'maj' + i).find((k) => majAddrs.has(majority[0].cluster.owner(k)!)) ?? 'maj0'
+    majority[0].data[majKey] = 'from-majority'
+    assert.ok(await until(() => majority.every((n) => (n.data as any)[value]?.[majKey] === 'from-majority'), 12000), 'majority took the write')
     await sleep(300)
-    assert.ok(minority.every((n) => !has(n, 'maj')), 'partition held — minority never saw the majority write')
+    assert.ok(minority.every((n) => !has(n, majKey)), 'partition held — minority never saw the majority write')
 
     // a write on the minority side is BUFFERED (read-only) — not visible on the majority.
     minority[0].data.min = 'from-minority'
@@ -91,7 +98,7 @@ test('chaos: network PARTITION then HEAL — majority writes, minority buffers, 
     // HEAL: the minority regains quorum → flushes its buffer; anti-entropy backfills
     // the majority's writes. All five reconverge (the view never changed — no ballot).
     c.heal()
-    assert.ok(await until(() => c.all().every((n) => has(n, 'maj') && has(n, 'min')), 30000), 'both writes present on every node after heal')
+    assert.ok(await until(() => c.all().every((n) => has(n, majKey) && has(n, 'min')), 30000), 'both writes present on every node after heal')
     assert.ok(await c.converged(30000), 'all five reconverged after heal')
   } finally {
     c.destroy()
@@ -116,13 +123,18 @@ test('chaos: SCOPED (R=2) partition then heal — disjoint holding stays correct
     c.partition(majority, minority)
     assert.ok(await until(() => minority.every((n) => n.cluster.writable === false), 12000), 'minority went read-only')
 
-    // a write on the majority side to a key the majority can own/route lands on its R-set
-    majority[0].data.ke = { k: 'ke' }
-    assert.ok(await until(() => { const reps = majority[0].cluster.replicas('ke').filter((a) => majority.some((m) => m.cluster.me === a)); return reps.length > 0 && reps.every((a) => has(c.node(a)!, 'ke')) }, 12000), 'majority-side scoped write replicated to its reachable R-set')
+    // a write on the majority side to a key the majority OWNS lands on its reachable R-set. Under Part 1
+    // (no never-drop fallback, DECISIONS AA.1) a key whose OWNER is the partitioned-away minority node
+    // can't be sequenced during this no-eviction partition (it buffers until heal) — so pick a key the
+    // majority owns, isolating the scoped write/replicate path from that CP-availability detail.
+    const majAddrs = new Set(majority.map((n) => n.cluster.me))
+    const keKey = Array.from({ length: 64 }, (_, i) => 'ke' + i).find((k) => majAddrs.has(majority[0].cluster.owner(k)!)) ?? 'ke0'
+    majority[0].data[keKey] = { k: keKey }
+    assert.ok(await until(() => { const reps = majority[0].cluster.replicas(keKey).filter((a) => majority.some((m) => m.cluster.me === a)); return reps.length > 0 && reps.every((a) => has(c.node(a)!, keKey)) }, 12000), 'majority-side scoped write replicated to its reachable R-set')
 
     // HEAL: the minority regains quorum; anti-entropy re-syncs the scoped holding both ways
     c.heal()
-    assert.ok(await c.heldOnReplicas(['ka', 'kb', 'kc', 'kd', 'ke'], 30000), 'after heal every key is back on exactly its R-set (no over- or under-replication)')
+    assert.ok(await c.heldOnReplicas(['ka', 'kb', 'kc', 'kd', keKey], 30000), 'after heal every key is back on exactly its R-set (no over- or under-replication)')
     assert.equal(c.servedSubs(), 0, 'no served-subscription leak across the scoped partition/heal')
   } finally {
     c.destroy()
