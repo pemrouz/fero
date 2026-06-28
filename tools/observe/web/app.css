@@ -165,7 +165,7 @@ body {
 .panel-dim { margin-left: auto; color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
 
 /* a contention kind → its colour (one source of truth via custom property) */
-[data-kind="won"]       { --k: var(--accent); }
+[data-kind="applied"]   { --k: var(--accent); }
 [data-kind="local"]     { --k: var(--ok); }
 [data-kind="forwarded"] { --k: var(--warn); }
 [data-kind="lost"]      { --k: var(--bad); }

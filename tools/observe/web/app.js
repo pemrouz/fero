@@ -103,7 +103,7 @@ const onEvent = (ev) => {
   const fenced = ev.kind === 'lost' && ev.we !== undefined && ev.epoch < ev.we
   const trueConflict = ev.kind === 'lost' && !fenced
 
-  // hot-keys tracks WRITES + TRUE conflicts (local/forwarded/true-conflict), NOT the `won`
+  // hot-keys tracks WRITES + TRUE conflicts (local/forwarded/true-conflict), NOT the `applied`
   // replication-echo nor epoch-fence churn — a key is "hot" because it's being written, not because
   // replication fans it out or a superseded version is re-delivered during catch-up.
   if (ev.key && (ev.kind === 'local' || ev.kind === 'forwarded' || trueConflict)) {

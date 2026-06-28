@@ -1150,7 +1150,7 @@ can't be a fero peer (transport is TCP), so a bridge is required.
   drop-oldest ring-buffer ViewProxy carrying the live provenance/contention events. Fed only from the
   EXISTING commit/apply call-sites (no second `data` sink, no `log.onAppend` listener): `lost` before the
   LWW loser early-return (a loser never lands in a snapshot — the push channel exists for exactly this),
-  `won` after a winning inbound record, `local`/`forwarded` ONCE in `commitLocal` (distinguished by the
+  `applied` (originally `won`; renamed — AB) after a winning inbound record, `local`/`forwarded` ONCE in `commitLocal` (distinguished by the
   in-scope `committingForward` flag — forwarded writes funnel through `commitLocal`, so emitting at
   `commitForwarded` too would DOUBLE-COUNT), `dropped` only under `observe:{verbose}`, plus `view`/
   `writable` chained into the membership hooks. Each event is a FLAT scalar provenance record (origin/seq/
@@ -1898,7 +1898,21 @@ stream, consumed by the same-version bridge/dashboard — safe under the "server
 version" posture). The `ProvKind` type comment is the canonical per-kind model; the emit-site comments are
 accurate. The grammar `commit:` / `replica:` rows still say `won` and are updated with the restyle.
 
+**Codebase consistency (the `won`→`applied` sweep).** Renamed everywhere it is the ProvKind / its mirror:
+the type + comments ([observe.ts](resource/observe.ts)), the emit ([index.ts](resource/index.ts):545), the
+bridge repl counter ([bridge.ts](../tools/observe/bridge.ts)), the dashboard stats/CSS
+([app.js](../tools/observe/web/app.js), [app.css](../tools/observe/web/app.css) `[data-kind="applied"]`),
+the observe-tools backlog ([tools/observe/IDEAS.md](../tools/observe/IDEAS.md)), and the debug viewer's
+commit-row `out` outcome vocab in the mock data ([shape.js](../tools/debug/mockups/shape.js),
+[sessions.fero.json](../tools/debug/mockups/debug/sessions.fero.json)). **Pending only in two files under a
+concurrent session's live edit** — [filter-grammar.md](../tools/debug/filter-grammar.md) (the `commit:`/
+per-holder rows: `won`→`applied` at the §3 commit row + the §"partition"/cross-cut/punch-list mentions) and
+[tree.html](../tools/debug/mockups/tree.html) (the `out`-vocab CSS class `.oc.won`→`.oc.applied`, the
+calm-mode class fallback, and the `OUTW` label key) — applied with that restyle to avoid clobbering its WIP.
+**Deliberately NOT renamed** (correct English "won the LWW race", not the ProvKind): the `confirm:'committed'`
+tier docs ("SEQUENCED, not necessarily WON" in [README](../README.md), [plan](../plan.md), index.ts,
+DECISIONS Z) and the retired `tools/debug/mockups/old/` snapshots (frozen archive).
+
 **Open follow-ups → [IDEAS](IDEAS.md):** the **Write-route JOIN** note is corrected (it needs
-caller-origin instrumentation, not a derivation); a small grammar breadcrumb (mark the `commit:` won/local/
-forwarded rows "audited: keep, DECISIONS AB") rides the in-flight `filter-grammar.md` restyle. Revisit
-`forwarded` for a merge only if the forward-traffic view is dropped from the roadmap.
+caller-origin instrumentation, not a derivation). Revisit `forwarded` for a merge only if the
+forward-traffic view is dropped from the roadmap.

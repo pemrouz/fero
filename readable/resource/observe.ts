@@ -1,4 +1,4 @@
-// L4 observe push-hook: a gated, bounded ring-buffer ViewProxy carrying the live provenance/contention stream (won/lost/forwarded/local).
+// L4 observe push-hook: a gated, bounded ring-buffer ViewProxy carrying the live provenance/contention stream (applied/lost/forwarded/local).
 
 import { $ } from '../../data/index.ts'
 import { type ChangeRecord } from '../transport/message.ts'

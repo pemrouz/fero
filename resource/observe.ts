@@ -1,4 +1,4 @@
-//! L4 observe push-hook: a gated, bounded ring-buffer ViewProxy carrying the live provenance/contention stream (won/lost/forwarded/local).
+//! L4 observe push-hook: a gated, bounded ring-buffer ViewProxy carrying the live provenance/contention stream (applied/lost/forwarded/local).
 // resource/observe.ts — the L4 PUSH channel (plan.md L4 §3 family [b]).
 //
 // The pull spine (inspect.ts) reports truthful slow state on a ~1s poll. This is its
