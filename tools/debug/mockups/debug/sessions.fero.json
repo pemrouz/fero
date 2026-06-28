@@ -26,13 +26,13 @@
           "replicas": [ { "addr": ":49807", "lag": 420, "stuckAt": "e3·s1241", "stale": true } ],
           "log": [
             { "e": 4, "s": 1287, "key": "user42.score",    "by": ":49801", "val": "8",     "out": "local", "winner": true },
-            { "e": 4, "s": 1283, "key": "user42.name",     "by": ":49801", "val": "\"kai\"", "out": "won" },
-            { "e": 4, "s": 1271, "key": "user42.streak",   "by": ":49801", "val": "12",    "out": "won" },
-            { "e": 4, "s": 1265, "key": "user42.score",    "by": ":49801", "val": "6",     "out": "won" },
+            { "e": 4, "s": 1283, "key": "user42.name",     "by": ":49801", "val": "\"kai\"", "out": "applied" },
+            { "e": 4, "s": 1271, "key": "user42.streak",   "by": ":49801", "val": "12",    "out": "applied" },
+            { "e": 4, "s": 1265, "key": "user42.score",    "by": ":49801", "val": "6",     "out": "applied" },
             { "e": 4, "s": 902,  "key": "user42.score",    "by": ":49803", "val": "7",     "out": "conflict" },
-            { "e": 3, "s": 1241, "key": "user42.score",    "by": ":49805", "val": "5",     "out": "won", "stuck": true },
-            { "e": 3, "s": 1238, "key": "user42.lastSeen", "by": ":49805", "val": "\"t91\"","out": "won" },
-            { "e": 3, "s": 1203, "key": "user42.score",    "by": ":49805", "val": "4",     "out": "won" },
+            { "e": 3, "s": 1241, "key": "user42.score",    "by": ":49805", "val": "5",     "out": "applied", "stuck": true },
+            { "e": 3, "s": 1238, "key": "user42.lastSeen", "by": ":49805", "val": "\"t91\"","out": "applied" },
+            { "e": 3, "s": 1203, "key": "user42.score",    "by": ":49805", "val": "4",     "out": "applied" },
             { "e": 2, "s": 851,  "key": "user42.score",    "by": ":49803", "val": "4",     "out": "fence" },
             { "e": 1, "s": 87,   "key": "user42.score",    "by": "CLI",    "val": "99",    "out": "fence" }
           ]
@@ -47,7 +47,7 @@
           "name": "order7", "owner": ":49803", "R": 5, "keys": 12, "wps": 61,
           "status": "contended", "note": "3 same-epoch conflicts / 60s",
           "log": [
-            { "e": 4, "s": 9210, "key": "order7.lines", "by": ":49803", "val": "…", "out": "won" },
+            { "e": 4, "s": 9210, "key": "order7.lines", "by": ":49803", "val": "…", "out": "applied" },
             { "e": 4, "s": 9208, "key": "order7.lines", "by": "CLI",    "val": "…", "out": "conflict" },
             { "e": 4, "s": 9205, "key": "order7.lines", "by": "CLI",    "val": "…", "out": "conflict" },
             { "e": 4, "s": 9201, "key": "order7.lines", "by": "CLI",    "val": "…", "out": "conflict" }
