@@ -542,7 +542,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         cur.seq = n
         cur.origin = origin
       } else versions.set(key, { epoch: e, seq: n, origin })
-      observe?.onRecord(record, 'won') // an inbound replicated record that WON LWW (applied just below)
+      observe?.onRecord(record, 'applied') // an inbound replicated record this replica APPLIES (won LWW; applied just below)
     } else {
       log.append(record) // provenance-less (handshake / non-fero) — apply verbatim
     }
@@ -1218,16 +1218,28 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   //! flushPending: quorum returned — re-commit the buffered writes in order (re-buffers if the gate closed again).
   // Quorum returned (the write-gate opened): re-commit everything buffered while
   // read-only, in order. commitLocal re-checks canWrite, so anything that can't go
-  // out (gate closed again) simply re-buffers. (Buffered writes flush under the
-  // CURRENT epoch — a known V1e semantic; preserving the attempt-epoch is an F2
-  // refinement. This current-epoch re-stamp is conflict-source #3 (DECISIONS AA):
-  // if ownership moved while we were quorum-less, epoch-dominance in commitLocal can
-  // stamp the flushed write at the new owner's epoch under OUR origin — a same-epoch
-  // `conflict`. Preserving the attempt-epoch closes it.)
+  // out (gate closed again) simply re-buffers.
+  //! Part 3 (DECISIONS AA #3): re-resolve ownership per buffered write — if the partition moved to
+  //! another owner while we were quorum-less, FORWARD it (Part 1) rather than commit-local under our
+  //! (now non-owner) provenance, which would be a same-epoch `conflict` at the new owner's epoch.
+  // While we were read-only (quorum-less) the cluster may have rebalanced the ring (an eviction /
+  // join committed a new view). A buffered write whose partition we no longer own must NOT be
+  // commit-local'd here — committing it under OUR origin at the (possibly epoch-dominance-lifted)
+  // current epoch manufactures a second origin for a partition the new owner already sequences
+  // (conflict #3). Route it through the owner instead (sendForward → owner re-sequences under ITS
+  // origin → no conflict); owner===me (we still own it, or solo / no view) ⇒ commit as the
+  // legitimate owner, exactly as before — so X's restored-overwrite dominance path is untouched.
+  // RESIDUAL: if our RING is itself stale at flush time (still names us owner though the cluster
+  // moved on), this still commit-local's via the owner===me branch — closed by #2's epoch-on-the-
+  // write-path guard. No worse than the prior always-commit-local behaviour; strictly an improvement.
   function flushPending() {
     if (!pending.length) return
     const batch = pending.splice(0)
-    for (const c of batch) commitLocal(c)
+    for (const c of batch) {
+      const owner = mesh.owner(partitionOf(c))
+      if (owner === undefined || owner === me) commitLocal(c)
+      else sendForward(c, owner)
+    }
   }
 
   //! distributed aggregates (Q2/Q3): the fold ENGINE lives in ./fold.ts (makeFold), built below once invoke+clientSubs exist.
