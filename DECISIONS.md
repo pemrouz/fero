@@ -1896,7 +1896,7 @@ vs `≠ me`). `won` is partial (the apply half is exact; ownership isn't on the 
 `applied`); the only code change is the `won`→`applied` rename (a wire-value on the in-repo `__observe`
 stream, consumed by the same-version bridge/dashboard — safe under the "servers trust each other / same
 version" posture). The `ProvKind` type comment is the canonical per-kind model; the emit-site comments are
-accurate. The grammar `commit:` / `replica:` rows still say `won` and are updated with the restyle.
+accurate. The grammar `commit:` / `replica:` rows are renamed too (see the sweep below).
 
 **Codebase consistency (the `won`→`applied` sweep).** Renamed everywhere it is the ProvKind / its mirror:
 the type + comments ([observe.ts](resource/observe.ts)), the emit ([index.ts](resource/index.ts):545), the
@@ -1904,11 +1904,12 @@ bridge repl counter ([bridge.ts](../tools/observe/bridge.ts)), the dashboard sta
 ([app.js](../tools/observe/web/app.js), [app.css](../tools/observe/web/app.css) `[data-kind="applied"]`),
 the observe-tools backlog ([tools/observe/IDEAS.md](../tools/observe/IDEAS.md)), and the debug viewer's
 commit-row `out` outcome vocab in the mock data ([shape.js](../tools/debug/mockups/shape.js),
-[sessions.fero.json](../tools/debug/mockups/debug/sessions.fero.json)). **Pending only in two files under a
-concurrent session's live edit** — [filter-grammar.md](../tools/debug/filter-grammar.md) (the `commit:`/
-per-holder rows: `won`→`applied` at the §3 commit row + the §"partition"/cross-cut/punch-list mentions) and
+[sessions.fero.json](../tools/debug/mockups/debug/sessions.fero.json)). Two files under a concurrent
+session's live edit — [filter-grammar.md](../tools/debug/filter-grammar.md) (the `commit:`/per-holder rows:
+`won`→`applied` at the §3 commit row + the §"partition"/cross-cut/punch-list mentions) and
 [tree.html](../tools/debug/mockups/tree.html) (the `out`-vocab CSS class `.oc.won`→`.oc.applied`, the
-calm-mode class fallback, and the `OUTW` label key) — applied with that restyle to avoid clobbering its WIP.
+calm-mode class fallback, and the `OUTW` label key) — are renamed **in the working tree** and land with that
+session's restyle commit (not committed separately, to avoid sweeping its WIP into this work).
 **Deliberately NOT renamed** (correct English "won the LWW race", not the ProvKind): the `confirm:'committed'`
 tier docs ("SEQUENCED, not necessarily WON" in [README](../README.md), [plan](../plan.md), index.ts,
 DECISIONS Z) and the retired `tools/debug/mockups/old/` snapshots (frozen archive).
