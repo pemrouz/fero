@@ -540,7 +540,7 @@ a `debug` SSE event + `/debug/` serving so the viewer goes LIVE through the SAME
     digest/snapshot (today only `seen` ships). **Zero hot-path cost** throughout — cold export-fold only.
     (tools/debug: export; resource: inspect, index; tools/observe: bridge)
 - **[P3] `write:` issuer annotations on the poll payload.** The `cluster.writes` confirm-lifecycle ViewProxy
-  (`bar`/`state`/`reason`/`latency`, keyed by a local id — [DECISIONS Z](DECISIONS.md)/AC) has no snapshot
+  (`guarantee`/`state`/`reason`/`latency`, keyed by a local id — [DECISIONS Z](DECISIONS.md)/AC) has no snapshot
   fold seam yet; fold it into the poll payload so those issuer-only fields JOIN onto `commit:` rows by
   `origin`/`seq` (they're structurally absent on fire-and-forget + inbound commits, so they can never be
   `commit:` values). (resource: inspect; tools/observe)

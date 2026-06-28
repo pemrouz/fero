@@ -15,7 +15,7 @@ test('writes: a record goes pending → confirmed and carries a measured latency
   const id = w.onStart('committed', 'users.42')
   let r = rows(w)[String(id)]
   assert.equal(r.state, 'pending', 'inserted pending')
-  assert.equal(r.tier, 'committed')
+  assert.equal(r.guarantee, 'committed')
   assert.equal(r.key, 'users.42', 'the dotted key path, not the value')
   assert.equal(typeof r.startedAt, 'number')
   assert.equal(r.latency, undefined, 'no latency while in flight')

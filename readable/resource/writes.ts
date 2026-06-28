@@ -1,9 +1,9 @@
-// cluster.writes: a gated, bounded ring-buffer ViewProxy of the confirm-write lifecycle — in-flight writes + per-tier latency, reactively.
+// cluster.writes: a gated, bounded ring-buffer ViewProxy of the confirm-write lifecycle — in-flight writes + per-guarantee latency, reactively.
 
 import { $ } from '../../data/index.ts'
 
-// WriteTier: the guarantee a write REQUESTED (the `confirm` value). 'accepted' is local-apply; 'committed'/'replicated'/'persisted' ride the network ('persisted' = durable on a W-quorum).
-export type WriteTier = 'accepted' | 'committed' | 'replicated' | 'persisted'
+// WriteGuarantee: the guarantee a write REQUESTED (the `confirm` value; the `write:` grammar axis, formerly `tier`/`bar` — DECISIONS AC). 'accepted' is local-apply; 'committed'/'replicated'/'persisted' ride the network ('persisted' = durable on a W-quorum).
+export type WriteGuarantee = 'accepted' | 'committed' | 'replicated' | 'persisted'
 
 // WriteState: where a tracked write is in its lifecycle — in flight, reached its bar, or fell short.
 export type WriteState = 'pending' | 'confirmed' | 'rejected'
@@ -11,7 +11,7 @@ export type WriteState = 'pending' | 'confirmed' | 'rejected'
 // WriteRecord: one flat confirm-lifecycle event — scalars only (dotted key, never the value); `latency` is the headline (ms the guarantee took).
 export type WriteRecord = {
   id: number
-  tier: WriteTier
+  guarantee: WriteGuarantee
   key: string
   state: WriteState
   reachedTier?: string
@@ -30,7 +30,7 @@ export type WritesOpts = { buffer?: number }
 // WritesLog: the lazily-built controller — the streamed proxy + the two emit-sites (onStart returns the id the caller threads to onSettle).
 export type WritesLog = {
   proxy: ReturnType<typeof $>
-  onStart: (tier: WriteTier, key: string) => number
+  onStart: (guarantee: WriteGuarantee, key: string) => number
   onSettle: (id: number, state: Exclude<WriteState, 'pending'>, info?: Partial<WriteRecord>) => void
 }
 
@@ -47,9 +47,9 @@ export const makeWritesLog = (opts: WritesOpts = {}): WritesLog => {
 
   return {
     proxy,
-    onStart: (tier, key) => {
+    onStart: (guarantee, key) => {
       const id = nextId++
-      const rec: WriteRecord = { id, tier, key, state: 'pending', startedAt: performance.now() }
+      const rec: WriteRecord = { id, guarantee, key, state: 'pending', startedAt: performance.now() }
       live.set(id, rec)
       order.push(id)
       ;(proxy as any)[String(id)] = rec
