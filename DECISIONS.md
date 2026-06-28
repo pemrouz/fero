@@ -1419,9 +1419,10 @@ exists, and add an explicit await-for-guarantee API for when you DO care about d
 3. **Tiered `confirm` surface.** `methods.update({key, value, confirm?, timeout?})` (and
    insert/remove). Default = fire-and-forget (zero tracking; the bare `data.x = v` assignment
    is the same path). `confirm:'accepted'` resolves once applied locally (read-your-write on
-   this node, not a durability claim); `confirm:'committed'` resolves `{tier,key,seq,epoch}`
-   once the OWNER sequenced + logged it, rejecting `{requestedTier,reachedTier,reason,
-   localCommit}` on withheld/timeout (localCommit carries the seq when a never-drop fallback
+   this node, not a durability claim); `confirm:'committed'` resolves `{guarantee,key,seq,epoch}`
+   once the OWNER sequenced + logged it, rejecting `{guarantee,reached,reason,
+   localCommit}` on withheld/timeout (the resolve/reject field was `tier`/`requestedTier`+`reachedTier`
+   until the [AC](#ac--writecommit-unification) `guarantee`/`reached` rename; localCommit carries the seq when a never-drop fallback
    committed it under our provenance, so a retry isn't blind). Confirmation rides `methods`,
    NOT assignment, because `await (data.x = v)` awaits the RHS `v` per the JS spec — which
    resolves the §11.1 / "Assignment ↔ `methods.update` parity" thread: it is the same write,
@@ -2001,7 +2002,7 @@ is derivable at **export** time, off existing wire traffic, with **zero** hot-pa
    `origin:`/`seq:` JOIN. The two POPULATIONS stay split; only the durability QUERY surface unifies.
 3. **`accepted` is a requested wait-point, not a durability rung** — it resolves at local-apply
    ([index.ts:1296](resource/index.ts)), never sequences a distinct stage, and has no `ProvKind` /
-   `reachedTier` counterpart. It lives only as a `write:` guarantee, never on `commit:`.
+   `reached` counterpart. It lives only as a `write:` guarantee, never on `commit:`.
 4. **The `committed` overload is resolved by KEY, not by banning the word.** `commit:committed` = the
    objective rung a record REACHED; `write:committed` = the guarantee a writer REQUESTED. This supersedes the
    prior "`committed` never leaks to `commit:`" rule now that durability is a first-class `commit:` axis.
@@ -2044,10 +2045,14 @@ allocation tripled GC to ~155ms historically), which is exactly why the fold-fro
   marks to the digest/snapshot to lift `commit:persisted` from ▸ planned to ⊘ needs-fold; (e) the
   `cluster.writes` → snapshot fold seam for the `write:` issuer annotations. None touches the write hot
   path; all are cold export-fold work.
-- The grammar/design landed docs-first ([filter-grammar.md](../tools/debug/filter-grammar.md) §3–§8); a
-  follow-up renamed the issuer-axis field end-to-end — `WriteRecord.tier`/`WriteTier` → `guarantee`/
-  `WriteGuarantee` ([writes.ts](resource/writes.ts) + its readable mirror + the `cluster.writes` test
-  assertions). The public `await` contract (`resolve.tier`, `reject.requestedTier`/`reachedTier`) is
-  UNCHANGED — a separate call-surface; renaming it (and `WriteRecord.reachedTier` → `reached`, which
-  touches the concurrently-edited `index.ts`) is a deferred follow-up. The `commit:` fold seams above are
-  the remaining build work; `tree.html` / the viewer are untouched.
+- The grammar/design landed docs-first ([filter-grammar.md](../tools/debug/filter-grammar.md) §3–§8); two
+  follow-ups then renamed the lifecycle vocabulary **end-to-end** to one consistent pair —
+  **`guarantee`** (the REQUESTED level) and **`reached`** (the ATTAINED level): (1) the issuer axis
+  `WriteRecord.tier`/`WriteTier` → `guarantee`/`WriteGuarantee`; (2) `WriteRecord.reachedTier` → `reached`
+  **and** the public `await` contract — the resolve value `{guarantee,key,seq,epoch,origin}` (was `tier`)
+  and the reject `{guarantee,reached,reason,localCommit}` (was `requestedTier`/`reachedTier`). One vocabulary
+  across all four faces: `cluster.writes` rows, the `write:` grammar, and the resolve+reject of
+  `methods.update({confirm})` all use `guarantee`/`reached`; only the input param stays `confirm:`.
+  ([writes.ts](resource/writes.ts), [index.ts](resource/index.ts) `writeWithConfirm`, the readable mirrors,
+  and the confirm/cluster.writes/chaos tests.) The `commit:` fold seams above are the remaining build work;
+  `tree.html` / the viewer are untouched.

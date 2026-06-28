@@ -244,7 +244,7 @@ the `cluster.writes` runtime ViewProxy — **no debug export today** (the whole 
 > keys — superseding the earlier "`committed` never leaks to `commit:`" framing now that durability
 > is a first-class `commit:` axis ([DECISIONS AC](../../DECISIONS.md)). `accepted` is the one guarantee
 > with **no** `commit:` counterpart: it's a local-apply wait-point, never a durability stage
-> reached by a committed record (`ProvKind` has no `accepted`; `reachedTier` is `committed`/`none`).
+> reached by a committed record (`ProvKind` has no `accepted`; `reached` is `committed`/`none`).
 
 ---
 

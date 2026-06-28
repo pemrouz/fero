@@ -14,7 +14,7 @@ export type WriteRecord = {
   guarantee: WriteGuarantee
   key: string
   state: WriteState
-  reachedTier?: string
+  reached?: string
   reason?: string
   seq?: number
   epoch?: number

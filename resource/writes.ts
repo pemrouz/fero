@@ -32,7 +32,7 @@ export type WriteRecord = {
   guarantee: WriteGuarantee // the guarantee REQUESTED (the `write:` grammar axis; pairs with commit:'s reached durability by key — DECISIONS AC)
   key: string // the dotted key path the write targeted — NOT the value
   state: WriteState
-  reachedTier?: string // confirmed ⇒ the guarantee reached (== guarantee); rejected ⇒ how far it got ('committed' | 'none'). (Field name still `reachedTier` — rename to `reached` deferred; touches index.ts, concurrently edited.)
+  reached?: string // confirmed ⇒ the guarantee reached (== guarantee); rejected ⇒ how far it got ('committed' | 'none')
   reason?: string // rejected ⇒ 'withheld' | 'timeout' | 'quorum' | 'unconfirmed'
   seq?: number // the owner's Lamport seq once committed (durable detection of a later supersession)
   epoch?: number // the view epoch the write committed under

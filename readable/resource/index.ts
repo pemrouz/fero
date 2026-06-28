@@ -775,20 +775,20 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   // writeWithConfirm: run a default write, returning a confirmation per its `confirm` tier — fire-and-forget (default), 'accepted' (local apply), 'committed' (owner-sequenced), or 'replicated' (W of the R-set).
   const writeWithConfirm = (chg: any, doWrite: () => void): unknown => {
-    const tier = chg && typeof chg === 'object' ? chg.confirm : undefined
-    if (!tier) return doWrite()
+    const guarantee = chg && typeof chg === 'object' ? chg.confirm : undefined
+    if (!guarantee) return doWrite()
     const key = norm(chg?.at ?? chg?.key)
     const keyStr = key.join('.')
-    if (tier === 'accepted') {
+    if (guarantee === 'accepted') {
       const wid = writesLog?.onStart('accepted', keyStr)
       doWrite()
-      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: 'accepted' })
-      return { tier: 'accepted', key }
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reached: 'accepted' })
+      return { guarantee: 'accepted', key }
     }
-    if (tier !== 'committed' && tier !== 'replicated' && tier !== 'persisted') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed' | 'replicated' | 'persisted')`)
-    if (tier === 'persisted' && !storage) throw new Error("fero: confirm:'persisted' requires a storage seam (none configured) — use 'replicated' for an in-memory W-quorum")
+    if (guarantee !== 'committed' && guarantee !== 'replicated' && guarantee !== 'persisted') throw new Error(`fero: unknown confirm guarantee "${guarantee}" (expected 'accepted' | 'committed' | 'replicated' | 'persisted')`)
+    if (guarantee === 'persisted' && !storage) throw new Error("fero: confirm:'persisted' requires a storage seam (none configured) — use 'replicated' for an in-memory W-quorum")
     const replTimeout = typeof chg?.timeout === 'number' ? chg.timeout : 5000
-    const wid = writesLog?.onStart(tier, keyStr)
+    const wid = writesLog?.onStart(guarantee, keyStr)
     let done = false
     let phase1 = false
     let safety: ReturnType<typeof setTimeout> | undefined
@@ -802,21 +802,21 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (done) return
       done = true
       if (safety) clearTimeout(safety)
-      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: reached, seq: o.seq, epoch: o.epoch, origin: o.origin })
-      resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch, origin: o.origin })
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reached, seq: o.seq, epoch: o.epoch, origin: o.origin })
+      resolveP({ guarantee: reached, key, seq: o.seq, epoch: o.epoch, origin: o.origin })
     }
     const fail = (o: WriteOutcome) => {
       if (done) return
       done = true
       if (safety) clearTimeout(safety)
       const quorum = o.reason === 'quorum'
-      const reachedTier = quorum ? 'committed' : 'none'
+      const reached = quorum ? 'committed' : 'none'
       const reason = o.reason ?? 'unconfirmed'
-      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch, origin: o.origin })
+      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reached, reason, seq: o.seq, epoch: o.epoch, origin: o.origin })
       rejectP(
         Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${reason})`), {
-          requestedTier: tier,
-          reachedTier,
+          guarantee,
+          reached,
           reason,
           localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch, origin: o.origin } : null,
         }),
@@ -829,10 +829,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         safety = undefined
       }
       if (!o.committed) return fail(o)
-      if (tier === 'committed') return win(o, 'committed')
+      if (guarantee === 'committed') return win(o, 'committed')
       const part = String(key[0])
       const quorumFail = () => fail({ committed: false, seq: o.seq, epoch: o.epoch, origin: o.origin, reason: 'quorum' })
-      if (tier === 'replicated')
+      if (guarantee === 'replicated')
         return void probeReplicated(part, o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : quorumFail()), replTimeout)
       const startProbe = () => probeReplicated(part, o.origin!, o.seq!, (ok) => (ok ? win(o, 'persisted') : quorumFail()), replTimeout, true)
       if (holds(part)) awaitLocalPersist(seenKey(o.origin!, part), o.seq!, replTimeout, startProbe, quorumFail)
