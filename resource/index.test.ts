@@ -777,6 +777,43 @@ test('persistence: state survives a restart via the storage seam (WAL)', async (
   }
 })
 
+test('Part 4 (DECISIONS AA #5): a restored node GATES writes until rejoin — its post-restart write converges (never a stale-epoch solo commit)', async () => {
+  // A node that restored state AND has peers configured is a REJOINER, not "first": ViewManager boots it
+  // solo (self-majority ⇒ writable), so a local write before it rejoins would commit as a SOLO OWNER at
+  // the restored (stale) epoch (epoch-dominance lifts it there) — a second origin colliding with the live
+  // owner (conflict #4). The boot-gate buffers its writes until it rejoins a >1-member view; they then
+  // FLUSH and route to the real owner at the merged epoch (Part 3). Observable end-to-end: the
+  // post-restart write CONVERGES on the whole cluster (it isn't lost and isn't stuck as a stale solo
+  // commit). bootGateMs is large so the REJOIN (not the alone-timeout) lifts the gate.
+  const base = join(os.tmpdir(), `fero-bootgate-${randomUUID()}`)
+  const [p1, p2, p3] = [await ports.free(), await ports.free(), await ports.free()]
+  const cfg = (port: number) => ({ host: '127.0.0.1', port, ports: [p1, p2, p3], wait: 350, storage: fileStorage(`${base}.${port}`), heartbeat: { interval: 100, misses: 2 }, evictAfter: 400, view: { bootGateMs: 5000 } })
+  const v = (n: any, k: string) => (n.data[value] as any)?.[k]?.v
+  let A = await fero('bg', cfg(p1))
+  const B = await fero('bg', cfg(p2))
+  const C = await fero('bg', cfg(p3))
+  try {
+    assert.ok(await until(() => [A, B, C].every((n) => n.cluster.members.length === 3), 10000), 'cluster formed')
+    B.data.seed = { v: 1 }
+    assert.ok(await until(() => [A, B, C].every((n) => v(n, 'seed') === 1), 8000), 'seed converged before the crash')
+    A.destroy() // crash the node that has storage
+    assert.ok(await until(() => B.cluster.members.length === 2 && C.cluster.members.length === 2, 10000), 'crashed node evicted')
+
+    // restart on the same port + WAL: it restores prior state and is a REJOINER (restored data + peers)
+    A = await fero('bg', cfg(p1))
+    // a write on the just-restarted node BEFORE it has surely rejoined: gated → buffered → flushed +
+    // owner-routed on rejoin. It must converge on ALL three (never lost, never a stale-epoch solo commit).
+    A.data.afterRestart = { v: 2 }
+    assert.ok(await until(() => [A, B, C].every((n) => v(n, 'afterRestart') === 2), 14000), 'the post-restart write converges cluster-wide (gated then forwarded)')
+    assert.ok(await until(() => [A, B, C].every((n) => v(n, 'seed') === 1), 8000), 'restored seed still present + converged')
+  } finally {
+    A.destroy()
+    B.destroy()
+    C.destroy()
+    for (const p of [p1, p2, p3]) rmSync(`${base}.${p}`, { force: true })
+  }
+})
+
 test('chaos: a node crashes, its peer keeps writing, it restarts and catches up', async () => {
   const path = join(os.tmpdir(), `fero-chaos-${randomUUID()}.log`)
   const [p1, p2] = [await ports.free(), await ports.free()]
