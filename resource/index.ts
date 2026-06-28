@@ -583,8 +583,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   })
 
   let storageUnsub: (() => void) | undefined
+  let restoredNonEmpty = false // #4 (DECISIONS AA #5): did we restore prior state? ⇒ we're a REJOINER, not "first"
   if (storage) {
-    for (const record of await storage.load()) applyInbound(record)
+    const restored = await storage.load()
+    restoredNonEmpty = restored.length > 0
+    for (const record of restored) applyInbound(record)
     // Persist every accepted record (local OR inbound). confirm:'persisted' keys its
     // W-quorum off when the append RESOLVES — so bump the DURABLE high-water then: now
     // for a sync seam (durable on return), on the Promise for an async one. A rejected
@@ -771,7 +774,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
             if (w) flushPending()
             observe?.onWritable(w) // CHAINED: surface the write-gate flip on the provenance ticker (off the per-record path)
           },
-          onCommit: () => {
+          onCommit: (v: { epoch: number; members: string[] }) => {
+            if (v && Array.isArray(v.members) && v.members.length > 1) clearBootGate() // #4: rejoined a real (>1-member) view ⇒ no longer a solo stale-epoch writer; flush buffered writes to the merged-epoch owners
             heldCache.clear() // the ring changed — invalidate the holds() memo
             markOrphans() // ring rebalanced → note partitions we no longer replicate (shed once handed off)
             resync() // ...and re-sync the ones we now acquire
@@ -783,6 +787,31 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         })
       : undefined
   const viewEpoch = (): number => viewMgr?.epoch ?? 1
+
+  //! ── boot-gate (#4, DECISIONS AA #5): a restored-with-peers node is read-only until it REJOINS ──
+  // A node that restored prior state AND has peers configured is a REJOINER, not "first". `ViewManager`
+  // boots it solo ({me}@1), which is a self-majority ⇒ writable — so a local write BEFORE it rejoins
+  // would commit as a SOLO OWNER, and epoch-dominance (X) lifts it to the restored data's (stale) epoch
+  // under OUR origin, colliding with the live cluster's owner at that epoch (conflict #4). Gate its
+  // writes (they BUFFER through the V1e path, then flush via Part 3's owner-routing) until it rejoins a
+  // committed view with >1 member (the live cluster — its writes then route to the real owner at the
+  // merged epoch), OR a short timeout elapses with no rejoin (genuinely alone now ⇒ become solo-writable,
+  // honest "I'm first after all"). Only `{storage + peers}` nodes gate; a fresh or peerless node never
+  // does (no startup latency). hasPeers: any static-discovery / broker config (ports>1 ⇒ a real list).
+  const hasPeers = !!((config as any).broker || (Array.isArray((config as any).hosts) && (config as any).hosts.length) || (Array.isArray((config as any).ports) && (config as any).ports.length > 1))
+  let bootGated = restoredNonEmpty && hasPeers && me !== undefined
+  let bootGateTimer: ReturnType<typeof setTimeout> | undefined
+  //! clearBootGate: lift the gate (rejoined, or alone-after-timeout) and flush the buffered writes via Part 3.
+  const clearBootGate = () => {
+    if (!bootGated) return
+    bootGated = false
+    if (bootGateTimer) clearTimeout(bootGateTimer)
+    flushPending() // buffered writes now route to the real owners at the rejoined epoch (Part 3 forwards a moved-owner write)
+  }
+  if (bootGated) {
+    bootGateTimer = setTimeout(clearBootGate, typeof viewOpts.bootGateMs === 'number' ? (viewOpts.bootGateMs as number) : 3000) // no rejoin in time ⇒ genuinely alone ⇒ writable solo
+    bootGateTimer.unref?.()
+  }
 
   //! aeTimer (scoped): periodic resync + fold-reconcile — the backstop for acquisition/drift a commit-triggered run can race.
   // Periodic anti-entropy (scoped only): the robust backstop for acquisition + drift
@@ -1123,15 +1152,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // solo-owner write epoch-dominance-lifted to a foreign epoch (the epoch-1-boot bug) — both stamp at
   // `e = max(viewEpoch, cur.epoch)` below. See DECISIONS AA for the full source list + the program.
   function commitLocal(change: ChangeRecord) {
-    //! write-gate chokepoint (V1e): no quorum ⇒ buffer instead of commit, so a minority can't diverge.
+    //! write-gate chokepoint (V1e + #4 boot-gate): no quorum, OR a restored-with-peers node not yet rejoined ⇒ buffer instead of commit.
     // Write-gate chokepoint (V1e): without a reachable quorum we are read-only —
     // buffer the write (don't stamp/log/broadcast) so a minority can't diverge.
     // This SUPERSEDES F1's never-drop local commit for a quorum-less node. Both
     // local writes and forwarded writes (commitForwarded) funnel through here.
-    if (viewMgr && !viewMgr.canWrite) {
+    // `bootGated` (#4) adds the same buffering for a restored-with-peers node until it
+    // rejoins — so it never commits as a solo owner at the restored (stale) epoch.
+    if ((viewMgr && !viewMgr.canWrite) || bootGated) {
       if (pending.length >= MAX_PENDING) pending.shift() // bounded: drop oldest
       pending.push(change)
-      lastCommit = { committed: false } // WITHHELD: quorum-less write-gate buffered it (not stamped/logged/replicated) — a forwarder's never-drop fallback must fire, not a false ack
+      lastCommit = { committed: false } // WITHHELD: quorum-less write-gate buffered it (not stamped/logged/replicated)
       return
     }
     const n = ++clock
@@ -1254,9 +1285,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // (conflict #3). Route it through the owner instead (sendForward → owner re-sequences under ITS
   // origin → no conflict); owner===me (we still own it, or solo / no view) ⇒ commit as the
   // legitimate owner, exactly as before — so X's restored-overwrite dominance path is untouched.
-  // RESIDUAL: if our RING is itself stale at flush time (still names us owner though the cluster
-  // moved on), this still commit-local's via the owner===me branch — closed by #2's epoch-on-the-
-  // write-path guard. No worse than the prior always-commit-local behaviour; strictly an improvement.
+  //! RESIDUAL (#3, open): a STALE local ring at flush (still names US owner though the cluster moved on)
+  //! still commit-local's here, and epoch-dominance can lift it to the moved-on owner's epoch under OUR
+  //! origin — a narrow same-epoch `conflict`. A blunt "drop if cur.epoch > attempt-epoch" does NOT close
+  //! it: that is indistinguishable from a LEGITIMATE knowing-overwrite of held higher-epoch data (the X
+  //! dominance case — same `cur.epoch > view`, same `cur.origin ≠ us`), so it loses real writes (it broke
+  //! the X regression test). Closing it cleanly needs the epoch-staleness work (don't commit-local when
+  //! our view lags what we hold) without regressing X — the LAST open residual (DECISIONS AA.5 / IDEAS).
   function flushPending() {
     if (!pending.length) return
     const batch = pending.splice(0)
@@ -1513,6 +1548,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (compactTimer) clearInterval(compactTimer)
       if (clientFlushTimer) clearInterval(clientFlushTimer)
       clearInterval(fwdRetryTimer) // Part 1: stop the forward-retry sweep so a torn-down node re-forwards nothing
+      if (bootGateTimer) clearTimeout(bootGateTimer) // #4: cancel the boot-gate timeout on a torn-down node
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()

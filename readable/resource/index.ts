@@ -356,8 +356,11 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   })
 
   let storageUnsub: (() => void) | undefined
+  let restoredNonEmpty = false
   if (storage) {
-    for (const record of await storage.load()) applyInbound(record)
+    const restored = await storage.load()
+    restoredNonEmpty = restored.length > 0
+    for (const record of restored) applyInbound(record)
     storageUnsub = log.onAppend((record) => {
       const r = storage.append(record)
       const origin = record.origin
@@ -453,7 +456,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
             if (w) flushPending()
             observe?.onWritable(w)
           },
-          onCommit: () => {
+          onCommit: (v: { epoch: number; members: string[] }) => {
+            if (v && Array.isArray(v.members) && v.members.length > 1) clearBootGate()
             heldCache.clear()
             markOrphans()
             resync()
@@ -465,6 +469,22 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         })
       : undefined
   const viewEpoch = (): number => viewMgr?.epoch ?? 1
+
+  // ── boot-gate (#4, DECISIONS AA #5): a restored-with-peers node is read-only until it REJOINS ──
+  const hasPeers = !!((config as any).broker || (Array.isArray((config as any).hosts) && (config as any).hosts.length) || (Array.isArray((config as any).ports) && (config as any).ports.length > 1))
+  let bootGated = restoredNonEmpty && hasPeers && me !== undefined
+  let bootGateTimer: ReturnType<typeof setTimeout> | undefined
+  // clearBootGate: lift the gate (rejoined, or alone-after-timeout) and flush the buffered writes via Part 3.
+  const clearBootGate = () => {
+    if (!bootGated) return
+    bootGated = false
+    if (bootGateTimer) clearTimeout(bootGateTimer)
+    flushPending()
+  }
+  if (bootGated) {
+    bootGateTimer = setTimeout(clearBootGate, typeof viewOpts.bootGateMs === 'number' ? (viewOpts.bootGateMs as number) : 3000)
+    bootGateTimer.unref?.()
+  }
 
   // aeTimer (scoped): periodic resync + fold-reconcile — the backstop for acquisition/drift a commit-triggered run can race.
   const aeTimer =
@@ -650,8 +670,8 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
 
   // commitLocal: stamp under our provenance, record as LWW winner, log, replicate — owned/solo writes, forwarded-write commits, buffered-write flushes.
   function commitLocal(change: ChangeRecord) {
-    // write-gate chokepoint (V1e): no quorum ⇒ buffer instead of commit, so a minority can't diverge.
-    if (viewMgr && !viewMgr.canWrite) {
+    // write-gate chokepoint (V1e + #4 boot-gate): no quorum, OR a restored-with-peers node not yet rejoined ⇒ buffer instead of commit.
+    if ((viewMgr && !viewMgr.canWrite) || bootGated) {
       if (pending.length >= MAX_PENDING) pending.shift()
       pending.push(change)
       lastCommit = { committed: false }
@@ -709,6 +729,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // Part 3 (DECISIONS AA #3): re-resolve ownership per buffered write — if the partition moved to
   // another owner while we were quorum-less, FORWARD it (Part 1) rather than commit-local under our
   // (now non-owner) provenance, which would be a same-epoch `conflict` at the new owner's epoch.
+  // RESIDUAL (#3, open): a STALE local ring at flush (still names US owner though the cluster moved on)
+  // still commit-local's here, and epoch-dominance can lift it to the moved-on owner's epoch under OUR
+  // origin — a narrow same-epoch `conflict`. A blunt "drop if cur.epoch > attempt-epoch" does NOT close
+  // it: that is indistinguishable from a LEGITIMATE knowing-overwrite of held higher-epoch data (the X
+  // dominance case — same `cur.epoch > view`, same `cur.origin ≠ us`), so it loses real writes (it broke
+  // the X regression test). Closing it cleanly needs the epoch-staleness work (don't commit-local when
+  // our view lags what we hold) without regressing X — the LAST open residual (DECISIONS AA.5 / IDEAS).
   function flushPending() {
     if (!pending.length) return
     const batch = pending.splice(0)
@@ -889,6 +916,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (compactTimer) clearInterval(compactTimer)
       if (clientFlushTimer) clearInterval(clientFlushTimer)
       clearInterval(fwdRetryTimer)
+      if (bootGateTimer) clearTimeout(bootGateTimer)
       viewMgr?.destroy()
       for (const unsub of clientSubs) unsub()
       mesh.destroy()
