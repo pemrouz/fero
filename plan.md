@@ -161,7 +161,7 @@ sessions.cluster.peers.filter('status', 'connected')   // any operator
 sessions.cluster.peers.connect([])                     // "peer events" = change records
 sessions.cluster.me                                    // local node identity
 sessions.cluster.partitions                            // ViewProxy<Partition[]>
-sessions.cluster.writes                                // ViewProxy of confirm-write lifecycle + per-tier latency (DECISIONS Z)
+sessions.cluster.writes                                // ViewProxy of confirm-write lifecycle + per-guarantee latency (DECISIONS Z)
 sessions.cluster.peers.send(rawMsg)                    // out-of-band escape hatch
 ```
 

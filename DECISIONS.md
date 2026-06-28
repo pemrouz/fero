@@ -1470,8 +1470,8 @@ long each guarantee takes", AT RUNTIME rather than only via the perf suite. A ga
 ring-buffer ViewProxy (resource/writes.ts): every `confirm` write shows up as a record that goes
 `pending` → `confirmed`/`rejected` carrying its measured `latency` + (committed/replicated)
 `seq`/`epoch` + (rejected) `reason`. Reactive, so `cluster.writes.filter('state','pending')` is
-what's in flight and `cluster.writes.filter('tier','replicated').avg('latency')` is how long the W
-bar costs — no firehose: fire-and-forget writes (the steady hot path) are NOT recorded (no
+what's in flight and `cluster.writes.filter('guarantee','replicated').avg('latency')` is how long the W
+guarantee costs — no firehose: fire-and-forget writes (the steady hot path) are NOT recorded (no
 guarantee to time). Built LAZILY on first `cluster.writes` access (an un-introspected node never
 allocates the ring; the emit-sites are `writesLog?.…` predicted-false branches until then) and —
 unlike observe — NOT nulled on detach: its emit-sites are already off the steady record path, the
@@ -1966,7 +1966,7 @@ forward-traffic view is dropped from the roadmap.
 **Context.** A user thesis: "a write and the commit it becomes are ONE concept, not two — we should be
 able to TRACE the durability stages (sequenced → replicated to W → persisted) for EVERY commit, not just
 opt-in `confirm:` writes." The debug grammar had split them into two keys — `commit:` (log vantage:
-type/provenance/outcome) and `write:` (issuer vantage: tier/state/reason/latency) — justified by a
+type/provenance/outcome) and `write:` (issuer vantage: guarantee/state/reason/latency) — justified by a
 "population mismatch" (tiers are only MEASURED on the opt-in `cluster.writes` path). The question: is that
 mismatch fundamental, or incidental? Decided via a 10-agent verify-then-adversarially-refute workflow,
 every claim re-traced against current code.
@@ -1995,15 +1995,15 @@ is derivable at **export** time, off existing wire traffic, with **zero** hot-pa
    inbound `applied` records). This is the user's win: one key (`commit:`) traces a write *and the commit
    it becomes*. `committed` is ● live (a logged record's existence is the committed fact); `replicated` is
    ⊘ needs-fold; `persisted` is ▸ planned (durable marks aren't shipped — digests carry `seen` only).
-2. **The issuer lifecycle stays on `write:` / `cluster.writes`** — requested `bar`, `state`, `reason`,
+2. **The issuer lifecycle stays on `write:` / `cluster.writes`** — requested `guarantee`, `state`, `reason`,
    `latency` exist only for opt-in confirm writes and are structurally absent on fire-and-forget and
    inbound commits, so they are NOT `commit:` values. A `commit:` row borrows them via the existing
    `origin:`/`seq:` JOIN. The two POPULATIONS stay split; only the durability QUERY surface unifies.
 3. **`accepted` is a requested wait-point, not a durability rung** — it resolves at local-apply
    ([index.ts:1296](resource/index.ts)), never sequences a distinct stage, and has no `ProvKind` /
-   `reachedTier` counterpart. It lives only as a `write:` bar, never on `commit:`.
+   `reachedTier` counterpart. It lives only as a `write:` guarantee, never on `commit:`.
 4. **The `committed` overload is resolved by KEY, not by banning the word.** `commit:committed` = the
-   objective rung a record REACHED; `write:committed` = the bar a writer REQUESTED. This supersedes the
+   objective rung a record REACHED; `write:committed` = the guarantee a writer REQUESTED. This supersedes the
    prior "`committed` never leaks to `commit:`" rule now that durability is a first-class `commit:` axis.
 5. **Naming = `commit:`.** Coverage is one-directional and decisive: `commit:` has a row for every
    sequenced/applied/rejected record; `write:` is a strict node-local subset (opt-in, keyed by a local id)
@@ -2033,7 +2033,9 @@ allocation tripled GC to ~155ms historically), which is exactly why the fold-fro
 
 **Consequences.**
 - The debug grammar gains `commit:{committed,replicated,persisted}` as a monotonic durability axis;
-  `write:`'s tier axis is relabelled `bar` (requested) and reframed as a JOIN-recovered annotation. §7
+  `write:`'s tier axis is relabelled `guarantee` (requested) — and the `WriteRecord.tier` field /
+  `WriteTier` type are renamed `guarantee` / `WriteGuarantee` end-to-end ([writes.ts](resource/writes.ts);
+  `cluster.writes.filter('guarantee', …)`) — reframed as a JOIN-recovered annotation. §7
   open decision #4 is resolved; the §6 punch-list now carries the concrete `commit:replicated` /
   `commit:persisted` fold seams instead of the vague "`write:*` whole family."
 - **Remaining (→ [IDEAS](IDEAS.md), debug-observability workstream):** (a) ship `log.marks()` in the
@@ -2042,5 +2044,10 @@ allocation tripled GC to ~155ms historically), which is exactly why the fold-fro
   marks to the digest/snapshot to lift `commit:persisted` from ▸ planned to ⊘ needs-fold; (e) the
   `cluster.writes` → snapshot fold seam for the `write:` issuer annotations. None touches the write hot
   path; all are cold export-fold work.
-- No code changed in this record — docs only ([filter-grammar.md](../tools/debug/filter-grammar.md) §3–§8).
-  The fold seams above are the build work; `tree.html` / the viewer are untouched.
+- The grammar/design landed docs-first ([filter-grammar.md](../tools/debug/filter-grammar.md) §3–§8); a
+  follow-up renamed the issuer-axis field end-to-end — `WriteRecord.tier`/`WriteTier` → `guarantee`/
+  `WriteGuarantee` ([writes.ts](resource/writes.ts) + its readable mirror + the `cluster.writes` test
+  assertions). The public `await` contract (`resolve.tier`, `reject.requestedTier`/`reachedTier`) is
+  UNCHANGED — a separate call-surface; renaming it (and `WriteRecord.reachedTier` → `reached`, which
+  touches the concurrently-edited `index.ts`) is a deferred follow-up. The `commit:` fold seams above are
+  the remaining build work; `tree.html` / the viewer are untouched.

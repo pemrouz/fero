@@ -105,8 +105,8 @@ honest if a live signal backs it.
 >
 > **`committed` legitimately lives on `commit:` now** — it's the baseline reached-durability,
 > superseding the old "`committed` never leaks to `commit:`" rule. The collision with the
-> *requested* tier is resolved by **key**, not by banning the word: `commit:committed` = the
-> objective rung a record REACHED; `write:committed` = the bar a writer REQUESTED (see `write:`).
+> *requested* guarantee is resolved by **key**, not by banning the word: `commit:committed` = the
+> objective rung a record REACHED; `write:committed` = the guarantee a writer REQUESTED (see `write:`).
 >
 > **Honesty hazard — `replicated` folds off `log.marks()`, never `seen`.** `seen` advances even
 > for epoch-fenced records that are never logged and never held (`index.ts:509`/`524`, the B1
@@ -120,7 +120,7 @@ honest if a live signal backs it.
 > probe but objective for **every** matched row.
 >
 > **Issuer lifecycle stays on `write:`, JOINed — not merged here.** `latency`, `state`
-> (pending/confirmed/rejected), `reason`, and the *requested* tier exist only for opt-in confirm
+> (pending/confirmed/rejected), `reason`, and the *requested* guarantee exist only for opt-in confirm
 > writes and are structurally absent on fire-and-forget and inbound commits, so they are **not**
 > `commit:` values — a `commit:` row borrows them via the `origin:`/`seq:` JOIN (§4).
 
@@ -223,26 +223,26 @@ the `cluster.writes` runtime ViewProxy — **no debug export today** (the whole 
 
 | Axis | Value | Definition | Use case | Source |
 |---|---|---|---|---|
-| **bar** (tier REQUESTED — the writer's wait-point, *not* the reached durability) | `accepted` | local-apply only — the **only** bar with no `commit:` rung (a wait-point, never a durability stage) | "resolved as soon as it applied here" | `writes.ts:24-43` · ⊘ |
+| **guarantee** (REQUESTED — the writer's wait-point, *not* the reached durability) | `accepted` | local-apply only — the **only** guarantee with no `commit:` rung (a wait-point, never a durability stage) | "resolved as soon as it applied here" | `writes.ts:24-43` · ⊘ |
 | | `committed` | waited for owner-sequencing (objective rung: `commit:committed`) | "asked to wait for the owner" | DECISIONS Z · ⊘ |
 | | `replicated` | waited for W of the R-set (objective rung: `commit:replicated`) | "asked to wait for W-durability" | · ⊘ |
 | | `persisted` | waited for W durable appends (objective rung: `commit:persisted`) | "asked to wait for fsync" | · ⊘ |
 | **state** | `pending` | in flight | "what's stuck right now" | · ⊘ |
-| | `confirmed` | reached its bar | | · ⊘ |
+| | `confirmed` | reached its guarantee | | · ⊘ |
 | | `rejected` | fell short | "what failed and why" | · ⊘ |
 | **reason** (rejected only) | `withheld` | quorum-less write-gate buffered it (⇐ `server:quorum-loss`) | "writes dropped by the CP gate" | · ⊘ |
 | | `timeout` | no ACK within `callTimeout` | | · ⊘ |
 | | `quorum` | sequenced but never reached W | "writes that missed replication" | · ⊘ |
 | | `unconfirmed` | default fallback | | · ⊘ |
-| **latency** | (scalar, ms) | `settledAt − startedAt` — how long the requested bar took | `cluster.writes.filter('bar','replicated').avg('latency')` | `writes.ts:40-42` · ⊘ |
+| **latency** | (scalar, ms) | `settledAt − startedAt` — how long the requested guarantee took | `cluster.writes.filter('guarantee','replicated').avg('latency')` | `writes.ts:40-42` · ⊘ |
 
 > Fire-and-forget writes (no `confirm:`) are **not recorded** — the zero-overhead hot path —
 > which is why `write:` can never host the union of all commits. `seq`/`epoch`/`origin` on a
 > write row are the JOIN fields to the commit it became (§4), not values. The `committed` overload
 > is resolved by **key + axis**: `commit:committed` = the objective rung a record REACHED;
-> `write:committed` = the bar the writer REQUESTED. Both are honest because they live on different
+> `write:committed` = the guarantee the writer REQUESTED. Both are honest because they live on different
 > keys — superseding the earlier "`committed` never leaks to `commit:`" framing now that durability
-> is a first-class `commit:` axis ([DECISIONS AC](../../DECISIONS.md)). `accepted` is the one bar
+> is a first-class `commit:` axis ([DECISIONS AC](../../DECISIONS.md)). `accepted` is the one guarantee
 > with **no** `commit:` counterpart: it's a local-apply wait-point, never a durability stage
 > reached by a committed record (`ProvKind` has no `accepted`; `reachedTier` is `committed`/`none`).
 
@@ -264,7 +264,7 @@ existing `clsOf` severity map).
 
 ### `origin:<uuid>` / `seq:<n>` — the LWW-triple JOIN
 One logical write has **four faces**: a `write:` row (the issuer lifecycle — requested
-bar / state / reason / latency), a `commit:` row (the objective outcome **and** reached
+guarantee / state / reason / latency), a `commit:` row (the objective outcome **and** reached
 durability — `applied`/`fence`/`conflict` × `committed`/`replicated`/`persisted`) on each
 replica that saw it, a `key:` `outcomes[]` entry, and a `server:quorum-loss` cause. They
 share `(epoch, seq, origin)`. `origin:X seq:42` scopes **all types at once** to that single
@@ -279,8 +279,8 @@ write — and it is precisely how a `commit:` row borrows the issuer-only `write
 - `commits:lagging` → `key:lagging` (per-partition) **+** `server:lagging` (node rollup) — two faces, two types.
 - `commits:diverged` → `key:lagging`.
 - `commits:rejected-fenced` / `rejected-conflict` → `commit:fence` / `commit:conflict` (+ `key:has-fence`/`has-conflict`).
-- `commits:accepted` → `write:accepted` (it's a write tier, not a commit-record state).
-- `write:{committed,replicated,persisted}` (the *tier* axis) **split by vantage** ([DECISIONS AC](../../DECISIONS.md)): the objective durability a record REACHED → `commit:{committed,replicated,persisted}` (a new monotonic `commit:` axis, all origins, `confirm`-independent); the bar a writer REQUESTED stays an issuer annotation on `write:` (relabelled `bar`). The old "`committed` never leaks to `commit:`" rule is **superseded** — the overload is resolved by key (`commit:` = reached, `write:` = requested), not by banning the word.
+- `commits:accepted` → `write:accepted` (it's a write guarantee, not a commit-record state).
+- `write:{committed,replicated,persisted}` (the *guarantee* axis, formerly *tier*) **split by vantage** ([DECISIONS AC](../../DECISIONS.md)): the objective durability a record REACHED → `commit:{committed,replicated,persisted}` (a new monotonic `commit:` axis, all origins, `confirm`-independent); the guarantee a writer REQUESTED stays an issuer annotation on `write:` (relabelled `tier`/`bar` → `guarantee`). The old "`committed` never leaks to `commit:`" rule is **superseded** — the overload is resolved by key (`commit:` = reached, `write:` = requested), not by banning the word.
 - `view:lagging` → `server:stale-epoch` (a client is never stale; view-lag is a server's epoch staleness).
 - `link:disconnected` → `server:disconnected` (⊘ needs-fold).
 
@@ -306,7 +306,7 @@ Each item is a real stored/streamed signal the viewer just doesn't consume yet.
 |---|---|---|
 | `commit:replicated` (objective, all commits) | ship `log.marks()` in the snapshot + retain each peer's R-set marks on `onDigest` + a `foldReplicated` (W-th-largest `log.marks()` threshold, live-winner gate). **Zero hot-path cost** — a cold export fold off existing digests, mirroring `deriveAggregate`'s frontier pass | digests already ship `seen` (`index.ts:638`); `log.marks()` exists (`log.ts:175`) but isn't shipped |
 | `commit:persisted` (objective, all commits) | the above **plus** durable marks (the `persisted` high-water) added to the digest/snapshot — today only `seen` ships | `persisted` map exists (`index.ts:316`) but never leaves the node |
-| `write:*` issuer fields (`bar`/`state`/`reason`/`latency`) | a `cluster.writes` → snapshot fold seam (none exists); these JOIN onto `commit:` rows by `origin:`/`seq:` | runtime ViewProxy, `writes.ts` |
+| `write:*` issuer fields (`guarantee`/`state`/`reason`/`latency`) | a `cluster.writes` → snapshot fold seam (none exists); these JOIN onto `commit:` rows by `origin:`/`seq:` | runtime ViewProxy, `writes.ts` |
 | `server:disconnected` / `suspect` | `export.ts` to fold `snapshot.peers` STATUS | stored, ships on wire (`peer.ts:34-41`) |
 | membership `admitted/evicting/evicted` | fold ViewManager transition state | stored, only count ships |
 | `epoch:past` timeline / `server:quorum-loss` history | bridge to consume the `kind:'view'`/`'writable'` observe transitions (it drops them) | `observe.ts:99`, dropped at `bridge.ts:354` |
@@ -329,7 +329,7 @@ Each item is a real stored/streamed signal the viewer just doesn't consume yet.
 4. **~~List `write:` now or omit until folded?~~ — RESOLVED: write/commit unification ([DECISIONS AC](../../DECISIONS.md)).**
    The durability lifecycle unifies onto `commit:` as the objective `committed`/`replicated`/`persisted`
    axis (one key traces a write *and the commit it becomes*); the issuer-only `write:` fields
-   (`bar`/`state`/`reason`/`latency`) stay a JOIN-recovered annotation, not a merged row. List
+   (`guarantee`/`state`/`reason`/`latency`) stay a JOIN-recovered annotation, not a merged row. List
    `commit:committed` now (● live once a log-export seam exists), grey `commit:replicated` (⊘ needs the
    `log.marks()` fold, §6) and `commit:persisted` (▸ planned, needs durable marks), and keep the `write:`
    annotations behind the `cluster.writes` fold seam. No token returns nothing once its §6 seam lands;
@@ -385,7 +385,7 @@ the token greyed per §7 #1.
 - [ ] ⛓ Durability axis — add `commit:{committed,replicated,persisted}` to the `commit:` value set
       (write/commit unification **resolved**, [DECISIONS AC](../../DECISIONS.md)). `commit:committed`
       lights up with the log-export seam; `commit:replicated` needs the `log.marks()` fold (§6);
-      `commit:persisted` is ▸ planned. The issuer-only `write:` annotations (`bar`/`state`/`reason`/
+      `commit:persisted` is ▸ planned. The issuer-only `write:` annotations (`guarantee`/`state`/`reason`/
       `latency`) stay behind the `cluster.writes` fold seam and attach to a `commit:` row via the
       `origin:`/`seq:` JOIN — never a merged row.
 - [ ] ⛓ `server:disconnected`/`suspect`, membership `admitted/evicting/evicted`, `epoch:past`

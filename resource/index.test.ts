@@ -1293,15 +1293,15 @@ test('cluster.writes: each confirm tier surfaces a confirmed record carrying its
     await A.methods.update({ key: ['c'], value: 3, confirm: 'replicated' }) // single node ⇒ W=1, resolves at the committed point
     const rows = () => Object.values((w as any)[value]) as any[]
     assert.ok(await until(() => rows().length === 3 && rows().every((r) => r.state === 'confirmed'), 3000), 'all three tiers recorded + confirmed')
-    const byTier = Object.fromEntries(rows().map((r) => [r.tier, r]))
+    const byTier = Object.fromEntries(rows().map((r) => [r.guarantee, r]))
     assert.equal(byTier.accepted.reachedTier, 'accepted', 'accepted = local apply')
     assert.equal(byTier.committed.reachedTier, 'committed', 'committed = owner sequenced')
     assert.equal(byTier.replicated.reachedTier, 'replicated', 'replicated = W of the R-set')
     for (const t of ['accepted', 'committed', 'replicated']) assert.equal(typeof byTier[t].latency, 'number', `${t} carries a numeric latency (how long the guarantee took)`)
     assert.equal(typeof byTier.committed.seq, 'number', 'committed/replicated carry the owner seq')
     assert.equal(byTier.committed.origin, A.cluster.uuid, 'and the owner origin (full LWW coordinates, parity with the resolve)')
-    // the surface is a real ViewProxy — per-tier latency folds reactively (the "how long each guarantee takes" query)
-    const avg = A.cluster.writes.filter('tier', 'replicated').avg('latency')
+    // the surface is a real ViewProxy — per-guarantee latency folds reactively (the "how long each guarantee takes" query)
+    const avg = A.cluster.writes.filter('guarantee', 'replicated').avg('latency')
     assert.equal(typeof (avg as any)[value], 'number', 'avg latency over a tier is a reactive scalar')
   } finally {
     A.destroy()
