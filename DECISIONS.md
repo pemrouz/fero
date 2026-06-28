@@ -1581,7 +1581,7 @@ drill would light it up); the write-route JOIN over `cluster.writes` + the `__ob
 already streams (existing data; `cluster.writes` isn't in the poll payload yet); a `networkSource`-backed CLI
 over the gated `__inspect` for remote (non-embedded) capture.
 
-## AA — Write path & conflict/fence semantics; the single-writer invariant & its four-part conflict-elimination program · Adopting · #1/#2/#3 landed (`d953e7b`/`0beceab`/`e0c7a2f`), #4 open
+## AA — Write path & conflict/fence semantics; the single-writer invariant & its conflict-elimination program · Adopting · #1/#2/#4 + #3-moved-owner landed (`d953e7b`/`0beceab`/`e0c7a2f`/`1fdd348`); one narrow #3 stale-ring residual open (conflict NOT yet eliminable)
 
 > **This record is the authoritative write-path reference.** It answers, in one read: how writes
 > route, the lost-ACK ambiguity, the EXACT fence-vs-conflict triggers and when each fires, the
@@ -1775,8 +1775,16 @@ provenance is conflict #3 (a second origin at the new owner's epoch — epoch-do
 Fix: `flushPending` re-resolves `owner(p)` per buffered write — `owner===me` (or solo) commits as the
 legitimate owner exactly as before (so X's restored-overwrite dominance path is UNTOUCHED — no attempt-
 epoch surgery needed); otherwise it FORWARDS via Part-1 `sendForward` (the current owner re-sequences
-under ITS origin). RESIDUAL: a stale local RING at flush (still names us owner) still commit-locals —
-closed by AA.4 (#2). Strictly an improvement; 131 resource + 10 chaos + 6 membership green.
+under ITS origin). Strictly an improvement; 131 resource + 10 chaos + 6 membership green. **RESIDUAL (OPEN,
+corrects an earlier wrong note):** if our local RING is itself stale at flush (still names US owner though
+the cluster moved on), `flushPending` still commit-local's via the `owner===me` branch, and epoch-dominance
+can lift it to the moved-on owner's epoch under OUR origin — a narrow same-epoch conflict. This is NOT
+closed by AA.4 (which is `commitForwarded`, a FORWARDED-write path; this is a commit-LOCAL path). A blunt
+"drop the buffered write if `cur.epoch > attempt-epoch`" does NOT work — it is indistinguishable from a
+LEGITIMATE knowing-overwrite of held higher-epoch data (the X dominance case: same `cur.epoch > view`, same
+`cur.origin ≠ us`), and dropping it loses real writes (it broke the X regression test, so it was reverted).
+Closing it needs the epoch-staleness work (gate a commit-local when our view lags what we hold) WITHOUT
+regressing X — the LAST open same-epoch two-origin path. Narrow (the stale-ring window during re-admission).
 
 ### AA.4 — Part 2 LANDED (`commitForwarded` owner-recheck) · Adopted · `0beceab`
 
@@ -1797,21 +1805,34 @@ relays the true reason (`withheld | not-owner`). Validated: churn + soak chaos (
 bounded, no stall), full + scoped partition/heal, the client write + confirm tests; chaos 10 + transport
 86 green.
 
-### AA.5 — #4 remains open (restore view-epoch, entangled with bootstrap write-gating)
+### AA.5 — Part 4 LANDED (a restored-with-peers node is read-only until it rejoins) · Adopted · `1fdd348`
 
-The last closer. Restoring the view-epoch to `max(restored)` fixes the DIVERGENCE bug (a pinned-uuid+
-storage node's own writes fenced for booting at epoch 1) but NOT the conflict: a restored solo node at
-epoch 5 still writes key k at epoch 5, colliding with the live owner's epoch-5 record. Closing the conflict
-needs the restored node to NOT act as a solo WRITABLE owner until it rejoins a view ≥ the cluster's epoch
-(today a solo node is a self-majority ⇒ writable). That's a real semantic call (a restored-with-peers node
-isn't "first"), gated on the durable-view-epoch-recovery work (Bounded memory, IDEAS) — and booting at a
-high epoch must not interfere with the rejoin ballot (`#highestProposed`/`#seenEpoch`). NARROW + niche
-(`{pinned-uuid, storage}`, restart→rejoin window).
+Closes conflict #4 (the restore-boot window). A node that restored prior state AND has peers configured is
+a REJOINER, not "first" — but `ViewManager` boots it solo ({me}@1), a self-majority ⇒ writable, so a local
+write before it rejoins commits as a SOLO OWNER and epoch-dominance lifts it to the restored (stale) epoch
+under OUR origin, colliding with the live owner (conflict #4). The fix is a resource-layer **boot-gate**
+(NOT the risky ViewManager/ballot boot-epoch change — the rejoin already works via the member-set-delta
+proposal, and booting at `max(restored)` only fixes the separate DIVERGENCE bug, not the conflict, AND a
+restored solo node would still write at the restored epoch). `bootGated` = restored-non-empty + peers-
+configured; while set, writes BUFFER (the V1e path). Cleared when a committed view with >1 member installs
+(rejoined — buffered writes then flush + owner-route at the merged epoch, AA.3) OR a short `bootGateMs`
+timeout elapses with no rejoin (genuinely alone ⇒ solo-writable). Fresh/peerless nodes never gate (no
+startup latency); only `{storage + peers}`. Test: a restored node's post-restart write CONVERGES cluster-
+wide (gated → forwarded — never lost, never a stale-epoch solo commit); 132 resource + 10 chaos (incl.
+crash→recover, full-cluster-crash) green; the X epoch-dominance + persisted regression tests still pass.
+(The separate durable-view-epoch DIVERGENCE recovery — boot at `max(restored)` for the genuinely-alone-then-
+rejoin case — stays open under Bounded memory/IDEAS; it is not a conflict.)
 
-**Net so far:** #1 (dominant) + #2 + #3 LANDED — the common + handoff + buffered-replay conflict sources
-are closed. `conflict` stays in the model until #4 lands (a same-epoch two-origin path remains only via
-the niche restore-boot window). Each part got its own commit + tests; #4 warrants its own design + review
-(the V/P/Q/X/Y discipline) given the bootstrap-semantics entanglement.
+**Net — conflict GREATLY reduced, NOT yet structurally impossible (honest result).** #1 (dominant) + #2
+(handoff) + #4 (restore-boot) FULLY closed; #3 closed for the moved-owner case. The original FOUR sources
+are down to ONE narrow residual: **#3's stale-local-ring + epoch-dominance window** (a node whose ring is
+momentarily stale during re-admission commit-local's a buffered write that dominance lifts to the moved-on
+owner's epoch). It is genuinely entangled with the load-bearing X dominance stamp (a blunt stale-drop is
+indistinguishable from a legit knowing-overwrite and loses real writes — tried + reverted). So `conflict` /
+`key:has-conflict` / `ProvKind lost` **STAY in the model** until that residual closes via the epoch-
+staleness work (gate a commit-local when our view lags what we hold, without regressing X). The practical
+benefit is banked: the common (fallback), handoff, buffered-replay-moved-owner, and restore-boot sources —
+the ones that actually fire — are gone; what remains is a rare re-admission-window race.
 
 ## AB — Provenance kinds audit: keep `local` / `forwarded` / `applied` (`won`→`applied`; forwarded retained as a not-yet-surfaced fact) · Investigated · rename Adopted
 
