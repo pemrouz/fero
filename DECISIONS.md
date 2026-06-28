@@ -1935,3 +1935,91 @@ DECISIONS Z) and the retired `tools/debug/mockups/old/` snapshots (frozen archiv
 **Open follow-ups → [IDEAS](IDEAS.md):** the **Write-route JOIN** note is corrected (it needs
 caller-origin instrumentation, not a derivation). Revisit `forwarded` for a merge only if the
 forward-traffic view is dropped from the roadmap.
+
+## AC — Write/commit unification: `commit:` gains an objective durability axis; the issuer lifecycle stays a JOINed `write:` annotation · Investigated → Adopting · (docs; fold seam → IDEAS)
+
+> **This record is the authoritative reference for the debug-grammar `commit:`/`write:` split.** The
+> catalog lives in [filter-grammar.md](../tools/debug/filter-grammar.md) §3–§7; this is the *why*, with the
+> code evidence and the honesty hazard that constrains the fold.
+
+**Context.** A user thesis: "a write and the commit it becomes are ONE concept, not two — we should be
+able to TRACE the durability stages (sequenced → replicated to W → persisted) for EVERY commit, not just
+opt-in `confirm:` writes." The debug grammar had split them into two keys — `commit:` (log vantage:
+type/provenance/outcome) and `write:` (issuer vantage: tier/state/reason/latency) — justified by a
+"population mismatch" (tiers are only MEASURED on the opt-in `cluster.writes` path). The question: is that
+mismatch fundamental, or incidental? Decided via a 10-agent verify-then-adversarially-refute workflow,
+every claim re-traced against current code.
+
+**The premise that motivated the ask is FALSE — but the conclusion survives on a different mechanism.**
+The thesis assumed the owner already tracks per-record replication state for the write-gate, so exporting
+it would be near-free. It does not:
+- **Write-gate = membership quorum, not a per-record tally.** `canWrite` is `inView*2 > members.length`
+  ([membership.ts:348](resource/membership.ts)), recomputed per coordinator tick — never a count of who
+  holds `(origin,seq)`. The gate is one boolean ([index.ts:1131](resource/index.ts)).
+- **Replication is fire-and-forget.** `replicateTo`/`broadcast` ([transport/index.ts:383](../transport/index.ts))
+  take no ack; the committer learns nothing about replica counts. This is deliberate ([DECISIONS Z]): a
+  stream tag would put an ack-id on an out-of-order data frame and advance a replica's dedup high-water
+  past a record it then drops.
+- **Per-record W-count is reconstructed on demand**, only for opt-in `confirm:` writes, via
+  `probeReplicated` ([index.ts:328](resource/index.ts)). No retained `Map<peer,marks>` exists.
+
+The TRUE enabling signal is the **anti-entropy digest** a node already ships ~1×/s —
+`{ v: Object.fromEntries(seen), … }` ([index.ts:638/659/732](resource/index.ts)) — which the bridge
+already folds into a cross-node frontier ([bridge.ts:233](../tools/observe/bridge.ts)). So `replicated`
+is derivable at **export** time, off existing wire traffic, with **zero** hot-path cost.
+
+**Decision — a PARTIAL unify (the honest shape):**
+1. **Durability becomes a fourth objective `commit:` axis** — `committed` < `replicated` < `persisted`,
+   monotonic, `confirm`-independent, present for **every** commit (all origins, incl. fire-and-forget and
+   inbound `applied` records). This is the user's win: one key (`commit:`) traces a write *and the commit
+   it becomes*. `committed` is ● live (a logged record's existence is the committed fact); `replicated` is
+   ⊘ needs-fold; `persisted` is ▸ planned (durable marks aren't shipped — digests carry `seen` only).
+2. **The issuer lifecycle stays on `write:` / `cluster.writes`** — requested `bar`, `state`, `reason`,
+   `latency` exist only for opt-in confirm writes and are structurally absent on fire-and-forget and
+   inbound commits, so they are NOT `commit:` values. A `commit:` row borrows them via the existing
+   `origin:`/`seq:` JOIN. The two POPULATIONS stay split; only the durability QUERY surface unifies.
+3. **`accepted` is a requested wait-point, not a durability rung** — it resolves at local-apply
+   ([index.ts:1296](resource/index.ts)), never sequences a distinct stage, and has no `ProvKind` /
+   `reachedTier` counterpart. It lives only as a `write:` bar, never on `commit:`.
+4. **The `committed` overload is resolved by KEY, not by banning the word.** `commit:committed` = the
+   objective rung a record REACHED; `write:committed` = the bar a writer REQUESTED. This supersedes the
+   prior "`committed` never leaks to `commit:`" rule now that durability is a first-class `commit:` axis.
+5. **Naming = `commit:`.** Coverage is one-directional and decisive: `commit:` has a row for every
+   sequenced/applied/rejected record; `write:` is a strict node-local subset (opt-in, keyed by a local id)
+   that never sees most commits. Only `commit:` can honestly host the union.
+
+**The honesty hazard (the load-bearing constraint on the fold).** An adversarial pass proved a naive
+`seen`-based `replicated` fold is a **guaranteed false-positive**: `seen` advances even for epoch-fenced
+records that are never logged and never held ([index.ts:509/524](resource/index.ts), the B1 sticky skip),
+so it would tag such a record `replicated` on *every* replica when held by *none* — the exact lie
+[DECISIONS B1] removed (`shedConfirmed` confirms against `log.marks()`, not `seen`). Agreement with the
+live `confirm:'replicated'` probe is no defense — `recvReplProbe` reads the same `seen` high-water, so both
+share the bug. The fold is honest **only** when it (1) derives the W-threshold from the shippable
+`log.marks()` high-water, NOT `seen`; (2) labels only the **live LWW winner** for a key (a scalar
+high-water can't distinguish a superseded / conflict-loser row from the live value); and (3) recomputes
+against the **live** R-set. The result is an *eventually-true* property (≤ `antiEntropyMs` stale), strictly
+weaker than the synchronous confirm probe — and that freshness contract must be stated wherever the token
+is surfaced, so no reader mistakes it for a point-in-time quorum guarantee.
+
+**Perf.** Hot path: **zero** added cost — `commitLocal`/`applyInbound` are untouched (preserves
+`index.perf.ts` 10k-writes < 150ms and `writes.perf.ts` fire-and-forget < 1.15× by construction). New
+steady-state: one retained-marks update per digest on the cold `onDigest` path (~1×/s/member +
+view-commit/connect), bounded `members × (origins×partitions)`. Fold at export: `O(N×seenKeys + rows)`,
+piggybacking on `deriveAggregate`'s frontier pass (W-th-largest instead of max), inside the existing cold
+budget (`bridge.perf.ts`: deriveAggregate < 8ms, foldLive < 15ms, once/~1s). The rejected alternative —
+per-commit probe / retained per-commit object — *would* regress `index.perf.ts` (a fresh per-write
+allocation tripled GC to ~155ms historically), which is exactly why the fold-from-digest design wins.
+
+**Consequences.**
+- The debug grammar gains `commit:{committed,replicated,persisted}` as a monotonic durability axis;
+  `write:`'s tier axis is relabelled `bar` (requested) and reframed as a JOIN-recovered annotation. §7
+  open decision #4 is resolved; the §6 punch-list now carries the concrete `commit:replicated` /
+  `commit:persisted` fold seams instead of the vague "`write:*` whole family."
+- **Remaining (→ [IDEAS](IDEAS.md), debug-observability workstream):** (a) ship `log.marks()` in the
+  InspectSnapshot; (b) retain each peer's R-set marks on `onDigest`; (c) `foldReplicated` (W-th-largest
+  `log.marks()` threshold + live-winner gate, eventually-true) alongside `foldOutcomes`; (d) add durable
+  marks to the digest/snapshot to lift `commit:persisted` from ▸ planned to ⊘ needs-fold; (e) the
+  `cluster.writes` → snapshot fold seam for the `write:` issuer annotations. None touches the write hot
+  path; all are cold export-fold work.
+- No code changed in this record — docs only ([filter-grammar.md](../tools/debug/filter-grammar.md) §3–§8).
+  The fold seams above are the build work; `tree.html` / the viewer are untouched.
