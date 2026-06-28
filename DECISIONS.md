@@ -1581,7 +1581,7 @@ drill would light it up); the write-route JOIN over `cluster.writes` + the `__ob
 already streams (existing data; `cluster.writes` isn't in the poll payload yet); a `networkSource`-backed CLI
 over the gated `__inspect` for remote (non-embedded) capture.
 
-## AA — Write path & conflict/fence semantics; the single-writer invariant & its four-part conflict-elimination program · Investigated → Adopting · (code in progress)
+## AA — Write path & conflict/fence semantics; the single-writer invariant & its four-part conflict-elimination program · Adopting · #1/#2/#3 landed (`d953e7b`/`0beceab`/`e0c7a2f`), #4 open
 
 > **This record is the authoritative write-path reference.** It answers, in one read: how writes
 > route, the lost-ACK ambiguity, the EXACT fence-vs-conflict triggers and when each fires, the
@@ -1756,44 +1756,62 @@ dedup is a deferred efficiency refinement, not correctness). Perf: the lone-serv
 orphan / loss; owner CRASH → evict → re-target to the new owner). 86 transport, 131 resource (incl.
 P2/P4/membership convergence), 10 chaos (partition/heal, eviction/heal, crash/recover, soak) all green.
 
+**Availability consequence (a sharper CP posture — `f80500f`).** The old fallback let a quorum-holding
+node make progress on ANY key by committing locally when the owner was unreachable (trading a possible
+conflict for availability). Without it, a partition whose single OWNER is unreachable is **write-
+unavailable from the majority until the owner is evicted** (a new owner is then elected) or returns —
+with a normal `evictAfter` (~1.5s) availability self-restores; with a huge `evictAfter` (no eviction) the
+write buffers until heal. This surfaced as latent flakiness in two no-eviction partition chaos tests
+(they wrote a key whose owner was randomly the partitioned-away node ~40% of runs — Part 1's chaos run
+passed by luck); fixed by writing a majority-OWNED key (`f80500f`). Correct, intended CP strengthening.
+
 **Removes conflict source #1 (the dominant one).** #2/#3/#4 remain → `conflict` is NOT yet impossible.
 
-### AA.2 — Parts #2/#3/#4 are each deeper than the first framing (design notes before implementing)
+### AA.3 — Part 3 LANDED (`flushPending` forwards a moved-owner buffered write) · Adopted · `e0c7a2f`
 
-The Part-1 implementation + a closer read show each remaining closer is entangled with a LOAD-BEARING
-consensus mechanism — none is a one-line guard, and a naive version risks a worse bug than the narrow
-conflict window it closes. Capture before anyone implements:
+A quorum-less node BUFFERS its writes (V1e); on quorum return `flushPending` used to `commitLocal` EVERY
+buffered write. But if the ring rebalanced while we were read-only, committing under OUR now-non-owner
+provenance is conflict #3 (a second origin at the new owner's epoch — epoch-dominance can lift it there).
+Fix: `flushPending` re-resolves `owner(p)` per buffered write — `owner===me` (or solo) commits as the
+legitimate owner exactly as before (so X's restored-overwrite dominance path is UNTOUCHED — no attempt-
+epoch surgery needed); otherwise it FORWARDS via Part-1 `sendForward` (the current owner re-sequences
+under ITS origin). RESIDUAL: a stale local RING at flush (still names us owner) still commit-locals —
+closed by AA.4 (#2). Strictly an improvement; 131 resource + 10 chaos + 6 membership green.
 
-- **#2 `commitForwarded` recheck needs epoch-ON-THE-WRITE-PATH, not just `owner(p)===me`.** A bare
-  "NACK if I'm not `owner(p)` at my epoch" does NOT close #2: the new owner O2, still at epoch E during
-  the VIEW_COMMIT install lag, genuinely IS `owner(p)` at ITS epoch E, so it commits the forwarded write
-  at E — exactly the stale-epoch commit that collides with old-owner O1's E commit. To close it, the
-  FORWARDER's view-epoch must travel on the WRITE frame and the receiver must NACK when
-  `forwarderEpoch > myEpoch` (I am behind a newer view — don't commit, catch up). This is the same
-  machinery as the deferred "reject-stale-epoch fence" (IDEAS) and should land WITH it. A bare
-  owner-recheck also risks the F1 ping-pong / formation stall (`committingForward` exists to avoid it) —
-  view-synchrony (V) bounds the disagreement to the install lag, and Part-1 retry replaces the bounce
-  with a retry-from-origin, but it must be tested against formation + churn + soak, not assumed safe.
-- **#3 `flushPending` attempt-epoch must OVERRIDE epoch-dominance for buffered flushes.** Stamping the
-  attempt epoch at buffer time isn't enough: `commitLocal`'s epoch-dominance (X) re-lifts a flushed write
-  to `cur.epoch` when a newer winner is already held — back to the conflict. A buffered flush is a stale
-  replay (NOT a knowing supersede, which is what dominance protects), so for the buffered-flush path the
-  stamp must be the attempt epoch WITHOUT dominance — so a stale buffered write FENCES (loses) instead of
-  conflicting. This touches the load-bearing X stamp; the X regression tests (restored-epoch overwrite,
-  lagging-view) must stay green.
-- **#4 is entangled with solo-bootstrap vs rejoin write-gating, not just a boot-epoch init.** Restoring
-  the view-epoch to `max(restored)` fixes the DIVERGENCE bug (the node's own writes fenced for booting at
-  epoch 1) but NOT the conflict: a restored solo node at epoch 5 still writes key k at epoch 5, colliding
-  with the live owner's epoch-5 record. Closing the conflict needs the restored node to NOT act as a solo
-  WRITABLE owner until it rejoins a view ≥ the cluster's epoch (today a solo node is a self-majority ⇒
-  writable). That's a real semantic call (a restored-with-peers node isn't "first"), gated on the
-  durable-view-epoch-recovery work (Bounded memory, IDEAS).
+### AA.4 — Part 2 LANDED (`commitForwarded` owner-recheck) · Adopted · `0beceab`
 
-**Net:** Part 1 removes the dominant, common conflict source and is the bulk of the practical benefit.
-#2/#3/#4 close NARROW, RARE latent windows and each warrants its own design + adversarial review + tests
-(the discipline every V/P/Q/X/Y consensus change got) — they are not safe to batch-land under time
-pressure. `conflict` stays in the model until all four land + a proof that no same-epoch two-origin path
-remains.
+**Corrects AA.2's #2 analysis** — "needs epoch-on-the-write-path" was a MISREAD. `commitForwarded`
+committed a forwarded write as-is (`committingForward` bypassed the recheck — F1, to dodge a pre-V
+live-connection ring-churn ping-pong). The fix is a **pure LOCAL recheck, no wire-format change**: NACK if
+we are not `owner(p)` at OUR current epoch. The misread was assuming "O2, still at epoch E, IS owner(p) at
+its epoch E" — FALSE: at epoch E the ring is the E-ring, where **O1** owns p; O2 owns it only in the E+1
+ring. So O2 at epoch E computes `owner(p)=O1 ≠ me` and NACKs the stale-epoch second origin. Safe NOW (not
+at F1 time) because view-synchrony (V) makes the ring a pure fn of (members, epoch) → a node's current-
+epoch ring has EXACTLY ONE owner per partition, so the disagreement is bounded to the install lag, not the
+unbounded pre-V churn — and the NACK returns to the ORIGINAL forwarder (which re-resolves via Part-1
+retry), not a node-to-node bounce. Two sender kinds: a SERVER (view member) NACKs → it re-resolves +
+retries (a confirm gets the real owner's outcome); a CLIENT has no ring (forwarded to a PICKED server, not
+the owner) → WE route it to the owner via `sendForward` + ACK accepted (this also closes the
+picked-server-commits-a-non-owned-write variant of #2; client confirm writes take the RPC path). transport
+relays the true reason (`withheld | not-owner`). Validated: churn + soak chaos (the F1 ping-pong risk —
+bounded, no stall), full + scoped partition/heal, the client write + confirm tests; chaos 10 + transport
+86 green.
+
+### AA.5 — #4 remains open (restore view-epoch, entangled with bootstrap write-gating)
+
+The last closer. Restoring the view-epoch to `max(restored)` fixes the DIVERGENCE bug (a pinned-uuid+
+storage node's own writes fenced for booting at epoch 1) but NOT the conflict: a restored solo node at
+epoch 5 still writes key k at epoch 5, colliding with the live owner's epoch-5 record. Closing the conflict
+needs the restored node to NOT act as a solo WRITABLE owner until it rejoins a view ≥ the cluster's epoch
+(today a solo node is a self-majority ⇒ writable). That's a real semantic call (a restored-with-peers node
+isn't "first"), gated on the durable-view-epoch-recovery work (Bounded memory, IDEAS) — and booting at a
+high epoch must not interfere with the rejoin ballot (`#highestProposed`/`#seenEpoch`). NARROW + niche
+(`{pinned-uuid, storage}`, restart→rejoin window).
+
+**Net so far:** #1 (dominant) + #2 + #3 LANDED — the common + handoff + buffered-replay conflict sources
+are closed. `conflict` stays in the model until #4 lands (a same-epoch two-origin path remains only via
+the niche restore-boot window). Each part got its own commit + tests; #4 warrants its own design + review
+(the V/P/Q/X/Y discipline) given the bootstrap-semantics entanglement.
 
 ## AB — Provenance kinds audit: keep `local` / `forwarded` / `applied` (`won`→`applied`; forwarded retained as a not-yet-surfaced fact) · Investigated · rename Adopted
 

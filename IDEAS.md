@@ -242,36 +242,35 @@ The routed/projected model (plan §5–6) has landed
   non-holder P4-sheds). Remaining: read-your-writes still routes a subsequent read to the
   stale owner until AE reconciles; and preserving the buffered write's ORIGINAL attempt-epoch
   on flush (V deferral — also a conflict-closer #3, see below).
-- **Conflict-elimination program (4 parts) — #1 LANDED, #2/#3/#4 OPEN** ([DECISIONS AA](DECISIONS.md)).
+- **Conflict-elimination program (4 parts) — #1/#2/#3 LANDED, #4 OPEN** ([DECISIONS AA](DECISIONS.md)).
   The design-review hypothesis (the never-drop fallback is the *single* source of `commit:conflict`,
   so removing it makes conflict structurally impossible) was rigorously **REFUTED**. A `conflict` is
   a violation of the single-writer invariant ("at most one origin stamps a partition's records per
   epoch"); the fallback is the DOMINANT violator but **not the only one**. So `commit:conflict` /
-  `key:has-conflict` / `ProvKind lost` (NOT fence-only) **stay in the model** until ALL FOUR sources close:
+  `key:has-conflict` / `ProvKind lost` (NOT fence-only) **stay in the model** until the LAST source closes:
   1. **Transparent forwarder retry — LANDED** (`d953e7b`, [DECISIONS AA.1](DECISIONS.md)). Replaces the
-     never-drop LOCAL commit (F1/X): the forwarder never commits under own provenance; `sendForward` +
-     a bounded `fwdRetry` buffer + an unref'd re-forward sweep re-resolve `owner(key)` each attempt
-     (owner eviction / view change re-targets transparently; `owner===me` ⇒ commit as the legit owner).
-     Durable once an owner ACKs (same-origin, no conflict); volatile until then (relaxed fire-and-forget
-     durability, Z). Removes conflict source #1 (the dominant one). *Open tail:* the forward→failure-
-     detector `setSuspect` linkage (faster eviction on exhaustion — none today); a same-cell buffer
-     dedup (efficiency, not correctness). (resource: index; transport)
-  2. **`commitForwarded` ownership/epoch recheck — OPEN (deeper than first framed, [AA.2](DECISIONS.md)).**
-     A bare "NACK if not `owner(p)===me`" does NOT close #2 — the new owner O2, still at epoch E in the
-     VIEW_COMMIT install lag, genuinely IS owner at its epoch E and commits the stale write. Closing it
-     needs the FORWARDER's epoch ON the WRITE frame + a NACK when `forwarderEpoch > myEpoch` (catch up,
-     don't commit) — the same machinery as the deferred reject-stale-epoch fence; land them together.
-     Must be tested against formation + churn + soak (the F1 ping-pong / formation-stall risk
-     `committingForward` guards, now bounded by view-synchrony). (resource: index, membership; transport)
-  3. **Preserve the buffered write's attempt-epoch in `flushPending` — OPEN ([AA.2](DECISIONS.md)).** The
-     V deferral, also a conflict-closer. Stamping the attempt epoch isn't enough: it must OVERRIDE
-     epoch-dominance (X) for the buffered-flush path (a stale replay, not a knowing supersede) so a stale
-     buffered write FENCES instead of conflicting — without regressing the X tests. (resource: index)
-  4. **Restore the view-epoch on a pinned-uuid+storage boot — OPEN ([AA.2](DECISIONS.md)).** The
+     never-drop LOCAL commit: the forwarder never commits under own provenance; re-forwards (re-resolving
+     `owner(key)` each attempt) until an owner ACKs. Removes conflict #1 (dominant). *Open tail:* the
+     forward→failure-detector `setSuspect` linkage (faster eviction on exhaustion); a same-cell buffer
+     dedup (efficiency). *Availability:* an owner-unreachable partition is write-unavailable until eviction
+     (`evictAfter`) — the CP sharpening the old fallback masked. (resource: index; transport)
+  2. **`commitForwarded` owner-recheck — LANDED** (`0beceab`, [DECISIONS AA.4](DECISIONS.md)). A PURE
+     LOCAL recheck (NACK if not `owner(p)===me` at our epoch) — no wire-format change (AA.2's "needs
+     epoch-on-the-write-path" was a misread: at epoch E, O2 is NOT the owner, O1 is). Safe via
+     view-synchrony (one owner per (partition,epoch)); a server NACKs+re-resolves, a client (no ring) is
+     routed to the owner via `sendForward`. Closes the handoff conflict + the picked-server-commits
+     variant. (resource: index; transport)
+  3. **`flushPending` forwards a moved-owner buffered write — LANDED** (`e0c7a2f`, [DECISIONS AA.3](DECISIONS.md)).
+     Cleaner than AA.2's "override epoch-dominance" plan: `flushPending` re-resolves `owner(p)` and
+     FORWARDS (not commit-local) a buffered write whose partition moved while we were quorum-less — X's
+     dominance path untouched. (resource: index)
+  4. **Restore the view-epoch on a pinned-uuid+storage boot — OPEN ([DECISIONS AA.5](DECISIONS.md)).** The
      "Durable view-epoch recovery" item below. `max(restored)` fixes the divergence bug but NOT the
      conflict — a restored solo node still writes at the restored epoch, colliding with the live owner.
      Closing it needs the restored-with-peers node to NOT be a solo writable owner until it rejoins a
-     view ≥ the cluster epoch (a real solo-bootstrap-vs-rejoin semantic call). (resource, membership)
+     view ≥ the cluster epoch (a real solo-bootstrap-vs-rejoin semantic call), and the boot-epoch must not
+     interfere with the rejoin ballot. The LAST same-epoch two-origin path (niche `{pinned-uuid,storage}`
+     restart→rejoin window). (resource, membership)
 - **Stale shed-confirmation across an orphan write — LANDED** ([DECISIONS P4a](DECISIONS.md)):
   `commitLocal` now clears `shedReady[p]` when its never-drop fallback appends a fresh winner to
   an orphan, so a confirmation earned against the old high-water can't be reused to shed before
@@ -564,6 +563,22 @@ a `debug` SSE event + `/debug/` serving so the viewer goes LIVE through the SAME
   subscription deltas are synthetic proxy records carrying NO provenance (`sendDelta` writes no origin/seq
   ext), so "lag = head−delivered" can't be measured without fabrication. P3 shipped the honest signal —
   subscription TOPOLOGY (who serves what, of which kind) — instead.
+- **Filter grammar & state catalog — DESIGN CONVERGED, build pending.** The viewer's filter/query layer has
+  a from-scratch, code-grounded spec: [tools/debug/filter-grammar.md](tools/debug/filter-grammar.md) — the
+  `key:value` exact-type grammar (comma = OR, whitespace = AND), the **7** entity types
+  (`commit:`/`key:`/`server:`/`client:`/`sub:`/`epoch:`/`write:` — `replica:` was revised OUT; a replica is a
+  (partition × holder) cell folded into `key:lagging`/`caught-up` + `server:lagging` + the inspector, not a
+  type), the two cross-cuts (`is:`, `origin:`/`seq:`), every value traced to a live signal or tagged
+  ⊘needs-fold, plus **§8 the view-layer action points** (parser, drop the ~7 fiction tokens, nest replicas
+  under partitions, wire the `is:` severity rollup) and **§6 the data-fold punch-list** (which overlaps the
+  items above — the `write:` family, `epoch:past`, per-holder `commit:` attribution all need the same seams).
+  TWO open investigations gate parts of it: **(a) write/commit unification** — whether `write:`/`commit:` are
+  ONE concept traceable end-to-end (trace `replicated`/`persisted` for EVERY commit, not just opt-in
+  confirm-writes) or stay two vantages of the same write; the make-or-break question is whether the owner's
+  per-commit W-replication tracking (it needs it for the write-gate) can be exported confirm-independently and
+  at what hot-path cost. **(b)** the never-drop-fallback **forwarder-retry** call (under *Partitioned ownership
+  & routing*), which decides whether `commit:conflict` survives. Don't build the `write:` UI until (a)
+  resolves. (tools/debug: filter-grammar, tree.html; resource: writes, export)
 - **Cross-cutting discipline:** every phase ships a teardown contract mirroring `bridge.close()` (clear timers,
   unsub observe legs, REAP served subs via the dispatch reap so a long-running exporter can't leak server-side
   sinks — the `reapPeer` leak); introspection NEVER perturbs the hot path (pull/sampled over always-on; extend
