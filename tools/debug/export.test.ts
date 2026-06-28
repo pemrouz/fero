@@ -295,7 +295,7 @@ test('foldOutcomes folds the observe lost-stream into per-partition fence/confli
     { by: ':A', kind: 'lost', key: 'user42.score', origin: 'X', seq: 5, epoch: 2, we: 4, ws: 9 }, // epoch 2 < winner 4 → FENCE (stale view)
     { by: ':B', kind: 'lost', key: 'user42.score', origin: 'X', seq: 5, epoch: 2, we: 4, ws: 9 }, // SAME write seen on another replica → deduped
     { by: ':A', kind: 'lost', key: 'order7.lines', origin: 'Y', seq: 9208, epoch: 4, we: 4, ws: 9210 }, // epoch == winner → CONFLICT
-    { by: ':A', kind: 'won', key: 'user42.name', origin: 'X', seq: 6, epoch: 4 }, // not 'lost' → ignored
+    { by: ':A', kind: 'applied', key: 'user42.name', origin: 'X', seq: 6, epoch: 4 }, // not 'lost' → ignored
     { by: ':Z', kind: 'lost', key: 'user42.x', origin: 'Q', seq: 1, epoch: 1, we: 4, ws: 9 }, // unknown observing node → skipped
   ]
   foldOutcomes(file, events)
@@ -309,7 +309,7 @@ test('foldOutcomes folds the observe lost-stream into per-partition fence/confli
 //! foldOutcomes attaches nothing when the stream carries no losers (a healthy cluster)
 test('foldOutcomes leaves partitions untouched when there are no lost events', () => {
   const file: any = { 'fero.debug': 1, _about: '', view: 'e4', resources: [{ name: 'r', members: [':A'], R: 1, nodes: [{ addr: ':A' }], partitions: [{ name: 'user42', owner: ':A' }] }] }
-  foldOutcomes(file, [{ by: ':A', kind: 'won', key: 'user42.score', origin: 'X', seq: 5, epoch: 4 }] as any)
+  foldOutcomes(file, [{ by: ':A', kind: 'applied', key: 'user42.score', origin: 'X', seq: 5, epoch: 4 }] as any)
   assert.equal(file.resources[0].partitions[0].outcomes, undefined)
 })
 

@@ -1795,7 +1795,7 @@ conflict window it closes. Capture before anyone implements:
 pressure. `conflict` stays in the model until all four land + a proof that no same-epoch two-origin path
 remains.
 
-## AB — Provenance kinds audit: keep `local` / `forwarded` / `won` (forwarded retained as a not-yet-surfaced fact) · Investigated · (no code)
+## AB — Provenance kinds audit: keep `local` / `forwarded` / `applied` (`won`→`applied`; forwarded retained as a not-yet-surfaced fact) · Investigated · rename Adopted
 
 > **This record is the authoritative provenance-kind reference.** The canonical per-kind definition
 > lives on the `ProvKind` type itself ([resource/observe.ts](resource/observe.ts):24); this record is
@@ -1819,16 +1819,26 @@ rather than blurring it.
 
 **VERDICT — keep all three. None is merged, dropped, or derived.**
 
-- **`won` → KEEP** (and the proposed `applied` rename is **declined**). It is the sole replication-apply
-  signal: the `repl/s` rate ([tools/observe/bridge.ts](../tools/observe/bridge.ts) `prov.won++`;
+- **`won` → KEEP, and RENAMED `won` → `applied`.** It is the sole replication-apply signal: the `repl/s`
+  rate ([tools/observe/bridge.ts](../tools/observe/bridge.ts) `prov.applied++`;
   [tools/observe/web/app.js](../tools/observe/web/app.js) `rates.repl`) and the per-replica apply trace a
   pull snapshot structurally cannot show (a poll never sees an applied-then-superseded record). **Not
-  derivable** from `ProvRecord` scalars: `won` is the LWW outcome decided against the held per-key version
-  (`index.ts` `applyInbound` ~536), which a downstream consumer holding only `{origin,seq,epoch,key}`
-  cannot recompute. `origin !== me` separates won from local/forwarded (inbound records keep the sender
-  origin) but NOT from `lost`/`dropped` (all inbound share it). The rename is net churn (the rename-fragile
-  literal-keyed `stats` at app.js:67/98, bridge counters, the grammar `commit:won` / `replica:won`) for no
-  clarity gain — `won`/`lost` is already the precise LWW-outcome antonym pair.
+  derivable** from `ProvRecord` scalars: the win is the LWW outcome decided against the held per-key version
+  (`index.ts` `applyInbound` ~536), which a downstream consumer holding only `{origin,seq,epoch,key}` cannot
+  recompute. `origin !== me` separates it from local/forwarded (inbound records keep the sender origin) but
+  NOT from `lost`/`dropped` (all inbound share it).
+  - **The rename (initially declined here, then reversed — recorded so the reasoning isn't lost).** `applied`
+    names the ACTION this node took, completing the accepted trio `local` / `forwarded` / `applied` (all
+    named by *where the record was sequenced relative to this node*); `won` was the odd one out, named by
+    race outcome. Decisive point: `won` **over-implies contention** — the kind fires on EVERY applied inbound
+    record, and the vast majority are uncontested normal replication, not a "win" over a competing version;
+    `applied` is honest for that common case. The original decline leaned on a `won`/`lost` antonym, which
+    doesn't hold up: `lost` bundles fence (an epoch fence, not an LWW loss) + conflict, so it was never the
+    clean opposite of `won`. The cost is mechanical (rename across observe.ts / index.ts:545 emit / bridge.ts
+    counters / app.js — one fragile spot: the literal-keyed `stats` field — / observe.test.ts / export.test.ts),
+    not a reason to decline. The grammar `commit:won` / `replica:won` rows ride the in-flight
+    [filter-grammar.md](../tools/debug/filter-grammar.md) restyle (dirty in a concurrent session); the debug-row
+    `out:'won'` outcome vocabulary in the mockups is a separate axis, aligned during the tree.html restyle.
 
 - **`local` → KEEP.** Drives `writes/s` + the hot-keys working set + top-origins boards (bridge.ts ~355,
   app.js ~109/173). Realized and load-bearing.
@@ -1881,10 +1891,12 @@ vs `≠ me`). `won` is partial (the apply half is exact; ownership isn't on the 
 `forwarded` is NOT post-hoc derivable from any stored field — it lives solely in the transient
 `committingForward` flag, and the ProvRecord deliberately drops the original writer origin.
 
-**Consequences / no code change.** All three kinds, both emit sites
-([resource/index.ts](resource/index.ts) `commitLocal` ~1159 and `applyInbound` ~545), and the grammar's
-`commit:` / `replica:` rows stand. The emit-site comments are already accurate; the `ProvKind` type comment
-is enriched to be the canonical per-kind model.
+**Consequences.** All three kinds and both emit sites stand
+([resource/index.ts](resource/index.ts) `commitLocal` ~1159 `local`/`forwarded`, `applyInbound` ~545
+`applied`); the only code change is the `won`→`applied` rename (a wire-value on the in-repo `__observe`
+stream, consumed by the same-version bridge/dashboard — safe under the "servers trust each other / same
+version" posture). The `ProvKind` type comment is the canonical per-kind model; the emit-site comments are
+accurate. The grammar `commit:` / `replica:` rows still say `won` and are updated with the restyle.
 
 **Open follow-ups → [IDEAS](IDEAS.md):** the **Write-route JOIN** note is corrected (it needs
 caller-origin instrumentation, not a derivation); a small grammar breadcrumb (mark the `commit:` won/local/
