@@ -328,7 +328,7 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         cur.seq = n
         cur.origin = origin
       } else versions.set(key, { epoch: e, seq: n, origin })
-      observe?.onRecord(record, 'won')
+      observe?.onRecord(record, 'applied')
     } else {
       log.append(record)
     }
@@ -699,10 +699,17 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   }
 
   // flushPending: quorum returned — re-commit the buffered writes in order (re-buffers if the gate closed again).
+  // Part 3 (DECISIONS AA #3): re-resolve ownership per buffered write — if the partition moved to
+  // another owner while we were quorum-less, FORWARD it (Part 1) rather than commit-local under our
+  // (now non-owner) provenance, which would be a same-epoch `conflict` at the new owner's epoch.
   function flushPending() {
     if (!pending.length) return
     const batch = pending.splice(0)
-    for (const c of batch) commitLocal(c)
+    for (const c of batch) {
+      const owner = mesh.owner(partitionOf(c))
+      if (owner === undefined || owner === me) commitLocal(c)
+      else sendForward(c, owner)
+    }
   }
 
   // distributed aggregates (Q2/Q3): the fold ENGINE lives in ./fold.ts (makeFold), built below once invoke+clientSubs exist.
