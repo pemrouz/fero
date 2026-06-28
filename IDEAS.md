@@ -518,6 +518,27 @@ a `debug` SSE event + `/debug/` serving so the viewer goes LIVE through the SAME
   "from whom". `cluster.writes` also isn't in the poll payload yet. (resource; tools/observe)
 - **[P3] `networkSource`-backed CLI** over the gated `__inspect` for remote (non-embedded) capture — the
   embedded `captureInProcess` + the live bridge cover in-process today. (tools/debug; tools/observe)
+- **[P3] `commit:` durability axis — objective `replicated`/`persisted` per commit ([DECISIONS AC](DECISIONS.md)).**
+  Make the durability a record REACHED a folded `commit:` value for EVERY commit (not just opt-in `confirm:`
+  writes) — the write/commit-unification deliverable. `committed` is already implied by a logged record; the
+  fold work is `replicated` (then `persisted`):
+  - Ship `log.marks()` (the SHIPPABLE high-water — NOT `seen`, which overstates by fenced dead seqs) in the
+    `InspectSnapshot` alongside `marks`; retain each peer's R-set marks on `onDigest` (today `shedConfirmed`
+    consumes `payload.v` and discards it).
+  - `foldReplicated` alongside `foldOutcomes` ([export.ts](tools/debug/export.ts)): a per-`seenKey`
+    W-th-largest `log.marks()` threshold (one extra pass on `deriveAggregate`'s existing frontier fold), then
+    tag a commit row `replicated` iff it is the LIVE LWW winner for its key AND `seq ≤ threshold`.
+    EVENTUALLY-true (≤ `antiEntropyMs` stale), strictly weaker than `confirm:'replicated'`'s synchronous probe
+    — surface that freshness, never claim a point-in-time quorum. The `seen`-vs-`log.marks()` honesty trap is
+    the load-bearing constraint ([DECISIONS AC](DECISIONS.md)/[B1]).
+  - `persisted` (▸ planned) additionally needs the durable `persisted` high-water shipped in the
+    digest/snapshot (today only `seen` ships). **Zero hot-path cost** throughout — cold export-fold only.
+    (tools/debug: export; resource: inspect, index; tools/observe: bridge)
+- **[P3] `write:` issuer annotations on the poll payload.** The `cluster.writes` confirm-lifecycle ViewProxy
+  (`bar`/`state`/`reason`/`latency`, keyed by a local id — [DECISIONS Z](DECISIONS.md)/AC) has no snapshot
+  fold seam yet; fold it into the poll payload so those issuer-only fields JOIN onto `commit:` rows by
+  `origin`/`seq` (they're structurally absent on fire-and-forget + inbound commits, so they can never be
+  `commit:` values). (resource: inspect; tools/observe)
 - **Owner-timeline must anchor at BIRTH, not the earliest retained view.** `foldOwnership` back-projects the
   CURRENT partition set onto every past view's ring and counts `owner(e)≠owner(e-1)` as a MOVE — so a partition
   created at e registers as a move from its COUNTERFACTUAL pre-birth slot (and every earlier ring-change
