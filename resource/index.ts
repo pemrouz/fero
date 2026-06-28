@@ -66,7 +66,7 @@ export type Cluster = {
   readonly epoch: number // current committed view-epoch (Milestone V); 1 for a read-only client
   readonly members: string[] // current committed view membership (servers); [] for a client
   readonly writable: boolean // can this server reach a quorum of its view? false ⇒ read-only (writes buffer)
-  readonly writes: any // confirm-write lifecycle ViewProxy (in-flight + per-tier latency) — gated, lazily built on first access (resource/writes.ts); records ONLY confirm:'accepted'|'committed'|'replicated' writes, never fire-and-forget
+  readonly writes: any // confirm-write lifecycle ViewProxy (in-flight + per-guarantee latency) — gated, lazily built on first access (resource/writes.ts); records ONLY confirm:'accepted'|'committed'|'replicated' writes, never fire-and-forget
 }
 
 //! Context: the second arg every method receives — data/cluster/methods/log/name + the calling peer (routed RPC).
@@ -1344,28 +1344,28 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
   // HOLDERS. 'persisted' is PHASE 2 against the DURABLE high-water — W of the R-set having
   // RESOLVED storage.append for (origin,seq) (its strength = the seam's: page-cache for the
   // built-in fileStorage, power-loss-safe for an fsync'd one); requires a storage seam. Resolve
-  // {tier,key,seq,epoch,origin} (committed = SEQUENCED, not necessarily the LWW winner — a
-  // higher-seq concurrent write can still supersede); reject {requestedTier,reachedTier,reason,
+  // {guarantee,key,seq,epoch,origin} (committed = SEQUENCED, not necessarily the LWW winner — a
+  // higher-seq concurrent write can still supersede); reject {guarantee,reached,reason,
   // localCommit} on withheld / timeout / quorum — carrying localCommit when a never-drop fallback
   // committed under our provenance (durable, just owner-unconfirmed) so a retry isn't blind.
   const writeWithConfirm = (chg: any, doWrite: () => void): unknown => {
-    const tier = chg && typeof chg === 'object' ? chg.confirm : undefined
-    if (!tier) return doWrite() // fire-and-forget (the default — no confirmation, zero overhead)
+    const guarantee = chg && typeof chg === 'object' ? chg.confirm : undefined
+    if (!guarantee) return doWrite() // fire-and-forget (the default — no confirmation, zero overhead)
     const key = norm(chg?.at ?? chg?.key)
     const keyStr = key.join('.') // dotted path for the cluster.writes ticker (gated — undefined unless someone introspected it)
-    if (tier === 'accepted') {
+    if (guarantee === 'accepted') {
       const wid = writesLog?.onStart('accepted', keyStr)
       doWrite()
-      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: 'accepted' }) // local apply — latency ≈ 0
-      return { tier: 'accepted', key } // applied on this node now (NOT a durability/cluster claim)
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reached: 'accepted' }) // local apply — latency ≈ 0
+      return { guarantee: 'accepted', key } // applied on this node now (NOT a durability/cluster claim)
     }
-    if (tier !== 'committed' && tier !== 'replicated' && tier !== 'persisted') throw new Error(`fero: unknown confirm tier "${tier}" (expected 'accepted' | 'committed' | 'replicated' | 'persisted')`)
+    if (guarantee !== 'committed' && guarantee !== 'replicated' && guarantee !== 'persisted') throw new Error(`fero: unknown confirm guarantee "${guarantee}" (expected 'accepted' | 'committed' | 'replicated' | 'persisted')`)
     // persisted needs somewhere to persist: with no storage seam its durability high-water never
     // advances, so the probe could only ever time out. Fail FAST + clearly instead. (A persisted
     // cluster needs storage on the holders; this guards the common holder/single-node path.)
-    if (tier === 'persisted' && !storage) throw new Error("fero: confirm:'persisted' requires a storage seam (none configured) — use 'replicated' for an in-memory W-quorum")
+    if (guarantee === 'persisted' && !storage) throw new Error("fero: confirm:'persisted' requires a storage seam (none configured) — use 'replicated' for an in-memory W-quorum")
     const replTimeout = typeof chg?.timeout === 'number' ? chg.timeout : 5000
-    const wid = writesLog?.onStart(tier, keyStr) // cluster.writes: a `pending` record now; settled in win/fail with the measured latency (gated — undefined unless introspected)
+    const wid = writesLog?.onStart(guarantee, keyStr) // cluster.writes: a `pending` record now; settled in win/fail with the measured latency (gated — undefined unless introspected)
     let done = false // the whole confirm settled
     let phase1 = false // committed point reached (or rejected) — disarms the safety timer; phase 2 (replicated probe) may still run
     let safety: ReturnType<typeof setTimeout> | undefined
@@ -1379,12 +1379,12 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       if (done) return
       done = true
       if (safety) clearTimeout(safety)
-      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reachedTier: reached, seq: o.seq, epoch: o.epoch, origin: o.origin })
+      if (wid !== undefined) writesLog!.onSettle(wid, 'confirmed', { reached, seq: o.seq, epoch: o.epoch, origin: o.origin })
       // origin + seq + epoch are the committed record's FULL LWW coordinates — committed means
       // SEQUENCED, not necessarily WON, so a caller can watch for a (epoch,seq,origin)-dominating
       // later write superseding theirs. origin is the owner's provenance (this node for an owned
       // write, the owner's uuid for a forwarded/client write — carried back on the WRITE-ACK).
-      resolveP({ tier: reached, key, seq: o.seq, epoch: o.epoch, origin: o.origin })
+      resolveP({ guarantee: reached, key, seq: o.seq, epoch: o.epoch, origin: o.origin })
     }
     const fail = (o: WriteOutcome) => {
       if (done) return
@@ -1395,13 +1395,13 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
       // under our provenance, so a non-quorum reject carries NO local seq (it reached 'none'). The old
       // 'committed-local' tier (a durable-but-owner-unconfirmed fallback commit) is therefore
       // unreachable. Only the quorum phase-2 miss is 'committed' (the owner DID sequence it).
-      const reachedTier = quorum ? 'committed' : 'none'
+      const reached = quorum ? 'committed' : 'none'
       const reason = o.reason ?? 'unconfirmed'
-      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reachedTier, reason, seq: o.seq, epoch: o.epoch, origin: o.origin })
+      if (wid !== undefined) writesLog!.onSettle(wid, 'rejected', { reached, reason, seq: o.seq, epoch: o.epoch, origin: o.origin })
       rejectP(
         Object.assign(new Error(`fero: write not ${quorum ? 'replicated to W' : 'committed'} (${reason})`), {
-          requestedTier: tier,
-          reachedTier,
+          guarantee,
+          reached,
           reason,
           localCommit: o.seq !== undefined ? { seq: o.seq, epoch: o.epoch, origin: o.origin } : null, // only the quorum phase-2 miss carries a seq now (committed at the owner, just under-replicated) — a retry can see it WAS sequenced
         }),
@@ -1414,10 +1414,10 @@ export async function fero(name: string, opts: FeroOpts = {}): Promise<Fero> {
         safety = undefined
       }
       if (!o.committed) return fail(o) // withheld / never-drop timeout — never reached the committed bar
-      if (tier === 'committed') return win(o, 'committed')
+      if (guarantee === 'committed') return win(o, 'committed')
       const part = String(key[0])
       const quorumFail = () => fail({ committed: false, seq: o.seq, epoch: o.epoch, origin: o.origin, reason: 'quorum' })
-      if (tier === 'replicated')
+      if (guarantee === 'replicated')
         // PHASE 2 (replicated) — the owner sequenced it (origin, seq); probe the R-set for W HOLDERS
         return void probeReplicated(part, o.origin!, o.seq!, (ok) => (ok ? win(o, 'replicated') : quorumFail()), replTimeout)
       // PHASE 2 (persisted) — W of the R-set must have DURABLY appended it. If WE hold the

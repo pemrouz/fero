@@ -20,10 +20,10 @@ test('writes: a record goes pending → confirmed and carries a measured latency
   assert.equal(typeof r.startedAt, 'number')
   assert.equal(r.latency, undefined, 'no latency while in flight')
 
-  w.onSettle(id, 'confirmed', { reachedTier: 'committed', seq: 5, epoch: 2 })
+  w.onSettle(id, 'confirmed', { reached: 'committed', seq: 5, epoch: 2 })
   r = rows(w)[String(id)]
   assert.equal(r.state, 'confirmed')
-  assert.equal(r.reachedTier, 'committed')
+  assert.equal(r.reached, 'committed')
   assert.equal(r.seq, 5)
   assert.equal(r.epoch, 2)
   assert.equal(typeof r.settledAt, 'number')
@@ -34,11 +34,11 @@ test('writes: a record goes pending → confirmed and carries a measured latency
 test('writes: a rejected settle records the reason + how far it reached', () => {
   const w = makeWritesLog()
   const id = w.onStart('replicated', 'k')
-  w.onSettle(id, 'rejected', { reachedTier: 'committed', reason: 'quorum', seq: 9, epoch: 3 })
+  w.onSettle(id, 'rejected', { reached: 'committed', reason: 'quorum', seq: 9, epoch: 3 })
   const r = rows(w)[String(id)]
   assert.equal(r.state, 'rejected')
   assert.equal(r.reason, 'quorum', "committed but not replicated to W")
-  assert.equal(r.reachedTier, 'committed')
+  assert.equal(r.reached, 'committed')
   assert.equal(r.seq, 9, 'a rejected replicated write still carries its durable commit seq')
 })
 
@@ -57,7 +57,7 @@ test('writes: settling an already-evicted record is a no-op (no resurrection)', 
   w.onStart('committed', 'b')
   w.onStart('committed', 'c') // evicts `a`
   assert.ok(!(String(a) in rows(w)), 'a was evicted by drop-oldest')
-  w.onSettle(a, 'confirmed', { reachedTier: 'committed' }) // late settle for the evicted record
+  w.onSettle(a, 'confirmed', { reached: 'committed' }) // late settle for the evicted record
   assert.equal(Object.keys(rows(w)).length, 2, 'still capped — the evicted record was not resurrected')
   assert.ok(!(String(a) in rows(w)), 'and stays gone')
 })

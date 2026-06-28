@@ -1046,12 +1046,12 @@ test('confirm: default (no confirm) is fire-and-forget — the write replicates,
   }
 })
 
-test('confirm: accepted resolves {tier:accepted} once the value is applied locally', async () => {
+test('confirm: accepted resolves {guarantee:accepted} once the value is applied locally', async () => {
   const p1 = await ports.free()
   const A: any = await fero('cf-acc', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
   try {
     const r: any = await A.methods.update({ key: ['k'], value: 42, confirm: 'accepted' })
-    assert.equal(r.tier, 'accepted')
+    assert.equal(r.guarantee, 'accepted')
     assert.deepEqual(r.key, ['k'])
     assert.equal(A.data.k?.[value], 42, 'applied locally')
   } finally {
@@ -1059,13 +1059,13 @@ test('confirm: accepted resolves {tier:accepted} once the value is applied local
   }
 })
 
-test('confirm: committed resolves {tier:committed,seq,epoch} when the OWNER sequences the write', async () => {
+test('confirm: committed resolves {guarantee:committed,seq,epoch} when the OWNER sequences the write', async () => {
   const p1 = await ports.free()
   const A: any = await fero('cf-own', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
   try {
     // a single node owns every key → commitLocal sequences synchronously
     const r: any = await A.methods.update({ key: ['acct'], value: { bal: 100 }, confirm: 'committed' })
-    assert.equal(r.tier, 'committed')
+    assert.equal(r.guarantee, 'committed')
     assert.deepEqual(r.key, ['acct'])
     assert.equal(typeof r.seq, 'number', 'carries the sequenced Lamport seq')
     assert.equal(typeof r.epoch, 'number', 'carries the view epoch')
@@ -1088,7 +1088,7 @@ test('confirm: committed resolves for a FORWARDED write — the owner ACKs with 
     assert.ok(await until(() => all.every(formed), 8000), 'cluster formed')
     const k = Array.from({ length: 100 }, (_, i) => 'f' + i).find((k) => A.cluster.owner(k) !== A.cluster.me)! // a key A does NOT own ⇒ A forwards to the owner
     const r: any = await A.methods.update({ key: [k], value: 7, confirm: 'committed' })
-    assert.equal(r.tier, 'committed', 'the owner ACKed the forwarded write as committed')
+    assert.equal(r.guarantee, 'committed', 'the owner ACKed the forwarded write as committed')
     assert.equal(typeof r.seq, 'number', 'the ACK carried the owner-sequenced seq')
     const owner = all.find((n) => n.cluster.me === A.cluster.owner(k))!
     assert.equal(r.origin, owner.cluster.uuid, 'origin on the resolve is the OWNER’s provenance (re-sequenced under it), not the forwarder’s')
@@ -1108,7 +1108,7 @@ test('confirm: a client confirm:committed resolves via the RPC (the server commi
   assert.ok(await until(() => connected(C.cluster, `127.0.0.1:${p1}`), 4000), 'client connected to A')
   try {
     const r: any = await C.methods.update({ key: ['ck'], value: 9, confirm: 'committed' })
-    assert.equal(r.tier, 'committed', 'client await resolved committed via the server')
+    assert.equal(r.guarantee, 'committed', 'client await resolved committed via the server')
     assert.ok(await until(() => A.data.ck?.[value] === 9 || B.data.ck?.[value] === 9, 6000), 'the write landed on the cluster')
   } finally {
     C.destroy()
@@ -1121,7 +1121,7 @@ test('confirm: an unknown tier rejects (the tier guard)', async () => {
   const p1 = await ports.free()
   const A: any = await fero('cf-bad', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
   try {
-    await assert.rejects(async () => A.methods.update({ key: ['k'], value: 1, confirm: 'nope' }), /unknown confirm tier/)
+    await assert.rejects(async () => A.methods.update({ key: ['k'], value: 1, confirm: 'nope' }), /unknown confirm guarantee/)
   } finally {
     A.destroy()
   }
@@ -1132,7 +1132,7 @@ test('confirm: replicated resolves immediately on a single node (W=1, no probe n
   const A: any = await fero('cf-rep1', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
   try {
     const r: any = await A.methods.update({ key: ['k'], value: 1, confirm: 'replicated' })
-    assert.equal(r.tier, 'replicated', 'single-node W=1 ⇒ replicated == committed, resolves at once')
+    assert.equal(r.guarantee, 'replicated', 'single-node W=1 ⇒ replicated == committed, resolves at once')
     assert.equal(typeof r.seq, 'number')
   } finally {
     A.destroy()
@@ -1153,9 +1153,9 @@ test('confirm: replicated resolves once W of the R-set hold the write (owned + f
     const owned = keys.find((k) => A.cluster.owner(k) === A.cluster.me)! // A sequences locally → probes the R-set, needs 1 other ack
     const foreign = keys.find((k) => A.cluster.owner(k) !== A.cluster.me)! // A forwards → owner ACKs (origin,seq) → A probes
     const ro: any = await A.methods.update({ key: [owned], value: 1, confirm: 'replicated' })
-    assert.equal(ro.tier, 'replicated', 'owner-write replicated to W (a probed replica acked once caught up)')
+    assert.equal(ro.guarantee, 'replicated', 'owner-write replicated to W (a probed replica acked once caught up)')
     const rf: any = await A.methods.update({ key: [foreign], value: 2, confirm: 'replicated' })
-    assert.equal(rf.tier, 'replicated', 'forwarded-write replicated to W (owner + this holder)')
+    assert.equal(rf.guarantee, 'replicated', 'forwarded-write replicated to W (owner + this holder)')
     assert.ok(await until(() => all.every((n) => n.data[owned]?.[value] === 1 && n.data[foreign]?.[value] === 2), 6000), 'both writes converged on the whole R-set')
   } finally {
     all.forEach((n) => n.destroy())
@@ -1188,7 +1188,7 @@ test('confirm: persisted resolves on a single node once its append is durable (s
   const A: any = await fero('cf-pers1', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100, storage: fileStorage(wal) })
   try {
     const r: any = await A.methods.update({ key: ['k'], value: 1, confirm: 'persisted' })
-    assert.equal(r.tier, 'persisted', 'single node W=1 + sync seam ⇒ persisted resolves')
+    assert.equal(r.guarantee, 'persisted', 'single node W=1 + sync seam ⇒ persisted resolves')
     assert.equal(typeof r.seq, 'number')
     assert.equal(r.origin, A.cluster.uuid, 'full LWW coordinates, same as the other tiers')
   } finally {
@@ -1205,7 +1205,7 @@ test('confirm: persisted waits for the storage append to RESOLVE (async seam gat
   try {
     const t0 = Date.now()
     const r: any = await A.methods.update({ key: ['k'], value: 1, confirm: 'persisted' })
-    assert.equal(r.tier, 'persisted')
+    assert.equal(r.guarantee, 'persisted')
     assert.ok(Date.now() - t0 >= 140, 'resolved ONLY after the async append settled — the durable high-water gated it, not the in-memory commit')
     assert.equal(appended, 1, 'the record was appended exactly once')
   } finally {
@@ -1228,9 +1228,9 @@ test('confirm: persisted resolves once W of the R-set have DURABLY appended (own
     const owned = keys.find((k) => A.cluster.owner(k) === A.cluster.me)! // A sequences + durably appends locally, durable-probes the rest
     const foreign = keys.find((k) => A.cluster.owner(k) !== A.cluster.me)! // A forwards; the owner persists, A also holds + persists
     const ro: any = await A.methods.update({ key: [owned], value: 1, confirm: 'persisted' })
-    assert.equal(ro.tier, 'persisted', 'owned write durably persisted on a W-quorum of the R-set')
+    assert.equal(ro.guarantee, 'persisted', 'owned write durably persisted on a W-quorum of the R-set')
     const rf: any = await A.methods.update({ key: [foreign], value: 2, confirm: 'persisted' })
-    assert.equal(rf.tier, 'persisted', 'forwarded write durably persisted on a W-quorum')
+    assert.equal(rf.guarantee, 'persisted', 'forwarded write durably persisted on a W-quorum')
   } finally {
     all.forEach((n) => n.destroy())
     wals.forEach((w) => rmSync(w, { force: true }))
@@ -1256,7 +1256,7 @@ test('confirm: persisted rejects quorum when a replica never durably appends (he
     }
     assert.ok(err, 'rejected (not resolved)')
     assert.equal(err.reason, 'quorum', "B holds it in memory but its append never resolves → not persisted to W")
-    assert.equal(err.requestedTier, 'persisted')
+    assert.equal(err.guarantee, 'persisted')
     assert.ok(await until(() => B.data[owned]?.[value] === 1, 4000), 'the write IS present on B in memory (replicated succeeded; only DURABILITY fell short)')
   } finally {
     all.forEach((n) => n.destroy())
@@ -1283,7 +1283,7 @@ test('cluster.writes: gated — a confirm write BEFORE first access is not recor
   }
 })
 
-test('cluster.writes: each confirm tier surfaces a confirmed record carrying its measured latency (the operability ask)', async () => {
+test('cluster.writes: each confirm guarantee surfaces a confirmed record carrying its measured latency (the operability ask)', async () => {
   const p1 = await ports.free()
   const A: any = await fero('cw-life', { host: '127.0.0.1', port: p1, ports: [p1], wait: 100 })
   try {
@@ -1294,9 +1294,9 @@ test('cluster.writes: each confirm tier surfaces a confirmed record carrying its
     const rows = () => Object.values((w as any)[value]) as any[]
     assert.ok(await until(() => rows().length === 3 && rows().every((r) => r.state === 'confirmed'), 3000), 'all three tiers recorded + confirmed')
     const byTier = Object.fromEntries(rows().map((r) => [r.guarantee, r]))
-    assert.equal(byTier.accepted.reachedTier, 'accepted', 'accepted = local apply')
-    assert.equal(byTier.committed.reachedTier, 'committed', 'committed = owner sequenced')
-    assert.equal(byTier.replicated.reachedTier, 'replicated', 'replicated = W of the R-set')
+    assert.equal(byTier.accepted.reached, 'accepted', 'accepted = local apply')
+    assert.equal(byTier.committed.reached, 'committed', 'committed = owner sequenced')
+    assert.equal(byTier.replicated.reached, 'replicated', 'replicated = W of the R-set')
     for (const t of ['accepted', 'committed', 'replicated']) assert.equal(typeof byTier[t].latency, 'number', `${t} carries a numeric latency (how long the guarantee took)`)
     assert.equal(typeof byTier.committed.seq, 'number', 'committed/replicated carry the owner seq')
     assert.equal(byTier.committed.origin, A.cluster.uuid, 'and the owner origin (full LWW coordinates, parity with the resolve)')

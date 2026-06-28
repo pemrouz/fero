@@ -188,7 +188,7 @@ test("chaos: confirm:'persisted' survives a FULL-CLUSTER crash — recovered fro
     const k = 'pk'
     const owner = c.node(c.owner(k)!)!
     const r: any = await owner.methods.update({ key: [k], value: { v: 42 }, confirm: 'persisted', timeout: 8000 })
-    assert.equal(r.tier, 'persisted', 'durably persisted on a W-quorum — so ≥W WALs hold it right now')
+    assert.equal(r.guarantee, 'persisted', 'durably persisted on a W-quorum — so ≥W WALs hold it right now')
     assert.ok(await c.converged(12000), 'all three hold it before the crash')
 
     // FULL crash: every node down (all in-memory state gone — only the on-disk WALs remain).
@@ -388,9 +388,9 @@ test("chaos: confirm:'replicated' — probe targets stranded by a partition reje
     await assert.rejects(
       owner.methods.update({ key: [k], value: { v: 1 }, confirm: 'replicated', timeout: 1500 }),
       (err: any) => {
-        assert.equal(err.requestedTier, 'replicated', 'requested replicated')
+        assert.equal(err.guarantee, 'replicated', 'requested replicated')
         assert.equal(err.reason, 'quorum', "rejected 'quorum' — committed but not replicated to W")
-        assert.equal(err.reachedTier, 'committed', 'reached the committed bar (the owner sequenced + logged it)')
+        assert.equal(err.reached, 'committed', 'reached the committed bar (the owner sequenced + logged it)')
         assert.ok(err.localCommit && typeof err.localCommit.seq === 'number', 'localCommit carries the durable seq for a non-blind retry')
         return true
       },
@@ -403,7 +403,7 @@ test("chaos: confirm:'replicated' — probe targets stranded by a partition reje
     const rej = (Object.values((w as any)[value]) as any[]).find((r) => r.key === k)
     assert.ok(rej && rej.state === 'rejected', 'cluster.writes shows the write as rejected')
     assert.equal(rej.reason, 'quorum', 'cluster.writes carries the reject reason')
-    assert.equal(rej.reachedTier, 'committed', 'cluster.writes shows it reached committed')
+    assert.equal(rej.reached, 'committed', 'cluster.writes shows it reached committed')
     assert.equal(typeof rej.latency, 'number', 'cluster.writes stamps the time-to-reject')
 
     c.heal()
@@ -440,7 +440,7 @@ test("chaos: confirm:'replicated' — a view change re-probes the NEW R-set (rec
     // Generous timeout: if recount never re-probed the new R-set this hangs to the timeout and
     // rejects 'quorum'; resolving (well before it) is the discriminator that recount fired.
     const r: any = await owner.methods.update({ key: [k], value: { v: 2 }, confirm: 'replicated', timeout: 15000 })
-    assert.equal(r.tier, 'replicated', 'resolved replicated — the new R-set (post-eviction survivors) reached W via recount')
+    assert.equal(r.guarantee, 'replicated', 'resolved replicated — the new R-set (post-eviction survivors) reached W via recount')
     assert.equal(owner.cluster.members.length, 3, 'the majority committed a 3-member view (the peers were evicted)')
     assert.equal(tally(owner), 0, 'no writer-side probe-tally leak after the resolve')
 
