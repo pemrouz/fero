@@ -153,6 +153,74 @@ test('a dialed link that drops redials with backoff; attempts are bounded and gi
   assert.ok(of('timer').length <= 12, `unbounded redial: ${of('timer').length} timers`)
 })
 
+test('revival: only a FAILED final attempt revives; the pending window and a peer-dialed link do not', () => {
+  //! adversarial-review regression: tries increments at ARM time, so tries==MAX during the 10th
+  // attempt's pending window is NOT parked — a revive there orphans the live timer into a second
+  // concurrent dial chain. Revival must key on gaveUp (the final attempt actually failed).
+  const { node, of } = harness('aa', { redialMs: 10, heartbeatMs: 50, hosts: ['sim:bb'] })
+  const fire = (tag: number) => {
+    const t = of('timer').filter((x) => x[2] === tag).pop()!
+    node.step({ kind: 'timer', id: t[1] as number, tag })
+  }
+  const revives = () => node.journal.read().filter((e) => e.kind === JK.revive).length
+  node.step({ kind: 'start' }) // dials sim:bb, arms the heartbeat
+  node.step({ kind: 'linkDown', link: 900, reason: 'refused', to: 'sim:bb' })
+  const exhaust = (n: number) => {
+    for (let i = 0; i < n; i++) { fire(TAG.redial); node.step({ kind: 'linkDown', link: 901 + i, reason: 'refused', to: 'sim:bb' }) }
+  }
+  exhaust(9) // 10 arms total — the FINAL attempt's timer is now pending
+  let c0 = of('connect').length
+  fire(TAG.heartbeat)
+  assert.equal(revives(), 0, 'the pending final attempt is not parked — no revive')
+  assert.equal(of('connect').length, c0, 'no dial forked over the live chain')
+  fire(TAG.redial) // the final attempt fires...
+  node.step({ kind: 'linkDown', link: 950, reason: 'refused', to: 'sim:bb' }) // ...and FAILS → parked
+  assert.ok(node.journal.read().some((e) => e.kind === JK.giveUp), 'give-up precedes any revive')
+  fire(TAG.heartbeat)
+  assert.equal(revives(), 1, 'a parked target revives exactly once per tick')
+  //! the revived dial fails → a fresh chain runs to give-up again; then the PEER dials us instead
+  node.step({ kind: 'linkDown', link: 951, reason: 'refused', to: 'sim:bb' })
+  exhaust(9); fire(TAG.redial)
+  node.step({ kind: 'linkDown', link: 952, reason: 'refused', to: 'sim:bb' })
+  node.step({ kind: 'linkUp', link: 60, dialed: false }) // bb dialed US — accepted link, no `to`
+  node.step({ kind: 'bytesIn', link: 60, bytes: hello('bb') }) // gossiped listen identifies it as sim:bb
+  c0 = of('connect').length
+  fire(TAG.heartbeat)
+  assert.equal(revives(), 1, 'a live peer-dialed link clears the stale give-up instead of reviving')
+  assert.equal(of('connect').length, c0, 'no dial into a dup race')
+  node.step({ kind: 'linkDown', link: 60, reason: 'close' }) // accepted link dies — we do not redial those
+  fire(TAG.heartbeat)
+  assert.equal(revives(), 1, 'the cleared give-up stays cleared — no parked ghost')
+  assert.equal(of('connect').length, c0)
+})
+
+test('the floor is silent on a paused link; a digest arriving mid-pause defers its suffix to drain', () => {
+  //! adversarial-review regression: control frames queued into a drop-oldest queue are doomed work,
+  // and serialising the missing suffix per inbound digest during a pause is O(suffix) discarded per
+  // tick — both must be deferred to the drain-time exchange.
+  const { node, of } = harness('aa', { heartbeatMs: 50 })
+  node.step({ kind: 'start' })
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: hello('bb') })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) }) // synced
+  node.step({ kind: 'write', recs: [{ type: REC.update, key: ['a'], value: 1 }, { type: REC.update, key: ['b'], value: 2 }] })
+  node.step({ kind: 'pause', link: 1 })
+  const link = node.links.get(1)!
+  const s0 = of('send').length
+  const t = of('timer').filter((x) => x[2] === TAG.heartbeat).pop()!
+  node.step({ kind: 'timer', id: t[1] as number, tag: TAG.heartbeat })
+  assert.equal(of('send').length, s0, 'no PING/digest sent on a paused link')
+  assert.equal(link.queued.length, 0, 'and none parked in the doomed queue')
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) }) // peer floor ticks anyway
+  assert.equal(link.queued.length, 0, 'the missing suffix must not serialise into a paused queue')
+  assert.equal(of('send').length, s0)
+  assert.equal(link.droppedWhilePaused, true, 'the deferred-suffix debt is marked')
+  node.step({ kind: 'drain', link: 1 })
+  const drained = of('send').slice(s0).map((e) => new Framer().push(e[2] as Uint8Array)[0])
+  assert.deepEqual(drained.map((f) => f.verb), [VERB.DIGEST], 'drain settles the debt with ONE re-sync digest')
+  assert.deepEqual(drained[0].value, { d: { aa: 2 }, r: 1 }, 'carrying the REAL log tail, reciprocal')
+})
+
 test('malformed HELLO and wire faults drop the link; unknown verbs drop the frame but keep the link', () => {
   const { node, of } = harness('aa')
   node.step({ kind: 'linkUp', link: 1, dialed: false })
@@ -287,8 +355,11 @@ test('heartbeat: the lower uuid originates PINGs, the peer replies PONG, the tim
   const hb = of('timer').find((t) => t[2] === TAG.heartbeat)!
   const sendsBefore = of('send').length
   node.step({ kind: 'timer', id: hb[1] as number, tag: TAG.heartbeat })
-  const pings = of('send').slice(sendsBefore).map((e) => [e[1], new Framer().push(e[2] as Uint8Array)[0].verb])
-  assert.deepEqual(pings, [[1, VERB.PING]]) // exactly one PING, on the zz link only
+  const sent = of('send').slice(sendsBefore).map((e) => [e[1], new Framer().push(e[2] as Uint8Array)[0].verb])
+  //! the PING side also carries the periodic AE floor: one reciprocal digest per tick, same link only
+  assert.deepEqual(sent, [[1, VERB.PING], [1, VERB.DIGEST]]) // originator link only; the aa link stays silent
+  const dig = of('send').slice(sendsBefore)[1]
+  assert.deepEqual(new Framer().push(dig[2] as Uint8Array)[0].value, { d: {}, r: 1 }) // r=1: asks for theirs back
   assert.equal(of('timer').filter((t) => t[2] === TAG.heartbeat).length, 2) // re-armed
 
   node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.PING) })

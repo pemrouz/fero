@@ -43,6 +43,7 @@ export const JK = {
   digestOut: 21,  // a=link, b=r — sent our per-origin high-water digest (r=1 asks the peer to answer with theirs)
   digestIn: 22,   // a=link — received a peer digest
   aeShip: 23,     // a=peerUuid, b=records — anti-entropy shipped the suffixes the peer's digest showed missing
+  revive: 24,     // a=to — the heartbeat floor revived a given-up dial target (give-up is a cool-down, not death)
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).
