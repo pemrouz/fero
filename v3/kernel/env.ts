@@ -1,0 +1,90 @@
+//! ── kernel/env — the ONLY doorway between the kernel and the world ───────────
+// The v3 organizing idea (plan-v3.md §2): the entire distributed core is a
+// single-threaded deterministic kernel advanced only by explicit Events and
+// emitting only explicit Effects. This file is the whole contract. The kernel
+// may import NOTHING from node:* (enforced by kernel/purity.test.ts) — real
+// sockets/timers (shell/) and the simulator (sim/) are both just implementations
+// of the interfaces below, which is what makes every protocol behaviour a
+// seeded, reproducible trajectory instead of a wall-clock race.
+//
+// Design note: Effects are a typed METHOD-PER-KIND sink rather than a pushed
+// tagged-union object. Pushing `{kind:'send', ...}` objects would allocate one
+// wrapper per effect on the hottest path (v2 ate a 3x GC regression from exactly
+// one per-write object); methods with scalar args allocate nothing. Events stay
+// a closed tagged union — they are allocated by the I/O boundary anyway (one per
+// socket chunk / timer fire), so the union costs nothing extra and keeps
+// node.step() a single fail-closed dispatch site.
+
+//! One inbound stimulus. The closed union node.step() dispatches on — nothing else moves the kernel.
+export type Event =
+  //! start: boot stimulus — dial the configured hosts. Posted once by the embedder (shell runtime or sim).
+  | { kind: 'start' }
+  //! linkUp: the env opened a socket. `link` ids are minted by the ENV (shell/sim), never the kernel. `to` is set on dialed links only.
+  | { kind: 'linkUp'; link: number; dialed: boolean; to?: string }
+  //! bytesIn: raw bytes arrived on a link — the highest-frequency event; framing/decoding is kernel work (kernel/codec).
+  | { kind: 'bytesIn'; link: number; bytes: Uint8Array }
+  //! linkDown: the link is gone (close/error/refused). Terminal per link id — ids are never reused. `to` rides along on a FAILED DIAL (no linkUp ever fired) so the kernel can still schedule a redial for that target.
+  | { kind: 'linkDown'; link: number; reason: string; to?: string }
+  //! pause/drain: send-plane backpressure, from the first commit (plan §5) — the env's write buffer filled / emptied.
+  | { kind: 'pause'; link: number }
+  | { kind: 'drain'; link: number }
+  //! timer: a timer the kernel set via sink.timer() fired. `id` is kernel-minted; `tag` says why it was set.
+  | { kind: 'timer'; id: number; tag: number }
+  //! write: local write attempts issued by the embedder (api layer / test). A BATCH per event so a synchronous burst coalesces into one frame per link (the one-frame-per-peer-per-tick counted invariant). M0: no cid/attemptEpoch yet — they land with M3's write contract.
+  | { kind: 'write'; recs: Rec[] }
+
+//! One outbound consequence. Typed methods (not pushed objects) so the steady-state path allocates no effect
+// WRAPPERS by construction (frame buffers and Applied records still allocate; the full alloc-counter
+// verification with --expose-gc heap deltas is an M8 pinned-runner deliverable, per plan §7 — not yet a test).
+export interface EffectSink {
+  //! connect(to): open a socket to 'host:port'. The env answers later with linkUp{dialed:true,to} or linkDown.
+  connect(to: string): void
+  //! send(link, bytes): ship one encoded frame. `bytes` is owned by the CALLER after return — envs that deliver later must not assume the buffer survives (codec's Outbox already hands over a fresh slice per flush; see kernel/codec.ts).
+  send(link: number, bytes: Uint8Array): void
+  //! close(link, reason): tear a link down. The env echoes linkDown (once) so kernel state changes only via events.
+  close(link: number, reason: string): void
+  //! timer(id, tag, ms): one-shot timer. `id` is kernel-minted (monotone), `tag` is a TAG.* discriminant echoed back on fire.
+  timer(id: number, tag: number, ms: number): void
+  //! cancel(id): best-effort cancel — a raced fire is delivered and must be ignored by the kernel (ids are checked against live sets).
+  cancel(id: number): void
+  //! apply(rec): a committed record materialises downstream (state proxy / api layer). The kernel NEVER mutates user state directly — apply is an output, which is what makes re-entrant capture (v2's applying/discarding flag family) structurally impossible.
+  apply(rec: Applied): void
+}
+
+//! Env: what the kernel is allowed to know about the world — a clock, a seeded rng, and the sink. Nothing else.
+export interface Env {
+  //! now(): milliseconds on the env's clock (virtual in sim). For journal stamps and backoff arithmetic only — NEVER for correctness decisions.
+  now(): number
+  //! rng(): [0,1) from the env's SEEDED generator — jitter must be reproducible per seed, so Math.random is banned in kernel/.
+  rng(): number
+  sink: EffectSink
+}
+
+//! ── the change record — memory format, log entry, and wire payload at once ───
+// Carried over from v2 verbatim (the one day-0 hypothesis that proved out):
+// {type, key, value, at?} is what `data` emits, what the log stores, and what
+// crosses the wire — no translation layer anywhere.
+
+//! REC: record type discriminants (3 bits on the wire — see kernel/codec.ts).
+export const REC = { update: 0, insert: 1, remove: 2 } as const
+
+//! Rec: one change record. `key` is a path (['user42','active']); `at` is the ordered-insert position key.
+export interface Rec {
+  type: number
+  key: string[]
+  value?: unknown
+  at?: string
+}
+
+//! Applied: a record + the provenance it committed under — what sink.apply() delivers downstream and what monitors/replay hash.
+export interface Applied extends Rec {
+  origin: string
+  seq: number
+  epoch: number
+}
+
+//! partitionOf: the routing/segmentation unit — key[0], or `at` for a root insert (v2's BI0 case, kept).
+export const partitionOf = (r: Rec): string => r.key.length ? r.key[0] : (r.at ?? '')
+
+//! TAG: timer discriminants. A closed set so step()'s timer dispatch is a flat switch that fails closed.
+export const TAG = { redial: 1, heartbeat: 2 } as const

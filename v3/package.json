@@ -1,0 +1,22 @@
+{
+  "name": "fero-v3",
+  "version": "0.0.0",
+  "description": "fero v3 — M0 centerpiece: deterministic kernel + thin I/O shells + simulation executive (see ../plan-v3.md)",
+  "type": "module",
+  "exports": {
+    ".": "./kernel/node.ts",
+    "./internals": "./internals.ts"
+  },
+  "imports": {
+    "#utils": "./utils/index.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"kernel/*.test.ts\" \"sim/*.test.ts\" \"tests/*.test.ts\" \"tools/debug/*.test.ts\"",
+    "perf": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"kernel/*.perf.ts\"",
+    "sim": "node --experimental-strip-types --no-warnings sim/run.ts",
+    "scenarios": "node --experimental-strip-types --no-warnings tools/debug/scenarios.ts",
+    "debug": "node --experimental-strip-types --no-warnings tools/debug/serve.ts"
+  },
+  "author": "pemrouz",
+  "license": "MIT"
+}
