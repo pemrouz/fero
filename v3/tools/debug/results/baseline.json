@@ -1,0 +1,787 @@
+{
+ "rev": "3ab584c",
+ "when": "2026-07-05T22:29:26.902Z",
+ "wallMs": 1651,
+ "pass": 10,
+ "total": 10,
+ "baseline": {
+  "rev": "3ab584c",
+  "when": "2026-07-05T22:28:09.171Z"
+ },
+ "scenarios": [
+  {
+   "id": "formation",
+   "title": "Mesh formation — one logical link per pair",
+   "kind": "happy",
+   "desc": "everyone dials everyone (deliberately redundant); identity-before-admission collapses each dial race to exactly one link per pair, no coordination frame",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "phases": [
+     {
+      "label": "dial ×6",
+      "sev": "info"
+     },
+     {
+      "label": "HELLO",
+      "sev": "info"
+     },
+     {
+      "label": "dedup",
+      "sev": "warn"
+     },
+     {
+      "label": "digest",
+      "sev": "gold"
+     },
+     {
+      "label": "formed",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "links/node",
+     "v": 2,
+     "kind": "count"
+    },
+    {
+     "k": "dup links closed",
+     "v": 7,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 71,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 29,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "links/node": 2,
+    "dup links closed": 7,
+    "events": 71,
+    "wall ms": 60
+   }
+  },
+  {
+   "id": "replication",
+   "title": "Owner-routed replication — zero conflicts by design",
+   "kind": "happy",
+   "desc": "every key has ONE writer (the M3 owner-routing rule, applied at the workload layer) — 30 writes fan out and converge with zero LWW elections",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "writers": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "phases": [
+     {
+      "label": "form",
+      "sev": "ok"
+     },
+     {
+      "label": "write routed",
+      "sev": "gold"
+     },
+     {
+      "label": "replicate",
+      "sev": "info"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 30,
+     "kind": "count"
+    },
+    {
+     "k": "applied",
+     "v": 60,
+     "kind": "count"
+    },
+    {
+     "k": "contested",
+     "v": 0,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 153,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 45,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "writes": 30,
+    "applied": 60,
+    "contested": 10,
+    "events": 153,
+    "wall ms": 68
+   }
+  },
+  {
+   "id": "conflict",
+   "title": "Concurrent same-key writes — LWW total order",
+   "kind": "unhappy",
+   "desc": "all three nodes write the SAME four keys at the same instant (what owner routing exists to prevent) — every node must elect the same winner, deterministically",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "writers": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "phases": [
+     {
+      "label": "form",
+      "sev": "ok"
+     },
+     {
+      "label": "3× same key",
+      "sev": "gold"
+     },
+     {
+      "label": "LWW election",
+      "sev": "warn"
+     },
+     {
+      "label": "same winner",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 12,
+     "kind": "count"
+    },
+    {
+     "k": "contested",
+     "v": 4,
+     "kind": "count"
+    },
+    {
+     "k": "lww losses",
+     "v": 15,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 92,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 10,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "writes": 12,
+    "contested": 4,
+    "lww losses": 15,
+    "events": 92,
+    "wall ms": 14
+   }
+  },
+  {
+   "id": "race-formation",
+   "title": "Writes racing formation — dial-race loss window",
+   "kind": "unhappy",
+   "desc": "writes issued INSIDE the dial/HELLO/dedup window under dup+delay faults — the adversarial review proved the original kernel lost writes here; digest-on-admit heals it",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "faults": [
+     [
+      "n01",
+      "n02"
+     ],
+     [
+      "n01",
+      "n03"
+     ],
+     [
+      "n02",
+      "n03"
+     ]
+    ],
+    "writers": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "phases": [
+     {
+      "label": "dial + write",
+      "sev": "gold"
+     },
+     {
+      "label": "dup race",
+      "sev": "warn"
+     },
+     {
+      "label": "digest sync",
+      "sev": "info"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 25,
+     "kind": "count"
+    },
+    {
+     "k": "dups dropped",
+     "v": 72,
+     "kind": "count"
+    },
+    {
+     "k": "ae re-shipped",
+     "v": 89,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 169,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 32,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "writes": 25,
+    "dups dropped": 72,
+    "ae re-shipped": 89,
+    "events": 169,
+    "wall ms": 63
+   }
+  },
+  {
+   "id": "dup-delay-chaos",
+   "title": "Duplication + uneven delays — 4-node chaos",
+   "kind": "unhappy",
+   "desc": "every pair gets its own fault personality (up to 40% duplication, 1-30ms delay spread → reordering across links) — 60 mixed-type writes still converge",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03",
+     "n04"
+    ],
+    "mesh": true,
+    "faults": [
+     [
+      "n01",
+      "n02"
+     ],
+     [
+      "n01",
+      "n03"
+     ],
+     [
+      "n01",
+      "n04"
+     ],
+     [
+      "n02",
+      "n03"
+     ],
+     [
+      "n02",
+      "n04"
+     ],
+     [
+      "n03",
+      "n04"
+     ]
+    ],
+    "writers": [
+     "n01",
+     "n02",
+     "n03",
+     "n04"
+    ],
+    "phases": [
+     {
+      "label": "form",
+      "sev": "ok"
+     },
+     {
+      "label": "write ×60",
+      "sev": "gold"
+     },
+     {
+      "label": "dup + delay",
+      "sev": "warn"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 60,
+     "kind": "count"
+    },
+    {
+     "k": "dups dropped",
+     "v": 275,
+     "kind": "count"
+    },
+    {
+     "k": "applied",
+     "v": 180,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 522,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 65,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "writes": 60,
+    "dups dropped": 275,
+    "applied": 180,
+    "events": 522,
+    "wall ms": 114
+   }
+  },
+  {
+   "id": "partition-heal",
+   "title": "Partition + heal — tail loss re-shipped",
+   "kind": "unhappy",
+   "desc": "a write dies IN FLIGHT at the cut, more land on both sides during it — the heal-time digest exchange ships exactly the missing suffixes, both directions",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02"
+    ],
+    "mesh": true,
+    "cut": [
+     [
+      "n01",
+      "n02"
+     ]
+    ],
+    "writers": [
+     "n01",
+     "n02"
+    ],
+    "phases": [
+     {
+      "label": "form",
+      "sev": "ok"
+     },
+     {
+      "label": "write",
+      "sev": "gold"
+     },
+     {
+      "label": "cut",
+      "sev": "crit"
+     },
+     {
+      "label": "heal + digest",
+      "sev": "info"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 3,
+     "kind": "count"
+    },
+    {
+     "k": "ae re-shipped",
+     "v": 6,
+     "kind": "count"
+    },
+    {
+     "k": "redials",
+     "v": 3,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 44,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 5,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "writes": 3,
+    "ae re-shipped": 6,
+    "redials": 3,
+    "events": 44,
+    "wall ms": 5
+   }
+  },
+  {
+   "id": "partition-during-dial",
+   "title": "Cut while dialing — no zombie links",
+   "kind": "unhappy",
+   "desc": "the partition lands while dials are IN FLIGHT (the adversarial-review zombie-link regression) — refused dials must leave nothing behind; backoff redial reconnects after heal",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02"
+    ],
+    "mesh": true,
+    "cut": [
+     [
+      "n01",
+      "n02"
+     ]
+    ],
+    "writers": [
+     "n01"
+    ],
+    "phases": [
+     {
+      "label": "dial",
+      "sev": "info"
+     },
+     {
+      "label": "cut mid-dial",
+      "sev": "crit"
+     },
+     {
+      "label": "backoff",
+      "sev": "warn"
+     },
+     {
+      "label": "heal",
+      "sev": "ok"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "redials",
+     "v": 10,
+     "kind": "count"
+    },
+    {
+     "k": "writes",
+     "v": 1,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 48,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 5,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "redials": 10,
+    "writes": 1,
+    "events": 48,
+    "wall ms": 6
+   }
+  },
+  {
+   "id": "backpressure",
+   "title": "Backpressure overflow — shed, de-sync, re-sync",
+   "kind": "unhappy",
+   "desc": "a paused link overflows its bounded queue: the WHOLE queue clears (pure tail loss, journal-visible), the link de-syncs, and the drain-time digest exchange re-ships everything",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02"
+    ],
+    "mesh": true,
+    "writers": [
+     "n01"
+    ],
+    "phases": [
+     {
+      "label": "pause",
+      "sev": "warn"
+     },
+     {
+      "label": "write ×300",
+      "sev": "gold"
+     },
+     {
+      "label": "shed",
+      "sev": "crit"
+     },
+     {
+      "label": "drain + digest",
+      "sev": "info"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 300,
+     "kind": "count"
+    },
+    {
+     "k": "shed",
+     "v": 257,
+     "kind": "count"
+    },
+    {
+     "k": "ae re-shipped",
+     "v": 300,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 321,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 38,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "writes": 300,
+    "shed": 257,
+    "ae re-shipped": 300,
+    "events": 321,
+    "wall ms": 46
+   }
+  },
+  {
+   "id": "wire",
+   "title": "Wire invariants — counted, pinned",
+   "kind": "meta",
+   "desc": "the perf strategy in one card: bytes-per-record pinned EXACTLY, frames-per-burst counted exactly — deterministic on any machine, so any drift vs baseline is a real wire change",
+   "diagram": {
+    "nodes": [
+     "a",
+     "b"
+    ],
+    "mesh": true,
+    "writers": [
+     "a"
+    ],
+    "phases": [
+     {
+      "label": "encode",
+      "sev": "info"
+     },
+     {
+      "label": "frame + crc",
+      "sev": "gold"
+     },
+     {
+      "label": "decode",
+      "sev": "info"
+     },
+     {
+      "label": "verify",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "bytes/record",
+     "v": 73,
+     "kind": "count"
+    },
+    {
+     "k": "frames/burst (3 peers)",
+     "v": 3,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 6,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "bytes/record": 73,
+    "frames/burst (3 peers)": 3,
+    "wall ms": 8
+   }
+  },
+  {
+   "id": "sweep",
+   "title": "Seed sweep — 100 chaotic trajectories",
+   "kind": "meta",
+   "desc": "the full CLI recipe at dashboard scale: per-pair fault personalities, writes racing formation, a partition/heal window on odd seeds — every seed must form, converge, and drain",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "faults": [
+     [
+      "n01",
+      "n02"
+     ],
+     [
+      "n01",
+      "n03"
+     ],
+     [
+      "n02",
+      "n03"
+     ]
+    ],
+    "cut": [
+     [
+      "n01",
+      "n03"
+     ]
+    ],
+    "writers": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "phases": [
+     {
+      "label": "×100 seeds",
+      "sev": "info"
+     },
+     {
+      "label": "race + cut",
+      "sev": "crit"
+     },
+     {
+      "label": "heal",
+      "sev": "ok"
+     },
+     {
+      "label": "converge ×100",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "seeds",
+     "v": "100/100",
+     "kind": "text"
+    },
+    {
+     "k": "events",
+     "v": 21844,
+     "kind": "count"
+    },
+    {
+     "k": "events/s",
+     "v": 15498,
+     "kind": "ms"
+    },
+    {
+     "k": "wall ms",
+     "v": 1411,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "seeds": "100/100",
+    "events": 21844,
+    "events/s": 19533,
+    "wall ms": 1120
+   }
+  }
+ ]
+}

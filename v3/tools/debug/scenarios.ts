@@ -1,0 +1,549 @@
+//! ── tools/debug/scenarios — the living scenario registry: every high-level behaviour as a named, diagrammed, measured run ──
+// The dashboard (scenarios.html at `/`) is a projection of THIS file: each entry
+// declares what the cluster is put through (happy path or fault path), a topology
+// diagram spec, and a run() that executes the scenario on the sim executive and
+// returns counted metrics + a full capture. Clicking a card opens that exact run
+// in the debugger — the scenario IS its own debug artifact (plan §8, "tests ARE
+// debug artifacts", extended: the scenario SUITE is the debugger's front door).
+//
+// Metrics discipline mirrors the perf strategy (plan §7): counted invariants
+// first (deterministic on any machine — any drift vs the committed baseline is
+// signal), wall-clock last (soft-compared; this box swings 2-3x). The baseline
+// lives in results/baseline.json and is only ever (re)written by the CLI —
+// the serve endpoint is read-only (the pull-spine ethic: rendering never mutates).
+
+import { execSync } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Sim } from '../../sim/exec.ts'
+import { cluster, formed, writes } from '../../sim/harness.ts'
+import { converged, drained } from '../../sim/monitors.ts'
+import { captureSim } from './capture.ts'
+import { contested } from './model.mjs'
+import { JK } from '../../kernel/journal.ts'
+import { Node } from '../../kernel/node.ts'
+import { REC, type Env, type Rec } from '../../kernel/env.ts'
+import { VERB, encodeFrame, encodeControl } from '../../kernel/codec.ts'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const RESULTS = join(HERE, 'results')
+
+//! the frozen /scenarios.json vocabulary — the dashboard renders EXACTLY these shapes
+export type Metric = { k: string; v: number | string; kind: 'count' | 'ms' | 'text' }
+export type Diagram = {
+  nodes: string[]
+  mesh?: boolean
+  faults?: [string, string][]
+  cut?: [string, string][]
+  writers?: string[]
+  phases: { label: string; sev: 'ok' | 'warn' | 'crit' | 'info' | 'gold' }[]
+}
+type Outcome = { pass: boolean; notes: string; metrics: Metric[]; capture: unknown }
+type Scenario = {
+  id: string
+  title: string
+  kind: 'happy' | 'unhappy' | 'meta'
+  desc: string
+  diagram: Diagram
+  run: () => Outcome
+}
+
+//! tally — counted facts straight off the journals: every metric traces to typed events, never a guess
+const tally = (sim: Sim) => {
+  const t = { writes: 0, applied: 0, dups: 0, lwwLost: 0, ae: 0, shed: 0, redials: 0, dupLinks: 0 }
+  for (const n of sim.nodes.values())
+    for (const e of n.journal.read()) {
+      if (e.kind === JK.writeLocal) t.writes++
+      else if (e.kind === JK.applyInbound) t.applied++
+      else if (e.kind === JK.dupDrop) t.dups++
+      else if (e.kind === JK.lwwSkip) t.lwwLost++
+      else if (e.kind === JK.aeShip) t.ae += Number(e.b) || 0
+      else if (e.kind === JK.dropOldest) t.shed += Number(e.b) || 0
+      else if (e.kind === JK.redial) t.redials++
+      else if (e.kind === JK.dupLink) t.dupLinks++
+    }
+  return t
+}
+
+//! failOf — the ONE verdict expression, identical to the sweep CLI's (run.ts): a scenario passes on the same terms a seed does
+const failOf = (sim: Sim, nodes: Node[]): string => {
+  const v = sim.violations
+  return (
+    (v.length ? `monitor: ${v[0].monitor} — ${v[0].detail}` : '') ||
+    (!formed(nodes) ? 'mesh never fully formed' : '') ||
+    (!sim.quiesced ? 'never quiesced' : '') ||
+    (converged(sim) ?? '') ||
+    (drained(sim) ?? '')
+  )
+}
+
+//! owner — deterministic key→node routing at the workload layer: the M3 owner-routing story previewed,
+// so the happy replication path is SINGLE-WRITER PER KEY and LWW elections simply never happen.
+// (Conflicts are not the steady state of this system — they are the `conflict` scenario below.)
+const owner = <T>(key: string, nodes: T[]): T =>
+  nodes[[...key].reduce((h, c) => h + c.charCodeAt(0), 0) % nodes.length]
+
+const allPairs = (n: number): [string, string][] => {
+  const out: [string, string][] = []
+  for (let i = 1; i <= n; i++) for (let j = i + 1; j <= n; j++) out.push([`n0${i}`, `n0${j}`])
+  return out
+}
+const ids = (n: number) => Array.from({ length: n }, (_, i) => `n0${i + 1}`)
+
+//! ── the registry — ordered happy → unhappy → meta (the dashboard renders in this order) ──
+export const SCENARIOS: Scenario[] = [
+  {
+    id: 'formation',
+    title: 'Mesh formation — one logical link per pair',
+    kind: 'happy',
+    desc: 'everyone dials everyone (deliberately redundant); identity-before-admission collapses each dial race to exactly one link per pair, no coordination frame',
+    diagram: {
+      nodes: ids(3), mesh: true,
+      phases: [
+        { label: 'dial ×6', sev: 'info' }, { label: 'HELLO', sev: 'info' },
+        { label: 'dedup', sev: 'warn' }, { label: 'digest', sev: 'gold' }, { label: 'formed', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(101)
+      const nodes = cluster(sim, 3)
+      sim.run()
+      const t = tally(sim)
+      const oneLinkEach = nodes.every((n) => n.admitted().length === 2)
+      const fail = failOf(sim, nodes) || (!oneLinkEach ? 'more than one link survived a pair' : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'links/node', v: nodes[0].admitted().length, kind: 'count' },
+          { k: 'dup links closed', v: t.dupLinks, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'replication',
+    title: 'Owner-routed replication — zero conflicts by design',
+    kind: 'happy',
+    desc: 'every key has ONE writer (the M3 owner-routing rule, applied at the workload layer) — 30 writes fan out and converge with zero LWW elections',
+    diagram: {
+      nodes: ids(3), mesh: true, writers: ids(3),
+      phases: [
+        { label: 'form', sev: 'ok' }, { label: 'write routed', sev: 'gold' },
+        { label: 'replicate', sev: 'info' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(202)
+      const nodes = cluster(sim, 3)
+      sim.run() // form first — this is the steady-state happy path
+      for (let i = 0; i < 30; i++) {
+        const key = `k${i % 10}`
+        const rec: Rec = { type: REC.update, key: [key], value: { n: i, note: `write ${i}` } }
+        sim.post(owner(key, nodes).uuid, { kind: 'write', recs: [rec] }, 1 + i * 3)
+      }
+      sim.run()
+      const capture = captureSim(sim)
+      const nContested = contested(capture).length
+      const t = tally(sim)
+      const fail = failOf(sim, nodes) || (nContested > 0 ? `${nContested} contested cells on the single-writer path` : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'applied', v: t.applied, kind: 'count' },
+          { k: 'contested', v: nContested, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture,
+      }
+    },
+  },
+  {
+    id: 'conflict',
+    title: 'Concurrent same-key writes — LWW total order',
+    kind: 'unhappy',
+    desc: 'all three nodes write the SAME four keys at the same instant (what owner routing exists to prevent) — every node must elect the same winner, deterministically',
+    diagram: {
+      nodes: ids(3), mesh: true, writers: ids(3),
+      phases: [
+        { label: 'form', sev: 'ok' }, { label: '3× same key', sev: 'gold' },
+        { label: 'LWW election', sev: 'warn' }, { label: 'same winner', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(303)
+      const nodes = cluster(sim, 3)
+      sim.run()
+      for (let k = 0; k < 4; k++)
+        for (const n of nodes) {
+          const rec: Rec = { type: REC.update, key: [`c${k}`], value: `${n.uuid} claims c${k}` }
+          sim.post(n.uuid, { kind: 'write', recs: [rec] }, 1 + k) // same instant per key → genuine concurrency
+        }
+      sim.run()
+      const capture = captureSim(sim)
+      const nContested = contested(capture).length
+      const t = tally(sim)
+      const fail = failOf(sim, nodes) || (nContested !== 4 ? `expected 4 contested cells, saw ${nContested}` : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'contested', v: nContested, kind: 'count' },
+          { k: 'lww losses', v: t.lwwLost, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture,
+      }
+    },
+  },
+  {
+    id: 'race-formation',
+    title: 'Writes racing formation — dial-race loss window',
+    kind: 'unhappy',
+    desc: 'writes issued INSIDE the dial/HELLO/dedup window under dup+delay faults — the adversarial review proved the original kernel lost writes here; digest-on-admit heals it',
+    diagram: {
+      nodes: ids(3), mesh: true, faults: allPairs(3), writers: ids(3),
+      phases: [
+        { label: 'dial + write', sev: 'gold' }, { label: 'dup race', sev: 'warn' },
+        { label: 'digest sync', sev: 'info' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(17)
+      const nodes = cluster(sim, 3)
+      for (let i = 0; i < 3; i++)
+        for (let j = i + 1; j < 3; j++)
+          sim.fault(nodes[i].uuid, nodes[j].uuid, { delay: [1, 1 + sim.rng() * 20], dupP: sim.rng() * 0.3 })
+      writes(sim, nodes, 25, 40) // deliberately concurrent with formation
+      sim.run()
+      const t = tally(sim)
+      const fail = failOf(sim, nodes)
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'dups dropped', v: t.dups, kind: 'count' },
+          { k: 'ae re-shipped', v: t.ae, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'dup-delay-chaos',
+    title: 'Duplication + uneven delays — 4-node chaos',
+    kind: 'unhappy',
+    desc: 'every pair gets its own fault personality (up to 40% duplication, 1-30ms delay spread → reordering across links) — 60 mixed-type writes still converge',
+    diagram: {
+      nodes: ids(4), mesh: true, faults: allPairs(4), writers: ids(4),
+      phases: [
+        { label: 'form', sev: 'ok' }, { label: 'write ×60', sev: 'gold' },
+        { label: 'dup + delay', sev: 'warn' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(42)
+      const nodes = cluster(sim, 4)
+      for (let i = 0; i < 4; i++)
+        for (let j = i + 1; j < 4; j++)
+          sim.fault(nodes[i].uuid, nodes[j].uuid, { delay: [1, 30], dupP: 0.4 })
+      writes(sim, nodes, 60)
+      sim.run()
+      const t = tally(sim)
+      const fail = failOf(sim, nodes)
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'dups dropped', v: t.dups, kind: 'count' },
+          { k: 'applied', v: t.applied, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'partition-heal',
+    title: 'Partition + heal — tail loss re-shipped',
+    kind: 'unhappy',
+    desc: 'a write dies IN FLIGHT at the cut, more land on both sides during it — the heal-time digest exchange ships exactly the missing suffixes, both directions',
+    diagram: {
+      nodes: ids(2), mesh: true, cut: [['n01', 'n02']], writers: ids(2),
+      phases: [
+        { label: 'form', sev: 'ok' }, { label: 'write', sev: 'gold' }, { label: 'cut', sev: 'crit' },
+        { label: 'heal + digest', sev: 'info' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(5)
+      const nodes = cluster(sim, 2)
+      sim.run()
+      sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['at-cut'], value: 1 }] }, 1)
+      sim.at(1, () => sim.partition('n01', 'n02')) // the write's frame is in flight when the cable dies
+      sim.at(40, () => sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['during'], value: 2 }] }, 0))
+      sim.at(40, () => sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: ['other-side'], value: 3 }] }, 0))
+      sim.at(120, () => sim.heal('n01', 'n02'))
+      sim.run()
+      const t = tally(sim)
+      const fail =
+        failOf(sim, nodes) ||
+        (nodes[1].state.size !== 3 ? `n02 holds ${nodes[1].state.size}/3 cells` : '') ||
+        (t.ae === 0 ? 'no anti-entropy shipped — loss was not healed by AE' : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'ae re-shipped', v: t.ae, kind: 'count' },
+          { k: 'redials', v: t.redials, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'partition-during-dial',
+    title: 'Cut while dialing — no zombie links',
+    kind: 'unhappy',
+    desc: 'the partition lands while dials are IN FLIGHT (the adversarial-review zombie-link regression) — refused dials must leave nothing behind; backoff redial reconnects after heal',
+    diagram: {
+      nodes: ids(2), mesh: true, cut: [['n01', 'n02']], writers: ['n01'],
+      phases: [
+        { label: 'dial', sev: 'info' }, { label: 'cut mid-dial', sev: 'crit' },
+        { label: 'backoff', sev: 'warn' }, { label: 'heal', sev: 'ok' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(11)
+      const nodes = cluster(sim, 2)
+      sim.partition('n01', 'n02') // dials from 'start' are still in flight
+      sim.run({ until: 300 })
+      const zombie = formed(nodes) || nodes.some((n) => n.links.size > 0)
+      sim.heal('n01', 'n02')
+      sim.run()
+      sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['after'], value: 1 }] })
+      sim.run()
+      const t = tally(sim)
+      const fail = (zombie ? 'a zombie link survived the refused dial' : '') || failOf(sim, nodes)
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'redials', v: t.redials, kind: 'count' },
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'backpressure',
+    title: 'Backpressure overflow — shed, de-sync, re-sync',
+    kind: 'unhappy',
+    desc: 'a paused link overflows its bounded queue: the WHOLE queue clears (pure tail loss, journal-visible), the link de-syncs, and the drain-time digest exchange re-ships everything',
+    diagram: {
+      nodes: ids(2), mesh: true, writers: ['n01'],
+      phases: [
+        { label: 'pause', sev: 'warn' }, { label: 'write ×300', sev: 'gold' }, { label: 'shed', sev: 'crit' },
+        { label: 'drain + digest', sev: 'info' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(9)
+      const nodes = cluster(sim, 2)
+      sim.run()
+      const link = [...nodes[0].links.values()].find((l) => l.uuid === 'n02')!
+      sim.post('n01', { kind: 'pause', link: link.id })
+      sim.run()
+      for (let i = 0; i < 300; i++)
+        sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] }, i * 0.1)
+      sim.run()
+      const shedHappened = link.queued.length === 0 && !link.synced
+      sim.post('n01', { kind: 'drain', link: link.id })
+      sim.run()
+      const t = tally(sim)
+      const fail =
+        (!shedHappened ? 'overflow did not shed+de-sync as specified' : '') ||
+        failOf(sim, nodes) ||
+        (nodes[1].state.size !== 300 ? `n02 holds ${nodes[1].state.size}/300 cells` : '') ||
+        (!link.synced ? 'link never re-synced after drain' : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'shed', v: t.shed, kind: 'count' },
+          { k: 'ae re-shipped', v: t.ae, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'wire',
+    title: 'Wire invariants — counted, pinned',
+    kind: 'meta',
+    desc: 'the perf strategy in one card: bytes-per-record pinned EXACTLY, frames-per-burst counted exactly — deterministic on any machine, so any drift vs baseline is a real wire change',
+    diagram: {
+      nodes: ['a', 'b'], mesh: true, writers: ['a'],
+      phases: [
+        { label: 'encode', sev: 'info' }, { label: 'frame + crc', sev: 'gold' },
+        { label: 'decode', sev: 'info' }, { label: 'verify', sev: 'ok' },
+      ],
+    },
+    run() {
+      //! the canonical record from codec.perf.ts — the SAME pin, surfaced on the dashboard
+      const frame = encodeFrame(
+        [{ type: REC.update, key: ['key1', 'field'], value: { n: 1, s: 'value-1', ok: true } }],
+        { origin: 'origin-1', baseSeq: 1, epoch: 0 },
+      )
+      //! frames-per-burst: a formed 3-peer node must emit exactly one frame per peer per write burst
+      let frames = 0
+      const env: Env = {
+        now: () => 0, rng: () => 0.5,
+        sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {} },
+      }
+      const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
+      for (let p = 0; p < 3; p++) {
+        node.step({ kind: 'linkUp', link: p + 1, dialed: true, to: `x:${p + 2}` })
+        node.step({ kind: 'bytesIn', link: p + 1, bytes: encodeControl(VERB.HELLO, { u: `p${p}`, i: 1, l: `x:${p + 2}` }) })
+        node.step({ kind: 'bytesIn', link: p + 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+      }
+      frames = 0
+      node.step({ kind: 'write', recs: [{ type: REC.update, key: ['k'], value: 1 }] })
+      const fail =
+        (frame.length !== 73 ? `canonical record frame is ${frame.length}B (pinned 73B)` : '') ||
+        (frames !== 3 ? `write burst produced ${frames} frames for 3 peers` : '')
+      //! the click-through capture: a minimal clean 2-node run, so the card opens to a readable timeline
+      const sim = new Sim(1)
+      const nodes = cluster(sim, 2)
+      for (let i = 0; i < 5; i++)
+        sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`w${i}`], value: i }] }, 5 + i)
+      sim.run()
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'bytes/record', v: frame.length, kind: 'count' },
+          { k: 'frames/burst (3 peers)', v: frames, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'sweep',
+    title: 'Seed sweep — 100 chaotic trajectories',
+    kind: 'meta',
+    desc: 'the full CLI recipe at dashboard scale: per-pair fault personalities, writes racing formation, a partition/heal window on odd seeds — every seed must form, converge, and drain',
+    diagram: {
+      nodes: ids(3), mesh: true, faults: allPairs(3), cut: [['n01', 'n03']], writers: ids(3),
+      phases: [
+        { label: '×100 seeds', sev: 'info' }, { label: 'race + cut', sev: 'crit' },
+        { label: 'heal', sev: 'ok' }, { label: 'converge ×100', sev: 'ok' },
+      ],
+    },
+    run() {
+      const SEEDS = 100
+      let green = 0
+      let events = 0
+      let firstFail: { sim: Sim; why: string } | null = null
+      let last: Sim | null = null
+      const t0 = performance.now()
+      for (let seed = 0; seed < SEEDS; seed++) {
+        const sim = new Sim(seed)
+        const nodes = cluster(sim, 3)
+        for (let i = 0; i < 3; i++)
+          for (let j = i + 1; j < 3; j++)
+            sim.fault(nodes[i].uuid, nodes[j].uuid, { delay: [1, 1 + sim.rng() * 25], dupP: sim.rng() * 0.25 })
+        writes(sim, nodes, 40)
+        if (seed % 2) {
+          const a = nodes[Math.floor(sim.rng() * nodes.length)].uuid
+          let b = a
+          while (b === a) b = nodes[Math.floor(sim.rng() * nodes.length)].uuid
+          const cut = 20 + sim.rng() * 150
+          sim.at(cut, () => sim.partition(a, b))
+          sim.at(cut + 30 + sim.rng() * 250, () => sim.heal(a, b))
+        }
+        sim.run()
+        events += sim.events
+        const fail = failOf(sim, nodes)
+        if (fail) { if (!firstFail) firstFail = { sim, why: fail } } else green++
+        last = sim
+      }
+      const wall = performance.now() - t0
+      //! a failing seed's capture wins the click-through (triage first); else the last seed's (a representative chaotic run)
+      const shown = firstFail ? firstFail.sim : last!
+      return {
+        pass: green === SEEDS,
+        notes: firstFail ? `seed ${firstFail.sim.seed}: ${firstFail.why} (capture shown)` : '',
+        metrics: [
+          { k: 'seeds', v: `${green}/${SEEDS}`, kind: 'text' },
+          { k: 'events', v: events, kind: 'count' },
+          { k: 'events/s', v: Math.round(events / (wall / 1000)), kind: 'ms' },
+        ],
+        capture: captureSim(shown),
+      }
+    },
+  },
+]
+
+//! ── the runner: results JSON (the /scenarios.json contract) + per-scenario captures ──
+export const runAll = () => {
+  let rev = '—'
+  try { rev = execSync('git rev-parse --short HEAD', { cwd: HERE }).toString().trim() } catch {}
+  const baseline = existsSync(join(RESULTS, 'baseline.json'))
+    ? JSON.parse(readFileSync(join(RESULTS, 'baseline.json'), 'utf8'))
+    : null
+  const baseFor = (id: string): Record<string, number | string> | null => {
+    const s = baseline?.scenarios?.find((x: { id: string }) => x.id === id)
+    return s ? Object.fromEntries(s.metrics.map((m: Metric) => [m.k, m.v])) : null
+  }
+  const captures = new Map<string, unknown>()
+  const t0 = performance.now()
+  const scenarios = SCENARIOS.map((s) => {
+    const st = performance.now()
+    let out: Outcome
+    try { out = s.run() }
+    catch (e) { out = { pass: false, notes: `threw: ${e}`, metrics: [], capture: null } } // a throwing scenario reports; the rest still run
+    const wallMs = Math.round(performance.now() - st)
+    if (out.capture) captures.set(s.id, out.capture)
+    return {
+      id: s.id, title: s.title, kind: s.kind, desc: s.desc, diagram: s.diagram,
+      pass: out.pass, notes: out.notes,
+      metrics: [...out.metrics, { k: 'wall ms', v: wallMs, kind: 'ms' as const }],
+      base: baseFor(s.id),
+    }
+  })
+  const results = {
+    rev,
+    when: new Date().toISOString(),
+    wallMs: Math.round(performance.now() - t0),
+    pass: scenarios.filter((s) => s.pass).length,
+    total: scenarios.length,
+    baseline: baseline ? { rev: baseline.rev, when: baseline.when } : null,
+    scenarios,
+  }
+  return { results, captures }
+}
+
+//! CLI: `npm run scenarios` — print the table, write results/latest.json; first run (or --rebase) also pins the baseline.
+if (process.argv[1] && process.argv[1].endsWith('scenarios.ts')) {
+  const { results } = runAll()
+  for (const s of results.scenarios) {
+    const counted = s.metrics.filter((m) => m.kind !== 'ms').map((m) => `${m.k} ${m.v}`).join(' · ')
+    console.log(`${s.pass ? '✓' : '✗'} ${s.id.padEnd(22)} ${counted}${s.notes ? `\n    ${s.notes}` : ''}`)
+  }
+  console.log(`\n${results.pass}/${results.total} scenarios · rev ${results.rev} · ${results.wallMs}ms`)
+  mkdirSync(RESULTS, { recursive: true })
+  writeFileSync(join(RESULTS, 'latest.json'), JSON.stringify(results, null, 1))
+  if (!existsSync(join(RESULTS, 'baseline.json')) || process.argv.includes('--rebase')) {
+    writeFileSync(join(RESULTS, 'baseline.json'), JSON.stringify(results, null, 1))
+    console.log(`baseline pinned at rev ${results.rev} → tools/debug/results/baseline.json`)
+  }
+  if (results.pass !== results.total) process.exit(1)
+}
