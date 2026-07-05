@@ -53,7 +53,8 @@ export interface NodeOpts {
 interface Stream {
   seen: number // highest applied-or-skipped seq for this origin — the applied watermark
 }
-//! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). M1's discovery re-announce revives given-up targets.
+//! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
+// heartbeats on, the heartbeat tick revives given-up targets (JK.revive) — give-up is a cool-down.
 export const MAX_REDIALS = 10
 
 export class Node {
@@ -100,7 +101,11 @@ export class Node {
   //! timers — kernel-minted ids; fired ids not in #timers are stale (cancel raced the fire) and ignored
   #timerSeq = 0
   #timers = new Map<number, { tag: number; to?: string }>()
-  #backoff = new Map<string, { ms: number; tries: number }>()
+  //! gaveUp distinguishes "parked after the final attempt FAILED" from "the final attempt is still
+  // pending" — tries increments at ARM time, so tries alone cannot tell them apart, and a revival
+  // during the pending window would orphan the live timer into a second concurrent dial chain
+  // (adversarial-review finding: forked chains, doubled dial traffic, starved giveUp).
+  #backoff = new Map<string, { ms: number; tries: number; gaveUp?: boolean }>()
   #hbTimer = -1
   destroyed = false
   env: Env
@@ -197,11 +202,37 @@ export class Node {
         if (meta.tag === TAG.redial && meta.to) { j.armed && j.emit(JK.dial, meta.to); this.env.sink.connect(meta.to) }
         else if (meta.tag === TAG.heartbeat) {
           for (const link of this.links.values())
-            //! lower-uuid side originates PINGs (halves N² probe traffic — v2's rule, kept)
-            if (link.state === LS.admitted && this.uuid < link.uuid) {
+            //! lower-uuid side originates PINGs (halves N² probe traffic — v2's rule, kept). Paused links
+            // are SKIPPED entirely: control frames queued into a drop-oldest queue are doomed work, and a
+            // drain would flush every stale r=1 digest at once, each triggering a duplicate suffix ship
+            // from the peer at the exact moment backpressure cleared (adversarial-review finding). The
+            // drain path has its own digest re-sync; a paused link needs no floor.
+            if (link.state === LS.admitted && !link.paused && this.uuid < link.uuid) {
               link.ship(encodeControl(VERB.PING), this.env.sink, j)
               j.armed && j.emit(JK.ping, link.id)
+              //! the periodic AE floor (plan §5 "periodic floor in ALL modes"): the same reciprocal digest
+              // exchange that heals admits and drains, on the heartbeat cadence — belt-and-braces against
+              // any loss mode WITHOUT a reconnect/drain signal (transport bugs, future non-TCP shells).
+              // One r=1 digest from the PING side covers both directions: the reply ships our gaps, and
+              // receiving their digest ships theirs. Nothing missing ⇒ nothing shipped (idempotent).
+              this.#sendDigest(link, 1)
             }
+          //! give-up revival: a target whose final redial attempt FAILED (gaveUp — never merely "tries
+          // exhausted": the last armed attempt may still be pending, and dialing over it would fork a
+          // second chain) is parked, not dead — each heartbeat re-dials any parked host we hold no link
+          // to, with a fresh backoff chain (the M1 re-announce floor; full UDP discovery lands with
+          // L0-complete). A live link to the host — including one the PEER dialed — clears the stale
+          // give-up instead of dialing into a dup race.
+          for (const to of this.#opts.hosts ?? []) {
+            if (to === this.listen) continue
+            if (!this.#backoff.get(to)?.gaveUp) continue // never failed, or the redial chain still owns it
+            let held = false
+            for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) { held = true; break }
+            this.#backoff.delete(to)
+            if (held) continue
+            j.armed && j.emit(JK.revive, to)
+            this.env.sink.connect(to)
+          }
           this.#armHeartbeat()
         }
         return
@@ -240,14 +271,20 @@ export class Node {
   //! #redial — jittered capped exponential backoff per target, BOUNDED attempts; jitter comes from env.rng so trajectories stay seed-reproducible.
   // The give-up after MAX_REDIALS is what keeps a refused target from keeping the
   // sim's event queue (and a real process's timer wheel) alive forever; it is
-  // journal-visible, and M1's discovery re-announce is what revives a given-up
-  // target. A successful identify resets the counter.
+  // journal-visible, and the heartbeat tick revives a given-up target (so with
+  // heartbeats on, one exhausted chain re-arms per heartbeat interval, bounded).
+  // A successful identify resets the counter.
   #redial(to: string) {
     if (this.destroyed) return
     const base = this.#opts.redialMs ?? 100
     const b = this.#backoff.get(to) ?? { ms: base, tries: 0 }
     if (b.tries >= MAX_REDIALS) {
-      this.journal.armed && this.journal.emit(JK.giveUp, to)
+      //! the final ARMED attempt has now FAILED — only here does the target become truly parked
+      if (!b.gaveUp) {
+        b.gaveUp = true
+        this.#backoff.set(to, b)
+        this.journal.armed && this.journal.emit(JK.giveUp, to)
+      }
       return
     }
     this.#backoff.set(to, { ms: Math.min(b.ms * 2, base * 32), tries: b.tries + 1 })
@@ -336,6 +373,15 @@ export class Node {
           return
         }
         j.armed && j.emit(JK.digestIn, link.id)
+        //! a PAUSED link cannot deliver: serialising the missing suffix into its drop-oldest queue is
+        // O(suffix) work per digest that overflow then discards (adversarial-review finding — the peer's
+        // heartbeat floor would trigger it every tick for the whole pause). Mark the debt instead; the
+        // drain-time digest exchange re-announces on a FLOWING link and ships once. synced deliberately
+        // untouched: an unsynced link stays unsynced (live writes withheld) until a real exchange lands.
+        if (link.paused) {
+          link.droppedWhilePaused = true
+          return
+        }
         //! ship every suffix the peer's digest shows missing: for each origin I hold, everything past their
         // high-water. encodeRuns splits Lamport gaps into valid contiguous frames; ship() honours backpressure.
         let shipped = 0

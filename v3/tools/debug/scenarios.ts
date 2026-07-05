@@ -51,7 +51,7 @@ type Scenario = {
 
 //! tally — counted facts straight off the journals: every metric traces to typed events, never a guess
 const tally = (sim: Sim) => {
-  const t = { writes: 0, applied: 0, dups: 0, lwwLost: 0, ae: 0, shed: 0, redials: 0, dupLinks: 0 }
+  const t = { writes: 0, applied: 0, dups: 0, lwwLost: 0, ae: 0, shed: 0, redials: 0, dupLinks: 0, giveUps: 0, revives: 0 }
   for (const n of sim.nodes.values())
     for (const e of n.journal.read()) {
       if (e.kind === JK.writeLocal) t.writes++
@@ -62,6 +62,8 @@ const tally = (sim: Sim) => {
       else if (e.kind === JK.dropOldest) t.shed += Number(e.b) || 0
       else if (e.kind === JK.redial) t.redials++
       else if (e.kind === JK.dupLink) t.dupLinks++
+      else if (e.kind === JK.giveUp) t.giveUps++
+      else if (e.kind === JK.revive) t.revives++
     }
   return t
 }
@@ -335,6 +337,47 @@ export const SCENARIOS: Scenario[] = [
         metrics: [
           { k: 'redials', v: t.redials, kind: 'count' },
           { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'revival',
+    title: 'Give-up + heartbeat revival — parked, not dead',
+    kind: 'unhappy',
+    desc: 'a peer stays partitioned past every redial attempt (journal-visible give-up); after heal, the heartbeat floor revives the dial — down-long-enough is a cool-down, never permanent',
+    diagram: {
+      nodes: ids(2), mesh: true, cut: [['n01', 'n02']], writers: ['n01'],
+      phases: [
+        { label: 'dial ×10', sev: 'info' }, { label: 'give up', sev: 'crit' },
+        { label: 'heal', sev: 'ok' }, { label: 'revive', sev: 'gold' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(13)
+      const nodes = cluster(sim, 2, { heartbeatMs: 100 })
+      sim.partition('n01', 'n02')
+      sim.run({ until: 8000 }) // heartbeats never quiesce — every phase runs to a bound
+      const gaveUp = nodes.some((n) => n.journal.read().some((e) => e.kind === JK.giveUp))
+      sim.heal('n01', 'n02')
+      sim.run({ until: 8400 })
+      sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['revived'], value: 1 }] })
+      sim.run({ until: 8600 })
+      const t = tally(sim)
+      const fail =
+        (!gaveUp ? 'the redial chain never gave up' : '') ||
+        (t.revives === 0 ? 'no revival fired' : '') ||
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
+        (!formed(nodes) ? 'mesh never re-formed after revival' : '') ||
+        (converged(sim) ?? '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'give-ups', v: t.giveUps, kind: 'count' },
+          { k: 'revives', v: t.revives, kind: 'count' },
+          { k: 'redials', v: t.redials, kind: 'count' },
           { k: 'events', v: sim.events, kind: 'count' },
         ],
         capture: captureSim(sim),

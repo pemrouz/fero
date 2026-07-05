@@ -5,6 +5,7 @@ import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed, writes } from './harness.ts'
 import { converged, drained } from './monitors.ts'
+import { JK } from '../kernel/journal.ts'
 
 //! the determinism canary (plan §3.1): the same seed twice must produce byte-identical trajectories.
 // This catches unrecorded nondeterminism (Map-iteration dependence, ambient time,
@@ -132,6 +133,109 @@ test('tail loss heals: writes lost to a partition (in-flight and during) converg
   assert.ok(formed(nodes), 're-formed after heal')
   assert.equal(converged(sim), null, 'digest AE must re-ship every lost suffix, both directions')
   assert.equal(nodes[1].state.size, 3)
+})
+
+test('give-up is a cool-down: with heartbeats on, the revival re-dials a given-up target after a LONG partition heals', () => {
+  // Without heartbeats a target that exhausts MAX_REDIALS is parked until restart (the documented M0
+  // hole). With heartbeats on, each tick revives any configured host we hold no link to (JK.revive).
+  const sim = new Sim(13)
+  const nodes = cluster(sim, 2, { heartbeatMs: 100 })
+  sim.partition('n01', 'n02') // dials from 'start' are refused; the backoff chain exhausts mid-partition
+  sim.run({ until: 8000 })    // heartbeats never quiesce — every phase runs to a virtual-time bound
+  assert.ok(!formed(nodes), 'still partitioned')
+  assert.ok(
+    nodes.some((n) => n.journal.read().some((e) => e.kind === JK.giveUp)),
+    'the redial chain must exhaust and give up during the long partition',
+  )
+  sim.heal('n01', 'n02')
+  //! worst case at heal: a revival mid-partition just started a FRESH backoff chain, so the pending
+  // redial can sit at the 640ms cap — reconnect latency is bounded by one chain step + a heartbeat
+  sim.run({ until: 9500 })
+  assert.ok(formed(nodes), 'heartbeat revival must re-form the mesh after heal')
+  assert.ok(nodes.some((n) => n.journal.read().some((e) => e.kind === JK.revive)), 'revival is journal-visible')
+  sim.post('n01', { kind: 'write', recs: [{ type: 0, key: ['revived'], value: 1 }] })
+  sim.run({ until: 9700 })
+  assert.equal(converged(sim), null, 'the revived mesh replicates')
+  assert.deepEqual(sim.violations, [])
+})
+
+test('the periodic AE floor heals loss that NO event announces (digest exchange rides every heartbeat)', () => {
+  // Every real TCP loss mode already has a trigger (admit, drain). The floor exists for loss the event
+  // system cannot see — a transport bug eating a delivered frame, a future non-TCP shell. Emulating that
+  // means excising a record from the receiver as if it never arrived, which deliberately violates the
+  // watermark-monotone invariant mid-run — so this cluster is built WITHOUT the perEvent monitors (the
+  // monitor would rightly flag the very corruption being injected; that is its job, not a test bug).
+  const sim = new Sim(21)
+  const ids = ['n01', 'n02']
+  const addrs = ids.map((id) => `sim:${id}`)
+  const nodes = ids.map((id, i) =>
+    sim.add({ uuid: id, listen: addrs[i], hosts: addrs.filter((_, j) => j !== i), heartbeatMs: 100, redialMs: 20, journalCap: 1 << 16 }),
+  )
+  for (const id of ids) sim.post(id, { kind: 'start' })
+  sim.run({ until: 500 })
+  assert.ok(formed(nodes))
+  sim.post('n01', { kind: 'write', recs: [{ type: 0, key: ['x'], value: 42 }] })
+  sim.run({ until: 700 })
+  assert.equal(converged(sim), null, 'replicated before the injected loss')
+  //! the injected transport bug: n02 forgets the record ever arrived — state, stamp, watermark, log copy
+  const b = nodes[1]
+  const k = JSON.stringify(['x'])
+  b.state.delete(k)
+  b.versions.delete(k)
+  b.streams.get('n01')!.seen = 0
+  b.logs.delete('n01')
+  assert.notEqual(converged(sim), null, 'diverged, with no reconnect/drain signal to trigger healing')
+  sim.run({ until: 1000 }) // ≥1 heartbeat: the floor digests announce, n01 re-ships the missing suffix
+  assert.equal(converged(sim), null, 'the heartbeat digest floor must heal with no other trigger')
+})
+
+test('the floor is QUIET when converged: idle heartbeat ticks ship nothing and dup-drop nothing', () => {
+  //! mutation-killer (adversarial-review gap): a floor whose digests did NOT carry the real log tails
+  // (e.g. hard-coded d:{}) would re-ship the entire history every tick and drown the receiver in
+  // dupDrops — while converging identically. Pinning zero AE traffic across idle ticks kills it.
+  const sim = new Sim(33)
+  const nodes = cluster(sim, 2, { heartbeatMs: 50 })
+  sim.run({ until: 300 })
+  assert.ok(formed(nodes))
+  for (let i = 0; i < 20; i++) sim.post('n01', { kind: 'write', recs: [{ type: 0, key: [`k${i}`], value: i }] }, 1 + i * 5)
+  sim.run({ until: 600 })
+  assert.equal(converged(sim), null)
+  const traffic = () => {
+    let ae = 0, dups = 0
+    for (const n of sim.nodes.values())
+      for (const e of n.journal.read()) { if (e.kind === JK.aeShip) ae++; else if (e.kind === JK.dupDrop) dups++ }
+    return { ae, dups }
+  }
+  const before = traffic()
+  sim.run({ until: 1600 }) // ~20 idle ticks
+  assert.equal(converged(sim), null)
+  assert.deepEqual(traffic(), before, 'an idle floor must ship nothing — digests carry REAL tails')
+})
+
+test('40-seed mini-sweep WITH heartbeats: the floor + revival machinery under dup/delay faults, racing writes, partition/heal', () => {
+  //! the review's coverage gap: the main sweeps run heartbeatMs 0 (quiescence), so no seed ever
+  // exercised the floor digests or revival interleavings. This sweep runs them under the same chaos
+  // vocabulary, bounded by virtual time instead of quiescence.
+  for (let seed = 100; seed < 140; seed++) {
+    const sim = new Sim(seed)
+    const nodes = cluster(sim, 3, { heartbeatMs: 40 })
+    for (let i = 0; i < 3; i++)
+      for (let j = i + 1; j < 3; j++)
+        sim.fault(nodes[i].uuid, nodes[j].uuid, { delay: [1, 1 + sim.rng() * 20], dupP: sim.rng() * 0.3 })
+    writes(sim, nodes, 25, 200)
+    if (seed % 2) {
+      const a = nodes[Math.floor(sim.rng() * nodes.length)].uuid
+      let b = a
+      while (b === a) b = nodes[Math.floor(sim.rng() * nodes.length)].uuid
+      const cut = 20 + sim.rng() * 100
+      sim.at(cut, () => sim.partition(a, b))
+      sim.at(cut + 30 + sim.rng() * 150, () => sim.heal(a, b))
+    }
+    sim.run({ until: 2500 })
+    assert.deepEqual(sim.violations, [], `seed ${seed}`)
+    assert.ok(formed(nodes), `seed ${seed}: formed`)
+    assert.equal(converged(sim), null, `seed ${seed}`)
+  }
 })
 
 test('backpressure overflow heals: the queue clears to a tail hole, the drain-time digest exchange re-ships it all', () => {

@@ -1,12 +1,12 @@
 {
- "rev": "3ab584c",
- "when": "2026-07-05T22:29:26.902Z",
- "wallMs": 1651,
- "pass": 10,
- "total": 10,
+ "rev": "8ff7201",
+ "when": "2026-07-05T23:42:16.151Z",
+ "wallMs": 1071,
+ "pass": 11,
+ "total": 11,
  "baseline": {
-  "rev": "3ab584c",
-  "when": "2026-07-05T22:28:09.171Z"
+  "rev": "8ff7201",
+  "when": "2026-07-05T23:03:22.119Z"
  },
  "scenarios": [
   {
@@ -64,7 +64,7 @@
     },
     {
      "k": "wall ms",
-     "v": 29,
+     "v": 27,
      "kind": "ms"
     }
    ],
@@ -72,7 +72,7 @@
     "links/node": 2,
     "dup links closed": 7,
     "events": 71,
-    "wall ms": 60
+    "wall ms": 33
    }
   },
   {
@@ -136,16 +136,16 @@
     },
     {
      "k": "wall ms",
-     "v": 45,
+     "v": 34,
      "kind": "ms"
     }
    ],
    "base": {
     "writes": 30,
     "applied": 60,
-    "contested": 10,
+    "contested": 0,
     "events": 153,
-    "wall ms": 68
+    "wall ms": 44
    }
   },
   {
@@ -209,7 +209,7 @@
     },
     {
      "k": "wall ms",
-     "v": 10,
+     "v": 13,
      "kind": "ms"
     }
    ],
@@ -218,7 +218,7 @@
     "contested": 4,
     "lww losses": 15,
     "events": 92,
-    "wall ms": 14
+    "wall ms": 13
    }
   },
   {
@@ -296,7 +296,7 @@
     },
     {
      "k": "wall ms",
-     "v": 32,
+     "v": 23,
      "kind": "ms"
     }
    ],
@@ -305,7 +305,7 @@
     "dups dropped": 72,
     "ae re-shipped": 89,
     "events": 169,
-    "wall ms": 63
+    "wall ms": 26
    }
   },
   {
@@ -397,7 +397,7 @@
     },
     {
      "k": "wall ms",
-     "v": 65,
+     "v": 56,
      "kind": "ms"
     }
    ],
@@ -406,7 +406,7 @@
     "dups dropped": 275,
     "applied": 180,
     "events": 522,
-    "wall ms": 114
+    "wall ms": 64
    }
   },
   {
@@ -478,7 +478,7 @@
     },
     {
      "k": "wall ms",
-     "v": 5,
+     "v": 4,
      "kind": "ms"
     }
    ],
@@ -487,7 +487,7 @@
     "ae re-shipped": 6,
     "redials": 3,
     "events": 44,
-    "wall ms": 5
+    "wall ms": 6
    }
   },
   {
@@ -553,7 +553,7 @@
     },
     {
      "k": "wall ms",
-     "v": 5,
+     "v": 3,
      "kind": "ms"
     }
    ],
@@ -561,7 +561,87 @@
     "redials": 10,
     "writes": 1,
     "events": 48,
-    "wall ms": 6
+    "wall ms": 5
+   }
+  },
+  {
+   "id": "revival",
+   "title": "Give-up + heartbeat revival — parked, not dead",
+   "kind": "unhappy",
+   "desc": "a peer stays partitioned past every redial attempt (journal-visible give-up); after heal, the heartbeat floor revives the dial — down-long-enough is a cool-down, never permanent",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02"
+    ],
+    "mesh": true,
+    "cut": [
+     [
+      "n01",
+      "n02"
+     ]
+    ],
+    "writers": [
+     "n01"
+    ],
+    "phases": [
+     {
+      "label": "dial ×10",
+      "sev": "info"
+     },
+     {
+      "label": "give up",
+      "sev": "crit"
+     },
+     {
+      "label": "heal",
+      "sev": "ok"
+     },
+     {
+      "label": "revive",
+      "sev": "gold"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "give-ups",
+     "v": 4,
+     "kind": "count"
+    },
+    {
+     "k": "revives",
+     "v": 4,
+     "kind": "count"
+    },
+    {
+     "k": "redials",
+     "v": 42,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 299,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 7,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "give-ups": 4,
+    "revives": 6,
+    "redials": 75,
+    "events": 352,
+    "wall ms": 10
    }
   },
   {
@@ -626,7 +706,7 @@
     },
     {
      "k": "wall ms",
-     "v": 38,
+     "v": 19,
      "kind": "ms"
     }
    ],
@@ -635,7 +715,7 @@
     "shed": 257,
     "ae re-shipped": 300,
     "events": 321,
-    "wall ms": 46
+    "wall ms": 23
    }
   },
   {
@@ -686,14 +766,14 @@
     },
     {
      "k": "wall ms",
-     "v": 6,
+     "v": 5,
      "kind": "ms"
     }
    ],
    "base": {
     "bytes/record": 73,
     "frames/burst (3 peers)": 3,
-    "wall ms": 8
+    "wall ms": 6
    }
   },
   {
@@ -767,20 +847,20 @@
     },
     {
      "k": "events/s",
-     "v": 15498,
+     "v": 24925,
      "kind": "ms"
     },
     {
      "k": "wall ms",
-     "v": 1411,
+     "v": 878,
      "kind": "ms"
     }
    ],
    "base": {
     "seeds": "100/100",
     "events": 21844,
-    "events/s": 19533,
-    "wall ms": 1120
+    "events/s": 22791,
+    "wall ms": 960
    }
   }
  ]

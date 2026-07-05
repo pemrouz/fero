@@ -185,13 +185,16 @@ because state is a deterministic fold of the journal'd inputs.
 
 ## What this deliberately does not have yet (stated, not implied)
 
-- **Anti-entropy is EVENT-driven, not periodic:** digests fire on admit and on
-  drain-after-overflow, which heals every TCP-real loss mode (tail loss at link
-  death, dial races, backpressure sheds). The plan's periodic AE floor (§5) is an
-  M1 remainder — it matters once transports or bugs can lose without a
-  reconnect/drain signal. There is deliberately NO per-frame drop fault in the
-  sim: TCP cannot drop mid-stream on a live link, and modelling it would demand
-  interior-gap healing no real shell needs (the fault vocabulary says why).
+- **Anti-entropy: event-driven triggers + the periodic floor.** Digests fire on
+  admit and drain-after-overflow (every TCP-real loss mode), AND ride every
+  heartbeat as the plan's §5 periodic floor — one reciprocal digest per tick from
+  the PING side heals loss that NO event announces (transport bugs, future
+  non-TCP shells; the sim test injects exactly that). Heartbeats also REVIVE
+  given-up dial targets (`JK.revive`), so give-up is a cool-down, never
+  permanent parking. Both are heartbeat-gated: `heartbeatMs: 0` (the sim sweep
+  mode) keeps trajectories quiescent and byte-identical. There is deliberately
+  NO per-frame drop fault in the sim: TCP cannot drop mid-stream on a live link,
+  and modelling it would demand interior-gap healing no real shell needs.
 - **Membership/epochs beyond the wire field (M2)** — heartbeats PING/PONG and
   journal, but no suspect/evict action yet. The `epoch` field already rides every
   frame and every LWW cell so M2 lands without a wire change.
@@ -204,5 +207,4 @@ because state is a deterministic fold of the journal'd inputs.
   repo CI is not yet stood up (the plan makes it an M0 exit criterion — it is the
   immediate next step).
 - **Unbounded growth (bounded at M4 compaction):** per-origin logs and the
-  per-cell versions map (tombstones included); a give-up'd dial target is only
-  revived by re-admit or restart (M1's discovery re-announce).
+  per-cell versions map (tombstones included).
