@@ -1,0 +1,526 @@
+//! ── kernel/codec — encode once; the bytes ARE the log entry and the wire ─────
+// v3 frame layout (11-byte fixed header, then body):
+//
+//   MAGIC(1) | flags(1) | verb(1) | bodyLen:u32LE | crc32c:u32LE | body
+//
+// Deltas from v2's codec, each traceable to an audited failure:
+//   - ONE bounds-checked Cursor primitive instead of ~12 hand-inlined varint
+//     loops (two of v2's inlined copies shipped silent-truncation bugs).
+//   - A crc32c over header [0,7) + body: a flipped epoch/seq/verb/flags byte
+//     becomes a FrameError (drop the link) instead of a wedged write-gate or a
+//     silent mis-dispatch — the judge panel flagged integrity-free frames as a
+//     liveness hole (plan §5), and the adversarial review showed body-only
+//     coverage let a verb flip re-dispatch a RECORDS frame as PING.
+//   - Streaming per-link Outbox encoder: records are appended into a reusable
+//     buffer during a step and the header is back-patched at flush — no per-frame
+//     Writer allocation, no double byteLength sizing pass (v2's encoder did both).
+//   - The record count is a fixed u32 (not a varint) so it can be back-patched.
+//   - Keys are length-prefixed segments — no '\0' joins anywhere, so keys
+//     containing '.', '\0', or unicode can never over-match (v2 carried a
+//     \0-composite convention into three parallel maps).
+//   - The value codec is binary and recursive from day 0 (CBOR-class: nested
+//     obj/arr, NaN-preserving f64, Uint8Array) because it becomes the log and
+//     WAL format too — v2 deferred this and JSON.parse became ~85% of decode.
+//
+// The provenance extension is carried over from v2 verbatim (it measured well):
+// a PROV frame carries ONE origin's CONTIGUOUS seqs within ONE epoch —
+// [origin, baseSeq, epoch] amortised per frame, seq = baseSeq + index. That
+// single-origin/contiguous/single-epoch invariant is load-bearing (it is what
+// licenses scalar high-water dedup downstream) and encodeRuns() is the one
+// shared splitter that enforces it.
+
+import { REC, type Rec } from './env.ts'
+
+//! MAGIC 0xF3 = protocol marker + version byte (bump on any wire change). MAX_FRAME bounds one frame's body (anti-OOM, enforced BOTH directions).
+export const MAGIC = 0xf3
+export const MAX_FRAME = 1 << 28 // 256 MiB
+export const HEADER = 11
+
+//! VERB: dense 1-byte frame verbs. WRITE/CALL/... are reserved for M2+ — the codec fails closed on unknowns at dispatch, not here.
+// DIGEST carries {d: {origin: highestHeldSeq}, r: 0|1} — "here is what I hold; r=1 means please answer with yours".
+export const VERB = { HELLO: 1, RECORDS: 2, PING: 3, PONG: 4, DIGEST: 5 } as const
+
+//! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.
+export const FLAG_PROV = 1
+
+//! FrameError: a WIRE fault (bad magic, bad crc, overrun, oversize) — the peer is dropped. Any other throw in a frame handler is a real bug and must rethrow unmasked (v2's rule, kept).
+export class FrameError extends Error {}
+
+//! ── crc32c (Castagnoli, software table) ──────────────────────────────────────
+// One table build at module load; ~1 cycle/byte in JS — cheap next to utf8 work.
+const CRC_T = new Uint32Array(256)
+for (let i = 0; i < 256; i++) {
+  let c = i
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0x82f63b78 ^ (c >>> 1) : c >>> 1
+  CRC_T[i] = c >>> 0
+}
+const crcUpdate = (state: number, b: Uint8Array, start: number, end: number): number => {
+  let c = state
+  for (let i = start; i < end; i++) c = CRC_T[(c ^ b[i]) & 0xff] ^ (c >>> 8)
+  return c
+}
+export const crc32c = (b: Uint8Array, start = 0, end = b.length): number =>
+  (crcUpdate(0xffffffff, b, start, end) ^ 0xffffffff) >>> 0
+
+//! crcFrame: the frame checksum covers header bytes [0,7) (magic|flags|verb|bodyLen) AND the body [11,end) —
+// leaving only the crc field itself out. Body-only coverage left flags/verb unprotected: a single flipped verb
+// byte turned a crc-valid RECORDS frame into a PING and every record in it silently vanished (found by the
+// adversarial review's corruption fuzz analysis).
+export const crcFrame = (b: Uint8Array, end: number): number =>
+  (crcUpdate(crcUpdate(0xffffffff, b, 0, 7), b, HEADER, end) ^ 0xffffffff) >>> 0
+
+//! ── value codec (VT tag byte) — binary, recursive, NaN-safe ──────────────────
+// Scalars null/undefined/false/true are TAG-ONLY (zero value bytes — v2's
+// measured nibble win, kept). int is a zigzag varint (int32 range), everything
+// else f64 (8 LE bytes — NaN and -0 preserved bit-exactly). Nested values carry
+// their own tag byte; a record's TOP-LEVEL vt rides free in the record tag.
+export const VT = {
+  none: 0, null: 1, undefined: 2, false: 3, true: 4,
+  int: 5, f64: 6, str: 7, obj: 8, arr: 9, u8: 10,
+} as const
+
+const vtOf = (v: unknown): number =>
+  v === null ? VT.null
+  : v === undefined ? VT.undefined
+  : v === false ? VT.false
+  : v === true ? VT.true
+  : typeof v === 'number'
+    ? (Number.isInteger(v) && Math.abs(v) <= 0x7fffffff && !Object.is(v, -0) ? VT.int : VT.f64)
+  : typeof v === 'string' ? VT.str
+  : v instanceof Uint8Array ? VT.u8
+  : Array.isArray(v) ? VT.arr
+  : typeof v === 'object' ? VT.obj
+  : (() => { throw new FrameError(`unencodable value type: ${typeof v}`) })()
+
+const utf8 = new TextEncoder()
+const utf8d = new TextDecoder()
+
+//! ── Writer — one growable scratch buffer with back-patching ──────────────────
+// Backs both the standalone encodeFrame() and the per-link Outbox. ensure()
+// doubles; u32at() patches a reserved slot (bodyLen / crc / count) after the
+// records are appended, which is what makes streaming encoding possible.
+export class Writer {
+  buf = new Uint8Array(4096)
+  len = 0
+  ensure(n: number) {
+    if (this.len + n <= this.buf.length) return
+    let cap = this.buf.length * 2
+    while (cap < this.len + n) cap *= 2
+    if (cap > MAX_FRAME + HEADER) throw new FrameError('frame exceeds MAX_FRAME')
+    const next = new Uint8Array(cap)
+    next.set(this.buf.subarray(0, this.len))
+    this.buf = next
+  }
+  u8(v: number) { this.ensure(1); this.buf[this.len++] = v }
+  u32(v: number) { this.ensure(4); this.u32at(this.len, v); this.len += 4 }
+  u32at(at: number, v: number) {
+    this.buf[at] = v & 0xff; this.buf[at + 1] = (v >>> 8) & 0xff
+    this.buf[at + 2] = (v >>> 16) & 0xff; this.buf[at + 3] = (v >>> 24) & 0xff
+  }
+  //! varint: unsigned LEB128 via Math (not bitwise — bitwise truncates at 32 bits; seqs are Lamport counters and outlive 2^32).
+  varint(v: number) {
+    while (v > 127) { this.u8((v & 0x7f) | 0x80); v = Math.floor(v / 128) }
+    this.u8(v)
+  }
+  zigzag(v: number) { this.varint(v < 0 ? -v * 2 - 1 : v * 2) }
+  f64(v: number) {
+    this.ensure(8)
+    new DataView(this.buf.buffer, this.buf.byteOffset + this.len, 8).setFloat64(0, v, true)
+    this.len += 8
+  }
+  //! str: varint byteLen + utf8, in ONE pass via encodeInto (v2 computed Buffer.byteLength twice per string — sizing pass then write pass).
+  str(s: string) {
+    this.ensure(4 + s.length * 3) // worst-case utf8 + up to 3 varint len bytes
+    const lenAt = this.len
+    // reserve 3 varint bytes for lengths up to 2^21-1; longer strings re-encode via the slow path
+    if (s.length * 3 < 1 << 21) {
+      this.len += 3
+      const { written } = utf8.encodeInto(s, this.buf.subarray(this.len))
+      this.buf[lenAt] = (written & 0x7f) | 0x80
+      this.buf[lenAt + 1] = ((written >>> 7) & 0x7f) | 0x80
+      this.buf[lenAt + 2] = written >>> 14
+      this.len += written
+    } else {
+      const bytes = utf8.encode(s)
+      this.varint(bytes.length)
+      this.bytes(bytes)
+    }
+  }
+  bytes(b: Uint8Array) { this.ensure(b.length); this.buf.set(b, this.len); this.len += b.length }
+  //! value: recursive tagged encode — the ONE place values become bytes (log, WAL, and wire all reuse it).
+  value(v: unknown, vt = vtOf(v)) {
+    switch (vt) {
+      case VT.none: case VT.null: case VT.undefined: case VT.false: case VT.true: return
+      case VT.int: return this.zigzag(v as number)
+      case VT.f64: return this.f64(v as number)
+      case VT.str: return this.str(v as string)
+      case VT.u8: { const b = v as Uint8Array; this.varint(b.length); return this.bytes(b) }
+      case VT.arr: {
+        const a = v as unknown[]
+        this.varint(a.length)
+        for (const x of a) { const t = vtOf(x); this.u8(t); this.value(x, t) }
+        return
+      }
+      case VT.obj: {
+        const entries = Object.entries(v as object)
+        this.varint(entries.length)
+        for (const [k, x] of entries) { this.str(k); const t = vtOf(x); this.u8(t); this.value(x, t) }
+        return
+      }
+      default: throw new FrameError(`bad vt ${vt}`)
+    }
+  }
+}
+
+//! ── Cursor — THE bounds-checked reader (exactly one; never inline a varint) ──
+// Every length/count is checked against `end` BEFORE any allocation or slice —
+// v2's rule, kept — but here the check exists once per primitive instead of
+// being re-spelled at ~12 call sites (where two copies shipped truncation bugs).
+export class Cursor {
+  buf: Uint8Array
+  pos: number
+  end: number
+  constructor(buf: Uint8Array, pos = 0, end = buf.length) { this.buf = buf; this.pos = pos; this.end = end }
+  need(n: number) { if (this.pos + n > this.end) throw new FrameError('frame truncated') }
+  u8(): number { this.need(1); return this.buf[this.pos++] }
+  u32(): number {
+    this.need(4)
+    const b = this.buf, p = this.pos
+    this.pos += 4
+    return (b[p] | (b[p + 1] << 8) | (b[p + 2] << 16)) + b[p + 3] * 0x1000000
+  }
+  varint(): number {
+    let v = 0, mul = 1
+    for (let i = 0; i < 8; i++) {
+      const b = this.u8()
+      v += (b & 0x7f) * mul
+      if ((b & 0x80) === 0) {
+        if (!Number.isSafeInteger(v)) throw new FrameError('varint overflow')
+        return v
+      }
+      mul *= 128
+    }
+    throw new FrameError('varint too long')
+  }
+  zigzag(): number { const v = this.varint(); return v % 2 ? -(v + 1) / 2 : v / 2 }
+  f64(): number {
+    this.need(8)
+    const v = new DataView(this.buf.buffer, this.buf.byteOffset + this.pos, 8).getFloat64(0, true)
+    this.pos += 8
+    return v
+  }
+  str(): string {
+    const n = this.varint()
+    this.need(n)
+    const s = utf8d.decode(this.buf.subarray(this.pos, this.pos + n))
+    this.pos += n
+    return s
+  }
+  bytes(): Uint8Array {
+    const n = this.varint()
+    this.need(n)
+    //! decoded bytes are COPIED out (copy-on-retain, plan §7): a subarray view would pin the whole receive chunk.
+    const b = this.buf.slice(this.pos, this.pos + n)
+    this.pos += n
+    return b
+  }
+  //! value: recursive tagged decode. Collection counts are sanity-bounded by remaining bytes before any Array/Object allocation.
+  value(vt: number): unknown {
+    switch (vt) {
+      case VT.none: case VT.undefined: return undefined
+      case VT.null: return null
+      case VT.false: return false
+      case VT.true: return true
+      case VT.int: return this.zigzag()
+      case VT.f64: return this.f64()
+      case VT.str: return this.str()
+      case VT.u8: return this.bytes()
+      case VT.arr: {
+        const n = this.varint()
+        if (n > this.end - this.pos) throw new FrameError('arr count overruns frame')
+        const a = new Array(n)
+        for (let i = 0; i < n; i++) a[i] = this.value(this.u8())
+        return a
+      }
+      case VT.obj: {
+        const n = this.varint()
+        if (n > this.end - this.pos) throw new FrameError('obj count overruns frame')
+        const o: Record<string, unknown> = {}
+        for (let i = 0; i < n; i++) {
+          const k = this.str()
+          const v = this.value(this.u8())
+          //! defineProperty for the one hostile key: a bracket-assign of '__proto__' is a [[Set]] that hits
+          // Object.prototype's accessor — the field silently vanishes (non-object value) or REPLACES the
+          // object's prototype (object value), so sender and receiver state diverge on a crc-valid frame.
+          if (k === '__proto__') Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true })
+          else o[k] = v
+        }
+        return o
+      }
+      default: throw new FrameError(`bad vt ${vt}`)
+    }
+  }
+  //! skipValue: advance past a value WITHOUT materialising it — what keeps relay/scan lazy (v2's measured scan<decode win).
+  skipValue(vt: number) {
+    switch (vt) {
+      case VT.none: case VT.null: case VT.undefined: case VT.false: case VT.true: return
+      case VT.int: this.varint(); return
+      case VT.f64: this.need(8); this.pos += 8; return
+      case VT.str: case VT.u8: { const n = this.varint(); this.need(n); this.pos += n; return }
+      case VT.arr: { const n = this.varint(); for (let i = 0; i < n; i++) this.skipValue(this.u8()); return }
+      case VT.obj: { const n = this.varint(); for (let i = 0; i < n; i++) { const s = this.varint(); this.need(s); this.pos += s; this.skipValue(this.u8()) } return }
+      default: throw new FrameError(`bad vt ${vt}`)
+    }
+  }
+}
+
+//! ── record encoding ──────────────────────────────────────────────────────────
+// tag byte: [ vt:5 bits | hasAt:1 | type:2 ]  then key (count + len-prefixed
+// segments), then at (if hasAt), then the value payload (vt from the tag).
+const HAS_AT = 4
+
+const writeRecord = (w: Writer, r: Rec) => {
+  const vt = r.type === REC.remove ? VT.none : vtOf(r.value)
+  w.u8((r.type & 3) | (r.at !== undefined ? HAS_AT : 0) | (vt << 3))
+  w.varint(r.key.length)
+  for (const seg of r.key) w.str(seg)
+  if (r.at !== undefined) w.str(r.at)
+  w.value(r.value, vt)
+}
+
+//! Prov: the per-frame provenance extension — one origin, contiguous seqs from baseSeq, one epoch.
+export interface Prov { origin: string; baseSeq: number; epoch: number }
+
+//! ── Outbox — the streaming per-link frame encoder ─────────────────────────────
+// One Outbox per link, reused forever: begin() stamps the header + provenance,
+// add() appends records (count tracked, patched at finish), finish() back-patches
+// bodyLen + count + crc and returns a FRESH COPY of the frame bytes. The copy is
+// deliberate: both shells and the sim may retain the buffer past return
+// (socket.write queues; sim delivers later), so handing out the reusable scratch
+// would corrupt in-flight frames — one slice per FRAME per flush (not per record)
+// is the M0 cost, revisited with a buffer ring in M8.
+export class Outbox {
+  w = new Writer()
+  count = 0
+  countAt = 0
+  open = false
+  begin(verb: number, prov?: Prov) {
+    const w = this.w
+    w.len = 0
+    w.u8(MAGIC); w.u8(prov ? FLAG_PROV : 0); w.u8(verb)
+    w.u32(0) // bodyLen, patched
+    w.u32(0) // crc, patched
+    if (prov) { w.str(prov.origin); w.varint(prov.baseSeq); w.varint(prov.epoch) }
+    this.countAt = w.len
+    w.u32(0) // record count, patched
+    this.count = 0
+    this.open = true
+  }
+  add(r: Rec) { writeRecord(this.w, r); this.count++ }
+  //! finish(): patch + checksum + hand over an owned copy. Returns null for an empty frame (nothing queued this step).
+  finish(): Uint8Array | null {
+    if (!this.open) return null
+    this.open = false
+    if (this.count === 0) return null
+    const w = this.w
+    const bodyLen = w.len - HEADER
+    if (bodyLen > MAX_FRAME) throw new FrameError('frame exceeds MAX_FRAME')
+    w.u32at(3, bodyLen)
+    w.u32at(this.countAt, this.count)
+    w.u32at(7, crcFrame(w.buf, w.len))
+    return w.buf.slice(0, w.len)
+  }
+}
+
+//! encodeControl: a control frame (HELLO/PING/...) carrying exactly ONE value as its body — v2's controlFrame shape, kept.
+export const encodeControl = (verb: number, value?: unknown): Uint8Array => {
+  const w = new Writer()
+  w.u8(MAGIC); w.u8(0); w.u8(verb)
+  w.u32(0); w.u32(0)
+  const vt = vtOf(value)
+  w.u8(vt)
+  w.value(value, vt)
+  w.u32at(3, w.len - HEADER)
+  w.u32at(7, crcFrame(w.buf, w.len))
+  return w.buf.slice(0, w.len)
+}
+
+//! encodeFrame: one-shot RECORDS encode (tests, catch-up). The hot path uses a per-link Outbox instead.
+export const encodeFrame = (records: Rec[], prov?: Prov): Uint8Array => {
+  const o = new Outbox()
+  o.begin(VERB.RECORDS, prov)
+  for (const r of records) o.add(r)
+  return o.finish() ?? encodeEmpty(prov)
+}
+const encodeEmpty = (prov?: Prov): Uint8Array => {
+  // an explicitly-empty RECORDS frame is only ever built by tests
+  const w = new Writer()
+  w.u8(MAGIC); w.u8(prov ? FLAG_PROV : 0); w.u8(VERB.RECORDS)
+  w.u32(0); w.u32(0)
+  if (prov) { w.str(prov.origin); w.varint(prov.baseSeq); w.varint(prov.epoch) }
+  w.u32(0)
+  w.u32at(3, w.len - HEADER)
+  w.u32at(7, crcFrame(w.buf, w.len))
+  return w.buf.slice(0, w.len)
+}
+
+//! encodeRuns: split a mixed batch into the FEWEST frames each satisfying single-origin / contiguous-seq / single-epoch.
+// A run breaks on an origin change, a seq gap, or an epoch change — the protocol
+// requirement that licenses scalar high-water dedup at every receiver.
+export const encodeRuns = (records: { rec: Rec; origin: string; seq: number; epoch: number }[]): Uint8Array[] => {
+  const frames: Uint8Array[] = []
+  const o = new Outbox()
+  let i = 0
+  while (i < records.length) {
+    const head = records[i]
+    o.begin(VERB.RECORDS, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch })
+    o.add(head.rec)
+    let j = i + 1
+    while (
+      j < records.length &&
+      records[j].origin === head.origin &&
+      records[j].epoch === head.epoch &&
+      records[j].seq === head.seq + (j - i)
+    ) { o.add(records[j].rec); j++ }
+    frames.push(o.finish()!)
+    i = j
+  }
+  return frames
+}
+
+//! ── Frame / RecordView — lazy zero-copy decode (v2's measured win, kept) ─────
+//! RecordView: type/prov are immediate; key/at/value decode (and memoise) only when read — a relayed record is never parsed.
+export class RecordView {
+  #buf: Uint8Array
+  #keyAt: number
+  #vt: number
+  #hasAt: boolean
+  #key?: string[]
+  #at?: string
+  #value?: unknown
+  #decoded = false
+  #valueAt = 0
+  #end: number
+  readonly type: number
+  origin: string
+  seq: number
+  epoch: number
+  constructor(buf: Uint8Array, tag: number, keyAt: number, end: number, origin: string, seq: number, epoch: number) {
+    this.#buf = buf; this.#keyAt = keyAt; this.#end = end
+    this.type = tag & 3
+    this.#hasAt = (tag & HAS_AT) !== 0
+    this.#vt = tag >>> 3
+    this.origin = origin; this.seq = seq; this.epoch = epoch
+  }
+  #head() {
+    if (this.#key) return
+    const c = new Cursor(this.#buf, this.#keyAt, this.#end)
+    const n = c.varint()
+    if (n > this.#end - c.pos) throw new FrameError('key count overruns frame')
+    const key = new Array(n)
+    for (let i = 0; i < n; i++) key[i] = c.str()
+    this.#key = key
+    if (this.#hasAt) this.#at = c.str()
+    this.#valueAt = c.pos
+  }
+  get key(): string[] { this.#head(); return this.#key! }
+  get at(): string | undefined { this.#head(); return this.#at }
+  get value(): unknown {
+    if (!this.#decoded) {
+      this.#head()
+      this.#value = new Cursor(this.#buf, this.#valueAt, this.#end).value(this.#vt)
+      this.#decoded = true
+    }
+    return this.#value
+  }
+  //! rec(): materialise a plain Rec (copies out of the receive chunk — the explicit retain point).
+  rec(): Rec {
+    const r: Rec = { type: this.type, key: this.key.slice() }
+    if (this.#hasAt) r.at = this.at
+    if (this.#vt !== VT.none) r.value = this.value
+    return r
+  }
+}
+
+//! Frame: a decoded view over ONE complete checksummed frame. Header getters are free; records() scans boundaries lazily.
+export class Frame {
+  buf: Uint8Array
+  constructor(buf: Uint8Array) { this.buf = buf }
+  get flags(): number { return this.buf[1] }
+  get verb(): number { return this.buf[2] }
+  #prov?: Prov | null
+  #bodyAt(): number { return HEADER }
+  prov(): Prov | null {
+    if (this.#prov !== undefined) return this.#prov
+    if ((this.flags & FLAG_PROV) === 0) return (this.#prov = null)
+    const c = new Cursor(this.buf, this.#bodyAt())
+    this.#prov = { origin: c.str(), baseSeq: c.varint(), epoch: c.varint() }
+    ;(this.#prov as Prov & { end: number }).end = c.pos
+    return this.#prov
+  }
+  //! value: the single payload of a control frame.
+  get value(): unknown {
+    const c = new Cursor(this.buf, this.#bodyAt())
+    return c.value(c.u8())
+  }
+  //! records(): boundary-scan into lazy RecordViews — values are SKIPPED, not decoded (the scan<full-decode contract).
+  records(): RecordView[] {
+    const p = this.prov()
+    const c = new Cursor(this.buf, p ? (p as Prov & { end: number }).end : this.#bodyAt())
+    const count = c.u32()
+    //! bound by REMAINING bytes / minimum record size (tag + key count = 2B) — pre-allocation is capped by
+    // what the frame could possibly hold, same discipline as every other count check in this file
+    if (count > (this.buf.length - c.pos) / 2) throw new FrameError('record count overruns frame')
+    const out = new Array<RecordView>(count)
+    const origin = p?.origin ?? ''
+    const epoch = p?.epoch ?? 0
+    for (let i = 0; i < count; i++) {
+      const tag = c.u8()
+      const keyAt = c.pos
+      const segs = c.varint()
+      if (segs > this.buf.length - c.pos) throw new FrameError('key count overruns frame')
+      for (let s = 0; s < segs; s++) { const n = c.varint(); c.need(n); c.pos += n }
+      if (tag & HAS_AT) { const n = c.varint(); c.need(n); c.pos += n }
+      c.skipValue(tag >>> 3)
+      out[i] = new RecordView(this.buf, tag, keyAt, c.pos, origin, p ? p.baseSeq + i : 0, epoch)
+    }
+    if (c.pos !== this.buf.length) throw new FrameError('trailing bytes after records')
+    return out
+  }
+}
+
+//! ── Framer — one per link; re-slices a TCP byte stream into complete frames ──
+// Straddle handling kept from v2 (it measured well): a partial frame is carried
+// as a single subarray; Buffer-level concat happens ONLY on a genuine straddle.
+// bodyLen is bounds-checked against MAX_FRAME BEFORE the straddle check, so one
+// hostile header can never balloon the carry (anti-OOM), and the crc is verified
+// BEFORE a Frame is handed to dispatch.
+export class Framer {
+  #carry: Uint8Array | null = null
+  push(chunk: Uint8Array): Frame[] {
+    let buf = this.#carry ? concat(this.#carry, chunk) : chunk
+    this.#carry = null
+    const out: Frame[] = []
+    let at = 0
+    while (buf.length - at >= HEADER) {
+      if (buf[at] !== MAGIC) throw new FrameError('bad magic')
+      const bodyLen = readU32(buf, at + 3)
+      if (bodyLen > MAX_FRAME) throw new FrameError('frame exceeds MAX_FRAME')
+      if (buf.length - at < HEADER + bodyLen) break
+      const frame = buf.subarray(at, at + HEADER + bodyLen)
+      if (crcFrame(frame, frame.length) !== readU32(frame, 7)) throw new FrameError('bad crc')
+      out.push(new Frame(frame))
+      at += HEADER + bodyLen
+    }
+    //! the carry is a COPY, not a subarray: retaining a view would pin every prior receive chunk (v2's chunk-pinning trap, closed).
+    if (at < buf.length) this.#carry = buf.slice(at)
+    return out
+  }
+}
+const readU32 = (b: Uint8Array, p: number): number =>
+  (b[p] | (b[p + 1] << 8) | (b[p + 2] << 16)) + b[p + 3] * 0x1000000
+const concat = (a: Uint8Array, b: Uint8Array): Uint8Array => {
+  const out = new Uint8Array(a.length + b.length)
+  out.set(a); out.set(b, a.length)
+  return out
+}

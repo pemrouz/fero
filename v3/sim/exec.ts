@@ -1,0 +1,239 @@
+//! ── sim/exec — the simulation executive: virtual time, seeded chaos, monitors ─
+// One event queue holds every pending timer and in-flight message across ALL
+// simulated nodes; a seeded PRNG drives every random choice (delays, drops,
+// dups, jitter — and, via Env.rng, the kernel's own backoff jitter); virtual
+// time jumps discretely between events. Consequences, which are the whole point
+// (plan-v3.md §6):
+//
+//   - run(seed, scenario) is fully reproducible: a failure IS its repro command.
+//   - There are no sleeps, so a thousand whole-cluster trajectories cost
+//     milliseconds — CI sweeps seeds instead of accepting a red baseline.
+//   - Quiescence ("queue empty") is a QUERY, so negative assertions are exact —
+//     the sleep(300)-and-hope class (29 bare sleeps in v2's resource tests
+//     alone) does not exist here.
+//   - Invariant monitors run after EVERY event, not at scenario end — a
+//     violating interleaving is caught at the event that violated it.
+//
+// Fault vocabulary (per unordered pair): delivery-delay range, duplication
+// probability, and partition/heal. Stated exactly (two review rounds shaped
+// this): links are FIFO BY CONSTRUCTION (the #lastAt clamp) because FIFO is a
+// kernel protocol REQUIREMENT — within-link reorder is deliberately
+// unschedulable, and the kernel does NOT tolerate it. There is deliberately NO
+// per-frame drop fault either: TCP never drops a frame mid-stream on a live
+// connection — real loss is TAIL loss at link death, which is exactly what
+// partition()/close() model (in-flight frames may or may not land, the rest
+// die) and exactly what suffix-only digest anti-entropy heals. A per-frame
+// dropP would manufacture interior gaps no real shell can produce and no
+// suffix digest can heal — a fault model for a network that doesn't exist.
+
+import { Node, type NodeOpts } from '../kernel/node.ts'
+import type { EffectSink, Event } from '../kernel/env.ts'
+
+//! mulberry32 — the seeded PRNG. Tiny, splittable-enough, deterministic across platforms.
+export const mulberry32 = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0
+  let t = seed
+  t = Math.imul(t ^ (t >>> 15), t | 1)
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+
+//! Task: one queue entry. `seq` breaks same-time ties by insertion order — total order, so trajectories are deterministic.
+interface Task { at: number; seq: number; run: () => void }
+
+//! Fault: the per-pair network personality. delay is [min,max) ms; dupP is a per-frame duplication probability.
+export interface Fault { delay?: [number, number]; dupP?: number }
+
+//! Violation: what a monitor returns to fail a trajectory — event-indexed so the shrink/debug loop starts AT the violation.
+export interface Violation { event: number; monitor: string; detail: string }
+
+export class Sim {
+  now = 0
+  rng: () => number
+  events = 0
+  //! trace: stateHash of the stepped node after every event — the determinism canary diffs two same-seed runs over this
+  trace: number[] = []
+  violations: Violation[] = []
+  monitors: { name: string; check: (sim: Sim) => string | null }[] = []
+  nodes = new Map<string, Node>()
+  #byListen = new Map<string, string>()
+  #queue: Task[] = []
+  #seq = 0
+  #linkSeq = 0
+  //! `delivered` is per END: a partition installed while a dial is IN FLIGHT must not deliver linkDown before
+  // linkUp (the kernel would ignore the unknown linkDown, then the late linkUp would mint a zombie link that
+  // never dies and never redials — adversarial-review finding). Pending ends convert to a refused dial instead.
+  #links = new Map<number, { owner: string; peer: string; peerLink: number; up: boolean; delivered: boolean; to?: string }>()
+  //! per-directed-link FIFO floor: TCP never reorders WITHIN a stream, so delivery times are clamped monotone
+  // per link — without this the sim models a link no shell will ever provide, and "tolerates reorder" becomes
+  // an untestable lie the kernel pays for (the dedup high-water would silently drop leapfrogged records).
+  #lastAt = new Map<number, number>()
+  #faults = new Map<string, Fault>()
+  #partitioned = new Set<string>()
+  #defaultFault: Fault
+  seed: number
+
+  constructor(seed: number, defaults: Fault = {}) {
+    this.seed = seed
+    this.rng = mulberry32(seed)
+    this.#defaultFault = { delay: [1, 5], ...defaults }
+  }
+
+  //! add — create a node whose Env is this executive. The kernel cannot tell it isn't on a real network; that is the design.
+  add(opts: NodeOpts): Node {
+    const sink = this.#sinkFor(opts.uuid)
+    const node = new Node(opts, { now: () => this.now, rng: this.rng, sink })
+    this.nodes.set(opts.uuid, node)
+    if (opts.listen) this.#byListen.set(opts.listen, opts.uuid)
+    return node
+  }
+
+  //! post — deliver an event to a node after `delay` virtual ms.
+  post(uuid: string, ev: Event, delay = 0) {
+    this.#schedule(delay, () => this.#step(uuid, ev))
+  }
+
+  //! at — schedule arbitrary chaos (partition/heal/fault changes) at a virtual time, so fault windows are part
+  // of the seeded trajectory instead of applying at whatever `now` the scenario code happened to run.
+  at(delay: number, fn: () => void) { this.#schedule(delay, fn) }
+
+  //! fault / partition / heal — install network personality between a pair (both directions; unordered key).
+  fault(a: string, b: string, f: Fault) { this.#faults.set(pairKey(a, b), f) }
+  partition(a: string, b: string) {
+    this.#partitioned.add(pairKey(a, b))
+    //! sever existing links between the pair — both ends observe linkDown, exactly like a real cable cut
+    for (const [id, l] of this.#links) if (l.up && pairKey(l.owner, l.peer) === pairKey(a, b)) this.#sever(id, 'partition')
+  }
+  heal(a: string, b: string) { this.#partitioned.delete(pairKey(a, b)) }
+
+  //! run — drain the queue (to quiescence) or until a horizon; monitors run after every event; returns violations.
+  run(opts: { until?: number; maxEvents?: number } = {}): Violation[] {
+    const max = opts.maxEvents ?? 1_000_000
+    let n = 0 // per-CALL budget — the cumulative counter would trip a later phase for the sins of an earlier one
+    while (this.#queue.length) {
+      if (opts.until !== undefined && this.#queue[0].at > opts.until) break
+      const t = this.#pop()
+      this.now = t.at
+      t.run()
+      this.events++
+      if (++n > max) throw new Error(`sim runaway: >${max} events in one run() (seed ${this.seed})`)
+      for (const m of this.monitors) {
+        const bad = m.check(this)
+        if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
+      }
+    }
+    return this.violations
+  }
+
+  //! quiesced — the exact negative-assertion primitive: nothing in flight, nothing pending.
+  get quiesced(): boolean { return this.#queue.length === 0 }
+
+  #step(uuid: string, ev: Event) {
+    const node = this.nodes.get(uuid)
+    if (!node) return
+    node.step(ev)
+    this.trace.push(node.stateHash)
+  }
+
+  #schedule(delay: number, run: () => void) {
+    const t = { at: this.now + delay, seq: this.#seq++, run }
+    //! binary min-heap ordered by (at, seq) — same-time events fire in insertion order, keeping trajectories total-ordered
+    const q = this.#queue
+    q.push(t)
+    let i = q.length - 1
+    while (i > 0) {
+      const p = (i - 1) >> 1
+      if (q[p].at < t.at || (q[p].at === t.at && q[p].seq < t.seq)) break
+      q[i] = q[p]; i = p
+    }
+    q[i] = t
+  }
+  #pop(): Task {
+    const q = this.#queue
+    const top = q[0]
+    const last = q.pop()!
+    if (q.length) {
+      q[0] = last
+      const lt = (a: Task, b: Task) => a.at < b.at || (a.at === b.at && a.seq < b.seq)
+      let i = 0
+      for (;;) {
+        const l = i * 2 + 1, r = l + 1
+        let m = i
+        if (l < q.length && lt(q[l], q[m])) m = l
+        if (r < q.length && lt(q[r], q[m])) m = r
+        if (m === i) break
+        const tmp = q[i]; q[i] = q[m]; q[m] = tmp
+        i = m
+      }
+    }
+    return top
+  }
+
+  #faultFor(a: string, b: string): Fault { return this.#faults.get(pairKey(a, b)) ?? this.#defaultFault }
+
+  #sever(id: number, reason: string) {
+    const l = this.#links.get(id)
+    if (!l || !l.up) return
+    const r = this.#links.get(l.peerLink)!
+    l.up = false; r.up = false
+    const d = this.#faultFor(l.owner, l.peer).delay ?? [1, 5]
+    //! linkDown goes only to ends that already saw linkUp; a pending end's linkUp task converts itself
+    // to a refused dial (dialer) or silence (acceptor) when it fires and finds up=false
+    if (l.delivered) this.post(l.owner, { kind: 'linkDown', link: id, reason }, d[0])
+    if (r.delivered) this.post(l.peer, { kind: 'linkDown', link: l.peerLink, reason }, d[0])
+  }
+
+  #sinkFor(me: string): EffectSink {
+    const sim = this
+    return {
+      connect(to: string) {
+        const target = sim.#byListen.get(to)
+        const fault = target ? sim.#faultFor(me, target) : sim.#defaultFault
+        const [dMin, dMax] = fault.delay ?? [1, 5]
+        const delay = dMin + sim.rng() * (dMax - dMin)
+        if (!target || sim.#partitioned.has(pairKey(me, target))) {
+          //! refused/unreachable: a FAILED dial — linkDown with `to` and no prior linkUp, so the kernel's backoff redial engages
+          const id = ++sim.#linkSeq
+          sim.post(me, { kind: 'linkDown', link: id, reason: 'refused', to }, delay)
+          return
+        }
+        const aLink = ++sim.#linkSeq
+        const bLink = ++sim.#linkSeq
+        const a = { owner: me, peer: target, peerLink: bLink, up: true, delivered: false, to }
+        const b = { owner: target, peer: me, peerLink: aLink, up: true, delivered: false }
+        sim.#links.set(aLink, a)
+        sim.#links.set(bLink, b)
+        //! delivery-time recheck: a partition installed while the dial is in flight turns the dialer's linkUp
+        // into a refused dial (so backoff redial engages) and the acceptor's into silence — never a zombie
+        sim.#schedule(delay, () => {
+          if (a.up) { a.delivered = true; sim.#step(me, { kind: 'linkUp', link: aLink, dialed: true, to }) }
+          else sim.#step(me, { kind: 'linkDown', link: aLink, reason: 'refused', to })
+        })
+        sim.#schedule(delay, () => {
+          if (b.up) { b.delivered = true; sim.#step(target, { kind: 'linkUp', link: bLink, dialed: false }) }
+        })
+      },
+      send(link: number, bytes: Uint8Array) {
+        const l = sim.#links.get(link)
+        if (!l || !l.up) return // send into a dead link goes nowhere — exactly like a closed socket
+        if (sim.#partitioned.has(pairKey(l.owner, l.peer))) return
+        const f = sim.#faultFor(l.owner, l.peer)
+        const [dMin, dMax] = f.delay ?? [1, 5]
+        const deliver = () => {
+          const at = Math.max(sim.now + dMin + sim.rng() * (dMax - dMin), sim.#lastAt.get(link) ?? 0)
+          sim.#lastAt.set(link, at)
+          sim.post(l.peer, { kind: 'bytesIn', link: l.peerLink, bytes }, at - sim.now)
+        }
+        deliver()
+        //! duplication: the same frame delivered again, still FIFO (a dup can never leapfrog its original)
+        if (f.dupP && sim.rng() < f.dupP) deliver()
+      },
+      close(link: number, reason: string) { sim.#sever(link, reason) },
+      timer(id: number, tag: number, ms: number) { sim.post(me, { kind: 'timer', id, tag }, ms) },
+      cancel() { /* fires are ignored by the kernel's live-id check; leaving them queued costs one no-op event */ },
+      apply() { /* downstream state is read via node.state in sim; the api layer binds here in M5 */ },
+    }
+  }
+}
+
+export const pairKey = (a: string, b: string): string => (a < b ? a + '|' + b : b + '|' + a)
