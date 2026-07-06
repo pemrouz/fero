@@ -31,6 +31,64 @@ export const perEvent = () => [
     },
   },
   {
+    //! M2's headline safety invariant: at most ONE view commits per epoch — two nodes installing
+    // DIFFERENT member sets for the same epoch is split-brain, the exact bug class ballots exist to kill.
+    name: 'one-view-per-epoch',
+    check: (() => {
+      const seen = new Map<number, string>()
+      return (sim: Sim): string | null => {
+        for (const [id, n] of sim.nodes) {
+          const v = n.membership.view
+          if (v.epoch === 0) continue
+          const key = JSON.stringify(v.members)
+          const prev = seen.get(v.epoch)
+          if (prev === undefined) seen.set(v.epoch, key)
+          else if (prev !== key) return `${id} installed a DIFFERENT view for epoch ${v.epoch}: ${key} vs ${prev}`
+        }
+        return null
+      }
+    })(),
+  },
+  {
+    //! committed epochs never go backwards — install() only accepts strictly newer views
+    name: 'epoch-monotone',
+    check: (() => {
+      const last = new Map<string, number>()
+      return (sim: Sim): string | null => {
+        for (const [id, n] of sim.nodes) {
+          const prev = last.get(id) ?? 0
+          if (n.epoch < prev) return `${id} epoch went backwards: ${n.epoch} < ${prev}`
+          last.set(id, n.epoch)
+        }
+        return null
+      }
+    })(),
+  },
+  {
+    //! per-origin LOGS are strictly seq-ascending — the structural invariant the AE suffix-slicer's
+    // tail walk depends on. Checked incrementally (only appended tails), so it names the exact event
+    // that poisoned a log (seed-79 regression: a self-echo append made a log non-monotone and an
+    // interior record became permanently unshippable).
+    name: 'log-monotone',
+    check: (() => {
+      const tail = new Map<string, { len: number; seq: number }>()
+      return (sim: Sim): string | null => {
+        for (const [id, n] of sim.nodes)
+          for (const [origin, entries] of n.logs) {
+            const k = id + '|' + origin
+            const prev = tail.get(k) ?? { len: 0, seq: 0 }
+            if (entries.length > prev.len) {
+              for (let i = Math.max(prev.len, 1); i < entries.length; i++)
+                if (entries[i].seq <= entries[i - 1].seq)
+                  return `${id} log[${origin}] non-ascending at ${i}: ${entries[i].seq} after ${entries[i - 1].seq}`
+              tail.set(k, { len: entries.length, seq: entries[entries.length - 1].seq })
+            }
+          }
+        return null
+      }
+    })(),
+  },
+  {
     //! per-origin applied watermarks are monotone by construction — a regression here means dup/dedup broke
     name: 'watermark-monotone',
     check: (() => {

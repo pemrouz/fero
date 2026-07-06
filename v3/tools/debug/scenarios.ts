@@ -51,7 +51,10 @@ type Scenario = {
 
 //! tally — counted facts straight off the journals: every metric traces to typed events, never a guess
 const tally = (sim: Sim) => {
-  const t = { writes: 0, applied: 0, dups: 0, lwwLost: 0, ae: 0, shed: 0, redials: 0, dupLinks: 0, giveUps: 0, revives: 0 }
+  const t = {
+    writes: 0, applied: 0, dups: 0, lwwLost: 0, ae: 0, shed: 0, redials: 0, dupLinks: 0, giveUps: 0, revives: 0,
+    proposes: 0, installs: 0, evicts: 0, joins: 0, buffered: 0,
+  }
   for (const n of sim.nodes.values())
     for (const e of n.journal.read()) {
       if (e.kind === JK.writeLocal) t.writes++
@@ -64,6 +67,11 @@ const tally = (sim: Sim) => {
       else if (e.kind === JK.dupLink) t.dupLinks++
       else if (e.kind === JK.giveUp) t.giveUps++
       else if (e.kind === JK.revive) t.revives++
+      else if (e.kind === JK.propose) t.proposes++
+      else if (e.kind === JK.viewInstall) t.installs++
+      else if (e.kind === JK.evict) t.evicts++
+      else if (e.kind === JK.join) t.joins++
+      else if (e.kind === JK.writeBuffered) t.buffered++
     }
   return t
 }
@@ -420,6 +428,96 @@ export const SCENARIOS: Scenario[] = [
         metrics: [
           { k: 'writes', v: t.writes, kind: 'count' },
           { k: 'shed', v: t.shed, kind: 'count' },
+          { k: 'ae re-shipped', v: t.ae, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'eviction',
+    title: 'Eviction + rejoin — membership through real ballots',
+    kind: 'unhappy',
+    desc: 'a node cut off past every redial is evicted by joint-consensus ballot; the CP gate buffers its writes; on heal it learns its eviction, JOINs back, and its buffer flushes — M2 end-to-end',
+    diagram: {
+      nodes: ids(3), mesh: true, cut: [['n01', 'n03'], ['n02', 'n03']], writers: ['n01', 'n03'],
+      phases: [
+        { label: 'view 1', sev: 'info' }, { label: 'cut', sev: 'crit' }, { label: 'evict ballot', sev: 'warn' },
+        { label: 'CP buffer', sev: 'gold' }, { label: 'rejoin + flush', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(52)
+      const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+      sim.run({ until: 400 })
+      sim.partition('n01', 'n03')
+      sim.partition('n02', 'n03')
+      sim.run({ until: 5500 })
+      const evicted = nodes[0].epoch === 2 && nodes[2].epoch === 1
+      sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['majority-write'], value: 1 }] })
+      sim.post('n03', { kind: 'write', recs: [{ type: REC.update, key: ['minority-write'], value: 2 }] })
+      sim.run({ until: 5700 })
+      const gated = nodes[2].membership.pending.length === 1 && !nodes[2].state.has(JSON.stringify(['minority-write']))
+      sim.heal('n01', 'n03')
+      sim.heal('n02', 'n03')
+      sim.run({ until: 9000 })
+      const t = tally(sim)
+      const fail =
+        (!evicted ? 'the eviction view never committed on the majority side' : '') ||
+        (!gated ? 'the CP gate failed to buffer the minority write' : '') ||
+        (nodes.some((n) => n.epoch !== 3) ? `rejoin view did not commit everywhere (epochs ${nodes.map((n) => n.epoch)})` : '') ||
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
+        (converged(sim) ?? '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'views committed', v: t.installs, kind: 'count' },
+          { k: 'evictions', v: t.evicts, kind: 'count' },
+          { k: 'joins', v: t.joins, kind: 'count' },
+          { k: 'writes buffered', v: t.buffered, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'split-brain',
+    title: 'Split-brain impossibility — 2-2 commits nothing',
+    kind: 'unhappy',
+    desc: 'a symmetric partition of four: neither side reaches joint majority, so NO view commits and both sides buffer under the CP gate; heal flushes both — one view, one history',
+    diagram: {
+      nodes: ids(4), mesh: true,
+      cut: [['n01', 'n03'], ['n01', 'n04'], ['n02', 'n03'], ['n02', 'n04']], writers: ['n01', 'n03'],
+      phases: [
+        { label: 'view 1', sev: 'info' }, { label: '2-2 cut', sev: 'crit' }, { label: 'both gate', sev: 'warn' },
+        { label: 'heal + flush', sev: 'gold' }, { label: 'one view', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(53)
+      const nodes = cluster(sim, 4, { heartbeatMs: 50 })
+      sim.run({ until: 500 })
+      for (const a of ['n01', 'n02']) for (const b of ['n03', 'n04']) sim.partition(a, b)
+      sim.run({ until: 1500 })
+      sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['left'], value: 'L' }] })
+      sim.post('n03', { kind: 'write', recs: [{ type: REC.update, key: ['right'], value: 'R' }] })
+      sim.run({ until: 1700 })
+      const bothGated = nodes[0].membership.pending.length === 1 && nodes[2].membership.pending.length === 1
+      for (const a of ['n01', 'n02']) for (const b of ['n03', 'n04']) sim.heal(a, b)
+      sim.run({ until: 3500 })
+      const t = tally(sim)
+      const fail =
+        (!bothGated ? 'a minority side committed instead of buffering' : '') ||
+        (nodes.some((n) => n.epoch !== 1) ? `a view committed across the split (epochs ${nodes.map((n) => n.epoch)})` : '') ||
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
+        (converged(sim) ?? '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'views committed', v: t.installs - 4, kind: 'count' }, // beyond the 4 genesis installs: MUST be 0
+          { k: 'writes buffered', v: t.buffered, kind: 'count' },
           { k: 'ae re-shipped', v: t.ae, kind: 'count' },
           { k: 'events', v: sim.events, kind: 'count' },
         ],

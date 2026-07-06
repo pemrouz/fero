@@ -6,6 +6,7 @@
 // and sweeps validate (plan §3.3).
 
 export { Node, MAX_REDIALS, stable, type NodeOpts } from './kernel/node.ts'
+export { Membership, SUSPECT_TICKS, MAX_PULLS, MAX_PENDING, type View } from './kernel/membership.ts'
 export { Link, LS, MAX_QUEUED } from './kernel/link.ts'
 export { Journal, JK, type JEvent } from './kernel/journal.ts'
 export {
