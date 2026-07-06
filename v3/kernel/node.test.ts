@@ -221,6 +221,24 @@ test('the floor is silent on a paused link; a digest arriving mid-pause defers i
   assert.deepEqual(drained[0].value, { d: { aa: 2 }, r: 1 }, 'carrying the REAL log tail, reciprocal')
 })
 
+test('a node never ingests its OWN origin: an echoed self-record cannot poison the log (seed-79 regression)', () => {
+  //! local writes never advance the node's own stream watermark, so a peer echoing our records back
+  // (digest-snapshot race) once appended a DUPLICATE out-of-order log entry — and a non-ascending log
+  // silently breaks the AE suffix walk, stranding an interior record forever.
+  const { node, of } = harness('aa')
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: hello('bb') })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  node.step({ kind: 'write', recs: [{ type: REC.update, key: ['a'], value: 1 }, { type: REC.update, key: ['b'], value: 2 }] })
+  const applies = of('apply').length
+  //! bb echoes aa's own seq-1 record back (as an AE ship computed from a stale digest snapshot)
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeFrame([{ type: REC.update, key: ['a'], value: 1 }], { origin: 'aa', baseSeq: 1, epoch: 0 }) })
+  const log = node.logs.get('aa')!
+  assert.deepEqual(log.map((e) => e.seq), [1, 2], 'the self-echo must NOT append — the own log is authoritative')
+  assert.equal(of('apply').length, applies, 'and must not re-apply')
+  assert.ok(node.journal.read().some((e) => e.kind === JK.dupDrop && e.a === 'aa'), 'journal-visible as a dup')
+})
+
 test('malformed HELLO and wire faults drop the link; unknown verbs drop the frame but keep the link', () => {
   const { node, of } = harness('aa')
   node.step({ kind: 'linkUp', link: 1, dialed: false })

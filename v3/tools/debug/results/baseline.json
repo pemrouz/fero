@@ -1,12 +1,12 @@
 {
- "rev": "8ff7201",
- "when": "2026-07-05T23:42:16.151Z",
- "wallMs": 1071,
- "pass": 11,
- "total": 11,
+ "rev": "de6a531",
+ "when": "2026-07-06T05:04:58.010Z",
+ "wallMs": 311,
+ "pass": 13,
+ "total": 13,
  "baseline": {
-  "rev": "8ff7201",
-  "when": "2026-07-05T23:03:22.119Z"
+  "rev": "de6a531",
+  "when": "2026-07-06T05:01:18.022Z"
  },
  "scenarios": [
   {
@@ -64,7 +64,7 @@
     },
     {
      "k": "wall ms",
-     "v": 27,
+     "v": 7,
      "kind": "ms"
     }
    ],
@@ -72,7 +72,7 @@
     "links/node": 2,
     "dup links closed": 7,
     "events": 71,
-    "wall ms": 33
+    "wall ms": 8
    }
   },
   {
@@ -136,7 +136,7 @@
     },
     {
      "k": "wall ms",
-     "v": 34,
+     "v": 9,
      "kind": "ms"
     }
    ],
@@ -145,7 +145,7 @@
     "applied": 60,
     "contested": 0,
     "events": 153,
-    "wall ms": 44
+    "wall ms": 12
    }
   },
   {
@@ -209,7 +209,7 @@
     },
     {
      "k": "wall ms",
-     "v": 13,
+     "v": 3,
      "kind": "ms"
     }
    ],
@@ -218,7 +218,7 @@
     "contested": 4,
     "lww losses": 15,
     "events": 92,
-    "wall ms": 13
+    "wall ms": 4
    }
   },
   {
@@ -281,31 +281,31 @@
     },
     {
      "k": "dups dropped",
-     "v": 72,
+     "v": 80,
      "kind": "count"
     },
     {
      "k": "ae re-shipped",
-     "v": 89,
+     "v": 101,
      "kind": "count"
     },
     {
      "k": "events",
-     "v": 169,
+     "v": 192,
      "kind": "count"
     },
     {
      "k": "wall ms",
-     "v": 23,
+     "v": 8,
      "kind": "ms"
     }
    ],
    "base": {
     "writes": 25,
-    "dups dropped": 72,
-    "ae re-shipped": 89,
-    "events": 169,
-    "wall ms": 26
+    "dups dropped": 80,
+    "ae re-shipped": 101,
+    "events": 192,
+    "wall ms": 11
    }
   },
   {
@@ -382,7 +382,7 @@
     },
     {
      "k": "dups dropped",
-     "v": 275,
+     "v": 337,
      "kind": "count"
     },
     {
@@ -392,21 +392,21 @@
     },
     {
      "k": "events",
-     "v": 522,
+     "v": 613,
      "kind": "count"
     },
     {
      "k": "wall ms",
-     "v": 56,
+     "v": 15,
      "kind": "ms"
     }
    ],
    "base": {
     "writes": 60,
-    "dups dropped": 275,
+    "dups dropped": 337,
     "applied": 180,
-    "events": 522,
-    "wall ms": 64
+    "events": 613,
+    "wall ms": 18
    }
   },
   {
@@ -463,31 +463,31 @@
     },
     {
      "k": "ae re-shipped",
-     "v": 6,
+     "v": 8,
      "kind": "count"
     },
     {
      "k": "redials",
-     "v": 3,
+     "v": 8,
      "kind": "count"
     },
     {
      "k": "events",
-     "v": 44,
+     "v": 71,
      "kind": "count"
     },
     {
      "k": "wall ms",
-     "v": 4,
+     "v": 1,
      "kind": "ms"
     }
    ],
    "base": {
     "writes": 3,
-    "ae re-shipped": 6,
-    "redials": 3,
-    "events": 44,
-    "wall ms": 6
+    "ae re-shipped": 8,
+    "redials": 8,
+    "events": 71,
+    "wall ms": 2
    }
   },
   {
@@ -553,7 +553,7 @@
     },
     {
      "k": "wall ms",
-     "v": 3,
+     "v": 1,
      "kind": "ms"
     }
    ],
@@ -561,7 +561,7 @@
     "redials": 10,
     "writes": 1,
     "events": 48,
-    "wall ms": 5
+    "wall ms": 2
    }
   },
   {
@@ -627,21 +627,21 @@
     },
     {
      "k": "events",
-     "v": 299,
+     "v": 303,
      "kind": "count"
     },
     {
      "k": "wall ms",
-     "v": 7,
+     "v": 4,
      "kind": "ms"
     }
    ],
    "base": {
     "give-ups": 4,
-    "revives": 6,
-    "redials": 75,
-    "events": 352,
-    "wall ms": 10
+    "revives": 4,
+    "redials": 42,
+    "events": 303,
+    "wall ms": 3
    }
   },
   {
@@ -706,7 +706,7 @@
     },
     {
      "k": "wall ms",
-     "v": 19,
+     "v": 6,
      "kind": "ms"
     }
    ],
@@ -715,7 +715,194 @@
     "shed": 257,
     "ae re-shipped": 300,
     "events": 321,
-    "wall ms": 23
+    "wall ms": 6
+   }
+  },
+  {
+   "id": "eviction",
+   "title": "Eviction + rejoin — membership through real ballots",
+   "kind": "unhappy",
+   "desc": "a node cut off past every redial is evicted by joint-consensus ballot; the CP gate buffers its writes; on heal it learns its eviction, JOINs back, and its buffer flushes — M2 end-to-end",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "cut": [
+     [
+      "n01",
+      "n03"
+     ],
+     [
+      "n02",
+      "n03"
+     ]
+    ],
+    "writers": [
+     "n01",
+     "n03"
+    ],
+    "phases": [
+     {
+      "label": "view 1",
+      "sev": "info"
+     },
+     {
+      "label": "cut",
+      "sev": "crit"
+     },
+     {
+      "label": "evict ballot",
+      "sev": "warn"
+     },
+     {
+      "label": "CP buffer",
+      "sev": "gold"
+     },
+     {
+      "label": "rejoin + flush",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "views committed",
+     "v": 9,
+     "kind": "count"
+    },
+    {
+     "k": "evictions",
+     "v": 3,
+     "kind": "count"
+    },
+    {
+     "k": "joins",
+     "v": 2,
+     "kind": "count"
+    },
+    {
+     "k": "writes buffered",
+     "v": 1,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 2119,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 27,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "views committed": 9,
+    "evictions": 3,
+    "joins": 2,
+    "writes buffered": 1,
+    "events": 2119,
+    "wall ms": 33
+   }
+  },
+  {
+   "id": "split-brain",
+   "title": "Split-brain impossibility — 2-2 commits nothing",
+   "kind": "unhappy",
+   "desc": "a symmetric partition of four: neither side reaches joint majority, so NO view commits and both sides buffer under the CP gate; heal flushes both — one view, one history",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03",
+     "n04"
+    ],
+    "mesh": true,
+    "cut": [
+     [
+      "n01",
+      "n03"
+     ],
+     [
+      "n01",
+      "n04"
+     ],
+     [
+      "n02",
+      "n03"
+     ],
+     [
+      "n02",
+      "n04"
+     ]
+    ],
+    "writers": [
+     "n01",
+     "n03"
+    ],
+    "phases": [
+     {
+      "label": "view 1",
+      "sev": "info"
+     },
+     {
+      "label": "2-2 cut",
+      "sev": "crit"
+     },
+     {
+      "label": "both gate",
+      "sev": "warn"
+     },
+     {
+      "label": "heal + flush",
+      "sev": "gold"
+     },
+     {
+      "label": "one view",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "views committed",
+     "v": 0,
+     "kind": "count"
+    },
+    {
+     "k": "writes buffered",
+     "v": 2,
+     "kind": "count"
+    },
+    {
+     "k": "ae re-shipped",
+     "v": 9,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 1854,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 20,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "views committed": 0,
+    "writes buffered": 2,
+    "ae re-shipped": 9,
+    "events": 1854,
+    "wall ms": 19
    }
   },
   {
@@ -766,14 +953,14 @@
     },
     {
      "k": "wall ms",
-     "v": 5,
+     "v": 1,
      "kind": "ms"
     }
    ],
    "base": {
     "bytes/record": 73,
     "frames/burst (3 peers)": 3,
-    "wall ms": 6
+    "wall ms": 1
    }
   },
   {
@@ -842,25 +1029,25 @@
     },
     {
      "k": "events",
-     "v": 21844,
+     "v": 23436,
      "kind": "count"
     },
     {
      "k": "events/s",
-     "v": 24925,
+     "v": 112870,
      "kind": "ms"
     },
     {
      "k": "wall ms",
-     "v": 878,
+     "v": 208,
      "kind": "ms"
     }
    ],
    "base": {
     "seeds": "100/100",
-    "events": 21844,
-    "events/s": 22791,
-    "wall ms": 960
+    "events": 23436,
+    "events/s": 130076,
+    "wall ms": 180
    }
   }
  ]

@@ -27,6 +27,7 @@
 import { FrameError, VERB, encodeControl, encodeRuns, type Frame } from './codec.ts'
 import { Link, LS, dialedByLower } from './link.ts'
 import { JK, Journal } from './journal.ts'
+import { Membership } from './membership.ts'
 import { REC, TAG, type Env, type Event, type Rec } from './env.ts'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
@@ -38,6 +39,9 @@ export interface NodeOpts {
   heartbeatMs?: number   // 0 = off (EXPLICIT protocol mode, not a magic duration)
   redialMs?: number      // backoff base; cap = 32x base
   journalCap?: number    // diagnostics ring size — captures that want full-history time-travel raise it
+  //! boot record seam (plan §5 boot modes; persistence itself lands with M4's WAL): a restored view.
+  // A node booted with epoch > 0 is REJOINING — read-only until a committed view ≥ this epoch installs.
+  boot?: { epoch: number; members: [string, string][] }
 }
 
 //! Stream: per-origin ingest state — a single monotone high-water (the `applied` watermark, M0 form).
@@ -71,6 +75,9 @@ export class Node {
   // (v2 DECISIONS A, kept). Convergence then follows from per-cell LWW below.
   seq = 0
   epoch = 0
+  //! membership (M2): committed views, ballots, the write-gate. The data plane below stays open —
+  // membership gates COMMITS and majority math, never replication (an evicted node still converges).
+  membership: Membership
   streams = new Map<string, Stream>()
   //! versions: per-cell LWW stamps, lexicographic (epoch, seq, origin) — the ONE conflict-resolution rule (plan §5).
   // Cells are full key paths (field-granular); a remove leaves its stamp as a
@@ -117,7 +124,20 @@ export class Node {
     this.uuid = opts.uuid
     this.listen = opts.listen ?? ''
     this.incarnation = opts.incarnation ?? 1
+    this.membership = new Membership(opts.boot)
+    this.epoch = this.membership.view.epoch // a restored node stamps at its restored epoch, never below it
     this.#opts = opts
+  }
+
+  //! hosts — the static discovery targets (membership's genesis quorum + the revival loop read it).
+  get hosts(): string[] { return this.#opts.hosts ?? [] }
+
+  //! dialing — is a backoff chain still actively trying this target? Membership holds eviction while
+  // true: an un-exhausted dial means reachability is UNKNOWN (e.g. the pending-redial window right
+  // after a heal), and evicting then is churn a one-tick wait avoids. Give-up ends the hold.
+  dialing(to: string): boolean {
+    const b = this.#backoff.get(to)
+    return !!b && !b.gaveUp
   }
 
   //! step — the single dispatch site. Unknown event kinds fail closed (throw): an unrecognised stimulus is a harness bug, never something to guess at.
@@ -174,8 +194,15 @@ export class Node {
         }
         this.links.delete(e.link)
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
-        //! dialed links redial with jittered capped exponential backoff — EXCEPT deliberate closes (dup-link/self-reject), which would just re-create the race
-        if (link.dialed && link.to && !link.noRedial) this.#redial(link.to)
+        //! BOTH sides redial a lost peer (jittered capped backoff) — the dialer via its target, the
+        // acceptor via the peer's gossiped listen. The acceptor-side chain is what arms the eviction
+        // dialing-hold symmetrically (review: a 3-tick blip once evicted a live member from the acceptor
+        // side, which held no chain) — crossing dials collapse via the one-link-per-pair dedup as usual.
+        // Deliberate closes (dup-link/self-reject) never redial: that would just re-create the race.
+        const redialTo = link.noRedial ? '' : link.dialed ? link.to ?? '' : link.listen
+        if (redialTo) this.#redial(redialTo)
+        //! a lost member link can flip the write-gate to minority — journal the transition NOW, not at the next tick
+        if (link.state === LS.admitted) this.membership.settle(this)
         return
       }
       case 'pause': {
@@ -217,6 +244,9 @@ export class Node {
               // receiving their digest ships theirs. Nothing missing ⇒ nothing shipped (idempotent).
               this.#sendDigest(link, 1)
             }
+          //! membership acts on the heartbeat clock too (explicit protocol mode): genesis, suspicion,
+          // eviction/join ballots, stale pulls, rejoin nudges — all only when heartbeats are on.
+          this.membership.tick(this)
           //! give-up revival: a target whose final redial attempt FAILED (gaveUp — never merely "tries
           // exhausted": the last armed attempt may still be pending, and dialing over it would fork a
           // second chain) is parked, not dead — each heartbeat re-dials any parked host we hold no link
@@ -238,20 +268,14 @@ export class Node {
         return
       }
       case 'write': {
-        //! local writes and inbound records share ONE ingest path; a local write is just the stream where origin === me.
-        for (const rec of e.recs) {
-          const seq = ++this.seq
-          this.#logFor(this.uuid).push({ rec, seq, epoch: this.epoch }) // the record is OWNED from here (embedder hands it over)
-          this.#apply(rec, this.uuid, seq, this.epoch)
-          j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
-          for (const link of this.links.values())
-            //! live records flow only on SYNCED links (admitted + peer digest received): anything earlier is
-            // covered by the digest-triggered suffix ship, and sending it live would leapfrog that suffix on
-            // the wire and turn it into permanently-dropped "duplicates" at the receiver (the sweep-found bug)
-            if (link.state === LS.admitted && link.synced)
-              link.add(rec, { origin: this.uuid, baseSeq: seq, epoch: this.epoch })
+        //! the write-gate (M2, plan §5: CP — majority-of-committed-view): a gated write BUFFERS
+        // (bounded drop-oldest, surfaced) and flushes through this same path when the gate opens,
+        // stamping at the THEN-current epoch (the plan's knowing-overwrite rule).
+        if (!this.membership.gate(this).open) {
+          this.membership.buffer(this, e.recs)
+          return
         }
-        for (const link of this.links.values()) link.flush(this.env.sink, j)
+        this.#commit(e.recs)
         return
       }
       default: {
@@ -259,6 +283,35 @@ export class Node {
         throw new Error(`unknown event ${(never as { kind: string }).kind}`)
       }
     }
+  }
+
+  //! #commit — the write path proper: stamp, log, apply, broadcast. Local writes and inbound records
+  // share ONE ingest shape; a local write is just the stream where origin === me.
+  #commit(recs: Rec[]) {
+    const j = this.journal
+    for (const rec of recs) {
+      const seq = ++this.seq
+      this.#logFor(this.uuid).push({ rec, seq, epoch: this.epoch }) // the record is OWNED from here (embedder hands it over)
+      this.#apply(rec, this.uuid, seq, this.epoch)
+      j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
+      for (const link of this.links.values())
+        //! live records flow only on SYNCED links (admitted + peer digest received): anything earlier is
+        // covered by the digest-triggered suffix ship, and sending it live would leapfrog that suffix on
+        // the wire and turn it into permanently-dropped "duplicates" at the receiver (the sweep-found bug)
+        if (link.state === LS.admitted && link.synced)
+          link.add(rec, { origin: this.uuid, baseSeq: seq, epoch: this.epoch })
+    }
+    for (const link of this.links.values()) link.flush(this.env.sink, j)
+  }
+
+  //! flushPending — the gate reopened: buffered writes re-enter the NORMAL commit path, in order,
+  // stamped at the current (higher) epoch. Called by membership.settle, never re-entrantly (settle
+  // only calls it when the gate is open, and #commit never touches the gate).
+  flushPending() {
+    const batches = this.membership.pending
+    if (!batches.length) return
+    this.membership.pending = []
+    for (const recs of batches) this.#commit(recs as Rec[])
   }
 
   #armHeartbeat() {
@@ -332,12 +385,22 @@ export class Node {
         link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
         link.state = LS.admitted
         this.byUuid.set(v.u, link.id)
-        if (link.to) this.#backoff.delete(link.to) // successful identify resets the redial backoff
+        //! successful identify resets the redial backoff — by OUR dial target AND by the peer's gossiped
+        // listen: when the peer dialed us while our own chain to it was mid-backoff (or a dup-race left
+        // our dialed link the loser), the listen-keyed entry would otherwise orphan with gaveUp unset,
+        // reporting dialing() forever and permanently holding eviction (review finding)
+        if (link.to) this.#backoff.delete(link.to)
+        if (v.l) this.#backoff.delete(v.l)
         j.armed && j.emit(JK.identified, link.id, v.u, v.i)
         //! digest-on-admit, from BOTH ends (direction-independent — v2's dialer-gated catch-up trap is the
         // counterexample this rule exists for): each side announces what it holds; the peer ships the missing
         // suffixes. Every admit heals — first link, keeper-after-dup-race, reconnect-after-heal.
         this.#sendDigest(link, 1)
+        //! view-on-admit (symmetric with digest-on-admit): announce the committed view so a healed peer's
+        // membership converges even when no epoch-stamped records flow; then settle — an admitted member
+        // can flip the gate back to majority, flushing any parked writes
+        this.membership.onAdmit(this, link)
+        this.membership.settle(this)
         return
       }
       case VERB.RECORDS: {
@@ -354,6 +417,9 @@ export class Node {
           j.armed && j.emit(JK.frameDrop, link.id, 'records without prov')
           return
         }
+        //! the epoch-staleness contract (plan §5): a record stamped above my committed view epoch is
+        // evidence of a view I missed — close the gate NOW and pull the view on this same link
+        if (prov.epoch > this.epoch) this.membership.staleObserved(this, prov.epoch, link)
         for (const rv of f.records()) this.#ingest(rv.origin, rv.seq, rv.epoch, rv)
         return
       }
@@ -402,6 +468,29 @@ export class Node {
         if (v.r === 1) this.#sendDigest(link, 0)
         return
       }
+      //! M2 membership control plane — identity-before-membership: all five verbs require admission,
+      // like DIGEST (a pre-admission membership frame is a protocol violation → close). Handlers live
+      // in kernel/membership.ts; settle() runs after each so gate transitions journal and buffered
+      // writes flush the moment a frame opens the gate.
+      case VERB.JOIN:
+      case VERB.PROPOSE:
+      case VERB.VOTE:
+      case VERB.VIEW:
+      case VERB.PULL: {
+        if (link.state !== LS.admitted) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'membership before hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'membership-before-hello')
+        }
+        const v = f.value as Record<string, unknown>
+        if (f.verb === VERB.JOIN) this.membership.onJoin(this, link, v)
+        else if (f.verb === VERB.PROPOSE) this.membership.onPropose(this, link, v)
+        else if (f.verb === VERB.VOTE) this.membership.onVote(this, link, v)
+        else if (f.verb === VERB.VIEW) this.membership.onView(this, link, v)
+        else this.membership.onPull(this, link, v)
+        this.membership.settle(this)
+        return
+      }
       default:
         j.armed && j.emit(JK.frameDrop, link.id, `unknown verb ${f.verb}`)
         return // drop the frame, keep the link — an unknown verb from a newer peer is not a wire fault
@@ -414,6 +503,14 @@ export class Node {
   // buffer to bound, drain, or leak. (A record that lost its LWW election still
   // advances `seen` — losing an election is not loss; v2's B1 lesson, kept.)
   #ingest(origin: string, seq: number, epoch: number, rv: { rec(): Rec }) {
+    //! a node NEVER ingests its own origin: its log is authoritative and complete for itself by
+    // construction (every local write appends at #commit). Without this guard, a peer echoing our
+    // records back — reachable via a digest-snapshot race: our digest said "holding nothing" an
+    // instant before our first write — passes the high-water check (local writes never advance our
+    // OWN stream watermark) and appends a DUPLICATE entry out of order. A non-ascending log breaks
+    // the AE suffix-slicer's walk, leaving an interior record no digest can ever re-ship (5-node
+    // sweep seed 79: a permanently missing cell three hops downstream).
+    if (origin === this.uuid) { this.journal.armed && this.journal.emit(JK.dupDrop, origin, seq); return }
     //! Lamport merge-up happens on RECEIPT (even for records that lose LWW) —
     // the clock tracks everything observed, which is what makes the next local write causally newest.
     if (seq > this.seq) this.seq = seq
@@ -474,9 +571,12 @@ export class Node {
   get stateHash(): number { return this.#hash | 0 }
 
   //! admitted — identified peer uuids (harness predicate: cluster formed ⇔ everyone admits everyone).
+  // Dead links are EXCLUDED even before their linkDown echo: a dup-race loser is marked dead
+  // synchronously, and counting it double-counted its uuid in genesis membership (review finding —
+  // a committed view with a duplicated member permanently poisons majority arithmetic).
   admitted(): string[] {
     const out: string[] = []
-    for (const l of this.links.values()) if (l.state === LS.admitted) out.push(l.uuid)
+    for (const l of this.links.values()) if (l.state === LS.admitted && !l.dead) out.push(l.uuid)
     return out
   }
 

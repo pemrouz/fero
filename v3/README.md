@@ -1,4 +1,4 @@
-# fero v3 — M0 + the M1 replication slice + the debug tool
+# fero v3 — M0 + M1 replication + M2 membership + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -116,11 +116,12 @@ above are the post-fix numbers, under the strictly harder racing workload.
 
 ```
 kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.test.ts enforces it)
-  env.ts      Event/EffectSink/Env — the ONLY doorway to the world
-  codec.ts    checksummed binary frames; ONE bounds-checked Cursor; streaming Outbox; lazy RecordViews
-  link.ts     identity-before-admission; one logical link per pair; bounded backpressure queue
-  node.ts     step(event) → effects; Lamport clock; per-cell LWW; per-origin high-water dedup
-  journal.ts  the one typed diagnostics ring (drop-oldest, surfaced drop counter)
+  env.ts        Event/EffectSink/Env — the ONLY doorway to the world
+  codec.ts      checksummed binary frames; ONE bounds-checked Cursor; streaming Outbox; lazy RecordViews
+  link.ts       identity-before-admission; one logical link per pair; bounded backpressure queue
+  node.ts       step(event) → effects; Lamport clock; per-cell LWW; per-origin high-water dedup
+  membership.ts committed views, joint-consensus ballots, the CP write-gate, epoch-stale + boot modes (M2)
+  journal.ts    the one typed diagnostics ring (drop-oldest, surfaced drop counter)
 shell/    production adapters (TCP + timers), zero protocol decisions, ~150 lines
 sim/      the executive: virtual time, seeded faults (FIFO-clamped), per-event monitors, sweep CLI
 tests/    Tier-3 real-socket smoke (the only wall-clock tier)
@@ -195,9 +196,52 @@ because state is a deterministic fold of the journal'd inputs.
   mode) keeps trajectories quiescent and byte-identical. There is deliberately
   NO per-frame drop fault in the sim: TCP cannot drop mid-stream on a live link,
   and modelling it would demand interior-gap healing no real shell needs.
-- **Membership/epochs beyond the wire field (M2)** — heartbeats PING/PONG and
-  journal, but no suspect/evict action yet. The `epoch` field already rides every
-  frame and every LWW cell so M2 lands without a wire change.
+- **M2 membership is LIVE** (kernel/membership.ts): committed views with
+  joint-consensus ballots (majority of BOTH old and new sets; at most one view
+  per epoch — a per-event sim monitor, not a hope). Ballot identity survived its
+  own adversarial review: a vote is (epoch, proposer, members-hash), enforced at
+  the grant site AND the propose site (the review's critical: proposing once
+  self-voted a vote already granted elsewhere — two views committed for one
+  epoch under an honest schedule; the review's own deterministic repro now runs
+  0 violations), re-grants to the same proposer are idempotent (a lost VOTE
+  frame heals on re-offer instead of burning the epoch), aged-out proposals
+  release the epoch, and every proposal path runs single-proposer discipline
+  (lowest live member; JOINs relay one hop). Suspicion → eviction through the
+  real propose path (held while a dial chain is still trying — give-up ends the
+  hold; BOTH sides run chains now, so acceptor-side blips hold too), the CP
+  write-gate (minority buffers into ONE bounded drop-oldest queue, flushes at
+  the then-current epoch), the epoch-staleness contract (targeted VIEW pull,
+  bounded retries, ALARMED release — never a silent wedge), view propagation by
+  install-time FLOOD + view-on-admit (a detached evictee learns its fate from
+  ANY member), reachability-gated re-joins (a proposer never re-admits a joiner
+  it cannot reach — a persistent asymmetric cut stabilizes as CP read-only
+  instead of churning epochs), membership frames fully shape-validated (a
+  crc-valid garbage VIEW once crashed the node), and boot modes (a restored
+  node is read-only until a live peer confirms its view — or, full-cluster
+  restart, the lowest restored member self-ballots the restored view). Epoch 0
+  is the OPEN genesis — exactly the M0/M1 behaviour until the first view
+  commits — and everything membership does rides the heartbeat clock, so
+  `heartbeatMs: 0` sweeps never enter it. The data plane stays open by design:
+  membership gates COMMITS and majority math, never replication — an evicted
+  node still converges, its stale-epoch stamps just lose LWW. v2's V1d
+  divergence class is a sim MUTATION test: a deliberately-broken self-fencing
+  build diverges and the harness catches it; the real kernel runs the same
+  trajectory green.
+- **The sweeps kept earning it during M2:** widening to 5-node topologies caught
+  a LATENT M1 bug (seed 79) — a digest-snapshot race echoed a node's own
+  records back, self-ingest passed the high-water (local writes never advanced
+  the own-stream watermark), and the resulting non-ascending log silently broke
+  the AE suffix walk, stranding one record forever. Fixed with the missing
+  invariant (a node never ingests its own origin) + a per-event log-monotone
+  monitor so the whole class now fails at the poisoning event. 2,500 seeds
+  across 3/4/5-node topologies green.
+- **M2 debts (stated):** votedFor/committed-view are not yet durable (a
+  crash-restart inside one ballot round could double-vote — M4's boot record
+  closes it); suspicion keys off link liveness, not PONG timeouts (a hung-but-
+  connected process needs M4's real-time faults to model); genesis requires one
+  full formation of the configured hosts; a healed evictee may flush its buffer
+  at its stale epoch in the admit-to-VIEW window (records converge via LWW —
+  M3's attemptEpoch NACK turns this into a proper reject/re-stamp).
 - **Owner routing, cid dedup, the guarantee ladder (M3-M4); storage/WAL (M4); the
   public `fero(name, opts)` API over `$()` proxies (M5).**
 - **Not yet verified (tracked, per plan §7/§11):** the zero-alloc claim is

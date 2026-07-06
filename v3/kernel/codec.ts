@@ -36,9 +36,15 @@ export const MAGIC = 0xf3
 export const MAX_FRAME = 1 << 28 // 256 MiB
 export const HEADER = 11
 
-//! VERB: dense 1-byte frame verbs. WRITE/CALL/... are reserved for M2+ — the codec fails closed on unknowns at dispatch, not here.
+//! VERB: dense 1-byte frame verbs, append-only. The codec fails closed on unknowns at dispatch, not here.
 // DIGEST carries {d: {origin: highestHeldSeq}, r: 0|1} — "here is what I hold; r=1 means please answer with yours".
-export const VERB = { HELLO: 1, RECORDS: 2, PING: 3, PONG: 4, DIGEST: 5 } as const
+// M2 membership control plane: JOIN {u,i,l} asks a member to propose the sender in; PROPOSE {e,m,p} /
+// VOTE {e,g,ce} are the joint-consensus ballot legs; VIEW {e,m} announces (or answers a PULL {e} with)
+// a committed view.
+export const VERB = {
+  HELLO: 1, RECORDS: 2, PING: 3, PONG: 4, DIGEST: 5,
+  JOIN: 6, PROPOSE: 7, VOTE: 8, VIEW: 9, PULL: 10,
+} as const
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.
 export const FLAG_PROV = 1

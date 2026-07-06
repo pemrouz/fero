@@ -20,6 +20,10 @@ export const captureNode = (node: Node) => ({
   listen: node.listen,
   seq: node.seq,     // Lamport clock — the node's own next-write stamp
   epoch: node.epoch,
+  //! M2 membership facts: the committed view, the write-gate verdict, and any parked writes
+  view: { epoch: node.membership.view.epoch, members: node.membership.view.members.map((m) => m[0]) },
+  gate: (() => { const g = node.membership.gate(node); return g.open ? 'open' : g.reason })(),
+  pendingWrites: node.membership.pending.length,
   stateHash: node.stateHash,
   dropped: node.journal.dropped,
   journal: node.journal.read(0),

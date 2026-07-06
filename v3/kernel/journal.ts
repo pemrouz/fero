@@ -44,6 +44,19 @@ export const JK = {
   digestIn: 22,   // a=link — received a peer digest
   aeShip: 23,     // a=peerUuid, b=records — anti-entropy shipped the suffixes the peer's digest showed missing
   revive: 24,     // a=to — the heartbeat floor revived a given-up dial target (give-up is a cool-down, not death)
+  //! ── M2 membership vocabulary (views, ballots, the write-gate) ──
+  suspect: 25,       // a=uuid — a committed-view member unreachable SUSPECT_TICKS consecutive ticks
+  propose: 26,       // a=epoch, b=memberCount — this node proposed a view ballot
+  vote: 27,          // a=epoch, b=granted(0|1), c=proposer — this node answered a ballot
+  viewInstall: 28,   // a=epoch, b=memberCount — a view became committed fact here
+  epochStale: 29,    // a=observedEpoch — evidence of a higher committed view; the write-gate closes
+  gateClose: 30,     // a=reason ('stale-epoch'|'rejoining'|'evicted'|'minority')
+  gateOpen: 31,
+  gateAlarm: 32,     // a=wantedEpoch — pull retries exhausted; gate RELEASED with this alarm (named, never silent)
+  writeBuffered: 33, // a=queueDepth — a gated write parked in the bounded pending buffer
+  writeBufferDrop: 34, // a=totalDropped — pending overflow dropped the oldest batch (surfaced loss)
+  join: 35,          // a=uuid — a JOIN request sent (a=self) or received (a=joiner)
+  evict: 36,         // a=uuid — this member left the committed view at install
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).
