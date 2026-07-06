@@ -20,7 +20,7 @@
 // journal-visible). Backpressure states: flowing → paused (env said the socket
 // buffer filled) → flowing on drain.
 
-import { Framer, Outbox, VERB, type Prov } from './codec.ts'
+import { Framer, Outbox, VERB, type AttemptRun, type Prov } from './codec.ts'
 import { JK, type Journal } from './journal.ts'
 import type { EffectSink } from './env.ts'
 
@@ -62,9 +62,11 @@ export class Link {
   to?: string
   constructor(id: number, dialed: boolean, to?: string) { this.id = id; this.dialed = dialed; this.to = to }
 
-  //! addRecord: append to the step's RECORDS frame, opening it with this step's provenance run on first use.
-  add(rec: Parameters<Outbox['add']>[0], prov: Prov) {
-    if (!this.outbox.open) this.outbox.begin(VERB.RECORDS, prov)
+  //! addRecord: append to the step's RECORDS frame, opening it with this run's provenance (and, for
+  // committed attempt runs, its attempt identity) on first use. Callers guarantee run continuity: one
+  // commit batch = one contiguous (seq, cid) run, flushed before the next batch opens.
+  add(rec: Parameters<Outbox['add']>[0], prov: Prov, attempt?: AttemptRun) {
+    if (!this.outbox.open) this.outbox.begin(VERB.RECORDS, prov, attempt)
     this.outbox.add(rec)
   }
 

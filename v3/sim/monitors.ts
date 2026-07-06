@@ -7,8 +7,9 @@
 // exactly-R at M6) — the monitor list is the machine-checkable form of the
 // plan's semantics section.
 
-import { stable } from '../kernel/node.ts'
+import { Node, stable } from '../kernel/node.ts'
 import { MAX_QUEUED } from '../kernel/link.ts'
+import { partitionOf } from '../kernel/env.ts'
 import type { Sim } from './exec.ts'
 
 //! perEvent — invariants that must hold at every instant, checked after every event.
@@ -68,38 +69,116 @@ export const perEvent = () => [
     //! per-origin LOGS are strictly seq-ascending — the structural invariant the AE suffix-slicer's
     // tail walk depends on. Checked incrementally (only appended tails), so it names the exact event
     // that poisoned a log (seed-79 regression: a self-echo append made a log non-monotone and an
-    // interior record became permanently unshippable).
+    // interior record became permanently unshippable). The cursor is keyed to the NODE OBJECT: a sim
+    // restart (sim.add replacing a node) resets the scan, or a stale cursor would silently skip the
+    // reborn node's early entries (adversarial-review monitor-blindness finding).
     name: 'log-monotone',
     check: (() => {
-      const tail = new Map<string, { len: number; seq: number }>()
+      const tail = new Map<string, { node: Node; len: number }>()
       return (sim: Sim): string | null => {
         for (const [id, n] of sim.nodes)
           for (const [origin, entries] of n.logs) {
             const k = id + '|' + origin
-            const prev = tail.get(k) ?? { len: 0, seq: 0 }
+            let prev = tail.get(k)
+            if (!prev || prev.node !== n) prev = { node: n, len: 0 }
             if (entries.length > prev.len) {
               for (let i = Math.max(prev.len, 1); i < entries.length; i++)
                 if (entries[i].seq <= entries[i - 1].seq)
                   return `${id} log[${origin}] non-ascending at ${i}: ${entries[i].seq} after ${entries[i - 1].seq}`
-              tail.set(k, { len: entries.length, seq: entries[entries.length - 1].seq })
+              prev.len = entries.length
             }
+            tail.set(k, prev)
           }
         return null
       }
     })(),
   },
   {
-    //! per-origin applied watermarks are monotone by construction — a regression here means dup/dedup broke
+    //! M3's headline invariant (the plan's single-writer monitor, v2 DECISIONS AA made structural):
+    // for any (partition, epoch>0), at most ONE origin ever stamps a record — every AA conflict source
+    // was some node stamping a partition it didn't solely own. Epoch 0 is exempt BY DESIGN (open
+    // genesis is multi-writer LWW). Incremental over appended log tails, like log-monotone; checked
+    // across ALL nodes' logs so a violation is caught wherever the colliding record first lands. The
+    // cursor is keyed to the NODE OBJECT so a sim restart rescans from 0 (a stale cursor would blind
+    // the monitor exactly around the AA #4 restart shape it exists to police).
+    name: 'single-writer',
+    check: (() => {
+      const owner = new Map<string, string>()
+      const tail = new Map<string, { node: Node; len: number }>()
+      return (sim: Sim): string | null => {
+        for (const [id, n] of sim.nodes)
+          for (const [origin, entries] of n.logs) {
+            const k = id + '|' + origin
+            let prev = tail.get(k)
+            if (!prev || prev.node !== n) prev = { node: n, len: 0 }
+            if (entries.length > prev.len) {
+              for (let i = prev.len; i < entries.length; i++) {
+                const e = entries[i]
+                if (e.epoch === 0) continue
+                const pk = partitionOf(e.rec) + '|' + e.epoch
+                const held = owner.get(pk)
+                if (held === undefined) owner.set(pk, origin)
+                else if (held !== origin)
+                  return `TWO origins stamped partition '${partitionOf(e.rec)}' at epoch ${e.epoch}: ${held} and ${origin} (seen at ${id})`
+              }
+              prev.len = entries.length
+            }
+            tail.set(k, prev)
+          }
+        return null
+      }
+    })(),
+  },
+  {
+    //! attempt-exactly-once — invariant 2 pinned DIRECTLY: one (issuer, cid) commits at most one
+    // distinct (origin, seq, epoch) anywhere in the cluster. Attempt identity rides committed records
+    // (FLAG_ATTEMPT) precisely so this is checkable — the adversarial review's critical (a retry
+    // crossing an ownership move re-committed, resurrecting a stale value over a newer write) is a
+    // violation HERE at the re-committing event, even though single-writer (per-epoch) cannot see it.
+    name: 'attempt-exactly-once',
+    check: (() => {
+      const committed = new Map<string, string>()
+      const tail = new Map<string, { node: Node; len: number }>()
+      return (sim: Sim): string | null => {
+        for (const [id, n] of sim.nodes)
+          for (const [origin, entries] of n.logs) {
+            const k = id + '|' + origin
+            let prev = tail.get(k)
+            if (!prev || prev.node !== n) prev = { node: n, len: 0 }
+            if (entries.length > prev.len) {
+              for (let i = prev.len; i < entries.length; i++) {
+                const e = entries[i]
+                if (e.iss === undefined) continue
+                const ak = e.iss + '|' + e.cid
+                const at = origin + '|' + e.seq + '|' + e.epoch
+                const held = committed.get(ak)
+                if (held === undefined) committed.set(ak, at)
+                else if (held !== at)
+                  return `attempt ${ak} committed TWICE: ${held} and ${at} (seen at ${id})`
+              }
+              prev.len = entries.length
+            }
+            tail.set(k, prev)
+          }
+        return null
+      }
+    })(),
+  },
+  {
+    //! per-origin applied watermarks are monotone by construction — a regression here means dup/dedup
+    // broke. Keyed to the node OBJECT: a restarted node legitimately restarts its watermarks from 0.
     name: 'watermark-monotone',
     check: (() => {
-      const last = new Map<string, number>()
+      const last = new Map<string, { node: Node; seen: number }>()
       return (sim: Sim): string | null => {
         for (const [id, n] of sim.nodes)
           for (const [origin, s] of n.streams) {
             const k = id + '|' + origin
-            const prev = last.get(k) ?? 0
-            if (s.seen < prev) return `${id} stream ${origin} watermark went backwards: ${s.seen} < ${prev}`
-            last.set(k, s.seen)
+            let prev = last.get(k)
+            if (!prev || prev.node !== n) prev = { node: n, seen: 0 }
+            if (s.seen < prev.seen) return `${id} stream ${origin} watermark went backwards: ${s.seen} < ${prev.seen}`
+            prev.seen = s.seen
+            last.set(k, prev)
           }
         return null
       }

@@ -1,19 +1,22 @@
-# fero v3 — M0 + M1 replication + M2 membership + the debug tool
+# fero v3 — M0 + M1 replication + M2 membership + M3 write pipeline + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
 proven **both ways from the same kernel bytes**), the **M1 replication slice**
 (per-cell LWW + Lamport clock + per-origin logs + digest anti-entropy, so tail loss
-from partitions, dial races, and backpressure overflow all HEAL), and the **debug
-tool** (capture → typed model → viewer with time-travel replay, plus a live mode) —
-each piece pulled forward exactly when a seed sweep or review demanded it, which is
-the architecture working as designed.
+from partitions, dial races, and backpressure overflow all HEAL), **M2 membership**
+(committed views by joint-consensus ballot + the CP write-gate), the **M3 write
+pipeline** (ring ownership over the committed view, forwarded attempts with cid
+dedup + typed NACKs — the single-writer invariant v2 spent DECISIONS AA chasing,
+now a per-event monitor), and the **debug tool** (capture → typed model → viewer
+with time-travel replay, plus a live mode) — each piece pulled forward exactly when
+a seed sweep or review demanded it, which is the architecture working as designed.
 
 ## Run it
 
 ```sh
-npm test                       # 53 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps, Tier-3 real-TCP smoke, debug-model + scenario suites
-npm run perf                   # 7 perf gates: counted invariants first, ratios second, absolutes last
+npm test                       # 121 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + the AA fault schedules, Tier-3 real-TCP smoke, debug-model + scenario suites
+npm run perf                   # 14 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
 npm run debug                  # scenario DASHBOARD at /, the debugger at /debug (http://localhost:4699)
@@ -91,26 +94,67 @@ into it:
   minimal — `/capture.json` rebuilds a truthful snapshot from a running in-process
   cluster ON REQUEST (no relay buffer with its own cadence to lie about, v2's
   10%-temporal-coverage bug class). The viewer polls; sim captures and live
-  clusters are the same format in the same tool. Live traffic is OWNER-ROUTED
-  (one writer per key — the M3 routing rule applied at the workload layer), so
-  the steady state shows zero contention, which is the design intent;
-  `--contend` opts into a conflicting workload to demo the LWW machinery.
+  clusters are the same format in the same tool. Live traffic lands on
+  workload-picked nodes and — once the genesis ballot commits (~2s in) — the
+  KERNEL owner-routes every write to its ring owner, so the steady state shows
+  zero contention by construction. `--contend` posts random-origin writes to a
+  shared key set: it demos real LWW elections in the pre-genesis open window,
+  after which the pipeline serializes even a deliberately conflicting workload
+  through one sequencer — which is the M3 story on one screen.
 
 ## Adversarially reviewed
 
-After the suite first went green, a 55-agent review (five lenses → dedup → two
-independent refuters per finding, confirmation requiring unanimous survival) was
-run against this code. 21 findings survived and ALL are fixed, including: a
-**dial-race write-loss window** (a write flushed only on the link that then lost
-the one-link-per-pair dedup died with it — confirmed with a seeded repro; fixed by
-replay-on-admit: the own-write log is the retransmit buffer, which also removed
-the form-first workload restriction), an **uncaught lazy-decode FrameError** (one
-crc-valid hostile frame could crash the node), **crc coverage extended over the
-header** (a verb flip used to re-dispatch RECORDS as PING silently), a
-`__proto__` decode corruption, a sim zombie-link race (partition during an
-in-flight dial), shell socket/listener leaks, a bypassable purity lint, and a
-tautological monitor. The test count went 30 → 39 in the process; the sweeps
-above are the post-fix numbers, under the strictly harder racing workload.
+Each milestone gets an adversarial multi-agent review after its suite goes green
+(N lenses → dedup → two independent refuters per finding, confirmation requiring
+survival). The pattern has paid for itself every time.
+
+**M0/M1:** 21 findings, all fixed — a **dial-race write-loss window** (a write
+flushed only on the link that then lost the one-link-per-pair dedup died with it;
+fixed by replay-on-admit: the own-write log is the retransmit buffer), an
+**uncaught lazy-decode FrameError** (one crc-valid hostile frame could crash the
+node), **crc coverage extended over the header** (a verb flip re-dispatched
+RECORDS as PING silently), a `__proto__` decode corruption, a sim zombie-link
+race, shell socket/listener leaks, a bypassable purity lint, a tautological
+monitor.
+
+**M2:** the headline was a genuine critical — the propose path could double-vote,
+committing **two views for one epoch** under an honest schedule (1,514 monitor
+violations in the review's own repro); fixed by ballot identity
+`(epoch, proposer, members-hash)` enforced at grant AND propose sites, now 0
+violations. Widening the sweep to 5 nodes also surfaced a latent M1 self-echo
+log-poisoning bug (seed 79), fixed with the never-ingest-own-origin invariant + a
+log-monotone monitor.
+
+**M3:** a 6-lens / 50-agent review returned 11 confirmed (2 critical), all fixed:
+- **Cross-owner exactly-once (critical).** The cid-dedup window was per-node, so a
+  retry after an ownership move hit a new owner with no memory of the cid and
+  re-committed — resurrecting a stale value OVER a newer acknowledged write (a
+  silent lost update the per-epoch single-writer monitor couldn't see). Fixed by
+  making committed forwarded runs **broadcast their attempt identity**
+  (FLAG_ATTEMPT: issuer + contiguous cids); replication feeds every node's dedup
+  window and doubles as an ACK (a replicated record carrying our issuer clears the
+  pending attempt — a lost WACK self-heals via the data path). A new
+  **attempt-exactly-once** per-event monitor watches the whole class directly, at
+  the re-committing event.
+- **Unbounded decode recursion (critical).** A deeply-nested hostile value threw a
+  RangeError — not a FrameError — escaping the frame net and crashing the node.
+  Fixed with a symmetric MAX_DEPTH cap on encode, decode, and skip.
+- **NACK storm (major).** A same-epoch `withheld` NACK re-forwarded instantly via
+  settle→flush, spinning at line rate against a minority owner. Same-epoch NACKs
+  now re-park onto the RETRY_TICKS clock; only a NACK revealing a newer view (fresh
+  routing state) re-drives immediately.
+- **Spoofable ACK/NACK (major).** Any admitted link could clear or re-drive another
+  node's route with a well-formed control frame. ACK/NACK are now bound to the
+  **owner of record** (the forward target).
+- Plus: relay ACKs re-batched (one WACK in → one WACK out, not n frames + n allocs),
+  a view-learned member whose dial chain gave up is now revived (was parked forever,
+  stranding attempts owner-routed to it), dedup lanes bounded by MAX_ISSUERS, the
+  drain no-ops when nothing is parked (a `#queued` counter), per-event monitor
+  cursors keyed to the node object (a sim restart rescans instead of blinding the
+  monitor), and encodeControl/encodeRuns reuse module scratch instead of a fresh 4KB
+  Writer per control frame. Seven more findings were refuted on inspection; four
+  "contested" perf/observability notes were addressed anyway. The test count went
+  110 → 121; every fix has a mutation-killer pin.
 
 ## Layout
 
@@ -119,8 +163,10 @@ kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.
   env.ts        Event/EffectSink/Env — the ONLY doorway to the world
   codec.ts      checksummed binary frames; ONE bounds-checked Cursor; streaming Outbox; lazy RecordViews
   link.ts       identity-before-admission; one logical link per pair; bounded backpressure queue
-  node.ts       step(event) → effects; Lamport clock; per-cell LWW; per-origin high-water dedup
+  node.ts       step(event) → effects; Lamport clock; per-cell LWW; the ONE stamp site (commit)
   membership.ts committed views, joint-consensus ballots, the CP write-gate, epoch-stale + boot modes (M2)
+  ring.ts       vnode hashring — allocation-free ownerOf(), a pure function of the committed view (M3)
+  write.ts      THE single write ingress: local/forwarded/inbound sources, cid dedup, typed NACKs, the ONE pending queue (M3)
   journal.ts    the one typed diagnostics ring (drop-oldest, surfaced drop counter)
 shell/    production adapters (TCP + timers), zero protocol decisions, ~150 lines
 sim/      the executive: virtual time, seeded faults (FIFO-clamped), per-event monitors, sweep CLI
@@ -235,15 +281,70 @@ because state is a deterministic fold of the journal'd inputs.
   invariant (a node never ingests its own origin) + a per-event log-monotone
   monitor so the whole class now fails at the poisoning event. 2,500 seeds
   across 3/4/5-node topologies green.
+- **M3 the write pipeline is LIVE** (kernel/write.ts + kernel/ring.ts): every
+  record enters through ONE ingress — source local (a 'write' event mints an
+  Attempt {cid, attemptEpoch, issuer} and commits here or FORWARDS to the ring
+  owner), forwarded (the owner cid-dedups then VALIDATES: owns-at-my-epoch +
+  attemptEpoch === my epoch + gate open, else a typed WNACK {not-owner |
+  stale-epoch | withheld, ce}), inbound (M1's replication ingest, moved
+  verbatim), replay (the M4 seam, named now). The ring is a pure function of
+  the committed view (two parallel typed arrays, allocation-free `ownerOf`), so
+  one-view-per-epoch (M2's monitor) makes single-writer-per-(partition, epoch)
+  STRUCTURAL — and that is now a per-event sim monitor of its own. All four of
+  v2's DECISIONS-AA conflict sources run as named fault schedules
+  (sim/write.test.ts): the never-drop fallback is DELETED (lost-ACK retries
+  dedup by cid at the owner and the duplicate ACK re-carries the ORIGINAL
+  commit coordinates — exactly-once at the commit site), un-validated
+  commitForwarded is inverted (owner validation, with the install window also
+  squeezed shut structurally: FIFO links + install-flood + view-on-admit + the
+  minority gate — four independent guards a five-construction fault hunt could
+  not beat), the flush re-stamp is unrepresentable (parked attempts re-resolve
+  OWNERSHIP at the flush boundary and forward; attemptEpoch is re-stamped ONLY
+  at issuer/flush boundaries, and a purity-suite lint pins node.commit's sole
+  caller), and the restore-boot collision dies in M2's rejoining read-only mode
+  (its parked writes owner-route at the merged epoch). The AA#3 mutant — a
+  v2-shaped local flush — is CAUGHT by the single-writer monitor (the V1d
+  pattern applied to M3). The client relay rule is in the kernel now:
+  attemptEpoch 0 marks a client attempt; the first server re-stamps at relay
+  time, keeps the CLIENT as the cid-dedup issuer, and routes the ACK back on
+  the arriving link. The ONE bounded pending queue (drop-oldest, surfaced)
+  replaced M2's buffer — gate-closed, owner-unreachable, NACKed, and
+  awaiting-ACK attempts are all the same parked work, re-driven at flush
+  boundaries and the heartbeat retry clock. Epoch 0 remains the OPEN fast path:
+  byte-identical M0/M1 trajectories (the 3-node sweep produces the exact same
+  237,451 events as pre-M3), zero attempt machinery below genesis (a counted
+  perf pin). Hot-partition ceiling measured on this box: **~125-134k forwarded
+  records/s through one owner** (kernel/write.perf.ts prints it; WSL2 swings
+  2-3x — the counted invariants are the durable claims: one WRITE frame per
+  batch per owner, one WACK per run).
 - **M2 debts (stated):** votedFor/committed-view are not yet durable (a
   crash-restart inside one ballot round could double-vote — M4's boot record
   closes it); suspicion keys off link liveness, not PONG timeouts (a hung-but-
   connected process needs M4's real-time faults to model); genesis requires one
-  full formation of the configured hosts; a healed evictee may flush its buffer
-  at its stale epoch in the admit-to-VIEW window (records converge via LWW —
-  M3's attemptEpoch NACK turns this into a proper reject/re-stamp).
-- **Owner routing, cid dedup, the guarantee ladder (M3-M4); storage/WAL (M4); the
-  public `fero(name, opts)` API over `$()` proxies (M5).**
+  full formation of the configured hosts. ~~A healed evictee may flush at its
+  stale epoch~~ — closed by M3: the flush re-resolves ownership and the owner
+  validates attemptEpoch (typed NACK, re-stamp at the issuer boundary, retry).
+- **M3 debts (stated):** owner-side dedup is an EXACT bounded window
+  (DEDUP_KEEP=1024 committed cids per issuer with original coordinates), not
+  the plan's high-water + out-of-order set — per-owner cid streams have
+  legitimate permanent gaps (cids interleave across partitions and ownership
+  moves between epochs), so a high-water test would FALSELY eat first
+  deliveries. Attempt identity now rides committed records so the window is fed
+  by replication cluster-wide (a retry after an ownership move dedups instead of
+  re-committing); the remaining residual is narrow — a retry that outraces the
+  ORIGINAL commit's replication to the new owner re-commits as a same-value
+  higher-stamp LWW supersede (harmless for idempotent records; M4's confirm
+  ladder closes it, since a confirmed write implies the new owner holds the
+  stream, and M5's non-idempotent methods will size the window against the retry
+  horizon). Dedup LANES themselves are bounded (MAX_ISSUERS=1024, oldest-
+  evicted, journal-surfaced) so a client churn can't grow kernel memory
+  forever. The issuer cid counter is volatile until M4's boot record; the issuer
+  string embeds the incarnation (uuid~inc) so a restart opens a fresh dedup lane
+  instead of aliasing its predecessor's cids. Pending overflow drops the OLDEST
+  attempt (journal-surfaced) — under sustained gate-closed writes beyond
+  MAX_PENDING=1024 that is real, counted loss.
+- **The guarantee ladder / confirm (M4); storage/WAL (M4); the public
+  `fero(name, opts)` API over `$()` proxies + the client cid-overlay (M5).**
 - **Not yet verified (tracked, per plan §7/§11):** the zero-alloc claim is
   structural (method-per-kind sink), not yet counter-verified (--expose-gc heap
   deltas are an M8 pinned-runner deliverable). The replay-refold check HAS landed

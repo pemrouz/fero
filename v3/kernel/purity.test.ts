@@ -72,6 +72,18 @@ test('kernel sources are pure: no I/O, no ambient time, no ambient randomness', 
   }
 })
 
+test('one stamp site: only kernel/write.ts drives node.commit()', () => {
+  //! the attemptEpoch law's lint half (plan §5): provenance stamping happens in node.commit(), and the
+  // ONLY module allowed to call it is the write ingress — a second caller is a second stamp site, the
+  // exact structure v2's four AA conflict sources grew from. node.ts DEFINES commit (no dot-call form).
+  const files = readdirSync(KERNEL).filter((f) => f.endsWith('.ts') && !f.includes('.test.') && !f.includes('.perf.'))
+  for (const f of files) {
+    if (f === 'write.ts') continue
+    const src = strip(readFileSync(join(KERNEL, f), 'utf8'))
+    assert.ok(!/\.commit\(/.test(src), `${f} calls .commit() — the stamp site is kernel/write.ts alone`)
+  }
+})
+
 test('the stripper itself: comments hide nothing, strings hide nothing', () => {
   //! banned tokens in comments must NOT trip the lint; banned tokens after a string-embedded // MUST
   assert.ok(!/setTimeout/.test(strip('// setTimeout(x)\nconst a = 1')))

@@ -57,6 +57,13 @@ export const JK = {
   writeBufferDrop: 34, // a=totalDropped — pending overflow dropped the oldest batch (surfaced loss)
   join: 35,          // a=uuid — a JOIN request sent (a=self) or received (a=joiner)
   evict: 36,         // a=uuid — this member left the committed view at install
+  //! ── M3 write-pipeline vocabulary (owner routing, cid dedup, NACKs) ──
+  writeForward: 37,  // a=ownerUuid, b=baseCid, c=count — an attempt run forwarded to the partition owner
+  writeAck: 38,      // a=issuer, b=baseCid, c=count — commit coordinates received; pending attempts cleared
+  writeNack: 39,     // a=reason ('not-owner'|'stale-epoch'|'withheld'), b=ownerEpoch, c=baseCid — typed rejection; the issuer re-resolves + re-forwards
+  writeDup: 40,      // a=issuer, b=cid — owner-side cid dedup absorbed a retransmit (the duplicate ACK re-carries the ORIGINAL coordinates)
+  writeRelay: 41,    // a=issuer, b=baseCid — a client attempt (attemptEpoch 0) re-stamped at this relay (the issuer/flush boundary rule)
+  dedupEvict: 42,    // a=issuer — a whole cid-dedup lane evicted (MAX_ISSUERS bound); its issuer re-enters the window on next commit
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

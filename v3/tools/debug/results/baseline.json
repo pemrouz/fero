@@ -1,12 +1,12 @@
 {
- "rev": "de6a531",
- "when": "2026-07-06T05:04:58.010Z",
- "wallMs": 311,
- "pass": 13,
- "total": 13,
+ "rev": "a8b69da",
+ "when": "2026-07-06T10:35:26.414Z",
+ "wallMs": 388,
+ "pass": 16,
+ "total": 16,
  "baseline": {
-  "rev": "de6a531",
-  "when": "2026-07-06T05:01:18.022Z"
+  "rev": "a8b69da",
+  "when": "2026-07-06T06:09:51.238Z"
  },
  "scenarios": [
   {
@@ -64,7 +64,7 @@
     },
     {
      "k": "wall ms",
-     "v": 7,
+     "v": 8,
      "kind": "ms"
     }
    ],
@@ -136,7 +136,7 @@
     },
     {
      "k": "wall ms",
-     "v": 9,
+     "v": 10,
      "kind": "ms"
     }
    ],
@@ -145,7 +145,7 @@
     "applied": 60,
     "contested": 0,
     "events": 153,
-    "wall ms": 12
+    "wall ms": 9
    }
   },
   {
@@ -209,7 +209,7 @@
     },
     {
      "k": "wall ms",
-     "v": 3,
+     "v": 4,
      "kind": "ms"
     }
    ],
@@ -218,7 +218,7 @@
     "contested": 4,
     "lww losses": 15,
     "events": 92,
-    "wall ms": 4
+    "wall ms": 5
    }
   },
   {
@@ -305,7 +305,7 @@
     "dups dropped": 80,
     "ae re-shipped": 101,
     "events": 192,
-    "wall ms": 11
+    "wall ms": 6
    }
   },
   {
@@ -397,7 +397,7 @@
     },
     {
      "k": "wall ms",
-     "v": 15,
+     "v": 19,
      "kind": "ms"
     }
    ],
@@ -406,7 +406,7 @@
     "dups dropped": 337,
     "applied": 180,
     "events": 613,
-    "wall ms": 18
+    "wall ms": 21
    }
   },
   {
@@ -478,7 +478,7 @@
     },
     {
      "k": "wall ms",
-     "v": 1,
+     "v": 2,
      "kind": "ms"
     }
    ],
@@ -632,7 +632,7 @@
     },
     {
      "k": "wall ms",
-     "v": 4,
+     "v": 9,
      "kind": "ms"
     }
    ],
@@ -641,7 +641,7 @@
     "revives": 4,
     "redials": 42,
     "events": 303,
-    "wall ms": 3
+    "wall ms": 8
    }
   },
   {
@@ -706,7 +706,7 @@
     },
     {
      "k": "wall ms",
-     "v": 6,
+     "v": 5,
      "kind": "ms"
     }
    ],
@@ -715,7 +715,7 @@
     "shed": 257,
     "ae re-shipped": 300,
     "events": 321,
-    "wall ms": 6
+    "wall ms": 8
    }
   },
   {
@@ -792,12 +792,12 @@
     },
     {
      "k": "events",
-     "v": 2119,
+     "v": 2133,
      "kind": "count"
     },
     {
      "k": "wall ms",
-     "v": 27,
+     "v": 23,
      "kind": "ms"
     }
    ],
@@ -805,9 +805,9 @@
     "views committed": 9,
     "evictions": 3,
     "joins": 2,
-    "writes buffered": 1,
-    "events": 2119,
-    "wall ms": 33
+    "writes buffered": 2,
+    "events": 2123,
+    "wall ms": 31
    }
   },
   {
@@ -883,26 +883,276 @@
     },
     {
      "k": "ae re-shipped",
-     "v": 9,
+     "v": 8,
      "kind": "count"
     },
     {
      "k": "events",
-     "v": 1854,
+     "v": 1852,
      "kind": "count"
     },
     {
      "k": "wall ms",
-     "v": 20,
+     "v": 23,
      "kind": "ms"
     }
    ],
    "base": {
     "views committed": 0,
     "writes buffered": 2,
-    "ae re-shipped": 9,
-    "events": 1854,
-    "wall ms": 19
+    "ae re-shipped": 8,
+    "events": 1852,
+    "wall ms": 27
+   }
+  },
+  {
+   "id": "write-pipeline",
+   "title": "The write pipeline — kernel owner routing (M3)",
+   "kind": "happy",
+   "desc": "writes land on random nodes; the KERNEL routes each to its ring owner over the committed view — forwarded attempts, ACKed coordinates, one origin per partition per epoch, zero contested cells",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "writers": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "phases": [
+     {
+      "label": "view 1",
+      "sev": "info"
+     },
+     {
+      "label": "write anywhere",
+      "sev": "gold"
+     },
+     {
+      "label": "forward → owner",
+      "sev": "info"
+     },
+     {
+      "label": "stamp + ACK",
+      "sev": "gold"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 30,
+     "kind": "count"
+    },
+    {
+     "k": "forwarded",
+     "v": 20,
+     "kind": "count"
+    },
+    {
+     "k": "acked runs",
+     "v": 40,
+     "kind": "count"
+    },
+    {
+     "k": "contested",
+     "v": 0,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 802,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 10,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "writes": 30,
+    "forwarded": 20,
+    "acked runs": 20,
+    "contested": 0,
+    "events": 802,
+    "wall ms": 11
+   }
+  },
+  {
+   "id": "lost-ack",
+   "title": "Lost ACK — cid dedup, original coordinates (AA #1)",
+   "kind": "unhappy",
+   "desc": "the owner commits but its ACK dies with the link (v2's dominant conflict source: the forwarder then self-committed a second origin) — v3 retries, the owner dedups by cid, and the duplicate ACK re-carries the ORIGINAL commit coordinates",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "faults": [
+     [
+      "n01",
+      "n02"
+     ]
+    ],
+    "writers": [
+     "n01"
+    ],
+    "phases": [
+     {
+      "label": "forward",
+      "sev": "info"
+     },
+     {
+      "label": "commit",
+      "sev": "gold"
+     },
+     {
+      "label": "ACK dies",
+      "sev": "crit"
+     },
+     {
+      "label": "retry → dedup",
+      "sev": "warn"
+     },
+     {
+      "label": "once",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "commits",
+     "v": 1,
+     "kind": "count"
+    },
+    {
+     "k": "acks observed",
+     "v": 1,
+     "kind": "count"
+    },
+    {
+     "k": "forwards",
+     "v": 1,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 1009,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 9,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "commits": 1,
+    "retries deduped": 1,
+    "forwards": 2,
+    "events": 1011,
+    "wall ms": 10
+   }
+  },
+  {
+   "id": "parked-flush",
+   "title": "Parked flush re-validates — owner-routed, never local (AA #3/#4)",
+   "kind": "unhappy",
+   "desc": "a minority node parks a write for a partition it does not own; on heal the flush RE-RESOLVES ownership and forwards — v2 re-stamped it locally at the current epoch (a second origin); v3's flushed record carries the owner's origin",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "cut": [
+     [
+      "n01",
+      "n03"
+     ],
+     [
+      "n02",
+      "n03"
+     ]
+    ],
+    "writers": [
+     "n03",
+     "n01"
+    ],
+    "phases": [
+     {
+      "label": "cut → park",
+      "sev": "crit"
+     },
+     {
+      "label": "owner writes",
+      "sev": "info"
+     },
+     {
+      "label": "heal",
+      "sev": "ok"
+     },
+     {
+      "label": "flush → forward",
+      "sev": "gold"
+     },
+     {
+      "label": "one origin",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "parked",
+     "v": 1,
+     "kind": "count"
+    },
+    {
+     "k": "flushed via owner",
+     "v": 2,
+     "kind": "count"
+    },
+    {
+     "k": "forwards",
+     "v": 1,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 1655,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 11,
+     "kind": "ms"
+    }
+   ],
+   "base": {
+    "parked": 1,
+    "flushed via owner": 2,
+    "forwards": 1,
+    "events": 1661,
+    "wall ms": 27
    }
   },
   {
@@ -953,14 +1203,14 @@
     },
     {
      "k": "wall ms",
-     "v": 1,
+     "v": 2,
      "kind": "ms"
     }
    ],
    "base": {
     "bytes/record": 73,
     "frames/burst (3 peers)": 3,
-    "wall ms": 1
+    "wall ms": 2
    }
   },
   {
@@ -1034,20 +1284,20 @@
     },
     {
      "k": "events/s",
-     "v": 112870,
+     "v": 96742,
      "kind": "ms"
     },
     {
      "k": "wall ms",
-     "v": 208,
+     "v": 243,
      "kind": "ms"
     }
    ],
    "base": {
     "seeds": "100/100",
     "events": 23436,
-    "events/s": 130076,
-    "wall ms": 180
+    "events/s": 82614,
+    "wall ms": 284
    }
   }
  ]
