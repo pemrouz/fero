@@ -41,13 +41,28 @@ export const HEADER = 11
 // M2 membership control plane: JOIN {u,i,l} asks a member to propose the sender in; PROPOSE {e,m,p} /
 // VOTE {e,g,ce} are the joint-consensus ballot legs; VIEW {e,m} announces (or answers a PULL {e} with)
 // a committed view.
+// M3 write pipeline: WRITE is a RECORDS-shaped frame (FLAG_PROV + record runs) whose provenance triple is
+// REINTERPRETED as the ATTEMPT triple [issuer, baseCid, attemptEpoch] — un-sequenced attempts forwarded to
+// the partition owner reuse the whole hot record-encode/decode path. WACK {u,c,n,s,e} answers a committed
+// run with its stamp coordinates; WNACK {u,c,n,r,ce} rejects one with a typed reason + the owner's epoch.
 export const VERB = {
   HELLO: 1, RECORDS: 2, PING: 3, PONG: 4, DIGEST: 5,
   JOIN: 6, PROPOSE: 7, VOTE: 8, VIEW: 9, PULL: 10,
+  WRITE: 11, WACK: 12, WNACK: 13,
 } as const
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.
 export const FLAG_PROV = 1
+//! FLAG_ATTEMPT: after the provenance triple, [issuerLen+utf8][baseCid varint] — the ATTEMPT IDENTITY of a
+// committed forwarded run, riding replication so EVERY node feeds its cid-dedup window from the records
+// themselves. This is what makes exactly-once survive an ownership move (adversarial-review critical:
+// a retry after a view change hit a new owner with no memory of the cid and re-committed — resurrecting
+// a stale value OVER a newer acknowledged write). Requires FLAG_PROV; cids are contiguous per run like seqs.
+export const FLAG_ATTEMPT = 2
+//! MAX_DEPTH: value-nesting bound BOTH directions — an unbounded recursive decode is a stack overflow a
+// hostile frame can trigger, and RangeError is NOT a FrameError: it once escaped the net and crashed the
+// node (adversarial-review critical). 64 is far beyond any sane payload and far below any stack limit.
+export const MAX_DEPTH = 64
 
 //! FrameError: a WIRE fault (bad magic, bad crc, overrun, oversize) — the peer is dropped. Any other throw in a frame handler is a real bug and must rethrow unmasked (v2's rule, kept).
 export class FrameError extends Error {}
@@ -154,7 +169,9 @@ export class Writer {
   }
   bytes(b: Uint8Array) { this.ensure(b.length); this.buf.set(b, this.len); this.len += b.length }
   //! value: recursive tagged encode — the ONE place values become bytes (log, WAL, and wire all reuse it).
-  value(v: unknown, vt = vtOf(v)) {
+  // Depth-bounded symmetrically with the decoder: what cannot be decoded must not be encodable.
+  value(v: unknown, vt = vtOf(v), depth = 0) {
+    if (depth > MAX_DEPTH) throw new FrameError('value nesting exceeds MAX_DEPTH')
     switch (vt) {
       case VT.none: case VT.null: case VT.undefined: case VT.false: case VT.true: return
       case VT.int: return this.zigzag(v as number)
@@ -164,13 +181,13 @@ export class Writer {
       case VT.arr: {
         const a = v as unknown[]
         this.varint(a.length)
-        for (const x of a) { const t = vtOf(x); this.u8(t); this.value(x, t) }
+        for (const x of a) { const t = vtOf(x); this.u8(t); this.value(x, t, depth + 1) }
         return
       }
       case VT.obj: {
         const entries = Object.entries(v as object)
         this.varint(entries.length)
-        for (const [k, x] of entries) { this.str(k); const t = vtOf(x); this.u8(t); this.value(x, t) }
+        for (const [k, x] of entries) { this.str(k); const t = vtOf(x); this.u8(t); this.value(x, t, depth + 1) }
         return
       }
       default: throw new FrameError(`bad vt ${vt}`)
@@ -230,8 +247,11 @@ export class Cursor {
     this.pos += n
     return b
   }
-  //! value: recursive tagged decode. Collection counts are sanity-bounded by remaining bytes before any Array/Object allocation.
-  value(vt: number): unknown {
+  //! value: recursive tagged decode. Collection counts are sanity-bounded by remaining bytes before any
+  // Array/Object allocation, and nesting is DEPTH-BOUNDED: a stack overflow is a RangeError, which is not
+  // a FrameError — one deeply-nested hostile frame once rode past the net and crashed the node.
+  value(vt: number, depth = 0): unknown {
+    if (depth > MAX_DEPTH) throw new FrameError('value nesting exceeds MAX_DEPTH')
     switch (vt) {
       case VT.none: case VT.undefined: return undefined
       case VT.null: return null
@@ -245,7 +265,7 @@ export class Cursor {
         const n = this.varint()
         if (n > this.end - this.pos) throw new FrameError('arr count overruns frame')
         const a = new Array(n)
-        for (let i = 0; i < n; i++) a[i] = this.value(this.u8())
+        for (let i = 0; i < n; i++) a[i] = this.value(this.u8(), depth + 1)
         return a
       }
       case VT.obj: {
@@ -254,7 +274,7 @@ export class Cursor {
         const o: Record<string, unknown> = {}
         for (let i = 0; i < n; i++) {
           const k = this.str()
-          const v = this.value(this.u8())
+          const v = this.value(this.u8(), depth + 1)
           //! defineProperty for the one hostile key: a bracket-assign of '__proto__' is a [[Set]] that hits
           // Object.prototype's accessor — the field silently vanishes (non-object value) or REPLACES the
           // object's prototype (object value), so sender and receiver state diverge on a crc-valid frame.
@@ -266,15 +286,17 @@ export class Cursor {
       default: throw new FrameError(`bad vt ${vt}`)
     }
   }
-  //! skipValue: advance past a value WITHOUT materialising it — what keeps relay/scan lazy (v2's measured scan<decode win).
-  skipValue(vt: number) {
+  //! skipValue: advance past a value WITHOUT materialising it — what keeps relay/scan lazy (v2's measured
+  // scan<decode win). Depth-bounded like value(): the scan recursion is just as hostile-reachable.
+  skipValue(vt: number, depth = 0) {
+    if (depth > MAX_DEPTH) throw new FrameError('value nesting exceeds MAX_DEPTH')
     switch (vt) {
       case VT.none: case VT.null: case VT.undefined: case VT.false: case VT.true: return
       case VT.int: this.varint(); return
       case VT.f64: this.need(8); this.pos += 8; return
       case VT.str: case VT.u8: { const n = this.varint(); this.need(n); this.pos += n; return }
-      case VT.arr: { const n = this.varint(); for (let i = 0; i < n; i++) this.skipValue(this.u8()); return }
-      case VT.obj: { const n = this.varint(); for (let i = 0; i < n; i++) { const s = this.varint(); this.need(s); this.pos += s; this.skipValue(this.u8()) } return }
+      case VT.arr: { const n = this.varint(); for (let i = 0; i < n; i++) this.skipValue(this.u8(), depth + 1); return }
+      case VT.obj: { const n = this.varint(); for (let i = 0; i < n; i++) { const s = this.varint(); this.need(s); this.pos += s; this.skipValue(this.u8(), depth + 1) } return }
       default: throw new FrameError(`bad vt ${vt}`)
     }
   }
@@ -296,6 +318,10 @@ const writeRecord = (w: Writer, r: Rec) => {
 
 //! Prov: the per-frame provenance extension — one origin, contiguous seqs from baseSeq, one epoch.
 export interface Prov { origin: string; baseSeq: number; epoch: number }
+//! AttemptRun: the per-frame attempt-identity extension (FLAG_ATTEMPT) — one issuer, contiguous cids.
+// Rides committed runs that originated as forwarded/relayed attempts, so replication itself feeds
+// every node's cid-dedup window (see FLAG_ATTEMPT above for the ownership-move story).
+export interface AttemptRun { issuer: string; baseCid: number }
 
 //! ── Outbox — the streaming per-link frame encoder ─────────────────────────────
 // One Outbox per link, reused forever: begin() stamps the header + provenance,
@@ -310,13 +336,16 @@ export class Outbox {
   count = 0
   countAt = 0
   open = false
-  begin(verb: number, prov?: Prov) {
+  begin(verb: number, prov?: Prov, attempt?: AttemptRun) {
     const w = this.w
     w.len = 0
-    w.u8(MAGIC); w.u8(prov ? FLAG_PROV : 0); w.u8(verb)
+    w.u8(MAGIC); w.u8((prov ? FLAG_PROV : 0) | (prov && attempt ? FLAG_ATTEMPT : 0)); w.u8(verb)
     w.u32(0) // bodyLen, patched
     w.u32(0) // crc, patched
-    if (prov) { w.str(prov.origin); w.varint(prov.baseSeq); w.varint(prov.epoch) }
+    if (prov) {
+      w.str(prov.origin); w.varint(prov.baseSeq); w.varint(prov.epoch)
+      if (attempt) { w.str(attempt.issuer); w.varint(attempt.baseCid) }
+    }
     this.countAt = w.len
     w.u32(0) // record count, patched
     this.count = 0
@@ -339,8 +368,14 @@ export class Outbox {
 }
 
 //! encodeControl: a control frame (HELLO/PING/...) carrying exactly ONE value as its body — v2's controlFrame shape, kept.
+// Encodes into a MODULE-LEVEL scratch Writer (adversarial-review perf finding: a fresh 4KB Writer per
+// control frame on the ACK/NACK paths) — safe because the kernel is single-threaded, encode never
+// re-enters, and the return is always an owned slice. A rare oversized frame (a huge VIEW) is not
+// allowed to pin its grown buffer forever: the scratch resets past 64KB.
+const ctrl = new Writer()
 export const encodeControl = (verb: number, value?: unknown): Uint8Array => {
-  const w = new Writer()
+  const w = ctrl
+  w.len = 0
   w.u8(MAGIC); w.u8(0); w.u8(verb)
   w.u32(0); w.u32(0)
   const vt = vtOf(value)
@@ -348,7 +383,9 @@ export const encodeControl = (verb: number, value?: unknown): Uint8Array => {
   w.value(value, vt)
   w.u32at(3, w.len - HEADER)
   w.u32at(7, crcFrame(w.buf, w.len))
-  return w.buf.slice(0, w.len)
+  const out = w.buf.slice(0, w.len)
+  if (w.buf.length > 1 << 16) w.buf = new Uint8Array(4096)
+  return out
 }
 
 //! encodeFrame: one-shot RECORDS encode (tests, catch-up). The hot path uses a per-link Outbox instead.
@@ -370,23 +407,34 @@ const encodeEmpty = (prov?: Prov): Uint8Array => {
   return w.buf.slice(0, w.len)
 }
 
-//! encodeRuns: split a mixed batch into the FEWEST frames each satisfying single-origin / contiguous-seq / single-epoch.
-// A run breaks on an origin change, a seq gap, or an epoch change — the protocol
-// requirement that licenses scalar high-water dedup at every receiver.
-export const encodeRuns = (records: { rec: Rec; origin: string; seq: number; epoch: number }[]): Uint8Array[] => {
+//! encodeRuns: split a mixed batch into the FEWEST frames each satisfying single-origin / contiguous-seq /
+// single-epoch — AND single-attempt-lane: records carrying attempt identity (iss/cid) run only with the
+// same issuer and contiguous cids, so the FLAG_ATTEMPT extension amortises per frame exactly like prov.
+// A run breaks on any discontinuity — the protocol requirement that licenses scalar high-water dedup at
+// every receiver. The M3 write pipeline reuses the splitter for WRITE frames (verb param): identical
+// shape, the triple read as [issuer, baseCid, attemptEpoch]. Uses a module-level scratch Outbox (finish()
+// hands out owned copies; the kernel is single-threaded and encode never re-enters).
+const runsScratch = new Outbox()
+export const encodeRuns = (
+  records: { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number }[],
+  verb: number = VERB.RECORDS,
+): Uint8Array[] => {
   const frames: Uint8Array[] = []
-  const o = new Outbox()
+  const o = runsScratch
   let i = 0
   while (i < records.length) {
     const head = records[i]
-    o.begin(VERB.RECORDS, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch })
+    o.begin(verb, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch },
+      head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid! } : undefined)
     o.add(head.rec)
     let j = i + 1
     while (
       j < records.length &&
       records[j].origin === head.origin &&
       records[j].epoch === head.epoch &&
-      records[j].seq === head.seq + (j - i)
+      records[j].seq === head.seq + (j - i) &&
+      records[j].iss === head.iss &&
+      (head.iss === undefined || records[j].cid === head.cid! + (j - i))
     ) { o.add(records[j].rec); j++ }
     frames.push(o.finish()!)
     i = j
@@ -411,12 +459,16 @@ export class RecordView {
   origin: string
   seq: number
   epoch: number
-  constructor(buf: Uint8Array, tag: number, keyAt: number, end: number, origin: string, seq: number, epoch: number) {
+  //! attempt identity (FLAG_ATTEMPT runs): the (issuer, cid) this record committed FROM — '' / 0 when absent
+  issuer: string
+  cid: number
+  constructor(buf: Uint8Array, tag: number, keyAt: number, end: number, origin: string, seq: number, epoch: number, issuer = '', cid = 0) {
     this.#buf = buf; this.#keyAt = keyAt; this.#end = end
     this.type = tag & 3
     this.#hasAt = (tag & HAS_AT) !== 0
     this.#vt = tag >>> 3
     this.origin = origin; this.seq = seq; this.epoch = epoch
+    this.issuer = issuer; this.cid = cid
   }
   #head() {
     if (this.#key) return
@@ -455,14 +507,22 @@ export class Frame {
   get flags(): number { return this.buf[1] }
   get verb(): number { return this.buf[2] }
   #prov?: Prov | null
+  #att?: AttemptRun | null
   #bodyAt(): number { return HEADER }
   prov(): Prov | null {
     if (this.#prov !== undefined) return this.#prov
     if ((this.flags & FLAG_PROV) === 0) return (this.#prov = null)
     const c = new Cursor(this.buf, this.#bodyAt())
     this.#prov = { origin: c.str(), baseSeq: c.varint(), epoch: c.varint() }
+    //! the attempt extension nests INSIDE the prov parse so `end` always points at the record count
+    this.#att = (this.flags & FLAG_ATTEMPT) !== 0 ? { issuer: c.str(), baseCid: c.varint() } : null
     ;(this.#prov as Prov & { end: number }).end = c.pos
     return this.#prov
+  }
+  //! attempt(): the run's attempt identity, when FLAG_ATTEMPT rode along (null otherwise).
+  attempt(): AttemptRun | null {
+    if (this.#att === undefined) this.prov()
+    return this.#att ?? null
   }
   //! value: the single payload of a control frame.
   get value(): unknown {
@@ -472,6 +532,7 @@ export class Frame {
   //! records(): boundary-scan into lazy RecordViews — values are SKIPPED, not decoded (the scan<full-decode contract).
   records(): RecordView[] {
     const p = this.prov()
+    const a = this.attempt()
     const c = new Cursor(this.buf, p ? (p as Prov & { end: number }).end : this.#bodyAt())
     const count = c.u32()
     //! bound by REMAINING bytes / minimum record size (tag + key count = 2B) — pre-allocation is capped by
@@ -488,7 +549,8 @@ export class Frame {
       for (let s = 0; s < segs; s++) { const n = c.varint(); c.need(n); c.pos += n }
       if (tag & HAS_AT) { const n = c.varint(); c.need(n); c.pos += n }
       c.skipValue(tag >>> 3)
-      out[i] = new RecordView(this.buf, tag, keyAt, c.pos, origin, p ? p.baseSeq + i : 0, epoch)
+      out[i] = new RecordView(this.buf, tag, keyAt, c.pos, origin, p ? p.baseSeq + i : 0, epoch,
+        a?.issuer ?? '', a ? a.baseCid + i : 0)
     }
     if (c.pos !== this.buf.length) throw new FrameError('trailing bytes after records')
     return out

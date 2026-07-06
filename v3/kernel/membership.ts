@@ -38,9 +38,10 @@
 // The write-gate (plan: CP, majority-of-committed-view): local writes commit iff
 //   open genesis  OR  (member of the view AND a majority of members reachable
 //   AND not epoch-stale AND not below the rejoin floor).
-// Gated writes buffer in ONE bounded drop-oldest queue (surfaced counter) and
-// flush through the normal write path when the gate opens — stamping at the
-// THEN-current epoch (the plan's knowing-overwrite rule; the v2 epoch-dominance
+// Gated writes park in the write pipeline's ONE bounded queue (kernel/write.ts
+// since M3 — attempts, not batches) and re-drive through the normal ingress when
+// the gate opens, re-resolving ownership and re-stamping attemptEpoch at that
+// flush boundary (the plan's knowing-overwrite rule; the v2 epoch-dominance
 // stamp max(view, cell) stays deleted).
 //
 // View PROPAGATION is gossip-flooded: every install re-announces the view on
@@ -78,7 +79,6 @@ export interface View { epoch: number; members: [string, string][] }
 //! protocol constants — ticks are heartbeat ticks (the membership clock)
 export const SUSPECT_TICKS = 3    // member unreachable this many consecutive ticks → suspect
 export const MAX_PULLS = 5        // targeted view-pull retries before the alarmed gate release
-export const MAX_PENDING = 1024   // gated-write buffer bound (drop-oldest, surfaced)
 export const PROPOSAL_AGE = 10    // ticks before an uncommitted proposal is abandoned (unblocks JOINs; re-grants make retry safe)
 export const REJOIN_TICKS = 10    // rejoining ticks without live confirmation before the self-ballot
 
@@ -118,9 +118,6 @@ export class Membership {
   //! rejoin floor: a restored node is read-only until a committed view ≥ this is CONFIRMED live (plan boot modes)
   rejoinFloor = 0
   #rejoinTicks = 0
-  //! the ONE gated-write buffer — bounded at birth, drop-oldest, loss surfaced (plan §3.4)
-  pending: unknown[][] = [] // batches of Rec, kept in arrival order
-  droppedPending = 0
   #wasOpen = true // last journaled gate state, for transition events
 
   constructor(boot?: { epoch: number; members: [string, string][] }) {
@@ -366,18 +363,9 @@ export class Membership {
     this.settle(node)
   }
 
-  //! buffer — a gated write parks here (bounded, drop-oldest, surfaced) until the gate opens.
-  buffer(node: Node, recs: unknown[]) {
-    this.pending.push(recs)
-    node.journal.armed && node.journal.emit(JK.writeBuffered, this.pending.length)
-    if (this.pending.length > MAX_PENDING) {
-      this.pending.shift()
-      this.droppedPending++
-      node.journal.armed && node.journal.emit(JK.writeBufferDrop, this.droppedPending)
-    }
-  }
-
-  //! settle — journal gate transitions and let the node flush the pending buffer on open.
+  //! settle — journal gate transitions and drive the write pipeline's flush boundary: parked attempts
+  // re-resolve their owner and re-enter the world whenever membership state moves (gate transitions,
+  // installs, admits, link losses — the queue itself lives in kernel/write.ts, plan §3.4).
   settle(node: Node) {
     const g = this.gate(node)
     if (g.open !== this.#wasOpen) {
@@ -386,7 +374,7 @@ export class Membership {
       if (g.open) j.armed && j.emit(JK.gateOpen)
       else j.armed && j.emit(JK.gateClose, g.reason)
     }
-    if (g.open && this.pending.length) node.flushPending()
+    if (g.open && node.writes.pending.size) node.writes.flush(node)
   }
 
   #propose(node: Node, view: View) {

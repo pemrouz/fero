@@ -8,26 +8,26 @@
 // every distributed regression is a reproducible seed instead of a wall-clock
 // race.
 //
-// M0 scope (plan-v3.md §11), stated exactly: full broadcast of own writes to
-// admitted peers + whole-log replay to every newly-admitted peer (the retransmit
-// buffer), gap-tolerant monotone high-water dedup per origin (Lamport seqs are
-// NOT contiguous — there is deliberately no hold-back and no reorder tolerance:
-// FIFO links are a PROTOCOL REQUIREMENT, provided by TCP and enforced in sim),
-// per-cell LWW on lexicographic (epoch, seq, origin), Lamport clock merge-up.
-// No membership ballots, no digest anti-entropy, no storage, no owner routing
-// yet (M1-M4) — but their seams are shaped: `epoch` rides every frame and every
-// LWW cell, ingest() is the single apply path, and streams are per-origin
-// descriptor objects (not v2's four parallel string-keyed maps).
+// Scope by milestone: M0 broadcast + dedup + LWW, M1 digest anti-entropy +
+// heartbeat floor, M2 membership (committed views, ballots, the write-gate),
+// M3 the write pipeline (owner routing via the view-derived ring, forwarded
+// attempts, cid dedup, typed NACKs — kernel/write.ts). Still ahead: storage/
+// durability (M4), the public api layer (M5), scoped replication (M6).
+// Per-origin seqs are LAMPORT stamps, NOT contiguous — there is deliberately no
+// hold-back and no reorder tolerance: FIFO links are a PROTOCOL REQUIREMENT,
+// provided by TCP and enforced in sim. Streams are per-origin descriptor
+// objects (not v2's four parallel string-keyed maps).
 //
 // The write path IS a function: a 'write' event enters ingest exactly like an
 // inbound record does — apply is a downstream EFFECT, so re-entrant capture
 // (v2's applying/committingForward/discarding flag family) has no place to
 // exist. That whole guard menagerie is deleted by construction, not by care.
 
-import { FrameError, VERB, encodeControl, encodeRuns, type Frame } from './codec.ts'
+import { FrameError, VERB, encodeControl, encodeRuns, type AttemptRun, type Frame } from './codec.ts'
 import { Link, LS, dialedByLower } from './link.ts'
 import { JK, Journal } from './journal.ts'
 import { Membership } from './membership.ts'
+import { Writes } from './write.ts'
 import { REC, TAG, type Env, type Event, type Rec } from './env.ts'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
@@ -78,6 +78,10 @@ export class Node {
   //! membership (M2): committed views, ballots, the write-gate. The data plane below stays open —
   // membership gates COMMITS and majority math, never replication (an evicted node still converges).
   membership: Membership
+  //! writes (M3): THE single write ingress — attempts, cid dedup, owner routing/forwarding, the ONE
+  // bounded pending queue. Local 'write' events, forwarded WRITE frames, and inbound RECORDS all
+  // enter the system through this object (kernel/write.ts is the stamp-site module).
+  writes = new Writes()
   streams = new Map<string, Stream>()
   //! versions: per-cell LWW stamps, lexicographic (epoch, seq, origin) — the ONE conflict-resolution rule (plan §5).
   // Cells are full key paths (field-granular); a remove leaves its stamp as a
@@ -97,7 +101,10 @@ export class Node {
   // flushed only on the dup-loser link died with it) and removes the form-first
   // constraint: whatever a doomed link swallowed, the digest exchange on the
   // surviving link re-ships. Unbounded in M0; M4's compaction bounds it.
-  logs = new Map<string, { rec: Rec; seq: number; epoch: number }[]>()
+  // Entries retain the ATTEMPT identity (iss/cid) of committed forwarded writes
+  // so anti-entropy re-ships it — a healed or future owner rebuilds its dedup
+  // window from the log stream itself (M3's ownership-move exactly-once story).
+  logs = new Map<string, { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number }[]>()
   //! M0 downstream state: a flat path→value map + an order-insensitive rolling hash.
   // The api layer binds a $() proxy to sink.apply() later (M5); the kernel keeps
   // this mirror so sim monitors and the replay/state-hash check (plan §3.1) can
@@ -138,6 +145,14 @@ export class Node {
   dialing(to: string): boolean {
     const b = this.#backoff.get(to)
     return !!b && !b.gaveUp
+  }
+
+  //! #revivable — the give-up revival target set: static hosts ∪ committed-view member listens (a
+  // joiner learned via a VIEW is as entitled to revival as a configured host — it may OWN partitions).
+  #revivable(): Set<string> {
+    const targets = new Set(this.#opts.hosts ?? [])
+    for (const [u, listen] of this.membership.view.members) if (u !== this.uuid && listen) targets.add(listen)
+    return targets
   }
 
   //! step — the single dispatch site. Unknown event kinds fail closed (throw): an unrecognised stimulus is a harness bug, never something to guess at.
@@ -247,13 +262,19 @@ export class Node {
           //! membership acts on the heartbeat clock too (explicit protocol mode): genesis, suspicion,
           // eviction/join ballots, stale pulls, rejoin nudges — all only when heartbeats are on.
           this.membership.tick(this)
+          //! the write pipeline's retry clock: in-flight attempts whose ACK/NACK never arrived re-park
+          // after RETRY_TICKS and re-resolve + re-forward (cid dedup makes every retransmit safe).
+          this.writes.tick(this)
           //! give-up revival: a target whose final redial attempt FAILED (gaveUp — never merely "tries
           // exhausted": the last armed attempt may still be pending, and dialing over it would fork a
-          // second chain) is parked, not dead — each heartbeat re-dials any parked host we hold no link
+          // second chain) is parked, not dead — each heartbeat re-dials any parked target we hold no link
           // to, with a fresh backoff chain (the M1 re-announce floor; full UDP discovery lands with
-          // L0-complete). A live link to the host — including one the PEER dialed — clears the stale
-          // give-up instead of dialing into a dup race.
-          for (const to of this.#opts.hosts ?? []) {
+          // L0-complete). Targets are the static hosts PLUS the committed view's member listens
+          // (adversarial-review wedge: a view-learned member — a joiner never in `hosts` — whose chain
+          // gave up was parked FOREVER, stranding every attempt owner-routed to it). A live link to the
+          // target — including one the PEER dialed — clears the stale give-up instead of dialing into a
+          // dup race.
+          for (const to of this.#revivable()) {
             if (to === this.listen) continue
             if (!this.#backoff.get(to)?.gaveUp) continue // never failed, or the redial chain still owns it
             let held = false
@@ -268,14 +289,11 @@ export class Node {
         return
       }
       case 'write': {
-        //! the write-gate (M2, plan §5: CP — majority-of-committed-view): a gated write BUFFERS
-        // (bounded drop-oldest, surfaced) and flushes through this same path when the gate opens,
-        // stamping at the THEN-current epoch (the plan's knowing-overwrite rule).
-        if (!this.membership.gate(this).open) {
-          this.membership.buffer(this, e.recs)
-          return
-        }
-        this.#commit(e.recs)
+        //! source=local into the single ingress (M3): epoch 0 + open gate is the M0/M1 fast path
+        // (straight to commit); otherwise attempts are minted {cid, attemptEpoch, issuer} and routed —
+        // committed here if we own the partition, forwarded to the owner if not, parked in the ONE
+        // bounded queue if the gate is closed or the owner unreachable (kernel/write.ts).
+        this.writes.issue(this, e.recs)
         return
       }
       default: {
@@ -285,33 +303,35 @@ export class Node {
     }
   }
 
-  //! #commit — the write path proper: stamp, log, apply, broadcast. Local writes and inbound records
-  // share ONE ingest shape; a local write is just the stream where origin === me.
-  #commit(recs: Rec[]) {
+  //! commit — THE stamp site: {origin: me, seq: ++lamport, epoch: committed view}, then log, apply,
+  // broadcast. Returns the FIRST stamped seq (a batch stamps contiguously — the write pipeline's
+  // run-ACK coordinates derive from it). Called ONLY by kernel/write.ts (the single-ingress rule;
+  // purity.test.ts lints the call sites) — local writes and inbound records share ONE ingest shape,
+  // a local write being just the stream where origin === me. When the batch originated as a
+  // forwarded/relayed ATTEMPT run, its identity (issuer, contiguous cids from baseCid) is logged and
+  // broadcast with the records (FLAG_ATTEMPT), so replication feeds every node's cid-dedup window —
+  // exactly-once then survives an ownership move (adversarial-review critical).
+  commit(recs: Rec[], attempt?: AttemptRun): number {
     const j = this.journal
-    for (const rec of recs) {
+    const s0 = this.seq + 1
+    for (let k = 0; k < recs.length; k++) {
+      const rec = recs[k]
       const seq = ++this.seq
-      this.#logFor(this.uuid).push({ rec, seq, epoch: this.epoch }) // the record is OWNED from here (embedder hands it over)
-      this.#apply(rec, this.uuid, seq, this.epoch)
+      const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch: this.epoch }
+      if (attempt) { entry.iss = attempt.issuer; entry.cid = attempt.baseCid + k }
+      this.logFor(this.uuid).push(entry) // the record is OWNED from here (embedder hands it over)
+      this.apply(rec, this.uuid, seq, this.epoch)
       j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
       for (const link of this.links.values())
         //! live records flow only on SYNCED links (admitted + peer digest received): anything earlier is
         // covered by the digest-triggered suffix ship, and sending it live would leapfrog that suffix on
         // the wire and turn it into permanently-dropped "duplicates" at the receiver (the sweep-found bug)
         if (link.state === LS.admitted && link.synced)
-          link.add(rec, { origin: this.uuid, baseSeq: seq, epoch: this.epoch })
+          link.add(rec, { origin: this.uuid, baseSeq: seq, epoch: this.epoch },
+            attempt ? { issuer: attempt.issuer, baseCid: attempt.baseCid + k } : undefined)
     }
     for (const link of this.links.values()) link.flush(this.env.sink, j)
-  }
-
-  //! flushPending — the gate reopened: buffered writes re-enter the NORMAL commit path, in order,
-  // stamped at the current (higher) epoch. Called by membership.settle, never re-entrantly (settle
-  // only calls it when the gate is open, and #commit never touches the gate).
-  flushPending() {
-    const batches = this.membership.pending
-    if (!batches.length) return
-    this.membership.pending = []
-    for (const recs of batches) this.#commit(recs as Rec[])
+    return s0
   }
 
   #armHeartbeat() {
@@ -420,7 +440,34 @@ export class Node {
         //! the epoch-staleness contract (plan §5): a record stamped above my committed view epoch is
         // evidence of a view I missed — close the gate NOW and pull the view on this same link
         if (prov.epoch > this.epoch) this.membership.staleObserved(this, prov.epoch, link)
-        for (const rv of f.records()) this.#ingest(rv.origin, rv.seq, rv.epoch, rv)
+        for (const rv of f.records()) this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)
+        return
+      }
+      //! M3 write pipeline — WRITE (a forwarded attempt run / a client relay), WACK (commit
+      // coordinates), WNACK (typed rejection). Identity-before-admission like everything else;
+      // handlers live in kernel/write.ts. settle() runs after: an ACK/NACK can move the pending
+      // queue, and a NACK's staleness evidence can flip the gate.
+      case VERB.WRITE: {
+        if (link.state !== LS.admitted) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'write before hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'write-before-hello')
+        }
+        this.writes.onWrite(this, link, f)
+        this.membership.settle(this)
+        return
+      }
+      case VERB.WACK:
+      case VERB.WNACK: {
+        if (link.state !== LS.admitted) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'write-ack before hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'write-ack-before-hello')
+        }
+        const v = f.value as Record<string, unknown>
+        if (f.verb === VERB.WACK) this.writes.onAck(this, link, v)
+        else this.writes.onNack(this, link, v)
+        this.membership.settle(this)
         return
       }
       case VERB.PING:
@@ -449,14 +496,15 @@ export class Node {
           return
         }
         //! ship every suffix the peer's digest shows missing: for each origin I hold, everything past their
-        // high-water. encodeRuns splits Lamport gaps into valid contiguous frames; ship() honours backpressure.
+        // high-water. encodeRuns splits Lamport gaps into valid contiguous frames (attempt identity rides
+        // along, so a healed peer rebuilds its cid-dedup window too); ship() honours backpressure.
         let shipped = 0
         for (const [origin, entries] of this.logs) {
           const theirs = typeof v.d[origin] === 'number' ? (v.d[origin] as number) : 0
           let lo = entries.length
           while (lo > 0 && entries[lo - 1].seq > theirs) lo-- // entries are seq-ascending; find the missing suffix
           if (lo === entries.length) continue
-          const missing = entries.slice(lo).map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch }))
+          const missing = entries.slice(lo).map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))
           for (const bytes of encodeRuns(missing)) link.ship(bytes, this.env.sink, j)
           shipped += missing.length
         }
@@ -497,37 +545,9 @@ export class Node {
     }
   }
 
-  //! #ingest — the single inbound apply path: gap-tolerant monotone dedup, then the LWW election in #apply.
-  // The FIFO-link + single-broadcaster requirement means arrival order IS stream
-  // order, so one comparison decides duplicate-vs-new; there is no hold-back
-  // buffer to bound, drain, or leak. (A record that lost its LWW election still
-  // advances `seen` — losing an election is not loss; v2's B1 lesson, kept.)
-  #ingest(origin: string, seq: number, epoch: number, rv: { rec(): Rec }) {
-    //! a node NEVER ingests its own origin: its log is authoritative and complete for itself by
-    // construction (every local write appends at #commit). Without this guard, a peer echoing our
-    // records back — reachable via a digest-snapshot race: our digest said "holding nothing" an
-    // instant before our first write — passes the high-water check (local writes never advance our
-    // OWN stream watermark) and appends a DUPLICATE entry out of order. A non-ascending log breaks
-    // the AE suffix-slicer's walk, leaving an interior record no digest can ever re-ship (5-node
-    // sweep seed 79: a permanently missing cell three hops downstream).
-    if (origin === this.uuid) { this.journal.armed && this.journal.emit(JK.dupDrop, origin, seq); return }
-    //! Lamport merge-up happens on RECEIPT (even for records that lose LWW) —
-    // the clock tracks everything observed, which is what makes the next local write causally newest.
-    if (seq > this.seq) this.seq = seq
-    const j = this.journal
-    let s = this.streams.get(origin)
-    if (!s) { s = { seen: 0 }; this.streams.set(origin, s) }
-    if (seq <= s.seen) { j.armed && j.emit(JK.dupDrop, origin, seq); return }
-    s.seen = seq
-    const rec = rv.rec() // ONE copy out of the receive chunk, shared by the log entry and the apply
-    //! stored BEFORE the LWW election — losers are logged too (the election re-runs identically at every
-    // node, and this copy may be the only one a lagging peer is ever offered via anti-entropy)
-    this.#logFor(origin).push({ rec, seq, epoch })
-    this.#apply(rec, origin, seq, epoch)
-    j.armed && j.emit(JK.applyInbound, origin, seq)
-  }
-
-  #logFor(origin: string): { rec: Rec; seq: number; epoch: number }[] {
+  //! logFor — per-origin log accessor (get-or-create). Kernel-internal: called by commit above and by
+  // the write module's inbound ingest (source=inbound lives in kernel/write.ts with the other sources).
+  logFor(origin: string): { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number }[] {
     let l = this.logs.get(origin)
     if (!l) { l = []; this.logs.set(origin, l) }
     return l
@@ -541,10 +561,11 @@ export class Node {
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }
 
-  //! #apply — the ONE record→state function (plan §3.3: exactly one projection path). Runs the per-cell
+  //! apply — the ONE record→state function (plan §3.3: exactly one projection path). Runs the per-cell
   // LWW election, mutates the state mirror, and emits the apply effect downstream. A record that loses
-  // its election is SKIPPED but its stream watermark still advances (the caller's job) — losing is not loss.
-  #apply(rec: Rec, origin: string, seq: number, epoch: number) {
+  // its election is SKIPPED but its stream watermark still advances (the caller's job) — losing is not
+  // loss. Kernel-internal: called by commit and by the write module's inbound ingest, nothing else.
+  apply(rec: Rec, origin: string, seq: number, epoch: number) {
     const k = JSON.stringify(rec.key.length ? rec.key : [rec.at ?? '']) // unambiguous internal key — wire keys stay length-prefixed
     //! LWW: lexicographic (epoch, seq, origin), identical on every node — apply iff strictly newer than the held stamp
     const cur = this.versions.get(k)

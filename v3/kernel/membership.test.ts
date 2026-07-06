@@ -6,7 +6,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
-import { MAX_PULLS, MAX_PENDING } from './membership.ts'
+import { MAX_PULLS } from './membership.ts'
+import { MAX_PENDING } from './write.ts'
 import { JK } from './journal.ts'
 import { Framer, VERB, encodeControl, encodeFrame } from './codec.ts'
 import { REC, TAG, type EffectSink, type Env } from './env.ts'
@@ -115,8 +116,9 @@ test('a vote only counts for the exact proposal it granted: a stale grant for di
   assert.equal(h.node.epoch, 2, 'the correctly-echoed grant commits')
 })
 
-test('write-gate: minority buffers (bounded, surfaced); regaining majority flushes through the normal path at the current epoch', () => {
+test('write-gate: minority parks (bounded, surfaced); regaining majority flushes through the normal path at the current epoch', () => {
   const h = formedView1()
+  h.node.writes.ring.place('gated', 'aa') // pin self-ownership: the flush must exercise the local commit leg
   //! sever both peers — 1 of 3 reachable is a minority: the gate closes
   h.node.step({ kind: 'linkDown', link: 1, reason: 'cut' })
   h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
@@ -125,29 +127,30 @@ test('write-gate: minority buffers (bounded, surfaced); regaining majority flush
   assert.equal(h.of('apply').length, applies, 'a gated write must not commit')
   assert.equal(h.node.state.size, 0)
   assert.equal(h.jk(JK.writeBuffered).length, 1)
-  //! one peer returns → 2 of 3 is a majority → the next tick settles the gate open and flushes
+  //! one peer returns → 2 of 3 is a majority → the admit settles the gate open and flushes
   h.admit(3, 'bb')
   h.tick()
-  assert.equal(h.node.state.size, 1, 'buffered write committed on gate-open')
-  assert.equal(h.node.membership.pending.length, 0)
+  assert.equal(h.node.state.size, 1, 'parked write committed on gate-open')
+  assert.equal(h.node.writes.pending.size, 0)
   const v = h.node.versions.get(JSON.stringify(['gated']))!
   assert.equal(v.epoch, 1, 'flushed writes stamp at the CURRENT epoch')
   assert.ok(h.jk(JK.gateClose).some((e) => e.a === 'minority'))
   assert.ok(h.jk(JK.gateOpen).length >= 1)
 })
 
-test('pending buffer is bounded drop-oldest with a surfaced counter', () => {
+test('the pending queue is bounded drop-oldest with a surfaced counter', () => {
   const h = formedView1()
   h.node.step({ kind: 'linkDown', link: 1, reason: 'cut' })
   h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
   for (let i = 0; i <= MAX_PENDING; i++) h.node.step({ kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] })
-  assert.equal(h.node.membership.pending.length, MAX_PENDING)
-  assert.equal(h.node.membership.droppedPending, 1)
+  assert.equal(h.node.writes.pending.size, MAX_PENDING)
+  assert.equal(h.node.writes.droppedPending, 1)
   assert.ok(h.jk(JK.writeBufferDrop).length === 1)
 })
 
 test('epoch-staleness: a higher-epoch record closes the gate and pulls the view ON THAT LINK; the VIEW reopens it', () => {
   const h = formedView1()
+  h.node.writes.ring.place('during', 'aa') // pin: the flushed write must commit HERE to observe its stamp
   const rec = encodeFrame([{ type: REC.update, key: ['x'], value: 9 }], { origin: 'bb', baseSeq: 50, epoch: 3 })
   h.node.step({ kind: 'bytesIn', link: 1, bytes: rec })
   assert.ok(h.jk(JK.epochStale).length === 1)
@@ -209,6 +212,7 @@ test('join: a member receiving JOIN from an admitted non-member proposes the gro
 
 test('boot modes: a rejoining node is read-only until a committed view ≥ its restored epoch installs', () => {
   const h = harness('cc', { hosts: ['sim:aa'], boot: { epoch: 5, members: [['aa', 'sim:aa'], ['cc', 'sim:cc']] } })
+  h.node.writes.ring.place('early', 'cc') // pin: the rejoin flush must commit HERE to observe its stamp
   h.node.step({ kind: 'start' })
   assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'rejoining' })
   h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['early'], value: 1 }] })

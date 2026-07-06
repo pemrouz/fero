@@ -23,14 +23,14 @@ export const captureNode = (node: Node) => ({
   //! M2 membership facts: the committed view, the write-gate verdict, and any parked writes
   view: { epoch: node.membership.view.epoch, members: node.membership.view.members.map((m) => m[0]) },
   gate: (() => { const g = node.membership.gate(node); return g.open ? 'open' : g.reason })(),
-  pendingWrites: node.membership.pending.length,
+  pendingWrites: node.writes.pending.size,
   stateHash: node.stateHash,
   dropped: node.journal.dropped,
   journal: node.journal.read(0),
   logs: Object.fromEntries(
     [...node.logs].map(([origin, entries]) => [
       origin,
-      entries.map((e) => ({ k: e.rec.key, at: e.rec.at, ty: e.rec.type, v: encodeVal(e.rec.value), seq: e.seq, epoch: e.epoch })),
+      entries.map((e) => ({ k: e.rec.key, at: e.rec.at, ty: e.rec.type, v: encodeVal(e.rec.value), seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid })),
     ]),
   ),
   state: [...node.state].map(([k, v]) => [k, encodeVal(v)]),

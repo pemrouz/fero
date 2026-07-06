@@ -97,8 +97,21 @@ export class Sim {
   // of the seeded trajectory instead of applying at whatever `now` the scenario code happened to run.
   at(delay: number, fn: () => void) { this.#schedule(delay, fn) }
 
+  //! directed one-shot frame traps: sever the pair INSTEAD of delivering the nth matching-verb frame.
+  #severOn = new Map<string, { verb: number; n: number }>()
+
   //! fault / partition / heal — install network personality between a pair (both directions; unordered key).
   fault(a: string, b: string, f: Fault) { this.#faults.set(pairKey(a, b), f) }
+
+  //! severOnFrame — the LOST-ACK primitive (plan §4 sim table), doctrine-clean: TCP never drops a frame
+  // mid-stream, but a link CAN die with a frame in the kernel buffer — pure tail loss. This models
+  // exactly that: when the nth frame with `verb` is about to leave a→b, the pair severs and the frame
+  // dies unsent. Deterministic (frame-triggered, not time-triggered), so schedules like "the WACK for
+  // that write never arrives" hold across seeds. The pair is NOT partitioned afterwards: redials
+  // reconnect (a transient reset) — add partition() alongside when the outage should persist.
+  severOnFrame(from: string, to: string, verb: number, nth = 1) {
+    this.#severOn.set(from + '>' + to, { verb, n: nth })
+  }
   partition(a: string, b: string) {
     this.#partitioned.add(pairKey(a, b))
     //! sever existing links between the pair — both ends observe linkDown, exactly like a real cable cut
@@ -217,6 +230,14 @@ export class Sim {
         const l = sim.#links.get(link)
         if (!l || !l.up) return // send into a dead link goes nowhere — exactly like a closed socket
         if (sim.#partitioned.has(pairKey(l.owner, l.peer))) return
+        //! frame trap (severOnFrame): the nth matching frame dies IN the kernel buffer as the link severs —
+        // byte [2] of a framed message is the verb (MAGIC | flags | verb), so the peek costs nothing
+        const trip = sim.#severOn.get(l.owner + '>' + l.peer)
+        if (trip && bytes[2] === trip.verb && --trip.n <= 0) {
+          sim.#severOn.delete(l.owner + '>' + l.peer)
+          sim.#sever(link, 'sever-on-frame')
+          return
+        }
         const f = sim.#faultFor(l.owner, l.peer)
         const [dMin, dMax] = f.delay ?? [1, 5]
         const deliver = () => {

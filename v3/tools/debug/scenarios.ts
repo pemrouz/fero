@@ -54,6 +54,7 @@ const tally = (sim: Sim) => {
   const t = {
     writes: 0, applied: 0, dups: 0, lwwLost: 0, ae: 0, shed: 0, redials: 0, dupLinks: 0, giveUps: 0, revives: 0,
     proposes: 0, installs: 0, evicts: 0, joins: 0, buffered: 0,
+    forwards: 0, acks: 0, nacks: 0, writeDups: 0, relays: 0,
   }
   for (const n of sim.nodes.values())
     for (const e of n.journal.read()) {
@@ -72,6 +73,11 @@ const tally = (sim: Sim) => {
       else if (e.kind === JK.evict) t.evicts++
       else if (e.kind === JK.join) t.joins++
       else if (e.kind === JK.writeBuffered) t.buffered++
+      else if (e.kind === JK.writeForward) t.forwards++
+      else if (e.kind === JK.writeAck) t.acks++
+      else if (e.kind === JK.writeNack) t.nacks++
+      else if (e.kind === JK.writeDup) t.writeDups++
+      else if (e.kind === JK.writeRelay) t.relays++
     }
   return t
 }
@@ -458,7 +464,7 @@ export const SCENARIOS: Scenario[] = [
       sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['majority-write'], value: 1 }] })
       sim.post('n03', { kind: 'write', recs: [{ type: REC.update, key: ['minority-write'], value: 2 }] })
       sim.run({ until: 5700 })
-      const gated = nodes[2].membership.pending.length === 1 && !nodes[2].state.has(JSON.stringify(['minority-write']))
+      const gated = nodes[2].writes.pending.size === 1 && !nodes[2].state.has(JSON.stringify(['minority-write']))
       sim.heal('n01', 'n03')
       sim.heal('n02', 'n03')
       sim.run({ until: 9000 })
@@ -504,7 +510,7 @@ export const SCENARIOS: Scenario[] = [
       sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['left'], value: 'L' }] })
       sim.post('n03', { kind: 'write', recs: [{ type: REC.update, key: ['right'], value: 'R' }] })
       sim.run({ until: 1700 })
-      const bothGated = nodes[0].membership.pending.length === 1 && nodes[2].membership.pending.length === 1
+      const bothGated = nodes[0].writes.pending.size === 1 && nodes[2].writes.pending.size === 1
       for (const a of ['n01', 'n02']) for (const b of ['n03', 'n04']) sim.heal(a, b)
       sim.run({ until: 3500 })
       const t = tally(sim)
@@ -519,6 +525,141 @@ export const SCENARIOS: Scenario[] = [
           { k: 'views committed', v: t.installs - 4, kind: 'count' }, // beyond the 4 genesis installs: MUST be 0
           { k: 'writes buffered', v: t.buffered, kind: 'count' },
           { k: 'ae re-shipped', v: t.ae, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'write-pipeline',
+    title: 'The write pipeline — kernel owner routing (M3)',
+    kind: 'happy',
+    desc: 'writes land on random nodes; the KERNEL routes each to its ring owner over the committed view — forwarded attempts, ACKed coordinates, one origin per partition per epoch, zero contested cells',
+    diagram: {
+      nodes: ids(3), mesh: true, writers: ids(3),
+      phases: [
+        { label: 'view 1', sev: 'info' }, { label: 'write anywhere', sev: 'gold' },
+        { label: 'forward → owner', sev: 'info' }, { label: 'stamp + ACK', sev: 'gold' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(71)
+      const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+      sim.run({ until: 400 }) // genesis: view 1 committed by ballot
+      for (let i = 0; i < 30; i++) {
+        const rec: Rec = { type: REC.update, key: [`k${i % 10}`], value: { n: i, note: `write ${i}` } }
+        sim.post(nodes[i % 3].uuid, { kind: 'write', recs: [rec] }, 450 + i * 10)
+      }
+      sim.run({ until: 2000 })
+      const capture = captureSim(sim)
+      const nContested = contested(capture).length
+      const t = tally(sim)
+      const stuck = nodes.reduce((s, n) => s + n.writes.pending.size, 0)
+      const fail =
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
+        (nodes.some((n) => n.epoch !== 1) ? 'genesis view never committed' : '') ||
+        (stuck ? `${stuck} attempts never ACKed` : '') ||
+        (nContested > 0 ? `${nContested} contested cells on the kernel-routed path` : '') ||
+        (converged(sim) ?? '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'forwarded', v: t.forwards, kind: 'count' },
+          { k: 'acked runs', v: t.acks, kind: 'count' },
+          { k: 'contested', v: nContested, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture,
+      }
+    },
+  },
+  {
+    id: 'lost-ack',
+    title: 'Lost ACK — cid dedup, original coordinates (AA #1)',
+    kind: 'unhappy',
+    desc: 'the owner commits but its ACK dies with the link (v2\'s dominant conflict source: the forwarder then self-committed a second origin) — v3 retries, the owner dedups by cid, and the duplicate ACK re-carries the ORIGINAL commit coordinates',
+    diagram: {
+      nodes: ids(3), mesh: true, faults: [['n01', 'n02']], writers: ['n01'],
+      phases: [
+        { label: 'forward', sev: 'info' }, { label: 'commit', sev: 'gold' },
+        { label: 'ACK dies', sev: 'crit' }, { label: 'retry → dedup', sev: 'warn' }, { label: 'once', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(61)
+      const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+      sim.run({ until: 400 })
+      for (const n of nodes) n.writes.ring.place('hot', 'n02')
+      sim.severOnFrame('n02', 'n01', VERB.WACK)
+      sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['hot'], value: 'exactly-once' }] })
+      sim.run({ until: 3000 })
+      const t = tally(sim)
+      const committed = nodes[1].logs.get('n02')?.filter((e) => e.rec.key[0] === 'hot').length ?? 0
+      //! the route completes by EITHER path: replication-as-ACK (the committed record carries its
+      // attempt identity back to the issuer) or the tick-clock retransmit hitting the dedup window
+      const acked = nodes[0].journal.read().filter((e) => e.kind === JK.writeAck).length
+      const fail =
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
+        (committed !== 1 ? `the write committed ${committed} times (must be exactly 1)` : '') ||
+        (acked < 1 ? 'the issuer never observed the commit (no replication-ACK, no duplicate WACK)' : '') ||
+        (nodes[0].writes.pending.size ? 'the issuer never cleared its attempt' : '') ||
+        (nodes[0].logs.get('n01') ? 'the issuer self-committed — the v2 fallback is supposed to be deleted' : '') ||
+        (converged(sim) ?? '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'commits', v: committed, kind: 'count' },
+          { k: 'acks observed', v: acked, kind: 'count' },
+          { k: 'forwards', v: t.forwards, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'parked-flush',
+    title: 'Parked flush re-validates — owner-routed, never local (AA #3/#4)',
+    kind: 'unhappy',
+    desc: 'a minority node parks a write for a partition it does not own; on heal the flush RE-RESOLVES ownership and forwards — v2 re-stamped it locally at the current epoch (a second origin); v3\'s flushed record carries the owner\'s origin',
+    diagram: {
+      nodes: ids(3), mesh: true, cut: [['n01', 'n03'], ['n02', 'n03']], writers: ['n03', 'n01'],
+      phases: [
+        { label: 'cut → park', sev: 'crit' }, { label: 'owner writes', sev: 'info' },
+        { label: 'heal', sev: 'ok' }, { label: 'flush → forward', sev: 'gold' }, { label: 'one origin', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(64)
+      const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+      sim.run({ until: 400 })
+      for (const n of nodes) n.writes.ring.place('shared', 'n01')
+      sim.partition('n01', 'n03')
+      sim.partition('n02', 'n03')
+      sim.run({ until: 600 })
+      sim.post('n03', { kind: 'write', recs: [{ type: REC.update, key: ['shared'], value: 'parked' }] })
+      sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['shared'], value: 'owner-value' }] }, 100)
+      sim.run({ until: 2000 })
+      const parked = nodes[2].writes.pending.size === 1
+      sim.heal('n01', 'n03')
+      sim.heal('n02', 'n03')
+      sim.run({ until: 6000 })
+      const t = tally(sim)
+      const atOwner = nodes[0].logs.get('n01')?.filter((e) => e.rec.key[0] === 'shared').length ?? 0
+      const fail =
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
+        (!parked ? 'the minority write did not park' : '') ||
+        (atOwner !== 2 ? `owner log holds ${atOwner} 'shared' records (want both writes)` : '') ||
+        (nodes[2].logs.get('n03') ? 'the parked write was stamped locally — the AA #3 shape' : '') ||
+        (converged(sim) ?? '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'parked', v: t.buffered, kind: 'count' },
+          { k: 'flushed via owner', v: atOwner, kind: 'count' },
+          { k: 'forwards', v: t.forwards, kind: 'count' },
           { k: 'events', v: sim.events, kind: 'count' },
         ],
         capture: captureSim(sim),
