@@ -421,14 +421,17 @@ export class Writes {
     if (origin === node.uuid) { j.armed && j.emit(JK.dupDrop, origin, seq); return }
     //! Lamport merge-up on RECEIPT (even for LWW losers) — the next local write must be causally newest
     if (seq > node.seq) node.seq = seq
-    let s = node.streams.get(origin)
-    if (!s) { s = { seen: 0 }; node.streams.set(origin, s) }
-    if (seq <= s.seen) { j.armed && j.emit(JK.dupDrop, origin, seq); return }
-    s.seen = seq
+    const d = node.streams.for(origin)
+    //! the APPLIED watermark advances at the dedup decision (LWW losers included — losing is not loss)
+    if (seq <= d.applied) { j.armed && j.emit(JK.dupDrop, origin, seq); return }
+    d.applied = seq
     const rec = rv.rec() // ONE copy out of the receive chunk, shared by the log entry and the apply
     const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch }
     if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
     node.logFor(origin).push(entry)
+    //! the SHIPPABLE watermark advances at the log append — the sole evidence confirm:'replicated'
+    // may ever read (M4c); synchronous with applied today, a distinct site by design
+    d.shippable = seq
     node.apply(rec, origin, seq, epoch)
     j.armed && j.emit(JK.applyInbound, origin, seq)
     if (rv.issuer) {

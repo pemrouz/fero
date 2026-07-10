@@ -34,7 +34,8 @@ export const captureNode = (node: Node) => ({
     ]),
   ),
   state: [...node.state].map(([k, v]) => [k, encodeVal(v)]),
-  streams: Object.fromEntries([...node.streams].map(([origin, s]) => [origin, s.seen])),
+  //! the full watermark ladder per stream (M4a): a = applied, s = shippable, d = durable
+  streams: Object.fromEntries([...node.streams].map(([origin, w]) => [origin, { a: w.applied, s: w.shippable, d: w.durable }])),
   links: [...node.links.values()].map((l) => ({
     id: l.id, uuid: l.uuid, dialed: l.dialed, admitted: l.state === LS.admitted, synced: l.synced,
     paused: l.paused, queued: l.queued.length,

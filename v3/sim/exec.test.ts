@@ -182,7 +182,8 @@ test('the periodic AE floor heals loss that NO event announces (digest exchange 
   const k = JSON.stringify(['x'])
   b.state.delete(k)
   b.versions.delete(k)
-  b.streams.get('n01')!.seen = 0
+  const w = b.streams.get('n01')!
+  w.applied = w.shippable = w.durable = 0 // the whole ladder forgets — total silent loss of the stream
   b.logs.delete('n01')
   assert.notEqual(converged(sim), null, 'diverged, with no reconnect/drain signal to trigger healing')
   sim.run({ until: 1000 }) // ≥1 heartbeat: the floor digests announce, n01 re-ships the missing suffix

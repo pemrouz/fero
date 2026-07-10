@@ -169,20 +169,35 @@ export const perEvent = () => [
     // broke. Keyed to the node OBJECT: a restarted node legitimately restarts its watermarks from 0.
     name: 'watermark-monotone',
     check: (() => {
-      const last = new Map<string, { node: Node; seen: number }>()
+      const last = new Map<string, { node: Node; applied: number }>()
       return (sim: Sim): string | null => {
         for (const [id, n] of sim.nodes)
           for (const [origin, s] of n.streams) {
             const k = id + '|' + origin
             let prev = last.get(k)
-            if (!prev || prev.node !== n) prev = { node: n, seen: 0 }
-            if (s.seen < prev.seen) return `${id} stream ${origin} watermark went backwards: ${s.seen} < ${prev.seen}`
-            prev.seen = s.seen
+            if (!prev || prev.node !== n) prev = { node: n, applied: 0 }
+            if (s.applied < prev.applied) return `${id} stream ${origin} watermark went backwards: ${s.applied} < ${prev.applied}`
+            prev.applied = s.applied
             last.set(k, prev)
           }
         return null
       }
     })(),
+  },
+  {
+    //! the watermark LADDER (M4a, plan §5 verbatim): applied ≥ shippable ≥ durable, per stream, at every
+    // instant. This ordering is what makes v2's recvReplProbe false positive unwritable — evidence for a
+    // stronger guarantee can never run ahead of the weaker one it implies. Durable stays 0 until M4b's
+    // storage lands; the monitor is armed FIRST so nothing can ever violate the contract unobserved.
+    name: 'watermark-ordering',
+    check: (sim: Sim): string | null => {
+      for (const [id, n] of sim.nodes)
+        for (const [origin, s] of n.streams) {
+          if (s.shippable > s.applied) return `${id} stream ${origin}: shippable ${s.shippable} > applied ${s.applied}`
+          if (s.durable > s.shippable) return `${id} stream ${origin}: durable ${s.durable} > shippable ${s.shippable}`
+        }
+      return null
+    },
   },
 ]
 
