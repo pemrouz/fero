@@ -271,6 +271,9 @@ import { decodeVal, kindNames, cellKey, stateAt, verifyReplay, routes, contested
 // through here before touching innerHTML; capture content is arbitrary user data.
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const klog = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+'k' : ''+n;
+// watermark normalizer: M4a captures carry the ladder {a: applied, s: shippable, d: durable};
+// pre-M4a captures carried a bare number (the applied watermark) — both stay renderable.
+const wm = v => typeof v === 'number' ? { a: v, s: v, d: 0 } : (v || { a: 0, s: 0, d: 0 });
 
 // ── value rendering: decodeVal() then a bounded one-line preview ──
 // strings '…' ~32 · numbers literal (NaN/-0/±Infinity survive the codec)
@@ -483,10 +486,10 @@ const buildForest = (capture, T) => {
                + stat(l.queued, 'queued', 'frames waiting in the outbox', 84, l.queued ? 'warn' : ''),
         entity: { kind: 'link', link: l, node: n }, f: { node: n.uuid, link: flags }, kids: [] };
     });
-    const streams = Object.entries(n.streams || {}).map(([origin, seen]) => ({
+    const streams = Object.entries(n.streams || {}).map(([origin, w]) => ({
       key: nk + '/g/streams/' + origin, type: 'stream', label: origin, icon: '∿', sev: '', pill: null,
-      metaRaw: stat('seen ' + seen, '', 'per-origin high-water — highest contiguous seq applied from this origin', 110),
-      entity: { kind: 'stream', origin, seen, node: n }, f: { node: n.uuid }, kids: [] }));
+      metaRaw: stat('applied ' + wm(w).a, '', 'the watermark ladder: applied (dedup) ≥ shippable (logged) ≥ durable (fsynced)', 110),
+      entity: { kind: 'stream', origin, w: wm(w), node: n }, f: { node: n.uuid }, kids: [] }));
     const jstat = klog(n.journal.length) + (n.dropped > 0 ? ' +' + klog(n.dropped) : '');
     return { key: nk, type: 'node', label: n.uuid, icon: '▢', sev, pill,
       metaRaw: stat(n.seq ?? '—', 'seq', 'Lamport clock — this node’s next write stamp', 66)
@@ -845,7 +848,7 @@ function renderStatus(){
   } else if (node.type === 'link'){
     sb.innerHTML = `link · ${sst(node.sev, node.pill ? node.pill.lab : 'up')} · queued ${e.link.queued}`;
   } else if (node.type === 'stream'){
-    sb.innerHTML = `stream ${esc(e.origin)} · seen ${esc(String(e.seen))}`;
+    sb.innerHTML = `stream ${esc(e.origin)} · applied ${esc(String(e.w.a))} · shippable ${esc(String(e.w.s))} · durable ${esc(String(e.w.d))}`;
   } else if (node.type === 'violation'){
     sb.innerHTML = sst('crit', 'invariant violated');
   } else sb.innerHTML = headerFacts();
@@ -911,10 +914,10 @@ function inspNode(nd){
   const links = n.links.length
     ? `<table class="vt"><thead><tr><th>peer</th><th>side</th><th>state</th><th>queued</th></tr></thead><tbody>${lrows}</tbody></table>`
     : `<div class="reason">No links.</div>`;
-  const srows = Object.entries(n.streams || {}).map(([o, seen]) =>
-    `<tr><td class="node">${ref(o, 'g/nodes/' + o)}</td><td>${esc(String(seen))}</td><td>${(n.logs[o] || []).length}</td></tr>`).join('');
+  const srows = Object.entries(n.streams || {}).map(([o, v]) => { const w = wm(v); return (
+    `<tr><td class="node">${ref(o, 'g/nodes/' + o)}</td><td>${esc(String(w.a))}</td><td>${esc(String(w.s))}</td><td>${esc(String(w.d))}</td><td>${(n.logs[o] || []).length}</td></tr>`)}).join('');
   const streams = srows
-    ? `<table class="vt"><thead><tr><th>origin</th><th>seen</th><th>log records</th></tr></thead><tbody>${srows}</tbody></table>`
+    ? `<table class="vt"><thead><tr><th>origin</th><th>applied</th><th>shippable</th><th>durable</th><th>log records</th></tr></thead><tbody>${srows}</tbody></table>`
     : `<div class="reason">No inbound streams yet.</div>`;
   // the journal mini-log — newest first, human-readable via the capture's vocab
   const jr = n.journal.slice(-15).reverse();

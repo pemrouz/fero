@@ -28,6 +28,7 @@ import { Link, LS, dialedByLower } from './link.ts'
 import { JK, Journal } from './journal.ts'
 import { Membership } from './membership.ts'
 import { Writes } from './write.ts'
+import { Streams } from './streams.ts'
 import { REC, TAG, type Env, type Event, type Rec } from './env.ts'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
@@ -44,19 +45,6 @@ export interface NodeOpts {
   boot?: { epoch: number; members: [string, string][] }
 }
 
-//! Stream: per-origin ingest state — a single monotone high-water (the `applied` watermark, M0 form).
-// Seqs are LAMPORT stamps, so per-origin streams are monotone but NOT contiguous
-// (the clock merges up on receipt — a local write after hearing seq 9 stamps 10+).
-// Dedup is therefore gap-tolerant: over a FIFO link from the single broadcaster,
-// any arrival ≤ seen is a genuine duplicate and any arrival > seen is new — this
-// is exactly what the in-order-single-broadcaster protocol requirement licenses
-// (plan §5 ordering contract), stated here instead of living as v2 folklore.
-// The plan's three-watermark descriptor (applied/shippable/durable) grows FROM
-// this object at M1/M4 — one more field each, never one more parallel map
-// (v2's seen/marks/persisted/versions constellation is the anti-pattern).
-interface Stream {
-  seen: number // highest applied-or-skipped seq for this origin — the applied watermark
-}
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
 // heartbeats on, the heartbeat tick revives given-up targets (JK.revive) — give-up is a cool-down.
 export const MAX_REDIALS = 10
@@ -82,7 +70,12 @@ export class Node {
   // bounded pending queue. Local 'write' events, forwarded WRITE frames, and inbound RECORDS all
   // enter the system through this object (kernel/write.ts is the stamp-site module).
   writes = new Writes()
-  streams = new Map<string, Stream>()
+  //! streams (M4a): per-origin descriptors carrying the watermark ladder {applied, shippable, durable}
+  // (kernel/streams.ts). Seqs are LAMPORT stamps — monotone per origin but NOT contiguous (the clock
+  // merges up on receipt), so dedup on `applied` is gap-tolerant: over a FIFO link from the single
+  // broadcaster, any arrival ≤ applied is a genuine duplicate and any arrival > applied is new (the
+  // plan §5 ordering contract, stated here instead of living as v2 folklore).
+  streams = new Streams()
   //! versions: per-cell LWW stamps, lexicographic (epoch, seq, origin) — the ONE conflict-resolution rule (plan §5).
   // Cells are full key paths (field-granular); a remove leaves its stamp as a
   // tombstone so a slower concurrent update cannot resurrect the value. Tombstone
@@ -322,6 +315,10 @@ export class Node {
       this.logFor(this.uuid).push(entry) // the record is OWNED from here (embedder hands it over)
       this.apply(rec, this.uuid, seq, this.epoch)
       j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
+      //! the own stream's ladder advances at the stamp site: applied+shippable together (logged and
+      // applied in this same step); durable waits for the M4b storage batch to resolve
+      const d = this.streams.for(this.uuid)
+      d.applied = d.shippable = seq
       for (const link of this.links.values())
         //! live records flow only on SYNCED links (admitted + peer digest received): anything earlier is
         // covered by the digest-triggered suffix ship, and sending it live would leapfrog that suffix on
