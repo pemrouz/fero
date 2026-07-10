@@ -345,6 +345,11 @@ because state is a deterministic fold of the journal'd inputs.
   MAX_PENDING=1024 that is real, counted loss.
 - **The guarantee ladder / confirm (M4); storage/WAL (M4); the public
   `fero(name, opts)` API over `$()` proxies + the client cid-overlay (M5).**
+  The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is written:
+  [CHECKPOINT.md](CHECKPOINT.md) — verdict: no overrun, ladder armed but not
+  triggered, M4 sliced into five landable increments (M4a streams/watermarks →
+  M4b storage seam + boot record → M4c confirm ladder → M4d log/compaction →
+  M4e the restore-from-WAL-only proof), each closing named debts from the ledger.
 - **Not yet verified (tracked, per plan §7/§11):** the zero-alloc claim is
   structural (method-per-kind sink), not yet counter-verified (--expose-gc heap
   deltas are an M8 pinned-runner deliverable). The replay-refold check HAS landed
