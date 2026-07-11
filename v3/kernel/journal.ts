@@ -74,6 +74,9 @@ export const JK = {
   //! ── M4c confirm vocabulary (the guarantee ladder) ──
   confirmReq: 49,    // a=id, b=level (CONFIRM.*), c=origin — a probe opened
   confirmed: 50,     // a=id, b=ok(0|1), c=memberCount — a probe answered (false = cancel/overflow, an honest reject)
+  //! ── M4d compaction vocabulary ──
+  compacted: 51,     // a=origin, b=droppedEntries — a prefix ≤ the frontier collapsed to its snapshot records
+  tombstoneGC: 52,   // a=droppedStamps — remove-versions nothing can contest anymore were released
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

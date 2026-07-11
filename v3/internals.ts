@@ -11,6 +11,7 @@ export { Writes, NACK, MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from 
 export { Ring, VNODES } from './kernel/ring.ts'
 export { Streams, StreamDescriptor } from './kernel/streams.ts'
 export { Confirm, CONFIRM, MAX_PROBES } from './kernel/confirm.ts'
+export { frontier, compact, gcTombstones, maybeCompact, COMPACT_AT } from './kernel/log.ts'
 export { Link, LS, MAX_QUEUED } from './kernel/link.ts'
 export { Journal, JK, type JEvent } from './kernel/journal.ts'
 export {

@@ -68,6 +68,10 @@ export class Confirm {
     if (p) this.#answer(node, p, false, this.#count(node, p))
   }
 
+  //! mark — a peer's recorded shippable tail for an origin (0 = never announced). The compaction
+  // frontier (kernel/log.ts) reads these: a cut is safe only when EVERY member is provably past it.
+  mark(uuid: string, origin: string): number { return this.#marks.get(uuid)?.get(origin)?.s ?? 0 }
+
   //! feed — a peer digest announced its tails: record (monotone) and recount. `d` < 0 means the digest
   // carried no durable map (a non-durable peer) — its durable evidence never advances.
   feed(node: Node, uuid: string, origin: string, s: number, d: number) {

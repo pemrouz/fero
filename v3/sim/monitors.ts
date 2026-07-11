@@ -81,6 +81,7 @@ export const perEvent = () => [
             const k = id + '|' + origin
             let prev = tail.get(k)
             if (!prev || prev.node !== n) prev = { node: n, len: 0 }
+            if (entries.length < prev.len) prev.len = 0 // compaction shrank the log — rescan (idempotent)
             if (entries.length > prev.len) {
               for (let i = Math.max(prev.len, 1); i < entries.length; i++)
                 if (entries[i].seq <= entries[i - 1].seq)
@@ -114,6 +115,7 @@ export const perEvent = () => [
             const k = id + '|' + origin
             let prev = tail.get(k)
             if (!prev || prev.node !== n) prev = { node: n, len: 0 }
+            if (entries.length < prev.len) prev.len = 0 // compaction shrank the log — rescan (idempotent)
             if (entries.length > prev.len) {
               const w = writerOf(origin)
               for (let i = prev.len; i < entries.length; i++) {
@@ -149,6 +151,7 @@ export const perEvent = () => [
             const k = id + '|' + origin
             let prev = tail.get(k)
             if (!prev || prev.node !== n) prev = { node: n, len: 0 }
+            if (entries.length < prev.len) prev.len = 0 // compaction shrank the log — rescan (idempotent)
             if (entries.length > prev.len) {
               for (let i = prev.len; i < entries.length; i++) {
                 const e = entries[i]

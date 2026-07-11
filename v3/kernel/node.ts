@@ -30,6 +30,7 @@ import { Membership } from './membership.ts'
 import { Writes } from './write.ts'
 import { Streams } from './streams.ts'
 import { Confirm } from './confirm.ts'
+import { maybeCompact } from './log.ts'
 import { REC, TAG, type Env, type Event, type Rec } from './env.ts'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
@@ -347,6 +348,8 @@ export class Node {
           //! the write pipeline's retry clock: in-flight attempts whose ACK/NACK never arrived re-park
           // after RETRY_TICKS and re-resolve + re-forward (cid dedup makes every retransmit safe).
           this.writes.tick(this)
+          //! compaction rides the same clock (M4d): size-armed, frontier-bounded, journal-surfaced
+          maybeCompact(this)
           //! give-up revival: a target whose final redial attempt FAILED (gaveUp — never merely "tries
           // exhausted": the last armed attempt may still be pending, and dialing over it would fork a
           // second chain) is parked, not dead — each heartbeat re-dials any parked target we hold no link
