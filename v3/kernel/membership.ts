@@ -120,7 +120,7 @@ export class Membership {
   #rejoinTicks = 0
   #wasOpen = true // last journaled gate state, for transition events
 
-  constructor(boot?: { epoch: number; members: [string, string][] }) {
+  constructor(boot?: { epoch: number; members: [string, string][]; votedFor?: { e: number; p: string; h: string } }) {
     if (boot && boot.epoch > 0 && viewOk(boot.members)) {
       //! the restored view WAS committed — it seeds ballot arithmetic and pull targets. But the node is
       // REJOINING: read-only until a live peer (or the rejoin self-ballot) confirms a view ≥ this epoch
@@ -128,6 +128,9 @@ export class Membership {
       this.view = { epoch: boot.epoch, members: sorted(boot.members) }
       this.rejoinFloor = boot.epoch
     }
+    //! the restored SPENT ballot (M4b): a crash inside one ballot round restarts remembering who it
+    // voted for — the M2 double-vote-after-restart debt is unrepresentable once this rides the WAL
+    if (boot?.votedFor) this.votedFor = { ...boot.votedFor }
   }
 
   //! isMember — of the COMMITTED view (open genesis has no members: nobody is excluded).
@@ -298,7 +301,12 @@ export class Membership {
     // same proposer (his abandoned/re-offered ballots — at most one of HIS can commit; a rejoining node
     // may vote: voting is not writing)
     const grant = v.e === this.view.epoch + 1 && !this.epochStale && (this.votedFor.e < v.e || this.votedFor.p === proposer)
-    if (grant) this.votedFor = { e: v.e, p: proposer, h }
+    if (grant) {
+      this.votedFor = { e: v.e, p: proposer, h }
+      //! the vote is DURABLE before the VOTE frame leaves (sink.boot precedes the ship in this step —
+      // the env contract): a crash between grant and send must not forget the spent ballot
+      node.persistBoot()
+    }
     j.armed && j.emit(JK.vote, v.e, grant ? 1 : 0, proposer)
     link.ship(encodeControl(VERB.VOTE, { e: v.e, g: grant ? 1 : 0, ce: this.view.epoch, h }), node.env.sink, j)
   }
@@ -347,6 +355,7 @@ export class Membership {
       if (!view.members.some((m) => m[0] === u)) j.armed && j.emit(JK.evict, u)
     this.view = { epoch: view.epoch, members: sorted(view.members) }
     node.epoch = view.epoch
+    node.persistBoot() // the committed view is a durable fact from the instant it installs
     j.armed && j.emit(JK.viewInstall, view.epoch, view.members.length)
     if (this.epochStale && view.epoch >= this.#staleWant) { this.epochStale = false; this.#pullTicks = 0 }
     if (this.rejoining() && view.epoch >= this.rejoinFloor) this.rejoinFloor = 0
@@ -383,6 +392,7 @@ export class Membership {
     if (this.votedFor.e >= view.epoch && this.votedFor.p !== node.uuid) return
     const h = hashOf(view.members)
     this.votedFor = { e: view.epoch, p: node.uuid, h }
+    node.persistBoot() // the self-vote is spent — durable before any PROPOSE frame leaves
     this.#proposal = { view, old: this.view.members.map((m) => m[0]), h, votes: new Set([node.uuid]), ticks: 0, age: 0 }
     node.journal.armed && node.journal.emit(JK.propose, view.epoch, view.members.length)
     //! a solo proposal (single-member old and new sets) commits immediately — solo boot mode

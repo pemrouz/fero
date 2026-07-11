@@ -105,6 +105,9 @@ export const perEvent = () => [
     check: (() => {
       const owner = new Map<string, string>()
       const tail = new Map<string, { node: Node; len: number }>()
+      //! provenance LANES (uuid~incarnation) normalize to the NODE: the invariant is one WRITER per
+      // (partition, epoch), and a reborn life stamping the partition its uuid still owns is the same writer
+      const writerOf = (origin: string) => { const i = origin.indexOf('~'); return i < 0 ? origin : origin.slice(0, i) }
       return (sim: Sim): string | null => {
         for (const [id, n] of sim.nodes)
           for (const [origin, entries] of n.logs) {
@@ -112,14 +115,15 @@ export const perEvent = () => [
             let prev = tail.get(k)
             if (!prev || prev.node !== n) prev = { node: n, len: 0 }
             if (entries.length > prev.len) {
+              const w = writerOf(origin)
               for (let i = prev.len; i < entries.length; i++) {
                 const e = entries[i]
                 if (e.epoch === 0) continue
                 const pk = partitionOf(e.rec) + '|' + e.epoch
                 const held = owner.get(pk)
-                if (held === undefined) owner.set(pk, origin)
-                else if (held !== origin)
-                  return `TWO origins stamped partition '${partitionOf(e.rec)}' at epoch ${e.epoch}: ${held} and ${origin} (seen at ${id})`
+                if (held === undefined) owner.set(pk, w)
+                else if (held !== w)
+                  return `TWO writers stamped partition '${partitionOf(e.rec)}' at epoch ${e.epoch}: ${held} and ${w} (seen at ${id})`
               }
               prev.len = entries.length
             }

@@ -23,7 +23,7 @@
 // (v2's applying/committingForward/discarding flag family) has no place to
 // exist. That whole guard menagerie is deleted by construction, not by care.
 
-import { FrameError, VERB, encodeControl, encodeRuns, type AttemptRun, type Frame } from './codec.ts'
+import { Framer, FrameError, VERB, encodeControl, encodeRuns, type AttemptRun, type Frame } from './codec.ts'
 import { Link, LS, dialedByLower } from './link.ts'
 import { JK, Journal } from './journal.ts'
 import { Membership } from './membership.ts'
@@ -40,19 +40,38 @@ export interface NodeOpts {
   heartbeatMs?: number   // 0 = off (EXPLICIT protocol mode, not a magic duration)
   redialMs?: number      // backoff base; cap = 32x base
   journalCap?: number    // diagnostics ring size — captures that want full-history time-travel raise it
-  //! boot record seam (plan §5 boot modes; persistence itself lands with M4's WAL): a restored view.
-  // A node booted with epoch > 0 is REJOINING — read-only until a committed view ≥ this epoch installs.
-  boot?: { epoch: number; members: [string, string][] }
+  //! durable (M4b): EXPLICIT protocol mode like heartbeatMs — when true, every committed/ingested run
+  // is WAL'd via sink.persist and the boot record is maintained via sink.boot. Off (the default, and
+  // the sweep mode) emits ZERO storage effects: trajectories stay byte-identical with M0-M3.
+  durable?: boolean
+  //! boot record (plan §5 boot modes): the DURABLE facts a restart trusts — the restored committed view
+  // (a node booted with epoch > 0 is REJOINING: read-only until a committed view ≥ this epoch is
+  // confirmed live), the Lamport floor, and the spent ballot identity (votedFor durability is what makes
+  // a crash inside one ballot round unable to double-vote — the M2 debt, closed here).
+  boot?: { epoch: number; members: [string, string][]; lamport?: number; votedFor?: { e: number; p: string; h: string } }
 }
 
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
 // heartbeats on, the heartbeat tick revives given-up targets (JK.revive) — give-up is a cool-down.
 export const MAX_REDIALS = 10
+//! LAMPORT_LEASE: how far past the durable clock ceiling a node may stamp before re-persisting the
+// boot record. A restore resumes AT the ceiling, so no seq can ever be issued twice across lives —
+// the lease is what keeps that guarantee off the per-write hot path (one cold boot-write per LEASE).
+export const LAMPORT_LEASE = 4096
 
 export class Node {
   readonly uuid: string
   readonly listen: string
   readonly incarnation: number
+  //! origin — THE PROVENANCE LANE this life stamps under: the bare uuid for incarnation 1, uuid~inc
+  // for reborn lives (so first lives — and every pre-M4 trajectory — are byte-identical on the wire).
+  // The lane is what makes crash recovery structurally sound: a previous life's stream becomes an
+  // IMMUTABLE FOREIGN stream the reborn re-syncs via ordinary suffix anti-entropy (its chain-truncated
+  // replay left a clean tail), instead of an unhealable interior hole inside one shared log — one log
+  // cannot serve two lives once the clock lease jumps past the lost records. The Lamport CEILING keeps
+  // new-lane stamps LWW-dominant over everything the old lane wrote ("incarnation fences flappers and
+  // stops dead-origin debris" — plan §5, made concrete). Old lanes are debris compaction sweeps (M4d).
+  readonly origin: string
   journal: Journal
   //! links by env-minted id; byUuid enforces one-logical-link-per-pair (kernel/link.ts keeper rule)
   links = new Map<number, Link>()
@@ -118,16 +137,35 @@ export class Node {
   env: Env
   #opts: NodeOpts
 
+  //! M4b storage plumbing: WAL batches in flight (batch → per-origin max seq, resolved into the durable
+  // watermark on the 'persisted' echo), the per-origin WAL CHAIN TAIL (each row records the seq its
+  // origin's chain stood at — replay's interior-hole detector), the dead-WAL latch (a persistFail is
+  // terminal: fsyncgate — a store that failed once may have lied about anything since), and the
+  // boot-time replay framer. All empty/idle when durable is off.
+  #batchSeq = 0
+  #inflight = new Map<number, Map<string, number>>()
+  walTail = new Map<string, number>()
+  #walDead = false
+  #seqCeiling = 0
+  #replayer: Framer | null = null
+
   constructor(opts: NodeOpts, env: Env) {
     this.env = env
     this.journal = new Journal(opts.journalCap)
     this.uuid = opts.uuid
     this.listen = opts.listen ?? ''
     this.incarnation = opts.incarnation ?? 1
+    this.origin = this.incarnation > 1 ? `${this.uuid}~${this.incarnation}` : this.uuid
     this.membership = new Membership(opts.boot)
     this.epoch = this.membership.view.epoch // a restored node stamps at its restored epoch, never below it
+    //! the Lamport floor from the boot record: even if the WAL tail was torn, the clock never restarts
+    // below the last durably-recorded stamp (seq reuse under one origin would collide provenance)
+    this.seq = opts.boot?.lamport ?? 0
     this.#opts = opts
   }
+
+  //! durable — the M4 storage mode (explicit, like heartbeats). Off ⇒ zero storage effects.
+  get durable(): boolean { return this.#opts.durable === true }
 
   //! hosts — the static discovery targets (membership's genesis quorum + the revival loop read it).
   get hosts(): string[] { return this.#opts.hosts ?? [] }
@@ -155,11 +193,49 @@ export class Node {
     switch (e.kind) {
       case 'start': {
         j.armed && j.emit(JK.start)
+        this.persistBoot() // the incarnation bump is a durable fact from the first instant
         for (const to of this.#opts.hosts ?? []) if (to !== this.listen) {
           j.armed && j.emit(JK.dial, to)
           this.env.sink.connect(to)
         }
         if ((this.#opts.heartbeatMs ?? 0) > 0) this.#armHeartbeat()
+        return
+      }
+      //! M4b storage echoes: a WAL batch resolved (advance the durable watermarks it covered) or failed
+      // (surfaced alarm — durable simply never advances past the hole; confirm:'persisted' becomes
+      // unreachable there, which is the honest answer).
+      case 'persisted': {
+        const covered = this.#inflight.get(e.batch)
+        if (!covered) return // unknown/duplicate echo — ignored by id, like timers
+        this.#inflight.delete(e.batch)
+        for (const [origin, maxSeq] of covered) {
+          const d = this.streams.for(origin)
+          if (maxSeq > d.durable) d.durable = maxSeq
+        }
+        j.armed && j.emit(JK.persisted, e.batch)
+        return
+      }
+      case 'persistFail': {
+        this.#inflight.delete(e.batch)
+        //! TERMINAL (the fsyncgate policy): a store that failed one batch may have lied about anything
+        // after it — rows persisted past a failure would replay as a chain built on sand. The WAL is
+        // dead from here: durable freezes, the alarm is the operator's problem, replication is untouched.
+        this.#walDead = true
+        j.armed && j.emit(JK.persistFail, e.batch, e.reason)
+        return
+      }
+      //! M4b replay: WAL bytes re-enter through the SAME ingest (source=replay in kernel/write.ts),
+      // original provenance, before the network exists. The boot framer re-slices exactly like a link's.
+      case 'replay': {
+        this.#replayer ??= new Framer()
+        try {
+          for (const f of this.#replayer.push(e.bytes)) this.writes.replay(this, f, e.prev ?? 0)
+        } catch (err) {
+          if (!(err instanceof FrameError)) throw err
+          //! a torn WAL tail decodes as a truncated/corrupt frame — surfaced, replay stops at the tear
+          j.armed && j.emit(JK.frameDrop, -1, `wal: ${err.message}`)
+          this.#replayer = new Framer()
+        }
         return
       }
       case 'linkUp': {
@@ -306,29 +382,70 @@ export class Node {
   // exactly-once then survives an ownership move (adversarial-review critical).
   commit(recs: Rec[], attempt?: AttemptRun): number {
     const j = this.journal
+    //! the clock lease: stamping past the durable ceiling re-persists the boot record FIRST (sink.boot
+    // is synchronous by contract), so a crash at ANY instant restores to a ceiling no stamp ever passed
+    if (this.durable && this.seq + recs.length > this.#seqCeiling) this.persistBoot()
     const s0 = this.seq + 1
     for (let k = 0; k < recs.length; k++) {
       const rec = recs[k]
       const seq = ++this.seq
       const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch: this.epoch }
       if (attempt) { entry.iss = attempt.issuer; entry.cid = attempt.baseCid + k }
-      this.logFor(this.uuid).push(entry) // the record is OWNED from here (embedder hands it over)
-      this.apply(rec, this.uuid, seq, this.epoch)
+      this.logFor(this.origin).push(entry) // the record is OWNED from here (embedder hands it over)
+      this.apply(rec, this.origin, seq, this.epoch)
       j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
-      //! the own stream's ladder advances at the stamp site: applied+shippable together (logged and
+      //! the own lane's ladder advances at the stamp site: applied+shippable together (logged and
       // applied in this same step); durable waits for the M4b storage batch to resolve
-      const d = this.streams.for(this.uuid)
+      const d = this.streams.for(this.origin)
       d.applied = d.shippable = seq
       for (const link of this.links.values())
         //! live records flow only on SYNCED links (admitted + peer digest received): anything earlier is
         // covered by the digest-triggered suffix ship, and sending it live would leapfrog that suffix on
         // the wire and turn it into permanently-dropped "duplicates" at the receiver (the sweep-found bug)
         if (link.state === LS.admitted && link.synced)
-          link.add(rec, { origin: this.uuid, baseSeq: seq, epoch: this.epoch },
+          link.add(rec, { origin: this.origin, baseSeq: seq, epoch: this.epoch },
             attempt ? { issuer: attempt.issuer, baseCid: attempt.baseCid + k } : undefined)
     }
     for (const link of this.links.values()) link.flush(this.env.sink, j)
+    //! WAL the committed run (durable mode): the row is the SAME encoded frame shape the wire carries —
+    // one format for log entry, WAL row, and payload (plan §7). One contiguous run ⇒ one frame.
+    if (this.durable && recs.length) {
+      const tail = this.logFor(this.origin).slice(-recs.length)
+      const [bytes] = encodeRuns(tail.map((e) => ({ rec: e.rec, origin: this.origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid })))
+      this.persistRun(this.origin, this.seq, bytes)
+    }
     return s0
+  }
+
+  //! persistRun — leave one encoded frame with the store (durable mode only): mint the batch id, record
+  // which (origin, maxSeq) the resolution will advance, link the row into the origin's chain (replay's
+  // interior-hole detector), journal, emit. Kernel-internal (commit + ingest + replay's chain re-seed).
+  persistRun(origin: string, maxSeq: number, bytes: Uint8Array) {
+    if (!this.durable || this.#walDead) return
+    const batch = ++this.#batchSeq
+    const prev = this.walTail.get(origin) ?? 0
+    this.walTail.set(origin, maxSeq)
+    this.#inflight.set(batch, new Map([[origin, maxSeq]]))
+    this.journal.armed && this.journal.emit(JK.persist, batch, bytes.length)
+    this.env.sink.persist(batch, bytes, prev)
+  }
+
+  //! persistBoot — (re)write the durable boot record: the committed view, the Lamport CEILING (the
+  // lease — see LAMPORT_LEASE), the incarnation, and the SPENT ballot identity (a vote must be durable
+  // before the VOTE frame leaves — membership calls this before shipping; the env's boot() contract is
+  // write-before-later-sends).
+  persistBoot() {
+    if (!this.durable) return
+    const m = this.membership
+    this.#seqCeiling = this.seq + LAMPORT_LEASE
+    this.env.sink.boot({
+      epoch: m.view.epoch,
+      members: m.view.members.map((x) => [x[0], x[1]] as [string, string]),
+      lamport: this.#seqCeiling,
+      incarnation: this.incarnation,
+      votedFor: { ...m.votedFor },
+    })
+    this.journal.armed && this.journal.emit(JK.bootWrite, m.view.epoch, m.votedFor.e)
   }
 
   #armHeartbeat() {
@@ -437,7 +554,14 @@ export class Node {
         //! the epoch-staleness contract (plan §5): a record stamped above my committed view epoch is
         // evidence of a view I missed — close the gate NOW and pull the view on this same link
         if (prov.epoch > this.epoch) this.membership.staleObserved(this, prov.epoch, link)
-        for (const rv of f.records()) this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)
+        let fresh = 0
+        let maxSeq = 0
+        for (const rv of f.records())
+          if (this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)) { fresh++; maxSeq = rv.seq }
+        //! WAL the frame when it carried anything new (durable mode) — the received bytes ARE the row
+        // (copied out: the frame is a view pinned to the receive chunk). Duplicate records inside a
+        // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent.
+        if (fresh && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice())
         return
       }
       //! M3 write pipeline — WRITE (a forwarded attempt run / a client relay), WACK (commit

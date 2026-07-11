@@ -21,6 +21,8 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     timer: (id, tag, ms) => effects.push(['timer', id, tag, ms]),
     cancel: (id) => effects.push(['cancel', id]),
     apply: (rec) => effects.push(['apply', rec]),
+    persist: (batch, bytes) => effects.push(['persist', batch, bytes]),
+    boot: (record) => effects.push(['boot', record]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }
   const node = new Node({ uuid, listen: `sim:${uuid}`, heartbeatMs: 50, ...opts }, env)
