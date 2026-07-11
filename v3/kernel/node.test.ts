@@ -24,6 +24,7 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     apply: (rec) => effects.push(['apply', rec]),
     persist: (batch, bytes) => effects.push(['persist', batch, bytes]),
     boot: (record) => effects.push(['boot', record]),
+    confirm: (id, ok, count) => effects.push(['confirm', id, ok, count]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }
   const node = new Node({ uuid, listen: `sim:${uuid}`, ...opts }, env)

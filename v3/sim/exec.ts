@@ -90,6 +90,9 @@ export class Sim {
   stores = new Map<string, SimStore>()
   #storeFaults = new Map<string, StoreFault>()
   #nodeOpts = new Map<string, NodeOpts>()
+  //! M4c: every confirm probe posted through the executive is tracked to its answer — the
+  // no-confirmed-write-lost check (monitors.confirmedIntact) walks the ok-resolved ones at end-of-run
+  confirms = new Map<string, { uuid: string; id: number; origin: string; seq: number; level: number; ok?: boolean; count?: number }>()
   seed: number
 
   constructor(seed: number, defaults: Fault = {}) {
@@ -135,6 +138,8 @@ export class Sim {
 
   //! post — deliver an event to a node after `delay` virtual ms.
   post(uuid: string, ev: Event, delay = 0) {
+    if (ev.kind === 'confirm')
+      this.confirms.set(uuid + '|' + ev.id, { uuid, id: ev.id, origin: ev.origin, seq: ev.seq, level: ev.level })
     this.#schedule(delay, () => this.#step(uuid, ev))
   }
 
@@ -320,6 +325,10 @@ export class Sim {
         })
       },
       boot(record) { sim.stores.get(me)!.boot = record },
+      confirm(id, ok, count) {
+        const c = sim.confirms.get(me + '|' + id)
+        if (c) { c.ok = ok; c.count = count }
+      },
     }
   }
 }

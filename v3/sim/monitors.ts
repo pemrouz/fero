@@ -229,6 +229,21 @@ export const converged = (sim: Sim): string | null => {
   return null
 }
 
+//! confirmedIntact — the no-confirmed-write-lost check (plan §6): every probe the ladder answered OK
+// names a record that must still EXIST — in at least one live node's log always, and (R=∞, converged)
+// in EVERY live node's log. Run at end-of-horizon like converged(); the M4e restore proof runs it
+// after killing and rebooting the whole cluster from WALs. Null = intact; else the lost coordinates.
+export const confirmedIntact = (sim: Sim): string | null => {
+  for (const c of sim.confirms.values()) {
+    if (c.ok !== true) continue
+    for (const [id, n] of sim.nodes) {
+      const held = n.logs.get(c.origin)?.some((e) => e.seq === c.seq)
+      if (!held) return `confirmed (${c.origin}, ${c.seq}) level ${c.level} is MISSING at ${id}`
+    }
+  }
+  return null
+}
+
 //! drained — at quiescence nothing may be parked: every paused-link queue must be empty.
 export const drained = (sim: Sim): string | null => {
   for (const [id, n] of sim.nodes)

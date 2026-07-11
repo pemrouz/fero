@@ -21,7 +21,7 @@ const formedView1 = (opts: { swallowTimers?: boolean } = {}) => {
   const env: Env = {
     now: () => 0, rng: () => 0.5,
     sink: {
-      connect() {}, send() { frames++ }, close() {}, cancel() {}, apply() {}, persist() {}, boot() {},
+      connect() {}, send() { frames++ }, close() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {},
       timer(id, tag) { if (!opts.swallowTimers) timers.push({ id, tag }) },
     },
   }
@@ -104,7 +104,7 @@ test('counted: epoch-0 writes pay ZERO write-pipeline overhead (the M0/M1 fast p
   let frames = 0
   const env: Env = {
     now: () => 0, rng: () => 0.5,
-    sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {} },
+    sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {} },
   }
   const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
   node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'x:2' })

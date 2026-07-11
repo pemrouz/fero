@@ -23,7 +23,7 @@ const formedNode = () => {
   const env: Env = {
     now: () => 0,
     rng: () => 0.5,
-    sink: { connect() {}, send() {}, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {} },
+    sink: { connect() {}, send() {}, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {} },
   }
   const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
   node.journal.armed = false // perf posture: unwatched journal must cost ~nothing (predicted-false emit gates)
@@ -56,7 +56,7 @@ test('counted: frames per write burst = admitted peers, exactly', () => {
   let frames = 0
   const env: Env = {
     now: () => 0, rng: () => 0.5,
-    sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {} },
+    sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {} },
   }
   const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
   for (let p = 0; p < 3; p++) {
