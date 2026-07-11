@@ -71,6 +71,9 @@ export const JK = {
   replayed: 46,      // a=records, b=origin — one WAL frame re-ingested at boot (source=replay)
   bootWrite: 47,     // a=epoch, b=votedForEpoch — the durable boot record was (re)written
   walHole: 48,       // a=origin, b=prev — a replayed row's chain link did not match: an interior hole (lying disk); the row is skipped, the loss becomes TAIL loss for AE to heal
+  //! ── M4c confirm vocabulary (the guarantee ladder) ──
+  confirmReq: 49,    // a=id, b=level (CONFIRM.*), c=origin — a probe opened
+  confirmed: 50,     // a=id, b=ok(0|1), c=memberCount — a probe answered (false = cancel/overflow, an honest reject)
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

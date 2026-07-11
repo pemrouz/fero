@@ -9,8 +9,10 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed } from './harness.ts'
-import { converged } from './monitors.ts'
+import { converged, confirmedIntact } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
+import { VERB } from '../kernel/codec.ts'
+import { CONFIRM } from '../kernel/confirm.ts'
 import { REC } from '../kernel/env.ts'
 import type { Node } from '../kernel/node.ts'
 
@@ -84,6 +86,55 @@ test('the fsync lie: every batch "resolves" but none survive — the reborn node
   assert.deepEqual(sim.violations, [])
   //! what the lie DOES poison — a durable claim that was false — is the confirm ladder's to catch at
   // the W-quorum (M4c/M4e): one lying disk cannot fake a quorum of resolutions
+})
+
+test('the guarantee ladder end-to-end: replicated on the digest cadence, persisted on the fsync quorum — and confirmed writes stay intact', () => {
+  const sim = new Sim(85)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+  for (const n of nodes) n.writes.ring.place('g', 'n01')
+  sim.run({ until: 400 })
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['g'], value: 'guaranteed' }] })
+  sim.run({ until: 450 })
+  const seq = nodes[0].logs.get('n01')!.at(-1)!.seq
+  sim.post('n01', { kind: 'confirm', id: 1, origin: 'n01', seq, level: CONFIRM.replicated })
+  sim.post('n01', { kind: 'confirm', id: 2, origin: 'n01', seq, level: CONFIRM.persisted })
+  //! evidence converges on the heartbeat digest cadence — a couple of ticks, no dedicated probe frames
+  sim.run({ until: 800 })
+  const rep = sim.confirms.get('n01|1')!
+  const per = sim.confirms.get('n01|2')!
+  assert.equal(rep.ok, true, 'replicated: a majority holds it shippable')
+  assert.ok(rep.count! >= 2)
+  assert.equal(per.ok, true, 'persisted: a majority resolved fsync batches covering it')
+  assert.equal(confirmedIntact(sim), null, 'every confirmed coordinate still exists everywhere')
+  assert.deepEqual(sim.violations, [])
+})
+
+test('a CONFIRMED write survives an ownership handoff exactly-once: the M3 residual, demonstrably closed', () => {
+  //! the residual: a lost-ACK retry could outrace the ORIGINAL commit's replication to the NEW owner and
+  // re-commit. confirm:'replicated' is the closure — it RESOLVES only once a majority holds the stream,
+  // so by the time the issuer trusts the write, the survivors that can become owner already dedup it.
+  const sim = new Sim(86)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+  for (const n of nodes) n.writes.ring.place('h', 'n02')
+  sim.run({ until: 400 })
+  //! the aa1 shape: the owner commits, the WACK dies with the link — the issuer keeps its attempt pending
+  sim.severOnFrame('n02', 'n01', VERB.WACK)
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['h'], value: 'once' }] })
+  sim.run({ until: 600 })
+  const seq = nodes[1].logs.get('n02')!.find((e) => e.rec.key[0] === 'h')!.seq
+  sim.post('n01', { kind: 'confirm', id: 5, origin: 'n02', seq, level: CONFIRM.replicated })
+  sim.run({ until: 900 })
+  assert.equal(sim.confirms.get('n01|5')!.ok, true, 'confirmed while the ACK is still lost')
+  //! NOW the owner dies for good: the view moves on, the retry re-resolves to a survivor
+  for (const other of ['n01', 'n03']) sim.partition('n02', other)
+  sim.run({ until: 7000 })
+  assert.deepEqual([nodes[0].epoch, nodes[2].epoch], [2, 2], 'n02 evicted — ownership moved')
+  const copies = [...sim.nodes.values()].filter((n) => n.uuid !== 'n02')
+    .map((n) => n.logs.get('n02')!.filter((e) => e.rec.key[0] === 'h').length)
+  assert.deepEqual(copies, [1, 1], 'exactly ONE commit of the confirmed write, cluster-wide')
+  assert.equal(nodes[0].writes.pending.size, 0, 'the retry resolved (dedup or replication-ACK), never re-committed')
+  assert.equal(confirmedIntact(sim), null)
+  assert.deepEqual(sim.violations, [], 'attempt-exactly-once + single-writer held across the handoff')
 })
 
 test('persistFail is surfaced and durable never advances past the hole — the cluster still converges', () => {

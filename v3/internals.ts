@@ -10,6 +10,7 @@ export { Membership, SUSPECT_TICKS, MAX_PULLS, type View } from './kernel/member
 export { Writes, NACK, MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './kernel/write.ts'
 export { Ring, VNODES } from './kernel/ring.ts'
 export { Streams, StreamDescriptor } from './kernel/streams.ts'
+export { Confirm, CONFIRM, MAX_PROBES } from './kernel/confirm.ts'
 export { Link, LS, MAX_QUEUED } from './kernel/link.ts'
 export { Journal, JK, type JEvent } from './kernel/journal.ts'
 export {
@@ -20,6 +21,6 @@ export {
 export { REC, TAG, partitionOf, type Rec, type Applied, type Event, type EffectSink, type Env } from './kernel/env.ts'
 export { Sim, mulberry32, pairKey, type Fault, type Violation } from './sim/exec.ts'
 export { cluster, formed, writes } from './sim/harness.ts'
-export { converged, drained, perEvent } from './sim/monitors.ts'
+export { converged, drained, confirmedIntact, perEvent } from './sim/monitors.ts'
 export { Runtime } from './shell/runtime.ts'
 export { captureSim, captureLive, captureNode } from './tools/debug/capture.ts'

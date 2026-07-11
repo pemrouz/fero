@@ -356,6 +356,7 @@ export class Membership {
     this.view = { epoch: view.epoch, members: sorted(view.members) }
     node.epoch = view.epoch
     node.persistBoot() // the committed view is a durable fact from the instant it installs
+    node.confirm.recount(node) // the view-change recount: thresholds are majorities OF THE COMMITTED VIEW
     j.armed && j.emit(JK.viewInstall, view.epoch, view.members.length)
     if (this.epochStale && view.epoch >= this.#staleWant) { this.epochStale = false; this.#pullTicks = 0 }
     if (this.rejoining() && view.epoch >= this.rejoinFloor) this.rejoinFloor = 0

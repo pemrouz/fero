@@ -29,6 +29,7 @@ import { JK, Journal } from './journal.ts'
 import { Membership } from './membership.ts'
 import { Writes } from './write.ts'
 import { Streams } from './streams.ts'
+import { Confirm } from './confirm.ts'
 import { REC, TAG, type Env, type Event, type Rec } from './env.ts'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
@@ -89,6 +90,8 @@ export class Node {
   // bounded pending queue. Local 'write' events, forwarded WRITE frames, and inbound RECORDS all
   // enter the system through this object (kernel/write.ts is the stamp-site module).
   writes = new Writes()
+  //! confirm (M4c): the guarantee ladder — probes over the watermark evidence (kernel/confirm.ts)
+  confirm = new Confirm()
   //! streams (M4a): per-origin descriptors carrying the watermark ladder {applied, shippable, durable}
   // (kernel/streams.ts). Seqs are LAMPORT stamps — monotone per origin but NOT contiguous (the clock
   // merges up on receipt), so dedup on `applied` is gap-tolerant: over a FIFO link from the single
@@ -213,6 +216,16 @@ export class Node {
           if (maxSeq > d.durable) d.durable = maxSeq
         }
         j.armed && j.emit(JK.persisted, e.batch)
+        this.confirm.recount(this) // own durable advanced — a persisted probe may now have its quorum
+        return
+      }
+      //! M4c: the guarantee-ladder probes (kernel/confirm.ts) — register may answer synchronously
+      case 'confirm': {
+        this.confirm.register(this, e.id, e.origin, e.seq, e.level)
+        return
+      }
+      case 'confirmCancel': {
+        this.confirm.cancel(this, e.id)
         return
       }
       case 'persistFail': {
@@ -414,6 +427,7 @@ export class Node {
       const [bytes] = encodeRuns(tail.map((e) => ({ rec: e.rec, origin: this.origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid })))
       this.persistRun(this.origin, this.seq, bytes)
     }
+    if (recs.length) this.confirm.recount(this) // own shippable advanced at the stamp site
     return s0
   }
 
@@ -562,6 +576,7 @@ export class Node {
         // (copied out: the frame is a view pinned to the receive chunk). Duplicate records inside a
         // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent.
         if (fresh && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice())
+        if (fresh) this.confirm.recount(this) // my shippable for this origin advanced — evidence for a probe
         return
       }
       //! M3 write pipeline — WRITE (a forwarded attempt run / a client relay), WACK (commit
@@ -601,12 +616,20 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'digest-before-hello')
         }
-        const v = f.value as { d?: Record<string, unknown>; r?: number }
+        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown> }
         if (typeof v?.d !== 'object' || v.d === null) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed digest')
           return
         }
         j.armed && j.emit(JK.digestIn, link.id)
+        //! confirm evidence rides every digest: the d map IS the peer's shippable tails, the optional p
+        // map its durable tails (sent only by durable-mode peers) — the ladder converges with zero new frames
+        for (const [origin, tail] of Object.entries(v.d))
+          if (typeof tail === 'number') {
+            const dur = typeof v.p?.[origin] === 'number' ? (v.p[origin] as number) : 0
+            this.confirm.feed(this, link.uuid, origin, tail, dur)
+          }
+        this.confirm.recount(this)
         //! a PAUSED link cannot deliver: serialising the missing suffix into its drop-oldest queue is
         // O(suffix) work per digest that overflow then discards (adversarial-review finding — the peer's
         // heartbeat floor would trigger it every tick for the whole pause). Mark the debt instead; the
@@ -675,10 +698,18 @@ export class Node {
   }
 
   //! #sendDigest — announce {origin: highestHeldSeq} (the log tails: exactly what this node can serve).
+  // Durable mode adds the p map (durable tails) — the persisted-confirm evidence; non-durable digests
+  // are byte-identical with M0-M3.
   #sendDigest(link: Link, r: 0 | 1) {
     const d: Record<string, number> = {}
     for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
-    link.ship(encodeControl(VERB.DIGEST, { d, r }), this.env.sink, this.journal)
+    let body: { d: Record<string, number>; r: number; p?: Record<string, number> }
+    if (this.durable) {
+      const p: Record<string, number> = {}
+      for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
+      body = { d, r, p }
+    } else body = { d, r }
+    link.ship(encodeControl(VERB.DIGEST, body), this.env.sink, this.journal)
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }
 

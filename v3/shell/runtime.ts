@@ -53,6 +53,8 @@ export class Runtime {
   #opts: RuntimeOpts
   #wal: number | null = null // fd, held open for append (the plan's fd-held contract)
   onApply: (rec: Applied) => void
+  //! onConfirm — the guarantee ladder's answers surface here (M5's confirm option resolves off it)
+  onConfirm: (id: number, ok: boolean, count: number) => void = () => {}
 
   constructor(opts: RuntimeOpts, onApply: (rec: Applied) => void = () => {}) {
     this.#opts = opts
@@ -120,6 +122,7 @@ export class Runtime {
           fs.writeFileSync(p + '.tmp', JSON.stringify(record))
           fs.renameSync(p + '.tmp', p)
         },
+        confirm(id, ok, count) { runtime.onConfirm(id, ok, count) },
       },
     })
   }

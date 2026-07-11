@@ -36,6 +36,11 @@ export type Event =
   // completed) or failed. Resolution is the sole trigger for the durable watermark — never the emit.
   | { kind: 'persisted'; batch: number }
   | { kind: 'persistFail'; batch: number; reason: string }
+  //! confirm/confirmCancel (M4c): the embedder opens a guarantee-ladder probe for (origin, seq) at a
+  // CONFIRM level (kernel/confirm.ts); the answer arrives via sink.confirm. Cancel is the embedder's
+  // deadline (the kernel never times out on its own — evidence is monotone and eventually sufficient).
+  | { kind: 'confirm'; id: number; origin: string; seq: number; level: number }
+  | { kind: 'confirmCancel'; id: number }
   //! replay (M4b): one WAL row fed back at boot, BEFORE the network exists — the same bytes that were
   // persisted, re-entering through the same ingest (source=replay in kernel/write.ts). Restore is not a
   // special path; it is the wire path pointed at the disk. `prev` is the row's per-origin CHAIN LINK
@@ -72,6 +77,9 @@ export interface EffectSink {
   // Cold path — per view install / vote grant, never per write. What it carries is what a restart may
   // trust: the committed view, the ballot identity already spent, the Lamport floor, the incarnation.
   boot(record: BootRecord): void
+  //! confirm(id, ok, count) (M4c): a guarantee-ladder probe's answer — ok with the member count whose
+  // ladder covered it, or false (cancel/overflow) with the count reached. Downstream delivery, like apply.
+  confirm(id: number, ok: boolean, count: number): void
 }
 
 //! BootRecord: the durable facts a restart derives its boot mode from (plan §5 membership, verbatim).
