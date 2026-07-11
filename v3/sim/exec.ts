@@ -27,7 +27,7 @@
 // suffix digest can heal — a fault model for a network that doesn't exist.
 
 import { Node, type NodeOpts } from '../kernel/node.ts'
-import type { EffectSink, Event } from '../kernel/env.ts'
+import type { BootRecord, EffectSink, Event } from '../kernel/env.ts'
 
 //! mulberry32 — the seeded PRNG. Tiny, splittable-enough, deterministic across platforms.
 export const mulberry32 = (seed: number) => () => {
@@ -43,6 +43,20 @@ interface Task { at: number; seq: number; run: () => void }
 
 //! Fault: the per-pair network personality. delay is [min,max) ms; dupP is a per-frame duplication probability.
 export interface Fault { delay?: [number, number]; dupP?: number }
+
+//! StoreFault: the per-node STORAGE personality (M4b, plan §4 sim table) — delay is fsync latency;
+// lieP is the FSYNC LIE (the batch resolves, but its rows do not survive a crash — firmware/page-cache
+// betrayal); failP surfaces a persistFail. Torn writes need no probability: any batch still UNRESOLVED
+// at crash time is the torn tail, dropped by restart()'s harvest.
+export interface StoreFault { delay?: [number, number]; lieP?: number; failP?: number }
+
+//! SimStore: one node's disk — the boot record + the WAL rows exactly as persisted (bytes + the
+// per-origin chain link). Survives restart() (it IS the disk); rows lost to torn tails / fsync lies
+// are dropped at harvest, like a real recovery — the chain links are how replay notices the holes.
+export interface SimStore {
+  boot: BootRecord | null
+  wal: { batch: number; bytes: Uint8Array; prev: number; resolved: boolean; lied: boolean }[]
+}
 
 //! Violation: what a monitor returns to fail a trajectory — event-indexed so the shrink/debug loop starts AT the violation.
 export interface Violation { event: number; monitor: string; detail: string }
@@ -71,6 +85,11 @@ export class Sim {
   #faults = new Map<string, Fault>()
   #partitioned = new Set<string>()
   #defaultFault: Fault
+  //! M4b storage: one SimStore per uuid (the "disk" — retained across restart()), per-node store faults,
+  // and the original NodeOpts so restart() can rebuild the node the way the scenario built it
+  stores = new Map<string, SimStore>()
+  #storeFaults = new Map<string, StoreFault>()
+  #nodeOpts = new Map<string, NodeOpts>()
   seed: number
 
   constructor(seed: number, defaults: Fault = {}) {
@@ -84,8 +103,34 @@ export class Sim {
     const sink = this.#sinkFor(opts.uuid)
     const node = new Node(opts, { now: () => this.now, rng: this.rng, sink })
     this.nodes.set(opts.uuid, node)
+    this.#nodeOpts.set(opts.uuid, opts)
+    if (!this.stores.has(opts.uuid)) this.stores.set(opts.uuid, { boot: null, wal: [] })
     if (opts.listen) this.#byListen.set(opts.listen, opts.uuid)
     return node
+  }
+
+  //! storeFault — install a storage personality for a node (fsync delay, lie probability, fail probability).
+  storeFault(uuid: string, f: StoreFault) { this.#storeFaults.set(uuid, f) }
+
+  //! restart — crash + recover a node FROM ITS DISK (M4b): destroy it mid-flight, harvest the store the
+  // way a real recovery would (unresolved batches are the torn tail — gone; fsync-lied batches are gone
+  // and their lie is only discovered now), then boot a fresh incarnation from the boot record and replay
+  // the surviving WAL through source=replay, before 'start' brings the network up. Returns the new node.
+  restart(uuid: string): Node {
+    const old = this.nodes.get(uuid)!
+    const opts = this.#nodeOpts.get(uuid)!
+    old.destroy()
+    const store = this.stores.get(uuid)!
+    store.wal = store.wal.filter((r) => r.resolved && !r.lied)
+    const b = store.boot
+    const reborn = this.add({
+      ...opts,
+      incarnation: old.incarnation + 1,
+      boot: b ? { epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor } : opts.boot,
+    })
+    for (const row of store.wal) this.post(uuid, { kind: 'replay', bytes: row.bytes, prev: row.prev }, 0)
+    this.post(uuid, { kind: 'start' }, 0)
+    return reborn
   }
 
   //! post — deliver an event to a node after `delay` virtual ms.
@@ -253,6 +298,28 @@ export class Sim {
       timer(id: number, tag: number, ms: number) { sim.post(me, { kind: 'timer', id, tag }, ms) },
       cancel() { /* fires are ignored by the kernel's live-id check; leaving them queued costs one no-op event */ },
       apply() { /* downstream state is read via node.state in sim; the api layer binds here in M5 */ },
+      //! M4b storage: append the row, then resolve (or fail) on the fsync clock with the node's store
+      // personality. A LIED batch resolves normally — the kernel advances durable, the row silently
+      // will not survive a crash: exactly the betrayal the M4e proof must catch.
+      persist(batch: number, bytes: Uint8Array, prev: number) {
+        const store = sim.stores.get(me)!
+        const f = sim.#storeFaults.get(me) ?? {}
+        const row = { batch, bytes, prev, resolved: false, lied: false }
+        store.wal.push(row)
+        if (f.failP && sim.rng() < f.failP) {
+          const [dMin, dMax] = f.delay ?? [1, 3]
+          store.wal.pop() // a failed batch never reached the disk
+          sim.post(me, { kind: 'persistFail', batch, reason: 'io' }, dMin + sim.rng() * (dMax - dMin))
+          return
+        }
+        if (f.lieP && sim.rng() < f.lieP) row.lied = true
+        const [dMin, dMax] = f.delay ?? [1, 3]
+        sim.#schedule(dMin + sim.rng() * (dMax - dMin), () => {
+          row.resolved = true
+          sim.#step(me, { kind: 'persisted', batch })
+        })
+      },
+      boot(record) { sim.stores.get(me)!.boot = record },
     }
   }
 }

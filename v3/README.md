@@ -1,4 +1,4 @@
-# fero v3 — M0 + M1 replication + M2 membership + M3 write pipeline + the debug tool
+# fero v3 — M0 + M1 replication + M2 membership + M3 write pipeline + M4a/b durability core + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -15,8 +15,8 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 121 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + the AA fault schedules, Tier-3 real-TCP smoke, debug-model + scenario suites
-npm run perf                   # 14 perf gates: counted invariants first, ratios second, absolutes last
+npm test                       # 139 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm run perf                   # 15 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
 npm run debug                  # scenario DASHBOARD at /, the debugger at /debug (http://localhost:4699)
@@ -163,12 +163,13 @@ kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.
   env.ts        Event/EffectSink/Env — the ONLY doorway to the world
   codec.ts      checksummed binary frames; ONE bounds-checked Cursor; streaming Outbox; lazy RecordViews
   link.ts       identity-before-admission; one logical link per pair; bounded backpressure queue
-  node.ts       step(event) → effects; Lamport clock; per-cell LWW; the ONE stamp site (commit)
+  node.ts       step(event) → effects; Lamport clock + lease; per-cell LWW; the ONE stamp site (commit); WAL batches + boot record (M4b)
   membership.ts committed views, joint-consensus ballots, the CP write-gate, epoch-stale + boot modes (M2)
   ring.ts       vnode hashring — allocation-free ownerOf(), a pure function of the committed view (M3)
-  write.ts      THE single write ingress: local/forwarded/inbound sources, cid dedup, typed NACKs, the ONE pending queue (M3)
+  write.ts      THE single write ingress: local/forwarded/inbound/replay sources, cid dedup, typed NACKs, the ONE pending queue (M3/M4b)
+  streams.ts    per-origin StreamDescriptor — the watermark ladder {applied, shippable, durable} as fields (M4a)
   journal.ts    the one typed diagnostics ring (drop-oldest, surfaced drop counter)
-shell/    production adapters (TCP + timers), zero protocol decisions, ~150 lines
+shell/    production adapters (TCP + timers + the fsync WAL/boot-record store), zero protocol decisions
 sim/      the executive: virtual time, seeded faults (FIFO-clamped), per-event monitors, sweep CLI
 tests/    Tier-3 real-socket smoke (the only wall-clock tier)
 utils/    ports/bench/ratio.interleaved — v2's #utils conventions
@@ -317,13 +318,43 @@ because state is a deterministic fold of the journal'd inputs.
   records/s through one owner** (kernel/write.perf.ts prints it; WSL2 swings
   2-3x — the counted invariants are the durable claims: one WRITE frame per
   batch per owner, one WACK per run).
-- **M2 debts (stated):** votedFor/committed-view are not yet durable (a
-  crash-restart inside one ballot round could double-vote — M4's boot record
-  closes it); suspicion keys off link liveness, not PONG timeouts (a hung-but-
-  connected process needs M4's real-time faults to model); genesis requires one
-  full formation of the configured hosts. ~~A healed evictee may flush at its
-  stale epoch~~ — closed by M3: the flush re-resolves ownership and the owner
-  validates attemptEpoch (typed NACK, re-stamp at the issuer boundary, retry).
+- **M4b the durability core is LIVE** (the storage seam + boot record; confirm
+  and compaction are M4c/M4d): storage is an EFFECT/EVENT pair — the kernel
+  emits `persist(batch, bytes, prev)` and `boot(record)`, the env echoes
+  `persisted`/`persistFail` — so purity and seeded determinism survive intact,
+  and durability is an EXPLICIT MODE (`durable: false` default keeps every
+  pre-M4 trajectory byte-identical; the 3-node sweep is still the exact same
+  237,451 events). The WAL row IS the wire frame (the same Framer reads a
+  socket and the file); restore replays rows through the SAME single ingress
+  (source=replay) with original provenance, before the network exists. The
+  durable-mode chaos sweep (150×3 + 150×5 seeds: torn tails, fsync lies, dead
+  disks, random mid-workload restarts) caught THREE real design flaws while
+  this slice was built, each now structural: (1) **interior WAL loss is
+  unhealable by suffix anti-entropy** (a lying disk drops middle batches;
+  Lamport gaps make the hole invisible to seqs) — every row now carries a
+  per-origin CHAIN LINK, and replay skips rows that do not link, converting
+  interior loss into the tail loss AE knows how to heal (orphans re-link on
+  later restarts); (2) **a stale clock floor let a reborn node re-issue spent
+  seqs** (silent loss both directions) — the boot record now stores a Lamport
+  CEILING (a lease, re-persisted every LAMPORT_LEASE stamps) and a restore
+  resumes AT the ceiling; (3) **one log cannot serve two lives** (after the
+  ceiling jump, a lost record of your own could never re-enter below the
+  watermark) — a reborn node stamps under a fresh PROVENANCE LANE
+  (`uuid~incarnation`; first lives keep the bare uuid, so the wire is
+  unchanged), making the previous life an immutable foreign stream that heals
+  by ordinary suffix AE — the plan's "incarnation fences dead-origin debris",
+  made concrete. persistFail is TERMINAL for the WAL (the fsyncgate policy:
+  alarm + freeze durable; replication untouched). The boot record carries
+  {view, ceiling, incarnation, votedFor} atomically — a crash inside one
+  ballot round can no longer double-vote (the M2 debt, closed with a pin),
+  and the sim's `restart(uuid)` rebuilds a node from nothing but its store.
+- **M2 debts (stated):** ~~votedFor/committed-view durability~~ — closed by
+  M4b (the boot record; pinned). Suspicion still keys off link liveness, not
+  PONG timeouts (a hung-but-connected process needs real-time faults — M4e);
+  genesis requires one full formation of the configured hosts. ~~A healed
+  evictee may flush at its stale epoch~~ — closed by M3: the flush re-resolves
+  ownership and the owner validates attemptEpoch (typed NACK, re-stamp at the
+  issuer boundary, retry).
 - **M3 debts (stated):** owner-side dedup is an EXACT bounded window
   (DEDUP_KEEP=1024 committed cids per issuer with original coordinates), not
   the plan's high-water + out-of-order set — per-owner cid streams have
@@ -338,10 +369,10 @@ because state is a deterministic fold of the journal'd inputs.
   stream, and M5's non-idempotent methods will size the window against the retry
   horizon). Dedup LANES themselves are bounded (MAX_ISSUERS=1024, oldest-
   evicted, journal-surfaced) so a client churn can't grow kernel memory
-  forever. The issuer cid counter is volatile until M4's boot record; the issuer
-  string embeds the incarnation (uuid~inc) so a restart opens a fresh dedup lane
-  instead of aliasing its predecessor's cids. Pending overflow drops the OLDEST
-  attempt (journal-surfaced) — under sustained gate-closed writes beyond
+  forever. ~~The issuer cid counter is volatile~~ — the incarnation now rides
+  the durable boot record (M4b), so the uuid~inc issuer lane is fresh across
+  real restarts by construction. Pending overflow drops the OLDEST attempt
+  (journal-surfaced) — under sustained gate-closed writes beyond
   MAX_PENDING=1024 that is real, counted loss.
 - **The guarantee ladder / confirm (M4); storage/WAL (M4); the public
   `fero(name, opts)` API over `$()` proxies + the client cid-overlay (M5).**

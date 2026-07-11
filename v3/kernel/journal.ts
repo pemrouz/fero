@@ -64,6 +64,13 @@ export const JK = {
   writeDup: 40,      // a=issuer, b=cid — owner-side cid dedup absorbed a retransmit (the duplicate ACK re-carries the ORIGINAL coordinates)
   writeRelay: 41,    // a=issuer, b=baseCid — a client attempt (attemptEpoch 0) re-stamped at this relay (the issuer/flush boundary rule)
   dedupEvict: 42,    // a=issuer — a whole cid-dedup lane evicted (MAX_ISSUERS bound); its issuer re-enters the window on next commit
+  //! ── M4 durability vocabulary (WAL batches, boot record, replay) ──
+  persist: 43,       // a=batch, b=bytes — a WAL batch left for the store
+  persisted: 44,     // a=batch — the store resolved the batch; durable watermarks advanced
+  persistFail: 45,   // a=batch, b=reason — the store FAILED the batch (surfaced; durable does not advance; confirm:'persisted' unreachable past here)
+  replayed: 46,      // a=records, b=origin — one WAL frame re-ingested at boot (source=replay)
+  bootWrite: 47,     // a=epoch, b=votedForEpoch — the durable boot record was (re)written
+  walHole: 48,       // a=origin, b=prev — a replayed row's chain link did not match: an interior hole (lying disk); the row is skipped, the loss becomes TAIL loss for AE to heal
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

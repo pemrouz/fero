@@ -30,8 +30,19 @@ export type Event =
   | { kind: 'drain'; link: number }
   //! timer: a timer the kernel set via sink.timer() fired. `id` is kernel-minted; `tag` says why it was set.
   | { kind: 'timer'; id: number; tag: number }
-  //! write: local write attempts issued by the embedder (api layer / test). A BATCH per event so a synchronous burst coalesces into one frame per link (the one-frame-per-peer-per-tick counted invariant). M0: no cid/attemptEpoch yet — they land with M3's write contract.
+  //! write: local write attempts issued by the embedder (api layer / test). A BATCH per event so a synchronous burst coalesces into one frame per link (the one-frame-per-peer-per-tick counted invariant).
   | { kind: 'write'; recs: Rec[] }
+  //! persisted/persistFail (M4b): a WAL batch the kernel emitted via sink.persist() RESOLVED (fsync
+  // completed) or failed. Resolution is the sole trigger for the durable watermark — never the emit.
+  | { kind: 'persisted'; batch: number }
+  | { kind: 'persistFail'; batch: number; reason: string }
+  //! replay (M4b): one WAL row fed back at boot, BEFORE the network exists — the same bytes that were
+  // persisted, re-entering through the same ingest (source=replay in kernel/write.ts). Restore is not a
+  // special path; it is the wire path pointed at the disk. `prev` is the row's per-origin CHAIN LINK
+  // (see sink.persist): a row whose prev does not match the replayed chain tail is an INTERIOR hole —
+  // a lying disk lost something before it — and is skipped, converting interior loss into the tail
+  // loss that suffix anti-entropy knows how to heal.
+  | { kind: 'replay'; bytes: Uint8Array; prev?: number }
 
 //! One outbound consequence. Typed methods (not pushed objects) so the steady-state path allocates no effect
 // WRAPPERS by construction (frame buffers and Applied records still allocate; the full alloc-counter
@@ -49,6 +60,34 @@ export interface EffectSink {
   cancel(id: number): void
   //! apply(rec): a committed record materialises downstream (state proxy / api layer). The kernel NEVER mutates user state directly — apply is an output, which is what makes re-entrant capture (v2's applying/discarding flag family) structurally impossible.
   apply(rec: Applied): void
+  //! persist(batch, bytes, prev) (M4b): append one encoded frame to the WAL. `batch` is kernel-minted;
+  // the env echoes {kind:'persisted', batch} when the fsync batch RESOLVES (or persistFail — surfaced,
+  // never silent; the kernel treats a failed WAL as DEAD thereafter — the fsyncgate policy). `bytes`
+  // are owned by the env after return. The WAL row IS the wire frame — one format — plus `prev`, the
+  // per-origin chain link (the seq the origin's chain stood at before this row): replay uses it to
+  // detect rows a lying disk silently dropped from the MIDDLE of the file, which no seq can reveal
+  // (Lamport streams are legitimately gappy) and suffix digests can never heal.
+  persist(batch: number, bytes: Uint8Array, prev: number): void
+  //! boot(record) (M4b): atomically replace the durable boot record (write-tmp + rename in the shell).
+  // Cold path — per view install / vote grant, never per write. What it carries is what a restart may
+  // trust: the committed view, the ballot identity already spent, the Lamport floor, the incarnation.
+  boot(record: BootRecord): void
+}
+
+//! BootRecord: the durable facts a restart derives its boot mode from (plan §5 membership, verbatim).
+// votedFor durability is what makes crash-inside-a-ballot double-votes unrepresentable (the M2 debt).
+// `lamport` is a clock CEILING, not the current value — a LEASE (kernel/node.ts LAMPORT_LEASE): no
+// stamp beyond it ever existed, so a restore resumes AT the ceiling and can never re-issue a seq its
+// previous life spent (the durable+restart sweep caught exactly that: a stale per-ballot floor let a
+// reborn node re-stamp seqs whose originals still lived at peers — silent loss both ways). Crossing
+// the ceiling re-persists the record first; the cold path stays cold, amortized per LEASE stamps.
+// heldPartitions arrives with M6 scoped replication (R=∞ holds everything — nothing to record).
+export interface BootRecord {
+  epoch: number
+  members: [string, string][]
+  lamport: number
+  incarnation: number
+  votedFor: { e: number; p: string; h: string }
 }
 
 //! Env: what the kernel is allowed to know about the world — a clock, a seeded rng, and the sink. Nothing else.

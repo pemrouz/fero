@@ -411,19 +411,30 @@ export class Writes {
   }
 
   //! inbound — source=inbound (moved verbatim from M1's node.#ingest): gap-tolerant monotone dedup,
-  // then the LWW election in node.apply. A node NEVER ingests its own origin: its log is authoritative
-  // and complete for itself by construction — without this guard a digest-snapshot race echoing our
-  // records back appends DUPLICATE entries out of order, breaking the AE suffix walk (5-node seed 79).
+  // then the LWW election in node.apply. OWN-ORIGIN echoes are special-cased: an echo AT OR BELOW the
+  // own log tail is dropped (the seed-79 class — a digest-snapshot race echoing our records back once
+  // appended duplicates OUT OF ORDER, breaking the AE suffix walk), but an echo BEYOND the tail is
+  // ingested append-ascending — after a crash whose disk lied or tore, our lost-but-replicated records
+  // come back from peers exactly this way (M4b's fsync-lie schedule proved the blanket guard turned
+  // recoverable loss into permanent self-amnesia). Appends stay ascending by construction (tail check),
+  // and the link machinery's pure-tail-loss guarantee means no interior holes — the same argument every
+  // other stream rests on. (An admitted peer could forge beyond-tail records under our origin; admitted
+  // peers are trusted at this layer — the M7 auth story bounds who is admitted.)
   // A record carrying ATTEMPT IDENTITY feeds the local cid-dedup window (the ownership-move story) and
   // doubles as an ACK: it clears a matching pending attempt and hops coordinates to a relayed client.
-  inbound(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }) {
+  // Returns true when the record was FRESH (logged) — the caller WALs the frame iff anything was.
+  inbound(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }): boolean {
     const j = node.journal
-    if (origin === node.uuid) { j.armed && j.emit(JK.dupDrop, origin, seq); return }
-    //! Lamport merge-up on RECEIPT (even for LWW losers) — the next local write must be causally newest
+    //! the Lamport merge-up runs first, even for drops: the clock must track everything observed —
+    // a reborn clock re-issuing a lost stamp would corrupt provenance cluster-wide.
     if (seq > node.seq) node.seq = seq
+    //! NO own-lane special case since M4a: the stamp site advances the own applied watermark, so the
+    // general dedup below already drops under-tail echoes of the CURRENT lane (the seed-79 poisoning).
+    // A PREVIOUS life's lane (uuid vs uuid~inc) is an ordinary foreign stream here — immutable,
+    // tail-complete at peers, healed by suffix AE like anything else (the M4b recovery story).
     const d = node.streams.for(origin)
     //! the APPLIED watermark advances at the dedup decision (LWW losers included — losing is not loss)
-    if (seq <= d.applied) { j.armed && j.emit(JK.dupDrop, origin, seq); return }
+    if (seq <= d.applied) { j.armed && j.emit(JK.dupDrop, origin, seq); return false }
     d.applied = seq
     const rec = rv.rec() // ONE copy out of the receive chunk, shared by the log entry and the apply
     const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch }
@@ -444,5 +455,45 @@ export class Writes {
         this.#remove(a)
       }
     }
+    return true
+  }
+
+  //! replay — source=replay (M4b): a WAL row re-ingested at boot, before the network exists. Everything
+  // a replayed record proves is durable by definition (it was just read from disk), so the whole ladder
+  // advances: applied, shippable, AND durable. Attempt identities re-feed the dedup window, so a
+  // restarted owner still dedups pre-crash retries. THE CHAIN CHECK: a row whose `prev` link does not
+  // match the origin's replayed tail sits past an INTERIOR hole — a lying disk dropped something before
+  // it (indistinguishable by seqs alone: Lamport streams are legitimately gappy). The row is SKIPPED
+  // (journaled), converting the interior loss into tail loss, which suffix anti-entropy heals live; a
+  // later re-shipped row that re-links the chain resumes the walk, so orphans self-heal across restarts.
+  replay(node: Node, f: Frame, prev: number) {
+    const prov = f.prov()
+    if (!prov) return // the WAL holds RECORDS-shaped frames only; anything else is not ours to guess at
+    const j = node.journal
+    const d = node.streams.for(prov.origin)
+    if (prev !== (node.walTail.get(prov.origin) ?? 0)) {
+      j.armed && j.emit(JK.walHole, prov.origin, prev)
+      return
+    }
+    let count = 0
+    for (const rv of f.records()) {
+      if (rv.seq > node.seq) node.seq = rv.seq // the Lamport clock rebuilds from every replayed stamp
+      if (rv.seq <= d.applied) continue // duplicate WAL rows (a re-persisted partially-fresh frame) re-dedup
+      d.applied = rv.seq
+      const rec = rv.rec()
+      const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
+      if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
+      node.logFor(prov.origin).push(entry)
+      d.shippable = rv.seq
+      d.durable = rv.seq
+      node.apply(rec, prov.origin, rv.seq, rv.epoch)
+      if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch)
+      count++
+    }
+    //! the accepted row extends the chain: future persists AND the next row's check link from here
+    node.walTail.set(prov.origin, d.applied)
+    //! deliberately NOT restored from rows: the committed epoch (boot record only — rows prove data,
+    // never views) and pending attempts (a fresh boot has no routes in flight)
+    j.armed && j.emit(JK.replayed, count, prov.origin)
   }
 }

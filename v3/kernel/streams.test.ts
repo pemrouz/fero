@@ -12,7 +12,7 @@ import { VERB, encodeControl, encodeFrame } from './codec.ts'
 import { REC, type EffectSink, type Env } from './env.ts'
 
 const formed = () => {
-  const sink: EffectSink = { connect() {}, send() {}, close() {}, timer() {}, cancel() {}, apply() {} }
+  const sink: EffectSink = { connect() {}, send() {}, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {} }
   const env: Env = { now: () => 0, rng: () => 0, sink }
   const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
   node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'x:2' })
