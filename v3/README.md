@@ -387,5 +387,17 @@ because state is a deterministic fold of the journal'd inputs.
   (model.mjs verifyReplay, run in tests and on every capture the viewer opens);
   repo CI is not yet stood up (the plan makes it an M0 exit criterion — it is the
   immediate next step).
-- **Unbounded growth (bounded at M4 compaction):** per-origin logs and the
-  per-cell versions map (tombstones included).
+- **M4d compaction is LIVE** (kernel/log.ts): the snapshot record supersedes
+  the prefix — below the per-origin FRONTIER (every committed-view member
+  provably applied past the cut, read off the digest evidence confirm already
+  tracks) each entry that is not its cell's current winner is dropped; winners
+  survive as ordinary records with ORIGINAL provenance, so catch-up needs zero
+  new machinery and the two plan properties hold as property tests
+  (replay-from-0 ≡ live; compacted catch-up ≡ uncompacted). A lagging member
+  PINS compaction — memory is spent exactly where a peer still needs history.
+  Tombstone GC releases a remove's stamp once no straggler anywhere could
+  still resurrect past it (per-lane quiescence), and the next pass drops the
+  remove record itself. Size-armed (COMPACT_AT) on the heartbeat tick,
+  journal-surfaced, monitors rescan on shrink. The M0 unbounded-growth debt is
+  CLOSED in memory; the on-disk counterpart (WAL snapshot+truncate) lands with
+  M4e's restore proof, where its correctness must be demonstrated anyway.
