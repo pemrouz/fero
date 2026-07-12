@@ -165,3 +165,53 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-y
 test('M5b — a durable client is refused loudly (offline-first is M6, not a silent misconfiguration)', async () => {
   await assert.rejects(fero('r', { hosts: ['127.0.0.1:1'], dir: '/tmp/x' } as never), /durable client/)
 })
+
+test('M5-REVIEW #9 — an async write rejection surfaces as a typed WriteReject, never a bare string', async () => {
+  //! drive a MAX_PENDING overflow: a client with no reachable server, flood past the bound → 'dropped'
+  const c = await fero('r', { uuid: 'zz', hosts: ['127.0.0.1:1'], heartbeatMs: 0 })
+  try {
+    const rejects: unknown[] = []
+    //! MAX_PENDING is 1024; issue well past it while nothing can drain (no primary)
+    await Promise.all(Array.from({ length: 1100 }, (_, i) =>
+      c.methods.update({ key: `k${i}`, value: i }, { timeout: 2000 }).catch((e) => rejects.push(e))))
+    assert.ok(rejects.length > 0, 'some writes were rejected under overflow/timeout')
+    for (const e of rejects) {
+      assert.equal(typeof e, 'object', 'a typed WriteReject object, never a bare string')
+      assert.ok((e as { guarantee?: string }).guarantee, 'carries guarantee')
+      assert.ok((e as { reached?: string }).reached, 'carries reached')
+    }
+  } finally {
+    await c.destroy()
+  }
+})
+
+test('M5-REVIEW #3 — write() clears its timeout timer on settle (no timer/closure accumulation on the hot path)', async () => {
+  const f = await fero('r', { uuid: 'aa' })
+  try {
+    const before = process.getActiveResourcesInfo ? process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length : 0
+    //! a burst of fast (epoch-0) writes — each resolves immediately; none may leave a live timer behind
+    for (let i = 0; i < 200; i++) await f.methods.update({ key: `k${i}`, value: i })
+    const after = process.getActiveResourcesInfo ? process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length : 0
+    assert.ok(after - before < 50, `write() timers cleared on settle (Timeout handles: ${before} → ${after})`)
+  } finally {
+    await f.destroy()
+  }
+})
+
+test('M5-REVIEW #12 — an illegal root replace throws loudly AND heals the proxy back to the confirmed fold', async () => {
+  const { value } = await import('../../../data/index.ts') as { value: symbol }
+  const s = await fero('r', { uuid: 'aa' })
+  try {
+    s.data.keep = { n: 1 }
+    s.data.also = 2
+    assert.throws(() => { (s.data as Record<symbol, unknown>)[value] = { wiped: true } }, /replace keys/)
+    //! the heal runs on a microtask — after it, the proxy reads the confirmed fold, not the ghost
+    await new Promise((r) => setTimeout(r, 10))
+    assert.deepEqual(snapshot(s.data), { keep: { n: 1 }, also: 2 }, 'healed back to kernel state — no ghost root')
+    //! and it is still LIVE: a normal write after the heal works
+    s.data.after = 3
+    assert.equal((snapshot(s.data) as Record<string, unknown>).after, 3)
+  } finally {
+    await s.destroy()
+  }
+})

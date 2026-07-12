@@ -92,9 +92,11 @@ export interface EffectSink {
   //! invoke (HOST side): a CALL/SUB/UNSUB frame arrived — the api runs the handler and answers with a
   // reply/subOut event. `link` identifies the caller for the answer route AND for sub reaping on death.
   invoke(link: number, id: number, mode: number, m: string, a: unknown): void
-  //! result (CALLER side): a RESULT frame answered our rpc id — or the kernel failed it locally
-  // (no primary, link died with the call in flight: ok=false, value = the reason string).
-  result(id: number, ok: boolean, value: unknown): void
+  //! result (CALLER side): a RESULT frame answered our rpc id (local=false), OR the kernel failed the
+  // rpc LOCALLY before it ever shipped (local=true: no primary / link died pre-dispatch — value is the
+  // reason). `local` is the unforgeable channel bit that keeps a handler REPLY whose value happens to
+  // equal a kernel reason string from being misread as a pre-dispatch failure (M5-review #7).
+  result(id: number, ok: boolean, value: unknown, local: boolean): void
   //! subRecs (CALLER side): one SUBREC frame — change records for a live subscription id.
   subRecs(id: number, recs: Rec[]): void
   //! snapshot(batch, rows) (M4e): ATOMICALLY REPLACE the whole WAL with `rows` — the disk counterpart

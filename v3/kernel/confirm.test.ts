@@ -23,7 +23,7 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     confirm: (id, ok, count) => effects.push(['confirm', id, ok, count]),
     snapshot: (batch, rows) => effects.push(['snapshot', batch, rows]),
     invoke: (link, id, mode, m, a) => effects.push(['invoke', link, id, mode, m, a]),
-    result: (id, ok, value) => effects.push(['result', id, ok, value]),
+    result: (id, ok, value, local) => effects.push(['result', id, ok, value, local]),
     subRecs: (id, recs) => effects.push(['subRecs', id, recs]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }

@@ -78,7 +78,7 @@ export class Runtime {
   //! the M5c method plane surfaces here — the api layer is the HOST (it runs handlers) and the CALLER
   // (it awaits results / folds sub records); the kernel only routes frames (env.ts contract).
   onInvoke: (link: number, id: number, mode: number, m: string, a: unknown) => void = () => {}
-  onResult: (id: number, ok: boolean, value: unknown) => void = () => {}
+  onResult: (id: number, ok: boolean, value: unknown, local: boolean) => void = () => {}
   onSubRecs: (id: number, recs: Rec[]) => void = () => {}
 
   constructor(opts: RuntimeOpts, onApply: (rec: Applied) => void = () => {}) {
@@ -207,7 +207,7 @@ export class Runtime {
         },
         confirm(id, ok, count) { runtime.onConfirm(id, ok, count) },
         invoke(link, id, mode, m, a) { runtime.onInvoke(link, id, mode, m, a) },
-        result(id, ok, value) { runtime.onResult(id, ok, value) },
+        result(id, ok, value, local) { runtime.onResult(id, ok, value, local) },
         subRecs(id, recs) { runtime.onSubRecs(id, recs) },
       },
     })

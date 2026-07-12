@@ -169,3 +169,40 @@ test('destroy detaches synchronously: post-destroy assignments stay local to the
   assert.equal(h.jk(JK.writeLocal).length, 1)
   await h.rt.destroy()
 })
+
+test('M5-REVIEW #0/#1/#4 — a re-entrant tap write during an epoch-0 fast-path write never orphans or mis-rejects the outer batch', async () => {
+  const h = harness()
+  //! a tap mirroring cell a into cell b: fires during the apply of an 'a' write, issuing a NESTED
+  // fast-path write that re-uses the SAME predicted cid (the fast path mints none)
+  h.bind.data.tap((c: { at?: string; key?: string[] }) => {
+    if ((c.at === 'a' || c.key?.[0] === 'a')) h.bind.data.b = 'mirror'
+  })
+  //! single-record outer write (finding #0): the outer promise MUST resolve, not orphan
+  const [pa] = h.bind.issue([{ type: REC.update, key: ['a'], value: 1 }], false)
+  const settledA = await Promise.race([
+    (pa as Promise<{ seq: number }>).then((c) => `ok:${c.seq}`, (e) => `rej:${e}`),
+    new Promise((r) => setTimeout(() => r('ORPHANED'), 300)),
+  ])
+  assert.match(String(settledA), /^ok:/, 'the outer a-write resolved (not orphaned)')
+  assert.equal(snapshot(h.bind.data).b, 'mirror', 'the re-entrant mirror committed too')
+  assert.equal(snapshot(h.bind.data).a, 1)
+
+  //! multi-record outer batch (findings #1/#4): every record settles committed, none spuriously 'superseded'
+  const h2 = harness()
+  h2.bind.data.tap((c: { at?: string; key?: string[] }) => {
+    if (c.at === 'x' || c.key?.[0] === 'x') h2.bind.data.z = 'from-tap'
+  })
+  const outs = h2.bind.issue([
+    { type: REC.update, key: ['x'], value: 10 },
+    { type: REC.update, key: ['y'], value: 20 },
+  ], false)
+  const rs = await Promise.all(outs.map((o) => Promise.race([
+    (o as Promise<{ seq: number }>).then((c) => ({ ok: true, seq: c.seq }), (e) => ({ ok: false, e: String(e) })),
+    new Promise<{ ok: boolean }>((r) => setTimeout(() => r({ ok: false }), 300)),
+  ])))
+  assert.ok(rs.every((r) => r.ok), `both records committed, none mis-rejected: ${JSON.stringify(rs)}`)
+  assert.equal(snapshot(h2.bind.data).x, 10)
+  assert.equal(snapshot(h2.bind.data).y, 20)
+  assert.equal(snapshot(h2.bind.data).z, 'from-tap')
+  await h.destroy(); await h2.destroy()
+})

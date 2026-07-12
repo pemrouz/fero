@@ -25,3 +25,13 @@ export { cluster, formed, writes } from './sim/harness.ts'
 export { converged, drained, confirmedIntact, perEvent } from './sim/monitors.ts'
 export { Runtime } from './shell/runtime.ts'
 export { captureSim, captureLive, captureNode } from './tools/debug/capture.ts'
+//! M5 api layer — the public surface's building blocks, for embedders composing their own shells.
+export { fero } from './api/index.ts'
+export { Bind, WRITES_KEEP, cellOf, type Coords, type Outcome } from './api/data.ts'
+export { Host, Caller, handle, SYSTEM, type Context } from './api/methods.ts'
+export { proxy, snapshot, applyRec, capture, records, isProxy, type Capture } from './api/substrate.ts'
+export { client } from './sim/harness.ts'
+export type {
+  Fero, FeroConfig, FeroOpts, Methods, Change, WriteOpts,
+  Guarantee, WriteResolve, WriteReject, Seams, Peer, ClusterShape,
+} from './api/types.ts'

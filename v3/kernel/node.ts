@@ -274,7 +274,7 @@ export class Node {
         const link = id !== null ? this.links.get(id) : undefined
         if (!link || link.state !== LS.admitted || link.dead) {
           j.armed && j.emit(JK.rpcFail, e.id, 'unreachable')
-          this.env.sink.result(e.id, false, 'unreachable')
+          this.env.sink.result(e.id, false, 'unreachable', true) // local=true: never shipped, never executed
           return
         }
         j.armed && j.emit(JK.rpcOut, e.mode, e.id)
@@ -814,7 +814,7 @@ export class Node {
         const v = f.value as { id?: unknown; ok?: unknown; v?: unknown }
         if (typeof v?.id !== 'number') return
         j.armed && j.emit(JK.rpcAnswer, v.id, v.ok === 1 ? 1 : 0)
-        return this.env.sink.result(v.id, v.ok === 1, v.v)
+        return this.env.sink.result(v.id, v.ok === 1, v.v, false) // a wire RESULT — a handler's reply, never a local failure
       }
       case VERB.SUBREC: {
         if (link.state !== LS.admitted) return

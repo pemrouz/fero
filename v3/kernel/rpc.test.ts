@@ -25,7 +25,7 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     confirm: (id, ok, count) => effects.push(['confirm', id, ok, count]),
     snapshot: (batch, rows) => effects.push(['snapshot', batch, rows]),
     invoke: (link, id, mode, m, a) => effects.push(['invoke', link, id, mode, m, a]),
-    result: (id, ok, value) => effects.push(['result', id, ok, value]),
+    result: (id, ok, value, local) => effects.push(['result', id, ok, value, local]),
     subRecs: (id, recs) => effects.push(['subRecs', id, recs]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }
@@ -66,7 +66,7 @@ test('a CLIENT rpc event ships on the primary; with no primary it fails IMMEDIAT
   h.node.step({ kind: 'start' })
   //! no primary yet: the failure is synchronous and typed — the api owns the retry policy
   h.node.step({ kind: 'rpc', id: 1, mode: VERB.CALL, m: 'x', a: 1 })
-  assert.deepEqual(h.of('result')[0], ['result', 1, false, 'unreachable'])
+  assert.deepEqual(h.of('result')[0], ['result', 1, false, 'unreachable', true])
   assert.equal(h.jk(JK.rpcFail).length, 1)
   //! primary admitted: CALL/SUB/UNSUB frames flow to it
   h.admit(1, 'aa')
@@ -78,7 +78,7 @@ test('a CLIENT rpc event ships on the primary; with no primary it fails IMMEDIAT
   assert.deepEqual(h.sentOn(1, VERB.UNSUB)[0].value, { id: 3 })
   //! RESULT and SUBREC arriving back surface as caller-side effects
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.RESULT, { id: 2, ok: 1, v: 'done' }) })
-  assert.deepEqual(h.of('result')[1], ['result', 2, true, 'done'])
+  assert.deepEqual(h.of('result')[1], ['result', 2, true, 'done', false])
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.SUBREC, { id: 3, recs: [{ type: 'update', key: ['k'], value: 5 }] }) })
   assert.deepEqual(h.of('subRecs')[0], ['subRecs', 3, [{ type: 'update', key: ['k'], value: 5 }]])
 })

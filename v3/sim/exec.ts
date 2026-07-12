@@ -103,7 +103,7 @@ export class Sim {
   confirms = new Map<string, { uuid: string; id: number; origin: string; seq: number; level: number; ok?: boolean; count?: number }>()
   //! M5c rpc recorders (no api host in sim): per-node inboxes the Tier-2 suites assert against.
   rpcInbox = new Map<string, { link: number; id: number; mode: number; m: string; a: unknown }[]>()
-  rpcResults = new Map<string, { id: number; ok: boolean; value: unknown }[]>()
+  rpcResults = new Map<string, { id: number; ok: boolean; value: unknown; local: boolean }[]>()
   rpcSubRecs = new Map<string, { id: number; recs: unknown[] }[]>()
   seed: number
 
@@ -373,7 +373,7 @@ export class Sim {
       //! M5c method plane: the sim has no api host — rpc effects record into per-node inboxes so
       // Tier-2 tests can assert routing; nothing is executed (handlers are impure by definition).
       invoke(link, id, mode, m, a) { (sim.rpcInbox.get(me) ?? sim.rpcInbox.set(me, []).get(me)!).push({ link, id, mode, m, a }) },
-      result(id, ok, value) { (sim.rpcResults.get(me) ?? sim.rpcResults.set(me, []).get(me)!).push({ id, ok, value }) },
+      result(id, ok, value, local) { (sim.rpcResults.get(me) ?? sim.rpcResults.set(me, []).get(me)!).push({ id, ok, value, local }) },
       subRecs(id, recs) { (sim.rpcSubRecs.get(me) ?? sim.rpcSubRecs.set(me, []).get(me)!).push({ id, recs }) },
     }
   }

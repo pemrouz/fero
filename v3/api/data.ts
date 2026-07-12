@@ -77,9 +77,15 @@ export class Bind {
   #overlay = new Map<string, number>()
   //! expected — the one echo the in-flight applyRec call may fan back (consume-once)
   #expected: { cell: string; ref: unknown; remove: boolean } | null = null
-  //! issuing — cells of the batch currently inside rt.write(): their synchronous applies must never
-  // be held by their own overlay marks (fast-path commits carry no iss to join on)
-  #issuing: Set<string> | null = null
+  //! frames — a STACK of in-flight fast-path collectors, one per active issue() call (M5-review #0/#1/#4).
+  // The epoch-0 fast path mints no kernel cid and applies synchronously inside rt.write(); a user tap
+  // reacting to one of those applies drains a RE-ENTRANT issue() INSIDE the outer one (substrate
+  // contract). A single-slot #issuing/#fastApplied let the nested call null the outer's state mid-drain,
+  // orphaning the outer promise (never resolved → flush-on-return hung) and mis-rejecting the outer's
+  // trailing records as 'superseded'. A stack scopes each call's collection: node.commit applies
+  // records sequentially, so while a nested frame is on top ONLY its records apply, and the outer frame
+  // is back on top for its own remaining records. #onApply reads the TOP frame.
+  #frames: { cells: Set<string>; applied: Applied[] }[] = []
   #destroyed = false
   //! outcomes — the bounded write-outcome ring (cluster.writes source). `n` is a version counter the
   // composer's fold compares (outcomes settle in microtasks — the NEXT step folds them, and writes
@@ -101,7 +107,22 @@ export class Bind {
     this.#iss = rt.node.uuid + '~' + rt.node.incarnation
     this.data = proxy({})
     rt.onApply = (a) => { if (!this.#destroyed) this.#onApply(a) }
-    this.#cap = capture(this.data, (recs) => this.#captured(recs))
+    this.#cap = capture(this.data, (recs) => this.#captured(recs), () => this.#healRoot())
+  }
+
+  //! healRoot — the illegal-root-replace repair (M5-review #12): `data[value] = x` throws (loud), but
+  // data has already overwritten the proxy's whole root, blowing away every child. Re-project the
+  // CONFIRMED fold from kernel state on a microtask (after the throw unwinds), with capture DETACHED so
+  // the re-projection issues nothing and the root reset does not re-trigger this guard. The beneath is
+  // always derivable — the same invariant #revert rests on, applied to the whole tree.
+  #healRoot() {
+    queueMicrotask(() => {
+      if (this.#destroyed) return
+      this.#cap.detach()
+      applyRec(this.data, { type: REC.update, key: [], value: {} }) // reset the ghost root
+      for (const [k, v] of this.#rt.node.state) applyRec(this.data, { type: REC.update, key: JSON.parse(k) as string[], value: v })
+      this.#cap = capture(this.data, (recs) => this.#captured(recs), () => this.#healRoot())
+    })
   }
   #validate?: (rec: Rec) => true | string
   //! tracked — the flush-on-return attribution seam (M5c): when a method handler is executing, the
@@ -133,17 +154,22 @@ export class Bind {
     }
     if (valid.length === 0) return out
     //! pre-create the pending entries under the cids the kernel is ABOUT to mint (contiguous, one per
-    // record, in order — kernel/write.ts issue) so synchronous commits settle through the same join
+    // record, in order — kernel/write.ts issue) so a SYNCHRONOUS self-owned commit (epoch ≥ 1) settles
+    // through the join (#onApply branch 1) DURING rt.write. `pend` holds our own object refs so the
+    // fast-path settle resolves them LOCALLY even if a re-entrant issue clobbered the shared map key
+    // (M5-review #0: the epoch-0 fast path re-uses the same predicted cid, so #pending keys collide).
     const c0 = node.writes.cid
     const promises = new Map<Rec, Promise<Coords>>()
-    const settledFast: Applied[] = []
+    const pend: { cell: string; cid: number; resolve: (c: Coords) => void; reject: (r: string) => void }[] = []
     for (let i = 0; i < valid.length; i++) {
       const rec = valid[i]
       const cid = c0 + 1 + i
       const cell = cellOf(rec)
       const row = this.#outcome({ key: cell, state: 'pending', cid })
+      let entry!: { cell: string; cid: number; resolve: (c: Coords) => void; reject: (r: string) => void }
       const pr = new Promise<Coords>((resolve, reject) => {
-        this.#pending.set(this.#iss + '|' + cid, { cell, cid, resolve, reject })
+        entry = { cell, cid, resolve, reject }
+        this.#pending.set(this.#iss + '|' + cid, entry)
       })
       //! the ring row settles with its promise (microtask — the version bump makes the next fold see it)
       pr.then(
@@ -151,25 +177,27 @@ export class Bind {
         (e) => { row.state = 'rejected'; row.reason = String(e); this.outcomes.n++ },
       )
       promises.set(rec, pr)
+      pend.push(entry)
       this.#overlay.set(cell, cid)
     }
-    this.#issuing = new Set([...promises.keys()].map(cellOf))
-    const fast = settledFast
-    this.#fastApplied = fast
-    try { this.#rt.write(valid) } finally { this.#issuing = null; this.#fastApplied = null }
+    //! push THIS call's fast-path collector; a nested re-entrant issue pushes its own on top, and node.commit
+    // applies sequentially so only the top frame's records apply while it is on top (M5-review #1/#4).
+    const frame = { cells: new Set(valid.map(cellOf)), applied: [] as Applied[] }
+    this.#frames.push(frame)
+    try { this.#rt.write(valid) } finally { this.#frames.pop() }
     this.#sweepDrops() // enqueue overflow drops synchronously inside write() — release NOW, not at the next apply
     //! the epoch-0 fast path mints NO cids (kernel/write.ts): commits applied synchronously with no
-    // attempt identity — settle positionally (single-threaded step: every iss-less apply inside our
-    // own write() call is ours, in record order) and clear the predicted entries
+    // attempt identity — settle positionally from OUR frame (single-threaded step: this frame collected
+    // exactly our records, in record order), resolving OUR OWN promise refs (map keys may have been
+    // clobbered by a re-entrant fast-path issue re-using the predicted cid), and clean up OUR entries
+    // (guarded so a nested clobber never cross-deletes another call's pending/overlay).
     if (node.writes.cid === c0) {
-      let pos = 0
-      for (let i = 0; i < valid.length; i++) {
-        const key = this.#iss + '|' + (c0 + 1 + i)
-        const p = this.#pending.get(key)
-        if (!p) continue // already settled (should not happen on the fast path, but never hang)
-        this.#pending.delete(key)
+      const key = (cid: number) => this.#iss + '|' + cid
+      for (let i = 0; i < pend.length; i++) {
+        const p = pend[i]
+        if (this.#pending.get(key(p.cid)) === p) this.#pending.delete(key(p.cid))
         if (this.#overlay.get(p.cell) === p.cid) this.#overlay.delete(p.cell)
-        const a = fast[pos++]
+        const a = frame.applied[i]
         if (a) p.resolve({ origin: a.origin, seq: a.seq, epoch: a.epoch })
         else p.reject('not-applied') // an epoch-0 local commit always applies; defensive, never expected
       }
@@ -180,7 +208,6 @@ export class Bind {
     if (t) for (const pr of promises.values()) t.push(pr)
     return out
   }
-  #fastApplied: Applied[] | null = null
 
   //! onApply — every committed record materializing downstream (live, forwarded-echo, replay alike).
   // Routing: settle the write-route join first; then the overlay policy for foreign records; then the
@@ -198,9 +225,12 @@ export class Bind {
       }
     }
     const cell = cellOf(a)
-    //! 2) fast-path settlement capture: iss-less applies inside our own write() call are ours in order
-    if (this.#fastApplied && a.iss === undefined && this.#issuing?.has(cell)) {
-      this.#fastApplied.push(a)
+    //! 2) fast-path settlement capture: an iss-less apply inside our own rt.write() is collected by the
+    // TOP frame (the currently-executing issue()); node.commit is sequential, so the top frame is always
+    // the call whose rt.write is on the stack when this record applies (M5-review #0/#1/#4).
+    const top = this.#frames[this.#frames.length - 1]
+    if (top && a.iss === undefined && top.cells.has(cell)) {
+      top.applied.push(a)
       this.#apply(a)
       return
     }
