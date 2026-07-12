@@ -60,6 +60,11 @@ export const MAX_REDIALS = 10
 // boot record. A restore resumes AT the ceiling, so no seq can ever be issued twice across lives —
 // the lease is what keeps that guarantee off the per-write hot path (one cold boot-write per LEASE).
 export const LAMPORT_LEASE = 4096
+//! SNAPSHOT_AT: WAL rows appended since the last snapshot that arm a whole-WAL snapshot+swap on the
+// heartbeat tick (M4e — the disk counterpart of COMPACT_AT). Counting rows-since-snapshot (not file
+// rows) bounds RELATIVE growth: even when the log itself is large (frontier pinned), at most
+// SNAPSHOT_AT appended rows separate swaps, so the file is O(log entries + SNAPSHOT_AT) always.
+export const SNAPSHOT_AT = 4096
 
 export class Node {
   readonly uuid: string
@@ -152,6 +157,16 @@ export class Node {
   #walDead = false
   #seqCeiling = 0
   #replayer: Framer | null = null
+  #walRows = 0 // rows appended since the last snapshot — the SNAPSHOT_AT arming counter
+  //! tainted — the restore was CONDEMNED: replay found an interior chain hole, which only a disk that
+  // resolved-then-lost a row can produce (honest crashes tear TAILS: the shell's ordered io-queue and
+  // the sim's FIFO fsync clock make resolved-past-a-hole unwritable). Fsyncgate says a liar's rows are
+  // not evidence — keeping the prefix could resurrect cells whose removes were compacted away
+  // cluster-wide on the strength of this disk's own durable claims (the seed-27 divergence). The fold
+  // resets to empty, remaining replay rows are ignored, the WAL swaps clean, and the cluster re-teaches
+  // everything — the proven-convergent wiped-disk path. Boot facts (identity, epoch, clock ceiling,
+  // ballot) are UNTOUCHED: they live in the boot record, which was never contradicted.
+  tainted = false
 
   constructor(opts: NodeOpts, env: Env) {
     this.env = env
@@ -350,6 +365,8 @@ export class Node {
           this.writes.tick(this)
           //! compaction rides the same clock (M4d): size-armed, frontier-bounded, journal-surfaced
           maybeCompact(this)
+          //! the WAL snapshot (M4e) arms AFTER compaction so the swap captures the just-compacted log
+          if (this.durable && this.#walRows >= SNAPSHOT_AT) this.snapshot()
           //! give-up revival: a target whose final redial attempt FAILED (gaveUp — never merely "tries
           // exhausted": the last armed attempt may still be pending, and dialing over it would fork a
           // second chain) is parked, not dead — each heartbeat re-dials any parked target we hold no link
@@ -443,8 +460,69 @@ export class Node {
     const prev = this.walTail.get(origin) ?? 0
     this.walTail.set(origin, maxSeq)
     this.#inflight.set(batch, new Map([[origin, maxSeq]]))
+    this.#walRows++
     this.journal.armed && this.journal.emit(JK.persist, batch, bytes.length)
     this.env.sink.persist(batch, bytes, prev)
+  }
+
+  //! snapshot — the whole-WAL snapshot+swap (M4e, the disk counterpart of M4d's compact): re-encode
+  // EVERY current log entry (post-compaction: O(live cells)) into fresh rows with FRESH chain links
+  // (each origin's chain restarts at prev=0) and hand the store the whole set to swap in atomically.
+  // Loser history and orphaned rows vanish from disk exactly as they vanished from memory; original
+  // stamps and attempt identities survive, so a restore from the swapped file is the same fold.
+  // walTail resets to the new chain tails BEFORE the effect leaves — appends racing the swap chain
+  // onto the snapshot, so a lied/torn swap turns them into chain holes replay detects (never a silent
+  // gap). Durable advances to the log tails on the swap batch's persisted echo: everything in the log
+  // is on disk from that instant. Cold path — tick-armed per SNAPSHOT_AT appended rows.
+  snapshot() {
+    if (!this.durable || this.#walDead) return
+    const batch = ++this.#batchSeq
+    const rows: { bytes: Uint8Array; prev: number }[] = []
+    const covered = new Map<string, number>()
+    this.walTail.clear()
+    for (const [origin, entries] of this.logs) {
+      if (!entries.length) continue
+      const runs = entries.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))
+      const frames = encodeRuns(runs)
+      //! chain links need each frame's LAST seq — recomputed with encodeRuns' own split rule (origin is
+      // constant here; epoch/seq/attempt contiguity split). The count assertion makes any future drift
+      // between this walk and the codec's splitter a loud throw, never a corrupted chain.
+      const lasts: number[] = []
+      for (let i = 0; i < runs.length; ) {
+        const h = runs[i]
+        let j = i + 1
+        while (j < runs.length && runs[j].epoch === h.epoch && runs[j].seq === h.seq + (j - i) &&
+               runs[j].iss === h.iss && (h.iss === undefined || runs[j].cid === h.cid! + (j - i))) j++
+        lasts.push(runs[j - 1].seq)
+        i = j
+      }
+      if (frames.length !== lasts.length) throw new Error('snapshot: run split diverged from encodeRuns')
+      let prev = 0
+      for (let k = 0; k < frames.length; k++) { rows.push({ bytes: frames[k], prev }); prev = lasts[k] }
+      this.walTail.set(origin, prev)
+      covered.set(origin, prev)
+    }
+    this.#inflight.set(batch, covered)
+    this.#walRows = 0
+    this.journal.armed && this.journal.emit(JK.snapshot, batch, rows.length)
+    this.env.sink.snapshot(batch, rows)
+  }
+
+  //! condemn — the fsyncgate verdict on a lying disk (see `tainted`): reset the fold to empty, swap
+  // the WAL clean (an empty snapshot — the liar's rows leave the disk with the taint, so the NEXT
+  // restart replays a consistent file instead of re-detecting the same hole forever), and let
+  // anti-entropy refold this node from the cluster. Called only from replay's chain check.
+  condemn(origin: string) {
+    this.tainted = true
+    this.logs.clear()
+    this.state.clear()
+    this.versions.clear()
+    this.streams = new Streams()
+    this.walTail.clear()
+    this.#entryHash.clear()
+    this.#hash = 0
+    this.journal.armed && this.journal.emit(JK.walTaint, origin)
+    this.snapshot()
   }
 
   //! persistBoot — (re)write the durable boot record: the committed view, the Lamport CEILING (the

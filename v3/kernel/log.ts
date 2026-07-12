@@ -40,14 +40,26 @@ import type { Node } from './node.ts'
 //! COMPACT_AT: per-origin entry count that arms a compaction pass (the size-aware trigger).
 export const COMPACT_AT = 4096
 
-//! frontier — the highest seq of origin `o` that EVERY committed-view member has provably applied
-// (0 when unknown, when any member has announced nothing, or at open genesis).
+//! frontier — the highest seq of origin `o` that EVERY committed-view member is provably past, on
+// marks that survive that member's crash (0 when unknown, when any member has announced nothing, or
+// at open genesis). In durable mode that means DURABLE marks (self reads its own ladder; peers via
+// the digest p-map evidence): applied/shippable regress when a crash eats un-fsynced rows, and a cut
+// taken over volatile marks strands the reborn — the records it needs to refold (removes especially)
+// are gone from every log (the sweep's seed-27 resurrection). A non-durable peer never announces p,
+// so its presence pins durable-cluster compaction at 0 — honest, and journal-visible in log sizes.
+// In non-durable mode applied marks are sound: a non-durable crash restores NOTHING (fresh incarnation,
+// empty fold), and a total refold from compacted winners converges — only PARTIAL restores are hazardous.
+// Known residual (documented, not closed): a disk that lies about the newest un-chained-over row of a
+// lane evades replay's hole detector (nothing after it points back), so its durable mark can overclaim
+// by that one row; closing it needs chained-over durable marks in the digest — M6 digest work.
 export const frontier = (node: Node, o: string): number => {
   const members = node.membership.view.members
   if (members.length === 0) return 0
   let f = Infinity
   for (const [uuid] of members) {
-    const s = uuid === node.uuid ? (node.streams.get(o)?.applied ?? 0) : node.confirm.mark(uuid, o)
+    const s = uuid === node.uuid
+      ? (node.durable ? (node.streams.get(o)?.durable ?? 0) : (node.streams.get(o)?.applied ?? 0))
+      : (node.durable ? node.confirm.markD(uuid, o) : node.confirm.mark(uuid, o))
     if (s < f) f = s
   }
   return f === Infinity ? 0 : f
@@ -82,7 +94,10 @@ export const gcTombstones = (node: Node): number => {
   const members = node.membership.view.members
   if (members.length === 0) return 0
   //! the straggler bound: for each lane, the oldest thing still deliverable anywhere — Infinity when
-  // the lane is fully quiesced (every member at the lane's known tail: nothing old is in flight)
+  // the lane is fully quiesced (every member at the lane's known tail: nothing old is in flight).
+  // Durable mode reads the same crash-stable marks as the frontier: a tombstone released on marks a
+  // crash can regress is the seed-27 resurrection (the reborn refolds a removed cell and nothing left
+  // anywhere can fence it).
   let bound = Infinity
   const lanes = new Set<string>(node.logs.keys())
   for (const [l] of node.streams) lanes.add(l)
@@ -90,7 +105,9 @@ export const gcTombstones = (node: Node): number => {
     let minApplied = Infinity
     let maxTail = node.streams.get(l)?.shippable ?? 0
     for (const [uuid] of members) {
-      const s = uuid === node.uuid ? (node.streams.get(l)?.applied ?? 0) : node.confirm.mark(uuid, l)
+      const s = uuid === node.uuid
+        ? (node.durable ? (node.streams.get(l)?.durable ?? 0) : (node.streams.get(l)?.applied ?? 0))
+        : (node.durable ? node.confirm.markD(uuid, l) : node.confirm.mark(uuid, l))
       if (s < minApplied) minApplied = s
       if (s > maxTail) maxTail = s
     }

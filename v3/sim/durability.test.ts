@@ -10,6 +10,7 @@ import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed } from './harness.ts'
 import { converged, confirmedIntact } from './monitors.ts'
+import { frontier, compact } from '../kernel/log.ts'
 import { JK } from '../kernel/journal.ts'
 import { VERB } from '../kernel/codec.ts'
 import { CONFIRM } from '../kernel/confirm.ts'
@@ -135,6 +136,94 @@ test('a CONFIRMED write survives an ownership handoff exactly-once: the M3 resid
   assert.equal(nodes[0].writes.pending.size, 0, 'the retry resolved (dedup or replication-ACK), never re-committed')
   assert.equal(confirmedIntact(sim), null)
   assert.deepEqual(sim.violations, [], 'attempt-exactly-once + single-writer held across the handoff')
+})
+
+test('THE M4e PROOF: kill the whole cluster mid-workload; every node restores from its disk alone; zero confirmed-write loss', () => {
+  //! nothing survives the crash but three directories: no live peer to lean on, no warning, in-flight
+  // fsync batches torn. The restored boot records re-form the view (the rejoin self-ballot covers the
+  // everyone-is-rejoining case), the WALs rebuild the logs, and every write the ladder CONFIRMED before
+  // the crash must still exist in every reborn log — confirmedIntact is the oracle.
+  const sim = new Sim(90)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+  sim.run({ until: 400 })
+  assert.deepEqual(nodes.map((n) => n.epoch), [1, 1, 1], 'genesis committed')
+  for (let i = 0; i < 24; i++)
+    sim.at(450 + i * 20, () => sim.post(`n0${1 + (i % 3)}`, { kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] }))
+  sim.run({ until: 1400 })
+  //! confirm every origin's tail at BOTH ladder levels — these are the survivors the crash must not touch
+  let id = 0
+  for (const [origin, entries] of nodes[0].logs) {
+    sim.post('n01', { kind: 'confirm', id: ++id, origin, seq: entries.at(-1)!.seq, level: CONFIRM.replicated })
+    sim.post('n01', { kind: 'confirm', id: ++id, origin, seq: entries.at(-1)!.seq, level: CONFIRM.persisted })
+  }
+  sim.run({ until: 2200 })
+  for (const [k, c] of sim.confirms) assert.equal(c.ok, true, `${k} must confirm before the crash`)
+  //! kill −9, all three at once
+  const reborn = ['n01', 'n02', 'n03'].map((u) => sim.restart(u))
+  sim.run({ until: 12000 })
+  assert.ok(formed(reborn), 'the mesh re-formed from three boot records')
+  assert.ok(reborn.every((n) => n.epoch >= 1 && n.membership.gate(n).open), 'a committed view is live again — writable')
+  assert.equal(converged(sim), null, 'three disks, one state')
+  assert.equal(confirmedIntact(sim, CONFIRM.persisted), null, 'every PERSISTED-confirmed write survived — the only level that promises majority-crash survival')
+  assert.deepEqual(sim.violations, [], 'ladder + exactly-once + single-writer held through the mass restart')
+  //! and the reborn cluster is alive, not a museum: a fresh write still converges
+  sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: ['post-restore'], value: 'alive' }] })
+  sim.run({ until: 14000 })
+  assert.equal(converged(sim), null)
+  assert.ok([...sim.nodes.values()].every((n) => n.state.has(key('post-restore'))))
+})
+
+test('WAL total loss: one disk wiped bare (boot record intact) inside the full-cluster restart — the other disks re-teach it', () => {
+  //! restore-from-disk is a CLUSTER property, not a per-node one: a persisted-confirmed write lives on
+  // a majority of disks, so one disk reduced to nothing still comes back whole — over anti-entropy,
+  // from the WALs that DID survive.
+  const sim = new Sim(91)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+  sim.run({ until: 400 })
+  for (let i = 0; i < 12; i++)
+    sim.at(450 + i * 30, () => sim.post(`n0${1 + (i % 3)}`, { kind: 'write', recs: [{ type: REC.update, key: [`w${i}`], value: i }] }))
+  sim.run({ until: 1200 })
+  let id = 0
+  for (const [origin, entries] of nodes[2].logs)
+    sim.post('n03', { kind: 'confirm', id: ++id, origin, seq: entries.at(-1)!.seq, level: CONFIRM.persisted })
+  sim.run({ until: 2000 })
+  for (const [k, c] of sim.confirms) assert.equal(c.ok, true, `${k} confirmed pre-crash`)
+  sim.stores.get('n02')!.wal = [] // the wipe: every row gone; boot.json survived
+  const reborn = ['n01', 'n02', 'n03'].map((u) => sim.restart(u))
+  sim.run({ until: 12000 })
+  const n02 = reborn[1]
+  assert.equal(jk(n02, JK.replayed).reduce((s, e) => s + Number(e.a), 0), 0, 'the wiped disk replayed nothing')
+  assert.ok(formed(reborn))
+  assert.equal(converged(sim), null, 'the survivors\' WALs re-taught the wiped member everything')
+  assert.equal(confirmedIntact(sim), null)
+  assert.deepEqual(sim.violations, [])
+})
+
+test('snapshot+swap under the executive: the swapped disk restores the same fold, and appends after the swap chain onto it', () => {
+  const sim = new Sim(92)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+  sim.run({ until: 400 })
+  //! churn on few keys: history >> live cells — then compact + swap on n01 mid-trajectory
+  for (let i = 0; i < 30; i++)
+    sim.at(450 + i * 15, () => sim.post(`n0${1 + (i % 3)}`, { kind: 'write', recs: [{ type: REC.update, key: [`c${i % 4}`], value: i }] }))
+  sim.run({ until: 1500 })
+  const rowsBefore = sim.stores.get('n01')!.wal.length
+  sim.at(10, () => {
+    const n = sim.nodes.get('n01')!
+    for (const o of n.logs.keys()) { const f = frontier(n, o); if (f > 0) compact(n, o, f) }
+    n.snapshot()
+  })
+  sim.at(100, () => sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: ['c1'], value: 'post-swap' }] }))
+  sim.run({ until: 3000 })
+  const store = sim.stores.get('n01')!
+  assert.ok(store.wal.length < rowsBefore, `the disk shrank: ${rowsBefore} rows → ${store.wal.length}`)
+  //! the proof that matters: restart n01 from the swapped file (+ the appends chained onto it)
+  const reborn = sim.restart('n01')
+  sim.run({ until: 8000 })
+  assert.equal(jk(reborn, JK.walHole).length, 0, 'appends after the swap linked cleanly onto the snapshot chains')
+  assert.equal(converged(sim), null)
+  assert.deepEqual(sim.violations, [])
+  assert.equal(reborn.state.get(key('c1')), 'post-swap', 'the post-swap write survived the restart via its chained row')
 })
 
 test('persistFail is surfaced and durable never advances past the hole — the cluster still converges', () => {

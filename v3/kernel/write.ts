@@ -463,18 +463,23 @@ export class Writes {
   // advances: applied, shippable, AND durable. Attempt identities re-feed the dedup window, so a
   // restarted owner still dedups pre-crash retries. THE CHAIN CHECK: a row whose `prev` link does not
   // match the origin's replayed tail sits past an INTERIOR hole — a lying disk dropped something before
-  // it (indistinguishable by seqs alone: Lamport streams are legitimately gappy). The row is SKIPPED
-  // (journaled), converting the interior loss into tail loss, which suffix anti-entropy heals live; a
-  // later re-shipped row that re-links the chain resumes the walk, so orphans self-heal across restarts.
+  // it (indistinguishable by seqs alone: Lamport streams are legitimately gappy; honest crashes tear
+  // TAILS, never interiors — the shell's ordered io-queue and the sim's FIFO fsync clock guarantee
+  // resolution order = append order). A hole therefore PROVES the disk lied, and the fsyncgate verdict
+  // is total: node.condemn() resets the fold, ignores the rest of the file, swaps the WAL clean, and
+  // the cluster re-teaches this node from scratch (M4e — a liar's prefix kept alive resurrected cells
+  // whose removes had been compacted away cluster-wide on this disk's own durable claims).
   replay(node: Node, f: Frame, prev: number) {
+    if (node.tainted) return // condemned: nothing further on this disk is evidence
     const prov = f.prov()
     if (!prov) return // the WAL holds RECORDS-shaped frames only; anything else is not ours to guess at
     const j = node.journal
-    const d = node.streams.for(prov.origin)
     if (prev !== (node.walTail.get(prov.origin) ?? 0)) {
       j.armed && j.emit(JK.walHole, prov.origin, prev)
+      node.condemn(prov.origin)
       return
     }
+    const d = node.streams.for(prov.origin)
     let count = 0
     for (const rv of f.records()) {
       if (rv.seq > node.seq) node.seq = rv.seq // the Lamport clock rebuilds from every replayed stamp
@@ -487,6 +492,10 @@ export class Writes {
       d.shippable = rv.seq
       d.durable = rv.seq
       node.apply(rec, prov.origin, rv.seq, rv.epoch)
+      //! replay speaks the SAME journal vocabulary as live ingest (it IS the ingest path): per-record
+      // applyInbound keeps the debugger's time-travel fold (tools/debug/model.mjs stateAt) truthful
+      // across a restore — without it a reborn node's fold looks empty to every journal consumer.
+      j.armed && j.emit(JK.applyInbound, prov.origin, rv.seq)
       if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch)
       count++
     }

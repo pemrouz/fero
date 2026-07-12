@@ -173,16 +173,19 @@ export const perEvent = () => [
   },
   {
     //! per-origin applied watermarks are monotone by construction — a regression here means dup/dedup
-    // broke. Keyed to the node OBJECT: a restarted node legitimately restarts its watermarks from 0.
+    // broke. Keyed to the STREAMS OBJECT (not the node): a restarted node restarts its watermarks from 0
+    // (fresh node, fresh streams), and a CONDEMNED restore (kernel condemn(): the disk proved itself a
+    // liar, the fold resets) legitimately replaces node.streams mid-life — both are new-object resets,
+    // never in-place regressions.
     name: 'watermark-monotone',
     check: (() => {
-      const last = new Map<string, { node: Node; applied: number }>()
+      const last = new Map<string, { streams: unknown; applied: number }>()
       return (sim: Sim): string | null => {
         for (const [id, n] of sim.nodes)
           for (const [origin, s] of n.streams) {
             const k = id + '|' + origin
             let prev = last.get(k)
-            if (!prev || prev.node !== n) prev = { node: n, applied: 0 }
+            if (!prev || prev.streams !== n.streams) prev = { streams: n.streams, applied: 0 }
             if (s.applied < prev.applied) return `${id} stream ${origin} watermark went backwards: ${s.applied} < ${prev.applied}`
             prev.applied = s.applied
             last.set(k, prev)
@@ -233,15 +236,21 @@ export const converged = (sim: Sim): string | null => {
 }
 
 //! confirmedIntact — the no-confirmed-write-lost check (plan §6): every probe the ladder answered OK
-// names a record that must still EXIST — in at least one live node's log always, and (R=∞, converged)
-// in EVERY live node's log. Run at end-of-horizon like converged(); the M4e restore proof runs it
-// after killing and rebooting the whole cluster from WALs. Null = intact; else the lost coordinates.
-export const confirmedIntact = (sim: Sim): string | null => {
+// names a record whose effect must survive — at every live node it is either still IN the log, or the
+// node's stream is provably PAST it (applied ≥ seq: the record was folded, and compaction may then
+// lawfully drop it — its winner survives in the fold, which converged() separately verifies). Run at
+// end-of-horizon like converged(); the M4e restore proof runs it after killing and rebooting the whole
+// cluster from WALs. `level` scopes the claim to what the ladder actually promised: after a MAJORITY-
+// simultaneous crash only `persisted` writes are guaranteed (replicated guards node loss, not cluster-
+// wide power loss) — full-crash proofs pass CONFIRM.persisted; minority-crash runs keep the default.
+// Null = intact; else the lost coordinates.
+export const confirmedIntact = (sim: Sim, level = 0): string | null => {
   for (const c of sim.confirms.values()) {
-    if (c.ok !== true) continue
+    if (c.ok !== true || c.level < level) continue
     for (const [id, n] of sim.nodes) {
       const held = n.logs.get(c.origin)?.some((e) => e.seq === c.seq)
-      if (!held) return `confirmed (${c.origin}, ${c.seq}) level ${c.level} is MISSING at ${id}`
+      const folded = (n.streams.get(c.origin)?.applied ?? 0) >= c.seq
+      if (!held && !folded) return `confirmed (${c.origin}, ${c.seq}) level ${c.level} is MISSING at ${id}`
     }
   }
   return null

@@ -18,11 +18,12 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Sim } from '../../sim/exec.ts'
 import { cluster, formed, writes } from '../../sim/harness.ts'
-import { converged, drained } from '../../sim/monitors.ts'
+import { converged, drained, confirmedIntact } from '../../sim/monitors.ts'
 import { captureSim } from './capture.ts'
 import { contested } from './model.mjs'
 import { JK } from '../../kernel/journal.ts'
 import { Node } from '../../kernel/node.ts'
+import { CONFIRM } from '../../kernel/confirm.ts'
 import { REC, type Env, type Rec } from '../../kernel/env.ts'
 import { VERB, encodeFrame, encodeControl } from '../../kernel/codec.ts'
 
@@ -667,6 +668,57 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'restore',
+    title: 'Kill \u22129 the whole cluster \u2014 restore from WALs alone (M4)',
+    kind: 'unhappy',
+    desc: 'durable mode: writes fsync to per-node WALs, tails are CONFIRMED at the persisted level, then every node dies at once \u2014 three directories are all that remain. Boot records re-form the view (the rejoin self-ballot), replay refolds the logs, and zero persisted-confirmed writes may be lost',
+    diagram: {
+      nodes: ids(3), mesh: true, writers: ids(3),
+      phases: [
+        { label: 'write + fsync', sev: 'gold' }, { label: 'confirm \u2713', sev: 'gold' },
+        { label: 'kill \u22129 \u00d73', sev: 'crit' }, { label: 'replay WALs', sev: 'info' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(90)
+      cluster(sim, 3, { heartbeatMs: 50, durable: true })
+      sim.run({ until: 400 })
+      const names = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']
+      for (let i = 0; i < 18; i++)
+        sim.at(50 + i * 20, () => sim.post(`n0${1 + (i % 3)}`, { kind: 'write', recs: [{ type: REC.update, key: [`${names[i % 6]}${i}`], value: { n: i } }] }))
+      sim.run({ until: 1600 })
+      const written = [...sim.nodes.get('n01')!.logs.values()].reduce((s, es) => s + es.length, 0)
+      //! confirm every origin's tail at the PERSISTED level \u2014 the only rung that promises majority-crash survival
+      let id = 0
+      for (const [origin, entries] of sim.nodes.get('n01')!.logs)
+        sim.post('n01', { kind: 'confirm', id: ++id, origin, seq: entries[entries.length - 1].seq, level: CONFIRM.persisted })
+      sim.run({ until: 2400 })
+      const confirmed = [...sim.confirms.values()].filter((c) => c.ok === true).length
+      //! the kill: all three at once \u2014 in-flight fsync batches tear, nothing is flushed
+      for (const u of [...sim.nodes.keys()]) sim.restart(u)
+      sim.run({ until: 14000 })
+      const live = [...sim.nodes.values()]
+      const replayed = live.reduce((s, n) => s + n.journal.read().filter((e) => e.kind === JK.replayed).reduce((x, e) => x + (Number(e.a) || 0), 0), 0)
+      const fail =
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} \u2014 ${sim.violations[0].detail}` : '') ||
+        (confirmed !== id ? `${confirmed}/${id} probes confirmed pre-crash` : '') ||
+        (!formed(live) ? 'mesh did not re-form from the boot records' : '') ||
+        (converged(sim) ?? '') ||
+        (confirmedIntact(sim, CONFIRM.persisted) ?? '') ||
+        (live.some((n) => !n.membership.gate(n).open) ? 'gate closed after restore' : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: written, kind: 'count' },
+          { k: 'confirmed persisted', v: confirmed, kind: 'count' },
+          { k: 'rows replayed', v: replayed, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
     id: 'wire',
     title: 'Wire invariants — counted, pinned',
     kind: 'meta',
@@ -688,7 +740,7 @@ export const SCENARIOS: Scenario[] = [
       let frames = 0
       const env: Env = {
         now: () => 0, rng: () => 0.5,
-        sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {} },
+        sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {} },
       }
       const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
       for (let p = 0; p < 3; p++) {

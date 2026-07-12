@@ -1,12 +1,12 @@
 {
- "rev": "a8b69da",
- "when": "2026-07-06T10:35:26.414Z",
- "wallMs": 388,
- "pass": 16,
- "total": 16,
+ "rev": "5cb5300",
+ "when": "2026-07-12T11:48:31.750Z",
+ "wallMs": 2418,
+ "pass": 17,
+ "total": 17,
  "baseline": {
   "rev": "a8b69da",
-  "when": "2026-07-06T06:09:51.238Z"
+  "when": "2026-07-06T10:35:26.414Z"
  },
  "scenarios": [
   {
@@ -64,7 +64,7 @@
     },
     {
      "k": "wall ms",
-     "v": 8,
+     "v": 30,
      "kind": "ms"
     }
    ],
@@ -136,7 +136,7 @@
     },
     {
      "k": "wall ms",
-     "v": 10,
+     "v": 39,
      "kind": "ms"
     }
    ],
@@ -145,7 +145,7 @@
     "applied": 60,
     "contested": 0,
     "events": 153,
-    "wall ms": 9
+    "wall ms": 10
    }
   },
   {
@@ -209,7 +209,7 @@
     },
     {
      "k": "wall ms",
-     "v": 4,
+     "v": 17,
      "kind": "ms"
     }
    ],
@@ -218,7 +218,7 @@
     "contested": 4,
     "lww losses": 15,
     "events": 92,
-    "wall ms": 5
+    "wall ms": 4
    }
   },
   {
@@ -296,7 +296,7 @@
     },
     {
      "k": "wall ms",
-     "v": 8,
+     "v": 34,
      "kind": "ms"
     }
    ],
@@ -305,7 +305,7 @@
     "dups dropped": 80,
     "ae re-shipped": 101,
     "events": 192,
-    "wall ms": 6
+    "wall ms": 8
    }
   },
   {
@@ -397,7 +397,7 @@
     },
     {
      "k": "wall ms",
-     "v": 19,
+     "v": 90,
      "kind": "ms"
     }
    ],
@@ -406,7 +406,7 @@
     "dups dropped": 337,
     "applied": 180,
     "events": 613,
-    "wall ms": 21
+    "wall ms": 19
    }
   },
   {
@@ -478,7 +478,7 @@
     },
     {
      "k": "wall ms",
-     "v": 2,
+     "v": 7,
      "kind": "ms"
     }
    ],
@@ -553,7 +553,7 @@
     },
     {
      "k": "wall ms",
-     "v": 1,
+     "v": 4,
      "kind": "ms"
     }
    ],
@@ -561,7 +561,7 @@
     "redials": 10,
     "writes": 1,
     "events": 48,
-    "wall ms": 2
+    "wall ms": 1
    }
   },
   {
@@ -632,7 +632,7 @@
     },
     {
      "k": "wall ms",
-     "v": 9,
+     "v": 21,
      "kind": "ms"
     }
    ],
@@ -641,7 +641,7 @@
     "revives": 4,
     "redials": 42,
     "events": 303,
-    "wall ms": 8
+    "wall ms": 9
    }
   },
   {
@@ -706,7 +706,7 @@
     },
     {
      "k": "wall ms",
-     "v": 5,
+     "v": 19,
      "kind": "ms"
     }
    ],
@@ -715,7 +715,7 @@
     "shed": 257,
     "ae re-shipped": 300,
     "events": 321,
-    "wall ms": 8
+    "wall ms": 5
    }
   },
   {
@@ -797,7 +797,7 @@
     },
     {
      "k": "wall ms",
-     "v": 23,
+     "v": 104,
      "kind": "ms"
     }
    ],
@@ -805,9 +805,9 @@
     "views committed": 9,
     "evictions": 3,
     "joins": 2,
-    "writes buffered": 2,
-    "events": 2123,
-    "wall ms": 31
+    "writes buffered": 1,
+    "events": 2133,
+    "wall ms": 23
    }
   },
   {
@@ -893,7 +893,7 @@
     },
     {
      "k": "wall ms",
-     "v": 23,
+     "v": 134,
      "kind": "ms"
     }
    ],
@@ -902,7 +902,7 @@
     "writes buffered": 2,
     "ae re-shipped": 8,
     "events": 1852,
-    "wall ms": 27
+    "wall ms": 23
    }
   },
   {
@@ -975,17 +975,17 @@
     },
     {
      "k": "wall ms",
-     "v": 10,
+     "v": 75,
      "kind": "ms"
     }
    ],
    "base": {
     "writes": 30,
     "forwarded": 20,
-    "acked runs": 20,
+    "acked runs": 40,
     "contested": 0,
     "events": 802,
-    "wall ms": 11
+    "wall ms": 10
    }
   },
   {
@@ -1057,16 +1057,16 @@
     },
     {
      "k": "wall ms",
-     "v": 9,
+     "v": 55,
      "kind": "ms"
     }
    ],
    "base": {
     "commits": 1,
-    "retries deduped": 1,
-    "forwards": 2,
-    "events": 1011,
-    "wall ms": 10
+    "acks observed": 1,
+    "forwards": 1,
+    "events": 1009,
+    "wall ms": 9
    }
   },
   {
@@ -1143,7 +1143,7 @@
     },
     {
      "k": "wall ms",
-     "v": 11,
+     "v": 64,
      "kind": "ms"
     }
    ],
@@ -1151,9 +1151,80 @@
     "parked": 1,
     "flushed via owner": 2,
     "forwards": 1,
-    "events": 1661,
-    "wall ms": 27
+    "events": 1655,
+    "wall ms": 11
    }
+  },
+  {
+   "id": "restore",
+   "title": "Kill −9 the whole cluster — restore from WALs alone (M4)",
+   "kind": "unhappy",
+   "desc": "durable mode: writes fsync to per-node WALs, tails are CONFIRMED at the persisted level, then every node dies at once — three directories are all that remain. Boot records re-form the view (the rejoin self-ballot), replay refolds the logs, and zero persisted-confirmed writes may be lost",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "writers": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "phases": [
+     {
+      "label": "write + fsync",
+      "sev": "gold"
+     },
+     {
+      "label": "confirm ✓",
+      "sev": "gold"
+     },
+     {
+      "label": "kill −9 ×3",
+      "sev": "crit"
+     },
+     {
+      "label": "replay WALs",
+      "sev": "info"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 18,
+     "kind": "count"
+    },
+    {
+     "k": "confirmed persisted",
+     "v": 3,
+     "kind": "count"
+    },
+    {
+     "k": "rows replayed",
+     "v": 54,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 4546,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 476,
+     "kind": "ms"
+    }
+   ],
+   "base": null
   },
   {
    "id": "wire",
@@ -1203,7 +1274,7 @@
     },
     {
      "k": "wall ms",
-     "v": 2,
+     "v": 7,
      "kind": "ms"
     }
    ],
@@ -1284,20 +1355,20 @@
     },
     {
      "k": "events/s",
-     "v": 96742,
+     "v": 18920,
      "kind": "ms"
     },
     {
      "k": "wall ms",
-     "v": 243,
+     "v": 1240,
      "kind": "ms"
     }
    ],
    "base": {
     "seeds": "100/100",
     "events": 23436,
-    "events/s": 82614,
-    "wall ms": 284
+    "events/s": 96742,
+    "wall ms": 243
    }
   }
  ]

@@ -1,4 +1,4 @@
-# fero v3 — M0 + M1 replication + M2 membership + M3 write pipeline + M4a/b durability core + the debug tool
+# fero v3 — M0 + M1 replication + M2 membership + M3 write pipeline + M4 durability + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -8,14 +8,17 @@ from partitions, dial races, and backpressure overflow all HEAL), **M2 membershi
 (committed views by joint-consensus ballot + the CP write-gate), the **M3 write
 pipeline** (ring ownership over the committed view, forwarded attempts with cid
 dedup + typed NACKs — the single-writer invariant v2 spent DECISIONS AA chasing,
-now a per-event monitor), and the **debug tool** (capture → typed model → viewer
+now a per-event monitor), **M4 durability** (the watermark ladder, the WAL + boot
+record + snapshot/truncate behind an effect seam, the confirm guarantee ladder,
+compaction, and the restore-from-WAL-only proof: kill −9 a whole cluster at any
+seed and zero persisted-confirmed writes are lost), and the **debug tool** (capture → typed model → viewer
 with time-travel replay, plus a live mode) — each piece pulled forward exactly when
 a seed sweep or review demanded it, which is the architecture working as designed.
 
 ## Run it
 
 ```sh
-npm test                       # 151 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm test                       # 158 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
 npm run perf                   # 15 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
@@ -168,6 +171,8 @@ kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.
   ring.ts       vnode hashring — allocation-free ownerOf(), a pure function of the committed view (M3)
   write.ts      THE single write ingress: local/forwarded/inbound/replay sources, cid dedup, typed NACKs, the ONE pending queue (M3/M4b)
   streams.ts    per-origin StreamDescriptor — the watermark ladder {applied, shippable, durable} as fields (M4a)
+  confirm.ts    the guarantee ladder: replicated/persisted probes over watermark evidence, view-change recount (M4c)
+  log.ts        compaction: snapshot-record-supersedes-prefix below the crash-stable frontier; tombstone GC (M4d)
   journal.ts    the one typed diagnostics ring (drop-oldest, surfaced drop counter)
 shell/    production adapters (TCP + timers + the fsync WAL/boot-record store), zero protocol decisions
 sim/      the executive: virtual time, seeded faults (FIFO-clamped), per-event monitors, sweep CLI
@@ -332,9 +337,12 @@ because state is a deterministic fold of the journal'd inputs.
   this slice was built, each now structural: (1) **interior WAL loss is
   unhealable by suffix anti-entropy** (a lying disk drops middle batches;
   Lamport gaps make the hole invisible to seqs) — every row now carries a
-  per-origin CHAIN LINK, and replay skips rows that do not link, converting
-  interior loss into the tail loss AE knows how to heal (orphans re-link on
-  later restarts); (2) **a stale clock floor let a reborn node re-issue spent
+  per-origin CHAIN LINK, and since honest crashes tear TAILS (the shell's
+  ordered io-queue and the sim's FIFO fsync clock make resolution order =
+  append order), a hole PROVES the disk lied: replay CONDEMNS the restore
+  (M4e hardening — the fold resets, the WAL swaps clean, the cluster
+  re-teaches; a liar's prefix kept alive resurrected removed cells whose
+  fences had been compacted away on this disk's own durable claims); (2) **a stale clock floor let a reborn node re-issue spent
   seqs** (silent loss both directions) — the boot record now stores a Lamport
   CEILING (a lease, re-persisted every LAMPORT_LEASE stamps) and a restore
   resumes AT the ceiling; (3) **one log cannot serve two lives** (after the
@@ -350,7 +358,7 @@ because state is a deterministic fold of the journal'd inputs.
   and the sim's `restart(uuid)` rebuilds a node from nothing but its store.
 - **M2 debts (stated):** ~~votedFor/committed-view durability~~ — closed by
   M4b (the boot record; pinned). Suspicion still keys off link liveness, not
-  PONG timeouts (a hung-but-connected process needs real-time faults — M4e);
+  PONG timeouts (a hung-but-connected process needs a real-time fault vocabulary — deferred past M4, tracked);
   genesis requires one full formation of the configured hosts. ~~A healed
   evictee may flush at its stale epoch~~ — closed by M3: the flush re-resolves
   ownership and the owner validates attemptEpoch (typed NACK, re-stamp at the
@@ -374,13 +382,13 @@ because state is a deterministic fold of the journal'd inputs.
   real restarts by construction. Pending overflow drops the OLDEST attempt
   (journal-surfaced) — under sustained gate-closed writes beyond
   MAX_PENDING=1024 that is real, counted loss.
-- **The guarantee ladder / confirm (M4); storage/WAL (M4); the public
-  `fero(name, opts)` API over `$()` proxies + the client cid-overlay (M5).**
-  The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is written:
+- **Next: the public `fero(name, opts)` API over `$()` proxies + the client
+  cid-overlay (M5).** The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is
   [CHECKPOINT.md](CHECKPOINT.md) — verdict: no overrun, ladder armed but not
   triggered, M4 sliced into five landable increments (M4a streams/watermarks →
   M4b storage seam + boot record → M4c confirm ladder → M4d log/compaction →
-  M4e the restore-from-WAL-only proof), each closing named debts from the ledger.
+  M4e the restore proof), each closing named debts from the ledger — all five
+  are now LIVE.
 - **Not yet verified (tracked, per plan §7/§11):** the zero-alloc claim is
   structural (method-per-kind sink), not yet counter-verified (--expose-gc heap
   deltas are an M8 pinned-runner deliverable). The replay-refold check HAS landed
@@ -389,8 +397,10 @@ because state is a deterministic fold of the journal'd inputs.
   immediate next step).
 - **M4d compaction is LIVE** (kernel/log.ts): the snapshot record supersedes
   the prefix — below the per-origin FRONTIER (every committed-view member
-  provably applied past the cut, read off the digest evidence confirm already
-  tracks) each entry that is not its cell's current winner is dropped; winners
+  provably past the cut on CRASH-STABLE marks: durable evidence in durable
+  mode, applied marks otherwise — M4e's restore sweep proved applied marks
+  compact away history a crashed lane still needs) each entry that is not its
+  cell's current winner is dropped; winners
   survive as ordinary records with ORIGINAL provenance, so catch-up needs zero
   new machinery and the two plan properties hold as property tests
   (replay-from-0 ≡ live; compacted catch-up ≡ uncompacted). A lagging member
@@ -399,5 +409,46 @@ because state is a deterministic fold of the journal'd inputs.
   still resurrect past it (per-lane quiescence), and the next pass drops the
   remove record itself. Size-armed (COMPACT_AT) on the heartbeat tick,
   journal-surfaced, monitors rescan on shrink. The M0 unbounded-growth debt is
-  CLOSED in memory; the on-disk counterpart (WAL snapshot+truncate) lands with
-  M4e's restore proof, where its correctness must be demonstrated anyway.
+  CLOSED in memory and on disk (the M4e WAL snapshot+swap).
+- **M4c the confirm ladder is LIVE** (kernel/confirm.ts): a probe asks "has
+  (origin, seq) reached this level?" and the ONLY admissible evidence is the
+  watermark ladder — `replicated` = a majority of the committed view holds it
+  SHIPPABLE, `persisted` = a majority holds it DURABLE, never `applied` (v2's
+  recvReplProbe answered off the apply watermark: a documented
+  guaranteed-false-positive, now unwritable). Evidence rides the digests that
+  already flow (the `d` map is the shippable tails; durable mode adds a `p`
+  map) — zero new frame types, convergence on the heartbeat cadence. Every
+  view install RECOUNTS every open probe; the kernel never times out on its
+  own (evidence is monotone — deadlines are the embedder's, cancel answers
+  false with the count reached); the registry is bounded (MAX_PROBES,
+  drop-oldest, surfaced). The M3 residual is demonstrably closed for confirmed
+  writes: a CONFIRMED write survives an ownership handoff exactly-once (the
+  lost-ACK retry cannot outrace what a majority already holds — pinned as a
+  sim schedule).
+- **M4e the restore proof is LIVE** (the WAL snapshot+swap + the full-cluster
+  kill): `sink.snapshot(batch, rows)` atomically REPLACES the whole WAL with
+  the current log re-encoded under fresh chain links (the shell writes tmp +
+  fsync + rename inside an ordered io-queue — which also fixed a latent M4b
+  bug: threadpool fs.write completions are not order-guaranteed, and two
+  swapped appends would have replayed as a false chain hole on a CLEAN
+  restart); durable advances to the log tails on the swap echo; arming is
+  rows-since-last-swap ≥ SNAPSHOT_AT on the tick, after compaction, so the
+  file is O(live cells + SNAPSHOT_AT) always. THE PROOF: kill −9 an entire
+  3- or 5-node cluster mid-workload at any seed — torn tails, one lying disk,
+  io failures, swaps mid-flight — restart every node from its directory
+  alone, and the mesh re-forms (boot records + the rejoin self-ballot),
+  converges, and loses ZERO persisted-confirmed writes (150×3 + 150×5 seeds
+  expected-empty; sim + a real-filesystem Tier-3 twin). The sweep caught a
+  REAL M4d soundness bug while this slice was built: the compaction frontier
+  and tombstone quiescence trusted `applied` marks, which a crash regresses —
+  a lying disk's reborn lane resurrected a removed cell after every fence was
+  compacted away cluster-wide (seed 27). Both now read CRASH-STABLE durable
+  marks in durable mode, and a detected lie condemns the restore outright
+  (`node.condemn()`: fold reset + clean swap + refold from the cluster — the
+  proven wiped-disk path). Honest limits, stated: `replicated` does not
+  survive a majority-simultaneous crash (that is `persisted`'s rung);
+  persisted-intact assumes a MINORITY of lying disks (fsyncgate's fault
+  model — a quorum counted mostly on betrayals is unrecoverable by any
+  design); and a lie confined to the newest un-chained-over row of a lane
+  evades the hole detector (closing it needs chained-over durable marks in
+  the digest — M6 digest work, tracked).
