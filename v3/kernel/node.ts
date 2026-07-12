@@ -265,6 +265,36 @@ export class Node {
         this.confirm.cancel(this, e.id)
         return
       }
+      //! ── M5c method plane (the routing half; the api host holds the handlers) ──
+      //! rpc: the CALLER side ships CALL/SUB/UNSUB on its primary. No live primary ⇒ an immediate
+      // failed result — the api's failover policy owns retries (the kernel stays stateless here:
+      // it routes frames, it does not track rpc ids).
+      case 'rpc': {
+        const id = this.primary
+        const link = id !== null ? this.links.get(id) : undefined
+        if (!link || link.state !== LS.admitted || link.dead) {
+          j.armed && j.emit(JK.rpcFail, e.id, 'unreachable')
+          this.env.sink.result(e.id, false, 'unreachable')
+          return
+        }
+        j.armed && j.emit(JK.rpcOut, e.mode, e.id)
+        link.ship(encodeControl(e.mode, e.mode === VERB.UNSUB ? { id: e.id } : { id: e.id, m: e.m, a: e.a }), this.env.sink, j)
+        return
+      }
+      //! reply/subOut: the HOST side answers an invoke — framed back down the link it came in on.
+      // A dead/gone link is a silent no-op: the caller's own linkDown handling owns that failure.
+      case 'reply': {
+        const link = this.links.get(e.link)
+        if (!link || link.state !== LS.admitted || link.dead) return
+        link.ship(encodeControl(VERB.RESULT, { id: e.id, ok: e.ok ? 1 : 0, v: e.value }), this.env.sink, j)
+        return
+      }
+      case 'subOut': {
+        const link = this.links.get(e.link)
+        if (!link || link.state !== LS.admitted || link.dead) return
+        link.ship(encodeControl(VERB.SUBREC, { id: e.id, recs: e.recs }), this.env.sink, j)
+        return
+      }
       case 'persistFail': {
         //! TERMINAL (the fsyncgate policy): a store that failed one batch may have lied about anything
         // after it — rows persisted past a failure would replay as a chain built on sand. The WAL is
@@ -752,6 +782,45 @@ export class Node {
         else this.writes.onNack(this, link, v)
         this.membership.settle(this)
         return
+      }
+      //! M5c method plane — the kernel ROUTES, the api host RUNS (purity: user handlers are arbitrary
+      // async code). CALL/SUB/UNSUB surface as the invoke effect; RESULT/SUBREC surface as result/
+      // subRecs. Malformed frames journal + drop (not link-fatal: the method plane is above the
+      // replication contract, and a bad call must not sever a healthy data link).
+      case VERB.CALL:
+      case VERB.SUB: {
+        if (link.state !== LS.admitted) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'rpc before hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'rpc-before-hello')
+        }
+        const v = f.value as { id?: unknown; m?: unknown; a?: unknown }
+        if (typeof v?.id !== 'number' || typeof v.m !== 'string') {
+          j.armed && j.emit(JK.frameDrop, link.id, 'malformed rpc')
+          return
+        }
+        j.armed && j.emit(JK.rpcIn, f.verb, v.id, v.m)
+        return this.env.sink.invoke(link.id, v.id, f.verb, v.m, v.a)
+      }
+      case VERB.UNSUB: {
+        if (link.state !== LS.admitted) return
+        const v = f.value as { id?: unknown }
+        if (typeof v?.id !== 'number') return
+        j.armed && j.emit(JK.rpcIn, f.verb, v.id, '')
+        return this.env.sink.invoke(link.id, v.id, f.verb, '', undefined)
+      }
+      case VERB.RESULT: {
+        if (link.state !== LS.admitted) return
+        const v = f.value as { id?: unknown; ok?: unknown; v?: unknown }
+        if (typeof v?.id !== 'number') return
+        j.armed && j.emit(JK.rpcAnswer, v.id, v.ok === 1 ? 1 : 0)
+        return this.env.sink.result(v.id, v.ok === 1, v.v)
+      }
+      case VERB.SUBREC: {
+        if (link.state !== LS.admitted) return
+        const v = f.value as { id?: unknown; recs?: unknown }
+        if (typeof v?.id !== 'number' || !Array.isArray(v.recs)) return
+        return this.env.sink.subRecs(v.id, v.recs as Rec[]) // deliberately un-journaled: per-delta volume
       }
       case VERB.PING:
         return link.ship(encodeControl(VERB.PONG), this.env.sink, j)

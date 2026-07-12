@@ -740,7 +740,7 @@ export const SCENARIOS: Scenario[] = [
       let frames = 0
       const env: Env = {
         now: () => 0, rng: () => 0.5,
-        sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {} },
+        sink: { connect() {}, send() { frames++ }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {}, invoke() {}, result() {}, subRecs() {} },
       }
       const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
       for (let p = 0; p < 3; p++) {

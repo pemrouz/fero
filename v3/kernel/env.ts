@@ -48,6 +48,14 @@ export type Event =
   // a lying disk lost something before it — and is skipped, converting interior loss into the tail
   // loss that suffix anti-entropy knows how to heal.
   | { kind: 'replay'; bytes: Uint8Array; prev?: number }
+  //! ── the M5c method plane: the kernel ROUTES method traffic, the api HOST runs the handlers ──
+  // (purity: a user handler is arbitrary async code — it can never run inside step()). rpc is the
+  // CALLER side: mode CALL/SUB/UNSUB, shipped on the client's primary (no primary ⇒ an immediate
+  // failed `result` effect — the api's failover policy owns retries). reply/subOut are the HOST side:
+  // the api answers an invoke, the kernel frames it back down the link it came in on.
+  | { kind: 'rpc'; id: number; mode: number; m?: string; a?: unknown }
+  | { kind: 'reply'; link: number; id: number; ok: boolean; value?: unknown }
+  | { kind: 'subOut'; link: number; id: number; recs: Rec[] }
 
 //! One outbound consequence. Typed methods (not pushed objects) so the steady-state path allocates no effect
 // WRAPPERS by construction (frame buffers and Applied records still allocate; the full alloc-counter
@@ -80,6 +88,15 @@ export interface EffectSink {
   //! confirm(id, ok, count) (M4c): a guarantee-ladder probe's answer — ok with the member count whose
   // ladder covered it, or false (cancel/overflow) with the count reached. Downstream delivery, like apply.
   confirm(id: number, ok: boolean, count: number): void
+  //! ── the M5c method plane (see the rpc/reply/subOut events) ──
+  //! invoke (HOST side): a CALL/SUB/UNSUB frame arrived — the api runs the handler and answers with a
+  // reply/subOut event. `link` identifies the caller for the answer route AND for sub reaping on death.
+  invoke(link: number, id: number, mode: number, m: string, a: unknown): void
+  //! result (CALLER side): a RESULT frame answered our rpc id — or the kernel failed it locally
+  // (no primary, link died with the call in flight: ok=false, value = the reason string).
+  result(id: number, ok: boolean, value: unknown): void
+  //! subRecs (CALLER side): one SUBREC frame — change records for a live subscription id.
+  subRecs(id: number, recs: Rec[]): void
   //! snapshot(batch, rows) (M4e): ATOMICALLY REPLACE the whole WAL with `rows` — the disk counterpart
   // of compaction (a swap is not an append; it gets its own verb). Rows are [frame + fresh chain link]
   // in replay order; the store must make the swap all-or-nothing (write-tmp + fsync + rename in the

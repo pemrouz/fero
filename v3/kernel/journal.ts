@@ -80,6 +80,11 @@ export const JK = {
   //! ── M4e WAL snapshot vocabulary ──
   snapshot: 53,      // a=batch, b=rows — a whole-WAL snapshot+swap left for the store (the disk counterpart of compaction)
   walTaint: 54,      // a=origin — an interior hole PROVED the disk lied (fsyncgate): the restore is condemned, the fold resets to empty, the WAL swaps clean, the cluster re-teaches
+  //! ── M5c method-plane vocabulary (the kernel routes; the api host runs) ──
+  rpcIn: 55,         // a=verb (CALL|SUB|UNSUB), b=id, c=method — an rpc frame arrived; handed to the host via sink.invoke
+  rpcAnswer: 56,     // a=id, b=ok(0|1) — a RESULT frame answered one of our rpc ids
+  rpcOut: 57,        // a=verb, b=id — an rpc event shipped on the primary
+  rpcFail: 58,       // a=id, b=reason — the kernel failed an rpc locally (no primary / primary died with it in flight)
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

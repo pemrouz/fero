@@ -17,10 +17,16 @@ import type { WriteReject, WriteResolve } from './types.ts'
 test('config recognition: unknown keys and unknown seams throw at fero() time; function values are methods', async () => {
   await assert.rejects(fero('r', { prot: 9 } as never), /unknown option 'prot'/)
   await assert.rejects(fero('r', { seams: { hash: () => 0 } } as never), /unknown seam 'hash'/)
-  //! a function-valued opt is a METHOD (recognized by value type, not key name) — stashed until M5c
-  const f = await fero('r', { checkout: () => 'later' })
-  assert.equal(typeof f.methods.checkout, 'function')
-  assert.throws(() => f.methods.checkout(), /M5c/)
+  //! a function-valued opt is a METHOD (recognized by value type, not key name) — and on a server it
+  // dispatches LOCALLY (M5c): one-shot invoke, flush-on-return, snapshot for proxy returns
+  const f = await fero('r', { checkout: (n: unknown) => `order-${n}` })
+  assert.equal(await f.methods.checkout(7), 'order-7')
+  //! built-in read returns the resource (snapshot locally)
+  f.data.k = 1
+  assert.deepEqual(await f.methods.read(), { k: 1 })
+  //! reserved names refuse loudly
+  await assert.rejects(fero('r', { update: () => 0 } as never), /built-in writer/)
+  await assert.rejects(fero('r', { ['\u0000evil']: () => 0 } as never), /reserved for the system plane/)
   await f.destroy()
 })
 
