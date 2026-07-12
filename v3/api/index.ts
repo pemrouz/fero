@@ -23,7 +23,7 @@ import { proxy } from './substrate.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'seams'])
+const CONFIG_KEYS = new Set(['uuid', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'seams'])
 const SEAM_KEYS = new Set(['validation'])
 
 //! keyPath — normalize the Change.key sugar: 'user42' and ['user42','active'] are both paths.
@@ -51,6 +51,13 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   // never be dialed can never be a member. listen (with or without hosts) = a server; neither = solo.
   const isClient = !config.listen && Array.isArray(config.hosts) && (config.hosts as string[]).length > 0
   if (isClient && config.dir) throw new Error(`fero('${name}'): a durable client (dir on a spoke) is not supported yet — offline-first clients are tracked for M6`)
+  //! replicas (M6): declared config, validated loudly — an integer R ≥ 1, servers only (a spoke
+  // holds nothing to scope; it follows whatever the cluster replicates)
+  if (config.replicas !== undefined) {
+    if (!Number.isInteger(config.replicas) || (config.replicas as number) < 1)
+      throw new Error(`fero('${name}'): replicas must be an integer ≥ 1 (omit for full replication)`)
+    if (isClient) throw new Error(`fero('${name}'): replicas is a server-side setting — a client follows the cluster's scoping`)
+  }
   const rtOpts: RuntimeOpts = {
     uuid: (config.uuid as string) ?? randomUUID().slice(0, 8),
     listen: config.listen as string | undefined,
@@ -63,6 +70,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     heartbeatMs: (config.heartbeatMs as number | undefined) ?? 500,
     redialMs: config.redialMs as number | undefined,
     journalCap: config.journalCap as number | undefined,
+    ...(config.replicas !== undefined ? { replicas: config.replicas as number } : {}),
     //! restore-before-network: a dir holding a previous life boots as its heir (incarnation bumped,
     // clock leased, votedFor honored) — the composer makes the wal.test.ts idiom the default path
     ...(config.dir ? restoreOpts(config.dir as string) : {}),

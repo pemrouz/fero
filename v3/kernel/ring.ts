@@ -39,7 +39,12 @@ export class Ring {
   #owners = new Uint16Array(0)
   #members: string[] = []
   #hash: (s: string) => number
-  #place = new Map<string, string>()
+  #place = new Map<string, string[]>()
+  //! holdersOf scratch — one reusable out-array + per-member seen flags, so the R-set lookup stays
+  // allocation-free like ownerOf (the scoped fan-out consults it per committed record). The returned
+  // array is INVALIDATED by the next holdersOf call on this ring — callers copy if they retain.
+  #scratch: string[] = []
+  #seen = new Uint8Array(0)
 
   constructor(hash: (s: string) => number = fnv) { this.#hash = hash }
 
@@ -59,13 +64,14 @@ export class Ring {
     this.#points = new Uint32Array(n)
     this.#owners = new Uint16Array(n)
     for (let i = 0; i < n; i++) { this.#points[i] = entries[i].p; this.#owners[i] = entries[i].m }
+    this.#seen = new Uint8Array(this.#members.length)
   }
 
   //! ownerOf — the allocation-free lookup: first vnode point ≥ hash(partition), wrapping to 0.
   // Returns '' on an empty ring (open genesis: every node owns its own writes).
   ownerOf(partition: string): string {
     const o = this.#place.get(partition)
-    if (o !== undefined) return o
+    if (o !== undefined) return o[0]
     const points = this.#points
     if (points.length === 0) return ''
     const h = this.#hash(partition)
@@ -78,11 +84,59 @@ export class Ring {
     return this.#members[this.#owners[lo === points.length ? 0 : lo]]
   }
 
+  //! holdersOf — the R-SET lookup (M6 scoped replication): the first r DISTINCT members on the
+  // successor walk from hash(partition), holder[0] === ownerOf(partition) always (single-writer is
+  // untouched — the owner is just the first holder). Same determinism story as ownerOf: a pure
+  // function of the committed view, so every node that installed epoch e computes the identical
+  // R-set. r is clamped to the member count (r ≥ members = full replication, the R=∞ degeneracy);
+  // pinned partitions contribute their pin list first, then the walk fills the remainder with
+  // distinct unpinned members. Returns the reusable scratch array — copy before retaining.
+  holdersOf(partition: string, r: number): readonly string[] {
+    const out = this.#scratch
+    out.length = 0
+    if (r <= 0) return out
+    const members = this.#members
+    const seen = this.#seen
+    seen.fill(0)
+    //! pins first, ownerOf semantics kept: a pinned uuid need not be a member (test seam contract)
+    const pinned = this.#place.get(partition)
+    if (pinned !== undefined)
+      for (const u of pinned) {
+        if (out.length >= r) return out
+        if (!out.includes(u)) {
+          out.push(u)
+          const mi = members.indexOf(u)
+          if (mi >= 0) seen[mi] = 1
+        }
+      }
+    const points = this.#points
+    if (points.length === 0) return out
+    const h = this.#hash(partition)
+    let lo = 0, hi = points.length
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1
+      if (points[mid] < h) lo = mid + 1
+      else hi = mid
+    }
+    if (lo === points.length) lo = 0
+    //! successor walk: consecutive vnode points often repeat a member — the seen flags dedup; the
+    // walk terminates after one full lap (every member has been offered) or r distinct collected
+    for (let i = 0; i < points.length && out.length < r; i++) {
+      const mi = this.#owners[(lo + i) % points.length]
+      if (seen[mi] === 0) { seen[mi] = 1; out.push(members[mi]) }
+    }
+    return out
+  }
+
   //! holds — does this uuid own the partition? (The name the plan reserves; same allocation-free path.)
   holds(uuid: string, partition: string): boolean { return this.ownerOf(partition) === uuid }
 
-  //! place — TEST-ONLY placement override: pin a partition to a member so fault schedules read as intent.
+  //! place — TEST-ONLY placement override: pin a partition to a member (or, for scoped-replication
+  // schedules, an ordered holder list — pins[0] is the owner) so fault schedules read as intent.
   // Must be applied identically on every node of a sim (the ring's determinism contract is the caller's
   // to keep when overriding). Never used in production paths.
-  place(partition: string, uuid: string) { this.#place.set(partition, uuid) }
+  place(partition: string, ...uuids: string[]) {
+    if (uuids.length === 0) this.#place.delete(partition) // unpin — back to the hash walk
+    else this.#place.set(partition, uuids)
+  }
 }

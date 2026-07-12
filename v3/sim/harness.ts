@@ -12,7 +12,7 @@ import { REC, type Rec } from '../kernel/env.ts'
 import type { Node } from '../kernel/node.ts'
 
 //! cluster — n nodes, full dial mesh (everyone dials everyone: deliberately redundant so the one-link-per-pair dedup is exercised on every formation).
-export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durable?: boolean; fault?: Fault } = {}): Node[] => {
+export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durable?: boolean; replicas?: number; fault?: Fault } = {}): Node[] => {
   const ids = Array.from({ length: n }, (_, i) => `n${String(i + 1).padStart(2, '0')}`)
   const addrs = ids.map((id) => `sim:${id}`)
   const nodes = ids.map((id, i) =>
@@ -22,6 +22,7 @@ export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durab
       hosts: addrs.filter((_, j) => j !== i),
       heartbeatMs: opts.heartbeatMs ?? 0, // explicit protocol mode — heartbeats OFF by default so quiescence is reachable
       durable: opts.durable ?? false, // explicit protocol mode — storage OFF by default (zero persist effects)
+      ...(opts.replicas !== undefined ? { replicas: opts.replicas } : {}), // explicit protocol mode — scoping OFF by default (M6)
       redialMs: 20,
       journalCap: 1 << 16, // capture-grade history: time-travel replay needs the journal un-truncated
     }),

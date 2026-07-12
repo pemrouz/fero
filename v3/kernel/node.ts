@@ -57,6 +57,14 @@ export interface NodeOpts {
   // primary (plan §5 client writes: a client never stamps provenance; the FIRST server re-stamps at
   // relay time). It never proposes, votes, JOIN-knocks, or counts toward genesis.
   client?: boolean
+  //! replicas (M6): EXPLICIT protocol mode like durable/client — scoped replication. Unset/0 = the
+  // R=∞ mode: every member holds every partition and the scoping machinery is provably inert (the
+  // sweep mode; trajectories stay byte-identical with M0-M5). Set (≥1) = each partition lives on
+  // exactly R holders (ring.holdersOf, holder[0] = the owner — single-writer untouched); replication
+  // fans out to holders only, non-holders shed under the keep-until-confirmed protocol (plan §5).
+  // Must be set identically on every member — like heartbeatMs, cluster config is the deployer's
+  // contract (the exactly-R sim monitor catches drift in test).
+  replicas?: number
 }
 
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
@@ -197,6 +205,11 @@ export class Node {
 
   //! client — the M5b role mode (see NodeOpts.client). Off ⇒ zero behavioural difference.
   get client(): boolean { return this.#opts.client === true }
+
+  //! replicas — the M6 scoped-replication mode (see NodeOpts.replicas). 0 ⇒ unscoped (R=∞), the
+  // machinery is inert; scoped() is the one branch guard every M6 code path hangs off.
+  get replicas(): number { return this.#opts.replicas ?? 0 }
+  get scoped(): boolean { return (this.#opts.replicas ?? 0) > 0 }
 
   //! primary — the client's ONE feeder link id (null while unconnected). Kernel-internal to the client
   // role; the write drain targets it, digests flow only over it, failover re-elects on its linkDown.
