@@ -268,6 +268,100 @@ test('AE FILTER — a digest answer ships a member only the partitions ITS R-set
   assert.deepEqual(shipped, ['shared'], 'the suffix ships bb\'s partitions only — never private ones')
 })
 
+//! ── slice 3b: the one-teacher latch — every leg driven deterministically ──
+
+const haveq = (e: number, q: Record<string, Record<string, number>>) => encodeControl(VERB.HAVEQ, { e, q })
+const havea = (e: number, a: Record<string, { ok: number; need: number; m?: Record<string, number>; md?: Record<string, number> }>) => encodeControl(VERB.HAVEA, { e, a })
+const acqFrame = (origin: string, rows: { seq: number; rec: Rec }[], epoch = 1): Uint8Array => {
+  const out = encodeRuns(rows.map((r) => ({ rec: r.rec, origin, seq: r.seq, epoch })), VERB.ACQ)
+  assert.equal(out.length, 1)
+  return out[0]
+}
+
+test('ACQUISITION — a co-holder\'s HAVEQ announce latches the from-zero assignee: need → ACQ → ACQDONE folds atomically; staged live replays above the cut, below-cut discards', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('px', 'bb', 'aa')
+  //! bb announces px (floors: lane bb up to 5) — aa is assigned but has nothing: latch + need
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  assert.equal(h.jk(JK.acquireStart).length, 1, 'the latch opened')
+  const needFrames = h.of('send').filter((e) => e[1] === 1)
+    .map((e) => new Framer().push((e[2] as Uint8Array).slice())[0]).filter((f) => f && f.verb === VERB.HAVEA)
+  assert.equal(needFrames.length, 1)
+  assert.deepEqual((needFrames[0].value as { a: Record<string, unknown> }).a.px, { ok: 0, need: 1, m: {} }, 'from-zero: empty marks')
+  //! live records for px arrive MID-LATCH: staged, nothing folds (the §0 law row 2)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 4, rec: rec(['px', 'stale'], 'covered') }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 6, rec: rec(['px', 'fresh'], 'live') }]) })
+  assert.equal(h.node.state.size, 0, 'nothing folds during the latch')
+  assert.equal(h.node.streams.get('bb')?.applied ?? 0, 0, 'the fence is untouched during the latch')
+  //! the teacher's transfer + DONE: the fold is ONE synchronous step
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 3, rec: rec(['px', 'a'], 1) }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 5, rec: rec(['px', 'b'], 2) }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 5 }, n: 2 }) })
+  assert.equal(h.jk(JK.acquire).length, 1, 'the fold committed')
+  assert.equal(h.node.scope!.held('px'), true)
+  assert.equal(h.node.state.get(JSON.stringify(['px', 'a'])), 1)
+  assert.equal(h.node.state.get(JSON.stringify(['px', 'b'])), 2)
+  const d = h.node.streams.get('bb')!
+  assert.equal(d.parts!.get('px')!.s, 6, 'floors: cut (5) then the replayed live 6')
+  assert.equal(h.node.state.get(JSON.stringify(['px', 'fresh'])), 'live', 'staged live ABOVE the cut replayed through the normal ingest')
+  assert.equal(h.node.state.has(JSON.stringify(['px', 'stale'])), false, 'staged live ≤ cut DISCARDED — its effect is in the fold or was lawfully compacted (the completeness floor)')
+  assert.deepEqual(h.node.logs.get('bb')!.map((e) => e.seq), [3, 5, 6], 'the lane: teacher records at their seqs + the live tail')
+})
+
+test('ACQUISITION aborts — torn count, foreign ACQ, teacher death, epoch flip, tick timeout: the buffer drops whole, nothing folds', () => {
+  //! torn: DONE's n disagrees with the staged teacher count
+  const t1 = armedView1()
+  t1.node.writes.ring.place('px', 'bb', 'aa')
+  t1.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  t1.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 3, rec: rec(['px', 'a'], 1) }]) })
+  t1.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 5 }, n: 2 }) })
+  assert.equal(t1.jk(JK.acquireAbort).filter((e) => e.b === 'torn').length, 1)
+  assert.equal(t1.node.state.size, 0, 'nothing folded')
+  assert.equal(t1.node.scope!.entries.get('px'), undefined, 'no residue ⇒ the entry drops to out (re-offered next round)')
+  //! foreign ACQ: only the latched teacher's frames stage
+  const t2 = armedView1()
+  t2.node.writes.ring.place('px', 'bb', 'aa')
+  t2.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  t2.node.step({ kind: 'bytesIn', link: 2, bytes: acqFrame('cc', [{ seq: 9, rec: rec(['px', 'x'], 9) }]) })
+  assert.equal(t2.jk(JK.stageDrop).length, 1, 'a second teacher\'s transfer drops (one teacher per attempt)')
+  //! teacher death aborts; epoch flip aborts
+  t2.node.step({ kind: 'linkDown', link: 1, reason: 'test' })
+  assert.equal(t2.jk(JK.acquireAbort).filter((e) => e.b === 'linkDown').length, 1)
+  const t3 = armedView1()
+  t3.node.writes.ring.place('px', 'bb', 'aa')
+  t3.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  t3.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(t3.jk(JK.acquireAbort).filter((e) => e.b === 'epoch').length, 1, 'the machine is epoch-scoped')
+  //! tick timeout: STAGE_TICKS heartbeats without DONE re-offers by abort
+  const t4 = armedView1()
+  t4.node.writes.ring.place('px', 'bb', 'aa')
+  t4.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  for (let i = 0; i < 9; i++) t4.tick()
+  assert.equal(t4.jk(JK.acquireAbort).filter((e) => e.b === 'timeout').length, 1)
+})
+
+test('SHED — the stateless predicate: HAVEA attestations from EVERY current holder over every frozen lane release the data; a partial answer does not', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('p', 'bb', 'aa')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 5, rec: rec(['p', 'x'], 1) }]) })
+  //! the R-set moves to {bb, cc}: aa freezes into an orphan
+  h.node.writes.ring.place('p', 'bb', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.jk(JK.orphaned).length, 1)
+  //! bb attests coverage — HALF the R-set: the predicate must NOT fire (every CURRENT holder, always)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(2, { p: { ok: 1, need: 0, m: { bb: 5 } } }) })
+  assert.equal(h.jk(JK.shed).length, 0, 'one of two holders is not coverage')
+  assert.equal(h.node.state.get(JSON.stringify(['p', 'x'])), 1)
+  //! cc attests too — the predicate fires: data, floors, lanes, entry all leave
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: havea(2, { p: { ok: 1, need: 0, m: { bb: 5 } } }) })
+  assert.equal(h.jk(JK.shed).length, 1, 'every current holder covered ⇒ shed')
+  assert.equal(h.node.state.has(JSON.stringify(['p', 'x'])), false)
+  assert.equal(h.node.scope!.entries.get('p'), undefined)
+  assert.equal(h.node.logs.get('bb')!.some((e) => e.rec.key[0] === 'p'), false, 'the lane filtered')
+  assert.equal(h.node.streams.get('bb')!.parts?.get('p'), undefined, 'floors dropped')
+  assert.equal(h.node.versions.has(JSON.stringify(['p', 'x'])), false, 'stamps dropped')
+})
+
 test('COMPACTION PIN — armed nodes never compact or GC on the member-ranged frontier (unsound under scoping); the unscoped control still does', () => {
   const build = (replicas?: number) => {
     const h = replicas ? armedView1() : harness('aa', { hosts: ['sim:bb', 'sim:cc'] })
