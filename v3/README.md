@@ -18,7 +18,7 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 158 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm test                       # 166 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
 npm run perf                   # 15 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
@@ -158,6 +158,56 @@ log-monotone monitor.
   Writer per control frame. Seven more findings were refuted on inspection; four
   "contested" perf/observability notes were addressed anyway. The test count went
   110 → 121; every fix has a mutation-killer pin.
+
+**M4:** a 6-lens review over the whole durability arc returned 20 findings;
+triaged inline, 13 confirmed and fixed, every fix pinned (158 → 166 tests):
+- **Durable froze in name only (critical, four independent finders).** A batch
+  in flight behind a persistFail still advanced the durable watermark on its
+  late echo — false `confirm:'persisted'` evidence for rows past a real on-disk
+  hole, with zero lying disks. persistFail now voids `#inflight` entirely; the
+  shell's io-queue latches `#walFailed` so an honest EIO can never leave an
+  interior hole for the hole-means-lie verdict to misread.
+- **The boot record had no fsync — file or directory (critical).** The one
+  record everything fences on (votedFor, the Lamport ceiling, the incarnation)
+  could regress across a power crash: a double-vote and cross-life seq reuse in
+  one bug. Now write-tmp + fsync + rename + directory-fsync; the WAL swap
+  rename gets the same directory fsync (every swap was a correlated rename-lie
+  without it), and its fd handoff is failure-ordered (no dangling-fd window).
+- **The burned-epoch wedge (critical, repro'd).** A proposer that collected
+  durable votes and vanished froze membership FOREVER — every proposal targeted
+  view.epoch+1, which the vote-once rule made unwinnable (M4b's durable
+  votedFor made the burn survive restarts). Proposals now ESCALATE past known
+  burns (own spent vote + the `ve` a refusal carries) and voters grant any
+  epoch above their committed view — one-view-per-epoch still rests on
+  vote-once-per-epoch, sweep-verified.
+- **condemn() kept the condemned dedup window (critical)** — a post-condemn
+  retry was dup-ACKed with the stamp of a record existing nowhere (silent
+  acknowledged loss). The window resets with the fold; retries degrade to
+  at-least-once until replication re-feeds it.
+- **Stale evidence across a peer's crash (major).** Confirm marks are monotone
+  — right within one life, a lie across lives. A HELLO with a higher
+  incarnation now FORGETS every mark that peer announced (probes wait for fresh
+  digests; the frontier pins until the reborn re-announces).
+- **Tombstone GC's seq-only straggler bound (major).** LWW is epoch-first: an
+  in-flight lower-epoch/higher-seq record escaped any seq comparison. GC now
+  releases only at FULL quiescence (every member at every lane's known tail, on
+  crash-stable marks, digest-only lanes included).
+- **Mixed durable/non-durable frontier (major).** Crash-stability is a property
+  of the MARK'S OWNER: a peer that ever announced a p map reads at markD
+  everywhere; a never-announced-p peer's crash is a total refold, so its
+  volatile mark is sound.
+- Plus: a clean `destroy()` now flushes queued WAL appends (committed writes
+  were silently dropped on shutdown); shell `restore()` distinguishes interior
+  corruption (a crc-valid row beyond the failure → the condemn verdict fires)
+  from an honest tail tear; `snapshot()` builds every row before mutating any
+  state and caps rows at 1024 records; monitor cursors key on the log ARRAY's
+  identity (a same-tick append+compact was invisible to a length check); replay
+  emits per-record journal events so the debugger's time-travel fold survives a
+  restore. Honest residuals, stated where they live (kernel/log.ts): a fresh
+  fold racing two teachers can resurrect a GC'd-removed cell (M6 state-transfer
+  closes it); dead provenance lanes are immortal in streams/digests (bounded by
+  restart count — M6 digest work); durable mode without heartbeats has no
+  compaction clock, so log AND WAL bounds require membership.
 
 ## Layout
 

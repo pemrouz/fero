@@ -137,6 +137,12 @@ export class Writes {
   // instead of aliasing cids its predecessor already spent (the counter is volatile until M4's boot record).
   issuer(node: Node): string { return node.uuid + '~' + node.incarnation }
 
+  //! reset — condemn's companion (kernel/node.ts condemn): drop every dedup coordinate learned from a
+  // condemned replay. A coordinate kept past the condemned fold would dup-ACK a retry with the stamp of
+  // a record that may exist nowhere — silent acknowledged loss. Forgetting is the honest weaker mode:
+  // a post-condemn retry re-commits as a same-value LWW supersede until replication re-feeds the window.
+  reset() { this.#seen.clear() }
+
   //! issue — source=local: the 'write' event lands here. Epoch 0 + open gate is the M0/M1 fast path
   // (straight to the stamp site, zero attempt bookkeeping); everything else mints Attempts and drains.
   issue(node: Node, recs: Rec[]) {

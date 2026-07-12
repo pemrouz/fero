@@ -21,12 +21,22 @@
 //   Open genesis (epoch 0) never compacts: no committed view, no frontier.
 //
 //   TOMBSTONE GC — a remove's version stamp must outlive every record it could
-//   still fence (a slow resurrect). It is droppable once NO stale record can
-//   freshly apply ANYWHERE: for every lane l, either every member's applied[l]
-//   ≥ the stamp's seq (anything older is dedup-dropped on arrival), or the lane
-//   is fully quiesced (every member holds its entire known history — nothing
-//   old remains in flight). Once the version drops, the next compaction pass
+//   still fence (a slow resurrect). Stamps are droppable only at FULL
+//   quiescence: every member at every lane's known tail, on crash-stable marks
+//   (nothing old remains in flight anywhere — seq bounds cannot substitute:
+//   LWW is epoch-first, and an in-flight lower-epoch/higher-seq record escapes
+//   any seq comparison). Once the version drops, the next compaction pass
 //   drops the remove record itself (it is no longer its cell's winner-of-record).
+//
+//   KNOWN RESIDUAL (tracked for M6, stated per plan §8 honesty): after a
+//   tombstone and its remove record are gone, a FRESH fold (a new joiner or a
+//   condemned refold) can race two teachers — fold a still-held update from an
+//   uncompacted peer, then have a compacted peer's sparse suffix advance its
+//   applied past the (now nonexistent) remove — resurrecting the cell at that
+//   node only. Members are safe (quiescence ranges over them); fresh folds
+//   need the M6 state-transfer semantics (an atomic snapshot fold from one
+//   teacher before live suffixes mix). converged() catches it per event in
+//   every sweep, and no seed has produced it in 300 restore-proof runs.
 //
 // Triggers are SIZE-AWARE and ride the heartbeat tick (like membership): an
 // origin's log arms at COMPACT_AT entries; a pass that cannot advance (frontier
@@ -52,14 +62,23 @@ export const COMPACT_AT = 4096
 // Known residual (documented, not closed): a disk that lies about the newest un-chained-over row of a
 // lane evades replay's hole detector (nothing after it points back), so its durable mark can overclaim
 // by that one row; closing it needs chained-over durable marks in the digest — M6 digest work.
+//! stableMark — one member's crash-stable contribution to the frontier/quiescence math. Crash-stability
+// is a property of THAT member, not of the asking node (the M4-review mixed-cluster finding: a
+// non-durable member compacting over a durable peer's VOLATILE marks re-opens the seed-27
+// resurrection): a peer that has ever announced a p map is durable — read it at markD (its crash
+// restores at least its durable); a never-announced-p peer is non-durable — its crash is a TOTAL
+// refold, so its volatile shippable mark is sound. Self reads its own ladder directly.
+const stableMark = (node: Node, uuid: string, o: string): number =>
+  uuid === node.uuid
+    ? (node.durable ? (node.streams.get(o)?.durable ?? 0) : (node.streams.get(o)?.applied ?? 0))
+    : (node.confirm.durablePeer(uuid) ? node.confirm.markD(uuid, o) : node.confirm.mark(uuid, o))
+
 export const frontier = (node: Node, o: string): number => {
   const members = node.membership.view.members
   if (members.length === 0) return 0
   let f = Infinity
   for (const [uuid] of members) {
-    const s = uuid === node.uuid
-      ? (node.durable ? (node.streams.get(o)?.durable ?? 0) : (node.streams.get(o)?.applied ?? 0))
-      : (node.durable ? node.confirm.markD(uuid, o) : node.confirm.mark(uuid, o))
+    const s = stableMark(node, uuid, o)
     if (s < f) f = s
   }
   return f === Infinity ? 0 : f
@@ -93,31 +112,33 @@ export const compact = (node: Node, o: string, upTo: number): number => {
 export const gcTombstones = (node: Node): number => {
   const members = node.membership.view.members
   if (members.length === 0) return 0
-  //! the straggler bound: for each lane, the oldest thing still deliverable anywhere — Infinity when
-  // the lane is fully quiesced (every member at the lane's known tail: nothing old is in flight).
-  // Durable mode reads the same crash-stable marks as the frontier: a tombstone released on marks a
-  // crash can regress is the seed-27 resurrection (the reborn refolds a removed cell and nothing left
-  // anywhere can fence it).
-  let bound = Infinity
+  //! FULL quiescence, every lane, or nothing (M4-review major): the old per-lane straggler bound
+  // compared SEQS while the LWW election is EPOCH-FIRST — an in-flight record with a LOWER epoch but
+  // HIGHER seq than the tombstone (stamped at genesis, delayed across the view change) escaped both
+  // the dedup fence (seq above the receiver's applied) and the released stamp, resurrecting the cell
+  // with an old-epoch value. Seqs across lanes/epochs are not comparable to a tombstone's stamp, so
+  // the only sound cheap condition is: NO lane has anything in flight anywhere (every member at every
+  // lane's known tail, on the same crash-stable marks the frontier uses). Then nothing old remains
+  // deliverable, and every non-live stamp is uncontestable. Tombstones ride out busy periods and
+  // release at quiet points — bounded in practice, honest always.
   const lanes = new Set<string>(node.logs.keys())
   for (const [l] of node.streams) lanes.add(l)
+  node.confirm.origins(lanes) // lanes known only from digests count too — their suffixes are in flight BY DEFINITION
   for (const l of lanes) {
-    let minApplied = Infinity
+    let min = Infinity
     let maxTail = node.streams.get(l)?.shippable ?? 0
     for (const [uuid] of members) {
-      const s = uuid === node.uuid
-        ? (node.durable ? (node.streams.get(l)?.durable ?? 0) : (node.streams.get(l)?.applied ?? 0))
-        : (node.durable ? node.confirm.markD(uuid, l) : node.confirm.mark(uuid, l))
-      if (s < minApplied) minApplied = s
+      const s = stableMark(node, uuid, l)
+      if (s < min) min = s
       if (s > maxTail) maxTail = s
     }
-    if (minApplied >= maxTail) continue // lane quiesced — contributes no straggler bound
-    if (minApplied < bound) bound = minApplied
+    if (min < maxTail) return 0 // something is still in flight — a straggler could contest ANY tombstone
   }
   let dropped = 0
-  for (const [k, v] of node.versions) {
+  for (const [k] of node.versions) {
     if (node.state.has(k)) continue // a live cell's stamp is its guard — never GC'd
-    if (v.seq <= bound) { node.versions.delete(k); dropped++ }
+    node.versions.delete(k)
+    dropped++
   }
   if (dropped) node.journal.armed && node.journal.emit(JK.tombstoneGC, dropped)
   return dropped

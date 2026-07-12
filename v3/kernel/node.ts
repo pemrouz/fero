@@ -141,6 +141,9 @@ export class Node {
   // during the pending window would orphan the live timer into a second concurrent dial chain
   // (adversarial-review finding: forked chains, doubled dial traffic, starved giveUp).
   #backoff = new Map<string, { ms: number; tries: number; gaveUp?: boolean }>()
+  //! highest incarnation ever identified per peer uuid — a HELLO above it means the peer was REBORN,
+  // and every evidence mark its previous life announced is void (confirm.forget; see that banner).
+  #peerInc = new Map<string, number>()
   #hbTimer = -1
   destroyed = false
   env: Env
@@ -245,10 +248,14 @@ export class Node {
         return
       }
       case 'persistFail': {
-        this.#inflight.delete(e.batch)
         //! TERMINAL (the fsyncgate policy): a store that failed one batch may have lied about anything
         // after it — rows persisted past a failure would replay as a chain built on sand. The WAL is
         // dead from here: durable freezes, the alarm is the operator's problem, replication is untouched.
+        // FREEZES MEANS FREEZES (M4-review critical, four independent finders): every batch still in
+        // flight is voided too — a batch issued before the failure but resolving after it sits PAST the
+        // hole on disk, and advancing durable on its echo would hand confirm:'persisted' false evidence
+        // for rows a restore will drop at the tear. Clearing #inflight makes the later echoes no-ops.
+        this.#inflight.clear()
         this.#walDead = true
         j.armed && j.emit(JK.persistFail, e.batch, e.reason)
         return
@@ -476,33 +483,33 @@ export class Node {
   // is on disk from that instant. Cold path — tick-armed per SNAPSHOT_AT appended rows.
   snapshot() {
     if (!this.durable || this.#walDead) return
-    const batch = ++this.#batchSeq
+    //! BUILD first, COMMIT after: every row is encoded into locals before any node state mutates, so a
+    // throw mid-encode (however unlikely) leaves walTail/inflight/counters untouched instead of half-
+    // reset against the on-disk chain (M4-review finding). Chunks are contiguity-split exactly like
+    // encodeRuns (each chunk encodes to EXACTLY one frame — asserted, so codec drift is a loud throw)
+    // and additionally capped at 1024 records, keeping any single row far from MAX_FRAME.
     const rows: { bytes: Uint8Array; prev: number }[] = []
-    const covered = new Map<string, number>()
-    this.walTail.clear()
+    const tails = new Map<string, number>()
     for (const [origin, entries] of this.logs) {
       if (!entries.length) continue
-      const runs = entries.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))
-      const frames = encodeRuns(runs)
-      //! chain links need each frame's LAST seq — recomputed with encodeRuns' own split rule (origin is
-      // constant here; epoch/seq/attempt contiguity split). The count assertion makes any future drift
-      // between this walk and the codec's splitter a loud throw, never a corrupted chain.
-      const lasts: number[] = []
-      for (let i = 0; i < runs.length; ) {
-        const h = runs[i]
+      let prev = 0
+      let i = 0
+      while (i < entries.length) {
+        const h = entries[i]
         let j = i + 1
-        while (j < runs.length && runs[j].epoch === h.epoch && runs[j].seq === h.seq + (j - i) &&
-               runs[j].iss === h.iss && (h.iss === undefined || runs[j].cid === h.cid! + (j - i))) j++
-        lasts.push(runs[j - 1].seq)
+        while (j < entries.length && j - i < 1024 && entries[j].epoch === h.epoch && entries[j].seq === h.seq + (j - i) &&
+               entries[j].iss === h.iss && (h.iss === undefined || entries[j].cid === h.cid! + (j - i))) j++
+        const frames = encodeRuns(entries.slice(i, j).map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid })))
+        if (frames.length !== 1) throw new Error('snapshot: chunk split diverged from encodeRuns')
+        rows.push({ bytes: frames[0], prev })
+        prev = entries[j - 1].seq
         i = j
       }
-      if (frames.length !== lasts.length) throw new Error('snapshot: run split diverged from encodeRuns')
-      let prev = 0
-      for (let k = 0; k < frames.length; k++) { rows.push({ bytes: frames[k], prev }); prev = lasts[k] }
-      this.walTail.set(origin, prev)
-      covered.set(origin, prev)
+      tails.set(origin, prev)
     }
-    this.#inflight.set(batch, covered)
+    const batch = ++this.#batchSeq
+    this.walTail = tails
+    this.#inflight.set(batch, new Map(tails)) // a COPY: walTail keeps moving with appends; the echo must cover the swap's tails only
     this.#walRows = 0
     this.journal.armed && this.journal.emit(JK.snapshot, batch, rows.length)
     this.env.sink.snapshot(batch, rows)
@@ -521,6 +528,11 @@ export class Node {
     this.walTail.clear()
     this.#entryHash.clear()
     this.#hash = 0
+    //! the cid-dedup window resets WITH the fold (M4-review critical): coordinates learned from the
+    // condemned rows would dup-ACK a retry for a record that may exist NOWHERE — silent acknowledged
+    // loss. Forgetting degrades post-condemn retries to at-least-once (a same-value LWW supersede)
+    // until replication re-feeds the window — the same documented class as M3's window eviction.
+    this.writes.reset()
     this.journal.armed && this.journal.emit(JK.walTaint, origin)
     this.snapshot()
   }
@@ -614,6 +626,15 @@ export class Node {
         link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
         link.state = LS.admitted
         this.byUuid.set(v.u, link.id)
+        //! reincarnation fences dead evidence: a peer identifying with a HIGHER incarnation crashed —
+        // its previous life's confirm marks (shippable AND durable tails) may all have regressed, so
+        // they are forgotten before anything recounts over them (M4-review: a replicated probe counted
+        // a peer that provably held nothing; the compaction frontier trusted marks no disk backs).
+        const prevInc = this.#peerInc.get(v.u) ?? 0
+        if (v.i > prevInc) {
+          if (prevInc > 0) this.confirm.forget(v.u)
+          this.#peerInc.set(v.u, v.i)
+        }
         //! successful identify resets the redial backoff — by OUR dial target AND by the peer's gossiped
         // listen: when the peer dialed us while our own chain to it was mid-backoff (or a dup-race left
         // our dialed link the loser), the listen-keyed entry would otherwise orphan with gaveUp unset,
@@ -704,7 +725,10 @@ export class Node {
         }
         j.armed && j.emit(JK.digestIn, link.id)
         //! confirm evidence rides every digest: the d map IS the peer's shippable tails, the optional p
-        // map its durable tails (sent only by durable-mode peers) — the ladder converges with zero new frames
+        // map its durable tails (sent only by durable-mode peers) — the ladder converges with zero new frames.
+        // A p map's PRESENCE (even empty) marks the peer durable — the compaction frontier reads its
+        // marks at markD from then on (crash-stable), never the volatile shippable tails.
+        if (typeof v.p === 'object' && v.p !== null) this.confirm.sawP(link.uuid)
         for (const [origin, tail] of Object.entries(v.d))
           if (typeof tail === 'number') {
             const dur = typeof v.p?.[origin] === 'number' ? (v.p[origin] as number) : 0

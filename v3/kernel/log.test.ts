@@ -81,6 +81,36 @@ test('the frontier: a lagging member PINS compaction; full acknowledgement unloc
   assert.equal(frontier(h.node, 'aa'), h.node.seq)
 })
 
+test('M4-REVIEW PIN — a DURABLE peer\'s frontier contribution is its durable mark, never its volatile shippable tail', () => {
+  //! the mixed-cluster resurrection shape: a peer that announces a p map is durable — its crash
+  // restores at least its durable, so ONLY that mark is crash-stable. Reading its (higher) shippable
+  // tail licensed compaction over history its reborn lane would still need (seed-27's class).
+  const h = churned()
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { aa: h.node.seq }, r: 0 }) })
+  //! bb: shippable tail = everything, durable only 3 — and the p map's presence flags it durable
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { aa: h.node.seq }, r: 0, p: { aa: 3 } }) })
+  assert.equal(frontier(h.node, 'aa'), 3, 'the durable mark bounds the cut — the shippable tail is crash-volatile')
+})
+
+test('M4-REVIEW PIN — a straggler in ANY lane holds EVERY tombstone: seq bounds cannot fence an epoch-first election', () => {
+  //! the escape the per-lane seq bound allowed: LWW is (epoch, seq, origin) — an in-flight record with
+  // a LOWER epoch but HIGHER seq than a tombstone loses the election yet beats any seq comparison, so
+  // partial GC over seq bounds released stamps it could still contest. The sound rule is total: any
+  // lane with anything in flight anywhere holds everything.
+  const h = churned()
+  const k = JSON.stringify(['gone'])
+  caughtUp(h) // lane aa fully quiesced everywhere
+  //! a FOREIGN lane appears mid-flight: bb announces it holds bb-records neither peer has confirmed applied
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { aa: h.node.seq, bb: 40 }, r: 0 }) })
+  gcTombstones(h.node)
+  assert.ok(h.node.versions.has(k), 'a straggling lane — ANY lane — holds every tombstone')
+  //! the foreign lane quiesces (cc confirms it too): now, and only now, the stamp releases
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { aa: h.node.seq, bb: 40 }, r: 0 }) })
+  h.node.streams.for('bb').applied = 40 // self applied it as well — every member at the lane's known tail
+  gcTombstones(h.node)
+  assert.ok(!h.node.versions.has(k), 'full quiescence releases')
+})
+
 test('PROPERTY replay-from-0 ≡ live: a fresh twin folding the COMPACTED log reaches the live state exactly', () => {
   const h = churned()
   caughtUp(h)

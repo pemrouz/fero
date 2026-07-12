@@ -74,14 +74,17 @@ export const perEvent = () => [
     // reborn node's early entries (adversarial-review monitor-blindness finding).
     name: 'log-monotone',
     check: (() => {
-      const tail = new Map<string, { node: Node; len: number }>()
+      const tail = new Map<string, { node: Node; arr: unknown; len: number }>()
       return (sim: Sim): string | null => {
         for (const [id, n] of sim.nodes)
           for (const [origin, entries] of n.logs) {
             const k = id + '|' + origin
             let prev = tail.get(k)
-            if (!prev || prev.node !== n) prev = { node: n, len: 0 }
-            if (entries.length < prev.len) prev.len = 0 // compaction shrank the log — rescan (idempotent)
+            //! the cursor keys on the log ARRAY's identity, not its length: compact() replaces the
+            // array (rescan from 0 — idempotent), appends mutate it in place (incremental). A length
+            // check alone was blind to a same-tick append+compact that left the length unchanged
+            // while entries below the cursor were new (M4-review monitor-blindness finding).
+            if (!prev || prev.node !== n || prev.arr !== entries) prev = { node: n, arr: entries, len: 0 }
             if (entries.length > prev.len) {
               for (let i = Math.max(prev.len, 1); i < entries.length; i++)
                 if (entries[i].seq <= entries[i - 1].seq)
@@ -105,7 +108,7 @@ export const perEvent = () => [
     name: 'single-writer',
     check: (() => {
       const owner = new Map<string, string>()
-      const tail = new Map<string, { node: Node; len: number }>()
+      const tail = new Map<string, { node: Node; arr: unknown; len: number }>()
       //! provenance LANES (uuid~incarnation) normalize to the NODE: the invariant is one WRITER per
       // (partition, epoch), and a reborn life stamping the partition its uuid still owns is the same writer
       const writerOf = (origin: string) => { const i = origin.indexOf('~'); return i < 0 ? origin : origin.slice(0, i) }
@@ -114,8 +117,11 @@ export const perEvent = () => [
           for (const [origin, entries] of n.logs) {
             const k = id + '|' + origin
             let prev = tail.get(k)
-            if (!prev || prev.node !== n) prev = { node: n, len: 0 }
-            if (entries.length < prev.len) prev.len = 0 // compaction shrank the log — rescan (idempotent)
+            //! the cursor keys on the log ARRAY's identity, not its length: compact() replaces the
+            // array (rescan from 0 — idempotent), appends mutate it in place (incremental). A length
+            // check alone was blind to a same-tick append+compact that left the length unchanged
+            // while entries below the cursor were new (M4-review monitor-blindness finding).
+            if (!prev || prev.node !== n || prev.arr !== entries) prev = { node: n, arr: entries, len: 0 }
             if (entries.length > prev.len) {
               const w = writerOf(origin)
               for (let i = prev.len; i < entries.length; i++) {
@@ -144,14 +150,17 @@ export const perEvent = () => [
     name: 'attempt-exactly-once',
     check: (() => {
       const committed = new Map<string, string>()
-      const tail = new Map<string, { node: Node; len: number }>()
+      const tail = new Map<string, { node: Node; arr: unknown; len: number }>()
       return (sim: Sim): string | null => {
         for (const [id, n] of sim.nodes)
           for (const [origin, entries] of n.logs) {
             const k = id + '|' + origin
             let prev = tail.get(k)
-            if (!prev || prev.node !== n) prev = { node: n, len: 0 }
-            if (entries.length < prev.len) prev.len = 0 // compaction shrank the log — rescan (idempotent)
+            //! the cursor keys on the log ARRAY's identity, not its length: compact() replaces the
+            // array (rescan from 0 — idempotent), appends mutate it in place (incremental). A length
+            // check alone was blind to a same-tick append+compact that left the length unchanged
+            // while entries below the cursor were new (M4-review monitor-blindness finding).
+            if (!prev || prev.node !== n || prev.arr !== entries) prev = { node: n, arr: entries, len: 0 }
             if (entries.length > prev.len) {
               for (let i = prev.len; i < entries.length; i++) {
                 const e = entries[i]
