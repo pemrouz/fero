@@ -39,7 +39,9 @@ export type Event =
   //! confirm/confirmCancel (M4c): the embedder opens a guarantee-ladder probe for (origin, seq) at a
   // CONFIRM level (kernel/confirm.ts); the answer arrives via sink.confirm. Cancel is the embedder's
   // deadline (the kernel never times out on its own — evidence is monotone and eventually sufficient).
-  | { kind: 'confirm'; id: number; origin: string; seq: number; level: number }
+  // `part` (M6): the record's partition — armed nodes count the probe over holdersOf(part) at the
+  // W-quorum instead of the view majority; ignored (and never set) unscoped.
+  | { kind: 'confirm'; id: number; origin: string; seq: number; level: number; part?: string }
   | { kind: 'confirmCancel'; id: number }
   //! replay (M4b): one WAL row fed back at boot, BEFORE the network exists — the same bytes that were
   // persisted, re-entering through the same ingest (source=replay in kernel/write.ts). Restore is not a
@@ -115,13 +117,20 @@ export interface EffectSink {
 // previous life spent (the durable+restart sweep caught exactly that: a stale per-ballot floor let a
 // reborn node re-stamp seqs whose originals still lived at peers — silent loss both ways). Crossing
 // the ceiling re-persists the record first; the cold path stays cold, amortized per LEASE stamps.
-// heldPartitions arrives with M6 scoped replication (R=∞ holds everything — nothing to record).
+// The M6 fields are ARMED-ONLY (absent unscoped — R=∞ boot bytes stay byte-identical with M4):
+// heldPartitions = the data-authoritative held ∪ orphaned set (the ring is duty-authoritative; replay
+// classifies WAL rows against BOTH — DESIGN-M6 C10); dirtyParts = partitions holding a spliced
+// interior record no WAL snapshot has captured yet — their replay-rebuilt floors would OVERCLAIM
+// (row maxes cover seqs the rows provably miss), so restore zeroes those floors and the handshake
+// re-heals honestly-low.
 export interface BootRecord {
   epoch: number
   members: [string, string][]
   lamport: number
   incarnation: number
   votedFor: { e: number; p: string; h: string }
+  heldPartitions?: string[]
+  dirtyParts?: string[]
 }
 
 //! Env: what the kernel is allowed to know about the world — a clock, a seeded rng, and the sink. Nothing else.

@@ -142,7 +142,12 @@ export class Sim {
     const reborn = this.add({
       ...opts,
       incarnation: old.incarnation + 1,
-      boot: b ? { epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor } : opts.boot,
+      boot: b ? {
+        epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor,
+        //! M6 (armed lives only): the held/dirty ledgers ride the restart like the shell's restoreOpts
+        ...(b.heldPartitions ? { heldPartitions: b.heldPartitions } : {}),
+        ...(b.dirtyParts ? { dirtyParts: b.dirtyParts } : {}),
+      } : opts.boot,
     })
     for (const row of store.wal) this.post(uuid, { kind: 'replay', bytes: row.bytes, prev: row.prev }, 0)
     this.post(uuid, { kind: 'start' }, 0)

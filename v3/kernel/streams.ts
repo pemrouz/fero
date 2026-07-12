@@ -23,17 +23,35 @@
 // and M4d's segment log gives shippable its own advance site; the false-positive
 // class dies by making the wrong-field read unwritable, not by care.
 //
-// Keyed per-origin (R=∞): every node holds every stream. The plan's full
-// per-(origin, partition) keying is M6's — scoped replication needs per-partition
-// watermarks for R-set shedding; introducing that dimension now would fragment
-// the dedup high-water for no consumer (and rung 1 of the de-scoping ladder
-// defers exactly that feature). Recorded in CHECKPOINT.md.
+// Keyed per-origin, with the M6 partition dimension as an OVERLAY: the scalar
+// ladder stays the dedup/digest fast path on every node, and scoped nodes
+// (node.armed) additionally carry per-(origin, partition) POSSESSION FLOORS —
+// `parts` below — allocated only when armed, so R=∞ descriptors are shape-
+// identical with M4. The per-origin `applied` dedup fence NEVER fragments
+// (DESIGN-M6 §0: splitting it per-partition breaks gap-tolerant dedup); the
+// partition dimension applies to possession evidence, not the fence.
 
 //! StreamDescriptor: one stream's ladder — plain fields, allocation-light, one object per origin.
 export class StreamDescriptor {
   applied = 0
   shippable = 0
   durable = 0
+  //! parts (M6, DESIGN-M6 §0): partition → {s, d} possession floors, armed nodes only. `s` attests
+  // "my log CONTAINS-OR-COVERS every (origin, p) record with seq ≤ s" — a floor, not a max-in-log
+  // (compaction may have dropped covered losers). It is the SOLE scoped possession claim: HAVEA
+  // answers, shed evidence, scoped confirm counting, and the scoped frontier all read it. `d` is its
+  // durable counterpart, advanced only by echoes whose rows the disk can actually restore (the
+  // no-interior-rows WAL discipline — a splice reaches disk via snapshot(), never persistRun).
+  parts?: Map<string, { s: number; d: number }>
+
+  //! part — get-or-create a partition's floor entry (armed ingest/stamp/replay sites only).
+  part(p: string): { s: number; d: number } {
+    let m = this.parts
+    if (!m) { m = new Map(); this.parts = m }
+    let e = m.get(p)
+    if (!e) { e = { s: 0, d: 0 }; m.set(p, e) }
+    return e
+  }
 }
 
 //! Streams: the per-origin descriptor table (get-or-create on the hot path, iterable for monitors/capture).

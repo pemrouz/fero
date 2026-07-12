@@ -15,7 +15,7 @@
 import { randomUUID } from 'node:crypto'
 import { Runtime, restoreOpts, type RuntimeOpts } from '../shell/runtime.ts'
 import { CONFIRM } from '../kernel/confirm.ts'
-import { REC, type Rec } from '../kernel/env.ts'
+import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
@@ -89,7 +89,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   let probeSeq = 0
   const probes = new Map<number, (ok: boolean) => void>()
   rt.onConfirm = (id, ok) => { probes.get(id)?.(ok); probes.delete(id) }
-  const probe = (c: Coords, level: number, ms: number): Promise<boolean> =>
+  const probe = (c: Coords, level: number, ms: number, part?: string): Promise<boolean> =>
     new Promise((resolve) => {
       const id = ++probeSeq
       const t = setTimeout(() => {
@@ -99,7 +99,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       }, ms)
       t.unref?.()
       probes.set(id, (ok) => { clearTimeout(t); resolve(ok) })
-      rt.node.step({ kind: 'confirm', id, origin: c.origin, seq: c.seq, level })
+      rt.node.step({ kind: 'confirm', id, origin: c.origin, seq: c.seq, level, part })
     })
 
   //! ── the method plane (M5c): every node HOSTS (servers get invokes; a spoke none), clients CALL ──
@@ -112,8 +112,8 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   // so its probes run at the PRIMARY, which holds the full member evidence
   const system: Record<string, (arg: unknown, ctx: Context) => unknown> = {
     confirm: (a) => {
-      const v = a as { o: string; s: number; l: number; t: number }
-      return probe({ origin: v.o, seq: v.s, epoch: 0 }, v.l, Math.min(v.t ?? 8000, 60_000))
+      const v = a as { o: string; s: number; l: number; t: number; pt?: string }
+      return probe({ origin: v.o, seq: v.s, epoch: 0 }, v.l, Math.min(v.t ?? 8000, 60_000), v.pt)
     },
   }
   host = new Host(rt, bind.data, table, system)
@@ -139,10 +139,12 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     const resolved: WriteResolve = { guarantee: 'committed', key: rec.key.length ? rec.key : [String(rec.at ?? '')], origin: coords.origin, seq: coords.seq, epoch: coords.epoch, cid: coords.cid }
     if (want === 'committed') return resolved
     const level = want === 'persisted' ? CONFIRM.persisted : CONFIRM.replicated
-    //! a spoke proves its guarantee AT THE PRIMARY (system confirm) — its own evidence is one digest wide
+    //! a spoke proves its guarantee AT THE PRIMARY (system confirm) — its own evidence is one digest
+    // wide. `pt` (M6): the partition rides along so an armed prover ranges the probe over the R-set.
+    const pt = partitionOf(rec)
     const ok = caller
-      ? await caller.call(SYSTEM + 'confirm', { o: coords.origin, s: coords.seq, l: level, t: ms }, { timeout: ms, retry: true }).then((v) => v === true, () => false)
-      : await probe(coords, level, ms)
+      ? await caller.call(SYSTEM + 'confirm', { o: coords.origin, s: coords.seq, l: level, t: ms, pt }, { timeout: ms, retry: true }).then((v) => v === true, () => false)
+      : await probe(coords, level, ms, pt)
     if (!ok) throw { guarantee: want, reached: 'committed', reason: 'timeout', localCommit: { origin: coords.origin, seq: coords.seq, epoch: coords.epoch } } satisfies WriteReject
     return { ...resolved, guarantee: want }
   }

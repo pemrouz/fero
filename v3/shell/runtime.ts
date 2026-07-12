@@ -48,7 +48,12 @@ export const restoreOpts = (dir: string): { boot?: NodeOpts['boot']; incarnation
   if (!fs.existsSync(bootPath)) return {}
   const b = JSON.parse(fs.readFileSync(bootPath, 'utf8')) as BootRecord
   return {
-    boot: { epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor },
+    boot: {
+      epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor,
+      //! M6 (armed lives only — absent keys stay absent, so unscoped restores are shape-identical)
+      ...(b.heldPartitions ? { heldPartitions: b.heldPartitions } : {}),
+      ...(b.dirtyParts ? { dirtyParts: b.dirtyParts } : {}),
+    },
     incarnation: b.incarnation + 1,
   }
 }
