@@ -1,4 +1,4 @@
-# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5a-c: composer, cid-overlay, clients, methods) + the debug tool
+# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5: composer, cid-overlay, clients, methods, cluster) + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -18,7 +18,7 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 201 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm test                       # 205 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
 npm run perf                   # 18 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
@@ -438,7 +438,8 @@ because state is a deterministic fold of the journal'd inputs.
   real restarts by construction. Pending overflow drops the OLDEST attempt
   (journal-surfaced) — under sustained gate-closed writes beyond
   MAX_PENDING=1024 that is real, counted loss.
-- **M5a+M5b+M5c — the composer, the client role, AND the method plane — are LIVE** (api/):
+- **M5 — the public api — is COMPLETE** (M5a composer + M5b clients + M5c
+  methods + M5d cluster/scenarios/demo; adversarial review pending) (api/):
   `await fero(name, opts)` → `{data, methods, cluster, destroy}` over `$()`
   proxies, sliced (like M4) into four landable increments: **M5a** composer +
   data binding + cid-overlay → **M5b** the client role (below) → **M5c** methods
@@ -539,6 +540,29 @@ because state is a deterministic fold of the journal'd inputs.
   - Validation: 201 tests (3 kernel routing pins, 5 Tier-3 method suites incl.
     flush-hostage and failover re-subscribe), 18 perf gates, epoch-0 sweep
     byte-identical, 17/17 scenarios zero drift.
+- **M5d — cluster end-to-end + the public scenario library + the demo**:
+  - **cluster.writes is the bounded confirm ring** (plan §9): the last
+    WRITES_KEEP=64 write outcomes as reactive rows {key, state: pending →
+    committed | rejected, origin/seq/epoch/cid, reason}. Plan Q4 is DECIDED:
+    pending rows are visible in cluster.writes and never marked inside `data`
+    itself — observability is a cluster concern; the data surface stays pure
+    value. The ring lives in the binding; the composer folds it on the same
+    post-step hook as the view (one integer compare per event when quiet).
+  - **The fold decision (deferred from M5a) is DECIDED**: the post-step hook +
+    journal cursor IS the mechanism for cluster reactivity — a first-class
+    membership sink effect would duplicate journal facts for one consumer.
+    Revisit only if M7's diagnostics work wants membership effects for replay.
+  - **The scenario library runs against the PUBLIC surface**
+    (tests/api-scenarios.test.ts): v2's chaos vocabulary — 5-node formation +
+    concurrent-writer convergence, kill/restart-from-WAL through
+    fero(name,{dir}), the FULL-CLUSTER kill + restore-from-WALs-only (the M4e
+    proof, public edition), and cluster.writes observability — no kernel
+    reach-through in any scenario body. Partition/heal stays sim-only by
+    design (real-TCP partition injection tests the harness, not fero).
+  - **The two-terminal demo** (examples/two-terminals.ts): `npm run demo --
+    serve 4800` / `npm run demo -- watch 4800` — a server mutating an
+    inventory by plain assignment, a client re-rendering through one tap;
+    kill and restart the server and the watcher resumes.
 - The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is
   [CHECKPOINT.md](CHECKPOINT.md) — verdict: no overrun, ladder armed but not
   triggered, M4 sliced into five landable increments (M4a streams/watermarks →
