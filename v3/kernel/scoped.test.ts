@@ -9,7 +9,7 @@ import assert from 'node:assert'
 import { Node } from './node.ts'
 import { JK } from './journal.ts'
 import { maybeCompact } from './log.ts'
-import { VERB, encodeControl, encodeRuns } from './codec.ts'
+import { Framer, VERB, encodeControl, encodeRuns } from './codec.ts'
 import { REC, TAG, type BootRecord, type EffectSink, type Env, type Rec } from './env.ts'
 
 const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
@@ -74,6 +74,9 @@ const frame = (origin: string, rows: { seq: number; rec: Rec }[], epoch = 1): Ui
 
 test('DUAL FENCE — an under-fence interior SPLICES in (lane ascending, floor advances); dups above and below the floor still drop', () => {
   const h = armedView1()
+  //! pin the partitions onto aa's R-set — the inbound gate must ADMIT them by placement, not hash luck
+  h.node.writes.ring.place('p1', 'bb', 'aa')
+  h.node.writes.ring.place('p2', 'bb', 'aa')
   //! cross-link interleave: seqs 10 then 12 arrive first (applied runs to 12), the interior 11 later
   h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 10, rec: rec(['p1', 'a'], 1) }]) })
   h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 12, rec: rec(['p2', 'a'], 2) }]) })
@@ -131,6 +134,8 @@ test('STAMP SITE — an armed owner\'s own-lane floor advances with every local 
 
 test('WAL DISCIPLINE — a splice never rides persistRun: splice-only frames persist nothing, the partition goes dirty (boot ledger), the snapshot swap captures it and its echo clears', () => {
   const h = armedView1({ durable: true })
+  h.node.writes.ring.place('p1', 'bb', 'aa')
+  h.node.writes.ring.place('p2', 'bb', 'aa')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 10, rec: rec(['p1', 'a'], 1) }]) })
   h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 12, rec: rec(['p2', 'a'], 2) }]) })
   const persists = () => h.of('persist').length
@@ -197,6 +202,70 @@ test('SCOPED CONFIRM — the threshold is W of the R-set: a solo armed owner sel
   h.node.step({ kind: 'confirmCancel', id: 9 })
   const c = h.of('confirm').pop()!
   assert.deepEqual([c[1], c[2], c[3]], [9, false, 1])
+})
+
+//! ── slice 3a: the scope machine — inbound gate, orphan freeze, fan-out filter, AE filter ──
+
+test('INBOUND GATE — a record for a non-assigned partition gate-drops (no fold, no floors, applied untouched); an assigned partition mints a held entry', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('theirs', 'bb', 'cc')
+  h.node.writes.ring.place('ours', 'aa', 'bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 5, rec: rec(['theirs', 'x'], 1) }]) })
+  assert.equal(h.jk(JK.gateDrop).length, 1, 'the epoch-skew window: dropped, journaled')
+  assert.equal(h.node.state.size, 0)
+  assert.equal(h.node.streams.get('bb')?.applied ?? 0, 0, 'a gate-drop advances NOTHING — the dropper never attests')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 6, rec: rec(['ours', 'x'], 2) }]) })
+  assert.equal(h.node.state.size, 1, 'the assigned partition folded')
+  assert.equal(h.node.scope!.held('ours'), true, 'first-ever record minted a held entry (complete by construction)')
+  assert.equal(h.node.scope!.held('theirs'), false)
+})
+
+test('ORPHAN FREEZE — an install that moves a held partition off the R-set freezes it: new records gate-drop, floors never advance, JK.orphaned fires', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('p', 'bb', 'aa')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 5, rec: rec(['p', 'x'], 1) }]) })
+  assert.equal(h.node.scope!.held('p'), true)
+  const floorBefore = h.node.streams.get('bb')!.parts!.get('p')!.s
+  //! epoch 2 re-pins p away from aa — the install's rescope must freeze aa's copy
+  h.node.writes.ring.place('p', 'bb', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.node.epoch, 2)
+  assert.equal(h.jk(JK.orphaned).length, 1, 'the freeze is journaled at the install')
+  assert.equal(h.node.scope!.held('p'), false)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 6, rec: rec(['p', 'y'], 2) }], 2) })
+  assert.equal(h.jk(JK.gateDrop).length, 1, 'orphans are HARD-frozen — feeding them would move the shed bar')
+  assert.equal(h.node.streams.get('bb')!.parts!.get('p')!.s, floorBefore, 'frozen floors never advance (the shed predicate reads these)')
+  assert.equal(h.node.state.get(JSON.stringify(['p', 'x'])), 1, 'the frozen copy itself survives until shed (3b)')
+})
+
+test('FAN-OUT FILTER — an armed owner ships a commit only to the partition\'s OTHER holders (plus client links); non-holders hear nothing live', () => {
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('mine', 'aa', 'cc') // holder set {aa, cc} — bb (link 1) is OUT
+  h.node.step({ kind: 'write', recs: [rec(['mine', 'x'], 1)] })
+  const records = (link: number) => h.of('send').filter((e) => e[1] === link)
+    .map((e) => new Framer().push((e[2] as Uint8Array).slice())[0])
+    .filter((f) => f && f.verb === VERB.RECORDS)
+  assert.equal(records(2).length, 1, 'the co-holder heard the commit live')
+  assert.equal(records(1).length, 0, 'the non-holder heard NOTHING — the R-set is the wire scope')
+})
+
+test('AE FILTER — a digest answer ships a member only the partitions ITS R-set covers', () => {
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('shared', 'aa', 'bb')
+  h.node.writes.ring.place('private', 'aa', 'cc')
+  h.node.step({ kind: 'write', recs: [rec(['shared', 'x'], 1)] })
+  h.node.step({ kind: 'write', recs: [rec(['private', 'x'], 2)] })
+  const sentBefore = h.of('send').filter((e) => e[1] === 1).length
+  //! bb re-announces empty tails (r=0 digest) — the suffix answer must carry ONLY bb's partitions
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  const frames = h.of('send').filter((e) => e[1] === 1).slice(sentBefore)
+    .map((e) => new Framer().push((e[2] as Uint8Array).slice())[0])
+    .filter((f) => f && f.verb === VERB.RECORDS)
+  const shipped: string[] = []
+  for (const f of frames) for (const rv of f.records()) shipped.push((rv.rec() as Rec).key[0])
+  assert.deepEqual(shipped, ['shared'], 'the suffix ships bb\'s partitions only — never private ones')
 })
 
 test('COMPACTION PIN — armed nodes never compact or GC on the member-ranged frontier (unsound under scoping); the unscoped control still does', () => {

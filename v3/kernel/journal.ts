@@ -85,6 +85,16 @@ export const JK = {
   rpcAnswer: 56,     // a=id, b=ok(0|1) — a RESULT frame answered one of our rpc ids
   rpcOut: 57,        // a=verb, b=id — an rpc event shipped on the primary
   rpcFail: 58,       // a=id, b=reason — the kernel failed an rpc locally (no primary / primary died with it in flight)
+  //! ── M6 scoped-replication vocabulary (DESIGN-M6 §3) ──
+  shed: 59,          // a=partition, b=droppedEntries — every current holder attested; the data left this node
+  acquire: 60,       // a=partition, b=entriesFolded, c=teacherUuid — the atomic one-teacher fold committed
+  orphaned: 61,      // a=partition, b=epoch — held data left the R-set at install; the freeze begins
+  acquireStart: 62,  // a=partition, b=teacherUuid — a one-teacher latch opened
+  acquireAbort: 63,  // a=partition, b=reason ('linkDown'|'epoch'|'overflow'|'reborn'|'torn'|'timeout')
+  teachShip: 64,     // a=partition, b=entries — teacher-side ACQ transfer
+  gateDrop: 65,      // a=origin, b=seq — a non-held record dropped at the inbound gate (epoch-skew window; expected-rare)
+  stageDrop: 66,     // a=partition, b=seq — a non-teacher transfer dropped during an open latch (expected-rare; monitored)
+  shedStall: 67,     // a=partition, b=ticks — the H7 alarm at escalating cadence, never silent
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).
