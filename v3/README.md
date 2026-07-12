@@ -1,4 +1,4 @@
-# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5a) + the debug tool
+# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5a+b: composer, cid-overlay, clients) + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -18,7 +18,7 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 182 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm test                       # 193 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
 npm run perf                   # 17 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
@@ -437,15 +437,14 @@ because state is a deterministic fold of the journal'd inputs.
   real restarts by construction. Pending overflow drops the OLDEST attempt
   (journal-surfaced) — under sustained gate-closed writes beyond
   MAX_PENDING=1024 that is real, counted loss.
-- **M5a — the public composer — is LIVE** (api/): `await fero(name, opts)` →
-  `{data, methods, cluster, destroy}` over `$()` proxies, sliced (like M4) into
-  four landable increments: **M5a** composer + data binding + cid-overlay (this) →
-  **M5b** the client role (kernel HELLO role, ae=0 client writes + retransmit,
-  server tap-forward to spokes, sim client sweeps) → **M5c** methods (CALL/SUB
-  verbs, sink.invoke with handlers hosted in the impure api layer, tagged
-  Handles + failover policies, flush-on-return) → **M5d** cluster end-to-end +
-  the scenario library over the public surface + the two-terminal demo + the M5
-  adversarial review. What M5a establishes:
+- **M5a+M5b — the public composer AND the client role — are LIVE** (api/):
+  `await fero(name, opts)` → `{data, methods, cluster, destroy}` over `$()`
+  proxies, sliced (like M4) into four landable increments: **M5a** composer +
+  data binding + cid-overlay → **M5b** the client role (below) → **M5c** methods
+  (CALL/SUB verbs, sink.invoke with handlers hosted in the impure api layer,
+  tagged Handles + failover policies, flush-on-return) → **M5d** cluster
+  end-to-end + the scenario library over the public surface + the two-terminal
+  demo + the M5 adversarial review. What M5a establishes:
   - **The substrate contract is settled by probe, not promise** (plan §10's
     go/no-go): `data`'s bare-verb sinks are clone-free with synchronous detach;
     `[view].res` is the record-apply ingress; echoes come back verb-REWRITTEN
@@ -464,11 +463,46 @@ because state is a deterministic fold of the journal'd inputs.
   - **One ingest** for assignment sugar and `methods.update/insert/remove`
     ({confirm, timeout} against the M4c ladder, WriteResolve/WriteReject
     unions) — so seams.validation covers both by construction (v2's OQ6).
-  - Known M5a residuals (tracked): capture-path overlay entries whose attempt
-    the kernel drops at MAX_PENDING overflow release only on the cell's next
-    apply (M5b ties the release to the drop); the cluster fold rides a
-    post-step hook (whether membership becomes a first-class sink effect is
-    the M5d decision); user methods stash but do not dispatch until M5c.
+  - ~~Capture-path overlay entries whose attempt the kernel drops at
+    MAX_PENDING overflow released only on the cell's next apply~~ — closed by
+    M5b: onAck feeds the dedup window (WACK coordinates ARE original commit
+    coordinates), and Bind sweeps on every droppedPending change — cleared
+    entries resolve from the window, dropped ones reject + revert visibly.
+    Still tracked: the cluster fold rides a post-step hook (first-class
+    membership effect is the M5d decision); user methods stash until M5c.
+- **M5b — the CLIENT role — is LIVE**: `fero(name, {hosts})` with no `listen`
+  is a SPOKE — a kernel node that folds the same replication stream as every
+  member but is invisible to membership. The shape:
+  - **Role on the wire, one byte**: HELLO gains `r:1`. Servers exclude client
+    links from genesis (count, sweep, and the lowest-uuid race — pinned), never
+    suspect them, and a client node runs none of the member machinery (no
+    propose/vote/JOIN-knock; stale-pulls and settle stay live).
+  - **The single-feeder rule**: a client digests exactly ONE server (its
+    PRIMARY — first admitted; re-elected on linkDown with immediate repark +
+    re-relay). Non-primary digests are consumed for confirm evidence but never
+    answered, so `synced` never rises elsewhere — per-origin ordering holds
+    because a spoke has ONE feeder by construction, and failover re-enters
+    through the same digest→suffix-ship door as every other heal.
+  - **The spoke feed**: servers tap-forward fresh INBOUND records to synced
+    client links (commit broadcasts already covered own-origin records), so a
+    spoke hears every lane live through its primary instead of at AE cadence —
+    attempt identity intact (the overlay join reads it). Zero cost to members:
+    one set-size check per record when no clients are connected.
+  - **Client writes are the plan's §5 contract verbatim**: ae=0 attempts (the
+    client marker, regardless of the view the client knows) relayed by the
+    primary, which re-stamps at arrival and owns re-resolution; retransmit on
+    the tick clock; owner-side cid dedup absorbs every ambiguity — the sim
+    pins lost-WACK, lost-WRITE, and feeder-death-mid-flight as exactly-once.
+  - Validation: 193 tests (5 kernel client pins, 4 sim spoke suites incl. a
+    30-seed in-suite mini-sweep, Tier-3 composer failover), the 150-seed
+    client-chaos sweep (per-pair delay/dup faults, feeder partitions, severed
+    relay-hop frames — 1.86M events, spokes included in convergence), and the
+    epoch-0 sweep still byte-identical (the role is inert when off).
+  - Client residuals (stated): a spoke's confirm probes see only its primary's
+    digest evidence, so `confirm:'replicated'` needs majority marks it rarely
+    holds — honest timeouts today; M5c's CALL verb makes confirm-over-RPC the
+    natural fix. Durable clients (offline-first) are refused loudly at
+    fero() time — tracked for M6.
 - The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is
   [CHECKPOINT.md](CHECKPOINT.md) — verdict: no overrun, ladder armed but not
   triggered, M4 sliced into five landable increments (M4a streams/watermarks →

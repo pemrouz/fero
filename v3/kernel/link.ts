@@ -56,6 +56,10 @@ export class Link {
   dead = false // set on wire fault so a half-processed chunk can't keep dispatching before linkDown arrives
   //! noRedial: set before a DELIBERATE close (dup-link, self-reject) — without it, closing the loser of a dial race would redial and re-create the race forever
   noRedial = false
+  //! client (M5b): the peer identified as a CLIENT (HELLO r:1) — a spoke, never a view member: excluded
+  // from genesis sweeps, fed by tap-forward when synced (it digests exactly ONE server, its primary, so
+  // synced here means "this node is that primary" — the single-feeder ordering guarantee)
+  client = false
 
   id: number
   dialed: boolean

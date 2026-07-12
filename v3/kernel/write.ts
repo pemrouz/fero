@@ -157,14 +157,16 @@ export class Writes {
   //! issue — source=local: the 'write' event lands here. Epoch 0 + open gate is the M0/M1 fast path
   // (straight to the stamp site, zero attempt bookkeeping); everything else mints Attempts and drains.
   issue(node: Node, recs: Rec[]) {
-    if (node.membership.view.epoch === 0 && node.membership.gate(node).open) {
+    //! a CLIENT never takes the fast path and never stamps: every attempt is minted at ae=0 (the
+    // client marker, plan §5) and relayed by the primary — the relay re-stamps at arrival (M5b)
+    if (!node.client && node.membership.view.epoch === 0 && node.membership.gate(node).open) {
       if (this.pending.size) this.#drain(node) // older parked attempts keep issue order ahead of this batch
       node.commit(recs)
       return
     }
     const me = this.issuer(node)
     for (const rec of recs)
-      this.#enqueue(node, { cid: ++this.#cid, ae: node.epoch, issuer: me, rec, via: -1, sent: -1, to: '', parked: false })
+      this.#enqueue(node, { cid: ++this.#cid, ae: node.client ? 0 : node.epoch, issuer: me, rec, via: -1, sent: -1, to: '', parked: false })
     this.#drain(node)
   }
 
@@ -172,6 +174,15 @@ export class Writes {
   // parked attempts re-enter the world with a REFRESHED attemptEpoch (#drain stamps it; lawful — this
   // node is the issuer or the owning relay of everything in its queue).
   flush(node: Node) { this.#drain(node) }
+
+  //! repark — the client-failover companion (M5b, called from node.ts on primary linkDown): put every
+  // in-flight attempt back on the queue and re-drain at the NEW primary immediately (not at RETRY_TICKS).
+  // Owner-side cid dedup absorbs any duplicate the dead relay already delivered.
+  repark(node: Node) {
+    for (const a of this.pending.values())
+      if (a.sent >= 0) { a.sent = -1; a.to = ''; this.#queued++ }
+    this.#drain(node)
+  }
 
   //! tick — the retry clock (heartbeat): an in-flight attempt whose ACK/NACK never arrived re-parks after
   // RETRY_TICKS and the drain re-resolves + re-forwards it. Covers lost WRITE, lost ACK, a dead owner
@@ -211,6 +222,27 @@ export class Writes {
   #drain(node: Node) {
     if (this.#queued === 0) return
     const j = node.journal
+    //! CLIENT drain (M5b): no gate, no ring — the primary link is the route for EVERYTHING queued
+    // (the relay owns ownership resolution, gating, and NACK re-drives). No primary ⇒ park; the
+    // failover path (node.ts linkDown) reparks in-flight attempts and re-drains at the new relay.
+    if (node.client) {
+      const id = node.primary
+      const link = id !== null ? node.links.get(id) : undefined
+      if (!link || link.state !== LS.admitted || link.dead) {
+        for (const a of this.pending.values())
+          if (!a.parked && a.sent < 0) { a.parked = true; j.armed && j.emit(JK.writeBuffered, this.pending.size) }
+        return
+      }
+      let list: Attempt[] | null = null
+      for (const a of this.pending.values())
+        if (a.sent < 0) (list ??= []).push(a)
+      if (!list) return
+      for (const a of list) { a.sent = 0; a.to = link.uuid; a.parked = false; this.#queued-- }
+      const batch = list.map((a) => ({ rec: a.rec, origin: a.issuer, seq: a.cid, epoch: 0 }))
+      for (const bytes of encodeRuns(batch, VERB.WRITE)) link.ship(bytes, node.env.sink, j)
+      j.armed && j.emit(JK.writeForward, link.uuid, list[0].cid, list.length)
+      return
+    }
     if (!node.membership.gate(node).open) {
       for (const a of this.pending.values())
         if (!a.parked && a.sent < 0) { a.parked = true; j.armed && j.emit(JK.writeBuffered, this.pending.size) }
@@ -404,6 +436,11 @@ export class Writes {
       }
       if (a.sent < 0) this.#queued--
       this.pending.delete(key)
+      //! the WACK's coordinates feed the dedup window too (M5b): they ARE the original commit
+      // coordinates, from the owner of record. This closes the WACK-before-replication window where a
+      // cleared attempt had no committed() evidence — the api's drop-sweep (and any dup arriving before
+      // the record replicates back) reads the answer from here.
+      this.#remember(node, v.u, v.c + i, v.s + i, v.e)
     }
     flushHop()
   }
@@ -462,6 +499,14 @@ export class Writes {
     d.shippable = seq
     node.apply(rec, origin, seq, epoch, entry.iss, entry.cid)
     j.armed && j.emit(JK.applyInbound, origin, seq)
+    //! the spoke feed (M5b): fresh inbound records re-ship to synced CLIENT links — a spoke hears every
+    // origin lane through its ONE primary (members still never re-broadcast to members). Same records,
+    // same order (this loop runs per fresh record, in arrival order), attempt identity intact (the
+    // client's overlay join reads it). Flushed once per frame by the RECORDS handler.
+    if (node.clientLinks.size)
+      for (const cl of node.clientLinks)
+        if (cl.state === LS.admitted && cl.synced && !cl.dead)
+          cl.add(rec, { origin, baseSeq: seq, epoch }, rv.issuer ? { issuer: rv.issuer, baseCid: rv.cid } : undefined)
     if (rv.issuer) {
       this.#remember(node, rv.issuer, rv.cid, seq, epoch)
       const a = this.pending.get(rv.issuer + '|' + rv.cid)

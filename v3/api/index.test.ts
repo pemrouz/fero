@@ -115,3 +115,47 @@ test('destroy is clean: sockets down, timers cleared, capture detached — the p
   f.data.local = 2 // no capture, no kernel — a local mutation only
   assert.deepEqual(snapshot(f.data), { k: 1, local: 2 })
 })
+
+test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-your-writes over the relay, failover past a dead server', async () => {
+  //! THREE servers: the failover leg kills one, and a surviving MAJORITY must exist to evict it —
+  // with two, a write owned by the dead member would (correctly, CP) park forever
+  const ps = [await ports.free(), await ports.free(), await ports.free()]
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const mk = (i: number, uuid: string) =>
+    fero('r', { uuid, listen: addrs[i], hosts: addrs.filter((_, j) => j !== i), heartbeatMs: 50, redialMs: 30 })
+  const a = await mk(0, 'aa')
+  const b = await mk(1, 'bb')
+  const d = await mk(2, 'dd')
+  let c: Awaited<ReturnType<typeof fero>> | null = null
+  try {
+    //! a committed view first, so client writes exercise the relay (ae=0) path, not open genesis
+    assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
+    a.data.seeded = 'before-client'
+    c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+    //! catch-up: the spoke folds the full state through its primary
+    assert.ok(await until(() => (snapshot(c!.data) as Record<string, unknown>).seeded === 'before-client'), 'client caught up')
+    //! read-your-writes: the assigned value is visible NOW (the pending overlay), before any ack
+    c.data.mine = { from: 'client' }
+    assert.deepEqual((snapshot(c.data) as Record<string, unknown>).mine, { from: 'client' })
+    const r = await c.methods.update({ key: 'via-method', value: 1 }, { timeout: 8000 })
+    assert.notEqual(r.origin, 'zz', 'a client NEVER stamps provenance — the commit is server-stamped')
+    assert.ok(await until(() => (snapshot(a.data) as Record<string, unknown>)['via-method'] === 1
+      && (snapshot(b.data) as Record<string, unknown>).mine !== undefined), 'client writes visible cluster-wide')
+    //! failover: kill a whole server (maybe the feeder, maybe an owner) — the surviving majority
+    // evicts it, the spoke re-feeds if needed, and writes flow again
+    await a.destroy()
+    c.data.after = 'failover'
+    assert.ok(await until(() => (snapshot(b.data) as Record<string, unknown>).after === 'failover'
+      && (snapshot(d.data) as Record<string, unknown>).after === 'failover', 30000), 'the write flowed past the dead server (eviction + re-route)')
+    assert.ok((snapshot(c.data) as Record<string, unknown>).seeded === 'before-client', 'spoke state intact')
+  } finally {
+    await c?.destroy()
+    await b.destroy()
+    await d.destroy()
+    await a.destroy().catch(() => {})
+  }
+})
+
+test('M5b — a durable client is refused loudly (offline-first is M6, not a silent misconfiguration)', async () => {
+  await assert.rejects(fero('r', { hosts: ['127.0.0.1:1'], dir: '/tmp/x' } as never), /durable client/)
+})
