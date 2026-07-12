@@ -31,7 +31,7 @@ import { Writes } from './write.ts'
 import { Streams } from './streams.ts'
 import { Confirm } from './confirm.ts'
 import { maybeCompact } from './log.ts'
-import { REC, TAG, type Env, type Event, type Rec } from './env.ts'
+import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
 export interface NodeOpts {
@@ -50,7 +50,7 @@ export interface NodeOpts {
   // (a node booted with epoch > 0 is REJOINING: read-only until a committed view ≥ this epoch is
   // confirmed live), the Lamport floor, and the spent ballot identity (votedFor durability is what makes
   // a crash inside one ballot round unable to double-vote — the M2 debt, closed here).
-  boot?: { epoch: number; members: [string, string][]; lamport?: number; votedFor?: { e: number; p: string; h: string } }
+  boot?: { epoch: number; members: [string, string][]; lamport?: number; votedFor?: { e: number; p: string; h: string }; heldPartitions?: string[]; dirtyParts?: string[] }
   //! client (M5b): EXPLICIT role mode — a SPOKE, never a view member. A client dials its hosts, keeps
   // exactly ONE primary link (the only link it digests — the single-feeder ordering guarantee), folds
   // the same replication stream as everyone else, and issues writes as ae=0 attempts relayed by the
@@ -170,6 +170,17 @@ export class Node {
   // boot-time replay framer. All empty/idle when durable is off.
   #batchSeq = 0
   #inflight = new Map<number, Map<string, number>>()
+  //! M6 armed-durable bookkeeping (all empty unscoped): per-batch (origin, partition) covers for the
+  // durable-floor advance; the DIRTY set — partitions holding a memory-only splice (counter per
+  // partition: a re-splice between a snapshot's build and its echo must survive the echo's clear);
+  // the per-snapshot metadata {floors at build, dirty counters at build} its echo commits.
+  #inflightParts = new Map<number, Map<string, Map<string, number>>>()
+  #dirty = new Map<string, number>()
+  #snapMeta = new Map<number, { floors: Map<string, Map<string, number>>; clears: Map<string, number> }>()
+  //! boot-restored M6 facts (C10): the held ∪ orphaned set of the previous life (null = record absent /
+  // unscoped) and the partitions whose replay floors must NOT rebuild (see BootRecord.dirtyParts).
+  bootHeld: Set<string> | null = null
+  bootDirty = new Set<string>()
   walTail = new Map<string, number>()
   #walDead = false
   #seqCeiling = 0
@@ -194,6 +205,8 @@ export class Node {
     this.origin = this.incarnation > 1 ? `${this.uuid}~${this.incarnation}` : this.uuid
     this.membership = new Membership(opts.boot)
     this.epoch = this.membership.view.epoch // a restored node stamps at its restored epoch, never below it
+    if (opts.boot?.heldPartitions) this.bootHeld = new Set(opts.boot.heldPartitions)
+    if (opts.boot?.dirtyParts) { this.bootDirty = new Set(opts.boot.dirtyParts); for (const p of this.bootDirty) this.#dirty.set(p, 0) }
     //! the Lamport floor from the boot record: even if the WAL tail was torn, the clock never restarts
     // below the last durably-recorded stamp (seq reuse under one origin would collide provenance)
     this.seq = opts.boot?.lamport ?? 0
@@ -216,6 +229,30 @@ export class Node {
   // epoch-0 fast path must stay byte-identical (DESIGN-M6 rule 3). Every scoped branch in the
   // replication plane guards on THIS, never on `scoped` alone.
   get armed(): boolean { return this.scoped && this.epoch > 0 }
+
+  //! spliced — a dual-fence splice landed for partition p (armed ingest only). Durable bookkeeping:
+  // the splice is memory-only (an interior row would walk walTail backwards and condemn the chain on
+  // replay), so the partition goes DIRTY and the snapshot swap is armed — the next tick's whole-WAL
+  // swap captures the lane in order. The FIRST transition to dirty persists the boot record
+  // synchronously: a crash before the swap must restore with this partition's floors zeroed
+  // (BootRecord.dirtyParts), or replay's row-max rebuild would attest coverage of the lost interior.
+  spliced(p: string) {
+    if (!this.durable) return
+    const n = this.#dirty.get(p)
+    this.#dirty.set(p, (n ?? 0) + 1)
+    this.#walRows = SNAPSHOT_AT // arm: the next heartbeat tick swaps the WAL
+    if (n === undefined) this.persistBoot()
+  }
+
+  //! replayHeld — the C10 replay classification: is partition p this life's to fold? Data-authoritative
+  // (the previous life's boot record) ∪ duty-authoritative (the restored ring). Unscoped replay never
+  // asks (the armed branch guards the call).
+  replayHeld(p: string): boolean {
+    if (this.bootHeld?.has(p)) return true
+    const ring = this.writes.ring
+    if (this.epoch > 0 && ring.epoch !== this.epoch) ring.build(this.epoch, this.membership.view.members)
+    return this.epoch > 0 && ring.holdsAny(this.uuid, p, this.replicas)
+  }
 
   //! primary — the client's ONE feeder link id (null while unconnected). Kernel-internal to the client
   // role; the write drain targets it, digests flow only over it, failover re-elects on its linkDown.
@@ -271,13 +308,42 @@ export class Node {
           const d = this.streams.for(origin)
           if (maxSeq > d.durable) d.durable = maxSeq
         }
+        //! M6 durable floors (armed only): a persistRun batch advances exactly the (origin, partition)
+        // floors its rows cover — SKIPPING partitions currently dirty (a memory-only splice means the
+        // WAL under-covers below the row max; the snapshot echo below is their only advance site).
+        const pcov = this.#inflightParts.get(e.batch)
+        if (pcov) {
+          this.#inflightParts.delete(e.batch)
+          for (const [origin, parts] of pcov) {
+            const d = this.streams.for(origin)
+            for (const [p, maxSeq] of parts) {
+              if (this.#dirty.has(p)) continue
+              const pe = d.part(p)
+              if (maxSeq > pe.d) pe.d = maxSeq
+            }
+          }
+        }
+        //! M6 snapshot echo (armed only): the swap captured the whole fold — every floor advances to
+        // its build-time possession value, and build-time dirty entries clear (unless re-spliced since
+        // build: the counter moved) with the boot record rewritten to drop them.
+        const snap = this.#snapMeta.get(e.batch)
+        if (snap) {
+          this.#snapMeta.delete(e.batch)
+          for (const [origin, parts] of snap.floors) {
+            const d = this.streams.for(origin)
+            for (const [p, s] of parts) { const pe = d.part(p); if (s > pe.d) pe.d = s }
+          }
+          let cleared = false
+          for (const [p, n] of snap.clears) if (this.#dirty.get(p) === n) { this.#dirty.delete(p); cleared = true }
+          if (cleared) this.persistBoot()
+        }
         j.armed && j.emit(JK.persisted, e.batch)
         this.confirm.recount(this) // own durable advanced — a persisted probe may now have its quorum
         return
       }
       //! M4c: the guarantee-ladder probes (kernel/confirm.ts) — register may answer synchronously
       case 'confirm': {
-        this.confirm.register(this, e.id, e.origin, e.seq, e.level)
+        this.confirm.register(this, e.id, e.origin, e.seq, e.level, e.part)
         return
       }
       case 'confirmCancel': {
@@ -522,6 +588,9 @@ export class Node {
       // applied in this same step); durable waits for the M4b storage batch to resolve
       const d = this.streams.for(this.origin)
       d.applied = d.shippable = seq
+      //! M6 possession floor (armed only): the minting owner's floor is trivially sound — it holds
+      // everything it ever stamped for the partition (DESIGN-M6 §0 own-lane stamp site)
+      if (this.armed) { const pe = d.part(partitionOf(rec)); if (seq > pe.s) pe.s = seq }
       for (const link of this.links.values())
         //! live records flow only on SYNCED links (admitted + peer digest received): anything earlier is
         // covered by the digest-triggered suffix ship, and sending it live would leapfrog that suffix on
@@ -536,7 +605,14 @@ export class Node {
     if (this.durable && recs.length) {
       const tail = this.logFor(this.origin).slice(-recs.length)
       const [bytes] = encodeRuns(tail.map((e) => ({ rec: e.rec, origin: this.origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid })))
-      this.persistRun(this.origin, this.seq, bytes)
+      //! armed: the batch records per-partition maxes so its echo advances exactly the durable floors
+      // this row covers (never a floor the WAL can't restore — DESIGN-M6 §0)
+      let parts: Map<string, number> | undefined
+      if (this.armed) {
+        parts = new Map()
+        for (const e of tail) { const p = partitionOf(e.rec); const m = parts.get(p); if (m === undefined || e.seq > m) parts.set(p, e.seq) }
+      }
+      this.persistRun(this.origin, this.seq, bytes, parts)
     }
     if (recs.length) this.confirm.recount(this) // own shippable advanced at the stamp site
     return s0
@@ -545,12 +621,16 @@ export class Node {
   //! persistRun — leave one encoded frame with the store (durable mode only): mint the batch id, record
   // which (origin, maxSeq) the resolution will advance, link the row into the origin's chain (replay's
   // interior-hole detector), journal, emit. Kernel-internal (commit + ingest + replay's chain re-seed).
-  persistRun(origin: string, maxSeq: number, bytes: Uint8Array) {
+  persistRun(origin: string, maxSeq: number, bytes: Uint8Array, parts?: Map<string, number>) {
     if (!this.durable || this.#walDead) return
     const batch = ++this.#batchSeq
     const prev = this.walTail.get(origin) ?? 0
     this.walTail.set(origin, maxSeq)
     this.#inflight.set(batch, new Map([[origin, maxSeq]]))
+    //! armed (M6): remember which per-(origin, partition) floors this batch's resolution may cover —
+    // a COPY (rxParts is a reusable scratch); dirty partitions are excluded at ECHO time, not here
+    // (a splice can dirty a partition while this batch is in flight).
+    if (parts?.size) this.#inflightParts.set(batch, new Map([[origin, new Map(parts)]]))
     this.#walRows++
     this.journal.armed && this.journal.emit(JK.persist, batch, bytes.length)
     this.env.sink.persist(batch, bytes, prev)
@@ -594,6 +674,19 @@ export class Node {
     const batch = ++this.#batchSeq
     this.walTail = tails
     this.#inflight.set(batch, new Map(tails)) // a COPY: walTail keeps moving with appends; the echo must cover the swap's tails only
+    //! armed (M6): the swap captures the WHOLE fold — splices included — so its echo may advance every
+    // durable floor to the possession floor as of THIS build, and clear the dirty entries whose
+    // counters haven't moved since (a re-splice between build and echo stays dirty for the next swap).
+    if (this.armed) {
+      const floors = new Map<string, Map<string, number>>()
+      for (const [origin, d] of this.streams) {
+        if (!d.parts?.size) continue
+        const per = new Map<string, number>()
+        for (const [p, pe] of d.parts) if (pe.s > 0) per.set(p, pe.s)
+        if (per.size) floors.set(origin, per)
+      }
+      this.#snapMeta.set(batch, { floors, clears: new Map(this.#dirty) })
+    }
     this.#walRows = 0
     this.journal.armed && this.journal.emit(JK.snapshot, batch, rows.length)
     this.env.sink.snapshot(batch, rows)
@@ -612,6 +705,11 @@ export class Node {
     this.walTail.clear()
     this.#entryHash.clear()
     this.#hash = 0
+    //! M6: the wiped fold has no splices left to protect — dirty/floor bookkeeping resets with it
+    this.#dirty.clear()
+    this.#inflightParts.clear()
+    this.#snapMeta.clear()
+    this.bootDirty.clear()
     //! the cid-dedup window resets WITH the fold (M4-review critical): coordinates learned from the
     // condemned rows would dup-ACK a retry for a record that may exist NOWHERE — silent acknowledged
     // loss. Forgetting degrades post-condemn retries to at-least-once (a same-value LWW supersede)
@@ -635,6 +733,9 @@ export class Node {
       lamport: this.#seqCeiling,
       incarnation: this.incarnation,
       votedFor: { ...m.votedFor },
+      //! M6 (armed only — unscoped boot bytes stay byte-identical): the dirty-partition ledger; the
+      // held-set joins here with slice 3's scope machine
+      ...(this.armed && this.#dirty.size ? { dirtyParts: [...this.#dirty.keys()] } : {}),
     })
     this.journal.armed && this.journal.emit(JK.bootWrite, m.view.epoch, m.votedFor.e)
   }
@@ -762,12 +863,21 @@ export class Node {
         if (prov.epoch > this.epoch) this.membership.staleObserved(this, prov.epoch, link)
         let fresh = 0
         let maxSeq = 0
-        for (const rv of f.records())
-          if (this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)) { fresh++; maxSeq = rv.seq }
-        //! WAL the frame when it carried anything new (durable mode) — the received bytes ARE the row
+        //! armed: reset the per-frame partition scratch — fast-path APPENDS record their per-partition
+        // maxes into it for the batch's durable-floor cover; SPLICES (flavor 2) deliberately don't
+        // (no-interior-rows: they reach disk via snapshot, and node.spliced() already armed it)
+        if (this.armed) { if (this.writes.rxParts) this.writes.rxParts.clear(); else this.writes.rxParts = new Map() }
+        for (const rv of f.records()) {
+          const flavor = this.writes.inbound(this, rv.origin, rv.seq, rv.epoch, rv)
+          if (flavor === 1) { fresh++; maxSeq = rv.seq }
+          else if (flavor === 2) fresh++
+        }
+        //! WAL the frame when it carried a fresh APPEND (durable mode) — the received bytes ARE the row
         // (copied out: the frame is a view pinned to the receive chunk). Duplicate records inside a
-        // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent.
-        if (fresh && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice())
+        // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent. A
+        // splice-only frame persists NOTHING here (maxSeq would walk the chain backwards) — its bytes
+        // reach disk inside the armed snapshot swap.
+        if (maxSeq && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice(), this.armed ? this.writes.rxParts ?? undefined : undefined)
         if (fresh) this.confirm.recount(this) // my shippable for this origin advanced — evidence for a probe
         //! flush the tap-forward (M5b): inbound() queued fresh records onto synced CLIENT links (the
         // spoke feed) — one flush per FRAME keeps the one-frame-per-tick shape on the client wire too

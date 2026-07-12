@@ -93,6 +93,7 @@ import { Ring } from './ring.ts'
 import { JK } from './journal.ts'
 import { LS, type Link } from './link.ts'
 import { partitionOf, type Rec } from './env.ts'
+import type { StreamDescriptor } from './streams.ts'
 import type { Node } from './node.ts'
 
 //! MAX_PENDING: the ONE attempt-queue bound (drop-oldest, surfaced) — M2's buffer bound, moved here with the queue.
@@ -476,8 +477,11 @@ export class Writes {
   // peers are trusted at this layer — the M7 auth story bounds who is admitted.)
   // A record carrying ATTEMPT IDENTITY feeds the local cid-dedup window (the ownership-move story) and
   // doubles as an ACK: it clears a matching pending attempt and hops coordinates to a relayed client.
-  // Returns true when the record was FRESH (logged) — the caller WALs the frame iff anything was.
-  inbound(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }): boolean {
+  // Returns the freshness FLAVOR: 0 = duplicate (nothing changed), 1 = fresh APPEND (WAL-safe — the
+  // caller may persistRun the frame), 2 = fresh SPLICE (M6 dual fence: folded and logged, but must
+  // NEVER ride persistRun — an interior row would walk walTail backwards and condemn the chain on
+  // replay; it reaches disk only via the next snapshot() swap — DESIGN-M6 §0 no-interior-rows).
+  inbound(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }): number {
     const j = node.journal
     //! the Lamport merge-up runs first, even for drops: the clock must track everything observed —
     // a reborn clock re-issuing a lost stamp would corrupt provenance cluster-wide.
@@ -487,8 +491,18 @@ export class Writes {
     // A PREVIOUS life's lane (uuid vs uuid~inc) is an ordinary foreign stream here — immutable,
     // tail-complete at peers, healed by suffix AE like anything else (the M4b recovery story).
     const d = node.streams.for(origin)
-    //! the APPLIED watermark advances at the dedup decision (LWW losers included — losing is not loss)
-    if (seq <= d.applied) { j.armed && j.emit(JK.dupDrop, origin, seq); return false }
+    //! the APPLIED watermark advances at the dedup decision (LWW losers included — losing is not loss).
+    // The scalar fence's license is "FIFO link × single broadcaster" — under M6 scoping one lane's
+    // records reach a node from MULTIPLE answerers holding different partition subsets, so an
+    // under-fence arrival may be an INTERIOR record, not a duplicate: the armed path falls through to
+    // the dual fence (DESIGN-M6 §0) instead of dropping. A CLIENT takes the same path — its feeder is
+    // one FIFO link, but a SCOPED feeder legitimately re-forwards its own splices out of seq order
+    // (on unscoped trajectories a client's under-fence arrival is always a genuine dup, which the
+    // dual fence answers identically: found-in-lane ⇒ drop — zero behavioural change).
+    if (seq <= d.applied) {
+      if (node.armed || node.client) return this.#splice(node, origin, seq, epoch, rv, d)
+      j.armed && j.emit(JK.dupDrop, origin, seq); return 0
+    }
     d.applied = seq
     const rec = rv.rec() // ONE copy out of the receive chunk, shared by the log entry and the apply
     const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch }
@@ -497,6 +511,16 @@ export class Writes {
     //! the SHIPPABLE watermark advances at the log append — the sole evidence confirm:'replicated'
     // may ever read (M4c); synchronous with applied today, a distinct site by design
     d.shippable = seq
+    //! M6 possession floor (armed only): the fast path is a single-source ascending delivery for this
+    // (origin, partition) sub-stream, so the floor advances with it (soundness: DESIGN-M6 §0). The
+    // partition also lands in the caller's per-frame scratch — the persistRun batch records per-
+    // partition maxes so the persisted echo can advance the DURABLE floors it actually covers.
+    if (node.armed) {
+      const p = partitionOf(rec)
+      const pe = d.part(p)
+      if (seq > pe.s) pe.s = seq
+      if (this.rxParts) { const m = this.rxParts.get(p); if (m === undefined || seq > m) this.rxParts.set(p, seq) }
+    }
     node.apply(rec, origin, seq, epoch, entry.iss, entry.cid)
     j.armed && j.emit(JK.applyInbound, origin, seq)
     //! the spoke feed (M5b): fresh inbound records re-ship to synced CLIENT links — a spoke hears every
@@ -517,7 +541,61 @@ export class Writes {
         this.#remove(a)
       }
     }
-    return true
+    return 1
+  }
+
+  //! rxParts — the RECORDS handler's per-frame scratch (armed only): partition → max fresh APPEND seq
+  // in the frame, feeding persistRun's per-partition batch cover. Null unscoped (zero fast-path cost).
+  rxParts: Map<string, number> | null = null
+
+  //! #splice — the DUAL FENCE (M6, DESIGN-M6 §0): an under-fence arrival on an ARMED node may be an
+  // INTERIOR record, not a duplicate — under scoping one lane's records reach a node from multiple
+  // answerers holding different partition subsets, so cross-link interleave lawfully delivers a seq
+  // below the scalar fence that this node has never seen. The decision ladder:
+  //   seq ≤ possession floor  → drop (genuine dup, or effect lawfully compacted-because-covered)
+  //   present in the lane     → drop (genuine dup above the floor — e.g. pre-floor history)
+  //   absent                  → SPLICE at seq position (the lane stays ascending for the AE walk and
+  //                             compaction), fold through the one LWW election, advance the floor.
+  // A CLIENT rides the same path with floor 0 forever (it attests nothing): its single scoped feeder
+  // legitimately re-forwards its own splices out of seq order, and on unscoped trajectories every
+  // under-fence arrival is a genuine dup that the lane-presence test drops identically.
+  // Durable nodes: the splice is MEMORY-ONLY here — node.spliced() marks the partition dirty and arms
+  // the snapshot swap; until the swap's echo the durable floor does not cover it (no-interior-rows).
+  #splice(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }, d: StreamDescriptor): number {
+    const j = node.journal
+    const rec = rv.rec()
+    const p = partitionOf(rec)
+    if (node.armed && (d.parts?.get(p)?.s ?? 0) >= seq) { j.armed && j.emit(JK.dupDrop, origin, seq); return 0 }
+    const lane = node.logFor(origin)
+    let lo = 0, hi = lane.length
+    while (lo < hi) { const mid = (lo + hi) >>> 1; if (lane[mid].seq < seq) lo = mid + 1; else hi = mid }
+    if (lo < lane.length && lane[lo].seq === seq) { j.armed && j.emit(JK.dupDrop, origin, seq); return 0 }
+    const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch }
+    if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
+    lane.splice(lo, 0, entry) // ascending preserved: inserted at its seq position
+    if (node.armed) {
+      const pe = d.part(p)
+      if (seq > pe.s) pe.s = seq
+      node.spliced(p) // durable bookkeeping: dirty partition + snapshot arming (no-op non-durable)
+    }
+    node.apply(rec, origin, seq, epoch, entry.iss, entry.cid)
+    j.armed && j.emit(JK.applyInbound, origin, seq)
+    //! the spoke feed sees splices too — same fresh-ingest contract as the fast path; the spoke's own
+    // dual fence (the client leg above) accepts the interior on its side
+    if (node.clientLinks.size)
+      for (const cl of node.clientLinks)
+        if (cl.state === LS.admitted && cl.synced && !cl.dead)
+          cl.add(rec, { origin, baseSeq: seq, epoch }, rv.issuer ? { issuer: rv.issuer, baseCid: rv.cid } : undefined)
+    if (rv.issuer) {
+      this.#remember(node, rv.issuer, rv.cid, seq, epoch)
+      const a = this.pending.get(rv.issuer + '|' + rv.cid)
+      if (a) {
+        j.armed && j.emit(JK.writeAck, rv.issuer, rv.cid, 1)
+        if (a.via >= 0) this.#ack(node, a.via, { u: rv.issuer, c: rv.cid, n: 1, s: seq, e: epoch })
+        this.#remove(a)
+      }
+    }
+    return 2
   }
 
   //! replay — source=replay (M4b): a WAL row re-ingested at boot, before the network exists. Everything
@@ -545,6 +623,50 @@ export class Writes {
     let count = 0
     for (const rv of f.records()) {
       if (rv.seq > node.seq) node.seq = rv.seq // the Lamport clock rebuilds from every replayed stamp
+      if (node.armed) {
+        //! M6 armed replay (DESIGN-M6 §0/C10) — three departures from the scalar path, all disk-only:
+        //   1. the BOOT HELD-GATE: a row record whose partition this life neither holds (boot record)
+        //      nor is assigned (restored ring) skips the fold and the floors but still advances
+        //      `applied` and the chain — it was fresh at persist time and counted in the row's chain
+        //      link, so skipping the advance would false-positive the walHole detector on rows
+        //      persisted before a shed.
+        //   2. the REPLAY DUAL FENCE: an under-applied record ABSENT from the lane is an interior a
+        //      mixed row captured (the live splice was WAL'd inside a later frame) — recover it.
+        //   3. FLOOR REBUILD: possession/durable floors rebuild from row maxes — except partitions
+        //      the boot record marked DIRTY (a live splice never reached disk: row maxes would
+        //      overclaim the hole), which stay at 0 and re-heal via the handshake, honestly low.
+        const rec = rv.rec()
+        const p = partitionOf(rec)
+        if (!node.replayHeld(p)) {
+          if (rv.seq > d.applied) d.applied = rv.seq
+          continue
+        }
+        if (rv.seq <= d.applied) {
+          const lane = node.logFor(prov.origin)
+          let lo = 0, hi = lane.length
+          while (lo < hi) { const mid = (lo + hi) >>> 1; if (lane[mid].seq < rv.seq) lo = mid + 1; else hi = mid }
+          if (lo < lane.length && lane[lo].seq === rv.seq) continue // duplicate WAL row — re-dedup
+          const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
+          if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
+          lane.splice(lo, 0, entry)
+        } else {
+          d.applied = rv.seq
+          const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
+          if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
+          node.logFor(prov.origin).push(entry)
+          if (rv.seq > d.shippable) d.shippable = rv.seq
+          if (rv.seq > d.durable) d.durable = rv.seq
+        }
+        if (!node.bootDirty.has(p)) {
+          const pe = d.part(p)
+          if (rv.seq > pe.s) { pe.s = rv.seq; pe.d = rv.seq } // disk-proven: possession AND durability
+        }
+        node.apply(rec, prov.origin, rv.seq, rv.epoch, rv.issuer || undefined, rv.issuer ? rv.cid : undefined)
+        j.armed && j.emit(JK.applyInbound, prov.origin, rv.seq)
+        if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch)
+        count++
+        continue
+      }
       if (rv.seq <= d.applied) continue // duplicate WAL rows (a re-persisted partially-fresh frame) re-dedup
       d.applied = rv.seq
       const rec = rv.rec()

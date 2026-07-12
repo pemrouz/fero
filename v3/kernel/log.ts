@@ -148,6 +148,12 @@ export const gcTombstones = (node: Node): number => {
 // length check per origin in the steady state.
 export const maybeCompact = (node: Node) => {
   if (node.membership.view.members.length === 0) return
+  //! M6 (armed): compaction and tombstone GC are PINNED until the handshake evidence plane (slice 3b)
+  // feeds per-(origin, partition) attested marks — the member-ranged frontier above is unsound under
+  // scoping (a non-holder's lane tail says nothing about a holder's possession, and vice versa), and
+  // pinning is the safe direction (memory over loss; DESIGN-M6 C3 lands the scoped frontier: min over
+  // holdersOf(p) ∪ announcers of the per-(o,p) stable marks, with acquiring holders contributing 0).
+  if (node.armed) return
   for (const [o, entries] of node.logs) {
     if (entries.length < COMPACT_AT) continue
     const f = frontier(node, o)

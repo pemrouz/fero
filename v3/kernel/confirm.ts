@@ -43,7 +43,9 @@ export const CONFIRM = { replicated: 0, persisted: 1 } as const
 //! MAX_PROBES: registry bound — overflow answers the OLDEST probe false (surfaced), never grows silently.
 export const MAX_PROBES = 1024
 
-interface Probe { id: number; origin: string; seq: number; level: number }
+//! `part` (M6): the record's partition — armed nodes range the count over holdersOf(part) at the
+// derived W-quorum instead of the view majority. Absent (or unscoped) keeps the M4 math verbatim.
+interface Probe { id: number; origin: string; seq: number; level: number; part?: string }
 
 export class Confirm {
   #probes = new Map<number, Probe>()
@@ -56,9 +58,11 @@ export class Confirm {
   #hasP = new Set<string>()
 
   //! register — open a probe; it may resolve synchronously (evidence can already suffice).
-  register(node: Node, id: number, origin: string, seq: number, level: number) {
+  register(node: Node, id: number, origin: string, seq: number, level: number, part?: string) {
     const j = node.journal
-    this.#probes.set(id, { id, origin, seq, level })
+    const probe: Probe = { id, origin, seq, level }
+    if (node.armed && part !== undefined) probe.part = part
+    this.#probes.set(id, probe)
     j.armed && j.emit(JK.confirmReq, id, level, origin)
     if (this.#probes.size > MAX_PROBES) {
       const oldest = this.#probes.keys().next().value!
@@ -126,17 +130,45 @@ export class Confirm {
     if (this.#probes.size === 0) return
     for (const p of [...this.#probes.values()]) {
       const count = this.#count(node, p)
-      const members = node.membership.view.members.length
-      const threshold = members === 0 ? 1 : (members >> 1) + 1
+      //! M6 scoped threshold: a partition-scoped probe on an armed node needs W = majority of the
+      // R-SET holders, not of the view — the record only ever lives on holdersOf(part) (DESIGN-M6 C3)
+      let threshold: number
+      if (p.part !== undefined && node.armed) {
+        const r = node.writes.ring
+        if (node.epoch > 0 && r.epoch !== node.epoch) r.build(node.epoch, node.membership.view.members)
+        threshold = (r.holders(p.part, node.replicas).length >> 1) + 1
+      } else {
+        const members = node.membership.view.members.length
+        threshold = members === 0 ? 1 : (members >> 1) + 1
+      }
       if (count >= threshold) this.#answer(node, p, true, count)
     }
   }
 
   //! #count — members (self included) whose ladder covers (origin, seq) at the probe's level.
+  // M6 (armed, partition-scoped probe): the range is holdersOf(part) and the evidence is the
+  // per-(origin, partition) POSSESSION floors — self reads its own `parts` ladder; a peer counts only
+  // on handshake-ATTESTED marks (slice 3b feeds them — until then peers honestly count 0). The bare
+  // digest `d[o] ≥ seq` is NEVER sufficient scoped evidence: under partition-filtered multi-source
+  // shipping a steady-held peer's lane tail can run past an interior hole (the judge-proven overclaim).
   #count(node: Node, p: Probe): number {
     const level = p.level
     const evid = (s: number, d: number) => (level === CONFIRM.persisted ? d : s) >= p.seq
     const own = node.streams.get(p.origin)
+    if (p.part !== undefined && node.armed) {
+      const r = node.writes.ring
+      if (node.epoch > 0 && r.epoch !== node.epoch) r.build(node.epoch, node.membership.view.members)
+      let n = 0
+      for (const uuid of r.holders(p.part, node.replicas)) {
+        if (uuid === node.uuid) {
+          const pe = own?.parts?.get(p.part)
+          if (pe && evid(pe.s, pe.d)) n++
+        }
+        // peers: attested per-(origin, partition) marks only — the scope handshake (slice 3b) feeds
+        // them; absent attestation counts nothing, which can only under-claim (the honest direction)
+      }
+      return n
+    }
     const members = node.membership.view.members
     if (members.length === 0) return own && evid(own.shippable, own.durable) ? 1 : 0
     let n = 0
