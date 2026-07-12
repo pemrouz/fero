@@ -45,6 +45,10 @@ export class Ring {
   // array is INVALIDATED by the next holdersOf call on this ring — callers copy if they retain.
   #scratch: string[] = []
   #seen = new Uint8Array(0)
+  //! holders memo — the per-epoch cache behind the hot callers (fan-out filter, AE answer filter,
+  // holdsAny): one successor walk per touched partition per epoch, then one Map.get per record.
+  // Cleared wholesale on build() (a new view is a new placement world) and per-partition on place().
+  #holdersCache = new Map<string, { r: number; list: readonly string[] }>()
 
   constructor(hash: (s: string) => number = fnv) { this.#hash = hash }
 
@@ -65,6 +69,7 @@ export class Ring {
     this.#owners = new Uint16Array(n)
     for (let i = 0; i < n; i++) { this.#points[i] = entries[i].p; this.#owners[i] = entries[i].m }
     this.#seen = new Uint8Array(this.#members.length)
+    this.#holdersCache.clear()
   }
 
   //! ownerOf — the allocation-free lookup: first vnode point ≥ hash(partition), wrapping to 0.
@@ -128,6 +133,23 @@ export class Ring {
     return out
   }
 
+  //! holders — the MEMOIZED R-set (the hot entry point): the frozen copy is stable until the next
+  // build()/place(), so the fan-out filter and AE answer filter share one walk per partition per
+  // epoch. r participates in the hit test (R_eff shifts when the view shrinks below replicas).
+  holders(partition: string, r: number): readonly string[] {
+    const hit = this.#holdersCache.get(partition)
+    if (hit !== undefined && hit.r === r) return hit.list
+    const list = Object.freeze([...this.holdersOf(partition, r)])
+    this.#holdersCache.set(partition, { r, list })
+    return list
+  }
+
+  //! holdsAny — R-set membership (the scoped counterpart of holds): is uuid one of the r holders?
+  // Linear over ≤ r entries of the memoized list — allocation-free after the first walk.
+  holdsAny(uuid: string, partition: string, r: number): boolean {
+    return this.holders(partition, r).includes(uuid)
+  }
+
   //! holds — does this uuid own the partition? (The name the plan reserves; same allocation-free path.)
   holds(uuid: string, partition: string): boolean { return this.ownerOf(partition) === uuid }
 
@@ -138,5 +160,6 @@ export class Ring {
   place(partition: string, ...uuids: string[]) {
     if (uuids.length === 0) this.#place.delete(partition) // unpin — back to the hash walk
     else this.#place.set(partition, uuids)
+    this.#holdersCache.delete(partition)
   }
 }
