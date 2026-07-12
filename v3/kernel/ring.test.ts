@@ -71,3 +71,62 @@ test('the hash is injectable, and the placement override wins and survives rebui
 test('vnode count is the documented constant (the balance/size trade is a decision, not an accident)', () => {
   assert.equal(VNODES, 32)
 })
+
+//! ── holdersOf (M6 scoped replication): the R-set is a pure, deterministic extension of ownerOf ──
+
+test('holdersOf: holder[0] === ownerOf, members distinct, r clamps to the member count, empty ring answers []', () => {
+  const r = new Ring()
+  assert.deepEqual([...r.holdersOf('anything', 2)], [], 'open genesis: no ring, no holders')
+  r.build(1, members('n01', 'n02', 'n03', 'n04', 'n05'))
+  const set = new Set(['n01', 'n02', 'n03', 'n04', 'n05'])
+  for (const k of keys) {
+    const h = [...r.holdersOf(k, 3)] // copy — the scratch is invalidated by the next call
+    assert.equal(h.length, 3)
+    assert.equal(h[0], r.ownerOf(k), `${k}: the owner IS the first holder (single-writer untouched)`)
+    assert.equal(new Set(h).size, 3, `${k}: holders are distinct members`)
+    for (const u of h) assert.ok(set.has(u))
+  }
+  //! degeneracies: r ≥ members = everyone (the R=∞ mode by another door); r ≤ 0 = nobody
+  assert.equal(new Set(r.holdersOf('k', 99)).size, 5)
+  assert.equal(r.holdersOf('k', Infinity).length, 5)
+  assert.equal(r.holdersOf('k', 0).length, 0)
+})
+
+test('holdersOf: two independently-built rings compute identical R-sets for every key (the split-brain property)', () => {
+  const a = new Ring()
+  const b = new Ring()
+  a.build(3, members('n01', 'n02', 'n03', 'n04'))
+  b.build(3, members('n01', 'n02', 'n03', 'n04'))
+  for (const k of keys) assert.deepEqual([...a.holdersOf(k, 2)], [...b.holdersOf(k, 2)])
+})
+
+test('holdersOf: minimal motion — removing a member never reassigns a surviving pair', () => {
+  const r = new Ring()
+  r.build(1, members('n01', 'n02', 'n03', 'n04'))
+  const before = new Map(keys.map((k) => [k, [...r.holdersOf(k, 2)]]))
+  r.build(2, members('n01', 'n02', 'n03'))
+  let moved = 0
+  for (const k of keys) {
+    const was = before.get(k)!
+    const now = [...r.holdersOf(k, 2)]
+    assert.ok(!now.includes('n04'), `${k}: a departed member cannot hold`)
+    if (was.includes('n04')) { moved++; continue } // its slots legitimately reassign
+    //! a pair untouched by the departure must not churn — successor-walk stability
+    assert.deepEqual(now, was, `${k} rescoped though neither holder departed`)
+  }
+  assert.ok(moved > 0 && moved < keys.length, `only n04's share moves (${moved}/${keys.length})`)
+})
+
+test('holdersOf: place() pins an ordered holder list; a single pin still draws the rest from the walk', () => {
+  const r = new Ring()
+  r.build(1, members('n01', 'n02', 'n03', 'n04'))
+  r.place('p', 'n03', 'n01')
+  assert.deepEqual([...r.holdersOf('p', 2)], ['n03', 'n01'], 'the pin list IS the R-set prefix, in order')
+  assert.equal(r.ownerOf('p'), 'n03', 'pins[0] is the owner')
+  const three = [...r.holdersOf('p', 3)]
+  assert.deepEqual(three.slice(0, 2), ['n03', 'n01'])
+  assert.ok(['n02', 'n04'].includes(three[2]), 'the walk fills past the pins with distinct members')
+  r.place('p') // unpin
+  assert.notEqual(r.ownerOf('p'), undefined)
+  assert.equal(r.holdersOf('p', 2).length, 2)
+})

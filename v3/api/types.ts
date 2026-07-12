@@ -66,6 +66,9 @@ export interface FeroConfig {
   heartbeatMs?: number
   redialMs?: number
   journalCap?: number
+  //! replicas (M6): scoped replication — each partition lives on exactly R holders. Omit for full
+  // replication (every server holds everything). Integer ≥ 1; servers only.
+  replicas?: number
   seams?: Seams
 }
 
