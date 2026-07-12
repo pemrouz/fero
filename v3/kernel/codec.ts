@@ -49,6 +49,11 @@ export const VERB = {
   HELLO: 1, RECORDS: 2, PING: 3, PONG: 4, DIGEST: 5,
   JOIN: 6, PROPOSE: 7, VOTE: 8, VIEW: 9, PULL: 10,
   WRITE: 11, WACK: 12, WNACK: 13,
+  //! M5c method plane (control frames; the kernel routes, the api HOST runs the handlers):
+  // CALL {id,m,a} / SUB {id,m,a} / UNSUB {id} travel client→server; RESULT {id,ok,v|e} answers a
+  // CALL; SUBREC {id,recs} streams a live subscription's change records. `id` is caller-minted,
+  // monotone per client (a SUB's id doubles as the subscription identity, v2's rule kept).
+  CALL: 14, RESULT: 15, SUB: 16, UNSUB: 17, SUBREC: 18,
 } as const
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.

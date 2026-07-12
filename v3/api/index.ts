@@ -18,7 +18,8 @@ import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { Bind, type Coords } from './data.ts'
-import { proxy } from './substrate.ts'
+import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
+import { proxy, snapshot as snap, isProxy } from './substrate.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
@@ -34,7 +35,11 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   const userMethods: Record<string, (...args: unknown[]) => unknown> = {}
   const config: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(opts)) {
-    if (typeof v === 'function') userMethods[k] = v as (...args: unknown[]) => unknown
+    if (typeof v === 'function') {
+      if (k.startsWith(SYSTEM)) throw new Error(`fero('${name}'): method names may not start with \\u0000 (reserved for the system plane)`)
+      if (k === 'update' || k === 'insert' || k === 'remove') throw new Error(`fero('${name}'): '${k}' is a built-in writer — wrap it via seams.validation or name the method differently`)
+      userMethods[k] = v as (...args: unknown[]) => unknown
+    }
     else if (CONFIG_KEYS.has(k)) config[k] = v
     else throw new Error(`fero('${name}'): unknown option '${k}' — config keys are ${[...CONFIG_KEYS].join(', ')}; function values are methods`)
   }
@@ -63,8 +68,13 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     ...(config.dir ? restoreOpts(config.dir as string) : {}),
   }
   const rt = new Runtime(rtOpts)
-  //! the binding wires rt.onApply BEFORE restore, so the WAL replay refills the proxy
-  const bind = new Bind(rt, { validate: seams.validation as ((rec: Rec) => true | string) | undefined })
+  //! the binding wires rt.onApply BEFORE restore, so the WAL replay refills the proxy. `tracked` is
+  // late-bound to the method host (flush-on-return attribution — api/methods.ts).
+  let host: Host | null = null
+  const bind = new Bind(rt, {
+    validate: seams.validation as ((rec: Rec) => true | string) | undefined,
+    tracked: () => host?.tracked(),
+  })
   if (config.dir) rt.restore()
 
   //! ── the confirm-probe multiplexer (M4c events under the methods surface) ──
@@ -84,6 +94,23 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       rt.node.step({ kind: 'confirm', id, origin: c.origin, seq: c.seq, level })
     })
 
+  //! ── the method plane (M5c): every node HOSTS (servers get invokes; a spoke none), clients CALL ──
+  //! the built-in read: the whole resource or one child — subscribable by return type like any method
+  const table: Record<string, (arg: unknown, ctx: Context) => unknown> = {
+    read: (a, ctx) => (a == null ? ctx.data : ctx.data.get(String(a))),
+    ...(userMethods as Record<string, (arg: unknown, ctx: Context) => unknown>),
+  }
+  //! the system plane: confirm-over-RPC — a spoke's ladder evidence is one digest wide (M5b residual),
+  // so its probes run at the PRIMARY, which holds the full member evidence
+  const system: Record<string, (arg: unknown, ctx: Context) => unknown> = {
+    confirm: (a) => {
+      const v = a as { o: string; s: number; l: number; t: number }
+      return probe({ origin: v.o, seq: v.s, epoch: 0 }, v.l, Math.min(v.t ?? 8000, 60_000))
+    },
+  }
+  host = new Host(rt, bind.data, table, system)
+  const caller = isClient ? new Caller(rt) : null
+
   //! ── the default write methods: the SAME ingest as assignment, plus await surfaces ──
   const write = async (rec: Rec, o: WriteOpts = {}): Promise<WriteResolve> => {
     const want: Guarantee = o.confirm ?? 'committed'
@@ -96,7 +123,11 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     ])
     const resolved: WriteResolve = { guarantee: 'committed', key: rec.key.length ? rec.key : [String(rec.at ?? '')], origin: coords.origin, seq: coords.seq, epoch: coords.epoch, cid: coords.cid }
     if (want === 'committed') return resolved
-    const ok = await probe(coords, want === 'persisted' ? CONFIRM.persisted : CONFIRM.replicated, ms)
+    const level = want === 'persisted' ? CONFIRM.persisted : CONFIRM.replicated
+    //! a spoke proves its guarantee AT THE PRIMARY (system confirm) — its own evidence is one digest wide
+    const ok = caller
+      ? await caller.call(SYSTEM + 'confirm', { o: coords.origin, s: coords.seq, l: level, t: ms }, { timeout: ms, retry: true }).then((v) => v === true, () => false)
+      : await probe(coords, level, ms)
     if (!ok) throw { guarantee: want, reached: 'committed', reason: 'timeout', localCommit: { origin: coords.origin, seq: coords.seq, epoch: coords.epoch } } satisfies WriteReject
     return { ...resolved, guarantee: want }
   }
@@ -108,11 +139,28 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     insert: (c: Change, o?: WriteOpts) => write({ type: REC.insert, key: keyPath(c.key), value: c.value, at: String(c.at ?? randomUUID()) }, o),
     remove: (c: Change, o?: WriteOpts) => write({ type: REC.remove, key: keyPath(c.key) }, o),
   } as Methods
-  for (const [k, fn] of Object.entries(userMethods)) {
-    if (k in methods) throw new Error(`fero('${name}'): method '${k}' overrides a default writer — that lands with M5c's dispatch`)
-    methods[k] = () => { throw new Error(`fero('${name}').methods.${k}: user-method dispatch lands at M5c`) }
-    void fn
+  //! user methods + the built-in read. On a SERVER a call is a local one-shot invoke (value, or
+  // SNAPSHOT of a returned proxy) — live local projections are `data` + operators directly, no wire
+  // needed (v2's localMethods rule, kept). On a CLIENT the namespace is OPEN (a spoke cannot know the
+  // servers' method names): ANY name yields the dual-mode Handle maker (await = one-shot CALL,
+  // reactive touch = live subscription — api/methods.ts); unknown names reject typed FROM the server.
+  if (!caller) {
+    for (const m of Object.keys(table)) {
+      methods[m] = async (a?: unknown) => {
+        const ctx: Context = { data: bind.data, flush: async () => {} }
+        const result = await table[m](a, ctx)
+        return isProxy(result) ? snap(result) : result
+      }
+    }
   }
+  const methodSurface = caller
+    ? new Proxy(methods, {
+        get(t, prop) {
+          if (typeof prop !== 'string' || prop in t || prop === 'then') return (t as Record<string | symbol, unknown>)[prop]
+          return (a?: unknown, o?: { timeout?: number; retry?: boolean }) => handle(caller, prop, a, o)
+        },
+      })
+    : methods
 
   //! ── cluster: a real ViewProxy over the committed view + peers + me (M5a minimal) ──
   // Folded from the journal cursor after any step that emitted membership-relevant events; one
@@ -127,11 +175,19 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   })
   const FOLD = new Set<number>([JK.viewInstall, JK.evict, JK.gateOpen, JK.gateClose, JK.identified, JK.linkDown, JK.suspect, JK.start])
   let cursor = 0
+  let lastPrimary = node.primary
   const fold = () => {
     const j = node.journal
     if (j.n === cursor) return
     const events = j.read(cursor)
     cursor = j.n
+    //! method-plane housekeeping rides the same fold: dead links reap their served subscriptions
+    // (the v2 leak guard), and a primary change fires the caller's failover policies (OQ2)
+    for (const e of events) if (e.kind === JK.linkDown) host!.reapLink(e.a as number)
+    if (caller && node.primary !== lastPrimary) {
+      lastPrimary = node.primary
+      if (node.primary !== null) caller.onPrimaryChange()
+    }
     if (!events.some((e) => FOLD.has(e.kind))) return
     cluster.epoch = node.epoch
     cluster.writable = node.membership.gate(node).open
@@ -149,10 +205,12 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   return {
     name,
     data: bind.data,
-    methods,
+    methods: methodSurface,
     cluster,
     async destroy() {
       bind.destroy()
+      host!.destroy()
+      caller?.destroy()
       //! settle in-flight confirm probes honestly (false = could not prove in time) — never hang a caller
       for (const [, settle] of probes) settle(false)
       probes.clear()

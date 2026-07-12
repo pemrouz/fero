@@ -75,6 +75,11 @@ export class Runtime {
   onApply: (rec: Applied) => void
   //! onConfirm — the guarantee ladder's answers surface here (M5's confirm option resolves off it)
   onConfirm: (id: number, ok: boolean, count: number) => void = () => {}
+  //! the M5c method plane surfaces here — the api layer is the HOST (it runs handlers) and the CALLER
+  // (it awaits results / folds sub records); the kernel only routes frames (env.ts contract).
+  onInvoke: (link: number, id: number, mode: number, m: string, a: unknown) => void = () => {}
+  onResult: (id: number, ok: boolean, value: unknown) => void = () => {}
+  onSubRecs: (id: number, recs: Rec[]) => void = () => {}
 
   constructor(opts: RuntimeOpts, onApply: (rec: Applied) => void = () => {}) {
     this.#opts = opts
@@ -201,6 +206,9 @@ export class Runtime {
           syncDir(runtime.#opts.dir)
         },
         confirm(id, ok, count) { runtime.onConfirm(id, ok, count) },
+        invoke(link, id, mode, m, a) { runtime.onInvoke(link, id, mode, m, a) },
+        result(id, ok, value) { runtime.onResult(id, ok, value) },
+        subRecs(id, recs) { runtime.onSubRecs(id, recs) },
       },
     })
   }

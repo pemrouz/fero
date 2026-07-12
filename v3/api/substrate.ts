@@ -44,6 +44,35 @@ export const applyRec = (p: any, r: Rec): void => {
   else res.update(r.value, r.key)
 }
 
+//! isProxy — the return-type dispatch probe (plan §9: a method returning a ViewProxy is subscribable;
+// anything else is a value). The view symbol is the identity test, at this one seam.
+export const isProxy = (x: unknown): boolean =>
+  (typeof x === 'function' || (typeof x === 'object' && x !== null)) && (x as Record<symbol, unknown>)[VIEW] !== undefined
+
+//! records — a RECORD-interface subscription (data's FunctionSink): fn gets data-native change records
+// {type:'update'|'insert'|'remove'|'move', key, value, at?}, values CLONED by the substrate, plus an
+// INITIAL whole-value snapshot record on attach — exactly the shape a method-subscription stream wants
+// (M5c). The substrate has no public detach for function sinks (GC-driven via the anchor), so stop()
+// is a latch + anchor release: emission stops synchronously, collection follows.
+export const records = (p: any, fn: (rec: { type: string; key: string[]; value?: unknown; at?: string }) => void): { stop(): void } => {
+  let dead = false
+  let anchor: object | null = { fero: 'sub' } // the strong ref that keeps the sink alive (substrate lifetimes contract)
+  p.connect(anchor, (rec: { type: string; key: string[]; value?: unknown; at?: string }) => { if (!dead) fn(rec) })
+  return { stop() { dead = true; anchor = null } }
+}
+
+//! applyStreamRec — fold one DATA-NATIVE stream record (string types — the SUBREC body is opaque to
+// the kernel) into a local mirror proxy. The root snapshot record replaces wholesale; 'move' records
+// are skipped (api/methods.ts banner: windowed sorts are not a streamable shape in M5c — sort on the
+// client proxy instead).
+export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?: unknown; at?: unknown }): void => {
+  const res = p[VIEW].res
+  const key = Array.isArray(r.key) ? r.key : []
+  if (r.type === 'update') res.update(r.value, key)
+  else if (r.type === 'insert') res.insert(r.value, key, String(r.at ?? ''))
+  else if (r.type === 'remove') res.remove(key)
+}
+
 //! Capture: the strongly-held write-capture subscription — detach() is synchronous and terminal.
 export interface Capture { detach(): void }
 

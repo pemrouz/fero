@@ -1,4 +1,4 @@
-# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5a+b: composer, cid-overlay, clients) + the debug tool
+# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5a-c: composer, cid-overlay, clients, methods) + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -18,8 +18,8 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 193 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
-npm run perf                   # 17 perf gates: counted invariants first, ratios second, absolutes last
+npm test                       # 201 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm run perf                   # 18 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
 npm run debug                  # scenario DASHBOARD at /, the debugger at /debug (http://localhost:4699)
@@ -229,6 +229,7 @@ api/      the public surface (M5a): fero(name, opts) → {data, methods, cluster
   substrate.ts  the ONE seam onto the `data` sibling ($() proxies): record-apply ingress, clone-free capture, sync detach
   data.ts       the binding: capture→ingest, apply→proxy, echo match-and-consume, the cid-keyed overlay (read-your-writes)
   index.ts      the composer: declared config schema (typos throw), seams.validation, default write methods over the confirm ladder
+  methods.ts    the method plane (M5c): the invoke HOST (flush-on-return via ALS) + the rpc CALLER (dual-mode Handles, failover policies)
   types.ts      the exported unions: Guarantee, WriteResolve/WriteReject, FeroConfig, Fero
 sim/      the executive: virtual time, seeded faults (FIFO-clamped), per-event monitors, sweep CLI
 tests/    Tier-3 real-socket smoke (the only wall-clock tier)
@@ -437,7 +438,7 @@ because state is a deterministic fold of the journal'd inputs.
   real restarts by construction. Pending overflow drops the OLDEST attempt
   (journal-surfaced) — under sustained gate-closed writes beyond
   MAX_PENDING=1024 that is real, counted loss.
-- **M5a+M5b — the public composer AND the client role — are LIVE** (api/):
+- **M5a+M5b+M5c — the composer, the client role, AND the method plane — are LIVE** (api/):
   `await fero(name, opts)` → `{data, methods, cluster, destroy}` over `$()`
   proxies, sliced (like M4) into four landable increments: **M5a** composer +
   data binding + cid-overlay → **M5b** the client role (below) → **M5c** methods
@@ -498,11 +499,46 @@ because state is a deterministic fold of the journal'd inputs.
     client-chaos sweep (per-pair delay/dup faults, feeder partitions, severed
     relay-hop frames — 1.86M events, spokes included in convergence), and the
     epoch-0 sweep still byte-identical (the role is inert when off).
-  - Client residuals (stated): a spoke's confirm probes see only its primary's
-    digest evidence, so `confirm:'replicated'` needs majority marks it rarely
-    holds — honest timeouts today; M5c's CALL verb makes confirm-over-RPC the
-    natural fix. Durable clients (offline-first) are refused loudly at
-    fero() time — tracked for M6.
+  - ~~A spoke's confirm probes see only its primary's digest evidence~~ —
+    closed by M5c: confirm-over-RPC (the system plane) proves a spoke's
+    guarantee AT its primary, which holds the full member evidence. Durable
+    clients (offline-first) remain refused loudly at fero() time — M6.
+- **M5c — the METHOD PLANE — is LIVE**: RPC + live subscriptions over five new
+  control verbs (CALL/RESULT/SUB/UNSUB/SUBREC), with the kernel ROUTING and the
+  api HOSTING (purity: a user handler is arbitrary async code — it surfaces as
+  the `invoke` effect and answers via `reply`/`subOut` events; the kernel never
+  runs it and tracks no rpc state). The shape:
+  - **Return-type dispatch, both ends** (plan §9): the host probes the handler's
+    return with the view symbol (a ViewProxy is subscribable, a value is a
+    value); the caller's dual-mode HANDLE picks consumption by touch — `await`
+    is a one-shot CALL, any reactive touch opens the live subscription into a
+    local mirror proxy (then/open/close/mode are the reserved handle surface).
+    The never-blind-await lesson is pinned: a ViewProxy is THENABLE, so awaiting
+    a handler result would collapse the live view to one frozen frame — the
+    host probes before awaiting (and an async handler returning a proxy still
+    collapses by promise adoption — return live views from sync handlers).
+  - **flush-on-return is BUILT** (plan §9, not documented-and-deferred): an
+    AsyncLocalStorage collector attributes every write a handler issues (across
+    awaits) to its invocation; the reply awaits them all at 'committed', and
+    `ctx.flush()` is the mid-body barrier — pinned by a Tier-3 test that holds
+    a reply hostage behind a closed write-gate.
+  - **Failover policies close v2's OQ2**: live handles RE-SUBSCRIBE on the new
+    primary (same id — server subs are per-link; the fresh initial snapshot
+    root-replaces the mirror); 'unreachable' (never-shipped ⇒ never-executed)
+    calls re-dispatch safely for everyone; shipped-and-lost calls fail fast
+    unless {retry: true} (re-execution is only safe when declared idempotent —
+    method invocations are NOT cid-deduped; only the writes they issue are).
+  - **The client methods namespace is OPEN** (a spoke cannot know its servers'
+    method names): any name yields a handle; unknown names reject typed from
+    the server. Server-local calls are one-shot invokes (v2's localMethods
+    rule) — live local projections are `data` + operators directly.
+  - Stated limitations: SUBREC bodies ride the control value codec (per-delta
+    clone + value encode — the perf tripwire bounds it); 'move' records
+    (windowed sorts) do not stream — subscribe to the source and sort on the
+    client proxy; async handlers returning proxies collapse to snapshots.
+  - Validation: 201 tests (3 kernel routing pins, 5 Tier-3 method suites incl.
+    flush-hostage and failover re-subscribe), 18 perf gates, epoch-0 sweep
+    byte-identical, 17/17 scenarios zero drift.
 - The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is
   [CHECKPOINT.md](CHECKPOINT.md) — verdict: no overrun, ladder armed but not
   triggered, M4 sliced into five landable increments (M4a streams/watermarks →

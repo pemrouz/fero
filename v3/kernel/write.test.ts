@@ -25,6 +25,9 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     boot: (record) => effects.push(['boot', record]),
     confirm: (id, ok, count) => effects.push(['confirm', id, ok, count]),
     snapshot: (batch, rows) => effects.push(['snapshot', batch, rows]),
+    invoke: (link, id, mode, m, a) => effects.push(['invoke', link, id, mode, m, a]),
+    result: (id, ok, value) => effects.push(['result', id, ok, value]),
+    subRecs: (id, recs) => effects.push(['subRecs', id, recs]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }
   const node = new Node({ uuid, listen: `sim:${uuid}`, heartbeatMs: 50, ...opts }, env)

@@ -101,6 +101,10 @@ export class Sim {
   //! M4c: every confirm probe posted through the executive is tracked to its answer — the
   // no-confirmed-write-lost check (monitors.confirmedIntact) walks the ok-resolved ones at end-of-run
   confirms = new Map<string, { uuid: string; id: number; origin: string; seq: number; level: number; ok?: boolean; count?: number }>()
+  //! M5c rpc recorders (no api host in sim): per-node inboxes the Tier-2 suites assert against.
+  rpcInbox = new Map<string, { link: number; id: number; mode: number; m: string; a: unknown }[]>()
+  rpcResults = new Map<string, { id: number; ok: boolean; value: unknown }[]>()
+  rpcSubRecs = new Map<string, { id: number; recs: unknown[] }[]>()
   seed: number
 
   constructor(seed: number, defaults: Fault = {}) {
@@ -366,6 +370,11 @@ export class Sim {
         const c = sim.confirms.get(me + '|' + id)
         if (c) { c.ok = ok; c.count = count }
       },
+      //! M5c method plane: the sim has no api host — rpc effects record into per-node inboxes so
+      // Tier-2 tests can assert routing; nothing is executed (handlers are impure by definition).
+      invoke(link, id, mode, m, a) { (sim.rpcInbox.get(me) ?? sim.rpcInbox.set(me, []).get(me)!).push({ link, id, mode, m, a }) },
+      result(id, ok, value) { (sim.rpcResults.get(me) ?? sim.rpcResults.set(me, []).get(me)!).push({ id, ok, value }) },
+      subRecs(id, recs) { (sim.rpcSubRecs.get(me) ?? sim.rpcSubRecs.set(me, []).get(me)!).push({ id, recs }) },
     }
   }
 }

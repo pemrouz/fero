@@ -66,15 +66,21 @@ export class Bind {
   #issuing: Set<string> | null = null
   #destroyed = false
 
-  constructor(rt: Runtime, opts: { validate?: (rec: Rec) => true | string } = {}) {
+  constructor(rt: Runtime, opts: { validate?: (rec: Rec) => true | string; tracked?: () => Promise<Coords>[] | undefined } = {}) {
     this.#rt = rt
     this.#validate = opts.validate
+    this.#tracked = opts.tracked
     this.#iss = rt.node.uuid + '~' + rt.node.incarnation
     this.data = proxy({})
     rt.onApply = (a) => { if (!this.#destroyed) this.#onApply(a) }
     this.#cap = capture(this.data, (recs) => this.#captured(recs))
   }
   #validate?: (rec: Rec) => true | string
+  //! tracked — the flush-on-return attribution seam (M5c): when a method handler is executing, the
+  // host exposes its per-invocation collector here (AsyncLocalStorage-backed); every coordinate
+  // promise this ingest mints inside that async context is collected, and the handler's return awaits
+  // them at 'committed' — plan §9's flush-on-return, BUILT.
+  #tracked?: () => Promise<Coords>[] | undefined
 
   //! issue — THE one local ingest (assignment sugar and methods.* both land here; the seams.validation
   // hook therefore covers both by construction — v2's OQ6). `fromCapture` says the proxy already holds
@@ -134,6 +140,8 @@ export class Bind {
     }
     let vi = 0
     for (let i = 0; i < recs.length; i++) if (out[i] === undefined) out[i] = promises.get(valid[vi++])!
+    const t = this.#tracked?.()
+    if (t) for (const pr of promises.values()) t.push(pr)
     return out
   }
   #fastApplied: Applied[] | null = null
