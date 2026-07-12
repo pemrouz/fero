@@ -83,8 +83,13 @@ export interface Capture { detach(): void }
 // Root replaces (XU0/XR0) are REJECTED loudly: a whole-resource overwrite has no honest per-partition
 // wire meaning — replace keys, not the root. The throw surfaces at the user's assignment site
 // (substrate contract: sink exceptions rethrow to the mutator after the cascade).
-export const capture = (p: any, onRecs: (recs: Rec[]) => void): Capture => {
+export const capture = (p: any, onRecs: (recs: Rec[]) => void, onRootReplace?: () => void): Capture => {
   const rootReplace = () => {
+    //! data sets the internal root value BEFORE fanning to sinks (core.ts Value.XU0) and transact
+    // stashes a sink throw until AFTER the cascade — so by the time this throw surfaces the proxy
+    // already holds the illegal whole-root value. onRootReplace lets the binding HEAL it back to the
+    // confirmed fold (M5-review #12); we still throw so the rejection is loud.
+    onRootReplace?.()
     throw new Error('fero: replace keys (data.k = v), not the resource root — a whole-root overwrite does not replicate')
   }
   const sink = {

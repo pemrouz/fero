@@ -128,3 +128,67 @@ test('failover re-subscribe (OQ2): a live handle survives its serving primary dy
     await c.destroy(); await b.destroy(); await a.destroy().catch(() => {})
   }
 })
+
+test("M5-REVIEW #7 — a handler that throws the exact text 'unreachable' rejects typed at the client, never held/hung/re-run", async () => {
+  const { a, b, addrs } = await pair({ check: () => { throw new Error('unreachable') } })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  try {
+    //! the handler's 'unreachable' arrives as a wire RESULT (local=false) → ordinary rejection, fast,
+    // NOT mistaken for the kernel's no-primary pre-dispatch failure (which would hang then re-execute)
+    await assert.rejects(async () => { await c.methods.check() }, /methods\.check: unreachable/)
+  } finally {
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+})
+
+test('M5-REVIEW #8 — introspecting a one-shot handle (String/JSON/`in`/symbols) never opens a leaked subscription', async () => {
+  const { a, b, addrs } = await pair({ total: (n: number) => n * 2 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  try {
+    const h = c.methods.total(21)
+    //! every coercion/introspection path must be passive — no SUB frame, no subscription
+    void `${h}`; void String(h); void JSON.stringify({ h }); void ('items' in h); void (h as any)[Symbol.iterator]
+    assert.equal(h.mode, 'oneshot', 'still a one-shot handle — nothing opened it')
+    //! the await path still works after all that introspection
+    assert.equal(await h, 42)
+  } finally {
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+})
+
+test('M5-REVIEW #11 — a live subscription over a DERIVED (operator) proxy keeps streaming across GC', async () => {
+  const { a, b, addrs } = await pair({ actives: (_: unknown, ctx: { data: any }) => ctx.data.filter('active', true) })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  try {
+    a.data.u1 = { active: true, n: 1 }
+    a.data.u2 = { active: false, n: 2 }
+    const live = c.methods.actives()
+    const p = live.open()
+    assert.ok(await until(() => Object.keys(snapshot(p) as object).length === 1, 8000), 'initial filtered snapshot (only u1)')
+    //! force GC if exposed, then write more — the derived chain must still feed the stream
+    if (typeof (globalThis as { gc?: () => void }).gc === 'function') { (globalThis as { gc?: () => void }).gc!(); (globalThis as { gc?: () => void }).gc!() }
+    a.data.u3 = { active: true, n: 3 }
+    assert.ok(await until(() => Object.keys(snapshot(p) as object).length === 2, 8000), 'the derived stream survived GC and delivered u3')
+  } finally {
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+})
+
+test('M5-REVIEW #5/#10 — a SERVER-local method flushes before returning AND returns a fresh copy (no live alias to kernel state)', async () => {
+  const s = await fero('r', { uuid: 'aa' })
+  try {
+    //! #5: a handler that writes must have its write committed before the local call returns
+    const setK = await fero('r', { uuid: 'bb', setK: (v: unknown, ctx: { data: any }) => { ctx.data.K = v; return 'done' } })
+    const r = await setK.methods.setK(42)
+    assert.equal(r, 'done')
+    assert.equal((snapshot(setK.data) as Record<string, unknown>).K, 42, 'flush-on-return: the write committed before the reply')
+    //! #10: read() returns a fresh COPY — mutating it must not corrupt committed kernel state
+    await s.methods.update({ key: 'u', value: { n: 1 } })
+    const got = await s.methods.read() as Record<string, { n: number }>
+    got.u.n = 999
+    assert.equal((snapshot(s.data) as Record<string, { n: number }>).u.n, 1, 'the read result was a copy — kernel state intact')
+    await setK.destroy()
+  } finally {
+    await s.destroy()
+  }
+})

@@ -19,7 +19,7 @@ import { REC, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
-import { proxy, snapshot as snap, isProxy } from './substrate.ts'
+import { proxy } from './substrate.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
@@ -117,10 +117,17 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     const ms = o.timeout ?? 10_000
     const r = bind.issue([rec], false)[0]
     if (typeof r === 'string') throw { guarantee: want, reached: 'issued', reason: r } satisfies WriteReject
-    const coords = await Promise.race([
-      r,
-      new Promise<never>((_, rej) => setTimeout(() => rej({ guarantee: want, reached: 'issued', reason: 'timeout' } satisfies WriteReject), ms).unref?.()),
-    ])
+    //! the timeout timer is CAPTURED and CLEARED on settle (M5-review #3: the bare setTimeout leaked one
+    // live timer + reject closure per write for the full `ms` on the hot path). And a POST-ISSUE kernel
+    // reject ('superseded'/'dropped'/'destroyed') is normalized to a typed WriteReject (M5-review #9:
+    // the bare string escaped the WriteReject contract). Only the coordinate resolution races the timer.
+    let timer: ReturnType<typeof setTimeout>
+    const coords = await new Promise<Coords>((resolve, reject) => {
+      timer = setTimeout(() => reject({ guarantee: want, reached: 'issued', reason: 'timeout' } satisfies WriteReject), ms)
+      timer.unref?.()
+      ;(r as Promise<Coords>).then(resolve, (e) =>
+        reject(typeof e === 'string' ? ({ guarantee: want, reached: 'issued', reason: e } satisfies WriteReject) : e))
+    }).finally(() => clearTimeout(timer))
     const resolved: WriteResolve = { guarantee: 'committed', key: rec.key.length ? rec.key : [String(rec.at ?? '')], origin: coords.origin, seq: coords.seq, epoch: coords.epoch, cid: coords.cid }
     if (want === 'committed') return resolved
     const level = want === 'persisted' ? CONFIRM.persisted : CONFIRM.replicated
@@ -139,19 +146,14 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     insert: (c: Change, o?: WriteOpts) => write({ type: REC.insert, key: keyPath(c.key), value: c.value, at: String(c.at ?? randomUUID()) }, o),
     remove: (c: Change, o?: WriteOpts) => write({ type: REC.remove, key: keyPath(c.key) }, o),
   } as Methods
-  //! user methods + the built-in read. On a SERVER a call is a local one-shot invoke (value, or
-  // SNAPSHOT of a returned proxy) — live local projections are `data` + operators directly, no wire
-  // needed (v2's localMethods rule, kept). On a CLIENT the namespace is OPEN (a spoke cannot know the
-  // servers' method names): ANY name yields the dual-mode Handle maker (await = one-shot CALL,
-  // reactive touch = live subscription — api/methods.ts); unknown names reject typed FROM the server.
+  //! user methods + the built-in read. On a SERVER a call routes through host.invokeLocal — the SAME
+  // flush-on-return + non-blind-await + proxy-collapse (with a CLONE) as a wire CALL, so local and
+  // remote invocation of the same handler are indistinguishable (M5-review #5/#10). Live local
+  // projections are `data` + operators directly, no method needed. On a CLIENT the namespace is OPEN
+  // (a spoke cannot know the servers' method names): ANY name yields the dual-mode Handle maker
+  // (await = one-shot CALL, reactive touch = live subscription); unknown names reject typed FROM the server.
   if (!caller) {
-    for (const m of Object.keys(table)) {
-      methods[m] = async (a?: unknown) => {
-        const ctx: Context = { data: bind.data, flush: async () => {} }
-        const result = await table[m](a, ctx)
-        return isProxy(result) ? snap(result) : result
-      }
-    }
+    for (const m of Object.keys(table)) methods[m] = (a?: unknown) => host!.invokeLocal(m, a)
   }
   const methodSurface = caller
     ? new Proxy(methods, {

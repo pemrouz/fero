@@ -1,4 +1,4 @@
-# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5: composer, cid-overlay, clients, methods, cluster) + the debug tool
+# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5, adversarially reviewed) + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -18,7 +18,7 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 205 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm test                       # 215 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
 npm run perf                   # 18 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
@@ -208,6 +208,51 @@ triaged inline, 13 confirmed and fixed, every fix pinned (158 → 166 tests):
   closes it); dead provenance lanes are immortal in streams/digests (bounded by
   restart count — M6 digest work); durable mode without heartbeats has no
   compaction clock, so log AND WAL bounds require membership.
+
+**M5:** a 6-lens review over the whole `api/` layer returned 14 findings; the
+verify pass (two adversarial skeptics per finding) confirmed 13, all fixed and
+pinned (205 → 215 tests). The headline was a genuine **critical the panel split
+on** — resolved by an empirical repro, not a vote:
+- **Re-entrant fast-path write orphans the outer write (critical).** At epoch 0
+  (the solo/forming-server operating mode), a local write mints no kernel cid, so
+  the binding PREDICTS cids and settles positionally. A user tap that writes from
+  inside the apply drains a re-entrant `issue()` INSIDE the outer one (the
+  substrate contract); it re-sampled the SAME predicted cid and clobbered the
+  outer's single-slot collector + `#pending` key, so the outer write's promise
+  never resolved — flush-on-return HUNG and `cluster.writes` stuck 'pending'
+  (and a sibling case mis-rejected the trailing records 'superseded'). One refuter
+  argued `data`'s `transact` serializes the writes; a 3-line repro showed the
+  `_pending` drain runs INSIDE the outer apply, before the outer settle — the bug
+  is real. Fixed with a STACK of per-call collectors + settling OWN promise refs
+  (not colliding map keys).
+- **Server-local methods skipped flush-on-return and returned a live alias
+  (major, two findings).** The server-local dispatch used a no-op flush and blind-
+  awaited the handler (collapsing thenable proxies), so local and wire invocation
+  of one handler gave opposite durability, and `read()` handed back a mutable
+  alias of committed kernel state. Both now route through `host.invokeLocal` — the
+  same ALS flush + non-blind-await + clone-on-proxy-return as a wire CALL.
+- **`'unreachable'` sentinel collision (major).** A handler throwing the exact
+  string was misread as the kernel's no-primary failure — the call hung to timeout
+  then re-executed on failover. The result effect now carries an unforgeable
+  `local` channel bit; a wire reply is never mistaken for a pre-dispatch failure.
+- **The dual-mode handle opened a subscription on introspection (major).**
+  `String(h)`, `JSON.stringify`, an `in`-check, a symbol access all hit the get
+  trap and leaked a client+server subscription. Coercion hooks and symbols are now
+  passive (a marker, never a SUB); only a genuine reactive read opens the stream.
+- **Subscription lifecycle races (major, two findings).** A SUB's `#subs` entry
+  was registered AFTER the flush-on-return await, so an UNSUB or a link death
+  during that window was lost, leaking a live server stream. The entry now
+  registers up front with a cancelled flag the deferred open checks. And a live
+  sub over a DERIVED (operator) proxy died after GC — the stream pinned only the
+  leaf sink, not the operator chain; the entry now retains the live proxy.
+- Plus: `write()` captured + cleared its timeout timer (a bare `setTimeout` leaked
+  one timer + reject closure per write on the hot path) and normalizes async kernel
+  rejections ('superseded'/'dropped'/'destroyed') into typed `WriteReject`s; the
+  illegal `data[value] = x` root hatch now throws loudly AND heals the proxy back
+  to the confirmed fold on a microtask (data sets the root before the sink can
+  refuse it). Every fix has a mutation-killer pin; one finding was refuted (the
+  clone-free read alias is `data`'s inherent shared-mutable model, reachable via
+  the primary `data.k` read path too — not specific to the method surface).
 
 ## Layout
 

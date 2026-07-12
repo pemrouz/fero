@@ -62,7 +62,7 @@ export class Host {
   #als = new AsyncLocalStorage<Promise<Coords>[]>()
   //! live subscriptions by `link|id` — reaped on UNSUB and on link death (the composer's fold calls
   // reapLink off JK.linkDown; v2's serve-side leak guard, kept)
-  #subs = new Map<string, { stop(): void }>()
+  #subs = new Map<string, { stop(): void; cancelled: boolean; live: unknown }>()
 
   constructor(rt: Runtime, data: any, methods: Record<string, Handler>, system: Record<string, Handler>) {
     this.#rt = rt
@@ -77,13 +77,23 @@ export class Host {
   tracked = (): Promise<Coords>[] | undefined => this.#als.getStore()
 
   #invoke(link: number, id: number, mode: number, m: string, a: unknown) {
+    const skey = link + '|' + id
     if (mode === VERB.UNSUB) {
-      const sub = this.#subs.get(link + '|' + id)
-      if (sub) { sub.stop(); this.#subs.delete(link + '|' + id) }
+      //! UNSUB may arrive DURING the handler/flush, before the stream opens (M5-review #6): the entry
+      // already exists (registered up front below), so mark it cancelled + stop whatever it holds. Once
+      // cancelled, the deferred open below sees it and never streams.
+      const sub = this.#subs.get(skey)
+      if (sub) { sub.cancelled = true; sub.stop(); this.#subs.delete(skey) }
       return
     }
     const fn = m.startsWith(SYSTEM) ? this.#system[m.slice(1)] : this.#methods[m]
     if (!fn) return this.#reply(link, id, false, `unknown method '${m.startsWith(SYSTEM) ? m.slice(1) : m}'`)
+    //! a SUB registers its entry BEFORE running the handler (M5-review #2/#6): reapLink (link death) and
+    // UNSUB run synchronously off kernel steps and would otherwise miss a sub whose #subs.set sits after
+    // the flush-on-return await, permanently leaking the stream. The placeholder holds a no-op stop and
+    // a cancelled flag; the deferred open replaces stop and checks cancelled.
+    const entry = mode === VERB.SUB ? { stop: () => {}, cancelled: false, live: undefined as unknown } : null
+    if (entry) this.#subs.set(skey, entry)
     //! each invocation gets its own write collector; the handler runs OUTSIDE the kernel step (async),
     // and its return implicitly flushes — the reply provably follows its own commits
     const tracked: Promise<Coords>[] = []
@@ -105,6 +115,7 @@ export class Host {
           result = await result
         await Promise.all(tracked.map((p) => p.catch(() => {}))) // flush-on-return
       } catch (err) {
+        if (entry && this.#subs.get(skey) === entry) this.#subs.delete(skey)
         return this.#reply(link, id, false, err instanceof Error ? err.message : String(err))
       }
       if (mode === VERB.CALL) {
@@ -112,19 +123,25 @@ export class Host {
         // no clone — the reply's codec copies the value into frame bytes synchronously inside step)
         return this.#reply(link, id, true, isProxy(result) ? snapshot(result) : result)
       }
+      //! the sub may have been UNSUBbed or its link reaped during the handler/flush — the entry is gone
+      // or cancelled; do not open a stream nobody is listening to (M5-review #2/#6)
+      if (!entry || entry.cancelled || this.#subs.get(skey) !== entry) return
       //! SUB: a proxy streams (initial snapshot rides the record interface's attach emit); a plain
       // value degrades to a single-shot stream (one root update) — same consumption shape either way
       if (!isProxy(result)) {
         this.#rt.node.step({ kind: 'subOut', link, id, recs: [{ type: 'update', key: [], value: result } as unknown as Rec] })
+        this.#subs.delete(skey) // a value SUB has no live stream to hold; drop the placeholder
         return
       }
-      const live = result
-      const stream = records(live, (rec) => {
+      //! retain the LIVE proxy on the entry (M5-review #11): records() pins only the leaf FunctionSink
+      // via its anchor, NOT the operator chain feeding it — a derived return (ctx.data.filter(...)) is
+      // held only by `result`, so without this strong ref the chain is GC'd and the stream goes silent.
+      entry.live = result
+      const stream = records(result, (rec) => {
         if (rec.type === 'move') return // documented M5c limitation (banner): sort client-side instead
         this.#rt.node.step({ kind: 'subOut', link, id, recs: [rec as unknown as Rec] })
       })
-      //! the anchor for the stream is the sub entry itself — strongly held until UNSUB/reap
-      this.#subs.set(link + '|' + id, { stop: () => stream.stop() })
+      entry.stop = () => stream.stop()
     })()
   }
 
@@ -132,10 +149,29 @@ export class Host {
     this.#rt.node.step({ kind: 'reply', link, id, ok, value })
   }
 
-  //! reapLink — the caller's link died: stop its streams (the composer folds JK.linkDown into this).
+  //! invokeLocal — a SERVER-side one-shot call (no wire): the SAME flush-on-return + non-blind-await +
+  // proxy-collapse discipline as a remote CALL (M5-review #5: the old server-local path used a no-op
+  // flush and no ALS, so a handler's writes were NOT awaited before the value returned — local and wire
+  // invocation of the same handler gave opposite durability). A returned ViewProxy is CLONED to its
+  // snapshot (M5-review #10: returning the live proxy value handed the caller a mutable alias of
+  // committed kernel state; the wire path serializes to a fresh copy, so local must clone to match).
+  async invokeLocal(m: string, a: unknown): Promise<unknown> {
+    const fn = this.#methods[m]
+    if (!fn) throw new Error(`unknown method '${m}'`)
+    const tracked: Promise<Coords>[] = []
+    const ctx: Context = { data: this.#data, flush: async () => { await Promise.all(tracked.splice(0).map((p) => p.catch(() => {}))) } }
+    let result: unknown = this.#als.run(tracked, () => fn(a, ctx))
+    if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
+      result = await result
+    await Promise.all(tracked.map((p) => p.catch(() => {}))) // flush-on-return
+    return isProxy(result) ? structuredClone(snapshot(result)) : result
+  }
+
+  //! reapLink — the caller's link died: stop its streams AND cancel any still opening in a flush window
+  // (the composer folds JK.linkDown into this; the cancelled flag makes the deferred open a no-op).
   reapLink(link: number) {
     for (const [key, sub] of this.#subs)
-      if (key.startsWith(link + '|')) { sub.stop(); this.#subs.delete(key) }
+      if (key.startsWith(link + '|')) { sub.cancelled = true; sub.stop(); this.#subs.delete(key) }
   }
 
   destroy() {
@@ -161,7 +197,7 @@ export class Caller {
 
   constructor(rt: Runtime) {
     this.#rt = rt
-    rt.onResult = (id, ok, value) => this.#onResult(id, ok, value)
+    rt.onResult = (id, ok, value, local) => this.#onResult(id, ok, value, local)
     rt.onSubRecs = (id, recs) => this.#onSubRecs(id, recs)
   }
 
@@ -200,13 +236,14 @@ export class Caller {
     this.#rt.node.step({ kind: 'rpc', id, mode: VERB.UNSUB })
   }
 
-  #onResult(id: number, ok: boolean, value: unknown) {
+  #onResult(id: number, ok: boolean, value: unknown, local: boolean) {
     const c = this.#calls.get(id)
     if (!c) return
-    //! 'unreachable' is a PRE-DISPATCH failure (the kernel never shipped the frame ⇒ the handler never
-    // ran) — holding it for the next primary is safe for EVERY call, retry-tagged or not; the call's
-    // own timeout still bounds the wait. Post-dispatch failures settle by policy (see onPrimaryChange).
-    if (!ok && value === 'unreachable') { c.held = true; return }
+    //! a LOCAL failure is pre-dispatch (the kernel never shipped the frame ⇒ the handler never ran) —
+    // hold it for the next primary (safe for EVERY call — the handler didn't run; the timeout bounds
+    // the wait). `local` is the channel bit (M5-review #7): a wire RESULT whose value happens to equal
+    // 'unreachable' arrives with local=false and settles as an ordinary handler rejection, never held.
+    if (!ok && local) { c.held = true; return }
     this.#calls.delete(id)
     if (ok) c.resolve(value)
     else c.reject(new Error(`methods.${c.m}: ${String(value)}`))
@@ -242,6 +279,13 @@ export class Caller {
   }
 }
 
+//! COERCION — property names that are introspection/coercion hooks, NOT reactive reads: touching them
+// must never open a subscription (M5-review #8: `String(h)`, template literals, JSON.stringify/toJSON,
+// util.inspect, duck-typing all hit the get trap; opening a live sub on any of them leaks a client+
+// server subscription with no lifecycle owner). Symbols (Symbol.toPrimitive/toStringTag/iterator, the
+// nodejs inspect symbol, etc.) are covered separately by the typeof check.
+const COERCION = new Set(['toJSON', 'toString', 'valueOf', 'constructor', 'nodeType', 'length', 'name', 'prototype'])
+
 //! handle — the tagged dual-mode Handle (plan §9): `await` (then) is a one-shot CALL; any reactive
 // touch opens the live subscription ONCE and delegates every subsequent trap to the local mirror
 // proxy. Reserved surface on a handle: then / open / close / mode — everything else is the live view.
@@ -249,15 +293,32 @@ export class Caller {
 export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: number; retry?: boolean } = {}): any => {
   let live: { id: number; proxy: any } | null = null
   const open = () => (live ??= caller.subscribe(m, a))
+  const reserved = (prop: string | symbol) => prop === 'then' || prop === 'open' || prop === 'close' || prop === 'mode'
+  //! a bare touch that is NOT a reactive read (a symbol, a coercion hook) must NOT open the sub. Coercion
+  // hooks return a MARKER (so `String(h)`/templates yield '[fero handle]' rather than throwing 'cannot
+  // convert to primitive'); toJSON returns undefined (serializes to nothing); every other symbol/passive
+  // prop is undefined. If the sub is already live, delegate to the mirror proxy.
+  const marker = () => '[fero handle]'
+  const passive = (prop: string | symbol): unknown => {
+    if (live) return (live.proxy as Record<string | symbol, unknown>)[prop]
+    if (prop === Symbol.toPrimitive || prop === 'toString' || prop === 'valueOf') return marker
+    if (prop === Symbol.toStringTag) return 'FeroHandle'
+    if (prop === 'toJSON') return () => undefined
+    return undefined
+  }
+  const isPassive = (prop: string | symbol) => typeof prop === 'symbol' || (typeof prop === 'string' && COERCION.has(prop))
   return new Proxy(function () {}, {
     get(_t, prop) {
       if (prop === 'then') return (onF?: (v: unknown) => unknown, onR?: (e: unknown) => unknown) => caller.call(m, a, opts).then(onF, onR)
       if (prop === 'open') return () => open().proxy
       if (prop === 'close') return () => { if (live) { caller.unsubscribe(live.id); live = null } }
       if (prop === 'mode') return live ? 'live' : 'oneshot'
+      if (isPassive(prop)) return passive(prop)
       return open().proxy[prop]
     },
     set() { throw new Error(`methods.${m}: subscription handles are read-only — write via data or methods.update`) },
-    has(_t, prop) { return prop === 'then' || prop === 'open' || prop === 'close' || prop === 'mode' || (prop in open().proxy) },
+    //! `has` (the `in` operator, duck-typing) must NEVER open a sub either — report only the reserved
+    // surface plus, if already live, the live proxy's keys
+    has(_t, prop) { return reserved(prop) || (live ? prop in live.proxy : false) },
   })
 }
