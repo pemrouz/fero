@@ -271,6 +271,15 @@ export class Runtime {
   //! write — the embedder's write ingress (the api layer binds $() assignment to this at M5).
   write(recs: Rec[]) { this.node.step({ kind: 'write', recs }) }
 
+  //! hook — a post-step tap (M5a): fn runs after EVERY node.step, on whatever event path (socket,
+  // timer, write, replay). The api's cluster fold rides this — one integer compare per event when
+  // nothing changed (it checks journal.n), so the hot path pays an indirection and nothing else.
+  // Interim seam: whether membership changes become first-class sink effects is an M5d decision.
+  hook(fn: () => void) {
+    const step = this.node.step.bind(this.node)
+    this.node.step = (e) => { step(e); fn() }
+  }
+
   #wire(sock: net.Socket, link: number) {
     this.#sockets.set(link, sock)
     sock.on('data', (chunk: Buffer) => {

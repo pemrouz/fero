@@ -138,6 +138,11 @@ test('replay IS the ingest path: state, logs, the full ladder, the clock, and th
   assert.equal(b.node.logs.get('aa')!.length, 1)
   assert.equal(b.node.logs.get('bb')!.length, 1)
   assert.equal(b.node.logs.get('bb')![0].iss, 'cli~1', 'attempt identity survives the WAL round-trip')
+  //! M5a: the replayed apply EFFECT carries it too — a restored embedder's proxy refills from replay
+  // through the same (iss, cid)-bearing join as live ingest (env.ts Applied)
+  const rb = b.of('apply').map((e) => e[1] as { iss?: string; cid?: number; origin: string }).find((r) => r.origin === 'bb')!
+  assert.equal(rb.iss, 'cli~1')
+  assert.equal(rb.cid, 9)
   for (const origin of ['aa', 'bb']) {
     const d = b.node.streams.get(origin)!
     assert.ok(d.applied === d.shippable && d.shippable === d.durable, `${origin}: replayed rows are durable by definition`)

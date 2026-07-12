@@ -1,0 +1,111 @@
+//! ── api/types — the exported public type vocabulary (plan §9: typed end-to-end) ──
+// Everything a consumer can name lives here: the guarantee ladder, the write
+// outcome unions, the config schema, and the composed instance shape. Substrate
+// `any` is wrapped at api/substrate.ts and never propagates past this surface.
+
+import type { Rec } from '../kernel/env.ts'
+
+//! Guarantee — the confirm ladder a write can be awaited at. 'committed' = stamped + applied at the
+// owner (coordinates known); 'replicated' = a majority of the committed view holds it in-log
+// (shippable evidence, M4c); 'persisted' = a majority has fsync-RESOLVED it (durable evidence).
+export type Guarantee = 'committed' | 'replicated' | 'persisted'
+
+//! WriteResolve — a write that reached its asked guarantee: the commit coordinates, plus the attempt
+// cid when the write took the attempt path (absent on epoch-0 fast-path commits).
+export interface WriteResolve {
+  guarantee: Guarantee
+  key: string[]
+  origin: string
+  seq: number
+  epoch: number
+  cid?: number
+}
+
+//! WriteReject — a write that did NOT reach its asked guarantee inside its deadline. `reached` is the
+// rung it provably got to ('issued' = accepted into the pipeline, coordinates unknown; 'committed' =
+// coordinates known via localCommit). A reject is NOT a rollback claim: the kernel keeps retrying an
+// issued attempt, and a committed write stays committed — the reject reports what could be PROVEN in
+// time, mirroring M4c's honest-probe semantics.
+export interface WriteReject {
+  guarantee: Guarantee
+  reached: 'issued' | 'committed'
+  reason: string
+  localCommit?: { origin: string; seq: number; epoch: number }
+}
+
+//! Change — the argument shape of the default write methods: key as name or path; value; `at` for
+// ordered inserts. (`methods.update({key:'user42', value:{…}})` ≡ `data.user42 = {…}` — one ingest.)
+export interface Change {
+  key?: string | string[]
+  value?: unknown
+  at?: string
+}
+
+//! WriteOpts — the options argument (always separate from the payload, never in-band keys).
+export interface WriteOpts {
+  confirm?: Guarantee
+  timeout?: number
+}
+
+//! Seams — the ONE reserved nested config key for function-valued config (plan §9), so the
+// "functions are methods" recognition rule survives. M5a ships `validation` (the user-overridable
+// hook BOTH assignment and methods.update pass through — v2's OQ6 closed by construction);
+// hash/codec/storage land with their milestones.
+export interface Seams {
+  //! validation — return true to admit, or a reason string to reject (assignment bounces + reverts;
+  // methods.* rejects with the reason). Runs at the ONE local ingest, before anything is issued.
+  validation?: (rec: Rec) => true | string
+}
+
+//! FeroConfig — the declared, picked config schema. Unknown non-function keys throw at fero() time.
+export interface FeroConfig {
+  uuid?: string
+  listen?: string
+  hosts?: string[]
+  dir?: string
+  heartbeatMs?: number
+  redialMs?: number
+  journalCap?: number
+  seams?: Seams
+}
+
+//! FeroOpts — config + methods in one bag, recognized by VALUE TYPE: function values are methods,
+// everything else must be a declared config key. (No `methods:` wrapper key — plan §9 verbatim.)
+export type FeroOpts = FeroConfig & { [method: string]: unknown }
+
+//! Methods — the one RPC/write namespace. M5a ships the default writers; user methods + remote
+// dispatch (return-type consumption, subscriptions) land at M5c.
+export interface Methods {
+  update(change: Change, opts?: WriteOpts): Promise<WriteResolve>
+  insert(change: Change, opts?: WriteOpts): Promise<WriteResolve>
+  remove(change: Change, opts?: WriteOpts): Promise<WriteResolve>
+  [method: string]: (...args: unknown[]) => unknown
+}
+
+//! Peer — one row of cluster.peers.
+export interface Peer {
+  uuid: string
+  incarnation: number
+  up: boolean
+}
+
+//! ClusterShape — the value under the `cluster` ViewProxy: the committed view {epoch, members,
+// writable} reactive, peers as rows, `me` a derived row (v2 OQ5 closed). It IS a data proxy —
+// query and connect it like any resource.
+export interface ClusterShape {
+  epoch: number
+  writable: boolean
+  members: Record<string, string>
+  peers: Record<string, Peer>
+  me: { uuid: string; origin: string; listen: string }
+}
+
+//! Fero — the composed instance. `data` and `cluster` are ViewProxies (dynamic by nature — reads
+// mint child views); they are typed open here and by their value shapes above.
+export interface Fero {
+  name: string
+  data: any
+  methods: Methods
+  cluster: any
+  destroy(): Promise<void>
+}

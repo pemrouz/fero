@@ -131,10 +131,17 @@ export interface Rec {
 }
 
 //! Applied: a record + the provenance it committed under — what sink.apply() delivers downstream and what monitors/replay hash.
+// `iss`/`cid` (M5a) are the ATTEMPT IDENTITY when the committed record carried one (forwarded/relayed
+// runs always do; FLAG_ATTEMPT rides replication and the WAL, so inbound and replay applies carry it
+// too) — the api layer joins its own issued cids against the apply stream to resolve write promises
+// and drop cid-overlay entries. Absent on fast-path local commits (epoch-0 genesis writes), which the
+// embedder observes synchronously inside its own write() call instead.
 export interface Applied extends Rec {
   origin: string
   seq: number
   epoch: number
+  iss?: string
+  cid?: number
 }
 
 //! partitionOf: the routing/segmentation unit — key[0], or `at` for a root insert (v2's BI0 case, kept).

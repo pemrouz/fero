@@ -373,3 +373,42 @@ test('mixed-outcome runs split correctly: dups re-ACK, valid records commit, rej
   assert.equal(h.node.logs.get('aa')!.length, 2, 'cid 1 once, cid 3 once')
   assert.equal(h.sentOn(1, VERB.WACK).length, 3, 'original ACK + dup re-ACK + fresh ACK')
 })
+
+test('M5a PIN — attempt identity rides the Applied effect: owner commits and inbound replication carry (iss, cid); the epoch-0 fast path carries none', () => {
+  //! the embedder-facing join (env.ts Applied): the api layer resolves ITS OWN writes by matching
+  // iss/cid on apply effects — so every path that knows an attempt identity must deliver it
+  const h = formedView1()
+  h.node.writes.ring.place('mine', 'aa')
+  //! path 1: a forwarded attempt committed at this owner — apply carries the FORWARDER's identity
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('bb~1', 5, 1, [{ type: REC.update, key: ['mine'], value: 'x' }]) })
+  const applies = h.of('apply').map((e) => e[1] as { iss?: string; cid?: number; origin: string; seq: number })
+  assert.equal(applies.length, 1)
+  assert.equal(applies[0].iss, 'bb~1')
+  assert.equal(applies[0].cid, 5)
+  assert.equal(applies[0].origin, 'aa', 'stamped under the owner — identity is the ATTEMPT, provenance is the commit')
+  //! path 2: an inbound committed record carrying FLAG_ATTEMPT (replication feeds every embedder's join)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: recordFrame('bb', 1, 1, 'cc~1', 9, [{ type: REC.update, key: ['theirs'], value: 'y' }]) })
+  const inb = h.of('apply').map((e) => e[1] as { iss?: string; cid?: number }).pop()!
+  assert.equal(inb.iss, 'cc~1')
+  assert.equal(inb.cid, 9)
+  //! path 3: the epoch-0 fast path mints no attempt — identity is absent, and the embedder instead
+  // observes the apply synchronously inside its own write() call
+  const h0 = harness('zz')
+  h0.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['k'], value: 1 }] })
+  const fast = h0.of('apply').map((e) => e[1] as { iss?: string; cid?: number }).pop()!
+  assert.equal(fast.iss, undefined)
+  assert.equal(fast.cid, undefined)
+  //! and the cid counter is embedder-readable: the attempt path minted nothing here either
+  assert.equal(h0.node.writes.cid, 0)
+})
+
+test('M5a PIN — a locally ISSUED attempt (epoch ≥ 1, self-owned) applies with our own issuer + the minted cid, and writes.cid samples the mint', () => {
+  const h = formedView1()
+  h.node.writes.ring.place('mine', 'aa')
+  const before = h.node.writes.cid
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['mine'], value: 42 }] })
+  assert.equal(h.node.writes.cid, before + 1, 'one cid per record, contiguous — the embedder brackets write() to learn them')
+  const a = h.of('apply').map((e) => e[1] as { iss?: string; cid?: number }).pop()!
+  assert.equal(a.iss, 'aa~1')
+  assert.equal(a.cid, before + 1)
+})
