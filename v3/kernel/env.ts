@@ -80,6 +80,13 @@ export interface EffectSink {
   //! confirm(id, ok, count) (M4c): a guarantee-ladder probe's answer — ok with the member count whose
   // ladder covered it, or false (cancel/overflow) with the count reached. Downstream delivery, like apply.
   confirm(id: number, ok: boolean, count: number): void
+  //! snapshot(batch, rows) (M4e): ATOMICALLY REPLACE the whole WAL with `rows` — the disk counterpart
+  // of compaction (a swap is not an append; it gets its own verb). Rows are [frame + fresh chain link]
+  // in replay order; the store must make the swap all-or-nothing (write-tmp + fsync + rename in the
+  // shell) BEFORE this call returns — the old file survives any crash mid-swap. The env echoes
+  // persisted/persistFail with `batch` like any other batch; on the echo the durable watermarks advance
+  // to the snapshot tails. Cold path — per SNAPSHOT_AT appended rows, never per write.
+  snapshot(batch: number, rows: { bytes: Uint8Array; prev: number }[]): void
 }
 
 //! BootRecord: the durable facts a restart derives its boot mode from (plan §5 membership, verbatim).

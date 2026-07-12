@@ -53,9 +53,12 @@ export interface StoreFault { delay?: [number, number]; lieP?: number; failP?: n
 //! SimStore: one node's disk — the boot record + the WAL rows exactly as persisted (bytes + the
 // per-origin chain link). Survives restart() (it IS the disk); rows lost to torn tails / fsync lies
 // are dropped at harvest, like a real recovery — the chain links are how replay notices the holes.
+// swapLied models a snapshot swap whose RENAME evaporates at crash: every append after it lands in
+// the phantom new file (doomed with it), while the old rows quietly return at harvest.
 export interface SimStore {
   boot: BootRecord | null
   wal: { batch: number; bytes: Uint8Array; prev: number; resolved: boolean; lied: boolean }[]
+  swapLied?: boolean
 }
 
 //! Violation: what a monitor returns to fail a trajectory — event-indexed so the shrink/debug loop starts AT the violation.
@@ -90,6 +93,11 @@ export class Sim {
   stores = new Map<string, SimStore>()
   #storeFaults = new Map<string, StoreFault>()
   #nodeOpts = new Map<string, NodeOpts>()
+  //! per-store FIFO fsync clock (the disk twin of #lastAt): a real WAL resolves batches IN APPEND ORDER
+  // (the shell's io-queue serializes write+fsync per row), so resolution times are clamped monotone per
+  // store — without this the sim manufactures resolved-rows-past-an-unresolved-row, an "interior hole"
+  // no honest disk can produce, and the kernel's hole-means-lie verdict would condemn honest restores.
+  #storeAt = new Map<string, number>()
   //! M4c: every confirm probe posted through the executive is tracked to its answer — the
   // no-confirmed-write-lost check (monitors.confirmedIntact) walks the ok-resolved ones at end-of-run
   confirms = new Map<string, { uuid: string; id: number; origin: string; seq: number; level: number; ok?: boolean; count?: number }>()
@@ -125,6 +133,7 @@ export class Sim {
     old.destroy()
     const store = this.stores.get(uuid)!
     store.wal = store.wal.filter((r) => r.resolved && !r.lied)
+    store.swapLied = false // the new life reopens the REAL file; the phantom died with the crash
     const b = store.boot
     const reborn = this.add({
       ...opts,
@@ -309,20 +318,48 @@ export class Sim {
       persist(batch: number, bytes: Uint8Array, prev: number) {
         const store = sim.stores.get(me)!
         const f = sim.#storeFaults.get(me) ?? {}
-        const row = { batch, bytes, prev, resolved: false, lied: false }
+        //! rows appended after a LIED swap live in the phantom new file — doomed with it at crash
+        const row = { batch, bytes, prev, resolved: false, lied: store.swapLied === true }
         store.wal.push(row)
+        //! FIFO fsync clock (see #storeAt): every echo — resolve OR fail — lands in append order
+        const [dMin, dMax] = f.delay ?? [1, 3]
+        const at = Math.max(sim.now + dMin + sim.rng() * (dMax - dMin), sim.#storeAt.get(me) ?? 0)
+        sim.#storeAt.set(me, at)
         if (f.failP && sim.rng() < f.failP) {
-          const [dMin, dMax] = f.delay ?? [1, 3]
           store.wal.pop() // a failed batch never reached the disk
-          sim.post(me, { kind: 'persistFail', batch, reason: 'io' }, dMin + sim.rng() * (dMax - dMin))
+          sim.post(me, { kind: 'persistFail', batch, reason: 'io' }, at - sim.now)
           return
         }
         if (f.lieP && sim.rng() < f.lieP) row.lied = true
-        const [dMin, dMax] = f.delay ?? [1, 3]
-        sim.#schedule(dMin + sim.rng() * (dMax - dMin), () => {
+        sim.#schedule(at - sim.now, () => {
           row.resolved = true
           sim.#step(me, { kind: 'persisted', batch })
         })
+      },
+      //! M4e snapshot+swap: the store contract is SYNCHRONOUS-durable (the shell writes tmp + fsync +
+      // rename before returning), so the swap lands at effect time and its rows enter RESOLVED — a
+      // crash before the echo under-claims (durable never advanced) but loses nothing. The fault rolls:
+      // failP = the swap failed outright (old file untouched; persistFail latches the WAL dead); lieP =
+      // the RENAME evaporates at crash — the old rows return at harvest and every append after the
+      // swap dies with the phantom new file. That degradation is PURE TAIL LOSS by construction (the
+      // old file is a self-consistent superset of the snapshot: the swap only removes redundancy), so
+      // no hole detection is needed — suffix anti-entropy heals it like any other tail.
+      snapshot(batch: number, rows: { bytes: Uint8Array; prev: number }[]) {
+        const store = sim.stores.get(me)!
+        const f = sim.#storeFaults.get(me) ?? {}
+        const [dMin, dMax] = f.delay ?? [1, 3]
+        const at = Math.max(sim.now + dMin + sim.rng() * (dMax - dMin), sim.#storeAt.get(me) ?? 0) // same FIFO clock as appends
+        sim.#storeAt.set(me, at)
+        if (f.failP && sim.rng() < f.failP) {
+          sim.post(me, { kind: 'persistFail', batch, reason: 'io' }, at - sim.now)
+          return
+        }
+        if (f.lieP && sim.rng() < f.lieP) store.swapLied = true
+        else {
+          store.wal = rows.map((r) => ({ batch, bytes: r.bytes, prev: r.prev, resolved: true, lied: false }))
+          store.swapLied = false
+        }
+        sim.#schedule(at - sim.now, () => sim.#step(me, { kind: 'persisted', batch }))
       },
       boot(record) { sim.stores.get(me)!.boot = record },
       confirm(id, ok, count) {

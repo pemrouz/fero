@@ -77,6 +77,9 @@ export const JK = {
   //! ── M4d compaction vocabulary ──
   compacted: 51,     // a=origin, b=droppedEntries — a prefix ≤ the frontier collapsed to its snapshot records
   tombstoneGC: 52,   // a=droppedStamps — remove-versions nothing can contest anymore were released
+  //! ── M4e WAL snapshot vocabulary ──
+  snapshot: 53,      // a=batch, b=rows — a whole-WAL snapshot+swap left for the store (the disk counterpart of compaction)
+  walTaint: 54,      // a=origin — an interior hole PROVED the disk lied (fsyncgate): the restore is condemned, the fold resets to empty, the WAL swaps clean, the cluster re-teaches
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

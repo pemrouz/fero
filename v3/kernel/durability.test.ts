@@ -8,7 +8,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { Node } from './node.ts'
+import { Node, SNAPSHOT_AT } from './node.ts'
 import { JK } from './journal.ts'
 import { Framer, VERB, encodeControl, encodeFrame, encodeRuns } from './codec.ts'
 import { REC, TAG, type BootRecord, type EffectSink, type Env, type Rec } from './env.ts'
@@ -25,6 +25,7 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     persist: (batch, bytes, prev) => effects.push(['persist', batch, bytes, prev]),
     boot: (record) => effects.push(['boot', record]),
     confirm: (id, ok, count) => effects.push(['confirm', id, ok, count]),
+    snapshot: (batch, rows) => effects.push(['snapshot', batch, rows]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }
   const node = new Node({ uuid, listen: `sim:${uuid}`, heartbeatMs: 50, durable: true, ...opts }, env)
@@ -173,10 +174,12 @@ test('a torn WAL tail surfaces as a journaled drop at the tear; everything befor
   assert.ok(c.jk(JK.frameDrop).some((e) => String(e.b).startsWith('wal:')), 'a corrupt row is surfaced, never guessed at')
 })
 
-test('an INTERIOR hole (a lying disk) breaks the chain: later rows skip until a re-link — never a silent gap', () => {
-  //! Lamport streams are legitimately gappy, so seqs cannot reveal a lied-away middle batch — the chain
-  // link can. Three writes → three rows; drop the MIDDLE one; the third must be skipped (walHole), the
-  // restored stream ends at the first row's tail, and AE owns the rest as ordinary tail loss.
+test('an INTERIOR hole (a lying disk) CONDEMNS the restore: the fold resets, the WAL swaps clean, the cluster re-teaches (fsyncgate)', () => {
+  //! honest crashes tear TAILS (the shell's ordered io-queue and the sim's FIFO fsync clock make
+  // resolution order = append order), so a surviving row past a missing one PROVES the disk lied — and
+  // a liar's prefix is not evidence: kept alive, it can resurrect cells whose removes were compacted
+  // away cluster-wide on this very disk's durable claims (the M4e sweep's seed-27 divergence). The
+  // verdict is total, mirroring persistFail's fsyncgate posture on the write side.
   const a = harness('aa')
   for (const k of ['k1', 'k2', 'k3']) a.node.step({ kind: 'write', recs: [{ type: REC.update, key: [k], value: k }] })
   const rows = a.of('persist').map((p) => ({ bytes: p[2] as Uint8Array, prev: p[3] as number }))
@@ -184,12 +187,96 @@ test('an INTERIOR hole (a lying disk) breaks the chain: later rows skip until a 
   const b = harness('aa', { incarnation: 2 })
   b.node.step({ kind: 'replay', bytes: rows[0].bytes, prev: rows[0].prev })
   b.node.step({ kind: 'replay', bytes: rows[2].bytes, prev: rows[2].prev }) // the middle row lied away
-  assert.equal(b.node.state.size, 1, 'only the pre-hole prefix restored')
   assert.ok(b.jk(JK.walHole).length === 1, 'the hole is surfaced at the exact row')
-  assert.equal(b.node.streams.get('aa')!.applied, 1, 'the stream ends at the tear — pure tail loss for AE')
-  //! the re-link: a row chained from the restored tail (an AE re-ship persisted post-restart) resumes the walk
+  assert.ok(b.jk(JK.walTaint).length === 1, 'and the verdict is journaled, never silent')
+  assert.equal(b.node.tainted, true)
+  assert.equal(b.node.state.size, 0, 'the fold reset — a liar\'s prefix is not evidence')
+  assert.equal(b.node.logs.size, 0)
+  const swap = b.of('snapshot').pop()!
+  assert.deepEqual(swap[2], [], 'the WAL swapped CLEAN — the next restart replays a consistent (empty) file, not the same hole')
   b.node.step({ kind: 'replay', bytes: rows[1].bytes, prev: rows[1].prev })
-  assert.equal(b.node.state.size, 2, 'a row that re-links the chain is accepted')
+  assert.equal(b.node.state.size, 0, 'nothing further from this disk is evidence')
+  //! the cluster re-teaches: ordinary inbound ingest refolds the node — the proven wiped-disk path
+  b.admit(1, 'bb')
+  b.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([
+    { rec: { type: REC.update, key: ['k1'], value: 'k1' } as Rec, origin: 'aa', seq: 1, epoch: 0 },
+    { rec: { type: REC.update, key: ['k2'], value: 'k2' } as Rec, origin: 'aa', seq: 2, epoch: 0 },
+    { rec: { type: REC.update, key: ['k3'], value: 'k3' } as Rec, origin: 'aa', seq: 3, epoch: 0 }])[0] })
+  assert.equal(b.node.state.size, 3, 'refolded from the wire — convergence owes nothing to the liar')
+})
+
+test('the WAL snapshot (M4e): the swap re-encodes the whole log under fresh chains; the echo advances durable to the tails', () => {
+  const h = harness('aa')
+  h.admit(1, 'bb')
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['a'], value: 1 }, { type: REC.update, key: ['b'], value: 2 }] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeFrame([{ type: REC.update, key: ['x'], value: 9 }], { origin: 'bb', baseSeq: 7, epoch: 0 }) })
+  h.node.snapshot()
+  const snaps = h.of('snapshot')
+  assert.equal(snaps.length, 1)
+  const rows = snaps[0][2] as { bytes: Uint8Array; prev: number }[]
+  //! one contiguous own run + one bb row — and every origin's chain RESTARTS at prev=0 in the swap
+  assert.equal(rows.length, 2)
+  assert.ok(rows.every((r) => r.prev === 0), 'fresh chains: the swapped file has no history to link to')
+  assert.deepEqual(rows.map((r) => new Framer().push(r.bytes.slice())[0].prov()!.origin), ['aa', 'bb'])
+  assert.equal(h.node.streams.get('aa')!.durable, 0, 'durable advances on the swap RESOLUTION, never on emit')
+  h.node.step({ kind: 'persisted', batch: snaps[0][1] as number })
+  assert.equal(h.node.streams.get('aa')!.durable, 2, 'everything in the log is on disk from the echo')
+  assert.equal(h.node.streams.get('bb')!.durable, 7)
+  assert.ok(h.jk(JK.snapshot).length === 1)
+  //! an append AFTER the swap chains onto the snapshot tail, not the pre-swap history
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['c'], value: 3 }] })
+  const p = h.of('persist').pop()!
+  assert.equal(p[3], 2, 'post-swap rows link from the snapshot tail')
+})
+
+test('snapshot arming: SNAPSHOT_AT appended rows trigger the swap on the tick, AFTER compaction — and the counter re-arms from zero', () => {
+  const h = harness('aa')
+  h.node.step({ kind: 'start' })
+  //! solo genesis commits a view of one on the first tick — compaction is live from then on
+  h.tick()
+  for (let i = 0; i < SNAPSHOT_AT + 8; i++)
+    h.node.step({ kind: 'write', recs: [{ type: REC.update, key: [`k${i % 4}`], value: i }] })
+  assert.equal(h.of('snapshot').length, 0, 'nothing swaps between ticks')
+  h.tick()
+  const snaps = h.of('snapshot')
+  assert.equal(snaps.length, 1, 'the tick armed the swap')
+  //! compaction ran first (same tick, solo frontier = own tail): thousands of churned rows leave a
+  // HANDFUL of snapshot records on disk — the whole point of the composition
+  const rows = snaps[0][2] as { bytes: Uint8Array; prev: number }[]
+  assert.ok(rows.length <= 4, `the swapped WAL holds ${rows.length} rows for ${SNAPSHOT_AT + 8}+ writes of history`)
+  h.tick()
+  assert.equal(h.of('snapshot').length, 1, 'the counter reset — no re-arm until SNAPSHOT_AT fresh rows')
+})
+
+test('restore from a swapped WAL is the same fold; a LIED swap degrades to pure tail loss — the swap is chain-transparent', () => {
+  const a = harness('aa')
+  a.admit(1, 'bb')
+  a.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['own'], value: 'mine' }] })
+  a.node.step({ kind: 'bytesIn', link: 1, bytes: encodeFrame([{ type: REC.update, key: ['theirs'], value: 'x' }], { origin: 'bb', baseSeq: 5, epoch: 0 }) })
+  const preSwap = a.of('persist').map((p) => ({ bytes: p[2] as Uint8Array, prev: p[3] as number }))
+  const preSwapHash = a.node.stateHash
+  a.node.snapshot()
+  const rows = (a.of('snapshot')[0][2] as { bytes: Uint8Array; prev: number }[]).slice()
+  a.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['after'], value: 'the swap' }] })
+  const post = a.of('persist').slice(preSwap.length).map((p) => ({ bytes: p[2] as Uint8Array, prev: p[3] as number }))
+  assert.equal(post.length, 1)
+  //! the honest disk: swapped rows + the post-swap append — the twin folds to the live state exactly
+  const b = harness('aa', { incarnation: 2 })
+  for (const r of [...rows, ...post]) b.node.step({ kind: 'replay', bytes: r.bytes, prev: r.prev })
+  assert.equal(b.node.stateHash, a.node.stateHash, 'the swapped file IS the history')
+  assert.equal(b.node.seq, a.node.seq)
+  for (const [, d] of b.node.streams) assert.ok(d.applied === d.durable, 'replayed rows are durable by definition')
+  //! chain-transparency: per origin the snapshot tail EQUALS the old chain tail (both are the log
+  // tail), so a swap whose RENAME evaporated at crash leaves the OLD file — a self-consistent
+  // SUPERSET of the snapshot (the swap only removes redundancy) — while appends after the swap died
+  // in the phantom new file. Replaying the old rows folds cleanly: no hole, no corruption; the lost
+  // append is ordinary TAIL loss for suffix anti-entropy. Pinned here so no future chain change can
+  // silently turn a lied rename into an interior hole.
+  const c = harness('aa', { incarnation: 2 })
+  for (const r of preSwap) c.node.step({ kind: 'replay', bytes: r.bytes, prev: r.prev })
+  assert.equal(c.jk(JK.walHole).length, 0, 'the old file is self-consistent — the swap never re-chains live history')
+  assert.equal(c.node.stateHash, preSwapHash, 'the pre-swap fold restored intact')
+  assert.equal(c.node.walTail.get('aa'), 1, 'and the chain tail matches where the phantom appends would have linked')
 })
 
 test('the reborn clock and lane cannot collide with a lost life: the ceiling floor + old-lane recovery', () => {

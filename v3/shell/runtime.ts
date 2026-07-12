@@ -52,6 +52,11 @@ export class Runtime {
   #linkSeq = 0
   #opts: RuntimeOpts
   #wal: number | null = null // fd, held open for append (the plan's fd-held contract)
+  //! WAL ops run STRICTLY IN ORDER through one promise chain: fs.write completions ride a threadpool
+  // and are not order-guaranteed, so two appends landing swapped would replay as a chain hole on a
+  // CLEAN restart; the queue is also what makes the snapshot swap atomic wrt appends (nothing
+  // straddles the rename — every queued append lands wholly before or wholly after the new file).
+  #ioq: Promise<void> = Promise.resolve()
   onApply: (rec: Applied) => void
   //! onConfirm — the guarantee ladder's answers surface here (M5's confirm option resolves off it)
   onConfirm: (id: number, ok: boolean, count: number) => void = () => {}
@@ -100,19 +105,49 @@ export class Runtime {
         //! persist: append [varint prev][frame] + fsync, then echo — batch-per-call today (each call IS
         // a run frame; the group-many-appends-per-fsync batching is an M8 measured optimization, not a
         // semantic). The prev prefix is the chain link replay's interior-hole detector reads back.
+        // Rows are copied out at CALL time (the kernel owns `bytes` only until return) and appended
+        // through the ordered #ioq (see its banner — unordered appends corrupt the chain on disk).
         persist(batch, bytes, prev) {
-          const fd = runtime.#wal
-          if (fd === null) return
+          if (runtime.#wal === null) return
           const w = new Writer()
           w.varint(prev)
           w.bytes(bytes)
-          fs.write(fd, w.buf.slice(0, w.len), (err) => {
-            if (err) return runtime.node.step({ kind: 'persistFail', batch, reason: err.code ?? 'write' })
-            fs.fsync(fd, (err2) => {
-              if (runtime.node.destroyed) return
-              if (err2) runtime.node.step({ kind: 'persistFail', batch, reason: err2.code ?? 'fsync' })
-              else runtime.node.step({ kind: 'persisted', batch })
+          const row = w.buf.slice(0, w.len)
+          runtime.#ioq = runtime.#ioq.then(() => new Promise<void>((done) => {
+            const fd = runtime.#wal
+            if (fd === null || runtime.node.destroyed) return done()
+            fs.write(fd, row, (err) => {
+              if (err) { runtime.node.step({ kind: 'persistFail', batch, reason: err.code ?? 'write' }); return done() }
+              fs.fsync(fd, (err2) => {
+                if (!runtime.node.destroyed)
+                  runtime.node.step(err2 ? { kind: 'persistFail', batch, reason: err2.code ?? 'fsync' } : { kind: 'persisted', batch })
+                done()
+              })
             })
+          }))
+        },
+        //! snapshot (M4e): the atomic whole-file swap — write every row to wal.log.tmp, fsync, close,
+        // rename over wal.log, reopen the append fd. Synchronous inside its #ioq slot (a swap is cold
+        // and must not interleave with appends); the old file survives any crash before the rename.
+        snapshot(batch, rows) {
+          if (!runtime.#opts.dir) return
+          const p = path.join(runtime.#opts.dir, 'wal.log')
+          runtime.#ioq = runtime.#ioq.then(() => {
+            if (runtime.#wal === null || runtime.node.destroyed) return
+            try {
+              const w = new Writer()
+              for (const r of rows) { w.varint(r.prev); w.bytes(r.bytes) }
+              const fd = fs.openSync(p + '.tmp', 'w')
+              fs.writeSync(fd, w.buf.subarray(0, w.len))
+              fs.fsyncSync(fd)
+              fs.closeSync(fd)
+              fs.closeSync(runtime.#wal) // safe: the queue guarantees no append is in flight
+              fs.renameSync(p + '.tmp', p)
+              runtime.#wal = fs.openSync(p, 'a')
+              runtime.node.step({ kind: 'persisted', batch })
+            } catch (err) {
+              runtime.node.step({ kind: 'persistFail', batch, reason: (err as NodeJS.ErrnoException).code ?? 'swap' })
+            }
           })
         },
         //! boot: atomic replace, SYNCHRONOUS — must be on disk before any later-emitted frame hits the wire
@@ -226,6 +261,7 @@ export class Runtime {
     for (const s of this.#sockets.values()) s.destroy()
     this.#sockets.clear()
     this.#paused.clear()
+    await this.#ioq.catch(() => {}) // let in-flight WAL ops land before the fd closes (their echoes no-op on a destroyed node)
     if (this.#wal !== null) { try { fs.closeSync(this.#wal) } catch {} this.#wal = null }
     if (this.#server) await new Promise<void>((resolve) => this.#server!.close(() => resolve()))
   }

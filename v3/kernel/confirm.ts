@@ -72,6 +72,15 @@ export class Confirm {
   // frontier (kernel/log.ts) reads these: a cut is safe only when EVERY member is provably past it.
   mark(uuid: string, origin: string): number { return this.#marks.get(uuid)?.get(origin)?.s ?? 0 }
 
+  //! markD — a peer's recorded DURABLE tail (0 = never announced / non-durable peer). In durable mode
+  // the compaction frontier and tombstone quiescence read THESE, never the shippable marks: applied and
+  // shippable regress when a crash eats un-fsynced rows, and a frontier computed over crash-volatile
+  // marks compacts away history a reborn member still needs (the seed-27 resurrection: a remove's
+  // record and its GC'd tombstone were both gone cluster-wide when the crashed lane came back without
+  // them). Durable marks are exactly the crash-stable lower bound — an honest disk restores at least
+  // everything it resolved.
+  markD(uuid: string, origin: string): number { return this.#marks.get(uuid)?.get(origin)?.d ?? 0 }
+
   //! feed — a peer digest announced its tails: record (monotone) and recount. `d` < 0 means the digest
   // carried no durable map (a non-durable peer) — its durable evidence never advances.
   feed(node: Node, uuid: string, origin: string, s: number, d: number) {

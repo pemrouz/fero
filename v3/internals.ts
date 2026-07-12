@@ -5,7 +5,7 @@
 // executive, so anything built on these is built on the same code paths the tests
 // and sweeps validate (plan §3.3).
 
-export { Node, MAX_REDIALS, stable, type NodeOpts } from './kernel/node.ts'
+export { Node, MAX_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT, stable, type NodeOpts } from './kernel/node.ts'
 export { Membership, SUSPECT_TICKS, MAX_PULLS, type View } from './kernel/membership.ts'
 export { Writes, NACK, MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './kernel/write.ts'
 export { Ring, VNODES } from './kernel/ring.ts'

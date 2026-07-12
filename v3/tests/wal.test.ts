@@ -11,7 +11,8 @@ import path from 'node:path'
 import os from 'node:os'
 import { Runtime, restoreOpts } from '../shell/runtime.ts'
 import { REC } from '../kernel/env.ts'
-import { until } from '#utils'
+import { JK } from '../kernel/journal.ts'
+import { ports, until } from '#utils'
 
 test('a solo durable node survives a hard restart: WAL + boot record restore state, clock, lane, and incarnation', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-'))
@@ -50,5 +51,62 @@ test('a solo durable node survives a hard restart: WAL + boot record restore sta
     await a?.destroy()
     await b?.destroy()
     fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('the M4e twin on real disks: a two-node cluster is killed whole — both restore from their WALs (one swapped) and reconverge', async () => {
+  const da = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-a-'))
+  const db = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-b-'))
+  const live: Runtime[] = []
+  try {
+    //! first lives: a real mesh, writes on both sides, everything fsync-resolved before the kill
+    const pa = await ports.free()
+    const pb = await ports.free()
+    const a = new Runtime({ uuid: 'aa', listen: `127.0.0.1:${pa}`, dir: da })
+    const b = new Runtime({ uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], dir: db })
+    live.push(a, b)
+    await a.start()
+    await b.start()
+    assert.ok(await until(() => a.node.admitted().length === 1 && b.node.admitted().length === 1), 'mesh formed')
+    a.write([{ type: REC.update, key: ['left'], value: 'from aa' }])
+    b.write([{ type: REC.update, key: ['right'], value: 'from bb' }])
+    assert.ok(await until(() =>
+      a.node.state.size === 2 && b.node.state.size === 2 &&
+      ['aa', 'bb'].every((o) => a.node.streams.get(o)!.durable > 0 && b.node.streams.get(o)!.durable > 0),
+    ), 'both writes replicated AND durable on both disks')
+    //! the REAL swap on aa: tmp + fsync + rename + reopen — then an append must chain onto the new file
+    a.node.snapshot()
+    assert.ok(await until(() => a.node.journal.read().some((e) => e.kind === JK.snapshot) &&
+      !fs.existsSync(path.join(da, 'wal.log.tmp'))), 'the swap landed atomically')
+    a.write([{ type: REC.update, key: ['after-swap'], value: true }])
+    const tail = () => a.node.seq
+    const want = tail()
+    assert.ok(await until(() => a.node.streams.get('aa')!.durable >= want), 'the post-swap append fsync-resolved on the NEW file')
+    assert.ok(await until(() => b.node.state.size === 3), 'and replicated')
+    const hashA = a.node.stateHash
+    const hashB = b.node.stateHash
+    //! the whole-cluster kill: both processes gone at once — three files each are all that remain
+    await a.destroy()
+    await b.destroy()
+    live.length = 0
+    //! second lives: restore BOTH from disk alone (no live peer to lean on), then re-form and verify
+    const a2 = new Runtime({ uuid: 'aa', listen: `127.0.0.1:${pa}`, dir: da, ...restoreOpts(da) })
+    const b2 = new Runtime({ uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], dir: db, ...restoreOpts(db) })
+    live.push(a2, b2)
+    a2.restore()
+    b2.restore()
+    assert.equal(a2.node.stateHash, hashA, 'aa restored from the swapped WAL + chained appends, before any network')
+    assert.equal(b2.node.stateHash, hashB, 'bb restored from its append-only WAL')
+    assert.equal(a2.node.incarnation, 2)
+    await a2.start()
+    await b2.start()
+    assert.ok(await until(() => a2.node.admitted().length === 1 && b2.node.admitted().length === 1), 'the reborn mesh formed')
+    //! alive, not a museum: a fresh write from the restored side still replicates
+    b2.write([{ type: REC.update, key: ['post-restore'], value: 'alive' }])
+    assert.ok(await until(() => a2.node.state.size === 4 && a2.node.stateHash === b2.node.stateHash), 'reconverged')
+  } finally {
+    for (const r of live) await r.destroy()
+    fs.rmSync(da, { recursive: true, force: true })
+    fs.rmSync(db, { recursive: true, force: true })
   }
 })
