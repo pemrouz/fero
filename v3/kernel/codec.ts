@@ -54,6 +54,12 @@ export const VERB = {
   // CALL; SUBREC {id,recs} streams a live subscription's change records. `id` is caller-minted,
   // monotone per client (a SUB's id doubles as the subscription identity, v2's rule kept).
   CALL: 14, RESULT: 15, SUB: 16, UNSUB: 17, SUBREC: 18,
+  //! M6 scoped replication (DESIGN-M6 C3/C8 — the churn-priced evidence + handover plane; the DIGEST
+  // wire shape is untouched in both modes): HAVEQ {e, q:{p:{o:seq}}} announces possession floors and
+  // asks for coverage; HAVEA {e, a:{p:{ok,need,m?,md?}}} attests-or-requests per partition; ACQ is a
+  // RECORDS-shaped one-teacher transfer (provenance + attempt identity ride exactly like AE);
+  // ACQDONE {p, e, t:{o:cut}, n} closes the atomic fold.
+  HAVEQ: 19, HAVEA: 20, ACQ: 21, ACQDONE: 22,
 } as const
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.

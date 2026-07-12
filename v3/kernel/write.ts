@@ -342,6 +342,11 @@ export class Writes {
     if (lane.size > DEDUP_KEEP) lane.delete(lane.keys().next().value!)
   }
 
+  //! remember — the ACQ-fold's doorway into the dedup window (M6): acquired records carry attempt
+  // identity exactly like AE re-ships, so a healed-or-future owner rebuilds exactly-once from the
+  // transfer itself (the M3 ownership-move story, kept across acquisition).
+  remember(node: Node, issuer: string, cid: number, s: number, e: number) { this.#remember(node, issuer, cid, s, e) }
+
   //! #ack — WACK on the reply route (`via` link) for relayed/forwarded attempts; via -1 = locally issued, no frame.
   #ack(node: Node, via: number, v: { u: string; c: number; n: number; s: number; e: number }) {
     if (via < 0) return
@@ -500,7 +505,15 @@ export class Writes {
     let rec: Rec | null = null
     if (node.armed) {
       rec = rv.rec()
-      if (!node.scope!.accepts(node, partitionOf(rec))) { j.armed && j.emit(JK.gateDrop, origin, seq); return 0 }
+      const p = partitionOf(rec)
+      const verdict = node.scope!.verdict(node, p)
+      if (verdict === 0) { j.armed && j.emit(JK.gateDrop, origin, seq); return 0 }
+      if (verdict === 2) {
+        //! an open latch: live records for the acquiring partition STAGE — nothing touches lanes,
+        // floors, or the fence until the fold (§0 law row 2; ACQDONE replays this span)
+        node.scope!.stage(node, p, origin, seq, epoch, rec, rv.issuer || undefined, rv.issuer ? rv.cid : undefined)
+        return 0
+      }
     }
     //! the APPLIED watermark advances at the dedup decision (LWW losers included — losing is not loss).
     // The scalar fence's license is "FIFO link × single broadcaster" — under M6 scoping one lane's

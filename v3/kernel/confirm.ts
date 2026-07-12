@@ -111,6 +111,13 @@ export class Confirm {
   //! durablePeer — has this peer ever announced durable evidence? (See #hasP.)
   durablePeer(uuid: string): boolean { return this.#hasP.has(uuid) }
 
+  //! pendingScoped — any partition-scoped probe still open? (The scope tick re-drives handshake
+  // rounds while one waits — evidence converges on tick cadence, priced per open probe.)
+  pendingScoped(): boolean {
+    for (const p of this.#probes.values()) if (p.part !== undefined) return true
+    return false
+  }
+
   //! forget — a peer was REBORN (its HELLO carries a higher incarnation): every mark it ever announced
   // is void. Marks are monotone by design (feed only raises), which is correct within one life and a
   // LIE across lives — a crash regresses shippable/applied outright, and even durable regresses when
@@ -158,14 +165,21 @@ export class Confirm {
     if (p.part !== undefined && node.armed) {
       const r = node.writes.ring
       if (node.epoch > 0 && r.epoch !== node.epoch) r.build(node.epoch, node.membership.view.members)
+      const entry = node.scope!.entries.get(p.part)
       let n = 0
       for (const uuid of r.holders(p.part, node.replicas)) {
         if (uuid === node.uuid) {
           const pe = own?.parts?.get(p.part)
           if (pe && evid(pe.s, pe.d)) n++
+        } else if (entry) {
+          //! peers count on handshake-ATTESTED per-(origin, partition) marks ONLY (never the bare
+          // digest d[o] — it provably overclaims past an interior hole under multi-source shipping);
+          // the persisted level reads the md-fed durable mirror. Absent attestation counts nothing —
+          // the honest direction; the scope tick re-HAVEQs while this probe stays open.
+          const s = entry.marks.get(uuid)?.get(p.origin) ?? 0
+          const dm = entry.marksD.get(uuid)?.get(p.origin) ?? 0
+          if (evid(s, dm)) n++
         }
-        // peers: attested per-(origin, partition) marks only — the scope handshake (slice 3b) feeds
-        // them; absent attestation counts nothing, which can only under-claim (the honest direction)
       }
       return n
     }

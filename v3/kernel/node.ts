@@ -249,14 +249,13 @@ export class Node {
     if (n === undefined) this.persistBoot()
   }
 
-  //! replayHeld — the C10 replay classification: is partition p this life's to fold? Data-authoritative
-  // (the previous life's boot record) ∪ duty-authoritative (the restored ring). Unscoped replay never
-  // asks (the armed branch guards the call).
+  //! replayHeld — the C10 replay classification: is partition p this life's to fold? The boot record
+  // is the SOLE data authority — ring-assigned-but-absent partitions are `out` (window 5: a crash
+  // mid-latch leaves staged records inside mixed WAL rows; folding them on the ring's say-so would
+  // resurrect a baseless partial span with overclaiming floors — the clean re-acquire is the recovery).
+  // A boot record without the field (a pre-scoped life upgrading) folds everything, the old behavior.
   replayHeld(p: string): boolean {
-    if (this.bootHeld?.has(p)) return true
-    const ring = this.writes.ring
-    if (this.epoch > 0 && ring.epoch !== this.epoch) ring.build(this.epoch, this.membership.view.members)
-    return this.epoch > 0 && ring.holdsAny(this.uuid, p, this.replicas)
+    return this.bootHeld === null || this.bootHeld.has(p)
   }
 
   //! primary — the client's ONE feeder link id (null while unconnected). Kernel-internal to the client
@@ -314,7 +313,13 @@ export class Node {
         this.#inflight.delete(e.batch)
         for (const [origin, maxSeq] of covered) {
           const d = this.streams.for(origin)
-          if (maxSeq > d.durable) d.durable = maxSeq
+          //! armed: the SCALAR durable stays capped at shippable — a snapshot swap captures dual-fence
+          // splices whose lane tail exceeds the scalar shippable (splices deliberately never advance
+          // it: interior completeness is a per-partition fact). The floors below carry the precise
+          // durable claim; the scalar under-reports in the safe direction and the ladder invariant
+          // (applied ≥ shippable ≥ durable) holds per instant on every node.
+          const cap = this.armed ? Math.min(maxSeq, d.shippable) : maxSeq
+          if (cap > d.durable) d.durable = cap
         }
         //! M6 durable floors (armed only): a persistRun batch advances exactly the (origin, partition)
         // floors its rows cover — SKIPPING partitions currently dirty (a memory-only splice means the
@@ -459,6 +464,9 @@ export class Node {
         this.links.delete(e.link)
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
+        //! M6: a dying teacher aborts every latch it was feeding (window 6 — the buffer drops whole,
+        // nothing folded, the next handshake round re-offers from a surviving holder)
+        if (this.armed && link.uuid) this.scope!.linkDown(this, link.uuid)
         //! client primary failover (M5b): the feeder died — elect the next admitted server, digest it
         // (its suffix ship resumes every origin lane from our announced tails, in order), and re-park
         // the in-flight attempts so the write drain re-targets the new relay NOW, not at RETRY_TICKS.
@@ -530,6 +538,9 @@ export class Node {
           this.writes.tick(this)
           //! compaction rides the same clock (M4d): size-armed, frontier-bounded, journal-surfaced
           maybeCompact(this)
+          //! M6: the scope machine's clock — orphan shed polls (with the shedStall alarm), latch
+          // timeouts, and the probe-driven handshake re-round (kernel/scope.ts tick banner)
+          if (this.armed) this.scope!.tick(this)
           //! the WAL snapshot (M4e) arms AFTER compaction so the swap captures the just-compacted log
           if (this.durable && this.#walRows >= SNAPSHOT_AT) this.snapshot()
           //! give-up revival: a target whose final redial attempt FAILED (gaveUp — never merely "tries
@@ -755,9 +766,10 @@ export class Node {
       lamport: this.#seqCeiling,
       incarnation: this.incarnation,
       votedFor: { ...m.votedFor },
-      //! M6 (armed only — unscoped boot bytes stay byte-identical): the dirty-partition ledger; the
-      // held-set joins here with slice 3's scope machine
+      //! M6 (armed only — unscoped boot bytes stay byte-identical): the dirty-partition ledger + the
+      // data-authoritative held-set (held ∪ orphan; an unfolded latch is deliberately absent — C10)
       ...(this.armed && this.#dirty.size ? { dirtyParts: [...this.#dirty.keys()] } : {}),
+      ...(this.armed ? { heldPartitions: this.scope!.heldList() } : {}),
     })
     this.journal.armed && this.journal.emit(JK.bootWrite, m.view.epoch, m.votedFor.e)
   }
@@ -1057,6 +1069,26 @@ export class Node {
         if (v.r === 1) this.#sendDigest(link, 0)
         return
       }
+      //! M6 scoped-replication plane (DESIGN-M6 C3/C8): HAVEQ/HAVEA carry the possession handshake,
+      // ACQ/ACQDONE the one-teacher transfer. Admitted-only like everything else; a frame arriving on
+      // an UNSCOPED node journals + drops (a scoped peer talking to an R=∞ node is a deploy-config
+      // drift — surfaced, never a crash and never a link kill: the data plane above it is healthy).
+      case VERB.HAVEQ:
+      case VERB.HAVEA:
+      case VERB.ACQ:
+      case VERB.ACQDONE: {
+        if (link.state !== LS.admitted) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'scope before hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'scope-before-hello')
+        }
+        if (!this.armed) { j.armed && j.emit(JK.frameDrop, link.id, 'scope frame while unscoped'); return }
+        if (f.verb === VERB.HAVEQ) this.scope!.onHaveQ(this, link, f.value as never)
+        else if (f.verb === VERB.HAVEA) this.scope!.onHaveA(this, link, f.value as never)
+        else if (f.verb === VERB.ACQ) this.scope!.onAcq(this, link, f as never)
+        else this.scope!.onAcqDone(this, link, f.value as never)
+        return
+      }
       //! M2 membership control plane — identity-before-membership: all five verbs require admission,
       // like DIGEST (a pre-admission membership frame is a protocol violation → close). Handlers live
       // in kernel/membership.ts; settle() runs after each so gate transitions journal and buffered
@@ -1142,6 +1174,15 @@ export class Node {
 
   //! stateHash — order-insensitive rolling hash over entries: O(1) per apply, comparable per event (the sim's convergence + replay-determinism checks key off it).
   get stateHash(): number { return this.#hash | 0 }
+
+  //! dropCell — remove one state cell OUTSIDE the LWW election (M6 shed: the data lawfully leaves
+  // this node without a remove record existing anywhere). Maintains the rolling hash exactly like
+  // apply()'s remove arm — a shed that bypassed this would silently poison every convergence check.
+  dropCell(k: string) {
+    const old = this.#entryHash.get(k)
+    if (old !== undefined) { this.#hash = (this.#hash - old) | 0; this.#entryHash.delete(k) }
+    this.state.delete(k)
+  }
 
   //! admitted — identified peer uuids (harness predicate: cluster formed ⇔ everyone admits everyone).
   // Dead links are EXCLUDED even before their linkDown echo: a dup-race loser is marked dead
