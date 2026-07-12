@@ -171,12 +171,22 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     writable: node.membership.gate(node).open,
     members: {},
     peers: {},
+    writes: {},
     me: { uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: (config.listen as string) ?? '' },
   })
   const FOLD = new Set<number>([JK.viewInstall, JK.evict, JK.gateOpen, JK.gateClose, JK.identified, JK.linkDown, JK.suspect, JK.start])
   let cursor = 0
   let lastPrimary = node.primary
+  let lastOutcomes = 0
   const fold = () => {
+    //! cluster.writes — the bounded confirm ring (plan §9; Q4 decided: pending rows are visible HERE,
+    // never marked inside `data`): folded whole when the ring version moved, one compare otherwise
+    if (bind.outcomes.n !== lastOutcomes) {
+      lastOutcomes = bind.outcomes.n
+      const rows: Record<string, unknown> = {}
+      for (const [id, o] of bind.outcomes.rows) rows[id] = { ...o }
+      cluster.writes = rows
+    }
     const j = node.journal
     if (j.n === cursor) return
     const events = j.read(cursor)

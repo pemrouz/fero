@@ -51,6 +51,22 @@ interface Pending {
   reject: (reason: string) => void
 }
 
+//! WRITES_KEEP: the cluster.writes ring bound — the last N write outcomes, oldest evicted.
+export const WRITES_KEEP = 64
+
+//! Outcome: one row of cluster.writes — a write's route observed from THIS node (plan Q4, decided:
+// pending rows are visible HERE, never marked inside `data` itself — observability is a cluster
+// concern, the data surface stays pure value).
+export interface Outcome {
+  key: string
+  state: 'pending' | 'committed' | 'rejected'
+  origin?: string
+  seq?: number
+  epoch?: number
+  cid?: number
+  reason?: string
+}
+
 export class Bind {
   data: any
   #rt: Runtime
@@ -65,6 +81,18 @@ export class Bind {
   // be held by their own overlay marks (fast-path commits carry no iss to join on)
   #issuing: Set<string> | null = null
   #destroyed = false
+  //! outcomes — the bounded write-outcome ring (cluster.writes source). `n` is a version counter the
+  // composer's fold compares (outcomes settle in microtasks — the NEXT step folds them, and writes
+  // themselves cause steps, so the lag is one event, not unbounded).
+  outcomes = { n: 0, rows: new Map<number, Outcome>() }
+  #outSeq = 0
+  #outcome(row: Outcome): Outcome {
+    const id = ++this.#outSeq
+    this.outcomes.rows.set(id, row)
+    if (this.outcomes.rows.size > WRITES_KEEP) this.outcomes.rows.delete(this.outcomes.rows.keys().next().value!)
+    this.outcomes.n++
+    return row
+  }
 
   constructor(rt: Runtime, opts: { validate?: (rec: Rec) => true | string; tracked?: () => Promise<Coords>[] | undefined } = {}) {
     this.#rt = rt
@@ -94,6 +122,7 @@ export class Bind {
       const v = this.#validate ? this.#validate(recs[i]) : true
       if (v !== true) {
         out[i] = v
+        this.#outcome({ key: cellOf(recs[i]), state: 'rejected', reason: v })
         //! a rejected assignment BOUNCES: the cell reverts to the confirmed fold (the user sees the
         // write refused, not silently dropped — and never sees it replicate)
         if (fromCapture) this.#revert(cellOf(recs[i]))
@@ -112,9 +141,16 @@ export class Bind {
       const rec = valid[i]
       const cid = c0 + 1 + i
       const cell = cellOf(rec)
-      promises.set(rec, new Promise<Coords>((resolve, reject) => {
+      const row = this.#outcome({ key: cell, state: 'pending', cid })
+      const pr = new Promise<Coords>((resolve, reject) => {
         this.#pending.set(this.#iss + '|' + cid, { cell, cid, resolve, reject })
-      }))
+      })
+      //! the ring row settles with its promise (microtask — the version bump makes the next fold see it)
+      pr.then(
+        (c) => { row.state = 'committed'; row.origin = c.origin; row.seq = c.seq; row.epoch = c.epoch; this.outcomes.n++ },
+        (e) => { row.state = 'rejected'; row.reason = String(e); this.outcomes.n++ },
+      )
+      promises.set(rec, pr)
       this.#overlay.set(cell, cid)
     }
     this.#issuing = new Set([...promises.keys()].map(cellOf))
