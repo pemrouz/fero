@@ -176,6 +176,16 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   // Folded from the journal cursor after any step that emitted membership-relevant events; one
   // integer compare per event otherwise. M5d makes this end-to-end (writes ring, partitions).
   const node = rt.node
+  //! cluster.partitions (M6, DESIGN-M6 C9): bounded local scalars, zeros while unscoped. The scope
+  // tallies + shedWaitingOn fold from the kernel scope map once slice 4 wires JK 59-63; until then
+  // the row is a truthful projection of "nothing is scoped on this node".
+  const partitionsRow = () => ({
+    replicas: node.replicas,
+    epoch: node.epoch,
+    w: node.replicas > 0 ? (Math.min(node.replicas, Math.max(node.membership.view.members.length, 1)) >> 1) + 1 : 0,
+    held: 0, acquiring: 0, orphaned: 0, acquired: 0, shed: 0,
+    shedWaitingOn: [] as string[],
+  })
   const cluster: any = proxy({
     epoch: node.epoch,
     writable: node.membership.gate(node).open,
@@ -183,6 +193,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     peers: {},
     writes: {},
     me: { uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: (config.listen as string) ?? '' },
+    partitions: partitionsRow(),
   })
   const FOLD = new Set<number>([JK.viewInstall, JK.evict, JK.gateOpen, JK.gateClose, JK.identified, JK.linkDown, JK.suspect, JK.start])
   let cursor = 0
@@ -212,6 +223,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     cluster.epoch = node.epoch
     cluster.writable = node.membership.gate(node).open
     cluster.members = Object.fromEntries(node.membership.view.members)
+    cluster.partitions = partitionsRow()
     const peers: Record<string, { uuid: string; incarnation: number; up: boolean }> = {}
     for (const l of node.links.values())
       if (l.uuid && !l.dead) peers[l.uuid] = { uuid: l.uuid, incarnation: l.incarnation, up: true }
@@ -239,4 +251,4 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   }
 }
 
-export type { Fero, FeroOpts, Guarantee, WriteResolve, WriteReject, Change, WriteOpts, Methods } from './types.ts'
+export type { Fero, FeroOpts, Guarantee, WriteResolve, WriteReject, Change, WriteOpts, Methods, Partitions, ScopedError } from './types.ts'

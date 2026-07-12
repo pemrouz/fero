@@ -30,6 +30,23 @@ test('config recognition: unknown keys and unknown seams throw at fero() time; f
   await f.destroy()
 })
 
+test('M6 config: replicas validates loudly (integer ≥ 1, servers only) and surfaces on cluster.partitions; unscoped shows zeros', async () => {
+  await assert.rejects(fero('r', { replicas: 0 } as never), /replicas must be an integer/)
+  await assert.rejects(fero('r', { replicas: 1.5 } as never), /replicas must be an integer/)
+  await assert.rejects(fero('r', { replicas: 2, hosts: ['tcp://nowhere:1'] } as never), /server-side setting/)
+  //! unscoped: the partitions row is a truthful all-zeros projection (replicas 0 = R=∞)
+  const plain = await fero('r', {})
+  const p0 = (snapshot(plain.cluster) as { partitions: Record<string, unknown> }).partitions
+  assert.deepEqual(p0, { replicas: 0, epoch: 0, w: 0, held: 0, acquiring: 0, orphaned: 0, acquired: 0, shed: 0, shedWaitingOn: [] })
+  await plain.destroy()
+  //! scoped solo: config reflected; w derives from R_eff (min(replicas, members)) — never configurable
+  const f = await fero('r', { uuid: 'aa', replicas: 2 })
+  const p = (snapshot(f.cluster) as { partitions: { replicas: number; w: number } }).partitions
+  assert.equal(p.replicas, 2)
+  assert.equal(p.w, 1, 'solo: R_eff = min(2, 1) = 1 ⇒ W = 1')
+  await f.destroy()
+})
+
 test('solo: assignment and methods.update are ONE ingest — both commit, both visible, coordinates resolve', async () => {
   const f = await fero('inventory', { uuid: 'aa' })
   assert.equal(f.name, 'inventory')

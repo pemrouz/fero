@@ -211,6 +211,12 @@ export class Node {
   get replicas(): number { return this.#opts.replicas ?? 0 }
   get scoped(): boolean { return (this.#opts.replicas ?? 0) > 0 }
 
+  //! armed — scoping is LIVE: scoped ∧ a committed view exists. Open genesis (epoch 0) is always
+  // unscoped — there is no committed ring to scope against, every node owns its own writes, and the
+  // epoch-0 fast path must stay byte-identical (DESIGN-M6 rule 3). Every scoped branch in the
+  // replication plane guards on THIS, never on `scoped` alone.
+  get armed(): boolean { return this.scoped && this.epoch > 0 }
+
   //! primary — the client's ONE feeder link id (null while unconnected). Kernel-internal to the client
   // role; the write drain targets it, digests flow only over it, failover re-elects on its linkDown.
   primary: number | null = null

@@ -404,3 +404,16 @@ test('stateHash is order-insensitive and remove-aware — identical states hash 
   assert.equal(a.stateHash, b.stateHash)
   assert.equal(a.state.size, b.state.size)
 })
+
+test('M6 arming predicate: scoped is config, armed requires a committed view — open genesis is never scoped', () => {
+  const { node: plain } = harness('aa')
+  assert.equal(plain.scoped, false)
+  assert.equal(plain.armed, false)
+  const { node } = harness('aa', { replicas: 2 })
+  assert.equal(node.replicas, 2)
+  assert.equal(node.scoped, true)
+  assert.equal(node.armed, false, 'epoch 0 (open genesis): no committed ring to scope against')
+  //! a committed view arms it: boot a restored epoch-1 view the M4 way (constructor boot facts)
+  const { node: restored } = harness('aa', { replicas: 2, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb']] } })
+  assert.equal(restored.armed, true, 'scoped ∧ epoch > 0 ⇒ armed')
+})

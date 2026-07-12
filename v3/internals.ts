@@ -33,5 +33,5 @@ export { proxy, snapshot, applyRec, capture, records, isProxy, type Capture } fr
 export { client } from './sim/harness.ts'
 export type {
   Fero, FeroConfig, FeroOpts, Methods, Change, WriteOpts,
-  Guarantee, WriteResolve, WriteReject, Seams, Peer, ClusterShape,
+  Guarantee, WriteResolve, WriteReject, Seams, Peer, ClusterShape, Partitions, ScopedError,
 } from './api/types.ts'

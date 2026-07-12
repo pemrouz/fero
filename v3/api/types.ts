@@ -92,6 +92,35 @@ export interface Peer {
   up: boolean
 }
 
+//! Partitions — the cluster.partitions row (M6, DESIGN-M6 C9): bounded, locally-derivable scalars
+// (rates/alarms, never a per-partition firehose — partition→holders rows are keyspace-unbounded and
+// were rejected). shedWaitingOn is the H7 surface: the uuids currently pinning any orphan's shed.
+export interface Partitions {
+  replicas: number // 0 = unscoped (R=∞)
+  epoch: number
+  w: number // derived write-quorum of the R-set (majority; never configurable)
+  held: number
+  acquiring: number
+  orphaned: number
+  acquired: number // lifetime counters
+  shed: number
+  shedWaitingOn: string[]
+}
+
+//! ScopedError — the typed refusal (plan §5/§9: an expression means the same at R=2 and R=∞; a
+// holistic op on a scoped node throws THIS, never warn + local partial; a gather that cannot reach
+// a partition's holders rejects with THIS, never a silent subset). `scoped: true` is the wire
+// discriminant — a RESULT error value carrying it rehydrates as-is instead of an Error-string wrap.
+export interface ScopedError {
+  scoped: true
+  op: string // 'group' | 'top' | 'gather' | 'get' | 'predicate' | …
+  reason: 'holistic' | 'closure' | 'unreachable' | 'timeout' | 'shortfall'
+  replicas: number
+  partition?: string
+  missing?: string[]
+  hint: string
+}
+
 //! ClusterShape — the value under the `cluster` ViewProxy: the committed view {epoch, members,
 // writable} reactive, peers as rows, `me` a derived row (v2 OQ5 closed). It IS a data proxy —
 // query and connect it like any resource.
@@ -101,6 +130,7 @@ export interface ClusterShape {
   members: Record<string, string>
   peers: Record<string, Peer>
   me: { uuid: string; origin: string; listen: string }
+  partitions: Partitions
 }
 
 //! Fero — the composed instance. `data` and `cluster` are ViewProxies (dynamic by nature — reads

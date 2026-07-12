@@ -45,6 +45,18 @@ test('absolute: 1M holdersOf(k, 3) R-set walks on a 5-member ring under the trip
   assert.ok(ms < 800, `1M R-set walks took ${ms.toFixed(1)}ms (ceiling 800ms)`)
 })
 
+test('absolute: 1M memoized holders() hits under the ownerOf-class ceiling (one walk per partition per epoch, then Map.get)', () => {
+  const r = new Ring()
+  r.build(1, members(5))
+  for (let i = 0; i < 4096; i++) r.holders(keys[i], 3) // populate: one walk per partition
+  let sink = 0
+  const ms = bench.time(() => {
+    for (let i = 0; i < 1_000_000; i++) sink += r.holders(keys[i & 4095], 3).length
+  })
+  assert.ok(sink > 0 && sink % 3_000_000 === 0)
+  assert.ok(ms < 400, `1M memoized R-set hits took ${ms.toFixed(1)}ms (ceiling 400ms — the fan-out consults this per record)`)
+})
+
 test('counted: lookup cost is flat in member count (binary search, not a scan)', () => {
   //! not a wall-clock ratio (too noisy here) — a structural check: 128 members costs at most ~2x the
   // per-lookup time of 4 members over a big batch, which a linear scan (32x points) could never satisfy

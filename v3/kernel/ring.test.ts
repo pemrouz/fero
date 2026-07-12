@@ -117,6 +117,38 @@ test('holdersOf: minimal motion — removing a member never reassigns a survivin
   assert.ok(moved > 0 && moved < keys.length, `only n04's share moves (${moved}/${keys.length})`)
 })
 
+test('holders(): the memo answers identically to the walk, keeps a stable frozen reference per epoch, and invalidates on build/place', () => {
+  const r = new Ring()
+  r.build(1, members('n01', 'n02', 'n03', 'n04'))
+  for (const k of keys.slice(0, 50)) assert.deepEqual([...r.holders(k, 2)], [...r.holdersOf(k, 2)])
+  const first = r.holders('part7', 2)
+  assert.equal(r.holders('part7', 2), first, 'same epoch, same r ⇒ the SAME array (one walk, then Map.get)')
+  assert.ok(Object.isFrozen(first), 'the memoized copy is frozen — retainable, unlike the scratch')
+  assert.notEqual(r.holdersOf('part8', 2), first, 'the scratch walk does not disturb the memo')
+  assert.equal(r.holders('part7', 2), first, 'still the same reference after unrelated walks')
+  //! r participates in the hit test: R_eff shifts when the view shrinks below replicas
+  const wider = r.holders('part7', 3)
+  assert.notEqual(wider, first)
+  assert.equal(wider.length, 3)
+  r.build(2, members('n01', 'n02', 'n03', 'n04'))
+  assert.notEqual(r.holders('part7', 2), first, 'build() clears the memo (a new view is a new world)')
+  const before = r.holders('pinme', 2)
+  r.place('pinme', 'n04')
+  assert.equal(r.holders('pinme', 2)[0], 'n04', 'place() invalidates its partition entry')
+  assert.notEqual(r.holders('pinme', 2), before)
+})
+
+test('holdsAny: R-set membership agrees with the walk for every member and every key', () => {
+  const r = new Ring()
+  r.build(1, members('n01', 'n02', 'n03', 'n04', 'n05'))
+  for (const k of keys.slice(0, 200)) {
+    const set = new Set(r.holdersOf(k, 2))
+    for (const u of ['n01', 'n02', 'n03', 'n04', 'n05'])
+      assert.equal(r.holdsAny(u, k, 2), set.has(u), `${k}/${u}`)
+    assert.ok(r.holdsAny(r.ownerOf(k), k, 2), 'the owner is always in its own R-set')
+  }
+})
+
 test('holdersOf: place() pins an ordered holder list; a single pin still draws the rest from the walk', () => {
   const r = new Ring()
   r.build(1, members('n01', 'n02', 'n03', 'n04'))
