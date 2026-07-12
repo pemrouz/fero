@@ -9,6 +9,7 @@
 
 import { Node, stable } from '../kernel/node.ts'
 import { MAX_QUEUED } from '../kernel/link.ts'
+import { SCOPE } from '../kernel/scope.ts'
 import { partitionOf } from '../kernel/env.ts'
 import type { Sim } from './exec.ts'
 
@@ -218,7 +219,110 @@ export const perEvent = () => [
       return null
     },
   },
+  {
+    //! M6 scoped-lawful-holding (the exactly-R shadow oracle's per-event half): a node's HELD entries
+    // are always ring-ASSIGNED at its own committed epoch — a held-but-unassigned partition means the
+    // inbound gate leaked or a rescope was missed (the freeze must fire the instant duty changes).
+    // Skipped wholesale on unscoped nodes (scope is null — zero cost at R=∞).
+    name: 'scoped-lawful-holding',
+    check: (sim: Sim): string | null => {
+      for (const [id, n] of sim.nodes) {
+        if (!n.scope || !n.armed) continue
+        const ring = n.writes.ring
+        if (ring.epoch !== n.epoch) ring.build(n.epoch, n.membership.view.members)
+        for (const [p, e] of n.scope.entries)
+          if (e.state === SCOPE.held && !ring.holdsAny(n.uuid, p, n.replicas))
+            return `${id} HOLDS '${p}' while epoch ${n.epoch}'s ring assigns it elsewhere — gate leak or missed rescope`
+      }
+      return null
+    },
+  },
+  {
+    //! M6 orphan-frozen (expected-empty): an orphan's possession floors never advance — the freeze is
+    // what fixes the shed bar, and a moving orphan floor means some ingest path fed a frozen partition
+    // (the gate, the splice, or the stamp site leaked). Keyed to the node OBJECT (restart = fresh scan).
+    name: 'orphan-frozen',
+    check: (() => {
+      const frozen = new Map<string, { node: Node; floors: Map<string, number> }>()
+      return (sim: Sim): string | null => {
+        for (const [id, n] of sim.nodes) {
+          if (!n.scope) continue
+          for (const [p, e] of n.scope.entries) {
+            if (e.state !== SCOPE.orphan) continue
+            const k = id + '|' + p
+            let snap = frozen.get(k)
+            if (!snap || snap.node !== n) {
+              const floors = new Map<string, number>()
+              for (const [origin, d] of n.streams) { const pe = d.parts?.get(p); if (pe) floors.set(origin, pe.s) }
+              snap = { node: n, floors }
+              frozen.set(k, snap)
+              continue
+            }
+            for (const [origin, d] of n.streams) {
+              const s = d.parts?.get(p)?.s ?? 0
+              const was = snap.floors.get(origin) ?? 0
+              if (s > was) return `${id} orphan '${p}' floor ADVANCED on lane ${origin}: ${was} → ${s} — the freeze leaked`
+            }
+          }
+        }
+        return null
+      }
+    })(),
+  },
 ]
+
+//! scopedConverged — the R-SCOPED quiescence check (M6): for every partition, every node HOLDING it
+// agrees cell-for-cell. Orphans are deliberately outside the comparison — a frozen copy is lawfully
+// stale until shed (3b); the plain converged() stays the oracle for unscoped runs.
+export const scopedConverged = (sim: Sim): string | null => {
+  //! group every live cell by partition, then compare across that partition's holding nodes
+  const parts = new Set<string>()
+  for (const [, n] of sim.nodes) {
+    if (!n.scope) continue
+    for (const [p, e] of n.scope.entries) if (e.state === SCOPE.held) parts.add(p)
+  }
+  for (const p of parts) {
+    let refId: string | null = null
+    let ref: Node | null = null
+    for (const [id, n] of sim.nodes) {
+      if (!n.scope?.held(p)) continue
+      if (ref === null) { refId = id; ref = n; continue }
+      //! compare the UNION of both holders' p-cells — a missing cell is a divergence, not a skip
+      const keys = new Set<string>()
+      for (const k of ref.state.keys()) if ((JSON.parse(k) as string[])[0] === p) keys.add(k)
+      for (const k of n.state.keys()) if ((JSON.parse(k) as string[])[0] === p) keys.add(k)
+      for (const k of keys) {
+        const inRef = ref.state.has(k), inN = n.state.has(k)
+        if (inRef !== inN || stable(ref.state.get(k)) !== stable(n.state.get(k)))
+          return `holders of '${p}' diverge: ${refId} vs ${id} at ${k}: ${JSON.stringify(ref.state.get(k))}${inRef ? '' : '(absent)'} vs ${JSON.stringify(n.state.get(k))}${inN ? '' : '(absent)'}`
+      }
+    }
+  }
+  return null
+}
+
+//! exactlyR — the horizon half of the M6 invariant: at quiescence, every partition present anywhere
+// is HELD by exactly its ring's R-set (both directions: every assigned holder has it; nobody else
+// holds it un-frozen). Orphans may still possess frozen data (3b's shed drains them) — they count as
+// lawful non-holders here, the exactly-R claim is about the HELD state.
+export const exactlyR = (sim: Sim): string | null => {
+  const nodes = [...sim.nodes.entries()].filter(([, n]) => n.scope && n.armed)
+  if (!nodes.length) return null
+  const [, first] = nodes[0]
+  const ring = first.writes.ring
+  if (ring.epoch !== first.epoch) ring.build(first.epoch, first.membership.view.members)
+  const parts = new Set<string>()
+  for (const [, n] of nodes) for (const [p] of n.scope!.entries) parts.add(p)
+  for (const p of parts) {
+    const lawful = new Set(ring.holders(p, first.replicas))
+    for (const [id, n] of nodes) {
+      const holds = n.scope!.held(p)
+      if (holds && !lawful.has(n.uuid)) return `'${p}' HELD at ${id} which epoch ${first.epoch}'s ring excludes`
+      if (!holds && lawful.has(n.uuid)) return `'${p}' NOT held at ${id} which epoch ${first.epoch}'s ring assigns (holders: ${[...lawful].join(',')})`
+    }
+  }
+  return null
+}
 
 //! converged — the quiescence check: every node holds the identical state (hash first, then a real diff for the report).
 // Null = converged; otherwise a human-readable divergence description — the

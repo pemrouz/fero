@@ -30,6 +30,7 @@ import { Membership } from './membership.ts'
 import { Writes } from './write.ts'
 import { Streams } from './streams.ts'
 import { Confirm } from './confirm.ts'
+import { Scope } from './scope.ts'
 import { maybeCompact } from './log.ts'
 import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
@@ -112,6 +113,9 @@ export class Node {
   writes = new Writes()
   //! confirm (M4c): the guarantee ladder — probes over the watermark evidence (kernel/confirm.ts)
   confirm = new Confirm()
+  //! scope (M6): the per-partition scoped-replication state machine (kernel/scope.ts) — constructed
+  // only on scoped nodes, consulted only when armed; null at R=∞ (structurally unreachable unscoped).
+  scope: Scope | null = null
   //! streams (M4a): per-origin descriptors carrying the watermark ladder {applied, shippable, durable}
   // (kernel/streams.ts). Seqs are LAMPORT stamps — monotone per origin but NOT contiguous (the clock
   // merges up on receipt), so dedup on `applied` is gap-tolerant: over a FIFO link from the single
@@ -207,6 +211,7 @@ export class Node {
     this.epoch = this.membership.view.epoch // a restored node stamps at its restored epoch, never below it
     if (opts.boot?.heldPartitions) this.bootHeld = new Set(opts.boot.heldPartitions)
     if (opts.boot?.dirtyParts) { this.bootDirty = new Set(opts.boot.dirtyParts); for (const p of this.bootDirty) this.#dirty.set(p, 0) }
+    if ((opts.replicas ?? 0) > 0) this.scope = new Scope() // (this.#opts assigns below — read opts directly)
     //! the Lamport floor from the boot record: even if the WAL tail was torn, the clock never restarts
     // below the last durably-recorded stamp (seq reuse under one origin would collide provenance)
     this.seq = opts.boot?.lamport ?? 0
@@ -289,6 +294,9 @@ export class Node {
     switch (e.kind) {
       case 'start': {
         j.armed && j.emit(JK.start)
+        //! M6: a RESTORED armed node classifies its replayed data before the network exists — held vs
+        // orphan derives from (boot record ∪ restored ring), the C10 rule the replay held-gate used
+        if (this.armed) this.scope!.rescope(this)
         this.persistBoot() // the incarnation bump is a durable fact from the first instant
         for (const to of this.#opts.hosts ?? []) if (to !== this.listen) {
           j.armed && j.emit(JK.dial, to)
@@ -589,13 +597,27 @@ export class Node {
       const d = this.streams.for(this.origin)
       d.applied = d.shippable = seq
       //! M6 possession floor (armed only): the minting owner's floor is trivially sound — it holds
-      // everything it ever stamped for the partition (DESIGN-M6 §0 own-lane stamp site)
-      if (this.armed) { const pe = d.part(partitionOf(rec)); if (seq > pe.s) pe.s = seq }
+      // everything it ever stamped for the partition (DESIGN-M6 §0 own-lane stamp site). The R-set
+      // for the fan-out filter below comes off the same memoized walk.
+      let holders: readonly string[] | null = null
+      if (this.armed) {
+        const p = partitionOf(rec)
+        const pe = d.part(p)
+        if (seq > pe.s) pe.s = seq
+        this.scope!.mintHeld(p) // the owner holds what it stamps — the entry exists from the first commit
+        const ring = this.writes.ring
+        if (ring.epoch !== this.epoch) ring.build(this.epoch, this.membership.view.members)
+        holders = ring.holders(p, this.replicas)
+      }
       for (const link of this.links.values())
         //! live records flow only on SYNCED links (admitted + peer digest received): anything earlier is
         // covered by the digest-triggered suffix ship, and sending it live would leapfrog that suffix on
-        // the wire and turn it into permanently-dropped "duplicates" at the receiver (the sweep-found bug)
-        if (link.state === LS.admitted && link.synced)
+        // the wire and turn it into permanently-dropped "duplicates" at the receiver (the sweep-found bug).
+        // M6 (armed): THE FAN-OUT FILTER — member links receive only their R-set's partitions; client
+        // links keep the spoke tap. Orphans are excluded from the instant of install (they are not in
+        // holdersOf) — the freeze that keeps the shed bar fixed (DESIGN-M6 C7).
+        if (link.state === LS.admitted && link.synced &&
+            (holders === null || link.client || holders.includes(link.uuid)))
           link.add(rec, { origin: this.origin, baseSeq: seq, epoch: this.epoch },
             attempt ? { issuer: attempt.issuer, baseCid: attempt.baseCid + k } : undefined)
     }
@@ -818,7 +840,7 @@ export class Node {
         // a peer that provably held nothing; the compaction frontier trusted marks no disk backs).
         const prevInc = this.#peerInc.get(v.u) ?? 0
         if (v.i > prevInc) {
-          if (prevInc > 0) this.confirm.forget(v.u)
+          if (prevInc > 0) { this.confirm.forget(v.u); this.scope?.forget(v.u) }
           this.#peerInc.set(v.u, v.i)
         }
         //! successful identify resets the redial backoff — by OUR dial target AND by the peer's gossiped
@@ -1004,13 +1026,26 @@ export class Node {
         //! ship every suffix the peer's digest shows missing: for each origin I hold, everything past their
         // high-water. encodeRuns splits Lamport gaps into valid contiguous frames (attempt identity rides
         // along, so a healed peer rebuilds its cid-dedup window too); ship() honours backpressure.
+        //! M6 (armed): the answer ships only partitions the REQUESTER may fold — a member link gets
+        // its R-set's subset (ring-derived; slice 3b tightens to possession-announced), a client link
+        // gets this node's HELD subset (an orphan's frozen copy is a teacher for holders, never a
+        // spoke feed). Skipped entries gate-drop at the receiver anyway (§0 law row 1) — the filter
+        // keeps the wire honest and the promiscuous-stage hole (3b) closed at the never-sent leg.
+        const scopedTo = this.armed
+          ? (p: string) => link.client ? this.scope!.held(p) : this.writes.ring.holdsAny(link.uuid, p, this.replicas)
+          : null
+        if (scopedTo !== null && this.writes.ring.epoch !== this.epoch)
+          this.writes.ring.build(this.epoch, this.membership.view.members)
         let shipped = 0
         for (const [origin, entries] of this.logs) {
           const theirs = typeof v.d[origin] === 'number' ? (v.d[origin] as number) : 0
           let lo = entries.length
           while (lo > 0 && entries[lo - 1].seq > theirs) lo-- // entries are seq-ascending; find the missing suffix
           if (lo === entries.length) continue
-          const missing = entries.slice(lo).map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))
+          let tail = entries.slice(lo)
+          if (scopedTo !== null) tail = tail.filter((e) => scopedTo(partitionOf(e.rec)))
+          if (!tail.length) continue
+          const missing = tail.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))
           for (const bytes of encodeRuns(missing)) link.ship(bytes, this.env.sink, j)
           shipped += missing.length
         }

@@ -491,6 +491,17 @@ export class Writes {
     // A PREVIOUS life's lane (uuid vs uuid~inc) is an ordinary foreign stream here — immutable,
     // tail-complete at peers, healed by suffix AE like anything else (the M4b recovery story).
     const d = node.streams.for(origin)
+    //! M6 INBOUND GATE (armed only, the §0 law's first row): a record for a partition this node
+    // neither holds nor is assigned — or holds only as a FROZEN ORPHAN — drops before the fence.
+    // It exists for the one lawful race (a sender fanning out on an older epoch's ring) and can never
+    // forge evidence (the dropper never attests marks for p) or strand data (the true holders receive
+    // it from the sender directly; a committer's own copy survives until shed). The rec materializes
+    // early here (armed only — the gate needs the partition before the fence can run).
+    let rec: Rec | null = null
+    if (node.armed) {
+      rec = rv.rec()
+      if (!node.scope!.accepts(node, partitionOf(rec))) { j.armed && j.emit(JK.gateDrop, origin, seq); return 0 }
+    }
     //! the APPLIED watermark advances at the dedup decision (LWW losers included — losing is not loss).
     // The scalar fence's license is "FIFO link × single broadcaster" — under M6 scoping one lane's
     // records reach a node from MULTIPLE answerers holding different partition subsets, so an
@@ -500,11 +511,11 @@ export class Writes {
     // (on unscoped trajectories a client's under-fence arrival is always a genuine dup, which the
     // dual fence answers identically: found-in-lane ⇒ drop — zero behavioural change).
     if (seq <= d.applied) {
-      if (node.armed || node.client) return this.#splice(node, origin, seq, epoch, rv, d)
+      if (node.armed || node.client) return this.#splice(node, origin, seq, epoch, rv, d, rec)
       j.armed && j.emit(JK.dupDrop, origin, seq); return 0
     }
     d.applied = seq
-    const rec = rv.rec() // ONE copy out of the receive chunk, shared by the log entry and the apply
+    if (rec === null) rec = rv.rec() // ONE copy out of the receive chunk, shared by the log entry and the apply
     const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch }
     if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
     node.logFor(origin).push(entry)
@@ -561,9 +572,9 @@ export class Writes {
   // under-fence arrival is a genuine dup that the lane-presence test drops identically.
   // Durable nodes: the splice is MEMORY-ONLY here — node.spliced() marks the partition dirty and arms
   // the snapshot swap; until the swap's echo the durable floor does not cover it (no-interior-rows).
-  #splice(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }, d: StreamDescriptor): number {
+  #splice(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }, d: StreamDescriptor, pre: Rec | null = null): number {
     const j = node.journal
-    const rec = rv.rec()
+    const rec = pre ?? rv.rec()
     const p = partitionOf(rec)
     if (node.armed && (d.parts?.get(p)?.s ?? 0) >= seq) { j.armed && j.emit(JK.dupDrop, origin, seq); return 0 }
     const lane = node.logFor(origin)
