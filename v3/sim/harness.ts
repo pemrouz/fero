@@ -35,6 +35,22 @@ export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durab
 export const formed = (nodes: Node[]): boolean =>
   nodes.every((n) => n.admitted().length === nodes.length - 1)
 
+//! client — a SPOKE (M5b): dials the given members, elects one primary feeder, folds the same
+// replication stream, writes as ae=0 relayed attempts. Convergence checks range over it like any node.
+export const client = (sim: Sim, id: string, servers: Node[], opts: { heartbeatMs?: number } = {}): Node => {
+  const c = sim.add({
+    uuid: id,
+    listen: `sim:${id}`,
+    hosts: servers.map((s) => `sim:${s.uuid}`),
+    heartbeatMs: opts.heartbeatMs ?? 0,
+    client: true,
+    redialMs: 20,
+    journalCap: 1 << 16,
+  })
+  sim.post(id, { kind: 'start' })
+  return c
+}
+
 //! writes — schedule a deterministic-random workload: `count` writes spread over (0, spanMs], mixed types/values drawn from the sim's seeded rng.
 export const writes = (sim: Sim, nodes: Node[], count: number, spanMs = 300) => {
   const keys = ['alpha', 'beta', 'gamma', 'delta', 'epsi']

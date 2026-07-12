@@ -115,6 +115,7 @@ export class Bind {
     const fast = settledFast
     this.#fastApplied = fast
     try { this.#rt.write(valid) } finally { this.#issuing = null; this.#fastApplied = null }
+    this.#sweepDrops() // enqueue overflow drops synchronously inside write() — release NOW, not at the next apply
     //! the epoch-0 fast path mints NO cids (kernel/write.ts): commits applied synchronously with no
     // attempt identity — settle positionally (single-threaded step: every iss-less apply inside our
     // own write() call is ours, in record order) and clear the predicted entries
@@ -180,6 +181,7 @@ export class Bind {
     }
     //! 4) the ONE projection: kernel record → proxy, with the echo pre-consumed
     this.#apply(a)
+    this.#sweepDrops()
   }
 
   //! apply — project one record into the proxy, arming the expected-echo consume for the synchronous
@@ -218,6 +220,29 @@ export class Bind {
     //! assignments have no await surface — swallow the coordinate promises (their overlay/journal
     // effects are the observable outcome), but NEVER let a reject become an unhandledRejection
     for (const r of this.issue(recs, true)) if (typeof r !== 'string') (r as Promise<Coords>).catch(() => {})
+  }
+
+  //! sweepDrops — the MAX_PENDING release (M5b, closes the M5a residual): when the kernel drops the
+  // oldest attempt at overflow (droppedPending grows), find our pending entries the kernel no longer
+  // holds. WACK'd-or-replicated ones have dedup-window coordinates (onAck feeds it) — resolve them;
+  // the rest are genuinely dropped — reject, release the overlay, and let the confirmed fold show
+  // through (the bounce is visible, never silent: counted kernel-side, rejected api-side).
+  #drops = 0
+  #sweepDrops() {
+    const w = this.#rt.node.writes
+    if (w.droppedPending === this.#drops) return
+    this.#drops = w.droppedPending
+    for (const [key, p] of this.#pending) {
+      if (w.pending.has(key)) continue
+      this.#pending.delete(key)
+      const c = w.committed(this.#iss, p.cid)
+      if (c) p.resolve({ origin: this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: p.cid })
+      else {
+        p.reject('dropped')
+        if (this.#overlay.get(p.cell) === p.cid) { this.#overlay.delete(p.cell); this.#revert(p.cell) }
+      }
+      if (this.#overlay.get(p.cell) === p.cid && c) this.#overlay.delete(p.cell)
+    }
   }
 
   //! destroy — synchronous detach (substrate contract): no capture after this returns, no applies in.

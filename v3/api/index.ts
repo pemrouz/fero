@@ -42,12 +42,20 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   for (const k of Object.keys(seams))
     if (!SEAM_KEYS.has(k)) throw new Error(`fero('${name}'): unknown seam '${k}' — M5a ships ${[...SEAM_KEYS].join(', ')}; hash/codec/storage land with their milestones`)
 
+  //! role by shape (the v2 rule, kept): hosts without a listen address = a CLIENT — a spoke that can
+  // never be dialed can never be a member. listen (with or without hosts) = a server; neither = solo.
+  const isClient = !config.listen && Array.isArray(config.hosts) && (config.hosts as string[]).length > 0
+  if (isClient && config.dir) throw new Error(`fero('${name}'): a durable client (dir on a spoke) is not supported yet — offline-first clients are tracked for M6`)
   const rtOpts: RuntimeOpts = {
     uuid: (config.uuid as string) ?? randomUUID().slice(0, 8),
     listen: config.listen as string | undefined,
     hosts: config.hosts as string[] | undefined,
+    client: isClient || undefined,
     dir: config.dir as string | undefined,
-    heartbeatMs: config.heartbeatMs as number | undefined,
+    //! the KERNEL keeps heartbeats explicit (0 = off, the sweep mode); the COMPOSER is where production
+    // defaults live: 500ms drives genesis/suspicion on servers and the write-retry clock + AE floor on
+    // clients. Pass heartbeatMs: 0 to opt out.
+    heartbeatMs: (config.heartbeatMs as number | undefined) ?? 500,
     redialMs: config.redialMs as number | undefined,
     journalCap: config.journalCap as number | undefined,
     //! restore-before-network: a dir holding a previous life boots as its heir (incarnation bumped,

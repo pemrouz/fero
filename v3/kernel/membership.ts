@@ -173,18 +173,21 @@ export class Membership {
   // proposals, proposal retry/abandon, stale-pull retries + alarmed release, rejoin/evictee recovery.
   tick(node: Node) {
     const j = node.journal
-    //! genesis: fully-formed open mesh + lowest uuid ⇒ propose view 1 over the admitted set
-    if (this.view.epoch === 0 && !this.#proposal && !this.rejoining() && !this.epochStale) {
+    //! genesis: fully-formed open mesh + lowest uuid ⇒ propose view 1 over the admitted set.
+    // CLIENT links are invisible here (M5b): a spoke never counts toward formation, never enters the
+    // member sweep, and never wins the lowest-uuid race — and a client NODE runs none of the member
+    // machinery at all (the node.client guards here and below; stale-pulls + settle stay live for it).
+    if (!node.client && this.view.epoch === 0 && !this.#proposal && !this.rejoining() && !this.epochStale) {
       const hosts = node.hosts
-      const admitted = node.admitted() // dedup-race losers are dead and excluded (review: a dead twin once double-counted)
-      if (hosts.length > 0 && admitted.length >= hosts.length && [node.uuid, ...admitted].sort()[0] === node.uuid) {
+      const links = this.#admitted(node).filter((l) => !l.client) // dedup-race losers are dead and excluded (review: a dead twin once double-counted)
+      if (hosts.length > 0 && links.length >= hosts.length && [node.uuid, ...links.map((l) => l.uuid)].sort()[0] === node.uuid) {
         const byUuid = new Map<string, string>([[node.uuid, node.listen]])
-        for (const l of this.#admitted(node)) byUuid.set(l.uuid, l.listen)
+        for (const l of links) byUuid.set(l.uuid, l.listen)
         this.#propose(node, { epoch: this.#nextEpoch(node), members: sorted([...byUuid.entries()]) })
       }
     }
     //! suspicion: a committed-view member with no admitted link for SUSPECT_TICKS ticks is suspect
-    if (this.view.epoch > 0 && this.isMember(node.uuid) && !this.rejoining()) {
+    if (!node.client && this.view.epoch > 0 && this.isMember(node.uuid) && !this.rejoining()) {
       for (const [uuid] of this.view.members) {
         if (uuid === node.uuid) continue
         const id = node.byUuid.get(uuid)
@@ -237,7 +240,7 @@ export class Membership {
     //! rejoining: pull the live view from restored members; if NOBODY confirms (full-cluster restart),
     // the lowest restored member self-ballots the restored view at epoch+1 — majority of the restored
     // set must grant, so a live newer cluster always outruns this (its VIEW clears the floor first).
-    if (this.rejoining() && !this.epochStale) {
+    if (!node.client && this.rejoining() && !this.epochStale) {
       const memberLinks = this.#admitted(node).filter((l) => this.isMember(l.uuid))
       this.#send(node, memberLinks, encodeControl(VERB.PULL, { e: this.view.epoch }))
       if (++this.#rejoinTicks >= REJOIN_TICKS && !this.#proposal && this.#lowestLive() === node.uuid)
@@ -245,7 +248,7 @@ export class Membership {
     }
     //! evicted: ask the lowest admitted MEMBER of my view to propose me back in (a fellow evictee would
     // silently drop the knock — the review's two-evictees-knocking-on-each-other wedge)
-    if (!this.rejoining() && this.view.epoch > 0 && !this.isMember(node.uuid) && !this.epochStale) {
+    if (!node.client && !this.rejoining() && this.view.epoch > 0 && !this.isMember(node.uuid) && !this.epochStale) {
       const target = this.#admitted(node).filter((l) => this.isMember(l.uuid)).sort((a, b) => (a.uuid < b.uuid ? -1 : 1))[0]
       if (target) {
         target.ship(encodeControl(VERB.JOIN, { u: node.uuid, i: node.incarnation, l: node.listen }), node.env.sink, j)

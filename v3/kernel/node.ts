@@ -51,6 +51,12 @@ export interface NodeOpts {
   // confirmed live), the Lamport floor, and the spent ballot identity (votedFor durability is what makes
   // a crash inside one ballot round unable to double-vote — the M2 debt, closed here).
   boot?: { epoch: number; members: [string, string][]; lamport?: number; votedFor?: { e: number; p: string; h: string } }
+  //! client (M5b): EXPLICIT role mode — a SPOKE, never a view member. A client dials its hosts, keeps
+  // exactly ONE primary link (the only link it digests — the single-feeder ordering guarantee), folds
+  // the same replication stream as everyone else, and issues writes as ae=0 attempts relayed by the
+  // primary (plan §5 client writes: a client never stamps provenance; the FIRST server re-stamps at
+  // relay time). It never proposes, votes, JOIN-knocks, or counts toward genesis.
+  client?: boolean
 }
 
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
@@ -189,6 +195,18 @@ export class Node {
   //! durable — the M4 storage mode (explicit, like heartbeats). Off ⇒ zero storage effects.
   get durable(): boolean { return this.#opts.durable === true }
 
+  //! client — the M5b role mode (see NodeOpts.client). Off ⇒ zero behavioural difference.
+  get client(): boolean { return this.#opts.client === true }
+
+  //! primary — the client's ONE feeder link id (null while unconnected). Kernel-internal to the client
+  // role; the write drain targets it, digests flow only over it, failover re-elects on its linkDown.
+  primary: number | null = null
+
+  //! clientLinks — the admitted CLIENT links this node serves (maintained at HELLO/linkDown). The
+  // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
+  // so the member hot path pays nothing (M5b).
+  clientLinks = new Set<Link>()
+
   //! hosts — the static discovery targets (membership's genesis quorum + the revival loop read it).
   get hosts(): string[] { return this.#opts.hosts ?? [] }
 
@@ -278,8 +296,11 @@ export class Node {
         const link = new Link(e.link, e.dialed, e.to)
         this.links.set(e.link, link)
         j.armed && j.emit(JK.linkUp, e.link, e.dialed ? 1 : 0)
-        //! both sides open with HELLO — identity first, before anything routes
-        link.ship(encodeControl(VERB.HELLO, { u: this.uuid, i: this.incarnation, l: this.listen }), this.env.sink, j)
+        //! both sides open with HELLO — identity first, before anything routes. Clients declare the
+        // role (r:1) so the peer excludes them from genesis and feeds them by tap-forward (M5b).
+        link.ship(encodeControl(VERB.HELLO, this.client
+          ? { u: this.uuid, i: this.incarnation, l: this.listen, r: 1 }
+          : { u: this.uuid, i: this.incarnation, l: this.listen }), this.env.sink, j)
         return
       }
       case 'bytesIn': {
@@ -314,6 +335,19 @@ export class Node {
         }
         this.links.delete(e.link)
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
+        this.clientLinks.delete(link)
+        //! client primary failover (M5b): the feeder died — elect the next admitted server, digest it
+        // (its suffix ship resumes every origin lane from our announced tails, in order), and re-park
+        // the in-flight attempts so the write drain re-targets the new relay NOW, not at RETRY_TICKS.
+        if (this.client && this.primary === e.link) {
+          this.primary = null
+          for (const l of this.links.values())
+            if (l.state === LS.admitted && !l.dead) { this.primary = l.id; break }
+          if (this.primary !== null) {
+            this.#sendDigest(this.links.get(this.primary)!, 1)
+            this.writes.repark(this)
+          }
+        }
         //! BOTH sides redial a lost peer (jittered capped backoff) — the dialer via its target, the
         // acceptor via the peer's gossiped listen. The acceptor-side chain is what arms the eviction
         // dialing-hold symmetrically (review: a 3-tick blip once evicted a live member from the acceptor
@@ -362,7 +396,8 @@ export class Node {
               // any loss mode WITHOUT a reconnect/drain signal (transport bugs, future non-TCP shells).
               // One r=1 digest from the PING side covers both directions: the reply ships our gaps, and
               // receiving their digest ships theirs. Nothing missing ⇒ nothing shipped (idempotent).
-              this.#sendDigest(link, 1)
+              // A client floors only its PRIMARY (the single-feeder rule — see the DIGEST handler).
+              if (!this.client || link.id === this.primary) this.#sendDigest(link, 1)
             }
           //! membership acts on the heartbeat clock too (explicit protocol mode): genesis, suspicion,
           // eviction/join ballots, stale pulls, rejoin nudges — all only when heartbeats are on.
@@ -624,6 +659,7 @@ export class Node {
           }
         }
         link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
+        if ((v as { r?: unknown }).r === 1) { link.client = true; this.clientLinks.add(link) }
         link.state = LS.admitted
         this.byUuid.set(v.u, link.id)
         //! reincarnation fences dead evidence: a peer identifying with a HIGHER incarnation crashed —
@@ -645,7 +681,12 @@ export class Node {
         //! digest-on-admit, from BOTH ends (direction-independent — v2's dialer-gated catch-up trap is the
         // counterexample this rule exists for): each side announces what it holds; the peer ships the missing
         // suffixes. Every admit heals — first link, keeper-after-dup-race, reconnect-after-heal.
-        this.#sendDigest(link, 1)
+        // CLIENT exception (M5b): a client digests exactly ONE server — its primary. The first admit
+        // elects it; every other link stays un-digested (and un-answered — see the DIGEST handler), so
+        // synced never rises there and this client has ONE feeder: per-origin ordering by construction.
+        if (this.client) {
+          if (this.primary === null) { this.primary = link.id; this.#sendDigest(link, 1) }
+        } else this.#sendDigest(link, 1)
         //! view-on-admit (symmetric with digest-on-admit): announce the committed view so a healed peer's
         // membership converges even when no epoch-stamped records flow; then settle — an admitted member
         // can flip the gate back to majority, flushing any parked writes
@@ -679,6 +720,10 @@ export class Node {
         // partially-fresh frame re-dedup on replay; the applied watermark makes that idempotent.
         if (fresh && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice())
         if (fresh) this.confirm.recount(this) // my shippable for this origin advanced — evidence for a probe
+        //! flush the tap-forward (M5b): inbound() queued fresh records onto synced CLIENT links (the
+        // spoke feed) — one flush per FRAME keeps the one-frame-per-tick shape on the client wire too
+        if (fresh && this.clientLinks.size)
+          for (const cl of this.clientLinks) cl.flush(this.env.sink, j)
         return
       }
       //! M3 write pipeline — WRITE (a forwarded attempt run / a client relay), WACK (commit
@@ -724,6 +769,20 @@ export class Node {
           return
         }
         j.armed && j.emit(JK.digestIn, link.id)
+        //! CLIENT single-feeder rule (M5b): a digest arriving on a NON-primary link goes unanswered and
+        // un-shipped — answering would sync that server's side of the link and open a second broadcast
+        // feeder, forking per-origin ordering. The evidence maps are still consumed (confirm is
+        // side-effect-free reading); everything active is primary-only.
+        if (this.client && link.id !== this.primary) {
+          if (typeof v.p === 'object' && v.p !== null) this.confirm.sawP(link.uuid)
+          for (const [origin, tail] of Object.entries(v.d))
+            if (typeof tail === 'number') {
+              const dur = typeof v.p?.[origin] === 'number' ? (v.p[origin] as number) : 0
+              this.confirm.feed(this, link.uuid, origin, tail, dur)
+            }
+          this.confirm.recount(this)
+          return
+        }
         //! confirm evidence rides every digest: the d map IS the peer's shippable tails, the optional p
         // map its durable tails (sent only by durable-mode peers) — the ladder converges with zero new frames.
         // A p map's PRESENCE (even empty) marks the peer durable — the compaction frontier reads its
