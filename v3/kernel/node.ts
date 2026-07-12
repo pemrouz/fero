@@ -432,7 +432,7 @@ export class Node {
       const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch: this.epoch }
       if (attempt) { entry.iss = attempt.issuer; entry.cid = attempt.baseCid + k }
       this.logFor(this.origin).push(entry) // the record is OWNED from here (embedder hands it over)
-      this.apply(rec, this.origin, seq, this.epoch)
+      this.apply(rec, this.origin, seq, this.epoch, entry.iss, entry.cid)
       j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
       //! the own lane's ladder advances at the stamp site: applied+shippable together (logged and
       // applied in this same step); durable waits for the M4b storage batch to resolve
@@ -822,7 +822,10 @@ export class Node {
   // LWW election, mutates the state mirror, and emits the apply effect downstream. A record that loses
   // its election is SKIPPED but its stream watermark still advances (the caller's job) — losing is not
   // loss. Kernel-internal: called by commit and by the write module's inbound ingest, nothing else.
-  apply(rec: Rec, origin: string, seq: number, epoch: number) {
+  // `iss`/`cid` (M5a): the attempt identity when the caller holds one — riding the Applied effect so
+  // the embedder can join ITS OWN writes against the apply stream (env.ts Applied; the api layer's
+  // write promises and cid-overlay drops key off exactly this join).
+  apply(rec: Rec, origin: string, seq: number, epoch: number, iss?: string, cid?: number) {
     const k = JSON.stringify(rec.key.length ? rec.key : [rec.at ?? '']) // unambiguous internal key — wire keys stay length-prefixed
     //! LWW: lexicographic (epoch, seq, origin), identical on every node — apply iff strictly newer than the held stamp
     const cur = this.versions.get(k)
@@ -842,7 +845,7 @@ export class Node {
       this.#entryHash.set(k, h)
       this.#hash = (this.#hash + h) | 0
     }
-    this.env.sink.apply({ type: rec.type, key: rec.key, value: rec.value, at: rec.at, origin, seq, epoch })
+    this.env.sink.apply({ type: rec.type, key: rec.key, value: rec.value, at: rec.at, origin, seq, epoch, iss, cid })
   }
 
   //! stateHash — order-insensitive rolling hash over entries: O(1) per apply, comparable per event (the sim's convergence + replay-determinism checks key off it).

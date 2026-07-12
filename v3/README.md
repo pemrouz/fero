@@ -1,4 +1,4 @@
-# fero v3 — M0 + M1 replication + M2 membership + M3 write pipeline + M4 durability + the debug tool
+# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5a) + the debug tool
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -18,8 +18,8 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 166 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
-npm run perf                   # 15 perf gates: counted invariants first, ratios second, absolutes last
+npm test                       # 182 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm run perf                   # 17 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
 npm run debug                  # scenario DASHBOARD at /, the debugger at /debug (http://localhost:4699)
@@ -29,8 +29,8 @@ npm run debug -- --live        # spin a REAL 3-node TCP cluster + owner-routed t
 npm run debug -- --live --contend      # ...with a deliberately conflicting workload (LWW elections on demand)
 ```
 
-Measured on this box (WSL2): `1000/1000 seeds green · 179,057 events in ~5.2s
-(~34,000 events/s)`. Every seed is a full cluster lifecycle — dial-race formation
+Measured on this box (WSL2): `1000/1000 seeds green · 237,451 events in ~4.5s
+(~53,000 events/s)`. Every seed is a full cluster lifecycle — dial-race formation
 under per-pair delay/duplication faults, a mixed-type write workload issued
 DURING formation (deliberately racing the dial-race window), convergence + drain +
 per-event invariant monitors. A failing seed prints itself; re-running that seed
@@ -225,6 +225,11 @@ kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.
   log.ts        compaction: snapshot-record-supersedes-prefix below the crash-stable frontier; tombstone GC (M4d)
   journal.ts    the one typed diagnostics ring (drop-oldest, surfaced drop counter)
 shell/    production adapters (TCP + timers + the fsync WAL/boot-record store), zero protocol decisions
+api/      the public surface (M5a): fero(name, opts) → {data, methods, cluster, destroy}
+  substrate.ts  the ONE seam onto the `data` sibling ($() proxies): record-apply ingress, clone-free capture, sync detach
+  data.ts       the binding: capture→ingest, apply→proxy, echo match-and-consume, the cid-keyed overlay (read-your-writes)
+  index.ts      the composer: declared config schema (typos throw), seams.validation, default write methods over the confirm ladder
+  types.ts      the exported unions: Guarantee, WriteResolve/WriteReject, FeroConfig, Fero
 sim/      the executive: virtual time, seeded faults (FIFO-clamped), per-event monitors, sweep CLI
 tests/    Tier-3 real-socket smoke (the only wall-clock tier)
 utils/    ports/bench/ratio.interleaved — v2's #utils conventions
@@ -432,8 +437,39 @@ because state is a deterministic fold of the journal'd inputs.
   real restarts by construction. Pending overflow drops the OLDEST attempt
   (journal-surfaced) — under sustained gate-closed writes beyond
   MAX_PENDING=1024 that is real, counted loss.
-- **Next: the public `fero(name, opts)` API over `$()` proxies + the client
-  cid-overlay (M5).** The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is
+- **M5a — the public composer — is LIVE** (api/): `await fero(name, opts)` →
+  `{data, methods, cluster, destroy}` over `$()` proxies, sliced (like M4) into
+  four landable increments: **M5a** composer + data binding + cid-overlay (this) →
+  **M5b** the client role (kernel HELLO role, ae=0 client writes + retransmit,
+  server tap-forward to spokes, sim client sweeps) → **M5c** methods (CALL/SUB
+  verbs, sink.invoke with handlers hosted in the impure api layer, tagged
+  Handles + failover policies, flush-on-return) → **M5d** cluster end-to-end +
+  the scenario library over the public surface + the two-terminal demo + the M5
+  adversarial review. What M5a establishes:
+  - **The substrate contract is settled by probe, not promise** (plan §10's
+    go/no-go): `data`'s bare-verb sinks are clone-free with synchronous detach;
+    `[view].res` is the record-apply ingress; echoes come back verb-REWRITTEN
+    (update→insert) and re-entrant user writes drain INSIDE an apply call — all
+    pinned facts (api/substrate.ts banner), consumed through ONE wrapper seam.
+  - **Two surfaces, no flag family**: kernel state IS the confirmed fold;
+    the proxy = confirmed + the cid-keyed pending overlay (read-your-writes).
+    Echo suppression is match-and-consume of one expected echo per apply; the
+    overlay needs no value bookkeeping (the beneath is always derivable from
+    kernel state — revert/bounce re-reads it).
+  - **The write-route join**: Applied now carries the attempt identity
+    (iss, cid) on every path that knows one (commit/inbound/replay — pinned),
+    so the api resolves its own writes off the ONE apply stream; the cross-epoch
+    LWW-loss race resolves from the dedup window's original coordinates
+    (writes.committed probe) instead of hanging.
+  - **One ingest** for assignment sugar and `methods.update/insert/remove`
+    ({confirm, timeout} against the M4c ladder, WriteResolve/WriteReject
+    unions) — so seams.validation covers both by construction (v2's OQ6).
+  - Known M5a residuals (tracked): capture-path overlay entries whose attempt
+    the kernel drops at MAX_PENDING overflow release only on the cell's next
+    apply (M5b ties the release to the drop); the cluster fold rides a
+    post-step hook (whether membership becomes a first-class sink effect is
+    the M5d decision); user methods stash but do not dispatch until M5c.
+- The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is
   [CHECKPOINT.md](CHECKPOINT.md) — verdict: no overrun, ladder armed but not
   triggered, M4 sliced into five landable increments (M4a streams/watermarks →
   M4b storage seam + boot record → M4c confirm ladder → M4d log/compaction →

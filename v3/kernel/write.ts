@@ -128,6 +128,10 @@ export class Writes {
   pending = new Map<string, Attempt>()
   droppedPending = 0
   #cid = 0
+  //! cid — the attempt counter, read-only (M5a): the embedder samples it around a synchronous write()
+  // to learn which cids its batch minted (issue() assigns one per record, contiguous, in record order;
+  // the epoch-0 fast path mints none — those records apply synchronously inside the same step instead).
+  get cid(): number { return this.#cid }
   #queued = 0 // attempts with sent < 0 — lets #drain no-op when everything is in flight
   //! per-issuer dedup window: cid → original commit coordinates, oldest-first (Map order), fed by BOTH
   // the local commit site and replicated attempt identities (the ownership-move exactly-once story)
@@ -142,6 +146,13 @@ export class Writes {
   // a record that may exist nowhere — silent acknowledged loss. Forgetting is the honest weaker mode:
   // a post-condemn retry re-commits as a same-value LWW supersede until replication re-feeds the window.
   reset() { this.#seen.clear() }
+
+  //! committed — read-only dedup-window probe (M5a): the ORIGINAL commit coordinates of an attempt, if
+  // still inside the exact window. The api layer resolves a pending write that committed but never
+  // surfaced through its own apply join (the cross-epoch LWW-loss race) from exactly this evidence.
+  committed(issuer: string, cid: number): { s: number; e: number } | undefined {
+    return this.#seen.get(issuer)?.get(cid)
+  }
 
   //! issue — source=local: the 'write' event lands here. Epoch 0 + open gate is the M0/M1 fast path
   // (straight to the stamp site, zero attempt bookkeeping); everything else mints Attempts and drains.
@@ -449,7 +460,7 @@ export class Writes {
     //! the SHIPPABLE watermark advances at the log append — the sole evidence confirm:'replicated'
     // may ever read (M4c); synchronous with applied today, a distinct site by design
     d.shippable = seq
-    node.apply(rec, origin, seq, epoch)
+    node.apply(rec, origin, seq, epoch, entry.iss, entry.cid)
     j.armed && j.emit(JK.applyInbound, origin, seq)
     if (rv.issuer) {
       this.#remember(node, rv.issuer, rv.cid, seq, epoch)
@@ -497,7 +508,7 @@ export class Writes {
       node.logFor(prov.origin).push(entry)
       d.shippable = rv.seq
       d.durable = rv.seq
-      node.apply(rec, prov.origin, rv.seq, rv.epoch)
+      node.apply(rec, prov.origin, rv.seq, rv.epoch, entry.iss, entry.cid)
       //! replay speaks the SAME journal vocabulary as live ingest (it IS the ingest path): per-record
       // applyInbound keeps the debugger's time-travel fold (tools/debug/model.mjs stateAt) truthful
       // across a restore — without it a reborn node's fold looks empty to every journal consumer.
