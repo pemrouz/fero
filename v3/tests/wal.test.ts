@@ -54,6 +54,58 @@ test('a solo durable node survives a hard restart: WAL + boot record restore sta
   }
 })
 
+test('M4-REVIEW PIN — a CLEAN destroy flushes every queued append: committed writes reach the disk before the fd closes', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-flush-'))
+  let a: Runtime | null = null
+  let b: Runtime | null = null
+  try {
+    a = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir })
+    await a.start()
+    //! write a burst and destroy IMMEDIATELY — no waiting for fsync echoes: the io-queue must drain
+    // to disk during destroy() (the review found these rows were silently dropped on clean shutdown)
+    for (let i = 0; i < 8; i++) a.write([{ type: REC.update, key: [`k${i}`], value: i }])
+    const hash = a.node.stateHash
+    await a.destroy()
+    a = null
+    b = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir, ...restoreOpts(dir) })
+    b.restore()
+    assert.equal(b.node.stateHash, hash, 'every committed write survived the clean shutdown')
+    assert.equal(b.node.state.size, 8)
+  } finally {
+    await a?.destroy()
+    await b?.destroy()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('M4-REVIEW PIN — interior corruption on a real WAL is a VERDICT, not a tear: valid rows beyond it condemn the restore', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-corrupt-'))
+  let a: Runtime | null = null
+  let b: Runtime | null = null
+  try {
+    a = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir })
+    await a.start()
+    for (let i = 0; i < 3; i++) a.write([{ type: REC.update, key: [`k${i}`], value: i }])
+    assert.ok(await until(() => (a!.node.streams.get('aa')?.durable ?? 0) === 3))
+    await a.destroy()
+    a = null
+    //! flip one byte in the MIDDLE of the file: rows after it are intact and crc-valid — the resync
+    // scan must find them and hand the kernel the impossible chain link that condemns the disk
+    const p = path.join(dir, 'wal.log')
+    const bytes = fs.readFileSync(p)
+    bytes[Math.floor(bytes.length / 2)] ^= 0xff
+    fs.writeFileSync(p, bytes)
+    b = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir, ...restoreOpts(dir) })
+    b.restore()
+    assert.equal(b.node.tainted, true, 'corruption with intact rows beyond it is proof, and the verdict fires')
+    assert.equal(b.node.state.size, 0, 'the fold reset — a corrupt disk\'s prefix is not evidence')
+  } finally {
+    await a?.destroy()
+    await b?.destroy()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('the M4e twin on real disks: a two-node cluster is killed whole — both restore from their WALs (one swapped) and reconverge', async () => {
   const da = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-a-'))
   const db = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-b-'))

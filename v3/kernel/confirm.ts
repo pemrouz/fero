@@ -49,6 +49,11 @@ export class Confirm {
   #probes = new Map<number, Probe>()
   //! per-peer evidence marks: uuid → origin → {s: shippable tail, d: durable tail}, fed by digests (monotone).
   #marks = new Map<string, Map<string, { s: number; d: number }>>()
+  //! peers that have EVER announced a durable (p) map — the "this peer is durable" signal. The
+  // compaction frontier keys crash-stability off it: a durable peer's marks must be read at markD
+  // (its crash restores at least its durable), a never-announced-p peer is non-durable and its crash
+  // is a TOTAL refold (volatile marks are then sound) — the mixed-cluster resurrection finding.
+  #hasP = new Set<string>()
 
   //! register — open a probe; it may resolve synchronously (evidence can already suffice).
   register(node: Node, id: number, origin: string, seq: number, level: number) {
@@ -90,6 +95,28 @@ export class Confirm {
     if (!m) { m = { s: 0, d: 0 }; per.set(origin, m) }
     if (s > m.s) m.s = s
     if (d > m.d) m.d = d
+  }
+
+  //! sawP — the peer's digest carried a p map (even an empty one): it runs in durable mode.
+  sawP(uuid: string) { this.#hasP.add(uuid) }
+
+  //! origins — add every lane ANY peer has ever announced to `into`. The tombstone-GC lane universe
+  // must include lanes this node has not received a single record of yet (only a digest mention):
+  // their in-flight suffixes are exactly as capable of contesting a released stamp as a known lane's.
+  origins(into: Set<string>) { for (const per of this.#marks.values()) for (const o of per.keys()) into.add(o) }
+  //! durablePeer — has this peer ever announced durable evidence? (See #hasP.)
+  durablePeer(uuid: string): boolean { return this.#hasP.has(uuid) }
+
+  //! forget — a peer was REBORN (its HELLO carries a higher incarnation): every mark it ever announced
+  // is void. Marks are monotone by design (feed only raises), which is correct within one life and a
+  // LIE across lives — a crash regresses shippable/applied outright, and even durable regresses when
+  // the disk lied or the restore was condemned. Counting a dead life's marks handed replicated-probes
+  // a quorum member that provably holds nothing, and held the compaction frontier open over evidence
+  // no disk backs (M4-review finding). Open probes are NOT re-answered — evidence became weaker, so
+  // they simply wait for the reborn's fresh digests.
+  forget(uuid: string) {
+    this.#marks.delete(uuid)
+    this.#hasP.delete(uuid)
   }
 
   //! recount — re-evaluate every open probe against CURRENT membership and CURRENT evidence. Called

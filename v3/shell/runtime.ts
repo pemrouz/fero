@@ -25,8 +25,18 @@ import net from 'node:net'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Node, type NodeOpts } from '../kernel/node.ts'
-import { Cursor, Writer, HEADER } from '../kernel/codec.ts'
+import { Cursor, Writer, HEADER, MAGIC, MAX_FRAME, crcFrame } from '../kernel/codec.ts'
 import type { Applied, BootRecord, Rec } from '../kernel/env.ts'
+
+//! syncDir — fsync a DIRECTORY: a rename is not durable until the directory entry is (POSIX leaves
+// it to the fs; ext4/xfs need the explicit dir fsync). Best-effort catch: some platforms refuse
+// fsync on a directory fd — there the rename+fsync(file) is the strongest available ordering.
+const syncDir = (dir: string) => {
+  try {
+    const fd = fs.openSync(dir, 'r')
+    try { fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
+  } catch { /* platform without dir-fsync: nothing stronger exists to ask for */ }
+}
 
 //! RuntimeOpts: NodeOpts + the storage directory (presence = durable mode; NodeOpts.durable derives from it).
 export interface RuntimeOpts extends NodeOpts { dir?: string }
@@ -57,6 +67,11 @@ export class Runtime {
   // CLEAN restart; the queue is also what makes the snapshot swap atomic wrt appends (nothing
   // straddles the rename — every queued append lands wholly before or wholly after the new file).
   #ioq: Promise<void> = Promise.resolve()
+  //! #walFailed — the SHELL-side fsyncgate latch: after one failed write/fsync/swap, every queued and
+  // future WAL op is skipped outright. Without it the queue kept appending past the failure and could
+  // SUCCEED, leaving an interior hole on an HONEST disk — which would then read as a lie at replay
+  // and condemn an innocent restore (M4-review: the hole-means-lie premise requires stop-on-failure).
+  #walFailed = false
   onApply: (rec: Applied) => void
   //! onConfirm — the guarantee ladder's answers surface here (M5's confirm option resolves off it)
   onConfirm: (id: number, ok: boolean, count: number) => void = () => {}
@@ -115,10 +130,18 @@ export class Runtime {
           const row = w.buf.slice(0, w.len)
           runtime.#ioq = runtime.#ioq.then(() => new Promise<void>((done) => {
             const fd = runtime.#wal
-            if (fd === null || runtime.node.destroyed) return done()
+            //! a queued append still RUNS after destroy() begins — a clean shutdown must flush what the
+            // kernel already committed (M4-review: guarding the write on `destroyed` silently dropped
+            // the tail of every clean run). Only the ECHO checks destroyed — a dead node ignores it anyway.
+            if (fd === null || runtime.#walFailed) return done()
             fs.write(fd, row, (err) => {
-              if (err) { runtime.node.step({ kind: 'persistFail', batch, reason: err.code ?? 'write' }); return done() }
+              if (err) {
+                runtime.#walFailed = true
+                if (!runtime.node.destroyed) runtime.node.step({ kind: 'persistFail', batch, reason: err.code ?? 'write' })
+                return done()
+              }
               fs.fsync(fd, (err2) => {
+                if (err2) runtime.#walFailed = true
                 if (!runtime.node.destroyed)
                   runtime.node.step(err2 ? { kind: 'persistFail', batch, reason: err2.code ?? 'fsync' } : { kind: 'persisted', batch })
                 done()
@@ -132,30 +155,50 @@ export class Runtime {
         snapshot(batch, rows) {
           if (!runtime.#opts.dir) return
           const p = path.join(runtime.#opts.dir, 'wal.log')
+          const dir = runtime.#opts.dir
           runtime.#ioq = runtime.#ioq.then(() => {
-            if (runtime.#wal === null || runtime.node.destroyed) return
+            if (runtime.#wal === null || runtime.#walFailed || runtime.node.destroyed) return
             try {
               const w = new Writer()
               for (const r of rows) { w.varint(r.prev); w.bytes(r.bytes) }
               const fd = fs.openSync(p + '.tmp', 'w')
-              fs.writeSync(fd, w.buf.subarray(0, w.len))
-              fs.fsyncSync(fd)
-              fs.closeSync(fd)
-              fs.closeSync(runtime.#wal) // safe: the queue guarantees no append is in flight
+              try {
+                fs.writeSync(fd, w.buf.subarray(0, w.len))
+                fs.fsyncSync(fd)
+              } finally { fs.closeSync(fd) }
               fs.renameSync(p + '.tmp', p)
+              //! the rename is not durable until the DIRECTORY entry is — without this, a power loss
+              // after the swap "resolved" brings the OLD file back: every swap would be a correlated
+              // rename-lie (M4-review). Same ordering discipline as the boot record below.
+              syncDir(dir)
+              //! fd swap LAST, only after the new file is durably in place: any throw above leaves the
+              // old fd valid and owned (no dangling-fd window — a closed-then-recycled fd number here
+              // once meant queued appends could write into an unrelated file; M4-review major).
+              const old = runtime.#wal
               runtime.#wal = fs.openSync(p, 'a')
+              try { fs.closeSync(old) } catch { /* already the new fd's problem space — never fatal */ }
               runtime.node.step({ kind: 'persisted', batch })
             } catch (err) {
-              runtime.node.step({ kind: 'persistFail', batch, reason: (err as NodeJS.ErrnoException).code ?? 'swap' })
+              runtime.#walFailed = true
+              if (!runtime.node.destroyed) runtime.node.step({ kind: 'persistFail', batch, reason: (err as NodeJS.ErrnoException).code ?? 'swap' })
             }
           })
         },
-        //! boot: atomic replace, SYNCHRONOUS — must be on disk before any later-emitted frame hits the wire
+        //! boot: atomic replace, SYNCHRONOUS, FSYNCED — must be DURABLY on disk before any later-emitted
+        // frame hits the wire (the kernel's write-before-later-sends contract: a vote must not outrun
+        // its own record). The M4-review critical here: writeFileSync+rename with no fsync (file OR
+        // directory) let the one record everything else fences on — votedFor, the Lamport ceiling, the
+        // incarnation — regress across a power crash: a double-vote and cross-life seq reuse in one bug.
         boot(record) {
           if (!runtime.#opts.dir) return
           const p = path.join(runtime.#opts.dir, 'boot.json')
-          fs.writeFileSync(p + '.tmp', JSON.stringify(record))
+          const fd = fs.openSync(p + '.tmp', 'w')
+          try {
+            fs.writeSync(fd, JSON.stringify(record))
+            fs.fsyncSync(fd)
+          } finally { fs.closeSync(fd) }
           fs.renameSync(p + '.tmp', p)
+          syncDir(runtime.#opts.dir)
         },
         confirm(id, ok, count) { runtime.onConfirm(id, ok, count) },
       },
@@ -165,7 +208,9 @@ export class Runtime {
   //! restore — walk the WAL rows ([varint prev][frame]) and replay each through the kernel's
   // source=replay ingest, BEFORE start() brings the network up. A torn tail (a row the crash cut mid-
   // append) fails the walk's bounds and simply ends the restore there — the loss is a tail, which is
-  // exactly what anti-entropy heals once the network exists.
+  // exactly what anti-entropy heals once the network exists. A failure that is NOT the tail — an
+  // intact, crc-valid row exists further on — is interior corruption, and the kernel (not this walk)
+  // must pass the verdict: the resync scan below hands it the evidence.
   restore(): void {
     if (!this.#opts.dir) return
     const p = path.join(this.#opts.dir, 'wal.log')
@@ -183,7 +228,24 @@ export class Runtime {
         c.pos += HEADER + bodyLen
         this.node.step({ kind: 'replay', bytes: frame, prev })
       }
-    } catch { /* the torn tail: everything before it replayed; the rest is the wire's to re-ship */ }
+    } catch {
+      //! the walk failed mid-file: torn tail OR interior corruption — distinguishable by whether any
+      // crc-valid frame still exists past the failure. If one does, the file is corrupt in the MIDDLE
+      // (bit rot, a lying disk): deliver that frame with an impossible chain link (prev −1) so the
+      // kernel's hole verdict — condemn, refold from the cluster — fires exactly as for any proven
+      // lie. Silently stopping here treated corruption as an honest tear and kept a partial fold the
+      // sim cannot even represent (M4-review major). No candidate ⇒ a genuine tail tear ⇒ done.
+      for (let x = c.pos; x + HEADER <= c.end; x++) {
+        if (bytes[x] !== MAGIC) continue
+        const bl = bytes[x + 3] | (bytes[x + 4] << 8) | (bytes[x + 5] << 16) | (bytes[x + 6] * 0x1000000)
+        if (bl < 0 || bl > MAX_FRAME || x + HEADER + bl > c.end) continue
+        const view = bytes.subarray(x, x + HEADER + bl)
+        const stored = (view[7] + view[8] * 0x100 + view[9] * 0x10000 + view[10] * 0x1000000) >>> 0
+        if (crcFrame(view, HEADER + bl) !== stored) continue
+        this.node.step({ kind: 'replay', bytes: bytes.slice(x, x + HEADER + bl), prev: -1 })
+        break
+      }
+    }
   }
 
   //! start — listen (if this node is dialable), then post the boot stimulus.
@@ -261,7 +323,11 @@ export class Runtime {
     for (const s of this.#sockets.values()) s.destroy()
     this.#sockets.clear()
     this.#paused.clear()
-    await this.#ioq.catch(() => {}) // let in-flight WAL ops land before the fd closes (their echoes no-op on a destroyed node)
+    //! FLUSH, then close: queued appends carry records the kernel already committed — a clean destroy
+    // that dropped them would un-persist acknowledged writes (M4-review major). The thunks themselves
+    // keep writing after destroy() begins (only their echoes check `destroyed`), so awaiting the queue
+    // here is what makes shutdown durable.
+    await this.#ioq.catch(() => {})
     if (this.#wal !== null) { try { fs.closeSync(this.#wal) } catch {} this.#wal = null }
     if (this.#server) await new Promise<void>((resolve) => this.#server!.close(() => resolve()))
   }

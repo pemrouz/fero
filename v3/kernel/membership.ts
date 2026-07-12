@@ -15,10 +15,13 @@
 // committing two different views for one epoch): a vote is votedFor =
 // (epoch, proposer, membersHash), enforced at BOTH the grant site and the
 // propose site. The rules, each load-bearing:
-//   - grant iff the ballot's epoch is view.epoch+1 AND (my vote for this epoch
-//     is unspent OR was spent on THIS proposer) — re-grants to the same proposer
-//     are idempotent, so a lost VOTE frame heals on the next re-offer instead of
-//     burning the epoch forever (the review's wedge finding);
+//   - grant iff the ballot's epoch is ABOVE the committed view AND (my vote for
+//     this epoch is unspent OR was spent on THIS proposer) — re-grants to the
+//     same proposer are idempotent, so a lost VOTE frame heals on the next
+//     re-offer instead of burning the epoch forever (the review's wedge
+//     finding); epochs above view+1 are lawful ESCALATIONS past burned epochs
+//     (see #burned — the M4-review permanent-wedge fix), never evidence that
+//     the skipped epochs committed;
 //   - a proposer counts only votes echoing its own proposal's members-hash, so
 //     grants for an abandoned same-epoch ballot cannot be miscounted;
 //   - proposer identity is the LINK's authenticated uuid, never a frame field;
@@ -108,6 +111,15 @@ export class Membership {
   //! ballot state: one vote per epoch, identified by (epoch, proposer, membersHash) — see the banner
   votedFor = { e: 0, p: '', h: '' }
   #proposal: { view: View; old: string[]; h: string; votes: Set<string>; ticks: number; age: number } | null = null
+  //! #burned — the highest epoch known to hold SPENT votes for a ballot that never committed (the
+  // proposer vanished mid-round). Vote-once-per-epoch means a burned epoch is unwinnable by any OTHER
+  // proposer, and with every proposal pinned to view.epoch+1 that was a PERMANENT liveness wedge: a
+  // live majority could never change membership again (M4-review, repro'd — and M4b's durable votedFor
+  // made the burn survive restarts). Escalation is the classic consensus answer (Raft terms): propose
+  // PAST the burn. Learned from a refusal's `ve` (the voter's votedFor.e) and from this node's own
+  // spent vote. Safety is untouched: one-view-per-epoch rests on vote-once-per-epoch, and the burned
+  // majority is exactly what makes the skipped epoch uncommittable by anyone else.
+  #burned = 0
   //! suspicion: consecutive ticks each member has been unreachable
   #suspectTicks = new Map<string, number>()
   #suspects = new Set<string>()
@@ -168,7 +180,7 @@ export class Membership {
       if (hosts.length > 0 && admitted.length >= hosts.length && [node.uuid, ...admitted].sort()[0] === node.uuid) {
         const byUuid = new Map<string, string>([[node.uuid, node.listen]])
         for (const l of this.#admitted(node)) byUuid.set(l.uuid, l.listen)
-        this.#propose(node, { epoch: 1, members: sorted([...byUuid.entries()]) })
+        this.#propose(node, { epoch: this.#nextEpoch(node), members: sorted([...byUuid.entries()]) })
       }
     }
     //! suspicion: a committed-view member with no admitted link for SUSPECT_TICKS ticks is suspect
@@ -199,7 +211,7 @@ export class Membership {
         const evictable = this.view.members.filter(([u, listen]) => this.#suspects.has(u) && !node.dialing(listen))
         if (evictable.length && live[0] === node.uuid && live.length * 2 > this.view.members.length) {
           const gone = new Set(evictable.map((m) => m[0]))
-          this.#propose(node, { epoch: this.view.epoch + 1, members: this.view.members.filter(([u]) => !gone.has(u)) })
+          this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => !gone.has(u)) })
         }
       }
     }
@@ -229,7 +241,7 @@ export class Membership {
       const memberLinks = this.#admitted(node).filter((l) => this.isMember(l.uuid))
       this.#send(node, memberLinks, encodeControl(VERB.PULL, { e: this.view.epoch }))
       if (++this.#rejoinTicks >= REJOIN_TICKS && !this.#proposal && this.#lowestLive() === node.uuid)
-        this.#propose(node, { epoch: this.view.epoch + 1, members: this.view.members })
+        this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members })
     }
     //! evicted: ask the lowest admitted MEMBER of my view to propose me back in (a fellow evictee would
     // silently drop the knock — the review's two-evictees-knocking-on-each-other wedge)
@@ -288,19 +300,20 @@ export class Membership {
       return
     }
     if (this.#proposal) return
-    this.#propose(node, { epoch: this.view.epoch + 1, members: sorted([...this.view.members, [v.u, v.l]]) })
+    this.#propose(node, { epoch: this.#nextEpoch(node), members: sorted([...this.view.members, [v.u, v.l]]) })
   }
 
   onPropose(node: Node, link: Link, v: { e?: unknown; m?: unknown }) {
     if (typeof v?.e !== 'number' || !viewOk(v.m)) return
     const j = node.journal
     const proposer = link.uuid // authenticated by HELLO — never trust a frame field for identity
-    if (v.e > this.view.epoch + 1) this.staleObserved(node, v.e - 1, link) // a ballot for e implies e-1 committed somewhere
     const h = hashOf(v.m)
     //! the vote-once rule with same-proposer idempotency (see banner): unspent epoch, or re-grant to the
     // same proposer (his abandoned/re-offered ballots — at most one of HIS can commit; a rejoining node
-    // may vote: voting is not writing)
-    const grant = v.e === this.view.epoch + 1 && !this.epochStale && (this.votedFor.e < v.e || this.votedFor.p === proposer)
+    // may vote: voting is not writing). ANY epoch above the committed view is grantable — a ballot
+    // above view+1 is a lawful ESCALATION past a burned epoch, not evidence that the middle committed
+    // (the old `=== view.epoch + 1` pin plus the e-1-committed inference was the wedge's other half).
+    const grant = v.e > this.view.epoch && !this.epochStale && (this.votedFor.e < v.e || this.votedFor.p === proposer)
     if (grant) {
       this.votedFor = { e: v.e, p: proposer, h }
       //! the vote is DURABLE before the VOTE frame leaves (sink.boot precedes the ship in this step —
@@ -308,12 +321,16 @@ export class Membership {
       node.persistBoot()
     }
     j.armed && j.emit(JK.vote, v.e, grant ? 1 : 0, proposer)
-    link.ship(encodeControl(VERB.VOTE, { e: v.e, g: grant ? 1 : 0, ce: this.view.epoch, h }), node.env.sink, j)
+    link.ship(encodeControl(VERB.VOTE, { e: v.e, g: grant ? 1 : 0, ce: this.view.epoch, h, ve: this.votedFor.e }), node.env.sink, j)
   }
 
-  onVote(node: Node, link: Link, v: { e?: unknown; g?: unknown; ce?: unknown; h?: unknown }) {
+  onVote(node: Node, link: Link, v: { e?: unknown; g?: unknown; ce?: unknown; h?: unknown; ve?: unknown }) {
     if (typeof v?.e !== 'number' || typeof v?.g !== 'number') return
     if (typeof v.ce === 'number') this.staleObserved(node, v.ce, link)
+    //! a REFUSAL carrying the voter's spent epoch (ve) teaches the burn in one round: this voter's
+    // vote is gone for every epoch ≤ ve, so the next proposal must escalate past it (see #burned)
+    if (v.g !== 1 && typeof v.ve === 'number' && Number.isFinite(v.ve) && v.ve > this.#burned && v.ve > this.view.epoch)
+      this.#burned = v.ve
     const p = this.#proposal
     //! count only grants that echo THIS proposal's identity — a stale grant for an earlier same-epoch
     // ballot (different members) must not commit a view nobody voted for
@@ -387,10 +404,20 @@ export class Membership {
     if (g.open && node.writes.pending.size) node.writes.flush(node)
   }
 
+  //! #nextEpoch — the epoch a fresh proposal must target: past the committed view, past every KNOWN
+  // burn, and past this node's own vote if it is spent on someone else (see #burned).
+  #nextEpoch(node: Node): number {
+    return Math.max(this.view.epoch, this.#burned, this.votedFor.p === node.uuid ? 0 : this.votedFor.e) + 1
+  }
+
   #propose(node: Node, view: View) {
     //! proposing SPENDS your vote — and a vote already spent on another proposer for this epoch cannot
-    // be spent again here (the review's critical: double-voting via propose committed two views/epoch)
-    if (this.votedFor.e >= view.epoch && this.votedFor.p !== node.uuid) return
+    // be spent again here (the review's critical: double-voting via propose committed two views/epoch).
+    // The refusal records the burn so the next attempt escalates past it instead of wedging forever.
+    if (this.votedFor.e >= view.epoch && this.votedFor.p !== node.uuid) {
+      if (this.votedFor.e > this.#burned) this.#burned = this.votedFor.e
+      return
+    }
     const h = hashOf(view.members)
     this.votedFor = { e: view.epoch, p: node.uuid, h }
     node.persistBoot() // the self-vote is spent — durable before any PROPOSE frame leaves

@@ -230,18 +230,26 @@ test('the WAL snapshot (M4e): the swap re-encodes the whole log under fresh chai
 })
 
 test('snapshot arming: SNAPSHOT_AT appended rows trigger the swap on the tick, AFTER compaction — and the counter re-arms from zero', () => {
-  const h = harness('aa')
+  const h = harness('aa', { hosts: ['sim:bb'] })
   h.node.step({ kind: 'start' })
-  //! solo genesis commits a view of one on the first tick — compaction is live from then on
-  h.tick()
+  h.admit(1, 'bb')
+  h.tick() // genesis: aa (lowest) proposes view 1 over {aa, bb}
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 1, g: 1, ce: 0, h: 'aa,bb' }) })
+  for (const k of ['k0', 'k1', 'k2', 'k3']) h.node.writes.ring.place(k, 'aa')
   for (let i = 0; i < SNAPSHOT_AT + 8; i++)
     h.node.step({ kind: 'write', recs: [{ type: REC.update, key: [`k${i % 4}`], value: i }] })
+  //! license the frontier on CRASH-STABLE evidence only (the M4-review fix): every fsync batch must
+  // resolve (own durable) AND the peer must acknowledge the tail WITH a durable map (markD, not the
+  // volatile shippable mark — sawP flags bb as a durable peer)
+  for (const p of h.of('persist')) h.node.step({ kind: 'persisted', batch: p[1] as number })
+  const tail = h.node.seq
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { aa: tail }, r: 0, p: { aa: tail } }) })
   assert.equal(h.of('snapshot').length, 0, 'nothing swaps between ticks')
   h.tick()
   const snaps = h.of('snapshot')
   assert.equal(snaps.length, 1, 'the tick armed the swap')
-  //! compaction ran first (same tick, solo frontier = own tail): thousands of churned rows leave a
-  // HANDFUL of snapshot records on disk — the whole point of the composition
+  //! compaction ran first (same tick, frontier = the durably-acknowledged tail): thousands of churned
+  // rows leave a HANDFUL of snapshot records on disk — the whole point of the composition
   const rows = snaps[0][2] as { bytes: Uint8Array; prev: number }[]
   assert.ok(rows.length <= 4, `the swapped WAL holds ${rows.length} rows for ${SNAPSHOT_AT + 8}+ writes of history`)
   h.tick()
@@ -277,6 +285,57 @@ test('restore from a swapped WAL is the same fold; a LIED swap degrades to pure 
   assert.equal(c.jk(JK.walHole).length, 0, 'the old file is self-consistent — the swap never re-chains live history')
   assert.equal(c.node.stateHash, preSwapHash, 'the pre-swap fold restored intact')
   assert.equal(c.node.walTail.get('aa'), 1, 'and the chain tail matches where the phantom appends would have linked')
+})
+
+test('M4-REVIEW PIN — durable FREEZES at a persistFail: batches already in flight are voided, their late echoes advance nothing', () => {
+  //! the false-evidence shape four independent finders converged on: batch 1 fails, batch 2 (issued
+  // before the failure, sitting PAST the hole on disk) resolves after — durable must NOT advance to
+  // it, or confirm:'persisted' certifies rows a restore will drop at the tear
+  const h = harness('aa')
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['a'], value: 1 }] })
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['b'], value: 2 }] })
+  const [b1, b2] = h.of('persist').map((p) => p[1] as number)
+  h.node.step({ kind: 'persistFail', batch: b1, reason: 'io' })
+  h.node.step({ kind: 'persisted', batch: b2 }) // the in-flight successor resolves AFTER the failure
+  assert.equal(h.node.streams.get('aa')!.durable, 0, 'frozen means frozen — nothing past the hole is evidence')
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['c'], value: 3 }] })
+  assert.equal(h.of('persist').length, 2, 'the WAL is dead — no new batches leave')
+})
+
+test('M4-REVIEW PIN — a reborn peer\'s evidence is void: a HELLO with a higher incarnation forgets every mark it announced', () => {
+  const h = harness('aa')
+  h.admit(1, 'bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { aa: 5 }, r: 0, p: { aa: 5 } }) })
+  assert.equal(h.node.confirm.mark('bb', 'aa'), 5)
+  assert.equal(h.node.confirm.markD('bb', 'aa'), 5)
+  //! bb crashes and returns as incarnation 2 — everything its first life claimed may have regressed
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  h.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:bb' })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 2, l: 'sim:bb' }) })
+  assert.equal(h.node.confirm.mark('bb', 'aa'), 0, 'shippable marks forgotten — a dead life proves nothing')
+  assert.equal(h.node.confirm.markD('bb', 'aa'), 0, 'durable marks too (a lied/condemned disk regresses even those)')
+})
+
+test('M4-REVIEW PIN — condemn resets the cid-dedup window: no ghost dup-ACKs for records that exist nowhere', () => {
+  //! replay row 1 feeds the window (iss cli~1 cid 9); the hole then condemns the restore — a retry of
+  // that cid must RE-COMMIT (at-least-once until replication re-feeds), never answer with the stamp
+  // of a record the condemned fold no longer holds anywhere
+  const a = harness('aa')
+  a.admit(1, 'bb')
+  a.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns(
+    [{ rec: { type: REC.update, key: ['x'], value: 1 } as Rec, origin: 'bb', seq: 3, epoch: 0, iss: 'cli~1', cid: 9 }])[0] })
+  const rows = a.of('persist').map((p) => ({ bytes: p[2] as Uint8Array, prev: p[3] as number }))
+  const b = harness('aa', { incarnation: 2 })
+  b.node.step({ kind: 'replay', bytes: rows[0].bytes, prev: rows[0].prev })
+  b.node.step({ kind: 'replay', bytes: rows[0].bytes, prev: 999 }) // impossible link — the disk lied
+  assert.equal(b.node.tainted, true)
+  b.admit(1, 'bb')
+  b.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  b.node.writes.ring.place('x', 'aa')
+  b.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns(
+    [{ rec: { type: REC.update, key: ['x'], value: 1 } as Rec, origin: 'cli~1', seq: 9, epoch: 1 }], VERB.WRITE)[0] })
+  assert.equal(b.jk(JK.writeDup).length, 0, 'the condemned window answers nothing')
+  assert.equal(b.node.logs.get('aa~2')!.length, 1, 'the retry re-committed — honest at-least-once, never a ghost ACK')
 })
 
 test('the reborn clock and lane cannot collide with a lost life: the ceiling floor + old-lane recovery', () => {

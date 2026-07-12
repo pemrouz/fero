@@ -142,3 +142,32 @@ test('V1d-class divergence (self-fencing flush) is CAUGHT by the harness; the re
   assert.equal(converged(real), null, 'the real kernel: same trajectory, no divergence')
   assert.deepEqual(real.violations, [])
 })
+
+test('M4-REVIEW PIN — a burned epoch cannot wedge membership: survivors ESCALATE past spent votes (Raft-term style)', () => {
+  //! the permanent-wedge shape (repro'd during the M4 review, made permanent by M4b's durable
+  // votedFor): n01 proposes evicting the vanished n03 at epoch 2, n02 durably GRANTS, the VOTE frame
+  // dies with the link and n01 vanishes forever — epoch 2 is burned (a majority of view 1 spent
+  // there). Pre-fix, every future proposal targeted view.epoch+1 = 2 and was refused by the vote-once
+  // rule: a LIVE MAJORITY could never change membership again. The fix: proposals escalate past every
+  // known burn (own spent vote + the `ve` a refusal carries), and voters grant any epoch above their
+  // committed view — safety still rests on vote-once-per-epoch (the burned majority is exactly what
+  // keeps epoch 2 uncommittable by anyone else).
+  const sim = new Sim(7)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+  sim.run({ until: 400 })
+  assert.deepEqual(epochs(nodes), [1, 1, 1])
+  sim.partition('n03', 'n01')
+  sim.partition('n03', 'n02')
+  sim.severOnFrame('n02', 'n01', 8 /* VERB.VOTE — the grant dies on the wire */)
+  let t = 400
+  while (sim.nodes.get('n02')!.membership.votedFor.e < 2 && t < 60000) { t += 200; sim.run({ until: t }) }
+  assert.equal(sim.nodes.get('n02')!.membership.votedFor.e, 2, 'the vote is durably spent on n01')
+  sim.partition('n01', 'n02') // n01 is gone forever, its ballot uncommitted
+  sim.heal('n03', 'n02')      // {n02, n03} is a live majority of view 1
+  sim.run({ until: t + 25000 })
+  const [n02, n03] = [sim.nodes.get('n02')!, sim.nodes.get('n03')!]
+  assert.ok(n02.epoch >= 3 && n02.epoch === n03.epoch, `the survivors escalated past the burn (epochs ${n02.epoch}/${n03.epoch})`)
+  assert.ok(!members(n02).includes('n01'), 'the vanished proposer was evicted after all')
+  assert.ok(n02.membership.gate(n02).open && n03.membership.gate(n03).open, 'writable — never wedged read-only')
+  assert.deepEqual(sim.violations, [], 'one-view-per-epoch + epoch-monotone held through the escalation')
+})
