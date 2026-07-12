@@ -31,6 +31,20 @@ test('absolute: view-install rebuild cost — 1k rebuilds of a 5-member ring und
   assert.ok(ms < 300, `1k rebuilds took ${ms.toFixed(1)}ms (ceiling 300ms)`)
 })
 
+test('absolute: 1M holdersOf(k, 3) R-set walks on a 5-member ring under the tripwire ceiling', () => {
+  //! the scoped fan-out (M6) consults holdersOf per committed record — it must stay noise like
+  // ownerOf. The walk is the binary search + a short distinct-collect (coupon-collector expected
+  // steps, single-digit at small r), reusing one scratch array: zero allocations per call.
+  const r = new Ring()
+  r.build(1, members(5))
+  let sink = 0
+  const ms = bench.time(() => {
+    for (let i = 0; i < 1_000_000; i++) sink += r.holdersOf(keys[i & 4095], 3).length
+  })
+  assert.ok(sink > 0 && sink % 3_000_000 === 0, `every walk returned exactly 3 holders (sink ${sink})`)
+  assert.ok(ms < 800, `1M R-set walks took ${ms.toFixed(1)}ms (ceiling 800ms)`)
+})
+
 test('counted: lookup cost is flat in member count (binary search, not a scan)', () => {
   //! not a wall-clock ratio (too noisy here) — a structural check: 128 members costs at most ~2x the
   // per-lookup time of 4 members over a big batch, which a linear scan (32x points) could never satisfy
