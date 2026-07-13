@@ -18,8 +18,8 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 215 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
-npm run perf                   # 18 perf gates: counted invariants first, ratios second, absolutes last
+npm test                       # 249 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm run perf                   # 20 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
 npm run debug                  # scenario DASHBOARD at /, the debugger at /debug (http://localhost:4699)
@@ -608,6 +608,60 @@ because state is a deterministic fold of the journal'd inputs.
     serve 4800` / `npm run demo -- watch 4800` — a server mutating an
     inventory by plain assignment, a client re-rendering through one tap;
     kill and restart the server and the watcher resumes.
+- **M6 — scoped replication + aggregates** (design record: [DESIGN-M6.md](DESIGN-M6.md),
+  a three-design judge panel synthesis; landed as six slices, M6a-M6f):
+  - **R-sets**: `replicas: N` config (explicit mode like durable/client — unset
+    is R=∞ and every scoped branch is provably inert: the 1000-seed epoch-0
+    sweep stayed byte-identical at exactly 237,451 events through all six
+    slices). `ring.holdersOf` extends ownerOf — holder[0] IS the owner, so
+    single-writer is untouched; a per-epoch memo makes the fan-out filter one
+    Map.get per record.
+  - **The scope machine** (kernel/scope.ts): held | acquiring | orphan per
+    partition. Commits fan out to holders only; the inbound gate drops
+    non-assigned records before the fence; orphans HARD-FREEZE (floors never
+    advance — monitored expected-empty).
+  - **The evidence plane**: per-(origin, partition) POSSESSION FLOORS
+    ("contains-or-covers ≤ s") beside the untouched per-origin dedup fence;
+    the DUAL FENCE splices lawful cross-link interiors; the no-interior-rows
+    WAL discipline (splices reach disk only via the snapshot swap; a dirty
+    ledger in the boot record keeps replay floors honest across crashes).
+    HAVEQ/HAVEA carry attested marks (the DIGEST wire shape is untouched in
+    both modes); scoped confirm counts W-of-the-R-set on attested marks only.
+  - **The handover**: one-teacher ACQ/ACQDONE latches (stage → verify count →
+    atomic fold → floors := the attested cut → staged live replays above it);
+    five abort legs drop the buffer whole. The STATELESS shed re-evaluates
+    fresh per arrival/install/tick — every current holder must attest
+    coverage of every frozen lane; crash-safe both sides (H1 proven both
+    legs); shedStall alarms at doubling cadence, shedWaitingOn names pinners.
+  - **The gather** (api/fold.ts, v2 Q3 carried): whole-resource read() IS the
+    download — stamped claims over held ∪ unshed-orphan scope, per-key LWW
+    merge, PARKING + the coverage sweep. §9 holds end-to-end: holistic
+    operators throw typed ScopedError (never a silent shard fold), `await
+    data` routes through the gather, non-held keys answer via typed remote
+    handles, ScopedError rehydrates typed across the wire.
+  - **THE Q3A VERDICT: real, reproduced, closed** (sim/q3a.test.ts). The plan
+    called it a "suspected real bug" — the mutation study (a v2-faithful
+    owned-only root-replace gather in the identical harness) vanishes keys on
+    60/60 {A,B}→{C,D} seeds; v3's parked union survives 1000/1000 seeds of
+    the same windows (500 organic grows + 500 pin-flip double handovers, 5ms
+    refresh slices through the acquisition window). The hunt also caught
+    three real v3 projection bugs before they shipped: parent-tombstone
+    ordering over live nested cells, explicit-undefined representability
+    (tombstone-equivalent, pending the value-codec ticket), and one doomed
+    cell aborting the whole projection transact (now per-cell isolated) —
+    plus refresh serialization (a one-shot read racing a shed re-gather
+    answered a mid-flight partial).
+  - **Deferred with rationale** (the M6 residual ledger, for the review round
+    and the next milestone): announcement-gated AE + scoped compaction
+    un-pinning are COUPLED (ring-gated AE is provably safe while compaction
+    is pinned — the H3 resurrection needs differently-compacted teachers);
+    tombstone GC stays pinned when armed; the distributed decomposable folds
+    (sum/max/avg facade) deferred by de-scoping rung 2 — holistic ops throw
+    with the materialize-first hint instead; spokes mirror their primary's
+    held shard (whole reads are gather-backed; subscription-scoped
+    tap-forward is future work); explicit-undefined cells do not cross the
+    gather; the live gather re-arms by install + paced re-poll (a push-based
+    claim stream is a wire optimization).
 - The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is
   [CHECKPOINT.md](CHECKPOINT.md) — verdict: no overrun, ladder armed but not
   triggered, M4 sliced into five landable increments (M4a streams/watermarks →

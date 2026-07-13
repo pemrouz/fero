@@ -53,7 +53,12 @@ export const rowsPartial = (rt: Runtime): Claims => {
   }
   for (const [cell, st] of node.versions) {
     if (!mine(cell)) continue
-    if (node.state.has(cell)) out[cell] = { v: node.state.get(cell), st: [st.epoch, st.seq, st.origin] }
+    const v = node.state.get(cell)
+    //! EXPLICIT-undefined cells ship as tombstone-equivalent: the wire codec drops undefined values
+    // and the union's update path cannot materialize them — the gather's contract is "keys with
+    // values"; the explicit-undefined representability question rides the open value-codec ticket
+    // (plan §14.1, noted in the M6 record).
+    if (node.state.has(cell) && v !== undefined) out[cell] = { v, st: [st.epoch, st.seq, st.origin] }
     else out[cell] = { st: [st.epoch, st.seq, st.origin], t: 1 }
   }
   return out
@@ -79,11 +84,22 @@ export class Gather {
     this.#call = call
   }
 
-  //! refresh — one gather generation: fan out to every view member (self in-process), replace each
+  //! refresh — one gather generation, SERIALIZED: concurrent callers (a one-shot read racing the
+  // fold's install/shed-triggered re-gather) queue behind each other instead of interleaving the
+  // registry's wholesale-replace or returning a mid-projection snapshot (the flake the Tier-3 suite
+  // caught: `await data` racing a shed re-gather answered with a partial union).
+  #chain: Promise<unknown> = Promise.resolve()
+  refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number }): Promise<unknown> {
+    const next = this.#chain.then(() => this.#refresh(rt, opts), () => this.#refresh(rt, opts))
+    this.#chain = next.catch(() => {}) // the chain never rejects; each caller sees its own outcome
+    return next
+  }
+
+  //! #refresh — one generation: fan out to every view member (self in-process), replace each
   // answerer's claim set wholesale, then fold. An unreachable member fails the ONE-SHOT caller typed
   // (never a silent partial — plan §5/§9); the LIVE path keeps the last-good claims (parking) and
   // retries on its cadence, which is the availability-honest reading of the same rule.
-  async refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number }): Promise<unknown> {
+  async #refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number }): Promise<unknown> {
     const node = this.#rt.node
     const gen = ++this.#gen
     const members = node.membership.view.members.map((m) => m[0])
@@ -111,9 +127,16 @@ export class Gather {
         per.set(uuid, claim)
       }
     }
-    //! fold + project the delta into the result proxy
+    //! fold the touched cells, then project in TWO PHASES: removes first, live updates second,
+    // shallow→deep. Field-granular LWW lawfully leaves a PARENT tombstone above a LIVE nested cell
+    // (plan §5's documented cross-hierarchy shape) — projecting the parent remove after the child
+    // update wiped the live subtree from the union while the kernel fold kept it (found by the Q3a
+    // hunt's LWW oracle at seed 0). Removes-then-updates re-projects survivors on top, matching the
+    // kernel's own materialization.
     const ring = node.writes.ring
     if (node.epoch > 0 && ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    const removes: string[][] = []
+    const updates: { key: string[]; v: unknown }[] = []
     for (const cell of touched) {
       const per = this.#registry.get(cell)
       const key = JSON.parse(cell) as string[]
@@ -128,12 +151,35 @@ export class Gather {
         const covered = win?.t === 1 || holders.every((h) => answered.has(h))
         if (covered) {
           if (per) this.#registry.delete(cell)
-          applyCell(this.proxy, key, undefined, true)
+          removes.push(key)
         }
         continue
       }
-      applyCell(this.proxy, key, win.v, false)
+      updates.push({ key, v: win.v })
     }
+    //! a DEEP remove into an absent subtree is a no-op — and must be skipped: the substrate's
+    // deep-remove crashes on missing intermediates, and one doomed remove aborts the whole
+    // projection transact (the hunt's seed-13 finding: every later refresh re-threw on the same
+    // registry cell and the union froze stale)
+    const present = (root: Record<string, unknown>, key: string[]): boolean => {
+      let cur: unknown = root
+      for (let i = 0; i < key.length - 1; i++) {
+        if (cur === null || typeof cur !== 'object') return false
+        cur = (cur as Record<string, unknown>)[key[i]]
+      }
+      return cur !== null && typeof cur === 'object'
+    }
+    //! …and every cell projects in ISOLATION: the substrate's deep ops crash on null/scalar
+    // intermediates (field-granular LWW lawfully nests a live cell under a null parent — the
+    // seed-41 finding: ONE such cell aborted the whole projection transact and every other key
+    // went stale as collateral). A cell that cannot materialize is skipped — its top-level key
+    // still shows through whatever of its siblings/parent projected (the kernel's own flat fold
+    // holds both cells; nesting-under-null is the documented §5 materialization ambiguity).
+    const root = snapshot(this.proxy) as Record<string, unknown>
+    for (const key of removes)
+      if (key.length === 1 || present(root, key)) { try { applyCell(this.proxy, key, undefined, true) } catch { /* absent subtree */ } }
+    updates.sort((a, b) => a.key.length - b.key.length)
+    for (const u of updates) { try { applyCell(this.proxy, u.key, u.v, false) } catch { /* blocked intermediate */ } }
     return snapshot(this.proxy)
   }
 
