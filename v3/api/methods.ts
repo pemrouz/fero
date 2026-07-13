@@ -50,6 +50,9 @@ export const SYSTEM = '\u0000'
 export interface Context {
   data: any
   flush(): Promise<void>
+  //! live (M6): true when this invocation opens a SUBSCRIPTION — a dual-mode handler (the scoped
+  // default read) returns the live gather proxy on the SUB leg and the one-shot value on CALL.
+  live?: boolean
 }
 
 type Handler = (arg: unknown, ctx: Context) => unknown
@@ -100,6 +103,7 @@ export class Host {
     const ctx: Context = {
       data: this.#data,
       flush: async () => { await Promise.all(tracked.splice(0).map((p) => p.catch(() => {}))) },
+      live: mode === VERB.SUB,
     }
     void (async () => {
       let result: unknown
@@ -116,6 +120,10 @@ export class Host {
         await Promise.all(tracked.map((p) => p.catch(() => {}))) // flush-on-return
       } catch (err) {
         if (entry && this.#subs.get(skey) === entry) this.#subs.delete(skey)
+        //! M6: a thrown ScopedError ships AS the error value (rehydrated typed at the caller);
+        // everything else keeps the message-string reply
+        if (typeof err === 'object' && err !== null && (err as { scoped?: boolean }).scoped === true)
+          return this.#reply(link, id, false, err)
         return this.#reply(link, id, false, err instanceof Error ? err.message : String(err))
       }
       if (mode === VERB.CALL) {
@@ -203,7 +211,7 @@ export class Caller {
 
   //! call — one-shot RPC. `retry` re-dispatches on primary failover (idempotent methods ONLY — the
   // banner's re-execution warning); default is fail-fast with a typed reason.
-  call(m: string, a: unknown, opts: { timeout?: number; retry?: boolean } = {}): Promise<unknown> {
+  call(m: string, a: unknown, opts: { timeout?: number; retry?: boolean; to?: string } = {}): Promise<unknown> {
     const id = ++this.#seq
     const ms = opts.timeout ?? 10_000
     return new Promise((resolve, reject) => {
@@ -217,7 +225,8 @@ export class Caller {
         resolve: (v) => { clearTimeout(t); resolve(v) },
         reject: (e) => { clearTimeout(t); reject(e) },
       })
-      this.#rt.node.step({ kind: 'rpc', id, mode: VERB.CALL, m, a })
+      //! `to` (M6): a named member instead of the primary — the scoped gather/remote-read fan-out
+      this.#rt.node.step({ kind: 'rpc', id, mode: VERB.CALL, m, a, ...(opts.to !== undefined ? { to: opts.to } : {}) })
     })
   }
 
@@ -246,6 +255,10 @@ export class Caller {
     if (!ok && local) { c.held = true; return }
     this.#calls.delete(id)
     if (ok) c.resolve(value)
+    //! M6: a typed ScopedError crosses the wire as the RESULT error value and rehydrates AS-IS —
+    // the `scoped: true` discriminant is the contract (api/types.ts); everything else keeps the
+    // Error-string wrap
+    else if (typeof value === 'object' && value !== null && (value as { scoped?: boolean }).scoped === true) c.reject(value)
     else c.reject(new Error(`methods.${c.m}: ${String(value)}`))
   }
 
@@ -310,6 +323,10 @@ export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: 
   return new Proxy(function () {}, {
     get(_t, prop) {
       if (prop === 'then') return (onF?: (v: unknown) => unknown, onR?: (e: unknown) => unknown) => caller.call(m, a, opts).then(onF, onR)
+      //! catch/finally are thenable-adjacent, NOT reactive touches — `methods.x().catch(...)` must
+      // behave like a promise, never open a subscription with a 'catch' operator (M6 papercut)
+      if (prop === 'catch') return (onR?: (e: unknown) => unknown) => caller.call(m, a, opts).catch(onR)
+      if (prop === 'finally') return (onD?: () => void) => caller.call(m, a, opts).finally(onD)
       if (prop === 'open') return () => open().proxy
       if (prop === 'close') return () => { if (live) { caller.unsubscribe(live.id); live = null } }
       if (prop === 'mode') return live ? 'live' : 'oneshot'
