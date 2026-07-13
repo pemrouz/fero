@@ -19,6 +19,7 @@ import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
+import { Gather, rowsPartial, type Claims } from './fold.ts'
 import { proxy } from './substrate.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
@@ -103,18 +104,46 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     })
 
   //! ── the method plane (M5c): every node HOSTS (servers get invokes; a spoke none), clients CALL ──
-  //! the built-in read: the whole resource or one child — subscribable by return type like any method
+  //! M6: scoped servers get a MEMBER caller (rpc `to` routing) — the gather's fan-out and the
+  // non-held remote read ride the same method plane a client uses; one Caller per node either way.
+  const scoped = !isClient && typeof config.replicas === 'number'
+  const memberCaller = scoped ? new Caller(rt) : null
+  //! the gather (M6, DESIGN-M6 C5): whole-resource read() under scoping — memoized, ONE per node
+  const gather = scoped
+    ? new Gather(rt, (uuid, t) => memberCaller!.call(SYSTEM + 'rows', undefined, { timeout: t, to: uuid }) as Promise<Claims>)
+    : null
+  //! the built-in read: the whole resource or one child — subscribable by return type like any
+  // method. Scoped + no key = THE GATHER (v2 Q3: read() IS the download): one-shot on CALL, the
+  // live parked-union proxy on SUB (ctx.live — re-gathered on installs + a paced tick).
   const table: Record<string, (arg: unknown, ctx: Context) => unknown> = {
-    read: (a, ctx) => (a == null ? ctx.data : ctx.data.get(String(a))),
+    read: (a, ctx) => {
+      if (a != null) {
+        //! a keyed read on a scoped node for a NON-HELD partition routes to the owner (one hop) —
+        // the same answer at R=2 and R=∞, never a silent local undefined (plan §9)
+        const k = String(a)
+        if (scoped && rt.node.armed && !rt.node.scope!.held(k)) {
+          const ring = rt.node.writes.ring
+          const owner = ring.ownerOf(k)
+          if (owner && owner !== rt.node.uuid)
+            return memberCaller!.call('read', k, { timeout: 8000, to: owner })
+        }
+        return ctx.data.get(k)
+      }
+      if (!scoped || !rt.node.armed) return ctx.data
+      if (ctx.live) { gather!.live((config.heartbeatMs as number | undefined ?? 500) * 4); return gather!.proxy }
+      return gather!.refresh(rt, { throwOnPartial: true })
+    },
     ...(userMethods as Record<string, (arg: unknown, ctx: Context) => unknown>),
   }
   //! the system plane: confirm-over-RPC — a spoke's ladder evidence is one digest wide (M5b residual),
-  // so its probes run at the PRIMARY, which holds the full member evidence
+  // so its probes run at the PRIMARY, which holds the full member evidence. `rows` (M6) answers the
+  // gather fan-out with this node's stamped claims (held ∪ orphan — an orphan claims until shed).
   const system: Record<string, (arg: unknown, ctx: Context) => unknown> = {
     confirm: (a) => {
       const v = a as { o: string; s: number; l: number; t: number; pt?: string }
       return probe({ origin: v.o, seq: v.s, epoch: 0 }, v.l, Math.min(v.t ?? 8000, 60_000), v.pt)
     },
+    rows: () => rowsPartial(rt),
   }
   host = new Host(rt, bind.data, table, system)
   const caller = isClient ? new Caller(rt) : null
@@ -181,13 +210,19 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   //! cluster.partitions (M6, DESIGN-M6 C9): bounded local scalars, zeros while unscoped. The scope
   // tallies + shedWaitingOn fold from the kernel scope map once slice 4 wires JK 59-63; until then
   // the row is a truthful projection of "nothing is scoped on this node".
-  const partitionsRow = () => ({
-    replicas: node.replicas,
-    epoch: node.epoch,
-    w: node.replicas > 0 ? (Math.min(node.replicas, Math.max(node.membership.view.members.length, 1)) >> 1) + 1 : 0,
-    held: 0, acquiring: 0, orphaned: 0, acquired: 0, shed: 0,
-    shedWaitingOn: [] as string[],
-  })
+  let acquiredEver = 0
+  let shedEver = 0
+  const partitionsRow = () => {
+    const t = node.scope?.tallies() ?? { held: 0, acquiring: 0, orphaned: 0 }
+    return {
+      replicas: node.replicas,
+      epoch: node.epoch,
+      w: node.replicas > 0 ? (Math.min(node.replicas, Math.max(node.membership.view.members.length, 1)) >> 1) + 1 : 0,
+      held: t.held, acquiring: t.acquiring, orphaned: t.orphaned,
+      acquired: acquiredEver, shed: shedEver,
+      shedWaitingOn: node.armed ? node.scope!.shedWaitingOn(node) : [] as string[],
+    }
+  }
   const cluster: any = proxy({
     epoch: node.epoch,
     writable: node.membership.gate(node).open,
@@ -197,11 +232,19 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     me: { uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: (config.listen as string) ?? '' },
     partitions: partitionsRow(),
   })
-  const FOLD = new Set<number>([JK.viewInstall, JK.evict, JK.gateOpen, JK.gateClose, JK.identified, JK.linkDown, JK.suspect, JK.start])
+  const FOLD = new Set<number>([JK.viewInstall, JK.evict, JK.gateOpen, JK.gateClose, JK.identified, JK.linkDown, JK.suspect, JK.start,
+    //! M6: the scope lifecycle re-folds cluster.partitions (tallies + lifetime counters + the H7 surface)
+    JK.shed, JK.acquire, JK.orphaned, JK.acquireStart, JK.acquireAbort, JK.shedStall])
   let cursor = 0
   let lastPrimary = node.primary
   let lastOutcomes = 0
+  let lastScopeN = -1
   const fold = () => {
+    //! M6: tally drift without journal events (held-mints at the gate/stamp site) — one int compare
+    if (node.scope && node.scope.n !== lastScopeN) {
+      lastScopeN = node.scope.n
+      cluster.partitions = partitionsRow()
+    }
     //! cluster.writes — the bounded confirm ring (plan §9; Q4 decided: pending rows are visible HERE,
     // never marked inside `data`): folded whole when the ring version moved, one compare otherwise
     if (bind.outcomes.n !== lastOutcomes) {
@@ -216,7 +259,15 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     cursor = j.n
     //! method-plane housekeeping rides the same fold: dead links reap their served subscriptions
     // (the v2 leak guard), and a primary change fires the caller's failover policies (OQ2)
-    for (const e of events) if (e.kind === JK.linkDown) host!.reapLink(e.a as number)
+    for (const e of events) {
+      if (e.kind === JK.linkDown) host!.reapLink(e.a as number)
+      //! M6: the kernel shed a partition — mirror it out of the proxy (ONE synthesized subtree
+      // remove, echo pre-consumed: nothing re-issues) and count the lifetime tallies
+      else if (e.kind === JK.shed) { shedEver++; bind.shedPartition(String(e.a)) }
+      else if (e.kind === JK.acquire) acquiredEver++
+      //! M6: every install re-gathers (the live union re-arms against the new ring — the Q3a leg)
+      else if (e.kind === JK.viewInstall && gather) void gather.refresh(rt, { throwOnPartial: false }).catch(() => {})
+    }
     if (caller && node.primary !== lastPrimary) {
       lastPrimary = node.primary
       if (node.primary !== null) caller.onPrimaryChange()
@@ -236,15 +287,54 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   await rt.start()
   fold()
 
+  //! ── the scoped data facade (M6, DESIGN-M6 C6): §9's promise — an expression means the same at
+  // R=2 and R=∞, TYPED ERRORS, never a silent partial. Operators would fold the held SHARD as if it
+  // were the resource: they throw ScopedError with the materialize-first hint (the distributed
+  // decomposable folds are deferred by de-scoping rung 2 — recorded at slice 5). `await data` routes
+  // through the gather; a non-held key access returns a typed one-shot remote handle (await = the
+  // owner's value); held keys and writes pass straight through to the raw proxy.
+  const OPERATORS = new Set(['filter', 'map', 'reduce', 'group', 'sort', 'az', 'za', 'top', 'limit', 'distinct', 'tap', 'pipe',
+    'sum', 'count', 'max', 'min', 'avg', 'some', 'every'])
+  const scopedThrow = (op: string, reason: 'holistic' | 'shortfall', hint: string, partition?: string): never => {
+    throw { scoped: true, op, reason, replicas: node.replicas, ...(partition !== undefined ? { partition } : {}), hint } satisfies import('./types.ts').ScopedError
+  }
+  const remoteKey = (k: string): unknown => new Proxy(Object.freeze({}), {
+    get(_, prop) {
+      if (prop === 'then') {
+        const owner = node.writes.ring.ownerOf(k)
+        return (F?: (v: unknown) => unknown, R?: (e: unknown) => unknown) =>
+          memberCaller!.call('read', k, { timeout: 8000, ...(owner && owner !== node.uuid ? { to: owner } : {}) }).then(F, R)
+      }
+      if (prop === Symbol.toStringTag) return 'FeroRemoteKey'
+      if (typeof prop === 'symbol') return undefined
+      return scopedThrow('get', 'shortfall', `'${k}' lives on its holders — await data.${k} (or methods.read('${k}')) for the value`, k)
+    },
+  })
+  const dataSurface = !scoped ? bind.data : new Proxy(bind.data, {
+    get(t, prop, r) {
+      if (typeof prop === 'symbol') return Reflect.get(t, prop, r)
+      if (prop === 'then') {
+        //! `await data` means the RESOURCE — the gather, never the shard (typed reject on shortfall)
+        return (F?: (v: unknown) => unknown, R?: (e: unknown) => unknown) => gather!.refresh(rt, { throwOnPartial: true }).then(F, R)
+      }
+      if (OPERATORS.has(prop)) return scopedThrow(prop, 'holistic', 'materialize first: (await methods.read()).' + prop + '(…) — or define a derived resource')
+      if (prop === 'get') return (k: unknown) => (!node.armed || node.scope!.held(String(k)) ? t[String(k)] : remoteKey(String(k)))
+      if (!node.armed || node.scope!.held(prop)) return Reflect.get(t, prop, r)
+      return remoteKey(prop)
+    },
+  })
+
   return {
     name,
-    data: bind.data,
+    data: dataSurface,
     methods: methodSurface,
     cluster,
     async destroy() {
       bind.destroy()
       host!.destroy()
       caller?.destroy()
+      memberCaller?.destroy()
+      gather?.destroy()
       //! settle in-flight confirm probes honestly (false = could not prove in time) — never hang a caller
       for (const [, settle] of probes) settle(false)
       probes.clear()

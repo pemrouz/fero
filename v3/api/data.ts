@@ -269,6 +269,17 @@ export class Bind {
   // assignment already is: the pending layer of the overlay, not a commit claim.
   #optimistic(rec: Rec) { this.#apply(rec) }
 
+  //! shedPartition (M6): the kernel shed partition p — the data lawfully left this node without a
+  // remove record existing anywhere. ONE synthesized subtree remove through the one projection, echo
+  // pre-consumed (the capture arm swallows the fan-back, so nothing re-issues cluster-wide);
+  // downstream operators see an ordinary remove. Overlay cells under p drop with it (their pending
+  // records now resolve at the partition's holders, via the apply-stream join as ever).
+  shedPartition(p: string) {
+    if (this.#destroyed) return
+    this.#apply({ type: REC.remove, key: [p] })
+    for (const cell of [...this.#overlay.keys()]) if ((JSON.parse(cell) as string[])[0] === p) this.#overlay.delete(cell)
+  }
+
   //! revert — re-project a cell from the CONFIRMED fold (kernel state): the beneath is derivable,
   // never tracked (see the banner).
   #revert(cell: string) {

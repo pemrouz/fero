@@ -55,7 +55,9 @@ export type Event =
   // CALLER side: mode CALL/SUB/UNSUB, shipped on the client's primary (no primary ⇒ an immediate
   // failed `result` effect — the api's failover policy owns retries). reply/subOut are the HOST side:
   // the api answers an invoke, the kernel frames it back down the link it came in on.
-  | { kind: 'rpc'; id: number; mode: number; m?: string; a?: unknown }
+  // `to` (M6): route to a NAMED member instead of the primary — the api's scoped gather/remote-read
+  // fan-out (member-to-member calls; never set on clients or unscoped nodes, so trajectories hold).
+  | { kind: 'rpc'; id: number; mode: number; m?: string; a?: unknown; to?: string }
   | { kind: 'reply'; link: number; id: number; ok: boolean; value?: unknown }
   | { kind: 'subOut'; link: number; id: number; recs: Rec[] }
 

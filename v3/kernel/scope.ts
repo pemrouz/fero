@@ -76,6 +76,10 @@ export interface ScopeEntry {
 
 export class Scope {
   entries = new Map<string, ScopeEntry>()
+  //! n — a version counter bumped on every entry create/transition/drop: the api's cluster.partitions
+  // fold compares it per step instead of re-walking the map (tallies drift on plain held-mints, which
+  // journal nothing scope-specific).
+  n = 0
 
   #entry(state: number): ScopeEntry { return { state, marks: new Map(), marksD: new Map() } }
 
@@ -96,6 +100,7 @@ export class Scope {
     if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
     if (!ring.holdsAny(node.uuid, p, node.replicas)) return 0
     this.entries.set(p, this.#entry(SCOPE.held))
+    this.n++
     return 1
   }
 
@@ -110,7 +115,7 @@ export class Scope {
   //! mintHeld — the STAMP-SITE twin of verdict(): an armed owner committing a record for p holds p
   // by definition (single-writer: the ring routed the write here).
   mintHeld(p: string) {
-    if (!this.entries.has(p)) this.entries.set(p, this.#entry(SCOPE.held))
+    if (!this.entries.has(p)) { this.entries.set(p, this.#entry(SCOPE.held)); this.n++ }
   }
 
   //! rescope — the INSTALL hook (membership install + the arming transition + a restored boot):
@@ -136,6 +141,7 @@ export class Scope {
         cur.state = SCOPE.orphan
         cur.polls = 0
         cur.nextStall = STALL_AT
+        this.n++
         j.armed && j.emit(JK.orphaned, p, node.epoch)
       }
       //! orphan re-assigned (H2's A leg): stays FROZEN — the lawful re-entry is an acquiring latch
@@ -148,6 +154,7 @@ export class Scope {
     if (this.entries.has(p)) return
     const assigned = node.writes.ring.holdsAny(node.uuid, p, node.replicas)
     this.entries.set(p, this.#entry(assigned ? SCOPE.held : SCOPE.orphan))
+    this.n++
     if (!assigned) {
       const e = this.entries.get(p)!
       e.polls = 0
@@ -320,6 +327,7 @@ export class Scope {
     e.buf = []
     e.teachN = 0
     e.ticks = 0
+    this.n++
     node.journal.armed && node.journal.emit(JK.acquireStart, p, teacher)
   }
 
@@ -409,6 +417,7 @@ export class Scope {
     }
     const live = e.buf!.filter((s) => s.live)
     e.state = SCOPE.held
+    this.n++
     e.teacher = undefined
     e.buf = undefined
     e.teachN = undefined
@@ -437,6 +446,7 @@ export class Scope {
     node.journal.armed && node.journal.emit(JK.acquireAbort, p, reason)
     let residue = false
     for (const entries of node.logs.values()) if (entries.some((x) => partitionOf(x.rec) === p)) { residue = true; break }
+    this.n++
     if (residue) {
       e.state = SCOPE.orphan
       e.teacher = undefined
@@ -482,6 +492,7 @@ export class Scope {
   #shed(node: Node, p: string, e: ScopeEntry) {
     let dropped = 0
     this.entries.delete(p)
+    this.n++
     if (node.durable) node.persistBoot()
     for (const [origin, entries] of node.logs) {
       const kept = entries.filter((x) => partitionOf(x.rec) !== p)

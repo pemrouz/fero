@@ -368,7 +368,9 @@ export class Node {
       // failed result — the api's failover policy owns retries (the kernel stays stateless here:
       // it routes frames, it does not track rpc ids).
       case 'rpc': {
-        const id = this.primary
+        //! route: a named member (M6 `to` — the scoped gather/remote-read fan-out) or the primary (a
+        // spoke's default). Unreachable answers locally either way — the api's failover owns retries.
+        const id = e.to !== undefined ? (this.byUuid.get(e.to) ?? null) : this.primary
         const link = id !== null ? this.links.get(id) : undefined
         if (!link || link.state !== LS.admitted || link.dead) {
           j.armed && j.emit(JK.rpcFail, e.id, 'unreachable')
