@@ -8,9 +8,10 @@
 // sleep(250) granularity) and each run cost wall-clock seconds.
 
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { Sim } from './exec.ts'
-import { cluster, formed, writes } from './harness.ts'
+import type { Sim } from './exec.ts'
+import { formed } from './harness.ts'
 import { converged, drained } from './monitors.ts'
+import { shrink, sweepBuild } from './shrink.ts'
 import { captureSim } from '../tools/debug/capture.ts'
 
 const arg = (name: string, dflt: number): number => {
@@ -34,32 +35,36 @@ const saveCapture = (sim: Sim, why: string): string => {
   return path
 }
 
+//! auto-shrink (M7, DESIGN-M7 §2): a failing seed's capture is joined by a MINIMAL one — same class,
+// 1-minimal steps, frozen at the violation. Opt-out with --no-shrink. The baseline-events check is the
+// empirical build-contract gate: if sweepBuild(null) doesn't replay the failing run exactly, say so and
+// keep only the honest full capture.
+const noShrink = process.argv.includes('--no-shrink')
+const autoShrink = (seed: number, orig: Sim | null) => {
+  if (noShrink) return
+  const s = shrink(sweepBuild(seed, nNodes, nWrites))
+  if (!s) { console.error('  shrink: could not reproduce — keeping the full capture only'); return }
+  if (orig && s.from.events !== orig.events) {
+    console.error(`  shrink: baseline diverged from the failing run (${s.from.events} vs ${orig.events} events) — keeping the full capture only`)
+    return
+  }
+  mkdirSync('captures', { recursive: true })
+  const path = `captures/seed-${seed}.shrunk.json`
+  writeFileSync(path, JSON.stringify(captureSim(s.sim, s)))
+  console.error(`  shrunk ${s.from.steps}→${s.steps.length} steps (${s.runs} runs${s.capped ? ', budget-capped' : ''}): npm run debug -- ${path}`)
+  console.error(`    original: ${s.from.fail}`)
+  console.error(`    minimal:  ${s.fail}`)
+}
+
 let failed = 0
 let events = 0
 const t0 = performance.now()
 
 for (let seed = 0; seed < seeds; seed++) {
   try {
-    const sim = new Sim(seed)
-    const nodes = cluster(sim, nNodes)
-    //! per-pair personalities drawn from the seed: uneven delays + up to 25% duplication
-    for (let i = 0; i < nodes.length; i++)
-      for (let j = i + 1; j < nodes.length; j++)
-        sim.fault(nodes[i].uuid, nodes[j].uuid, {
-          delay: [1, 1 + sim.rng() * 25],
-          dupP: sim.rng() * 0.25,
-        })
-    //! writes race mesh formation deliberately — digest-on-admit AE (the dial-race loss fix) must make them converge
-    writes(sim, nodes, nWrites)
-    //! odd seeds add a partition/heal window mid-writes: tail loss both directions, healed by re-admit digests
-    if (seed % 2) {
-      const a = nodes[Math.floor(sim.rng() * nodes.length)].uuid
-      let b = a
-      while (b === a) b = nodes[Math.floor(sim.rng() * nodes.length)].uuid
-      const cut = 20 + sim.rng() * 150
-      sim.at(cut, () => sim.partition(a, b))
-      sim.at(cut + 30 + sim.rng() * 250, () => sim.heal(a, b))
-    }
+    //! the sweep scenario lives in sweepBuild (shrink.ts) — ONE definition serves the sweep AND the shrinker;
+    // draw order is byte-identical to the pre-M7 inline block (pinned by shrink.test.ts + the frozen event count)
+    const { sim, nodes } = sweepBuild(seed, nNodes, nWrites)(null)
     const violations = sim.run()
     events += sim.events
 
@@ -74,12 +79,14 @@ for (let seed = 0; seed < seeds; seed++) {
       console.error(`✗ seed ${seed}: ${fail}`)
       console.error(`  repro: new Sim(${seed}) + cluster(${nNodes}) + writes(${nWrites})`)
       saveCapture(sim, String(fail))
+      autoShrink(seed, sim)
     } else if (seed === forceCapture) {
       saveCapture(sim, 'requested via --capture')
     }
   } catch (e) {
     failed++ // a throwing seed reports and the sweep continues — never mask the rest of the seed space
     console.error(`✗ seed ${seed}: threw ${e}`)
+    autoShrink(seed, null)
   }
 }
 

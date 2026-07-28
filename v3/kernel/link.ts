@@ -28,7 +28,10 @@ import type { EffectSink } from './env.ts'
 export const MAX_QUEUED = 256
 
 //! LinkState: the admission ladder. M0 collapses identified→admitted (no membership yet); the distinct states exist so M2 can insert a view-admission step without reshaping the machine.
-export const LS = { hello: 0, admitted: 1 } as const
+//! LS.diag (M7): the authenticated diagnostics latch — a state, not a field. An LS.diag link is
+// structurally outside membership: never in byUuid/clientLinks, never counted by admitted(), and every
+// admitted-only verb closes it (kernel/diag.ts holds the whole machine). Appended, never renumbered.
+export const LS = { hello: 0, admitted: 1, diag: 2 } as const
 
 export class Link {
   state: number = LS.hello

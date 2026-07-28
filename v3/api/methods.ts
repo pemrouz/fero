@@ -67,6 +67,8 @@ export class Host {
   //! live subscriptions by `link|id` — reaped on UNSUB and on link death (the composer's fold calls
   // reapLink off JK.linkDown; v2's serve-side leak guard, kept)
   #subs = new Map<string, { stop(): void; cancelled: boolean; live: unknown }>()
+  //! served (M7 [diagnostics]): the leak-guard scalar — live subscriptions this host currently serves
+  get served(): number { return this.#subs.size }
 
   constructor(rt: Runtime, data: any, methods: Record<string, Handler>, system: Record<string, Handler>) {
     this.#rt = rt

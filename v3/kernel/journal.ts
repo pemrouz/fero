@@ -95,6 +95,13 @@ export const JK = {
   gateDrop: 65,      // a=origin, b=seq — a non-held record dropped at the inbound gate (epoch-skew window; expected-rare)
   stageDrop: 66,     // a=partition, b=seq — a non-teacher transfer dropped during an open latch (expected-rare; monitored)
   shedStall: 67,     // a=partition, b=ticks — the H7 alarm at escalating cadence, never silent
+  //! ── M7 DIAG vocabulary (DESIGN-M7 §1 — session audit lives HERE; the wire deny is one constant) ──
+  diagAuth: 68,      // a=link, b=allowName — a diag session latched (the audit identity is the allowlist NAME; tokens never ride the journal)
+  diagDeny: 69,      // a=link, b=reason ('no-config'|'bad-token'|'malformed') — journal holds the typed truth; the wire says only 'denied'
+  diagPull: 70,      // a=link, b=op ('node'|'logs'|'state'), c=rows — emitted AFTER the reply builds (a pull never contains its own row).
+                     // DELIBERATE asymmetry: q:'journal'/'meta' pulls are NOT journaled — journaling reads-of-the-journal at follow
+                     // cadence would evict the very history being followed (a 1 Hz dash eats a 4096-cap ring in minutes). Audit anchor
+                     // for a session = diagAuth + linkDown. Do not "fix" this into spam.
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

@@ -1,4 +1,4 @@
-# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5, adversarially reviewed) + the debug tool
+# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5, adversarially reviewed) + M6 scoped replication + M7 debug tooling, full
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -11,22 +11,32 @@ dedup + typed NACKs — the single-writer invariant v2 spent DECISIONS AA chasin
 now a per-event monitor), **M4 durability** (the watermark ladder, the WAL + boot
 record + snapshot/truncate behind an effect seam, the confirm guarantee ladder,
 compaction, and the restore-from-WAL-only proof: kill −9 a whole cluster at any
-seed and zero persisted-confirmed writes are lost), and the **debug tool** (capture → typed model → viewer
-with time-travel replay, plus a live mode) — each piece pulled forward exactly when
-a seed sweep or review demanded it, which is the architecture working as designed.
+seed and zero persisted-confirmed writes are lost), **M6 scoped replication** (R-sets,
+keep-until-confirmed shedding, the one-teacher handover, owner-scoped folds and the
+gather — hardened by a 55-finding adversarial review whose centerpiece is the pp
+floor law), and **M7 debug tooling, full** (the authenticated DIAG wire channel, the
+trajectory shrinker, the Symbol-keyed `[diagnostics]` handle, the 5-node live dash,
+and the honesty promotion gate) over a debug tool (capture → typed model → viewer with
+time-travel replay) that has co-evolved with the protocol since M0 — each piece pulled
+forward exactly when a seed sweep or review demanded it, which is the architecture
+working as designed.
 
 ## Run it
 
 ```sh
-npm test                       # 254 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm test                       # 288 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
 npm run perf                   # 20 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
 npm run debug                  # scenario DASHBOARD at /, the debugger at /debug (http://localhost:4699)
 npm run sim -- --seeds 5 --capture 3   # force-write a healthy capture to explore in the debugger
 npm run debug -- captures/seed-3.json  # open a capture in the debugger
-npm run debug -- --live        # spin a REAL 3-node TCP cluster + owner-routed traffic and debug it live
+npm run debug -- --live        # spin a REAL 5-node TCP cluster + owner-routed traffic and debug it live
+npm run debug -- --live --nodes 3      # ...at another size
 npm run debug -- --live --contend      # ...with a deliberately conflicting workload (LWW elections on demand)
+npm run shrink -- --seed 42            # minimize a failing sweep seed → captures/seed-42.shrunk.json
+npm run shrink -- --replay captures/seed-42.shrunk.json   # re-run a minimal repro from DATA (the fix-verification loop)
+FERO_DIAG_TOKEN=… npm run debug -- --attach h:p,h:p       # dash a REAL multi-process cluster over the DIAG wire
 ```
 
 Measured on this box (WSL2): `1000/1000 seeds green · 237,451 events in ~4.5s
@@ -97,13 +107,49 @@ into it:
   minimal — `/capture.json` rebuilds a truthful snapshot from a running in-process
   cluster ON REQUEST (no relay buffer with its own cadence to lie about, v2's
   10%-temporal-coverage bug class). The viewer polls; sim captures and live
-  clusters are the same format in the same tool. Live traffic lands on
-  workload-picked nodes and — once the genesis ballot commits (~2s in) — the
-  KERNEL owner-routes every write to its ring owner, so the steady state shows
-  zero contention by construction. `--contend` posts random-origin writes to a
-  shared key set: it demos real LWW elections in the pre-genesis open window,
-  after which the pipeline serializes even a deliberately conflicting workload
-  through one sequencer — which is the M3 story on one screen.
+  clusters are the same format in the same tool. `--live` runs **5 real TCP nodes**
+  by default (M7's live-dash bar): the workload's key→writer rule is uncorrelated
+  with the kernel's ring, so most writes enter at a non-owner and the KERNEL
+  owner-forwards them — the cid write-route timeline (issued → forwarded →
+  sequenced → applied at every node) lights up on real traffic. Measured on a
+  fresh 5-node run: 44 route rows, 25 owner-forwarded writes, converged,
+  replay-verified. `--contend` posts random-origin writes to a shared key set: it
+  demos real LWW elections in the pre-genesis open window, after which the pipeline
+  serializes even a deliberately conflicting workload through one sequencer — which
+  is the M3 story on one screen.
+- **The DIAG channel + attach mode** (M7 — [kernel/diag.ts](kernel/diag.ts),
+  [tools/debug/attach.ts](tools/debug/attach.ts)): the same debugger, pointed at a
+  REAL multi-process cluster. A debug client opens a normal link, HELLOs with `r:2`
+  + a bearer token from the node's `diag.allow` allowlist, and latches into a
+  session that is **structurally outside membership** — never in `byUuid` (a spoofed
+  uuid cannot evict a real member), never admitted (invisible to genesis, suspicion,
+  heartbeats, anti-entropy), never in the client set (zero per-record cost while
+  attached). Pulls are cursor-chunked (journal / logs / node fold / state), so a busy
+  node stays servable where a monolithic pull would frame-overflow into a dial loop.
+  The wire says only `denied`; the TYPED reason (`no-config` / `bad-token` /
+  `malformed`) and the audit identity (the allowlist NAME, never the token) live in
+  the journal. `--attach h:p,h:p` rebuilds `/capture.json` from fresh pulls per HTTP
+  request; a node that will not answer becomes an `absent` row with a typed reason,
+  never an invented node card.
+- **The shrinker** ([sim/shrink.ts](sim/shrink.ts)): a failing seed's capture is
+  joined by a MINIMAL one. Every schedule is a list of literal `Step`s and every
+  build-time rng draw runs unconditionally, so removing a step cannot shift another
+  step's randomness — determinism is self-enforcing rather than bookkept. The oracle
+  is the first failure's CLASS (monitor name / named end-check / normalized crash),
+  never its detail, and the artifact carries the original and minimal failure lines
+  side by side so a shrink that landed on a different bug is visible rather than
+  hidden. The final run is frozen AT the violating event, so the capture opens there
+  by construction — time-travel needs no scrubber machinery. Measured on the M7
+  acceptance demo: **40 steps → 1**, in 6 candidate runs, replay-verified.
+- **The honesty promotion gate** ([tools/debug/honesty.test.ts](tools/debug/honesty.test.ts)):
+  plan §3.6 made executable. Empty-but-valid REAL-PRODUCER captures are folded and
+  deep-equal-pinned (any field a fold learns to invent breaks it); every string leaf
+  every fold emits must trace to a capture fact, a closed enum, or a composite
+  identity whose every PART traces; `verifyReplay`'s prose is the one carve-out,
+  pinned by template and exercised by a deliberately-truncated fixture so it can
+  never go dormant; an absent row must change the header and nothing else; and the
+  viewer is pinned at source to exactly one model import with no local fold
+  redefinition (v2's dual-language drift bug, made structurally impossible).
 
 ## Adversarially reviewed
 
@@ -269,6 +315,7 @@ kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.
   confirm.ts    the guarantee ladder: replicated/persisted probes over watermark evidence, view-change recount (M4c)
   log.ts        compaction: snapshot-record-supersedes-prefix below the crash-stable frontier; tombstone GC (M4d)
   journal.ts    the one typed diagnostics ring (drop-oldest, surfaced drop counter)
+  diag.ts       the authenticated DIAG plane (M7): the r:2 session latch + cursor-chunked pulls, structurally outside membership
 shell/    production adapters (TCP + timers + the fsync WAL/boot-record store), zero protocol decisions
 api/      the public surface (M5a): fero(name, opts) → {data, methods, cluster, destroy}
   substrate.ts  the ONE seam onto the `data` sibling ($() proxies): record-apply ingress, clone-free capture, sync detach
@@ -276,7 +323,10 @@ api/      the public surface (M5a): fero(name, opts) → {data, methods, cluster
   index.ts      the composer: declared config schema (typos throw), seams.validation, default write methods over the confirm ladder
   methods.ts    the method plane (M5c): the invoke HOST (flush-on-return via ALS) + the rpc CALLER (dual-mode Handles, failover policies)
   types.ts      the exported unions: Guarantee, WriteResolve/WriteReject, FeroConfig, Fero
+  diagnostics.ts the Symbol-keyed internals seam (M7): capture/journal/served/confirms/compact/drop — absent beats faked
 sim/      the executive: virtual time, seeded faults (FIFO-clamped), per-event monitors, sweep CLI
+  shrink.ts     the trajectory minimizer (M7): literal Steps + unconditional build draws ⇒ removal cannot shift randomness
+tools/debug/ the debug tool: capture → model folds → viewer; scenarios dashboard; live + DIAG attach modes (M7)
 tests/    Tier-3 real-socket smoke (the only wall-clock tier)
 utils/    ports/bench/ratio.interleaved — v2's #utils conventions
 ```
@@ -334,8 +384,11 @@ back-patches one preallocated buffer — no per-frame Writer, no double sizing p
 it (v2 bolted five channels on afterwards). Every drop, dedup, LWW loss, backpressure
 transition, redial, and give-up is a typed, cursor-readable event with a surfaced
 overflow counter. The sim's failure report IS a debug artifact: seed + violating
-monitor + event index. Capture/replay/time-travel (M7) get their substrate for free
-because state is a deterministic fold of the journal'd inputs.
+monitor + event index. Capture/replay/time-travel get their substrate for free
+because state is a deterministic fold of the journal'd inputs — M7 spent that
+substrate on the shrinker (a failing seed's capture is joined by a minimal one,
+frozen at the violating event) and on the DIAG channel (the same folds, pulled off
+a real multi-process cluster over the wire).
 
 ## What this deliberately does not have yet (stated, not implied)
 
@@ -608,6 +661,57 @@ because state is a deterministic fold of the journal'd inputs.
     serve 4800` / `npm run demo -- watch 4800` — a server mutating an
     inventory by plain assignment, a client re-rendering through one tap;
     kill and restart the server and the watcher resumes.
+- **M7 — debug tooling, full is LIVE** (design record: [DESIGN-M7.md](DESIGN-M7.md),
+  panel-synthesized: 3 open questions × 2 independent candidate designs × 1 skeptic
+  judge, every citation verified against the tree before synthesis). Most of plan §8
+  had already been pulled forward — the journal spine (M0), the capture format, the
+  typed model with time-travel + replay-verify, the full viewer, the scenario
+  dashboard. M7 closed the five things that were genuinely absent:
+  - **The DIAG wire channel + its allowlist** (kernel/diag.ts, verbs 23/24, JK
+    68–70): the authenticated diagnostics plane plan §8 reserved from the first
+    protocol byte, and — per plan §12 — the only auth v3.0 ships. The panel killed
+    the obvious design: a monolithic whole-node pull frame-overflows on exactly the
+    busy nodes you attach a debugger to, and the resulting FrameError → link drop →
+    re-dial is a deterministic loop, so pulls are cursor-chunked instead. The
+    session is a LINK STATE, not a peer: never in `byUuid` (so a diag client
+    presenting a member's uuid cannot trip the dup-link keeper and evict it), never
+    admitted, never in the client set. The HELLO path — the kernel's most
+    safety-critical code — grew exactly one branch. The wire deny is one constant
+    (`denied`) so an unauthenticated prober learns nothing, while the journal keeps
+    the typed reason and the allowlist NAME; the token never rides the journal.
+    Journal pulls are deliberately NOT journaled: journaling reads-of-the-journal at
+    follow cadence evicts the very history being followed (a 1 Hz dash would eat a
+    4096-row ring in minutes) — the audit anchor is the session latch plus its
+    linkDown.
+  - **Parity by construction:** `captureNode` is re-based onto the same `diagNode`
+    fold the wire serves. One producer, two consumers — an in-process capture and a
+    remote attach cannot drift, and a deepEqual pin backstops it anyway.
+  - **The shrinker** (sim/shrink.ts) and the acceptance loop: chaos failure →
+    minimal repro → the capture opens AT the violating event. Measured on the
+    acceptance demo (a fence-blind log re-append mutant, the V1d precedent):
+    **40 steps → 1 step in 6 candidate runs**, replay-verified, with the
+    original and minimal failure lines side by side in the artifact so a shrink
+    that wandered onto a different bug is visible rather than hidden. The repro
+    block is standalone-replayable from DATA (`npm run shrink -- --replay`) — the
+    fix-verification loop.
+  - **The `[diagnostics]` handle** (api/diagnostics.ts): v2's Symbol-keyed idiom on
+    v3's organs — capture / journal cursor / served / confirms / logSize / compact /
+    drop. Nothing is stubbed: `observe`/`isolate`/`heal` are ABSENT rather than
+    faked (the journal cursor and the public tap are the pull-spine answers; a TCP
+    shell cannot hold a partition honestly). The review's shared defect is fixed
+    here: `compact()` is size-gate-free (v2's drive-it-deterministically purpose)
+    but REFUSES on an armed node — forcing a member-ranged frontier pass on a scoped
+    holder could drop the only real copy, so the pin wins and says so.
+  - **The 5-node live dash** and **the honesty promotion gate**: measured on a fresh
+    `--live` run — 5 nodes, converged, 44 write-route rows, 25 owner-forwarded
+    writes with acks, replay-verified. The gate makes plan §3.6 executable, and it
+    caught a real derived-key case on its first run (it now verifies the DERIVATION
+    of composite identities rather than blanket-allowing their shape).
+  - Full battery after M7: **288/288 tests, 20/20 perf gates, 1000/1000 identity
+    sweep at exactly 237,451 events** — every byte of the new surface is
+    unreachable without an `r:2` HELLO or a DIAGQ arriving, so the frozen sweep is
+    untouched, and the harness refactor the shrinker required is pinned by a
+    200-seed golden against the frozen pre-split scenario.
 - **M6 — scoped replication + aggregates** (design record: [DESIGN-M6.md](DESIGN-M6.md),
   a three-design judge panel synthesis; landed as six slices, M6a-M6f):
   - **R-sets**: `replicas: N` config (explicit mode like durable/client — unset

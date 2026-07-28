@@ -10,6 +10,7 @@ import { Sim, type Fault } from './exec.ts'
 import { perEvent } from './monitors.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 import type { Node } from '../kernel/node.ts'
+import type { Step } from './shrink.ts' // type-only: no runtime cycle (shrink imports harness at runtime)
 
 //! cluster — n nodes, full dial mesh (everyone dials everyone: deliberately redundant so the one-link-per-pair dedup is exercised on every formation).
 export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durable?: boolean; replicas?: number; fault?: Fault } = {}): Node[] => {
@@ -52,33 +53,46 @@ export const client = (sim: Sim, id: string, servers: Node[], opts: { heartbeatM
   return c
 }
 
-//! writes — schedule a deterministic-random workload: `count` writes spread over (0, spanMs], mixed types/values drawn from the sim's seeded rng.
-export const writes = (sim: Sim, nodes: Node[], count: number, spanMs = 300) => {
+//! writesPlan — the same workload as `writes`, PLANNED as literal Steps instead of posted (M7 shrinker
+// contract, DESIGN-M7 §2): every rng draw happens here, at plan time, in EXACTLY the draw order the
+// pre-split writes() used (node, key, key-suffix, roll, value draws, delay — per iteration) so the split
+// is byte-invisible to every seeded trajectory (pinned by shrink.test.ts's golden + the frozen 1000-seed
+// sweep count). Posting a Step draws NOTHING — which is what lets the shrinker remove one step without
+// shifting any other step's randomness (replan-to-burn: determinism is self-enforcing).
+export const writesPlan = (rng: () => number, uuids: string[], count: number, spanMs = 300): Step[] => {
   const keys = ['alpha', 'beta', 'gamma', 'delta', 'epsi']
+  const out: Step[] = []
   for (let i = 0; i < count; i++) {
-    const node = nodes[Math.floor(sim.rng() * nodes.length)]
-    const key = keys[Math.floor(sim.rng() * keys.length)] + Math.floor(sim.rng() * 4)
-    const roll = sim.rng()
+    const uuid = uuids[Math.floor(rng() * uuids.length)]
+    const key = keys[Math.floor(rng() * keys.length)] + Math.floor(rng() * 4)
+    const roll = rng()
     const rec: Rec =
       roll < 0.15
         ? { type: REC.remove, key: [key] }
         : roll < 0.5
-          ? { type: REC.update, key: [key], value: valueOf(sim, i) }
+          ? { type: REC.update, key: [key], value: valueOf(rng, i) }
           : roll < 0.75
-            ? { type: REC.update, key: [key, 'nested'], value: valueOf(sim, i) }
-            : { type: REC.insert, key: [], at: key, value: valueOf(sim, i) }
-    sim.post(node.uuid, { kind: 'write', recs: [rec] }, 1 + sim.rng() * spanMs)
+            ? { type: REC.update, key: [key, 'nested'], value: valueOf(rng, i) }
+            : { type: REC.insert, key: [], at: key, value: valueOf(rng, i) }
+    out.push({ at: 1 + rng() * spanMs, op: 'write', uuid, recs: [rec] })
   }
+  return out
+}
+
+//! writes — schedule a deterministic-random workload: `count` writes spread over (0, spanMs], mixed types/values drawn from the sim's seeded rng. Now plan-then-post; API and draw order unchanged.
+export const writes = (sim: Sim, nodes: Node[], count: number, spanMs = 300) => {
+  for (const s of writesPlan(sim.rng, nodes.map((n) => n.uuid), count, spanMs))
+    if (s.op === 'write') sim.post(s.uuid, { kind: 'write', recs: s.recs }, s.at)
 }
 
 //! valueOf — a value zoo: scalars, unicode, NaN, nested obj/arr, bytes — every VT the codec claims, exercised on every sweep.
-const valueOf = (sim: Sim, i: number): unknown => {
-  switch (Math.floor(sim.rng() * 8)) {
+const valueOf = (rng: () => number, i: number): unknown => {
+  switch (Math.floor(rng() * 8)) {
     case 0: return i
-    case 1: return sim.rng() < 0.5 ? null : undefined
-    case 2: return sim.rng() < 0.5
+    case 1: return rng() < 0.5 ? null : undefined
+    case 2: return rng() < 0.5
     case 3: return `v${i}-é中文` // unicode strings cross the utf8 path
-    case 4: return sim.rng() < 0.3 ? NaN : sim.rng() * 1e9 // NaN must survive bit-exactly (f64 codec claim)
+    case 4: return rng() < 0.3 ? NaN : rng() * 1e9 // NaN must survive bit-exactly (f64 codec claim)
     case 5: return { n: i, s: `s${i}`, deep: { ok: true, list: [1, 'two', null] } }
     case 6: return [i, `x${i}`, { y: i }]
     default: return new Uint8Array([i & 0xff, (i >> 8) & 0xff])

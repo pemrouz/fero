@@ -60,6 +60,12 @@ export const VERB = {
   // RECORDS-shaped one-teacher transfer (provenance + attempt identity ride exactly like AE);
   // ACQDONE {p, e, t:{o:cut}, n} closes the atomic fold.
   HAVEQ: 19, HAVEA: 20, ACQ: 21, ACQDONE: 22,
+  //! M7 DIAG plane (DESIGN-M7 §1 — the authenticated diagnostics channel, structurally OUTSIDE
+  // membership): DIAGQ {id≥1, q, ...} is a client pull (journal/logs cursors, node fold, state);
+  // DIAGA answers it (id:0 is the session verdict — the ACCEPT/deny of an r:2 HELLO). Direction-split
+  // paired verbs like HAVEQ/HAVEA — no subcommand byte: control frames carry exactly ONE value, so the
+  // op rides INSIDE the value (the DIGEST-r idiom) and #dispatch keeps its flat fail-closed switch.
+  DIAGQ: 23, DIAGA: 24,
 } as const
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.

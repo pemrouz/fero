@@ -31,6 +31,7 @@ import { Writes } from './write.ts'
 import { Streams } from './streams.ts'
 import { Confirm } from './confirm.ts'
 import { Scope, SCOPE } from './scope.ts'
+import { diagHello, onDiagQ } from './diag.ts'
 import { maybeCompact } from './log.ts'
 import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
@@ -66,6 +67,12 @@ export interface NodeOpts {
   // Must be set identically on every member — like heartbeatMs, cluster config is the deployer's
   // contract (the exactly-R sim monitor catches drift in test).
   replicas?: number
+  //! diag (M7, DESIGN-M7 §1): the authenticated diagnostics channel's allowlist — name → opaque bearer
+  // token (names are audit identities and ride the journal; tokens never do). Absent/empty = the DIAG
+  // channel is DEAD: every r:2 HELLO is denied (fail closed, like durable/client/replicas — absent =
+  // mode off). Object values ({token, scopes}) are reserved post-1.0. The token crosses cleartext —
+  // run DIAG on trusted networks or a tunnel (plan §12 posture, stated out loud).
+  diag?: { allow: Record<string, string> }
 }
 
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
@@ -259,6 +266,10 @@ export class Node {
   // machinery is inert; scoped() is the one branch guard every M6 code path hangs off.
   get replicas(): number { return this.#opts.replicas ?? 0 }
   get scoped(): boolean { return (this.#opts.replicas ?? 0) > 0 }
+
+  //! diagAllow — the M7 DIAG allowlist (see NodeOpts.diag). Absent/empty ⇒ the channel is dead: every
+  // r:2 HELLO is denied (fail closed, the durable/client/replicas idiom for absent modes).
+  get diagAllow(): Record<string, string> | undefined { return this.#opts.diag?.allow }
 
   //! armed — scoping is LIVE: scoped ∧ a committed view exists. Open genesis (epoch 0) is always
   // unscoped — there is no committed ring to scope against, every node owns its own writes, and the
@@ -915,6 +926,11 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'malformed-hello')
         }
+        //! M7 DIAG (DESIGN-M7 §1): an r:2 HELLO is a diagnostics ATTACH, not a peer — the whole machine
+        // lives in kernel/diag.ts; this is the one branch the safety-critical HELLO path grows. Checked
+        // BEFORE self-reject/dup-link so a diag client can never perturb byUuid or evict a member by
+        // presenting a spoofed uuid; the LS.diag leg catches a re-HELLO on an already-latched session.
+        if (link.state === LS.diag || (v as { r?: unknown }).r === 2) return diagHello(this, link, v as Record<string, unknown>)
         if (v.u === this.uuid) {
           //! self-reject by uuid — a gossip loop or misconfig dialled ourselves; never redial a self-loop
           j.armed && j.emit(JK.selfReject, link.id)
@@ -1219,6 +1235,21 @@ export class Node {
         this.membership.settle(this)
         return
       }
+      //! M7 DIAG plane (cold cases, after every hot verb): per-frame auth is the LATCH state check
+      // alone — a DIAGQ outside an authenticated session is the records-before-hello shape (close);
+      // a DIAGA arriving at a node is a confused client (drop the frame, keep the link — the
+      // default-arm posture, since it proves nothing hostile).
+      case VERB.DIAGQ: {
+        if (link.state !== LS.diag) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'diagq outside session')
+          link.dead = link.noRedial = true
+          return this.env.sink.close(link.id, 'diag-denied')
+        }
+        return onDiagQ(this, link, f.value as Record<string, unknown>)
+      }
+      case VERB.DIAGA:
+        j.armed && j.emit(JK.frameDrop, link.id, 'unexpected diaga')
+        return
       default:
         j.armed && j.emit(JK.frameDrop, link.id, `unknown verb ${f.verb}`)
         return // drop the frame, keep the link — an unknown verb from a newer peer is not a wire fault
