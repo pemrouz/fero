@@ -50,9 +50,13 @@ export const restoreOpts = (dir: string): { boot?: NodeOpts['boot']; incarnation
   return {
     boot: {
       epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor,
-      //! M6 (armed lives only — absent keys stay absent, so unscoped restores are shape-identical)
+      //! M6 (armed lives only — absent keys stay absent, so unscoped restores are shape-identical):
+      // the held/orphan/dirty ledgers + the floor seed all ride, or a frozen orphan's rows lose
+      // their replay authority and its floors collapse (the fix-round H1 regression in the sim)
       ...(b.heldPartitions ? { heldPartitions: b.heldPartitions } : {}),
+      ...(b.orphanParts ? { orphanParts: b.orphanParts } : {}),
       ...(b.dirtyParts ? { dirtyParts: b.dirtyParts } : {}),
+      ...(b.floors ? { floors: b.floors } : {}),
     },
     incarnation: b.incarnation + 1,
   }

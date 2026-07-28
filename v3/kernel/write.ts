@@ -89,6 +89,7 @@
 // which is also what clocks the retries — no view, no forwarding, no liveness debt).
 
 import { VERB, encodeControl, encodeRuns, type Frame } from './codec.ts'
+import { SCOPE } from './scope.ts'
 import { Ring } from './ring.ts'
 import { JK } from './journal.ts'
 import { LS, type Link } from './link.ts'
@@ -257,6 +258,15 @@ export class Writes {
       if (a.sent >= 0) continue
       const owner = epoch === 0 ? node.uuid : this.ring.ownerOf(partitionOf(a.rec))
       if (owner === node.uuid || owner === '') {
+        //! M6 [finding 27]: an ORPHAN-FROZEN partition must not accept new stamps — the freeze
+        // invariant ("an orphan's floors never advance") holds at the stamp site too. The attempt
+        // PARKS; the retry clock re-drains it after the re-entry latch (rescope's orphan-reassigned
+        // leg) transitions the partition back to held. Acquiring is deliberately NOT parked: the
+        // mid-latch owner commit is lawful single-writer data (staged live replays over it).
+        if (node.armed && node.scope!.entries.get(partitionOf(a.rec))?.state === SCOPE.orphan) {
+          if (!a.parked) { a.parked = true; j.armed && j.emit(JK.writeBuffered, this.pending.size) }
+          continue
+        }
         a.ae = epoch // the issuer/flush-boundary re-stamp (the ONLY lawful site besides relay arrival)
         ;(commits ??= []).push(a)
         continue
@@ -405,6 +415,10 @@ export class Writes {
         ae !== node.epoch || epoch === 0 ? NACK.staleEpoch
         : !this.ring.holds(node.uuid, partitionOf(rv)) ? NACK.notOwner
         : !gate.open ? NACK.withheld
+        //! M6 [finding 27]: owner-by-ring but ORPHAN-frozen (re-assignment pending its re-entry
+        // latch) — withheld is the honest retryable answer; the issuer's retry clock re-forwards
+        // after the latch completes. Acquiring commits stay lawful (mid-latch owner writes).
+        : node.armed && node.scope!.entries.get(partitionOf(rv))?.state === SCOPE.orphan ? NACK.withheld
         : ''
       if (reason) {
         if (nack && (nack.r !== reason || nack.c + nack.n !== cid)) flushNack()
@@ -486,7 +500,7 @@ export class Writes {
   // caller may persistRun the frame), 2 = fresh SPLICE (M6 dual fence: folded and logged, but must
   // NEVER ride persistRun — an interior row would walk walTail backwards and condemn the chain on
   // replay; it reaches disk only via the next snapshot() swap — DESIGN-M6 §0 no-interior-rows).
-  inbound(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }): number {
+  inbound(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number; pp?: number }): number {
     const j = node.journal
     //! the Lamport merge-up runs first, even for drops: the clock must track everything observed —
     // a reborn clock re-issuing a lost stamp would corrupt provenance cluster-wide.
@@ -510,8 +524,9 @@ export class Writes {
       if (verdict === 0) { j.armed && j.emit(JK.gateDrop, origin, seq); return 0 }
       if (verdict === 2) {
         //! an open latch: live records for the acquiring partition STAGE — nothing touches lanes,
-        // floors, or the fence until the fold (§0 law row 2; ACQDONE replays this span)
-        node.scope!.stage(node, p, origin, seq, epoch, rec, rv.issuer || undefined, rv.issuer ? rv.cid : undefined)
+        // floors, or the fence until the fold (§0 law row 2; ACQDONE replays this span). The pp
+        // rides the buffer so the replayed span keeps its chain evidence.
+        node.scope!.stage(node, p, origin, seq, epoch, rec, rv.issuer || undefined, rv.issuer ? rv.cid : undefined, rv.pp)
         return 0
       }
     }
@@ -529,20 +544,28 @@ export class Writes {
     }
     d.applied = seq
     if (rec === null) rec = rv.rec() // ONE copy out of the receive chunk, shared by the log entry and the apply
-    const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch }
+    const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number } = { rec, seq, epoch }
     if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
+    if (node.armed && rv.pp !== undefined && rv.pp >= 0) entry.pp = rv.pp
     node.logFor(origin).push(entry)
     //! the SHIPPABLE watermark advances at the log append — the sole evidence confirm:'replicated'
     // may ever read (M4c); synchronous with applied today, a distinct site by design
     d.shippable = seq
-    //! M6 possession floor (armed only): the fast path is a single-source ascending delivery for this
-    // (origin, partition) sub-stream, so the floor advances with it (soundness: DESIGN-M6 §0). The
-    // partition also lands in the caller's per-frame scratch — the persistRun batch records per-
-    // partition maxes so the persisted echo can advance the DURABLE floors it actually covers.
+    //! M6 possession floor (armed only) — THE CHAIN RULE (the review's floor law, findings
+    // 10/18/25): advance to seq ONLY when the current floor already covers the sender-stamped
+    // predecessor (`pp >= 0 && pp <= pe.s`). "Single-source ascending delivery" was the old
+    // license and it is locally unverifiable — a mid-lane first arrival, an AE re-admit race, or
+    // two senders serving one lane all delivered a seq above an interior the node never received,
+    // and the eager advance FORGED coverage the shed predicate then destroyed data on. A gapped
+    // record still folds (the lane keeps it); the floor waits for the handshake latch's attested
+    // cut. Unknown pp (-1: pre-pp history, epoch-0 rows) fails CLOSED. The partition also lands in
+    // the caller's per-frame scratch — the persistRun batch records per-partition maxes so the
+    // persisted echo can advance the DURABLE floors it actually covers (capped at pe.s there).
     if (node.armed) {
       const p = partitionOf(rec)
       const pe = d.part(p)
-      if (seq > pe.s) pe.s = seq
+      const pp = rv.pp ?? -1
+      if (pp >= 0 && pp <= pe.s && seq > pe.s) pe.s = seq
       if (this.rxParts) { const m = this.rxParts.get(p); if (m === undefined || seq > m) this.rxParts.set(p, seq) }
     }
     node.apply(rec, origin, seq, epoch, entry.iss, entry.cid)
@@ -585,21 +608,40 @@ export class Writes {
   // under-fence arrival is a genuine dup that the lane-presence test drops identically.
   // Durable nodes: the splice is MEMORY-ONLY here — node.spliced() marks the partition dirty and arms
   // the snapshot swap; until the swap's echo the durable floor does not cover it (no-interior-rows).
-  #splice(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number }, d: StreamDescriptor, pre: Rec | null = null): number {
+  #splice(node: Node, origin: string, seq: number, epoch: number, rv: { rec(): Rec; issuer: string; cid: number; pp?: number }, d: StreamDescriptor, pre: Rec | null = null): number {
     const j = node.journal
-    const rec = pre ?? rv.rec()
-    const p = partitionOf(rec)
-    if (node.armed && (d.parts?.get(p)?.s ?? 0) >= seq) { j.armed && j.emit(JK.dupDrop, origin, seq); return 0 }
+    //! [finding 45] the CLIENT leg (pre === null: unarmed, no gate ran) defers materialising the
+    // record until the lane-presence test proves it fresh — on unscoped trajectories every
+    // under-fence arrival is a genuine dup, and decoding it just to drop it was a per-dup
+    // allocation the old scalar fence never paid.
+    let rec = pre
+    if (node.armed && rec !== null && (d.parts?.get(partitionOf(rec))?.s ?? 0) >= seq) { j.armed && j.emit(JK.dupDrop, origin, seq); return 0 }
     const lane = node.logFor(origin)
     let lo = 0, hi = lane.length
     while (lo < hi) { const mid = (lo + hi) >>> 1; if (lane[mid].seq < seq) lo = mid + 1; else hi = mid }
     if (lo < lane.length && lane[lo].seq === seq) { j.armed && j.emit(JK.dupDrop, origin, seq); return 0 }
-    const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch }
+    if (rec === null) rec = rv.rec()
+    const p = partitionOf(rec)
+    const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number } = { rec, seq, epoch }
     if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
+    if (node.armed && rv.pp !== undefined && rv.pp >= 0) entry.pp = rv.pp
     lane.splice(lo, 0, entry) // ascending preserved: inserted at its seq position
     if (node.armed) {
       const pe = d.part(p)
-      if (seq > pe.s) pe.s = seq
+      //! the chain rule at the splice site, PLUS the forward walk: a gap-fill can make later
+      // already-folded (o,p) entries contiguous — advance through every one that now chains
+      // (each stored pp verified), stopping at the first remaining gap. Splices are rare heal
+      // events; the walk is bounded by the lane suffix and usually a few steps.
+      const pp = rv.pp ?? -1
+      if (pp >= 0 && pp <= pe.s) {
+        if (seq > pe.s) pe.s = seq
+        for (let i = lo + 1; i < lane.length; i++) {
+          const en = lane[i]
+          if (partitionOf(en.rec) !== p) continue
+          if (en.pp !== undefined && en.pp >= 0 && en.pp <= pe.s) { if (en.seq > pe.s) pe.s = en.seq }
+          else break
+        }
+      }
       node.spliced(p) // durable bookkeeping: dirty partition + snapshot arming (no-op non-durable)
     }
     node.apply(rec, origin, seq, epoch, entry.iss, entry.cid)
@@ -661,7 +703,7 @@ export class Writes {
         //      overclaim the hole), which stay at 0 and re-heal via the handshake, honestly low.
         const rec = rv.rec()
         const p = partitionOf(rec)
-        if (!node.replayHeld(p)) {
+        if (!node.replayHeld(p, prov.origin)) {
           if (rv.seq > d.applied) d.applied = rv.seq
           continue
         }
@@ -670,20 +712,27 @@ export class Writes {
           let lo = 0, hi = lane.length
           while (lo < hi) { const mid = (lo + hi) >>> 1; if (lane[mid].seq < rv.seq) lo = mid + 1; else hi = mid }
           if (lo < lane.length && lane[lo].seq === rv.seq) continue // duplicate WAL row — re-dedup
-          const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
+          const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
           if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
+          if (rv.pp >= 0) entry.pp = rv.pp
           lane.splice(lo, 0, entry)
         } else {
           d.applied = rv.seq
-          const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
+          const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
           if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
+          if (rv.pp >= 0) entry.pp = rv.pp
           node.logFor(prov.origin).push(entry)
           if (rv.seq > d.shippable) d.shippable = rv.seq
           if (rv.seq > d.durable) d.durable = rv.seq
         }
+        //! floor rebuild under the CHAIN RULE from the boot-record SEED (the panel's compaction
+        // hole): pe.s starts at the last durably-recorded floor (constructor seed — honest-low if
+        // stale) and advances only through chain-verified rows, restoring exactly the pre-crash
+        // floor — never a row-max claim over a span the rows provably miss. Dirty partitions stay
+        // unseeded and unadvanced (honest-low, handshake re-heals), unchanged.
         if (!node.bootDirty.has(p)) {
           const pe = d.part(p)
-          if (rv.seq > pe.s) { pe.s = rv.seq; pe.d = rv.seq } // disk-proven: possession AND durability
+          if (rv.pp >= 0 && rv.pp <= pe.s && rv.seq > pe.s) { pe.s = rv.seq; pe.d = rv.seq } // disk-proven: possession AND durability
         }
         node.apply(rec, prov.origin, rv.seq, rv.epoch, rv.issuer || undefined, rv.issuer ? rv.cid : undefined)
         j.armed && j.emit(JK.applyInbound, prov.origin, rv.seq)

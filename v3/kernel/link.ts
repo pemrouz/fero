@@ -67,15 +67,26 @@ export class Link {
   constructor(id: number, dialed: boolean, to?: string) { this.id = id; this.dialed = dialed; this.to = to }
 
   //! addRecord: append to the step's RECORDS frame, opening it with this run's provenance (and, for
-  // committed attempt runs, its attempt identity) on first use. Callers guarantee run continuity: one
-  // commit batch = one contiguous (seq, cid) run, flushed before the next batch opens.
-  add(rec: Parameters<Outbox['add']>[0], prov: Prov, attempt?: AttemptRun) {
-    if (!this.outbox.open) this.outbox.begin(VERB.RECORDS, prov, attempt)
-    this.outbox.add(rec)
+  // committed attempt runs, its attempt identity) on first use. Run continuity is CHECKED, not
+  // assumed (M6-review): the armed fan-out filter hands each link a lawfully-GAPPY subset of a
+  // commit batch, and a frame's seqs/cids decode as baseSeq+i/baseCid+i — a discontinuous add
+  // ROTATES the open frame into the outbox's pending list and begins fresh. Unscoped fan-out is
+  // every-record-every-link, so rotation never fires there (byte-identity preserved). `pp` is the
+  // record's sub-stream predecessor (armed senders only — undefined keeps FLAG_PP off the frame).
+  add(rec: Parameters<Outbox['add']>[0], prov: Prov, attempt?: AttemptRun, pp?: number) {
+    if (this.outbox.open && (!this.outbox.continues(prov, attempt) || this.outbox.pp !== (pp !== undefined)))
+      this.outbox.rotate()
+    if (!this.outbox.open) this.outbox.begin(VERB.RECORDS, prov, attempt, pp !== undefined)
+    this.outbox.add(rec, pp)
   }
 
-  //! flush: close the step's frame and ship it — or park it (bounded) if the socket is backed up.
+  //! flush: close the step's frame(s) and ship — rotated frames first (order kept), then the open
+  // one — or park them (bounded) if the socket is backed up.
   flush(sink: EffectSink, j: Journal) {
+    if (this.outbox.pending.length) {
+      for (const bytes of this.outbox.pending) this.ship(bytes, sink, j)
+      this.outbox.pending.length = 0
+    }
     const bytes = this.outbox.finish()
     if (!bytes) return
     this.ship(bytes, sink, j)

@@ -30,7 +30,7 @@ import { Membership } from './membership.ts'
 import { Writes } from './write.ts'
 import { Streams } from './streams.ts'
 import { Confirm } from './confirm.ts'
-import { Scope } from './scope.ts'
+import { Scope, SCOPE } from './scope.ts'
 import { maybeCompact } from './log.ts'
 import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
@@ -143,7 +143,12 @@ export class Node {
   // Entries retain the ATTEMPT identity (iss/cid) of committed forwarded writes
   // so anti-entropy re-ships it — a healed or future owner rebuilds its dedup
   // window from the log stream itself (M3's ownership-move exactly-once story).
-  logs = new Map<string, { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number }[]>()
+  logs = new Map<string, { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }[]>()
+  //! M6 pp (the floor law): the last seq this life stamped per partition — the sub-stream
+  // predecessor the NEXT own-lane stamp carries. Fed on every scoped commit (epoch 0 included) and
+  // NEVER cleared by shed (a shed-then-reassigned same-life owner must not re-stamp pp=0 over its
+  // own shed history); restarts rebirth the origin lane, so a fresh map is truthful. Memory-only.
+  lastStamp = new Map<string, number>()
   //! M0 downstream state: a flat path→value map + an order-insensitive rolling hash.
   // The api layer binds a $() proxy to sink.apply() later (M5); the kernel keeps
   // this mirror so sim monitors and the replay/state-hash check (plan §3.1) can
@@ -181,10 +186,16 @@ export class Node {
   #inflightParts = new Map<number, Map<string, Map<string, number>>>()
   #dirty = new Map<string, number>()
   #snapMeta = new Map<number, { floors: Map<string, Map<string, number>>; clears: Map<string, number> }>()
-  //! boot-restored M6 facts (C10): the held ∪ orphaned set of the previous life (null = record absent /
-  // unscoped) and the partitions whose replay floors must NOT rebuild (see BootRecord.dirtyParts).
+  //! boot-restored M6 facts (C10): the foldable set of the previous life (held ∪ orphaned — null =
+  // record absent / unscoped), the FROZEN half (finding 48: restored orphans re-enter only through
+  // the latch, even when the restored ring re-assigns them), and the partitions whose replay floors
+  // must NOT rebuild (see BootRecord.dirtyParts).
   bootHeld: Set<string> | null = null
+  bootOrphans: Set<string> | null = null
   bootDirty = new Set<string>()
+  bootAt0 = true
+  get bornAt0(): boolean { return this.bootAt0 }
+  set bornAt0(v: boolean) { this.bootAt0 = v }
   walTail = new Map<string, number>()
   #walDead = false
   #seqCeiling = 0
@@ -209,8 +220,28 @@ export class Node {
     this.origin = this.incarnation > 1 ? `${this.uuid}~${this.incarnation}` : this.uuid
     this.membership = new Membership(opts.boot)
     this.epoch = this.membership.view.epoch // a restored node stamps at its restored epoch, never below it
-    if (opts.boot?.heldPartitions) this.bootHeld = new Set(opts.boot.heldPartitions)
+    //! bornAt0 — this LIFE started at open genesis (not a boot restore): the one licence for the
+    // arming floor-truing (scope.rescope) — its lanes at the arming instant are epoch-0 full
+    // broadcast, complete by construction. A restored life's lanes may hold lawful pp-gaps.
+    this.bornAt0 = this.epoch === 0
+    //! the boot record's foldable set = held ∪ orphaned (both restore data); the orphan half ALSO
+    // restores its frozen classification (finding 48 — rescope must not silently un-freeze it)
+    if (opts.boot?.heldPartitions || opts.boot?.orphanParts)
+      this.bootHeld = new Set([...(opts.boot.heldPartitions ?? []), ...(opts.boot.orphanParts ?? [])])
+    if (opts.boot?.orphanParts) this.bootOrphans = new Set(opts.boot.orphanParts)
     if (opts.boot?.dirtyParts) { this.bootDirty = new Set(opts.boot.dirtyParts); for (const p of this.bootDirty) this.#dirty.set(p, 0) }
+    //! the floor SEED (the pp chain-rebuild's base — see BootRecord.floors): restored BEFORE replay
+    // so each row's chain check advances from the last durably-recorded floor instead of collapsing
+    // to 0 at the first compacted/pre-pp gap. Dirty partitions stay unseeded (their floors would
+    // overclaim the lost splice — the honest-low rule, unchanged).
+    if (opts.boot?.floors)
+      for (const [origin, parts] of Object.entries(opts.boot.floors))
+        for (const [p, sd] of Object.entries(parts)) {
+          if (this.bootDirty.has(p)) continue
+          const pe = this.streams.for(origin).part(p)
+          pe.s = sd[0]
+          pe.d = sd[1]
+        }
     if ((opts.replicas ?? 0) > 0) this.scope = new Scope() // (this.#opts assigns below — read opts directly)
     //! the Lamport floor from the boot record: even if the WAL tail was torn, the clock never restarts
     // below the last durably-recorded stamp (seq reuse under one origin would collide provenance)
@@ -250,11 +281,18 @@ export class Node {
   }
 
   //! replayHeld — the C10 replay classification: is partition p this life's to fold? The boot record
-  // is the SOLE data authority — ring-assigned-but-absent partitions are `out` (window 5: a crash
-  // mid-latch leaves staged records inside mixed WAL rows; folding them on the ring's say-so would
-  // resurrect a baseless partial span with overclaiming floors — the clean re-acquire is the recovery).
+  // is the data authority for FOREIGN lanes — ring-assigned-but-absent partitions are `out` (window 5:
+  // a crash mid-latch leaves staged records inside mixed WAL rows; folding them on the ring's say-so
+  // would resurrect a baseless partial span with overclaiming floors — the clean re-acquire is the
+  // recovery). OWN-LINEAGE lanes (this uuid, any incarnation) are the one exception (M6-review
+  // finding 11): every own-lineage WAL row was stamped by this node's own commit path (single-writer;
+  // staged foreign records never ride persistRun), so an acquiring OWNER's mid-latch commits — WACK'd,
+  // possibly the ONLY copy at R=1 — are disk truth the boot record lawfully lags (heldList excludes
+  // acquiring). Folding them is data-safe in every window: unassigned content re-derives an orphan
+  // that freezes, polls, and re-sheds only on fresh coverage proof.
   // A boot record without the field (a pre-scoped life upgrading) folds everything, the old behavior.
-  replayHeld(p: string): boolean {
+  replayHeld(p: string, origin?: string): boolean {
+    if (origin !== undefined && (origin === this.uuid || origin.startsWith(this.uuid + '~'))) return true
     return this.bootHeld === null || this.bootHeld.has(p)
   }
 
@@ -294,8 +332,13 @@ export class Node {
       case 'start': {
         j.armed && j.emit(JK.start)
         //! M6: a RESTORED armed node classifies its replayed data before the network exists — held vs
-        // orphan derives from (boot record ∪ restored ring), the C10 rule the replay held-gate used
+        // orphan derives from (boot record ∪ restored ring ∪ the frozen orphanParts half), the C10
+        // rule the replay held-gate used
         if (this.armed) this.scope!.rescope(this)
+        //! restored dirtyParts arm the snapshot swap immediately (M6-review finding 54): the dirty
+        // ledger's only clear site is a snapshot echo, and nothing else would schedule one — the
+        // floors stayed pinned at 0 and the ledger persisted forever.
+        if (this.durable && this.#dirty.size) this.#walRows = SNAPSHOT_AT
         this.persistBoot() // the incarnation bump is a durable fact from the first instant
         for (const to of this.#opts.hosts ?? []) if (to !== this.listen) {
           j.armed && j.emit(JK.dial, to)
@@ -323,7 +366,11 @@ export class Node {
         }
         //! M6 durable floors (armed only): a persistRun batch advances exactly the (origin, partition)
         // floors its rows cover — SKIPPING partitions currently dirty (a memory-only splice means the
-        // WAL under-covers below the row max; the snapshot echo below is their only advance site).
+        // WAL under-covers below the row max; the snapshot echo below is their only advance site),
+        // partitions with no POSSESSION-state scope entry (shed or re-latched while the batch was in
+        // flight: get-or-creating the floor here resurrects a ghost {s:0, d>0} durable claim for rows
+        // the shed's swap purged — M6-review findings 16/20), and any advance past the possession
+        // floor (pe.d ≤ pe.s per instant: durable evidence never exceeds the possession claim).
         const pcov = this.#inflightParts.get(e.batch)
         if (pcov) {
           this.#inflightParts.delete(e.batch)
@@ -331,24 +378,38 @@ export class Node {
             const d = this.streams.for(origin)
             for (const [p, maxSeq] of parts) {
               if (this.#dirty.has(p)) continue
+              const st = this.scope!.entries.get(p)?.state
+              if (st !== SCOPE.held && st !== SCOPE.orphan) continue
               const pe = d.part(p)
-              if (maxSeq > pe.d) pe.d = maxSeq
+              const cap = Math.min(maxSeq, pe.s)
+              if (cap > pe.d) pe.d = cap
             }
           }
         }
         //! M6 snapshot echo (armed only): the swap captured the whole fold — every floor advances to
         // its build-time possession value, and build-time dirty entries clear (unless re-spliced since
-        // build: the counter moved) with the boot record rewritten to drop them.
+        // build: the counter moved) with the boot record rewritten to drop them. The same possession-
+        // state guard applies: a partition shed (or re-latched) between build and echo takes nothing.
         const snap = this.#snapMeta.get(e.batch)
         if (snap) {
           this.#snapMeta.delete(e.batch)
           for (const [origin, parts] of snap.floors) {
             const d = this.streams.for(origin)
-            for (const [p, s] of parts) { const pe = d.part(p); if (s > pe.d) pe.d = s }
+            for (const [p, s] of parts) {
+              const st = this.scope!.entries.get(p)?.state
+              if (st !== SCOPE.held && st !== SCOPE.orphan) continue
+              const pe = d.part(p)
+              const cap = Math.min(s, pe.s)
+              if (cap > pe.d) pe.d = cap
+            }
           }
           let cleared = false
-          for (const [p, n] of snap.clears) if (this.#dirty.get(p) === n) { this.#dirty.delete(p); cleared = true }
+          const sealedNow: string[] = []
+          for (const [p, n] of snap.clears) if (this.#dirty.get(p) === n) { this.#dirty.delete(p); cleared = true; sealedNow.push(p) }
           if (cleared) this.persistBoot()
+          //! the SEAL (findings 19/37/46): a dirty-clear proves the disk restores this partition's
+          // whole base — a pending ACQDONE attestation gate opens now (announce + boot-list re-entry)
+          for (const p of sealedNow) this.scope!.sealed(this, p)
         }
         j.armed && j.emit(JK.persisted, e.batch)
         this.confirm.recount(this) // own durable advanced — a persisted probe may now have its quorum
@@ -600,8 +661,21 @@ export class Node {
     for (let k = 0; k < recs.length; k++) {
       const rec = recs[k]
       const seq = ++this.seq
-      const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq, epoch: this.epoch }
+      const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number } = { rec, seq, epoch: this.epoch }
       if (attempt) { entry.iss = attempt.issuer; entry.cid = attempt.baseCid + k }
+      //! M6 pp (the floor law): the stamping owner is the ONE party that knows this (origin,
+      // partition) sub-stream's predecessor — lastStamp, fed on EVERY scoped commit INCLUDING epoch
+      // 0 (the panel's seam hole: an armed-gated feed would stamp the first post-arming commit
+      // pp=0, forging first-ever over the genesis history) and NEVER cleared by shed (the
+      // shed-then-reassigned-same-life window would re-forge pp=0; restarts rebirth the lane, so a
+      // fresh map is truthful). Memory-only — unscoped nodes never touch it (byte-identity).
+      let pp: number | undefined
+      if (this.scoped) {
+        const p = partitionOf(rec)
+        pp = this.lastStamp.get(p) ?? 0
+        this.lastStamp.set(p, seq)
+        if (this.armed) entry.pp = pp
+      }
       this.logFor(this.origin).push(entry) // the record is OWNED from here (embedder hands it over)
       this.apply(rec, this.origin, seq, this.epoch, entry.iss, entry.cid)
       j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
@@ -609,15 +683,17 @@ export class Node {
       // applied in this same step); durable waits for the M4b storage batch to resolve
       const d = this.streams.for(this.origin)
       d.applied = d.shippable = seq
-      //! M6 possession floor (armed only): the minting owner's floor is trivially sound — it holds
-      // everything it ever stamped for the partition (DESIGN-M6 §0 own-lane stamp site). The R-set
-      // for the fan-out filter below comes off the same memoized walk.
+      //! M6 possession floor (armed only), under the SAME chain rule as ingest: the owner's floor
+      // advances only when it covers its own predecessor stamp. This is not paranoia — a same-life
+      // owner that SHED p and was later re-assigned it stamps with pp = its old lastStamp while its
+      // floor re-starts at 0: the eager advance would claim the shed history it no longer holds
+      // (the re-entry latch trues the floor first, then stamps chain normally).
       let holders: readonly string[] | null = null
       if (this.armed) {
         const p = partitionOf(rec)
         const pe = d.part(p)
-        if (seq > pe.s) pe.s = seq
-        this.scope!.mintHeld(p) // the owner holds what it stamps — the entry exists from the first commit
+        if (pp! <= pe.s && seq > pe.s) pe.s = seq
+        this.scope!.mintHeld(this, p) // the owner holds what it stamps — the entry exists from the first commit
         const ring = this.writes.ring
         if (ring.epoch !== this.epoch) ring.build(this.epoch, this.membership.view.members)
         holders = ring.holders(p, this.replicas)
@@ -628,18 +704,20 @@ export class Node {
         // the wire and turn it into permanently-dropped "duplicates" at the receiver (the sweep-found bug).
         // M6 (armed): THE FAN-OUT FILTER — member links receive only their R-set's partitions; client
         // links keep the spoke tap. Orphans are excluded from the instant of install (they are not in
-        // holdersOf) — the freeze that keeps the shed bar fixed (DESIGN-M6 C7).
+        // holdersOf) — the freeze that keeps the shed bar fixed (DESIGN-M6 C7). Armed sends carry pp
+        // (link.add rotates frames at run discontinuities the filter creates).
         if (link.state === LS.admitted && link.synced &&
             (holders === null || link.client || holders.includes(link.uuid)))
           link.add(rec, { origin: this.origin, baseSeq: seq, epoch: this.epoch },
-            attempt ? { issuer: attempt.issuer, baseCid: attempt.baseCid + k } : undefined)
+            attempt ? { issuer: attempt.issuer, baseCid: attempt.baseCid + k } : undefined,
+            this.armed ? pp : undefined)
     }
     for (const link of this.links.values()) link.flush(this.env.sink, j)
     //! WAL the committed run (durable mode): the row is the SAME encoded frame shape the wire carries —
     // one format for log entry, WAL row, and payload (plan §7). One contiguous run ⇒ one frame.
     if (this.durable && recs.length) {
       const tail = this.logFor(this.origin).slice(-recs.length)
-      const [bytes] = encodeRuns(tail.map((e) => ({ rec: e.rec, origin: this.origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid })))
+      const [bytes] = encodeRuns(tail.map((e) => ({ rec: e.rec, origin: this.origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp })), undefined, this.armed)
       //! armed: the batch records per-partition maxes so its echo advances exactly the durable floors
       // this row covers (never a floor the WAL can't restore — DESIGN-M6 §0)
       let parts: Map<string, number> | undefined
@@ -698,7 +776,7 @@ export class Node {
         let j = i + 1
         while (j < entries.length && j - i < 1024 && entries[j].epoch === h.epoch && entries[j].seq === h.seq + (j - i) &&
                entries[j].iss === h.iss && (h.iss === undefined || entries[j].cid === h.cid! + (j - i))) j++
-        const frames = encodeRuns(entries.slice(i, j).map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid })))
+        const frames = encodeRuns(entries.slice(i, j).map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp })), undefined, this.armed)
         if (frames.length !== 1) throw new Error('snapshot: chunk split diverged from encodeRuns')
         rows.push({ bytes: frames[0], prev })
         prev = entries[j - 1].seq
@@ -768,12 +846,28 @@ export class Node {
       lamport: this.#seqCeiling,
       incarnation: this.incarnation,
       votedFor: { ...m.votedFor },
-      //! M6 (armed only — unscoped boot bytes stay byte-identical): the dirty-partition ledger + the
-      // data-authoritative held-set (held ∪ orphan; an unfolded latch is deliberately absent — C10)
+      //! M6 (armed only — unscoped boot bytes stay byte-identical): the dirty-partition ledger, the
+      // data-authoritative held-set (a mid-latch entry rides under its PRE-latch classification;
+      // the staged buffer itself is memory-only — C10 as amended by the review), the FROZEN orphan
+      // half (finding 48), and the floor seed (the pp chain-rebuild's base — a stale seed is
+      // honest-low, and replay advances from it through the WAL rows).
       ...(this.armed && this.#dirty.size ? { dirtyParts: [...this.#dirty.keys()] } : {}),
-      ...(this.armed ? { heldPartitions: this.scope!.heldList() } : {}),
+      ...(this.armed ? { heldPartitions: this.scope!.heldList(), orphanParts: this.scope!.orphanList(), floors: this.#floorSeed() } : {}),
     })
     this.journal.armed && this.journal.emit(JK.bootWrite, m.view.epoch, m.votedFor.e)
+  }
+
+  //! #floorSeed — the boot record's floor snapshot: per (origin, partition) [possession, durable].
+  #floorSeed(): Record<string, Record<string, [number, number]>> {
+    const out: Record<string, Record<string, [number, number]>> = {}
+    for (const [origin, d] of this.streams) {
+      if (!d.parts?.size) continue
+      const per: Record<string, [number, number]> = {}
+      let any = false
+      for (const [p, pe] of d.parts) if (pe.s > 0 || pe.d > 0) { per[p] = [pe.s, pe.d]; any = true }
+      if (any) out[origin] = per
+    }
+    return out
   }
 
   #armHeartbeat() {
@@ -878,6 +972,13 @@ export class Node {
         // can flip the gate back to majority, flushing any parked writes
         this.membership.onAdmit(this, link)
         this.membership.settle(this)
+        //! round-on-admit (M6-review findings 13/23/33/40/49 — DESIGN-M6 C3's mandated trigger): the
+        // post-reconnect multi-source window creates interior holes suffix AE cannot fill (they sit
+        // below the scalar lane tail), and a lost install-round offer otherwise re-heals only at the
+        // next install. One batched HAVEQ round per admit re-announces + re-probes; it rides AFTER
+        // the VIEW frame on this same FIFO link (finding 39's ordering rule), so a healed peer
+        // installs the epoch before judging the round's epoch stamp.
+        if (this.armed && !link.client) this.scope!.round(this)
         return
       }
       case VERB.RECORDS: {
@@ -1059,8 +1160,12 @@ export class Node {
           let tail = entries.slice(lo)
           if (scopedTo !== null) tail = tail.filter((e) => scopedTo(partitionOf(e.rec)))
           if (!tail.length) continue
-          const missing = tail.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))
-          for (const bytes of encodeRuns(missing)) link.ship(bytes, this.env.sink, j)
+          //! armed AE answers carry each entry's STORED pp (the floor law): the receiver's floors
+          // advance only through chain-verified spans, so a suffix landing above a gap folds without
+          // forging coverage of the still-missing interior (finding 10's AE leg / the multi-source
+          // interleave). Unscoped answers stay flag-free — bytes unchanged.
+          const missing = tail.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp }))
+          for (const bytes of encodeRuns(missing, undefined, this.armed)) link.ship(bytes, this.env.sink, j)
           shipped += missing.length
         }
         if (shipped) j.armed && j.emit(JK.aeShip, link.uuid, shipped)

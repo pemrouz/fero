@@ -20,9 +20,12 @@
 //               (zero-claim). Here zero-claim is unrepresentable — a key
 //               leaves the union only via a tombstone or the coverage sweep.
 //   coverage  — a parked key drops once every CURRENT holder of its partition
-//               answered in this generation and none claims it: absence
-//               attested by the full holder set is a real (possibly
-//               tombstone-GC'd) delete, not a handover window.
+//               answered in this generation, ATTESTS the partition (the answer
+//               carries the member's attestation set — an acquiring or
+//               post-shed answerer attests nothing for it, M6-review findings
+//               0/28/53), and none claims it: absence attested by the full
+//               holder set is a real (possibly tombstone-GC'd) delete, not a
+//               handover window.
 //
 // The LIVE variant re-gathers on every view install and on a paced tick while
 // subscribed (the api is the impure host — timers live here, never in the
@@ -37,19 +40,30 @@ import type { ScopedError } from './types.ts'
 //! one member's claim for one cell: the value, its LWW stamp, tombstone flag.
 export interface Claim { v?: unknown; st: [number, number, string]; t?: number }
 export type Claims = Record<string, Claim>
+//! Rows — one member's `rows` answer: the claims PLUS the attestation set `att` — the partitions this
+// member can attest ABSENCE for at answer time (held ∪ unshed-orphan, exactly the scope the claims
+// come from; null = ALL, the unscoped sentinel). M6-review findings 0/28/53: without it the coverage
+// sweep read "answered this generation" as absence attestation — but an ACQUIRING answerer lawfully
+// claims nothing mid-latch and a post-shed answerer claims nothing at all, so one skewed generation
+// (early-acquiring + late-post-shed answers) blinked a key the kernel fold held (the P4/H6 violation).
+export interface Rows { c: Claims; att: string[] | null }
 
 //! rowsPartial — the member-side answer (the system `rows` handler): stamped claims over this node's
-// held ∪ orphan scope. Tombstones ride from the versions map (a removed cell's stamp without a live
-// value); acquiring partitions contribute nothing (their base is not yet this node's to attest).
-export const rowsPartial = (rt: Runtime): Claims => {
+// held ∪ orphan scope, plus the attestation set for the coverage sweep. Tombstones ride from the
+// versions map (a removed cell's stamp without a live value); acquiring partitions contribute
+// nothing (their base is not yet this node's to attest) and are NOT attested.
+export const rowsPartial = (rt: Runtime): Rows => {
   const node = rt.node
   const out: Claims = {}
   const scope = node.scope
+  //! the attestation set is computed ONCE per answer from the same entries the claims filter reads —
+  // answer-time atomicity is the point: whatever scope this member claims from, it attests, no more
+  const att = !node.armed || !scope ? null : new Set<string>()
+  if (att !== null) for (const [p, e] of scope!.entries) if (e.state !== 2) att.add(p) // held (1) + orphan (3); acquiring (2) never
   const mine = (cell: string): boolean => {
-    if (!node.armed || !scope) return true // unscoped: the whole fold is local truth
+    if (att === null) return true // unscoped: the whole fold is local truth
     const p = (JSON.parse(cell) as string[])[0] ?? ''
-    const e = scope.entries.get(p)
-    return e !== undefined && e.state !== 2 // held (1) and orphan (3) claim; acquiring (2) does not
+    return att.has(p)
   }
   for (const [cell, st] of node.versions) {
     if (!mine(cell)) continue
@@ -61,7 +75,7 @@ export const rowsPartial = (rt: Runtime): Claims => {
     if (node.state.has(cell) && v !== undefined) out[cell] = { v, st: [st.epoch, st.seq, st.origin] }
     else out[cell] = { st: [st.epoch, st.seq, st.origin], t: 1 }
   }
-  return out
+  return { c: out, att: att === null ? null : [...att] }
 }
 
 //! newer — the kernel's LWW total order (epoch, seq, origin), verbatim.
@@ -72,14 +86,14 @@ const newer = (a: [number, number, string], b: [number, number, string]): boolea
 // the composer — v2's M3 leak); one-shot and live consumption share the registry and the refresh.
 export class Gather {
   #rt: Runtime
-  #call: (uuid: string, timeoutMs: number) => Promise<Claims>
+  #call: (uuid: string, timeoutMs: number) => Promise<Rows>
   //! cell → member uuid → claim (the registry: claims survive across refreshes — parking's substrate)
   #registry = new Map<string, Map<string, Claim>>()
   proxy: any = proxy({})
   #timer: ReturnType<typeof setInterval> | null = null
   #gen = 0
 
-  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number) => Promise<Claims>) {
+  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number) => Promise<Rows>) {
     this.#rt = rt
     this.#call = call
   }
@@ -104,7 +118,7 @@ export class Gather {
     const gen = ++this.#gen
     const members = node.membership.view.members.map((m) => m[0])
     const mine = rowsPartial(this.#rt)
-    const answered = new Map<string, Claims>([[node.uuid, mine]])
+    const answered = new Map<string, Rows>([[node.uuid, mine]])
     const missing: string[] = []
     await Promise.all(members.filter((u) => u !== node.uuid).map(async (u) => {
       try { answered.set(u, await this.#call(u, opts.timeoutMs ?? 8000)) }
@@ -115,10 +129,17 @@ export class Gather {
         scoped: true, op: 'gather', reason: 'unreachable', replicas: node.replicas, missing,
         hint: 'some members are unreachable — the whole-resource read would be a silent partial; retry when the view heals',
       } satisfies ScopedError
-    if (gen !== this.#gen) return snapshot(this.proxy) // a newer refresh superseded this one mid-flight
+    //! superseded mid-flight by a newer refresh — answer a CLONE, never the live union root
+    // (M6-review finding 8: the one-shot paths hand this value to user code)
+    if (gen !== this.#gen) return structuredClone(snapshot(this.proxy))
+    //! per-generation attestations: uuid → the partitions that member attests (null = ALL). Built
+    // from the answers of THIS generation only — attestation never survives a refresh (findings 0/28/53)
+    const att = new Map<string, Set<string> | null>()
+    for (const [uuid, rows] of answered) att.set(uuid, rows.att === null ? null : new Set(rows.att))
     //! merge: replace each answerer's claims wholesale, keep everyone else's (parking substrate)
     const touched = new Set<string>([...this.#registry.keys()])
-    for (const [uuid, claims] of answered) {
+    for (const [uuid, rows] of answered) {
+      const claims = rows.c
       for (const cell of Object.keys(claims)) touched.add(cell)
       for (const [cell, per] of this.#registry) { per.delete(uuid); if (!per.size) void cell } // wholesale replace below
       for (const [cell, claim] of Object.entries(claims)) {
@@ -127,6 +148,14 @@ export class Gather {
         per.set(uuid, claim)
       }
     }
+    //! reap the registry rows of every uuid NO LONGER IN THE COMMITTED VIEW (M6-review findings
+    // 1/22/52): a departed/evicted member is never fanned out to again, so its ghost claims would
+    // otherwise assert a value forever (win never null ⇒ the sweep can never even run) and leak one
+    // registry entry per dead uuid for the node's lifetime. Members merely MISSING this generation
+    // keep their claims — that is lawful parking, not departure.
+    const alive = new Set(members)
+    for (const [, per] of this.#registry)
+      for (const uuid of per.keys()) if (!alive.has(uuid)) per.delete(uuid)
     //! fold the touched cells, then project in TWO PHASES: removes first, live updates second,
     // shallow→deep. Field-granular LWW lawfully leaves a PARENT tombstone above a LIVE nested cell
     // (plan §5's documented cross-hierarchy shape) — projecting the parent remove after the child
@@ -144,11 +173,18 @@ export class Gather {
       if (per) for (const c of per.values()) if (win === null || newer(c.st, win.st)) win = c
       if (win === null || win.t === 1) {
         //! zero-claim or tombstone: a tombstone is a real delete; zero-claim drops ONLY when every
-        // current holder answered this generation and none claims it (the coverage sweep) — else the
-        // key PARKS: the last projected value stands until the handover settles (the Q3a fix)
+        // current holder answered this generation AND ATTESTED the partition and none claims it (the
+        // coverage sweep) — else the key PARKS: the last projected value stands until the handover
+        // settles (the Q3a fix). The attestation qualifier (M6-review findings 0/28/53) is what makes
+        // "answered" mean "attested absence": an answer taken while the holder was still ACQUIRING
+        // (or under epoch skew, before it even knew it was assigned) carries no att for p and counts
+        // for nothing — DESIGN-M6 C5's "answered, current-epoch subscription", enforced.
         const p = key[0] ?? ''
         const holders = node.armed ? ring.holders(p, node.replicas) : node.membership.view.members.map((m) => m[0])
-        const covered = win?.t === 1 || holders.every((h) => answered.has(h))
+        const covered = win?.t === 1 || holders.every((h) => {
+          const a = att.get(h)
+          return a !== undefined && (a === null || a.has(p)) // undefined = did not answer this generation
+        })
         if (covered) {
           if (per) this.#registry.delete(cell)
           removes.push(key)
@@ -180,10 +216,16 @@ export class Gather {
       if (key.length === 1 || present(root, key)) { try { applyCell(this.proxy, key, undefined, true) } catch { /* absent subtree */ } }
     updates.sort((a, b) => a.key.length - b.key.length)
     for (const u of updates) { try { applyCell(this.proxy, u.key, u.v, false) } catch { /* blocked intermediate */ } }
-    return snapshot(this.proxy)
+    //! the one-shot answer is a CLONE (M6-review finding 8): snapshot() is the proxy's live internal
+    // root — `await data` and local methods.read() hand this value straight to user code, and a
+    // mutation there must never write through into the union every live subscriber shares. The wire
+    // path copies into frame bytes anyway; local must match. (The live SUB path hands out `proxy`
+    // itself — a read-only projection by contract — and stays as-is.)
+    return structuredClone(snapshot(this.proxy))
   }
 
   //! live — arm the paced re-gather (the composer also refreshes on every view install). Idempotent.
+  // Callers compute intervalMs via liveCadence() — never hand a raw heartbeat multiple in here.
   live(intervalMs: number) {
     if (this.#timer) return
     this.#timer = setInterval(() => { void this.refresh(this.#rt, { throwOnPartial: false }).catch(() => {}) }, intervalMs)
@@ -199,3 +241,9 @@ export class Gather {
 //! applyCell — project one folded cell into the result proxy through the ONE substrate seam.
 const applyCell = (p: any, key: string[], v: unknown, remove: boolean) =>
   applyStreamRec(p, remove ? { type: 'remove', key } : { type: 'update', key, value: v })
+
+//! liveCadence — the live gather's re-poll interval: 4× the heartbeat with a 1s FLOOR (M6-review
+// finding 9: heartbeatMs: 0 is the composer's documented heartbeat opt-out — without the floor it
+// armed setInterval(…, 0), a continuous full-cluster rows fan-out on the serialized refresh chain).
+// Normal configs keep the existing default: liveCadence(undefined) === liveCadence(500) === 2000.
+export const liveCadence = (heartbeatMs?: number): number => Math.max(1000, (heartbeatMs ?? 500) * 4)

@@ -38,6 +38,7 @@ import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, isProxy, proxy, records, snapshot } from './substrate.ts'
 import type { Coords } from './data.ts'
+import type { ScopedError } from './types.ts'
 
 //! SYSTEM — the reserved method-name prefix (unreachable from fero() opts: the composer rejects it):
 // internal RPCs (confirm-over-the-wire) share the method plane without stealing any user name.
@@ -193,6 +194,7 @@ interface PendingCall {
   a: unknown
   retry: boolean
   held: boolean // failed pre-dispatch ('unreachable' = never shipped, never executed) — safe to re-dispatch for EVERY call
+  to?: string // M6-review finding 6: a to-routed call has no failover to hold for — it fails fast, typed
   resolve: (v: unknown) => void
   reject: (e: Error) => void
 }
@@ -222,6 +224,7 @@ export class Caller {
       t.unref?.()
       this.#calls.set(id, {
         m, a, retry: opts.retry === true, held: false,
+        ...(opts.to !== undefined ? { to: opts.to } : {}),
         resolve: (v) => { clearTimeout(t); resolve(v) },
         reject: (e) => { clearTimeout(t); reject(e) },
       })
@@ -252,7 +255,23 @@ export class Caller {
     // hold it for the next primary (safe for EVERY call — the handler didn't run; the timeout bounds
     // the wait). `local` is the channel bit (M5-review #7): a wire RESULT whose value happens to equal
     // 'unreachable' arrives with local=false and settles as an ordinary handler rejection, never held.
-    if (!ok && local) { c.held = true; return }
+    //! …but ONLY for primary-routed calls. A TO-ROUTED call (M6-review finding 6) names its member —
+    // a primary change never makes that member reachable, and the member caller has no
+    // onPrimaryChange wired anyway, so "held" would just sit out the full timeout. Reject NOW, typed:
+    // the gather's fan-out and the remote-key read turn one dead link into one fast ScopedError
+    // instead of an 8s stall per generation.
+    if (!ok && local) {
+      if (c.to !== undefined) {
+        this.#calls.delete(id)
+        return c.reject({
+          scoped: true, op: c.m.startsWith(SYSTEM) ? c.m.slice(1) : c.m, reason: 'unreachable',
+          replicas: this.#rt.node.replicas, missing: [c.to],
+          hint: `member ${c.to} has no admitted link — retry when the view heals`,
+        } satisfies ScopedError as unknown as Error)
+      }
+      c.held = true
+      return
+    }
     this.#calls.delete(id)
     if (ok) c.resolve(value)
     //! M6: a typed ScopedError crosses the wire as the RESULT error value and rehydrates AS-IS —

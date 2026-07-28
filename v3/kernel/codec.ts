@@ -64,6 +64,15 @@ export const VERB = {
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.
 export const FLAG_PROV = 1
+//! FLAG_PP: each record is preceded by ONE varint — its (origin, partition) sub-stream PREDECESSOR
+// seq encoded as (pp + 1), wire 0 = UNKNOWN. The M6-review floor law: a receiver may advance its
+// possession floor to a record's seq ONLY when its floor already covers the sender-stamped
+// predecessor (`pp >= 0 && floor >= pp`) — locally-verifiable sub-stream contiguity, killing the
+// mint-family floor forgeries (findings 10/18/25: mid-lane first arrivals, AE re-admit races, and
+// multi-source interleave all overclaimed the prefix). UNKNOWN fails CLOSED (fold, never advance —
+// the panel's fail-open hole): pre-pp history and epoch-0 rows re-shipped by AE must not forge
+// first-ever claims. Set ONLY by ARMED senders (never at epoch 0 — inertness/byte-identity).
+export const FLAG_PP = 4
 //! FLAG_ATTEMPT: after the provenance triple, [issuerLen+utf8][baseCid varint] — the ATTEMPT IDENTITY of a
 // committed forwarded run, riding replication so EVERY node feeds its cid-dedup window from the records
 // themselves. This is what makes exactly-once survive an ownership move (adversarial-review critical:
@@ -347,22 +356,56 @@ export class Outbox {
   count = 0
   countAt = 0
   open = false
-  begin(verb: number, prov?: Prov, attempt?: AttemptRun) {
+  //! per-frame pp mode (FLAG_PP set at begin) — every add() in the frame then carries its varint
+  pp = false
+  //! run continuity (M6-review, the fan-out filter corollary): a RECORDS frame's seqs/cids decode as
+  // baseSeq+i / baseCid+i, so the frame may only hold ONE contiguous run. Under the armed per-link
+  // fan-out filter a link's record subset is lawfully GAPPY — add() detects the break and ROTATES
+  // (finishes the open frame into `pending`, begins a fresh one), mirroring encodeRuns' split rule.
+  // Unscoped fan-out is every-record-to-every-link, so rotation never fires there (byte-identity).
+  pending: Uint8Array[] = []
+  #origin = ''
+  #nextSeq = 0
+  #epoch = 0
+  #iss: string | undefined
+  #nextCid = 0
+  begin(verb: number, prov?: Prov, attempt?: AttemptRun, pp = false) {
     const w = this.w
     w.len = 0
-    w.u8(MAGIC); w.u8((prov ? FLAG_PROV : 0) | (prov && attempt ? FLAG_ATTEMPT : 0)); w.u8(verb)
+    w.u8(MAGIC); w.u8((prov ? FLAG_PROV : 0) | (prov && attempt ? FLAG_ATTEMPT : 0) | (pp ? FLAG_PP : 0)); w.u8(verb)
     w.u32(0) // bodyLen, patched
     w.u32(0) // crc, patched
     if (prov) {
       w.str(prov.origin); w.varint(prov.baseSeq); w.varint(prov.epoch)
       if (attempt) { w.str(attempt.issuer); w.varint(attempt.baseCid) }
+      this.#origin = prov.origin; this.#nextSeq = prov.baseSeq; this.#epoch = prov.epoch
+      this.#iss = attempt?.issuer; this.#nextCid = attempt?.baseCid ?? 0
     }
     this.countAt = w.len
     w.u32(0) // record count, patched
     this.count = 0
+    this.pp = pp
     this.open = true
   }
-  add(r: Rec) { writeRecord(this.w, r); this.count++ }
+  //! continues — would (prov, attempt) extend the OPEN frame's run contiguously (same lane/epoch/
+  // attempt lane, next seq/cid)? False on a closed outbox — the caller begins fresh either way.
+  continues(prov: Prov, attempt?: AttemptRun): boolean {
+    return this.open &&
+      prov.origin === this.#origin && prov.epoch === this.#epoch && prov.baseSeq === this.#nextSeq &&
+      (attempt?.issuer ?? undefined) === this.#iss && (this.#iss === undefined || attempt!.baseCid === this.#nextCid)
+  }
+  //! rotate — finish the open frame into the pending list (shipped at the next flush, order kept).
+  rotate() {
+    const bytes = this.finish()
+    if (bytes) this.pending.push(bytes)
+  }
+  add(r: Rec, pp?: number) {
+    if (this.pp) this.w.varint((pp ?? -1) + 1) // wire 0 = unknown predecessor (fails closed)
+    writeRecord(this.w, r)
+    this.count++
+    this.#nextSeq++
+    this.#nextCid++
+  }
   //! finish(): patch + checksum + hand over an owned copy. Returns null for an empty frame (nothing queued this step).
   finish(): Uint8Array | null {
     if (!this.open) return null
@@ -427,8 +470,12 @@ const encodeEmpty = (prov?: Prov): Uint8Array => {
 // hands out owned copies; the kernel is single-threaded and encode never re-enters).
 const runsScratch = new Outbox()
 export const encodeRuns = (
-  records: { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number }[],
+  records: { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }[],
   verb: number = VERB.RECORDS,
+  //! withPp (M6 floor law): armed senders stamp every record's predecessor varint (FLAG_PP). NEVER a
+  // run-split condition — pp is per-record data, so the split shape is identical either way (the
+  // snapshot chunker's one-frame assert depends on this).
+  withPp = false,
 ): Uint8Array[] => {
   const frames: Uint8Array[] = []
   const o = runsScratch
@@ -436,8 +483,8 @@ export const encodeRuns = (
   while (i < records.length) {
     const head = records[i]
     o.begin(verb, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch },
-      head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid! } : undefined)
-    o.add(head.rec)
+      head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid! } : undefined, withPp)
+    o.add(head.rec, head.pp)
     let j = i + 1
     while (
       j < records.length &&
@@ -446,7 +493,7 @@ export const encodeRuns = (
       records[j].seq === head.seq + (j - i) &&
       records[j].iss === head.iss &&
       (head.iss === undefined || records[j].cid === head.cid! + (j - i))
-    ) { o.add(records[j].rec); j++ }
+    ) { o.add(records[j].rec, records[j].pp); j++ }
     frames.push(o.finish()!)
     i = j
   }
@@ -473,13 +520,17 @@ export class RecordView {
   //! attempt identity (FLAG_ATTEMPT runs): the (issuer, cid) this record committed FROM — '' / 0 when absent
   issuer: string
   cid: number
-  constructor(buf: Uint8Array, tag: number, keyAt: number, end: number, origin: string, seq: number, epoch: number, issuer = '', cid = 0) {
+  //! pp (FLAG_PP runs): the (origin, partition) sub-stream predecessor seq; -1 = UNKNOWN (flag
+  // absent, or wire 0). Every floor-advance site must fail CLOSED on -1 (fold, never advance).
+  pp: number
+  constructor(buf: Uint8Array, tag: number, keyAt: number, end: number, origin: string, seq: number, epoch: number, issuer = '', cid = 0, pp = -1) {
     this.#buf = buf; this.#keyAt = keyAt; this.#end = end
     this.type = tag & 3
     this.#hasAt = (tag & HAS_AT) !== 0
     this.#vt = tag >>> 3
     this.origin = origin; this.seq = seq; this.epoch = epoch
     this.issuer = issuer; this.cid = cid
+    this.pp = pp
   }
   #head() {
     if (this.#key) return
@@ -552,7 +603,11 @@ export class Frame {
     const out = new Array<RecordView>(count)
     const origin = p?.origin ?? ''
     const epoch = p?.epoch ?? 0
+    const hasPp = (this.flags & FLAG_PP) !== 0
     for (let i = 0; i < count; i++) {
+      //! FLAG_PP: one predecessor varint precedes each record's tag — decoded as (wire - 1), so
+      // wire 0 lands at -1 = UNKNOWN (fails closed at every floor-advance site)
+      const pp = hasPp ? c.varint() - 1 : -1
       const tag = c.u8()
       const keyAt = c.pos
       const segs = c.varint()
@@ -561,7 +616,7 @@ export class Frame {
       if (tag & HAS_AT) { const n = c.varint(); c.need(n); c.pos += n }
       c.skipValue(tag >>> 3)
       out[i] = new RecordView(this.buf, tag, keyAt, c.pos, origin, p ? p.baseSeq + i : 0, epoch,
-        a?.issuer ?? '', a ? a.baseCid + i : 0)
+        a?.issuer ?? '', a ? a.baseCid + i : 0, pp)
     }
     if (c.pos !== this.buf.length) throw new FrameError('trailing bytes after records')
     return out

@@ -304,3 +304,60 @@ FOLD-set additions (api/index.ts:187): 59, 60, 61, 63. No `shedInvalidated` kind
 
 ---
 **File targets**: new `v3/kernel/scope.ts`, `v3/api/fold.ts`, facade in `v3/api/data.ts`/`index.ts`, `v3/sim/scoped.test.ts`; enumerated seams in ring.ts, streams.ts, write.ts, node.ts, membership.ts, confirm.ts, log.ts, env.ts, journal.ts, codec.ts, link.ts, monitors.ts, harness.ts, api/types.ts, api/index.ts, api/methods.ts. Implementer decisions remaining: none intended.
+---
+
+## §7 THE REVIEW-ROUND ADDENDUM — the pp floor law (supersedes §0's fast-path floor license)
+
+The adversarial review (55 findings, 50 confirmed by paired skeptics) plus a design panel on this
+fix proved §0's fast-path floor-advance license — "single-source ascending delivery per (origin,
+partition) sub-stream" — locally unverifiable and FALSE in three confirmed-critical windows: a
+mid-lane first arrival minted held and claimed the never-received prefix (findings 10/18/25); a
+lost fan-out span's AE heal raced a newer live record and the forged floor DUAL-FENCE-DROPPED the
+healing interior (permanent hole); and two senders lawfully serving one lane (owner fan-out × AE
+answerer — routine under scoping) interleaved into the same forgery with no faults at all.
+
+**The law.** Only the stamping owner knows a sub-stream's predecessor. Every armed record carries
+`pp` — the seq of the previous (origin, partition) record its CURRENT LIFE stamped (`node.lastStamp`,
+fed on every scoped commit INCLUDING epoch 0, never cleared by shed; rebirth = a fresh lane so a
+fresh map is truthful). Receiver rule at EVERY floor-advance site (fast path, splice + its forward
+chain-walk, replay):
+
+    advance floor(o,p) to seq  IFF  pp >= 0  AND  pp <= floor(o,p)
+
+Unknown pp (−1: flag absent, or wire 0) fails CLOSED — fold, never advance. A gapped record still
+folds (availability untouched; verdict's mint makes NO possession claim); the handshake latch's
+attested cut trues floors up. Wire: FLAG_PP (codec 4), one varint per record encoded as pp+1,
+set ONLY by armed senders — epoch-0 and R=∞ bytes are untouched (the 1000-seed identity sweep
+pins 237,451 events). Log entries, WAL rows, snapshot rows, teach (ACQ) runs and AE answers all
+carry the stored pp; the boot record carries a per-(origin, partition) floor SEED `[s, d]` the
+replay chain-rebuild advances from (a stale seed is honest-low; the panel's compaction hole).
+
+**Companions the law forces (each closes confirmed findings):**
+- **Shed bar = frozen lane TAILS** (12/21 + the panel's fatal): under pp, floors lawfully
+  under-claim content (epoch-0 data, bootDirty restores, gap-folds) — the empty-floors husk drop
+  destroyed real data with zero coverage proof. `ScopeEntry.tails` captures per-lane content maxes
+  at every freeze; the husk test is content-emptiness; `evaluateSheds`/`shedWaitingOn` range over
+  tails. The ARMING TRUING (a life born at epoch 0 only) sets floors := tails once — the pre-arm
+  inheritance door, sound because epoch-0 replication is full broadcast.
+- **Sealed attestation** (19/37/46, C8 implemented): a durable ACQDONE folds in memory and holds —
+  but ATTESTS NOTHING (`sealed: false` gates announce/HAVEA-ok/heldList) until the snapshot swap's
+  persisted echo calls `scope.sealed(p)`. An orphan can never shed against marks one crash erases.
+- **The boot record's held/orphan split + floor seed** (48/31/47/51/11): `orphanParts` restores
+  frozen (re-entry ONLY through the latch); a mid-latch pre-latch base rides under its own
+  pre-latch classification (`preState`); install order is VIEW-flood → rescope → boot-write (39);
+  held-set mints persist the record; replay folds OWN-LINEAGE rows regardless of the held-gate
+  (single-writer disk truth — the acquiring owner's WACK'd commits survive the crash).
+- **Evidence-plane liveness** (13/23/26/33/38/40/49): a batched HAVEQ round fires on link
+  (re)admit and, at SHED_TICKS cadence, while any co-holder's marks lag (`#lagging`); a
+  re-assigned orphan latches even at EQUAL floors (the empty-delta un-freeze); non-holder confirm
+  probes carry probe-local evidence fed by probe-driven rounds.
+- **Run-discontinuity frame rotation** (review corollary): the armed fan-out filter hands each
+  link a gappy subset of a commit batch, and a RECORDS frame's seqs decode as baseSeq+i — the
+  link Outbox now detects the break and rotates frames. Unscoped fan-out never rotates.
+- **Gather attestation coverage** (0/28/53) + registry reaping (1/22/52) + the §9 api closures
+  (4/5/6/8/9/15/41/42/45) and the test-honesty round (29/30/32/34/35) — see the README M6 record.
+
+**Rejected in-round:** floors-from-tails at boot restores (replayed lanes may hold lawful pp-gaps
+the truing would overclaim — only the epoch-0-born arming may true); per-record receiver-side
+"first-ever" detection (locally impossible — the exact reason the sender stamps pp); attesting
+tails on the wire instead of floors (a tail proves nothing about interiors).

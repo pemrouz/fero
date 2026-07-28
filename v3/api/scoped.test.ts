@@ -131,3 +131,120 @@ test('SCOPED spoke: a client reads the WHOLE resource through its primary\'s gat
     await Promise.all(nodes.map((n) => n.destroy()))
   }
 })
+
+//! ── M6-review fix-round pins (the api slice) ─────────────────────────────────
+
+test('COVERAGE ATTESTATION [0/28/53] — an answerer that does not ATTEST a partition can never drop its keys: acquiring/post-shed answers park, full attested absence drops', async () => {
+  const { Gather } = await import('./fold.ts')
+  //! a minimal fake node: self is an armed member holding nothing; h1/h2 are p's holders
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2,
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['h1', 'h2'] } },
+    scope: { entries: new Map() },
+    versions: new Map(), state: new Map(),
+  }
+  //! a TOP-LEVEL cell: a nested leaf's remove lawfully leaves an empty parent object in the union —
+  // the pin's claim is about the coverage sweep, not the substrate's parent materialization
+  const cell = JSON.stringify(['p'])
+  let phase = 0
+  const answers: Record<number, Record<string, { c: Record<string, unknown>; att: string[] }>> = {
+    //! gen 0: h2 (held) claims the cell; h1 mid-latch attests nothing
+    0: { h1: { c: {}, att: [] }, h2: { c: { [cell]: { v: 7, st: [1, 3, 'o'] } }, att: ['p'] } },
+    //! gen 1: THE SKEW WINDOW — h2 now mid-latch (claims nothing, attests nothing), h1 held but
+    // empty. Under the pre-fix rule "answered ⇒ attests" this generation DROPPED the key (the P4
+    // blink, findings 0/28: both answered, zero claims). The attestation qualifier parks it.
+    1: { h1: { c: {}, att: ['p'] }, h2: { c: {}, att: [] } },
+    //! gen 2: both holders attest p and neither claims — real absence, the coverage sweep drops
+    2: { h1: { c: {}, att: ['p'] }, h2: { c: {}, att: ['p'] } },
+  }
+  const g = new Gather({ node: fake } as never, async (uuid: string) => answers[phase][uuid] as never)
+  await g.refresh({ node: fake } as never, { throwOnPartial: false })
+  assert.equal((snapshot(g.proxy) as Record<string, unknown>).p !== undefined, true, 'gen 0: the union holds the claimed key')
+  phase = 1
+  await g.refresh({ node: fake } as never, { throwOnPartial: false })
+  assert.equal((snapshot(g.proxy) as Record<string, unknown>).p !== undefined, true, 'gen 1 (the skew window): PARKED — an un-attesting answerer is not absence evidence')
+  phase = 2
+  await g.refresh({ node: fake } as never, { throwOnPartial: false })
+  assert.equal((snapshot(g.proxy) as Record<string, unknown>).p, undefined, 'gen 2: attested absence from the full holder set drops the key')
+  g.destroy()
+})
+
+test('SYSTEM PLANE [5] — a user method named `read` owns the public name but never intercepts the internal keyed hop', async () => {
+  const nodes = await spawn(3, 2, { read: () => 'USER-READ-SENTINEL' })
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    for (let i = 0; i < 6; i++) nodes[i % 3].data[`u${i}`] = { v: i }
+    //! the public name is the user's (methods may be named anything — the M6 rulebook)
+    assert.equal(await nodes[0].methods.read(), 'USER-READ-SENTINEL', 'the user read wins the public dispatch')
+    //! settle first: the union sees all 6 keys (the gather rides `await data`, never the user method)
+    const settled = await until(async () => {
+      const r = await (nodes[0].data as PromiseLike<Record<string, unknown>>).then((x) => x, () => ({}))
+      return Object.keys(r).filter((k) => k.startsWith('u')).length === 6
+    }, 15_000)
+    assert.ok(settled, 'the union settled')
+    //! the remote-key handle rides the SYSTEM plane: a foreign key still answers the CELL value
+    const kernel = nodes[0] as unknown as { data: Record<string, unknown> }
+    const isForeign = (k: string): boolean => {
+      try { void (kernel.data[k] as Record<string, unknown>).probe; return false } catch { return true }
+    }
+    const fetched: [string, unknown][] = []
+    for (let i = 0; i < 6; i++) {
+      const k = `u${i}`
+      if (!isForeign(k)) continue
+      fetched.push([k, await (kernel.data[k] as PromiseLike<unknown>)])
+    }
+    assert.ok(fetched.length >= 1, 'at least one foreign key exercised the system hop')
+    for (const [k, v] of fetched)
+      assert.deepEqual(v, { v: Number(k.slice(1)) }, `await data.${k} fetched the true cell — not the user read's answer`)
+  } finally { await Promise.all(nodes.map((n) => n.destroy())) }
+})
+
+test('TO-ROUTED FAIL-FAST [6] — a keyed read whose owner link is down rejects TYPED and quickly, never the silent full timeout', async () => {
+  const nodes = await spawn(3, 2)
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    for (let i = 0; i < 9; i++) nodes[i % 3].data[`f${i}`] = i
+    const kernel = nodes[0] as unknown as { data: Record<string, unknown> }
+    const isForeign = (k: string): boolean => {
+      try { void (kernel.data[k] as Record<string, unknown>); return typeof kernel.data[k] !== 'number' } catch { return true }
+    }
+    //! find a key owned NEITHER by n01 (so the hop is remote) — then kill every other member and
+    // ask immediately, inside the pre-eviction window (the link is gone; the view has not moved)
+    const foreign: string[] = []
+    await until(() => { foreign.length = 0; for (let i = 0; i < 9; i++) if (isForeign(`f${i}`)) foreign.push(`f${i}`); return foreign.length > 0 }, 15_000)
+    await nodes[1].destroy()
+    await nodes[2].destroy()
+    const t0 = Date.now()
+    let outcome: 'value' | 'typed' | 'other' = 'other'
+    try {
+      await (kernel.data[foreign[0]] as PromiseLike<unknown>)
+      outcome = 'value'
+    } catch (e) {
+      outcome = (e as ScopedError).scoped === true ? 'typed' : 'other'
+    }
+    const elapsed = Date.now() - t0
+    //! either the ring already re-homed the key locally (a late view) — a value is lawful — or the
+    // hop failed FAST and TYPED; what is banned is the untyped 8-second stall
+    assert.notEqual(outcome, 'other', 'a failed hop is a typed ScopedError, never a generic timeout')
+    assert.ok(elapsed < 5000, `answered in ${elapsed}ms — the dead-link hop must not ride the full rpc timeout`)
+  } finally { await nodes[0].destroy() }
+})
+
+test('SNAPSHOT CLONE [8] — mutating an awaited whole-resource read never corrupts the union', async () => {
+  const nodes = await spawn(3, 2)
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    nodes[0].data.orig = { keep: 1 }
+    await until(async () => {
+      const r = await (nodes[0].data as PromiseLike<Record<string, { keep: number }>>).then((x) => x, () => null)
+      return !!r && r.orig?.keep === 1
+    }, 15_000)
+    const first = await (nodes[0].data as PromiseLike<Record<string, { keep: number }>>)
+    first.orig.keep = 999 // a caller scribbling on its copy
+    ;(first as Record<string, unknown>).injected = true
+    const second = await (nodes[0].data as PromiseLike<Record<string, { keep: number }>>)
+    assert.equal(second.orig.keep, 1, 'the union is unmoved by caller-side mutation — the return was a copy')
+    assert.equal((second as Record<string, unknown>).injected, undefined, 'no injected key leaked into the shared state')
+  } finally { await Promise.all(nodes.map((n) => n.destroy())) }
+})

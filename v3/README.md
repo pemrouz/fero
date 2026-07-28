@@ -18,7 +18,7 @@ a seed sweep or review demanded it, which is the architecture working as designe
 ## Run it
 
 ```sh
-npm test                       # 249 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm test                       # 254 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
 npm run perf                   # 20 perf gates: counted invariants first, ratios second, absolutes last
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
@@ -662,6 +662,41 @@ because state is a deterministic fold of the journal'd inputs.
     tap-forward is future work); explicit-undefined cells do not cross the
     gather; the live gather re-arms by install + paced re-poll (a push-based
     claim stream is a wire optimization).
+  - **THE M6 ADVERSARIAL REVIEW ROUND** (6 find-lenses × 2 skeptics per
+    finding, every verdict traced against the real code): 55 findings, **50
+    confirmed**, 1 split, 4 rejected — every survivor fixed with a
+    mutation-killer pin. The centerpiece fix is **the pp floor law**
+    (DESIGN-M6 §7 addendum): the fast-path possession-floor advance's old
+    license ("single-source ascending sub-stream delivery") was locally
+    unverifiable and false in three confirmed-critical windows (mid-lane
+    first arrivals minted held with a forged prefix claim; an AE re-admit
+    race dropped the healing span at the dual fence; two senders serving one
+    lane interleaved into the same forgery — each breaking exactly-R/P2/P3
+    permanently). Every armed record now carries `pp`, its sender-stamped
+    (origin, partition) predecessor (FLAG_PP, one varint per record; wire 0 =
+    unknown, which FAILS CLOSED), and a floor advances only when it already
+    covers the predecessor — locally-verifiable sub-stream contiguity, with
+    the boot record now carrying a floor SEED the replay chain-rebuild
+    advances from. Companion structural fixes: the shed bar re-based onto
+    frozen lane TAILS (floors lawfully under-claim under pp — the old
+    empty-floors husk drop destroyed epoch-0/bootDirty data with zero
+    coverage proof); durable ACQDONE attestation gated on the snapshot
+    swap's echo (`sealed` — an orphan can never shed against marks one crash
+    erases); the boot record's held/orphan split (a restored orphan
+    re-enters only through the latch, never a silent un-freeze); the install
+    order fixed to VIEW-flood → rescope → boot-write; evidence-plane
+    liveness closed (round-on-admit, marks-lag re-rounds, the orphan
+    re-entry latch at equal floors, non-holder confirm probes with
+    probe-local evidence); the armed fan-out's run-discontinuity frame
+    rotation (a latent wire corruption on multi-record scoped batches); and
+    the gather's coverage sweep re-based onto per-answer ATTESTATION sets
+    (an acquiring or post-shed answerer can never attest absence) with
+    departed-member claim reaping. Test honesty landed alongside: the scoped
+    P2 oracle (`scopedConfirmedIntact`), engagement guards on the CHURN and
+    Q3A sweeps, and monitor snapshot/vacuity fixes. Full battery after the
+    round: **254/254 tests, 20/20 perf gates, 1000/1000 identity sweep at
+    exactly 237,451 events** — the entire fix round is byte-invisible at
+    R=∞.
 - The plan's pre-M4 CHECKPOINT (the M2–M4 swamp guard) is
   [CHECKPOINT.md](CHECKPOINT.md) — verdict: no overrun, ladder armed but not
   triggered, M4 sliced into five landable increments (M4a streams/watermarks →

@@ -377,10 +377,6 @@ export class Membership {
     node.epoch = view.epoch
     node.persistBoot() // the committed view is a durable fact from the instant it installs
     node.confirm.recount(node) // the view-change recount: thresholds are majorities OF THE COMMITTED VIEW
-    //! M6: every install re-derives the scope machine against the new ring — held partitions that
-    // left the R-set freeze into orphans HERE, the instant the duty changes (kernel/scope.ts)
-    if (node.armed) node.scope!.rescope(node)
-    j.armed && j.emit(JK.viewInstall, view.epoch, view.members.length)
     if (this.epochStale && view.epoch >= this.#staleWant) { this.epochStale = false; this.#pullTicks = 0 }
     if (this.rejoining() && view.epoch >= this.rejoinFloor) this.rejoinFloor = 0
     if (this.#proposal && this.#proposal.view.epoch <= view.epoch) this.#proposal = null
@@ -392,7 +388,18 @@ export class Membership {
       j.armed && j.emit(JK.dial, listen)
       node.env.sink.connect(listen)
     }
+    //! THE VIEW FLOODS FIRST (M6-review finding 39): rescope's install round ships HAVEQ on these
+    // same FIFO links — a peer still on the old epoch must receive the VIEW before the round, or it
+    // deterministically drops the round for epoch skew and the offer waits a full re-round cadence.
     this.#send(node, this.#admitted(node), encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }))
+    //! M6: every install re-derives the scope machine against the new ring — held partitions that
+    // left the R-set freeze into orphans HERE, the instant the duty changes (kernel/scope.ts)
+    if (node.armed) node.scope!.rescope(node)
+    //! ...and the boot record is rewritten AFTER rescope (findings 31/47): the arming install's
+    // held/orphan lists and an epoch-abort's residue orphan are durable facts of THIS install —
+    // the pre-rescope record above only guaranteed the epoch itself before any frame left.
+    if (node.armed && node.durable) node.persistBoot()
+    j.armed && j.emit(JK.viewInstall, view.epoch, view.members.length)
     this.settle(node)
   }
 

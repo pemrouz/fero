@@ -45,7 +45,13 @@ export const MAX_PROBES = 1024
 
 //! `part` (M6): the record's partition — armed nodes range the count over holdersOf(part) at the
 // derived W-quorum instead of the view majority. Absent (or unscoped) keeps the M4 math verbatim.
-interface Probe { id: number; origin: string; seq: number; level: number; part?: string }
+interface Probe {
+  id: number; origin: string; seq: number; level: number; part?: string
+  //! probe-LOCAL attested evidence per holder uuid (M6-review finding 38): a NON-holder issuer has
+  // no scope entry to read marks from — its open probes carry their own, fed by the probe-driven
+  // HAVEQ round (scope.round asks the partition's holders; ok answers land here via feedScoped).
+  ev?: Map<string, { s: number; d: number }>
+}
 
 export class Confirm {
   #probes = new Map<number, Probe>()
@@ -110,6 +116,32 @@ export class Confirm {
   origins(into: Set<string>) { for (const per of this.#marks.values()) for (const o of per.keys()) into.add(o) }
   //! durablePeer — has this peer ever announced durable evidence? (See #hasP.)
   durablePeer(uuid: string): boolean { return this.#hasP.has(uuid) }
+
+  //! scopedParts — the partitions of every OPEN scoped probe (finding 38): scope.round HAVEQs these
+  // even when this node holds no entry for them — a non-holder issuer's only evidence source.
+  scopedParts(into: Set<string>) {
+    for (const p of this.#probes.values()) if (p.part !== undefined) into.add(p.part)
+  }
+
+  //! feedScoped — an ok HAVEA answer's attested floors, routed to every open probe on that
+  // partition (finding 38): the answerer's m/md maps are its self-attested possession/durable
+  // claims for the probe's origin lane. Monotone per (probe, uuid); recounts when anything moved.
+  feedScoped(node: Node, uuid: string, part: string, m?: Record<string, number>, md?: Record<string, number>) {
+    let touched = false
+    for (const p of this.#probes.values()) {
+      if (p.part !== part) continue
+      const s = typeof m?.[p.origin] === 'number' ? m[p.origin] : 0
+      const d = typeof md?.[p.origin] === 'number' ? md[p.origin] : 0
+      if (s <= 0 && d <= 0) continue
+      const ev = (p.ev ??= new Map())
+      const cur = ev.get(uuid)
+      if (!cur || s > cur.s || d > cur.d) {
+        ev.set(uuid, { s: Math.max(s, cur?.s ?? 0), d: Math.max(d, cur?.d ?? 0) })
+        touched = true
+      }
+    }
+    if (touched) this.recount(node)
+  }
 
   //! pendingScoped — any partition-scoped probe still open? (The scope tick re-drives handshake
   // rounds while one waits — evidence converges on tick cadence, priced per open probe.)
@@ -179,6 +211,11 @@ export class Confirm {
           const s = entry.marks.get(uuid)?.get(p.origin) ?? 0
           const dm = entry.marksD.get(uuid)?.get(p.origin) ?? 0
           if (evid(s, dm)) n++
+        } else {
+          //! NON-holder issuer (finding 38): no scope entry exists to carry marks — the probe's own
+          // ev map (fed by the probe-driven round's ok answers) is the attested evidence.
+          const ev = p.ev?.get(uuid)
+          if (ev && evid(ev.s, ev.d)) n++
         }
       }
       return n
