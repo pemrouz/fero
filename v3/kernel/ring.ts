@@ -97,9 +97,13 @@ export class Ring {
   // pinned partitions contribute their pin list first, then the walk fills the remainder with
   // distinct unpinned members. Returns the reusable scratch array — copy before retaining.
   holdersOf(partition: string, r: number): readonly string[] {
+    //! ALLOCATION DISCIPLINE (M8 alloc gate Z4, DESIGN-M8): the scratch is written through an index
+    // CURSOR with ONE trailing length-set — the previous `out.length = 0`-then-push shape discarded
+    // the backing FixedArray every call and V8 regrew it (~150 B/call, 7 scavenges per 100k calls
+    // measured; 0 after this shape). The cursor never reads past m, so the stale tail is inert.
     const out = this.#scratch
-    out.length = 0
-    if (r <= 0) return out
+    let m = 0
+    if (r <= 0) { out.length = 0; return out }
     const members = this.#members
     const seen = this.#seen
     seen.fill(0)
@@ -107,15 +111,17 @@ export class Ring {
     const pinned = this.#place.get(partition)
     if (pinned !== undefined)
       for (const u of pinned) {
-        if (out.length >= r) return out
-        if (!out.includes(u)) {
-          out.push(u)
+        if (m >= r) { out.length = m; return out }
+        let dup = false
+        for (let i = 0; i < m; i++) if (out[i] === u) { dup = true; break }
+        if (!dup) {
+          out[m++] = u
           const mi = members.indexOf(u)
           if (mi >= 0) seen[mi] = 1
         }
       }
     const points = this.#points
-    if (points.length === 0) return out
+    if (points.length === 0) { out.length = m; return out }
     const h = this.#hash(partition)
     let lo = 0, hi = points.length
     while (lo < hi) {
@@ -126,10 +132,11 @@ export class Ring {
     if (lo === points.length) lo = 0
     //! successor walk: consecutive vnode points often repeat a member — the seen flags dedup; the
     // walk terminates after one full lap (every member has been offered) or r distinct collected
-    for (let i = 0; i < points.length && out.length < r; i++) {
+    for (let i = 0; i < points.length && m < r; i++) {
       const mi = this.#owners[(lo + i) % points.length]
-      if (seen[mi] === 0) { seen[mi] = 1; out.push(members[mi]) }
+      if (seen[mi] === 0) { seen[mi] = 1; out[m++] = members[mi] }
     }
+    out.length = m
     return out
   }
 
