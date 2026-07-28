@@ -821,9 +821,23 @@ function headerFacts(){
   const bits = [esc(s.kind || '—')];
   if (s.seed != null) bits.push('seed ' + esc(String(s.seed)));
   if (s.kind === 'sim') bits.push(s.quiesced ? 'quiesced' : sst('warn', 'not quiesced'));
-  bits.push(s.converged ? 'converged ✓' : sst('crit', 'diverged ✗'));
-  const bad = REPLAY.find(r => !r.ok);
-  bits.push(!bad ? 'replay ✓' : sst('crit', `replay ✗ ${esc(bad.uuid)}: ${esc(bad.reason)}`));
+  // shrunk captures (M7): the pill renders RECORDED facts only (summarize passes capture.shrunk through);
+  // a capture frozen AT its violating event is mid-flight by construction — divergence there is not a
+  // finding, so soften (never hide) it, keyed STRICTLY on the recorded atViolation fact.
+  if (s.shrunk) bits.push(sst('warn', `shrunk ${s.shrunk.from.steps}→${s.shrunk.steps.length} steps${s.shrunk.atViolation ? ' · ends @ violation' : ''}`));
+  // converged === null means ZERO captured nodes (an attach where nobody answered) — "no nodes" is the
+  // only honest render; a green badge over an empty set would be the vacuous-true lie the fold refuses
+  bits.push(s.converged === null ? sst('warn', 'no nodes')
+    : s.converged ? 'converged ✓'
+    : (s.shrunk && s.shrunk.atViolation ? sst('warn', 'mid-flight @ violation') : sst('crit', 'diverged ✗')));
+  // absent rows (M7 attach): targets that yielded no slice this rebuild — named with their typed reason,
+  // never synthesized into node cards (absence renders as absence)
+  if (s.absent && s.absent.length)
+    bits.push(sst('warn', `absent: ${s.absent.map(a => `${esc(a.target)} (${esc(a.reason)})`).join(', ')}`));
+  if (s.converged !== null) { // zero nodes ⇒ no replay basis — claim nothing rather than a vacuous ✓
+    const bad = REPLAY.find(r => !r.ok);
+    bits.push(!bad ? 'replay ✓' : sst('crit', `replay ✗ ${esc(bad.uuid)}: ${esc(bad.reason)}`));
+  }
   if (s.violations.length) bits.push(sst('crit', s.violations.length + ' violation' + (s.violations.length === 1 ? '' : 's')));
   bits.push(s.events != null ? s.events + ' events' : klog(s.journalRows) + ' journal rows');
   return bits.join(' · ');

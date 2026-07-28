@@ -16,6 +16,12 @@
 //     capture (the drift guard: if the reimplementation diverges, tests fail).
 
 //! ── value codec: capture JSON must carry what JSON cannot (NaN, undefined, ±Infinity, -0, bytes) ──
+//! the CLOSED enums (M7 honesty gate): every fold-minted status string lives in one of these two lists —
+// the string-leaf traceability test walks fold outputs and rejects any leaf outside capture-strings ∪
+// these enums ∪ vocab names ∪ cellKey encodings. Add a status HERE (and to its fold) or the gate fails.
+export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived']
+export const ABSENT_REASONS = ['refused', 'timeout', 'unauthorized', 'frame', 'vocab-mismatch', 'restarted', 'error']
+
 export const encodeVal = (v) => {
   if (v === undefined) return { $: 'u' }
   if (typeof v === 'number') {
@@ -195,5 +201,13 @@ export const summarize = (capture) => ({
   violations: capture.violations ?? [],
   journalRows: capture.nodes.reduce((n, x) => n + x.journal.length, 0),
   truncated: capture.nodes.filter((n) => n.dropped > 0).map((n) => n.uuid),
-  converged: capture.nodes.every((n) => n.stateHash === capture.nodes[0].stateHash),
+  //! converged is NULL on zero nodes — `every()` over an empty set is vacuously true, and a fold must
+  // never synthesize a green claim about a cluster it holds no facts for (M7 honesty gate)
+  converged: capture.nodes.length === 0 ? null : capture.nodes.every((n) => n.stateHash === capture.nodes[0].stateHash),
+  //! absent (M7 attach): targets that yielded no slice this rebuild — passthrough of recorded facts;
+  // absence contributes ZERO facts to every other fold (they range over nodes[] only)
+  absent: capture.absent ?? [],
+  //! shrunk (M7): pure passthrough of the capture's shrink facts — the viewer renders the pill from
+  // THIS, never infers "shrunk-ness" (honesty: a fold may carry a recorded fact, never mint one).
+  shrunk: capture.shrunk ?? null,
 })

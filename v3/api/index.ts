@@ -21,6 +21,9 @@ import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy } from './substrate.ts'
+import { diagnostics, type Diagnostics } from './diagnostics.ts'
+import { compact, frontier, gcTombstones } from '../kernel/log.ts'
+import { captureNode } from '../tools/debug/capture.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
@@ -376,7 +379,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   await rt.start()
   fold()
 
-  return {
+  const inst: Fero = {
     name,
     data: dataSurface,
     methods: methodSurface,
@@ -393,6 +396,31 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       await rt.destroy()
     },
   }
+  //! [diagnostics] (M7, DESIGN-M7 §3): the Symbol-keyed internals seam — attached WITHOUT widening the
+  // typed Fero surface (diag() in api/diagnostics.ts is the one sanctioned door). Every member is a
+  // pull or a bounded effect; nothing here runs unless called, so the instance's hot paths are untouched.
+  const diagHandle: Diagnostics = {
+    capture: () => captureNode(node),
+    journal: (from = 0) => ({ n: node.journal.n, dropped: node.journal.dropped, events: node.journal.read(from) }),
+    served: () => host!.served,
+    confirms: () => ({ api: probes.size, kernel: node.confirm.inflight }),
+    logSize: () => { let n = 0; for (const [, entries] of node.logs) n += entries.length; return n },
+    compact: () => {
+      //! honest refusals (DESIGN-M7 §3, the panel's shared-defect fix): 0 on an ARMED node — compaction
+      // is PINNED under scoping (the member-ranged frontier says nothing about a holder's possession;
+      // forcing it here would be a diagnostics member that can cause real data loss) — and 0 after
+      // destroy. Otherwise the REAL pass, size-gate-free (v2's drive-it-deterministically purpose).
+      if (node.armed || node.destroyed) return 0
+      let d = 0
+      for (const o of [...node.logs.keys()]) d += compact(node, o, frontier(node, o))
+      d += gcTombstones(node)
+      fold() // compaction ran OUTSIDE node.step — the composer's hook wraps step only, so fold by hand
+      return d
+    },
+    drop: (uuid: string) => rt.drop(uuid),
+  }
+  ;(inst as Fero & { [diagnostics]?: Diagnostics })[diagnostics] = diagHandle
+  return inst
 }
 
 export type { Fero, FeroOpts, Guarantee, WriteResolve, WriteReject, Change, WriteOpts, Methods, Partitions, ScopedError } from './types.ts'

@@ -1,8 +1,10 @@
-//! ── tools/debug/serve — the debug server: scenario dashboard + debugger, over captures OR a live cluster ──
+//! ── tools/debug/serve — the debug server: scenario dashboard + debugger, over captures, a live cluster, OR a remote attach ──
 //   npm run debug                                     # scenario dashboard at /, debugger at /debug
 //   npm run debug -- captures/seed-42.json            # open a saved capture in the debugger
-//   npm run debug -- --live                           # spin a real 3-node TCP cluster + traffic, poll it live
+//   npm run debug -- --live                           # spin a real 5-node TCP cluster + traffic, poll it live
+//   npm run debug -- --live --nodes 3                 # ...at another size
 //   npm run debug -- --live --contend                 # ...with a DELIBERATELY conflicting workload (LWW demo)
+//   FERO_DIAG_TOKEN=… npm run debug -- --attach h:p,h:p   # dash a REAL (multi-process) cluster over the DIAG wire
 //
 // Routes:
 //   /                → scenarios.html (dashboard) — or the debugger when a capture file / --live was given
@@ -25,6 +27,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Runtime } from '../../shell/runtime.ts'
 import { captureLive } from './capture.ts'
+import { AttachPool } from './attach.ts'
 import { runAll } from './scenarios.ts'
 import { ports } from '#utils'
 import { REC, type Rec } from '../../kernel/env.ts'
@@ -39,16 +42,31 @@ const opt = (name: string, dflt: number) => {
 const captureFile = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a))
 const port = opt('port', 4699)
 
-//! --live: three real Runtimes over real TCP on this machine + an OWNER-ROUTED traffic generator.
-// Every key is written by exactly ONE node (the M3 owner-routing rule, applied at the workload
-// layer) — so the steady state shows ZERO contention, which is the design intent: conflicts are
-// not this system's normal weather. `--contend` flips to random-origin writes over a shared
-// keyset so LWW elections (and the debugger's contested-cells view) can be demonstrated.
+//! --attach (M7): the DIAG-wire consumer — /capture.json is rebuilt by FRESH pulls from a REAL
+// (multi-process) cluster per HTTP request (the pull-spine crossing process boundaries). The token
+// rides FERO_DIAG_TOKEN, never argv (ps-visible). Mutually exclusive with --live: two node sources
+// for one /capture.json would be a lie about what you're looking at.
+const attachArg = (() => { const i = args.indexOf('--attach'); return i >= 0 ? (args[i + 1] ?? '') : null })()
+if (attachArg !== null && flag('live')) {
+  console.error('--live and --attach are two node sources for one /capture.json — pick one')
+  process.exit(2)
+}
+const pool = attachArg !== null ? new AttachPool(attachArg.split(',').filter(Boolean), process.env.FERO_DIAG_TOKEN ?? '') : null
+
+//! --live: N real Runtimes (default 5 — the M7 live-dash) over real TCP on this machine + an
+// OWNER-ROUTED traffic generator. Every key is written by exactly ONE node (the M3 owner-routing
+// rule, applied at the workload layer) — so the steady state shows ZERO contention, which is the
+// design intent: conflicts are not this system's normal weather. The workload's char-sum owner is
+// UNCORRELATED with the kernel ring, so most writes enter at a non-ring-owner and the kernel
+// owner-forwards them — which is exactly what lights up the cid write-route timeline (issued →
+// forwarded → sequenced → applied) in the debugger. `--contend` flips to random-origin writes over
+// a shared keyset so LWW elections (and the contested-cells view) can be demonstrated.
 const runtimes: Runtime[] = []
 if (flag('live')) {
-  const ps = [await ports.free(), await ports.free(), await ports.free()]
+  const N = Math.max(2, opt('nodes', 5))
+  const ps = await Promise.all(Array.from({ length: N }, () => ports.free()))
   const addrs = ps.map((p) => `127.0.0.1:${p}`)
-  for (let i = 0; i < 3; i++)
+  for (let i = 0; i < N; i++)
     runtimes.push(new Runtime({
       uuid: `n${i + 1}`, listen: addrs[i], hosts: addrs.filter((_, j) => j !== i),
       redialMs: 200, heartbeatMs: 2000, journalCap: 1 << 16,
@@ -84,12 +102,12 @@ const json = (res: http.ServerResponse, body: string) => {
   res.end(body)
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const [url, qs] = (req.url ?? '/').split('?')
   try {
     if (url === '/') {
-      // a capture file or --live means the user came to DEBUG that — land them in the debugger
-      if (captureFile || flag('live')) page(res, 'viewer.html')
+      // a capture file, --live, or --attach means the user came to DEBUG that — land them in the debugger
+      if (captureFile || flag('live') || pool) page(res, 'viewer.html')
       else page(res, 'scenarios.html')
     } else if (url === '/scenarios' || url === '/scenarios.html') {
       page(res, 'scenarios.html')
@@ -106,8 +124,9 @@ const server = http.createServer((req, res) => {
       json(res, JSON.stringify(c))
     } else if (url === '/capture.json') {
       if (flag('live')) json(res, JSON.stringify(captureLive(runtimes.map((r) => r.node))))
+      else if (pool) json(res, JSON.stringify(await pool.capture())) // fresh pulls per request; concurrent requests coalesce
       else if (captureFile) json(res, readFileSync(captureFile).toString())
-      else { res.writeHead(404); res.end('no capture source — open a scenario from /, or pass a file / --live') }
+      else { res.writeHead(404); res.end('no capture source — open a scenario from /, or pass a file / --live / --attach') }
     } else {
       res.writeHead(404); res.end('not found')
     }
@@ -116,7 +135,10 @@ const server = http.createServer((req, res) => {
   }
 })
 server.listen(port, () => {
-  const mode = captureFile ? `capture: ${captureFile}` : flag('live') ? 'LIVE cluster' : 'scenario dashboard'
+  const mode = captureFile ? `capture: ${captureFile}`
+    : flag('live') ? `LIVE cluster (${runtimes.length} nodes)`
+    : pool ? `ATTACHED via DIAG: ${attachArg}`
+    : 'scenario dashboard'
   console.log(`fero v3 → http://localhost:${port}/  (${mode})`)
   console.log(`  dashboard http://localhost:${port}/scenarios · debugger http://localhost:${port}/debug`)
 })

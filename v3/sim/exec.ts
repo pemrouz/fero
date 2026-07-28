@@ -192,8 +192,12 @@ export class Sim {
   heal(a: string, b: string) { this.#partitioned.delete(pairKey(a, b)) }
 
   //! run — drain the queue (to quiescence) or until a horizon; monitors run after every event; returns violations.
-  run(opts: { until?: number; maxEvents?: number } = {}): Violation[] {
+  // stopOnViolation (M7 shrinker, DESIGN-M7 §2): freeze the trajectory AT the first violating event —
+  // sim.events === violations[first].event and every journal is cut at the violation instant, so the
+  // capture opens AT the violation by construction (no scrubber machinery, no Violation shape change).
+  run(opts: { until?: number; maxEvents?: number; stopOnViolation?: boolean } = {}): Violation[] {
     const max = opts.maxEvents ?? 1_000_000
+    const v0 = this.violations.length // stop on violations pushed by THIS call, not an earlier phase's
     let n = 0 // per-CALL budget — the cumulative counter would trip a later phase for the sins of an earlier one
     while (this.#queue.length) {
       if (opts.until !== undefined && this.#queue[0].at > opts.until) break
@@ -206,6 +210,7 @@ export class Sim {
         const bad = m.check(this)
         if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
       }
+      if (opts.stopOnViolation && this.violations.length > v0) return this.violations
     }
     return this.violations
   }

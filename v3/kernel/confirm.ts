@@ -55,6 +55,8 @@ interface Probe {
 
 export class Confirm {
   #probes = new Map<number, Probe>()
+  //! inflight (M7 [diagnostics]): open kernel probes — must drain to 0 after settle AND after destroy
+  get inflight(): number { return this.#probes.size }
   //! per-peer evidence marks: uuid → origin → {s: shippable tail, d: durable tail}, fed by digests (monotone).
   #marks = new Map<string, Map<string, { s: number; d: number }>>()
   //! peers that have EVER announced a durable (p) map — the "this peer is durable" signal. The

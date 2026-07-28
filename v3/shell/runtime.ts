@@ -342,6 +342,18 @@ export class Runtime {
     this.node.step({ kind: 'linkUp', link, dialed: false })
   }
 
+  //! drop (M7 [diagnostics]): abruptly destroy the socket to an IDENTIFIED peer — what a real network
+  // drop looks like (no goodbye; both kernels hear linkDown via 'close'). A transient, not a partition:
+  // the peer redials within redialMs. false = no identified live link for that uuid; never throws.
+  drop(uuid: string): boolean {
+    const link = this.node.byUuid.get(uuid)
+    if (link === undefined) return false
+    const sock = this.#sockets.get(link)
+    if (!sock || sock.destroyed) return false
+    sock.destroy()
+    return true
+  }
+
   async destroy(): Promise<void> {
     this.node.destroy()
     for (const t of this.#timers.values()) clearTimeout(t)
