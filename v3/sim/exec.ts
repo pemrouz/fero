@@ -100,7 +100,7 @@ export class Sim {
   #storeAt = new Map<string, number>()
   //! M4c: every confirm probe posted through the executive is tracked to its answer — the
   // no-confirmed-write-lost check (monitors.confirmedIntact) walks the ok-resolved ones at end-of-run
-  confirms = new Map<string, { uuid: string; id: number; origin: string; seq: number; level: number; ok?: boolean; count?: number }>()
+  confirms = new Map<string, { uuid: string; id: number; origin: string; seq: number; level: number; part?: string; ok?: boolean; count?: number }>()
   //! M5c rpc recorders (no api host in sim): per-node inboxes the Tier-2 suites assert against.
   rpcInbox = new Map<string, { link: number; id: number; mode: number; m: string; a: unknown }[]>()
   rpcResults = new Map<string, { id: number; ok: boolean; value: unknown; local: boolean }[]>()
@@ -144,9 +144,13 @@ export class Sim {
       incarnation: old.incarnation + 1,
       boot: b ? {
         epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor,
-        //! M6 (armed lives only): the held/dirty ledgers ride the restart like the shell's restoreOpts
+        //! M6 (armed lives only): the held/orphan/dirty ledgers + the floor seed ride the restart
+        // like the shell's restoreOpts — dropping orphanParts here silently un-listed a frozen
+        // orphan from the replay authority (the M6 fix-round H1 regression: its rows never folded)
         ...(b.heldPartitions ? { heldPartitions: b.heldPartitions } : {}),
+        ...(b.orphanParts ? { orphanParts: b.orphanParts } : {}),
         ...(b.dirtyParts ? { dirtyParts: b.dirtyParts } : {}),
+        ...(b.floors ? { floors: b.floors } : {}),
       } : opts.boot,
     })
     for (const row of store.wal) this.post(uuid, { kind: 'replay', bytes: row.bytes, prev: row.prev }, 0)
@@ -157,7 +161,7 @@ export class Sim {
   //! post — deliver an event to a node after `delay` virtual ms.
   post(uuid: string, ev: Event, delay = 0) {
     if (ev.kind === 'confirm')
-      this.confirms.set(uuid + '|' + ev.id, { uuid, id: ev.id, origin: ev.origin, seq: ev.seq, level: ev.level })
+      this.confirms.set(uuid + '|' + ev.id, { uuid, id: ev.id, origin: ev.origin, seq: ev.seq, level: ev.level, part: ev.part })
     this.#schedule(delay, () => this.#step(uuid, ev))
   }
 

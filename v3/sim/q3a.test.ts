@@ -66,11 +66,15 @@ const oracle = (sim: Sim): Set<string> => {
 }
 
 test('Q3A organic — 40 seeds of single-join grow with a live gather open: the union never blinks a held key', async () => {
+  //! engagement ledger (M6-review finding 34): silently-skipped unformed seeds must not inflate
+  // the sweep's claim — the formed count is asserted at the end.
+  let formedSeeds = 0
   for (let seed = 0; seed < 40; seed++) {
     const sim = new Sim(seed)
     const members = cluster(sim, 2, { heartbeatMs: 50, replicas: 2 })
     sim.run({ until: 1200 })
     if (!formed(members)) continue
+    formedSeeds++
     const gather = gatherFor(sim, members[0])
     writes(sim, members, 12, 250)
     sim.at(400 + Math.floor(sim.rng() * 300), () => {
@@ -97,14 +101,17 @@ test('Q3A organic — 40 seeds of single-join grow with a live gather open: the 
     assert.deepEqual(sim.violations, [], `seed ${seed}: kernel monitors green under the hunt`)
     gather.destroy()
   }
+  assert.ok(formedSeeds >= 30, `the sweep actually ran: ${formedSeeds}/40 seeds formed (a silent skip is not a pass)`)
 })
 
 test('Q3A H2-shaped — 60 seeds of {A,B}→{C,D} pin-flips under delay faults, 5ms slices: the PARKED union survives the window that broke v2 on 60/60', async () => {
+  let formedSeeds = 0
   for (let seed = 0; seed < 60; seed++) {
     const sim = new Sim(seed)
     const members = cluster(sim, 4, { heartbeatMs: 50, replicas: 2, fault: { delay: [5, 60] } })
     sim.run({ until: 2000 })
     if (!formed(members)) continue
+    formedSeeds++
     for (const m of members) m.writes.ring.place('gx', 'n01', 'n02')
     sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['gx', 'v'], value: `s${seed}` }] }, 0)
     sim.run({ until: 2400 })
@@ -126,6 +133,10 @@ test('Q3A H2-shaped — 60 seeds of {A,B}→{C,D} pin-flips under delay faults, 
     assert.ok(members[2].scope!.held('gx') && members[3].scope!.held('gx'), `seed ${seed}: the new R-set holds gx`)
     assert.ok(!members[0].scope!.entries.has('gx') && !members[1].scope!.entries.has('gx'), `seed ${seed}: the old holders drained`)
     assert.equal(members[2].state.get(JSON.stringify(['gx', 'v'])), `s${seed}`, `seed ${seed}: the value survived the double handover`)
+    //! the kernel monitors ran through the whole window (finding 34: this leg never checked them —
+    // a kernel invariant break under the pin-flip would have passed silently)
+    assert.deepEqual(sim.violations, [], `seed ${seed}: kernel monitors green through the pin-flip`)
     gather.destroy()
   }
+  assert.ok(formedSeeds >= 45, `the H2 sweep actually ran: ${formedSeeds}/60 seeds formed`)
 })

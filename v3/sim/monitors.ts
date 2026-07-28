@@ -245,6 +245,15 @@ export const perEvent = () => [
     check: (() => {
       const frozen = new Map<string, { node: Node; floors: Map<string, number> }>()
       return (sim: Sim): string | null => {
+        //! snapshot invalidation (M6-review finding 32): a shed or re-acquire ends the freeze — a
+        // partition that is not CURRENTLY an orphan drops its snapshot, so a later re-orphaning of
+        // the same (node, partition) starts a FRESH scan instead of comparing across lawful
+        // held-era floor advances (the false-violation class).
+        for (const [k, snap] of frozen) {
+          const bar = k.indexOf('|')
+          const cur = sim.nodes.get(k.slice(0, bar))
+          if (cur !== snap.node || cur.scope?.entries.get(k.slice(bar + 1))?.state !== SCOPE.orphan) frozen.delete(k)
+        }
         for (const [id, n] of sim.nodes) {
           if (!n.scope) continue
           for (const [p, e] of n.scope.entries) {
@@ -307,7 +316,13 @@ export const scopedConverged = (sim: Sim): string | null => {
 // lawful non-holders here, the exactly-R claim is about the HELD state.
 export const exactlyR = (sim: Sim): string | null => {
   const nodes = [...sim.nodes.entries()].filter(([, n]) => n.scope && n.armed)
-  if (!nodes.length) return null
+  //! honesty guards (M6-review finding 35): a scoped-configured sim with NO armed node at horizon
+  // is a vacuous pass hiding a never-formed seed — report it; and the claim is per the COMMITTED
+  // epoch, so armed nodes still split across epochs at horizon is non-quiescence, not a baseline.
+  if (!nodes.length)
+    return [...sim.nodes.values()].some((n) => n.scope) ? 'exactlyR: scoped sim reached the horizon with NO armed node — vacuous (never formed?)' : null
+  const epochs = new Set(nodes.map(([, n]) => n.epoch))
+  if (epochs.size > 1) return `exactlyR: armed nodes disagree on the epoch at horizon (${[...epochs].join(',')}) — not quiescent`
   const [, first] = nodes[0]
   const ring = first.writes.ring
   if (ring.epoch !== first.epoch) ring.build(first.epoch, first.membership.view.members)
@@ -364,6 +379,44 @@ export const confirmedIntact = (sim: Sim, level = 0): string | null => {
       const held = n.logs.get(c.origin)?.some((e) => e.seq === c.seq)
       const folded = (n.streams.get(c.origin)?.applied ?? 0) >= c.seq
       if (!held && !folded) return `confirmed (${c.origin}, ${c.seq}) level ${c.level} is MISSING at ${id}`
+    }
+  }
+  return null
+}
+
+//! scopedConfirmedIntact — the R-SCOPED no-confirmed-write-lost oracle (M6-review finding 29: the
+// unscoped confirmedIntact's `applied ≥ seq` predicate is unsound under scoping — an armed node's
+// per-origin applied lawfully runs past records of partitions it never held, so a LOST confirmed
+// record reads as "folded"). The scoped claim: every OK-answered partition-scoped confirm names a
+// record every CURRENT holder of its partition must contain-or-cover — lane presence, or a
+// possession floor ≥ seq (sound evidence under the pp chain law), or a NEWER same-cell version
+// (LWW lawfully superseded it and compaction dropped the loser). Non-holders and frozen orphans
+// owe nothing — the holders are the R copies the confirm promised.
+export const scopedConfirmedIntact = (sim: Sim, level = 0): string | null => {
+  for (const c of sim.confirms.values()) {
+    if (c.ok !== true || c.level < level || c.part === undefined) continue
+    for (const [id, n] of sim.nodes) {
+      if (!n.scope || !n.armed) continue
+      const ring = n.writes.ring
+      if (ring.epoch !== n.epoch) ring.build(n.epoch, n.membership.view.members)
+      if (!ring.holdsAny(n.uuid, c.part, n.replicas)) continue // not this node's duty
+      if (!n.scope.held(c.part)) continue // mid-acquisition at horizon is exactlyR's complaint, not P2's
+      const inLane = n.logs.get(c.origin)?.some((e) => e.seq === c.seq) === true
+      const floor = (n.streams.get(c.origin)?.parts?.get(c.part)?.s ?? 0) >= c.seq
+      //! LWW supersede (same lane only — cross-origin stamps say nothing about THIS record): a
+      // version in the partition from the SAME origin at seq ≥ c.seq proves the lane folded through
+      // the confirmed record here; compaction may then have dropped the loser row lawfully.
+      let superseded = false
+      if (!inLane && !floor) {
+        for (const [cell, v] of n.versions) {
+          if (v.origin !== c.origin || v.seq < c.seq) continue
+          if ((JSON.parse(cell) as string[])[0] !== c.part) continue
+          superseded = true
+          break
+        }
+      }
+      if (!inLane && !floor && !superseded)
+        return `scoped confirmed (${c.origin}, ${c.seq}) part '${c.part}' level ${c.level} is MISSING at holder ${id}`
     }
   }
   return null

@@ -65,37 +65,61 @@ const armedView1 = (opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) =
 
 const rec = (key: string[], value: unknown): Rec => ({ type: REC.update, key, value })
 //! one frame per call — encodeRuns splits NON-CONTIGUOUS seqs into several frames (gappy Lamport
-// lanes are the norm here), so the helper asserts the rows encoded to exactly one
-const frame = (origin: string, rows: { seq: number; rec: Rec }[], epoch = 1): Uint8Array => {
-  const out = encodeRuns(rows.map((r) => ({ rec: r.rec, origin, seq: r.seq, epoch })), VERB.RECORDS)
+// lanes are the norm here), so the helper asserts the rows encoded to exactly one. Rows may carry
+// pp (the M6-review floor law): a row WITHOUT pp decodes as UNKNOWN and every floor-advance site
+// fails closed on it — armed-path pins that assert floor movement must stamp the chain.
+const frame = (origin: string, rows: { seq: number; rec: Rec; pp?: number }[], epoch = 1): Uint8Array => {
+  const withPp = rows.some((r) => r.pp !== undefined)
+  const out = encodeRuns(rows.map((r) => ({ rec: r.rec, origin, seq: r.seq, epoch, pp: r.pp })), VERB.RECORDS, withPp)
   assert.equal(out.length, 1, 'test rows must be one contiguous run — send gappy seqs as separate frames')
   return out[0]
 }
 
-test('DUAL FENCE — an under-fence interior SPLICES in (lane ascending, floor advances); dups above and below the floor still drop', () => {
+test('DUAL FENCE — an under-fence interior SPLICES in (lane ascending, floor chains); dups above and below the floor still drop', () => {
   const h = armedView1()
   //! pin the partitions onto aa's R-set — the inbound gate must ADMIT them by placement, not hash luck
   h.node.writes.ring.place('p1', 'bb', 'aa')
   h.node.writes.ring.place('p2', 'bb', 'aa')
-  //! cross-link interleave: seqs 10 then 12 arrive first (applied runs to 12), the interior 11 later
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 10, rec: rec(['p1', 'a'], 1) }]) })
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 12, rec: rec(['p2', 'a'], 2) }]) })
+  //! cross-link interleave: seqs 10 then 12 arrive first (applied runs to 12), the interior 11 later.
+  // Every row carries its sub-stream pp — the floor law admits only chain-verified advances.
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 10, rec: rec(['p1', 'a'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 12, rec: rec(['p2', 'a'], 2), pp: 0 }]) })
   const d = h.node.streams.get('bb')!
   assert.equal(d.applied, 12)
-  assert.deepEqual([d.parts!.get('p1')!.s, d.parts!.get('p2')!.s], [10, 12], 'fast-path floors track per-partition maxes')
-  h.node.step({ kind: 'bytesIn', link: 2, bytes: frame('bb', [{ seq: 11, rec: rec(['p1', 'b'], 3) }]) })
+  assert.deepEqual([d.parts!.get('p1')!.s, d.parts!.get('p2')!.s], [10, 12], 'chained fast-path floors track per-partition sub-streams')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: frame('bb', [{ seq: 11, rec: rec(['p1', 'b'], 3), pp: 10 }]) })
   assert.deepEqual(h.node.logs.get('bb')!.map((e) => e.seq), [10, 11, 12], 'the splice lands at its seq position — ascending preserved')
   assert.equal(h.node.state.get(JSON.stringify(['p1', 'b'])), 3, 'the interior record folded through the one LWW election')
-  assert.equal(d.parts!.get('p1')!.s, 11, 'the possession floor advanced with the splice')
+  assert.equal(d.parts!.get('p1')!.s, 11, 'the possession floor advanced with the CHAINED splice')
   assert.equal(d.applied, 12, 'the scalar fence never regresses or fragments')
   //! a genuine duplicate of the splice drops on lane presence; a below-floor absentee drops as covered
   const dups = () => h.jk(JK.dupDrop).length
   const before = dups()
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 11, rec: rec(['p1', 'b'], 3) }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 11, rec: rec(['p1', 'b'], 3), pp: 10 }]) })
   assert.equal(dups(), before + 1, 'present-in-lane ⇒ dup')
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 9, rec: rec(['p1', 'z'], 9) }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 9, rec: rec(['p1', 'z'], 9), pp: 0 }]) })
   assert.equal(dups(), before + 2, 'absent but ≤ floor ⇒ effect-covered, dropped')
   assert.equal(h.node.state.has(JSON.stringify(['p1', 'z'])), false)
+})
+
+test('FLOOR LAW — a gapped or unknown pp FOLDS but never advances the floor; the gap-fill chain-walk trues it up (M6-review findings 10/18/25)', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('p1', 'bb', 'aa')
+  const d = () => h.node.streams.get('bb')!
+  //! a MID-LANE first arrival (pp 20 over an interior aa never received): folds, mints held — and
+  // claims NOTHING (the v2-era eager advance forged coverage of 1..20 and orphans shed on it)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 21, rec: rec(['p1', 'x'], 1), pp: 20 }]) })
+  assert.equal(h.node.scope!.held('p1'), true, 'the record folded (availability preserved)')
+  assert.equal(h.node.state.get(JSON.stringify(['p1', 'x'])), 1)
+  assert.equal(d().parts?.get('p1')?.s ?? 0, 0, 'the floor made NO claim over the unpossessed interior')
+  //! an UNKNOWN pp (flag-less frame — pre-pp history, epoch-0 rows) fails closed the same way
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 25, rec: rec(['p1', 'y'], 2) }]) })
+  assert.equal(d().parts?.get('p1')?.s ?? 0, 0, 'unknown predecessor ⇒ fold, never advance')
+  //! the AE-shaped heal: the missing prefix arrives (chained from 0) — the splice chain-walk trues
+  // the floor THROUGH the previously-gapped 21 but stops at the unknown-pp 25
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: frame('bb', [{ seq: 20, rec: rec(['p1', 'base'], 0), pp: 0 }]) })
+  assert.equal(d().parts!.get('p1')!.s, 21, 'gap filled ⇒ the walk chained 20 then 21; the unknown 25 stays unclaimed')
+  assert.deepEqual(h.node.logs.get('bb')!.map((e) => e.seq), [20, 21, 25], 'every record is in the lane regardless of floor claims')
 })
 
 test('INERTNESS — the same interleave at an UNSCOPED node dup-drops the interior (the M1 scalar fence, byte-for-byte)', () => {
@@ -136,8 +160,8 @@ test('WAL DISCIPLINE — a splice never rides persistRun: splice-only frames per
   const h = armedView1({ durable: true })
   h.node.writes.ring.place('p1', 'bb', 'aa')
   h.node.writes.ring.place('p2', 'bb', 'aa')
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 10, rec: rec(['p1', 'a'], 1) }]) })
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 12, rec: rec(['p2', 'a'], 2) }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 10, rec: rec(['p1', 'a'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 12, rec: rec(['p2', 'a'], 2), pp: 0 }]) })
   const persists = () => h.of('persist').length
   const afterFast = persists()
   assert.ok(afterFast >= 1, 'the fast-path frame persisted (the received bytes are the row)')
@@ -146,7 +170,7 @@ test('WAL DISCIPLINE — a splice never rides persistRun: splice-only frames per
   const d = h.node.streams.get('bb')!
   assert.deepEqual([d.parts!.get('p1')!.d, d.parts!.get('p2')!.d], [10, 12], 'durable floors advanced per the batch cover')
   //! the interior arrives: memory-only — NO persist effect, the partition is dirty in the boot record
-  h.node.step({ kind: 'bytesIn', link: 2, bytes: frame('bb', [{ seq: 11, rec: rec(['p1', 'b'], 3) }]) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: frame('bb', [{ seq: 11, rec: rec(['p1', 'b'], 3), pp: 10 }]) })
   assert.equal(persists(), afterFast, 'a splice-only frame persisted NOTHING (an interior row would condemn the chain on replay)')
   const boot = h.of('boot').pop()![1] as BootRecord
   assert.deepEqual(boot.dirtyParts, ['p1'], 'the dirty ledger is durable BEFORE the splice can be lost to a crash')
@@ -161,16 +185,16 @@ test('WAL DISCIPLINE — a splice never rides persistRun: splice-only frames per
   assert.equal(boot2.dirtyParts, undefined, 'dirty cleared — the disk restores the splice now')
 })
 
-test('REPLAY — the boot held-gate skips non-held rows (applied/chain advance, no fold), floors rebuild from row maxes EXCEPT boot-dirty partitions', () => {
+test('REPLAY — the boot held-gate skips non-held rows (applied/chain advance, no fold), floors rebuild through the pp chain EXCEPT boot-dirty partitions', () => {
   const h = harness('aa', {
     replicas: 2,
     boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']], heldPartitions: ['p1', 'p3'], dirtyParts: ['p3'] },
   })
   //! pin p2 away from aa so the ring agrees with the boot record's silence about it
   h.node.writes.ring.place('p2', 'bb', 'cc')
-  h.node.step({ kind: 'replay', bytes: frame('bb', [{ seq: 10, rec: rec(['p1', 'a'], 1) }]), prev: 0 })
-  h.node.step({ kind: 'replay', bytes: frame('bb', [{ seq: 12, rec: rec(['p2', 'a'], 2) }]), prev: 10 })
-  h.node.step({ kind: 'replay', bytes: frame('bb', [{ seq: 14, rec: rec(['p3', 'a'], 3) }]), prev: 12 })
+  h.node.step({ kind: 'replay', bytes: frame('bb', [{ seq: 10, rec: rec(['p1', 'a'], 1), pp: 0 }]), prev: 0 })
+  h.node.step({ kind: 'replay', bytes: frame('bb', [{ seq: 12, rec: rec(['p2', 'a'], 2), pp: 0 }]), prev: 10 })
+  h.node.step({ kind: 'replay', bytes: frame('bb', [{ seq: 14, rec: rec(['p3', 'a'], 3), pp: 0 }]), prev: 12 })
   const d = h.node.streams.get('bb')!
   assert.equal(d.applied, 14, 'applied advanced over every row — held or not (the chain stays whole)')
   assert.equal(h.node.walTail.get('bb'), 14)
@@ -272,8 +296,9 @@ test('AE FILTER — a digest answer ships a member only the partitions ITS R-set
 
 const haveq = (e: number, q: Record<string, Record<string, number>>) => encodeControl(VERB.HAVEQ, { e, q })
 const havea = (e: number, a: Record<string, { ok: number; need: number; m?: Record<string, number>; md?: Record<string, number> }>) => encodeControl(VERB.HAVEA, { e, a })
-const acqFrame = (origin: string, rows: { seq: number; rec: Rec }[], epoch = 1): Uint8Array => {
-  const out = encodeRuns(rows.map((r) => ({ rec: r.rec, origin, seq: r.seq, epoch })), VERB.ACQ)
+const acqFrame = (origin: string, rows: { seq: number; rec: Rec; pp?: number }[], epoch = 1): Uint8Array => {
+  const withPp = rows.some((r) => r.pp !== undefined)
+  const out = encodeRuns(rows.map((r) => ({ rec: r.rec, origin, seq: r.seq, epoch, pp: r.pp })), VERB.ACQ, withPp)
   assert.equal(out.length, 1)
   return out[0]
 }
@@ -289,13 +314,13 @@ test('ACQUISITION — a co-holder\'s HAVEQ announce latches the from-zero assign
   assert.equal(needFrames.length, 1)
   assert.deepEqual((needFrames[0].value as { a: Record<string, unknown> }).a.px, { ok: 0, need: 1, m: {} }, 'from-zero: empty marks')
   //! live records for px arrive MID-LATCH: staged, nothing folds (the §0 law row 2)
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 4, rec: rec(['px', 'stale'], 'covered') }]) })
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 6, rec: rec(['px', 'fresh'], 'live') }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 4, rec: rec(['px', 'stale'], 'covered'), pp: 3 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 6, rec: rec(['px', 'fresh'], 'live'), pp: 5 }]) })
   assert.equal(h.node.state.size, 0, 'nothing folds during the latch')
   assert.equal(h.node.streams.get('bb')?.applied ?? 0, 0, 'the fence is untouched during the latch')
   //! the teacher's transfer + DONE: the fold is ONE synchronous step
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 3, rec: rec(['px', 'a'], 1) }]) })
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 5, rec: rec(['px', 'b'], 2) }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 3, rec: rec(['px', 'a'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 5, rec: rec(['px', 'b'], 2), pp: 3 }]) })
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 5 }, n: 2 }) })
   assert.equal(h.jk(JK.acquire).length, 1, 'the fold committed')
   assert.equal(h.node.scope!.held('px'), true)

@@ -120,11 +120,15 @@ export interface EffectSink {
 // reborn node re-stamp seqs whose originals still lived at peers — silent loss both ways). Crossing
 // the ceiling re-persists the record first; the cold path stays cold, amortized per LEASE stamps.
 // The M6 fields are ARMED-ONLY (absent unscoped — R=∞ boot bytes stay byte-identical with M4):
-// heldPartitions = the data-authoritative held ∪ orphaned set (the ring is duty-authoritative; replay
-// classifies WAL rows against BOTH — DESIGN-M6 C10); dirtyParts = partitions holding a spliced
-// interior record no WAL snapshot has captured yet — their replay-rebuilt floors would OVERCLAIM
-// (row maxes cover seqs the rows provably miss), so restore zeroes those floors and the handshake
-// re-heals honestly-low.
+// heldPartitions = the data-authoritative HELD set (plus an open latch's pre-latch held base);
+// orphanParts = the FROZEN half, split from held by the M6 review (finding 48 — a merged list let a
+// boot rescope silently un-freeze a restored orphan the ring re-assigned; restored orphans re-enter
+// ONLY through the latch); dirtyParts = partitions holding a spliced interior record no WAL snapshot
+// has captured yet — their replay-rebuilt floors would OVERCLAIM (row maxes cover seqs the rows
+// provably miss), so restore zeroes those floors and the handshake re-heals honestly-low; floors =
+// the per-(origin, partition) possession/durable floors at the last boot write — the replay SEED the
+// pp chain-rebuild advances from (the panel's compaction hole: chain bases below a compacted or
+// pre-pp span would otherwise collapse every floor to 0 on restart; a stale seed is honest-low).
 export interface BootRecord {
   epoch: number
   members: [string, string][]
@@ -132,7 +136,9 @@ export interface BootRecord {
   incarnation: number
   votedFor: { e: number; p: string; h: string }
   heldPartitions?: string[]
+  orphanParts?: string[]
   dirtyParts?: string[]
+  floors?: Record<string, Record<string, [number, number]>>
 }
 
 //! Env: what the kernel is allowed to know about the world — a clock, a seeded rng, and the sink. Nothing else.

@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed, writes } from './harness.ts'
-import { drained, exactlyR, scopedConverged } from './monitors.ts'
+import { drained, exactlyR, scopedConverged, scopedConfirmedIntact } from './monitors.ts'
 import { SCOPE } from '../kernel/scope.ts'
 import { JK } from '../kernel/journal.ts'
 import { REC } from '../kernel/env.ts'
@@ -140,25 +140,28 @@ test('H1 — an orphan crashes mid-shed (durable): the boot record re-derives th
     heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16, replicas: 2, durable: true,
   })
   sim.post('n99', { kind: 'start' }, 0)
-  //! freeze the victim mid-lifecycle: every handshake frame touching n01 dies with a re-armed sever
-  // through the install window (marks feed from BOTH directions — a peer's own HAVEQ announce is an
-  // attestation too), then the full cut holds the freeze; kill −9 and restart from its own disk
-  const others = [...members.slice(1), joiner].map((m) => m.uuid)
-  for (let t = 0; t <= 650; t += 25)
-    sim.at(t, () => {
-      for (const u of others) {
-        sim.severOnFrame('n01', u, 19 /* VERB.HAVEQ */)
-        sim.severOnFrame(u, 'n01', 19 /* VERB.HAVEQ */)
-      }
-    })
-  sim.at(675, () => { for (const m of [...members, joiner]) if (m.uuid !== 'n01') sim.partition('n01', m.uuid) })
-  sim.run({ until: 8000 })
+  //! freeze the victim mid-lifecycle, doctrine-clean (the fix-round hardened the evidence plane —
+  // admit-rounds + marks-lag rounds leak through any one-shot sever cadence, and a from-birth cut
+  // just gets n01 EVICTED instead of orphaned): run in 5ms SLICES until n01's install lands (its
+  // orphans exist), then cut it from everyone in that same slice. The freeze is real because the
+  // sheds that matter wait on the DURABLE joiner's marks, and n99 cannot attest an acquired
+  // partition before its latch folds AND its snapshot echo seals — several heartbeats away —
+  // while the pre-existing co-holders' fast attestations lawfully complete a few sheds first
+  // (the shedPre leg of the dual-outcome pin). Kill −9 and restart from its own disk.
   const old = members[0]
+  let installed = false
+  for (let t = 5005; t <= 25_000 && !installed; t += 5) {
+    sim.run({ until: t })
+    installed = [...old.scope!.entries.values()].some((e) => e.state === SCOPE.orphan)
+  }
+  assert.ok(installed, 'n01 installed the grown view and orphaned at least one moved partition')
+  for (const m of [...members, joiner]) if (m.uuid !== 'n01') sim.partition('n01', m.uuid)
+  sim.run({ until: 27_000 })
   const orphanedPre = old.journal.read().filter((e) => e.kind === JK.orphaned).map((e) => e.a as string)
   const shedPre = new Set(old.journal.read().filter((e) => e.kind === JK.shed).map((e) => e.a as string))
   const frozenAtCrash = orphanedPre.filter((p) => !shedPre.has(p))
   const reborn = sim.restart('n01')
-  sim.run({ until: 8200 })
+  sim.run({ until: 27_200 })
   //! BOTH crash legs, decided by where the crash landed (the boot record is the authority):
   // shed-then-crash ⇒ the WAL rows for the shed partition replay-gate away (no resurrection);
   // crash-mid-shed ⇒ the orphan re-derives FROZEN from (boot record ∪ restored ring) pre-network
@@ -166,10 +169,10 @@ test('H1 — an orphan crashes mid-shed (durable): the boot record re-derives th
     assert.equal(reborn.scope!.entries.get(p), undefined, `${p} shed pre-crash — its WAL rows must not resurrect it`)
   for (const p of frozenAtCrash)
     assert.equal(reborn.scope!.entries.get(p)?.state, SCOPE.orphan, `${p} was mid-shed at the crash — re-derived frozen`)
-  assert.ok(frozenAtCrash.length > 0, `the sever+cut froze at least one shed mid-flight (orphaned: ${orphanedPre.length}, shed pre-crash: ${shedPre.size})`)
+  assert.ok(frozenAtCrash.length > 0, `the n99 cut froze at least one shed mid-flight (orphaned: ${orphanedPre.length}, shed pre-crash: ${shedPre.size})`)
   //! heal: the poll resumes against the current holders, the stateless predicate re-fires, re-shed
   for (const m of [...members, joiner]) if (m.uuid !== 'n01') sim.heal('n01', m.uuid)
-  sim.run({ until: 30_000 })
+  sim.run({ until: 45_000 })
   const all = [members[1], members[2], joiner, reborn]
   assert.deepEqual(sim.violations, [], 'monitors green across crash + restore + re-shed')
   assert.equal(exactlyR(sim), null)
@@ -180,11 +183,17 @@ test('H1 — an orphan crashes mid-shed (durable): the boot record re-derives th
 })
 
 test('CHURN mini-sweep: 25 seeds of grow + member restart + partition/heal under faults — the full handover lifecycle converges every time', () => {
+  //! ENGAGEMENT ledger (M6-review finding 30): a seed whose churn never actually exercises the
+  // machine (join never commits, nothing sheds, nothing acquires) must not count as a pass of "the
+  // full handover lifecycle". Guards are per-seed where determinism allows (epoch must advance for
+  // the join) and aggregate where fault timing lawfully varies (sheds/acquires across the sweep).
+  let sheds = 0, acquires = 0, confirmsOk = 0
   for (let seed = 800; seed < 825; seed++) {
     const sim = new Sim(seed)
     const members = cluster(sim, 4, { heartbeatMs: 50, replicas: 2, durable: true, fault: { delay: [1, 12], dupP: 0.05 } })
     sim.run({ until: 2000 })
     assert.ok(formed(members), `seed ${seed}: formed`)
+    const epoch0 = members[0].epoch
     writes(sim, members, 25, 400)
     //! the churn schedule: a join mid-workload, a member crash+restore, one partition/heal pair
     sim.at(300, () => {
@@ -199,15 +208,40 @@ test('CHURN mini-sweep: 25 seeds of grow + member restart + partition/heal under
     const a = members[0].uuid
     sim.at(600, () => sim.partition(a, victim))
     sim.at(1000, () => sim.heal(a, victim))
+    //! scoped confirm probes ride the churn: the P2 oracle below verifies every OK against the
+    // horizon holders (finding 29 — confirmedIntact is scope-blind and never ran on scoped sweeps)
+    for (let i = 0; i < 6; i++)
+      sim.post(members[i % 4].uuid, { kind: 'write', recs: [{ type: REC.update, key: [`cw${i % 3}`, 'v'], value: `s${seed}-${i}` }] }, 500 + i * 150)
+    sim.at(1600, () => {
+      for (const m of members) {
+        const d = m.streams.get(m.origin)
+        if (!d || d.applied === 0) continue
+        for (const [p, pe] of d.parts ?? []) { sim.post(m.uuid, { kind: 'confirm', id: 9000 + seed, origin: m.origin, seq: pe.s, level: 0, part: p }, 0); break }
+      }
+    })
     sim.run({ until: 40_000 })
     assert.deepEqual(sim.violations, [], `seed ${seed}: monitors green through the churn`)
     assert.equal(exactlyR(sim), null, `seed ${seed}: exactly-R restored`)
     assert.equal(scopedConverged(sim), null, `seed ${seed}: holders converged`)
+    assert.equal(scopedConfirmedIntact(sim), null, `seed ${seed}: no confirmed write lost (the scoped P2 oracle)`)
     //! every orphan drained: churn must never wedge a shed (H7's liveness, minus the true laggard)
     for (const [id, n] of sim.nodes)
       assert.equal([...n.scope!.entries.values()].filter((e) => e.state === SCOPE.orphan).length, 0,
         `seed ${seed}: ${id} drained its orphans`)
+    //! per-seed: the join must have COMMITTED (epoch advanced past the formed baseline)
+    const horizon = [...sim.nodes.values()].map((n) => n.epoch)
+    assert.ok(Math.max(...horizon) > epoch0, `seed ${seed}: the churn moved the epoch (join committed)`)
+    for (const [, n] of sim.nodes) {
+      const events = n.journal.read()
+      sheds += events.filter((e) => e.kind === JK.shed).length
+      acquires += events.filter((e) => e.kind === JK.acquire).length
+    }
+    for (const c of sim.confirms.values()) if (c.ok === true && c.part !== undefined) confirmsOk++
   }
+  //! aggregate engagement: the sweep as a whole exercised real handovers and real scoped confirms
+  assert.ok(sheds > 0, `the sweep shed at least once (${sheds})`)
+  assert.ok(acquires > 0, `the sweep acquired at least once (${acquires})`)
+  assert.ok(confirmsOk > 0, `the sweep answered at least one scoped confirm OK (${confirmsOk})`)
 })
 
 test('mini-sweep: 30 seeds of R=2/5 with dup+delay faults and a mid-run partition/heal — exactly-R, scoped convergence, zero violations', () => {
