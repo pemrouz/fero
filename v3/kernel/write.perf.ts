@@ -8,51 +8,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
-import { VERB, encodeControl, encodeRuns } from './codec.ts'
+import { VERB, encodeControl } from './codec.ts'
 import { REC, type Env, type Rec } from './env.ts'
 import { bench } from '#utils'
+//! fixtures single-sourced with the M8 baseline probes (tools/perf/fixtures.ts) — declaration move
+// only; every timed loop body below is byte-identical to its pre-extraction form
+import { formedView1, writeFrames } from '../tools/perf/fixtures.ts'
 
 const BATCH = 2_000
-
-//! a formed 3-member view-1 node — aa is the lowest uuid, so it self-proposes genesis on the first tick
-const formedView1 = (opts: { swallowTimers?: boolean } = {}) => {
-  let frames = 0
-  const timers: { id: number; tag: number }[] = []
-  const env: Env = {
-    now: () => 0, rng: () => 0.5,
-    sink: {
-      connect() {}, send() { frames++ }, close() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {},
-      timer(id, tag) { if (!opts.swallowTimers) timers.push({ id, tag }) },
-    },
-  }
-  const node = new Node({ uuid: 'aa', listen: 'x:1', hosts: ['x:2', 'x:3'], heartbeatMs: 50 }, env)
-  node.journal.armed = false // perf posture: unwatched journal must cost ~nothing
-  node.step({ kind: 'start' })
-  for (let p = 0; p < 2; p++) {
-    const u = p === 0 ? 'bb' : 'cc'
-    node.step({ kind: 'linkUp', link: p + 1, dialed: true, to: `x:${p + 2}` })
-    node.step({ kind: 'bytesIn', link: p + 1, bytes: encodeControl(VERB.HELLO, { u, i: 1, l: `x:${p + 2}` }) })
-    node.step({ kind: 'bytesIn', link: p + 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
-  }
-  const hb = timers.find((t) => t.tag === 2)!
-  node.step({ kind: 'timer', id: hb.id, tag: hb.tag }) // genesis tick → propose view 1
-  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 1, g: 1, ce: 0, h: 'aa,bb,cc' }) })
-  if (node.epoch !== 1) throw new Error('perf fixture failed to commit view 1')
-  return { node, framesSent: () => frames }
-}
-
-//! the OWNER leg fixture: pre-encoded WRITE frames from one issuer, contiguous cids, all self-owned
-const writeFrames = (count: number, batch: number) => {
-  const frames: Uint8Array[] = []
-  for (let f = 0; f < count; f++) {
-    const recs = Array.from({ length: batch }, (_, i) => ({
-      rec: { type: REC.update, key: [`hot`, `f${(f * batch + i) % 512}`], value: { n: i, s: `v${i}` } } as Rec,
-      origin: 'bb~1', seq: 1 + f * batch + i, epoch: 1,
-    }))
-    frames.push(...encodeRuns(recs, VERB.WRITE))
-  }
-  return frames
-}
 
 test('absolute + THE DOCUMENTED NUMBER: hot-partition ceiling — one owner sequencing forwarded writes', () => {
   const { node } = formedView1()

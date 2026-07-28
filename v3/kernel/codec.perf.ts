@@ -7,24 +7,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Framer, Outbox, VERB, encodeFrame } from './codec.ts'
-import { REC, type Rec } from './env.ts'
 import { bench, ratio } from '#utils'
-
-const N = 10_000
-const recs: Rec[] = Array.from({ length: N }, (_, i) => ({
-  type: REC.update,
-  key: [`key${i % 512}`, 'field'],
-  value: { n: i, s: `value-${i}`, ok: (i & 1) === 0 },
-}))
+//! fixtures single-sourced with the M8 baseline probes (tools/perf/fixtures.ts) — declaration move
+// only; every timed loop body below is byte-identical to its pre-extraction form
+import { CANONICAL_FRAME_BYTES, CODEC_N as N, canonicalFrame, codecRecs as recs } from '../tools/perf/fixtures.ts'
 
 //! COUNTED: the wire cost of a canonical record is pinned EXACTLY — any encoding change that grows it fails on every machine identically.
 test('counted: bytes-on-wire per canonical record is pinned', () => {
-  const one = encodeFrame(
-    [{ type: REC.update, key: ['key1', 'field'], value: { n: 1, s: 'value-1', ok: true } }],
-    { origin: 'origin-1', baseSeq: 1, epoch: 0 },
-  )
+  const one = canonicalFrame()
   // 11 header + prov(origin len+utf8, baseSeq, epoch) + count u32 + record(tag, key segs, obj value) — the exact figure is the contract
-  assert.equal(one.length, 73, `canonical record frame is ${one.length}B (was 73B — wire cost changed, justify in DECISIONS)`)
+  assert.equal(one.length, CANONICAL_FRAME_BYTES, `canonical record frame is ${one.length}B (was ${CANONICAL_FRAME_BYTES}B — wire cost changed, justify in DECISIONS)`)
 })
 
 //! COUNTED: a batch coalesces into exactly ONE frame, and decode yields exactly N views (no splits, no drops).

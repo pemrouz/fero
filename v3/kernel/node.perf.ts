@@ -9,29 +9,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
-import { Framer, VERB, encodeControl, Outbox } from './codec.ts'
+import { Framer, VERB, encodeControl, encodeRuns, Outbox } from './codec.ts'
 import { REC, type Env, type Rec } from './env.ts'
 import { bench, ratio } from '#utils'
-
-const BATCH = 2_000
-const recs: Rec[] = Array.from({ length: BATCH }, (_, i) => ({
-  type: REC.update, key: [`k${i % 256}`], value: { n: i, s: `v${i}` },
-}))
-
-//! a formed 1-peer node with a swallow-everything sink — measures kernel work, not I/O
-const formedNode = () => {
-  const env: Env = {
-    now: () => 0,
-    rng: () => 0.5,
-    sink: { connect() {}, send() {}, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {} },
-  }
-  const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
-  node.journal.armed = false // perf posture: unwatched journal must cost ~nothing (predicted-false emit gates)
-  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'x:2' })
-  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'x:2' }) })
-  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) }) // sync — live records flow
-  return node
-}
+//! fixtures single-sourced with the M8 baseline probes (tools/perf/fixtures.ts) — declaration move
+// only; every timed loop body below is byte-identical to its pre-extraction form
+import { NODE_BATCH as BATCH, nodeRecs as recs, formedNode } from '../tools/perf/fixtures.ts'
 
 test('ratio: full kernel write path vs direct-call strawman stays within budget', () => {
   const node = formedNode()
@@ -86,4 +69,37 @@ test('absolute: 2k-record inbound apply under the tripwire ceiling', () => {
   let i = 0
   const ms = bench.time(() => { node.step({ kind: 'bytesIn', link: 1, bytes: frames[i++] }) })
   assert.ok(ms < 100, `2k inbound apply took ${ms.toFixed(1)}ms (ceiling 100ms)`)
+})
+
+//! COUNTED + ABSOLUTE (M8, plan §7's "digest build at realistic origins×partitions"): a caught-up
+// peer's r:1 digest asks for OURS and ships nothing back (its claim covers every lane) — so the step
+// isolates the digest BUILD: walk 100 origin lanes, encode one control frame. Entry count is the
+// deterministic law (every lane exactly once); the ms is the usual tripwire tier.
+test('counted + absolute: digest build over 100 origin lanes — every lane exactly once, one frame', () => {
+  const sent: Uint8Array[] = []
+  const env: Env = {
+    now: () => 0, rng: () => 0.5,
+    sink: { connect() {}, send(_l, bytes) { sent.push(bytes) }, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {} },
+  }
+  const node = new Node({ uuid: 'aa', listen: 'x:1' }, env)
+  node.journal.armed = false
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'x:2' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'x:2' }) })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  const ORIGINS = 100
+  const one: Rec = { type: REC.update, key: ['k'], value: 1 }
+  for (let o = 0; o < ORIGINS; o++)
+    node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: one, origin: `origin-${o}`, seq: 1, epoch: 0 }])[0] })
+  //! the peer claims every lane at our tails — nothing to ship, ONLY the digest answer builds
+  const claim: Record<string, number> = { aa: 0 }
+  for (let o = 0; o < ORIGINS; o++) claim[`origin-${o}`] = 1
+  const ask = encodeControl(VERB.DIGEST, { d: claim, r: 1 })
+  sent.length = 0
+  const ms = bench.time(() => { node.step({ kind: 'bytesIn', link: 1, bytes: ask }) })
+  assert.equal(sent.length, 6, 'each r:1 answers with exactly ONE digest frame (warmup + 5 timed)')
+  const answer = new Framer().push(sent[sent.length - 1])[0]
+  assert.equal(answer.verb, VERB.DIGEST)
+  const d = (answer.value as { d: Record<string, number> }).d
+  assert.equal(Object.keys(d).length, ORIGINS, 'every origin lane appears in the digest exactly once')
+  assert.ok(ms < 50, `100-lane digest build took ${ms.toFixed(2)}ms (tripwire 50ms)`)
 })

@@ -1,4 +1,4 @@
-# fero v3 — M0…M4 (kernel, replication, membership, writes, durability) + the fero() public api (M5, adversarially reviewed) + M6 scoped replication + M7 debug tooling, full
+# fero v3 — M0…M8: kernel, replication, membership, writes, durability, the fero() api, scoped replication, debug tooling, hardening
 
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
@@ -24,8 +24,11 @@ working as designed.
 ## Run it
 
 ```sh
-npm test                       # 288 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
-npm run perf                   # 20 perf gates: counted invariants first, ratios second, absolutes last
+npm test                       # 292 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+npm run perf                   # perf gates: counted invariants first, ratios second, absolutes last — now incl. the alloc gates (--expose-gc) + the baseline gate
+npm run perf:alloc             # just the allocation gates (kernel/alloc.perf.ts)
+npm run perf:absolute          # run the persisted-baseline probes, print the delta table (tools/perf/BASELINE.md)
+npm run perf:pin -- --runner=<label> --reason "why"   # pin the baseline (the ONLY writer; advisory on this box)
 npm run sim -- --seeds 1000    # 1000 seeded chaos trajectories (dup faults + partition/heal + writes racing formation)
 npm run scenarios              # run the scenario registry, print the table, pin/refresh results/ (--rebase re-pins the baseline)
 npm run debug                  # scenario DASHBOARD at /, the debugger at /debug (http://localhost:4699)
@@ -45,6 +48,22 @@ under per-pair delay/duplication faults, a mixed-type write workload issued
 DURING formation (deliberately racing the dial-race window), convergence + drain +
 per-event invariant monitors. A failing seed prints itself; re-running that seed
 reproduces the trajectory bit-for-bit.
+
+## Green-or-quarantined (the policy, stated)
+
+The suite has NO ambient-red baseline and no flakes-as-backlog: every test either
+passes or is QUARANTINED — an explicit `t.skip` carrying (a) the reason, (b) a
+pointer to the IDEAS entry with the repro seed, and (c) the un-quarantine
+condition. A bare skip with none of those is a review reject. Two skip classes
+are sanctioned WITHOUT an IDEAS entry because they are environment honesty, not
+defects: the absolute-tier gate on a box whose fingerprint did not pin the
+baseline ("no baseline for this runner" — tools/perf/BASELINE.md), and a Tier-3
+probe that declared its own run invalid (probe-error: formation flake after
+retry, a mid-run backpressure shed). A flake is reproduced under seed sweep and
+classified product-bug vs test-bug before any other work continues; any
+real-socket failure must be reproduced as a sim fault primitive before its fix
+merges. Scope honesty: this policy governs v3/ — the root v1/v2 tree is other
+sessions' domain.
 
 ## The debug tool
 
@@ -299,6 +318,65 @@ on** — resolved by an empirical repro, not a vote:
   refuse it). Every fix has a mutation-killer pin; one finding was refuted (the
   clone-free read alias is `data`'s inherent shared-mutable model, reachable via
   the primary `data.k` read path too — not specific to the method surface).
+
+## The cross-partition recipe (M8, plan §5 "Ordering")
+
+fero orders exactly one thing: each (origin, partition) stream — strictly
+increasing seqs, in order, from exactly one broadcaster. There is **no cross-origin
+or cross-partition ordering and no cross-partition atomicity**, and no API implies
+it. A method handler that writes two partitions performs two independent commits:
+each is exactly-once and confirmable, but there is no transaction spanning them.
+When you need more:
+
+1. **Model it single-partition.** The partition IS the atomicity domain — the
+   top-level key (`data.user42 = {…}` → partition `user42`). Co-locate state that
+   must move together under one top-level key and write it in one assignment: one
+   record run, one owner, one sequencer, atomic by construction. This is the
+   answer for the overwhelming majority of "transactions" (an entity + its
+   sub-entities as one nested value).
+2. **The outbox pattern for cross-partition effects.** Write the primary state AND
+   an intent row in the SAME partition (atomic): `data.order17 = { …order,
+   outbox: { creditUser: 'user42', amount: 5 } }`. A consumer — a method or a
+   subscription on `.filter(o => o.outbox)` — applies the second-partition effect
+   and clears the intent. Retries are safe: the consumer's write is idempotent by
+   key, the intent row is the durable cursor, and `confirm: 'persisted'` on the
+   first write makes the intent crash-proof before anything acts on it.
+3. **Read-after-cross-partition-write:** the cid overlay gives read-your-writes
+   per client per partition; to OBSERVE another client's cross-partition pair,
+   await `confirm: 'replicated'` on the first write before reading the second —
+   ordering is then yours, purchased explicitly, not implied by the API.
+
+## The availability posture (M8, plan §5 "Membership"/"Scoped")
+
+**Writes are CP.** Commit requires the majority side of the committed view: the
+minority's writes park in ONE bounded drop-oldest buffer (`writeBuffered`, depth
+surfaced; overflow drops the OLDEST batch and says so — `writeBufferDrop`), and
+flush at the then-current epoch on heal. A stale-epoch node pulls the newer view
+with bounded retries, then releases its gate ALARMED (`gateAlarm`) — availability
+degrades loudly, never a silent wedge.
+
+**Reads stay open.** Membership gates COMMITS and majority math, never
+replication: every node keeps serving its local (possibly stale) state through a
+partition, an evicted node still converges as a reader, and its stale-epoch
+stamps simply lose LWW. Clients (spokes) fail over their primary on link death,
+re-park in-flight attempts at the new relay, and re-subscribe live handles — the
+handle survives its server dying.
+
+**Durability is explicit.** `confirm: 'persisted'` = a majority holds the write
+DURABLE (storage batch resolved — never merely applied). Kill −9 the whole
+cluster at any seed: restore replays the WAL through the ingest path and zero
+persisted-confirmed writes are lost (the M4e proof, a pinned test). A rejoining
+node is read-only until a committed view ≥ its restored epoch is confirmed live;
+a full-cluster restart self-ballots from the restored view.
+
+**Scoped mode trades memory for loss, never the reverse.** Exactly-R holders is a
+two-sided invariant; a non-holder sheds only when every current holder attests
+coverage (keep-until-confirmed: under churn the node HOLDS — memory grows,
+`shedStall` alarms escalate, data never silently disappears). Data whose holders
+left the R-set freezes as an ORPHAN: its owner's writes NACK `withheld` (typed,
+retryable) until the one-teacher handover re-homes the data — a bounded
+availability dent in exchange for zero-loss handover, which is the posture
+everywhere: fero prefers refusing loudly over answering wrong.
 
 ## Layout
 
@@ -661,6 +739,55 @@ a real multi-process cluster over the wire).
     serve 4800` / `npm run demo -- watch 4800` — a server mutating an
     inventory by plain assignment, a client re-rendering through one tap;
     kill and restart the server and the watcher resumes.
+- **M8 — hardening is LIVE** (panel-designed like M6/M7: 2 candidates + a skeptic
+  judge per open question + a plan-coverage critic; the alloc judge ran its OWN V8
+  probes to adjudicate a factual dispute between candidates). What landed:
+  - **Allocation verification with teeth** (kernel/alloc.perf.ts, `npm run
+    perf:alloc`, and inside the default perf gate): the panel's adjudicated finding
+    is that a naked gc-fenced heap delta is UNSOUND for exactly the failures it
+    exists to catch — scavenges EAT the delta, so the signal SHRINKS as a
+    regression grows and min-of-k selects the most-truncated window. The sound
+    instrument is a conjunct: delta-≤-slack AND `gcEvents === 0` (GC-event physics:
+    a loop that allocates nothing can never scavenge — categorical at every
+    regression magnitude, and immune to WSL2 CPU noise). Three claim classes
+    (DECISIONS V3-21): zero-GARBAGE ring lookups, zero-RETENTION steady cycles
+    (duplicate-absorb, Outbox, issuer leg), retention-BUDGETS on the fresh path
+    (retention IS the product — the honest claim is ≤512 B/record, batch-
+    independent). The suite's mutation control (D6) proves the instrument can see.
+    **Its first run found a real bug**: ring.holdersOf discarded its scratch's
+    backing store every call (~7 scavenges/100k calls) — fixed to index-cursor
+    writes (0 events), gate Z4 fencing it forever.
+  - **The persisted absolute tier** (tools/perf/: fixtures single-sourced with the
+    perf siblings, a 9-row probe registry, a pure compare module, the pin CLI, and
+    [BASELINE.md](tools/perf/BASELINE.md) — the never-widen escape hatch written
+    down). Counts (bytes-per-record 73, frames-per-burst 3, per-forward 1,
+    per-owner-run 3) exact-compare on ANY machine; wall medians compare only on
+    the runner FINGERPRINT that pinned them (host + OS + CPU + Node major), with
+    `advisory` posture printing and only a `pinned` posture (refused on WSL/VM
+    boxes) enforcing. A pin refuses on missing --runner/--reason, any erroring
+    probe, an out-of-band baseline move, and a tolerance outside the validated
+    10–50% cap (the bypass a candidate design left open). First pin: advisory,
+    wsl2-devbox.
+  - **Socket throughput, measured honestly** (tools/perf/probes.tcp.ts): ~62k
+    records/s through the real TCP shell on this box — completion clocked by an
+    onApply COUNTER (never the Lamport watermark, which is not a record count —
+    a panel-caught trap), validity by JOURNAL physics (a tap counting
+    dropOldest/aeShip: a mid-run shed that AE heals passes every end-state check
+    while the median measures anti-entropy — so both must be zero or the run is a
+    typed probe-error, never a number). Plus the digest-build gate (100 origin
+    lanes, entry count exact) closing plan §7's last counted-invariant gap.
+  - **The v2 referent, classified** (DECISIONS V3-20): v2's L2 write path is
+    socket-coupled at construction — the plan's headless interleaved A/B is
+    unconstructible against it, and against v2's bare L1 (array push + project,
+    no dedup/LWW/provenance/watermarks) it is a category error: measured ~9× in
+    v2's favor, which prices exactly the machinery v2's L1 does not do (v3's own
+    strawman ratio, ~3×, is the tracked analogue). The real referent — both
+    stacks over sockets — is specified beside the pinned-runner IDEAS entry.
+  - **The ledgers + the recipes**: v3/DECISIONS.md (V3-1…V3-21 + carried v2
+    rejections) and v3/IDEAS.md (every DESIGN-M6/M7 residual, the carried module
+    debts, the Tier-3 descope, the CI provisioning entry) seeded; the
+    cross-partition recipe and the availability posture written (above); the
+    green-or-quarantined policy stated with its two sanctioned skip classes.
 - **M7 — debug tooling, full is LIVE** (design record: [DESIGN-M7.md](DESIGN-M7.md),
   panel-synthesized: 3 open questions × 2 independent candidate designs × 1 skeptic
   judge, every citation verified against the tree before synthesis). Most of plan §8
@@ -807,12 +934,17 @@ a real multi-process cluster over the wire).
   M4b storage seam + boot record → M4c confirm ladder → M4d log/compaction →
   M4e the restore proof), each closing named debts from the ledger — all five
   are now LIVE.
-- **Not yet verified (tracked, per plan §7/§11):** the zero-alloc claim is
-  structural (method-per-kind sink), not yet counter-verified (--expose-gc heap
-  deltas are an M8 pinned-runner deliverable). The replay-refold check HAS landed
-  (model.mjs verifyReplay, run in tests and on every capture the viewer opens);
-  repo CI is not yet stood up (the plan makes it an M0 exit criterion — it is the
-  immediate next step).
+- **Verification status (per plan §7/§11), updated at M8:** the allocation claims
+  ARE now counter-verified — kernel/alloc.perf.ts under --expose-gc (DECISIONS
+  V3-21: zero-garbage ring lookups by GC-event physics, zero-retention steady
+  cycles, fresh-path retention budgets; the suite's first run found and fixed a
+  real holdersOf violation). Absolute medians + socket throughput ARE persisted —
+  tools/perf/results/baseline.json (advisory posture on this box; see
+  tools/perf/BASELINE.md for the runner-identity rules and the escape hatch). The
+  replay-refold check has been live since the debug tool landed. Repo CI remains
+  unprovisioned: no git remote exists, so workflows would be dead files — the
+  provisioning entry is IDEAS P1, and the baseline machinery is ready to accept
+  the pinned runner's numbers the day it exists.
 - **M4d compaction is LIVE** (kernel/log.ts): the snapshot record supersedes
   the prefix — below the per-origin FRONTIER (every committed-view member
   provably past the cut on CRASH-STABLE marks: durable evidence in durable
