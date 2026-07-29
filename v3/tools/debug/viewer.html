@@ -166,6 +166,8 @@
   .insp .ih .isub{margin-top:5px;color:var(--dim);font-size:11.5px;line-height:1.45;word-break:break-word}
   .insp .ih .isub .mono{color:var(--ink)} .insp .ih .isub .bad{color:var(--crit)} .insp .ih .isub .warnt{color:var(--warn)}
   .insp .seg{padding:14px 16px;border-bottom:1px solid var(--line)}
+  /* the time-travel banner — gold like the tread: one glance says "this pane is a replay" */
+  .tban{padding:7px 16px;border-bottom:1px solid var(--line);font:600 10.5px var(--mono);color:var(--gold);background:color-mix(in srgb, var(--gold) 7%, transparent)}
   .insp .seg .st{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin-bottom:9px;display:flex;gap:7px;align-items:center}
   .insp .seg .st .stn{margin-left:auto;color:var(--faint);font-weight:600;letter-spacing:0;font-family:var(--mono)}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12px}
@@ -490,12 +492,14 @@ const buildForest = (capture, T) => {
       key: nk + '/g/streams/' + origin, type: 'stream', label: origin, icon: '∿', sev: '', pill: null,
       metaRaw: stat('applied ' + wm(w).a, '', 'the watermark ladder: applied (dedup) ≥ shippable (logged) ≥ durable (fsynced)', 110),
       entity: { kind: 'stream', origin, w: wm(w), node: n }, f: { node: n.uuid }, kids: [] }));
-    const jstat = klog(n.journal.length) + (n.dropped > 0 ? ' +' + klog(n.dropped) : '');
+    // under scrub the jrnl stat becomes a PROGRESS readout (rows ≤ T / retained) — on a
+    // write-free capture (mesh formation) this is the row that shows time actually moving
+    const jstat = (scrub ? klog(jAt(n.journal, T)) + '/' : '') + klog(n.journal.length) + (n.dropped > 0 ? ' +' + klog(n.dropped) : '');
     return { key: nk, type: 'node', label: n.uuid, icon: '▢', sev, pill,
       metaRaw: stat(n.seq ?? '—', 'seq', 'Lamport clock — this node’s next write stamp', 66)
              + stat(n.epoch ?? '—', 'ep', 'cluster epoch', 58)
              + stat(keysN, 'keys', scrub ? 'state cells @ scrub point (replayed)' : 'state cells at capture end', 74)
-             + stat(jstat, 'jrnl', 'journal rows retained' + (n.dropped > 0 ? ' (+dropped to overflow)' : ''), 96, n.dropped > 0 ? 'warn' : '')
+             + stat(jstat, 'jrnl', (scrub ? 'journal rows ≤ the scrub point / retained' : 'journal rows retained') + (n.dropped > 0 ? ' (+dropped to overflow)' : ''), 96, n.dropped > 0 ? 'warn' : '')
              + stat(adm + '/' + n.links.length, 'links', 'admitted / total links', 82),
       entity: { kind: 'node', node: n }, f: { node: n.uuid, kinds },
       kids: [group(nk + '/g/links', 'Links', '⇄', links), group(nk + '/g/streams', 'Streams', '∿', streams)] };
@@ -640,6 +644,12 @@ let T = null;           // time-travel scrub point (journal t); null = present
 let LIVE = false, PAUSED = false, pollTimer = null;
 let SCENARIO = '';      // ?scenario=<id> → one-shot fetch, no polling
 let SEEDED = false;     // expansion seeded once; live ticks preserve the user's tree
+
+// the ONE effective-scrub predicate — T is only honoured when this capture can replay it
+// (mirrors buildForest's gate exactly, so every surface agrees on whether we're time-travelling)
+const scrubT = () => (CAP && D && T != null && !D.truncated && T < D.maxT) ? T : null;
+// journal rows visible at the scrub point (journals are t-ascending, per-node index)
+const jAt = (journal, t) => { let n = 0; for (const e of journal){ if (e.t > t) break; n++; } return n; };
 
 /* flatten the forest into the visible row list, honouring expand + filter.
    With a filter active: prune non-matching branches and AUTO-EXPAND ancestors
@@ -854,7 +864,10 @@ function renderStatus(){
       (bad ? ` · ${sst('crit', bad + ' crit')}` : '') + (wrn ? ` · ${sst('warn', wrn + ' warn')}` : '');
   } else if (node.type === 'node'){
     const n = e.node;
-    sb.innerHTML = `${sst(node.sev, node.pill ? node.pill.lab : 'converged')} · seq ${n.seq ?? '—'} · ${n.state.length} keys · journal ${klog(n.journal.length)}`;
+    const t = scrubT();   // the bar mirrors the tree: replayed keys + journal progress at the scrub point
+    sb.innerHTML = t != null
+      ? `${sst('', '@ t' + t)} · ${stateAt(CAP, n.uuid, t).size} keys · journal ${klog(jAt(n.journal, t))}/${klog(n.journal.length)}`
+      : `${sst(node.sev, node.pill ? node.pill.lab : 'converged')} · seq ${n.seq ?? '—'} · ${n.state.length} keys · journal ${klog(n.journal.length)}`;
   } else if (node.type === 'write'){
     sb.innerHTML = `write ${esc(node.label)} · ${sst(node.sev, esc(e.o.summaryText))}`;
   } else if (node.type === 'cell'){
@@ -874,7 +887,7 @@ function renderScrub(){
   const off = !CAP || (D && D.truncated) || maxT === 0;
   r.disabled = off;
   r.title = D && D.truncated ? 'journal truncated — replay unavailable'
-    : 'time-travel — replay every journal to an event index (stateAt fold)';
+    : 'time-travel — drag or mouse-wheel to replay every journal to an event index (stateAt fold)';
   const cur = T != null ? Math.min(T, maxT) : maxT;
   if (document.activeElement !== r) r.value = cur;
   $('tread').textContent = CAP ? `@ ${cur}/${maxT}` : '';
@@ -906,18 +919,27 @@ function renderInspector(){
   else if (e.kind === 'link') html = inspLink(node);
   else if (e.kind === 'stream') html = inspStream(node);
   else if (e.kind === 'violation') html = inspViolation(node);
+  // one quiet banner while time-travelling — says which panes replay and which are end facts
+  const t = scrubT();
+  if (t != null) html = `<div class="tban">replayed @ t${t} — state, journal & routes at the scrub point · links, streams & elections show capture end</div>` + html;
   $('insp').innerHTML = html;
 }
 function inspNode(nd){
   const n = nd.entity.node;
+  // time-travel scopes everything journal-DERIVABLE to t ≤ T (keys via stateAt, the mini-log,
+  // the by-kind rollup); facts the capture only holds at END (seq/epoch/links/streams) stay,
+  // labelled — deriving them would mean minting state the fold layer never proved
+  const t = scrubT();
+  const rows = t != null ? n.journal.slice(0, jAt(n.journal, t)) : n.journal;
   const sub = `<span class="mono">${esc(n.listen ?? '—')}</span> · seq ${esc(String(n.seq ?? '—'))} · epoch ${esc(String(n.epoch ?? '—'))}`;
   const facts = kv([
     ['listen', esc(String(n.listen ?? '—'))],
     ['seq', esc(String(n.seq ?? '—'))],
     ['epoch', esc(String(n.epoch ?? '—'))],
     ['stateHash', esc(String(n.stateHash)), n.stateHash !== D.modal && CAP.nodes.length > 1 ? 'bad' : ''],
-    ['keys', String(n.state.length)],
-    ['journal', klog(n.journal.length) + (n.dropped > 0 ? ` / ${klog(n.dropped)} dropped` : ' / 0 dropped'), n.dropped > 0 ? 'warn' : ''],
+    ['keys', t != null ? `${stateAt(CAP, n.uuid, t).size} <span class="x">@ t${t} · ${n.state.length} at end</span>` : String(n.state.length)],
+    ['journal', t != null ? `${klog(rows.length)} <span class="x">≤ t${t} · ${klog(n.journal.length)} retained</span>`
+                          : klog(n.journal.length) + (n.dropped > 0 ? ` / ${klog(n.dropped)} dropped` : ' / 0 dropped'), n.dropped > 0 ? 'warn' : ''],
   ]);
   const lrows = n.links.map(l => {
     const state = !l.admitted ? 'pre-admit' : l.synced === false ? 'syncing' : l.synced === true ? 'synced' : '—';
@@ -933,49 +955,65 @@ function inspNode(nd){
   const streams = srows
     ? `<table class="vt"><thead><tr><th>origin</th><th>applied</th><th>shippable</th><th>durable</th><th>log records</th></tr></thead><tbody>${srows}</tbody></table>`
     : `<div class="reason">No inbound streams yet.</div>`;
-  // the journal mini-log — newest first, human-readable via the capture's vocab
-  const jr = n.journal.slice(-15).reverse();
-  const jlog = `<div class="mlog">` + jr.map(e => {
+  // the journal mini-log — newest first, human-readable via the capture's vocab;
+  // under scrub it is the window ENDING AT the scrub point, so dragging/wheeling
+  // steps visibly through this node's history (the whole point of time travel)
+  const jr = rows.slice(-15).reverse();
+  const jlog = jr.length ? `<div class="mlog">` + jr.map(e => {
     const name = D.names[e.kind] || ('kind' + e.kind);
     return `<div class="mr"><span class="stp">t${e.t}</span><span class="kvv">${journalLine(name, e, R)}</span>` +
       `<span class="oc ${JCLS[name] || 'fwd'}">${esc(name)}</span></div>`;
-  }).join('') + `</div>`;
-  // one-line counts-by-kind rollup (this node's whole retained journal)
+  }).join('') + `</div>` : `<div class="reason">Nothing yet at this point.</div>`;
+  // one-line counts-by-kind rollup (scoped with the mini-log while scrubbing)
   const counts = new Map();
-  for (const e of n.journal) { const nm = D.names[e.kind] || ('kind' + e.kind); counts.set(nm, (counts.get(nm) || 0) + 1); }
+  for (const e of rows) { const nm = D.names[e.kind] || ('kind' + e.kind); counts.set(nm, (counts.get(nm) || 0) + 1); }
   const roll = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
     .map(([k, c]) => `${esc(k)} ×${c}`).join(' · ') + (counts.size > 6 ? ` · +${counts.size - 6} kinds` : '');
+  const atEnd = t != null ? `<span class="stn">@ capture end</span>` : '';
   return ihead(esc(n.uuid), 'node', nd.sev, sub) +
     seg('Facts', facts) +
-    seg('Links', links, `<span class="stn">${n.links.filter(l => l.admitted).length}/${n.links.length} admitted</span>`) +
-    seg('Streams', streams) +
-    seg('Journal · newest first', jlog, `<span class="stn">last ${jr.length} of ${klog(n.journal.length)}${n.dropped > 0 ? ' · +' + klog(n.dropped) + ' dropped' : ''}</span>`) +
-    seg('By kind', `<div class="reason mono" style="font-size:11px">${roll || '—'}</div>`);
+    seg('Links', links, atEnd || `<span class="stn">${n.links.filter(l => l.admitted).length}/${n.links.length} admitted</span>`) +
+    seg('Streams', streams, atEnd) +
+    seg('Journal · newest first', jlog, `<span class="stn">last ${jr.length} of ${klog(rows.length)}${t != null ? ` ≤ t${t}` : ''}${n.dropped > 0 ? ' · +' + klog(n.dropped) + ' dropped' : ''}</span>`) +
+    seg('By kind', `<div class="reason mono" style="font-size:11px">${roll || '—'}</div>`, t != null ? `<span class="stn">≤ t${t}</span>` : '');
 }
 function inspWrite(nd){
   const { r, rec, o } = nd.entity;
   const key = rec ? prettyCell(cellKey(rec.k, rec.at)) : null;
+  // under scrub the header rollup is the AT-T count (each stop's status is a journal fact AT its
+  // own s.t, so counting stops with s.t ≤ T is a derivation) — o.summaryText is the END-of-run
+  // verdict and would contradict the banner; same reason the sev colour is muted while scrubbing
+  const t = scrubT();
+  const allStops = CAP.nodes.map(n => ({ uuid: n.uuid, ...(r.nodes[n.uuid] || { status: 'never-arrived', t: null }) }));
+  const okAtT = t != null ? allStops.filter(s => s.t != null && s.t <= t && (s.status === 'origin' || s.status === 'applied')).length : 0;
+  const rollup = t != null ? `applied ${okAtT}/${CAP.nodes.length} by t${t}` : o.summaryText;
   const sub = rec
-    ? `<span class="mono">${esc(key)}</span>${rec.ty === 2 ? ' <span class="warnt">removed</span>' : ' = <span class="mono">' + esc(fmtVal(rec.v, 48)) + '</span>'} · ${esc(o.summaryText)}`
-    : `record not captured · ${esc(o.summaryText)}`;
+    ? `<span class="mono">${esc(key)}</span>${rec.ty === 2 ? ' <span class="warnt">removed</span>' : ' = <span class="mono">' + esc(fmtVal(rec.v, 48)) + '</span>'} · ${esc(rollup)}`
+    : `record not captured · ${esc(rollup)}`;
   const recd = rec
     ? `{ type:<span class="vv">'${esc(tyName(rec.ty))}'</span>, key:<span class="kk">'${esc(key)}'</span>` +
       (rec.ty === 2 ? '' : `, value:<span class="vv">${esc(fmtVal(rec.v, 60))}</span>`) + ` }\n` +
       `<span style="color:var(--soft)">@ seq ${esc(String(rec.seq))} · epoch ${esc(String(rec.epoch))} · origin ${ref(r.origin, 'g/nodes/' + r.origin)}` +
       (r.partition !== '' ? ` · part ${esc(String(r.partition))}` : '') + `</span>`
     : `<span class="bad">record not captured</span> — no node's log holds ${esc(r.origin)} seq ${esc(String(r.seq))}; the payload is unknown (never invented)`;
-  // the LWW winner that beat this write, when the election is findable in the captured logs
+  // the LWW winner that beat this write, when the election is findable in the captured logs.
+  // NOT under scrub: D.contested is the END-of-run election — at T the loser may have lost to
+  // an intermediate write, and the final winner may not even have arrived anywhere yet (naming
+  // it would be the route pane minting the future the banner promises it doesn't)
   let beatenBy = '';
-  if (rec && o.lost.length){
+  if (rec && o.lost.length && t == null){
     const c = D.contested.get(cellKey(rec.k, rec.at));
     const w = c && c.winner;
     if (w && !(w.origin === r.origin && w.seq === r.seq))
       beatenBy = ` to ${ref(w.origin + '#' + w.seq, 'g/writes/' + w.origin + '#' + w.seq)}`;
   }
-  // the route timeline — one stop per node, in arrival order; absence is REAL information
-  const stops = CAP.nodes.map(n => ({ uuid: n.uuid, ...(r.nodes[n.uuid] || { status: 'never-arrived', t: null }) }))
-    .sort((a, b) => (a.t == null) - (b.t == null) || (a.t ?? 0) - (b.t ?? 0));
+  // the route timeline — one stop per node, in arrival order; absence is REAL information.
+  // Under scrub, each stop's t is compared to T: a stop the replay hasn't reached yet says
+  // so instead of its end-of-run verdict (whose severity would be a claim about the future)
+  const stops = [...allStops].sort((a, b) => (a.t == null) - (b.t == null) || (a.t ?? 0) - (b.t ?? 0));
   const lis = stops.map(s => {
+    if (t != null && (s.t == null || s.t > t))
+      return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="x">not arrived by t${t}</span></li>`;
     const at = s.t != null ? ` <span class="x">· t${s.t}</span>` : '';
     if (s.status === 'origin') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b>origin</b> — wrote seq ${esc(String(r.seq))}${at}</li>`;
     if (s.status === 'applied') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span>applied${at}</li>`;
@@ -985,7 +1023,9 @@ function inspWrite(nd){
       ? `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span>not yet arrived</li>`
       : `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b>never arrived</b></li>`;
   }).join('');
-  return ihead(esc(r.origin + '#' + r.seq), 'write', nd.sev, sub) +
+  // sev muted under scrub — the crit/warn colour is the END verdict (never-arrived/lww-lost),
+  // not a fact at T; the tree row keeps it (with tdim) because the tree is explicitly the ledger
+  return ihead(esc(r.origin + '#' + r.seq), 'write', t != null ? '' : nd.sev, sub) +
     seg('Change record', `<div class="recd">${recd}</div>`) +
     seg('Route', `<ul class="tl">${lis}</ul>`, r.partition !== '' ? `<span class="stn">part ${esc(String(r.partition))}</span>` : '');
 }
@@ -998,8 +1038,10 @@ function inspCell(nd){
     ['epoch·seq', c.winner ? `e${esc(String(c.winner.epoch))}·s${esc(String(c.winner.seq))}` : '—'],
     ['candidates', String(c.cand), c.cand > 1 ? 'warn' : ''],
   ]);
-  // the election — every candidate the captured logs hold, newest first, winner badged
-  const cont = D.contested.get(c.ck);
+  // the election — every candidate the captured logs hold, newest first, winner badged.
+  // Suppressed under scrub, matching cellRows: election data is end-of-run, and a mid-replay
+  // cell showing its final election would be the viewer claiming the future
+  const cont = scrubT() != null ? null : D.contested.get(c.ck);
   const election = cont ? seg('Election · newest first', `<div class="mlog">` + cont.candidates.map(x => {
     const tok = x.origin + '#' + x.seq;
     const won = cont.winner && cont.winner.origin === x.origin && cont.winner.seq === x.seq;
@@ -1126,6 +1168,18 @@ function setT(v){
 }
 $('trange').addEventListener('input', e => { if (!e.target.disabled) setT(+e.target.value); });
 $('treset').addEventListener('click', () => setT(null));
+// wheel over the scrubber steps time — up = forward, down = back; ~200 notches
+// traverse any capture (native range inputs ignore the wheel, so this is the wiring)
+$('scrub').addEventListener('wheel', e => {
+  // !CAP: the error/empty pane never ran renderScrub, so the range still has its markup default
+  // (enabled) — without this guard a wheel would drive setT into derive(null). deltaY 0 (a purely
+  // horizontal trackpad pan) is not a time gesture — let it scroll, don't step backwards.
+  if (!CAP || $('trange').disabled || !e.deltaY) return;
+  e.preventDefault();
+  const maxT = D ? D.maxT : 0;
+  const step = Math.max(1, Math.round(maxT / 200)) * (e.deltaY < 0 ? 1 : -1);
+  setT(Math.min(maxT, Math.max(0, (T != null ? T : maxT) + step)));
+}, { passive: false });
 
 // ── keyboard: j/k move · h/l collapse-expand · Enter toggle · g is:crit · a clear · / filter · Esc close ──
 document.addEventListener('keydown', e => {
