@@ -210,3 +210,18 @@ the root plan's §7.1 wording amendment is left to the session that owns root fi
   closure — the r:1 uuid-spoof hole is tracked in IDEAS under this heading).
 - **v2 migration/compat**: none — greenfield deploy; no wire/WAL/cluster interop.
 - **CRDT / OR-set merge**: LWW stays (V3-3).
+
+## V4-1 — fero v4 runs on data v4; fero owns the write surface (D0–D4, 2026-08-01)
+Context: data v4 landed fero's entire DESIGN-DATA3 wishlist (W1–W17 — hot lane,
+origin tokens, clause-10 deep-path law, executable SCHEDULE, public sink/each/
+promote, wire egress, rescopable filter, quantiles, per-path connect, mount).
+Decision: the api layer consumes data v4 through the one substrate seam; fero's
+assignment-writable public surface is FERO'S OWN LENS (writes trap into
+Bind.issue BEFORE data — validation covers assignment and methods.* by
+construction), deleting the capture/echo/heal wart family instead of porting
+it. The #frames stack stays (fero-kernel re-entrancy, orthogonal to data's
+clause-5 queue). The 16-clause SCHEDULE suite rides fero CI (test:contract).
+Consequences: 297/297 + 16/16 green; perf 36/36 at the v3-era thresholds; the
+seam is contract-pinned in both CIs (the c870bde class is structurally closed);
+residue tracked in IDEAS (move-streaming mirror keying, frame-batched apply,
+armor slimming).
