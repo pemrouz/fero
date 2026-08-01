@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "kind": "fero-v3-absolute-baseline",
+  "rev": "9449003",
+  "when": "2026-07-28T07:48:59.357Z",
+  "dirty": true,
+  "reason": "initial advisory baseline — WSL2 dev box, ms tier informational; the pinned quiet runner is unprovisioned (IDEAS P1)",
+  "supersedes": {
+    "rev": "9449003",
+    "when": "2026-07-28T07:46:11.248Z"
+  },
+  "runner": {
+    "id": "wsl2-devbox",
+    "posture": "advisory",
+    "host": "dhulfiqhar",
+    "os": "Linux",
+    "release": "6.18.33.2-microsoft-standard-WSL2",
+    "cpu": "Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz ×12",
+    "node": "26.1.0"
+  },
+  "msTolerancePct": 50,
+  "counts": {
+    "wire.bytes-per-record": 73,
+    "wire.frames-per-burst-3peers": 3,
+    "write.frames-per-forward": 1,
+    "write.frames-per-owner-run": 3
+  },
+  "probes": {
+    "codec.encode-decode-10k": {
+      "file": "kernel/codec.perf.ts",
+      "ms": 59.554,
+      "n": 10000,
+      "persec": 167914
+    },
+    "node.inbound-apply-2k": {
+      "file": "kernel/node.perf.ts",
+      "ms": 10.173,
+      "n": 2000,
+      "persec": 196594
+    },
+    "write.owner-2k": {
+      "file": "kernel/write.perf.ts",
+      "ms": 29.851,
+      "n": 2000,
+      "persec": 67000
+    },
+    "write.issuer-512": {
+      "file": "kernel/write.perf.ts",
+      "ms": 1.727,
+      "n": 512,
+      "persec": 296447
+    },
+    "api.write-5k": {
+      "file": "api/data.perf.ts",
+      "ms": 52.597,
+      "n": 5000,
+      "persec": 95063
+    },
+    "api.inbound-5k": {
+      "file": "api/data.perf.ts",
+      "ms": 29.645,
+      "n": 5000,
+      "persec": 168664
+    },
+    "ring.ownerof-1m": {
+      "file": "kernel/ring.perf.ts",
+      "ms": 99.248,
+      "n": 1000000,
+      "persec": 10075799
+    },
+    "node.step-vs-strawman": {
+      "file": "kernel/node.perf.ts",
+      "ratio": 3.021
+    },
+    "tcp.replicate-20k": {
+      "file": "tools/perf/probes.tcp.ts",
+      "ms": 272.2,
+      "n": 20000,
+      "persec": 73479
+    }
+  }
+}
