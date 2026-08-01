@@ -28,7 +28,7 @@
 // (cell + value identity; removes match by type — their echo carries the old
 // value), and everything else in the same drain is genuine local work.
 
-import { proxy, applyRec, capture, type Capture } from './substrate.ts'
+import { proxy, applyRec, lens } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
@@ -69,14 +69,12 @@ export interface Outcome {
 
 export class Bind {
   data: any
+  #handle: any // the raw data v4 source handle beneath the lens
   #rt: Runtime
-  #cap: Capture
   #iss: string
   //! pending — 'iss|cid' → the unsettled write; overlay — cell → the NEWEST pending cid holding it
   #pending = new Map<string, Pending>()
   #overlay = new Map<string, number>()
-  //! expected — the one echo the in-flight applyRec call may fan back (consume-once)
-  #expected: { cell: string; ref: unknown; remove: boolean } | null = null
   //! frames — a STACK of in-flight fast-path collectors, one per active issue() call (M5-review #0/#1/#4).
   // The epoch-0 fast path mints no kernel cid and applies synchronously inside rt.write(); a user tap
   // reacting to one of those applies drains a RE-ENTRANT issue() INSIDE the outer one (substrate
@@ -105,25 +103,16 @@ export class Bind {
     this.#validate = opts.validate
     this.#tracked = opts.tracked
     this.#iss = rt.node.uuid + '~' + rt.node.incarnation
-    this.data = proxy({})
+    //! the two-layer surface (DESIGN-DATA3 §4.1): #handle is the data v4 source holding the
+    // projection; data is FERO'S OWN LENS over it — assignment/delete trap straight into
+    // issue() (validation, overlay, owner routing) BEFORE data sees anything, so no capture
+    // sink exists and the entire v3 echo family (#expected, verb-rewrite matching,
+    // #healRoot) is deleted, not ported. A root replace throws PRE-COMMIT in the lens.
+    this.#handle = proxy({})
+    this.data = lens(this.#handle, [], (recs) => this.#fromLens(recs))
     rt.onApply = (a) => { if (!this.#destroyed) this.#onApply(a) }
-    this.#cap = capture(this.data, (recs) => this.#captured(recs), () => this.#healRoot())
   }
 
-  //! healRoot — the illegal-root-replace repair (M5-review #12): `data[value] = x` throws (loud), but
-  // data has already overwritten the proxy's whole root, blowing away every child. Re-project the
-  // CONFIRMED fold from kernel state on a microtask (after the throw unwinds), with capture DETACHED so
-  // the re-projection issues nothing and the root reset does not re-trigger this guard. The beneath is
-  // always derivable — the same invariant #revert rests on, applied to the whole tree.
-  #healRoot() {
-    queueMicrotask(() => {
-      if (this.#destroyed) return
-      this.#cap.detach()
-      applyRec(this.data, { type: REC.update, key: [], value: {} }) // reset the ghost root
-      for (const [k, v] of this.#rt.node.state) applyRec(this.data, { type: REC.update, key: JSON.parse(k) as string[], value: v })
-      this.#cap = capture(this.data, (recs) => this.#captured(recs), () => this.#healRoot())
-    })
-  }
   #validate?: (rec: Rec) => true | string
   //! tracked — the flush-on-return attribution seam (M5c): when a method handler is executing, the
   // host exposes its per-invocation collector here (AsyncLocalStorage-backed); every coordinate
@@ -258,11 +247,11 @@ export class Bind {
     this.#sweepDrops()
   }
 
-  //! apply — project one record into the proxy, arming the expected-echo consume for the synchronous
-  // fan-back. Ref-equal updates are filtered by the substrate (no echo — the arm just expires).
+  //! apply — project one record into the projection handle (the hot lane, fero's origin).
+  // No echo arming: nothing subscribes that could re-issue (the lens routes user writes
+  // BEFORE data; data-side sinks never write back).
   #apply(rec: Rec) {
-    this.#expected = { cell: cellOf(rec), ref: rec.value, remove: rec.type === REC.remove }
-    try { applyRec(this.data, rec) } finally { this.#expected = null }
+    applyRec(this.#handle, rec)
   }
 
   //! optimistic — a direct issue (methods.*) makes its value visible immediately, exactly like an
@@ -289,22 +278,20 @@ export class Bind {
     else this.#apply({ type: REC.remove, key })
   }
 
-  //! captured — the write-capture sink: consume the one expected echo of an in-flight apply; issue
-  // everything else as local writes. (A re-entrant user write drained inside our apply call arrives
-  // here as its own batch and falls through to issue() — the probed substrate contract.)
-  #captured(recs: Rec[]) {
-    if (this.#destroyed) return
-    const e = this.#expected
-    if (e && recs.length === 1) {
-      const r = recs[0]
-      if (cellOf(r) === e.cell && (e.remove ? r.type === REC.remove : r.value === e.ref)) {
-        this.#expected = null
-        return
-      }
+  //! fromLens — the lens's write sink: every assignment/delete lands here as Recs and rides
+  // THE one ingest (issue → validation → optimistic apply → kernel). fromCapture=false:
+  // unlike v3's capture (where the user's mutation had already hit the proxy), the lens
+  // routes BEFORE data — a validation reject never becomes visible, no bounce-revert needed.
+  // Post-destroy, the surface survives as a plain local value (the v3 pin, kept): writes
+  // apply to the local projection only, replicating nowhere.
+  #fromLens(recs: Rec[]) {
+    if (this.#destroyed) {
+      for (const r of recs) this.#apply(r)
+      return
     }
     //! assignments have no await surface — swallow the coordinate promises (their overlay/journal
     // effects are the observable outcome), but NEVER let a reject become an unhandledRejection
-    for (const r of this.issue(recs, true)) if (typeof r !== 'string') (r as Promise<Coords>).catch(() => {})
+    for (const r of this.issue(recs, false)) if (typeof r !== 'string') (r as Promise<Coords>).catch(() => {})
   }
 
   //! sweepDrops — the MAX_PENDING release (M5b, closes the M5a residual): when the kernel drops the
@@ -330,10 +317,10 @@ export class Bind {
     }
   }
 
-  //! destroy — synchronous detach (substrate contract): no capture after this returns, no applies in.
+  //! destroy — no applies in after this returns; the lens keeps working as a LOCAL value
+  // (writes stop replicating — the v3 post-destroy pin, preserved in #fromLens).
   destroy() {
     this.#destroyed = true
-    this.#cap.detach()
     for (const [, p] of this.#pending) p.reject('destroyed')
     this.#pending.clear()
     this.#overlay.clear()

@@ -1,134 +1,197 @@
-//! ── api/substrate — the ONE seam onto the `data` sibling library ─────────────
-// plan §10 named three substrate contract points (record-apply ingress, a
-// non-cloning capture sink, synchronous detach) and a fallback posture: a thin
-// typed wrapper over the symbol reach-through, NOT a fork. This file IS that
-// wrapper — everything else in api/ consumes these functions and never touches
-// data internals. The contract facts below are PROBED against data HEAD (M5a),
-// not assumed:
+//! ── api/substrate — the ONE seam onto the `data` sibling library (data v4) ────
+// fero v4 runs on data v4 (../../data/v4) — the tree that landed fero's
+// DESIGN-DATA3 wishlist. The v2-era probed contract points are now ANSWERED
+// NATIVELY and pinned by the executable SCHEDULE suite (fero CI runs data's
+// conformance/schedule.test.ts against data HEAD — package.json test chain):
 //
-//   - a bare-attach sink (an object with verb methods, `proxy.connect(sink)`)
-//     gets NO initial emit and NO clones — record values arrive by reference,
-//     which is what keeps the capture path off the structuredClone tax that ate
-//     ~30-40% of v2's write budget (plan §10). The view holds it by WeakRef
-//     only, so the CALLER must retain the sink (Capture does) — and detach is
-//     synchronous via view.disconnect(sink).
-//   - `[view].res.update/insert/remove(value, key, at?)` honor arbitrary key
-//     paths (the proxy-level `.update()` does NOT — it ignores the key arg) and
-//     fan out synchronously, auto-creating nested intermediates.
-//   - echo verbs are REWRITTEN by the substrate: an update applied to a fresh
-//     key echoes as an INSERT (BI0), an insert to an existing key as an UPDATE
-//     (BU1), a ref-equal update not at all. Echo suppression therefore matches
-//     by CELL + value identity (api/data.ts), never by verb or record equality.
-//   - a write issued from inside a sink callback (a user tap reacting to an
-//     inbound apply) is deferred to the substrate's pending queue and drained
-//     INSIDE the outer apply call — so suppression must consume exactly ONE
-//     expected echo and capture everything else, never blanket-flag a window.
+//   - the record-apply ingress is the seam's HOT LANE (data W7): fero Recs
+//     apply VERBATIM — numeric type tags, path keys, at-keyed root inserts —
+//     zero reshape, values installed by reference, clause-10 tolerances
+//     (idempotent removes, per-record isolation) built in.
+//   - the ECHO PROBLEM IS STRUCTURALLY GONE (DESIGN-DATA3 §4.1): fero owns the
+//     write surface (the LENS below traps assignment/delete and routes to
+//     Bind.issue BEFORE data sees anything), so no capture sink exists to echo
+//     into. The v3 match-and-consume family (#expected, verb-rewrite matching,
+//     the healRoot microtask) is deleted, not ported.
+//   - subscriptions are data v4 handles with SYNCHRONOUS dispose and strong
+//     scope-owned refs — records().stop() is a real detach, and the operator
+//     chain behind a derived view is held by the graph, not a WeakRef dance.
+//   - [value] reads are FRESH dense materializations (not v2's live mutable
+//     alias) — the same call sites, safer semantics; deep clones remain only
+//     where a value crosses to USER ownership (methods.ts, fold.ts).
+//
+// One deliberate v2-parity retention: fero's `data` surface stays assignment-
+// writable and (root or child) THENABLE — that is fero's public API (plan §9),
+// now implemented by fero's OWN lens rather than inherited from data.
 
-import { $, value as VALUE, view as VIEW } from '../../../data/index.ts'
+import {
+  $, value as VALUE, node as NODE, lane, ingest, DataNode, exportContract,
+} from '../../../data/v4/api/index.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 
-//! proxy — mint the user-facing ViewProxy (data's `$`). Typed `any` HERE and only here: data's own
-// surface types exist but its proxy is structurally dynamic; api/types.ts re-types fero's surface.
+//! ORIGIN — the token every substrate apply carries. Nothing in fero suppresses on it today
+// (no capture sink exists to protect); it exists so any sink — diagnostics, a user tap, a
+// future spoke-forwarder — can OPT OUT of replication-applied noise declaratively
+// (connect(..., { origin: ORIGIN }) sees only non-fero commits). Kernel-level, one compare.
+export const ORIGIN: symbol = Symbol('fero')
+
+//! proxy — mint a resource container (a data v4 source handle; non-callable, non-thenable —
+// fero's thenable/assignable public shape is the LENS, layered by api/data.ts).
 export const proxy = (initial: unknown = {}): any => $(initial)
 
-//! snapshot — the raw current value (data's `[value]` hatch).
+//! snapshot — the dense current value (v4 [value]: a fresh container per read; rows shared
+// by reference under the path-copy immutability law).
 export const snapshot = (p: any): unknown => p[VALUE]
 
-//! applyRec — the record-apply ingress: one committed/optimistic Rec into the proxy, fanning to every
-// sink synchronously. The v3 record IS the substrate record (REC numeric type aside), so this is pure
-// dispatch — the one place the `view` symbol is ever dereferenced for writing.
-export const applyRec = (p: any, r: Rec): void => {
-  const res = p[VIEW].res
-  if (r.type === REC.remove) res.remove(r.key)
-  else if (r.type === REC.insert) res.insert(r.value, r.key, String(r.at ?? ''))
-  else res.update(r.value, r.key)
-}
+//! contract — data's machine-readable manifest (reserved names + operator categories); the
+// scoped facade derives its operator set from this instead of a hand-copied list.
+export const contract = exportContract
 
-//! isProxy — the return-type dispatch probe (plan §9: a method returning a ViewProxy is subscribable;
-// anything else is a value). The view symbol is the identity test, at this one seam.
+//! isProxy — the return-type dispatch probe (plan §9): anything carrying a data v4 node —
+// a raw handle, an operator view, or a fero lens (which forwards the symbol) — is
+// subscribable; every other value is a value. v4 handles are NOT thenable, so the v3
+// blind-await hazard shrinks to fero's own lens (which keeps the v2-parity thenable).
 export const isProxy = (x: unknown): boolean =>
-  (typeof x === 'function' || (typeof x === 'object' && x !== null)) && (x as Record<symbol, unknown>)[VIEW] !== undefined
+  x !== null && (typeof x === 'object' || typeof x === 'function') && (x as any)[NODE] instanceof DataNode
 
-//! records — a RECORD-interface subscription (data's FunctionSink): fn gets data-native change records
-// {type:'update'|'insert'|'remove'|'move', key, value, at?}, values CLONED by the substrate, plus an
-// INITIAL whole-value snapshot record on attach — exactly the shape a method-subscription stream wants
-// (M5c). The substrate has no public detach for function sinks (GC-driven via the anchor), so stop()
-// is a latch + anchor release: emission stops synchronously, collection follows.
+//! lanes — one pre-resolved hot lane per handle (data W7): profile, source, and origin all
+// fixed at first use; per-apply work is the loop + writes only. Rejects surface through a
+// per-call slot so applyRec can vivify orphan cells (below) without per-lane closures.
+const lanes = new WeakMap<object, (recs: readonly Rec[]) => { applied: number; rejected: number }>()
+let rejects: { record: unknown; error: unknown }[] | null = null
+const laneOf = (p: any) => {
+  let l = lanes.get(p)
+  if (l === undefined) {
+    l = lane(p, { origin: ORIGIN, onReject: (rj) => rejects?.push(rj) }) as (recs: readonly Rec[]) => { applied: number; rejected: number }
+    lanes.set(p, l)
+  }
+  return l
+}
+
+//! applyRec — one committed/optimistic Rec into the handle via the hot lane. ORPHAN-CELL
+// VIVIFY: field-granular LWW lawfully commits a nested cell before (or after the removal
+// of) its row — data v4 keeps deep-writes-cannot-invent-rows LOUD (clause 10c), so the
+// substrate supplies fero's replication semantics here: a rejected deep write vivifies the
+// row ({}) and re-applies, byte-for-byte what data v2's auto-vivifying [view].res did.
+// Everything else that rejects is a genuine fault and rethrows.
+export const applyRec = (p: any, r: Rec): void => {
+  //! SAVE/RESTORE, not set/null: applyRec re-enters through data's effect phase (a user
+  // tap issuing a write → #optimistic → applyRec while the outer lane is mid-flush), and a
+  // module-level slot nulled by the inner call corrupted the outer's. Note the flush-time
+  // wrinkle: a lane call made INSIDE an effect defers its whole batch (clause 5), so its
+  // rejects surface during the OUTER call's drain — vivify is exact for the replication
+  // path (applies arrive outside data effects) and best-effort for effect-issued writes.
+  const prev = rejects
+  rejects = []
+  try {
+    laneOf(p)([r])
+    const mine = rejects
+    if (mine.length > 0) {
+      const rj = mine[0]
+      if (r.type === REC.update && r.key.length > 1 && String((rj.error as Error)?.message ?? '').includes('not live')) {
+        rejects = [] // the retry's rejects stay LOUD — a post-vivify failure is a genuine fault
+        laneOf(p)([{ type: REC.update, key: [r.key[0]], value: {} }, r])
+        if (rejects.length > 0) throw rejects[0].error
+        return
+      }
+      throw rj.error
+    }
+  } finally {
+    rejects = prev
+  }
+}
+
+//! records — a RECORD-interface subscription: fn gets v2-profile change records
+// {type:'update'|'insert'|'remove'|'move', key, value, at?} with an initial whole-value
+// snapshot on attach (v4 V2RecordSink parity) and values CLONED (the stream crosses to
+// wire/user ownership). stop() is a REAL synchronous detach now (v4 SubscriptionHandle),
+// and the operator chain behind a derived view is graph-held — the v3 anchor/WeakRef
+// pinning contract is gone.
 export const records = (p: any, fn: (rec: { type: string; key: string[]; value?: unknown; at?: string }) => void): { stop(): void } => {
-  let dead = false
-  let anchor: object | null = { fero: 'sub' } // the strong ref that keeps the sink alive (substrate lifetimes contract)
-  p.connect(anchor, (rec: { type: string; key: string[]; value?: unknown; at?: string }) => { if (!dead) fn(rec) })
-  return { stop() { dead = true; anchor = null } }
+  const h = (p as { connect: (a: object, f: unknown) => { dispose(): void } }).connect({}, fn)
+  return { stop: () => h.dispose() }
 }
 
-//! applyStreamRec — fold one DATA-NATIVE stream record (string types — the SUBREC body is opaque to
-// the kernel) into a local mirror proxy. The root snapshot record replaces wholesale; 'move' records
-// are skipped (api/methods.ts banner: windowed sorts are not a streamable shape in M5c — sort on the
-// client proxy instead).
+//! applyStreamRec — fold one v2-profile stream record into a local mirror handle via the
+// seam's tolerant ingest (whole-value updates diff against current state — the resubscribe
+// snapshot root-replace rides this, legally). 'move' records are skipped: mirrors are
+// keyed (object-born) sources, and positional identity is not a mirror shape — the
+// documented consequence stands (sort on the client proxy); the serve side keeps its skip.
 export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?: unknown; at?: unknown }): void => {
-  const res = p[VIEW].res
-  const key = Array.isArray(r.key) ? r.key : []
-  if (r.type === 'update') res.update(r.value, key)
-  else if (r.type === 'insert') res.insert(r.value, key, String(r.at ?? ''))
-  else if (r.type === 'remove') res.remove(key)
-}
-
-//! Capture: the strongly-held write-capture subscription — detach() is synchronous and terminal.
-export interface Capture { detach(): void }
-
-//! capture — attach a bare-verb sink translating substrate notifications into Rec[] batches (one
-// onRecs call per verb emission: a single assignment is a batch of 1; a patch() is one batch of N).
-// Values pass through BY REFERENCE (no clones — the kernel owns records on hand-over, and data has
-// already installed the same reference in the proxy, so ownership is genuinely shared-immutable).
-// Root replaces (XU0/XR0) are REJECTED loudly: a whole-resource overwrite has no honest per-partition
-// wire meaning — replace keys, not the root. The throw surfaces at the user's assignment site
-// (substrate contract: sink exceptions rethrow to the mutator after the cascade).
-export const capture = (p: any, onRecs: (recs: Rec[]) => void, onRootReplace?: () => void): Capture => {
-  const rootReplace = () => {
-    //! data sets the internal root value BEFORE fanning to sinks (core.ts Value.XU0) and transact
-    // stashes a sink throw until AFTER the cascade — so by the time this throw surfaces the proxy
-    // already holds the illegal whole-root value. onRootReplace lets the binding HEAL it back to the
-    // confirmed fold (M5-review #12); we still throw so the rejection is loud.
-    onRootReplace?.()
-    throw new Error('fero: replace keys (data.k = v), not the resource root — a whole-root overwrite does not replicate')
-  }
-  const sink = {
-    XU0: rootReplace,
-    XR0: rootReplace,
-    BU1(U1: unknown[]) {
-      const out: Rec[] = []
-      for (let i = 0; i < U1.length; i += 2) out.push({ type: REC.update, key: [String(U1[i])], value: U1[i + 1] })
-      onRecs(out)
-    },
-    BU2(U2: unknown[]) {
-      const out: Rec[] = []
-      for (let i = 0; i < U2.length; i += 2) out.push({ type: REC.update, key: (U2[i] as string[]).map(String), value: U2[i + 1] })
-      onRecs(out)
-    },
-    BI0(I0: unknown[]) {
-      const out: Rec[] = []
-      for (let i = 0; i < I0.length; i += 2) out.push({ type: REC.insert, key: [], value: I0[i + 1], at: String(I0[i]) })
-      onRecs(out)
-    },
-    BI2(I2: unknown[]) {
-      const out: Rec[] = []
-      for (let i = 0; i < I2.length; i += 3) out.push({ type: REC.insert, key: (I2[i] as string[]).map(String), value: I2[i + 1], at: String(I2[i + 2]) })
-      onRecs(out)
-    },
-    //! BR1 skips value === undefined rows by SUBSTRATE contract (array shift signals, not removes)
-    BR1(R1: unknown[]) {
-      const out: Rec[] = []
-      for (let i = 0; i < R1.length; i += 2) if (R1[i + 1] !== undefined) out.push({ type: REC.remove, key: [String(R1[i])] })
-      if (out.length) onRecs(out)
-    },
-    BR2(R2: unknown[]) {
-      const out: Rec[] = []
-      for (let i = 0; i < R2.length; i += 2) out.push({ type: REC.remove, key: (R2[i] as string[]).map(String) })
-      onRecs(out)
-    },
-  }
-  p.connect(sink)
-  return {
-    detach() { p[VIEW].disconnect(sink) },
+  if (r.type === 'move') return
+  const rec = { type: r.type, key: Array.isArray(r.key) ? r.key : [], value: r.value, ...(r.at !== undefined ? { at: r.at } : {}) }
+  //! the same ORPHAN-CELL VIVIFY as applyRec: the gather lawfully projects a parent
+  // tombstone FIRST and re-projects the live nested cell after (fold.ts two-phase order —
+  // the Q3a seed-0 shape), which needs the deep update to re-invent the row exactly as
+  // data v2's auto-vivifying res did. Everything else that rejects keeps v2-armor
+  // tolerance (fold.ts wraps every cell in isolation anyway).
+  let rejected: unknown = null
+  ingest(p, [rec as never], { origin: ORIGIN, onReject: (rj) => (rejected = rj.error) })
+  if (
+    rejected !== null && r.type === 'update' && rec.key.length > 1 &&
+    String((rejected as Error)?.message ?? '').includes('not live')
+  ) {
+    ingest(p, [{ type: 'update', key: [rec.key[0]], value: {} } as never, rec as never], { origin: ORIGIN, onReject: () => {} })
   }
 }
+
+//! ── the LENS: fero's OWN write surface (DESIGN-DATA3 §4.1) ────────────────────
+// data v4 removed assignment writes; fero's public API keeps them (plan §9 — zero events,
+// assignment IS a write). The lens is fero's thin Proxy over the v4 handle: reads and
+// RESERVED names (operators, get/connect/tap/…) delegate to v4; child access returns a
+// nested lens (so deep assignment works); set/delete mint fero Recs and hand them to the
+// SINK (Bind.issue — validation, overlay, owner routing) BEFORE data sees anything. A
+// root replace ([value] =, or assigning the lens itself) throws PRE-COMMIT — the v3
+// throw-then-heal dance is unnecessary by construction. `then` keeps fero's v2-parity
+// await-for-snapshot on the UNSCOPED surface (the scoped facade overrides it with the
+// gather — api/index.ts).
+const LENS = Symbol('fero.lens')
+const RESERVED_NAMES: ReadonlySet<string> = new Set(contract().reserved)
+
+export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void): any =>
+  new Proxy(Object.create(null) as Record<string | symbol, unknown>, {
+    get(_t, prop) {
+      if (prop === LENS) return h
+      if (typeof prop === 'symbol') return h[prop] // [value] / [node] / iterator / toPrimitive
+      if (prop === 'then')
+        //! v2 parity: await data (or any child) resolves its current snapshot. then is
+        // consume-once per touch; a method handler returning a lens is guarded by the
+        // host's isProxy-before-await discipline exactly as in v3.
+        return (F?: (v: unknown) => unknown, R?: (e: unknown) => unknown) => Promise.resolve(h[VALUE]).then(F, R)
+      if (prop === 'get')
+        //! the total, collision-safe child read — returns a WRITE-CAPABLE lens (keyedRead
+        // and user code route here for partition names shadowed by RESERVED)
+        return (k: unknown) => lens(h.get(String(k)), [...path, String(k)], sink)
+      if (RESERVED_NAMES.has(prop)) return h[prop] // operators + built-ins: v4's own dispatch
+      const child = h.get(prop)
+      return lens(child, [...path, prop], sink)
+    },
+    set(_t, prop, v) {
+      if (typeof prop === 'symbol')
+        throw new Error('fero: replace keys (data.k = v), not the resource root — a whole-root overwrite does not replicate')
+      sink([{ type: REC.update, key: [...path, String(prop)], value: v }])
+      return true
+    },
+    deleteProperty(_t, prop) {
+      //! no-op delete filter (v2 parity — the substrate used to filter these before the
+      // capture sink ever saw them): deleting an absent (or undefined-valued — the leaf
+      // equivalence, data clause 10c) target issues NOTHING. One O(depth) leaf read.
+      if ((h.get(String(prop)) as any)[VALUE] === undefined) return true
+      sink([{ type: REC.remove, key: [...path, String(prop)] }])
+      return true
+    },
+    has(_t, prop) {
+      if (prop === LENS || prop === 'then') return true
+      return Reflect.has(h, prop)
+    },
+    ownKeys(_t) {
+      return Reflect.ownKeys(h)
+    },
+    getOwnPropertyDescriptor(_t, prop) {
+      return Reflect.getOwnPropertyDescriptor(h, prop)
+    },
+  })
+
+//! unwrap — the underlying v4 handle of a lens (or the value itself when not a lens):
+// internal consumers (the gather's projection, diagnostics) that want raw v4 semantics.
+export const unwrap = (x: any): any => (x !== null && typeof x === 'object' || typeof x === 'function' ? (x[LENS] ?? x) : x)
