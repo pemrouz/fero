@@ -105,3 +105,13 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
 - [P2] (api) Cross-partition ordering guidance beyond the recipe (a derived
   `cluster.writes` join was the M5 sketch; revisit if users ask for transactions).
 - [P3] (kernel) AsyncIterator methods (plan §11's deferred thread).
+
+## data-v4 migration residue (V4-1)
+- [P3] (api) Windowed-sort subscription streaming: data v4 round-trips moves
+  (W1/W3); fero mirrors are keyed (object-born) — streaming positional sorts
+  needs a mirror-keying redesign. Both skips (serve + apply) kept, documented.
+- [P3] (api,perf) Frame-batched inbound apply: the lane applies per-record
+  today (0.547× the v2 path even unbatched, m3 gate); batching per shell frame
+  is a further win when a workload wants it.
+- [P3] (api) fold.ts cell-isolation armor is mostly moot under clause 10d —
+  slim it when the file is next touched.

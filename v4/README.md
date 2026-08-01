@@ -1,5 +1,7 @@
 # fero v3 — M0…M8: kernel, replication, membership, writes, durability, the fero() api, scoped replication, debug tooling, hardening
 
+> **fero v4** — this tree is fero v3 MIGRATED ONTO DATA v4 (../../data/v4: the DESIGN-DATA3 wishlist, all landed). See [STATUS.md](STATUS.md) for the migration ledger; the inherited milestone log below describes the v3 lineage this tree carries.
+
 The from-scratch rewrite of fero-v2, built to [plan-v3.md](../plan-v3.md). This folder
 holds **M0** (the deterministic kernel + thin I/O shells + simulation executive,
 proven **both ways from the same kernel bytes**), the **M1 replication slice**
