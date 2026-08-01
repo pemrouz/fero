@@ -1,7 +1,7 @@
 {
   "name": "fero-v4",
   "version": "0.0.0",
-  "description": "fero v4 \u2014 deterministic kernel + thin I/O shells + simulation executive + the fero() public api (see ../plan-v3.md)",
+  "description": "fero v4 — deterministic kernel + thin I/O shells + simulation executive + the fero() public api (see ../plan-v3.md)",
   "type": "module",
   "exports": {
     ".": "./api/index.ts",
@@ -11,7 +11,7 @@
     "#utils": "./utils/index.ts"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"kernel/*.test.ts\" \"sim/*.test.ts\" \"tests/*.test.ts\" \"api/*.test.ts\" \"tools/debug/*.test.ts\" \"tools/perf/*.test.ts\"",
+    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"kernel/*.test.ts\" \"sim/*.test.ts\" \"tests/*.test.ts\" \"api/*.test.ts\" \"tools/debug/*.test.ts\" \"tools/perf/*.test.ts\" && npm run test:contract",
     "perf": "node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test \"kernel/*.perf.ts\" \"api/*.perf.ts\" \"tests/*.perf.ts\"",
     "perf:absolute": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts",
     "perf:pin": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts --pin",
@@ -20,7 +20,8 @@
     "shrink": "node --experimental-strip-types --no-warnings sim/shrink.ts",
     "scenarios": "node --experimental-strip-types --no-warnings tools/debug/scenarios.ts",
     "debug": "node --experimental-strip-types --no-warnings tools/debug/serve.ts",
-    "demo": "node --experimental-strip-types --no-warnings examples/two-terminals.ts"
+    "demo": "node --experimental-strip-types --no-warnings examples/two-terminals.ts",
+    "test:contract": "node --experimental-strip-types --no-warnings --test ../../data/v4/conformance/schedule.test.ts"
   },
   "author": "pemrouz",
   "license": "MIT"

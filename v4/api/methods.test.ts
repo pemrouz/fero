@@ -157,7 +157,7 @@ test('M5-REVIEW #8 — introspecting a one-shot handle (String/JSON/`in`/symbols
 })
 
 test('M5-REVIEW #11 — a live subscription over a DERIVED (operator) proxy keeps streaming across GC', async () => {
-  const { a, b, addrs } = await pair({ actives: (_: unknown, ctx: { data: any }) => ctx.data.filter('active', true) })
+  const { a, b, addrs } = await pair({ actives: (_: unknown, ctx: { data: any }) => ctx.data.filter((r: any) => r.active === true) }) // v4: predicate-only filter (data MIGRATION §3.1)
   const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
   try {
     a.data.u1 = { active: true, n: 1 }

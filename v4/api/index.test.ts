@@ -215,17 +215,18 @@ test('M5-REVIEW #3 — write() clears its timeout timer on settle (no timer/clos
   }
 })
 
-test('M5-REVIEW #12 — an illegal root replace throws loudly AND heals the proxy back to the confirmed fold', async () => {
-  const { value } = await import('../../../data/index.ts') as { value: symbol }
+test('M5-REVIEW #12 (v4 form) — an illegal root replace throws PRE-COMMIT: no ghost, no heal, binding stays live', async () => {
+  //! the v3 throw-then-heal microtask dance is structurally gone: fero's LENS refuses the
+  // root replace BEFORE data commits anything (DESIGN-DATA3 §4.1/W6), so the state below
+  // is asserted IMMEDIATELY — nothing to heal. The v4 value symbol is the read hatch now.
+  const { value } = await import('../../../data/v4/api/index.ts') as { value: symbol }
   const s = await fero('r', { uuid: 'aa' })
   try {
     s.data.keep = { n: 1 }
     s.data.also = 2
     assert.throws(() => { (s.data as Record<symbol, unknown>)[value] = { wiped: true } }, /replace keys/)
-    //! the heal runs on a microtask — after it, the proxy reads the confirmed fold, not the ghost
-    await new Promise((r) => setTimeout(r, 10))
-    assert.deepEqual(snapshot(s.data), { keep: { n: 1 }, also: 2 }, 'healed back to kernel state — no ghost root')
-    //! and it is still LIVE: a normal write after the heal works
+    assert.deepEqual(snapshot(s.data), { keep: { n: 1 }, also: 2 }, 'refused pre-commit — no ghost root, synchronously')
+    //! and it is still LIVE: a normal write straight after works
     s.data.after = 3
     assert.equal((snapshot(s.data) as Record<string, unknown>).after, 3)
   } finally {

@@ -20,7 +20,7 @@ import { JK } from '../kernel/journal.ts'
 import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
-import { proxy } from './substrate.ts'
+import { proxy, contract } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
 import { captureNode } from '../tools/debug/capture.ts'
@@ -127,8 +127,9 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   // through the gather; a non-held key access returns a typed one-shot remote handle (await = the
   // owner's value); held keys and writes pass straight through to the raw proxy. Built BEFORE the
   // Host so handlers receive it as ctx.data (M6-review finding 4 — see below).
-  const OPERATORS = new Set(['filter', 'map', 'reduce', 'group', 'sort', 'az', 'za', 'top', 'limit', 'distinct', 'tap', 'pipe',
-    'sum', 'count', 'max', 'min', 'avg', 'some', 'every'])
+  //! the operator set comes from data's exportContract() (DESIGN-DATA3 W17 promise: fero
+  // deletes its hand-copied operator lists — drift with data's registry is now impossible)
+  const OPERATORS = new Set(Object.keys(contract().operators))
   const scopedThrow = (op: string, reason: 'holistic' | 'shortfall', hint: string, partition?: string): never => {
     throw { scoped: true, op, reason, replicas: node.replicas, ...(partition !== undefined ? { partition } : {}), hint } satisfies import('./types.ts').ScopedError
   }
@@ -329,7 +330,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       lastOutcomes = bind.outcomes.n
       const rows: Record<string, unknown> = {}
       for (const [id, o] of bind.outcomes.rows) rows[id] = { ...o }
-      cluster.writes = rows
+      cluster.set('writes', rows)
     }
     const j = node.journal
     let refold = false
@@ -355,13 +356,13 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       }
       if (events.some((e) => FOLD.has(e.kind))) {
         refold = true
-        cluster.epoch = node.epoch
-        cluster.writable = node.membership.gate(node).open
-        cluster.members = Object.fromEntries(node.membership.view.members)
+        cluster.set('epoch', node.epoch)
+        cluster.set('writable', node.membership.gate(node).open)
+        cluster.set('members', Object.fromEntries(node.membership.view.members))
         const peers: Record<string, { uuid: string; incarnation: number; up: boolean }> = {}
         for (const l of node.links.values())
           if (l.uuid && !l.dead) peers[l.uuid] = { uuid: l.uuid, incarnation: l.incarnation, up: true }
-        cluster.peers = peers
+        cluster.set('peers', peers)
       }
     }
     //! cluster.partitions: ONE O(P) recompute per fold() invocation, AFTER the event loop (M6-review
@@ -371,7 +372,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     // journals nothing (held-mints at the gate/stamp site) — one int compare on the hot path.
     if (refold || (node.scope !== null && node.scope.n !== lastScopeN)) {
       if (node.scope) lastScopeN = node.scope.n
-      cluster.partitions = partitionsRow()
+      cluster.set('partitions', partitionsRow())
     }
   }
   rt.hook(fold)
