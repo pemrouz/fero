@@ -31,7 +31,10 @@ export { fero } from './api/index.ts'
 export { diagnostics, diag, type Diagnostics, type CapturedNode } from './api/diagnostics.ts'
 export { Bind, WRITES_KEEP, cellOf, type Coords, type Outcome } from './api/data.ts'
 export { Host, Caller, handle, SYSTEM, type Context } from './api/methods.ts'
-export { proxy, snapshot, applyRec, capture, records, isProxy, type Capture } from './api/substrate.ts'
+//! NB: the v2-era capture sink is GONE (D2 — the lens owns the write surface); this line
+// once re-exported it and made the whole entry a SyntaxError at import (pinned by
+// tests/internals.test.ts).
+export { proxy, snapshot, applyRec, applyStreamRec, records, isProxy, lens, unwrap, contract, ORIGIN } from './api/substrate.ts'
 export { client } from './sim/harness.ts'
 export type {
   Fero, FeroConfig, FeroOpts, Methods, Change, WriteOpts,
