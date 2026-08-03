@@ -162,7 +162,61 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void): any =
         //! the total, collision-safe child read — returns a WRITE-CAPABLE lens (keyedRead
         // and user code route here for partition names shadowed by RESERVED)
         return (k: unknown) => lens(h.get(String(k)), [...path, String(k)], sink)
-      if (RESERVED_NAMES.has(prop)) return h[prop] // operators + built-ins: v4's own dispatch
+      //! data's WRITE builtins must NOT delegate raw (the re-evaluation BLOCKER): h.set/
+      // update/patch mutate the LOCAL projection only — no validation, no overlay, no
+      // replication — a silent public-surface desync backdoor contradicting §4.1's
+      // "validation covers both by construction". The v2-parity typed idioms ROUTE through
+      // the same sink as assignment/delete (Bind.issue — so the validate hook, overlay,
+      // and post-destroy pin cover them identically); the verbs that cannot be made
+      // replication-correct through a lens THROW with the fero-shaped alternative.
+      if (prop === 'set')
+        return (k: unknown, v: unknown) => void sink([{ type: REC.update, key: [...path, String(k)], value: v }])
+      if (prop === 'update')
+        return (v: unknown) => {
+          if (path.length === 0)
+            throw new Error('fero: replace keys (data.k = v), not the resource root — a whole-root overwrite does not replicate')
+          sink([{ type: REC.update, key: path, value: v }])
+        }
+      if (prop === 'remove')
+        return () => {
+          if (path.length === 0)
+            throw new Error('fero: remove() on the resource root is not a write — destroy() the resource instead')
+          //! same no-op delete filter as deleteProperty (leaf equivalence, data clause 10c)
+          if (h[VALUE] === undefined) return
+          sink([{ type: REC.remove, key: path }])
+        }
+      if (prop === 'patch')
+        return (pairs: unknown) => {
+          if (!Array.isArray(pairs) || pairs.some((p) => !Array.isArray(p) || p.length !== 2))
+            throw new Error('fero: patch() takes [key, value] TUPLE pairs — patch([[k1, v1], [k2, v2]])')
+          sink((pairs as [unknown, unknown][]).map(([k, v]) => ({ type: REC.update, key: [...path, String(k)], value: v })))
+        }
+      if (prop === 'insert')
+        return () => {
+          throw new Error('fero: insert() mints a data-side key that would not replicate — fero owns key identity; write a keyed child (data.k = v) or methods.insert()')
+        }
+      if (prop === 'ingest')
+        return () => {
+          throw new Error("fero: ingest() is the replication ingress — public writes go through assignment / set / update / patch (they route to fero's issue())")
+        }
+      if (prop === 'raf')
+        return () => {
+          throw new Error('fero: raf() writes the local projection directly and would not replicate — coalesce in your own frame callback and assign')
+        }
+      if (prop === 'dispose')
+        return () => {
+          throw new Error("fero: dispose() belongs to the projection's lifecycle — destroy() the resource instead")
+        }
+      if (prop === 'first' || prop === 'last')
+        //! wrap as lenses — the raw handles data returns carry the typed write verbs,
+        // which would reopen the backdoor one child down (l.first().update(v))
+        return () => {
+          const snap = (h[VALUE] ?? {}) as Record<string, unknown>
+          const keys = Object.keys(snap)
+          const k = prop === 'first' ? keys[0] ?? '0' : keys[keys.length - 1] ?? '0'
+          return lens(h.get(k), [...path, k], sink)
+        }
+      if (RESERVED_NAMES.has(prop)) return h[prop] // operators + READ built-ins: v4's own dispatch
       const child = h.get(prop)
       return lens(child, [...path, prop], sink)
     },
