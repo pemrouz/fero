@@ -66,6 +66,57 @@ test('solo: assignment and methods.update are ONE ingest — both commit, both v
   await f.destroy()
 })
 
+//! Regression (v4 re-evaluation BLOCKER): the lens delegated EVERY reserved name raw —
+// including data's WRITE builtins — so f.data.set('k',v) / f.data.k.update(v) /
+// f.data.patch([...]) mutated the LOCAL projection only: no validation, no overlay, no
+// replication (the sink saw only assignments). §4.1's "validation covers both by
+// construction" now holds for the typed idioms too: set/update/patch/remove route through
+// the SAME sink as assignment/delete (Bind.issue), and the verbs that cannot be made
+// replication-correct through a lens (insert/ingest/raf/dispose) throw fero-shaped errors.
+test('D3 lens: data write builtins route through issue() — validated — or throw; never the raw projection', async () => {
+  const seen: unknown[] = []
+  const f = await fero('lensguard', {
+    uuid: 'aa',
+    seams: {
+      validation: (rec: { value?: { stock?: number } }) => {
+        seen.push(rec)
+        return rec.value?.stock === 13 ? 'unlucky' : true
+      },
+    },
+  })
+  try {
+    //! the v2-parity typed idioms — same sink as assignment, observationally ≡ it
+    f.data.set('w', { stock: 1 })
+    assert.deepEqual(snapshot(f.data), { w: { stock: 1 } })
+    f.data.w.update({ stock: 2 })
+    assert.deepEqual(snapshot(f.data), { w: { stock: 2 } })
+    f.data.patch([['x', { stock: 4 }], ['y', { stock: 5 }]])
+    assert.deepEqual((snapshot(f.data) as Record<string, unknown>).x, { stock: 4 })
+    f.data.y.remove()
+    assert.equal((snapshot(f.data) as Record<string, unknown>).y, undefined)
+    assert.ok(seen.length >= 4, 'every routed verb passed the validation seam (issue), not the raw handle')
+
+    //! a REJECTED verb write never lands in the projection — the backdoor's exact
+    // signature was "validation bounced it but the handle mutated anyway"
+    f.data.set('w', { stock: 13 })
+    assert.deepEqual((snapshot(f.data) as Record<string, unknown>).w, { stock: 2 }, 'rejected verb write bounced PRE-COMMIT')
+
+    //! the un-routable verbs throw with the fero-shaped alternative
+    assert.throws(() => (f.data as { insert(v: unknown): unknown }).insert({ stock: 9 }), /fero: insert\(\)/)
+    assert.throws(() => (f.data as { ingest(r: unknown[]): unknown }).ingest([]), /fero: ingest\(\)/)
+    assert.throws(() => (f.data as { raf(): unknown }).raf(), /fero: raf\(\)/)
+    assert.throws(() => (f.data as { dispose(): void }).dispose(), /fero: dispose\(\)/)
+    assert.throws(() => (f.data as { update(v: unknown): void }).update({}), /resource root/)
+    assert.throws(() => (f.data as { remove(): void }).remove(), /destroy/)
+
+    //! first()/last() return LENSES — the one-child-down backdoor is closed too
+    f.data.first().update({ stock: 6 })
+    assert.deepEqual((snapshot(f.data) as Record<string, unknown>).w, { stock: 6 })
+  } finally {
+    await f.destroy()
+  }
+})
+
 test('two nodes over real sockets: writes on either side converge through the PUBLIC surface, both directions', async () => {
   const pa = await ports.free()
   const pb = await ports.free()
