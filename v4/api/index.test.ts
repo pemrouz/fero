@@ -270,7 +270,7 @@ test('M5-REVIEW #12 (v4 form) — an illegal root replace throws PRE-COMMIT: no 
   //! the v3 throw-then-heal microtask dance is structurally gone: fero's LENS refuses the
   // root replace BEFORE data commits anything (DESIGN-DATA3 §4.1/W6), so the state below
   // is asserted IMMEDIATELY — nothing to heal. The v4 value symbol is the read hatch now.
-  const { value } = await import('../../../data/v4/api/index.ts') as { value: symbol }
+  const { value } = await import('../../../data/api/index.ts') as { value: symbol }
   const s = await fero('r', { uuid: 'aa' })
   try {
     s.data.keep = { n: 1 }

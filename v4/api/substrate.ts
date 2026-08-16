@@ -1,5 +1,5 @@
 //! ── api/substrate — the ONE seam onto the `data` sibling library (data v4) ────
-// fero v4 runs on data v4 (../../data/v4) — the tree that landed fero's
+// fero v4 runs on data v4 (../../data, the v4 tree promoted to its root) — the tree that landed fero's
 // DESIGN-DATA3 wishlist. The v2-era probed contract points are now ANSWERED
 // NATIVELY and pinned by the executable SCHEDULE suite (fero CI runs data's
 // conformance/schedule.test.ts against data HEAD — package.json test chain):
@@ -26,7 +26,7 @@
 
 import {
   $, value as VALUE, node as NODE, lane, ingest, DataNode, exportContract,
-} from '../../../data/v4/api/index.ts'
+} from '../../../data/api/index.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 
 //! ORIGIN — the token every substrate apply carries. Nothing in fero suppresses on it today
