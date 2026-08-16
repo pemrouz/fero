@@ -1,7 +1,4 @@
+captures/
 node_modules/
-*.js
-!examples/**/*.js
-!tools/observe/web/*.js
-!tools/debug/mockups/*.js
-dist/
-.DS_Store
+tools/debug/results/latest.json
+tools/perf/results/latest.json
