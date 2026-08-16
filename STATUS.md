@@ -61,3 +61,17 @@ inside the outer apply.
 - 2026-08-01 — D0–D3 landed: substrate rewritten onto data v4 (one seam file,
   one import), Bind on the lens architecture, cluster fold on .set(), facade on
   exportContract(), contract ride wired. 297/297 + 16/16.
+- 2026-08-03..16 — D4/D5 closed (perf 36/36 at the v3-era thresholds; ledger
+  close), then the cross-repo ADVERSARIAL RE-EVALUATION's fero-side fixes:
+  the lens write-builtin backdoor closed (set/update/patch/remove route
+  through issue(); insert/ingest/raf/dispose throw fero-shaped;
+  first()/last() wrap as lenses) and the ./internals entry repaired (the
+  deleted capture sink was still re-exported). 299/299 + 18/18 (data's
+  contract grew two clauses-worth of pins, SCHEDULE_VERSION 4).
+- 2026-08-16 — data promoted its v4 tree to its repo root; substrate
+  re-pointed one hop shorter. Then THE FERO ROOT PROMOTION (same day): this
+  tree moved to the repo root (package `fero` 4.0.0), the v2 surface + frozen
+  v3 tree retired to the `master` branch tip, seam paths flattened
+  (substrate `../../data/api/index.ts`, contract ride
+  `../data/conformance/schedule.test.ts`). Full battery green post-move:
+  299/299 + 18/18 + perf 36/36.
