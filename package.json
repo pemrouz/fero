@@ -1,20 +1,27 @@
 {
   "name": "fero",
-  "version": "0.0.0",
-  "description": "distributed, replicated reactive resources — fero(name, opts) on top of `data`",
+  "version": "4.0.0",
+  "description": "fero — distributed, replicated reactive resources: deterministic kernel + thin I/O shells + simulation executive + the fero() public api, on the `data` sibling engine",
   "type": "module",
   "exports": {
-    ".": "./index.ts",
+    ".": "./api/index.ts",
     "./internals": "./internals.ts"
   },
   "imports": {
     "#utils": "./utils/index.ts"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"transport/*.test.ts\" \"log/*.test.ts\" \"resource/*.test.ts\" \"tools/*.test.ts\" \"tools/observe/*.test.ts\" \"tools/debug/*.test.ts\" \"tools/debug/mockups/*.test.ts\" \"tests/chaos/*.test.ts\"",
-    "perf": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"transport/*.perf.ts\" \"log/*.perf.ts\" \"resource/*.perf.ts\" \"tools/observe/*.perf.ts\" \"tools/debug/*.perf.ts\"",
-    "readable": "node --experimental-strip-types --no-warnings tools/readable.ts",
-    "observe": "node --experimental-strip-types --no-warnings tools/observe/index.ts"
+    "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"kernel/*.test.ts\" \"sim/*.test.ts\" \"tests/*.test.ts\" \"api/*.test.ts\" \"tools/debug/*.test.ts\" \"tools/perf/*.test.ts\" && npm run test:contract",
+    "perf": "node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test \"kernel/*.perf.ts\" \"api/*.perf.ts\" \"tests/*.perf.ts\"",
+    "perf:absolute": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts",
+    "perf:pin": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts --pin",
+    "perf:alloc": "node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test kernel/alloc.perf.ts",
+    "sim": "node --experimental-strip-types --no-warnings sim/run.ts",
+    "shrink": "node --experimental-strip-types --no-warnings sim/shrink.ts",
+    "scenarios": "node --experimental-strip-types --no-warnings tools/debug/scenarios.ts",
+    "debug": "node --experimental-strip-types --no-warnings tools/debug/serve.ts",
+    "demo": "node --experimental-strip-types --no-warnings examples/two-terminals.ts",
+    "test:contract": "node --experimental-strip-types --no-warnings --test ../data/conformance/schedule.test.ts"
   },
   "author": "pemrouz",
   "license": "MIT"
