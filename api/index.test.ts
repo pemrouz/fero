@@ -11,6 +11,8 @@ import path from 'node:path'
 import os from 'node:os'
 import { fero } from './index.ts'
 import { snapshot } from './substrate.ts'
+import { diag } from './diagnostics.ts'
+import { JK } from '../kernel/journal.ts'
 import { ports, until } from '#utils'
 import type { WriteReject, WriteResolve } from './types.ts'
 
@@ -189,6 +191,22 @@ test('restore through the composer: fero(name, {dir}) refills the proxy from the
     await assert.rejects(fero('r', { uuid: 'bb', dir }), /does not match this dir's previous life 'aa'/)
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('v4.1 name echo: a dial onto a DIFFERENT resource refuses loudly — never admitted, never merged', async () => {
+  const p = await ports.free()
+  const alpha = await fero('alpha', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeatMs: 0 })
+  //! 'beta' reaches for alpha's port — the exact misdial that used to silently cross-replicate
+  const beta = await fero('beta', { uuid: 'bb', hosts: [`127.0.0.1:${p}`], heartbeatMs: 0, redialMs: 30 })
+  try {
+    alpha.data.k = 'alpha-only'
+    assert.ok(await until(() => diag(alpha)!.journal().events.some((e) => e.kind === JK.nameReject), 4000), 'the refusal is journal-visible (JK.nameReject)')
+    assert.deepEqual((snapshot(alpha.cluster) as { peers: object }).peers, {}, 'never admitted')
+    assert.deepEqual(snapshot(beta.data), {}, 'no cross-resource merge — beta never folded alpha')
+  } finally {
+    await beta.destroy()
+    await alpha.destroy()
   }
 })
 

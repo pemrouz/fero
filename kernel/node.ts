@@ -38,6 +38,13 @@ import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
 export interface NodeOpts {
   uuid: string
+  //! name (v4.1): the RESOURCE this node replicates, echoed in HELLO. Admission previously checked
+  // only uuid shape/dup/self — a connection to a port serving a DIFFERENT fero resource was fully
+  // admitted, and digest-on-admit silently cross-replicated two unrelated resources' logs (a durable
+  // data merge as the default misdial outcome). When BOTH sides declare a name and they differ, the
+  // link refuses loudly (dead + noRedial, JK.nameReject). Absent = legacy/no check (sim harnesses and
+  // pre-v4.1 peers are wire-compatible; trajectories without it stay byte-identical).
+  name?: string
   listen?: string        // my dialable address, gossiped in HELLO
   hosts?: string[]       // static discovery targets to dial on start
   incarnation?: number   // bumped per restart (M2 fences flappers with it; carried in HELLO from day 0)
@@ -90,6 +97,10 @@ export const SNAPSHOT_AT = 4096
 
 export class Node {
   readonly uuid: string
+  //! name — the resource identity this node replicates; rides HELLO so a misdial onto another
+  // resource's port refuses instead of silently merging logs (see NodeOpts.name). Optional: absent
+  // (sim harness, embedders) disables the check and keeps the HELLO body byte-identical with v4.0.
+  readonly name?: string
   readonly listen: string
   readonly incarnation: number
   //! origin — THE PROVENANCE LANE this life stamps under: the bare uuid for incarnation 1, uuid~inc
@@ -222,6 +233,7 @@ export class Node {
     this.env = env
     this.journal = new Journal(opts.journalCap)
     this.uuid = opts.uuid
+    this.name = opts.name
     this.listen = opts.listen ?? ''
     this.incarnation = opts.incarnation ?? 1
     this.origin = this.incarnation > 1 ? `${this.uuid}~${this.incarnation}` : this.uuid
@@ -500,9 +512,13 @@ export class Node {
         j.armed && j.emit(JK.linkUp, e.link, e.dialed ? 1 : 0)
         //! both sides open with HELLO — identity first, before anything routes. Clients declare the
         // role (r:1) so the peer excludes them from genesis and feeds them by tap-forward (M5b).
-        link.ship(encodeControl(VERB.HELLO, this.client
-          ? { u: this.uuid, i: this.incarnation, l: this.listen, r: 1 }
-          : { u: this.uuid, i: this.incarnation, l: this.listen }), this.env.sink, j)
+        // `n` (v4.1) declares the RESOURCE, only when configured — absent keys keep the frame
+        // byte-identical with v4.0 (the sim's byte-identical sweep contract rides on that).
+        link.ship(encodeControl(VERB.HELLO, {
+          u: this.uuid, i: this.incarnation, l: this.listen,
+          ...(this.client ? { r: 1 } : {}),
+          ...(this.name !== undefined ? { n: this.name } : {}),
+        }), this.env.sink, j)
         return
       }
       case 'bytesIn': {
@@ -934,6 +950,24 @@ export class Node {
         // BEFORE self-reject/dup-link so a diag client can never perturb byUuid or evict a member by
         // presenting a spoofed uuid; the LS.diag leg catches a re-HELLO on an already-latched session.
         if (link.state === LS.diag || (v as { r?: unknown }).r === 2) return diagHello(this, link, v as Record<string, unknown>)
+        //! resource-name refusal (v4.1): when BOTH ends declare a name and they differ, this link
+        // reaches for a DIFFERENT resource — admit it and digest-on-admit would silently cross-
+        // replicate two unrelated logs (a durable merge). Refuse loudly instead: dead + noRedial,
+        // the same idiom as the self-reject below. One side declaring and the other not is the
+        // legacy/embedder case — no check (absent means "no claim", never "any resource").
+        {
+          const n = (v as { n?: unknown }).n
+          if (n !== undefined && typeof n !== 'string') {
+            j.armed && j.emit(JK.frameDrop, link.id, 'malformed hello')
+            link.dead = true
+            return this.env.sink.close(link.id, 'malformed-hello')
+          }
+          if (typeof n === 'string' && this.name !== undefined && n !== this.name) {
+            j.armed && j.emit(JK.nameReject, link.id, n)
+            link.dead = link.noRedial = true
+            return this.env.sink.close(link.id, 'name-mismatch')
+          }
+        }
         if (v.u === this.uuid) {
           //! self-reject by uuid — a gossip loop or misconfig dialled ourselves; never redial a self-loop
           j.armed && j.emit(JK.selfReject, link.id)

@@ -77,6 +77,9 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     throw new Error(`fero('${name}'): uuid '${config.uuid as string}' does not match this dir's previous life '${restored.uuid}' — one dir, one identity (use a fresh dir for a new node)`)
   const rtOpts: RuntimeOpts = {
     uuid: (config.uuid as string) ?? restored.uuid ?? randomUUID().slice(0, 8),
+    //! the resource name rides HELLO (v4.1): a misdial onto another resource's port refuses loudly
+    // (JK.nameReject) instead of silently cross-replicating two unrelated logs
+    name,
     listen: config.listen as string | undefined,
     hosts: config.hosts as string[] | undefined,
     client: isClient || undefined,
