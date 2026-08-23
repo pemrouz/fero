@@ -12,7 +12,7 @@
   },
   "scripts": {
     "test": "node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"kernel/*.test.ts\" \"sim/*.test.ts\" \"tests/*.test.ts\" \"api/*.test.ts\" \"tools/debug/*.test.ts\" \"tools/perf/*.test.ts\" && npm run test:contract",
-    "perf": "node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test \"kernel/*.perf.ts\" \"api/*.perf.ts\" \"tests/*.perf.ts\"",
+    "perf": "node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test \"kernel/*.perf.ts\" \"api/*.perf.ts\" \"sim/*.perf.ts\" \"tests/*.perf.ts\"",
     "perf:absolute": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts",
     "perf:pin": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts --pin",
     "perf:alloc": "node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test kernel/alloc.perf.ts",
