@@ -130,6 +130,13 @@ export interface EffectSink {
 // pp chain-rebuild advances from (the panel's compaction hole: chain bases below a compacted or
 // pre-pp span would otherwise collapse every floor to 0 on restart; a stale seed is honest-low).
 export interface BootRecord {
+  //! uuid (v4.1): the node's own identity, persisted so a restore can recover it — without this,
+  // fero(name, {dir}) with uuid omitted minted a FRESH random identity each life while inheriting the
+  // old life's epoch/members/lamport/votedFor and WAL: the heir booted evicted-read-only (the restored
+  // member list holds the OLD uuid), and its previous life's lanes lost their own-lineage replay
+  // authority (node.ts replayHeld). Optional for the absent-key discipline: a pre-v4.1 boot.json
+  // simply lacks it and restore falls back to the configured/random identity (legacy behavior, stated).
+  uuid?: string
   epoch: number
   members: [string, string][]
   lamport: number

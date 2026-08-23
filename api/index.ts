@@ -62,8 +62,21 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       throw new Error(`fero('${name}'): replicas must be an integer ≥ 1 (omit for full replication)`)
     if (isClient) throw new Error(`fero('${name}'): replicas is a server-side setting — a client follows the cluster's scoping`)
   }
+  //! uuid discipline (v4.1): the string is validated (an empty uuid, or one containing '~' — the
+  // incarnation-lane separator — could alias another node's lane in origin-string space), and a
+  // durable dir's RESTORED identity beats the random default: fero(name, {dir}) with uuid omitted
+  // boots as the SAME node every life. A user-supplied uuid that contradicts the dir throws loudly —
+  // adopting a foreign log under a new name is the silent evicted-heir bug, never a default.
+  if (config.uuid !== undefined && (typeof config.uuid !== 'string' || config.uuid === '' || config.uuid.includes('~')))
+    throw new Error(`fero('${name}'): uuid must be a non-empty string without '~' (the incarnation-lane separator)`)
+  //! restore-before-network: a dir holding a previous life boots as its heir (identity recovered,
+  // incarnation bumped, clock leased, votedFor honored) — the composer makes the wal.test.ts idiom
+  // the default path
+  const restored = config.dir ? restoreOpts(config.dir as string) : {}
+  if (config.uuid !== undefined && restored.uuid !== undefined && config.uuid !== restored.uuid)
+    throw new Error(`fero('${name}'): uuid '${config.uuid as string}' does not match this dir's previous life '${restored.uuid}' — one dir, one identity (use a fresh dir for a new node)`)
   const rtOpts: RuntimeOpts = {
-    uuid: (config.uuid as string) ?? randomUUID().slice(0, 8),
+    uuid: (config.uuid as string) ?? restored.uuid ?? randomUUID().slice(0, 8),
     listen: config.listen as string | undefined,
     hosts: config.hosts as string[] | undefined,
     client: isClient || undefined,
@@ -75,9 +88,8 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     redialMs: config.redialMs as number | undefined,
     journalCap: config.journalCap as number | undefined,
     ...(config.replicas !== undefined ? { replicas: config.replicas as number } : {}),
-    //! restore-before-network: a dir holding a previous life boots as its heir (incarnation bumped,
-    // clock leased, votedFor honored) — the composer makes the wal.test.ts idiom the default path
-    ...(config.dir ? restoreOpts(config.dir as string) : {}),
+    ...(restored.boot !== undefined ? { boot: restored.boot } : {}),
+    ...(restored.incarnation !== undefined ? { incarnation: restored.incarnation } : {}),
   }
   const rt = new Runtime(rtOpts)
   //! the binding wires rt.onApply BEFORE restore, so the WAL replay refills the proxy. `tracked` is

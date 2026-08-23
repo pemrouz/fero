@@ -43,11 +43,14 @@ export interface RuntimeOpts extends NodeOpts { dir?: string }
 
 //! restoreOpts — read the durable facts back into NodeOpts shape (the embedder calls this BEFORE
 // constructing the Runtime, bumps incarnation itself, then replays via runtime.restore()).
-export const restoreOpts = (dir: string): { boot?: NodeOpts['boot']; incarnation?: number } => {
+export const restoreOpts = (dir: string): { uuid?: string; boot?: NodeOpts['boot']; incarnation?: number } => {
   const bootPath = path.join(dir, 'boot.json')
   if (!fs.existsSync(bootPath)) return {}
   const b = JSON.parse(fs.readFileSync(bootPath, 'utf8')) as BootRecord
   return {
+    //! identity recovery (v4.1): the dir knows who it belongs to — a pre-v4.1 boot.json lacks the
+    // field (absent key) and the caller falls back to its configured/random uuid, the legacy behavior
+    ...(b.uuid ? { uuid: b.uuid } : {}),
     boot: {
       epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor,
       //! M6 (armed lives only — absent keys stay absent, so unscoped restores are shape-identical):
