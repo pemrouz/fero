@@ -180,6 +180,76 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'scale-formation',
+    title: 'Scale — 100 nodes, 4,950 links, one mesh',
+    kind: 'happy',
+    desc: '9,900 dials dedup to one link per pair and 100 concurrent writers converge — the sim/scale tier headline at dashboard budget (diagram is a 10-node schematic of the 100; monitors ride SAMPLED via run({checkEvery}) — per-event walks would cost minutes at this width)',
+    diagram: {
+      nodes: ids(10), mesh: true, writers: ids(10),
+      phases: [
+        { label: 'dial ×9,900', sev: 'info' }, { label: 'dedup ×4,950', sev: 'warn' },
+        { label: 'write ×100', sev: 'gold' }, { label: 'converge ×100', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(0)
+      const nodes = cluster(sim, 100)
+      writes(sim, nodes, 100, 300)
+      sim.run({ checkEvery: 2000, maxEvents: 3_000_000 })
+      const t = tally(sim)
+      const links = nodes.reduce((s, n) => s + n.admitted().length, 0) / 2
+      const fail = failOf(sim, nodes) || (links !== 4950 ? `${links}/4950 links survived the dial storm` : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'nodes', v: nodes.length, kind: 'count' },
+          { k: 'links', v: links, kind: 'count' },
+          { k: 'dup links closed', v: t.dupLinks, kind: 'count' },
+          { k: 'applied', v: t.applied, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'scale-genesis',
+    title: 'Scale genesis — one ballot, one proposer, 50 members',
+    kind: 'happy',
+    desc: 'the lowest uuid alone proposes view 1 once its full mesh stands, and ONE ballot commits all 50 members — the single-proposer law the scale tier pins at n=100 (sim/scale.test.ts), sized to the dashboard budget here',
+    diagram: {
+      nodes: ids(8), mesh: true,
+      phases: [
+        { label: 'mesh at n01', sev: 'info' }, { label: 'propose ×1', sev: 'gold' },
+        { label: 'vote ×49', sev: 'info' }, { label: 'view 1 ×50', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(1)
+      const nodes = cluster(sim, 50, { heartbeatMs: 100 })
+      sim.run({ until: 1500, checkEvery: 1000, maxEvents: 3_000_000 }) // heartbeats never quiesce — a virtual-time bound
+      const t = tally(sim)
+      const proposers = nodes.filter((n) => n.journal.read().some((e) => e.kind === JK.propose)).map((n) => n.uuid)
+      const fail =
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
+        (!formed(nodes) ? 'mesh never fully formed' : '') ||
+        (nodes.some((n) => n.epoch !== 1) ? 'genesis never committed everywhere' : '') ||
+        (proposers.join() !== 'n01' ? `proposers [${proposers}] — the single-proposer law broke` : '') ||
+        (t.installs !== 50 ? `${t.installs}/50 installs — a node re-installed or missed view 1` : '') ||
+        (drained(sim) ?? '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'members', v: 50, kind: 'count' },
+          { k: 'proposers', v: proposers.length, kind: 'count' },
+          { k: 'installs', v: t.installs, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
     id: 'conflict',
     title: 'Concurrent same-key writes — LWW total order',
     kind: 'unhappy',
@@ -436,6 +506,50 @@ export const SCENARIOS: Scenario[] = [
         metrics: [
           { k: 'writes', v: t.writes, kind: 'count' },
           { k: 'shed', v: t.shed, kind: 'count' },
+          { k: 'ae re-shipped', v: t.ae, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'scale-overflow',
+    title: 'Scale backpressure — 50 queues shed ONCE at fan-out 99',
+    kind: 'unhappy',
+    desc: 'half of one node’s 99 links pause; a 500-write burst overflows MAX_QUEUED on every paused link — exactly ONE whole-queue drop each (de-sync withholds a second), then 50 simultaneous drains re-teach every shed tail (diagram is a 6-node schematic of the 100)',
+    diagram: {
+      nodes: ids(6), mesh: true, writers: ['n01'],
+      phases: [
+        { label: 'form ×100', sev: 'ok' }, { label: 'pause ×50', sev: 'warn' },
+        { label: 'burst ×500', sev: 'gold' }, { label: 'shed ×50', sev: 'crit' },
+        { label: 'drain + converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(2)
+      const nodes = cluster(sim, 100)
+      sim.run({ checkEvery: 2000, maxEvents: 3_000_000 })
+      const paused = [...nodes[0].links.values()].sort((a, b) => (a.uuid < b.uuid ? -1 : 1)).slice(0, 50)
+      for (const l of paused) sim.post('n001', { kind: 'pause', link: l.id })
+      sim.run({ checkEvery: 2000, maxEvents: 3_000_000 })
+      for (let i = 0; i < 500; i++) sim.post('n001', { kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] }, i * 0.1)
+      sim.run({ checkEvery: 2000, maxEvents: 3_000_000 })
+      const drops = nodes[0].journal.read().filter((e) => e.kind === JK.dropOldest).length
+      for (const l of paused) sim.post('n001', { kind: 'drain', link: l.id }, 0)
+      sim.run({ checkEvery: 2000, maxEvents: 3_000_000 })
+      const t = tally(sim)
+      const fail =
+        failOf(sim, nodes) ||
+        (drops !== 50 ? `${drops} whole-queue drops for 50 paused links — the one-drop law broke` : '') ||
+        (paused.some((l) => !l.synced) ? 'a drained link never re-latched synced' : '') ||
+        (nodes[99].state.size !== 500 ? `n100 holds ${nodes[99].state.size}/500 cells` : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'paused links', v: 50, kind: 'count' },
+          { k: 'whole-queue drops', v: drops, kind: 'count' },
+          { k: 'records shed', v: t.shed, kind: 'count' },
           { k: 'ae re-shipped', v: t.ae, kind: 'count' },
           { k: 'events', v: sim.events, kind: 'count' },
         ],
