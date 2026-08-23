@@ -133,3 +133,14 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   is a further win when a workload wants it.
 - [P3] (api) fold.ts cell-isolation armor is mostly moot under clause 10d —
   slim it when the file is next touched.
+
+## The v4.1 surface (V4-2 residue)
+- [P3] (api) `client: true` as an explicit role pin — deliberately absent (with
+  client the default it pins nothing); add the day an asymmetric-intent process
+  wants to refuse accidental server markers.
+- [P3] (api,shell) Non-loopback derived binds — never a default (unauthenticated
+  peer plane); revisit only alongside peer-to-peer auth (see the carried v2
+  rejection).
+- [P3] (api) A held-shard local read under scoping (f.snapshot throws typed
+  today) — needs a name that cannot be mistaken for the resource ('shard'?);
+  wait for demand.

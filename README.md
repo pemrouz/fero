@@ -738,9 +738,12 @@ a real multi-process cluster over the wire).
     reach-through in any scenario body. Partition/heal stays sim-only by
     design (real-TCP partition injection tests the harness, not fero).
   - **The two-terminal demo** (examples/two-terminals.ts): `npm run demo --
-    serve 4800` / `npm run demo -- watch 4800` — a server mutating an
-    inventory by plain assignment, a client re-rendering through one tap;
-    kill and restart the server and the watcher resumes.
+    serve` / `npm run demo -- watch` — a server mutating an inventory by
+    plain assignment, a client re-rendering through one tap; kill and
+    restart the server and the watcher resumes. Since V4-2 the demo needs
+    ZERO addresses/identities: the server is a server because it declares a
+    `data:` seed, the watcher is bare fero(name), and both meet on the
+    name-derived loopback port (guarded by the HELLO name echo).
 - **M8 — hardening is LIVE** (panel-designed like M6/M7: 2 candidates + a skeptic
   judge per open question + a plan-coverage critic; the alloc judge ran its OWN V8
   probes to adjudicate a factual dispute between candidates). What landed:
