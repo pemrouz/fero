@@ -21,7 +21,7 @@ test('config recognition: unknown keys and unknown seams throw at fero() time; f
   await assert.rejects(fero('r', { seams: { hash: () => 0 } } as never), /unknown seam 'hash'/)
   //! a function-valued opt is a METHOD (recognized by value type, not key name) — and on a server it
   // dispatches LOCALLY (M5c): one-shot invoke, flush-on-return, snapshot for proxy returns
-  const f = await fero('r', { checkout: (n: unknown) => `order-${n}` })
+  const f = await fero('r', { listen: false, checkout: (n: unknown) => `order-${n}` })
   assert.equal(await f.methods.checkout(7), 'order-7')
   //! built-in read returns the resource (snapshot locally)
   f.data.k = 1
@@ -35,14 +35,15 @@ test('config recognition: unknown keys and unknown seams throw at fero() time; f
 test('M6 config: replicas validates loudly (integer ≥ 1, servers only) and surfaces on cluster.partitions; unscoped shows zeros', async () => {
   await assert.rejects(fero('r', { replicas: 0 } as never), /replicas must be an integer/)
   await assert.rejects(fero('r', { replicas: 1.5 } as never), /replicas must be an integer/)
-  await assert.rejects(fero('r', { replicas: 2, hosts: ['tcp://nowhere:1'] } as never), /server-side setting/)
+  //! v4.1: replicas + hosts is a legal DIALING MEMBER now (replicas implies server), so the old
+  // spoke-with-replicas reject is unrepresentable by construction — role is a pure function of config
   //! unscoped: the partitions row is a truthful all-zeros projection (replicas 0 = R=∞)
-  const plain = await fero('r', {})
+  const plain = await fero('r', { listen: false })
   const p0 = (snapshot(plain.cluster) as { partitions: Record<string, unknown> }).partitions
   assert.deepEqual(p0, { replicas: 0, epoch: 0, w: 0, held: 0, acquiring: 0, orphaned: 0, acquired: 0, shed: 0, shedWaitingOn: [] })
   await plain.destroy()
   //! scoped solo: config reflected; w derives from R_eff (min(replicas, members)) — never configurable
-  const f = await fero('r', { uuid: 'aa', replicas: 2 })
+  const f = await fero('r', { uuid: 'aa', replicas: 2, listen: false })
   const p = (snapshot(f.cluster) as { partitions: { replicas: number; w: number } }).partitions
   assert.equal(p.replicas, 2)
   assert.equal(p.w, 1, 'solo: R_eff = min(2, 1) = 1 ⇒ W = 1')
@@ -50,7 +51,7 @@ test('M6 config: replicas validates loudly (integer ≥ 1, servers only) and sur
 })
 
 test('solo: assignment and methods.update are ONE ingest — both commit, both visible, coordinates resolve', async () => {
-  const f = await fero('inventory', { uuid: 'aa' })
+  const f = await fero('inventory', { uuid: 'aa', listen: false })
   assert.equal(f.name, 'inventory')
   f.data.widget = { stock: 3 }
   const r: WriteResolve = await f.methods.update({ key: 'widget', value: { stock: 2 } })
@@ -79,6 +80,7 @@ test('D3 lens: data write builtins route through issue() — validated — or th
   const seen: unknown[] = []
   const f = await fero('lensguard', {
     uuid: 'aa',
+    listen: false,
     seams: {
       validation: (rec: { value?: { stock?: number } }) => {
         seen.push(rec)
@@ -168,20 +170,20 @@ test("the guarantee ladder under methods: confirm:'replicated' proves against a 
 test('restore through the composer: fero(name, {dir}) refills the proxy from the WAL before the network exists', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-api-'))
   try {
-    const first = await fero('r', { uuid: 'aa', dir })
+    const first = await fero('r', { uuid: 'aa', dir, listen: false })
     first.data.persisted = { rows: 3 }
     first.data.persisted.rows = 4
     await first.methods.update({ key: 'volatile', value: true })
     await first.destroy()
 
-    const second = await fero('r', { uuid: 'aa', dir })
+    const second = await fero('r', { uuid: 'aa', dir, listen: false })
     assert.deepEqual(snapshot(second.data), { persisted: { rows: 4 }, volatile: true }, 'the heir folded the WAL into the proxy')
     assert.equal((snapshot(second.cluster) as { me: { origin: string } }).me.origin, 'aa~2', 'reborn lane')
     await second.destroy()
 
     //! v4.1 identity recovery: the dir knows who it belongs to — a THIRD life with uuid OMITTED must
     // boot as 'aa', not as a fresh random heir over aa's log (the silent evicted-read-only bug)
-    const third = await fero('r', { dir })
+    const third = await fero('r', { dir, listen: false })
     assert.equal((snapshot(third.cluster) as { me: { uuid: string } }).me.uuid, 'aa', 'restore recovered the identity')
     assert.equal((snapshot(third.cluster) as { me: { origin: string } }).me.origin, 'aa~3', 'same node, next incarnation')
     assert.deepEqual(snapshot(third.data), { persisted: { rows: 4 }, volatile: true }, 'the fold rode the recovered lane')
@@ -216,7 +218,7 @@ test('v4.1 uuid discipline: empty and lane-separator uuids refuse at fero() time
 })
 
 test('v4.1 f.snapshot: the synchronous dense value — data\'s [value] read surfaced first-class', async () => {
-  const f = await fero('r', { uuid: 'aa' })
+  const f = await fero('r', { uuid: 'aa', listen: false })
   try {
     f.data.w = { stock: 3 }
     assert.deepEqual(f.snapshot, { w: { stock: 3 } })
@@ -274,8 +276,46 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-y
   }
 })
 
-test('M5b — a durable client is refused loudly (offline-first is M6, not a silent misconfiguration)', async () => {
-  await assert.rejects(fero('r', { hosts: ['127.0.0.1:1'], dir: '/tmp/x' } as never), /durable client/)
+test('v4.1 roles: following is ambient, serving is a declared act — and the derived port needs zero addresses', async () => {
+  //! no marker = a CLIENT (the open method namespace is the client tell); resolves with no server up
+  const bare = await fero('bare-role', { heartbeatMs: 0 })
+  assert.equal(typeof bare.methods.anything, 'function', 'bare fero is a client — open namespace')
+  await bare.destroy()
+  //! a data seed / a method / dir / replicas / server: true each imply SERVER (closed namespace).
+  // NB this also retires M5b's durable-client refusal: dir implies server, so a durable spoke is
+  // unrepresentable by construction — {hosts, dir} is a durable dialing MEMBER now.
+  const viaData = await fero('role-via-data', { data: { k: 1 }, heartbeatMs: 0 })
+  assert.equal(typeof viaData.methods.anything, 'undefined', 'a data seed implies server')
+  assert.deepEqual(snapshot(viaData.data), { k: 1 }, 'seeded')
+  await viaData.destroy()
+  const viaMethod = await fero('r', { listen: false, m: () => 1 })
+  assert.equal(typeof viaMethod.methods.anything, 'undefined', 'methods imply server')
+  await viaMethod.destroy()
+  //! the loud refusals: an undialable member; a role pin that is not literally true
+  await assert.rejects(fero('r', { listen: false, hosts: ['127.0.0.1:1'] }), /undialable/)
+  await assert.rejects(fero('r', { server: 1 } as never), /server must be true/)
+  //! derived-port end-to-end: a bare server and a bare client find each other by NAME alone
+  const s = await fero('derive-e2e', { server: true, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('derive-e2e', { heartbeatMs: 50, redialMs: 30 })
+  try {
+    s.data.k = 'found'
+    assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).k === 'found', 8000), 'found via the derived port — zero addresses configured')
+  } finally { await c.destroy(); await s.destroy() }
+})
+
+test('v4.1 data seed: applied only when the local fold is empty at boot — a restore never re-seeds', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-seed-'))
+  const seed = { widgets: { stock: 10 } }
+  try {
+    const a = await fero('r', { uuid: 'aa', dir, listen: false, data: seed })
+    assert.deepEqual(snapshot(a.data), { widgets: { stock: 10 } }, 'the empty fold seeded')
+    a.data.widgets.stock = 4
+    await a.destroy()
+    const b = await fero('r', { dir, listen: false, data: seed })
+    assert.equal((snapshot(b.data) as { widgets: { stock: number } }).widgets.stock, 4, 'the restore kept the newer value — no re-seed clobber')
+    await b.destroy()
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+  await assert.rejects(fero('r', { listen: false, data: [1] as never }), /plain object/)
 })
 
 test('M5-REVIEW #9 — an async write rejection surfaces as a typed WriteReject, never a bare string', async () => {
@@ -298,7 +338,7 @@ test('M5-REVIEW #9 — an async write rejection surfaces as a typed WriteReject,
 })
 
 test('M5-REVIEW #3 — write() clears its timeout timer on settle (no timer/closure accumulation on the hot path)', async () => {
-  const f = await fero('r', { uuid: 'aa' })
+  const f = await fero('r', { uuid: 'aa', listen: false })
   try {
     const before = process.getActiveResourcesInfo ? process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length : 0
     //! a burst of fast (epoch-0) writes — each resolves immediately; none may leave a live timer behind
@@ -315,7 +355,7 @@ test('M5-REVIEW #12 (v4 form) — an illegal root replace throws PRE-COMMIT: no 
   // root replace BEFORE data commits anything (DESIGN-DATA3 §4.1/W6), so the state below
   // is asserted IMMEDIATELY — nothing to heal. The v4 value symbol is the read hatch now.
   const { value } = await import('../../data/api/index.ts') as { value: symbol }
-  const s = await fero('r', { uuid: 'aa' })
+  const s = await fero('r', { uuid: 'aa', listen: false })
   try {
     s.data.keep = { n: 1 }
     s.data.also = 2

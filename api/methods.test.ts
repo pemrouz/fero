@@ -175,10 +175,10 @@ test('M5-REVIEW #11 — a live subscription over a DERIVED (operator) proxy keep
 })
 
 test('M5-REVIEW #5/#10 — a SERVER-local method flushes before returning AND returns a fresh copy (no live alias to kernel state)', async () => {
-  const s = await fero('r', { uuid: 'aa' })
+  const s = await fero('r', { uuid: 'aa', listen: false })
   try {
     //! #5: a handler that writes must have its write committed before the local call returns
-    const setK = await fero('r', { uuid: 'bb', setK: (v: unknown, ctx: { data: any }) => { ctx.data.K = v; return 'done' } })
+    const setK = await fero('r', { uuid: 'bb', listen: false, setK: (v: unknown, ctx: { data: any }) => { ctx.data.K = v; return 'done' } })
     const r = await setK.methods.setK(42)
     assert.equal(r, 'done')
     assert.equal((snapshot(setK.data) as Record<string, unknown>).K, 42, 'flush-on-return: the write committed before the reply')
