@@ -39,7 +39,9 @@ export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durab
   if (opts.fault)
     for (let i = 0; i < ids.length; i++)
       for (let j = i + 1; j < ids.length; j++) sim.fault(ids[i], ids[j], opts.fault)
-  sim.monitors.push(...perEvent())
+  //! idempotent registration: a second cluster() on the same Sim (grow scenarios) must not
+  // double-evaluate every invariant on every event — the sentinel is perEvent()'s first monitor name.
+  if (!sim.monitors.some((m) => m.name === 'queued-implies-paused')) sim.monitors.push(...perEvent())
   for (const id of ids) sim.post(id, { kind: 'start' })
   return nodes
 }
