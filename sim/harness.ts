@@ -28,6 +28,13 @@ export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durab
       journalCap: 1 << 16, // capture-grade history: time-travel replay needs the journal un-truncated
     }),
   )
+  //! per-pair fault personalities for the whole mesh. sim.fault() draws NO rng and the ids are
+  // literal, so passing `fault` perturbs only this cluster's own trajectory — never another seed's
+  // draw order. Joiners added later via sim.add pair at the sim's DEFAULT personality; a scenario
+  // wanting faulted joiners installs sim.fault for those pairs explicitly.
+  if (opts.fault)
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++) sim.fault(ids[i], ids[j], opts.fault)
   sim.monitors.push(...perEvent())
   for (const id of ids) sim.post(id, { kind: 'start' })
   return nodes
