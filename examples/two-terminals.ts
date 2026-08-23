@@ -1,20 +1,19 @@
 //! ── the two-terminal demo (plan §11 M5): one resource, two processes, real sockets ──
 //
-//   terminal 1:  npm run demo -- serve 4800
-//   terminal 2:  npm run demo -- watch 4800
+//   terminal 1:  npm run demo -- serve
+//   terminal 2:  npm run demo -- watch
 //
-// The server seeds a tiny inventory and mutates it once a second. The watcher is a
-// CLIENT (hosts, no listen): it folds the same replicated state and re-renders on
-// every change through a plain reactive tap — no polling, no events, no wire code.
-// Kill the server mid-run and restart it with the same command: the watcher redials,
-// catches up over anti-entropy, and the tap resumes. Everything below is the public
-// surface — `fero`, `data`, one tap.
+// v4.1: zero addresses, zero identities, zero internals imports. The server is a server
+// because it DECLARES an initial value (`data:` is a server marker — role by declared
+// act); the watcher is bare fero(name) — a client by default, dialing the name-derived
+// local port. Kill the server mid-run and restart it with the same command: the watcher
+// redials, catches up over anti-entropy, and the tap resumes. Everything below is the
+// public surface — `fero`, `data`, one tap.
 
-import { fero } from '../api/index.ts'
-import { snapshot } from '../api/substrate.ts'
+import { fero, derivedAddr } from '../api/index.ts'
 
-const [mode, port = '4800'] = process.argv.slice(2)
-const addr = `127.0.0.1:${port}`
+const mode = process.argv[2]
+const addr = derivedAddr('inventory') // shown in the labels — derived from the NAME, configured nowhere
 
 const render = (label: string, value: unknown) => {
   console.clear()
@@ -23,24 +22,28 @@ const render = (label: string, value: unknown) => {
 }
 
 if (mode === 'serve') {
-  const f = await fero('inventory', { uuid: 'server', listen: addr })
-  f.data.widgets = { stock: 10, price: 4.5 }
-  f.data.gadgets = { stock: 3, price: 19.99 }
+  const f = await fero('inventory', {
+    //! the initial value: seeds only a fresh resource, and marks this node the SERVER
+    data: {
+      widgets: { stock: 10, price: 4.5 },
+      gadgets: { stock: 3, price: 19.99 },
+    },
+  })
   let tick = 0
   setInterval(() => {
     tick++
     //! ordinary assignments ARE the replication api
     f.data.widgets.stock = 10 + Math.round(Math.sin(tick / 3) * 5)
     if (tick % 5 === 0) f.data.gadgets.stock = 3 + (tick / 5) % 4
-    render(`SERVER on ${addr} (tick ${tick})`, snapshot(f.data))
+    render(`SERVER on ${addr} (tick ${tick})`, f.snapshot)
   }, 1000)
-  render(`SERVER on ${addr} — waiting for watchers`, snapshot(f.data))
+  render(`SERVER on ${addr} — waiting for watchers`, f.snapshot)
 } else if (mode === 'watch') {
-  const f = await fero('inventory', { uuid: 'watcher-' + process.pid, hosts: [addr] })
+  const f = await fero('inventory')
   render(`WATCHER of ${addr} — connecting`, {})
-  //! one tap: re-render on every replicated change (the bare 0-arg form — no record bookkeeping)
-  f.data.tap(() => render(`WATCHER of ${addr}`, snapshot(f.data)))
+  //! one tap: re-render on every replicated change — no polling, no events, no wire code
+  f.data.tap(() => render(`WATCHER of ${addr}`, f.snapshot))
 } else {
-  console.log('usage: npm run demo -- serve [port] | watch [port]')
+  console.log('usage: npm run demo -- serve | watch')
   process.exit(1)
 }
