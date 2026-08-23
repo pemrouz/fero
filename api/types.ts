@@ -58,17 +58,29 @@ export interface Seams {
 }
 
 //! FeroConfig — the declared, picked config schema. Unknown non-function keys throw at fero() time.
+//! Role (v4.1) is by DECLARED ACT: any server marker — server: true, listen, dir, replicas, a `data`
+// seed, or any function-valued option (hosted methods) — makes a server; no marker makes a CLIENT
+// dialing its hosts (or, bare, the name-derived local port). Role is a pure function of the config.
 export interface FeroConfig {
   uuid?: string
-  listen?: string
+  //! server — the explicit role pin: serve even with no other marker (binds the derived port).
+  server?: true
+  //! listen — the dialable address; omitted on a server = the name-derived loopback port; false =
+  // the socketless solo node (serves nothing, dials nothing — pure local; refuses hosts loudly).
+  listen?: string | false
+  //! hosts — dial targets, pure and simple: alone = a client's feeders; beside a server marker =
+  // a dialing member (the listen+hosts cluster shape). Omitted on a bare client = the derived port.
   hosts?: string[]
   dir?: string
   heartbeatMs?: number
   redialMs?: number
   journalCap?: number
   //! replicas (M6): scoped replication — each partition lives on exactly R holders. Omit for full
-  // replication (every server holds everything). Integer ≥ 1; servers only.
+  // replication (every server holds everything). Integer ≥ 1; implies the server role (v4.1).
   replicas?: number
+  //! data (v4.1) — initial rows, applied ONLY when the local fold is empty at boot (a durable
+  // restore or replayed state never re-seeds); rides the ordinary validated ingest. Implies server.
+  data?: Record<string, unknown>
   seams?: Seams
 }
 

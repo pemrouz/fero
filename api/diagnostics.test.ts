@@ -14,7 +14,7 @@ import { verifyReplay } from '../tools/debug/model.mjs'
 import { ports, until } from '#utils'
 
 test('hygiene: the handle is Symbol-keyed — absent from keys/for-in, present via diag()', async () => {
-  const f = await fero('r', {})
+  const f = await fero('r', { listen: false })
   try {
     assert.deepEqual(Object.keys(f), ['name', 'data', 'methods', 'cluster', 'snapshot', 'destroy'], 'the typed surface, exactly')
     const seen: string[] = []
@@ -29,7 +29,7 @@ test('hygiene: the handle is Symbol-keyed — absent from keys/for-in, present v
 })
 
 test('capture ⇄ the replay oracle, and the atomic journal cursor with honest truncation', async () => {
-  const f = await fero('r', { uuid: 'aa', journalCap: 32 })
+  const f = await fero('r', { uuid: 'aa', journalCap: 32, listen: false })
   try {
     for (let i = 0; i < 60; i++) f.data[`k${i % 7}`] = { n: i, deep: [i, `s${i}`] }
     await until(() => (snapshot(f.data) as Record<string, { n: number }>).k3?.n === 59, 4000)

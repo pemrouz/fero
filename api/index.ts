@@ -27,8 +27,22 @@ import { captureNode } from '../tools/debug/capture.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'seams'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'seams'])
 const SEAM_KEYS = new Set(['validation'])
+
+//! the derived default port (v4.1): a pure function of the resource NAME — fnv1a32 into a fixed
+// loopback range, so a bare server and a bare client find each other with zero addresses configured
+// and zero scanning (discovery stays deterministic; the name-echo HELLO refusal turns a rare range
+// collision into a loud close, never a merge). Loopback ONLY: the peer plane is unauthenticated —
+// a guessable port must never default onto a routable interface.
+const PORT_BASE = 44800
+const PORT_RANGE = 1024
+const fnv = (s: string): number => {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0 }
+  return h
+}
+export const derivedAddr = (name: string): string => `127.0.0.1:${PORT_BASE + (fnv(name) % PORT_RANGE)}`
 
 //! keyPath — normalize the Change.key sugar: 'user42' and ['user42','active'] are both paths.
 const keyPath = (k: string | string[] | undefined): string[] =>
@@ -51,17 +65,33 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   for (const k of Object.keys(seams))
     if (!SEAM_KEYS.has(k)) throw new Error(`fero('${name}'): unknown seam '${k}' — M5a ships ${[...SEAM_KEYS].join(', ')}; hash/codec/storage land with their milestones`)
 
-  //! role by shape (the v2 rule, kept): hosts without a listen address = a CLIENT — a spoke that can
-  // never be dialed can never be a member. listen (with or without hosts) = a server; neither = solo.
-  const isClient = !config.listen && Array.isArray(config.hosts) && (config.hosts as string[]).length > 0
-  if (isClient && config.dir) throw new Error(`fero('${name}'): a durable client (dir on a spoke) is not supported yet — offline-first clients are tracked for M6`)
-  //! replicas (M6): declared config, validated loudly — an integer R ≥ 1, servers only (a spoke
-  // holds nothing to scope; it follows whatever the cluster replicates)
-  if (config.replicas !== undefined) {
-    if (!Number.isInteger(config.replicas) || (config.replicas as number) < 1)
-      throw new Error(`fero('${name}'): replicas must be an integer ≥ 1 (omit for full replication)`)
-    if (isClient) throw new Error(`fero('${name}'): replicas is a server-side setting — a client follows the cluster's scoping`)
-  }
+  //! role by DECLARED ACT (v4.1 — supersedes the v2 hosts-without-listen rule): following is the
+  // ambient case, serving is a declared act. Any server MARKER makes a server — server: true, listen
+  // (an address, or false = the socketless solo), dir (durability), replicas (scoping), a `data`
+  // seed, or any function-valued option (methods are HOSTED). No marker = a CLIENT: a spoke dialing
+  // its hosts — or, bare, the name-derived local port. `hosts` is pure dial targets now: alone it
+  // keeps the v2 client shape; beside a marker it makes a dialing member (listen+hosts, unchanged).
+  // Role is a pure function of the CONFIG — never of timing, launch order, or who answers a dial.
+  if (config.server !== undefined && config.server !== true)
+    throw new Error(`fero('${name}'): server must be true when present — omit it (a bare fero is a client) or pin the role with server: true`)
+  if (config.listen !== undefined && config.listen !== false && typeof config.listen !== 'string')
+    throw new Error(`fero('${name}'): listen must be a 'host:port' string, or false for a socketless solo node`)
+  if (config.data !== undefined && (typeof config.data !== 'object' || config.data === null || Array.isArray(config.data)))
+    throw new Error(`fero('${name}'): data must be a plain object of initial rows — it seeds the resource only when the local fold is empty at boot`)
+  const isServer = config.server === true || config.listen !== undefined || config.dir !== undefined
+    || config.replicas !== undefined || config.data !== undefined || Object.keys(userMethods).length > 0
+  const isClient = !isServer
+  //! an undialable member is refused loudly: a socketless node cannot be dialed back, heartbeated,
+  // or counted by genesis — the v2 rule ("a spoke that can never be dialed can never be a member")
+  // survives as a validation instead of a role inference
+  if (config.listen === false && Array.isArray(config.hosts) && (config.hosts as string[]).length > 0)
+    throw new Error(`fero('${name}'): an undialable node (listen: false) cannot join a cluster — give it a listen address or drop hosts`)
+  if (config.replicas !== undefined && (!Number.isInteger(config.replicas) || (config.replicas as number) < 1))
+    throw new Error(`fero('${name}'): replicas must be an integer ≥ 1 (omit for full replication)`)
+  //! the effective topology: a server without an address serves the derived port; a bare client
+  // dials it — the demo's two terminals need zero addresses, and real deployments keep explicit ones
+  const listen = isServer && config.listen !== false ? ((config.listen as string | undefined) ?? derivedAddr(name)) : undefined
+  const hosts = (config.hosts as string[] | undefined) ?? (isClient ? [derivedAddr(name)] : undefined)
   //! uuid discipline (v4.1): the string is validated (an empty uuid, or one containing '~' — the
   // incarnation-lane separator — could alias another node's lane in origin-string space), and a
   // durable dir's RESTORED identity beats the random default: fero(name, {dir}) with uuid omitted
@@ -80,8 +110,8 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     //! the resource name rides HELLO (v4.1): a misdial onto another resource's port refuses loudly
     // (JK.nameReject) instead of silently cross-replicating two unrelated logs
     name,
-    listen: config.listen as string | undefined,
-    hosts: config.hosts as string[] | undefined,
+    listen,
+    hosts,
     client: isClient || undefined,
     dir: config.dir as string | undefined,
     //! the KERNEL keeps heartbeats explicit (0 = off, the sweep mode); the COMPOSER is where production
@@ -103,6 +133,13 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     tracked: () => host?.tracked(),
   })
   if (config.dir) rt.restore()
+  //! the data seed (v4.1): applied ONLY when the local fold is empty at boot — a durable restore or
+  // any replayed state skips it (re-seeding every life would clobber newer values: the restored
+  // Lamport ceiling stamps above old writes). Seeds ride the ordinary lens assignment, so the
+  // validation seam covers them like any write; on first contact with an existing cluster, LWW
+  // resolves collisions (higher-epoch cluster stamps win; fresh keys replicate in).
+  if (config.data !== undefined && rt.node.versions.size === 0)
+    for (const [k, v] of Object.entries(config.data as Record<string, unknown>)) (bind.data as Record<string, unknown>)[k] = v
 
   //! ── the confirm-probe multiplexer (M4c events under the methods surface) ──
   let probeSeq = 0
@@ -328,7 +365,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     members: {},
     peers: {},
     writes: {},
-    me: { uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: (config.listen as string) ?? '' },
+    me: { uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: node.listen },
     partitions: partitionsRow(),
   })
   const FOLD = new Set<number>([JK.viewInstall, JK.evict, JK.gateOpen, JK.gateClose, JK.identified, JK.linkDown, JK.suspect, JK.start,
