@@ -215,6 +215,16 @@ test('v4.1 uuid discipline: empty and lane-separator uuids refuse at fero() time
   await assert.rejects(fero('r', { uuid: 'a~1' }), /without '~'/)
 })
 
+test('v4.1 f.snapshot: the synchronous dense value — data\'s [value] read surfaced first-class', async () => {
+  const f = await fero('r', { uuid: 'aa' })
+  try {
+    f.data.w = { stock: 3 }
+    assert.deepEqual(f.snapshot, { w: { stock: 3 } })
+    assert.deepEqual(f.snapshot, snapshot(f.data), 'identical to the substrate read — no internals import needed')
+    assert.equal(JSON.stringify(f.snapshot), '{"w":{"stock":3}}', 'stringify-ready (the render-loop idiom)')
+  } finally { await f.destroy() }
+})
+
 test('destroy is clean: sockets down, timers cleared, capture detached — the proxy survives as a plain local value', async () => {
   const p = await ports.free()
   const f = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${p}` })

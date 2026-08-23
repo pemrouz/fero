@@ -69,6 +69,15 @@ test('SCOPED §9 equivalence: operators throw TYPED ScopedError (never a silent 
       assert.equal(se.reason, 'holistic')
       assert.ok(se.hint.includes('methods.read'), 'the hint names the materialize-first path')
     }
+    //! v4.1 f.snapshot on an ARMED scoped node: a sync local read could only be the shard — same rule, typed
+    try {
+      void nodes[0].snapshot
+      assert.fail('snapshot on a scoped shard must throw')
+    } catch (e) {
+      const se = e as ScopedError
+      assert.equal(se.scoped, true)
+      assert.equal(se.op, 'snapshot')
+    }
     //! key access: a held key is the raw child; a NON-held key is a one-shot remote handle — await
     // gives the owner's value; sync property reads throw typed (undefined would be a wrong answer)
     const node0 = nodes[0]
