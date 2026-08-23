@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (319 + the 18-clause data contract ride) /
+Run from the repo root: `npm test` (327 + the 18-clause data contract ride) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -101,3 +101,15 @@ inside the outer apply.
   kernel: a full-cluster restore resumes its view by mutual equal-epoch
   re-confirmation — NO self-ballot (the M4e twin's law, now pinned at 25
   and 100). Battery: 319/319 + 18/18 + perf 41/41.
+- 2026-08-23 (later) — the scale tier reaches THE DASHBOARD: three cards
+  (scale-formation — cluster(sim,100) + 100 writers on the scenarios page;
+  scale-genesis — one ballot/one proposer at 50; scale-overflow — the
+  one-drop-per-paused-link law at fan-out 99), schematic diagrams by the
+  sweep-card precedent, registry 20/20 (wall 2.4s→7.0s, baseline re-pinned
+  with zero counted drift), verified on the REAL page via headless Chromium
+  (cards + 100-node viewer click-through + live scrubber, zero page
+  errors). Plus scenarios.dom.test.ts — the vm harness scenarios.html's
+  header had promised since v3 (8 renderer pins, mutation-checked). NOTE: a
+  long-running `npm run debug` serves the registry loaded at ITS start —
+  restart it to see new cards (?rerun=1 is not enough). Battery: 327/327 +
+  18/18 + perf 41/41.
