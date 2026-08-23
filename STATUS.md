@@ -8,8 +8,9 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (299 + the 18-clause data contract ride) /
-`npm run perf` (self-contained package).
+Run from the repo root: `npm test` (319 + the 18-clause data contract ride) /
+`npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
+script-tier).
 
 ## Migration ledger (D-phases, per DESIGN-DATA3 §5)
 
@@ -75,3 +76,28 @@ inside the outer apply.
   (substrate `../../data/api/index.ts`, contract ride
   `../data/conformance/schedule.test.ts`). Full battery green post-move:
   299/299 + 18/18 + perf 36/36.
+- 2026-08-23 — THE SCALE TIER (n≈100; previous ceiling everywhere was 5).
+  Groundwork fixes: cluster()'s declared-but-dead `fault` option now applies
+  (three suites had silently run without their chaos — re-verified green
+  under the real personalities, timing-neutral A/B); ids pad to
+  max(2, len(n)) so lexicographic uuid order — the lowest-uuid proposer
+  discipline — survives n≥100 (n≤99 byte-identical, goldens pinned);
+  monitor registration idempotent. The enabler: `run({checkEvery})` samples
+  the monitor pass (per-event O(nodes×lanes) walks would cost ~30min per
+  100-node trajectory; the log-cursor monitors lose NOTHING under sampling;
+  default 1 byte-identical, pinned three ways). New tiers: sim/scale.test.ts
+  (six n=50..100 headline laws — 100-member one-ballot genesis, single
+  proposer, fanout-99 overflow/drain, genesis-stall + staggered-start pins,
+  R=3-of-50 inheritance wave), sim/scale-chaos.test.ts (ten n=8..30
+  churn/durability models with ENGAGEMENT guards — both fired during
+  authoring and forced real fixes to vacuous chaos), sim/scale.perf.ts
+  (5 pins: 69,400-event formation golden, O(pairs) flatness ratio 16.43 vs
+  16.50, exact k·n(n-1) digest law, 99-apply fan-out count, 20s wall
+  tripwire), tests/scale-tcp.test.ts (12-node real-socket dial-storm smoke),
+  sim/scale-run.ts + `npm run sim:scale` (11-scenario deep registry; first
+  full run 56M+ events ALL GREEN — 9,603 sheds/zero stalls at R=3-of-100,
+  peak-epoch 21 = perfect join serialization at 80+20, 2,495 torn WAL rows
+  healed, 40 fsync lies detected). One catalogue claim corrected by the
+  kernel: a full-cluster restore resumes its view by mutual equal-epoch
+  re-confirmation — NO self-ballot (the M4e twin's law, now pinned at 25
+  and 100). Battery: 319/319 + 18/18 + perf 41/41.

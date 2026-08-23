@@ -74,6 +74,24 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
 - [P3] (api) Offline-first durable clients (spoke WAL + replay-on-reconnect).
 - [P3] (api) Remote-Handle ergonomics (tagged Handles across the method plane).
 
+## Scale (n≈100 residue, 2026-08-23)
+- [P2] (sim) **Monitor passes walk O(nodes×lanes) Maps even when nothing changed**
+  (~15ms per invocation at n=100). `run({checkEvery})` is the mitigation; the real
+  fix is stepped-node-scoped incremental checks — the executive knows which node
+  stepped each event, so the hot four could walk one node's lanes, not all.
+- [P2] (kernel) **Digest AE is O(n²) exchanges per heartbeat tick, full-mesh**
+  (exactly k·n(n-1) digest frames per k ticks — pinned in sim/scale.perf.ts):
+  hb=100 at n=100 costs ~10M events per 60s virtual in floor traffic alone.
+  Couple any change with the announcement-gated-AE ticket above; maybeCompact's
+  O(lanes×members)-per-tick unscoped walk belongs to the same budget.
+- [P2] (kernel) **MAX_QUEUED=256 whole-queue drop under full-mesh pause bursts**:
+  scale.test.ts pins today's law (one drop per link, de-sync withholds, AE heals)
+  at fanout 99; window sizing joins the open MAX_PENDING/writeBufferDrop ticket.
+- [P3] (sim) Scale-golden caveats: sweepBuild's draw order is nNodes-scoped, so
+  every golden pins its own (n, writes, seed); scale-run failure captures are
+  ~50-100× the n=3 sizes (100 × 64k-cap journals) — triage-grade, and the
+  restart/storeFault scenarios are not Step-shrinkable by construction.
+
 ## Carried module debts (M2/M3/M4 records — tracked, not silent)
 - [P2] (kernel) M2: suspicion keys off link liveness, not PONG round-trips — a
   half-open TCP link can look live longer than it is; revisit with the shell's
