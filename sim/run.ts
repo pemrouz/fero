@@ -24,6 +24,11 @@ const nNodes = arg('nodes', 3)
 const nWrites = arg('writes', 40)
 //! --capture N: force-write seed N's capture even when green (for exploring a healthy trajectory in the viewer)
 const forceCapture = arg('capture', -1)
+//! scale knobs: --check-every K throttles the monitor pass (detection lags <= K events; the
+// log-cursor monitors lose nothing — see run({checkEvery})); --max-events raises the runaway
+// guard, which big-n trajectories exceed legitimately (n=100 formation alone is ~100k events).
+const checkEvery = arg('check-every', 1)
+const maxEvents = arg('max-events', 1_000_000)
 
 //! tests ARE debug artifacts (plan §8): a failing seed doesn't just print — it writes a capture the
 // viewer opens directly, so triage starts from a rendered timeline instead of a repro command.
@@ -65,7 +70,7 @@ for (let seed = 0; seed < seeds; seed++) {
     //! the sweep scenario lives in sweepBuild (shrink.ts) — ONE definition serves the sweep AND the shrinker;
     // draw order is byte-identical to the pre-M7 inline block (pinned by shrink.test.ts + the frozen event count)
     const { sim, nodes } = sweepBuild(seed, nNodes, nWrites)(null)
-    const violations = sim.run()
+    const violations = sim.run({ checkEvery, maxEvents })
     events += sim.events
 
     const fail =
