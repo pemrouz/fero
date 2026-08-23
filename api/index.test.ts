@@ -176,9 +176,25 @@ test('restore through the composer: fero(name, {dir}) refills the proxy from the
     assert.deepEqual(snapshot(second.data), { persisted: { rows: 4 }, volatile: true }, 'the heir folded the WAL into the proxy')
     assert.equal((snapshot(second.cluster) as { me: { origin: string } }).me.origin, 'aa~2', 'reborn lane')
     await second.destroy()
+
+    //! v4.1 identity recovery: the dir knows who it belongs to — a THIRD life with uuid OMITTED must
+    // boot as 'aa', not as a fresh random heir over aa's log (the silent evicted-read-only bug)
+    const third = await fero('r', { dir })
+    assert.equal((snapshot(third.cluster) as { me: { uuid: string } }).me.uuid, 'aa', 'restore recovered the identity')
+    assert.equal((snapshot(third.cluster) as { me: { origin: string } }).me.origin, 'aa~3', 'same node, next incarnation')
+    assert.deepEqual(snapshot(third.data), { persisted: { rows: 4 }, volatile: true }, 'the fold rode the recovered lane')
+    await third.destroy()
+
+    //! and a CONTRADICTING uuid refuses loudly — adopting a foreign log under a new name is never a default
+    await assert.rejects(fero('r', { uuid: 'bb', dir }), /does not match this dir's previous life 'aa'/)
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('v4.1 uuid discipline: empty and lane-separator uuids refuse at fero() time', async () => {
+  await assert.rejects(fero('r', { uuid: '' }), /uuid must be a non-empty string/)
+  await assert.rejects(fero('r', { uuid: 'a~1' }), /without '~'/)
 })
 
 test('destroy is clean: sockets down, timers cleared, capture detached — the proxy survives as a plain local value', async () => {

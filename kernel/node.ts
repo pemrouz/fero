@@ -852,6 +852,9 @@ export class Node {
     const m = this.membership
     this.#seqCeiling = this.seq + LAMPORT_LEASE
     this.env.sink.boot({
+      //! identity rides the record (v4.1): restore recovers WHO this dir belongs to, so an omitted
+      // config uuid can never half-restore under a fresh random identity (the silent evicted-heir bug)
+      uuid: this.uuid,
       epoch: m.view.epoch,
       members: m.view.members.map((x) => [x[0], x[1]] as [string, string]),
       lamport: this.#seqCeiling,
