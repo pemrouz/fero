@@ -102,6 +102,8 @@ export const JK = {
                      // DELIBERATE asymmetry: q:'journal'/'meta' pulls are NOT journaled — journaling reads-of-the-journal at follow
                      // cadence would evict the very history being followed (a 1 Hz dash eats a 4096-cap ring in minutes). Audit anchor
                      // for a session = diagAuth + linkDown. Do not "fix" this into spam.
+  //! ── v4.1 admission vocabulary ──
+  nameReject: 71,    // a=link, b=theirName — the HELLO declared a DIFFERENT resource name: refused (dead + noRedial), never admitted (admitting would silently cross-replicate two resources' logs)
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).
