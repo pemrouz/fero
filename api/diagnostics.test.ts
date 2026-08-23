@@ -16,7 +16,7 @@ import { ports, until } from '#utils'
 test('hygiene: the handle is Symbol-keyed — absent from keys/for-in, present via diag()', async () => {
   const f = await fero('r', {})
   try {
-    assert.deepEqual(Object.keys(f), ['name', 'data', 'methods', 'cluster', 'destroy'], 'the typed surface, exactly')
+    assert.deepEqual(Object.keys(f), ['name', 'data', 'methods', 'cluster', 'snapshot', 'destroy'], 'the typed surface, exactly')
     const seen: string[] = []
     for (const k in f) seen.push(k)
     assert.ok(!seen.some((k) => k.toLowerCase().includes('diag')), 'for-in never sees the handle')

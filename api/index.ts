@@ -20,7 +20,7 @@ import { JK } from '../kernel/journal.ts'
 import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
-import { proxy, contract } from './substrate.ts'
+import { proxy, contract, snapshot as snapshotOf } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
 import { captureNode } from '../tools/debug/capture.ts'
@@ -400,6 +400,15 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     data: dataSurface,
     methods: methodSurface,
     cluster,
+    //! snapshot (v4.1): the sanctioned SYNCHRONOUS whole-resource read — data's [value] materialize,
+    // surfaced first-class so render loops need no internals import. A fresh top container per
+    // access; rows shared by reference (stringify-and-discard is the intended use — methods.read()
+    // remains the cloning path). On an ARMED scoped node a sync local read could only be the shard —
+    // §9's banned silent partial — so it throws the typed ScopedError instead.
+    get snapshot() {
+      if (scoped && node.armed) scopedThrow('snapshot', 'holistic', 'a scoped node holds a shard — await data (the gather) or methods.read() for the whole resource')
+      return snapshotOf(bind.data)
+    },
     async destroy() {
       bind.destroy()
       host!.destroy()

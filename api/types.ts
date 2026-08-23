@@ -140,5 +140,11 @@ export interface Fero {
   data: any
   methods: Methods
   cluster: any
+  //! snapshot (v4.1): the synchronous dense value of the resource — data's [value] read surfaced
+  // first-class (the render-loop idiom; no internals import). A fresh top container per access with
+  // rows shared BY REFERENCE: mutating them corrupts the live projection (the documented data-model
+  // footgun — methods.read() is the cloning path). On an armed scoped node it throws ScopedError:
+  // a sync local read would be the shard, and a silent partial is never an answer (plan §9).
+  readonly snapshot: unknown
   destroy(): Promise<void>
 }
