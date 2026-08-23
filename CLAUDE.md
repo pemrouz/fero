@@ -33,7 +33,7 @@ exercises, run data's perf suite too.
 
 | Dir | What lives there |
 |---|---|
-| [api/](api) | The public surface: `fero()` ([index.ts](api/index.ts)), the LENS write trap → `Bind.issue` ([data.ts](api/data.ts)), **[substrate.ts](api/substrate.ts) — the ONE seam onto `../../data/api/index.ts`**, methods/RPC, fold, diagnostics, types. |
+| [api/](api) | The public surface: `fero()` ([index.ts](api/index.ts)), the LENS write trap → `Bind.issue` ([data.ts](api/data.ts)), **[substrate.ts](api/substrate.ts) — the ONE seam onto `../../data/api/index.ts`**, methods/RPC, fold, diagnostics, types. V4-2 role model: bare `fero(name)` = a CLIENT on the name-derived port; `server: true`/`listen`/`dir`/`replicas`/a `data:` seed/any method ⇒ server; `listen: false` = socketless solo; `f.snapshot` = the sync dense read. |
 | [kernel/](kernel) | The deterministic kernel: node, write pipeline, ring, membership, journal/log, codec (frames + runs), confirm, streams, scope, diag. No I/O — everything replayable. |
 | [shell/](shell) | The thin I/O runtime (real sockets/timers around the kernel). |
 | [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep — chaos schedules against the SAME kernel bytes the shell runs. |
@@ -50,7 +50,7 @@ DESIGN-M6/M7.
 
 | Command | What it does |
 |---|---|
-| `npm test` | 327 unit/sim/scenario tests (incl. the n=100 scale tier), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
+| `npm test` | 331 unit/sim/scenario tests (incl. the n=100 scale tier), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
 | `npm run perf` | The 41 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
 | `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` | Sim executive, shrinker, scenario server, debug viewer, two-terminals demo. |
 | `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200s each; `--only <name>`, `--seeds N`). Script-tier — run it on scale-relevant kernel changes, not per-commit. |

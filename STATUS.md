@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (327 + the 18-clause data contract ride) /
+Run from the repo root: `npm test` (331 + the 18-clause data contract ride) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -112,4 +112,22 @@ inside the outer apply.
   header had promised since v3 (8 renderer pins, mutation-checked). NOTE: a
   long-running `npm run debug` serves the registry loaded at ITS start —
   restart it to see new cards (?rerun=1 is not enough). Battery: 327/327 +
+  18/18 + perf 41/41.
+- 2026-08-23 (later still) — THE v4.1 SURFACE (V4-2): role by DECLARED ACT —
+  bare fero(name) is a CLIENT now; server: true / listen / dir / replicas /
+  a `data:` seed / any method marks a server; `listen: false` is the
+  socketless solo (BREAKING for the old bare-solo shape). The name-derived
+  default port (fnv1a32 → 127.0.0.1:[44800,45824), loopback only) behind the
+  new HELLO name echo — JK.nameReject (71) closes the silent cross-resource
+  merge on a misdial (both ends refuse, dead+noRedial; absent name = legacy,
+  frames byte-identical). The boot record carries `uuid` and restore
+  recovers it — the silent evicted-heir bug closed (uuid omitted on a
+  durable dir minted a fresh identity over the old life's WAL), with the
+  config/dir mismatch throw and fero()-time uuid validation (non-empty, no
+  '~'). The `data:` seed applies only when the local fold is empty at boot
+  (a restore never re-seeds) through the validated lens ingest. f.snapshot =
+  the sync dense read on the instance (armed-scoped throws typed;
+  JSON.stringify(f.data) stays documented-wrong — toJSON delegation was
+  REJECTED, see V4-2). The demo drops every address, identity, and internals
+  import (smoke-verified live on the derived port). Battery: 331/331 +
   18/18 + perf 41/41.

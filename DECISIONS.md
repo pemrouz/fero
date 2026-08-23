@@ -225,3 +225,45 @@ Consequences: 297/297 + 16/16 green; perf 36/36 at the v3-era thresholds; the
 seam is contract-pinned in both CIs (the c870bde class is structurally closed);
 residue tracked in IDEAS (move-streaming mirror keying, frame-batched apply,
 armor slimming).
+
+## V4-2 — the v4.1 surface: role by declared act, derived ports, recovered identity, f.snapshot (2026-08-23)
+Context: three config questions the surface couldn't answer cleanly — why must
+a caller mint a uuid, why must localhost topologies name addresses, why does a
+render loop import internals. Each closed with a real defect en route.
+Decision:
+- **Identity**: the boot record carries `uuid`; restore recovers it; the
+  composer resolves config ?? restored ?? random and THROWS on a config/dir
+  contradiction. (Closed en route: the silent evicted-heir bug — uuid omitted
+  on a durable dir half-restored under a fresh identity.) uuid validates at
+  fero() time: non-empty, no '~' (the incarnation-lane separator).
+- **Role by DECLARED ACT** (supersedes v2's hosts-without-listen rule): any
+  server marker — server: true, listen ('host:port' | false = the socketless
+  solo), dir, replicas, a data seed, any function-valued option — makes a
+  server; no marker = a CLIENT. hosts is pure dial targets (alone = the v2
+  client shape; beside a marker = a dialing member). Role is a pure function
+  of CONFIG. REJECTED: bind-arbitration (first to bind serves) — role must
+  never depend on timing or launch order; and client: true — with client the
+  default it pins nothing (add on demand for asymmetric-intent processes).
+- **The derived default port**: fnv1a32(name) into 127.0.0.1:[44800,45824) —
+  a bare server binds it, a bare client dials it; zero addresses on
+  localhost, zero scanning. Prerequisite shipped FIRST: HELLO echoes the
+  resource name; both ends refuse a mismatch (JK.nameReject 71, dead +
+  noRedial) — a misdial used to be ADMITTED and digest-on-admit silently
+  cross-replicated two resources' logs. Absent name = legacy embedder/sim:
+  no check, HELLO bytes unchanged. Loopback ONLY — the peer plane is
+  unauthenticated; a routable derived bind is never a default.
+- **The data seed**: `data: {...}` applies only when the local fold is empty
+  at boot (a restore/replay never re-seeds — the restored Lamport ceiling
+  would clobber newer values); rides the validated lens ingest like any write.
+- **f.snapshot**: the synchronous whole-resource read on the INSTANCE
+  (data's [value]); armed-scoped nodes throw the typed ScopedError (a sync
+  local read is the shard — the banned silent partial). REJECTED: delegating
+  toJSON through the lens — it quasi-reserves a name on the data surface and
+  adds a compare to the hot get trap; JSON.stringify(f.data) stays
+  documented-wrong (leaves render {}), f.snapshot is the idiom.
+Consequences: BREAKING — bare fero(name) is a client now (the old bare solo
+is `listen: false`); the durable-client and replicas-on-a-client refusals
+retire, unrepresentable by construction (dir/replicas imply server); the
+two-terminal demo runs with zero addresses/identities/internals imports.
+Battery: 331/331 + 18/18 contract + perf 41/41 (cold paths only — compose,
+boot, HELLO admission).
