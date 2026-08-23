@@ -239,6 +239,55 @@ test('40-seed mini-sweep WITH heartbeats: the floor + revival machinery under du
   }
 })
 
+test('checkEvery: 1 (and default) are byte-identical — the throttle at K=1 IS the per-event contract', () => {
+  const runWith = (opts?: { checkEvery?: number }) => {
+    const sim = new Sim(1234)
+    const nodes = cluster(sim, 3)
+    sim.fault('n01', 'n02', { delay: [1, 20], dupP: 0.3 })
+    writes(sim, nodes, 25)
+    const violations = sim.run(opts ?? {})
+    return { events: sim.events, trace: sim.trace.join(','), violations }
+  }
+  const dflt = runWith()
+  const k1 = runWith({ checkEvery: 1 })
+  assert.equal(k1.events, dflt.events)
+  assert.equal(k1.trace, dflt.trace)
+  assert.deepEqual(k1.violations, dflt.violations)
+})
+
+test('checkEvery: K detects a planted violation within K events of its per-event index', () => {
+  //! the monitor mechanism is what is under test, not any one invariant — a planted monitor that
+  // trips at a known event index measures exactly how far detection may lag under sampling.
+  const detectionAt = (checkEvery: number): number => {
+    const sim = new Sim(77)
+    const nodes = cluster(sim, 3)
+    writes(sim, nodes, 25)
+    sim.monitors.push({ name: 'planted', check: (s: Sim) => (s.events >= 100 ? 'planted' : null) })
+    const violations = sim.run({ stopOnViolation: true, checkEvery })
+    const hit = violations.find((v) => v.monitor === 'planted')!
+    assert.ok(hit, 'the planted violation must be detected')
+    return hit.event
+  }
+  const perEvent = detectionAt(1)
+  assert.equal(perEvent, 100, 'per-event detection lands ON the violating event')
+  const sampled = detectionAt(30)
+  assert.ok(sampled >= 100 && sampled <= 100 + 30, `detection at ${sampled} must lag <= checkEvery past event 100`)
+})
+
+test('checkEvery: a violation in the final sub-K tail is caught by the exit check at the final state', () => {
+  const sim = new Sim(77)
+  const nodes = cluster(sim, 3)
+  writes(sim, nodes, 25)
+  sim.monitors.push({ name: 'planted', check: (s: Sim) => (s.events >= 100 ? 'planted' : null) })
+  //! checkEvery far beyond the trajectory: no periodic pass ever fires — only the exit check stands
+  // between a tail violation and a silent pass
+  const violations = sim.run({ checkEvery: 1 << 30 })
+  const hit = violations.find((v) => v.monitor === 'planted')!
+  assert.ok(hit, 'the exit check must catch what no periodic pass saw')
+  assert.equal(hit.event, sim.events, 'detection is stamped at the final event')
+  assert.ok(sim.quiesced, 'the trajectory ran to quiescence despite the pending violation')
+})
+
 test('backpressure overflow heals: the queue clears to a tail hole, the drain-time digest exchange re-ships it all', () => {
   const sim = new Sim(9)
   const nodes = cluster(sim, 2)
