@@ -17,6 +17,7 @@
     "perf:pin": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts --pin",
     "perf:alloc": "node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test kernel/alloc.perf.ts",
     "sim": "node --experimental-strip-types --no-warnings sim/run.ts",
+    "sim:scale": "node --experimental-strip-types --no-warnings sim/scale-run.ts",
     "shrink": "node --experimental-strip-types --no-warnings sim/shrink.ts",
     "scenarios": "node --experimental-strip-types --no-warnings tools/debug/scenarios.ts",
     "debug": "node --experimental-strip-types --no-warnings tools/debug/serve.ts",
