@@ -1,12 +1,12 @@
 {
- "rev": "5cb5300",
- "when": "2026-07-12T11:48:31.750Z",
- "wallMs": 2418,
- "pass": 17,
- "total": 17,
+ "rev": "102baf2",
+ "when": "2026-08-23T15:07:26.058Z",
+ "wallMs": 7790,
+ "pass": 20,
+ "total": 20,
  "baseline": {
-  "rev": "a8b69da",
-  "when": "2026-07-06T10:35:26.414Z"
+  "rev": "5cb5300",
+  "when": "2026-07-12T11:48:31.750Z"
  },
  "scenarios": [
   {
@@ -64,7 +64,7 @@
     },
     {
      "k": "wall ms",
-     "v": 30,
+     "v": 23,
      "kind": "ms"
     }
    ],
@@ -72,7 +72,7 @@
     "links/node": 2,
     "dup links closed": 7,
     "events": 71,
-    "wall ms": 8
+    "wall ms": 30
    }
   },
   {
@@ -136,7 +136,7 @@
     },
     {
      "k": "wall ms",
-     "v": 39,
+     "v": 29,
      "kind": "ms"
     }
    ],
@@ -145,8 +145,161 @@
     "applied": 60,
     "contested": 0,
     "events": 153,
-    "wall ms": 10
+    "wall ms": 39
    }
+  },
+  {
+   "id": "scale-formation",
+   "title": "Scale — 100 nodes, 4,950 links, one mesh",
+   "kind": "happy",
+   "desc": "9,900 dials dedup to one link per pair and 100 concurrent writers converge — the sim/scale tier headline at dashboard budget (diagram is a 10-node schematic of the 100; monitors ride SAMPLED via run({checkEvery}) — per-event walks would cost minutes at this width)",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03",
+     "n04",
+     "n05",
+     "n06",
+     "n07",
+     "n08",
+     "n09",
+     "n10"
+    ],
+    "mesh": true,
+    "writers": [
+     "n01",
+     "n02",
+     "n03",
+     "n04",
+     "n05",
+     "n06",
+     "n07",
+     "n08",
+     "n09",
+     "n10"
+    ],
+    "phases": [
+     {
+      "label": "dial ×9,900",
+      "sev": "info"
+     },
+     {
+      "label": "dedup ×4,950",
+      "sev": "warn"
+     },
+     {
+      "label": "write ×100",
+      "sev": "gold"
+     },
+     {
+      "label": "converge ×100",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "nodes",
+     "v": 100,
+     "kind": "count"
+    },
+    {
+     "k": "links",
+     "v": 4950,
+     "kind": "count"
+    },
+    {
+     "k": "dup links closed",
+     "v": 10984,
+     "kind": "count"
+    },
+    {
+     "k": "applied",
+     "v": 9900,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 138629,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 3580,
+     "kind": "ms"
+    }
+   ],
+   "base": null
+  },
+  {
+   "id": "scale-genesis",
+   "title": "Scale genesis — one ballot, one proposer, 50 members",
+   "kind": "happy",
+   "desc": "the lowest uuid alone proposes view 1 once its full mesh stands, and ONE ballot commits all 50 members — the single-proposer law the scale tier pins at n=100 (sim/scale.test.ts), sized to the dashboard budget here",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03",
+     "n04",
+     "n05",
+     "n06",
+     "n07",
+     "n08"
+    ],
+    "mesh": true,
+    "phases": [
+     {
+      "label": "mesh at n01",
+      "sev": "info"
+     },
+     {
+      "label": "propose ×1",
+      "sev": "gold"
+     },
+     {
+      "label": "vote ×49",
+      "sev": "info"
+     },
+     {
+      "label": "view 1 ×50",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "members",
+     "v": 50,
+     "kind": "count"
+    },
+    {
+     "k": "proposers",
+     "v": 1,
+     "kind": "count"
+    },
+    {
+     "k": "installs",
+     "v": 50,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 94598,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 1092,
+     "kind": "ms"
+    }
+   ],
+   "base": null
   },
   {
    "id": "conflict",
@@ -209,7 +362,7 @@
     },
     {
      "k": "wall ms",
-     "v": 17,
+     "v": 7,
      "kind": "ms"
     }
    ],
@@ -218,7 +371,7 @@
     "contested": 4,
     "lww losses": 15,
     "events": 92,
-    "wall ms": 4
+    "wall ms": 17
    }
   },
   {
@@ -296,7 +449,7 @@
     },
     {
      "k": "wall ms",
-     "v": 34,
+     "v": 14,
      "kind": "ms"
     }
    ],
@@ -305,7 +458,7 @@
     "dups dropped": 80,
     "ae re-shipped": 101,
     "events": 192,
-    "wall ms": 8
+    "wall ms": 34
    }
   },
   {
@@ -397,7 +550,7 @@
     },
     {
      "k": "wall ms",
-     "v": 90,
+     "v": 25,
      "kind": "ms"
     }
    ],
@@ -406,7 +559,7 @@
     "dups dropped": 337,
     "applied": 180,
     "events": 613,
-    "wall ms": 19
+    "wall ms": 90
    }
   },
   {
@@ -478,7 +631,7 @@
     },
     {
      "k": "wall ms",
-     "v": 7,
+     "v": 3,
      "kind": "ms"
     }
    ],
@@ -487,7 +640,7 @@
     "ae re-shipped": 8,
     "redials": 8,
     "events": 71,
-    "wall ms": 2
+    "wall ms": 7
    }
   },
   {
@@ -553,7 +706,7 @@
     },
     {
      "k": "wall ms",
-     "v": 4,
+     "v": 2,
      "kind": "ms"
     }
    ],
@@ -561,7 +714,7 @@
     "redials": 10,
     "writes": 1,
     "events": 48,
-    "wall ms": 1
+    "wall ms": 4
    }
   },
   {
@@ -632,7 +785,7 @@
     },
     {
      "k": "wall ms",
-     "v": 21,
+     "v": 8,
      "kind": "ms"
     }
    ],
@@ -641,7 +794,7 @@
     "revives": 4,
     "redials": 42,
     "events": 303,
-    "wall ms": 9
+    "wall ms": 21
    }
   },
   {
@@ -706,7 +859,7 @@
     },
     {
      "k": "wall ms",
-     "v": 19,
+     "v": 12,
      "kind": "ms"
     }
    ],
@@ -715,8 +868,85 @@
     "shed": 257,
     "ae re-shipped": 300,
     "events": 321,
-    "wall ms": 5
+    "wall ms": 19
    }
+  },
+  {
+   "id": "scale-overflow",
+   "title": "Scale backpressure — 50 queues shed ONCE at fan-out 99",
+   "kind": "unhappy",
+   "desc": "half of one node’s 99 links pause; a 500-write burst overflows MAX_QUEUED on every paused link — exactly ONE whole-queue drop each (de-sync withholds a second), then 50 simultaneous drains re-teach every shed tail (diagram is a 6-node schematic of the 100)",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03",
+     "n04",
+     "n05",
+     "n06"
+    ],
+    "mesh": true,
+    "writers": [
+     "n01"
+    ],
+    "phases": [
+     {
+      "label": "form ×100",
+      "sev": "ok"
+     },
+     {
+      "label": "pause ×50",
+      "sev": "warn"
+     },
+     {
+      "label": "burst ×500",
+      "sev": "gold"
+     },
+     {
+      "label": "shed ×50",
+      "sev": "crit"
+     },
+     {
+      "label": "drain + converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "paused links",
+     "v": 50,
+     "kind": "count"
+    },
+    {
+     "k": "whole-queue drops",
+     "v": 50,
+     "kind": "count"
+    },
+    {
+     "k": "records shed",
+     "v": 12850,
+     "kind": "count"
+    },
+    {
+     "k": "ae re-shipped",
+     "v": 25000,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 116610,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 1896,
+     "kind": "ms"
+    }
+   ],
+   "base": null
   },
   {
    "id": "eviction",
@@ -797,7 +1027,7 @@
     },
     {
      "k": "wall ms",
-     "v": 104,
+     "v": 49,
      "kind": "ms"
     }
    ],
@@ -807,7 +1037,7 @@
     "joins": 2,
     "writes buffered": 1,
     "events": 2133,
-    "wall ms": 23
+    "wall ms": 104
    }
   },
   {
@@ -893,7 +1123,7 @@
     },
     {
      "k": "wall ms",
-     "v": 134,
+     "v": 50,
      "kind": "ms"
     }
    ],
@@ -902,7 +1132,7 @@
     "writes buffered": 2,
     "ae re-shipped": 8,
     "events": 1852,
-    "wall ms": 23
+    "wall ms": 134
    }
   },
   {
@@ -975,7 +1205,7 @@
     },
     {
      "k": "wall ms",
-     "v": 75,
+     "v": 21,
      "kind": "ms"
     }
    ],
@@ -985,7 +1215,7 @@
     "acked runs": 40,
     "contested": 0,
     "events": 802,
-    "wall ms": 10
+    "wall ms": 75
    }
   },
   {
@@ -1057,7 +1287,7 @@
     },
     {
      "k": "wall ms",
-     "v": 55,
+     "v": 16,
      "kind": "ms"
     }
    ],
@@ -1066,7 +1296,7 @@
     "acks observed": 1,
     "forwards": 1,
     "events": 1009,
-    "wall ms": 9
+    "wall ms": 55
    }
   },
   {
@@ -1143,7 +1373,7 @@
     },
     {
      "k": "wall ms",
-     "v": 64,
+     "v": 21,
      "kind": "ms"
     }
    ],
@@ -1152,7 +1382,7 @@
     "flushed via owner": 2,
     "forwards": 1,
     "events": 1655,
-    "wall ms": 11
+    "wall ms": 64
    }
   },
   {
@@ -1220,11 +1450,17 @@
     },
     {
      "k": "wall ms",
-     "v": 476,
+     "v": 128,
      "kind": "ms"
     }
    ],
-   "base": null
+   "base": {
+    "writes": 18,
+    "confirmed persisted": 3,
+    "rows replayed": 54,
+    "events": 4546,
+    "wall ms": 476
+   }
   },
   {
    "id": "wire",
@@ -1274,14 +1510,14 @@
     },
     {
      "k": "wall ms",
-     "v": 7,
+     "v": 4,
      "kind": "ms"
     }
    ],
    "base": {
     "bytes/record": 73,
     "frames/burst (3 peers)": 3,
-    "wall ms": 2
+    "wall ms": 7
    }
   },
   {
@@ -1355,20 +1591,20 @@
     },
     {
      "k": "events/s",
-     "v": 18920,
+     "v": 28938,
      "kind": "ms"
     },
     {
      "k": "wall ms",
-     "v": 1240,
+     "v": 811,
      "kind": "ms"
     }
    ],
    "base": {
     "seeds": "100/100",
     "events": 23436,
-    "events/s": 96742,
-    "wall ms": 243
+    "events/s": 18920,
+    "wall ms": 1240
    }
   }
  ]
