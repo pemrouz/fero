@@ -14,7 +14,11 @@ import type { Step } from './shrink.ts' // type-only: no runtime cycle (shrink i
 
 //! cluster — n nodes, full dial mesh (everyone dials everyone: deliberately redundant so the one-link-per-pair dedup is exercised on every formation).
 export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durable?: boolean; replicas?: number; fault?: Fault } = {}): Node[] => {
-  const ids = Array.from({ length: n }, (_, i) => `n${String(i + 1).padStart(2, '0')}`)
+  //! id width follows n: lexicographic order IS uuid order (the lowest uuid is the genesis proposer,
+  // membership.ts gate) — at n=100 a 2-wide pad would sort n100 between n10 and n11. n≤99 keeps the
+  // historical 2-wide ids so every seeded golden stays byte-identical.
+  const pad = Math.max(2, String(n).length)
+  const ids = Array.from({ length: n }, (_, i) => `n${String(i + 1).padStart(pad, '0')}`)
   const addrs = ids.map((id) => `sim:${id}`)
   const nodes = ids.map((id, i) =>
     sim.add({

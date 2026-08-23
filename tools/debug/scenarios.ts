@@ -101,12 +101,13 @@ const failOf = (sim: Sim, nodes: Node[]): string => {
 const owner = <T>(key: string, nodes: T[]): T =>
   nodes[[...key].reduce((h, c) => h + c.charCodeAt(0), 0) % nodes.length]
 
+const idOf = (i: number, n: number) => `n${String(i).padStart(Math.max(2, String(n).length), '0')}`
 const allPairs = (n: number): [string, string][] => {
   const out: [string, string][] = []
-  for (let i = 1; i <= n; i++) for (let j = i + 1; j <= n; j++) out.push([`n0${i}`, `n0${j}`])
+  for (let i = 1; i <= n; i++) for (let j = i + 1; j <= n; j++) out.push([idOf(i, n), idOf(j, n)])
   return out
 }
-const ids = (n: number) => Array.from({ length: n }, (_, i) => `n0${i + 1}`)
+const ids = (n: number) => Array.from({ length: n }, (_, i) => idOf(i + 1, n))
 
 //! ── the registry — ordered happy → unhappy → meta (the dashboard renders in this order) ──
 export const SCENARIOS: Scenario[] = [
