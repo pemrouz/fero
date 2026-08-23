@@ -195,10 +195,25 @@ export class Sim {
   // stopOnViolation (M7 shrinker, DESIGN-M7 §2): freeze the trajectory AT the first violating event —
   // sim.events === violations[first].event and every journal is cut at the violation instant, so the
   // capture opens AT the violation by construction (no scrubber machinery, no Violation shape change).
-  run(opts: { until?: number; maxEvents?: number; stopOnViolation?: boolean } = {}): Violation[] {
+  //! checkEvery (scale tier): run the monitor pass every K events instead of every event, plus ONCE
+  // when the loop exits — the full per-event pass is O(nodes × lanes) even when nothing changed, which
+  // at n=100 costs more than the trajectory itself. The log-cursor monitors (log-monotone,
+  // single-writer, attempt-exactly-once) lose NOTHING under sampling (cursors scan every appended
+  // entry exactly once regardless of K); state-snapshot monitors coarsen to sampled + at-exit.
+  // Violation.event is then the DETECTION event — at most checkEvery past the violating one.
+  run(opts: { until?: number; maxEvents?: number; stopOnViolation?: boolean; checkEvery?: number } = {}): Violation[] {
     const max = opts.maxEvents ?? 1_000_000
+    const every = opts.checkEvery ?? 1
     const v0 = this.violations.length // stop on violations pushed by THIS call, not an earlier phase's
     let n = 0 // per-CALL budget — the cumulative counter would trip a later phase for the sins of an earlier one
+    let unchecked = false // events have run since the last monitor pass — the exit check owes one
+    const check = (): void => {
+      unchecked = false
+      for (const m of this.monitors) {
+        const bad = m.check(this)
+        if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
+      }
+    }
     while (this.#queue.length) {
       if (opts.until !== undefined && this.#queue[0].at > opts.until) break
       const t = this.#pop()
@@ -206,12 +221,11 @@ export class Sim {
       t.run()
       this.events++
       if (++n > max) throw new Error(`sim runaway: >${max} events in one run() (seed ${this.seed})`)
-      for (const m of this.monitors) {
-        const bad = m.check(this)
-        if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
-      }
+      unchecked = true
+      if (n % every === 0) check()
       if (opts.stopOnViolation && this.violations.length > v0) return this.violations
     }
+    if (unchecked) check() // the final sub-K tail is always checked at the exit state
     return this.violations
   }
 
