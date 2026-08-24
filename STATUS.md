@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (331 + the 18-clause data contract ride) /
+Run from the repo root: `npm test` (333 + the 18-clause data contract ride) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -131,3 +131,21 @@ inside the outer apply.
   REJECTED, see V4-2). The demo drops every address, identity, and internals
   import (smoke-verified live on the derived port). Battery: 331/331 +
   18/18 + perf 41/41.
+- 2026-08-23 (the V4-2 adversarial review) — 4 lenses × 2-stage verify over
+  the surface stack; 12 confirmed, all triaged. FIXED: legacy-dir poisoning
+  (a v4.0 boot record + omitted uuid now REFUSES with the one-time-upgrade
+  hint instead of letting the random default claim the dir and lock the true
+  owner out); a non-empty wal.log without boot.json refuses as an incomplete
+  dir (the silent foreign-log adoption); restored uuids get the config-grade
+  validation; the boot record now carries the resource NAME (the disk twin
+  of the HELLO echo — fero('other', {dir-of-'r'}) refuses); a seed row the
+  validation seam rejects throws at fero() time, pre-validated whole so a
+  partial seed can never persist; a derived-port bind failure names the
+  mechanism and TEARS DOWN the half-built instance (bind/host/WAL-fd leaked
+  on any start rejection before); explicit listen required when a derived
+  (loopback) address would be gossiped to non-local hosts; hosts: [] on a
+  client refuses; cluster.me carries role + a client's effective dial
+  targets. ACCEPTED AS DESIGNED: the bare-solo→client flip (the V4-2
+  breaking change itself); pre-arm scoped snapshot reads locally; nameReject
+  churn is heartbeat-bounded and self-heals when the right resource appears.
+  Battery: 333/333 + 18/18 + perf 41/41.

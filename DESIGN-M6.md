@@ -299,7 +299,7 @@ FOLD-set additions (api/index.ts:187): 59, 60, 61, 63. No `shedInvalidated` kind
 5. **Shed evidence is shippable, not durable** (plan §5 verbatim) — all-R-non-durable simultaneous crash post-shed loses the prefix; durable-marks shed refinement for durable clusters → IDEAS.
 6. **One-shot gather is a documented snapshot union** — monotonicity is the live gather's promise (same staleness class as R=∞ multi-replica reads); wire-optimal disjoint Σ-partials need epoch-fenced disjointness → IDEAS.
 7. **Subscription-scoped spoke tap-forward** (only-what-you-watch) → IDEAS; a spoke today mirrors its primary's held shard + gather-backed wholes.
-8. **Offline-first durable clients** — already rejected loudly at fero() (api/index.ts:53); unchanged by M6.
+8. **Offline-first durable clients** — unrepresentable since V4-2 (dir implies the server role; no config shape yields a durable spoke), which retires the old fero()-time reject this line used to cite.
 9. **Remote-Handle ergonomics** (failover policy defaults per handle, handle caching) — M5 Handle machinery reused as-is; polish → IDEAS (api workstream).
 
 ---
