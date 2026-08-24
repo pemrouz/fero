@@ -9,7 +9,8 @@ import assert from 'node:assert'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { fero } from './index.ts'
+import net from 'node:net'
+import { fero, derivedAddr } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { JK } from '../kernel/journal.ts'
@@ -277,30 +278,87 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-y
 })
 
 test('v4.1 roles: following is ambient, serving is a declared act — and the derived port needs zero addresses', async () => {
-  //! no marker = a CLIENT (the open method namespace is the client tell); resolves with no server up
-  const bare = await fero('bare-role', { heartbeatMs: 0 })
+  //! no marker = a CLIENT (the open method namespace is the client tell); resolves with no server up.
+  // pid-suffixed names: the derived port is a pure function of the name, so fixed test names would
+  // bind fixed global ports and collide across concurrent checkouts of this repo on one box
+  const bare = await fero(`bare-role-${process.pid}`, { heartbeatMs: 0 })
   assert.equal(typeof bare.methods.anything, 'function', 'bare fero is a client — open namespace')
+  //! v4.1 observability: the role and the effective dial targets ride cluster.me
+  const bm = (snapshot(bare.cluster) as { me: { role: string; hosts: string[] } }).me
+  assert.equal(bm.role, 'client')
+  assert.deepEqual(bm.hosts, [derivedAddr(`bare-role-${process.pid}`)], 'the derived dial target is public')
   await bare.destroy()
   //! a data seed / a method / dir / replicas / server: true each imply SERVER (closed namespace).
   // NB this also retires M5b's durable-client refusal: dir implies server, so a durable spoke is
   // unrepresentable by construction — {hosts, dir} is a durable dialing MEMBER now.
-  const viaData = await fero('role-via-data', { data: { k: 1 }, heartbeatMs: 0 })
+  const viaData = await fero(`role-via-data-${process.pid}`, { data: { k: 1 }, heartbeatMs: 0 })
   assert.equal(typeof viaData.methods.anything, 'undefined', 'a data seed implies server')
+  assert.equal((snapshot(viaData.cluster) as { me: { role: string } }).me.role, 'server')
   assert.deepEqual(snapshot(viaData.data), { k: 1 }, 'seeded')
   await viaData.destroy()
   const viaMethod = await fero('r', { listen: false, m: () => 1 })
   assert.equal(typeof viaMethod.methods.anything, 'undefined', 'methods imply server')
   await viaMethod.destroy()
-  //! the loud refusals: an undialable member; a role pin that is not literally true
+  //! the loud refusals: an undialable member; a role pin that is not literally true; a dead-end
+  // client with an EMPTY hosts; a derived (loopback) listen gossiped to non-local peers
   await assert.rejects(fero('r', { listen: false, hosts: ['127.0.0.1:1'] }), /undialable/)
   await assert.rejects(fero('r', { server: 1 } as never), /server must be true/)
+  await assert.rejects(fero('r', { hosts: [] }), /hosts is empty/)
+  await assert.rejects(fero('r', { server: true, hosts: ['10.0.0.5:4800'] }), /explicit listen required/)
   //! derived-port end-to-end: a bare server and a bare client find each other by NAME alone
-  const s = await fero('derive-e2e', { server: true, heartbeatMs: 50, redialMs: 30 })
-  const c = await fero('derive-e2e', { heartbeatMs: 50, redialMs: 30 })
+  const nm = `derive-e2e-${process.pid}`
+  const s = await fero(nm, { server: true, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero(nm, { heartbeatMs: 50, redialMs: 30 })
   try {
     s.data.k = 'found'
     assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).k === 'found', 8000), 'found via the derived port — zero addresses configured')
   } finally { await c.destroy(); await s.destroy() }
+  //! a derived-port bind failure names the MECHANISM — raw EADDRINUSE on a port nobody chose is
+  // loud but incomprehensible (and the failure path must tear the runtime down, not leak it)
+  const cn = `collide-${process.pid}`
+  const caddr = derivedAddr(cn)
+  const ci = caddr.lastIndexOf(':')
+  const blocker = net.createServer()
+  await new Promise<void>((res, rej) => { blocker.once('error', rej); blocker.listen(Number(caddr.slice(ci + 1)), caddr.slice(0, ci), res) })
+  try {
+    await assert.rejects(fero(cn, { server: true }), /derived port .* pass listen explicitly/)
+  } finally { await new Promise<void>((r) => blocker.close(() => r())) }
+})
+
+test('v4.1 identity hardening: legacy dirs, incomplete dirs, invalid and cross-resource boot records all refuse loudly', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-idh-'))
+  try {
+    //! a v4.0 boot record (no uuid): the RANDOM default may never claim it — one misboot would stamp
+    // the accident into boot.json and lock the true owner out behind the mismatch throw
+    fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
+    await assert.rejects(fero('r', { dir, listen: false }), /predates identity recovery/)
+    const up = await fero('r', { uuid: 'aa', dir, listen: false }) // the one-time named upgrade…
+    await up.destroy()
+    const rec = await fero('r', { dir, listen: false }) // …and recovery is automatic thereafter
+    assert.equal((snapshot(rec.cluster) as { me: { uuid: string } }).me.uuid, 'aa')
+    await rec.destroy()
+    //! the dir records WHAT as well as WHO — the disk twin of the HELLO name echo
+    await assert.rejects(fero('other', { dir, listen: false }), /belongs to resource 'r'/)
+    //! an invalid uuid planted in boot.json refuses with the same rule as config
+    fs.writeFileSync(path.join(dir, 'boot.json'), JSON.stringify({ uuid: 'x~2', epoch: 0, members: [], lamport: 0, incarnation: 1, votedFor: { e: 0, p: '', h: '' } }))
+    await assert.rejects(fero('r', { dir, listen: false }), /invalid uuid/)
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+  //! a NON-EMPTY wal.log with no boot.json is an incomplete dir (partial copy) — never adopted
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-idh2-'))
+  try {
+    fs.writeFileSync(path.join(dir2, 'wal.log'), Buffer.from([1, 2, 3]))
+    await assert.rejects(fero('r', { uuid: 'bb', dir: dir2, listen: false }), /no boot\.json/)
+  } finally { fs.rmSync(dir2, { recursive: true, force: true }) }
+})
+
+test('v4.1 data seed: a row the validation seam refuses throws at fero() time — never a silent partial seed', async () => {
+  await assert.rejects(
+    fero('r', {
+      listen: false,
+      data: { a: { stock: 1 }, b: { stock: -5 } },
+      seams: { validation: (r: { value?: { stock?: number } }) => ((r.value?.stock ?? 0) >= 0 ? true : 'negative stock') },
+    }),
+    /data seed row 'b' rejected by seams\.validation — negative stock/)
 })
 
 test('v4.1 data seed: applied only when the local fold is empty at boot — a restore never re-seeds', async () => {

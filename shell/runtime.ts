@@ -43,14 +43,29 @@ export interface RuntimeOpts extends NodeOpts { dir?: string }
 
 //! restoreOpts — read the durable facts back into NodeOpts shape (the embedder calls this BEFORE
 // constructing the Runtime, bumps incarnation itself, then replays via runtime.restore()).
-export const restoreOpts = (dir: string): { uuid?: string; boot?: NodeOpts['boot']; incarnation?: number } => {
+// NB (v4.1): the result now carries the dir's uuid and resource name — an embedder that blind-spreads
+// it AFTER a configured uuid silently adopts the dir's identity (and before it, silently keeps its
+// own over the dir's boot facts). Compare explicitly like the composer does (api/index.ts): a
+// config/dir identity contradiction should THROW, never resolve by spread order.
+export const restoreOpts = (dir: string): { uuid?: string; name?: string; boot?: NodeOpts['boot']; incarnation?: number } => {
   const bootPath = path.join(dir, 'boot.json')
-  if (!fs.existsSync(bootPath)) return {}
+  if (!fs.existsSync(bootPath)) {
+    //! a NON-EMPTY wal.log with no boot record is an incomplete dir (partial copy, deleted
+    // boot.json, a rename that never survived a foreign fs) — replaying it would adopt an unowned
+    // log under whatever identity the caller happens to hold: the silent merge v4.1 refuses. An
+    // EMPTY wal.log is the honest crash-before-first-boot-write window (the append fd creates the
+    // file at construction) — a pristine fresh boot, not an adoption.
+    const walPath = path.join(dir, 'wal.log')
+    if (fs.existsSync(walPath) && fs.statSync(walPath).size > 0)
+      throw new Error(`restoreOpts: ${dir} holds a wal.log but no boot.json — an incomplete dir (partial copy?); refusing to adopt an unowned log`)
+    return {}
+  }
   const b = JSON.parse(fs.readFileSync(bootPath, 'utf8')) as BootRecord
   return {
     //! identity recovery (v4.1): the dir knows who it belongs to — a pre-v4.1 boot.json lacks the
     // field (absent key) and the caller falls back to its configured/random uuid, the legacy behavior
     ...(b.uuid ? { uuid: b.uuid } : {}),
+    ...(b.name ? { name: b.name } : {}),
     boot: {
       epoch: b.epoch, members: b.members, lamport: b.lamport, votedFor: b.votedFor,
       //! M6 (armed lives only — absent keys stay absent, so unscoped restores are shape-identical):

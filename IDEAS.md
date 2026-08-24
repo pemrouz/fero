@@ -144,3 +144,7 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
 - [P3] (api) A held-shard local read under scoping (f.snapshot throws typed
   today) — needs a name that cannot be mistaken for the resource ('shard'?);
   wait for demand.
+- [P3] (api) A transitional diagnostic for v4.0 solo idioms — a bare config that
+  was a solo pre-V4-2 ({uuid} alone, {seams} alone) boots as a client silently;
+  cluster.me.role now names it, but a one-release composer warning would catch
+  migrations earlier. Add only if migration reports appear.

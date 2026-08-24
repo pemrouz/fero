@@ -5,7 +5,7 @@ Guide for Claude sessions working in this repo. Read this before making changes.
 ## What this is
 
 **fero v4** — distributed, replicated reactive resources: `fero(name, opts)`
-returns `{ data, methods, cluster, destroy }`, where `data` is a live view
+returns `{ name, data, methods, cluster, snapshot, destroy }`, where `data` is a live view
 whose reads, writes (plain assignment), and reactive operators all flow
 through the sibling [`data`](../data/) engine's change records — which are
 also the wire format. Underneath: a **deterministic kernel** (per-cell LWW +
@@ -50,7 +50,7 @@ DESIGN-M6/M7.
 
 | Command | What it does |
 |---|---|
-| `npm test` | 331 unit/sim/scenario tests (incl. the n=100 scale tier), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
+| `npm test` | 333 unit/sim/scenario tests (incl. the n=100 scale tier), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
 | `npm run perf` | The 41 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
 | `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` | Sim executive, shrinker, scenario server, debug viewer, two-terminals demo. |
 | `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200s each; `--only <name>`, `--seeds N`). Script-tier — run it on scale-relevant kernel changes, not per-commit. |

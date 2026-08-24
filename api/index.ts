@@ -1,4 +1,4 @@
-//! ── api/index — the composer: fero(name, opts) → { data, methods, cluster, destroy } ──
+//! ── api/index — the composer: fero(name, opts) → { name, data, methods, cluster, snapshot, destroy } ──
 // The whole public surface (plan §9, the v2 shape kept): zero events, zero hooks —
 // everything reactive is a ViewProxy you connect or tap. Config recognition is by
 // VALUE TYPE backed by a DECLARED schema: function-valued opts are methods (any
@@ -92,19 +92,45 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   // dials it — the demo's two terminals need zero addresses, and real deployments keep explicit ones
   const listen = isServer && config.listen !== false ? ((config.listen as string | undefined) ?? derivedAddr(name)) : undefined
   const hosts = (config.hosts as string[] | undefined) ?? (isClient ? [derivedAddr(name)] : undefined)
+  //! an explicitly EMPTY hosts on a client is a dead-end (it dials nothing — not even the derived
+  // port) — refuse loudly rather than boot a follower that can never follow anything
+  if (isClient && Array.isArray(config.hosts) && (config.hosts as string[]).length === 0)
+    throw new Error(`fero('${name}'): hosts is empty — omit it (a bare client dials the name-derived port) or list feeders`)
+  //! the derived listen is a LOOPBACK convenience: gossiping 127.0.0.1 as "my dialable address" to a
+  // non-local peer would have every dial-back reach the peer's OWN box — a futile redial forever, or
+  // a same-named stranger silently welded into membership. Dialing past loopback demands explicit listen.
+  const loopback = (h: string) => h.startsWith('127.') || h.startsWith('localhost:') || h.startsWith('[::1]')
+  if (isServer && config.listen === undefined && hosts !== undefined && hosts.some((h) => !loopback(h)))
+    throw new Error(`fero('${name}'): explicit listen required when dialing non-local hosts — the derived port is a loopback-only convenience (peers would be told 127.0.0.1 is this node's address)`)
   //! uuid discipline (v4.1): the string is validated (an empty uuid, or one containing '~' — the
   // incarnation-lane separator — could alias another node's lane in origin-string space), and a
   // durable dir's RESTORED identity beats the random default: fero(name, {dir}) with uuid omitted
   // boots as the SAME node every life. A user-supplied uuid that contradicts the dir throws loudly —
   // adopting a foreign log under a new name is the silent evicted-heir bug, never a default.
-  if (config.uuid !== undefined && (typeof config.uuid !== 'string' || config.uuid === '' || config.uuid.includes('~')))
+  const badUuid = (u: unknown) => typeof u !== 'string' || u === '' || u.includes('~')
+  if (config.uuid !== undefined && badUuid(config.uuid))
     throw new Error(`fero('${name}'): uuid must be a non-empty string without '~' (the incarnation-lane separator)`)
   //! restore-before-network: a dir holding a previous life boots as its heir (identity recovered,
   // incarnation bumped, clock leased, votedFor honored) — the composer makes the wal.test.ts idiom
   // the default path
   const restored = config.dir ? restoreOpts(config.dir as string) : {}
+  //! the review's legacy-poisoning finding: a pre-v4.1 boot record carries no uuid — letting the
+  // RANDOM default claim such a dir would stamp the accident into boot.json on the very next write
+  // and lock the true owner out behind the mismatch throw below. Refuse instead: the operator names
+  // the identity ONCE; every later boot record carries it and recovery is automatic thereafter.
+  if (restored.boot !== undefined && restored.uuid === undefined && config.uuid === undefined)
+    throw new Error(`fero('${name}'): this dir predates identity recovery (a v4.0 boot record carries no uuid) — pass the node's uuid once; the next boot record will carry it`)
+  //! a hand-edited or embedder-written boot record gets the SAME validation as config (the composer
+  // is the public gate; the kernel trusts NodeOpts by design)
+  if (restored.uuid !== undefined && badUuid(restored.uuid))
+    throw new Error(`fero('${name}'): this dir's boot record carries an invalid uuid (${JSON.stringify(restored.uuid)}) — repair boot.json`)
   if (config.uuid !== undefined && restored.uuid !== undefined && config.uuid !== restored.uuid)
     throw new Error(`fero('${name}'): uuid '${config.uuid as string}' does not match this dir's previous life '${restored.uuid}' — one dir, one identity (use a fresh dir for a new node)`)
+  //! the dir records WHAT as well as WHO (v4.1): the same misdial class the name-echo closes on the
+  // wire exists one layer down — fero('other', {dir-of-'r'}) would fold r's WAL into 'other' and
+  // replicate it outward. A legacy record lacks the field: no check, stated legacy behavior.
+  if (restored.name !== undefined && restored.name !== name)
+    throw new Error(`fero('${name}'): this dir belongs to resource '${restored.name}' — one dir, one resource (use a fresh dir)`)
   const rtOpts: RuntimeOpts = {
     uuid: (config.uuid as string) ?? restored.uuid ?? randomUUID().slice(0, 8),
     //! the resource name rides HELLO (v4.1): a misdial onto another resource's port refuses loudly
@@ -133,13 +159,6 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     tracked: () => host?.tracked(),
   })
   if (config.dir) rt.restore()
-  //! the data seed (v4.1): applied ONLY when the local fold is empty at boot — a durable restore or
-  // any replayed state skips it (re-seeding every life would clobber newer values: the restored
-  // Lamport ceiling stamps above old writes). Seeds ride the ordinary lens assignment, so the
-  // validation seam covers them like any write; on first contact with an existing cluster, LWW
-  // resolves collisions (higher-epoch cluster stamps win; fresh keys replicate in).
-  if (config.data !== undefined && rt.node.versions.size === 0)
-    for (const [k, v] of Object.entries(config.data as Record<string, unknown>)) (bind.data as Record<string, unknown>)[k] = v
 
   //! ── the confirm-probe multiplexer (M4c events under the methods surface) ──
   let probeSeq = 0
@@ -365,7 +384,14 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     members: {},
     peers: {},
     writes: {},
-    me: { uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: node.listen },
+    //! me carries the ROLE and (for clients) the effective dial targets (v4.1 — the review's
+    // observability finding: a bare client's silent failure modes all presented as {listen: '',
+    // peers: {}}, indistinguishable from "server not up yet" without the diagnostics seam)
+    me: {
+      uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: node.listen,
+      role: isClient ? 'client' : 'server',
+      ...(isClient ? { hosts: hosts ?? [] } : {}),
+    },
     partitions: partitionsRow(),
   })
   const FOLD = new Set<number>([JK.viewInstall, JK.evict, JK.gateOpen, JK.gateClose, JK.identified, JK.linkDown, JK.suspect, JK.start,
@@ -429,7 +455,47 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   }
   rt.hook(fold)
 
-  await rt.start()
+  //! any failure past Runtime construction must tear down what was built — the review caught the
+  // leak: a rejected fero() left the bind, the host, and the open WAL fd alive, and v4.1 makes
+  // start-rejection a default-path event (a derived-port collision) rather than an operator typo
+  const abort = async (err: unknown): Promise<never> => {
+    bind.destroy()
+    host!.destroy()
+    caller?.destroy()
+    memberCaller?.destroy()
+    gather?.destroy()
+    for (const [, settle] of probes) settle(false)
+    probes.clear()
+    await rt.destroy().catch(() => {})
+    throw err
+  }
+  //! the data seed (v4.1): applied ONLY when the local fold is empty at boot — a durable restore or
+  // any replayed state skips it (re-seeding every life would clobber newer values: the restored
+  // Lamport ceiling stamps above old writes). The declared seed is CONFIG, so a row the validation
+  // seam refuses is a config error and throws at fero() time — pre-validated as a whole batch first,
+  // so a rejected seed never half-applies (with dir, a partial seed would persist and no later life
+  // could ever complete it: versions.size > 0 skips the retry forever). On first contact with an
+  // existing cluster, LWW resolves collisions (higher-epoch cluster stamps win; fresh keys ride in).
+  if (config.data !== undefined && rt.node.versions.size === 0) {
+    const recs: Rec[] = Object.entries(config.data as Record<string, unknown>).map(([k, v]) => ({ type: REC.update, key: [k], value: v }))
+    const validate = seams.validation as ((rec: Rec) => true | string) | undefined
+    if (validate)
+      for (const r of recs) {
+        const v = validate(r)
+        if (v !== true) await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' rejected by seams.validation — ${v}`))
+      }
+    for (const r of bind.issue(recs, false))
+      if (typeof r === 'string') await abort(new Error(`fero('${name}'): data seed refused by the kernel — ${r}`))
+  }
+  try {
+    await rt.start()
+  } catch (err) {
+    //! a DERIVED-port bind failure names the mechanism the user never configured — raw EADDRINUSE
+    // on a port nobody chose is loud but incomprehensible (the review's exact wording)
+    await abort(isServer && config.listen === undefined
+      ? new Error(`fero('${name}'): could not bind the derived port ${listen} (${(err as Error)?.message ?? String(err)}) — another resource's derived port may collide on this box; pass listen explicitly or rename the resource`)
+      : err)
+  }
   fold()
 
   const inst: Fero = {

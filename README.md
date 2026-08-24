@@ -397,7 +397,7 @@ kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.
   journal.ts    the one typed diagnostics ring (drop-oldest, surfaced drop counter)
   diag.ts       the authenticated DIAG plane (M7): the r:2 session latch + cursor-chunked pulls, structurally outside membership
 shell/    production adapters (TCP + timers + the fsync WAL/boot-record store), zero protocol decisions
-api/      the public surface (M5a): fero(name, opts) → {data, methods, cluster, destroy}
+api/      the public surface: fero(name, opts) → {name, data, methods, cluster, snapshot, destroy} (V4-2: role by declared act; bare fero(name) = a client on the name-derived port)
   substrate.ts  the ONE seam onto the `data` sibling ($() proxies): record-apply ingress, clone-free capture, sync detach
   data.ts       the binding: capture→ingest, apply→proxy, echo match-and-consume, the cid-keyed overlay (read-your-writes)
   index.ts      the composer: declared config schema (typos throw), seams.validation, default write methods over the confirm ladder
@@ -619,6 +619,7 @@ a real multi-process cluster over the wire).
 - **M5 — the public api — is COMPLETE** (M5a composer + M5b clients + M5c
   methods + M5d cluster/scenarios/demo; adversarial review pending) (api/):
   `await fero(name, opts)` → `{data, methods, cluster, destroy}` over `$()`
+  (V4-2 widened the surface to `{name, data, methods, cluster, snapshot, destroy}`)
   proxies, sliced (like M4) into four landable increments: **M5a** composer +
   data binding + cid-overlay → **M5b** the client role (below) → **M5c** methods
   (CALL/SUB verbs, sink.invoke with handlers hosted in the impure api layer,

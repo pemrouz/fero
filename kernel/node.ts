@@ -869,8 +869,10 @@ export class Node {
     this.#seqCeiling = this.seq + LAMPORT_LEASE
     this.env.sink.boot({
       //! identity rides the record (v4.1): restore recovers WHO this dir belongs to, so an omitted
-      // config uuid can never half-restore under a fresh random identity (the silent evicted-heir bug)
+      // config uuid can never half-restore under a fresh random identity (the silent evicted-heir
+      // bug) — and WHAT it replicates, so a dir pointed at by the wrong resource refuses loudly.
       uuid: this.uuid,
+      ...(this.name !== undefined ? { name: this.name } : {}),
       epoch: m.view.epoch,
       members: m.view.members.map((x) => [x[0], x[1]] as [string, string]),
       lamport: this.#seqCeiling,

@@ -137,6 +137,10 @@ export interface BootRecord {
   // authority (node.ts replayHeld). Optional for the absent-key discipline: a pre-v4.1 boot.json
   // simply lacks it and restore falls back to the configured/random identity (legacy behavior, stated).
   uuid?: string
+  //! name (v4.1): the RESOURCE this dir replicates — the disk twin of HELLO's name echo. A dir
+  // pointed at by the wrong resource refuses at fero() time instead of folding a foreign WAL into
+  // an unrelated resource and replicating it outward. Absent on legacy/embedder records: no check.
+  name?: string
   epoch: number
   members: [string, string][]
   lamport: number
