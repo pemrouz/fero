@@ -296,6 +296,13 @@ export class Runtime {
         server.listen(port, host, () => {
           server.removeListener('error', reject)
           server.on('error', () => {}) // post-start server errors must not become uncaughtException
+          //! port 0 (V4-3): the OS chose — publish the real address to the kernel NOW, inside the listen
+          // callback: before the start stimulus dials anyone and before any accepted socket can HELLO
+          // (accept fires only after listen), so the gossiped listen is never ':0'.
+          if (port === 0) {
+            const a = server.address() as net.AddressInfo
+            this.node.listen = `${host}:${a.port}`
+          }
           resolve()
         })
       })

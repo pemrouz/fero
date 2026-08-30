@@ -101,7 +101,13 @@ export class Node {
   // resource's port refuses instead of silently merging logs (see NodeOpts.name). Optional: absent
   // (sim harness, embedders) disables the check and keeps the HELLO body byte-identical with v4.0.
   readonly name?: string
-  readonly listen: string
+  //! listen — my dialable address, gossiped in HELLO. Assignable (V4-3): a shell that binds port 0 writes
+  // the OS-chosen address here inside its listen callback — before the start stimulus and before any
+  // accepted socket can HELLO — and the kernel reads it only at send/propose time. Assignment invalidates
+  // the cached hosts (own listen is excluded from the dial set).
+  #listen = ''
+  get listen(): string { return this.#listen }
+  set listen(v: string) { this.#listen = v; this.#hostsCache = null }
   readonly incarnation: number
   //! origin — THE PROVENANCE LANE this life stamps under: the bare uuid for incarnation 1, uuid~inc
   // for reborn lives (so first lives — and every pre-M4 trajectory — are byte-identical on the wire).
@@ -328,8 +334,21 @@ export class Node {
   // so the member hot path pays nothing (M5b).
   clientLinks = new Set<Link>()
 
-  //! hosts — the static discovery targets (membership's genesis quorum + the revival loop read it).
-  get hosts(): string[] { return this.#opts.hosts ?? [] }
+  //! hosts — the discovery targets: static NodeOpts.hosts ∪ the dynamic set the `discover` event
+  // installs (V4-3), deduplicated, minus this node's own listen. Genesis (links ≥ hosts) and the
+  // revival loop read it every heartbeat, so it is CACHED — rebuilt only when either set (or the
+  // listen) changes; the per-tick readers allocate nothing.
+  #dynamic: string[] = []
+  #hostsCache: string[] | null = null
+  get hosts(): string[] {
+    if (this.#hostsCache === null) {
+      const out = new Set<string>()
+      for (const h of this.#opts.hosts ?? []) if (h !== this.listen) out.add(h)
+      for (const h of this.#dynamic) if (h !== this.listen) out.add(h)
+      this.#hostsCache = [...out]
+    }
+    return this.#hostsCache
+  }
 
   //! dialing — is a backoff chain still actively trying this target? Membership holds eviction while
   // true: an un-exhausted dial means reachability is UNKNOWN (e.g. the pending-redial window right
@@ -342,7 +361,7 @@ export class Node {
   //! #revivable — the give-up revival target set: static hosts ∪ committed-view member listens (a
   // joiner learned via a VIEW is as entitled to revival as a configured host — it may OWN partitions).
   #revivable(): Set<string> {
-    const targets = new Set(this.#opts.hosts ?? [])
+    const targets = new Set(this.hosts)
     for (const [u, listen] of this.membership.view.members) if (u !== this.uuid && listen) targets.add(listen)
     return targets
   }
@@ -363,11 +382,43 @@ export class Node {
         // floors stayed pinned at 0 and the ledger persisted forever.
         if (this.durable && this.#dirty.size) this.#walRows = SNAPSHOT_AT
         this.persistBoot() // the incarnation bump is a durable fact from the first instant
-        for (const to of this.#opts.hosts ?? []) if (to !== this.listen) {
+        for (const to of this.hosts) {
           j.armed && j.emit(JK.dial, to)
           this.env.sink.connect(to)
         }
         if ((this.#opts.heartbeatMs ?? 0) > 0) this.#armHeartbeat()
+        return
+      }
+      //! discover (V4-3): the dynamic host set, replaced wholesale. ADDED targets dial now unless a live
+      // link already covers them (our dialed `to`, or the peer's gossiped listen) or a backoff chain is
+      // still actively trying them; a covered target's stale backoff entry is cleared so a later loss
+      // starts a fresh chain. FORGOTTEN targets PARK: the entry is set given-up at the cap, so the chain's
+      // next linkDown stops instead of restarting from base, and revival (hosts ∪ view) no longer lists
+      // them — unless the target is a static host or a committed member, which are never forgotten.
+      // Live links are never closed here: a peer's departure is a link fact, not a directory fact. A
+      // target re-added later clears its park and dials afresh.
+      case 'discover': {
+        const next = new Set<string>()
+        for (const h of e.hosts) if (h && h !== this.listen) next.add(h)
+        const prev = new Set(this.#dynamic)
+        this.#dynamic = [...next]
+        this.#hostsCache = null
+        const statics = new Set(this.#opts.hosts ?? [])
+        for (const to of prev) {
+          if (next.has(to) || statics.has(to) || this.membership.view.members.some(([, l]) => l === to)) continue
+          const b = this.#backoff.get(to)
+          this.#backoff.set(to, { ms: b?.ms ?? (this.#opts.redialMs ?? 100), tries: MAX_REDIALS, gaveUp: true })
+        }
+        for (const to of next) {
+          if (prev.has(to) || statics.has(to)) continue
+          let held = false
+          for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) { held = true; break }
+          if (held) { this.#backoff.delete(to); continue }
+          if (this.dialing(to)) continue
+          this.#backoff.delete(to)
+          j.armed && j.emit(JK.dial, to)
+          this.env.sink.connect(to)
+        }
         return
       }
       //! M4b storage echoes: a WAL batch resolved (advance the durable watermarks it covered) or failed
