@@ -206,25 +206,33 @@ heartbeatMs, redialMs }, {system: true})`.
 done by hand against the tree. Re-run the panel on the implementation.)
 
 - **No `unregister` method.** Link death IS the mechanism: a clean destroy
-  closes the socket (FIN → linkDown on the host, immediate), a crash does the
-  same via the OS, and a hung process falls to the failure detector. The host
-  removes every entry a registrant made when its uuid is no longer up in
-  `cluster.peers`. Fewer moving parts than a best-effort call racing
-  `Caller.destroy`.
-- **A user resource may not `listen` on the rendezvous address** — refused at
-  compose time. Otherwise a fero node of another name squatting the port would
-  be name-rejected by every directory client (`dead + noRedial`, kernel/node.ts
-  HELLO), and a noRedial link never starts a backoff chain, so give-up revival
-  never reaches it: discovery on the box stranded until the processes restart.
-  A NON-fero squatter is fine: framer garbage → a normal linkDown → a bounded
-  chain → give-up → revival every heartbeat (the rendezvous is the directory
-  client's static host) → recovers the moment the squatter leaves.
-- **`discover` removal PARKS, not deletes.** Deleting a mid-flight chain's
-  backoff entry would let its next linkDown restart from base (MAX_REDIALS
-  more dials at a dead address). Parking sets the entry given-up at the cap:
-  the chain's next failure stops, revival ignores it (not in hosts), and a
-  later re-add clears the park and dials afresh. Static hosts and committed
-  members are never parked by a discover.
+  closes the socket (FIN → linkDown on the host, immediate) and a crash does
+  the same via the OS. Entry lifetime IS the registrant's TCP connection to the
+  current host: a hung-but-connected process keeps its entry (the kernel runs
+  no failure detector over client links — PONG is proof of life, not
+  accounted; suspicion ranges over committed members only), exactly as it
+  keeps its cluster membership. The host removes every entry a registrant made
+  when its uuid is no longer up in `cluster.peers`. Fewer moving parts than a
+  best-effort call racing `Caller.destroy`.
+- **A user resource may not `listen` on a rendezvous socket** — refused at
+  compose time under ANY spelling that lands on the same loopback socket
+  (`0.0.0.0:3376`, `localhost:3376`, `[::]:3376`; the panel's bypass), against
+  the instance's own rendezvous, the process default, AND the constant (so
+  `rendezvous: false` cannot squat a socket a later process will dial). And
+  the kernel no longer strands on a squat at all: a name-rejected DIALED
+  target is parked given-up, so give-up revival re-dials it once per
+  heartbeat — a squat is a heartbeat-bounded nuisance that heals when the
+  right resource appears (`kernel/discover.test.ts`, the name-reject pin).
+  A NON-fero squatter: framer garbage → a normal linkDown → a bounded chain
+  → give-up → revival every heartbeat → recovers the moment it leaves.
+- **`discover` removal cancels, then parks only what is still named.** A
+  forgotten target's armed redial timer is CANCELLED (the panel found the
+  park-then-re-add fork: an orphaned timer plus a fresh dial ran the chain
+  doubled); the entry is parked — `dialing()` false, `#redial` ends the chain
+  and drops the entry — only while a live link or an in-flight dial still
+  names the target, and simply deleted otherwise, so `#backoff` is bounded by
+  the live link set rather than by every address a port-0 server ever had.
+  Static hosts and committed members are never parked by a discover.
 - **Register on EVERY directory primary change** (`{retry: true}`; idempotent).
   Peer-down cleanup is keyed by uuid TRANSITIONS: a registrant that reconnects
   before the host processes its old link's close keeps its uuid up (the fold
@@ -242,3 +250,48 @@ done by hand against the tree. Re-run the panel on the implementation.)
   transient, not a strand.
 - **Panel answers:** Q1 no (clients host nothing). Q2 no settle. Q3 no
   dial-back. Q4 3376 + `FERO_RENDEZVOUS`. Q5 per-instance. Q6 covered above.
+
+## §10 The implementation panel (after landing)
+
+Five lenses (kernel, directory mechanics, composer, tests, ops) × a skeptic
+per finding, against commits 26213b2/e28e48a/b8a4f73: 25 confirmed, 0
+refuted, 8 major. Every major was reproduced with a scratch script. Fixed:
+
+- **The squat strand** (composer + kernel, above): the string-compare guard
+  was bypassable (`0.0.0.0:3376`, `localhost:3376`, `rendezvous: false`), and
+  a name-rejected target was never revived. Now `sameSocket` refuses every
+  spelling against own/default/constant, and the kernel parks a name-rejected
+  dialed target given-up so revival re-dials it each heartbeat.
+- **Owner keys split on the first space** — a name with a space never had its
+  entries removed. Keys are `JSON.stringify([name, uuid])` now.
+- **Cleanup by (name, uuid) without ownership** — a dir-restored identity
+  re-registering while its wedged predecessor's socket was still open lost
+  its cell when that socket finally closed. `owner` maps each cell to its
+  CURRENT registrant; the later registrant wins; only the owner's death drops.
+- **The battery's isolation lived in one npm script** — a single-file
+  `node --test api/index.test.ts` met the box's real directory. Every suite
+  that composes without a rendezvous now pins `FERO_RENDEZVOUS ??= 'off'` at
+  import.
+- **No deterministic pin for the fold-order defect** — `hostMethods` is an
+  exported test seam; the exact tap-before-publish shape, GRACE, ownership
+  transfer, the space-name and the per-caller cap are unit-pinned.
+- **The bind-retry loop composed a full Runtime 4–20×/s forever** against a
+  held port — now a `listen()/close()` probe gates the compose, the delay
+  doubles per consecutive failure to a 5 s cap, and a non-EADDRINUSE errno
+  (EACCES on a reserved Windows band, EADDRNOTAVAIL on a foreign interface)
+  is surfaced on `cluster.me.rendezvous.error` (as is a register refusal).
+- Minors: `listen: false` reported the directory as *down* rather than
+  absent (`meets` is now the one predicate); `FERO_RENDEZVOUS=garbage` failed
+  deep in the shell (refused at fero() time, variable named); `isAddr`
+  accepted `'127.0.0.1:'` and port 0 for a rendezvous; precedence (config >
+  env > constant) is documented; the takeover test's bound is derived from
+  the redial chain it actually waits for; instances are built inside
+  try/finally; a per-caller cap (4096) bounds a runaway registrant.
+
+Accepted as designed / documented rather than fixed: any local process can
+register any name (loopback is the trust boundary — it could equally dial the
+resource and HELLO with that name); a hung-but-connected registrant keeps its
+entry (the kernel has no client-link failure detector — IDEAS); the shell's
+timers are ref'd, so a process holding only a bare client does not exit
+without `destroy()` (pre-existing; IDEAS); 3376 sits inside the band Windows'
+Hyper-V may reserve at random — the errno surfaces and the retry backs off.

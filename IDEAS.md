@@ -180,3 +180,12 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
 - [P3] (api) A shared per-process directory client (one socket per process
   instead of one per instance) — rejected at V4-3 for uniformity; revisit if a
   process hosting hundreds of resources minds the sockets.
+- [P3] (kernel) A failure detector over CLIENT links (PONG accounting): today a
+  hung-but-connected client keeps its directory entry and its served
+  subscriptions until TCP notices; crashes and clean closes are immediate. The
+  panel accepted the gap; close it the day a hung watcher matters.
+- [P3] (shell) Ref'd timers/sockets: a process holding only a bare client never
+  exits without `destroy()` (pre-existing; V4-3 adds a second Runtime per
+  instance, so the demo's "just fero(name)" now pins the loop harder). Decide
+  deliberately: unref the directory client's timers/sockets, or document
+  `destroy()` as the exit protocol.
