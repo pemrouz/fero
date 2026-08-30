@@ -98,6 +98,9 @@ export const diagNode = (node: Node) => ({
   view: { epoch: node.membership.view.epoch, members: node.membership.view.members.map((m) => m[0]) },
   gate: (() => { const g = node.membership.gate(node); return g.open ? 'open' : g.reason })(),
   pendingWrites: node.writes.pending.size,
+  //! client: this node's OWN role (M5b spoke) — the debugger's topology replay needs it for the single-feeder
+  // synced rule (a client digests only its primary); additive, so an older bridge simply never sees it
+  client: node.client,
   stateHash: node.stateHash,
   jn: node.journal.n,
   dropped: node.journal.dropped,

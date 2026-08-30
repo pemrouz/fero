@@ -38,7 +38,7 @@ exercises, run data's perf suite too.
 | [shell/](shell) | The thin I/O runtime (real sockets/timers around the kernel). |
 | [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep — chaos schedules against the SAME kernel bytes the shell runs. |
 | [tests/](tests) | Cross-layer scenarios: api scenarios, TCP tier, WAL tier, internals entry pin, baseline perf. |
-| [tools/](tools) | debug/ (capture viewer, scenario server, honesty checks, the ELI5 tooltip glossary [eli5.mjs](tools/debug/eli5.mjs) — every `data-tip` key on both pages resolves there, gated by eli5.test) + perf/ (absolute probes, BASELINE.md, pin/compare machinery). |
+| [tools/](tools) | debug/ (capture viewer, scenario server, honesty checks, the ONE fold model [model.mjs](tools/debug/model.mjs) — `stateAt`/`topologyAt` replay state AND links/streams under time travel, each behind its own `verify*` drift guard that proves the replay reproduces the captured end before the page paints it — the ELI5 tooltip glossary [eli5.mjs](tools/debug/eli5.mjs) — every `data-tip` key on both pages resolves there, gated by eli5.test) + perf/ (absolute probes, BASELINE.md, pin/compare machinery). |
 | [utils/](utils) [examples/](examples) | Shared helpers (`#utils` import map); the two-terminals demo. |
 
 Entries: `.` → [api/index.ts](api/index.ts), `./internals` →

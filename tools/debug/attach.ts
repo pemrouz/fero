@@ -136,7 +136,7 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
   const w = nq.n as {
     uuid: string; listen: string; seq: number; epoch: number
     view: { epoch: number; members: string[] }; gate: string
-    pendingWrites: number; stateHash: number; jn: number; dropped: number
+    pendingWrites: number; client?: boolean; stateHash: number; jn: number; dropped: number
     streams: Record<string, { a: number; s: number; d: number }>
     origins: Record<string, { tail: number; base: number }>
     links: unknown[]
@@ -170,7 +170,7 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
     vocab: meta.vocab as Record<string, number>,
     node: {
       uuid: w.uuid, listen: w.listen, seq: w.seq, epoch: w.epoch, view: w.view, gate: w.gate,
-      pendingWrites: w.pendingWrites, stateHash: w.stateHash, dropped: w.dropped,
+      pendingWrites: w.pendingWrites, client: w.client, stateHash: w.stateHash, dropped: w.dropped,
       journal, logs,
       state: (st.cells as [string, unknown][]).map(([k, v]) => [k, encodeVal(v)]),
       streams: w.streams, links: w.links,

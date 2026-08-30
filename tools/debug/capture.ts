@@ -32,6 +32,7 @@ export const captureNode = (node: Node) => {
     view: d.view,
     gate: d.gate,
     pendingWrites: d.pendingWrites,
+    client: d.client,
     stateHash: d.stateHash,
     dropped: d.dropped,
     journal: node.journal.read(0),

@@ -15,6 +15,10 @@
 import { test, before } from 'node:test'
 import assert from 'node:assert'
 import { runAll } from './scenarios.ts'
+import { Sim } from '../../sim/exec.ts'
+import { cluster, writes } from '../../sim/harness.ts'
+import { captureSim } from './capture.ts'
+import { REC } from '../../kernel/env.ts'
 import * as MODEL from './model.mjs'
 import { tip } from './eli5.mjs'
 import { bootViewer, dragTo } from './dom-shim.ts'
@@ -146,4 +150,124 @@ test('the ELI5 layer is wired: hovering a painted [data-tip] paints the glossary
   hover('no-such-key')
   assert.equal(card().on, false, 'an unknown key paints NO card — absence renders as absence')
   assert.equal(card().html, '')
+})
+
+test('links and streams REPLAY under scrub — they pop into existence as the scrubber moves (the reported n=100 case, proven on the registry captures)', async () => {
+  const countType = (html: string, type: string) => (html.match(new RegExp(`data-type="${type}"`, 'g')) || []).length
+  const click = (el: (id: string) => any, i: number) =>
+    el('tree').fire('click', { target: { closest: (s: string) => (s === '.trow' ? { dataset: { i: String(i) } } : null) } })
+  //! formation: a 3-node mesh — every node's Links group goes 0 → full, with a mid-formation step in between
+  {
+    const { el, g } = await bootViewer('formation', captures.get('formation'))
+    const maxT = Number(el('trange').max)
+    g(`for (const n of CAP.nodes){ expanded.add('g/nodes/' + n.uuid); expanded.add('g/nodes/' + n.uuid + '/g/links'); expanded.add('g/nodes/' + n.uuid + '/g/streams') } render()`)
+    const endLinks = countType(el('tree').innerHTML, 'link')
+    assert.ok(endLinks >= 6, `the formed mesh paints every link (${endLinks})`)
+    dragTo(el, 0)
+    assert.equal(countType(el('tree').innerHTML, 'link'), 0, 'at t0 no line is open — the Links groups are empty')
+    assert.match(el('tree').innerHTML, /0\/0<span class="su"> links<\/span>/, 'the links-stat reads 0/0 at t0')
+    assert.match(el('tree').innerHTML, /data-tip="links@t"/, 'and is labelled as replayed')
+    assert.doesNotMatch(el('tree').innerHTML, /data-tip="at-end"/, 'no node fell back to its end tables')
+    const seen = new Set<number>()
+    for (let f = 1; f < 20; f++) { dragTo(el, Math.floor((maxT * f) / 20)); seen.add(countType(el('tree').innerHTML, 'link')) }
+    assert.ok([...seen].some((c) => c > 0 && c !== endLinks), `intermediate steps show the mesh mid-formation (${[...seen].join(',')})`)
+    dragTo(el, maxT)
+    assert.equal(countType(el('tree').innerHTML, 'link'), endLinks, 'back at present: the end table, byte for byte')
+    // the node inspector and the status bar say so too
+    dragTo(el, 0)
+    click(el, g('(renderTree(), flat.findIndex(r => r.n.type === "node"))'))
+    assert.match(el('insp').innerHTML, /links & streams at the scrub point/, 'the banner now claims links & streams')
+    assert.match(el('insp').innerHTML, /No links yet at this point/, 'the Links pane is empty at t0, and says why')
+    assert.doesNotMatch(el('insp').innerHTML, /@ capture end/, 'nothing in this inspector is an end fact any more')
+    assert.match(el('statusRight').innerHTML, /0\/0 links/, 'the status bar carries the replayed links stat')
+    dragTo(el, maxT)
+    assert.match(el('insp').innerHTML, /\d+\/\d+ admitted<\/span>/, 'at present the Links pane is the plain end table again')
+  }
+  //! replication: streams pop in with the writes
+  {
+    const { el, g } = await bootViewer('replication', captures.get('replication'))
+    const maxT = Number(el('trange').max)
+    g(`for (const n of CAP.nodes){ expanded.add('g/nodes/' + n.uuid); expanded.add('g/nodes/' + n.uuid + '/g/streams') } render()`)
+    const endStreams = countType(el('tree').innerHTML, 'stream')
+    assert.ok(endStreams >= 3, `streams at the end (${endStreams})`)
+    dragTo(el, 0)
+    assert.equal(countType(el('tree').innerHTML, 'stream'), 0, 'no stream before the first record')
+    dragTo(el, maxT)
+    assert.equal(countType(el('tree').innerHTML, 'stream'), endStreams)
+  }
+  //! the reported case itself, n=100: n001's links-stat moves — 0/0 at t0, mid-formation a fifth of the way in, 99/99 at present
+  {
+    const { el } = await bootViewer('scale-formation', captures.get('scale-formation'))
+    const maxT = Number(el('trange').max)
+    const statOf = () => (el('tree').innerHTML.match(/(\d+\/\d+)<span class="su"> links<\/span>/) || [])[1]
+    assert.equal(statOf(), '99/99')
+    dragTo(el, 0)
+    assert.equal(statOf(), '0/0')
+    dragTo(el, Math.floor(maxT / 5))
+    const q = statOf()
+    assert.ok(q !== '0/0' && q !== '99/99', `a fifth of the way in, n001 is mid-formation (${q})`)
+    dragTo(el, maxT)
+    assert.equal(statOf(), '99/99')
+  }
+})
+
+test('the verdict is HONOURED: a node whose topology replay was refused keeps its end tables, labelled everywhere it paints; its peer replays; a selection absent at T is kept', async () => {
+  const click = (el: (id: string) => any, i: number) =>
+    el('tree').fire('click', { target: { closest: (s: string) => (s === '.trow' ? { dataset: { i: String(i) } } : null) } })
+  //! the reborn writer (ISSUES I-1): a restarted durable node stamps under uuid~2 — its journal cannot reproduce its stream table
+  const sim = new Sim(21); const pair = cluster(sim, 2, { durable: true }); writes(sim, pair, 6, 100); sim.run()
+  sim.restart('n01'); sim.run()
+  for (let i = 0; i < 3; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`after${i}`], value: i }] }, i * 5)
+  sim.run()
+  const cap = captureSim(sim)
+  const verdict = (MODEL.verifyTopology(cap) as { uuid: string; ok: boolean; reason?: string }[]).find((r) => r.uuid === 'n01')!
+  assert.equal(verdict.ok, false); assert.match(verdict.reason!, /^streams size \d+ vs \d+$/)
+  const { el, g } = await bootViewer('reborn', cap)
+  const maxT = Number(el('trange').max)
+  g(`for (const n of CAP.nodes){ expanded.add('g/nodes/' + n.uuid); expanded.add('g/nodes/' + n.uuid + '/g/links'); expanded.add('g/nodes/' + n.uuid + '/g/streams') } render()`)
+  dragTo(el, Math.floor(maxT / 2))
+  // the forest: n01's Links/Streams groups carry the '@ end' pill with the verdict's reason (info-level), n02's do not
+  const groups = JSON.parse(g(`JSON.stringify(FOREST.find(x => x.key === 'g/nodes').kids.map(n => ({ u: n.label, pills: n.kids.map(k => k.pill && k.pill.lab), facts: n.kids.map(k => k.pill && k.pill.fact), sevs: n.kids.map(k => k.sev) })))`))
+  assert.deepEqual(groups, [
+    { u: 'n01', pills: ['@ end', '@ end'], facts: [verdict.reason, verdict.reason], sevs: ['info', 'info'] },
+    { u: 'n02', pills: [null, null], facts: [null, null], sevs: ['', ''] },
+  ])
+  const tree = el('tree').innerHTML
+  assert.match(tree, new RegExp(`data-tip="at-end" data-tip-fact="${verdict.reason}"`), 'the tree paints the reason on the pill')
+  assert.match(tree, /data-tip="links@t"/, 'n02 replays')
+  assert.match(tree, /data-tip="at-end" data-tip-fact="streams size \d+ vs \d+">\d+\/\d+<span class="su"> links/, "n01's links-stat is labelled as an end fact")
+  // is:info surfaces the refused groups (their sev is info)
+  el('q').value = 'is:info'; el('q').fire('input', { target: { value: 'is:info' } })
+  assert.match(el('tree').innerHTML, /@ end/, 'is:info finds the @ end groups')
+  el('q').value = ''; el('q').fire('input', { target: { value: '' } })
+  // the inspectors: n01 says '@ capture end' (twice, Links + Streams), n02 says '@ t…'
+  const idx = (label: string) => g(`(renderTree(), flat.findIndex(r => r.n.type === 'node' && r.n.label === ${JSON.stringify(label)}))`) as number
+  click(el, idx('n01'))
+  assert.equal((el('insp').innerHTML.match(/@ capture end/g) || []).length, 2, "n01's Links and Streams panes are end facts")
+  assert.match(el('insp').innerHTML, new RegExp(`data-tip="at-end" data-tip-fact="${verdict.reason}"`))
+  assert.match(el('insp').innerHTML, /links & streams @ end for 1 node the replay could not reproduce/, 'the banner counts the refused node')
+  click(el, idx('n02'))
+  assert.match(el('insp').innerHTML, /admitted @ t\d+/, 'n02 replays')
+  assert.doesNotMatch(el('insp').innerHTML, /@ capture end/)
+  // the LEAF rows of the refused node say it too — inspector and status bar
+  g(`navTo(FOREST.find(x => x.key === 'g/nodes').kids.find(n => n.label === 'n01').kids[0].kids[0].key)`)
+  assert.match(el('insp').innerHTML, /data-tip="at-end"/, "a refused node's link inspector is labelled")
+  assert.match(el('statusRight').innerHTML, /@ capture end/, 'and its status bar')
+  g(`navTo(FOREST.find(x => x.key === 'g/nodes').kids.find(n => n.label === 'n01').kids[1].kids[0].key)`)
+  assert.match(el('insp').innerHTML, /data-tip="at-end"/, "a refused node's stream inspector is labelled")
+  g(`navTo(FOREST.find(x => x.key === 'g/nodes').kids.find(n => n.label === 'n02').kids[0].kids[0].key)`)
+  assert.doesNotMatch(el('insp').innerHTML, /@ capture end/, "a replayed node's link inspector is not")
+  dragTo(el, maxT)
+  //! a selection scrubbed back to before it existed is KEPT and says so; it re-attaches when it reappears
+  g(`navTo(FOREST.find(x => x.key === 'g/nodes').kids.find(n => n.label === 'n02').kids[0].kids[0].key)`)
+  const sel = g('selKey') as string
+  assert.match(el('insp').innerHTML, /link id/)
+  dragTo(el, 0)
+  assert.equal(g('selKey'), sel, 'the selection survives the scrub')
+  assert.match(el('insp').innerHTML, /is not open yet @ t0/, 'the pane says the line is not open yet')
+  assert.match(el('insp').innerHTML, /data-tip="not-yet@t"/)
+  assert.match(el('statusRight').innerHTML, /not here yet @ t0/)
+  dragTo(el, maxT)
+  assert.equal(g('selKey'), sel)
+  assert.match(el('insp').innerHTML, /link id/, 'back at present the link inspector is back')
 })

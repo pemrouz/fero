@@ -267,7 +267,7 @@ test('parity by construction: captureNode is diagNode + the chunked planes (deep
   const wire = h.lastA(9).n as ReturnType<typeof diagNode>
   const cap = captureNode(h.node)
   //! every scalar/topology fact in the capture IS the wire's fold output — one producer, two consumers
-  for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'stateHash', 'streams'] as const)
+  for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'client', 'stateHash', 'streams'] as const)
     assert.deepEqual(cap[k], wire[k], `capture.${k} must equal the wire fold's`)
   assert.deepEqual(cap.links, wire.links)
   assert.equal(cap.dropped, wire.dropped)

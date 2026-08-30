@@ -216,3 +216,40 @@ inside the outer apply.
   entries die with their registrant, two names, Context.peer, squatter).
   Spec DESIGN-DIRECTORY.md; DECISIONS V4-3. Battery: 355/355 + 18/18 +
   perf 41/41 (341 + the neighbour-landed ELI5 gates + these 14).
+- 2026-08-30 — debugger: links + streams REPLAY under time travel. The
+  100-node scenario's scrubber moved keys@t/jrnl@t but every node painted
+  99/99 links and 65 streams at t=0 — the tree/inspector read the capture's
+  END snapshot (diagNode's link table/watermark ladder carry no t), and the
+  only statement of that lived in the inspector banner, hidden with nothing
+  selected. Now `topologyAt(capture, uuid, t)` (model.mjs) replays the link
+  lifecycle (linkUp/identified/dupLink→closing/linkDown/pause/drain/
+  dropOldest/digestIn/diagAuth, the client single-feeder rule via the new
+  additive `client` field on diagNode/captureNode/attach) and the watermark
+  ladder (writeLocal/applyInbound/gateDrop; durable claimed only where
+  provable, queued-while-paused an explicit unknown); `verifyTopology` is
+  its drift guard (the fold at t=∞ must reproduce every captured end table —
+  all 20 registry captures, every node, pass) and the viewer replays a
+  node's topology ONLY where that proof holds, else the end tables stay,
+  labelled `@ end` with the reason (a reborn durable writer — I-1's `uuid~2`
+  lane — is the truthful fallback producer in the ELI5 sweep). The
+  adversarial review's per-step oracle (kernel snapshot after EVERY step vs
+  the fold at that row, 60+ seeds) found what the ∞ guard cannot: `walTaint`
+  (condemn wipes streams/state — both replay planes now honour the row);
+  leaf rows of a refused node painted unlabelled end facts (inspector +
+  status bar now say `@ capture end` with the reason); a selection scrubbed
+  to before it existed was dropped (kept now — the pane says "not here
+  yet"); fields an older capture cannot vouch for ride the verdict as
+  `unverified` and paint as unknown; `routes` minted `''` for a partition
+  no writeLocal row named (null now). Documented bounds (ISSUES): a fatal
+  frameDrop's dead link inside a client's re-election window, armed/durable
+  lanes minted without a row, synced settling at the end of the digestIn
+  step. Pinned: model.test (t0 empty / ∞ exact / closing loser / paused
+  unknown / paused-digest no-sync / client single-feeder + failover /
+  durable unknown / walTaint reset / refusal templates), honesty (empties,
+  traceability at linkUp + dupLink rows with the `''` carve-out scoped to
+  the topology fold and proven exercised, typed refusal templates, the
+  reborn producer, import pin), viewer.dom (links 0→mid→full on formation +
+  scale-formation n001 0/0→mid→99/99, streams 0→full; the verdict honoured
+  on every surface, is:info finds `@ end`, kept selection), eli5 (six new
+  keys reachable, `not-captured` now truthfully reachable), diag/attach
+  parity pins `client` and refolds the topology of a wire-pulled slice.

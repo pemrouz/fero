@@ -22,7 +22,7 @@ import { cluster, writes } from '../../sim/harness.ts'
 import { shrink, sweepBuild } from '../../sim/shrink.ts'
 import { captureLive, captureSim, captureAttached } from './capture.ts'
 import {
-  kindNames, stateAt, verifyReplay, routes, contested, summarize, cellKey,
+  kindNames, stateAt, verifyReplay, routes, contested, summarize, cellKey, topologyAt, verifyTopology,
   ROUTE_STATUS, ABSENT_REASONS,
 } from './model.mjs'
 
@@ -49,10 +49,14 @@ test('(a) fold closure on EMPTY real-producer captures: exhaustive goldens, noth
   assert.equal((routes(A0) as Map<string, unknown>).size, 0)
   assert.deepEqual(contested(A0), [])
   assert.deepEqual(verifyReplay(A0), [])
+  assert.deepEqual(verifyTopology(A0), [])
 
   const A1 = captureLive([bareNode()])
   assert.equal((stateAt(A1, 'gate', Infinity) as Map<string, unknown>).size, 0, 'no state at any t')
   assert.deepEqual(verifyReplay(A1), [{ uuid: 'gate', ok: true }], 'an empty node replays trivially — and says so')
+  const topo = topologyAt(A1, 'gate', Infinity) as { links: Map<number, unknown>; streams: Map<string, unknown> }
+  assert.equal(topo.links.size, 0, 'no link at any t'); assert.equal(topo.streams.size, 0, 'no stream at any t')
+  assert.deepEqual(verifyTopology(A1), [{ uuid: 'gate', ok: true }], 'an empty topology replays trivially — and says so')
   assert.equal((routes(A1) as Map<string, unknown>).size, 0)
   assert.deepEqual(contested(A1), [])
   const s1 = summarize(A1) as { nodes: number; converged: boolean; journalRows: number }
@@ -109,11 +113,32 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
   sim.run()
   const chaotic = captureSim(sim)
   const attached = captureAttached([], [{ target: '127.0.0.1:1', reason: 'timeout' }])
+  //! a REBORN durable writer (ISSUES I-1: its new life stamps under uuid~2) — the one real producer whose topology
+  // replay is REFUSED, so verifyTopology's prose carve-out is exercised by a producer, never a hand edit
+  const sim4 = new Sim(21); const pair4 = cluster(sim4, 2, { durable: true }); writes(sim4, pair4, 6, 100); sim4.run()
+  sim4.restart('n01'); sim4.run()
+  for (let i = 0; i < 3; i++) sim4.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`after${i}`], value: i }] }, i * 5)
+  sim4.run()
+  const reborn = captureSim(sim4)
 
   const universe = (c: unknown) =>
     new Set([...capStrings(c), ...ROUTE_STATUS, ...ABSENT_REASONS, ...Object.keys(JK)])
 
-  for (const cap of [chaotic, attached, captureLive([bareNode()])]) {
+  //! verifyTopology's pinned templates — the value parts are TYPED (booleans/null/digits) and the identity parts
+  // (an origin, a uuid) must be capture strings: an invented word cannot ride a template
+  const topoReasonOk = (r: string, allowed: Set<string>): boolean => {
+    if (/^journal truncated \(\d+ dropped\)$/.test(r) || /^links size \d+ vs \d+$/.test(r) || /^streams size \d+ vs \d+$/.test(r)) return true
+    if (/^capture has link #\d+, replay does not$/.test(r)) return true
+    let m = /^capture has stream (.+), replay does not$/.exec(r)
+    if (m) return allowed.has(m[1])
+    m = /^link #\d+ (uuid|dialed|admitted|synced|paused|queued|diag): (.+) vs (.+)$/.exec(r)
+    if (m) return [m[2], m[3]].every((v) => /^(true|false|null|\d+)$/.test(v) || allowed.has(v))
+    m = /^stream (.+) ([asd]): (.+) vs (.+)$/.exec(r)
+    if (m) return allowed.has(m[1]) && [m[3], m[4]].every((v) => /^(null|\d+)$/.test(v))
+    return false
+  }
+  let empties = 0, closings = 0, refusals = 0
+  for (const cap of [chaotic, attached, captureLive([bareNode()]), reborn]) {
     const allowed = universe(cap)
     const nums = capNumbers(cap)
     //! cell keys are JSON encodings of capture keys — derived, so add them to the universe explicitly
@@ -126,6 +151,20 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
       for (const s of leaves(fold(cap)))
         assert.ok(traces(s, allowed, nums), `${name} minted an untraceable string: ${JSON.stringify(s)}`)
     }
+    //! topologyAt at the END and at the rows where its two transient shapes exist: a linkUp row (the link is
+    // pre-HELLO — uuid '' = ABSENCE, the one carve-out, scoped to THIS fold) and a dupLink row (a closing loser)
+    const allowedTopo = new Set(allowed); allowedTopo.add('')
+    const K = cap.vocab as Record<string, number>
+    for (const n of cap.nodes as { uuid: string; journal: { t: number; kind: number; a?: unknown }[] }[]) {
+      const ts = new Set<number>([Infinity]); let ups = 0
+      for (const e of n.journal) { if (e.kind === K.linkUp && ups++ < 3) ts.add(e.t); if (e.kind === K.dupLink) ts.add(e.t) }
+      for (const t of ts) {
+        const topo = topologyAt(cap, n.uuid, t) as { links: Map<number, { uuid: string; closing: boolean }> }
+        for (const l of topo.links.values()) { if (l.uuid === '') empties++; if (l.closing) closings++ }
+        for (const s of leaves(topo))
+          assert.ok(traces(s, allowedTopo, nums), `topologyAt minted an untraceable string: ${JSON.stringify(s)}`)
+      }
+    }
     //! verifyReplay is the ONE prose-minting fold — carved out and pinned by TEMPLATE instead
     for (const r of verifyReplay(cap) as { ok: boolean; uuid: string; reason?: string }[]) {
       if (r.ok) continue
@@ -137,7 +176,19 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
         `verifyReplay prose outside its pinned templates: ${JSON.stringify(r.reason)}`,
       )
     }
+    //! verifyTopology is the second prose-minting fold — the same carve-out, its own TYPED templates; its
+    // `unverified` list may name only link fields
+    for (const r of verifyTopology(cap) as { ok: boolean; uuid: string; reason?: string; unverified?: string[] }[]) {
+      for (const f of r.unverified ?? []) assert.ok(['uuid', 'dialed', 'admitted', 'synced', 'paused', 'queued', 'diag'].includes(f), `unverified names a non-field: ${f}`)
+      if (r.ok) continue
+      refusals++
+      assert.ok(topoReasonOk(r.reason!, allowed), `verifyTopology prose outside its pinned templates: ${JSON.stringify(r.reason)}`)
+    }
   }
+  //! the carve-outs are EXERCISED, not dormant (the (b2) principle): pre-HELLO links, closing losers, a refusal
+  assert.ok(empties > 0, 'a pre-HELLO link (uuid \'\') was seen at a linkUp row')
+  assert.ok(closings > 0, 'a closing loser was seen at a dupLink row')
+  assert.ok(refusals > 0, 'the reborn producer exercised a refusal template')
 })
 
 test('(b2) the prose carve-out is EXERCISED, not dormant: a truncated capture mints its pinned template', () => {
@@ -153,6 +204,9 @@ test('(b2) the prose carve-out is EXERCISED, not dormant: a truncated capture mi
   const [r] = verifyReplay(cap) as { ok: boolean; reason: string }[]
   assert.equal(r.ok, false, 'truncation DISABLES the replay claim rather than reconstructing fiction')
   assert.match(r.reason, /^journal truncated \(\d+ dropped\)$/)
+  const [rt] = verifyTopology(cap) as { ok: boolean; reason: string }[]
+  assert.equal(rt.ok, false, 'the topology replay refuses a truncated journal the same way')
+  assert.match(rt.reason, /^journal truncated \(\d+ dropped\)$/)
 })
 
 test('(c) absent honesty: an absent row changes summarize verbatim and NOTHING else', () => {
@@ -167,6 +221,7 @@ test('(c) absent honesty: an absent row changes summarize verbatim and NOTHING e
   assert.deepEqual(strip(summarize(withAbsent)), strip(summarize(base)), 'no other header fact moves')
   assert.deepEqual([...(routes(withAbsent) as Map<string, unknown>)], [...(routes(base) as Map<string, unknown>)])
   assert.deepEqual(verifyReplay(withAbsent), verifyReplay(base))
+  assert.deepEqual(verifyTopology(withAbsent), verifyTopology(base))
   assert.deepEqual(contested(withAbsent), contested(base))
 })
 
@@ -188,7 +243,7 @@ test('(d) the viewer data plane: exactly one model import, no local fold redefin
   // the ELI5 hover layer (words + wiring, no folds). A third import would be a new seam to police here.
   assert.deepEqual(imports.map((m) => m[2]), ['./model.mjs', './eli5.mjs'], 'the viewer imports the model and the ELI5 layer — nothing else')
   const imported = imports[0][1].split(',').map((s) => s.trim()).sort()
-  assert.deepEqual(imported, ['cellKey', 'contested', 'decodeVal', 'kindNames', 'routes', 'stateAt', 'summarize', 'verifyReplay'])
+  assert.deepEqual(imported, ['cellKey', 'contested', 'decodeVal', 'kindNames', 'routes', 'stateAt', 'summarize', 'topologyAt', 'verifyReplay', 'verifyTopology'])
   assert.deepEqual(imports[1][1].split(',').map((s) => s.trim()), ['mountTips'], 'the chrome import is the hover mount alone — the glossary is read through it, never copied into the page')
   //! no local shadowing: a fold reimplemented in the page is exactly v2's dual-language drift bug
   for (const name of [...imported, 'mountTips', 'tip', 'tipHTML', 'ELI5'])

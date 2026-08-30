@@ -102,6 +102,10 @@ export const stateAt = (capture, uuid, t) => {
     if (e.t > t) break
     if (e.kind === K.writeLocal) applyOne(uuid, e.a)
     else if (e.kind === K.applyInbound) applyOne(e.a, e.b)
+    //! walTaint: the fsyncgate verdict — kernel/node.ts condemn() wipes state, versions, logs and streams, then
+    // anti-entropy re-teaches the node. The end-state refold cannot see this (the re-taught fold coincides),
+    // so the row is honoured HERE: everything replayed before the hole is gone at this step.
+    else if (e.kind === K.walTaint) { state.clear(); versions.clear() }
   }
   return state
 }
@@ -125,6 +129,126 @@ export const verifyReplay = (capture) => {
   })
 }
 
+//! topologyAt — TIME TRAVEL for the topology planes: replay a node's journal to event index t into its
+// link table and its per-origin watermark ladder — the SAME row shapes diagNode snapshots at capture end
+// (kernel/diag.ts `links` / `streams`), so the viewer paints one row type from either source. Every rule
+// below is a kernel emit site (cited so drift is auditable), the way stateAt mirrors the LWW election:
+//   links    linkUp(a=id, b=dialed) opens · identified(a=id, b=uuid) admits (kernel/node.ts HELLO: LS.admitted
+//            is set in the same synchronous block as the emit — identified ⇔ admitted) · dupLink(a=closed) /
+//            selfReject(a) / nameReject(a) mark the LOSER closing: dead, still in the table until its linkDown
+//            echo (the kernel deletes only on the echo — deleting early would read as a failed dial and redial
+//            the race) · linkDown(a) removes · pause(a)/drain(a) flip paused · dropOldest(a) de-syncs (the
+//            whole queue was cleared) · digestIn(a) syncs UNLESS the link is paused (the DIGEST handler marks
+//            debt and returns before `synced = true`) or the node is a CLIENT and the link is not its primary
+//            (the single-feeder rule: primary = the first admitted link, re-elected to the next admitted
+//            survivor when it goes down) · diagAuth(a) latches a diagnostics session.
+//   streams  writeLocal(a=seq) advances the OWN lane's applied+shippable together (node.ts commit: the stamp
+//            site) · applyInbound(a=origin, b=seq) advances both by max (write.ts: the fast path sets them to
+//            seq, a splice fills BELOW the fence and never lowers them) · gateDrop(a=origin) names a lane
+//            without advancing it (streams.for runs before the gate).
+// NOT derivable — carried as null, never guessed: `queued` while paused (ship() parks frames silently),
+// `durable` once anything was ever persisted (persist/persisted carry batch ids, never origins; a node with
+// no persisted/replayed row anywhere in its journal provably never reached disk, so its durable IS 0), and
+// whether the PEER is a client (no emit). `n` on a stream is the count of records folded so far.
+// verifyTopology() is the drift guard: this fold at t=∞ must reproduce every captured end table exactly —
+// the viewer replays a node's topology only where that proof holds, and shows the end (labelled) elsewhere.
+// KNOWN BOUNDS the ∞ guard cannot see (per-step oracle findings, recorded in ISSUES.md — each transient,
+// each self-healing at the next journal row that names the fact): (1) a link killed by a FATAL frameDrop
+// is `dead` in the kernel until its linkDown echo, and a CLIENT's primary re-election skips dead links —
+// the fold cannot tell a fatal frameDrop from a non-fatal one (same kind, free-text reason), so it may
+// elect such a link for the one round-trip before the echo; (2) armed (replicas) and durable nodes mint
+// EMPTY lanes with no journal row (boot floors, the replay entry, a staged record) — lane PRESENCE at an
+// intermediate step is a lower bound there; (3) `synced` flips at the END of the digestIn step, after any
+// aeShip row the same step emits — one row early at row granularity.
+export const topologyAt = (capture, uuid, t) => {
+  const node = capture.nodes.find((n) => n.uuid === uuid)
+  const K = capture.vocab
+  const links = new Map()
+  const streams = new Map()
+  const isClient = node.client === true
+  let primary = null
+  //! durable0: nothing ever went to (or came back from) disk — the durable mark is provably still 0
+  const durable0 = !node.journal.some((e) => e.kind === K.persisted || e.kind === K.replayed)
+  const lane = (origin) => {
+    let d = streams.get(origin)
+    if (!d) { d = { a: 0, s: 0, d: durable0 ? 0 : null, n: 0 }; streams.set(origin, d) }
+    return d
+  }
+  const advance = (origin, seq) => { const d = lane(origin); if (seq > d.a) d.a = seq; if (seq > d.s) d.s = seq; d.n++ }
+  const electPrimary = () => { primary = null; for (const l of links.values()) if (l.admitted && !l.closing) { primary = l.id; break } }
+  for (const e of node.journal) {
+    if (e.t > t) break
+    const k = e.kind
+    if (k === K.linkUp) {
+      links.set(e.a, { id: e.a, uuid: '', dialed: e.b === 1, admitted: false, synced: false, paused: false, queued: 0, client: null, diag: false, closing: false })
+    } else if (k === K.identified) {
+      const l = links.get(e.a)
+      if (l) { l.uuid = e.b; l.admitted = true; if (isClient && primary === null) primary = l.id }
+    } else if (k === K.dupLink || k === K.selfReject || k === K.nameReject) {
+      const l = links.get(e.a)
+      if (l) l.closing = true
+    } else if (k === K.linkDown) {
+      links.delete(e.a) // a linkDown with no prior linkUp is a FAILED dial — nothing to remove
+      if (isClient && primary === e.a) electPrimary()
+    } else if (k === K.pause) {
+      const l = links.get(e.a)
+      if (l) { l.paused = true; l.queued = null }
+    } else if (k === K.drain) {
+      const l = links.get(e.a)
+      if (l) { l.paused = false; l.queued = 0 }
+    } else if (k === K.dropOldest) {
+      const l = links.get(e.a)
+      if (l) l.synced = false
+    } else if (k === K.digestIn) {
+      const l = links.get(e.a)
+      if (l && !l.paused && (!isClient || l.id === primary)) l.synced = true
+    } else if (k === K.diagAuth) {
+      const l = links.get(e.a)
+      if (l) l.diag = true
+    } else if (k === K.writeLocal) advance(uuid, e.a)
+    else if (k === K.applyInbound) advance(e.a, e.b)
+    else if (k === K.gateDrop) lane(e.a)
+    else if (k === K.walTaint) streams.clear() // condemn(): every lane is wiped with the fold; AE re-teaches (links untouched)
+  }
+  return { links, streams }
+}
+
+//! verifyTopology — the topology replay's refold check (the verifyReplay pattern applied to links/streams):
+// topologyAt at t=∞ must reproduce each node's captured link table and watermark ladder field for field.
+// Null fields in the replay are declared unknowns (never compared); fields ABSENT from an older capture
+// (synced, diag) are not claims either — they are reported as `unverified` so the viewer paints them as
+// unknown under scrub rather than as a derivation nothing vouched for. A node that fails here keeps its
+// END tables in the viewer, labelled with this reason — the fold layer proves what may be replayed
+// instead of the page assuming it.
+export const verifyTopology = (capture) => {
+  const LINK_FIELDS = ['uuid', 'dialed', 'admitted', 'synced', 'paused', 'queued', 'diag']
+  return capture.nodes.map((node) => {
+    if (node.dropped > 0) return { uuid: node.uuid, ok: false, reason: `journal truncated (${node.dropped} dropped)` }
+    const bad = (reason) => ({ uuid: node.uuid, ok: false, reason })
+    const { links, streams } = topologyAt(capture, node.uuid, Infinity)
+    const end = node.links || []
+    if (links.size !== end.length) return bad(`links size ${links.size} vs ${end.length}`)
+    const unverified = []
+    for (const f of LINK_FIELDS) if (end.some((l) => l[f] === undefined)) unverified.push(f)
+    for (const l of end) {
+      const r = links.get(l.id)
+      if (!r) return bad(`capture has link #${l.id}, replay does not`)
+      for (const f of LINK_FIELDS)
+        if (r[f] !== null && l[f] !== undefined && r[f] !== l[f]) return bad(`link #${l.id} ${f}: ${r[f]} vs ${l[f]}`)
+    }
+    const ends = Object.entries(node.streams || {})
+    if (streams.size !== ends.length) return bad(`streams size ${streams.size} vs ${ends.length}`)
+    for (const [o, w0] of ends) {
+      const r = streams.get(o)
+      if (!r) return bad(`capture has stream ${o}, replay does not`)
+      const w = typeof w0 === 'number' ? { a: w0, s: w0, d: 0 } : w0 // pre-M4a captures carried the applied scalar alone
+      for (const f of ['a', 's', 'd'])
+        if (r[f] !== null && r[f] !== w[f]) return bad(`stream ${o} ${f}: ${r[f]} vs ${w[f]}`)
+    }
+    return unverified.length ? { uuid: node.uuid, ok: true, unverified } : { uuid: node.uuid, ok: true }
+  })
+}
+
 //! routes — the write-route join (v2's flagship debug feature, impossible there because origin was
 // re-stamped at commit; trivial here because provenance is a real join key): for every (origin, seq),
 // what happened at every node — origin / applied / lww-lost / duplicate / never-arrived.
@@ -133,7 +257,7 @@ export const routes = (capture) => {
   const map = new Map() // 'origin#seq' → { origin, seq, partition, nodes: {uuid: {status, t}} }
   const touch = (origin, seq) => {
     const id = origin + '#' + seq
-    if (!map.has(id)) map.set(id, { origin, seq, partition: '', nodes: {} })
+    if (!map.has(id)) map.set(id, { origin, seq, partition: null, nodes: {} }) // null until a writeLocal row names it — a route seen only inbound (a reborn origin's old life) has no partition FACT
     return map.get(id)
   }
   for (const node of capture.nodes) {
