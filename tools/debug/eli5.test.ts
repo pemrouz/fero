@@ -16,7 +16,8 @@ import { runAll } from './scenarios.ts'
 import { captureLive, captureSim, captureAttached } from './capture.ts'
 import { ELI5, tip, tipHTML, phaseKey } from './eli5.mjs'
 import { bootViewer, bootScenarios, bootScenariosPure, dragTo } from './dom-shim.ts'
-import { ABSENT_REASONS } from './model.mjs'
+import { ABSENT_REASONS, verifyTopology } from './model.mjs'
+import { REC } from '../../kernel/env.ts'
 
 type Entry = { t: string; d: string }
 const G = ELI5 as Record<string, Entry>
@@ -114,6 +115,9 @@ const sweepViewer = async () => {
       for (const f of [0.25, 0.5, 0.75]) { dragTo(el, Math.floor(maxT * f)); visit(`${id}@t${f}`) }
       dragTo(el, 0); visit(`${id}@t0`)
       dragTo(el, maxT)
+      // a LINK selected at present, then carried back to t0 where it is not open yet: the kept selection's pane
+      const lk = firstKey('link')
+      if (lk) { g(`navTo(${JSON.stringify(lk)})`); dragTo(el, 0); sweep(el, `${id}@t0/kept-selection`); dragTo(el, maxT) }
     }
   }
   for (const [id, cap] of run.captures) await drive(id, cap)
@@ -142,6 +146,18 @@ const sweepViewer = async () => {
   const truncated = captureLive(small)
   assert.ok(truncated.nodes.some((n) => n.dropped > 0), 'the tiny ring overflowed — the fixture is what it claims')
   await drive('truncated', truncated, '')
+  //! a durable node that RESTARTED and wrote again: its new life stamps under `uuid~2` (the lane-rebirth
+  // rule — ISSUES I-1), which the journal-derived topology replay cannot reproduce, so verifyTopology refuses
+  // it: the one truthful producer whose links/streams must fall back to the END tables under scrub (the
+  // '@ end' marker and its reason). The other node replays fine — both paths paint in one capture.
+  const sim4 = new Sim(21); const pair4 = cluster(sim4, 2, { durable: true }); writes(sim4, pair4, 6, 100); sim4.run()
+  sim4.restart('n01'); sim4.run()
+  for (let i = 0; i < 3; i++) sim4.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`after${i}`], value: i }] }, i * 5)
+  sim4.run()
+  const reborn = captureSim(sim4)
+  const verdicts = verifyTopology(reborn) as { ok: boolean }[]
+  assert.ok(verdicts.some((r) => !r.ok) && verdicts.some((r) => r.ok), 'the reborn writer is refused by the topology proof, its peer is not — the fixture is what it claims')
+  await drive('reborn', reborn, '')
   //! an ATTACH envelope with every absent reason and no nodes (the honest 'no nodes' header)
   await drive('attached', captureAttached([], ABSENT_REASONS.map((reason: string, i: number) => ({ target: `127.0.0.1:${i + 1}`, reason }))), '')
   return { painted, dangling }
@@ -176,7 +192,6 @@ const UNREACHABLE_OFFLINE: Record<string, string> = {
   'violations': 'no truthful offline producer records a violation: the kernel does not break its own invariants on demand',
   'violation': 'same — the violation row/pill needs a recorded violation',
   'g:violations': 'same — the group appears only when the capture holds one',
-  'not-captured': 'needs a write whose record no log still holds — compaction past 4096 entries per lane, or an attach that pulled journals but not logs; no cheap truthful producer',
   'route:dup': 'a duplicate-only route needs a dupDrop row with NO apply row in the retained journal — trimmed history, which full-ring producers never show',
   'stop:duplicate': 'same — the route stop for a duplicate-only node',
 }

@@ -5,11 +5,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from '../../sim/exec.ts'
-import { cluster, formed, writes } from '../../sim/harness.ts'
+import { cluster, client, formed, writes } from '../../sim/harness.ts'
 import { converged } from '../../sim/monitors.ts'
 import { JK } from '../../kernel/journal.ts'
 import { captureSim } from './capture.ts'
-import { encodeVal, decodeVal, kindNames, stateAt, verifyReplay, routes, contested, summarize } from './model.mjs'
+import { encodeVal, decodeVal, kindNames, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology } from './model.mjs'
+import { captureLive } from './capture.ts'
+import { REC } from '../../kernel/env.ts'
 
 //! one real chaotic trajectory shared by the suite: dup faults + a partition/heal window + racing writes
 const chaoticCapture = () => {
@@ -117,4 +119,194 @@ test('summarize reports capture health honestly (convergence from hashes, trunca
   assert.equal(s.converged, true)
   assert.deepEqual(s.truncated, [])
   assert.deepEqual(s.violations, [])
+})
+
+//! ── topology replay (links + streams under time travel) ──
+type L = { id: number; uuid: string; dialed: boolean; admitted: boolean; synced: boolean | null; paused: boolean; queued: number | null; closing: boolean }
+type W = { a: number; s: number; d: number | null; n: number }
+type Topo = { links: Map<number, L>; streams: Map<string, W> }
+
+test('topologyAt is genuine time travel for links and streams: nothing at t0, the captured end tables at ∞, a dial-race loser CLOSING in between', () => {
+  const cap = chaoticCapture()
+  const K = cap.vocab
+  for (const n of cap.nodes) {
+    const t0 = topologyAt(cap, n.uuid, 0) as Topo
+    assert.equal(t0.links.size, 0, 'no line is open at t0 — the journal starts with start + dials')
+    assert.equal(t0.streams.size, 0, 'no stream before the first record')
+    const end = topologyAt(cap, n.uuid, Infinity) as Topo
+    assert.deepEqual([...end.links.keys()].sort((a, b) => a - b), n.links.map((l) => l.id).sort((a, b) => a - b), 'the captured link ids, exactly')
+    for (const l of n.links) {
+      const r = end.links.get(l.id)!
+      assert.deepEqual(
+        { uuid: r.uuid, dialed: r.dialed, admitted: r.admitted, synced: r.synced, paused: r.paused, queued: r.queued, closing: r.closing },
+        { uuid: l.uuid, dialed: l.dialed, admitted: l.admitted, synced: l.synced, paused: l.paused, queued: l.queued, closing: false },
+        `link #${l.id} replays field for field`)
+    }
+    assert.deepEqual([...end.streams.keys()].sort(), Object.keys(n.streams).sort(), 'the captured origins, exactly')
+    for (const [o, w] of Object.entries(n.streams)) {
+      const r = end.streams.get(o)!
+      assert.deepEqual({ a: r.a, s: r.s, d: r.d }, w, `stream ${o}: the watermark ladder replays (durable is PROVABLY 0 on a never-persisting node)`)
+    }
+  }
+  assert.ok((verifyTopology(cap) as { ok: boolean }[]).every((r) => r.ok), 'the drift guard passes on the chaotic fixture')
+  //! the dial race: at the dupLink row the loser is CLOSING and still in the table (the kernel deletes only
+  // on the linkDown echo); by the end it is gone
+  let races = 0
+  for (const n of cap.nodes)
+    for (const e of n.journal) {
+      if (e.kind !== K.dupLink) continue
+      const at = (topologyAt(cap, n.uuid, e.t) as Topo).links.get(e.a as number)
+      assert.ok(at && at.closing, `${n.uuid}: the loser #${e.a} is closing at its dupLink row`)
+      assert.ok(!(topologyAt(cap, n.uuid, Infinity) as Topo).links.get(e.a as number), 'and gone by the end')
+      races++
+    }
+  assert.ok(races > 0, 'the fixture holds at least one dial race')
+  //! links pop into existence: some intermediate step shows a partly-formed mesh
+  const n0 = cap.nodes[0]
+  const admittedAt = (t: number) => [...(topologyAt(cap, n0.uuid, t) as Topo).links.values()].filter((l) => l.admitted).length
+  const samples = Array.from({ length: 40 }, (_, i) => admittedAt(Math.floor((i / 40) * n0.journal.length)))
+  assert.ok(samples.some((c) => c > 0 && c < n0.links.length), `an intermediate step is mid-formation (${samples.join(',')})`)
+})
+
+test('paused links: queued is an UNKNOWN (null) the replay never claims — verifyTopology skips it; drain restores the fact', () => {
+  const sim = new Sim(3)
+  const nodes = cluster(sim, 2)
+  sim.run()
+  assert.ok(formed(nodes))
+  const link = nodes[0].links.values().next().value!
+  sim.post('n01', { kind: 'pause', link: link.id })
+  sim.run()
+  for (let i = 0; i < 5; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] }, i)
+  sim.run()
+  assert.ok(link.paused && link.queued.length > 0, 'the real link parked frames while paused')
+  const paused = captureLive([...sim.nodes.values()])
+  const rp = (topologyAt(paused, 'n01', Infinity) as Topo).links.get(link.id)!
+  assert.equal(rp.paused, true)
+  assert.equal(rp.queued, null, 'the parked depth is not a diary fact — null, never a guess')
+  assert.ok((verifyTopology(paused) as { ok: boolean; reason?: string }[]).every((r) => r.ok), 'an unknown is never compared — the guard still passes')
+  sim.post('n01', { kind: 'drain', link: link.id })
+  sim.run()
+  const drained = captureSim(sim)
+  const rd = (topologyAt(drained, 'n01', Infinity) as Topo).links.get(link.id)!
+  assert.deepEqual({ paused: rd.paused, queued: rd.queued, synced: rd.synced }, { paused: false, queued: 0, synced: true })
+  assert.ok((verifyTopology(drained) as { ok: boolean }[]).every((r) => r.ok))
+})
+
+test('durable nodes: the durable mark is claimed only where provable — persisted ⇒ unknown (null), skipped by the guard; the replay still verifies', () => {
+  const sim = new Sim(5)
+  const nodes = cluster(sim, 2, { durable: true })
+  writes(sim, nodes, 10, 100)
+  sim.run()
+  const cap = captureSim(sim)
+  const K = cap.vocab
+  for (const n of cap.nodes) {
+    assert.ok(n.journal.some((e) => e.kind === K.persisted), 'the fixture persisted')
+    const end = topologyAt(cap, n.uuid, Infinity) as Topo
+    for (const [o, w] of end.streams) {
+      assert.equal(w.d, null, `${n.uuid}/${o}: durable is unknown once anything reached disk (batches carry no origin)`)
+      assert.deepEqual({ a: w.a, s: w.s }, { a: n.streams[o].a, s: n.streams[o].s })
+    }
+  }
+  assert.ok((verifyTopology(cap) as { ok: boolean; reason?: string }[]).every((r) => r.ok), JSON.stringify(verifyTopology(cap)))
+})
+
+test('verifyTopology says why a replay is refused: a truncated ring, and a capture whose end table the journal cannot reproduce', () => {
+  const sim = new Sim(11)
+  const small = ['s1', 's2'].map((uuid, i, all) => sim.add({ uuid, listen: `sim:${uuid}`, hosts: all.filter((_, j) => j !== i).map((u) => `sim:${u}`), redialMs: 20, journalCap: 8 }))
+  for (const n of small) sim.post(n.uuid, { kind: 'start' })
+  writes(sim, small, 6, 40); sim.run()
+  const truncated = captureLive(small)
+  for (const r of verifyTopology(truncated) as { ok: boolean; reason: string }[]) {
+    assert.equal(r.ok, false)
+    assert.match(r.reason, /^journal truncated \(\d+ dropped\)$/)
+  }
+  //! a capture whose end table disagrees with its journal (here: a link the journal never opened) is refused
+  // with the specific field — the viewer keeps that node's end tables, labelled with this reason
+  const cap = chaoticCapture()
+  const n = cap.nodes[0]
+  const forged = { ...cap, nodes: cap.nodes.map((x) => (x === n ? { ...x, links: [...x.links, { ...x.links[0], id: 999999 }] } : x)) }
+  const [r] = verifyTopology(forged) as { ok: boolean; reason: string }[]
+  assert.equal(r.ok, false)
+  assert.match(r.reason, /^links size \d+ vs \d+$/)
+})
+
+test('clients: the single-feeder rule — only the primary syncs; when it drops, the next admitted survivor is elected and syncs on its digest', () => {
+  const sim = new Sim(9)
+  const servers = cluster(sim, 3)
+  client(sim, 'c1', servers)
+  sim.run()
+  writes(sim, servers, 6, 100)
+  sim.run()
+  const cap = captureSim(sim)
+  const c = cap.nodes.find((x) => x.uuid === 'c1')!
+  assert.equal(c.client, true, 'the capture carries the role (the additive diagNode field)')
+  const end = topologyAt(cap, 'c1', Infinity) as Topo
+  assert.equal(end.links.size, 3, 'a spoke holds a line to every server')
+  const synced = [...end.links.values()].filter((l) => l.synced)
+  assert.equal(synced.length, 1, 'exactly ONE feeder is synced — the others digest nothing (kernel: the DIGEST handler answers only the primary)')
+  assert.deepEqual(c.links.filter((l) => l.synced).map((l) => l.id), [synced[0].id], 'and it is the one the kernel holds synced')
+  assert.ok((verifyTopology(cap) as { ok: boolean; reason?: string }[]).every((r) => r.ok), JSON.stringify(verifyTopology(cap)))
+  //! failover: cut the primary's peer — the kernel elects the next admitted survivor and digests it
+  const primary = synced[0]
+  sim.partition('c1', primary.uuid)
+  sim.run({ until: sim.now + 500 })
+  const cap2 = captureSim(sim)
+  const end2 = topologyAt(cap2, 'c1', Infinity) as Topo
+  assert.ok(!end2.links.has(primary.id), 'the old primary is gone')
+  const synced2 = [...end2.links.values()].filter((l) => l.synced)
+  assert.equal(synced2.length, 1, 'one feeder again')
+  assert.notEqual(synced2[0].id, primary.id)
+  const c2 = cap2.nodes.find((x) => x.uuid === 'c1')!
+  assert.deepEqual(c2.links.filter((l) => l.synced).map((l) => l.id), [synced2[0].id], 'the replay elected the same survivor the kernel did')
+  assert.ok((verifyTopology(cap2) as { ok: boolean; reason?: string }[]).every((r) => r.ok), JSON.stringify(verifyTopology(cap2)))
+})
+
+test('a digest on a PAUSED link never syncs it (kernel marks debt and returns before synced=true): an overflowed, still-paused link stays unsynced through the digest', () => {
+  const sim = new Sim(4)
+  //! heartbeats: the LOWER uuid (n01) originates the PING + r=1 digest floor, and skips its own paused links —
+  // so the paused side must be n02: n01's floor digest keeps arriving on n02's paused link
+  const nodes = cluster(sim, 2, { heartbeatMs: 50 })
+  sim.run({ until: 300 })
+  assert.ok(formed(nodes))
+  const link = nodes[1].links.values().next().value!
+  assert.equal(link.synced, true, 'synced before the pause')
+  sim.post('n02', { kind: 'pause', link: link.id })
+  sim.run({ until: sim.now + 10 })
+  for (let i = 0; i < 300; i++) sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] }, i * 0.1)
+  sim.run({ until: sim.now + 400 })
+  const cap = captureLive([...sim.nodes.values()])
+  const K = cap.vocab
+  const j = cap.nodes.find((n) => n.uuid === 'n02')!.journal
+  const iDrop = j.findIndex((e) => e.kind === K.dropOldest && e.a === link.id)
+  assert.ok(iDrop >= 0, 'the queue overflowed (dropOldest) while paused — synced fell')
+  assert.ok(j.slice(iDrop).some((e) => e.kind === K.digestIn && e.a === link.id), 'a digest ARRIVED on the paused link after the overflow')
+  assert.equal(link.synced, false, 'the kernel left it unsynced (paused: debt marked, no sync)')
+  const r = (topologyAt(cap, 'n02', Infinity) as Topo).links.get(link.id)!
+  assert.deepEqual({ paused: r.paused, synced: r.synced, queued: r.queued }, { paused: true, synced: false, queued: null })
+  assert.ok((verifyTopology(cap) as { ok: boolean; reason?: string }[]).every((x) => x.ok), JSON.stringify(verifyTopology(cap)))
+})
+
+test('walTaint (a lying disk condemned at replay) resets the fold: streams AND state are empty at that row, re-taught after — the ∞ guard alone cannot see this', () => {
+  const sim = new Sim(200)
+  const nodes = cluster(sim, 3, { durable: true, heartbeatMs: 50 })
+  sim.run({ until: 300 })
+  writes(sim, nodes, 12, 200)
+  sim.run({ until: 800 })
+  const store = sim.stores.get('n03')!
+  const resolved = store.wal.map((r, i) => (r.resolved ? i : -1)).filter((i) => i >= 0)
+  assert.ok(resolved.length >= 3, `n03 has an interior resolved row to poison (${resolved.length})`)
+  store.wal[resolved[1]].lied = true   // an fsync lie: the row vanishes at restart, leaving an INTERIOR hole in the chain
+  sim.restart('n03')
+  sim.run({ until: sim.now + 1500 })
+  const cap = captureSim(sim)
+  const K = cap.vocab
+  const n = cap.nodes.find((x) => x.uuid === 'n03')!
+  const taint = n.journal.find((e) => e.kind === K.walTaint)
+  assert.ok(taint, 'the restart condemned the lying disk (walTaint)')
+  assert.ok(n.journal.some((e) => e.kind === K.applyInbound && e.t < taint!.t), 'rows replayed BEFORE the hole — the fold had lanes and state to reset')
+  assert.equal((topologyAt(cap, 'n03', taint!.t) as Topo).streams.size, 0, 'every lane is gone at the walTaint row')
+  assert.equal((stateAt(cap, 'n03', taint!.t) as Map<string, unknown>).size, 0, 'and so is the state')
+  assert.ok((topologyAt(cap, 'n03', Infinity) as Topo).streams.size > 0, 're-taught by anti-entropy afterwards')
+  assert.ok((verifyTopology(cap) as { ok: boolean; reason?: string }[]).every((r) => r.ok), JSON.stringify(verifyTopology(cap)))
+  assert.ok((verifyReplay(cap) as { ok: boolean; reason?: string }[]).every((r) => r.ok), JSON.stringify(verifyReplay(cap)))
 })

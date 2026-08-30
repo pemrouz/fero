@@ -20,7 +20,9 @@
        BOTTOM= breadcrumb (location) + level-scoped rollup + the time-travel
                scrubber (beyond v2, kept visually quiet): replay every node's
                journal to an event index through the same stateAt() fold the
-               replay oracle uses.
+               replay oracle uses — and its links/streams through topologyAt(),
+               only where verifyTopology() proved that replay reproduces the
+               captured end tables (elsewhere the end shows, labelled '@ end').
      HONESTY RULES (v2's hard-won debug ethics): folds derive, never
      synthesize; absent data renders as absent ('—', 'record not captured');
      truncation disables time-travel loudly instead of reconstructing fiction.
@@ -264,7 +266,7 @@
 // same bytes Node's capture tests replay, so the folds structurally cannot drift.
 // The viewer NEVER reimplements LWW: stateAt/routes/contested/verifyReplay do
 // all conflict reasoning; this file is projection + interaction only.
-import { decodeVal, kindNames, cellKey, stateAt, verifyReplay, routes, contested, summarize } from './model.mjs';
+import { decodeVal, kindNames, cellKey, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology } from './model.mjs';
 // the ELI5 layer: every data-tip="<key>" on this page resolves in ./eli5.mjs (the shared glossary + hover card)
 import { mountTips } from './eli5.mjs';
 
@@ -378,7 +380,10 @@ const derive = (capture) => {
   }
   const d = { names, routes: routeMap, contested: cmap, modal, maxT, origins, kindFreq,
               quiesced: !!capture.quiesced, live: capture.kind === 'live',
-              truncated: capture.nodes.some(n => n.dropped > 0) };
+              truncated: capture.nodes.some(n => n.dropped > 0),
+              // per node: may its links/streams be REPLAYED under scrub? verifyTopology's verdict (the drift
+              // guard: the fold at t=∞ reproduced the captured end tables) — a page never assumes a fold is faithful
+              topo: new Map(verifyTopology(capture).map(r => [r.uuid, r])) };
   DER.set(capture, d);
   return d;
 };
@@ -456,8 +461,8 @@ const cellRows = (capture, d, T) => {
 // `key` names its ELI5 entry, `fact` an optional capture fact the card repeats under the explanation
 const stat = (v, u, key, w, cls, fact) =>
   `<span class="stat${cls ? ' ' + cls : ''}" style="width:${w}px" data-tip="${esc(key)}"${fact ? ` data-tip-fact="${esc(fact)}"` : ''}>${esc(String(v))}${u ? `<span class="su"> ${esc(u)}</span>` : ''}</span>`;
-const group = (key, label, icon, kids, cap) =>
-  ({ key, type: 'group', label, icon, sev: '', pill: null, metaRaw: '', gcount: kids.length, entity: null, f: {}, kids, cap });
+const group = (key, label, icon, kids, cap, pill = null, sev = '') =>
+  ({ key, type: 'group', label, icon, sev, pill, metaRaw: '', gcount: kids.length, entity: null, f: {}, kids, cap });
 
 /* ── TREE BUILD — the capture folded into nested tree nodes. Every row carries
    `f` (its filterable facets) + `sev` + an optional pill; healthy rows are
@@ -472,29 +477,44 @@ const buildForest = (capture, T) => {
   const nodeRows = nodes.map(n => {
     const nk = 'g/nodes/' + n.uuid;
     const keysN = scrub ? stateAt(capture, n.uuid, T).size : n.state.length;
-    const adm = n.links.filter(l => l.admitted).length;
+    //! TOPOLOGY REPLAY (the "nothing pops into existence while scrubbing" report): under scrub, links and
+    // streams come from topologyAt — but only for a node whose replay verifyTopology PROVED reproduces its
+    // captured end tables; any other node keeps its end snapshot, labelled '@ end' with the verdict's
+    // reason. The page never assumes a fold is faithful — the fold layer proves it, per capture, per node.
+    const tv = scrub ? d.topo.get(n.uuid) : null;
+    const tp = tv && tv.ok ? topologyAt(capture, n.uuid, T) : null;
+    const atEnd = scrub && !tp ? { cls:'info', lab:'@ end', key:'at-end', fact: tv ? tv.reason : '' } : null;
+    // a field the capture could not vouch for (absent from its end table — an older capture) renders as
+    // unknown under replay, exactly as it does at present: the verdict's `unverified` list says which
+    const unvSynced = !!(tp && tv.unverified && tv.unverified.includes('synced'));
+    const lks = tp ? [...tp.links.values()].map(l => unvSynced ? { ...l, synced: null } : l) : n.links;
+    const adm = lks.filter(l => l.admitted).length;
     const diverged = capture.nodes.length > 1 && n.stateHash !== d.modal;
     const sev = diverged ? 'crit' : n.dropped > 0 ? 'warn' : '';
     const pill = diverged ? { cls:'crit', lab:'diverged', key:'node:diverged' }
       : n.dropped > 0 ? { cls:'warn', lab:'truncated', key:'node:truncated', fact: `${n.dropped} oldest events dropped` } : null;
     const kinds = new Set();
     for (const e of n.journal) kinds.add((d.names[e.kind] || ('kind' + e.kind)).toLowerCase());
-    const links = n.links.map(l => {
+    const links = lks.map(l => {
       const flags = new Set();
-      if (!l.admitted) flags.add('pre-admit');
+      if (l.closing) flags.add('closing');                              // a dup-race loser awaiting its close echo (replay only)
+      else if (!l.admitted) flags.add('pre-admit');
       if (l.paused) flags.add('paused');
-      if (l.admitted && l.synced === false) flags.add('syncing');   // synced ABSENT (old capture) → unknown, no claim
-      const lp = flags.has('paused') ? { cls:'warn', lab:'paused', key:'link:paused' }
+      if (l.admitted && l.synced === false && !l.closing) flags.add('syncing');   // synced ABSENT (old capture) → unknown, no claim
+      const lp = flags.has('closing') ? { cls:'info', lab:'closing', key:'link:closing' }
+        : flags.has('paused') ? { cls:'warn', lab:'paused', key:'link:paused' }
         : flags.has('syncing') ? { cls:'warn', lab:'syncing', key:'link:syncing' }
         : flags.has('pre-admit') ? { cls:'info', lab:'pre-admit', key:'link:pre-admit' } : null;
       return { key: nk + '/g/links/' + l.id, type: 'link', label: l.uuid ? '→' + l.uuid : 'link#' + l.id, icon: '⇄',
         sev: lp ? (lp.cls === 'info' ? 'info' : 'warn') : '', pill: lp,
         metaRaw: stat('#' + l.id, '', 'link-id', 44)
                + stat(l.dialed ? 'dialed' : 'accepted', '', l.dialed ? 'side:dialed' : 'side:accepted', 82)
-               + stat(l.queued, 'queued', 'queued', 84, l.queued ? 'warn' : ''),
+               + (l.queued == null ? stat('—', 'queued', 'unknown@t', 84)                // parked-while-paused depth is not a diary fact
+                                   : stat(l.queued, 'queued', 'queued', 84, l.queued ? 'warn' : '')),
         entity: { kind: 'link', link: l, node: n }, f: { node: n.uuid, link: flags }, kids: [] };
     });
-    const streams = Object.entries(n.streams || {}).map(([origin, w]) => ({
+    const sts = tp ? [...tp.streams] : Object.entries(n.streams || {});   // [origin, ladder] either way
+    const streams = sts.map(([origin, w]) => ({
       key: nk + '/g/streams/' + origin, type: 'stream', label: origin, icon: '∿', sev: '', pill: null,
       metaRaw: stat('applied ' + wm(w).a, '', 'wm:applied', 110),
       entity: { kind: 'stream', origin, w: wm(w), node: n }, f: { node: n.uuid }, kids: [] }));
@@ -506,9 +526,11 @@ const buildForest = (capture, T) => {
              + stat(n.epoch ?? '—', 'ep', 'epoch', 58)
              + stat(keysN, 'keys', scrub ? 'keys@t' : 'keys', 74)
              + stat(jstat, 'jrnl', scrub ? 'jrnl@t' : 'jrnl', 96, n.dropped > 0 ? 'warn' : '', n.dropped > 0 ? `+${n.dropped} dropped to ring overflow` : '')
-             + stat(adm + '/' + n.links.length, 'links', 'links-stat', 82),
-      entity: { kind: 'node', node: n }, f: { node: n.uuid, kinds },
-      kids: [group(nk + '/g/links', 'Links', '⇄', links), group(nk + '/g/streams', 'Streams', '∿', streams)] };
+             + (atEnd ? stat(adm + '/' + lks.length, 'links', 'at-end', 100, '', atEnd.fact)   // 100px: mid-formation OPEN counts run to 3 digits (dup-race losers linger until their echo)
+                      : stat(adm + '/' + lks.length, 'links', tp ? 'links@t' : 'links-stat', 100)),
+      //! tp/tv/lks/sts ride the entity so the inspector and status bar read the SAME replayed tables (one fold per node per drag)
+      entity: { kind: 'node', node: n, tp, tv, lks, sts }, f: { node: n.uuid, kinds },
+      kids: [group(nk + '/g/links', 'Links', '⇄', links, undefined, atEnd, atEnd ? 'info' : ''), group(nk + '/g/streams', 'Streams', '∿', streams, undefined, atEnd, atEnd ? 'info' : '')] };
   });
 
   //! Writes — one row per (origin,seq) from routes(), newest first (max t desc).
@@ -626,7 +648,7 @@ const sugValues = (capture, d) => ({
   key: [],                                                   // free text — no closed value set
   write: ['applied', 'lww-lost', 'never-arrived', 'duplicate'],
   cell: ['contested', 'diverged'],
-  link: ['syncing', 'paused', 'pre-admit'],
+  link: ['syncing', 'paused', 'pre-admit', 'closing'],
   kind: Object.keys(capture.vocab).sort((a, b) => (d.kindFreq.get(b) || 0) - (d.kindFreq.get(a) || 0)),
 });
 
@@ -873,11 +895,21 @@ function headerFacts(){
   bits.push(s.events != null ? fact(s.events + ' events', 'events') : fact(klog(s.journalRows) + ' journal rows', 'journal-rows'));
   return bits.join(' · ');
 }
+// the '@ capture end' mark for a leaf (link/stream) of a node whose topology could NOT be replayed at this
+// scrub point — the parent group carries the pill, the inspector and status bar must say it too
+const refusedVerdict = (n) => { const t = scrubT(); const tv = t != null ? D.topo.get(n.uuid) : null; return tv && !tv.ok ? tv : null; };
+const refusedMark = (n) => { const tv = refusedVerdict(n); return tv ? `${fact('@ capture end', 'at-end')} · ` : ''; };
 function renderStatus(){
   const sb = $('statusRight');
   if (!CAP){ sb.innerHTML = ''; return; }
   const node = selKey ? findNode(selKey) : null;
-  if (!node){ sb.innerHTML = headerFacts(); return; }                    // nothing selected → the capture's headline facts
+  if (!node){
+    // a selection that does not exist AT THIS scrub point (a line not yet open, a stream not yet started, a
+    // field not yet written) stays selected — the bar says so instead of pretending nothing is selected
+    const t = scrubT();
+    sb.innerHTML = selKey && t != null ? fact('not here yet @ t' + t, 'not-yet@t') : headerFacts();
+    return;
+  }
   const e = node.entity;
   if (node.type === 'group'){
     const bad = node.kids.filter(k => k.sev === 'crit').length, wrn = node.kids.filter(k => k.sev === 'warn').length;
@@ -885,18 +917,20 @@ function renderStatus(){
       (bad ? ` · ${sst('crit', bad + ' crit', 'sev:crit')}` : '') + (wrn ? ` · ${sst('warn', wrn + ' warn', 'sev:warn')}` : '');
   } else if (node.type === 'node'){
     const n = e.node;
-    const t = scrubT();   // the bar mirrors the tree: replayed keys + journal progress at the scrub point
+    const t = scrubT();   // the bar mirrors the tree: replayed keys + journal progress (+ links) at the scrub point
+    const tp = t != null ? e.tp : null;                                  // the forest's replay for this node (or null → refused)
     sb.innerHTML = t != null
       ? `${sst('', '@ t' + t, 'tread')} · ${fact(stateAt(CAP, n.uuid, t).size + ' keys', 'keys@t')} · ${fact('journal ' + klog(jAt(n.journal, t)) + '/' + klog(n.journal.length), 'jrnl@t')}`
+        + (tp ? ` · ${fact([...tp.links.values()].filter(l => l.admitted).length + '/' + tp.links.size + ' links', 'links@t')}` : '')
       : `${sst(node.sev, node.pill ? node.pill.lab : 'converged', node.pill ? node.pill.key : 'node:converged')} · ${fact('seq ' + (n.seq ?? '—'), 'seq')} · ${fact(n.state.length + ' keys', 'keys')} · ${fact('journal ' + klog(n.journal.length), 'jrnl')}`;
   } else if (node.type === 'write'){
     sb.innerHTML = `${fact('write ' + esc(node.label), 'write')} · ${sst(node.sev, esc(e.o.summaryText), 'route:summary')}`;
   } else if (node.type === 'cell'){
     sb.innerHTML = `${fact('cell', 'cell')} · ${sst(node.sev, node.pill ? node.pill.lab : 'settled', node.pill ? node.pill.key : 'cell:settled')} · ${fact('winner ' + (e.cell.winner ? esc(e.cell.winner.origin + '#' + e.cell.winner.seq) : '—'), 'cell-winner')}`;
   } else if (node.type === 'link'){
-    sb.innerHTML = `${fact('link', 'link')} · ${sst(node.sev, node.pill ? node.pill.lab : 'up', node.pill ? node.pill.key : 'link:up')} · ${fact('queued ' + e.link.queued, 'queued')}`;
+    sb.innerHTML = refusedMark(e.node) + `${fact('link', 'link')} · ${sst(node.sev, node.pill ? node.pill.lab : 'up', node.pill ? node.pill.key : 'link:up')} · ${e.link.queued == null ? fact('queued —', 'unknown@t') : fact('queued ' + e.link.queued, 'queued')}`;
   } else if (node.type === 'stream'){
-    sb.innerHTML = `${fact('stream ' + esc(e.origin), 'stream')} · ${fact('applied ' + esc(String(e.w.a)), 'wm:applied')} · ${fact('shippable ' + esc(String(e.w.s)), 'wm:shippable')} · ${fact('durable ' + esc(String(e.w.d)), 'wm:durable')}`;
+    sb.innerHTML = refusedMark(e.node) + `${fact('stream ' + esc(e.origin), 'stream')} · ${fact('applied ' + esc(String(e.w.a)), 'wm:applied')} · ${fact('shippable ' + esc(String(e.w.s)), 'wm:shippable')} · ${e.w.d == null ? fact('durable —', 'unknown@t') : fact('durable ' + esc(String(e.w.d)), 'wm:durable')}`;
   } else if (node.type === 'violation'){
     sb.innerHTML = sst('crit', 'invariant violated', 'violation');
   } else sb.innerHTML = headerFacts();
@@ -929,6 +963,20 @@ function ihead(title, kind, sev, sub){
 function renderInspector(){
   const node = selKey ? findNode(selKey) : null;
   const body = document.querySelector('.body');
+  //! a selection that is ABSENT at this scrub point keeps the pane open and says why — the whole point of
+  // watching one link/stream/cell is wheeling through the step where it appears; dropping the selection
+  // (the old behaviour) defeated that. The row's own parts name it (no fold is consulted).
+  if (!node && selKey && scrubT() != null){
+    body.classList.remove('noinsp');
+    const parts = selKey.split('/'), t = scrubT();
+    const what = parts[parts.length - 2] === 'links' ? 'link #' + parts[parts.length - 1] + ' is not open yet'
+      : parts[parts.length - 2] === 'streams' ? 'no stream from ' + parts[parts.length - 1] + ' yet'
+      : parts[1] === 'cells' ? 'cell ' + prettyCell(decodeURIComponent(parts[2])) + ' is not written yet'
+      : 'this row does not exist yet';
+    $('insp').innerHTML = `<div class="tban" data-tip="replayed">replayed @ t${t}</div>` +
+      `<div class="reason" data-tip="not-yet@t">${esc(what)} @ t${t} — scrub forward and it appears here, still selected.</div>`;
+    return;
+  }
   // no selection → collapse the pane so the tree reclaims its column
   if (!node || !node.entity){ body.classList.add('noinsp'); $('insp').innerHTML = ''; return; }
   body.classList.remove('noinsp');
@@ -942,14 +990,18 @@ function renderInspector(){
   else if (e.kind === 'violation') html = inspViolation(node);
   // one quiet banner while time-travelling — says which panes replay and which are end facts
   const t = scrubT();
-  if (t != null) html = `<div class="tban" data-tip="replayed">replayed @ t${t} — state, journal & routes at the scrub point · links, streams & elections show capture end</div>` + html;
+  if (t != null){
+    const fb = [...D.topo.values()].filter(r => !r.ok).length;   // nodes whose topology could not be replayed (labelled '@ end' in place)
+    html = `<div class="tban" data-tip="replayed">replayed @ t${t} — state, journal, routes, links & streams at the scrub point · seq/epoch & elections show capture end${fb ? ` · links & streams @ end for ${fb} node${fb > 1 ? 's' : ''} the replay could not reproduce` : ''}</div>` + html;
+  }
   $('insp').innerHTML = html;
 }
 function inspNode(nd){
   const n = nd.entity.node;
-  // time-travel scopes everything journal-DERIVABLE to t ≤ T (keys via stateAt, the mini-log,
-  // the by-kind rollup); facts the capture only holds at END (seq/epoch/links/streams) stay,
-  // labelled — deriving them would mean minting state the fold layer never proved
+  // time-travel scopes everything journal-DERIVABLE to t ≤ T (keys via stateAt, links + streams via
+  // topologyAt where verifyTopology proved the replay, the mini-log, the by-kind rollup); facts the
+  // capture only holds at END (seq/epoch, and the topology of a node whose replay failed its proof)
+  // stay, labelled — deriving them would mean minting state the fold layer never proved
   const t = scrubT();
   const rows = t != null ? n.journal.slice(0, jAt(n.journal, t)) : n.journal;
   const sub = `<span class="mono" data-tip="listen">${esc(n.listen ?? '—')}</span> · ${fact('seq ' + esc(String(n.seq ?? '—')), 'seq')} · ${fact('epoch ' + esc(String(n.epoch ?? '—')), 'epoch')}`;
@@ -962,20 +1014,27 @@ function inspNode(nd){
     ['journal', t != null ? `${klog(rows.length)} <span class="x">≤ t${t} · ${klog(n.journal.length)} retained</span>`
                           : klog(n.journal.length) + (n.dropped > 0 ? ` / ${klog(n.dropped)} dropped` : ' / 0 dropped'), n.dropped > 0 ? 'warn' : '', t != null ? 'jrnl@t' : 'journal'],
   ]);
-  const lrows = n.links.map(l => {
-    const state = !l.admitted ? 'pre-admit' : l.synced === false ? 'syncing' : l.synced === true ? 'synced' : '—';
-    const skey = !l.admitted ? 'link:pre-admit' : l.synced === false ? 'link:syncing' : l.synced === true ? 'synced' : '';
-    const cls = !l.admitted ? '' : l.synced === false ? 'min' : l.synced === true ? 'maj' : '';
+  const tv = t != null ? nd.entity.tv : null;                       // the forest's verdict + replay for this node —
+  const tp = t != null ? nd.entity.tp : null;                       // null → the end tables (labelled with the reason)
+  const lks = nd.entity.lks;                                        // display links (unverified fields already unknown)
+  const lrows = lks.map(l => {
+    const state = l.closing ? 'closing' : !l.admitted ? 'pre-admit' : l.synced === false ? 'syncing' : l.synced === true ? 'synced' : '—';
+    const skey = l.closing ? 'link:closing' : !l.admitted ? 'link:pre-admit' : l.synced === false ? 'link:syncing' : l.synced === true ? 'synced' : '';
+    const cls = l.closing ? 'min' : !l.admitted ? '' : l.synced === false ? 'min' : l.synced === true ? 'maj' : '';
     return `<tr><td class="node">${l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '—'} <span style="color:var(--soft)" data-tip="link-id">#${esc(String(l.id))}</span></td>` +
-      `<td data-tip="${l.dialed ? 'side:dialed' : 'side:accepted'}">${l.dialed ? 'dialed' : 'accepted'}</td><td class="${cls}"><span${skey ? ` data-tip="${skey}"` : ''}>${state}</span>${l.paused ? ' <span class="min" data-tip="link:paused">· paused</span>' : ''}</td><td data-tip="queued">${esc(String(l.queued))}</td></tr>`;
+      `<td data-tip="${l.dialed ? 'side:dialed' : 'side:accepted'}">${l.dialed ? 'dialed' : 'accepted'}</td><td class="${cls}"><span${skey ? ` data-tip="${skey}"` : ''}>${state}</span>${l.paused ? ' <span class="min" data-tip="link:paused">· paused</span>' : ''}</td>` +
+      (l.queued == null ? `<td data-tip="unknown@t">—</td>` : `<td data-tip="queued">${esc(String(l.queued))}</td>`) + `</tr>`;
   }).join('');
-  const links = n.links.length
+  const links = lks.length
     ? `<table class="vt"><thead><tr><th data-tip="peer">peer</th><th data-tip="side">side</th><th data-tip="link-state">state</th><th data-tip="queued">queued</th></tr></thead><tbody>${lrows}</tbody></table>`
-    : `<div class="reason">No links.</div>`;
-  const srows = Object.entries(n.streams || {}).map(([o, v]) => { const w = wm(v); return (
-    `<tr><td class="node">${ref(o, 'g/nodes/' + o)}</td><td data-tip="wm:applied">${esc(String(w.a))}</td><td data-tip="wm:shippable">${esc(String(w.s))}</td><td data-tip="wm:durable">${esc(String(w.d))}</td><td data-tip="log-records">${(n.logs[o] || []).length}</td></tr>`)}).join('');
+    : `<div class="reason">No links${tp ? ' yet at this point' : ''}.</div>`;
+  const sts = nd.entity.sts;
+  const srows = sts.map(([o, v]) => { const w = wm(v); return (
+    `<tr><td class="node">${ref(o, 'g/nodes/' + o)}</td><td data-tip="wm:applied">${esc(String(w.a))}</td><td data-tip="wm:shippable">${esc(String(w.s))}</td>` +
+    (w.d == null ? `<td data-tip="unknown@t">—</td>` : `<td data-tip="wm:durable">${esc(String(w.d))}</td>`) +
+    (tp ? `<td data-tip="stream-folded@t">${esc(String(w.n))}</td>` : `<td data-tip="log-records">${(n.logs[o] || []).length}</td>`) + `</tr>`)}).join('');
   const streams = srows
-    ? `<table class="vt"><thead><tr><th data-tip="origin">origin</th><th data-tip="wm:applied">applied</th><th data-tip="wm:shippable">shippable</th><th data-tip="wm:durable">durable</th><th data-tip="log-records">log records</th></tr></thead><tbody>${srows}</tbody></table>`
+    ? `<table class="vt"><thead><tr><th data-tip="origin">origin</th><th data-tip="wm:applied">applied</th><th data-tip="wm:shippable">shippable</th><th data-tip="wm:durable">durable</th>${tp ? '<th data-tip="stream-folded@t">folded</th>' : '<th data-tip="log-records">log records</th>'}</tr></thead><tbody>${srows}</tbody></table>`
     : `<div class="reason">No inbound streams yet.</div>`;
   // the journal mini-log — newest first, human-readable via the capture's vocab;
   // under scrub it is the window ENDING AT the scrub point, so dragging/wheeling
@@ -991,11 +1050,13 @@ function inspNode(nd){
   for (const e of rows) { const nm = D.names[e.kind] || ('kind' + e.kind); counts.set(nm, (counts.get(nm) || 0) + 1); }
   const roll = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
     .map(([k, c]) => `${esc(k)} ×${c}`).join(' · ') + (counts.size > 6 ? ` · +${counts.size - 6} kinds` : '');
-  const atEnd = t != null ? `<span class="stn" data-tip="at-end">@ capture end</span>` : '';
+  // '@ capture end' now marks only a node whose topology could NOT be replayed (the verdict's reason rides the card)
+  const atEnd = t != null && !tp ? `<span class="stn" data-tip="at-end"${tv && tv.reason ? ` data-tip-fact="${esc(tv.reason)}"` : ''}>@ capture end</span>` : '';
   return ihead(esc(n.uuid), 'node', nd.sev, sub) +
     seg('Facts', facts, '', 'facts') +
-    seg('Links', links, atEnd || `<span class="stn" data-tip="admitted">${n.links.filter(l => l.admitted).length}/${n.links.length} admitted</span>`, 'g:links') +
-    seg('Streams', streams, atEnd, 'g:streams') +
+    seg('Links', links, atEnd || (tp ? `<span class="stn" data-tip="links@t">${lks.filter(l => l.admitted).length}/${lks.length} admitted @ t${t}</span>`
+                                     : `<span class="stn" data-tip="admitted">${n.links.filter(l => l.admitted).length}/${n.links.length} admitted</span>`), 'g:links') +
+    seg('Streams', streams, atEnd || (tp ? `<span class="stn" data-tip="streams@t">@ t${t}</span>` : ''), 'g:streams') +
     seg('Journal · newest first', jlog, `<span class="stn">last ${jr.length} of ${klog(rows.length)}${t != null ? ` ≤ t${t}` : ''}${n.dropped > 0 ? ' · +' + klog(n.dropped) + ' dropped' : ''}</span>`, 'journal') +
     seg('By kind', `<div class="reason mono" style="font-size:11px">${roll || '—'}</div>`, t != null ? `<span class="stn">≤ t${t}</span>` : '', 'by-kind');
 }
@@ -1016,7 +1077,7 @@ function inspWrite(nd){
     ? `{ type:<span class="vv" data-tip="rec:${esc(tyName(rec.ty))}">'${esc(tyName(rec.ty))}'</span>, key:<span class="kk" data-tip="rec-key">'${esc(key)}'</span>` +
       (rec.ty === 2 ? '' : `, value:<span class="vv" data-tip="rec-value">${esc(fmtVal(rec.v, 60))}</span>`) + ` }\n` +
       `<span style="color:var(--soft)"><span data-tip="rec-seq">@ seq ${esc(String(rec.seq))}</span> · <span data-tip="rec-epoch">epoch ${esc(String(rec.epoch))}</span> · <span data-tip="origin">origin</span> ${ref(r.origin, 'g/nodes/' + r.origin)}` +
-      (r.partition !== '' ? ` · <span data-tip="partition">part ${esc(String(r.partition))}</span>` : '') + `</span>`
+      (r.partition != null ? ` · <span data-tip="partition">part ${esc(String(r.partition))}</span>` : '') + `</span>`
     : `<span class="bad" data-tip="not-captured">record not captured</span> — no node's log holds ${esc(r.origin)} seq ${esc(String(r.seq))}; the payload is unknown (never invented)`;
   // the LWW winner that beat this write, when the election is findable in the captured logs.
   // NOT under scrub: D.contested is the END-of-run election — at T the loser may have lost to
@@ -1049,7 +1110,7 @@ function inspWrite(nd){
   // not a fact at T; the tree row keeps it (with tdim) because the tree is explicitly the ledger
   return ihead(esc(r.origin + '#' + r.seq), 'write', t != null ? '' : nd.sev, sub) +
     seg('Change record', `<div class="recd">${recd}</div>`, '', 'change-record') +
-    seg('Route', `<ul class="tl">${lis}</ul>`, r.partition !== '' ? `<span class="stn" data-tip="partition">part ${esc(String(r.partition))}</span>` : '', 'route');
+    seg('Route', `<ul class="tl">${lis}</ul>`, r.partition != null ? `<span class="stn" data-tip="partition">part ${esc(String(r.partition))}</span>` : '', 'route');
 }
 function inspCell(nd){
   const c = nd.entity.cell;
@@ -1086,6 +1147,8 @@ function inspLink(nd){
   const { link: l, node: n } = nd.entity;
   const peer = l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '<span class="warnt">unidentified</span>';
   const side = l.dialed ? 'dialed' : 'accepted';
+  const tvr = refusedVerdict(n);
+  const atEnd = tvr ? `<span class="stn" data-tip="at-end"${tvr.reason ? ` data-tip-fact="${esc(tvr.reason)}"` : ''}>@ capture end</span>` : '';
   return ihead(esc(l.uuid ? '→' + l.uuid : 'link#' + l.id), 'link', nd.sev,
       `${ref(n.uuid, 'g/nodes/' + n.uuid)} ⇄ ${peer} · <span data-tip="side:${side}">${side}</span>`) +
     seg('Facts', kv([
@@ -1093,21 +1156,25 @@ function inspLink(nd){
       ['peer', peer, '', 'peer'],
       ['side', side, '', 'side:' + side],
       ['admitted', l.admitted ? 'yes' : 'no', l.admitted ? '' : 'warn', 'admitted'],
+      ...(l.closing ? [['closing', 'yes', '', 'link:closing']] : []),              // replay-only: a refused line awaiting its close echo (info, like its pill)
       ['synced', l.synced === true ? 'yes' : l.synced === false ? 'no' : '—', l.synced === false ? 'warn' : '', 'synced'],   // '—' = field absent from this capture
       ['paused', l.paused ? 'yes' : 'no', l.paused ? 'warn' : '', 'paused'],
-      ['queued', String(l.queued), l.queued ? 'warn' : '', 'queued'],
-    ]), '', 'facts');
+      l.queued == null ? ['queued', '—', '', 'unknown@t'] : ['queued', String(l.queued), l.queued ? 'warn' : '', 'queued'],
+    ]), atEnd, 'facts');
 }
 function inspStream(nd){
   const { origin, w, node: n } = nd.entity;   // w = the watermark ladder the row already shows (a `seen` field never existed on the entity — that fact rendered 'undefined')
+  const tvr = refusedVerdict(n);
+  const atEnd = tvr ? `<span class="stn" data-tip="at-end"${tvr.reason ? ` data-tip-fact="${esc(tvr.reason)}"` : ''}>@ capture end</span>` : '';
   return ihead(esc(origin), 'stream', '', `<span data-tip="stream">inbound stream</span> on ${ref(n.uuid, 'g/nodes/' + n.uuid)}`) +
     seg('Facts', kv([
       ['origin', ref(origin, 'g/nodes/' + origin), '', 'origin'],
       ['applied', esc(String(w.a)), '', 'wm:applied'],
       ['shippable', esc(String(w.s)), '', 'wm:shippable'],
-      ['durable', esc(String(w.d)), '', 'wm:durable'],
-      ['log records held', String((n.logs[origin] || []).length), '', 'log-records'],
-    ]), '', 'facts');
+      w.d == null ? ['durable', '—', '', 'unknown@t'] : ['durable', esc(String(w.d)), '', 'wm:durable'],
+      w.n != null ? ['folded so far', String(w.n), '', 'stream-folded@t']            // replayed: records folded by the scrub point
+                  : ['log records held', String((n.logs[origin] || []).length), '', 'log-records'],
+    ]), atEnd, 'facts');
 }
 function inspViolation(nd){
   const v = nd.entity.v;
@@ -1188,7 +1255,7 @@ function setT(v){
   T = (v == null || v >= maxT) ? null : Math.max(0, v);
   if (LIVE){ if (T != null) stopPoll(true); else startPoll(); }        // scrubbing a live feed pauses polling; reset resumes
   FOREST = buildForest(CAP, T);                                        // cells + node key-stats recompute through stateAt
-  if (selKey && !findNode(selKey)) selKey = '';
+  // a selection absent at this T is KEPT (the inspector says 'not here yet'); it re-attaches when it reappears
   syncURL(); render();
 }
 $('trange').addEventListener('input', e => { if (!e.target.disabled) setT(+e.target.value); });

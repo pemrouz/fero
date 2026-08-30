@@ -9,7 +9,7 @@ import assert from 'node:assert'
 import { Runtime } from '../../shell/runtime.ts'
 import { AttachPool, DiagClient, pullNode } from './attach.ts'
 import { captureNode } from './capture.ts'
-import { verifyReplay, summarize, routes } from './model.mjs'
+import { verifyReplay, summarize, routes, verifyTopology } from './model.mjs'
 import { REC } from '../../kernel/env.ts'
 import { ports, until } from '#utils'
 
@@ -39,13 +39,17 @@ test('parity: a slice pulled over the DIAG wire deepEquals the in-process captur
     const local = captureNode(rts[0].node)
     //! the moving parts (the pull's own journal rows, and the links table the session itself appears in)
     // are compared by prefix/identity; everything else must be byte-equal
-    for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'stateHash', 'streams', 'logs', 'state'] as const)
+    for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'client', 'stateHash', 'streams', 'logs', 'state'] as const)
       assert.deepEqual(answer.node[k], local[k], `${k} must match the in-process fold`)
     assert.deepEqual(answer.node.journal.slice(0, 20), local.journal.slice(0, 20), 'journal prefix identical')
     //! the pulled slice is a REAL capture: the model's replay oracle refolds it to the same end state
     const cap = { v: 1, kind: 'live', vocab: answer.vocab, seed: null, nodes: [answer.node] }
     for (const r of verifyReplay(cap) as { ok: boolean; uuid: string; reason?: string }[])
       assert.ok(r.ok, `replay-refold on a WIRE-pulled slice (${r.uuid}: ${r.reason ?? ''})`)
+    //! and the topology plane: the pulled link table (the DIAG session's own row included — uuid '', diag true)
+    // and watermark ladder refold from the pulled journal; `client` rides the wire so the single-feeder rule can
+    for (const r of verifyTopology(cap) as { ok: boolean; uuid: string; reason?: string }[])
+      assert.ok(r.ok, `topology-refold on a WIRE-pulled slice (${r.uuid}: ${r.reason ?? ''})`)
   } finally { c.close(); await stop() }
 })
 
