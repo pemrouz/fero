@@ -105,6 +105,22 @@ into it:
   LWW fold). Keyboard: j/k/h/l, `/` to filter, Esc. Honesty by construction:
   renders only folded facts, absence renders as absence, journal truncation
   disables time-travel loudly instead of reconstructing fiction.
+- **ELI5 tooltips** ([tools/debug/eli5.mjs](tools/debug/eli5.mjs)): hover anything
+  on either page — a stat, a pill, a journal-kind badge, a route stop, a metric
+  key, a phase chip, a header fact — for a plain-English card (one term line,
+  one or two sentences in the house words: computer, diary, ticket number,
+  record book, member list, tie-break). ONE glossary + ONE hover layer, plain-JS
+  ESM shared verbatim by both pages and the tests, the same way model.mjs is:
+  every `data-tip="<key>"` resolves there or paints nothing. Copy explains what a
+  label MEANS and never asserts a fact about the loaded capture (a repeated fact
+  rides `data-tip-fact`, escaped, as a dim second line). `eli5.test` polices it
+  both ways: every key either page paints must resolve (a sweep boots the real
+  page scripts over every scenario capture, a mid-flight live capture, an
+  overflowed-ring cluster, a never-healed cut run to quiescence and an attach
+  envelope with every absent reason), every entry must be reachable (dead copy
+  fails, with a short documented list of what no truthful offline producer can
+  paint), and the closed vocabularies — all 71 journal kinds, every registry
+  metric key and phase label — are pinned in both directions.
 - **Scenario dashboard** ([tools/debug/scenarios.ts](tools/debug/scenarios.ts) +
   [scenarios.html](tools/debug/scenarios.html), served at `/`): every high-level
   behaviour as a named, diagrammed, measured card — happy paths (formation,

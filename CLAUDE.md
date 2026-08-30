@@ -38,7 +38,7 @@ exercises, run data's perf suite too.
 | [shell/](shell) | The thin I/O runtime (real sockets/timers around the kernel). |
 | [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep — chaos schedules against the SAME kernel bytes the shell runs. |
 | [tests/](tests) | Cross-layer scenarios: api scenarios, TCP tier, WAL tier, internals entry pin, baseline perf. |
-| [tools/](tools) | debug/ (capture viewer, scenario server, honesty checks) + perf/ (absolute probes, BASELINE.md, pin/compare machinery). |
+| [tools/](tools) | debug/ (capture viewer, scenario server, honesty checks, the ELI5 tooltip glossary [eli5.mjs](tools/debug/eli5.mjs) — every `data-tip` key on both pages resolves there, gated by eli5.test) + perf/ (absolute probes, BASELINE.md, pin/compare machinery). |
 | [utils/](utils) [examples/](examples) | Shared helpers (`#utils` import map); the two-terminals demo. |
 
 Entries: `.` → [api/index.ts](api/index.ts), `./internals` →
@@ -50,7 +50,7 @@ DESIGN-M6/M7.
 
 | Command | What it does |
 |---|---|
-| `npm test` | 333 unit/sim/scenario tests (incl. the n=100 scale tier), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
+| `npm test` | 341 unit/sim/scenario tests (incl. the n=100 scale tier and the debugger's DOM/ELI5 gates), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
 | `npm run perf` | The 41 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
 | `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` | Sim executive, shrinker, scenario server, debug viewer, two-terminals demo. |
 | `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200s each; `--only <name>`, `--seeds N`). Script-tier — run it on scale-relevant kernel changes, not per-commit. |

@@ -11,6 +11,7 @@
 //   /scenarios       → scenarios.html
 //   /scenarios.json  → run the registry (cached; ?rerun=1 re-runs) — read-only: baselines are pinned by the CLI only
 //   /debug           → viewer.html (the debugger); ?scenario=<id> loads that scenario's capture
+//   /model.mjs, /eli5.mjs → the shared model + ELI5 glossary modules (the SAME bytes the tests import)
 //   /capture/<id>.json → the named scenario's capture from the cached run
 //   /capture.json    → the file capture, or a live snapshot rebuilt ON REQUEST
 //
@@ -117,6 +118,8 @@ const server = http.createServer(async (req, res) => {
       page(res, 'viewer.html')
     } else if (url === '/model.mjs') {
       page(res, 'model.mjs', 'text/javascript')
+    } else if (url === '/eli5.mjs') {
+      page(res, 'eli5.mjs', 'text/javascript')   // the shared ELI5 glossary + tooltip layer, imported by BOTH pages
     } else if (url.startsWith('/capture/')) {
       const id = url.slice('/capture/'.length).replace(/\.json$/, '')
       const c = scenarios(false).captures.get(id)

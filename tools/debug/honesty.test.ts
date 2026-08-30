@@ -181,17 +181,25 @@ test('(c2) shrunk facts are passthrough only: the viewer can never infer shrunk-
   }
 })
 
-test('(d) the viewer data plane: exactly one model import, no local fold redefinitions', () => {
+test('(d) the viewer data plane: exactly one model import, no local fold redefinitions; the chrome plane imports only the hover layer', () => {
   const src = readFileSync(join(HERE, 'viewer.html'), 'utf8')
   const imports = [...src.matchAll(/^\s*import\s+\{([^}]+)\}\s+from\s+'([^']+)'/gm)]
-  assert.equal(imports.length, 1, 'the viewer has exactly ONE module import — the model')
-  assert.equal(imports[0][2], './model.mjs')
+  //! two planes, two imports, nothing else: the DATA plane is the model (every fold), the CHROME plane is
+  // the ELI5 hover layer (words + wiring, no folds). A third import would be a new seam to police here.
+  assert.deepEqual(imports.map((m) => m[2]), ['./model.mjs', './eli5.mjs'], 'the viewer imports the model and the ELI5 layer — nothing else')
   const imported = imports[0][1].split(',').map((s) => s.trim()).sort()
   assert.deepEqual(imported, ['cellKey', 'contested', 'decodeVal', 'kindNames', 'routes', 'stateAt', 'summarize', 'verifyReplay'])
+  assert.deepEqual(imports[1][1].split(',').map((s) => s.trim()), ['mountTips'], 'the chrome import is the hover mount alone — the glossary is read through it, never copied into the page')
   //! no local shadowing: a fold reimplemented in the page is exactly v2's dual-language drift bug
-  for (const name of imported)
+  for (const name of [...imported, 'mountTips', 'tip', 'tipHTML', 'ELI5'])
     assert.ok(
       !new RegExp(`(function|const|let|var)\\s+${name}\\b`).test(src),
-      `viewer.html redefines ${name} locally — the model must be the ONE fold source`,
+      `viewer.html redefines ${name} locally — the model / the glossary must be the ONE source`,
     )
+  //! the chrome plane never folds: eli5.mjs imports nothing (no model reach-around — with zero imports it
+  // structurally cannot call a fold) and defines nothing named like one (a look-alike would be a third copy)
+  const eli5 = readFileSync(join(HERE, 'eli5.mjs'), 'utf8')
+  assert.equal([...eli5.matchAll(/^\s*import\s/gm)].length, 0, 'eli5.mjs is self-contained — words and hover wiring only')
+  for (const name of imported)
+    assert.ok(!new RegExp(`(function|const|let|var)\\s+${name}\\b`).test(eli5), `eli5.mjs defines ${name} — the chrome plane must not fold`)
 })
