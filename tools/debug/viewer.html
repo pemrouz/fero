@@ -52,6 +52,8 @@
   /* a navigable reference token (a node uuid / origin#seq / cell that IS a tree row) — click jumps the tree there. Discoverable via a faint dotted underline; lights up gold on hover. */
   .ref{cursor:pointer;border-bottom:1px dotted var(--faint);transition:color .1s,border-color .1s}
   .ref:hover{color:var(--gold);border-bottom-color:var(--gold-2)}
+  /* ELI5 tooltips: ./eli5.mjs injects the card and [data-tip]{cursor:help}; clickable chrome that also explains itself keeps its pointer */
+  .oitem[data-tip],.cseg[data-tip],.iclose[data-tip],.oclear[data-tip],.treset[data-tip],.ox[data-tip],.ochip[data-tip]{cursor:pointer}
   ::selection{background:var(--sel)}
 
   /* ── top command bar: just the ONE omni filter box, edge to edge — pure black ── */
@@ -228,11 +230,11 @@
 <!-- ── command bar: the ONE omni filter box — chips + input + match count + reset ✕ + suggestions ── -->
 <div class="bar">
   <div class="omni" id="omni">
-    <span class="oicon">⌕</span>
+    <span class="oicon" data-tip="filter">⌕</span>
     <div class="ochips" id="ochips"></div>
-    <input id="q" spellcheck="false" placeholder="filter the whole tree — a name, a facet (write:lww-lost), or is:crit" autocomplete="off">
-    <span class="ocount" id="ocount"></span>
-    <span class="oclear" id="oclear" title="reset — clear the filter">✕</span>
+    <input id="q" spellcheck="false" placeholder="filter the whole tree — a name, a facet (write:lww-lost), or is:crit" autocomplete="off" data-tip="filter">
+    <span class="ocount" id="ocount" data-tip="matches"></span>
+    <span class="oclear" id="oclear" data-tip="filter-clear">✕</span>
     <div class="omenu" id="omenu"></div>
   </div>
   <span class="srcname" id="srcName"></span>
@@ -249,9 +251,9 @@
 <!-- ── bottom status bar: scrubber + selection breadcrumb + level-scoped rollup ── -->
 <div class="keys">
   <span class="scrub" id="scrub">
-    <input type="range" id="trange" min="0" max="0" step="1" value="0">
-    <span class="tread" id="tread"></span>
-    <span class="treset" id="treset" title="reset time travel" style="display:none">✕</span>
+    <input type="range" id="trange" min="0" max="0" step="1" value="0" data-tip="time-travel">
+    <span class="tread" id="tread" data-tip="tread"></span>
+    <span class="treset" id="treset" data-tip="time-travel-reset" style="display:none">✕</span>
   </span>
   <div class="crumb" id="crumb"></div>
   <div class="kright"><span class="right" id="statusRight"></span></div>
@@ -263,6 +265,8 @@
 // The viewer NEVER reimplements LWW: stateAt/routes/contested/verifyReplay do
 // all conflict reasoning; this file is projection + interaction only.
 import { decodeVal, kindNames, cellKey, stateAt, verifyReplay, routes, contested, summarize } from './model.mjs';
+// the ELI5 layer: every data-tip="<key>" on this page resolves in ./eli5.mjs (the shared glossary + hover card)
+import { mountTips } from './eli5.mjs';
 
 // ═══ DATA LAYER : BEGIN ══════════════════════════════════════════════════
 // Pure functions only — no DOM between the markers. The validation harness
@@ -329,7 +333,7 @@ const journalLine = (name, e, R = (t) => esc(String(t))) => {
     case 'dupLink':      return `dup link — closed #${esc(String(e.a))}, kept #${esc(String(e.b))}`;
     case 'selfReject':   return `link #${esc(String(e.a))} rejected — presented our own uuid`;
     case 'linkDown':     return `link #${esc(String(e.a))} down · ${esc(String(e.b))}`;
-    case 'frameDrop':    return `link #${esc(String(e.a))} frame error · ${esc(String(e.b))} — link dropped`;
+    case 'frameDrop':    return `link #${esc(String(e.a))} dropped a frame · ${esc(String(e.b))}`;   // broken bytes / before-hello also drop the LINK; an unknown verb keeps it — the ELI5 says which
     case 'writeLocal':   return `write seq ${esc(String(e.a))} → part ${esc(String(e.b))}`;
     case 'applyInbound': return `apply ${w(e.a, e.b)}`;
     case 'dropOldest':   return `outbox overflow on link #${esc(String(e.a))} — dropped ${esc(String(e.b))}`;
@@ -396,13 +400,14 @@ const outcomeOf = (capture, r, d) => {
   if (dup.length)   flags.add('duplicate');
   const settled = d.quiesced && !d.live;                    // only a quiesced sim can PROVE a write is lost
   const sev = never.length ? (settled ? 'crit' : 'warn') : lost.length ? 'warn' : '';
-  const pill = never.length ? (settled ? { cls:'crit', lab:'never-arrived', tip:'a node never saw this write and the sim has quiesced — it is lost' }
-                                       : { cls:'warn', lab:'in-flight', tip:'a node has not seen this write yet (normal on a live capture)' })
-    : lost.length ? { cls:'warn', lab:'lww-lost', tip:'this write lost a per-cell LWW election on at least one node' } : null;
-  const parts = [`<span class="${ok.length === uuids.length ? 'x' : ''}">applied ${ok.length}/${uuids.length}</span>`];
-  if (lost.length)  parts.push(`<span class="warnt">lost@${esc(lost.join(','))}</span>`);
-  if (never.length) parts.push(`<span class="${settled ? 'bad' : 'warnt'}">⊘ ${esc(never.join(','))}</span>`);
-  if (dup.length)   parts.push(`<span class="x">dup@${esc(dup.join(','))}</span>`);
+  // a pill names its ELI5 KEY (./eli5.mjs): the write:/cell:/link: filter vocabulary IS the pill vocabulary, one explanation each
+  const pill = never.length ? (settled ? { cls:'crit', lab:'never-arrived', key:'write:never-arrived' }
+                                       : { cls:'warn', lab:'in-flight', key:'write:in-flight' })
+    : lost.length ? { cls:'warn', lab:'lww-lost', key:'write:lww-lost' } : null;
+  const parts = [`<span class="${ok.length === uuids.length ? 'x' : ''}" data-tip="route:applied">applied ${ok.length}/${uuids.length}</span>`];
+  if (lost.length)  parts.push(`<span class="warnt" data-tip="route:lost">lost@${esc(lost.join(','))}</span>`);
+  if (never.length) parts.push(`<span class="${settled ? 'bad' : 'warnt'}" data-tip="${settled ? 'route:never' : 'route:inflight'}">⊘ ${esc(never.join(','))}</span>`);
+  if (dup.length)   parts.push(`<span class="x" data-tip="route:dup">dup@${esc(dup.join(','))}</span>`);
   const summaryText = [`applied ${ok.length}/${uuids.length}`,
     ...(lost.length ? ['lost@' + lost.join(',')] : []),
     ...(never.length ? ['⊘ ' + never.join(',')] : [])].join(' · ');
@@ -447,9 +452,10 @@ const cellRows = (capture, d, T) => {
   return out.sort((a, b) => prettyCell(a.ck) < prettyCell(b.ck) ? -1 : 1);
 };
 
-// a fixed-width, right-aligned stat cell (value + dim unit) → columns line up across sibling rows
-const stat = (v, u, tip, w, cls) =>
-  `<span class="stat${cls ? ' ' + cls : ''}" style="width:${w}px" title="${esc(tip)}">${esc(String(v))}${u ? `<span class="su"> ${esc(u)}</span>` : ''}</span>`;
+// a fixed-width, right-aligned stat cell (value + dim unit) → columns line up across sibling rows;
+// `key` names its ELI5 entry, `fact` an optional capture fact the card repeats under the explanation
+const stat = (v, u, key, w, cls, fact) =>
+  `<span class="stat${cls ? ' ' + cls : ''}" style="width:${w}px" data-tip="${esc(key)}"${fact ? ` data-tip-fact="${esc(fact)}"` : ''}>${esc(String(v))}${u ? `<span class="su"> ${esc(u)}</span>` : ''}</span>`;
 const group = (key, label, icon, kids, cap) =>
   ({ key, type: 'group', label, icon, sev: '', pill: null, metaRaw: '', gcount: kids.length, entity: null, f: {}, kids, cap });
 
@@ -469,8 +475,8 @@ const buildForest = (capture, T) => {
     const adm = n.links.filter(l => l.admitted).length;
     const diverged = capture.nodes.length > 1 && n.stateHash !== d.modal;
     const sev = diverged ? 'crit' : n.dropped > 0 ? 'warn' : '';
-    const pill = diverged ? { cls:'crit', lab:'diverged', tip:'end stateHash differs from the cluster’s modal hash' }
-      : n.dropped > 0 ? { cls:'warn', lab:'truncated', tip:`journal ring overflowed — ${n.dropped} oldest events dropped (replay unavailable)` } : null;
+    const pill = diverged ? { cls:'crit', lab:'diverged', key:'node:diverged' }
+      : n.dropped > 0 ? { cls:'warn', lab:'truncated', key:'node:truncated', fact: `${n.dropped} oldest events dropped` } : null;
     const kinds = new Set();
     for (const e of n.journal) kinds.add((d.names[e.kind] || ('kind' + e.kind)).toLowerCase());
     const links = n.links.map(l => {
@@ -478,29 +484,29 @@ const buildForest = (capture, T) => {
       if (!l.admitted) flags.add('pre-admit');
       if (l.paused) flags.add('paused');
       if (l.admitted && l.synced === false) flags.add('syncing');   // synced ABSENT (old capture) → unknown, no claim
-      const lp = flags.has('paused') ? { cls:'warn', lab:'paused', tip:'send-plane backpressure engaged' }
-        : flags.has('syncing') ? { cls:'warn', lab:'syncing', tip:'admitted but the anti-entropy exchange has not completed' }
-        : flags.has('pre-admit') ? { cls:'info', lab:'pre-admit', tip:'link is up but the peer has not been admitted yet' } : null;
+      const lp = flags.has('paused') ? { cls:'warn', lab:'paused', key:'link:paused' }
+        : flags.has('syncing') ? { cls:'warn', lab:'syncing', key:'link:syncing' }
+        : flags.has('pre-admit') ? { cls:'info', lab:'pre-admit', key:'link:pre-admit' } : null;
       return { key: nk + '/g/links/' + l.id, type: 'link', label: l.uuid ? '→' + l.uuid : 'link#' + l.id, icon: '⇄',
         sev: lp ? (lp.cls === 'info' ? 'info' : 'warn') : '', pill: lp,
-        metaRaw: stat('#' + l.id, '', 'link id', 44)
-               + stat(l.dialed ? 'dialed' : 'accepted', '', 'which side opened this link', 82)
-               + stat(l.queued, 'queued', 'frames waiting in the outbox', 84, l.queued ? 'warn' : ''),
+        metaRaw: stat('#' + l.id, '', 'link-id', 44)
+               + stat(l.dialed ? 'dialed' : 'accepted', '', l.dialed ? 'side:dialed' : 'side:accepted', 82)
+               + stat(l.queued, 'queued', 'queued', 84, l.queued ? 'warn' : ''),
         entity: { kind: 'link', link: l, node: n }, f: { node: n.uuid, link: flags }, kids: [] };
     });
     const streams = Object.entries(n.streams || {}).map(([origin, w]) => ({
       key: nk + '/g/streams/' + origin, type: 'stream', label: origin, icon: '∿', sev: '', pill: null,
-      metaRaw: stat('applied ' + wm(w).a, '', 'the watermark ladder: applied (dedup) ≥ shippable (logged) ≥ durable (fsynced)', 110),
+      metaRaw: stat('applied ' + wm(w).a, '', 'wm:applied', 110),
       entity: { kind: 'stream', origin, w: wm(w), node: n }, f: { node: n.uuid }, kids: [] }));
     // under scrub the jrnl stat becomes a PROGRESS readout (rows ≤ T / retained) — on a
     // write-free capture (mesh formation) this is the row that shows time actually moving
     const jstat = (scrub ? klog(jAt(n.journal, T)) + '/' : '') + klog(n.journal.length) + (n.dropped > 0 ? ' +' + klog(n.dropped) : '');
     return { key: nk, type: 'node', label: n.uuid, icon: '▢', sev, pill,
-      metaRaw: stat(n.seq ?? '—', 'seq', 'Lamport clock — this node’s next write stamp', 66)
-             + stat(n.epoch ?? '—', 'ep', 'cluster epoch', 58)
-             + stat(keysN, 'keys', scrub ? 'state cells @ scrub point (replayed)' : 'state cells at capture end', 74)
-             + stat(jstat, 'jrnl', (scrub ? 'journal rows ≤ the scrub point / retained' : 'journal rows retained') + (n.dropped > 0 ? ' (+dropped to overflow)' : ''), 96, n.dropped > 0 ? 'warn' : '')
-             + stat(adm + '/' + n.links.length, 'links', 'admitted / total links', 82),
+      metaRaw: stat(n.seq ?? '—', 'seq', 'seq', 66)
+             + stat(n.epoch ?? '—', 'ep', 'epoch', 58)
+             + stat(keysN, 'keys', scrub ? 'keys@t' : 'keys', 74)
+             + stat(jstat, 'jrnl', scrub ? 'jrnl@t' : 'jrnl', 96, n.dropped > 0 ? 'warn' : '', n.dropped > 0 ? `+${n.dropped} dropped to ring overflow` : '')
+             + stat(adm + '/' + n.links.length, 'links', 'links-stat', 82),
       entity: { kind: 'node', node: n }, f: { node: n.uuid, kinds },
       kids: [group(nk + '/g/links', 'Links', '⇄', links), group(nk + '/g/streams', 'Streams', '∿', streams)] };
   });
@@ -514,8 +520,8 @@ const buildForest = (capture, T) => {
     const tmax = ts.length ? Math.max(...ts) : -1;
     const tmin = ts.length ? Math.min(...ts) : Infinity;
     const kvv = rec
-      ? `<span class="kk">${rec.ty === 2 ? 'remove ' : ''}${esc(prettyCell(cellKey(rec.k, rec.at)))}</span>${rec.ty === 2 ? '' : ' = ' + esc(fmtVal(rec.v))}`
-      : `<span class="x">record not captured</span>`;                     // honest: the payload is absent from this capture
+      ? `<span class="kk" data-tip="${rec.ty === 2 ? 'rec:remove' : 'rec-key'}">${rec.ty === 2 ? 'remove ' : ''}${esc(prettyCell(cellKey(rec.k, rec.at)))}</span>${rec.ty === 2 ? '' : ' = <span data-tip="rec-value">' + esc(fmtVal(rec.v)) + '</span>'}`
+      : `<span class="x" data-tip="not-captured">record not captured</span>`;   // honest: the payload is absent from this capture
     return { key: 'g/writes/' + r.origin + '#' + r.seq, type: 'write', label: r.origin + '#' + r.seq, icon: '·',
       sev: o.sev, pill: o.pill, tdim: scrub && tmin > T, tmax,            // tdim: nothing about this write happened yet at the scrub point
       metaRaw: `${kvv} <span class="x">·</span> ${o.summaryHtml}`,
@@ -526,15 +532,15 @@ const buildForest = (capture, T) => {
   //! Cells — the union of every node's state (or the replayed state @ scrub point)
   const cellNodes = cellRows(capture, d, scrub ? T : null).map(c => {
     const sev = c.diverged ? (scrub ? 'warn' : 'crit') : c.contested ? 'warn' : '';
-    const pill = c.diverged ? (scrub ? { cls:'warn', lab:'differs@t', tip:'nodes disagree at this replay point (in-flight propagation)' }
-                                     : { cls:'crit', lab:'diverged', tip:'nodes disagree on this cell’s end value' })
-      : c.contested ? { cls:'warn', lab:'contested', tip:`${c.cand} candidates fought this cell’s LWW election` } : null;
+    const pill = c.diverged ? (scrub ? { cls:'warn', lab:'differs@t', key:'cell:differs@t' }
+                                     : { cls:'crit', lab:'diverged', key:'cell:diverged' })
+      : c.contested ? { cls:'warn', lab:'contested', key:'cell:contested', fact: `${c.cand} candidates` } : null;
     const flags = new Set();
     if (c.diverged) flags.add('diverged');
     if (c.contested) flags.add('contested');
     return { key: 'g/cells/' + encodeURIComponent(c.ck), type: 'cell', label: prettyCell(c.ck), icon: '▪', sev, pill,
-      metaRaw: `= ${esc(fmtVal(c.value))} <span class="x">·</span> by ${c.winner ? esc(c.winner.origin + '#' + c.winner.seq) : '—'}`
-             + (c.cand > 1 ? ` <span class="x">·</span> ${c.cand} candidates` : ''),
+      metaRaw: `<span data-tip="cell-value">= ${esc(fmtVal(c.value))}</span> <span class="x">·</span> <span data-tip="cell-winner">by ${c.winner ? esc(c.winner.origin + '#' + c.winner.seq) : '—'}</span>`
+             + (c.cand > 1 ? ` <span class="x">·</span> <span data-tip="candidates">${c.cand} candidates</span>` : ''),
       entity: { kind: 'cell', cell: c },
       f: { origin: c.winner ? c.winner.origin : '', key: prettyCell(c.ck), cell: flags }, kids: [] };
   });
@@ -542,7 +548,7 @@ const buildForest = (capture, T) => {
   //! Violations — only when the capture recorded any; always crit, shown verbatim in the inspector.
   const viols = (capture.violations || []).map((v, i) => ({
     key: 'g/violations/' + i, type: 'violation', label: 'violation #' + i, icon: '✕', sev: 'crit',
-    pill: { cls: 'crit', lab: 'violation', tip: 'an invariant the sim checks was violated' },
+    pill: { cls: 'crit', lab: 'violation', key: 'violation' },
     metaRaw: `<span class="bad">${esc(String(typeof v === 'string' ? v : JSON.stringify(v)).slice(0, 90))}</span>`,
     entity: { kind: 'violation', v }, f: {}, kids: [] }));
 
@@ -690,14 +696,15 @@ function rowHTML(row, i){
   const tw = hasKids ? (open ? '▾' : '▸') : '';
   const ind = 18 + depth * 15;
   const pill = n.pill
-    ? `<span class="pill ${n.pill.cls}" title="${esc(n.pill.lab)} — ${esc(n.pill.tip || '')}"><span class="pd"></span>${esc(n.pill.lab)}</span>` : '';
+    ? `<span class="pill ${n.pill.cls}" data-tip="${esc(n.pill.key)}"${n.pill.fact ? ` data-tip-fact="${esc(n.pill.fact)}"` : ''}><span class="pd"></span>${esc(n.pill.lab)}</span>` : '';
   const gc = n.type === 'group' ? `<span class="gc">${n.gcount}</span>` : '';
+  const tipKey = n.type === 'group' ? 'g:' + n.label.toLowerCase() : n.type;   // every row type explains itself (./eli5.mjs)
   return `<div class="trow${dim ? ' dim' : ''}" data-i="${i}" data-type="${n.type}" data-depth="${depth}" data-sev="${n.sev || ''}" ` +
     `${n.key === selKey ? 'aria-selected="true"' : ''} style="padding-left:${ind}px">` +
     `<span class="tw ${hasKids ? '' : 'leaf'}">${tw}</span>` +
     `<span class="sd"></span>` +
     `<span class="ic">${n.icon || ''}</span>` +
-    `<span class="lab">${esc(n.label)}${gc}</span>` +
+    `<span class="lab" data-tip="${tipKey}">${esc(n.label)}${gc}</span>` +
     `<span class="grow"></span>` +
     `<span class="pillwrap">${pill}</span>` +
     `<span class="meta">${n.metaRaw || ''}</span></div>`;
@@ -726,8 +733,20 @@ const R = (txt, rkey) => ref(txt, rkey);   // journalLine's ref hook
 
 /* ── the omni bar: chips (time-travel only) · match count · suggestions ── */
 const sevDotVar = s => s === 'crit' ? 'crit' : s === 'warn' ? 'warn' : s === 'info' ? 'info' : 'soft';
+// a token's ELI5 key: a bare head → its filter-head entry; is:<sev> → the severity rollup; a write:/cell:/link:
+// status value → the SAME entry its pill uses (the facet vocabulary IS the pill vocabulary); kind:<k> → that
+// journal kind; node:/origin:/key: values are data, so the head's explanation applies
+const tokTip = (tok) => {
+  const m = /^([a-z]+):(.*)$/i.exec(tok); if (!m) return '';
+  const t = m[1].toLowerCase(), v = m[2];
+  if (!v) return 'f:' + t;
+  if (t === 'is') return 'sev:' + (SEV_ALIAS[v.toLowerCase()] || v.toLowerCase());
+  if (t === 'kind') return 'jk:' + v;
+  if (t === 'write' || t === 'cell' || t === 'link') return t + ':' + v.toLowerCase();
+  return 'f:' + t;
+};
 function menuItem(pick, label, note, dotCls, count){
-  return `<div class="oitem" data-pick="${esc(pick)}" title="${esc(label)}${note ? ' — ' + esc(note) : ''}">` +
+  return `<div class="oitem" data-pick="${esc(pick)}" data-tip="${esc(tokTip(pick))}">` +
     `<span class="od" style="background:var(--${dotCls || 'soft'})"></span><span class="ot">${esc(label)}</span>` +
     `<span class="onote">${esc(note || '')}</span><span class="oc">${count === '' ? '' : count}</span></div>`;
 }
@@ -778,7 +797,7 @@ function renderMenu(){
 function renderBar(){
   // the only chip is the gold time-travel marker; the filter lives inline in the query string
   $('ochips').innerHTML = T != null
-    ? `<span class="ochip tt"><span class="pd"></span>time-travel @ ${T}<span class="ox" data-ttx title="reset time travel">✕</span></span>` : '';
+    ? `<span class="ochip tt" data-tip="time-travel"><span class="pd"></span>time-travel @ ${T}<span class="ox" data-ttx data-tip="time-travel-reset">✕</span></span>` : '';
   if (document.activeElement !== $('q')) $('q').value = query;   // don't fight the caret while typing
   renderMenu();
   const ast = parseFilter(query);
@@ -811,45 +830,47 @@ function readURL(){
 
 /* ── bottom bar: breadcrumb (location) + level-scoped rollup + scrubber ── */
 function renderCrumb(){
-  const segs = [{ key: '', label: 'cluster' }];
+  const segs = [{ key: '', label: 'cluster', tip: 'crumb' }];
   if (selKey){
     const parts = selKey.split('/'); let acc = '';
     for (let i = 0; i < parts.length; i++){
       acc = i ? acc + '/' + parts[i] : parts[i];
       const n = findNode(acc);
-      if (n) segs.push({ key: acc, label: n.type === 'group' ? n.label.toLowerCase() : n.label });
+      if (n) segs.push({ key: acc, label: n.type === 'group' ? n.label.toLowerCase() : n.label, tip: n.type === 'group' ? 'g:' + n.label.toLowerCase() : n.type });
     }
   }
   const cur = segs.length - 1;
   $('crumb').innerHTML = segs.map((s, i) =>
-    `<span class="cseg${i === cur ? ' cur' : ''}" data-segkey="${esc(s.key)}">${esc(s.label)}</span>`).join('<span class="csep">›</span>');
+    `<span class="cseg${i === cur ? ' cur' : ''}" data-segkey="${esc(s.key)}" data-tip="${esc(s.tip)}">${esc(s.label)}</span>`).join('<span class="csep">›</span>');
 }
-const sst = (st, txt) => `<span class="sst ${st || 'ok'}">${txt}</span>`;
+// status-bar atoms carry their ELI5 key (./eli5.mjs): sst = a severity-coloured statement, fact = a quiet one
+const sst = (st, txt, key) => `<span class="sst ${st || 'ok'}"${key ? ` data-tip="${esc(key)}"` : ''}>${txt}</span>`;
+const fact = (txt, key) => `<span data-tip="${esc(key)}">${txt}</span>`;
 // the capture header facts — everything from summarize() + the cached verifyReplay()
 function headerFacts(){
   const s = SUMMARY;
-  const bits = [esc(s.kind || '—')];
-  if (s.seed != null) bits.push('seed ' + esc(String(s.seed)));
-  if (s.kind === 'sim') bits.push(s.quiesced ? 'quiesced' : sst('warn', 'not quiesced'));
+  const bits = [fact(esc(s.kind || '—'), s.kind === 'live' ? 'kind:live' : 'kind:sim')];
+  if (s.seed != null) bits.push(fact('seed ' + esc(String(s.seed)), 'seed'));
+  if (s.kind === 'sim') bits.push(s.quiesced ? fact('quiesced', 'quiesced') : sst('warn', 'not quiesced', 'not-quiesced'));
   // shrunk captures (M7): the pill renders RECORDED facts only (summarize passes capture.shrunk through);
   // a capture frozen AT its violating event is mid-flight by construction — divergence there is not a
   // finding, so soften (never hide) it, keyed STRICTLY on the recorded atViolation fact.
-  if (s.shrunk) bits.push(sst('warn', `shrunk ${s.shrunk.from.steps}→${s.shrunk.steps.length} steps${s.shrunk.atViolation ? ' · ends @ violation' : ''}`));
+  if (s.shrunk) bits.push(sst('warn', `shrunk ${s.shrunk.from.steps}→${s.shrunk.steps.length} steps${s.shrunk.atViolation ? ' · ends @ violation' : ''}`, 'shrunk'));
   // converged === null means ZERO captured nodes (an attach where nobody answered) — "no nodes" is the
   // only honest render; a green badge over an empty set would be the vacuous-true lie the fold refuses
-  bits.push(s.converged === null ? sst('warn', 'no nodes')
-    : s.converged ? 'converged ✓'
-    : (s.shrunk && s.shrunk.atViolation ? sst('warn', 'mid-flight @ violation') : sst('crit', 'diverged ✗')));
+  bits.push(s.converged === null ? sst('warn', 'no nodes', 'no-nodes')
+    : s.converged ? fact('converged ✓', 'converged')
+    : (s.shrunk && s.shrunk.atViolation ? sst('warn', 'mid-flight @ violation', 'mid-flight') : sst('crit', 'diverged ✗', 'diverged')));
   // absent rows (M7 attach): targets that yielded no slice this rebuild — named with their typed reason,
   // never synthesized into node cards (absence renders as absence)
   if (s.absent && s.absent.length)
-    bits.push(sst('warn', `absent: ${s.absent.map(a => `${esc(a.target)} (${esc(a.reason)})`).join(', ')}`));
+    bits.push(sst('warn', `absent: ${s.absent.map(a => `${esc(a.target)} (<span data-tip="absent:${esc(a.reason)}">${esc(a.reason)}</span>)`).join(', ')}`, 'absent'));
   if (s.converged !== null) { // zero nodes ⇒ no replay basis — claim nothing rather than a vacuous ✓
     const bad = REPLAY.find(r => !r.ok);
-    bits.push(!bad ? 'replay ✓' : sst('crit', `replay ✗ ${esc(bad.uuid)}: ${esc(bad.reason)}`));
+    bits.push(!bad ? fact('replay ✓', 'replay-ok') : sst('crit', `replay ✗ ${esc(bad.uuid)}: ${esc(bad.reason)}`, 'replay-bad'));
   }
-  if (s.violations.length) bits.push(sst('crit', s.violations.length + ' violation' + (s.violations.length === 1 ? '' : 's')));
-  bits.push(s.events != null ? s.events + ' events' : klog(s.journalRows) + ' journal rows');
+  if (s.violations.length) bits.push(sst('crit', s.violations.length + ' violation' + (s.violations.length === 1 ? '' : 's'), 'violations'));
+  bits.push(s.events != null ? fact(s.events + ' events', 'events') : fact(klog(s.journalRows) + ' journal rows', 'journal-rows'));
   return bits.join(' · ');
 }
 function renderStatus(){
@@ -860,24 +881,24 @@ function renderStatus(){
   const e = node.entity;
   if (node.type === 'group'){
     const bad = node.kids.filter(k => k.sev === 'crit').length, wrn = node.kids.filter(k => k.sev === 'warn').length;
-    sb.innerHTML = `${node.gcount} ${esc(node.label.toLowerCase())}` +
-      (bad ? ` · ${sst('crit', bad + ' crit')}` : '') + (wrn ? ` · ${sst('warn', wrn + ' warn')}` : '');
+    sb.innerHTML = fact(`${node.gcount} ${esc(node.label.toLowerCase())}`, 'g:' + node.label.toLowerCase()) +
+      (bad ? ` · ${sst('crit', bad + ' crit', 'sev:crit')}` : '') + (wrn ? ` · ${sst('warn', wrn + ' warn', 'sev:warn')}` : '');
   } else if (node.type === 'node'){
     const n = e.node;
     const t = scrubT();   // the bar mirrors the tree: replayed keys + journal progress at the scrub point
     sb.innerHTML = t != null
-      ? `${sst('', '@ t' + t)} · ${stateAt(CAP, n.uuid, t).size} keys · journal ${klog(jAt(n.journal, t))}/${klog(n.journal.length)}`
-      : `${sst(node.sev, node.pill ? node.pill.lab : 'converged')} · seq ${n.seq ?? '—'} · ${n.state.length} keys · journal ${klog(n.journal.length)}`;
+      ? `${sst('', '@ t' + t, 'tread')} · ${fact(stateAt(CAP, n.uuid, t).size + ' keys', 'keys@t')} · ${fact('journal ' + klog(jAt(n.journal, t)) + '/' + klog(n.journal.length), 'jrnl@t')}`
+      : `${sst(node.sev, node.pill ? node.pill.lab : 'converged', node.pill ? node.pill.key : 'node:converged')} · ${fact('seq ' + (n.seq ?? '—'), 'seq')} · ${fact(n.state.length + ' keys', 'keys')} · ${fact('journal ' + klog(n.journal.length), 'jrnl')}`;
   } else if (node.type === 'write'){
-    sb.innerHTML = `write ${esc(node.label)} · ${sst(node.sev, esc(e.o.summaryText))}`;
+    sb.innerHTML = `${fact('write ' + esc(node.label), 'write')} · ${sst(node.sev, esc(e.o.summaryText), 'route:summary')}`;
   } else if (node.type === 'cell'){
-    sb.innerHTML = `cell · ${sst(node.sev, node.pill ? node.pill.lab : 'settled')} · winner ${e.cell.winner ? esc(e.cell.winner.origin + '#' + e.cell.winner.seq) : '—'}`;
+    sb.innerHTML = `${fact('cell', 'cell')} · ${sst(node.sev, node.pill ? node.pill.lab : 'settled', node.pill ? node.pill.key : 'cell:settled')} · ${fact('winner ' + (e.cell.winner ? esc(e.cell.winner.origin + '#' + e.cell.winner.seq) : '—'), 'cell-winner')}`;
   } else if (node.type === 'link'){
-    sb.innerHTML = `link · ${sst(node.sev, node.pill ? node.pill.lab : 'up')} · queued ${e.link.queued}`;
+    sb.innerHTML = `${fact('link', 'link')} · ${sst(node.sev, node.pill ? node.pill.lab : 'up', node.pill ? node.pill.key : 'link:up')} · ${fact('queued ' + e.link.queued, 'queued')}`;
   } else if (node.type === 'stream'){
-    sb.innerHTML = `stream ${esc(e.origin)} · applied ${esc(String(e.w.a))} · shippable ${esc(String(e.w.s))} · durable ${esc(String(e.w.d))}`;
+    sb.innerHTML = `${fact('stream ' + esc(e.origin), 'stream')} · ${fact('applied ' + esc(String(e.w.a)), 'wm:applied')} · ${fact('shippable ' + esc(String(e.w.s)), 'wm:shippable')} · ${fact('durable ' + esc(String(e.w.d)), 'wm:durable')}`;
   } else if (node.type === 'violation'){
-    sb.innerHTML = sst('crit', 'invariant violated');
+    sb.innerHTML = sst('crit', 'invariant violated', 'violation');
   } else sb.innerHTML = headerFacts();
 }
 // the time-travel scrubber — quiet; disabled (with the honest tooltip) when any journal truncated
@@ -886,8 +907,7 @@ function renderScrub(){
   r.max = maxT;
   const off = !CAP || (D && D.truncated) || maxT === 0;
   r.disabled = off;
-  r.title = D && D.truncated ? 'journal truncated — replay unavailable'
-    : 'time-travel — drag or mouse-wheel to replay every journal to an event index (stateAt fold)';
+  r.dataset.tip = D && D.truncated ? 'time-travel-off' : 'time-travel';   // the ELI5 says why it is off (./eli5.mjs)
   const cur = T != null ? Math.min(T, maxT) : maxT;
   if (document.activeElement !== r) r.value = cur;
   $('tread').textContent = CAP ? `@ ${cur}/${maxT}` : '';
@@ -898,11 +918,12 @@ function renderScrub(){
 /* ════════════════════════════════════════════════════════════════════════
    INSPECTOR — the selected row's rich leaf view
    ════════════════════════════════════════════════════════════════════════ */
-const seg = (title, body, extra = '') => `<div class="seg"><div class="st">${title}${extra}</div>${body}</div>`;
-const kv = rows => `<dl class="kv">${rows.map(([k, v, c]) => `<dt>${k}</dt><dd class="${c || ''}">${v}</dd>`).join('')}</dl>`;
+// seg/kv carry ELI5 keys (./eli5.mjs): a section title explains the pane, a <dt> explains its fact
+const seg = (title, body, extra = '', key = '') => `<div class="seg"><div class="st"><span${key ? ` data-tip="${esc(key)}"` : ''}>${title}</span>${extra}</div>${body}</div>`;
+const kv = rows => `<dl class="kv">${rows.map(([k, v, c, key]) => `<dt${key ? ` data-tip="${esc(key)}"` : ''}>${k}</dt><dd class="${c || ''}">${v}</dd>`).join('')}</dl>`;
 function ihead(title, kind, sev, sub){
   return `<div class="ih ${sev || 'ok'}"><div class="ik"><span class="sd"></span><span class="tt">${title}</span>` +
-    `<span class="kind">${esc(kind)}</span><span class="iclose" title="close · Esc">✕</span></div>` +
+    `<span class="kind" data-tip="${esc(kind)}">${esc(kind)}</span><span class="iclose" data-tip="close">✕</span></div>` +
     `<div class="isub">${sub}</div></div>`;
 }
 function renderInspector(){
@@ -921,7 +942,7 @@ function renderInspector(){
   else if (e.kind === 'violation') html = inspViolation(node);
   // one quiet banner while time-travelling — says which panes replay and which are end facts
   const t = scrubT();
-  if (t != null) html = `<div class="tban">replayed @ t${t} — state, journal & routes at the scrub point · links, streams & elections show capture end</div>` + html;
+  if (t != null) html = `<div class="tban" data-tip="replayed">replayed @ t${t} — state, journal & routes at the scrub point · links, streams & elections show capture end</div>` + html;
   $('insp').innerHTML = html;
 }
 function inspNode(nd){
@@ -931,29 +952,30 @@ function inspNode(nd){
   // labelled — deriving them would mean minting state the fold layer never proved
   const t = scrubT();
   const rows = t != null ? n.journal.slice(0, jAt(n.journal, t)) : n.journal;
-  const sub = `<span class="mono">${esc(n.listen ?? '—')}</span> · seq ${esc(String(n.seq ?? '—'))} · epoch ${esc(String(n.epoch ?? '—'))}`;
+  const sub = `<span class="mono" data-tip="listen">${esc(n.listen ?? '—')}</span> · ${fact('seq ' + esc(String(n.seq ?? '—')), 'seq')} · ${fact('epoch ' + esc(String(n.epoch ?? '—')), 'epoch')}`;
   const facts = kv([
-    ['listen', esc(String(n.listen ?? '—'))],
-    ['seq', esc(String(n.seq ?? '—'))],
-    ['epoch', esc(String(n.epoch ?? '—'))],
-    ['stateHash', esc(String(n.stateHash)), n.stateHash !== D.modal && CAP.nodes.length > 1 ? 'bad' : ''],
-    ['keys', t != null ? `${stateAt(CAP, n.uuid, t).size} <span class="x">@ t${t} · ${n.state.length} at end</span>` : String(n.state.length)],
+    ['listen', esc(String(n.listen ?? '—')), '', 'listen'],
+    ['seq', esc(String(n.seq ?? '—')), '', 'seq'],
+    ['epoch', esc(String(n.epoch ?? '—')), '', 'epoch'],
+    ['stateHash', esc(String(n.stateHash)), n.stateHash !== D.modal && CAP.nodes.length > 1 ? 'bad' : '', 'statehash'],
+    ['keys', t != null ? `${stateAt(CAP, n.uuid, t).size} <span class="x">@ t${t} · ${n.state.length} at end</span>` : String(n.state.length), '', t != null ? 'keys@t' : 'keys'],
     ['journal', t != null ? `${klog(rows.length)} <span class="x">≤ t${t} · ${klog(n.journal.length)} retained</span>`
-                          : klog(n.journal.length) + (n.dropped > 0 ? ` / ${klog(n.dropped)} dropped` : ' / 0 dropped'), n.dropped > 0 ? 'warn' : ''],
+                          : klog(n.journal.length) + (n.dropped > 0 ? ` / ${klog(n.dropped)} dropped` : ' / 0 dropped'), n.dropped > 0 ? 'warn' : '', t != null ? 'jrnl@t' : 'journal'],
   ]);
   const lrows = n.links.map(l => {
     const state = !l.admitted ? 'pre-admit' : l.synced === false ? 'syncing' : l.synced === true ? 'synced' : '—';
+    const skey = !l.admitted ? 'link:pre-admit' : l.synced === false ? 'link:syncing' : l.synced === true ? 'synced' : '';
     const cls = !l.admitted ? '' : l.synced === false ? 'min' : l.synced === true ? 'maj' : '';
-    return `<tr><td class="node">${l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '—'} <span style="color:var(--soft)">#${esc(String(l.id))}</span></td>` +
-      `<td>${l.dialed ? 'dialed' : 'accepted'}</td><td class="${cls}">${state}${l.paused ? ' <span class="min">· paused</span>' : ''}</td><td>${esc(String(l.queued))}</td></tr>`;
+    return `<tr><td class="node">${l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '—'} <span style="color:var(--soft)" data-tip="link-id">#${esc(String(l.id))}</span></td>` +
+      `<td data-tip="${l.dialed ? 'side:dialed' : 'side:accepted'}">${l.dialed ? 'dialed' : 'accepted'}</td><td class="${cls}"><span${skey ? ` data-tip="${skey}"` : ''}>${state}</span>${l.paused ? ' <span class="min" data-tip="link:paused">· paused</span>' : ''}</td><td data-tip="queued">${esc(String(l.queued))}</td></tr>`;
   }).join('');
   const links = n.links.length
-    ? `<table class="vt"><thead><tr><th>peer</th><th>side</th><th>state</th><th>queued</th></tr></thead><tbody>${lrows}</tbody></table>`
+    ? `<table class="vt"><thead><tr><th data-tip="peer">peer</th><th data-tip="side">side</th><th data-tip="link-state">state</th><th data-tip="queued">queued</th></tr></thead><tbody>${lrows}</tbody></table>`
     : `<div class="reason">No links.</div>`;
   const srows = Object.entries(n.streams || {}).map(([o, v]) => { const w = wm(v); return (
-    `<tr><td class="node">${ref(o, 'g/nodes/' + o)}</td><td>${esc(String(w.a))}</td><td>${esc(String(w.s))}</td><td>${esc(String(w.d))}</td><td>${(n.logs[o] || []).length}</td></tr>`)}).join('');
+    `<tr><td class="node">${ref(o, 'g/nodes/' + o)}</td><td data-tip="wm:applied">${esc(String(w.a))}</td><td data-tip="wm:shippable">${esc(String(w.s))}</td><td data-tip="wm:durable">${esc(String(w.d))}</td><td data-tip="log-records">${(n.logs[o] || []).length}</td></tr>`)}).join('');
   const streams = srows
-    ? `<table class="vt"><thead><tr><th>origin</th><th>applied</th><th>shippable</th><th>durable</th><th>log records</th></tr></thead><tbody>${srows}</tbody></table>`
+    ? `<table class="vt"><thead><tr><th data-tip="origin">origin</th><th data-tip="wm:applied">applied</th><th data-tip="wm:shippable">shippable</th><th data-tip="wm:durable">durable</th><th data-tip="log-records">log records</th></tr></thead><tbody>${srows}</tbody></table>`
     : `<div class="reason">No inbound streams yet.</div>`;
   // the journal mini-log — newest first, human-readable via the capture's vocab;
   // under scrub it is the window ENDING AT the scrub point, so dragging/wheeling
@@ -961,21 +983,21 @@ function inspNode(nd){
   const jr = rows.slice(-15).reverse();
   const jlog = jr.length ? `<div class="mlog">` + jr.map(e => {
     const name = D.names[e.kind] || ('kind' + e.kind);
-    return `<div class="mr"><span class="stp">t${e.t}</span><span class="kvv">${journalLine(name, e, R)}</span>` +
-      `<span class="oc ${JCLS[name] || 'fwd'}">${esc(name)}</span></div>`;
+    return `<div class="mr"><span class="stp" data-tip="t">t${e.t}</span><span class="kvv">${journalLine(name, e, R)}</span>` +
+      `<span class="oc ${JCLS[name] || 'fwd'}" data-tip="jk:${esc(name)}">${esc(name)}</span></div>`;
   }).join('') + `</div>` : `<div class="reason">Nothing yet at this point.</div>`;
   // one-line counts-by-kind rollup (scoped with the mini-log while scrubbing)
   const counts = new Map();
   for (const e of rows) { const nm = D.names[e.kind] || ('kind' + e.kind); counts.set(nm, (counts.get(nm) || 0) + 1); }
   const roll = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
     .map(([k, c]) => `${esc(k)} ×${c}`).join(' · ') + (counts.size > 6 ? ` · +${counts.size - 6} kinds` : '');
-  const atEnd = t != null ? `<span class="stn">@ capture end</span>` : '';
+  const atEnd = t != null ? `<span class="stn" data-tip="at-end">@ capture end</span>` : '';
   return ihead(esc(n.uuid), 'node', nd.sev, sub) +
-    seg('Facts', facts) +
-    seg('Links', links, atEnd || `<span class="stn">${n.links.filter(l => l.admitted).length}/${n.links.length} admitted</span>`) +
-    seg('Streams', streams, atEnd) +
-    seg('Journal · newest first', jlog, `<span class="stn">last ${jr.length} of ${klog(rows.length)}${t != null ? ` ≤ t${t}` : ''}${n.dropped > 0 ? ' · +' + klog(n.dropped) + ' dropped' : ''}</span>`) +
-    seg('By kind', `<div class="reason mono" style="font-size:11px">${roll || '—'}</div>`, t != null ? `<span class="stn">≤ t${t}</span>` : '');
+    seg('Facts', facts, '', 'facts') +
+    seg('Links', links, atEnd || `<span class="stn" data-tip="admitted">${n.links.filter(l => l.admitted).length}/${n.links.length} admitted</span>`, 'g:links') +
+    seg('Streams', streams, atEnd, 'g:streams') +
+    seg('Journal · newest first', jlog, `<span class="stn">last ${jr.length} of ${klog(rows.length)}${t != null ? ` ≤ t${t}` : ''}${n.dropped > 0 ? ' · +' + klog(n.dropped) + ' dropped' : ''}</span>`, 'journal') +
+    seg('By kind', `<div class="reason mono" style="font-size:11px">${roll || '—'}</div>`, t != null ? `<span class="stn">≤ t${t}</span>` : '', 'by-kind');
 }
 function inspWrite(nd){
   const { r, rec, o } = nd.entity;
@@ -988,14 +1010,14 @@ function inspWrite(nd){
   const okAtT = t != null ? allStops.filter(s => s.t != null && s.t <= t && (s.status === 'origin' || s.status === 'applied')).length : 0;
   const rollup = t != null ? `applied ${okAtT}/${CAP.nodes.length} by t${t}` : o.summaryText;
   const sub = rec
-    ? `<span class="mono">${esc(key)}</span>${rec.ty === 2 ? ' <span class="warnt">removed</span>' : ' = <span class="mono">' + esc(fmtVal(rec.v, 48)) + '</span>'} · ${esc(rollup)}`
-    : `record not captured · ${esc(rollup)}`;
+    ? `<span class="mono" data-tip="rec-key">${esc(key)}</span>${rec.ty === 2 ? ' <span class="warnt" data-tip="rec:remove">removed</span>' : ' = <span class="mono" data-tip="rec-value">' + esc(fmtVal(rec.v, 48)) + '</span>'} · <span data-tip="route:summary">${esc(rollup)}</span>`
+    : `<span data-tip="not-captured">record not captured</span> · <span data-tip="route:summary">${esc(rollup)}</span>`;
   const recd = rec
-    ? `{ type:<span class="vv">'${esc(tyName(rec.ty))}'</span>, key:<span class="kk">'${esc(key)}'</span>` +
-      (rec.ty === 2 ? '' : `, value:<span class="vv">${esc(fmtVal(rec.v, 60))}</span>`) + ` }\n` +
-      `<span style="color:var(--soft)">@ seq ${esc(String(rec.seq))} · epoch ${esc(String(rec.epoch))} · origin ${ref(r.origin, 'g/nodes/' + r.origin)}` +
-      (r.partition !== '' ? ` · part ${esc(String(r.partition))}` : '') + `</span>`
-    : `<span class="bad">record not captured</span> — no node's log holds ${esc(r.origin)} seq ${esc(String(r.seq))}; the payload is unknown (never invented)`;
+    ? `{ type:<span class="vv" data-tip="rec:${esc(tyName(rec.ty))}">'${esc(tyName(rec.ty))}'</span>, key:<span class="kk" data-tip="rec-key">'${esc(key)}'</span>` +
+      (rec.ty === 2 ? '' : `, value:<span class="vv" data-tip="rec-value">${esc(fmtVal(rec.v, 60))}</span>`) + ` }\n` +
+      `<span style="color:var(--soft)"><span data-tip="rec-seq">@ seq ${esc(String(rec.seq))}</span> · <span data-tip="rec-epoch">epoch ${esc(String(rec.epoch))}</span> · <span data-tip="origin">origin</span> ${ref(r.origin, 'g/nodes/' + r.origin)}` +
+      (r.partition !== '' ? ` · <span data-tip="partition">part ${esc(String(r.partition))}</span>` : '') + `</span>`
+    : `<span class="bad" data-tip="not-captured">record not captured</span> — no node's log holds ${esc(r.origin)} seq ${esc(String(r.seq))}; the payload is unknown (never invented)`;
   // the LWW winner that beat this write, when the election is findable in the captured logs.
   // NOT under scrub: D.contested is the END-of-run election — at T the loser may have lost to
   // an intermediate write, and the final winner may not even have arrived anywhere yet (naming
@@ -1013,30 +1035,30 @@ function inspWrite(nd){
   const stops = [...allStops].sort((a, b) => (a.t == null) - (b.t == null) || (a.t ?? 0) - (b.t ?? 0));
   const lis = stops.map(s => {
     if (t != null && (s.t == null || s.t > t))
-      return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="x">not arrived by t${t}</span></li>`;
-    const at = s.t != null ? ` <span class="x">· t${s.t}</span>` : '';
-    if (s.status === 'origin') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b>origin</b> — wrote seq ${esc(String(r.seq))}${at}</li>`;
-    if (s.status === 'applied') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span>applied${at}</li>`;
-    if (s.status === 'lww-lost') return `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="bad">lost LWW</span>${beatenBy}${at}</li>`;
-    if (s.status === 'duplicate') return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span>dup discarded — already seen${at}</li>`;
+      return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="x" data-tip="stop:not-yet">not arrived by t${t}</span></li>`;
+    const at = s.t != null ? ` <span class="x" data-tip="t">· t${s.t}</span>` : '';
+    if (s.status === 'origin') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b data-tip="stop:origin">origin</b> — wrote seq ${esc(String(r.seq))}${at}</li>`;
+    if (s.status === 'applied') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:applied">applied</span>${at}</li>`;
+    if (s.status === 'lww-lost') return `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="bad" data-tip="stop:lww-lost">lost LWW</span>${beatenBy}${at}</li>`;
+    if (s.status === 'duplicate') return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:duplicate">dup discarded — already seen</span>${at}</li>`;
     return D.live
-      ? `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span>not yet arrived</li>`
-      : `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b>never arrived</b></li>`;
+      ? `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:inflight">not yet arrived</span></li>`
+      : `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b data-tip="stop:never">never arrived</b></li>`;
   }).join('');
   // sev muted under scrub — the crit/warn colour is the END verdict (never-arrived/lww-lost),
   // not a fact at T; the tree row keeps it (with tdim) because the tree is explicitly the ledger
   return ihead(esc(r.origin + '#' + r.seq), 'write', t != null ? '' : nd.sev, sub) +
-    seg('Change record', `<div class="recd">${recd}</div>`) +
-    seg('Route', `<ul class="tl">${lis}</ul>`, r.partition !== '' ? `<span class="stn">part ${esc(String(r.partition))}</span>` : '');
+    seg('Change record', `<div class="recd">${recd}</div>`, '', 'change-record') +
+    seg('Route', `<ul class="tl">${lis}</ul>`, r.partition !== '' ? `<span class="stn" data-tip="partition">part ${esc(String(r.partition))}</span>` : '', 'route');
 }
 function inspCell(nd){
   const c = nd.entity.cell;
   const winTok = c.winner ? c.winner.origin + '#' + c.winner.seq : null;
-  const sub = `= <span class="mono">${esc(fmtVal(c.value, 48))}</span> · winner ${winTok ? `<span class="mono">${ref(winTok, 'g/writes/' + winTok)}</span>` : '—'}`;
+  const sub = `<span data-tip="cell-value">= <span class="mono">${esc(fmtVal(c.value, 48))}</span></span> · <span data-tip="cell-winner">winner</span> ${winTok ? `<span class="mono">${ref(winTok, 'g/writes/' + winTok)}</span>` : '—'}`;
   const facts = kv([
-    ['winner', winTok ? ref(winTok, 'g/writes/' + winTok) : '—'],                       // '—' = no untruncated journal to replay: never guessed
-    ['epoch·seq', c.winner ? `e${esc(String(c.winner.epoch))}·s${esc(String(c.winner.seq))}` : '—'],
-    ['candidates', String(c.cand), c.cand > 1 ? 'warn' : ''],
+    ['winner', winTok ? ref(winTok, 'g/writes/' + winTok) : '—', '', 'cell-winner'],   // '—' = no untruncated journal to replay: never guessed
+    ['epoch·seq', c.winner ? `e${esc(String(c.winner.epoch))}·s${esc(String(c.winner.seq))}` : '—', '', 'stamp'],
+    ['candidates', String(c.cand), c.cand > 1 ? 'warn' : '', 'candidates'],
   ]);
   // the election — every candidate the captured logs hold, newest first, winner badged.
   // Suppressed under scrub, matching cellRows: election data is end-of-run, and a mid-replay
@@ -1045,49 +1067,52 @@ function inspCell(nd){
   const election = cont ? seg('Election · newest first', `<div class="mlog">` + cont.candidates.map(x => {
     const tok = x.origin + '#' + x.seq;
     const won = cont.winner && cont.winner.origin === x.origin && cont.winner.seq === x.seq;
-    return `<div class="mr" data-nav="${esc('g/writes/' + tok)}"><span class="stp">e${esc(String(x.epoch))}</span>` +
-      `<span class="kvv">${esc(tok)} → ${x.ty === 2 ? '<span class="kk">remove</span>' : esc(fmtVal(x.v))}</span>` +
-      `<span class="oc ${won ? 'applied' : 'conflict'}">${won ? 'won' : 'lost'}</span></div>`;
-  }).join('') + `</div>`, `<span class="stn">${cont.candidates.length} candidates</span>`) : '';
+    return `<div class="mr" data-nav="${esc('g/writes/' + tok)}"><span class="stp" data-tip="rec-epoch">e${esc(String(x.epoch))}</span>` +
+      `<span class="kvv">${esc(tok)} → ${x.ty === 2 ? '<span class="kk" data-tip="rec:remove">remove</span>' : esc(fmtVal(x.v))}</span>` +
+      `<span class="oc ${won ? 'applied' : 'conflict'}" data-tip="${won ? 'won' : 'lost'}">${won ? 'won' : 'lost'}</span></div>`;
+  }).join('') + `</div>`, `<span class="stn" data-tip="candidates">${cont.candidates.length} candidates</span>`, 'election') : '';
   // per-node values — only when nodes disagree; a missing cell renders as absent
   const first = c.perNode.find(p => p.has);
   const winJson = first ? JSON.stringify(first.v) : undefined;
-  const perNode = c.diverged ? seg('Per-node value', `<table class="vt"><thead><tr><th>node</th><th>value</th></tr></thead><tbody>` +
+  const perNode = c.diverged ? seg('Per-node value', `<table class="vt"><thead><tr><th data-tip="node">node</th><th data-tip="cell-value">value</th></tr></thead><tbody>` +
     c.perNode.map(p => {
       const bad = !p.has || JSON.stringify(p.v) !== winJson;
       return `<tr><td class="node">${ref(p.uuid, 'g/nodes/' + p.uuid)}</td>` +
-        `<td class="${bad ? 'min' : 'maj'}">${p.has ? esc(fmtVal(p.v, 56)) : '∅ absent'}</td></tr>`;
-    }).join('') + `</tbody></table>`) : '';
-  return ihead(esc(prettyCell(c.ck)), 'cell', nd.sev, sub) + seg('Facts', facts) + election + perNode;
+        `<td class="${bad ? 'min' : 'maj'}">${p.has ? esc(fmtVal(p.v, 56)) : '<span data-tip="absent-cell">∅ absent</span>'}</td></tr>`;
+    }).join('') + `</tbody></table>`, '', 'per-node') : '';
+  return ihead(esc(prettyCell(c.ck)), 'cell', nd.sev, sub) + seg('Facts', facts, '', 'facts') + election + perNode;
 }
 function inspLink(nd){
   const { link: l, node: n } = nd.entity;
   const peer = l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '<span class="warnt">unidentified</span>';
+  const side = l.dialed ? 'dialed' : 'accepted';
   return ihead(esc(l.uuid ? '→' + l.uuid : 'link#' + l.id), 'link', nd.sev,
-      `${ref(n.uuid, 'g/nodes/' + n.uuid)} ⇄ ${peer} · ${l.dialed ? 'dialed' : 'accepted'}`) +
+      `${ref(n.uuid, 'g/nodes/' + n.uuid)} ⇄ ${peer} · <span data-tip="side:${side}">${side}</span>`) +
     seg('Facts', kv([
-      ['link id', '#' + esc(String(l.id))],
-      ['peer', peer],
-      ['side', l.dialed ? 'dialed' : 'accepted'],
-      ['admitted', l.admitted ? 'yes' : 'no', l.admitted ? '' : 'warn'],
-      ['synced', l.synced === true ? 'yes' : l.synced === false ? 'no' : '—', l.synced === false ? 'warn' : ''],   // '—' = field absent from this capture
-      ['paused', l.paused ? 'yes' : 'no', l.paused ? 'warn' : ''],
-      ['queued', String(l.queued), l.queued ? 'warn' : ''],
-    ]));
+      ['link id', '#' + esc(String(l.id)), '', 'link-id'],
+      ['peer', peer, '', 'peer'],
+      ['side', side, '', 'side:' + side],
+      ['admitted', l.admitted ? 'yes' : 'no', l.admitted ? '' : 'warn', 'admitted'],
+      ['synced', l.synced === true ? 'yes' : l.synced === false ? 'no' : '—', l.synced === false ? 'warn' : '', 'synced'],   // '—' = field absent from this capture
+      ['paused', l.paused ? 'yes' : 'no', l.paused ? 'warn' : '', 'paused'],
+      ['queued', String(l.queued), l.queued ? 'warn' : '', 'queued'],
+    ]), '', 'facts');
 }
 function inspStream(nd){
-  const { origin, seen, node: n } = nd.entity;
-  return ihead(esc(origin), 'stream', '', `inbound stream on ${ref(n.uuid, 'g/nodes/' + n.uuid)}`) +
+  const { origin, w, node: n } = nd.entity;   // w = the watermark ladder the row already shows (a `seen` field never existed on the entity — that fact rendered 'undefined')
+  return ihead(esc(origin), 'stream', '', `<span data-tip="stream">inbound stream</span> on ${ref(n.uuid, 'g/nodes/' + n.uuid)}`) +
     seg('Facts', kv([
-      ['origin', ref(origin, 'g/nodes/' + origin)],
-      ['seen (high-water)', esc(String(seen))],
-      ['log records held', String((n.logs[origin] || []).length)],
-    ]));
+      ['origin', ref(origin, 'g/nodes/' + origin), '', 'origin'],
+      ['applied', esc(String(w.a)), '', 'wm:applied'],
+      ['shippable', esc(String(w.s)), '', 'wm:shippable'],
+      ['durable', esc(String(w.d)), '', 'wm:durable'],
+      ['log records held', String((n.logs[origin] || []).length), '', 'log-records'],
+    ]), '', 'facts');
 }
 function inspViolation(nd){
   const v = nd.entity.v;
-  return ihead(esc(nd.label), 'violation', 'crit', 'an invariant the sim checks was violated — shown verbatim') +
-    seg('Violation', `<div class="recd">${esc(typeof v === 'string' ? v : JSON.stringify(v, null, 2))}</div>`);
+  return ihead(esc(nd.label), 'violation', 'crit', '<span data-tip="violation">an invariant the sim checks was violated</span> — shown verbatim') +
+    seg('Violation', `<div class="recd">${esc(typeof v === 'string' ? v : JSON.stringify(v, null, 2))}</div>`, '', 'violation');
 }
 
 function render(){
@@ -1224,9 +1249,9 @@ function applyCapture(capture){
 function renderSrc(){
   const sn = $('srcName');
   if (!CAP){ sn.innerHTML = ''; return; }
-  if (LIVE) sn.innerHTML = `<b class="liveDot">●</b>&nbsp; live · ${CAP.nodes.length} node${CAP.nodes.length === 1 ? '' : 's'} · ` +
-    `${klog(SUMMARY.journalRows)} journal rows${PAUSED ? ' · <span class="paused">paused</span>' : ''}`;
-  else if (SCENARIO) sn.innerHTML = `scenario · <b>${esc(SCENARIO)}</b>`;
+  if (LIVE) sn.innerHTML = `<span data-tip="live"><b class="liveDot">●</b>&nbsp; live · ${CAP.nodes.length} node${CAP.nodes.length === 1 ? '' : 's'}</span> · ` +
+    `<span data-tip="journal-rows">${klog(SUMMARY.journalRows)} journal rows</span>${PAUSED ? ' · <span class="paused" data-tip="live-paused">paused</span>' : ''}`;
+  else if (SCENARIO) sn.innerHTML = `<span data-tip="scenario">scenario · <b>${esc(SCENARIO)}</b></span>`;
   else sn.innerHTML = '';                    // plain file/capture mode shows no source label (v2's quiet rule)
 }
 function loadStatic(capture, name){
@@ -1262,6 +1287,9 @@ $('file').addEventListener('change', e => { const f = e.target.files[0]; if (f) 
 // drop a capture .json anywhere on the page
 document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) readFile(f); });
+
+// the ELI5 hover layer — one delegated listener set, so every repaint above is covered (./eli5.mjs)
+mountTips(document);
 
 // boot: deep-link state first, then the source — scenario (one-shot) or /capture.json (poll when live)
 (async function boot(){

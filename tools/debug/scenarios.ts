@@ -697,7 +697,7 @@ export const SCENARIOS: Scenario[] = [
     kind: 'unhappy',
     desc: 'the owner commits but its ACK dies with the link (v2\'s dominant conflict source: the forwarder then self-committed a second origin) — v3 retries, the owner dedups by cid, and the duplicate ACK re-carries the ORIGINAL commit coordinates',
     diagram: {
-      nodes: ids(3), mesh: true, faults: [['n01', 'n02']], writers: ['n01'],
+      nodes: ids(3), mesh: true, cut: [['n01', 'n02']], writers: ['n01'],   // the link DIES once mid-message (severOnFrame) — a cut that heals, not a dup/delay personality
       phases: [
         { label: 'forward', sev: 'info' }, { label: 'commit', sev: 'gold' },
         { label: 'ACK dies', sev: 'crit' }, { label: 'retry → dedup', sev: 'warn' }, { label: 'once', sev: 'ok' },

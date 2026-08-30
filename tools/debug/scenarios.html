@@ -46,6 +46,8 @@
   .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
   a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
   ::selection{background:var(--sel)}
+  /* ELI5 tooltips: ./eli5.mjs injects the card and [data-tip]{cursor:help}; the bar's link chrome keeps its pointer */
+  .rbtn[data-tip],.foot[data-tip],.dbg[data-tip]{cursor:pointer}
 
   /* ── top bar: brand (left) · pass tally + rev/time (center) · debugger link + re-run (right) ── */
   .bar{display:flex;align-items:center;justify-content:center;gap:14px;height:60px;background:#000;position:relative;
@@ -147,17 +149,20 @@
   <div class="brand"><span class="mk">▦</span>fero v3<span class="sep">·</span><span class="pg">scenarios</span></div>
   <div class="tally" id="tally"></div>
   <div class="bright">
-    <a class="dbg" href="/debug">↗ debugger</a>
-    <button class="rbtn" id="rerun" title="re-run the whole scenario suite"><span class="rg">⟳</span>re-run</button>
+    <a class="dbg" href="/debug" data-tip="debugger-link">↗ debugger</a>
+    <button class="rbtn" id="rerun" data-tip="rerun"><span class="rg">⟳</span>re-run</button>
   </div>
 </div>
 <!-- first run only: this payload has no reference yet -->
-<div class="basenote" id="basenote">no baseline yet — this run becomes the reference</div>
+<div class="basenote" id="basenote" data-tip="no-baseline">no baseline yet — this run becomes the reference</div>
 
 <!-- ── card grid ── -->
 <main class="wrap"><div class="grid" id="grid"></div></main>
 
 <script type="module">
+// the ELI5 layer: every data-tip="<key>" on this page resolves in ./eli5.mjs (the shared glossary + hover card)
+import { mountTips, phaseKey } from './eli5.mjs';
+
 /* ════════════════════════════════════════════════════════════════════════
    PURE HELPERS — no DOM. The validation harness extracts this whole module
    and drives esc/rel/fmtDelta/diagram directly, so keep them side-effect
@@ -196,16 +201,15 @@ function fmtDelta(m, base){
     const v = Number(m.v), bn = Number(b);
     if(!Number.isFinite(v) || !Number.isFinite(bn)) return '';
     if(bn === 0)                                     // no % of zero — fall back to exact compare
-      return v === 0 ? '<span class="deq">=</span>'
-                     : `<span class="dchip">${esc(b)} → ${esc(m.v)}</span>`;
+      return v === 0 ? '<span class="deq" data-tip="delta:same">=</span>'
+                     : `<span class="dchip" data-tip="delta:drift">${esc(b)} → ${esc(m.v)}</span>`;
     const pct = Math.round((v - bn) / bn * 100);
-    return `<span class="dms${pct > 100 ? ' hot' : ''}" `+
-      `title="wall-clock is noisy on this machine — counted rows are the signal">`+
+    return `<span class="dms${pct > 100 ? ' hot' : ''}" data-tip="${pct > 100 ? 'delta:ms-hot' : 'delta:ms'}">`+   // the ELI5 says why ms is dim
       `${pct >= 0 ? '+' : ''}${pct}%</span>`;
   }
   if(String(m.v) === String(b))                      // count → quiet '='; text → nothing at all
-    return m.kind === 'text' ? '' : '<span class="deq">=</span>';
-  return `<span class="dchip">${esc(b)} → ${esc(m.v)}</span>`;
+    return m.kind === 'text' ? '' : '<span class="deq" data-tip="delta:same">=</span>';
+  return `<span class="dchip" data-tip="delta:drift">${esc(b)} → ${esc(m.v)}</span>`;
 }
 
 /* ── diagram: declarative spec → inline SVG topology + phase strip ──
@@ -247,10 +251,10 @@ function diagram(d){
     const s = seg(P[i], P[j]);
     const cls = cuts.has(k) ? 'lc' : faults.has(k) ? 'lf' : 'lk';   // the link BECOMES the worst state's stroke
     lines += `<line class="${cls}" x1="${f1(s.x1)}" y1="${f1(s.y1)}" x2="${f1(s.x2)}" y2="${f1(s.y2)}"/>`;
-    if(faults.has(k)) fmarks += `<g><title>dup/delay fault</title>`+
+    if(faults.has(k)) fmarks += `<g data-tip="d:fault">`+
       `<circle class="mbg" cx="${f1(s.mx)}" cy="${f1(s.my)}" r="8"/>`+
       `<text class="mf" x="${f1(s.mx)}" y="${f1(s.my)}" dy=".35em">≋</text></g>`;
-    if(cuts.has(k)) cmarks += `<g><title>partition cut</title>`+     // rendered AFTER faults → ✂ sits over ≋
+    if(cuts.has(k)) cmarks += `<g data-tip="d:cut">`+                // rendered AFTER faults → ✂ sits over ≋
       `<circle class="mbg" cx="${f1(s.mx)}" cy="${f1(s.my)}" r="8"/>`+
       `<text class="mc" x="${f1(s.mx)}" y="${f1(s.my)}" dy=".35em">✂</text></g>`;
   }
@@ -263,12 +267,12 @@ function diagram(d){
       : Math.cos(p.a) < -0.3
         ? `<text class="nl" x="${f1(p.x - NR - 6)}" y="${f1(p.y + 3)}" text-anchor="end">${esc(p.id)}</text>`
         : `<text class="nl" x="${f1(p.x + NR + 6)}" y="${f1(p.y + 3)}" text-anchor="start">${esc(p.id)}</text>`;
-    nodes += `<g class="nd${w ? ' wr' : ''}"><circle class="nc" cx="${f1(p.x)}" cy="${f1(p.y)}" r="${NR}"/>`+
+    nodes += `<g class="nd${w ? ' wr' : ''}" data-tip="${w ? 'd:writer' : 'd:node'}"><circle class="nc" cx="${f1(p.x)}" cy="${f1(p.y)}" r="${NR}"/>`+
       (w ? `<circle class="wb" cx="${f1(p.x + NR*0.707)}" cy="${f1(p.y - NR*0.707)}" r="3"/>` : '')+
       lab + `</g>`;
   }
-  const strip = (d.phases || []).map(p =>
-    `<span class="ph"><i class="pdm ${esc(p.sev || '')}"></i><span class="pl">${esc(p.label || '')}</span></span>`
+  const strip = (d.phases || []).map(p =>   // the label explains the phase; the diamond explains its colour
+    `<span class="ph" data-tip="${esc(phaseKey(p.label))}"><i class="pdm ${esc(p.sev || '')}"${p.sev ? ` data-tip="psev:${esc(p.sev)}"` : ''}></i><span class="pl">${esc(p.label || '')}</span></span>`
   ).join('<span class="parr">→</span>');
   const alt = `topology: ${n} node${n === 1 ? '' : 's'}`+
     `${cuts.size ? `, ${cuts.size} cut link${cuts.size === 1 ? '' : 's'}` : ''}`+
@@ -288,12 +292,12 @@ function cardHTML(s){
   const id = s.id != null ? String(s.id) : '';
   const title = String(s.title ?? id);
   const kp = PILL[s.kind];
-  const kindPill = kp ? `<span class="pill ${kp[0]}"><span class="pd"></span>${kp[1]}</span>` : '';
-  const passPill = s.pass === true  ? `<span class="pill ok"><span class="pd"></span>pass</span>`
-                 : s.pass === false ? `<span class="pill crit"><span class="pd"></span>fail</span>` : '';
+  const kindPill = kp ? `<span class="pill ${kp[0]}" data-tip="kind:${esc(s.kind)}"><span class="pd"></span>${kp[1]}</span>` : '';
+  const passPill = s.pass === true  ? `<span class="pill ok" data-tip="pass"><span class="pd"></span>pass</span>`
+                 : s.pass === false ? `<span class="pill crit" data-tip="fail"><span class="pd"></span>fail</span>` : '';
   const base = s.base && typeof s.base === 'object' ? s.base : null;
   const rows = (Array.isArray(s.metrics) ? s.metrics : []).map(m =>
-    `<div class="mxr"><span class="mk">${esc(m.k ?? '')}</span>`+
+    `<div class="mxr"><span class="mk" data-tip="${esc('m:' + (m.k ?? ''))}">${esc(m.k ?? '')}</span>`+
     `<span class="mv">${esc(m.v ?? '')}</span>`+
     `<span class="md">${fmtDelta(m, base)}</span></div>`).join('');
   return `<a class="card" href="/debug?scenario=${esc(encodeURIComponent(id))}">`+
@@ -301,9 +305,9 @@ function cardHTML(s){
     `<span class="pills">${kindPill}${passPill}</span></div>`+
     diagram(s.diagram)+
     (s.desc ? `<div class="cdesc">${esc(s.desc)}</div>` : '')+
-    (s.pass === false ? `<div class="cnote"><b>fail</b>${esc(s.notes || 'no failure notes from the runner')}</div>` : '')+
+    (s.pass === false ? `<div class="cnote" data-tip="fail-note"><b>fail</b>${esc(s.notes || 'no failure notes from the runner')}</div>` : '')+
     (rows ? `<div class="mx">${rows}</div>` : '')+
-    `<div class="foot">open in debugger →</div></a>`;
+    `<div class="foot" data-tip="open-debugger">open in debugger →</div></a>`;
 }
 function tallyHTML(p, err){
   const list = Array.isArray(p.scenarios) ? p.scenarios : [];
@@ -311,12 +315,12 @@ function tallyHTML(p, err){
   const pass  = p.pass  ?? list.filter(s => s.pass === true).length;
   const failing = total - pass;
   const pill = failing <= 0
-    ? `<span class="pill ok big"><span class="pd"></span>${pass}/${total} passing</span>`
-    : `<span class="pill crit big"><span class="pd"></span>${pass}/${total} — ${failing} failing</span>`;
+    ? `<span class="pill ok big" data-tip="tally"><span class="pd"></span>${pass}/${total} passing</span>`
+    : `<span class="pill crit big" data-tip="tally"><span class="pd"></span>${pass}/${total} — ${failing} failing</span>`;
   const bits = [];
-  if(p.rev) bits.push('rev ' + esc(p.rev));
-  const t = rel(p.when); if(t) bits.push(t);
-  if(typeof p.wallMs === 'number') bits.push(p.wallMs + ' ms run');
+  if(p.rev) bits.push(`<span data-tip="rev">rev ${esc(p.rev)}</span>`);
+  const t = rel(p.when); if(t) bits.push(`<span data-tip="when">${t}</span>`);
+  if(typeof p.wallMs === 'number') bits.push(`<span data-tip="wall-run">${p.wallMs} ms run</span>`);
   return pill + (bits.length ? `<span class="meta">${bits.join(' · ')}</span>` : '')
     + (err ? `<span class="errnote" title="${esc(err)}">${esc(err)}</span>` : '');
 }
@@ -327,6 +331,7 @@ function tallyHTML(p, err){
    ════════════════════════════════════════════════════════════════════════ */
 if(typeof document !== 'undefined'){
   const $ = id => document.getElementById(id);
+  mountTips(document);                               // the ELI5 hover layer (./eli5.mjs)
   let LAST = null;                                   // the last good payload (kept through a failed re-run)
 
   async function load(url){

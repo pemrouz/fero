@@ -7,17 +7,9 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { readFileSync } from 'node:fs'
-import vm from 'node:vm'
+import { bootScenariosPure } from './dom-shim.ts'
 
-const html = readFileSync(new URL('./scenarios.html', import.meta.url), 'utf8')
-const src = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1]
-assert.ok(src, 'scenarios.html holds one inline module script')
-
-const ctx = vm.createContext({})
-//! const/let bindings stay script-scoped, so the export hook rides the SAME evaluation
-vm.runInContext(`${src}\n;this.__H__ = { esc, rel, fmtDelta, diagram, cardHTML, tallyHTML }`, ctx, { filename: 'scenarios.html#module' })
-const H = (ctx as { __H__: Record<string, (...a: never[]) => string> }).__H__
+const H = bootScenariosPure()
 const ids = (n: number) => Array.from({ length: n }, (_, i) => `n${String(i + 1).padStart(Math.max(2, String(n).length), '0')}`)
 const count = (s: string, needle: string) => s.split(needle).length - 1
 
@@ -45,11 +37,11 @@ test('rel buckets: just now / s / m / h / plain date past 24h; garbage renders a
 
 test('fmtDelta: counts are always-signal (quiet = / warn chip), ms is dim ±% (hot past +100), no base renders as absence', () => {
   const d = H.fmtDelta as (m: { k: string; v: number | string; kind: string }, base: Record<string, number | string> | null) => string
-  assert.equal(d({ k: 'events', v: 5, kind: 'count' }, { events: 5 }), '<span class="deq">=</span>')
+  assert.equal(d({ k: 'events', v: 5, kind: 'count' }, { events: 5 }), '<span class="deq" data-tip="delta:same">=</span>', 'the quiet = explains itself')
   assert.ok(d({ k: 'events', v: 6, kind: 'count' }, { events: 5 }).includes('5 → 6'), 'count drift chips old → new')
   assert.ok(!d({ k: 'events', v: 4, kind: 'count' }, { events: 5 }).includes('deq'), 'a count IMPROVEMENT still chips — drift is never green')
-  assert.equal(d({ k: 'wall ms', v: 30, kind: 'ms' }, { 'wall ms': 20 }), `<span class="dms" title="wall-clock is noisy on this machine — counted rows are the signal">+50%</span>`)
-  assert.ok(d({ k: 'wall ms', v: 50, kind: 'ms' }, { 'wall ms': 20 }).includes('dms hot'), '+150% goes hot')
+  assert.equal(d({ k: 'wall ms', v: 30, kind: 'ms' }, { 'wall ms': 20 }), `<span class="dms" data-tip="delta:ms">+50%</span>`, 'the ms cell names its ELI5 (why it is dim) instead of a native title')
+  assert.ok(d({ k: 'wall ms', v: 50, kind: 'ms' }, { 'wall ms': 20 }).includes('dms hot" data-tip="delta:ms-hot"'), '+150% goes hot, with the hot explanation')
   assert.equal(d({ k: 'seeds', v: '100/100', kind: 'text' }, { seeds: '100/100' }), '', 'equal text renders nothing')
   assert.equal(d({ k: 'events', v: 5, kind: 'count' }, null), '', 'no base → empty cell')
   assert.equal(d({ k: 'events', v: 5, kind: 'count' }, { other: 5 }), '', 'no base ENTRY → empty cell')
@@ -80,6 +72,12 @@ test('diagram: writers badge, fault ≋ / cut ✂ glyphs, cut-over-fault stroke 
   assert.equal(count(svg, 'class="lc"'), 1, 'the faulted+cut pair takes the WORST stroke (cut)')
   assert.equal(count(svg, 'class="lf"'), 1, 'the fault-only pair keeps the fault stroke')
   assert.ok(svg.includes('1 cut link, 2 faulted links'), 'aria-label counts both')
+  assert.equal(count(svg, 'data-tip="d:fault"'), 2, 'each fault glyph explains itself')
+  assert.equal(count(svg, 'data-tip="d:cut"'), 1)
+  assert.equal(count(svg, 'data-tip="d:writer"'), 1, 'the writer node explains its gold rim')
+  assert.equal(count(svg, 'data-tip="d:node"'), 3)
+  assert.equal(count(svg, 'data-tip="p:'), 3, 'every phase chip names its p: entry')
+  assert.ok(svg.includes('data-tip="psev:crit"') && svg.includes('data-tip="psev:warn"'), 'the diamond explains its colour')
   assert.equal(count(svg, 'class="ph"'), 3, 'three phase chips')
   assert.ok(svg.includes('pdm crit') && svg.includes('pdm warn'), 'sev maps straight to classes')
 })
@@ -91,6 +89,7 @@ test('cardHTML: pass pill vs fail note (only on failure), metric rows, escaped c
   assert.ok(ok.includes('href="/debug?scenario=scale-formation"'))
   assert.ok(ok.includes('>pass</span>') && !ok.includes('cnote'), 'a passing card carries NO failure note')
   assert.equal(count(ok, 'class="mxr"'), 1)
+  assert.ok(ok.includes('data-tip="m:nodes"') && ok.includes('data-tip="kind:happy"') && ok.includes('data-tip="pass"'), 'metric keys, the kind pill and the pass pill carry their ELI5 keys')
   const bad = card({ id: 'x', title: 't', kind: 'unhappy', diagram: base, pass: false, notes: '<b>boom</b>', metrics: [], base: null })
   assert.ok(bad.includes('>fail</span>') && bad.includes('cnote'), 'a failing card shows the note')
   assert.ok(bad.includes('&lt;b&gt;boom&lt;/b&gt;'), 'notes are data, escaped like everything else')

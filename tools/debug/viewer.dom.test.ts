@@ -10,104 +10,14 @@
 // exactly the layer that silently rotted.
 //
 // If the viewer grows a DOM API this shim lacks, the script throws at load and this suite fails
-// loudly — extend the shim; never stub the assertion.
+// loudly — extend the shim (./dom-shim.ts, shared with eli5.test.ts); never stub the assertion.
 
 import { test, before } from 'node:test'
 import assert from 'node:assert'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import vm from 'node:vm'
 import { runAll } from './scenarios.ts'
 import * as MODEL from './model.mjs'
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-
-//! the DOM shim — string-sink elements: innerHTML/textContent are plain props, listeners are captured
-const makeEl = (id: string) => {
-  const listeners: Record<string, Array<(e: unknown) => void>> = {}
-  const set = new Set<string>()
-  const el: any = {
-    id, listeners, innerHTML: '', textContent: '', value: '', max: '', min: '', disabled: false,
-    title: '', dataset: {}, style: {} as Record<string, string>, files: [],
-    classList: {
-      add: (c: string) => set.add(c), remove: (c: string) => set.delete(c),
-      toggle: (c: string, f?: boolean) => { (f ?? !set.has(c)) ? set.add(c) : set.delete(c) },
-      contains: (c: string) => set.has(c),
-    },
-    addEventListener: (t: string, fn: (e: unknown) => void) => { (listeners[t] ??= []).push(fn) },
-    focus() {}, blur() {}, click() {}, scrollIntoView() {},
-    // fire through the REGISTERED listeners — the same path a real event takes; a listener that
-    // throws propagates and fails the test (no swallowing)
-    fire(type: string, extra: Record<string, unknown> = {}) {
-      const fns = listeners[type] ?? []
-      assert.ok(fns.length > 0, `no '${type}' listener registered on #${id} — the wiring is gone`)
-      for (const fn of fns) fn({ preventDefault() {}, stopPropagation() {}, target: el, ...extra })
-    },
-  }
-  return el
-}
-
-//! boot the real viewer script against one scenario capture; returns the live vm context + elements.
-// getElementById answers ONLY for ids that exist in the page's real markup (like a browser) — an
-// auto-vivifying registry would keep a page green whose script references an id the HTML lost.
-// The script runs in strict mode (it is a module in the browser) so sloppy-only code cannot pass
-// here and die there — the exact silent-wiring class this file polices.
-const bootViewer = async (scenarioId: string, capture: unknown, opts: { failFetch?: boolean } = {}) => {
-  const html = readFileSync(join(HERE, 'viewer.html'), 'utf8')
-  const m = /<script type="module">([\s\S]*?)<\/script>/.exec(html)
-  assert.ok(m, 'viewer.html has one inline module script')
-  const markup = html.slice(0, html.indexOf('<script type="module">'))
-  const realIds = new Set([...markup.matchAll(/\bid="([^"]+)"/g)].map((x) => x[1]))
-  const els = new Map<string, any>()
-  const el = (id: string) => {
-    if (!els.has(id)) {
-      assert.ok(realIds.has(id), `viewer script asked for #${id} which the markup does not have`)
-      els.set(id, makeEl(id))
-    }
-    return els.get(id)
-  }
-  const body = makeEl('.body')
-  const docListeners: Record<string, Array<(e: unknown) => void>> = {}
-  const document = {
-    getElementById: (id: string) => (realIds.has(id) ? el(id) : null),
-    querySelector: (sel: string) => (sel === '.body' ? body : null),
-    addEventListener: (t: string, fn: (e: unknown) => void) => { (docListeners[t] ??= []).push(fn) },
-    activeElement: null,
-  }
-  const wire = JSON.parse(JSON.stringify(capture)) // exactly what the HTTP route would serve
-  const ctx = vm.createContext({
-    document, docListeners,
-    location: { search: `?scenario=${scenarioId}`, pathname: '/debug' },
-    history: { replaceState() {} },
-    getSelection: () => ({ isCollapsed: true }),
-    fetch: async () => (opts.failFetch ? { ok: false, status: 503 } : { ok: true, json: async () => wire }),
-    setInterval: () => 0, clearInterval: () => {},
-    URLSearchParams, console,
-    __MODEL__: MODEL,
-  })
-  const src = m![1].replace(
-    /^import\s+\{([^}]+)\}\s+from\s+'\.\/model\.mjs'/m,
-    'const {$1} = __MODEL__',
-  )
-  assert.notEqual(src, m![1], 'the model import was found and rewired')
-  vm.runInContext(`'use strict';\n${src}`, ctx, { filename: 'viewer.html<script>' })
-  // the boot IIFE awaits the fetch stub — pump microtasks until it settles either way
-  const g = (expr: string) => vm.runInContext(expr, ctx)
-  for (let i = 0; i < 20 && !g('CAP != null') && !el('tree').innerHTML; i++)
-    await new Promise((r) => setImmediate(r))
-  if (!opts.failFetch) {
-    assert.ok(g('CAP != null'), 'boot loaded the capture')
-    assert.ok(!el('tree').innerHTML.includes("Couldn't load"), 'boot did not fall into the error pane')
-  }
-  return { el, g, docListeners }
-}
-
-//! drive one scrub through the trange 'input' listener — the exact drag path
-const dragTo = (el: (id: string) => any, t: number) => {
-  el('trange').value = String(t)
-  el('trange').fire('input')
-}
+import { tip } from './eli5.mjs'
+import { bootViewer, dragTo } from './dom-shim.ts'
 
 let captures: Map<string, unknown>
 before(() => { captures = runAll().captures as Map<string, unknown> })
@@ -142,7 +52,7 @@ test('scrubbing replays state everywhere it is painted: tree, node inspector, wr
   el('tree').fire('click', { target: { closest: (s: string) => (s === '.trow' ? { dataset: { i: String(iNode) } } : null) } })
   const insp0 = el('insp').innerHTML
   assert.match(insp0, /replayed @ t0/, 'the inspector carries the time-travel banner')
-  assert.match(insp0, /<dt>keys<\/dt><dd[^>]*>0 <span class="x">@ t0/, 'replayed key count at t0 is exactly 0 (anchored: "20" must not satisfy it)')
+  assert.match(insp0, /<dt[^>]*>keys<\/dt><dd[^>]*>0 <span class="x">@ t0/, 'replayed key count at t0 is exactly 0 (anchored: "20" must not satisfy it)')
   assert.match(insp0, /≤ t0/, 'the journal pane is scoped to the scrub point')
   for (const [, ts] of insp0.matchAll(/class="stp">t(\d+)</g))
     assert.ok(Number(ts) <= 0, 'no mini-log row from the future')
@@ -213,4 +123,27 @@ test('the wheel steps time; reset restores the present — both through their re
   assert.equal(g('T'), 0, 'wheel clamps at t0, never negative')
   el('treset').fire('click')
   assert.equal(el('tree').innerHTML, atEnd, 'reset renders byte-identical to the end state')
+})
+
+test('the ELI5 layer is wired: hovering a painted [data-tip] paints the glossary card; leaving, pressing, or an unknown key clears it', async () => {
+  const { el, g, hover, fireDoc } = await bootViewer('replication', captures.get('replication'))
+  assert.ok(g('document.__eli5 != null'), 'mountTips ran on the document')
+  assert.ok(g('document.head.children.some(c => c.id === "<style>" && /\\.e5\\b/.test(c.textContent))'), 'the card CSS was injected into <head>')
+  const card = () => ({ html: g('document.__eli5.card.innerHTML') as string, on: g('document.__eli5.card.classList.contains("on")') as boolean })
+  // a key the tree really paints — the node row's seq stat
+  assert.match(el('tree').innerHTML, /data-tip="seq"/, 'the tree paints a seq stat with its ELI5 key')
+  hover('seq')
+  const e = tip('seq') as { t: string; d: string }
+  assert.ok(card().on, 'the card shows after the (immediate, shimmed) settle')
+  assert.ok(card().html.includes(e.t) && card().html.includes(e.d), 'the card carries the glossary entry verbatim')
+  // a fact rides under the explanation, escaped
+  hover('node:truncated', '<7> dropped')
+  assert.ok(card().html.includes('&lt;7&gt; dropped'), 'data-tip-fact renders as the dim second line, escaped')
+  hover(null)                                                   // onto plain chrome
+  assert.equal(card().on, false, 'leaving onto a non-tip element hides the card')
+  hover('seq'); fireDoc('mousedown', {})
+  assert.equal(card().on, false, 'a press hides the card')
+  hover('no-such-key')
+  assert.equal(card().on, false, 'an unknown key paints NO card — absence renders as absence')
+  assert.equal(card().html, '')
 })

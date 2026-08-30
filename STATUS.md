@@ -158,3 +158,34 @@ inside the outer apply.
   server's gadgets tick is gone (one writer per cell keeps the demo legible);
   the header's restart claim corrected — anti-entropy reconciles BOTH ways,
   the memory-only server recovers the newer state from its watcher.
+- 2026-08-30 (later) — ELI5 TOOLTIPS throughout the debugger: ONE plain-English
+  glossary + ONE hover layer ([tools/debug/eli5.mjs](tools/debug/eli5.mjs),
+  plain-JS ESM shared verbatim by viewer.html, scenarios.html and the tests,
+  served at /eli5.mjs) replaces the 11 terse native `title=`s with 337
+  entries — every tree stat/pill/group, inspector fact/section/table header,
+  journal-kind badge (all 71 JK kinds), route stop, cell election row, omni
+  filter head/value, status-bar fact, time-travel control, live/attach chrome,
+  and on the dashboard every metric key, phase chip, diagram glyph, pill and
+  delta cell. Copy was written from a 7-lens source research pass over the
+  kernel and then adversarially verified (12 refuters + 3 newcomer readers);
+  it explains what a label MEANS and never claims a fact about the loaded
+  capture (`data-tip-fact` carries a repeated fact, escaped). Gate:
+  eli5.test.ts — no dangling key (a sweep boots the real page scripts over
+  every scenario capture, a mid-flight live capture, an overflowed-ring
+  cluster, a never-healed cut run to quiescence, an attach envelope with every
+  absent reason), no dead copy (an 8-entry documented unreachable list), the
+  JK/metric/phase vocabularies pinned both ways. The DOM shim moved to
+  dom-shim.ts (shared by viewer.dom/scenarios.dom/eli5 suites) and grew the
+  tooltip layer's needs; the wiring test hovers through the registered
+  document listener; honesty (d) now pins the TWO-plane import shape (the
+  model for every fold, eli5 for the hover mount alone, eli5.mjs importing
+  nothing). Six mutation checks (unmounted layer, vanished/typo'd/dead key,
+  dropped dashboard key, new JK kind) each turn a suite red. Verified by
+  driving the real pages in headless Chromium (25 hovers read back,
+  hide-on-leave, zero page errors). The review also surfaced and fixed three
+  pre-existing debugger inaccuracies: the stream inspector's Facts rendered
+  `seen (high-water) undefined` (the entity never carried `seen` — it now
+  shows the watermark ladder it does carry); the lost-ack card drew its
+  severed link as a ≋ dup/delay fault (it is a one-shot ✂ cut that heals);
+  the frameDrop journal line claimed `— link dropped` for every drop (an
+  unknown verb keeps the link). Battery: 341/341 + 18/18.
