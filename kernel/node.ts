@@ -187,7 +187,10 @@ export class Node {
   // pending" — tries increments at ARM time, so tries alone cannot tell them apart, and a revival
   // during the pending window would orphan the live timer into a second concurrent dial chain
   // (adversarial-review finding: forked chains, doubled dial traffic, starved giveUp).
-  #backoff = new Map<string, { ms: number; tries: number; gaveUp?: boolean }>()
+  //! parked (V4-3): a forgotten DYNAMIC target that a live link (or an in-flight dial) still names —
+  // kept only so that link's eventual linkDown ends the chain instead of starting one; nothing dials,
+  // revives, or counts a parked target, and #redial drops the entry the moment it is consulted
+  #backoff = new Map<string, { ms: number; tries: number; gaveUp?: boolean; parked?: boolean }>()
   //! highest incarnation ever identified per peer uuid — a HELLO above it means the peer was REBORN,
   // and every evidence mark its previous life announced is void (confirm.forget; see that banner).
   #peerInc = new Map<string, number>()
@@ -355,7 +358,7 @@ export class Node {
   // after a heal), and evicting then is churn a one-tick wait avoids. Give-up ends the hold.
   dialing(to: string): boolean {
     const b = this.#backoff.get(to)
-    return !!b && !b.gaveUp
+    return !!b && !b.gaveUp && !b.parked
   }
 
   //! #revivable — the give-up revival target set: static hosts ∪ committed-view member listens (a
@@ -391,12 +394,14 @@ export class Node {
       }
       //! discover (V4-3): the dynamic host set, replaced wholesale. ADDED targets dial now unless a live
       // link already covers them (our dialed `to`, or the peer's gossiped listen) or a backoff chain is
-      // still actively trying them; a covered target's stale backoff entry is cleared so a later loss
-      // starts a fresh chain. FORGOTTEN targets PARK: the entry is set given-up at the cap, so the chain's
-      // next linkDown stops instead of restarting from base, and revival (hosts ∪ view) no longer lists
-      // them — unless the target is a static host or a committed member, which are never forgotten.
-      // Live links are never closed here: a peer's departure is a link fact, not a directory fact. A
-      // target re-added later clears its park and dials afresh.
+      // still actively trying them; the dial registers a tries-0 entry so a park arriving while it is
+      // in flight can see it. FORGOTTEN targets: any armed redial timer is CANCELLED (never an orphaned
+      // second chain — the V4-3 panel's fork), then the entry is PARKED while a live link or an in-flight
+      // dial still names the target (its eventual linkDown must end the chain, not start one) and
+      // simply dropped otherwise — nothing can redial an address no timer, link, host, or member names,
+      // so #backoff stays bounded. Static hosts and committed members are never forgotten. Live links
+      // are never closed here: a peer's departure is a link fact, not a directory fact. A target
+      // re-added later clears its park and dials afresh.
       case 'discover': {
         const next = new Set<string>()
         for (const h of e.hosts) if (h && h !== this.listen) next.add(h)
@@ -404,18 +409,21 @@ export class Node {
         this.#dynamic = [...next]
         this.#hostsCache = null
         const statics = new Set(this.#opts.hosts ?? [])
+        const covered = (to: string): boolean => {
+          for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) return true
+          return false
+        }
         for (const to of prev) {
           if (next.has(to) || statics.has(to) || this.membership.view.members.some(([, l]) => l === to)) continue
-          const b = this.#backoff.get(to)
-          this.#backoff.set(to, { ms: b?.ms ?? (this.#opts.redialMs ?? 100), tries: MAX_REDIALS, gaveUp: true })
+          for (const [id, m] of this.#timers) if (m.tag === TAG.redial && m.to === to) { this.#timers.delete(id); this.env.sink.cancel(id) }
+          if (covered(to) || this.dialing(to)) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: MAX_REDIALS, gaveUp: true, parked: true })
+          else this.#backoff.delete(to)
         }
         for (const to of next) {
           if (prev.has(to) || statics.has(to)) continue
-          let held = false
-          for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) { held = true; break }
-          if (held) { this.#backoff.delete(to); continue }
+          if (covered(to)) { this.#backoff.delete(to); continue }
           if (this.dialing(to)) continue
-          this.#backoff.delete(to)
+          this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: 0 }) // a dial in flight — visible to a park
           j.armed && j.emit(JK.dial, to)
           this.env.sink.connect(to)
         }
@@ -970,6 +978,10 @@ export class Node {
     if (this.destroyed) return
     const base = this.#opts.redialMs ?? 100
     const b = this.#backoff.get(to) ?? { ms: base, tries: 0 }
+    //! a PARKED target (discover forgot it while a link/dial still named it): the chain ends here and
+    // the entry goes with it — no timer, no revival, nothing left to grow (#backoff stays bounded by
+    // the live link set, not by every address a port-0 server ever had)
+    if (b.parked) { this.#backoff.delete(to); return }
     if (b.tries >= MAX_REDIALS) {
       //! the final ARMED attempt has now FAILED — only here does the target become truly parked
       if (!b.gaveUp) {
@@ -1018,6 +1030,13 @@ export class Node {
           if (typeof n === 'string' && this.name !== undefined && n !== this.name) {
             j.armed && j.emit(JK.nameReject, link.id, n)
             link.dead = link.noRedial = true
+            //! a DIALED target answering for another resource is parked GIVEN-UP (never a redial chain —
+            // that would hammer a misconfigured port), so the heartbeat's give-up revival re-dials it
+            // once per heartbeat while it stays in hosts ∪ view: a squatter on the rendezvous, or a
+            // resource that moves onto the right port later, heals at heartbeat cadence instead of
+            // stranding this node forever (V4-3 panel: noRedial alone never started a chain, so
+            // revival — which keys on gaveUp — could never reach the target)
+            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: MAX_REDIALS, gaveUp: true })
             return this.env.sink.close(link.id, 'name-mismatch')
           }
         }
