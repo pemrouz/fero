@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (355 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
+Run from the repo root: `npm test` (372 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -253,3 +253,26 @@ inside the outer apply.
   on every surface, is:info finds `@ end`, kept selection), eli5 (six new
   keys reachable, `not-captured` now truthfully reachable), diag/attach
   parity pins `client` and refolds the topology of a wire-pulled slice.
+- 2026-08-30 (V4-3, the implementation panel) — 5 lenses × a skeptic per
+  finding over the landed directory: 25 confirmed (8 major, every one
+  reproduced), 0 refuted. Fixed: the squat strand (the string-compare listen
+  guard was bypassed by `0.0.0.0:3376` / `localhost:3376` / `rendezvous:
+  false` → `sameSocket` refuses every spelling against own/default/constant,
+  AND the kernel parks a name-rejected dialed target given-up so heartbeat
+  revival re-dials it — the V4-2 "heartbeat-bounded churn" claim is true
+  now); owner keys split on the first space (names with spaces never cleaned
+  up → JSON keys); cleanup by (name, uuid) with no ownership (a dir-restored
+  identity re-registering past its wedged predecessor lost its cell when that
+  socket closed → per-cell `owner`, later wins); the battery's isolation
+  lived in one npm script (`FERO_RENDEZVOUS ??= 'off'` pinned in every
+  non-directory suite); the fold-order defect had no deterministic pin
+  (`hostMethods` exported as a seam; GRACE / ownership / space-name / cap
+  unit-pinned); the bind retry composed a full Runtime 4–20×/s against a
+  held port (probe-gated, exponential to 5s, errnos on
+  `cluster.me.rendezvous.error`); discover's park forked the redial chain on
+  re-add (the armed timer is cancelled; entries nothing names are dropped, so
+  #backoff is bounded). Minors: `listen: false` read as "down" (now `false`),
+  env garbage refused at fero() time, isAddr strict, precedence documented,
+  try/finally shapes, a derived takeover bound. Documented not fixed: the
+  loopback trust boundary, hung-but-connected registrants keep entries, ref'd
+  shell timers. Battery: 372/372 + 18/18 + perf 41/41.

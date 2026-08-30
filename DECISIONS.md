@@ -337,3 +337,14 @@ does NOT fix: a 2-member view has no fault tolerance and a bare restart is a
 new identity — `dir` + ≥3 members stays the deployment rule. A debugger badge
 for `#` resources is an IDEAS line (viewer.html is mid-edit in another
 session). Battery: 355/355 + 18/18 contract + perf 41/41.
+Addendum (the implementation panel, same day — DESIGN-DIRECTORY §10): 25
+confirmed findings, 8 major, all reproduced; fixed in the follow-up commits —
+the squat strand (a `sameSocket` guard against every spelling + kernel
+revival of a name-rejected target at heartbeat cadence), JSON owner keys
+(names with spaces), per-cell ownership (the later registrant wins; only the
+owner's death drops), `FERO_RENDEZVOUS ??= 'off'` pinned inside every
+non-directory suite, `hostMethods` as a unit-test seam (the fold-order defect
+pinned deterministically), a probe-gated, exponentially backed-off bind retry
+with errnos on `cluster.me.rendezvous.error`, discover's park cancelling the
+armed timer and dropping entries nothing names. Precedence documented: config
+> env > constant. Battery: 372/372 + 18/18 contract + perf 41/41.

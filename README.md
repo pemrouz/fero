@@ -785,9 +785,20 @@ a real multi-process cluster over the wire).
   servers, two names never collide, a NEW joiner after the host died still
   finds the survivors, and a non-fero squatter on the port is survived.
   `cluster.me` carries the effective `hosts` and `rendezvous: {addr, hosting,
-  up}`; the diagnostics seam exposes the directory nodes. The battery runs
-  with the directory OFF (explicit topologies stay isolated on a shared box);
-  api/directory.test.ts opts in with a free rendezvous port per test.
+  up, error?}`; the diagnostics seam exposes the directory nodes. Precedence:
+  `rendezvous:` config > `FERO_RENDEZVOUS` env (an address, or `off`; it sets
+  the PROCESS DEFAULT and never overrides an explicit key) > the constant.
+  Trust boundary, stated: the directory is as unauthenticated as the peer
+  plane — loopback IS the boundary; any local process can register any name
+  (it could equally dial the resource and HELLO with that name); a per-caller
+  cap bounds a runaway, nothing authenticates. A user resource may not listen
+  on a rendezvous socket under any spelling (`0.0.0.0:3376`, `localhost:3376`
+  …), and a name-rejected target is revived at heartbeat cadence, so a squat
+  is a bounded nuisance, not a strand. The battery runs with the directory OFF
+  (every non-directory suite pins `FERO_RENDEZVOUS ??= 'off'` at import, so a
+  single-file run never meets a live box directory); api/directory.test.ts
+  opts in with a free rendezvous port per test. The post-landing adversarial
+  panel and its fixes: DESIGN-DIRECTORY §10.
 - **M8 — hardening is LIVE** (panel-designed like M6/M7: 2 candidates + a skeptic
   judge per open question + a plan-coverage critic; the alloc judge ran its OWN V8
   probes to adjudicate a factual dispute between candidates). What landed:
