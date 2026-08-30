@@ -84,3 +84,6 @@ Source-served, no build: everything runs via `--experimental-strip-types`.
 - `npm test` on every change; a bug fix ships with the regression test that
   catches it. Perf on every hot-path change.
 - **Never push / open PRs without the user's explicit instruction.**
+- **Speak in simple English.** Short sentences, everyday words, one idea
+  at a time. Say the plain thing first, then the detail. Avoid jargon unless
+  it is a fero term — and then say what it means the first time.
