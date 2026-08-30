@@ -267,3 +267,73 @@ retire, unrepresentable by construction (dir/replicas imply server); the
 two-terminal demo runs with zero addresses/identities/internals imports.
 Battery: 331/331 + 18/18 contract + perf 41/41 (cold paths only — compose,
 boot, HELLO admission).
+
+## V4-3 — the per-box directory: no name hashing, servers on free ports, `#` system resources (2026-08-30)
+Context: the derived port welded WHERE a resource lives to HOW it is found, and
+live experiments against the tree measured the cost: 1024 slots per box
+(P(collision) ≈ 4% at 10 names, 17% at 20, 50% at 38); one bare server per
+name per box (the second is EADDRINUSE); a bare hub has no `hosts`, so genesis
+— proposed only by a lowest-uuid node WITH hosts — was a uuid coin-flip
+(pinned: `aaaa` never forms, `zzzz` forms); a bare client could only START from
+the derived port; a dead hub left every NEW joiner blind. The old fero's
+discovery on `master` (static `hosts × ports` + a well-known `#broker`
+candidate, handshake gossip of known servers) pointed at the shape: a
+well-known RENDEZVOUS, not a well-known port PER RESOURCE. Spec:
+DESIGN-DIRECTORY.md (the panel run was refused by a usage limit; the
+adversarial pass was done by hand, §9).
+Decision:
+- **`#directory`, a system resource at `127.0.0.1:3376`** ("FERO" on a keypad;
+  below Linux's ephemeral range so `listen(0)` never hands it to a resource;
+  loopback only — the peer plane is unauthenticated). The first SERVER on the
+  box to bind it hosts a soft-state registry `name → {uuid: listen}`; every
+  dialable instance opens a `#directory` client (api/directory.ts): servers
+  `register`, everyone opens `lookup(name)` as a LIVE subscription, and the
+  folded addresses feed the kernel through the new `discover` event. Hosting
+  is first-to-bind — a DISCOVERY role only; the data role stays a pure
+  function of config (V4-2). Clients host nothing; a host's death makes every
+  server's directory client retry the bind (jittered) until one hosts.
+- **Method-plane state, not replicated data.** The registry is a data proxy on
+  the host; an entry lives exactly as long as its registrant's link to the
+  CURRENT host — peer-down cleanup keyed by uuid transitions, read AFTER the
+  fold (a reaction reading `peers` inside a tap sees the row from BEFORE the
+  fold, which dropped registrations arriving in the same TCP chunk as their
+  HELLO; a microtask defer + a 3-pass grace for not-yet-published callers).
+  Takeover = the existing Caller failover (re-subscribe, root-replace) +
+  re-register on every primary change. No `unregister`: link death IS the
+  mechanism. REJECTED: the registry as replicated `data` — soft state through
+  a CRDT log needs a takeover sweep against lanes anti-entropy resurrects.
+- **Servers bind a FREE port** (`listen` omitted ⇒ `127.0.0.1:0`; the shell
+  publishes the OS-chosen address to the kernel inside its listen callback —
+  before start, before any accept can HELLO). `derivedAddr` deleted.
+- **Kernel `discover`** (`{kind, hosts}`): `node.hosts` = static ∪ dynamic
+  (cached; own listen excluded), read by genesis and revival unchanged; added
+  targets dial unless a live link or an active chain covers them; forgotten
+  targets PARK at the cap (a mid-flight chain stops at its next failure,
+  revival ignores them, a re-add clears the park); static hosts and committed
+  members are never parked. No new journal kind. Genesis over a discovered
+  set: concurrent proposals resolve by the ballot (one vote per epoch), a late
+  registrant joins at the next epoch — no settle window (sim-pinned).
+- **`#` is reserved**: `fero('#…')` throws for users; the composer's internal
+  entry mints system resources; the name rides HELLO, so `#directory` reads as
+  a system node in captures and journals. A user resource may not `listen` ON
+  the rendezvous (its HELLO would name-reject every directory client dead +
+  noRedial — never revived — stranding discovery on the box). A NON-fero
+  squatter is survivable: bounded chain → give-up → heartbeat revival, and
+  the servers' bind-retry loop hosts the moment the port frees.
+- **Config**: `rendezvous?: string | false` (default the constant; the
+  `FERO_RENDEZVOUS` env var overrides the default — an address, or `off`).
+  `npm test` / `npm run perf` run with `off`, so explicit-topology tests never
+  meet another tenant's directory on a shared box; discovery tests opt in with
+  a free port EACH. A client with no directory and no hosts refuses loudly.
+  `cluster.me` carries `hosts` (static ∪ discovered) on every role and
+  `rendezvous: {addr, hosting, up} | false`; the diagnostics seam exposes the
+  directory nodes (`rendezvous()`); `Context.peer` names a wire caller.
+- Panel answers (§9): Q1 clients host nothing; Q2 no settle; Q3 no dial-back;
+  Q4 3376 + env; Q5 per-instance directory clients (uniform, no process-level
+  state); Q6 the strands found were closed by construction (above).
+Consequences: BREAKING within 4.x — `derivedAddr` is gone, a bare client with
+the directory off refuses, `cluster.me.hosts` exists on servers too. What it
+does NOT fix: a 2-member view has no fault tolerance and a bare restart is a
+new identity — `dir` + ≥3 members stays the deployment rule. A debugger badge
+for `#` resources is an IDEAS line (viewer.html is mid-edit in another
+session). Battery: 355/355 + 18/18 contract + perf 41/41.

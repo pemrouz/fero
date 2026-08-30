@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (333 + the 18-clause data contract ride) /
+Run from the repo root: `npm test` (355 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -189,3 +189,30 @@ inside the outer apply.
   severed link as a ≋ dup/delay fault (it is a one-shot ✂ cut that heals);
   the frameDrop journal line claimed `— link dropped` for every drop (an
   unknown verb keeps the link). Battery: 341/341 + 18/18.
+- 2026-08-30 (V4-3) — THE DIRECTORY: no name hashing. The derived port
+  measured badly (1024 slots/box → 50% collision odds at 38 names; one bare
+  server per name; a host-less hub made genesis a uuid coin-flip — pinned
+  `aaaa` never forms; a dead hub blinded every new joiner). Replaced by the
+  `#directory` SYSTEM resource (the `#` prefix is reserved) at the per-box
+  rendezvous 127.0.0.1:3376: servers bind a FREE port (port 0 — the shell
+  publishes the real address to the kernel before start) and `register`,
+  everyone opens `lookup(name)` as a live subscription, and the folded
+  addresses feed the kernel's new `discover` event (static ∪ dynamic hosts,
+  cached; forgotten targets park at the cap, never closed; static hosts and
+  members never parked). Soft state on the method plane: entries die with the
+  registrant's link (peer-down cleanup keyed by uuid transitions, read AFTER
+  the fold — the mid-fold read dropped registrations riding the same chunk as
+  their HELLO), takeover = re-subscribe + re-register on every primary. First
+  server to bind hosts; the rest retry the bind on link-down (jittered). A
+  user resource may not listen ON the rendezvous; a non-fero squatter is
+  survived. Config `rendezvous: addr | false`, env FERO_RENDEZVOUS (the
+  battery runs `off`; discovery tests opt in with a free port each).
+  cluster.me: `hosts` on every role + `rendezvous {addr, hosting, up}`;
+  diag.rendezvous() exposes the directory nodes; Context.peer names a wire
+  caller. Pinned: kernel/discover.test.ts (dial/cover/park/re-add/static,
+  sim genesis over a discovered set + late JOIN), tests/tcp.test.ts port 0,
+  api/directory.test.ts (refusals, 3-round no-pin formation, bare client →
+  explicit servers, host death → takeover/failover/NEW joiner/bare restart,
+  entries die with their registrant, two names, Context.peer, squatter).
+  Spec DESIGN-DIRECTORY.md; DECISIONS V4-3. Battery: 355/355 + 18/18 +
+  perf 41/41 (341 + the neighbour-landed ELI5 gates + these 14).

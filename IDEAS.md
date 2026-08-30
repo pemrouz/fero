@@ -138,9 +138,10 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
 - [P3] (api) `client: true` as an explicit role pin — deliberately absent (with
   client the default it pins nothing); add the day an asymmetric-intent process
   wants to refuse accidental server markers.
-- [P3] (api,shell) Non-loopback derived binds — never a default (unauthenticated
-  peer plane); revisit only alongside peer-to-peer auth (see the carried v2
-  rejection).
+- [P3] (api,shell) A non-loopback RENDEZVOUS / default listen — never a default
+  (unauthenticated peer plane); an explicit `rendezvous: '10.0.0.5:3376'` is an
+  operator's declared act today; revisit defaults only alongside peer-to-peer
+  auth (see the carried v2 rejection).
 - [P3] (api) A held-shard local read under scoping (f.snapshot throws typed
   today) — needs a name that cannot be mistaken for the resource ('shard'?);
   wait for demand.
@@ -162,3 +163,20 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   write tombstones/subsumes older child cells; a child write newer than the
   parent re-applies over it), or project from the kernel fold by key depth.
   Needs a sim oracle on the PROJECTION, not only the cell map.
+
+## The directory (V4-3 residue)
+- [P2] (tools/debug) Badge `#`-prefixed SYSTEM resources in the viewer/scenarios
+  pages (the name rides HELLO and the boot record, so a capture can tell), and
+  capture the directory nodes through `diag(f).rendezvous()` — viewer.html was
+  mid-edit in another session when V4-3 landed, so the seam exists and the
+  rendering does not.
+- [P2] (api) Cross-box discovery: `hosts: ['10.0.0.5']` (host, no port) meaning
+  "ask THAT box's directory" — the old `hosts × ports` idea with ports = [the
+  rendezvous]; the HELLO name echo already guards the misdial. Needs the
+  explicit-listen rule (a loopback listen must never be gossiped off-box).
+- [P3] (kernel) A one-heartbeat settle after the last `discover` change before
+  genesis proposes — only if partial-first-view + JOIN churn ever shows up in a
+  real deployment (the ballot arbitrates today; sim-pinned).
+- [P3] (api) A shared per-process directory client (one socket per process
+  instead of one per instance) — rejected at V4-3 for uniformity; revisit if a
+  process hosting hundreds of resources minds the sockets.
