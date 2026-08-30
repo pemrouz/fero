@@ -128,6 +128,57 @@ decisions in [DECISIONS.md](DECISIONS.md).
   `<title>` and `.brand`, [tools/debug/serve.ts](tools/debug/serve.ts) the
   listen banner; the root has been v4 since 2026-08-16.
 
+### I-15 · model: a fatal `frameDrop`'s dead link can win a client's primary re-election in the replay
+- **Where:** [tools/debug/model.mjs](tools/debug/model.mjs) `topologyAt`
+  (`electPrimary` skips only `closing` links; `closing` is set by
+  dupLink/selfReject/nameReject).
+- **Symptom:** on a CLIENT node, when its primary goes down while another
+  link is dead from a fatal `frameDrop` but its `linkDown` echo has not
+  landed, the kernel elects the next *live* admitted link (`!l.dead`,
+  kernel/node.ts linkDown handler) and the replay elects the dead one —
+  `synced` on the real new primary reads false for the one round-trip until
+  the echo; `verifyTopology` passes at ∞ (self-healed). Reproduced only with
+  a hostile frame (`bytesIn` of garbage + a 60 ms delay fault); the sim's
+  chaos vocabulary never produces a `frameDrop` (60 seeds: 0 divergences).
+- **Root cause:** `frameDrop` is one kind with a free-text reason; fatal
+  (`link.dead = true` + close) and non-fatal drops ('unknown verb',
+  'malformed digest', …) are indistinguishable from the journal.
+- **Suggested fix:** a typed kill row (or a `c` flag on `frameDrop` marking
+  fatal) — append-only vocabulary, so a new kind; then `closing` on it.
+
+### I-16 · model: armed (replicas) and durable nodes mint EMPTY stream lanes with no journal row
+- **Where:** kernel/node.ts constructor (boot floors: `streams.for(origin)`),
+  kernel/write.ts replay entry and the non-held replay advance,
+  kernel/write.ts `streams.for` before the M6 gate (a staged record emits
+  nothing); [tools/debug/model.mjs](tools/debug/model.mjs) `topologyAt`
+  mints lanes from writeLocal/applyInbound/gateDrop only.
+- **Symptom:** at an intermediate step a scoped/durable node's kernel holds
+  a zero-valued lane the replay lacks (presence only); at ∞ the guard
+  refuses such nodes honestly (`streams size N vs M` — 9/30 nodes in a
+  scoped-churn probe) or passes when a later row names the origin.
+- **Suggested fix:** journal the silent sites (the non-held replay advance
+  changes `applied` with no trace at all), or have `verifyTopology` report
+  lane presence as a lower bound for armed captures.
+
+### I-17 · model: `synced` is claimed at the `digestIn` row; the kernel flips it at the END of that step
+- **Where:** kernel/node.ts DIGEST handler (`digestIn` emit → suffix ship →
+  `aeShip` emit → `link.synced = true`); `topologyAt`'s digestIn arm.
+- **Symptom:** when the same step also emits `aeShip`, the row after
+  `digestIn` shows synced=true one row early (4 of 5,664 digestIn rows over
+  5 chaos seeds). Same-step only; a per-step oracle sees 0 divergences.
+- **Suggested fix:** accept and document (done in the fold header), or set
+  synced lazily on the next non-aeShip row.
+
+### I-18 · attach: the journal is pulled to HEAD after the node snapshot, so a busy node can be refused as "drift"
+- **Where:** [tools/debug/attach.ts](tools/debug/attach.ts) `pullNode`
+  (q:'node' first, then the journal cursor to `next === undefined`).
+- **Symptom:** rows landing between the two pulls make `topologyAt(∞)`
+  disagree with the snapshot → `verifyTopology` refuses (`@ end`) for
+  snapshot skew, not drift. Same pre-existing class as I-2 for
+  `verifyReplay` (state is pulled last).
+- **Suggested fix:** fold for verification only over rows `t < jn` of the
+  node snapshot, or label the refusal reason 'snapshot skew'.
+
 ## Fixed
 
 - **I-11 (fixed in e81ac65)** · the stream inspector's Facts rendered
@@ -139,3 +190,21 @@ decisions in [DECISIONS.md](DECISIONS.md).
 - **I-13 (fixed in e81ac65)** · the `frameDrop` journal line read
   `frame error · <reason> — link dropped` for every drop; only wire faults
   and before-hello violations drop the link — an unknown verb keeps it.
+- **I-14 (fixed in 2bac581)** · viewer: links/streams never changed under
+  time travel and the tree never said so. The 100-node scenario scrubbed
+  keys@t/jrnl@t while every node painted 99/99 links and 65 streams at t=0:
+  the tree/inspector read the END snapshot (diagNode's tables carry no t),
+  `stateAt` folded only writeLocal/applyInbound, and the only statement of
+  it was the inspector banner — hidden with nothing selected; the scrubber's
+  own ELI5 ("rebuild what each knew then") over-promised. Now `topologyAt`
+  replays the link lifecycle and watermark ladder behind `verifyTopology`
+  (the fold at ∞ must reproduce the captured end tables — all 20 registry
+  captures, every node), and a node that fails the proof keeps its end
+  tables labelled `@ end` with the reason on every surface. The review's
+  per-step oracle also caught `walTaint` (condemn wipes streams/state —
+  both replay planes honour it now, the ∞ refold could not see it).
+- **I-1 addendum (2bac581)** · the reborn durable writer is now the
+  debugger's truthful *refusal* fixture too: its post-restart writes stamp
+  under `uuid~2`, so `verifyTopology` refuses it (`streams size 2 vs 3`)
+  and the viewer shows its end tables `@ end` — and `routes` no longer mints
+  `''` for a partition no writeLocal row named (null → rendered as absence).
