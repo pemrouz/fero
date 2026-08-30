@@ -4,6 +4,10 @@
 // meaning-equivalence rules (typed ScopedError, never a silent shard answer), the non-held remote
 // key handle, ScopedError wire rehydration at a spoke, and cluster.partitions.
 
+//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
+// meet a live box directory (the battery's npm script sets the same default)
+process.env.FERO_RENDEZVOUS ??= 'off'
+
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { fero, type Fero, type ScopedError } from './index.ts'

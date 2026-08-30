@@ -4,6 +4,10 @@
 // replication visible through two proxies, the guarantee ladder under methods.update, restore into
 // the proxy, and teardown.
 
+//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
+// meet a live box directory (the battery's npm script sets the same default)
+process.env.FERO_RENDEZVOUS ??= 'off'
+
 import { test } from 'node:test'
 import assert from 'node:assert'
 import fs from 'node:fs'

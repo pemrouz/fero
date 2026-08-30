@@ -75,13 +75,13 @@ export interface FeroConfig {
   // member (the listen+hosts cluster shape). The directory's discovered set is UNIONED with them;
   // omitted on a bare client = the discovered set alone.
   hosts?: string[]
-  //! rendezvous (V4-3) — the per-box directory every dialable node meets at: default '127.0.0.1:3376'
-  // (or the FERO_RENDEZVOUS environment variable — an address, or 'off'). A server registers
+  //! rendezvous (V4-3) — the per-box directory every dialable node meets at. Precedence: this key >
+  // the FERO_RENDEZVOUS environment variable (an address, or 'off' — it sets the PROCESS DEFAULT and
+  // never overrides an explicit key) > the constant '127.0.0.1:3376'. A server registers
   // {name, uuid, listen} there; everyone looks its name up LIVE, and the addresses feed the kernel's
   // dial set. false = no directory at all (the pure-static shape). The first dialable server on the
   // box to bind the address hosts it — a discovery role only; the data role never depends on timing.
-  // A user resource may not listen ON the rendezvous address (its name would be refused by every
-  // directory client's HELLO check, stranding discovery on the box).
+  // A user resource may not listen on a rendezvous socket under any spelling (`0.0.0.0:3376` too).
   rendezvous?: string | false
   dir?: string
   heartbeatMs?: number
@@ -158,10 +158,12 @@ export interface ClusterShape {
     role: 'server' | 'client'
     //! hosts (V4-3): the EFFECTIVE dial targets — static ∪ discovered — on every role
     hosts: string[]
-    //! rendezvous (V4-3): the directory this node meets at — false when disabled; `hosting` = this
-    // instance binds it; `up` = a directory link is admitted (a bare client with `up: false` and
-    // `hosts: []` is "no directory on this box", distinct from "nobody registered yet")
-    rendezvous: { addr: string; hosting: boolean; up: boolean } | false
+    //! rendezvous (V4-3): the directory this node meets at — false when it meets none (disabled, or
+    // a socketless solo); `hosting` = this instance binds it; `up` = a directory link is admitted (a
+    // bare client with `up: false` and `hosts: []` is "no directory on this box", distinct from
+    // "nobody registered yet"); `error` = the last bind errno other than EADDRINUSE (EACCES: a
+    // reserved band …) or the host's register refusal — absent when all is well
+    rendezvous: { addr: string; hosting: boolean; up: boolean; error?: string } | false
   }
   partitions: Partitions
 }

@@ -5,6 +5,10 @@
 // stays UNRESOLVED while a write is parked at an unreachable owner), confirm-over-RPC (the M5b spoke
 // residual, closed), and failover re-subscribe (v2's OQ2: the live handle survives its server dying).
 
+//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
+// meet a live box directory (the battery's npm script sets the same default)
+process.env.FERO_RENDEZVOUS ??= 'off'
+
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { fero } from './index.ts'
