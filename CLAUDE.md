@@ -43,7 +43,8 @@ exercises, run data's perf suite too.
 
 Entries: `.` → [api/index.ts](api/index.ts), `./internals` →
 [internals.ts](internals.ts). Ledger docs: [STATUS.md](STATUS.md) (D-phases +
-log), [DECISIONS.md](DECISIONS.md), [CHECKPOINT.md](CHECKPOINT.md),
+log), [DECISIONS.md](DECISIONS.md), [ISSUES.md](ISSUES.md) (bugs found,
+with evidence — open first, fixed at the bottom), [CHECKPOINT.md](CHECKPOINT.md),
 DESIGN-M6/M7.
 
 ## Commands
