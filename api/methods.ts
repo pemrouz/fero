@@ -54,6 +54,9 @@ export interface Context {
   //! live (M6): true when this invocation opens a SUBSCRIPTION — a dual-mode handler (the scoped
   // default read) returns the live gather proxy on the SUB leg and the one-shot value on CALL.
   live?: boolean
+  //! peer (V4-3): the invoking link's uuid — the caller's identity as admitted at HELLO; undefined for a
+  // local invoke (host.invokeLocal). The directory host keys registrations by it (api/directory.ts).
+  peer?: string
 }
 
 type Handler = (arg: unknown, ctx: Context) => unknown
@@ -107,6 +110,7 @@ export class Host {
       data: this.#data,
       flush: async () => { await Promise.all(tracked.splice(0).map((p) => p.catch(() => {}))) },
       live: mode === VERB.SUB,
+      ...(this.#rt.node.links.get(link)?.uuid ? { peer: this.#rt.node.links.get(link)!.uuid } : {}),
     }
     void (async () => {
       let result: unknown

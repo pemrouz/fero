@@ -60,17 +60,29 @@ export interface Seams {
 //! FeroConfig — the declared, picked config schema. Unknown non-function keys throw at fero() time.
 //! Role (v4.1) is by DECLARED ACT: any server marker — server: true, listen, dir, replicas, a `data`
 // seed, or any function-valued option (hosted methods) — makes a server; no marker makes a CLIENT
-// dialing its hosts (or, bare, the name-derived local port). Role is a pure function of the config.
+// dialing its hosts (or, bare, the servers the directory lists for the name). Role is a pure
+// function of the config.
 export interface FeroConfig {
   uuid?: string
-  //! server — the explicit role pin: serve even with no other marker (binds the derived port).
+  //! server — the explicit role pin: serve even with no other marker (binds a free loopback port
+  // and registers it with the directory).
   server?: true
-  //! listen — the dialable address; omitted on a server = the name-derived loopback port; false =
-  // the socketless solo node (serves nothing, dials nothing — pure local; refuses hosts loudly).
+  //! listen — the dialable address; omitted on a server = a free loopback port (127.0.0.1:0, the
+  // OS picks; cluster.me.listen shows it), published through the directory; false = the socketless
+  // solo node (serves nothing, dials nothing, meets no directory — pure local; refuses hosts loudly).
   listen?: string | false
-  //! hosts — dial targets, pure and simple: alone = a client's feeders; beside a server marker =
-  // a dialing member (the listen+hosts cluster shape). Omitted on a bare client = the derived port.
+  //! hosts — static dial targets: alone = a client's feeders; beside a server marker = a dialing
+  // member (the listen+hosts cluster shape). The directory's discovered set is UNIONED with them;
+  // omitted on a bare client = the discovered set alone.
   hosts?: string[]
+  //! rendezvous (V4-3) — the per-box directory every dialable node meets at: default '127.0.0.1:3376'
+  // (or the FERO_RENDEZVOUS environment variable — an address, or 'off'). A server registers
+  // {name, uuid, listen} there; everyone looks its name up LIVE, and the addresses feed the kernel's
+  // dial set. false = no directory at all (the pure-static shape). The first dialable server on the
+  // box to bind the address hosts it — a discovery role only; the data role never depends on timing.
+  // A user resource may not listen ON the rendezvous address (its name would be refused by every
+  // directory client's HELLO check, stranding discovery on the box).
+  rendezvous?: string | false
   dir?: string
   heartbeatMs?: number
   redialMs?: number
@@ -141,7 +153,16 @@ export interface ClusterShape {
   writable: boolean
   members: Record<string, string>
   peers: Record<string, Peer>
-  me: { uuid: string; origin: string; listen: string }
+  me: {
+    uuid: string; origin: string; listen: string
+    role: 'server' | 'client'
+    //! hosts (V4-3): the EFFECTIVE dial targets — static ∪ discovered — on every role
+    hosts: string[]
+    //! rendezvous (V4-3): the directory this node meets at — false when disabled; `hosting` = this
+    // instance binds it; `up` = a directory link is admitted (a bare client with `up: false` and
+    // `hosts: []` is "no directory on this box", distinct from "nobody registered yet")
+    rendezvous: { addr: string; hosting: boolean; up: boolean } | false
+  }
   partitions: Partitions
 }
 
