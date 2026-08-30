@@ -149,3 +149,12 @@ inside the outer apply.
   breaking change itself); pre-arm scoped snapshot reads locally; nameReject
   churn is heartbeat-bounded and self-heals when the right resource appears.
   Battery: 333/333 + 18/18 + perf 41/41.
+- 2026-08-30 — the two-terminal demo's watcher WRITES: a bare client's plain
+  assignment (`f.data.gadgets.stock = …` every 4s) rides a WRITE frame to its
+  server, is stamped there (origin = the server), and echoes to every watcher
+  as ordinary replication — the relay path api/index.test.ts:240-278 pins for
+  hosts-listed clients, identical by construction for the bare shape
+  (smoke-verified live: the server's frame shows the watcher's write). The
+  server's gadgets tick is gone (one writer per cell keeps the demo legible);
+  the header's restart claim corrected — anti-entropy reconciles BOTH ways,
+  the memory-only server recovers the newer state from its watcher.

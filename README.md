@@ -740,8 +740,10 @@ a real multi-process cluster over the wire).
     design (real-TCP partition injection tests the harness, not fero).
   - **The two-terminal demo** (examples/two-terminals.ts): `npm run demo --
     serve` / `npm run demo -- watch` — a server mutating an inventory by
-    plain assignment, a client re-rendering through one tap; kill and
-    restart the server and the watcher resumes. Since V4-2 the demo needs
+    plain assignment, a client re-rendering through one tap AND writing back
+    (a client's assignment rides a WRITE frame to its server, is stamped
+    there, and echoes to every watcher); kill and restart the server and
+    anti-entropy reconciles both ways. Since V4-2 the demo needs
     ZERO addresses/identities: the server is a server because it declares a
     `data:` seed, the watcher is bare fero(name), and both meet on the
     name-derived loopback port (guarded by the HELLO name echo).
