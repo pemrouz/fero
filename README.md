@@ -413,7 +413,7 @@ kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.
   journal.ts    the one typed diagnostics ring (drop-oldest, surfaced drop counter)
   diag.ts       the authenticated DIAG plane (M7): the r:2 session latch + cursor-chunked pulls, structurally outside membership
 shell/    production adapters (TCP + timers + the fsync WAL/boot-record store), zero protocol decisions
-api/      the public surface: fero(name, opts) → {name, data, methods, cluster, snapshot, destroy} (V4-2: role by declared act; bare fero(name) = a client on the name-derived port)
+api/      the public surface: fero(name, opts) → {name, data, methods, cluster, snapshot, destroy} (V4-2: role by declared act; V4-3: bare fero(name) = a client that looks the name up in the box's #directory, a server binds a free port and registers — api/directory.ts)
   substrate.ts  the ONE seam onto the `data` sibling ($() proxies): record-apply ingress, clone-free capture, sync detach
   data.ts       the binding: capture→ingest, apply→proxy, echo match-and-consume, the cid-keyed overlay (read-your-writes)
   index.ts      the composer: declared config schema (typos throw), seams.validation, default write methods over the confirm ladder
@@ -761,8 +761,33 @@ a real multi-process cluster over the wire).
     there, and echoes to every watcher); kill and restart the server and
     anti-entropy reconciles both ways. Since V4-2 the demo needs
     ZERO addresses/identities: the server is a server because it declares a
-    `data:` seed, the watcher is bare fero(name), and both meet on the
-    name-derived loopback port (guarded by the HELLO name echo).
+    `data:` seed, the watcher is bare fero(name) — and since V4-3 both meet
+    through the box's directory: the server binds a FREE port and registers
+    it with `#directory`, the watcher looks the name up live (no hashing; a
+    second `serve` in a third terminal joins the first as a cluster).
+- **V4-3 — the per-box directory** ([DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md),
+  DECISIONS V4-3): the name-derived port is gone. `#directory` is a SYSTEM
+  resource (the `#` prefix is reserved — fero() refuses it for users) at one
+  well-known loopback rendezvous, `127.0.0.1:3376` ("FERO" on a keypad, below
+  the ephemeral range; `FERO_RENDEZVOUS` env / `rendezvous:` config, `false`
+  = no directory). The first server on the box to bind it hosts a soft-state
+  registry `name → {uuid: listen}` on the method plane (never a log, never a
+  WAL); every dialable instance opens a `#directory` client: servers bind a
+  free port (`127.0.0.1:0`, the shell publishes the real address to the
+  kernel before start) and `register`, everyone opens `lookup(name)` as a
+  LIVE subscription whose folded addresses feed the kernel's new `discover`
+  event (static ∪ dynamic hosts, cached; forgotten targets park, never
+  closed). Entries die with their registrant's link; a host's death makes
+  the surviving servers race for the port and the lookups re-subscribe —
+  registrants re-register on every primary change. Measured before/after:
+  N bare servers of one name now form a view with no addresses and no uuid
+  pins (the genesis coin-flip is closed), a bare client finds explicit-listen
+  servers, two names never collide, a NEW joiner after the host died still
+  finds the survivors, and a non-fero squatter on the port is survived.
+  `cluster.me` carries the effective `hosts` and `rendezvous: {addr, hosting,
+  up}`; the diagnostics seam exposes the directory nodes. The battery runs
+  with the directory OFF (explicit topologies stay isolated on a shared box);
+  api/directory.test.ts opts in with a free rendezvous port per test.
 - **M8 — hardening is LIVE** (panel-designed like M6/M7: 2 candidates + a skeptic
   judge per open question + a plan-coverage critic; the alloc judge ran its OWN V8
   probes to adjudicate a factual dispute between candidates). What landed:

@@ -33,7 +33,7 @@ exercises, run data's perf suite too.
 
 | Dir | What lives there |
 |---|---|
-| [api/](api) | The public surface: `fero()` ([index.ts](api/index.ts)), the LENS write trap → `Bind.issue` ([data.ts](api/data.ts)), **[substrate.ts](api/substrate.ts) — the ONE seam onto `../../data/api/index.ts`**, methods/RPC, fold, diagnostics, types. V4-2 role model: bare `fero(name)` = a CLIENT on the name-derived port; `server: true`/`listen`/`dir`/`replicas`/a `data:` seed/any method ⇒ server; `listen: false` = socketless solo; `f.snapshot` = the sync dense read. |
+| [api/](api) | The public surface: `fero()` ([index.ts](api/index.ts)), the LENS write trap → `Bind.issue` ([data.ts](api/data.ts)), **[substrate.ts](api/substrate.ts) — the ONE seam onto `../../data/api/index.ts`**, methods/RPC, fold, diagnostics, types. V4-2 role model: bare `fero(name)` = a CLIENT; `server: true`/`listen`/`dir`/`replicas`/a `data:` seed/any method ⇒ server; `listen: false` = socketless solo; `f.snapshot` = the sync dense read. **V4-3 discovery: [directory.ts](api/directory.ts)** — the `#directory` system resource at the per-box rendezvous `127.0.0.1:3376` (`FERO_RENDEZVOUS` env / `rendezvous:` config; the battery runs it `off`): a server binds a FREE port and registers, everyone looks the name up live → the kernel's `discover` event. `#` names are reserved. Spec: [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md). |
 | [kernel/](kernel) | The deterministic kernel: node, write pipeline, ring, membership, journal/log, codec (frames + runs), confirm, streams, scope, diag. No I/O — everything replayable. |
 | [shell/](shell) | The thin I/O runtime (real sockets/timers around the kernel). |
 | [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep — chaos schedules against the SAME kernel bytes the shell runs. |
@@ -45,7 +45,7 @@ Entries: `.` → [api/index.ts](api/index.ts), `./internals` →
 [internals.ts](internals.ts). Ledger docs: [STATUS.md](STATUS.md) (D-phases +
 log), [DECISIONS.md](DECISIONS.md), [ISSUES.md](ISSUES.md) (bugs found,
 with evidence — open first, fixed at the bottom), [CHECKPOINT.md](CHECKPOINT.md),
-DESIGN-M6/M7.
+DESIGN-M6/M7, [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md) (V4-3).
 
 ## Commands
 
