@@ -85,3 +85,16 @@ test('three nodes, full dial mesh: exactly one link per pair; writes from every 
   )
   for (const r of rts) await r.destroy()
 })
+
+test('port 0 (V4-3): the shell publishes the OS-chosen address to the kernel before start — a peer dials it, admits, and gossips the REAL listen', async () => {
+  const a = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', redialMs: 50 })
+  await a.start()
+  assert.match(a.node.listen, /^127\.0\.0\.1:[1-9]\d*$/, 'the kernel holds the real address, never :0')
+  const b = new Runtime({ uuid: 'bb', listen: '127.0.0.1:0', hosts: [a.node.listen], redialMs: 50 })
+  await b.start()
+  assert.ok(await until(() => a.node.admitted().length === 1 && b.node.admitted().length === 1), 'admitted over the ephemeral ports')
+  const link = [...a.node.links.values()].find((l) => l.uuid === 'bb')!
+  assert.equal(link.listen, b.node.listen, 'HELLO carried the resolved address, not the configured :0')
+  await a.destroy()
+  await b.destroy()
+})

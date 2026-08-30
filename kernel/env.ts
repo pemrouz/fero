@@ -25,6 +25,10 @@ export type Event =
   | { kind: 'bytesIn'; link: number; bytes: Uint8Array }
   //! linkDown: the link is gone (close/error/refused). Terminal per link id — ids are never reused. `to` rides along on a FAILED DIAL (no linkUp ever fired) so the kernel can still schedule a redial for that target.
   | { kind: 'linkDown'; link: number; reason: string; to?: string }
+  //! discover (V4-3): the DYNAMIC host set changed — the directory's live lookup (api/directory.ts) folded to an
+  // address list. Replaces that set wholesale: added targets dial, forgotten targets stop being revived.
+  // Static NodeOpts.hosts stays the seed; node.hosts = static ∪ dynamic.
+  | { kind: 'discover'; hosts: string[] }
   //! pause/drain: send-plane backpressure, from the first commit (plan §5) — the env's write buffer filled / emptied.
   | { kind: 'pause'; link: number }
   | { kind: 'drain'; link: number }
