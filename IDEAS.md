@@ -148,3 +148,17 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   was a solo pre-V4-2 ({uuid} alone, {seams} alone) boots as a client silently;
   cluster.me.role now names it, but a one-release composer warning would catch
   migrations earlier. Add only if migration reports appear.
+- [P2] (kernel,api) OVERLAPPING CELLS — a row-level record (`key:['gadgets']`,
+  e.g. a `data:` seed or `data.gadgets = {…}`) and a leaf record
+  (`key:['gadgets','stock']`) are INDEPENDENT LWW cells: the kernel fold
+  converges cell-for-cell (converged() is satisfied) but the DATA PROJECTION
+  depends on the order the two cells were applied, which differs per node.
+  Repro (2026-08-30, scratch parked-probe): memory-only server seeded
+  {gadgets:{stock:3}}, client writes stock=9 while the server is down, server
+  restarts (re-seeds) → the client's parked write commits at the new server,
+  yet the server's snapshot reads 3 (old-life row record arrived after the
+  leaf) while the client reads 9 — persistent until the next leaf write.
+  Candidates: order a parent cell against its descendants at apply (a parent
+  write tombstones/subsumes older child cells; a child write newer than the
+  parent re-applies over it), or project from the kernel fold by key depth.
+  Needs a sim oracle on the PROJECTION, not only the cell map.
