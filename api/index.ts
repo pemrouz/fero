@@ -22,33 +22,33 @@ import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, snapshot as snapshotOf } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
+import { Directory, DIRECTORY, isAddr, rendezvousDefault } from './directory.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
 import { captureNode } from '../tools/debug/capture.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'seams'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'seams', 'rendezvous'])
 const SEAM_KEYS = new Set(['validation'])
 
-//! the derived default port (v4.1): a pure function of the resource NAME — fnv1a32 into a fixed
-// loopback range, so a bare server and a bare client find each other with zero addresses configured
-// and zero scanning (discovery stays deterministic; the name-echo HELLO refusal turns a rare range
-// collision into a loud close, never a merge). Loopback ONLY: the peer plane is unauthenticated —
-// a guessable port must never default onto a routable interface.
-const PORT_BASE = 44800
-const PORT_RANGE = 1024
-const fnv = (s: string): number => {
-  let h = 0x811c9dc5
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0 }
-  return h
-}
-export const derivedAddr = (name: string): string => `127.0.0.1:${PORT_BASE + (fnv(name) % PORT_RANGE)}`
+//! discovery (V4-3, DESIGN-DIRECTORY.md): no name hashing — a server binds a FREE loopback port and
+// registers {name, uuid, listen} with the per-box directory (api/directory.ts, the `#directory`
+// system resource at the rendezvous address); everyone looks the name up LIVE and the addresses feed
+// the kernel's dial set through the `discover` event. Zero addresses configured, zero collisions.
+export { RENDEZVOUS, DIRECTORY } from './directory.ts'
 
 //! keyPath — normalize the Change.key sugar: 'user42' and ['user42','active'] are both paths.
 const keyPath = (k: string | string[] | undefined): string[] =>
   k === undefined ? [] : Array.isArray(k) ? k.map(String) : [String(k)]
 
-export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => {
+export const fero = (name: string, opts: FeroOpts = {}): Promise<Fero> => compose(name, opts, false)
+
+//! compose — the composer proper. `system` admits a `#`-prefixed name (the directory) and skips the
+// directory for the instance itself (a directory never meets a directory); the public fero() always
+// passes false — the # prefix can never be taken by accident.
+const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise<Fero> => {
+  if (typeof name !== 'string' || name === '') throw new Error(`fero(${JSON.stringify(name)}): name must be a non-empty string`)
+  if (!isSystem && name.startsWith('#')) throw new Error(`fero('${name}'): names starting with # are reserved for system resources (${DIRECTORY})`)
   //! split by value type: functions → methods; the rest must be declared config
   const userMethods: Record<string, (...args: unknown[]) => unknown> = {}
   const config: Record<string, unknown> = {}
@@ -88,20 +88,26 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     throw new Error(`fero('${name}'): an undialable node (listen: false) cannot join a cluster — give it a listen address or drop hosts`)
   if (config.replicas !== undefined && (!Number.isInteger(config.replicas) || (config.replicas as number) < 1))
     throw new Error(`fero('${name}'): replicas must be an integer ≥ 1 (omit for full replication)`)
-  //! the effective topology: a server without an address serves the derived port; a bare client
-  // dials it — the demo's two terminals need zero addresses, and real deployments keep explicit ones
-  const listen = isServer && config.listen !== false ? ((config.listen as string | undefined) ?? derivedAddr(name)) : undefined
-  const hosts = (config.hosts as string[] | undefined) ?? (isClient ? [derivedAddr(name)] : undefined)
-  //! an explicitly EMPTY hosts on a client is a dead-end (it dials nothing — not even the derived
-  // port) — refuse loudly rather than boot a follower that can never follow anything
-  if (isClient && Array.isArray(config.hosts) && (config.hosts as string[]).length === 0)
-    throw new Error(`fero('${name}'): hosts is empty — omit it (a bare client dials the name-derived port) or list feeders`)
-  //! the derived listen is a LOOPBACK convenience: gossiping 127.0.0.1 as "my dialable address" to a
+  //! the rendezvous (V4-3): the per-box directory this instance meets at — config beats the process
+  // default (FERO_RENDEZVOUS beats the constant); false = no directory. A system resource meets none.
+  if (config.rendezvous !== undefined && config.rendezvous !== false && !isAddr(config.rendezvous))
+    throw new Error(`fero('${name}'): rendezvous must be a 'host:port' string, or false for no directory`)
+  const rendezvous: string | false = isSystem ? false : ((config.rendezvous as string | false | undefined) ?? rendezvousDefault())
+  //! the effective topology: a server without an address binds a FREE loopback port (the OS picks,
+  // the directory publishes it) — the demo's two terminals need zero addresses, real deployments keep
+  // explicit ones; a bare client dials whatever the directory lists for the name
+  const listen = isServer && config.listen !== false ? ((config.listen as string | undefined) ?? '127.0.0.1:0') : undefined
+  const hosts = config.hosts as string[] | undefined
+  //! a user resource may not listen ON the rendezvous address: every directory client's HELLO would
+  // name-reject it (dead + noRedial — never revived), stranding discovery on the box for good
+  if (!isSystem && rendezvous !== false && listen === rendezvous)
+    throw new Error(`fero('${name}'): listen ${listen} is the rendezvous address (the directory's) — pick another port, or move the directory with rendezvous:`)
+  //! the default listen is a LOOPBACK convenience: gossiping 127.0.0.1 as "my dialable address" to a
   // non-local peer would have every dial-back reach the peer's OWN box — a futile redial forever, or
   // a same-named stranger silently welded into membership. Dialing past loopback demands explicit listen.
   const loopback = (h: string) => h.startsWith('127.') || h.startsWith('localhost:') || h.startsWith('[::1]')
   if (isServer && config.listen === undefined && hosts !== undefined && hosts.some((h) => !loopback(h)))
-    throw new Error(`fero('${name}'): explicit listen required when dialing non-local hosts — the derived port is a loopback-only convenience (peers would be told 127.0.0.1 is this node's address)`)
+    throw new Error(`fero('${name}'): explicit listen required when dialing non-local hosts — the default listen is a free loopback port (peers would be told 127.0.0.1 is this node's address)`)
   //! uuid discipline (v4.1): the string is validated (an empty uuid, or one containing '~' — the
   // incarnation-lane separator — could alias another node's lane in origin-string space), and a
   // durable dir's RESTORED identity beats the random default: fero(name, {dir}) with uuid omitted
@@ -131,6 +137,10 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   // replicate it outward. A legacy record lacks the field: no check, stated legacy behavior.
   if (restored.name !== undefined && restored.name !== name)
     throw new Error(`fero('${name}'): this dir belongs to resource '${restored.name}' — one dir, one resource (use a fresh dir)`)
+  //! (after identity validation: a bad uuid is the earlier, more specific error) a client with nothing to dial is a dead-end — refuse loudly rather than boot a follower that can
+  // never follow anything: no directory (rendezvous: false / FERO_RENDEZVOUS=off) AND no hosts
+  if (isClient && rendezvous === false && (hosts === undefined || hosts.length === 0))
+    throw new Error(`fero('${name}'): a client needs something to dial — the directory is off (rendezvous: false) and hosts is ${hosts === undefined ? 'omitted' : 'empty'}`)
   const rtOpts: RuntimeOpts = {
     uuid: (config.uuid as string) ?? restored.uuid ?? randomUUID().slice(0, 8),
     //! the resource name rides HELLO (v4.1): a misdial onto another resource's port refuses loudly
@@ -378,20 +388,25 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       shedWaitingOn: node.armed ? node.scope!.shedWaitingOn(node) : [] as string[],
     }
   }
+  //! me carries the ROLE, the EFFECTIVE dial targets (static ∪ discovered — on every role, V4-3) and the
+  // rendezvous state (v4.1's observability finding, extended: a bare client's "nobody registered yet"
+  // ({hosts: [], rendezvous.up: true}) and "no directory on this box" (up: false) read differently;
+  // none of it needs the diagnostics seam). `listen` re-folds after start — port 0 resolves there.
+  let discovered: string[] = []
+  let directory: Directory | null = null
+  const meRow = () => ({
+    uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: node.listen,
+    role: isClient ? 'client' : 'server',
+    hosts: [...new Set([...(hosts ?? []), ...discovered])].filter((h) => h !== node.listen),
+    rendezvous: rendezvous === false ? false : { addr: rendezvous, hosting: directory?.hosting ?? false, up: directory?.up ?? false },
+  })
   const cluster: any = proxy({
     epoch: node.epoch,
     writable: node.membership.gate(node).open,
     members: {},
     peers: {},
     writes: {},
-    //! me carries the ROLE and (for clients) the effective dial targets (v4.1 — the review's
-    // observability finding: a bare client's silent failure modes all presented as {listen: '',
-    // peers: {}}, indistinguishable from "server not up yet" without the diagnostics seam)
-    me: {
-      uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: node.listen,
-      role: isClient ? 'client' : 'server',
-      ...(isClient ? { hosts: hosts ?? [] } : {}),
-    },
+    me: meRow(),
     partitions: partitionsRow(),
   })
   const FOLD = new Set<number>([JK.viewInstall, JK.evict, JK.gateOpen, JK.gateClose, JK.identified, JK.linkDown, JK.suspect, JK.start,
@@ -456,8 +471,8 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   rt.hook(fold)
 
   //! any failure past Runtime construction must tear down what was built — the review caught the
-  // leak: a rejected fero() left the bind, the host, and the open WAL fd alive, and v4.1 makes
-  // start-rejection a default-path event (a derived-port collision) rather than an operator typo
+  // leak: a rejected fero() left the bind, the host, and the open WAL fd alive (a listen collision
+  // is an ordinary start rejection, not an operator typo)
   const abort = async (err: unknown): Promise<never> => {
     bind.destroy()
     host!.destroy()
@@ -466,6 +481,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
     gather?.destroy()
     for (const [, settle] of probes) settle(false)
     probes.clear()
+    await directory?.destroy().catch(() => {})
     await rt.destroy().catch(() => {})
     throw err
   }
@@ -490,13 +506,25 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
   try {
     await rt.start()
   } catch (err) {
-    //! a DERIVED-port bind failure names the mechanism the user never configured — raw EADDRINUSE
-    // on a port nobody chose is loud but incomprehensible (the review's exact wording)
-    await abort(isServer && config.listen === undefined
-      ? new Error(`fero('${name}'): could not bind the derived port ${listen} (${(err as Error)?.message ?? String(err)}) — another resource's derived port may collide on this box; pass listen explicitly or rename the resource`)
-      : err)
+    await abort(err) // an explicit listen that would not bind (EADDRINUSE …) — the default is port 0, which cannot collide
   }
   fold()
+  //! the directory (V4-3): wired AFTER start, so a port-0 server registers its REAL address. Servers
+  // register and attempt to host; every dialable instance looks its name up live; the folded address
+  // set posts as `discover` (the kernel dials/parks) and re-folds cluster.me.hosts.
+  if (rendezvous !== false && (isClient || listen !== undefined)) {
+    directory = new Directory({
+      compose: (n, o) => compose(n, o, true),
+      addr: rendezvous, name, uuid: node.uuid,
+      listen: () => (isClient ? undefined : node.listen),
+      serve: !isClient,
+      heartbeatMs: rtOpts.heartbeatMs as number, redialMs: rtOpts.redialMs,
+      onHosts: (hs) => { discovered = hs; node.step({ kind: 'discover', hosts: hs }); cluster.set('me', meRow()) },
+      onState: () => cluster.set('me', meRow()),
+    })
+    try { await directory.start() } catch (err) { await abort(err) }
+  }
+  cluster.set('me', meRow())
 
   const inst: Fero = {
     name,
@@ -521,6 +549,9 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       //! settle in-flight confirm probes honestly (false = could not prove in time) — never hang a caller
       for (const [, settle] of probes) settle(false)
       probes.clear()
+      //! the directory client first (its link drops ⇒ the host forgets this instance's entries), then
+      // the hosted directory if this instance holds it (⇒ the other servers race for the port)
+      await directory?.destroy()
       await rt.destroy()
     },
   }
@@ -546,6 +577,7 @@ export const fero = async (name: string, opts: FeroOpts = {}): Promise<Fero> => 
       return d
     },
     drop: (uuid: string) => rt.drop(uuid),
+    rendezvous: () => (directory ? { client: directory.client, host: directory.host } : null),
   }
   ;(inst as Fero & { [diagnostics]?: Diagnostics })[diagnostics] = diagHandle
   return inst

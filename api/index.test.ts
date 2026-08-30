@@ -10,7 +10,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import net from 'node:net'
-import { fero, derivedAddr } from './index.ts'
+import { fero } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { JK } from '../kernel/journal.ts'
@@ -277,51 +277,47 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-y
   }
 })
 
-test('v4.1 roles: following is ambient, serving is a declared act — and the derived port needs zero addresses', async () => {
-  //! no marker = a CLIENT (the open method namespace is the client tell); resolves with no server up.
-  // pid-suffixed names: the derived port is a pure function of the name, so fixed test names would
-  // bind fixed global ports and collide across concurrent checkouts of this repo on one box
-  const bare = await fero(`bare-role-${process.pid}`, { heartbeatMs: 0 })
+test('v4.1 roles: following is ambient, serving is a declared act — in the battery the directory is OFF, so topologies are explicit', async () => {
+  //! no marker = a CLIENT (the open method namespace is the client tell). With no directory (the
+  // battery runs FERO_RENDEZVOUS=off) a client needs hosts — bare refuses loudly: nothing to dial.
+  await assert.rejects(fero(`bare-role-${process.pid}`, { heartbeatMs: 0 }), /needs something to dial/)
+  const feeder = `127.0.0.1:${await ports.free()}`
+  const bare = await fero(`bare-role-${process.pid}`, { hosts: [feeder], heartbeatMs: 0 })
   assert.equal(typeof bare.methods.anything, 'function', 'bare fero is a client — open namespace')
-  //! v4.1 observability: the role and the effective dial targets ride cluster.me
-  const bm = (snapshot(bare.cluster) as { me: { role: string; hosts: string[] } }).me
+  //! observability: the role, the effective dial targets and the rendezvous state ride cluster.me
+  const bm = (snapshot(bare.cluster) as { me: { role: string; hosts: string[]; rendezvous: unknown } }).me
   assert.equal(bm.role, 'client')
-  assert.deepEqual(bm.hosts, [derivedAddr(`bare-role-${process.pid}`)], 'the derived dial target is public')
+  assert.deepEqual(bm.hosts, [feeder], 'the effective dial targets are public')
+  assert.equal(bm.rendezvous, false, 'no directory')
   await bare.destroy()
-  //! a data seed / a method / dir / replicas / server: true each imply SERVER (closed namespace).
+  //! a data seed / a method / dir / replicas / server: true each imply SERVER (closed namespace) — and a
+  // server without listen binds a FREE loopback port (V4-3: port 0, the OS picks), visible in me.listen.
   // NB this also retires M5b's durable-client refusal: dir implies server, so a durable spoke is
   // unrepresentable by construction — {hosts, dir} is a durable dialing MEMBER now.
   const viaData = await fero(`role-via-data-${process.pid}`, { data: { k: 1 }, heartbeatMs: 0 })
   assert.equal(typeof viaData.methods.anything, 'undefined', 'a data seed implies server')
-  assert.equal((snapshot(viaData.cluster) as { me: { role: string } }).me.role, 'server')
+  const vm = (snapshot(viaData.cluster) as { me: { role: string; listen: string } }).me
+  assert.equal(vm.role, 'server')
+  assert.match(vm.listen, /^127\.0\.0\.1:[1-9]\d*$/, 'a real ephemeral port, never :0')
   assert.deepEqual(snapshot(viaData.data), { k: 1 }, 'seeded')
   await viaData.destroy()
   const viaMethod = await fero('r', { listen: false, m: () => 1 })
   assert.equal(typeof viaMethod.methods.anything, 'undefined', 'methods imply server')
   await viaMethod.destroy()
   //! the loud refusals: an undialable member; a role pin that is not literally true; a dead-end
-  // client with an EMPTY hosts; a derived (loopback) listen gossiped to non-local peers
+  // client with an EMPTY hosts and no directory; a loopback default listen gossiped to non-local peers
   await assert.rejects(fero('r', { listen: false, hosts: ['127.0.0.1:1'] }), /undialable/)
   await assert.rejects(fero('r', { server: 1 } as never), /server must be true/)
-  await assert.rejects(fero('r', { hosts: [] }), /hosts is empty/)
+  await assert.rejects(fero('r', { hosts: [] }), /needs something to dial/)
   await assert.rejects(fero('r', { server: true, hosts: ['10.0.0.5:4800'] }), /explicit listen required/)
-  //! derived-port end-to-end: a bare server and a bare client find each other by NAME alone
-  const nm = `derive-e2e-${process.pid}`
-  const s = await fero(nm, { server: true, heartbeatMs: 50, redialMs: 30 })
-  const c = await fero(nm, { heartbeatMs: 50, redialMs: 30 })
-  try {
-    s.data.k = 'found'
-    assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).k === 'found', 8000), 'found via the derived port — zero addresses configured')
-  } finally { await c.destroy(); await s.destroy() }
-  //! a derived-port bind failure names the MECHANISM — raw EADDRINUSE on a port nobody chose is
-  // loud but incomprehensible (and the failure path must tear the runtime down, not leak it)
-  const cn = `collide-${process.pid}`
-  const caddr = derivedAddr(cn)
+  //! an EXPLICIT listen that cannot bind still rejects (and the failure path tears the runtime down,
+  // not leaks it); the default listen is port 0, which cannot collide
+  const caddr = `127.0.0.1:${await ports.free()}`
   const ci = caddr.lastIndexOf(':')
   const blocker = net.createServer()
   await new Promise<void>((res, rej) => { blocker.once('error', rej); blocker.listen(Number(caddr.slice(ci + 1)), caddr.slice(0, ci), res) })
   try {
-    await assert.rejects(fero(cn, { server: true }), /derived port .* pass listen explicitly/)
+    await assert.rejects(fero(`collide-${process.pid}`, { listen: caddr }), /EADDRINUSE/)
   } finally { await new Promise<void>((r) => blocker.close(() => r())) }
 })
 

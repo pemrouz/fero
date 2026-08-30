@@ -3,24 +3,33 @@
 //   terminal 1:  npm run demo -- serve
 //   terminal 2:  npm run demo -- watch
 //
-// v4.1: zero addresses, zero identities, zero internals imports. The server is a server
-// because it DECLARES an initial value (`data:` is a server marker — role by declared
-// act); the watcher is bare fero(name) — a client by default, dialing the name-derived
-// local port — and it WRITES too: a client's assignment rides a WRITE frame to its
-// server, is stamped there, and echoes back to every watcher as ordinary replication.
-// Kill the server mid-run and restart it with the same command: the watcher redials and
-// anti-entropy reconciles both ways — the memory-only server recovers the newer state
-// from its watcher. Everything below is the public surface — `fero`, `data`, one tap.
+// V4-3: zero addresses, zero identities, zero internals imports — and zero hashing. The server is a
+// server because it DECLARES an initial value (`data:` is a server marker — role by declared act);
+// it binds a free loopback port and registers it with the box's directory (the `#directory` system
+// resource at the rendezvous address, hosted by the first server on the box). The watcher is bare
+// fero(name) — a client by default — and looks the name up live. Kill the server mid-run and
+// restart it with the same command: it gets a NEW port, the directory says so, the watcher redials,
+// catches up over anti-entropy, and the tap resumes. Run a second `serve` in a third terminal: the
+// two servers find each other the same way and form a cluster. Everything below is the public
+// surface — `fero`, `data`, `cluster.me`, one tap.
 
-import { fero, derivedAddr } from '../api/index.ts'
+import { fero } from '../api/index.ts'
 
 const mode = process.argv[2]
-const addr = derivedAddr('inventory') // shown in the labels — derived from the NAME, configured nowhere
 
 const render = (label: string, value: unknown) => {
   console.clear()
   console.log(`fero two-terminal demo — ${label}\n`)
   console.log(JSON.stringify(value, null, 2))
+}
+
+//! where am I, and who do I know: the listen the OS chose, the directory, the discovered peers —
+// all on cluster.me; `.snapshot()` is the public sync read of any view
+type Me = { listen: string; hosts: string[]; rendezvous: false | { addr: string; hosting: boolean; up: boolean } }
+const label = (role: string, f: { cluster: any }) => {
+  const me = f.cluster.me.snapshot() as Me
+  const rz = me.rendezvous === false ? 'no directory' : `directory ${me.rendezvous.addr}${me.rendezvous.hosting ? ' (hosting)' : ''}${me.rendezvous.up ? '' : ' (down)'}`
+  return `${role}${me.listen ? ` on ${me.listen}` : ''} — ${rz} — peers ${JSON.stringify(me.hosts)}`
 }
 
 if (mode === 'serve') {
@@ -36,17 +45,16 @@ if (mode === 'serve') {
     tick++
     //! ordinary assignments ARE the replication api
     f.data.widgets.stock = 10 + Math.round(Math.sin(tick / 3) * 5)
-    render(`SERVER on ${addr} (tick ${tick})`, f.snapshot)
+    render(`${label('SERVER', f)} (tick ${tick})`, f.snapshot)
   }, 1000)
-  render(`SERVER on ${addr} — waiting for watchers`, f.snapshot)
+  render(`${label('SERVER', f)} — waiting for watchers`, f.snapshot)
 } else if (mode === 'watch') {
   const f = await fero('inventory')
-  render(`WATCHER of ${addr} — connecting`, {})
+  render(label('WATCHER', f), {})
   //! one tap: re-render on every replicated change — no polling, no events, no wire code
-  f.data.tap(() => render(`WATCHER of ${addr}`, f.snapshot))
-  //! writes from a client replicate too: relayed to the server, stamped there, echoed to every watcher
-  let sold = 0
-  setInterval(() => { f.data.gadgets.stock = 3 + (++sold % 5) }, 4000)
+  f.data.tap(() => render(label('WATCHER', f), f.snapshot))
+  //! and one more on the cluster: the label follows the directory (a restarted server has a new port)
+  f.cluster.tap(() => render(label('WATCHER', f), f.snapshot))
 } else {
   console.log('usage: npm run demo -- serve | watch')
   process.exit(1)

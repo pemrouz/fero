@@ -36,6 +36,10 @@ export interface Diagnostics {
   // linkDown via 'close'; the peer typically redials within redialMs — a transient, not a partition).
   // OPTIONAL: present only on real-TCP backings; false = no identified live link to that uuid.
   drop?(uuid: string): boolean
+  //! the directory nodes this instance runs (V4-3): its `#directory` client and, when it won the bind,
+  // the hosted `#directory` server — real Fero instances, so a tool can capture/diag them like any node.
+  // null when the instance meets no directory (rendezvous: false, listen: false, a system resource).
+  rendezvous(): { client: Fero | null; host: Fero | null } | null
 }
 
 //! diagnostics — the Symbol key. Not Symbol.for (a registry symbol would be forgeable); exported from
