@@ -6,6 +6,10 @@
 // real disks. Partition/heal stays sim-only by design: real-TCP partition injection needs a proxy
 // layer that would test the harness, not fero.
 
+//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
+// meet a live box directory (the battery's npm script sets the same default)
+process.env.FERO_RENDEZVOUS ??= 'off'
+
 import { test } from 'node:test'
 import assert from 'node:assert'
 import fs from 'node:fs'

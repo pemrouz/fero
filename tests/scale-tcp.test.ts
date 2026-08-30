@@ -6,6 +6,10 @@
 // Tier-2's job (sim/scale.test.ts); THIS file proves the shell composition survives fan-in 12 —
 // 12 listeners + 132 sockets ≈ 144 fds, 7x under the default 1024 ulimit.
 
+//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
+// meet a live box directory (the battery's npm script sets the same default)
+process.env.FERO_RENDEZVOUS ??= 'off'
+
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { fero, type Fero } from '../api/index.ts'

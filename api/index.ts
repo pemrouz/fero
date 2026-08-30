@@ -22,7 +22,7 @@ import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, snapshot as snapshotOf } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
-import { Directory, DIRECTORY, isAddr, rendezvousDefault } from './directory.ts'
+import { Directory, DIRECTORY, RENDEZVOUS, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
 import { captureNode } from '../tools/debug/capture.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
@@ -74,8 +74,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // Role is a pure function of the CONFIG — never of timing, launch order, or who answers a dial.
   if (config.server !== undefined && config.server !== true)
     throw new Error(`fero('${name}'): server must be true when present — omit it (a bare fero is a client) or pin the role with server: true`)
-  if (config.listen !== undefined && config.listen !== false && typeof config.listen !== 'string')
-    throw new Error(`fero('${name}'): listen must be a 'host:port' string, or false for a socketless solo node`)
+  if (config.listen !== undefined && config.listen !== false && !isAddr(config.listen, true))
+    throw new Error(`fero('${name}'): listen must be a 'host:port' string (a non-empty host; port 0 = a free port), or false for a socketless solo node`)
   if (config.data !== undefined && (typeof config.data !== 'object' || config.data === null || Array.isArray(config.data)))
     throw new Error(`fero('${name}'): data must be a plain object of initial rows — it seeds the resource only when the local fold is empty at boot`)
   const isServer = config.server === true || config.listen !== undefined || config.dir !== undefined
@@ -88,20 +88,31 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     throw new Error(`fero('${name}'): an undialable node (listen: false) cannot join a cluster — give it a listen address or drop hosts`)
   if (config.replicas !== undefined && (!Number.isInteger(config.replicas) || (config.replicas as number) < 1))
     throw new Error(`fero('${name}'): replicas must be an integer ≥ 1 (omit for full replication)`)
-  //! the rendezvous (V4-3): the per-box directory this instance meets at — config beats the process
-  // default (FERO_RENDEZVOUS beats the constant); false = no directory. A system resource meets none.
+  //! the rendezvous (V4-3): the per-box directory this instance meets at — precedence: `rendezvous:`
+  // config > FERO_RENDEZVOUS (an address, or 'off') > the constant; false = no directory. A system
+  // resource meets none. A malformed env value is refused HERE, loudly, not deep in the shell.
   if (config.rendezvous !== undefined && config.rendezvous !== false && !isAddr(config.rendezvous))
-    throw new Error(`fero('${name}'): rendezvous must be a 'host:port' string, or false for no directory`)
-  const rendezvous: string | false = isSystem ? false : ((config.rendezvous as string | false | undefined) ?? rendezvousDefault())
+    throw new Error(`fero('${name}'): rendezvous must be a 'host:port' string (port 1–65535), or false for no directory`)
+  const envDefault = config.rendezvous === undefined && !isSystem ? rendezvousDefault() : false
+  if (envDefault !== false && !isAddr(envDefault))
+    throw new Error(`fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')`)
+  const rendezvous: string | false = isSystem ? false : ((config.rendezvous as string | false | undefined) ?? envDefault)
   //! the effective topology: a server without an address binds a FREE loopback port (the OS picks,
   // the directory publishes it) — the demo's two terminals need zero addresses, real deployments keep
   // explicit ones; a bare client dials whatever the directory lists for the name
   const listen = isServer && config.listen !== false ? ((config.listen as string | undefined) ?? '127.0.0.1:0') : undefined
   const hosts = config.hosts as string[] | undefined
-  //! a user resource may not listen ON the rendezvous address: every directory client's HELLO would
-  // name-reject it (dead + noRedial — never revived), stranding discovery on the box for good
-  if (!isSystem && rendezvous !== false && listen === rendezvous)
-    throw new Error(`fero('${name}'): listen ${listen} is the rendezvous address (the directory's) — pick another port, or move the directory with rendezvous:`)
+  //! a user resource may not listen ON a rendezvous socket — its own, the process default's, or the
+  // constant's — under ANY spelling that lands on the same loopback socket (`0.0.0.0:3376`,
+  // `localhost:3376`, `[::]:3376` all bind what 127.0.0.1:3376 dials): every directory client on the
+  // box would name-reject it. The kernel now revives a name-rejected target at heartbeat cadence, so
+  // a squat is a heartbeat-bounded nuisance rather than a strand — but a resource that CANNOT be
+  // found by anyone is a misconfiguration worth refusing at fero() time.
+  if (!isSystem && listen !== undefined) {
+    const taken = [rendezvous, envDefault, RENDEZVOUS].find((rz) => rz !== false && sameSocket(listen, rz))
+    if (taken !== undefined)
+      throw new Error(`fero('${name}'): listen ${listen} would take the directory's socket (${taken}) — pick another port, or move the directory with rendezvous:`)
+  }
   //! the default listen is a LOOPBACK convenience: gossiping 127.0.0.1 as "my dialable address" to a
   // non-local peer would have every dial-back reach the peer's OWN box — a futile redial forever, or
   // a same-named stranger silently welded into membership. Dialing past loopback demands explicit listen.
@@ -394,11 +405,17 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // none of it needs the diagnostics seam). `listen` re-folds after start — port 0 resolves there.
   let discovered: string[] = []
   let directory: Directory | null = null
+  //! meets — the ONE predicate for "this instance meets a directory": a rendezvous is set AND the
+  // instance is dialable (a client) or dialed (a listening server) — a socketless solo meets none and
+  // says `false`, never "down" (the panel's observability finding)
+  const meets = rendezvous !== false && (isClient || listen !== undefined)
   const meRow = () => ({
     uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: node.listen,
     role: isClient ? 'client' : 'server',
     hosts: [...new Set([...(hosts ?? []), ...discovered])].filter((h) => h !== node.listen),
-    rendezvous: rendezvous === false ? false : { addr: rendezvous, hosting: directory?.hosting ?? false, up: directory?.up ?? false },
+    rendezvous: meets
+      ? { addr: rendezvous as string, hosting: directory?.hosting ?? false, up: directory?.up ?? false, ...(directory?.error !== undefined ? { error: directory.error } : {}) }
+      : false as const,
   })
   const cluster: any = proxy({
     epoch: node.epoch,
@@ -512,10 +529,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   //! the directory (V4-3): wired AFTER start, so a port-0 server registers its REAL address. Servers
   // register and attempt to host; every dialable instance looks its name up live; the folded address
   // set posts as `discover` (the kernel dials/parks) and re-folds cluster.me.hosts.
-  if (rendezvous !== false && (isClient || listen !== undefined)) {
+  if (meets) {
     directory = new Directory({
       compose: (n, o) => compose(n, o, true),
-      addr: rendezvous, name, uuid: node.uuid,
+      addr: rendezvous as string, name, uuid: node.uuid,
       listen: () => (isClient ? undefined : node.listen),
       serve: !isClient,
       heartbeatMs: rtOpts.heartbeatMs as number, redialMs: rtOpts.redialMs,
