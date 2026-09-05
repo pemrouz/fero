@@ -276,3 +276,11 @@ inside the outer apply.
   try/finally shapes, a derived takeover bound. Documented not fixed: the
   loopback trust boundary, hung-but-connected registrants keep entries, ref'd
   shell timers. Battery: 372/372 + 18/18 + perf 41/41.
+
+- 2026-08-31 — THE DEMO, SPLIT AND RECORDED: examples/two-terminals.ts now
+  dispatches to examples/server.ts + examples/client.ts (shared demo-ui.ts);
+  the client writes back (a sale every 4 s by plain assignment). The site's
+  hero replays a RECORDED run of exactly these files (scratch site/record.mjs,
+  22 s: seed → watch → sale → SIGKILL → restart on a new port → redial) and a
+  checker asserts the panes only ever paint recorded frames. The run
+  reproduces IDEAS P2 (overlapping cells) — noted there. Battery green.
