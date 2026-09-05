@@ -4,7 +4,7 @@
 import { fero } from '../api/index.ts'
 import { render, label } from './demo-ui.ts'
 
-const f = await fero('inventory', {
+const inventory = await fero('inventory', {
   data: {
     widgets: { stock: 10, price: 4.5 },
     gadgets: { stock: 3, price: 19.99 },
@@ -14,8 +14,8 @@ const f = await fero('inventory', {
 let tick = 0
 setInterval(() => {
   tick++
-  f.data.widgets.stock = 10 + Math.round(Math.sin(tick / 3) * 5)
-  render(`${label('SERVER', f)} (tick ${tick})`, f.snapshot)
+  inventory.data.widgets.stock = 10 + Math.round(Math.sin(tick / 3) * 5)
+  render(`${label('SERVER', inventory)} (tick ${tick})`, inventory.snapshot)
 }, 1000)
 
-render(`${label('SERVER', f)} — waiting for watchers`, f.snapshot)
+render(`${label('SERVER', inventory)} — waiting for watchers`, inventory.snapshot)
