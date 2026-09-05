@@ -162,6 +162,11 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   Candidates: order a parent cell against its descendants at apply (a parent
   write tombstones/subsumes older child cells; a child write newer than the
   parent re-applies over it), or project from the kernel fold by key depth.
+  Reproduced 2026-08-31 by the site's recorded demo (scratch site/record.mjs →
+  demo-transcript.json): after the memory-only restart BOTH projections show
+  the seed values (widgets 10, gadgets 3) although the watcher's leaf cells are
+  newer, and the watcher's write parked during the outage (gadgets 1→0) never
+  shows at the new server.
   Needs a sim oracle on the PROJECTION, not only the cell map.
 
 ## The directory (V4-3 residue)

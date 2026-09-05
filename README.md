@@ -754,12 +754,15 @@ a real multi-process cluster over the wire).
     proof, public edition), and cluster.writes observability — no kernel
     reach-through in any scenario body. Partition/heal stays sim-only by
     design (real-TCP partition injection tests the harness, not fero).
-  - **The two-terminal demo** (examples/two-terminals.ts): `npm run demo --
+  - **The two-terminal demo** (examples/two-terminals.ts, dispatching to
+    examples/server.ts and examples/client.ts): `npm run demo --
     serve` / `npm run demo -- watch` — a server mutating an inventory by
     plain assignment, a client re-rendering through one tap AND writing back
     (a client's assignment rides a WRITE frame to its server, is stamped
-    there, and echoes to every watcher); kill and restart the server and
-    anti-entropy reconciles both ways. Since V4-2 the demo needs
+    there, and echoes to every watcher); kill and restart the server and the
+    watcher redials the new port and its taps resume (a memory-only restart
+    re-seeds; the overlapping-cells projection wart the recorded run exposes
+    is IDEAS P2). Since V4-2 the demo needs
     ZERO addresses/identities: the server is a server because it declares a
     `data:` seed, the watcher is bare fero(name) — and since V4-3 both meet
     through the box's directory: the server binds a FREE port and registers
