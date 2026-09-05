@@ -348,3 +348,69 @@ pinned deterministically), a probe-gated, exponentially backed-off bind retry
 with errnos on `cluster.me.rendezvous.error`, discover's park cancelling the
 armed timer and dropping entries nothing names. Precedence documented: config
 > env > constant. Battery: 372/372 + 18/18 contract + perf 41/41.
+
+## V4-4 — the relay validates: seams.validation is an issuer-boundary hook, on the wire too (2026-09-05)
+Context: a site review probed a server with `seams: { validation: r =>
+r.key[0] !== 'admin' || 'reserved' }`. It refused its own `data.admin = …`
+and a hosted method's `ctx.data.admin = …`, but a bare client's
+`data.admin = …` LANDED and the client read `committed`. The validator was
+wired into Bind.issue (the ONE local ingest); a relayed WRITE frame (ae 0)
+entered kernel/write.ts onWrite → #enqueue directly. The relay "re-stamps ae
+(relay time is an issuer boundary)" — yet ran no validator, so validation was
+a local-invariant hook, not a bound on what an admitted client may write.
+Decision:
+- **The relay runs the server's validator.** The composer hands
+  `seams.validation` down as `NodeOpts.validate` — a pure predicate, so the
+  kernel stays I/O-free and deterministic; onWrite's ae-0 branch runs it per
+  record before `#enqueue`. Absent ⇒ every relayed record admitted and
+  trajectories stay byte-identical (one undefined check per frame).
+- **`invalid` is a fourth NACK class, and it is TERMINAL.** WNACK
+  `{r:'invalid', m: reason, ce}`, batched per contiguous same-reason run like
+  the three routing reasons; `m` is bounded on the way out (REASON_MAX 256).
+  At the ISSUER the attempt leaves the queue for good — `Writes.rejected`
+  ('issuer|cid' → m, bounded at MAX_PENDING) + `rejectedPending`; the api's
+  `Bind.sweep` (the droppedPending probe, widened) rejects the promise with
+  the reason and reverts the overlay cell — called from the composer's
+  post-step fold, because a WNACK step applies nothing. At a RELAY (via ≥ 0)
+  it hops onward to the client. Owner-of-record gating is unchanged. The
+  journal records the typed class, never the free text.
+- **A committed retransmit skips the check.** A cid in the dedup window
+  passed once; a state-dependent predicate must not turn a retransmit of a
+  committed record into a lie — the ordinary path dup-ACKs it.
+- **Forwarded (ae > 0) peer attempts are NOT re-validated.** The issuing
+  server ran its validator; peers are trusted at this layer (same code, same
+  config — the deployer's contract, like replicas). REJECTED: validating at
+  the owner too — it doubles the check on every cluster write and buys
+  nothing while peers are trusted.
+- REJECTED: a new sink effect for the reject (an EffectSink change through
+  shell/sim/every harness for what the counter+probe idiom already says).
+  REJECTED: carrying the free-text reason in `r` (the vocabulary stays closed
+  and journal-typed; the text rides as `m`).
+- **The relay is keyed on the ADMISSION FACT, not the claim.** `ae === 0` is
+  what an honest spoke sends; a client link forging ae = epoch used to skip
+  the relay into the owner leg (dedup → epoch/owner/gate → commit, no
+  validator). The branch is now `ae === 0 || link.client` (the HELLO r:1
+  fact the server recorded), so any WRITE on a client link is relayed:
+  validated and re-stamped. One boolean per member WRITE frame; honest
+  clients byte-identical.
+- **An ACK/NACK on a client link is dropped** (`frameDrop 'write-ack from
+  client'`, link kept). A client owns nothing to answer for; a parked
+  relayed attempt has no owner of record yet (`to` ''), so the owner gate
+  alone let a forged WACK clear it — or a forged terminal `invalid` end it
+  and hop a fake reason to the victim.
+- What this is NOT: authorization, or peer auth. The hook sees the record,
+  never the caller; per-caller rules live on the method plane (ctx.peer). It
+  bounds what the fero CLIENT (the SDK's write surface) may write; a raw
+  socket forging pre-stamped RECORDS frames still lands as replication —
+  spokes legitimately ship suffixes back through AE, so that is the r:1
+  peer-auth question (IDEAS), not a one-line drop. The "methods only" door
+  (IDEAS Security, step 2) is a separate decision, under design review —
+  including whether that door makes the per-record hook redundant.
+Consequences: a plain client assignment a server's validator refuses now
+bounces at the client with the server's reason (cluster.writes shows
+rejected + reason; methods.update rejects a WriteReject at reached 'issued').
+Pinned: kernel/write.test.ts ×5 (the relay refuses, batches, dedup-skips;
+terminal at the issuer + owner-of-record + malformed `m`; the relay hop; the
+forged-ae client; the client-link ACK/NACK drop), sim/client.test.ts (under
+the executive, every monitor green), api/index.test.ts (the probe) — each
+mutation-checked. Battery: 379/379 + 18/18 + perf 41/41.

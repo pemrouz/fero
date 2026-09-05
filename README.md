@@ -542,7 +542,9 @@ a real multi-process cluster over the wire).
   Attempt {cid, attemptEpoch, issuer} and commits here or FORWARDS to the ring
   owner), forwarded (the owner cid-dedups then VALIDATES: owns-at-my-epoch +
   attemptEpoch === my epoch + gate open, else a typed WNACK {not-owner |
-  stale-epoch | withheld, ce}), inbound (M1's replication ingest, moved
+  stale-epoch | withheld, ce} — and, for a CLIENT's relayed record, the relay
+  runs the server's seams.validation first: a refusal is the TERMINAL
+  {invalid, m: reason}, 2026-09-05), inbound (M1's replication ingest, moved
   verbatim), replay (the M4 seam, named now). The ring is a pure function of
   the committed view (two parallel typed arrays, allocation-free `ownerOf`), so
   one-view-per-epoch (M2's monitor) makes single-writer-per-(partition, epoch)
@@ -659,7 +661,10 @@ a real multi-process cluster over the wire).
     (writes.committed probe) instead of hanging.
   - **One ingest** for assignment sugar and `methods.update/insert/remove`
     ({confirm, timeout} against the M4c ladder, WriteResolve/WriteReject
-    unions) — so seams.validation covers both by construction (v2's OQ6).
+    unions) — so seams.validation covers both by construction (v2's OQ6) —
+    and, since 2026-09-05, the writes a server RELAYS for its clients
+    (DECISIONS V4-4): the relay is an issuer boundary and validates like one;
+    a refusal is the terminal WNACK `invalid` and the client sees the reason.
   - ~~Capture-path overlay entries whose attempt the kernel drops at
     MAX_PENDING overflow released only on the cell's next apply~~ — closed by
     M5b: onAck feeds the dedup window (WACK coordinates ARE original commit

@@ -284,3 +284,24 @@ inside the outer apply.
   22 s: seed → watch → sale → SIGKILL → restart on a new port → redial) and a
   checker asserts the panes only ever paint recorded frames. The run
   reproduces IDEAS P2 (overlapping cells) — noted there. Battery green.
+
+- 2026-09-05 — THE RELAY VALIDATES (IDEAS Security, step 1; DECISIONS V4-4):
+  a bare client's plain write relayed through its primary now meets the
+  server's `seams.validation` at the relay ingress (kernel/write.ts onWrite,
+  ae 0 — `NodeOpts.validate`, handed down by the composer). Before, a server
+  that refused its OWN `data.admin = …` let a client's LAND and read
+  `committed`. A refusal is a fourth, TERMINAL NACK class — WNACK
+  `{r:'invalid', m: reason}`: the issuer drops the attempt for good
+  (`Writes.rejected` + `rejectedPending`; `Bind.sweep` — the droppedPending
+  probe, widened — reads the reason off the composer's post-step fold, since a
+  WNACK step applies nothing), so the client's promise rejects with the
+  server's reason and a plain assignment bounces; a relay hops it onward; a
+  committed retransmit skips the check (dedup window). No validator ⇒
+  trajectories byte-identical. Two adjacent forgeries closed with it: the
+  relay keys on `link.client` (a client forging ae = epoch is relayed, not
+  admitted to the owner leg unvalidated) and ACK/NACK frames on a client link
+  are dropped. Honest scope: a bound on the fero client's write surface, not
+  peer auth (a forged RECORDS frame from a spoke still lands — filed under
+  the r:1 item). Pinned ×7 (kernel/write ×5, sim/client, api/index — the
+  probe), each mutation-checked. Step 2 (the opt-in methods-only door) is
+  under design review — see IDEAS. Battery: 379/379 + 18/18 + perf 41/41.
