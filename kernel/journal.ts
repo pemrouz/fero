@@ -60,7 +60,7 @@ export const JK = {
   //! ── M3 write-pipeline vocabulary (owner routing, cid dedup, NACKs) ──
   writeForward: 37,  // a=ownerUuid, b=baseCid, c=count — an attempt run forwarded to the partition owner
   writeAck: 38,      // a=issuer, b=baseCid, c=count — commit coordinates received; pending attempts cleared
-  writeNack: 39,     // a=reason ('not-owner'|'stale-epoch'|'withheld'), b=ownerEpoch, c=baseCid — typed rejection; the issuer re-resolves + re-forwards
+  writeNack: 39,     // a=reason ('not-owner'|'stale-epoch'|'withheld' — the issuer re-resolves + re-forwards; 'invalid' — the relay's validator refused it, TERMINAL), b=ownerEpoch, c=baseCid
   writeDup: 40,      // a=issuer, b=cid — owner-side cid dedup absorbed a retransmit (the duplicate ACK re-carries the ORIGINAL coordinates)
   writeRelay: 41,    // a=issuer, b=baseCid — a client attempt (attemptEpoch 0) re-stamped at this relay (the issuer/flush boundary rule)
   dedupEvict: 42,    // a=issuer — a whole cid-dedup lane evicted (MAX_ISSUERS bound); its issuer re-enters the window on next commit

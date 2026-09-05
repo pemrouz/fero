@@ -106,8 +106,12 @@ export const DEDUP_KEEP = 1024
 //! MAX_ISSUERS: dedup lanes retained (oldest-evicted, surfaced) — lanes must not grow with every client that ever wrote.
 export const MAX_ISSUERS = 1024
 
-//! NACK: the typed rejection vocabulary (plan §5, verbatim).
-export const NACK = { notOwner: 'not-owner', staleEpoch: 'stale-epoch', withheld: 'withheld' } as const
+//! NACK: the typed rejection vocabulary (plan §5, verbatim) — plus `invalid` (2026-09-05): the relay's
+// admission predicate refused the record. Unlike the three routing reasons it is TERMINAL — no retry can
+// change the answer — and the validator's reason text rides beside it as `m`.
+export const NACK = { notOwner: 'not-owner', staleEpoch: 'stale-epoch', withheld: 'withheld', invalid: 'invalid' } as const
+//! REASON_MAX: the validator's reason is user-authored text riding a control frame — bounded on the way out.
+export const REASON_MAX = 256
 
 //! Attempt: one record's write-route state, from issue to commit/ACK. `via` is the link to answer on
 // for relayed client attempts (-1 = locally issued); `sent` is -1 while parked, else ticks since
@@ -129,6 +133,13 @@ export class Writes {
   //! the ONE bounded queue — key `issuer|cid`, insertion order preserved (issue order per issuer)
   pending = new Map<string, Attempt>()
   droppedPending = 0
+  //! rejected — attempts this node ISSUED that were refused TERMINALLY (a relay's validator said no),
+  // 'issuer|cid' → the reason it gave. The api's write-outcome join reads it (api/data.ts Bind.sweep)
+  // once `rejectedPending` moves — the same counter+probe idiom as droppedPending/committed(). Bounded
+  // like the queue (oldest-evicted): an embedder that never consumes reasons (sim, kernel tests) must
+  // not grow it forever. A RELAY records nothing here — it hops the refusal onward to its client.
+  rejected = new Map<string, string>()
+  rejectedPending = 0
   #cid = 0
   //! cid — the attempt counter, read-only (M5a): the embedder samples it around a synchronous write()
   // to learn which cids its batch minted (issue() assigns one per record, contiguous, in record order;
@@ -365,20 +376,68 @@ export class Writes {
     link.ship(encodeControl(VERB.WACK, v), node.env.sink, node.journal)
   }
 
+  //! #nack — WNACK on a reply route (`via` link): the onward hop of a terminal `invalid` at a relay. The
+  // asker being gone is not an error — its retransmit would meet the same validator again.
+  #nack(node: Node, via: number, v: { u: string; c: number; n: number; r: string; m: string; ce: number }) {
+    const link = node.links.get(via)
+    if (!link || link.dead) return
+    link.ship(encodeControl(VERB.WNACK, v), node.env.sink, node.journal)
+  }
+
   //! onWrite — source=forwarded (and the client relay rule): a WRITE frame's provenance triple is the
-  // attempt triple [issuer, baseCid, attemptEpoch]. ae 0 marks a CLIENT attempt: this server becomes the
-  // relay — stamps ae (relay time is an issuer boundary), queues with the reply route, and owns
-  // re-resolution from here. ae > 0 is an owner-validation ingress: dedup → validate → commit or WNACK.
+  // attempt triple [issuer, baseCid, attemptEpoch]. A CLIENT attempt — ae 0, the marker an honest spoke
+  // always sends, OR any WRITE arriving on a link admitted as a client (HELLO r:1): the relay is keyed on
+  // the server's ADMISSION FACT, never on the sender's claim, so a forged ae cannot slip a client past
+  // the relay into the owner leg — this server becomes the relay: stamps ae (relay time is an issuer
+  // boundary), validates, queues with the reply route, and owns re-resolution from here. ae > 0 from a
+  // member is the owner-validation ingress: dedup → validate → commit or WNACK.
   onWrite(node: Node, link: Link, f: Frame) {
     const j = node.journal
     const prov = f.prov()
     if (!prov) { j.armed && j.emit(JK.frameDrop, link.id, 'write without attempt triple'); return }
     const { origin: issuer, baseSeq: c0, epoch: ae } = prov
-    if (ae === 0) {
+    if (ae === 0 || link.client) {
       j.armed && j.emit(JK.writeRelay, issuer, c0)
+      const validate = node.validate
       let i = 0
-      for (const rv of f.records())
-        this.#enqueue(node, { cid: c0 + i++, ae: node.epoch, issuer, rec: rv.rec(), via: link.id, sent: -1, to: '', parked: false })
+      //! no predicate: the pre-validation loop, byte-for-byte (one undefined-check per frame is the
+      // whole cost — no closure, no compare, trajectories identical)
+      if (validate === undefined) {
+        for (const rv of f.records())
+          this.#enqueue(node, { cid: c0 + i++, ae: node.epoch, issuer, rec: rv.rec(), via: link.id, sent: -1, to: '', parked: false })
+        this.#drain(node)
+        return
+      }
+      //! the relay VALIDATES (2026-09-05): relay time IS an issuer boundary, so the server's admission
+      // predicate (NodeOpts.validate — the api's seams.validation) runs here exactly as it does on the
+      // server's own issues (api/data.ts issue). A refused record never enters the queue: it WNACKs
+      // `invalid` with the reason, batched per contiguous same-reason run like every other NACK. A cid
+      // already in the dedup window SKIPS the check — it committed once (so it passed once), and a
+      // state-dependent predicate must not turn a retransmit of a committed record into a lie; the
+      // ordinary path below dup-ACKs it with its original coordinates.
+      let nack: { m: string; c: number; n: number } | null = null
+      const flushNack = () => {
+        if (!nack) return
+        j.armed && j.emit(JK.writeNack, NACK.invalid, node.epoch, nack.c)
+        link.ship(encodeControl(VERB.WNACK, { u: issuer, c: nack.c, n: nack.n, r: NACK.invalid, m: nack.m, ce: node.epoch }), node.env.sink, j)
+        nack = null
+      }
+      for (const rv of f.records()) {
+        const cid = c0 + i++
+        const rec = rv.rec()
+        if (!this.#seen.get(issuer)?.has(cid)) {
+          const v = validate(rec)
+          if (v !== true) {
+            const m = String(v).slice(0, REASON_MAX)
+            if (nack && (nack.m !== m || nack.c + nack.n !== cid)) flushNack()
+            nack ? nack.n++ : (nack = { m, c: cid, n: 1 })
+            continue
+          }
+        }
+        flushNack()
+        this.#enqueue(node, { cid, ae: node.epoch, issuer, rec, via: link.id, sent: -1, to: '', parked: false })
+      }
+      flushNack()
       this.#drain(node)
       return
     }
@@ -470,12 +529,44 @@ export class Writes {
   // instantly just re-manufactures the same answer at line rate — the review's storm), or parked for
   // the next flush boundary when ce reveals a newer view (the install is the fresh routing state that
   // makes an immediate retry meaningful). The relay owns re-resolution for client attempts identically.
-  onNack(node: Node, link: Link, v: { u?: unknown; c?: unknown; n?: unknown; r?: unknown; ce?: unknown }) {
+  onNack(node: Node, link: Link, v: { u?: unknown; c?: unknown; n?: unknown; r?: unknown; m?: unknown; ce?: unknown }) {
     if (typeof v?.u !== 'string' || typeof v.c !== 'number' || typeof v.n !== 'number' || v.n <= 0 || v.n > MAX_PENDING) return
     const j = node.journal
     j.armed && j.emit(JK.writeNack, typeof v.r === 'string' ? v.r : '?', typeof v.ce === 'number' ? v.ce : -1, v.c)
     const newer = typeof v.ce === 'number' && v.ce > node.epoch
     if (newer) node.membership.staleObserved(node, v.ce as number, link)
+    //! `invalid` is TERMINAL (the relay's validator refused the record — a retry re-manufactures the
+    // same answer): the attempt leaves the queue for good. Still owner-of-record gated like every
+    // ACK/NACK. A RELAY hops the refusal onward to its client (via ≥ 0 — batched per contiguous run
+    // like onAck's hop; the reason text travels verbatim); the ISSUER records the reason under the
+    // attempt key and bumps rejectedPending for the api's outcome join (api/data.ts Bind.sweep).
+    // Only an issuer boundary ever refuses, so a relay hearing `invalid` from an owner is a defensive
+    // path — handled honestly rather than retried against an answer that cannot change.
+    if (v.r === NACK.invalid) {
+      const m = typeof v.m === 'string' ? v.m : NACK.invalid
+      let hop: { via: number; c: number; n: number } | null = null
+      const flushHop = () => {
+        if (!hop) return
+        this.#nack(node, hop.via, { u: v.u as string, c: hop.c, n: hop.n, r: NACK.invalid, m, ce: node.epoch })
+        hop = null
+      }
+      for (let i = 0; i < v.n; i++) {
+        const key = v.u + '|' + (v.c + i)
+        const a = this.pending.get(key)
+        if (!a || (a.to && a.to !== link.uuid)) { flushHop(); continue }
+        if (a.via >= 0) {
+          if (hop && (hop.via !== a.via || hop.c + hop.n !== v.c + i)) flushHop()
+          hop ? hop.n++ : (hop = { via: a.via, c: v.c + i, n: 1 })
+        } else {
+          this.rejected.set(key, m)
+          if (this.rejected.size > MAX_PENDING) this.rejected.delete(this.rejected.keys().next().value!)
+          this.rejectedPending++
+        }
+        this.#remove(a)
+      }
+      flushHop()
+      return
+    }
     for (let i = 0; i < v.n; i++) {
       const a = this.pending.get(v.u + '|' + (v.c + i))
       if (!a || (a.to && a.to !== link.uuid)) continue // only the owner of record may re-drive the route

@@ -281,6 +281,44 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-y
   }
 })
 
+test("relayed client writes run the SERVER's seams.validation at the relay: the refused row never lands; the client's assignment bounces and its methods.update rejects with the server's reason", async () => {
+  //! the IDEAS probe (2026-09-05): before this fix a server that refused its OWN `data.admin = …` still
+  // let a bare client's `data.admin = …` LAND (the relay re-stamped but ran no validator)
+  const addr = `127.0.0.1:${await ports.free()}`
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeatMs: 50, redialMs: 30,
+    seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeatMs: 50, redialMs: 30 })
+  const rows = (f: typeof c) => Object.values(snapshot(f.cluster).writes as Record<string, { key: string; state: string; reason?: string }>)
+  try {
+    //! the server refuses its OWN admin write (the local hook, unchanged)
+    s.data.admin = 'local'
+    assert.equal((snapshot(s.data) as Record<string, unknown>).admin, undefined)
+    //! a plain client assignment: visible optimistically (read-your-writes), then it BOUNCES when the
+    // relay refuses it — and cluster.writes shows the server's reason on the rejected row
+    c.data.admin = 'from-client'
+    assert.equal((snapshot(c.data) as Record<string, unknown>).admin, 'from-client', 'pending overlay until the relay answers')
+    assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).admin === undefined, 8000), 'the refusal bounced the cell')
+    //! the outcome row settles in a microtask and folds on the NEXT step (api/data.ts outcomes) — await it
+    const rejected = () => rows(c).find((r) => r.key === JSON.stringify(['admin']) && r.state === 'rejected')
+    assert.ok(await until(() => rejected() !== undefined, 8000), 'cluster.writes shows the rejected row')
+    assert.equal(rejected()?.reason, 'reserved', "the client reads the SERVER's validator verbatim")
+    //! methods.update rejects TYPED with the same reason — the WriteReject contract, not a hang or a timeout
+    await assert.rejects(
+      c.methods.update({ key: 'admin', value: 1 }, { timeout: 8000 }),
+      (e: { guarantee: string; reached: string; reason: string }) => e.reason === 'reserved' && e.reached === 'issued' && e.guarantee === 'committed')
+    //! an admitted client write still lands cluster-wide, and the refused row never existed anywhere
+    c.data.open = 1
+    assert.ok(await until(() => (snapshot(s.data) as Record<string, unknown>).open === 1, 8000), 'the admitted write flowed')
+    assert.equal((snapshot(s.data) as Record<string, unknown>).admin, undefined, 'the server never held the refused row')
+    assert.equal(rows(s).some((r) => r.key === JSON.stringify(['admin']) && r.state !== 'rejected'), false)
+  } finally {
+    await c.destroy()
+    await s.destroy()
+  }
+})
+
 test('v4.1 roles: following is ambient, serving is a declared act — in the battery the directory is OFF, so topologies are explicit', async () => {
   //! no marker = a CLIENT (the open method namespace is the client tell). With no directory (the
   // battery runs FERO_RENDEZVOUS=off) a client needs hosts — bare refuses loudly: nothing to dial.

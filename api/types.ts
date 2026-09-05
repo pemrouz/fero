@@ -53,7 +53,13 @@ export interface WriteOpts {
 // hash/codec/storage land with their milestones.
 export interface Seams {
   //! validation — return true to admit, or a reason string to reject (assignment bounces + reverts;
-  // methods.* rejects with the reason). Runs at the ONE local ingest, before anything is issued.
+  // methods.* rejects with the reason). Runs at the ONE local ingest, before anything is issued — AND,
+  // on a server, at the relay ingress for the client writes it relays (relay time is an issuer
+  // boundary): a refused relayed write WNACKs `invalid` with the reason, so the CLIENT's promise rejects
+  // with it and a plain client assignment bounces exactly like a local reject. Keep it a pure function
+  // of the record: it runs inside the kernel step, and a retransmit of an already-committed record is
+  // dup-ACKed without re-checking. It bounds WHAT an admitted client may write, per record; it does not
+  // see WHO wrote it — per-caller rules belong in hosted methods (ctx.peer).
   validation?: (rec: Rec) => true | string
 }
 

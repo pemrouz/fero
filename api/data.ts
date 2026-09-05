@@ -174,7 +174,7 @@ export class Bind {
     const frame = { cells: new Set(valid.map(cellOf)), applied: [] as Applied[] }
     this.#frames.push(frame)
     try { this.#rt.write(valid) } finally { this.#frames.pop() }
-    this.#sweepDrops() // enqueue overflow drops synchronously inside write() — release NOW, not at the next apply
+    this.sweep() // enqueue overflow drops synchronously inside write() — release NOW, not at the next apply
     //! the epoch-0 fast path mints NO cids (kernel/write.ts): commits applied synchronously with no
     // attempt identity — settle positionally from OUR frame (single-threaded step: this frame collected
     // exactly our records, in record order), resolving OUR OWN promise refs (map keys may have been
@@ -244,7 +244,7 @@ export class Bind {
     }
     //! 4) the ONE projection: kernel record → proxy, with the echo pre-consumed
     this.#apply(a)
-    this.#sweepDrops()
+    this.sweep()
   }
 
   //! apply — project one record into the projection handle (the hot lane, fero's origin).
@@ -294,18 +294,40 @@ export class Bind {
     for (const r of this.issue(recs, false)) if (typeof r !== 'string') (r as Promise<Coords>).catch(() => {})
   }
 
-  //! sweepDrops — the MAX_PENDING release (M5b, closes the M5a residual): when the kernel drops the
-  // oldest attempt at overflow (droppedPending grows), find our pending entries the kernel no longer
-  // holds. WACK'd-or-replicated ones have dedup-window coordinates (onAck feeds it) — resolve them;
-  // the rest are genuinely dropped — reject, release the overlay, and let the confirmed fold show
-  // through (the bounce is visible, never silent: counted kernel-side, rejected api-side).
+  //! sweep — the kernel-side settlement probe: the MAX_PENDING release (M5b, closes the M5a residual)
+  // widened to TERMINAL REJECTS (2026-09-05). When the kernel drops the oldest attempt at overflow
+  // (droppedPending grows) or a relay's validator refused one of ours (rejectedPending grows — the
+  // WNACK `invalid` path, kernel/write.ts onNack), find our pending entries the kernel no longer
+  // holds. A recorded REASON rejects with it — the client sees the server's seams.validation verbatim:
+  // a plain assignment bounces, methods.* rejects typed, exactly like a local reject. WACK'd-or-
+  // replicated ones have dedup-window coordinates (onAck feeds it) — resolve them; the rest are
+  // genuinely dropped — reject 'dropped'. Either way the overlay releases and the confirmed fold shows
+  // through (the bounce is visible, never silent: counted kernel-side, rejected api-side). Two integer
+  // compares when nothing moved; the composer's post-step fold calls it because a WNACK step applies
+  // nothing — without that hop the promise would wait for an unrelated apply.
   #drops = 0
-  #sweepDrops() {
+  #rejects = 0
+  sweep() {
     const w = this.#rt.node.writes
-    if (w.droppedPending === this.#drops) return
+    const drops = w.droppedPending !== this.#drops
+    if (!drops && w.rejectedPending === this.#rejects) return
     this.#drops = w.droppedPending
+    this.#rejects = w.rejectedPending
     for (const [key, p] of this.#pending) {
       if (w.pending.has(key)) continue
+      const reason = w.rejected.get(key)
+      if (reason !== undefined) {
+        this.#pending.delete(key)
+        w.rejected.delete(key) // consumed: the reason has one reader
+        p.reject(reason)
+        if (this.#overlay.get(p.cell) === p.cid) { this.#overlay.delete(p.cell); this.#revert(p.cell) }
+        continue
+      }
+      //! a reject settles ONLY the entries it names. An un-rejected entry the kernel no longer holds
+      // is normally a WACK'd attempt whose commit is about to arrive through the apply join (one socket
+      // chunk can carry a WACK and a WNACK in one step) — settling it here from the dedup window would
+      // resolve it early and, on a spoke, under the wrong origin. Only a DROP may pre-empt the join.
+      if (!drops) continue
       this.#pending.delete(key)
       const c = w.committed(this.#iss, p.cid)
       if (c) p.resolve({ origin: this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: p.cid })

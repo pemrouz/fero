@@ -168,6 +168,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     redialMs: config.redialMs as number | undefined,
     journalCap: config.journalCap as number | undefined,
     ...(config.replicas !== undefined ? { replicas: config.replicas as number } : {}),
+    //! the relay runs the SAME validator (2026-09-05): a client's plain write relayed through this
+    // server is admitted or refused by seams.validation exactly like this server's own issues — the
+    // kernel's relay ingress (kernel/write.ts onWrite, ae 0) gets the predicate as a pure NodeOpts fact.
+    // Inert on a client (nobody relays through a spoke); the local hook in Bind is unchanged.
+    ...(seams.validation !== undefined ? { validate: seams.validation as (rec: Rec) => true | string } : {}),
     ...(restored.boot !== undefined ? { boot: restored.boot } : {}),
     ...(restored.incarnation !== undefined ? { incarnation: restored.incarnation } : {}),
   }
@@ -434,6 +439,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   let lastOutcomes = 0
   let lastScopeN = -1
   const fold = () => {
+    //! settle kernel-side outcomes FIRST (two integer compares when nothing moved): a relay's `invalid`
+    // WNACK removes our attempt inside a step that applies nothing, so the write's promise/overlay
+    // would otherwise wait for the next apply — the sweep rides the post-step hook instead
+    bind.sweep()
     //! cluster.writes — the bounded confirm ring (plan §9; Q4 decided: pending rows are visible HERE,
     // never marked inside `data`): folded whole when the ring version moved, one compare otherwise
     if (bind.outcomes.n !== lastOutcomes) {
