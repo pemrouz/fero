@@ -80,6 +80,15 @@ export interface NodeOpts {
   // mode off). Object values ({token, scopes}) are reserved post-1.0. The token crosses cleartext —
   // run DIAG on trusted networks or a tunnel (plan §12 posture, stated out loud).
   diag?: { allow: Record<string, string> }
+  //! validate (relay validation, 2026-09-05): the embedder's per-record admission predicate for RELAYED
+  // client writes — the api hands seams.validation down so the relay ingress (write.ts onWrite, ae 0)
+  // runs the SAME check this server runs on its own issues: relay time is an issuer boundary, and an
+  // issuer validates before it issues. A pure function of the record (it runs inside step(); no I/O);
+  // a refusal WNACKs {r:'invalid', m: reason} back to the client and never enters the pipeline. Absent
+  // = every relayed record admitted (the prior behavior; trajectories stay byte-identical). Forwarded
+  // (ae > 0) peer attempts are NOT re-validated: the issuing server already ran its validator, and
+  // peers are trusted at this layer — same code, same config (the deployer's contract, like replicas).
+  validate?: (rec: Rec) => true | string
 }
 
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
@@ -291,6 +300,10 @@ export class Node {
   //! diagAllow — the M7 DIAG allowlist (see NodeOpts.diag). Absent/empty ⇒ the channel is dead: every
   // r:2 HELLO is denied (fail closed, the durable/client/replicas idiom for absent modes).
   get diagAllow(): Record<string, string> | undefined { return this.#opts.diag?.allow }
+
+  //! validate — the relay-ingress admission predicate (see NodeOpts.validate). Absent ⇒ every relayed
+  // record is admitted; onWrite's relay branch pays one undefined-check per FRAME, nothing per record.
+  get validate(): ((rec: Rec) => true | string) | undefined { return this.#opts.validate }
 
   //! armed — scoping is LIVE: scoped ∧ a committed view exists. Open genesis (epoch 0) is always
   // unscoped — there is no committed ring to scope against, every node owns its own writes, and the
@@ -1168,6 +1181,12 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'write-ack-before-hello')
         }
+        //! a CLIENT never owns a partition, so it never has an ACK or NACK to send: one arriving on an r:1
+        // link is a forgery aimed at someone else's route (a parked relayed attempt has no owner of record
+        // yet — `to` is '' — so the owner gate alone would let it through: cleared by a fake WACK, or ended
+        // with a fake terminal `invalid` and a fake reason hopped to the victim). Drop the frame, keep the
+        // link (a confused client is not a wire fault). Members are unaffected — one boolean per ACK frame.
+        if (link.client) { j.armed && j.emit(JK.frameDrop, link.id, 'write-ack from client'); return }
         const v = f.value as Record<string, unknown>
         if (f.verb === VERB.WACK) this.writes.onAck(this, link, v)
         else this.writes.onNack(this, link, v)

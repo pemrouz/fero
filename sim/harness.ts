@@ -13,7 +13,7 @@ import type { Node } from '../kernel/node.ts'
 import type { Step } from './shrink.ts' // type-only: no runtime cycle (shrink imports harness at runtime)
 
 //! cluster — n nodes, full dial mesh (everyone dials everyone: deliberately redundant so the one-link-per-pair dedup is exercised on every formation).
-export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durable?: boolean; replicas?: number; fault?: Fault } = {}): Node[] => {
+export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durable?: boolean; replicas?: number; fault?: Fault; validate?: (rec: Rec) => true | string } = {}): Node[] => {
   //! id width follows n: lexicographic order IS uuid order (the lowest uuid is the genesis proposer,
   // membership.ts gate) — at n=100 a 2-wide pad would sort n100 between n10 and n11. n≤99 keeps the
   // historical 2-wide ids so every seeded golden stays byte-identical.
@@ -28,6 +28,7 @@ export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durab
       heartbeatMs: opts.heartbeatMs ?? 0, // explicit protocol mode — heartbeats OFF by default so quiescence is reachable
       durable: opts.durable ?? false, // explicit protocol mode — storage OFF by default (zero persist effects)
       ...(opts.replicas !== undefined ? { replicas: opts.replicas } : {}), // explicit protocol mode — scoping OFF by default (M6)
+      ...(opts.validate !== undefined ? { validate: opts.validate } : {}), // the relay's admission predicate — absent by default (every relayed record admitted)
       redialMs: 20,
       journalCap: 1 << 16, // capture-grade history: time-travel replay needs the journal un-truncated
     }),

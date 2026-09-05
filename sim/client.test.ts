@@ -65,6 +65,32 @@ test('the relay rule end-to-end: a client write re-stamps at the primary, commit
   assert.deepEqual(sim.violations, [])
 })
 
+test('the relay validates under the executive: a refused client record is WNACKed `invalid` and terminal, the admitted one commits exactly-once, every monitor stays green', () => {
+  const sim = new Sim(74)
+  const members = cluster(sim, 3, { heartbeatMs: 50, validate: (rec) => (rec.key[0] === 'admin' ? 'reserved' : true) })
+  const c = client(sim, 'zc1', members, { heartbeatMs: 50 })
+  sim.run({ until: 500 })
+  const primary = [...c.links.values()].find((l) => l.id === c.primary)!.uuid
+  //! own both keys at a member that is NOT the primary: the refusal must happen at the RELAY, before any forward
+  const owner = members.map((m) => m.uuid).find((u) => u !== primary)!
+  pin([...members, c], 'admin', owner)
+  pin([...members, c], 'open', owner)
+  sim.post(c.uuid, { kind: 'write', recs: [{ type: REC.update, key: ['open'], value: 1 }, { type: REC.update, key: ['admin'], value: 'x' }] })
+  sim.run({ until: 3000 })
+  const relay = members.find((m) => m.uuid === primary)!
+  assert.deepEqual(jk(relay, JK.writeNack).map((e) => e.a), ['invalid'], 'the relay refused it — typed')
+  assert.equal(jk(members.find((m) => m.uuid === owner)!, JK.writeNack).length, 0, 'the owner never saw the refused record')
+  assert.equal(c.writes.pending.size, 0, 'both routes ended: one WACK, one terminal WNACK')
+  assert.equal(c.writes.rejected.get('zc1~1|2'), 'reserved', 'the reason waits for the api at the client (issuer lane = uuid~incarnation)')
+  assert.equal(c.writes.rejectedPending, 1)
+  for (const n of [...members, c]) {
+    assert.equal(n.state.has(key('admin')), false, `${n.uuid} never held the refused row`)
+    assert.equal(JSON.stringify(n.state.get(key('open'))), '1', `${n.uuid} holds the admitted one`)
+  }
+  assert.equal(converged(sim), null)
+  assert.deepEqual(sim.violations, [])
+})
+
 test('feeder failover mid-flight: the primary is partitioned away with attempts in the air — repark, re-relay, dedup; exactly-once', () => {
   const sim = new Sim(73)
   const members = cluster(sim, 3, { heartbeatMs: 50 })

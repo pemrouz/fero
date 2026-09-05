@@ -50,9 +50,9 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
 }
 
 //! aa at committed view 1 over {aa, bb, cc}; links 1=bb 2=cc (the same shape membership.test.ts drives)
-const formedView1 = (uuid = 'aa') => {
+const formedView1 = (uuid = 'aa', extra: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
   const hosts = ['aa', 'bb', 'cc'].filter((u) => u !== uuid).map((u) => `sim:${u}`)
-  const h = harness(uuid, { hosts })
+  const h = harness(uuid, { hosts, ...extra })
   h.node.step({ kind: 'start' })
   const peers = ['aa', 'bb', 'cc'].filter((u) => u !== uuid)
   h.admit(1, peers[0])
@@ -172,6 +172,164 @@ test('WNACK withheld: an owner whose gate is closed refuses instead of parking �
   h.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('bb~1', 1, 2, [{ type: REC.update, key: ['mine'], value: 1 }]) })
   assert.deepEqual(h.sentOn(1, VERB.WNACK)[0].value, { u: 'bb~1', c: 1, n: 1, r: 'withheld', ce: 2 })
   assert.equal(h.node.writes.pending.size, 0, 'the owner parked NOTHING')
+})
+
+test('the relay VALIDATES: a refused ae=0 record WNACKs `invalid` with the reason (batched per reason run), the admitted ones commit, a committed dup skips the check', () => {
+  //! the server's admission predicate — state-dependent on purpose (`strict` flips later) to prove the
+  // dedup-window skip: a retransmit of a committed record is never turned into a lie by a changed answer
+  let strict = false
+  const h = formedView1('aa', { validate: (rec: Rec) => (strict ? 'closed' : rec.key[0] === 'admin' ? 'reserved' : true) })
+  h.node.writes.ring.place('admin', 'aa')
+  h.node.writes.ring.place('open', 'aa')
+  //! a CLIENT run (ae 0): [open ✓, admin ✗, admin/sub ✗ (same reason → one NACK run), open/b ✓]
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('zz~1', 1, 0, [
+    { type: REC.update, key: ['open'], value: 1 },
+    { type: REC.update, key: ['admin'], value: 'x' },
+    { type: REC.update, key: ['admin', 'sub'], value: 'y' },
+    { type: REC.update, key: ['open', 'b'], value: 2 },
+  ]) })
+  assert.equal(h.jk(JK.writeRelay).length, 1, 'the relay boundary was crossed')
+  const nacks = h.sentOn(1, VERB.WNACK)
+  assert.equal(nacks.length, 1, 'contiguous same-reason refusals batch into ONE WNACK')
+  assert.deepEqual(nacks[0].value, { u: 'zz~1', c: 2, n: 2, r: 'invalid', m: 'reserved', ce: 1 })
+  assert.deepEqual(h.jk(JK.writeNack).map((e) => [e.a, e.c]), [['invalid', 2]], 'journaled under the typed class, never the free text')
+  //! the admitted records committed here (aa owns both partitions) and ACKed back — cids 1 and 4 are
+  // non-contiguous, so two runs, two WACKs; the refused row never touched the fold or the queue
+  assert.equal(h.node.state.size, 2)
+  assert.equal(h.node.state.has(JSON.stringify(['admin'])), false, 'the refused row never landed')
+  assert.equal(h.node.writes.pending.size, 0, 'nothing parked for a refused record')
+  const acks = h.sentOn(1, VERB.WACK)
+  assert.deepEqual(acks.map((a) => [(a.value as { c: number }).c, (a.value as { n: number }).n]), [[1, 1], [4, 1]])
+  //! the predicate now refuses EVERYTHING — a retransmit of committed cid 1 is dup-ACKed with its
+  // original coordinates (the dedup window pre-empts the check); a FRESH cid 5 is refused with the new reason
+  strict = true
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('zz~1', 1, 0, [{ type: REC.update, key: ['open'], value: 1 }]) })
+  const acks2 = h.sentOn(1, VERB.WACK)
+  assert.equal(acks2.length, 3, 'the retransmit was ACKed, not NACKed')
+  assert.deepEqual(acks2[2].value, acks[0].value, 'ORIGINAL coordinates — exactly-once at the relay')
+  assert.equal(h.sentOn(1, VERB.WNACK).length, 1, 'no new NACK for the committed dup')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('zz~1', 5, 0, [{ type: REC.update, key: ['open'], value: 9 }]) })
+  const nacks2 = h.sentOn(1, VERB.WNACK)
+  assert.equal(nacks2.length, 2)
+  assert.deepEqual(nacks2[1].value, { u: 'zz~1', c: 5, n: 1, r: 'invalid', m: 'closed', ce: 1 })
+  assert.equal(h.node.state.size, 2, 'still two rows')
+  //! and with NO predicate the relay admits everything, as before
+  const open = formedView1('aa')
+  open.node.writes.ring.place('admin', 'aa')
+  open.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('zz~1', 1, 0, [{ type: REC.update, key: ['admin'], value: 'x' }]) })
+  assert.equal(open.node.state.size, 1)
+  assert.equal(open.sentOn(1, VERB.WNACK).length, 0)
+})
+
+test('`invalid` is TERMINAL at the issuer: the attempt leaves the queue, the reason is recorded for the api, the tick clock never re-sends it; a non-owner-of-record `invalid` is ignored', () => {
+  const h = harness('cl', { client: true, hosts: ['sim:aa'] })
+  h.node.step({ kind: 'start' })
+  h.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:aa' })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa' }) })
+  h.node.step({ kind: 'write', recs: [
+    { type: REC.update, key: ['a'], value: 1 }, { type: REC.update, key: ['b'], value: 2 }, { type: REC.update, key: ['c'], value: 3 },
+  ] })
+  assert.equal(h.node.writes.pending.size, 3)
+  assert.equal(h.sentOn(1, VERB.WRITE).length, 1, 'one relayed run to the primary')
+  //! the relay refuses cid 2 terminally
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WNACK, { u: 'cl~1', c: 2, n: 1, r: 'invalid', m: 'reserved', ce: 1 }) })
+  assert.equal(h.node.writes.pending.size, 2, 'cid 2 left the queue for good')
+  assert.equal(h.node.writes.pending.has('cl~1|2'), false)
+  assert.equal(h.node.writes.rejected.get('cl~1|2'), 'reserved', 'the reason waits for the api')
+  assert.equal(h.node.writes.rejectedPending, 1)
+  assert.deepEqual(h.jk(JK.writeNack).map((e) => [e.a, e.c]), [['invalid', 2]])
+  //! the retry clock re-sends the in-flight cids 1 and 3 — never 2
+  for (let i = 0; i <= RETRY_TICKS; i++) h.tick()
+  const frames = h.sentOn(1, VERB.WRITE)
+  assert.ok(frames.length >= 2, 'a retry went out')
+  for (const f of frames.slice(1)) {
+    const p = f.prov()!
+    const cids = [...f.records()].map((_, i) => p.baseSeq + i)
+    assert.ok(!cids.includes(2), `retry ${JSON.stringify(cids)} must not carry the refused cid`)
+  }
+  //! an `invalid` from a link that is NOT the owner of record cannot clear a route (cid 1 is bound to aa)
+  h.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:bb' })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.WNACK, { u: 'cl~1', c: 1, n: 1, r: 'invalid', m: 'spoof', ce: 1 }) })
+  assert.equal(h.node.writes.pending.has('cl~1|1'), true, 'ignored — only the owner of record may end a route')
+  assert.equal(h.node.writes.rejectedPending, 1)
+  //! a malformed `m` degrades to the typed class, never a crash or a hang
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WNACK, { u: 'cl~1', c: 3, n: 1, r: 'invalid', m: 7, ce: 1 }) })
+  assert.equal(h.node.writes.rejected.get('cl~1|3'), 'invalid')
+  assert.equal(h.node.writes.pending.size, 1)
+})
+
+test('a RELAY that hears `invalid` for a relayed attempt hops it onward to its client verbatim and forgets the route — recording nothing itself', () => {
+  const h = formedView1()
+  h.node.writes.ring.place('theirs', 'bb')
+  //! a client spoke on link 3 (r:1 HELLO) relays a write for bb's partition through aa
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: writeFrame('zz~1', 1, 0, [
+    { type: REC.update, key: ['theirs'], value: 1 }, { type: REC.update, key: ['theirs', 'x'], value: 2 },
+  ]) })
+  assert.equal(h.node.writes.pending.size, 2, 'relayed: re-stamped and queued with the reply route')
+  assert.equal(h.sentOn(1, VERB.WRITE).length, 1, 'forwarded to the owner bb')
+  //! bb (the owner of record) answers `invalid` — this code never does, but the frame is well-formed
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WNACK, { u: 'zz~1', c: 1, n: 2, r: 'invalid', m: 'nope', ce: 1 }) })
+  assert.equal(h.node.writes.pending.size, 0, 'terminal at the relay too — never retried against an answer that cannot change')
+  const hop = h.sentOn(3, VERB.WNACK)
+  assert.equal(hop.length, 1, 'ONE hop for the contiguous run')
+  assert.deepEqual(hop[0].value, { u: 'zz~1', c: 1, n: 2, r: 'invalid', m: 'nope', ce: 1 })
+  assert.equal(h.node.writes.rejectedPending, 0, 'a relay records nothing — the reason belongs to the client')
+  assert.equal(h.node.writes.rejected.size, 0)
+})
+
+test('the relay is keyed on the ADMISSION FACT, not the claim: a client link forging ae = epoch still meets the validator and is re-stamped; a member with ae = epoch takes the owner leg', () => {
+  const h = formedView1('aa', { validate: (rec: Rec) => (rec.key[0] === 'admin' ? 'reserved' : true) })
+  h.node.writes.ring.place('admin', 'aa')
+  h.node.writes.ring.place('open', 'aa')
+  //! a client spoke on link 3 (HELLO r:1) lies: ae = the committed epoch, as a member would send
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: writeFrame('zz~1', 1, h.node.epoch, [
+    { type: REC.update, key: ['admin'], value: 'x' }, { type: REC.update, key: ['open'], value: 1 },
+  ]) })
+  assert.equal(h.jk(JK.writeRelay).length, 1, 'forced through the relay — the link is a client, whatever it claims')
+  assert.deepEqual(h.sentOn(3, VERB.WNACK)[0].value, { u: 'zz~1', c: 1, n: 1, r: 'invalid', m: 'reserved', ce: 1 })
+  assert.equal(h.node.state.has(JSON.stringify(['admin'])), false, 'the forged attempt never reached the owner leg unvalidated')
+  assert.equal(h.node.state.has(JSON.stringify(['open'])), true, 'the admitted record was relayed and committed')
+  assert.equal(h.sentOn(3, VERB.WACK).length, 1)
+  //! a MEMBER (link 1 = bb) with ae = epoch takes the owner leg exactly as before: no relay, no validator
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('bb~1', 1, h.node.epoch, [{ type: REC.update, key: ['admin'], value: 'peer' }]) })
+  assert.equal(h.jk(JK.writeRelay).length, 1, 'no second relay')
+  assert.equal(h.node.state.has(JSON.stringify(['admin'])), true, 'a peer is trusted at this layer — its issuer validated')
+  assert.equal(h.sentOn(1, VERB.WNACK).length, 0)
+})
+
+test('an ACK or NACK arriving on a CLIENT link is dropped (a client owns nothing to answer for): it can neither clear nor terminally end another route', () => {
+  const h = formedView1()
+  h.node.writes.ring.place('theirs', 'bb')
+  //! client A (link 3) relays a write for bb's partition — in flight to bb, owner of record bb
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'za', i: 1, l: 'sim:za', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: writeFrame('za~1', 1, 0, [{ type: REC.update, key: ['theirs'], value: 1 }]) })
+  assert.equal(h.node.writes.pending.size, 1)
+  //! …and a PARKED one: cc's partition, cc is not linked here, so `to` is still '' (the owner gate alone would pass anyone)
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  h.node.writes.ring.place('parked', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: writeFrame('za~1', 2, 0, [{ type: REC.update, key: ['parked'], value: 1 }]) })
+  assert.equal(h.node.writes.pending.size, 2)
+  assert.equal(h.node.writes.pending.get('za~1|2')!.to, '', 'parked: no owner of record yet')
+  //! client B (link 4) forges a WACK for the parked attempt and a terminal WNACK for the in-flight one
+  h.node.step({ kind: 'linkUp', link: 4, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 4, bytes: encodeControl(VERB.HELLO, { u: 'zb', i: 1, l: 'sim:zb', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 4, bytes: encodeControl(VERB.WACK, { u: 'za~1', c: 2, n: 1, s: 99, e: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 4, bytes: encodeControl(VERB.WNACK, { u: 'za~1', c: 1, n: 1, r: 'invalid', m: 'forged', ce: 1 }) })
+  assert.equal(h.node.writes.pending.size, 2, 'both routes intact')
+  assert.equal(h.sentOn(3, VERB.WNACK).length, 0, 'nothing hopped to the victim')
+  assert.equal(h.sentOn(3, VERB.WACK).length, 0)
+  assert.deepEqual(h.jk(JK.frameDrop).map((e) => e.b), ['write-ack from client', 'write-ack from client'])
+  assert.equal(h.node.links.get(4)!.dead, false, 'the link is kept — a confused client is not a wire fault')
+  //! the real owner of record (bb, link 1) still answers the in-flight route
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'za~1', c: 1, n: 1, s: 7, e: 1 }) })
+  assert.equal(h.node.writes.pending.size, 1)
+  assert.equal(h.sentOn(3, VERB.WACK).length, 1, 'hopped to client A')
 })
 
 test('a WNACK re-parks the attempts and its ce is absorbed as staleness evidence; the flush re-stamps ae (the law)', () => {
