@@ -54,6 +54,41 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   peer-auth workstream; DIAG's immunity must not be mistaken for closure.
 - [P3] (kernel) DIAG token transport: cleartext by design in v3.0 (trusted
   networks / tunnel); allowlist object values ({token, scopes}) reserved.
+- [P2] (api,kernel) **Relayed client writes bypass the server's
+  `seams.validation`; there is no "methods only" door** (site review,
+  2026-09-05). Evidence, probed that day: a server with
+  `seams: { validation: r => r.key[0] !== 'admin' || 'reserved' }` refuses its
+  OWN `data.admin = …` and a hosted method's `ctx.data.admin = …` (neither lands),
+  but a bare client's `data.admin = …` LANDS on it and the client's write reads
+  `committed`. Why: the validator is wired into Bind (api/index.ts passes
+  `validate: seams.validation` into api/data.ts issue(), the ONE local ingest),
+  while a relayed WRITE frame (ae 0) enters kernel/write.ts onWrite → #enqueue
+  directly — the relay "re-stamps ae (relay time is an issuer boundary)" but
+  runs no validator. So today validation is a local-invariant hook for the writes
+  a node issues itself, not authorization: nothing bounds what an admitted client
+  may write. Two steps, in order:
+  1. **Validate at the relay.** Run the server's validator on every relayed
+     record before #enqueue; a reject becomes a WNACK carrying the reason (the
+     client's promise rejects with it; a plain client assignment bounces like a
+     local reject). Consistent with the code's own "issuer boundary" wording; one
+     hook, no new config. The kernel stays I/O-free — hand it a pure
+     `validate(rec)` (NodeOpts/env) and a WNACK reason path. Regression: the
+     probe above as an api test (server validator, client assignment, assert the
+     row never lands and the client sees the reason).
+  2. **Methods as the only door (opt-in).** The reviewer's sketch: a server that
+     declares "methods only" (name TBD — a `methods:` object in config, or a
+     pin) refuses relayed plain writes and the built-in update/insert/remove from
+     clients; a client then changes data only through the server's named
+     methods, whose ctx.data writes already run under the server's validator.
+     `update: true` (or `update: resource.update`) reopens the built-in writer
+     for servers that want it. The pin is about the wire — a server's own code
+     stays trusted. ctx.peer (V4-3) already gives a method the caller's uuid for
+     per-caller rules.
+  Observed alongside: a hosted method's ctx.data write that the validator
+  refuses bounces SILENTLY — the call still resolves — flush-on-return does not
+  surface it. Decide whether a refused write inside a handler should reject the
+  call. Not a substitute for peer auth (above): a client can still dial; this
+  bounds what it can do once admitted.
 
 ## api surface
 - [P3] (shell,api) **isolate/heal on the diagnostics handle** — rejected in v3.0
