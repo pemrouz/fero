@@ -52,6 +52,16 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   presenting a member's uuid can trip the dup-link keeper against the real member.
   DIAG (r:2) is structurally immune; the client plane is NOT — belongs to the
   peer-auth workstream; DIAG's immunity must not be mistaken for closure.
+  Evidence added 2026-09-05 (V4-4's panel): an admitted r:1 link may still
+  send RECORDS frames — kernel/node.ts's RECORDS case checks admission, not
+  `link.client`, so a forged, pre-stamped record lands as replication under
+  any origin lane, past seams.validation and past any methods-only door. It
+  is NOT a one-line drop: spokes legitimately ship suffixes back to a server
+  that digests them (a restored server re-learns from its clients through
+  ordinary AE), so "are spokes trusted replicas?" is the design question.
+  Closed the same day, cheaply: a client's WRITE is relayed by ADMISSION FACT
+  (`ae === 0 || link.client`), and ACK/NACK frames on a client link are
+  dropped (`write-ack from client`).
 - [P3] (kernel) DIAG token transport: cleartext by design in v3.0 (trusted
   networks / tunnel); allowlist object values ({token, scopes}) reserved.
 - [P2] (api,kernel) **Relayed client writes bypass the server's
@@ -67,23 +77,99 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   runs no validator. So today validation is a local-invariant hook for the writes
   a node issues itself, not authorization: nothing bounds what an admitted client
   may write. Two steps, in order:
-  1. **Validate at the relay.** Run the server's validator on every relayed
-     record before #enqueue; a reject becomes a WNACK carrying the reason (the
-     client's promise rejects with it; a plain client assignment bounces like a
-     local reject). Consistent with the code's own "issuer boundary" wording; one
-     hook, no new config. The kernel stays I/O-free — hand it a pure
-     `validate(rec)` (NodeOpts/env) and a WNACK reason path. Regression: the
-     probe above as an api test (server validator, client assignment, assert the
-     row never lands and the client sees the reason).
-  2. **Methods as the only door (opt-in).** The reviewer's sketch: a server that
-     declares "methods only" (name TBD — a `methods:` object in config, or a
-     pin) refuses relayed plain writes and the built-in update/insert/remove from
-     clients; a client then changes data only through the server's named
-     methods, whose ctx.data writes already run under the server's validator.
-     `update: true` (or `update: resource.update`) reopens the built-in writer
-     for servers that want it. The pin is about the wire — a server's own code
-     stays trusted. ctx.peer (V4-3) already gives a method the caller's uuid for
-     per-caller rules.
+  1. **Validate at the relay — DONE 2026-09-05** (DECISIONS V4-4). The api
+     hands `seams.validation` down as `NodeOpts.validate`; the relay ingress
+     (kernel/write.ts onWrite, ae 0) runs it before `#enqueue`. A refusal is a
+     WNACK `{r:'invalid', m: reason}` — a fourth, TERMINAL reason class: the
+     issuer drops the attempt for good (`Writes.rejected` + `rejectedPending`,
+     read by `Bind.sweep` off the composer's post-step fold), so the client's
+     promise rejects with the server's reason and a plain assignment bounces;
+     a relay hearing `invalid` hops it onward. A cid already in the dedup
+     window skips the check (a committed retransmit is never turned into a
+     lie by a state-dependent predicate). Forwarded ae>0 peer attempts are NOT
+     re-validated (peers are trusted at this layer — same code, same config).
+     Two forgeries adjacent to the door closed with it: a client link forging
+     ae = epoch is relayed anyway (the relay keys on `link.client`, the
+     server's admission fact), and an ACK/NACK arriving on a client link is
+     dropped (it could clear or terminally end another client's parked
+     route). Pinned: kernel/write.test.ts ×5, sim/client.test.ts,
+     api/index.test.ts (the probe above), each mutation-checked. Honest
+     scope: this bounds what the fero CLIENT may write; a raw socket that
+     forges RECORDS frames still bypasses it (the r:1 item above) — so it is
+     a bound on the SDK's write surface, not peer auth. What the hook still
+     is NOT: authorization — it sees the record, never the caller (ctx.peer
+     lives on the method plane).
+  2. **Methods as the only door (opt-in) — OPEN; proposed design 2026-09-05,
+     not built.** Three independent proposals converged (the panel's critique
+     and judge legs did not run — session limit — so this is the author's
+     synthesis over uncritiqued proposals; re-run the critique before building):
+     - **Config:** `writes?: 'methods' | ('update' | 'insert' | 'remove')[]`,
+       a DECLARED FeroConfig key. Omitted = open (the demo's contract).
+       `'methods'` ≡ `[]`; a list REOPENS built-in verbs for clients
+       (`['update']` admits type-0 records — plain assignment AND
+       methods.update, same bytes — and refuses inserts/removes). A string or
+       array, so the value-type rule holds untouched; NOT under `seams` (that
+       key is for function-valued config). A SERVER MARKER like data/replicas
+       (role stays a pure function of config). REJECTED spellings: a
+       `methods:` wrapper word (plan §9 rejected it), top-level `update: true`
+       (`update` is a refused method name — two natures), `update:
+       resource.update` (no instance yet at fero() time), `relay: false`
+       (kernel jargon), `clients: …` (collides with the rejected `client:`).
+     - **Mechanics — zero kernel change beyond V4-4:** the door is a
+       degenerate validator the composer FOLDS INTO `NodeOpts.validate`:
+       `admit = door open ? validation : rec => allowed.has(rec.type) ?
+       (validation?.(rec) ?? true) : 'methods-only'`. Door before validator
+       (authorization precedes schema; a closed verb never runs user code).
+       The refusal rides V4-4's terminal WNACK `invalid` with `m:
+       'methods-only'`; the client sees WriteReject reason 'methods-only' or
+       a bounce — the path already pinned. Open servers hand the kernel
+       exactly V4-4's value (zero cost); pinned servers pay one Set.has per
+       RELAYED record. Alternative considered: a kernel mode flag + a typed
+       `NACK.methodsOnly` that refuses on the tag byte without decoding the
+       body — cheaper under hostile spam, but a second refusal mechanism and
+       more kernel; add it only if a consumer needs the typed class.
+     - **The pin is about the wire:** the server's own writes and its
+       handlers' ctx.data writes never arrive on a client link, so they never
+       meet the door; they still meet the validator (below).
+     - **The silent-bounce residue — decided YES:** a validator-refused
+       ctx.data write inside a handler must REJECT the call with the reason
+       (and `ctx.flush()` must throw it): under the pin the handler is the
+       client's only door, and a bounce the caller cannot see is exactly the
+       silent partial §9 bans. Mechanism: Bind.issue pushes a pre-rejected
+       promise into the live handler collector; Host's flush-on-return stops
+       swallowing refusals. Kernel outcomes ('dropped'/'superseded') inside a
+       handler stay as today — a separate decision (retry semantics).
+     - **`#directory` host** composes with `writes: 'methods'` (its clients
+       only CALL) — a free hardening.
+     - **Tests:** api/index.test.ts (the door closes assignment AND the
+       built-ins; reopen `['update']` under a validator — the two doors
+       compose; config refusals + the server marker; the pin is about the
+       wire; the OPEN default keeps the two-terminal shape),
+       api/methods.test.ts (a refused handler write rejects the call; flush
+       throws), api/directory.test.ts (host is methods-only), one
+       sim/client.test.ts case with `validate: () => 'methods-only'`. No new
+       kernel path ⇒ perf is structural (nothing to widen).
+     - **Does it obviate seams.validation? Partly.** It replaces validation
+       as the answer to WHO may change WHAT — completely (a `(rec)` predicate
+       never saw the caller; a handler has the argument, ctx.peer, current
+       state, atomic multi-record changes). It does NOT replace the
+       per-record SCHEMA hook, which guards four writers no method can: the
+       server's own plain writes, a handler's own bugs (one invariant in one
+       place instead of in every handler), the `data:` seed at boot, and
+       open-mode servers (the demo shape — the only per-record bound there).
+       So the hook stays, narrowed in pitch: "what a record may look like",
+       never "who may write". Retiring it entirely means "open mode = trust
+       your clients entirely" + no seed check + no invariant on the server's
+       own writes — a bigger surface decision, not recommended.
+     - **For the user to decide:** (a) advertise the pin in the server→client
+       HELLO so a client refuses at issue() with zero RTT (HELLO bytes are a
+       stability surface; the round-trip bounce is honest today); (b) a
+       default-closed rule for servers that declare ≥1 method ("if you
+       declared methods, you meant methods") — the demo survives, mixed
+       servers do not; (c) whether kernel outcomes inside a handler should
+       also fail the call; (d) `writes` on a bare client: imply server (the
+       data/replicas precedent) or throw; (e) a second demo rung (`sell` +
+       the pin) for the site and the examples series.
   Observed alongside: a hosted method's ctx.data write that the validator
   refuses bounces SILENTLY — the call still resolves — flush-on-return does not
   surface it. Decide whether a refused write inside a handler should reject the
