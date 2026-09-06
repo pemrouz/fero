@@ -349,6 +349,13 @@ export class Node {
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
   // so the member hot path pays nothing (M5b).
   clientLinks = new Set<Link>()
+  //! resync (spokes only, 2026-09-06 — DECISIONS V4-5): a spoke's fold is a VIEW of its feeder's, never a
+  // source. When the feeder's digest shows a lane tail BELOW ours, the cluster's truth moved under us
+  // (records died with a server; a failover landed on a lagging feeder) — the fold resets, an empty r=1
+  // digest asks the feeder for everything, and the feeder's r=0 reply (FIFO: after the suffix) completes
+  // it: every cell held before that did not come back is removed downstream. `old` = the cells held at
+  // the reset. Null when not resyncing. Survives a failover (the new primary's reply completes it).
+  resync: { old: Set<string> } | null = null
 
   //! hosts — the discovery targets: static NodeOpts.hosts ∪ the dynamic set the `discover` event
   // installs (V4-3), deduplicated, minus this node's own listen. Genesis (links ≥ hosts) and the
@@ -910,18 +917,8 @@ export class Node {
   // anti-entropy refold this node from the cluster. Called only from replay's chain check.
   condemn(origin: string) {
     this.tainted = true
-    this.logs.clear()
-    this.state.clear()
-    this.versions.clear()
-    this.streams = new Streams()
+    this.#resetFold()
     this.walTail.clear()
-    this.#entryHash.clear()
-    this.#hash = 0
-    //! M6: the wiped fold has no splices left to protect — dirty/floor bookkeeping resets with it
-    this.#dirty.clear()
-    this.#inflightParts.clear()
-    this.#snapMeta.clear()
-    this.bootDirty.clear()
     //! the cid-dedup window resets WITH the fold (M4-review critical): coordinates learned from the
     // condemned rows would dup-ACK a retry for a record that may exist NOWHERE — silent acknowledged
     // loss. Forgetting degrades post-condemn retries to at-least-once (a same-value LWW supersede)
@@ -929,6 +926,51 @@ export class Node {
     this.writes.reset()
     this.journal.armed && this.journal.emit(JK.walTaint, origin)
     this.snapshot()
+  }
+
+  //! #resetFold — the fold wipe shared by condemn() (a lying disk) and a spoke's resync (a feeder whose
+  // truth moved under it): logs, state, versions, streams, the rolling hash, and the M6 floor bookkeeping
+  // (a wiped fold has no splices left to protect). Emits NOTHING downstream — the callers decide.
+  #resetFold() {
+    this.logs.clear()
+    this.state.clear()
+    this.versions.clear()
+    this.streams = new Streams()
+    this.#entryHash.clear()
+    this.#hash = 0
+    this.#dirty.clear()
+    this.#inflightParts.clear()
+    this.#snapMeta.clear()
+    this.bootDirty.clear()
+  }
+
+  //! #resyncBegin (spokes) — take the feeder's truth: remember the cells held, wipe the fold, and ask the
+  // feeder for everything with an EMPTY r=1 digest. Its suffix ship IS the re-download; its r=0 reply,
+  // which it sends AFTER the ship on the same FIFO link, is the completion marker (#resyncEnd). The
+  // projection downstream is left as it is until then — no remove-everything flicker; cells that come
+  // back identical re-apply in place. The dedup window stays: WACKed coordinates were true when learned.
+  #resyncBegin(link: Link) {
+    const old = new Set(this.state.keys())
+    this.journal.armed && this.journal.emit(JK.resync, old.size)
+    this.#resetFold()
+    this.resync = { old }
+    this.#sendDigest(link, 1)
+  }
+
+  //! #resyncEnd — the feeder's reply arrived: every cell held at the reset that the re-download did not
+  // bring back is a GHOST — removed downstream through the ordinary apply effect (a synthesized remove
+  // under this node's own name, seq 0: never logged, never on the wire; the api's overlay policy keeps
+  // a still-pending own write on top of it exactly as for any foreign remove).
+  #resyncEnd() {
+    const { old } = this.resync!
+    this.resync = null
+    let ghosts = 0
+    for (const cell of old) {
+      if (this.state.has(cell)) continue
+      ghosts++
+      this.env.sink.apply({ type: REC.remove, key: JSON.parse(cell) as string[], origin: this.uuid, seq: 0, epoch: 0 })
+    }
+    this.journal.armed && this.journal.emit(JK.resynced, ghosts)
   }
 
   //! persistBoot — (re)write the durable boot record: the committed view, the Lamport CEILING (the
@@ -1127,6 +1169,11 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'records-before-hello')
         }
+        //! a SPOKE never teaches (2026-09-06, DECISIONS V4-5): RECORDS on a client link drop — a spoke's fold
+        // is a view of its feeder's, never a source, so servers learn from members only (a forged or stale
+        // spoke could otherwise write any lane as "replication"). Frame dropped, link kept: a pre-fix spoke
+        // that is ahead of us still ships — stale, not a wire fault.
+        if (link.client) { j.armed && j.emit(JK.frameDrop, link.id, 'records from client'); return }
         const prov = f.prov()
         if (!prov) {
           //! M0: every RECORDS frame carries provenance; an un-stamped one is a protocol violation, not data
@@ -1273,6 +1320,22 @@ export class Node {
             this.confirm.feed(this, link.uuid, origin, tail, dur)
           }
         this.confirm.recount(this)
+        //! a SPOKE never teaches (2026-09-06, DECISIONS V4-5): its fold is a VIEW of its feeder's, so it ships
+        // no suffix back — servers learn from members only (and drop RECORDS on client links). And when the
+        // feeder's digest shows a lane tail BELOW ours, the cluster's truth moved under us — records died
+        // with a server, or we failed over onto a lagging feeder — so the only honest move is to take the
+        // feeder's truth: reset, re-download, remove what did not come back (#resyncBegin / #resyncEnd).
+        // "Ahead of my feeder" is a TRUE signal on the single-feeder FIFO: at the instant a feeder builds a
+        // digest, its tails cover everything it has ever shipped us (live tap-forwards included).
+        if (this.client) {
+          if (this.resync === null) {
+            for (const [origin, d] of this.streams)
+              if (d.applied > (typeof v.d[origin] === 'number' ? (v.d[origin] as number) : 0)) return this.#resyncBegin(link)
+          } else if (v.r === 0) this.#resyncEnd()
+          link.synced = true
+          if (v.r === 1) this.#sendDigest(link, 0)
+          return
+        }
         //! a PAUSED link cannot deliver: serialising the missing suffix into its drop-oldest queue is
         // O(suffix) work per digest that overflow then discards (adversarial-review finding — the peer's
         // heartbeat floor would trigger it every tick for the whole pause). Mark the debt instead; the

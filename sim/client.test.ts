@@ -91,6 +91,40 @@ test('the relay validates under the executive: a refused client record is WNACKe
   assert.deepEqual(sim.violations, [])
 })
 
+test("a feeder dies holding a record only it and its spoke had: the spoke fails over to a LAGGING member, resyncs DOWN (never re-teaches), and the record returns through the cluster when the feeder does", () => {
+  const sim = new Sim(75)
+  const members = cluster(sim, 3, { heartbeatMs: 50 })
+  const c = client(sim, 'zc1', members, { heartbeatMs: 50 })
+  sim.run({ until: 500 })
+  const primary = [...c.links.values()].find((l) => l.id === c.primary)!.uuid
+  const others = members.map((m) => m.uuid).filter((u) => u !== primary)
+  pin([...members, c], 'only', primary) // owned by the feeder: it commits, WACKs + tap-forwards to the spoke, broadcasts to the members…
+  //! …but that broadcast never reaches the other members, and from then on the feeder is cut off from them
+  for (const o of others) sim.severOnFrame(primary, o, VERB.RECORDS)
+  sim.post(c.uuid, { kind: 'write', recs: [{ type: REC.update, key: ['only'], value: 'mine' }] }, 10)
+  sim.at(25, () => { for (const o of others) sim.partition(primary, o) })
+  sim.run({ until: 800 })
+  assert.equal(JSON.stringify(c.state.get(key('only'))), '"mine"', 'the spoke holds the commit (WACK + tap-forward from its feeder)')
+  assert.equal(c.writes.pending.size, 0, 'the route completed')
+  for (const o of others) assert.equal(sim.nodes.get(o)!.state.has(key('only')), false, 'the other members never saw it')
+  //! now the feeder vanishes from the spoke too: failover onto a member that is BEHIND the spoke
+  sim.at(800, () => sim.partition(c.uuid, primary))
+  sim.run({ until: 4000 })
+  const feeder = c.primary === null ? null : [...c.links.values()].find((l) => l.id === c.primary)!.uuid
+  assert.ok(feeder !== null && feeder !== primary, `failed over (feeder now ${feeder})`)
+  assert.equal(jk(c, JK.resync).length, 1, 'ahead of the new feeder → one resync')
+  assert.deepEqual(jk(c, JK.resynced).map((e) => e.a), [1], 'one ghost: the record only the dead feeder had')
+  assert.equal(c.state.has(key('only')), false, "the spoke took the cluster's truth — it did not re-teach the record")
+  for (const o of others) assert.equal(sim.nodes.get(o)!.state.has(key('only')), false, 'the members still never saw it')
+  //! the old feeder returns: the record comes back through the CLUSTER (member AE), and the spoke hears it from its feeder
+  sim.at(4000, () => { for (const o of others) sim.heal(primary, o); sim.heal(c.uuid, primary) })
+  sim.run({ until: 14000 })
+  assert.equal(JSON.stringify(c.state.get(key('only'))), '"mine"', 'back — via the cluster, not the spoke')
+  assert.equal(jk(c, JK.resync).length, 1, 'no second resync')
+  assert.equal(converged(sim), null)
+  assert.deepEqual(sim.violations, [])
+})
+
 test('feeder failover mid-flight: the primary is partitioned away with attempts in the air — repark, re-relay, dedup; exactly-once', () => {
   const sim = new Sim(73)
   const members = cluster(sim, 3, { heartbeatMs: 50 })
