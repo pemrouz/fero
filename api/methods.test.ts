@@ -15,11 +15,14 @@ import { fero } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { ports, until, sleep } from '#utils'
 
-const pair = async (methods: Record<string, unknown> = {}) => {
+//! pair — two servers; `methods` (if any) are hosted under `methods:` (V4-5 — which also makes the pair
+// PROTECTED: a spoke changes data only through them), `extra` is further config for both
+const pair = async (methods: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) => {
   const pa = await ports.free()
   const pb = await ports.free()
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30, ...methods })
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30, ...methods })
+  const hosted = Object.keys(methods).length ? { methods } : {}
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30, ...hosted, ...extra } as never)
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30, ...hosted, ...extra } as never)
   assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
   return { a, b, addrs: [`127.0.0.1:${pa}`, `127.0.0.1:${pb}`] }
 }
@@ -182,7 +185,7 @@ test('M5-REVIEW #5/#10 — a SERVER-local method flushes before returning AND re
   const s = await fero('r', { uuid: 'aa', listen: false })
   try {
     //! #5: a handler that writes must have its write committed before the local call returns
-    const setK = await fero('r', { uuid: 'bb', listen: false, setK: (v: unknown, ctx: { data: any }) => { ctx.data.K = v; return 'done' } })
+    const setK = await fero('r', { uuid: 'bb', listen: false, methods: { setK: (v: unknown, ctx: { data: any }) => { ctx.data.K = v; return 'done' } } })
     const r = await setK.methods.setK(42)
     assert.equal(r, 'done')
     assert.equal((snapshot(setK.data) as Record<string, unknown>).K, 42, 'flush-on-return: the write committed before the reply')
@@ -195,4 +198,39 @@ test('M5-REVIEW #5/#10 — a SERVER-local method flushes before returning AND re
   } finally {
     await s.destroy()
   }
+})
+
+test("V4-5 — a validator-refused write inside a HANDLER fails the call with the reason (wire and local); ctx.flush() throws it so a handler can recover; admitted writes still resolve", async () => {
+  const { a, b, addrs } = await pair({
+    poke: (_: unknown, ctx: { data: any }) => { ctx.data.admin = 1; return 'ok' },
+    careful: async (_: unknown, ctx: { data: any; flush(): Promise<void> }) => {
+      ctx.data.admin = 1
+      try { await ctx.flush(); return 'landed' } catch (e) { return 'recovered: ' + (e as Error).message }
+    },
+    fine: (_: unknown, ctx: { data: any }) => { ctx.data.ok = 1; return 'fine' },
+  }, { seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') } })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const view = (f: typeof c) => snapshot(f.data) as Record<string, unknown>
+  try {
+    //! before V4-5 this call resolved 'ok' while the write silently vanished — the banned silent partial
+    await assert.rejects(async () => { await c.methods.poke() }, /write refused \(\["admin"\]\): reserved/)
+    assert.equal(view(a).admin, undefined); assert.equal(view(b).admin, undefined)
+    //! a mid-body flush throws the same refusal — the handler decides what to do with it
+    assert.equal(await c.methods.careful(), 'recovered: write refused (["admin"]): reserved')
+    //! admitted writes keep the ordinary flush-on-return contract
+    assert.equal(await c.methods.fine(), 'fine')
+    assert.ok(view(a).ok === 1 || view(b).ok === 1, 'committed before the reply')
+    //! a SERVER-local invocation follows the same rule
+    await assert.rejects(a.methods.poke(), /write refused/)
+  } finally {
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+  //! the Refused rides the LENS path only: a handler that calls the instance's own methods.update gets its
+  // typed WriteReject alone, and a handler that catches it RECOVERS (the panel's double-report finding)
+  const s = await fero('r', {
+    uuid: 'ss', listen: false, seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') },
+    methods: { tryAdmin: async () => { try { await s.methods.update({ key: 'admin', value: 1 }); return 'set' } catch (e) { return 'refused: ' + (e as { reason: string }).reason } } },
+  })
+  try { assert.equal(await s.methods.tryAdmin(), 'refused: reserved', 'the handler handled it — flush-on-return must not override the recovery') }
+  finally { await s.destroy() }
 })

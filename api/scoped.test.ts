@@ -117,7 +117,7 @@ test('SCOPED spoke: a client reads the WHOLE resource through its primary\'s gat
   const nodes = await Promise.all(addrs.map((listen, i) =>
     fero('scoped', {
       uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i),
-      heartbeatMs: 50, redialMs: 30, replicas: 2, boom,
+      heartbeatMs: 50, redialMs: 30, replicas: 2, methods: { boom },
     })))
   const client = await fero('scoped', { hosts: addrs, heartbeatMs: 50, redialMs: 30 })
   try {
@@ -184,7 +184,7 @@ test('COVERAGE ATTESTATION [0/28/53] — an answerer that does not ATTEST a part
 })
 
 test('SYSTEM PLANE [5] — a user method named `read` owns the public name but never intercepts the internal keyed hop', async () => {
-  const nodes = await spawn(3, 2, { read: () => 'USER-READ-SENTINEL' })
+  const nodes = await spawn(3, 2, { methods: { read: () => 'USER-READ-SENTINEL' } })
   try {
     assert.ok(await formed(nodes), 'formed')
     for (let i = 0; i < 6; i++) nodes[i % 3].data[`u${i}`] = { v: i }

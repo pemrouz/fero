@@ -290,7 +290,7 @@ test('Context.peer: a wire call carries the caller uuid, a local invoke carries 
   const addr = `127.0.0.1:${await ports.free()}`
   let s: Fero | undefined, c: Fero | undefined
   try {
-    s = await fero(`peer-${process.pid}`, { listen: addr, heartbeatMs: 50, redialMs: 30, rendezvous: false, who: (_: unknown, ctx: { peer?: string }) => ctx.peer ?? null })
+    s = await fero(`peer-${process.pid}`, { listen: addr, heartbeatMs: 50, redialMs: 30, rendezvous: false, methods: { who: (_: unknown, ctx: { peer?: string }) => ctx.peer ?? null } })
     c = await fero(`peer-${process.pid}`, { hosts: [addr], heartbeatMs: 50, redialMs: 30, rendezvous: false })
     assert.ok(await until(() => peers(c!) === 1))
     assert.equal(await c.methods.who(), me(c).uuid)

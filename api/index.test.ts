@@ -21,20 +21,72 @@ import { JK } from '../kernel/journal.ts'
 import { ports, until } from '#utils'
 import type { WriteReject, WriteResolve } from './types.ts'
 
-test('config recognition: unknown keys and unknown seams throw at fero() time; function values are methods', async () => {
+test('config recognition (V4-5): unknown keys, unknown seams and TOP-LEVEL FUNCTIONS throw at fero() time; methods live under methods:', async () => {
   await assert.rejects(fero('r', { prot: 9 } as never), /unknown option 'prot'/)
   await assert.rejects(fero('r', { seams: { hash: () => 0 } } as never), /unknown seam 'hash'/)
-  //! a function-valued opt is a METHOD (recognized by value type, not key name) — and on a server it
-  // dispatches LOCALLY (M5c): one-shot invoke, flush-on-return, snapshot for proxy returns
-  const f = await fero('r', { listen: false, checkout: (n: unknown) => `order-${n}` })
+  //! the pre-V4-5 spelling ("any function is a method") is refused with the pointer — moving the function
+  // under methods: also declares the door, on purpose
+  await assert.rejects(fero('r', { listen: false, checkout: (n: unknown) => `order-${n}` } as never), /methods live under methods: \{ checkout \}/)
+  await assert.rejects(fero('r', { methods: 'sell' } as never), /methods must be a plain object/)
+  await assert.rejects(fero('r', { methods: () => 1 } as never), /methods must be a plain object/, 'a function-valued methods: gets the plain-object message, not a pointer to methods: { methods }')
+  await assert.rejects(fero('r', { methods: new (class { sell() { return 1 } })() } as never), /plain object of handlers/, 'a class instance keeps its handlers on the prototype — it would host nothing and protect everything')
+  await assert.rejects(fero('r', { methods: { sell: 1 } } as never), /methods\.sell must be a function/)
+  //! under methods: a handler dispatches LOCALLY on a server (M5c): one-shot invoke, flush-on-return,
+  // snapshot for proxy returns
+  const f = await fero('r', { listen: false, methods: { checkout: (n: unknown) => `order-${n}` } })
   assert.equal(await f.methods.checkout(7), 'order-7')
   //! built-in read returns the resource (snapshot locally)
   f.data.k = 1
   assert.deepEqual(await f.methods.read(), { k: 1 })
   //! reserved names refuse loudly
-  await assert.rejects(fero('r', { update: () => 0 } as never), /built-in writer/)
-  await assert.rejects(fero('r', { ['\u0000evil']: () => 0 } as never), /reserved for the system plane/)
+  await assert.rejects(fero('r', { methods: { update: () => 0 } } as never), /built-in writer/)
+  await assert.rejects(fero('r', { methods: { ['\u0000evil']: () => 0 } } as never), /reserved for the system plane/)
   await f.destroy()
+})
+
+test("V4-5 the door: `methods:` makes clients change data ONLY through the methods — plain writes and the write builtins bounce 'methods-only'; the server's own writes and its handlers stay trusted; the validator still guards the trusted side", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeatMs: 50, redialMs: 30,
+    data: { stock: 3 },
+    seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') },
+    //! the handler READ idiom: `await ctx.data.stock` is the current value (the live view is thenable —
+    // v2 parity); a bare `ctx.data.stock` is the live child view, not the number
+    methods: { sell: async (n: number, ctx: { data: any }) => { const stock = (await ctx.data.stock) as number; ctx.data.stock = stock - n; return stock - n } },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeatMs: 50, redialMs: 30 })
+  const view = (f: typeof c) => snapshot(f.data) as Record<string, unknown>
+  const rows = (f: typeof c) => Object.values(snapshot(f.cluster).writes as Record<string, { key: string; state: string; reason?: string }>)
+  try {
+    assert.ok(await until(() => view(c).stock === 3, 8000), 'the spoke folded the seed')
+    //! a plain client assignment: visible optimistically, then it BOUNCES with the door's reason
+    c.data.stock = 99
+    assert.equal(view(c).stock, 99, 'read-your-writes until the relay answers')
+    assert.ok(await until(() => view(c).stock === 3, 8000), 'bounced — the relay refused it')
+    assert.ok(await until(() => rows(c).some((r) => r.key === JSON.stringify(['stock']) && r.state === 'rejected' && r.reason === 'methods-only'), 8000), 'cluster.writes names the door')
+    //! the write builtins are the same bytes as assignment — refused identically, typed, never a timeout
+    const door = (e: { reason: string; reached: string }) => e.reason === 'methods-only' && e.reached === 'issued'
+    await assert.rejects(c.methods.update({ key: 'stock', value: 1 }, { timeout: 8000 }), door)
+    await assert.rejects(c.methods.insert({ value: { x: 1 } }, { timeout: 8000 }), door)
+    await assert.rejects(c.methods.remove({ key: 'stock' }, { timeout: 8000 }), door)
+    //! THE door: the method changes data (flush-on-return — the host holds it before replying)
+    assert.equal(await c.methods.sell(1), 2)
+    assert.equal(view(s).stock, 2)
+    assert.ok(await until(() => view(c).stock === 2, 8000), 'the change replicated back to the spoke')
+    //! the pin is about the WIRE: the server's own write lands and replicates…
+    s.data.note = 'mine'
+    assert.ok(await until(() => view(c).note === 'mine', 8000))
+    //! …and the validator still guards the trusted side: the server's OWN admin write bounces locally
+    s.data.admin = 5
+    assert.equal(view(s).admin, undefined)
+    assert.equal(view(s).stock, 2, 'nothing the client sent directly ever landed')
+  } finally {
+    await c.destroy()
+    await s.destroy()
+  }
+  //! `methods: {}` alone is a server that clients may only read
+  const ro = await fero(`ro-${process.pid}`, { methods: {}, heartbeatMs: 0 })
+  try { assert.equal((snapshot(ro.cluster) as { me: { role: string } }).me.role, 'server') } finally { await ro.destroy() }
 })
 
 test('M6 config: replicas validates loudly (integer ≥ 1, servers only) and surfaces on cluster.partitions; unscoped shows zeros', async () => {
@@ -364,7 +416,7 @@ test('v4.1 roles: following is ambient, serving is a declared act — in the bat
   assert.match(vm.listen, /^127\.0\.0\.1:[1-9]\d*$/, 'a real ephemeral port, never :0')
   assert.deepEqual(snapshot(viaData.data), { k: 1 }, 'seeded')
   await viaData.destroy()
-  const viaMethod = await fero('r', { listen: false, m: () => 1 })
+  const viaMethod = await fero('r', { listen: false, methods: { m: () => 1 } })
   assert.equal(typeof viaMethod.methods.anything, 'undefined', 'methods imply server')
   await viaMethod.destroy()
   //! the loud refusals: an undialable member; a role pin that is not literally true; a dead-end

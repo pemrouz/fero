@@ -78,7 +78,7 @@ test('served() + drop(): the v2 leak guard — an ungraceful peer drop reaps its
   const pa = await ports.free()
   const a = await fero('r', {
     uuid: 'aa', listen: `127.0.0.1:${pa}`, heartbeatMs: 50,
-    watch: (_: unknown, ctx: { data: unknown }) => ctx.data, // returns a proxy → subscribable
+    methods: { watch: (_: unknown, ctx: { data: unknown }) => ctx.data }, // returns a proxy → subscribable
   })
   //! redialMs 500 keeps the client's reconnect+resubscribe OUT of the assertion window (WSL2 timing)
   const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 500 })

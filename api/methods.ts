@@ -37,8 +37,19 @@ import { VERB } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, isProxy, proxy, records, snapshot } from './substrate.ts'
-import type { Coords } from './data.ts'
+import type { Coords, Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
+
+//! settle — flush-on-return's wait (V4-5): every tracked write reaches an outcome; a write the validator
+// REFUSED (api/data.ts Refused) fails the handler with the reason — a reply that claims an effect that
+// never happened is §9's banned silent partial, and under `methods:` the handler is the client's only
+// door. The kernel's own string outcomes ('superseded' | 'dropped' | 'destroyed') stay swallowed here,
+// as before — whether they should fail the call too is a separate decision (retry semantics).
+const settle = async (tracked: Promise<Coords>[]): Promise<void> => {
+  for (const r of await Promise.allSettled(tracked))
+    if (r.status === 'rejected' && (r.reason as Refused | null)?.refused === true)
+      throw new Error(`write refused (${(r.reason as Refused).key}): ${(r.reason as Refused).reason}`)
+}
 
 //! SYSTEM — the reserved method-name prefix (unreachable from fero() opts: the composer rejects it):
 // internal RPCs (confirm-over-the-wire) share the method plane without stealing any user name.
@@ -108,7 +119,7 @@ export class Host {
     const tracked: Promise<Coords>[] = []
     const ctx: Context = {
       data: this.#data,
-      flush: async () => { await Promise.all(tracked.splice(0).map((p) => p.catch(() => {}))) },
+      flush: () => settle(tracked.splice(0)),
       live: mode === VERB.SUB,
       ...(this.#rt.node.links.get(link)?.uuid ? { peer: this.#rt.node.links.get(link)!.uuid } : {}),
     }
@@ -124,7 +135,7 @@ export class Host {
         result = this.#als.run(tracked, () => fn(a, ctx))
         if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
           result = await result
-        await Promise.all(tracked.map((p) => p.catch(() => {}))) // flush-on-return
+        await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
       } catch (err) {
         if (entry && this.#subs.get(skey) === entry) this.#subs.delete(skey)
         //! M6: a thrown ScopedError ships AS the error value (rehydrated typed at the caller);
@@ -174,11 +185,11 @@ export class Host {
     const fn = this.#methods[m]
     if (!fn) throw new Error(`unknown method '${m}'`)
     const tracked: Promise<Coords>[] = []
-    const ctx: Context = { data: this.#data, flush: async () => { await Promise.all(tracked.splice(0).map((p) => p.catch(() => {}))) } }
+    const ctx: Context = { data: this.#data, flush: () => settle(tracked.splice(0)) }
     let result: unknown = this.#als.run(tracked, () => fn(a, ctx))
     if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
       result = await result
-    await Promise.all(tracked.map((p) => p.catch(() => {}))) // flush-on-return
+    await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
     return isProxy(result) ? structuredClone(snapshot(result)) : result
   }
 

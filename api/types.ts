@@ -4,6 +4,7 @@
 // `any` is wrapped at api/substrate.ts and never propagates past this surface.
 
 import type { Rec } from '../kernel/env.ts'
+import type { Context } from './methods.ts'
 
 //! Guarantee — the confirm ladder a write can be awaited at. 'committed' = stamped + applied at the
 // owner (coordinates known); 'replicated' = a majority of the committed view holds it in-log
@@ -29,6 +30,9 @@ export interface WriteResolve {
 export interface WriteReject {
   guarantee: Guarantee
   reached: 'issued' | 'committed'
+  //! reason — 'timeout' | 'superseded' | 'dropped' | 'destroyed' (the kernel's outcomes), 'methods-only'
+  // (the server takes client changes only through its `methods:` — V4-5), or the server's own
+  // seams.validation string for a relayed record it refused (V4-4).
   reason: string
   localCommit?: { origin: string; seq: number; epoch: number }
 }
@@ -52,22 +56,24 @@ export interface WriteOpts {
 // hook BOTH assignment and methods.update pass through — v2's OQ6 closed by construction);
 // hash/codec/storage land with their milestones.
 export interface Seams {
-  //! validation — return true to admit, or a reason string to reject (assignment bounces + reverts;
-  // methods.* rejects with the reason). Runs at the ONE local ingest, before anything is issued — AND,
-  // on a server, at the relay ingress for the client writes it relays (relay time is an issuer
-  // boundary): a refused relayed write WNACKs `invalid` with the reason, so the CLIENT's promise rejects
-  // with it and a plain client assignment bounces exactly like a local reject. Keep it a pure function
-  // of the record: it runs inside the kernel step, and a retransmit of an already-committed record is
-  // dup-ACKed without re-checking. It bounds WHAT an admitted client may write, per record; it does not
-  // see WHO wrote it — per-caller rules belong in hosted methods (ctx.peer).
+  //! validation — a SCHEMA check: what a record may look like, never who may write it. Return true to
+  // admit, or a reason string to reject (assignment bounces + reverts; methods.* rejects with the
+  // reason; inside a hosted method the CALL fails with it — V4-5). Runs at the ONE local ingest, before
+  // anything is issued — the server's own writes, its handlers' ctx.data writes, the data: seed — AND,
+  // on an OPEN server, at the relay ingress for the client writes it relays (V4-4: a refused relayed
+  // write WNACKs `invalid` with the reason, so the client's promise rejects and a plain client
+  // assignment bounces exactly like a local reject). Under `methods:` no client record ever reaches
+  // it — the door refuses first. Keep it a pure function of the record: it runs inside the kernel step,
+  // and a retransmit of an already-committed record is dup-ACKed without re-checking. Per-caller rules
+  // belong in hosted methods (ctx.peer).
   validation?: (rec: Rec) => true | string
 }
 
-//! FeroConfig — the declared, picked config schema. Unknown non-function keys throw at fero() time.
+//! FeroConfig — the declared, picked config schema. Unknown keys throw at fero() time; so does a
+// function-valued key (methods live under `methods:` — V4-5).
 //! Role (v4.1) is by DECLARED ACT: any server marker — server: true, listen, dir, replicas, a `data`
-// seed, or any function-valued option (hosted methods) — makes a server; no marker makes a CLIENT
-// dialing its hosts (or, bare, the servers the directory lists for the name). Role is a pure
-// function of the config.
+// seed, or `methods:` — makes a server; no marker makes a CLIENT dialing its hosts (or, bare, the
+// servers the directory lists for the name). Role is a pure function of the config.
 export interface FeroConfig {
   uuid?: string
   //! server — the explicit role pin: serve even with no other marker (binds a free loopback port
@@ -99,12 +105,24 @@ export interface FeroConfig {
   //! data (v4.1) — initial rows, applied ONLY when the local fold is empty at boot (a durable
   // restore or replayed state never re-seeds); rides the ordinary validated ingest. Implies server.
   data?: Record<string, unknown>
+  //! methods (V4-5) — the hosted methods, AND THE DOOR: declaring them means clients change data ONLY
+  // through them. Every relayed plain write from a client — assignment, delete, the write builtins,
+  // methods.update/insert/remove (one ingest, the same bytes) — is refused at the relay with the
+  // terminal reason 'methods-only' (the client's promise rejects typed; a plain assignment bounces).
+  // The pin is about the WIRE: the server's own writes and its handlers' ctx.data writes are trusted
+  // (they still meet seams.validation). Reads and subscriptions stay open — reads are not writes.
+  // Omit it for an OPEN resource (anyone admitted may write anything — the demo shape). Open or
+  // protected, nothing in between. `methods: {}` is a resource clients may only read. A handler gets
+  // (arg, ctx): ctx.data is the server's own surface, ctx.peer the caller's uuid, ctx.flush() the
+  // mid-body barrier. Names may not start with \u0000 (the system plane) or be update/insert/remove
+  // (the built-in writers). Implies server.
+  methods?: Record<string, (arg: any, ctx: Context) => unknown>
   seams?: Seams
 }
 
-//! FeroOpts — config + methods in one bag, recognized by VALUE TYPE: function values are methods,
-// everything else must be a declared config key. (No `methods:` wrapper key — plan §9 verbatim.)
-export type FeroOpts = FeroConfig & { [method: string]: unknown }
+//! FeroOpts — the config bag. Recognition is by DECLARED KEY (V4-5 retired the "any function-valued
+// option is a method" rule: a top-level function throws with a pointer to `methods:`).
+export type FeroOpts = FeroConfig
 
 //! Methods — the one RPC/write namespace. M5a ships the default writers; user methods + remote
 // dispatch (return-type consumption, subscriptions) land at M5c.
