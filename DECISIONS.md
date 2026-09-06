@@ -414,3 +414,108 @@ terminal at the issuer + owner-of-record + malformed `m`; the relay hop; the
 forged-ae client; the client-link ACK/NACK drop), sim/client.test.ts (under
 the executive, every monitor green), api/index.test.ts (the probe) — each
 mutation-checked. Battery: 379/379 + 18/18 + perf 41/41.
+
+## V4-5 — `methods:` is the door; spokes are views (2026-09-06)
+Context: V4-4 left two things open. (1) The "methods only" door — three
+independent design proposals converged on a new `writes:` config key with a
+verb-granular reopen list. (2) Evidence that an admitted spoke could ship
+RECORDS to a server: kernel/node.ts's RECORDS case checked admission, not
+`link.client`, and the DIGEST handler's suffix-ship loop ran on spokes too, so
+a spoke ahead of its feeder re-taught it. The user cut both: "open or
+protected, nothing in between"; `methods:` is the word, its presence protects;
+a spoke never teaches — it resyncs to the cluster's truth.
+Decision:
+- **`methods:` — the one spelling for hosted methods, and THE DOOR.** A
+  declared FeroConfig key: a plain object of handlers `(arg, ctx) => …`;
+  names off the system plane and off the built-in writers, exactly as before.
+  A top-level function-valued option now THROWS with a pointer (`'sell' is a
+  function — methods live under methods: { sell }, and declaring them makes
+  clients change data only through them`): the pre-V4-5 "any function is a
+  method" recognition rule is retired, so recognition is by declared key
+  alone (FeroOpts = FeroConfig — TypeScript catches typos too). Presence =
+  PROTECTED: every relayed client record — assignment, delete, the write
+  builtins, methods.update/insert/remove (one ingest, the same bytes) — is
+  refused at the relay with the terminal reason 'methods-only' (V4-4's
+  `invalid` WNACK, `m` 'methods-only') BEFORE any user code runs; the client's
+  promise rejects typed, a plain assignment bounces, cluster.writes names the
+  door. Reads and subscriptions stay open (reads are not writes). The pin is
+  about the WIRE: the server's own writes and its handlers' ctx.data writes
+  are trusted — and still meet seams.validation. `methods: {}` = a resource
+  clients may only read. Implies server. No reopen knob.
+  Mechanics: ZERO kernel change — the door is a degenerate admission
+  predicate (`() => 'methods-only'`) the composer folds into V4-4's one hook
+  (NodeOpts.validate) instead of the server's validator; open servers hand
+  the kernel exactly what V4-4 did. The `#directory` host declares its methods
+  and is protected for free.
+  REJECTED: a `writes:` key (a second word for what `methods:` already says;
+  its reopen list is the "in between" ruled out). Keeping top-level functions
+  as an open-server spelling beside `methods:` (two spellings whose placement
+  changes who may write). A kernel mode flag + a typed `NACK.methodsOnly`
+  refusing on the tag byte without decoding the body (cheaper under hostile
+  spam, but a second refusal mechanism and more kernel; add it only if a
+  consumer needs the typed class — IDEAS). Advertising the pin in HELLO for a
+  zero-RTT client refusal (a wire-surface change; the round-trip bounce is
+  honest — IDEAS).
+- **A validator-refused write inside a handler FAILS the call.** Bind.issue
+  leaves a `Refused {refused, key, reason}` rejection in the live handler
+  collector; the Host's flush-on-return and `ctx.flush()` throw
+  `write refused (<cell>): <reason>` — wire CALL and invokeLocal alike. Under
+  the door the handler is the client's only way in, so a reply that claims an
+  effect that never happened is §9's banned silent partial. The kernel's own
+  outcomes ('superseded' | 'dropped' | 'destroyed') stay swallowed — whether
+  they should fail the call too is a separate decision (retry semantics —
+  IDEAS). Handler READ idiom, stated: `await ctx.data.x` is the current value
+  (the live view is thenable, v2 parity); a bare `ctx.data.x` is the live
+  child view, not the number. Panel notes (the one review lens that ran):
+  the Refused rides the LENS path only — a handler calling the instance's
+  own methods.update gets its typed WriteReject alone, so a handler that
+  catches it recovers (a double report would have overridden it); `methods:`
+  must be a PLAIN object (a class instance keeps its handlers on the
+  prototype — it would host nothing and protect everything — refused at
+  fero() time); and the loudness holds for CALL and invokeLocal — on the SUB
+  leg a refused handler write, like ANY thrown SUB handler, leaves a stream
+  that never opens with no client-side error: a pre-existing gap of the
+  subscription leg, filed in IDEAS, not widened here.
+- **Spokes are VIEWS, not replicas.** (i) A client never ships a suffix: the
+  DIGEST handler's client branch answers r=1 with its tails and ships nothing.
+  (ii) A server drops RECORDS arriving on a client link (frameDrop 'records
+  from client', link kept — a pre-fix spoke that is ahead still ships: stale,
+  not hostile). (iii) RESYNC: when the feeder's digest shows a lane tail BELOW
+  the spoke's, the cluster's truth moved under it (records died with a server;
+  a failover landed on a lagging feeder). The spoke resets its fold
+  (#resetFold, shared with condemn), sends an EMPTY r=1 digest, and on the
+  feeder's r=0 reply — sent after the suffix on the same FIFO link — removes
+  every cell held at the reset that did not come back, through the ordinary
+  apply effect (a synthesized remove under its own name, seq 0: never logged,
+  never on the wire; the overlay keeps a still-pending own write on top).
+  The projection is left as it is until then: no remove-everything flicker.
+  "Ahead of my feeder" is a TRUE signal on the single-feeder FIFO — at the
+  instant a feeder builds a digest its tails cover everything it has shipped.
+  Journal `resync`(a=cells) / `resynced`(a=ghosts); the debug fold model
+  treats `resync` exactly like `walTaint`. Survives a failover (the new
+  primary's reply completes it).
+  REJECTED: per-lane truncation with a local refold (compaction keeps only
+  current winners, so a cell's previous value may be gone locally — only a
+  full re-download is honest). Keeping the spoke's extra records forever (the
+  cluster is the truth; a spoke holding what the cluster lost would diverge
+  permanently). A remove-everything projection reset at the start (visible
+  flicker on every failover onto a lagging feeder; the completion diff
+  removes only real ghosts).
+Consequences: BREAKING within 4.x — `fero(name, { sell: fn })` throws; write
+`methods: { sell }` and know it now protects. Open servers (no `methods:`)
+are unchanged: the two-terminal demo's client keeps writing plainly — that
+is the intended homepage narrative (the demo; "you probably don't want
+everyone to change anything"; protect with named methods). Site claims to
+re-pitch: "any function: a hosted method" → `methods:`; the seams.validation
+rows → a schema check (V4-4). IDEAS Security P2 closes (both steps); the r:1
+peer-auth item narrows to the HELLO uuid spoof (RECORDS from a spoke now
+drop; a spoke never ships). Tests: api/index.test.ts (recognition rewritten;
+the door: assignment + builtins bounce 'methods-only', the method writes, the
+server's own writes land, the validator guards the trusted side, `methods:
+{}` is a server; the spoke resync over real sockets), api/methods.test.ts
+(a refused handler write fails the call, flush throws, recovery, local
+rule), kernel/client.test.ts (a spoke never ships + resyncs with ghost
+removes; RECORDS on a client link drop), sim/client.test.ts (a feeder dies
+holding a record only it and its spoke had — the spoke fails over to a
+lagging member, resyncs down, and the record returns through the cluster),
+tools/debug/eli5 + model gates. Battery: 385/385 + 18/18 + perf 41/41.

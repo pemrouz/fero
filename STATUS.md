@@ -305,3 +305,22 @@ inside the outer apply.
   the r:1 item). Pinned ×7 (kernel/write ×5, sim/client, api/index — the
   probe), each mutation-checked. Step 2 (the opt-in methods-only door) is
   under design review — see IDEAS. Battery: 379/379 + 18/18 + perf 41/41.
+
+- 2026-09-06 — `methods:` IS THE DOOR; SPOKES ARE VIEWS (DECISIONS V4-5). The
+  one spelling for hosted methods is now `methods: { sell(arg, ctx) {…} }` —
+  a top-level function throws with the pointer — and its presence PROTECTS
+  the resource: every relayed client write (assignment, delete, the
+  builtins, methods.update/insert/remove — one ingest) bounces with the
+  terminal reason 'methods-only'; the server's own writes and its handlers
+  stay trusted (and still meet seams.validation); reads stay open. Zero
+  kernel change: the door is a degenerate predicate folded into V4-4's one
+  hook. Open or protected, nothing in between (the panel's `writes:` key and
+  reopen list REJECTED). A validator-refused write inside a handler now
+  FAILS the call (`write refused (<cell>): <reason>`; ctx.flush() throws it).
+  The spoke hole closed: a client never ships a suffix, a server drops
+  RECORDS on client links, and a spoke AHEAD of its feeder RESYNCS to the
+  cluster's truth (fold reset → empty r=1 digest → the r=0 reply completes:
+  ghosts removed downstream; journal resync/resynced, the debug fold model
+  treats resync like walTaint). The `#directory` host is protected for free.
+  BREAKING within 4.x: `fero(name, { sell: fn })` → `methods: { sell }`.
+  Battery: 385/385 + 18/18 + perf 41/41.

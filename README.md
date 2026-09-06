@@ -416,7 +416,7 @@ shell/    production adapters (TCP + timers + the fsync WAL/boot-record store), 
 api/      the public surface: fero(name, opts) → {name, data, methods, cluster, snapshot, destroy} (V4-2: role by declared act; V4-3: bare fero(name) = a client that looks the name up in the box's #directory, a server binds a free port and registers — api/directory.ts)
   substrate.ts  the ONE seam onto the `data` sibling ($() proxies): record-apply ingress, clone-free capture, sync detach
   data.ts       the binding: capture→ingest, apply→proxy, echo match-and-consume, the cid-keyed overlay (read-your-writes)
-  index.ts      the composer: declared config schema (typos throw), seams.validation, default write methods over the confirm ladder
+  index.ts      the composer: declared config schema (typos throw), `methods:` = the hosted methods AND the door (V4-5), seams.validation, default write methods over the confirm ladder
   methods.ts    the method plane (M5c): the invoke HOST (flush-on-return via ALS) + the rpc CALLER (dual-mode Handles, failover policies)
   types.ts      the exported unions: Guarantee, WriteResolve/WriteReject, FeroConfig, Fero
   diagnostics.ts the Symbol-keyed internals seam (M7): capture/journal/served/confirms/compact/drop — absent beats faked
@@ -665,6 +665,10 @@ a real multi-process cluster over the wire).
     and, since 2026-09-05, the writes a server RELAYS for its clients
     (DECISIONS V4-4): the relay is an issuer boundary and validates like one;
     a refusal is the terminal WNACK `invalid` and the client sees the reason.
+    Since 2026-09-06 (V4-5) `methods:` is the door: declaring hosted methods
+    makes clients change data ONLY through them ('methods-only' bounces every
+    relayed plain write); spokes are views — they never teach a server and
+    resync to the cluster's truth when their feeder's digest is below theirs.
   - ~~Capture-path overlay entries whose attempt the kernel drops at
     MAX_PENDING overflow released only on the cell's next apply~~ — closed by
     M5b: onAck feeds the dedup window (WACK coordinates ARE original commit
