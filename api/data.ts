@@ -44,6 +44,11 @@ export interface Coords { origin: string; seq: number; epoch: number; cid?: numb
 // methods.* awaits them.
 export type Issued = (Promise<Coords> | string)[]
 
+//! Refused — the rejection a validator-refused write leaves in a HANDLER's collector (V4-5): the Host's
+// flush-on-return fails the call with it. `refused: true` is the discriminant against the kernel's
+// string outcomes ('superseded' | 'dropped' | 'destroyed'), which stay swallowed there.
+export interface Refused { refused: true; key: string; reason: string }
+
 interface Pending {
   cell: string
   cid: number
@@ -128,6 +133,7 @@ export class Bind {
     const node = this.#rt.node
     const out: Issued = new Array(recs.length)
     const valid: Rec[] = []
+    const t = this.#tracked?.()
     for (let i = 0; i < recs.length; i++) {
       const v = this.#validate ? this.#validate(recs[i]) : true
       if (v !== true) {
@@ -193,7 +199,6 @@ export class Bind {
     }
     let vi = 0
     for (let i = 0; i < recs.length; i++) if (out[i] === undefined) out[i] = promises.get(valid[vi++])!
-    const t = this.#tracked?.()
     if (t) for (const pr of promises.values()) t.push(pr)
     return out
   }
@@ -291,7 +296,23 @@ export class Bind {
     }
     //! assignments have no await surface — swallow the coordinate promises (their overlay/journal
     // effects are the observable outcome), but NEVER let a reject become an unhandledRejection
-    for (const r of this.issue(recs, false)) if (typeof r !== 'string') (r as Promise<Coords>).catch(() => {})
+    const out = this.issue(recs, false)
+    const t = this.#tracked?.()
+    for (let i = 0; i < out.length; i++) {
+      const r = out[i]
+      if (typeof r !== 'string') { (r as Promise<Coords>).catch(() => {}); continue }
+      //! a refused ASSIGNMENT inside a HANDLER is not allowed to be silent (V4-5): a reply that claims an
+      // effect that never happened is §9's banned silent partial, and under `methods:` the handler is the
+      // client's only door. The lens path has no await surface of its own, so the refusal is left in the
+      // handler's collector as a Refused rejection — flush-on-return fails the call. methods.* callers
+      // are NOT reported here: they get their own typed WriteReject and decide (a handler that catches
+      // it and recovers must not be overridden at flush — the panel's double-report finding).
+      if (t) {
+        const p = Promise.reject({ refused: true, key: cellOf(recs[i]), reason: r } satisfies Refused) as Promise<Coords>
+        p.catch(() => {})
+        t.push(p)
+      }
+    }
   }
 
   //! sweep — the kernel-side settlement probe: the MAX_PENDING release (M5b, closes the M5a residual)

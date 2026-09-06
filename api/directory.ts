@@ -295,7 +295,9 @@ export class Directory {
     let host: Fero | null = null
     const { methods, onPeers } = hostMethods(() => (host ? (snapshot(host.cluster) as { peers: Peers }).peers ?? {} : {}))
     try {
-      host = await o.compose(DIRECTORY, { listen: o.addr, heartbeatMs: o.heartbeatMs, ...(o.redialMs !== undefined ? { redialMs: o.redialMs } : {}), ...methods }, true)
+      //! `methods:` makes the directory PROTECTED (V4-5): its clients only ever CALL register/lookup, so a
+      // stray plain write into the box's directory is refused at the relay, never folded
+      host = await o.compose(DIRECTORY, { listen: o.addr, heartbeatMs: o.heartbeatMs, ...(o.redialMs !== undefined ? { redialMs: o.redialMs } : {}), methods }, true)
       if (this.#destroyed) { await host.destroy(); return }
       this.host = host
       this.#fails = 0

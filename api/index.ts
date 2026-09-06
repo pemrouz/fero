@@ -1,10 +1,10 @@
 //! ── api/index — the composer: fero(name, opts) → { name, data, methods, cluster, snapshot, destroy } ──
 // The whole public surface (plan §9, the v2 shape kept): zero events, zero hooks —
 // everything reactive is a ViewProxy you connect or tap. Config recognition is by
-// VALUE TYPE backed by a DECLARED schema: function-valued opts are methods (any
-// name — no reserved-verb discipline), non-function values must be known FeroConfig
-// keys, typos throw at fero() time. Function-valued CONFIG lives under the one
-// reserved `seams` key so the recognition rule survives.
+// DECLARED KEY: every option must be a known FeroConfig key, typos throw at fero()
+// time, and hosted methods live under `methods:` — whose presence is THE DOOR (V4-5:
+// clients change a protected resource only through its methods). Function-valued
+// CONFIG lives under the one reserved `seams` key.
 //
 // M5a scope: the server/solo composer over the shell Runtime — data binding both
 // directions with the cid-overlay (api/data.ts), the default write methods with
@@ -28,8 +28,13 @@ import { captureNode } from '../tools/debug/capture.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'seams', 'rendezvous'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'methods', 'seams', 'rendezvous'])
 const SEAM_KEYS = new Set(['validation'])
+//! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
+// V4-4's `invalid` WNACK as `m`, surfaces as WriteReject.reason and cluster.writes.reason, and is what a
+// plain client assignment bounces on. A degenerate admission predicate folded into the ONE kernel hook.
+export const METHODS_ONLY = 'methods-only'
+const METHODS_ONLY_ADMIT = (_: Rec): true | string => METHODS_ONLY
 
 //! discovery (V4-3, DESIGN-DIRECTORY.md): no name hashing — a server binds a FREE loopback port and
 // registers {name, uuid, listen} with the per-box directory (api/directory.ts, the `#directory`
@@ -49,18 +54,30 @@ export const fero = (name: string, opts: FeroOpts = {}): Promise<Fero> => compos
 const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise<Fero> => {
   if (typeof name !== 'string' || name === '') throw new Error(`fero(${JSON.stringify(name)}): name must be a non-empty string`)
   if (!isSystem && name.startsWith('#')) throw new Error(`fero('${name}'): names starting with # are reserved for system resources (${DIRECTORY})`)
-  //! split by value type: functions → methods; the rest must be declared config
-  const userMethods: Record<string, (...args: unknown[]) => unknown> = {}
+  //! every option is a DECLARED key (V4-5): a function-valued option is the pre-V4-5 method spelling —
+  // refused with the pointer (moving it under `methods:` also declares the door, on purpose)
   const config: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(opts)) {
-    if (typeof v === 'function') {
-      if (k.startsWith(SYSTEM)) throw new Error(`fero('${name}'): method names may not start with \\u0000 (reserved for the system plane)`)
-      if (k === 'update' || k === 'insert' || k === 'remove') throw new Error(`fero('${name}'): '${k}' is a built-in writer — wrap it via seams.validation or name the method differently`)
-      userMethods[k] = v as (...args: unknown[]) => unknown
-    }
-    else if (CONFIG_KEYS.has(k)) config[k] = v
-    else throw new Error(`fero('${name}'): unknown option '${k}' — config keys are ${[...CONFIG_KEYS].join(', ')}; function values are methods`)
+  for (const [k, v] of Object.entries(opts as Record<string, unknown>)) {
+    if (typeof v === 'function' && k !== 'methods') // `methods: fn` gets the plain-object message below, not a pointer to methods: { methods }
+      throw new Error(`fero('${name}'): '${k}' is a function — methods live under methods: { ${k} }, and declaring them makes clients change data only through them`)
+    if (!CONFIG_KEYS.has(k)) throw new Error(`fero('${name}'): unknown option '${k}' — config keys are ${[...CONFIG_KEYS].join(', ')}`)
+    config[k] = v
   }
+  //! methods: — the hosted methods AND the door (V4-5). Validated as a whole at fero() time: a PLAIN
+  // object of functions (own enumerable handlers — a class instance keeps its methods on the prototype,
+  // would host nothing and protect everything: refused here, not discovered by clients at runtime);
+  // names off the system plane and off the built-in writers.
+  const m = config.methods
+  const plain = typeof m === 'object' && m !== null && !Array.isArray(m) && (Object.getPrototypeOf(m) === Object.prototype || Object.getPrototypeOf(m) === null)
+  if (m !== undefined && !plain)
+    throw new Error(`fero('${name}'): methods must be a plain object of handlers — methods: { sell(arg, ctx) { … } } (own functions, not a class instance) — its presence makes the resource protected (clients change data only through them)`)
+  const userMethods = (config.methods ?? {}) as Record<string, (...args: unknown[]) => unknown>
+  for (const [k, v] of Object.entries(userMethods)) {
+    if (typeof v !== 'function') throw new Error(`fero('${name}'): methods.${k} must be a function (arg, ctx) => …`)
+    if (k.startsWith(SYSTEM)) throw new Error(`fero('${name}'): method names may not start with \\u0000 (reserved for the system plane)`)
+    if (k === 'update' || k === 'insert' || k === 'remove') throw new Error(`fero('${name}'): methods.${k} is a built-in writer — wrap it via seams.validation or name the method differently`)
+  }
+  const methodsOnly = config.methods !== undefined
   const seams = (config.seams ?? {}) as Record<string, unknown>
   for (const k of Object.keys(seams))
     if (!SEAM_KEYS.has(k)) throw new Error(`fero('${name}'): unknown seam '${k}' — M5a ships ${[...SEAM_KEYS].join(', ')}; hash/codec/storage land with their milestones`)
@@ -68,7 +85,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   //! role by DECLARED ACT (v4.1 — supersedes the v2 hosts-without-listen rule): following is the
   // ambient case, serving is a declared act. Any server MARKER makes a server — server: true, listen
   // (an address, or false = the socketless solo), dir (durability), replicas (scoping), a `data`
-  // seed, or any function-valued option (methods are HOSTED). No marker = a CLIENT: a spoke dialing
+  // seed, or `methods:` (hosted methods — and the door, V4-5). No marker = a CLIENT: a spoke dialing
   // its hosts — or, bare, the name-derived local port. `hosts` is pure dial targets now: alone it
   // keeps the v2 client shape; beside a marker it makes a dialing member (listen+hosts, unchanged).
   // Role is a pure function of the CONFIG — never of timing, launch order, or who answers a dial.
@@ -79,7 +96,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   if (config.data !== undefined && (typeof config.data !== 'object' || config.data === null || Array.isArray(config.data)))
     throw new Error(`fero('${name}'): data must be a plain object of initial rows — it seeds the resource only when the local fold is empty at boot`)
   const isServer = config.server === true || config.listen !== undefined || config.dir !== undefined
-    || config.replicas !== undefined || config.data !== undefined || Object.keys(userMethods).length > 0
+    || config.replicas !== undefined || config.data !== undefined || methodsOnly
   const isClient = !isServer
   //! an undialable member is refused loudly: a socketless node cannot be dialed back, heartbeated,
   // or counted by genesis — the v2 rule ("a spoke that can never be dialed can never be a member")
@@ -168,11 +185,14 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     redialMs: config.redialMs as number | undefined,
     journalCap: config.journalCap as number | undefined,
     ...(config.replicas !== undefined ? { replicas: config.replicas as number } : {}),
-    //! the relay runs the SAME validator (2026-09-05): a client's plain write relayed through this
-    // server is admitted or refused by seams.validation exactly like this server's own issues — the
-    // kernel's relay ingress (kernel/write.ts onWrite, ae 0) gets the predicate as a pure NodeOpts fact.
-    // Inert on a client (nobody relays through a spoke); the local hook in Bind is unchanged.
-    ...(seams.validation !== undefined ? { validate: seams.validation as (rec: Rec) => true | string } : {}),
+    //! the relay's admission predicate (V4-4, V4-5): a client's plain write relayed through this server
+    // meets the kernel's relay ingress (kernel/write.ts onWrite) with THIS predicate — under `methods:`
+    // the door itself (every relayed record refused 'methods-only', before any user code runs);
+    // otherwise the server's seams.validation, exactly as for its own issues; otherwise nothing (open —
+    // the relay loop is the pre-V4-4 loop). Zero kernel change for the door: it is what the composer puts
+    // INTO the one hook. Inert on a client (nobody relays through a spoke).
+    ...(methodsOnly ? { validate: METHODS_ONLY_ADMIT }
+      : seams.validation !== undefined ? { validate: seams.validation as (rec: Rec) => true | string } : {}),
     ...(restored.boot !== undefined ? { boot: restored.boot } : {}),
     ...(restored.incarnation !== undefined ? { incarnation: restored.incarnation } : {}),
   }
