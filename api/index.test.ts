@@ -319,6 +319,27 @@ test("relayed client writes run the SERVER's seams.validation at the relay: the 
   }
 })
 
+test("a spoke re-syncs to the cluster's truth: a server reborn EMPTY makes the client's stale cells disappear — the client never re-teaches it", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  const a = await fero('r', { uuid: 'aa', listen: addr, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeatMs: 50, redialMs: 30 })
+  let a2: Awaited<ReturnType<typeof fero>> | null = null
+  const view = (f: typeof c) => snapshot(f.data) as Record<string, unknown>
+  try {
+    a.data.x = 1
+    a.data.y = 2
+    assert.ok(await until(() => view(c).y === 2, 8000), 'the spoke folded the server')
+    await a.destroy()
+    //! the server comes back with NOTHING (no dir): the cluster's truth is now empty
+    a2 = await fero('r', { uuid: 'aa2', listen: addr, heartbeatMs: 50, redialMs: 30 })
+    assert.ok(await until(() => view(c).x === undefined && view(c).y === undefined, 12000), 'the stale cells disappeared from the spoke')
+    assert.deepEqual(view(a2), {}, 'the spoke taught the reborn server nothing')
+  } finally {
+    await c.destroy()
+    await a2?.destroy()
+  }
+})
+
 test('v4.1 roles: following is ambient, serving is a declared act — in the battery the directory is OFF, so topologies are explicit', async () => {
   //! no marker = a CLIENT (the open method namespace is the client tell). With no directory (the
   // battery runs FERO_RENDEZVOUS=off) a client needs hosts — bare refuses loudly: nothing to dial.

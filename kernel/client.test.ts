@@ -158,3 +158,62 @@ test('primary failover: the feeder dies — next admitted server becomes primary
   assert.equal(re.length, 1, 'the in-flight attempt re-sent to the new relay immediately')
   assert.equal(re[0].prov()!.epoch, 0, 'still ae=0 — dedup at the owner absorbs any duplicate')
 })
+
+test("a spoke never teaches — and a spoke AHEAD of its feeder resyncs to the feeder's truth: fold reset, empty r=1 digest, ghosts removed on the r=0 reply", () => {
+  const h = harness('cl', { client: true, hosts: ['sim:aa'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'aa')
+  h.digestFrom(1) // the primary's reply: nothing held yet → nothing to compare
+  const lane = (from: number, keys: string[]) =>
+    encodeRuns(keys.map((k, i) => ({ rec: { type: REC.update, key: [k], value: k } as Rec, origin: 'bb', seq: from + i, epoch: 1 })))[0]
+  //! the feeder ships lane bb 1..3 (cells x, y, z)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: lane(1, ['x', 'y', 'z']) })
+  assert.equal(h.node.state.size, 3)
+  const applies0 = h.of('apply').length
+  //! the feeder's heartbeat digest (r=1) shows bb at tail 3: we are NOT ahead — no ship, a plain r=0 answer
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { bb: 3 }, r: 1 }) })
+  assert.equal(h.sentOn(1, VERB.RECORDS).length, 0, 'a spoke ships nothing')
+  assert.equal(h.node.resync, null)
+  let d = h.sentOn(1, VERB.DIGEST).map((f) => f.value as { d: Record<string, number>; r: number })
+  assert.equal(d[d.length - 1].r, 0); assert.equal(d[d.length - 1].d.bb, 3, 'answered with our tails')
+  //! now the feeder says bb is at tail 1: the cluster lost 2 and 3 — we are AHEAD of our feeder
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1 }, r: 1 }) })
+  assert.equal(h.sentOn(1, VERB.RECORDS).length, 0, 'STILL nothing shipped — a spoke never re-teaches a server')
+  assert.notEqual(h.node.resync, null, 'resync begun')
+  assert.equal(h.node.state.size, 0, 'the fold reset')
+  assert.equal(h.node.logs.size, 0)
+  d = h.sentOn(1, VERB.DIGEST).map((f) => f.value as { d: Record<string, number>; r: number })
+  assert.deepEqual(d[d.length - 1], { d: {}, r: 1 }, 'an EMPTY r=1 digest: send me everything, then tell me your tails')
+  assert.equal(h.of('apply').length, applies0, 'nothing removed downstream yet — the projection waits for the re-download')
+  assert.deepEqual(h.jk(JK.resync).map((e) => e.a), [3])
+  //! the feeder ships its truth (bb 1 = x) and then replies r=0 → complete: y and z are ghosts
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: lane(1, ['x']) })
+  assert.notEqual(h.node.resync, null, 'a record is not the completion marker — the reply is')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1 }, r: 0 }) })
+  assert.equal(h.node.resync, null)
+  assert.deepEqual([...h.node.state.keys()], [JSON.stringify(['x'])])
+  const removes = h.of('apply').slice(applies0).map((e) => e[1] as Rec).filter((r) => r.type === REC.remove).map((r) => r.key[0]).sort()
+  assert.deepEqual(removes, ['y', 'z'], 'ghost removes reached the api — exactly the cells that did not come back')
+  assert.deepEqual(h.jk(JK.resynced).map((e) => e.a), [2])
+  //! a later digest whose tails cover ours never re-triggers; an r=1 keeps being answered
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1 }, r: 1 }) })
+  assert.equal(h.node.resync, null)
+  d = h.sentOn(1, VERB.DIGEST).map((f) => f.value as { d: Record<string, number>; r: number })
+  assert.deepEqual(d[d.length - 1], { d: { bb: 1 }, r: 0 })
+})
+
+test('a server drops RECORDS arriving on a CLIENT link — a spoke is never a source: frame dropped, link kept, fold untouched', () => {
+  const h = harness('aa')
+  h.admit(1, 'bb')
+  h.digestFrom(1)
+  h.admit(2, 'zz', 1)
+  h.digestFrom(2)
+  const forged = () => encodeRuns([{ rec: { type: REC.update, key: ['forged'], value: 1 } as Rec, origin: 'bb', seq: 9, epoch: 1 }])[0]
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: forged() })
+  assert.equal(h.node.state.size, 0, 'nothing folded from a spoke')
+  assert.deepEqual(h.jk(JK.frameDrop).map((e) => e.b), ['records from client'])
+  assert.equal(h.node.links.get(2)!.dead, false, 'the link is kept — stale, not a wire fault')
+  //! the same bytes on the MEMBER link are ordinary replication
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: forged() })
+  assert.equal(h.node.state.size, 1)
+})

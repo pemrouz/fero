@@ -106,6 +106,9 @@ export const stateAt = (capture, uuid, t) => {
     // anti-entropy re-teaches the node. The end-state refold cannot see this (the re-taught fold coincides),
     // so the row is honoured HERE: everything replayed before the hole is gone at this step.
     else if (e.kind === K.walTaint) { state.clear(); versions.clear() }
+    //! resync: a spoke found itself ahead of its feeder — kernel/node.ts #resyncBegin wipes the fold exactly
+    // like condemn() and the feeder re-teaches it; same rule, same reason (the end-state refold cannot see it)
+    else if (e.kind === K.resync) { state.clear(); versions.clear() }
   }
   return state
 }
@@ -208,7 +211,7 @@ export const topologyAt = (capture, uuid, t) => {
     } else if (k === K.writeLocal) advance(uuid, e.a)
     else if (k === K.applyInbound) advance(e.a, e.b)
     else if (k === K.gateDrop) lane(e.a)
-    else if (k === K.walTaint) streams.clear() // condemn(): every lane is wiped with the fold; AE re-teaches (links untouched)
+    else if (k === K.walTaint || k === K.resync) streams.clear() // condemn() / a spoke's resync: every lane is wiped with the fold; AE re-teaches (links untouched)
   }
   return { links, streams }
 }

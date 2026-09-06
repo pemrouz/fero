@@ -104,6 +104,9 @@ export const JK = {
                      // for a session = diagAuth + linkDown. Do not "fix" this into spam.
   //! ── v4.1 admission vocabulary ──
   nameReject: 71,    // a=link, b=theirName — the HELLO declared a DIFFERENT resource name: refused (dead + noRedial), never admitted (admitting would silently cross-replicate two resources' logs)
+  //! ── spokes are views (2026-09-06, DECISIONS V4-5) ──
+  resync: 72,        // a=cells — a SPOKE found itself AHEAD of its feeder (the cluster's truth moved under it): fold reset, empty r=1 digest out, re-download begins
+  resynced: 73,      // a=ghosts — the re-download completed (the feeder's r=0 reply, FIFO after its suffix): cells held before that did not come back were removed downstream
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).
