@@ -519,3 +519,91 @@ removes; RECORDS on a client link drop), sim/client.test.ts (a feeder dies
 holding a record only it and its spoke had — the spoke fails over to a
 lagging member, resyncs down, and the record returns through the cluster),
 tools/debug/eli5 + model gates. Battery: 385/385 + 18/18 + perf 41/41.
+
+## V4-6 — the graceful leave: a clean destroy() shrinks the view by ballot (2026-09-07)
+Context: the user's by-hand run of the first example (two copies of one file,
+Ctrl-C one, start it again) wedged: the survivor at `writable false` forever,
+the newcomer never admitted. Arithmetic, not a bug: a view change needs a
+strict majority of the OLD view (membership.ts's joint check), a two-member
+view's old majority is both members, a dead member cannot vote, and the
+survivor never even proposes an eviction (the live-majority guard). Two facts
+made a clean stop indistinguishable from a crash: destroy() sent nothing (no
+LEAVE verb existed) and a bare restart is a new uuid (V4-2/V4-3). "Why does a
+cluster of 1 or 2 not work, what would it take, and the trade-off" was
+answered from source (a rules reader, an options reader, a skeptic): 1 works
+(open genesis); 2 works while both are up, and heals restarts with `dir` on
+both (a pause-while-down cluster); 2 losing a member for good cannot be made
+both safe and automatic by any symmetric rule (equal-epoch views are ignored
+forever — a wrong guess is a permanent fork). Options: `dir` on both (works
+today); LEAVE on a clean destroy (no safety cost); an opt-in asymmetric
+tie-break for n=2 (one-directional — heals only the light member's crash);
+an operator force (a guarded door in front of the existing hand-edited-
+boot.json self-ballot). Rejected: a quorum-of-one gate (half a keyspace, no
+recovery path), automatic unilateral eviction (symmetric split-brain), a
+derived uuid without `dir` (two copies of one file collide; a vote without
+stable storage double-votes), a witness (needs a third failure domain, and a
+third bare copy already is one that also holds data). The user chose LEAVE
+alone: "tie-break would just work for one server going down".
+Decision:
+- **A clean destroy() LEAVES before it tears down.** The kernel gains a
+  `leave` stimulus (Event) and a LEAVE verb (25, value `{}`): a member that
+  is stopping on purpose proposes the view WITHOUT itself when it is the
+  lowest live member, else knocks LEAVE on every member link each tick and
+  the lowest live member proposes the shrunk view — the single-proposer
+  discipline kept; the frame carries no identity, the leaver IS the link's
+  authenticated uuid. The leaver's own grant is the old-majority vote an
+  eviction of a DEAD member can never get, so joint consensus passes on a
+  two-member view (2-of-2 old, 1-of-1 new) and the survivor is writable alone
+  (one of one is a majority). Journal `leave` (a=uuid: self when sent, the
+  leaver when received) and `left` (a=epoch, b=clean).
+- **The exit proof.** The leaver goes only when a VIEW at or above its epoch
+  that does not hold it arrives from a peer that stays — the proposer's VIEW,
+  or a survivor's flood-back of its own self-proposed view. Going before that
+  could take the only copy of the commit with it. Bounded: LEAVE_TICKS (4
+  heartbeat ticks — ~2 s at the 500 ms default) without the echo and it goes
+  anyway (`left` b=0), from where it looks like a crash and the pre-V4-6 path
+  (suspicion, redials, eviction) takes over. Runtime.leave() adds a wall-clock
+  cap (the tick bound at this node's cadence plus slack; heartbeats off ⇒ no
+  view ⇒ answered at once) so destroy() can never hang on it. A leaver never
+  knocks JOIN back in between `left` and the teardown (the evictee branch
+  skips a leaver); a leaver's ballot REBASES on any newer view that still
+  holds it (a member admitted meanwhile is never dropped); the last member of
+  a view simply goes (never an empty view). Nothing to leave (open genesis, a
+  client, a non-member, a rejoiner, a stale gate) answers clean at once.
+- **Nothing else moved.** Ballots, majorities, vote-once-per-epoch, escalation
+  past burns, view-on-admit, the gate: untouched. `evict` keeps meaning "left
+  the committed view at install" for a leaver too (the ELI5 says so). The
+  sink effect `left(clean)` is OPTIONAL — only the shell waits on it; the sim
+  records it per uuid (`sim.left`). A peer that predates the verb drops the
+  frame and keeps the link (the unknown-verb rule): the leave then times out
+  and degrades to a crash — a rolling upgrade is safe, just slow for the
+  first stops.
+- **`diag(f).crash()`** — drop()'s fault-injection twin: tear down WITHOUT the
+  leave, a process death as the cluster sees it (destroy() = leave + the same
+  teardown). api/methods.test's hold-path test uses it: its premise "kill one
+  of two → minority" needs a crash now, since a clean leave hands the
+  survivor a writable one-member view.
+- **Example 01** stays three copies (a CRASH of one of two still wedges — the
+  deployment rule is unchanged: three plus `dir`), but its banner and README
+  now say a clean stop of one of two works, with the real two-copy paste. New
+  lib helper `coalesce`: the cluster view sets its fields one record at a
+  time (`writable` lands before `members`), so a tap that renders inside the
+  callback sees a half-updated line — `coalesce` renders once per turn.
+REJECTED/DEFERRED: the n=2 tie-break (one-directional; "two cannot lose the
+primary"); the operator force (the unguarded self-ballot via a hand-edited
+boot.json already exists — a loud guarded door is a last resort to file if
+ever needed); a scoped-mode handover BEFORE leaving (a leaving holder is
+exactly as safe as an evicted one today — the R-set re-acquires from the
+other holders; a pre-leave shed is future work); warning spokes before
+leaving (they fail over on the link death, as for a crash).
+Consequences: the two-terminals story works with two copies — Ctrl-C one,
+the other prints `members 1 writable true` and keeps committing, start the
+file again and it prints `members 2` (verified by hand over real processes;
+the stopping copy exits in ~10 ms). Every clean stop of any member shrinks the
+view at once instead of after ~20 s of suspicion and redials. Tests:
+kernel/membership.test.ts (+7: both leaver shapes, the receiver, ignored
+knocks, the bound, nothing-to-leave, the rebase), sim/membership.test.ts
+(+2: n=2 then a newcomer; n=3 under writes, monitors quiet),
+api/index.test.ts (+1: two fero servers over real sockets — destroy one, the
+survivor alone and writable, a new identity joins and catches up).
+Battery: 396/396 + 18/18 + perf 41/41.

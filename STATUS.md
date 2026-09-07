@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (372 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
+Run from the repo root: `npm test` (396 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -324,3 +324,46 @@ inside the outer apply.
   treats resync like walTaint). The `#directory` host is protected for free.
   BREAKING within 4.x: `fero(name, { sell: fn })` → `methods: { sell }`.
   Battery: 385/385 + 18/18 + perf 41/41.
+
+- 2026-09-05 — THE EXAMPLE SERIES BEGINS: examples/01-three-servers is the
+  pattern every later example follows — one folder, one file per terminal
+  (`node server.ts`, no flags: Node ≥ 22.18 / 23.6 strips types itself), a
+  `check.ts` that runs the terminals as children bounded by
+  FERO_EXAMPLE_TICKS, asserts on the lines they print, and ends with `ok
+  <example>`; examples/lib.ts holds the plain-Node plumbing (ticks, onExit,
+  until, logChanges, spawnRole, story — zero fero code) so a folder plus
+  lib.ts is copyable. tests/examples.test.ts runs every check.ts inside
+  `npm test` under a PRIVATE rendezvous port per example (the battery stays
+  FERO_RENDEZVOUS=off; grandchildren inherit the port), with a per-example
+  budget and a process-group kill in `finally`, plus a drift guard (check.ts
+  + README present, listed in examples/README.md, no #utils/internals
+  imports outside the debugger series). 01 itself: `server: true` run three
+  times forms a view through the directory and each copy's own row (keyed by
+  its uuid, whole-row style) shows on every screen; the check kills one
+  (writes keep committing on the majority), starts the file again (a NEW
+  identity joins and catches up) and SIGTERMs the rest (clean destroy). It
+  was "run it twice" first: the user's by-hand run showed why not — a
+  two-member view cannot evict its dead half or admit the returning one, so
+  the survivor wedges at `writable false` forever (DECISIONS V4-3's rule,
+  now the example's banner). Battery: 386/386 + 18/18.
+
+- 2026-09-07 — THE GRACEFUL LEAVE (DECISIONS V4-6): a clean `destroy()`
+  now asks the view for a ballot WITHOUT itself before it tears down — a
+  `leave` stimulus + a LEAVE verb (25); the leaver proposes when it is the
+  lowest live member, else knocks LEAVE on every member link and the lowest
+  proposes; its own grant is the old-majority vote a dead member never has,
+  so a two-member view loses one member cleanly and the survivor is
+  writable ALONE. The leaver goes on a survivor's VIEW echo (the exit
+  proof), or after LEAVE_TICKS (4) like a crash (`left` b=0 — suspicion +
+  eviction follow as before); Runtime.leave() caps it in wall-clock so
+  destroy() cannot hang. A leaver never knocks JOIN back in; its ballot
+  rebases on a newer view; the last member simply goes. `diag(f).crash()`
+  is the no-leave teardown (a process death) for tests and failure
+  stories. Journal `leave`/`left` + ELI5; sink `left(clean)` optional
+  (the sim records it). Example 01: banner + README now say Ctrl-C of one
+  of two WORKS (a real two-copy paste) while a CRASH of one of two still
+  wedges — three plus `dir` stays the rule; lib `coalesce` renders the
+  cluster line once per turn (its fields land one record at a time). Born
+  from the user's question "why does a cluster of 1 or 2 not work" — the
+  option catalog and the rejections are in V4-6. Battery: 396/396 + 18/18
+  + perf 41/41.
