@@ -19,6 +19,9 @@
 export type Event =
   //! start: boot stimulus — dial the configured hosts. Posted once by the embedder (shell runtime or sim).
   | { kind: 'start' }
+  //! leave (V4-6): the graceful-exit stimulus — "I am stopping on purpose; get the view changed without me".
+  // The env hears the outcome on sink.left (clean or bounded-out) and tears the node down after it.
+  | { kind: 'leave' }
   //! linkUp: the env opened a socket. `link` ids are minted by the ENV (shell/sim), never the kernel. `to` is set on dialed links only.
   | { kind: 'linkUp'; link: number; dialed: boolean; to?: string }
   //! bytesIn: raw bytes arrived on a link — the highest-frequency event; framing/decoding is kernel work (kernel/codec).
@@ -107,6 +110,10 @@ export interface EffectSink {
   result(id: number, ok: boolean, value: unknown, local: boolean): void
   //! subRecs (CALLER side): one SUBREC frame — change records for a live subscription id.
   subRecs(id: number, recs: Rec[]): void
+  //! left(clean) (V4-6, OPTIONAL — only an env that waits on destroy cares): the graceful leave is over.
+  // clean=true: the view without this node committed and a survivor echoed it (or there was nothing to
+  // leave); false: LEAVE_TICKS ran out — the node goes like a crash. Fires exactly once per leave.
+  left?(clean: boolean): void
   //! snapshot(batch, rows) (M4e): ATOMICALLY REPLACE the whole WAL with `rows` — the disk counterpart
   // of compaction (a swap is not an append; it gets its own verb). Rows are [frame + fresh chain link]
   // in replay order; the store must make the swap all-or-nothing (write-tmp + fsync + rename in the

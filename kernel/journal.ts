@@ -56,7 +56,7 @@ export const JK = {
   writeBuffered: 33, // a=queueDepth — a gated write parked in the bounded pending buffer
   writeBufferDrop: 34, // a=totalDropped — pending overflow dropped the oldest batch (surfaced loss)
   join: 35,          // a=uuid — a JOIN request sent (a=self) or received (a=joiner)
-  evict: 36,         // a=uuid — this member left the committed view at install
+  evict: 36,         // a=uuid — this member left the committed view at install (voted out — or it asked to leave: see leave/left)
   //! ── M3 write-pipeline vocabulary (owner routing, cid dedup, NACKs) ──
   writeForward: 37,  // a=ownerUuid, b=baseCid, c=count — an attempt run forwarded to the partition owner
   writeAck: 38,      // a=issuer, b=baseCid, c=count — commit coordinates received; pending attempts cleared
@@ -107,6 +107,9 @@ export const JK = {
   //! ── spokes are views (2026-09-06, DECISIONS V4-5) ──
   resync: 72,        // a=cells — a SPOKE found itself AHEAD of its feeder (the cluster's truth moved under it): fold reset, empty r=1 digest out, re-download begins
   resynced: 73,      // a=ghosts — the re-download completed (the feeder's r=0 reply, FIFO after its suffix): cells held before that did not come back were removed downstream
+  //! ── the graceful leave (2026-09-07, DECISIONS V4-6) ──
+  leave: 74,         // a=uuid — a LEAVE sent (a=self: this node is stopping on purpose) or received (a=the leaver): "propose the view without me"
+  left: 75,          // a=epoch, b=clean(0|1) — the leaver's exit: 1 = the view without it committed and a survivor echoed it; 0 = LEAVE_TICKS ran out, it goes like a crash (suspicion + eviction follow)
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

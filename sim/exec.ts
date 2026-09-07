@@ -73,6 +73,8 @@ export class Sim {
   violations: Violation[] = []
   monitors: { name: string; check: (sim: Sim) => string | null }[] = []
   nodes = new Map<string, Node>()
+  //! V4-6: the graceful-leave outcome per uuid (the kernel's `left` effect) — a scenario destroys the node after it
+  left = new Map<string, boolean>()
   #byListen = new Map<string, string>()
   #queue: Task[] = []
   #seq = 0
@@ -403,6 +405,7 @@ export class Sim {
       invoke(link, id, mode, m, a) { (sim.rpcInbox.get(me) ?? sim.rpcInbox.set(me, []).get(me)!).push({ link, id, mode, m, a }) },
       result(id, ok, value, local) { (sim.rpcResults.get(me) ?? sim.rpcResults.set(me, []).get(me)!).push({ id, ok, value, local }) },
       subRecs(id, recs) { (sim.rpcSubRecs.get(me) ?? sim.rpcSubRecs.set(me, []).get(me)!).push({ id, recs }) },
+      left(clean) { sim.left.set(me, clean) },
     }
   }
 }

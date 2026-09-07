@@ -452,6 +452,11 @@ export class Node {
       //! M4b storage echoes: a WAL batch resolved (advance the durable watermarks it covered) or failed
       // (surfaced alarm — durable simply never advances past the hole; confirm:'persisted' becomes
       // unreachable there, which is the honest answer).
+      //! leave (V4-6): the graceful-exit stimulus — membership runs the ballot; sink.left reports the outcome
+      case 'leave': {
+        this.membership.leave(this)
+        return
+      }
       case 'persisted': {
         const covered = this.#inflight.get(e.batch)
         if (!covered) return // unknown/duplicate echo — ignored by id, like timers
@@ -1403,7 +1408,7 @@ export class Node {
         else this.scope!.onAcqDone(this, link, f.value as never)
         return
       }
-      //! M2 membership control plane — identity-before-membership: all five verbs require admission,
+      //! M2 membership control plane — identity-before-membership: all six verbs require admission,
       // like DIGEST (a pre-admission membership frame is a protocol violation → close). Handlers live
       // in kernel/membership.ts; settle() runs after each so gate transitions journal and buffered
       // writes flush the moment a frame opens the gate.
@@ -1411,7 +1416,8 @@ export class Node {
       case VERB.PROPOSE:
       case VERB.VOTE:
       case VERB.VIEW:
-      case VERB.PULL: {
+      case VERB.PULL:
+      case VERB.LEAVE: {
         if (link.state !== LS.admitted) {
           j.armed && j.emit(JK.frameDrop, link.id, 'membership before hello')
           link.dead = true
@@ -1422,7 +1428,8 @@ export class Node {
         else if (f.verb === VERB.PROPOSE) this.membership.onPropose(this, link, v)
         else if (f.verb === VERB.VOTE) this.membership.onVote(this, link, v)
         else if (f.verb === VERB.VIEW) this.membership.onView(this, link, v)
-        else this.membership.onPull(this, link, v)
+        else if (f.verb === VERB.PULL) this.membership.onPull(this, link, v)
+        else this.membership.onLeave(this, link)
         this.membership.settle(this)
         return
       }

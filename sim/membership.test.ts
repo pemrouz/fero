@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
-import { cluster, formed } from './harness.ts'
+import { cluster, formed, writes } from './harness.ts'
 import { converged } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
 import { LS } from '../kernel/link.ts'
@@ -170,4 +170,59 @@ test('M4-REVIEW PIN — a burned epoch cannot wedge membership: survivors ESCALA
   assert.ok(!members(n02).includes('n01'), 'the vanished proposer was evicted after all')
   assert.ok(n02.membership.gate(n02).open && n03.membership.gate(n03).open, 'writable — never wedged read-only')
   assert.deepEqual(sim.violations, [], 'one-view-per-epoch + epoch-monotone held through the escalation')
+})
+
+//! ── the graceful leave (V4-6, 2026-09-07) end-to-end: the two-member story that used to wedge ──
+
+test('graceful leave (V4-6), n=2: the leaver knocks, the survivor proposes the view without it and stays WRITABLE alone; the leaver goes clean; a newcomer then joins the survivor', () => {
+  const sim = new Sim(61)
+  const nodes = cluster(sim, 2, { heartbeatMs: 50 })
+  sim.run({ until: 400 })
+  assert.deepEqual(epochs(nodes), [1, 1])
+  const [n01, n02] = nodes
+  sim.post('n02', { kind: 'write', recs: [{ type: 0, key: ['from-the-leaver'], value: 1 }] })
+  sim.post('n02', { kind: 'leave' }, 50)
+  sim.run({ until: 800 })
+  assert.equal(sim.left.get('n02'), true, 'the leaver heard a survivor echo the view without it')
+  assert.equal(n01.epoch, 2)
+  assert.deepEqual(members(n01), ['n01'])
+  assert.ok(n01.membership.gate(n01).open, 'one of one: writable — no wedge')
+  assert.ok(n02.journal.read().some((e) => e.kind === JK.left && e.b === 1))
+  assert.ok(n01.journal.read().some((e) => e.kind === JK.evict && e.a === 'n02'))
+  //! the leaver is torn down (what the shell does on `left`); the survivor keeps committing on its own
+  n02.destroy()
+  sim.nodes.delete('n02')
+  sim.post('n01', { kind: 'write', recs: [{ type: 0, key: ['alone'], value: 1 }] })
+  sim.run({ until: 1000 })
+  assert.ok(n01.state.has(JSON.stringify(['alone'])), 'a write commits on the one-member view')
+  assert.ok(n01.state.has(JSON.stringify(['from-the-leaver'])), 'and what the leaver wrote before going is kept')
+  //! a NEW identity joins: view-on-admit → JOIN → the survivor's ballot (old {n01}: itself; new {n01,n03}: both)
+  const n03 = sim.add({ uuid: 'n03', listen: 'sim:n03', hosts: ['sim:n01'], heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('n03', { kind: 'start' })
+  sim.run({ until: 2500 })
+  assert.deepEqual(members(n01), ['n01', 'n03'], 'the newcomer was admitted by ballot')
+  assert.equal(n03.epoch, n01.epoch)
+  assert.ok(n03.state.has(JSON.stringify(['alone'])) && n03.state.has(JSON.stringify(['from-the-leaver'])), 'and caught up')
+  assert.equal(converged(sim), null)
+  assert.deepEqual(sim.violations, [], 'one-view-per-epoch + epoch-monotone held throughout')
+})
+
+test('graceful leave (V4-6), n=3 under writes: one member leaves mid-stream; the two survivors commit the shrunk view and keep converging; the monitors stay quiet', () => {
+  const sim = new Sim(62)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+  sim.run({ until: 400 })
+  assert.deepEqual(epochs(nodes), [1, 1, 1])
+  writes(sim, nodes, 30, 300)
+  sim.at(120, () => sim.post('n03', { kind: 'leave' }))
+  sim.run({ until: 1500 })
+  assert.equal(sim.left.get('n03'), true)
+  assert.deepEqual(epochs(nodes).slice(0, 2), [2, 2], 'the survivors committed the shrunk view')
+  assert.deepEqual(members(nodes[0]), ['n01', 'n02'])
+  assert.ok(nodes[0].membership.gate(nodes[0]).open && nodes[1].membership.gate(nodes[1]).open, 'two of two: writable')
+  nodes[2].destroy()
+  sim.nodes.delete('n03')
+  writes(sim, nodes.slice(0, 2), 20, 200)
+  sim.run({ until: 2500 })
+  assert.equal(converged(sim), null, 'the survivors agree on everything, including what the leaver wrote before going')
+  assert.deepEqual(sim.violations, [])
 })

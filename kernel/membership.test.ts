@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
-import { MAX_PULLS } from './membership.ts'
+import { LEAVE_TICKS, MAX_PULLS } from './membership.ts'
 import { MAX_PENDING } from './write.ts'
 import { JK } from './journal.ts'
 import { Framer, VERB, encodeControl, encodeFrame } from './codec.ts'
@@ -28,6 +28,7 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     invoke: (link, id, mode, m, a) => effects.push(['invoke', link, id, mode, m, a]),
     result: (id, ok, value, local) => effects.push(['result', id, ok, value, local]),
     subRecs: (id, recs) => effects.push(['subRecs', id, recs]),
+    left: (clean) => effects.push(['left', clean]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }
   const node = new Node({ uuid, listen: `sim:${uuid}`, heartbeatMs: 50, ...opts }, env)
@@ -367,4 +368,175 @@ test('membership frames before HELLO are a protocol violation: the link closes',
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 9, m: [] }) })
   assert.deepEqual(h.of('close')[0], ['close', 1, 'membership-before-hello'])
   assert.equal(h.node.epoch, 0, 'and the view was NOT installed')
+})
+
+//! ── the graceful leave (V4-6, 2026-09-07) — see membership.ts's banner ──
+
+//! drive a 2-node genesis to a committed view 1 on 'aa' (lowest, proposer): the smallest view that can vote —
+// and the one suspicion + eviction can never shrink (a dead half is a missing old-majority vote)
+const formedPair = () => {
+  const h = harness('aa', { hosts: ['sim:bb'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'bb')
+  h.tick()
+  assert.equal(h.jk(JK.propose).length, 1)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 1, g: 1, ce: 0, h: 'aa,bb' }) })
+  assert.equal(h.node.epoch, 1, 'aa + bb = 2 of 2 — view 1')
+  return h
+}
+const proposed = (h: ReturnType<typeof harness>, link: number, e: number) =>
+  h.sentOn(link, VERB.PROPOSE).filter((f) => (f.value as { e: number }).e === e).map((f) => (f.value as { m: [string, string][] }).m.map((m) => m[0]))
+
+test('graceful leave (V4-6), n=2, the leaver IS the lowest live member: it proposes the view without itself, the survivor\'s vote commits it, and the survivor\'s VIEW echo lets it go', () => {
+  const h = formedPair()
+  h.node.step({ kind: 'leave' })
+  assert.deepEqual(h.jk(JK.leave).map((e) => e.a), ['aa'], 'journaled once, naming self')
+  assert.deepEqual(proposed(h, 1, 2), [['bb']], 'the shrunk view is proposed at epoch 2: members WITHOUT the leaver')
+  assert.equal(h.sentOn(1, VERB.LEAVE).length, 0, 'the lowest never knocks — it proposes')
+  assert.equal(h.of('left').length, 0, 'not gone: nothing committed yet')
+  //! bb's grant: OLD majority = aa + bb of {aa,bb} — the leaver's own vote, exactly what an eviction of a
+  // DEAD aa can never have; NEW majority = bb of {bb}. Joint consensus passes.
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb' }) })
+  assert.equal(h.node.epoch, 2, 'committed')
+  assert.equal(h.node.membership.isMember('aa'), false)
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'evicted' }, 'a leaver stops writing the instant it is out')
+  assert.ok(h.sentOn(1, VERB.VIEW).some((f) => (f.value as { e: number }).e === 2), 'the view floods to the survivor')
+  assert.equal(h.of('left').length, 0, 'STILL not gone: the survivor has not echoed — going now could take the commit with us')
+  //! the survivor installs and floods the view back — THAT is the exit proof
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['bb', 'sim:bb']] }) })
+  assert.deepEqual(h.of('left'), [['left', true]])
+  const left = h.jk(JK.left)
+  assert.equal(left.length, 1)
+  assert.equal(left[0].a, 2)
+  assert.equal(left[0].b, 1)
+  //! ticks after the exit change nothing: no re-knock, no second outcome
+  h.tick(); h.tick()
+  assert.equal(h.of('left').length, 1)
+  assert.equal(h.sentOn(1, VERB.LEAVE).length, 0)
+})
+
+test('graceful leave (V4-6), n=2, the leaver is NOT the lowest: it knocks LEAVE on the member link every tick, the lowest proposes, and the VIEW without it is the exit proof', () => {
+  const h = harness('bb', { hosts: ['sim:aa'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'aa')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']], p: 'aa' }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  assert.equal(h.node.epoch, 1)
+  h.node.step({ kind: 'leave' })
+  assert.equal(h.sentOn(1, VERB.LEAVE).length, 1, 'LEAVE knocked at aa')
+  assert.equal(h.sentOn(1, VERB.PROPOSE).length, 0, 'a non-lowest leaver never proposes (single-proposer discipline)')
+  h.tick()
+  assert.equal(h.sentOn(1, VERB.LEAVE).length, 2, 're-knocked on the tick — idempotent at the receiver')
+  //! aa proposes {aa}; the leaver GRANTS (voting is not writing): its vote is the old-majority half
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: [['aa', 'sim:aa']], p: 'aa' }) })
+  const vote = h.sentOn(1, VERB.VOTE).find((f) => (f.value as { e: number }).e === 2)
+  assert.ok(vote && (vote.value as { g: number }).g === 1, 'granted')
+  assert.equal(h.of('left').length, 0)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa']] }) })
+  assert.equal(h.node.epoch, 2)
+  assert.deepEqual(h.of('left'), [['left', true]], 'the proposer\'s VIEW without me proves the commit reached a survivor')
+  assert.equal(h.jk(JK.left)[0].b, 1)
+})
+
+test('graceful leave (V4-6), the receiver: a LEAVE from a member makes the lowest live member propose the view without it; 2-of-2 old + 1-of-1 new commits; the survivor is writable ALONE', () => {
+  const h = formedPair()
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(h.jk(JK.leave).map((e) => e.a), ['bb'], 'journaled with the leaver\'s AUTHENTICATED uuid — the frame carries none')
+  assert.deepEqual(proposed(h, 1, 2), [['aa']], 'proposed at epoch 2 without the leaver')
+  //! a second knock while the ballot is in flight is ignored — no duelling ballots
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.equal(h.jk(JK.propose).filter((e) => e.a === 2).length, 1)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa' }) })
+  assert.equal(h.node.epoch, 2)
+  assert.deepEqual(h.node.membership.view.members, [['aa', 'sim:aa']])
+  assert.ok(h.jk(JK.evict).some((e) => e.a === 'bb'), 'the leaver left the view at install (evict = left the view, however it went)')
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' }, 'one of one is a majority: writable alone — the two-member wedge is gone')
+  assert.equal(h.node.membership.leaving, null, 'the receiver itself is not leaving')
+})
+
+test('graceful leave (V4-6): a LEAVE is ignored at open genesis, from a non-member, at a non-lowest member, and while a ballot is in flight', () => {
+  //! open genesis: there is no view to shrink
+  const g = harness('aa', { hosts: ['sim:bb'] })
+  g.node.step({ kind: 'start' })
+  g.admit(1, 'bb')
+  g.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.equal(g.jk(JK.propose).length, 0)
+  //! a non-member knocking: nothing to remove
+  const h = formedView1()
+  h.admit(3, 'dd')
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.equal(h.jk(JK.propose).filter((e) => e.a === 2).length, 0)
+  //! a non-lowest member hears it and defers — the leaver knocks on EVERY member link, so the lowest hears it too
+  const m = harness('bb', { hosts: ['sim:aa', 'sim:cc'] })
+  m.node.step({ kind: 'start' })
+  m.admit(1, 'aa')
+  m.admit(2, 'cc')
+  m.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  m.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.equal(m.jk(JK.propose).length, 0, 'bb > aa: not the proposer')
+  assert.deepEqual(m.jk(JK.leave).map((e) => e.a), ['cc'], 'but the knock is journaled')
+  //! a ballot in flight (dd's join): cc's LEAVE waits for its next knock
+  const k = formedView1()
+  k.admit(3, 'dd')
+  k.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.JOIN, { u: 'dd', i: 1, l: 'sim:dd' }) })
+  assert.equal(k.jk(JK.propose).filter((e) => e.a === 2).length, 1)
+  k.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.equal(k.jk(JK.propose).length, 2, 'no second ballot while one is in flight (genesis + the join)')
+})
+
+test('graceful leave (V4-6), the bound: no vote ever comes → after LEAVE_TICKS the leaver goes anyway (`left` b=0) — from there it is a crash, and eviction follows the old way', () => {
+  const h = formedPair()
+  h.node.step({ kind: 'leave' })
+  for (let i = 0; i < LEAVE_TICKS; i++) {
+    h.tick()
+    assert.equal(h.of('left').length, 0, `tick ${i + 1}: still waiting`)
+  }
+  h.tick()
+  assert.deepEqual(h.of('left'), [['left', false]])
+  assert.equal(h.jk(JK.left)[0].b, 0)
+  assert.equal(h.node.epoch, 1, 'nothing committed: the view is unchanged')
+  assert.ok(h.sentOn(1, VERB.PROPOSE).length >= 2, 'the ballot was re-offered while waiting (a lost PROPOSE heals)')
+})
+
+test('graceful leave (V4-6): nothing to leave answers at once — open genesis, a rejoiner, a solo view — with no LEAVE, no ballot, no journal; a second leave() is a no-op', () => {
+  const g = harness('aa')
+  g.node.step({ kind: 'start' })
+  g.node.step({ kind: 'leave' })
+  assert.deepEqual(g.of('left'), [['left', true]])
+  assert.equal(g.jk(JK.leave).length, 0)
+  assert.equal(g.jk(JK.left).length, 0)
+  //! a rejoiner (restored, unconfirmed) has no live view to change
+  const r = harness('cc', { hosts: ['sim:aa'], boot: { epoch: 5, members: [['aa', 'sim:aa'], ['cc', 'sim:cc']] } })
+  r.node.step({ kind: 'start' })
+  r.node.step({ kind: 'leave' })
+  assert.deepEqual(r.of('left'), [['left', true]])
+  assert.equal(r.jk(JK.propose).length, 0)
+  //! a solo view (the full-restart self-ballot committed a one-member view): the last member simply goes
+  const s = harness('aa', { boot: { epoch: 5, members: [['aa', 'sim:aa']] } })
+  s.node.step({ kind: 'start' })
+  for (let i = 0; i < 10; i++) s.tick()
+  assert.equal(s.node.epoch, 6, 'the solo self-ballot committed')
+  s.node.step({ kind: 'leave' })
+  assert.deepEqual(s.of('left'), [['left', true]])
+  assert.equal(s.jk(JK.leave).length, 0)
+  //! one outcome per node
+  const h = formedPair()
+  h.node.step({ kind: 'leave' })
+  h.node.step({ kind: 'leave' })
+  assert.equal(h.jk(JK.leave).length, 1)
+  assert.equal(h.jk(JK.propose).filter((e) => e.a === 2).length, 1)
+})
+
+test('graceful leave (V4-6), rebase: a newer view that still holds the leaver drops its stale shrunk ballot; the next tick re-proposes from the NEW members — a member admitted meanwhile is never dropped', () => {
+  const h = formedView1() // {aa,bb,cc} at 1; aa is the lowest
+  //! aa's epoch-2 vote goes to bb's ballot (dd joining, relayed) — so aa's own shrunk ballot must escalate to 3
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc'], ['dd', 'sim:dd']], p: 'bb' }) })
+  h.node.step({ kind: 'leave' })
+  assert.deepEqual(proposed(h, 1, 3), [['bb', 'cc']], 'proposed past the spent vote, from the view as it stands')
+  //! bb's ballot commits first: view 2 holds aa AND dd — aa's epoch-3 ballot was built on a stale old set
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc'], ['dd', 'sim:dd']] }) })
+  assert.equal(h.node.epoch, 2)
+  assert.equal(h.of('left').length, 0, 'still a member: not gone')
+  h.tick()
+  assert.deepEqual(proposed(h, 1, 3), [['bb', 'cc'], ['bb', 'cc', 'dd']], 're-proposed at 3 from the NEW base: dd stays')
 })

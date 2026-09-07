@@ -13,6 +13,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { fero } from './index.ts'
 import { snapshot } from './substrate.ts'
+import { diag } from './diagnostics.ts'
 import { ports, until, sleep } from '#utils'
 
 //! pair — two servers; `methods` (if any) are hosted under `methods:` (V4-5 — which also makes the pair
@@ -92,8 +93,9 @@ test("flush-on-return: a handler's reply is HELD while its write is parked at an
     // resolve before the reply, so at least one server already folds it
     assert.ok((snapshot(a.data) as Record<string, unknown>).x === 1 || (snapshot(b.data) as Record<string, unknown>).x === 1,
       'the write was committed before the reply left')
-    //! hold path: kill bb → {aa} is a minority of 2 → the gate closes and puts park → the reply is HELD
-    await b.destroy()
+    //! hold path: CRASH bb (no leave — destroy() is graceful since V4-6, and a clean leave would hand {aa}
+    // a writable one-member view) → {aa} is a minority of 2 → the gate closes and puts park → the reply is HELD
+    await diag(b)!.crash!()
     assert.ok(await until(() => (snapshot(a.cluster) as { writable: boolean }).writable === false, 10_000), 'gate closed (minority)')
     let settled = false
     const held = c.methods.put({ k: 'y', v: 2 }, { timeout: 60_000 }).then(() => { settled = true }, () => { settled = true })

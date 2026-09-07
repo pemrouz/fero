@@ -40,7 +40,7 @@ export const HEADER = 11
 // DIGEST carries {d: {origin: highestHeldSeq}, r: 0|1} — "here is what I hold; r=1 means please answer with yours".
 // M2 membership control plane: JOIN {u,i,l} asks a member to propose the sender in; PROPOSE {e,m,p} /
 // VOTE {e,g,ce} are the joint-consensus ballot legs; VIEW {e,m} announces (or answers a PULL {e} with)
-// a committed view.
+// a committed view. LEAVE {} (V4-6) asks for the view WITHOUT the sender — the graceful exit.
 // M3 write pipeline: WRITE is a RECORDS-shaped frame (FLAG_PROV + record runs) whose provenance triple is
 // REINTERPRETED as the ATTEMPT triple [issuer, baseCid, attemptEpoch] — un-sequenced attempts forwarded to
 // the partition owner reuse the whole hot record-encode/decode path. WACK {u,c,n,s,e} answers a committed
@@ -66,6 +66,11 @@ export const VERB = {
   // paired verbs like HAVEQ/HAVEA — no subcommand byte: control frames carry exactly ONE value, so the
   // op rides INSIDE the value (the DIGEST-r idiom) and #dispatch keeps its flat fail-closed switch.
   DIAGQ: 23, DIAGA: 24,
+  //! graceful LEAVE (2026-09-07, DECISIONS V4-6): a member that is stopping ON PURPOSE asks the view's
+  // proposer for the view without it. The leaver can still vote, so the ballot passes where an eviction
+  // of the same node never could (a two-member view). The frame carries no identity on purpose: the
+  // leaver IS the link's authenticated uuid. Value {} — a control frame carries exactly one value.
+  LEAVE: 25,
 } as const
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.
