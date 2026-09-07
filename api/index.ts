@@ -572,6 +572,22 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   }
   cluster.set('me', meRow())
 
+  //! teardown — everything destroy() does AFTER the graceful leave (V4-6): the local surfaces, the
+  // in-flight confirm probes (settled false = could not prove in time — never hang a caller), the
+  // directory client (its link drops ⇒ the host forgets this instance's entries), then the hosted
+  // directory if this instance holds it (⇒ the other servers race for the port), then the runtime.
+  // The diagnostics crash() door runs THIS alone: a process death, as the cluster would see it.
+  const teardown = async () => {
+    bind.destroy()
+    host!.destroy()
+    caller?.destroy()
+    memberCaller?.destroy()
+    gather?.destroy()
+    for (const [, settle] of probes) settle(false)
+    probes.clear()
+    await directory?.destroy()
+    await rt.destroy()
+  }
   const inst: Fero = {
     name,
     data: dataSurface,
@@ -587,18 +603,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       return snapshotOf(bind.data)
     },
     async destroy() {
-      bind.destroy()
-      host!.destroy()
-      caller?.destroy()
-      memberCaller?.destroy()
-      gather?.destroy()
-      //! settle in-flight confirm probes honestly (false = could not prove in time) — never hang a caller
-      for (const [, settle] of probes) settle(false)
-      probes.clear()
-      //! the directory client first (its link drops ⇒ the host forgets this instance's entries), then
-      // the hosted directory if this instance holds it (⇒ the other servers race for the port)
-      await directory?.destroy()
-      await rt.destroy()
+      //! the graceful leave FIRST (V4-6): while the resource is still whole, get the view changed without
+      // this node by ballot — a clean stop is not a crash, and a two-member cluster survives it. Bounded
+      // in the shell (Runtime.leave); then the ordinary teardown, unchanged.
+      await rt.leave()
+      await teardown()
     },
   }
   //! [diagnostics] (M7, DESIGN-M7 §3): the Symbol-keyed internals seam — attached WITHOUT widening the
@@ -623,6 +632,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       return d
     },
     drop: (uuid: string) => rt.drop(uuid),
+    crash: () => teardown(),
     rendezvous: () => (directory ? { client: directory.client, host: directory.host } : null),
   }
   ;(inst as Fero & { [diagnostics]?: Diagnostics })[diagnostics] = diagHandle

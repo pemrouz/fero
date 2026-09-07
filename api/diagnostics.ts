@@ -36,6 +36,10 @@ export interface Diagnostics {
   // linkDown via 'close'; the peer typically redials within redialMs — a transient, not a partition).
   // OPTIONAL: present only on real-TCP backings; false = no identified live link to that uuid.
   drop?(uuid: string): boolean
+  //! crash (V4-6): tear the instance down WITHOUT the graceful leave — a process death, as the cluster
+  // sees it (no ballot; the survivors suspect, then evict). destroy() leaves first; this is drop()'s
+  // fault-injection twin for tests and failure stories. OPTIONAL like drop().
+  crash?(): Promise<void>
   //! the directory nodes this instance runs (V4-3): its `#directory` client and, when it won the bind,
   // the hosted `#directory` server — real Fero instances, so a tool can capture/diag them like any node.
   // null when the instance meets no directory (rendezvous: false, listen: false, a system resource).

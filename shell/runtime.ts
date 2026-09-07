@@ -25,6 +25,7 @@ import net from 'node:net'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Node, type NodeOpts } from '../kernel/node.ts'
+import { LEAVE_TICKS } from '../kernel/membership.ts'
 import { Cursor, Writer, HEADER, MAGIC, MAX_FRAME, crcFrame } from '../kernel/codec.ts'
 import type { Applied, BootRecord, Rec } from '../kernel/env.ts'
 
@@ -88,6 +89,9 @@ export class Runtime {
   #server: net.Server | null = null
   #linkSeq = 0
   #opts: RuntimeOpts
+  //! the graceful leave (V4-6): one promise per runtime, settled by the kernel's `left` effect or the cap
+  #leaving: Promise<boolean> | null = null
+  #onLeft: ((clean: boolean) => void) | null = null
   #wal: number | null = null // fd, held open for append (the plan's fd-held contract)
   //! WAL ops run STRICTLY IN ORDER through one promise chain: fs.write completions ride a threadpool
   // and are not order-guaranteed, so two appends landing swapped would replay as a chain hole on a
@@ -138,6 +142,7 @@ export class Runtime {
           }
         },
         close(link) { runtime.#sockets.get(link)?.destroy() },
+        left(clean) { runtime.#onLeft?.(clean) },
         timer(id, tag, ms) {
           runtime.#timers.set(id, setTimeout(() => {
             runtime.#timers.delete(id)
@@ -377,6 +382,24 @@ export class Runtime {
     if (!sock || sock.destroyed) return false
     sock.destroy()
     return true
+  }
+
+  //! leave (V4-6) — the graceful exit: ask the kernel to get the view changed without this node and
+  // wait for the outcome. Resolves true when the shrunk view committed and a survivor echoed it (or
+  // there was nothing to leave), false when the kernel's LEAVE_TICKS bound or this wall-clock cap ran
+  // out — the caller tears down either way; false only means the survivors will evict us the slow way.
+  // The cap covers the tick bound at this node's heartbeat cadence plus slack (heartbeats OFF ⇒ no
+  // view ⇒ the kernel answers at once). Idempotent: a second call joins the first wait.
+  leave(): Promise<boolean> {
+    if (this.#leaving) return this.#leaving
+    if (this.node.destroyed) return Promise.resolve(false)
+    this.#leaving = new Promise<boolean>((resolve) => {
+      const capMs = Math.max(250, (this.#opts.heartbeatMs ?? 0) * (LEAVE_TICKS + 2))
+      const cap = setTimeout(() => { this.#onLeft = null; resolve(false) }, capMs)
+      this.#onLeft = (clean) => { clearTimeout(cap); this.#onLeft = null; resolve(clean) }
+      this.node.step({ kind: 'leave' })
+    })
+    return this.#leaving
   }
 
   async destroy(): Promise<void> {

@@ -28,8 +28,20 @@
 //   - proposing spends your own vote — and you cannot propose an epoch your
 //     vote is already spent on for another proposer.
 // Single-proposer discipline keeps honest contention out of the ballot layer:
-// every proposal path (genesis, eviction, join, rejoin) requires being the
-// lowest-uuid LIVE member; a JOIN landing elsewhere is relayed one hop.
+// every proposal path (genesis, eviction, join, rejoin, leave) requires being
+// the lowest-uuid LIVE member; a JOIN landing elsewhere is relayed one hop.
+//
+// LEAVE (V4-6, 2026-09-07) is the graceful exit. A member stopping on purpose
+// asks for the view WITHOUT itself while it can still vote: leave() proposes
+// the shrunk view when this node is the lowest live member, else knocks LEAVE
+// on every member link and the lowest live member proposes it. The leaver's
+// own grant is the old-majority vote an eviction of a DEAD member can never
+// get — so a two-member view loses one member cleanly, where suspicion +
+// eviction wedge it forever. The leaver goes once a survivor's VIEW echo
+// proves the commit reached someone who stays; LEAVE_TICKS without that echo
+// and it goes anyway (journal `left` b=0) — from there it looks like a crash
+// and the pre-V4-6 path (suspicion, eviction) takes over. Nothing else moved:
+// ballots, majorities, and vote-once are exactly as above.
 //
 // Genesis is the OPEN mode: epoch 0 has no members, no gate, no ballots — byte-
 // for-byte the M0/M1 behaviour, so everything below this milestone is unchanged
@@ -84,6 +96,7 @@ export const SUSPECT_TICKS = 3    // member unreachable this many consecutive ti
 export const MAX_PULLS = 5        // targeted view-pull retries before the alarmed gate release
 export const PROPOSAL_AGE = 10    // ticks before an uncommitted proposal is abandoned (unblocks JOINs; re-grants make retry safe)
 export const REJOIN_TICKS = 10    // rejoining ticks without live confirmation before the self-ballot
+export const LEAVE_TICKS = 4      // ticks a leaver waits for the view without it to commit AND echo before it goes like a crash
 
 const sorted = (m: [string, string][]) => [...m].sort((a, b) => (a[0] < b[0] ? -1 : 1))
 //! majority of `of`, counting ONLY voters that are in `of` (a voter in both joint sets counts in both;
@@ -130,6 +143,8 @@ export class Membership {
   //! rejoin floor: a restored node is read-only until a committed view ≥ this is CONFIRMED live (plan boot modes)
   rejoinFloor = 0
   #rejoinTicks = 0
+  //! leaving — the graceful exit in progress (V4-6): ticks spent waiting, and whether it is over
+  leaving: { ticks: number; done: boolean } | null = null
   #wasOpen = true // last journaled gate state, for transition events
 
   constructor(boot?: { epoch: number; members: [string, string][]; votedFor?: { e: number; p: string; h: string } }) {
@@ -228,6 +243,12 @@ export class Membership {
         this.#send(node, this.#proposalTargets(node), this.#proposeFrame(node))
       }
     }
+    //! leaving (V4-6): re-knock every tick until a survivor's echo, bounded — then go like a crash.
+    // Once my shrunk view is installed here there is nothing left to knock for: only the echo is awaited.
+    if (this.leaving && !this.leaving.done) {
+      if (++this.leaving.ticks > LEAVE_TICKS) this.#finishLeave(node, false)
+      else if (this.isMember(node.uuid)) this.#knockLeave(node)
+    }
     //! stale-epoch pulls: targeted, bounded; then the alarmed release (a wedged gate is named, never silent)
     if (this.epochStale) {
       if (this.#pullTicks++ < MAX_PULLS) {
@@ -247,8 +268,10 @@ export class Membership {
         this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members })
     }
     //! evicted: ask the lowest admitted MEMBER of my view to propose me back in (a fellow evictee would
-    // silently drop the knock — the review's two-evictees-knocking-on-each-other wedge)
-    if (!node.client && !this.rejoining() && this.view.epoch > 0 && !this.isMember(node.uuid) && !this.epochStale) {
+    // silently drop the knock — the review's two-evictees-knocking-on-each-other wedge). A LEAVER is out
+    // on purpose (V4-6): once its shrunk view installs it is a non-member too, and must never knock its
+    // way back in during the ticks between `left` and the shell's teardown.
+    if (!node.client && !this.rejoining() && !this.leaving && this.view.epoch > 0 && !this.isMember(node.uuid) && !this.epochStale) {
       const target = this.#admitted(node).filter((l) => this.isMember(l.uuid)).sort((a, b) => (a.uuid < b.uuid ? -1 : 1))[0]
       if (target) {
         target.ship(encodeControl(VERB.JOIN, { u: node.uuid, i: node.incarnation, l: node.listen }), node.env.sink, j)
@@ -306,6 +329,19 @@ export class Membership {
     this.#propose(node, { epoch: this.#nextEpoch(node), members: sorted([...this.view.members, [v.u, v.l]]) })
   }
 
+  //! onLeave (V4-6) — a member is stopping on purpose and asks for the view without it. The lowest live
+  // member proposes it (single-proposer discipline — the leaver knocks on EVERY member link, so the
+  // proposer hears it directly and the rest ignore it), under the join's guards: a committed view,
+  // membership on both sides, no ballot in flight, no stale gate. Identity is the link's authenticated
+  // uuid — the frame carries none. Never an empty view (the last member simply goes).
+  onLeave(node: Node, link: Link) {
+    const leaver = link.uuid
+    node.journal.armed && node.journal.emit(JK.leave, leaver)
+    if (node.client || this.view.epoch === 0 || !this.isMember(node.uuid) || !this.isMember(leaver) || this.epochStale || this.rejoining()) return
+    if (this.#lowestLive() !== node.uuid || this.#proposal || this.view.members.length < 2) return
+    this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => u !== leaver) })
+  }
+
   onPropose(node: Node, link: Link, v: { e?: unknown; m?: unknown }) {
     if (typeof v?.e !== 'number' || !viewOk(v.m)) return
     const j = node.journal
@@ -357,6 +393,11 @@ export class Membership {
     if (v.e > this.view.epoch) this.install(node, { epoch: v.e, members: v.m })
     else if (v.e < this.view.epoch)
       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal) // help a laggard up
+    //! the leaver's exit proof (V4-6): a VIEW at or above my committed epoch that does not hold me, from a
+    // peer that stays — the commit reached a survivor, so going now cannot un-commit it. Covers both shapes:
+    // the proposer's VIEW (installed just above) and a survivor's flood-back of my own self-proposed view.
+    if (this.leaving && !this.leaving.done && v.e >= this.view.epoch && !v.m.some((m) => m[0] === node.uuid))
+      this.#finishLeave(node, true)
   }
 
   onPull(node: Node, link: Link, v: { e?: unknown }) {
@@ -380,6 +421,9 @@ export class Membership {
     if (this.epochStale && view.epoch >= this.#staleWant) { this.epochStale = false; this.#pullTicks = 0 }
     if (this.rejoining() && view.epoch >= this.rejoinFloor) this.rejoinFloor = 0
     if (this.#proposal && this.#proposal.view.epoch <= view.epoch) this.#proposal = null
+    //! a leaver REBASES (V4-6): a newer view that still holds me makes my in-flight shrunk ballot stale
+    // (its old set is no longer the committed view) — drop it; the next tick re-knocks from this view
+    if (this.leaving && !this.leaving.done && this.#proposal && this.isMember(node.uuid)) this.#proposal = null
     for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u) }
     if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear() } // an evictee's grudges expire with its membership
     //! dial any member this node holds no link to (the joiner's side of a join, a healed evictee's peers)
@@ -415,6 +459,44 @@ export class Membership {
       else j.armed && j.emit(JK.gateClose, g.reason)
     }
     if (g.open && node.writes.pending.size) node.writes.flush(node)
+  }
+
+  //! leave — the GRACEFUL exit (V4-6; see the banner). Starts the leave and returns; the outcome
+  // arrives on sink.left exactly once: at once with clean=true when there is nothing to leave (open
+  // genesis, a client, a non-member, a solo view, a rejoiner, a stale gate — the caller tears down
+  // now), later with clean=true on a survivor's echo, or clean=false when LEAVE_TICKS ran out.
+  leave(node: Node) {
+    if (this.leaving) return
+    if (node.client || this.view.epoch === 0 || !this.isMember(node.uuid) || this.view.members.length < 2 || this.rejoining() || this.epochStale) {
+      node.env.sink.left?.(true)
+      return
+    }
+    this.leaving = { ticks: 0, done: false }
+    node.journal.armed && node.journal.emit(JK.leave, node.uuid)
+    this.#knockLeave(node)
+  }
+
+  //! #knockLeave — one round of the leave: propose the shrunk view myself when I am the lowest live
+  // member (replacing any OTHER ballot of mine — leaving outranks it, and re-spending my vote on my own
+  // new ballot is the idempotent same-proposer case), else send LEAVE on every admitted member link —
+  // the one that is lowest live proposes, the rest ignore it. Idempotent per tick.
+  #knockLeave(node: Node) {
+    const shrunk = this.view.members.filter(([u]) => u !== node.uuid)
+    if (shrunk.length === 0) { this.#finishLeave(node, true); return } // the last member simply goes
+    if (this.#lowestLive() === node.uuid) {
+      if (this.#proposal && this.#proposal.h !== hashOf(shrunk)) this.#proposal = null
+      if (!this.#proposal) this.#propose(node, { epoch: this.#nextEpoch(node), members: shrunk })
+      return
+    }
+    this.#send(node, this.#admitted(node).filter((l) => !l.client && this.isMember(l.uuid)), encodeControl(VERB.LEAVE, {}))
+  }
+
+  //! #finishLeave — the leave is over, once: journal `left` (b = clean) and tell the env.
+  #finishLeave(node: Node, clean: boolean) {
+    if (!this.leaving || this.leaving.done) return
+    this.leaving.done = true
+    node.journal.armed && node.journal.emit(JK.left, this.view.epoch, clean ? 1 : 0)
+    node.env.sink.left?.(clean)
   }
 
   //! #nextEpoch — the epoch a fresh proposal must target: past the committed view, past every KNOWN

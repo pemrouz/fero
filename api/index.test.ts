@@ -537,3 +537,31 @@ test('M5-REVIEW #12 (v4 form) — an illegal root replace throws PRE-COMMIT: no 
     await s.destroy()
   }
 })
+
+test('a clean destroy LEAVES (V4-6): two servers, one destroyed — the survivor\'s view shrinks by ballot and stays writable ALONE; a new identity then joins it', async () => {
+  const [pa, pb, pc] = [await ports.free(), await ports.free(), await ports.free()]
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30 })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30 })
+  const view = () => snapshot(a.cluster) as { epoch: number; writable: boolean; members: Record<string, string> }
+  let c: Awaited<ReturnType<typeof fero>> | undefined
+  try {
+    assert.ok(await until(() => view().epoch >= 1 && (snapshot(b.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
+    b.data.before = 'from b'
+    assert.ok(await until(() => a.snapshot.before === 'from b'))
+    //! Ctrl-C in the two-terminals story: destroy() LEAVES — a ballot with the survivor — before it tears down
+    const t0 = Date.now()
+    await b.destroy()
+    assert.ok(diag(b)!.journal().events.some((e) => e.kind === JK.left && e.b === 1), 'the leaver went CLEAN: its shrunk view committed and aa echoed it')
+    assert.ok(await until(() => view().epoch === 2 && Object.keys(view().members).length === 1 && view().writable, 5000), `the survivor is alone and writable (${JSON.stringify(view())})`)
+    assert.ok(Date.now() - t0 < 4000, 'a ballot, not a suspicion timeout')
+    const r = await a.methods.update({ key: 'after', value: 1 }, { timeout: 5000 })
+    assert.equal(r.guarantee, 'committed')
+    //! the restarted terminal is a NEW identity — it joins the one-member view (old majority = aa alone)
+    c = await fero('r', { uuid: 'cc', listen: `127.0.0.1:${pc}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30 })
+    assert.ok(await until(() => Object.keys(view().members).length === 2 && (snapshot(c!.cluster) as { epoch: number }).epoch === view().epoch, 8000), 'the newcomer was admitted')
+    assert.ok(await until(() => c!.snapshot.after === 1 && c!.snapshot.before === 'from b'), 'and caught up — including the row the leaver wrote')
+  } finally {
+    await a.destroy()
+    await c?.destroy()
+  }
+})
