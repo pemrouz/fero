@@ -1,21 +1,19 @@
-//! ── 01 · one file, run it three times ──
+//! ── 01 · one file, run it twice ──
 //
 //   terminal 1:  node server.ts
 //   terminal 2:  node server.ts
-//   terminal 3:  node server.ts
 //   prove it:    node check.ts
 //
 // The whole config is `server: true`. Each copy binds a free port, registers under the name 'hello'
-// with the box's directory, finds the other copies by that name, and forms a view with them — zero
+// with the box's directory, finds the other copy by that name, and forms a view with it — zero
 // addresses, zero identities. Each copy writes ONE row, keyed by its own uuid: plain assignment IS
 // the replication api, and every copy prints the whole object on every replicated change.
 //
-// Why three: writes commit on a MAJORITY of the view. Kill any one of three and the other two keep
-// going; start the file again and the newcomer joins and catches up. Two copies replicate fine, and
-// a clean stop (Ctrl-C) of one of two is fine too — destroy() LEAVES: the view shrinks by a ballot
-// and the other carries on alone. What two cannot survive is a CRASH (kill -9, a pulled plug): a dead
-// member's vote is gone, and changing a view needs a majority of the OLD view, so the survivor waits
-// at `writable false` and nobody can be admitted. That is the deployment rule (13): three, plus `dir`.
+// Ctrl-C one copy: destroy() LEAVES — the view shrinks by a ballot to `members 1` and the other copy
+// carries on alone, still writable. Run the file again: the newcomer is voted in (`members 2`) and
+// catches up. What two copies cannot survive is a CRASH (kill -9, a pulled plug): a dead member's vote
+// is gone, and changing a view needs a majority of the OLD view, so the survivor waits at
+// `writable false`. That is the deployment rule (13): three members, plus `dir`.
 
 import { fero } from '../../api/index.ts'
 import { coalesce, logChanges, onExit, ticks } from '../lib.ts'

@@ -6,7 +6,7 @@ or 23.6+ runs the `.ts` files as they are.
 
 | # | Example | The one lesson | Terminals |
 |---|---|---|---|
-| 01 | [three-servers](01-three-servers/) | one file, run three times, is a replicated object that survives losing one | `node server.ts` ×3 |
+| 01 | [two-servers](01-two-servers/) | one file, run twice, is a replicated object; stop one and the other carries on alone | `node server.ts` ×2 |
 
 Three rules every example keeps:
 

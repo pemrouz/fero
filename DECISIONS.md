@@ -585,7 +585,11 @@ Decision:
   survivor a writable one-member view.
 - **Example 01** stays three copies (a CRASH of one of two still wedges — the
   deployment rule is unchanged: three plus `dir`), but its banner and README
-  now say a clean stop of one of two works, with the real two-copy paste. New
+  now say a clean stop of one of two works, with the real two-copy paste.
+  (Amended 2026-09-12: 01 went back to TWO copies — `01-two-servers` — the
+  user's original ask. The leave made the crash story unnecessary at rung 01;
+  the check stops a copy cleanly instead of killing it, and the crash rule
+  lives at rung 13.) New
   lib helper `coalesce`: the cluster view sets its fields one record at a
   time (`writable` lands before `members`), so a tap that renders inside the
   callback sees a half-updated line — `coalesce` renders once per turn.

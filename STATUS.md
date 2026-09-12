@@ -367,3 +367,14 @@ inside the outer apply.
   from the user's question "why does a cluster of 1 or 2 not work" — the
   option catalog and the rejections are in V4-6. Battery: 396/396 + 18/18
   + perf 41/41.
+
+- 2026-09-12 — 01 IS TWO SERVERS AGAIN: `examples/01-two-servers` (was
+  01-three-servers). Three was only ever a workaround for the two-copy wedge;
+  the graceful leave (V4-6) removed it, so rung 01 is back to the user's
+  original ask — one file, run it twice. The check now STOPS a copy cleanly
+  (SIGTERM) and asserts the survivor prints `members 1 writable true` and
+  keeps committing alone, then a new copy is voted in (`members 2`) and
+  catches up, including the stopped copy's row; ~20 s faster (no eviction
+  wait). The README carries the real two-copy run from both terminals and
+  states the limit: two survive a clean stop, not a crash — three plus `dir`
+  is rung 13. Battery: 396/396 + 18/18.
