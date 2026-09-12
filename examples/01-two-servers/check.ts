@@ -4,7 +4,7 @@
 
 import assert from 'node:assert'
 import path from 'node:path'
-import { spawnRole, story, until, type Role } from '../lib.ts'
+import { privateDirectory, spawnRole, story, until, type Role } from '../lib.ts'
 
 const SERVER = path.join(import.meta.dirname, 'server.ts')
 const roles: Role[] = []
@@ -13,6 +13,7 @@ const lastRow = (r: Role) => JSON.parse(r.out.trim().split('\n').filter((l) => l
 const tickOf = (r: Role, id: string | undefined) => (id && lastRow(r)[id]?.ticks) ?? -1
 const lastView = (r: Role) => r.out.trim().split('\n').filter((l) => l.startsWith('members ')).pop() ?? ''
 
+await privateDirectory()                                              //! a check meets its own directory, never the box's
 await story(roles, async () => {
   const [a, b] = ['A', 'B'].map((tag) => { const r = spawnRole(SERVER, [], { tag }); roles.push(r); return r })
   //! two copies find each other through the directory and commit a two-member view
