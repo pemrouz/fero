@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (396 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
+Run from the repo root: `npm test` (397 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -378,3 +378,36 @@ inside the outer apply.
   wait). The README carries the real two-copy run from both terminals and
   states the limit: two survive a clean stop, not a crash — three plus `dir`
   is rung 13. Battery: 396/396 + 18/18.
+
+- 2026-09-12 — RUNG 02, A SERVER AND A CLIENT: the committed demo split
+  moved into examples/02-server-client (server.ts, client.ts, demo-ui.ts;
+  two-terminals.ts deleted — `npm run demo` / `demo:watch` run the two files
+  directly). The two footguns the plan's critic found are gone: the server
+  rewrites the WHOLE widgets row in the seed's style (never a leaf on a
+  seeded row — IDEAS P2), and the client's sale is a FACT row (one new row
+  per event, never a read-modify-write of gadgets.stock); the server's
+  screen counts sales with a live `filter().length()` and shows `watchers`
+  from cluster.peers; demo-ui's render skips an unchanged picture (a local
+  write applies once now and once as its echo). The check starts the CLIENT
+  first (a bare client waits, `(down)`), then the server; asserts the rows
+  arrive, the label names the server's port, two sales reach the server and
+  echo back, the seeded gadgets row is untouched, both exit 0 by
+  themselves. README: real frames from a kill -9 + restart run, including
+  the honest part — a memory-only restart re-seeds and the watcher's earlier
+  sales vanish when it resyncs (V4-5) — `dir` is rung 12. The website's
+  hero inlines these two files by path and replays a recording of them:
+  paths, prose, claims and the recording were redone in the same sitting
+  (scratch ~/fero-site). Three skeptics then reviewed the rung against the
+  source and five things were wrong and are fixed: the footgun's stated
+  mechanism (post-V4-5 it is the watcher's RESYNC deleting the stale leaf
+  from the re-seeded row — the watcher's row loses the field — not the
+  re-seed landing on the leaf); "a write applies twice" (true of a
+  client's write, not a server's — its echo is a same-reference no-op at
+  data's chokepoint); the label printed `hosts` under the word `peers`
+  (now `servers`); the check's `(down)` assertion was a boot transient
+  every client prints (now it must STAY down with no rows before the
+  server starts) and its "echoed back" line was satisfied by the
+  client's own optimistic copy (reworded; the server's count is the
+  proof); and a check run by hand on the box directory met the user's own
+  terminals — lib's `privateDirectory()` now gives every check its own
+  free port (01 too). Battery: 397/397 + 18/18.
