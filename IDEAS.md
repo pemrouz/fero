@@ -193,6 +193,14 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   newer, and the watcher's write parked during the outage (gadgets 1→0) never
   shows at the new server.
   Needs a sim oracle on the PROJECTION, not only the cell map.
+  2026-09-12: the demo (now examples/02-server-client) no longer has this
+  shape — the server rewrites WHOLE rows and the client appends FACT rows, so
+  no row record ever overlaps a leaf; the wart itself is still open and still
+  reproducible by a leaf write on a seeded row (the 02 README warns). Its
+  post-V4-5 shape (probed 2026-09-12, a spoke never teaches now): after the
+  memory-only restart the server re-seeds the row and the CLIENT's resync
+  ghost-removes the stale leaf cell from the re-seeded row — the client's row
+  loses the field ({price} without {stock}) until the next whole-row write.
 
 ## The directory (V4-3 residue)
 - [P2] (tools/debug) Badge `#`-prefixed SYSTEM resources in the viewer/scenarios

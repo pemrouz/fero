@@ -39,7 +39,7 @@ exercises, run data's perf suite too.
 | [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep — chaos schedules against the SAME kernel bytes the shell runs. |
 | [tests/](tests) | Cross-layer scenarios: api scenarios, TCP tier, WAL tier, internals entry pin, baseline perf. |
 | [tools/](tools) | debug/ (capture viewer, scenario server, honesty checks, the ONE fold model [model.mjs](tools/debug/model.mjs) — `stateAt`/`topologyAt` replay state AND links/streams under time travel, each behind its own `verify*` drift guard that proves the replay reproduces the captured end before the page paints it — the ELI5 tooltip glossary [eli5.mjs](tools/debug/eli5.mjs) — every `data-tip` key on both pages resolves there, gated by eli5.test) + perf/ (absolute probes, BASELINE.md, pin/compare machinery). |
-| [utils/](utils) [examples/](examples) | Shared helpers (`#utils` import map); the two-terminals demo; **the graded example series** ([examples/README.md](examples/README.md)): one folder per example, one file per terminal run as plain `node server.ts`, a `check.ts` per folder that proves it (bounded by `FERO_EXAMPLE_TICKS`, ends with `ok <example>`), plain-Node plumbing in [lib.ts](examples/lib.ts) — every check runs inside `npm test` via [tests/examples.test.ts](tests/examples.test.ts) under a private rendezvous port. |
+| [utils/](utils) [examples/](examples) | Shared helpers (`#utils` import map); **the graded example series** ([examples/README.md](examples/README.md)): one folder per example, one file per terminal run as plain `node server.ts`, a `check.ts` per folder that proves it (bounded by `FERO_EXAMPLE_TICKS`, ends with `ok <example>`), plain-Node plumbing in [lib.ts](examples/lib.ts) — every check runs inside `npm test` via [tests/examples.test.ts](tests/examples.test.ts) under a private rendezvous port. |
 
 Entries: `.` → [api/index.ts](api/index.ts), `./internals` →
 [internals.ts](internals.ts). Ledger docs: [STATUS.md](STATUS.md) (D-phases +
@@ -51,9 +51,9 @@ DESIGN-M6/M7, [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md) (V4-3).
 
 | Command | What it does |
 |---|---|
-| `npm test` | 396 unit/sim/scenario tests (incl. the examples smoke tier, the n=100 scale tier and the debugger's DOM/ELI5 gates), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
+| `npm test` | 397 unit/sim/scenario tests (incl. the examples smoke tier, the n=100 scale tier and the debugger's DOM/ELI5 gates), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
 | `npm run perf` | The 41 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
-| `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` | Sim executive, shrinker, scenario server, debug viewer, two-terminals demo. |
+| `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` / `demo:watch` | Sim executive, shrinker, scenario server, debug viewer, the two-terminal demo (= examples/02-server-client's server.ts / client.ts). |
 | `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200s each; `--only <name>`, `--seeds N`). Script-tier — run it on scale-relevant kernel changes, not per-commit. |
 
 Source-served, no build: everything runs via `--experimental-strip-types`.
