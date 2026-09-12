@@ -21,7 +21,8 @@
     "shrink": "node --experimental-strip-types --no-warnings sim/shrink.ts",
     "scenarios": "node --experimental-strip-types --no-warnings tools/debug/scenarios.ts",
     "debug": "node --experimental-strip-types --no-warnings tools/debug/serve.ts",
-    "demo": "node --experimental-strip-types --no-warnings examples/two-terminals.ts",
+    "demo": "node examples/02-server-client/server.ts",
+    "demo:watch": "node examples/02-server-client/client.ts",
     "test:contract": "node --experimental-strip-types --no-warnings --test ../data/conformance/schedule.test.ts"
   },
   "author": "pemrouz",

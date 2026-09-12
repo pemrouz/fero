@@ -7,6 +7,7 @@ or 23.6+ runs the `.ts` files as they are.
 | # | Example | The one lesson | Terminals |
 |---|---|---|---|
 | 01 | [two-servers](01-two-servers/) | one file, run twice, is a replicated object; stop one and the other carries on alone | `node server.ts` ×2 |
+| 02 | [server-client](02-server-client/) | a seed makes a server; a bare `fero(name)` follows it and writes back | `node server.ts` · `node client.ts` |
 
 Three rules every example keeps:
 
@@ -17,5 +18,6 @@ Three rules every example keeps:
    the view shrinks by a ballot before the sockets close, so a clean stop is never mistaken for a crash.
 
 How a check works: `check.ts` runs the role files as child processes with `FERO_EXAMPLE_TICKS` set so
-they stop by themselves, reads what they print, asserts, and ends with `ok <example>`. The smoke test
-`tests/examples.test.ts` runs every `check.ts` under a private directory port inside `npm test`.
+they stop by themselves, reads what they print, asserts, and ends with `ok <example>`. A check meets its
+own private directory (a free port), never the box's, so it can run while your terminals are up. The
+smoke test `tests/examples.test.ts` runs every `check.ts` the same way inside `npm test`.

@@ -4,6 +4,7 @@
 // a check.ts uses to run the terminals its README names and read what they print.
 
 import { spawn, type ChildProcess } from 'node:child_process'
+import net from 'node:net'
 
 //! ticks() — how many ticks a role runs before it destroys itself: FERO_EXAMPLE_TICKS, or forever.
 // A check.ts sets it; a terminal never does. The role prints the same lines either way.
@@ -15,18 +16,18 @@ export const ticks = (): number => {
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 //! logChanges() — a console.log that skips a repeat of the previous line. Taps fire per applied
-// record (a local write applies once optimistically and once more as its committed echo; the cluster
-// view refolds on every write outcome), so a render loop prints only when the picture changed.
+// record, and one assignment can land more than once (a client's own write shows now and again as its
+// committed echo; the cluster view refolds on every write outcome), so a render loop prints only when
+// the picture changed.
 export const logChanges = (): ((line: string) => void) => {
   let last = ''
   return (line) => { if (line !== last) console.log((last = line)) }
 }
 
-//! until(check, ms) — poll a sync or async predicate every 25 ms. A throw or a rejection counts as
-// false; resolves false on timeout. Never hangs, never throws — the caller asserts the boolean.
-//! coalesce — run fn once per turn of the event loop, after the current batch of records. A tap fires per
-// applied record, and the cluster view sets its fields one record at a time (epoch, writable, members…),
-// so a render that reads the whole snapshot INSIDE the tap can see a half-updated picture for an instant.
+//! coalesce — run fn once after the current synchronous batch of records (a microtask), not once per
+// record. A tap fires per applied record, and the cluster view sets its fields one record at a time
+// (epoch, writable, members…), so a render that reads the whole snapshot INSIDE the tap can see a
+// half-updated picture for an instant.
 export const coalesce = (fn: () => unknown): (() => void) => {
   let queued = false
   return () => {
@@ -36,6 +37,8 @@ export const coalesce = (fn: () => unknown): (() => void) => {
   }
 }
 
+//! until(check, ms) — poll a sync or async predicate every 25 ms. A throw or a rejection counts as
+// false; resolves false on timeout. Never hangs, never throws — the caller asserts the boolean.
 export const until = async (check: () => unknown, ms = 10_000): Promise<boolean> => {
   const t0 = Date.now()
   for (;;) {
@@ -47,6 +50,20 @@ export const until = async (check: () => unknown, ms = 10_000): Promise<boolean>
 
 //! onExit(fn) — Ctrl-C (SIGINT) or SIGTERM runs fn (destroy the instances), then exits 0. Without
 // destroy() a fero process never ends: the shell's timers and sockets are ref'd on purpose.
+//! privateDirectory() — a check meets its OWN directory, never the box's. On the default rendezvous the
+// roles a check spawns would find whatever is already registered there (your own terminals, say) and
+// the proof would be of the wrong cluster. The smoke tier sets FERO_RENDEZVOUS itself; by hand this
+// picks a free loopback port. Children inherit it through spawnRole's env spread.
+export const privateDirectory = async (): Promise<void> => {
+  if (process.env.FERO_RENDEZVOUS !== undefined && process.env.FERO_RENDEZVOUS !== '') return
+  const port = await new Promise<number>((resolve, reject) => {
+    const s = net.createServer()
+    s.once('error', reject)
+    s.listen(0, '127.0.0.1', () => { const a = s.address() as net.AddressInfo; s.close(() => resolve(a.port)) })
+  })
+  process.env.FERO_RENDEZVOUS = `127.0.0.1:${port}`
+}
+
 export const onExit = (fn: () => unknown): void => {
   let done = false
   const go = async () => {
