@@ -30,9 +30,10 @@ await story(roles, async () => {
   assert.ok(await until(() => listen(server) !== undefined && header(client).endsWith(`servers ["${listen(server)}"]`)), "the client's label names the server's port")
   assert.ok(await until(() => /watchers 1,/.test(server.out)), 'the server sees one watcher')
   //! sales: fact rows, relayed up and stamped at the server. The SERVER's count is the proof of the relay; the
-  // watcher's own screen shows a sale the instant it is assigned (its optimistic copy), echo or no echo.
+  // watcher's own screen shows a sale only when the server's stamped echo comes back (V4-7: no optimistic
+  // copy), so its count is a round-trip proof too.
   assert.ok(await until(() => /sales 2\)/.test(server.out), 20_000), 'two sale rows reached the server')
-  assert.ok(await until(() => sales(client) === 2), 'the watcher shows its own two sale rows')
+  assert.ok(await until(() => sales(client) === 2), 'the watcher shows its own two sale rows — as their echoes')
   assert.ok(await until(() => { const g = lastFrame(server).gadgets; return g?.stock === 3 && g?.price === 19.99 }), 'the seeded gadgets row is untouched: a sale is a new row, not a rewrite')
   assert.equal(await client.exited, 0, 'the client stopped by itself after two sales')
   assert.equal(await server.exited, 0, 'the server stopped by itself after its ticks')

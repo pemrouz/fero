@@ -127,6 +127,7 @@ server coming back with its data (12), a client failing over between servers (14
   "no server yet".
 - Sales are counted, not folded into `gadgets.stock` — turning facts into a total is 06's lesson.
 - The client's bounded run waits one second after its last sale before stopping: the sale is already on
-  the wire, the wait only lets its echo paint. Proving a write landed is 03's lesson.
+  the wire, and a client shows its own write only when the server's stamped echo comes back — the wait
+  lets that echo paint. Proving a write landed is 03's lesson.
 - A second `node server.ts` in a third terminal joins the first as a cluster (as in 01) and shows up in
   the label's `servers`; every watcher shows in the server's `watchers`.

@@ -16,9 +16,8 @@ export const ticks = (): number => {
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 //! logChanges() — a console.log that skips a repeat of the previous line. Taps fire per applied
-// record, and one assignment can land more than once (a client's own write shows now and again as its
-// committed echo; the cluster view refolds on every write outcome), so a render loop prints only when
-// the picture changed.
+// record and the cluster view refolds on every write outcome (pending → committed), so a render loop
+// can be asked to print the same picture twice — it prints only when the picture changed.
 export const logChanges = (): ((line: string) => void) => {
   let last = ''
   return (line) => { if (line !== last) console.log((last = line)) }

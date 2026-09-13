@@ -6,7 +6,7 @@
 let last = ''
 export const render = (label: string, value: unknown) => {
   const text = `fero two-terminal demo — ${label}\n\n${JSON.stringify(value, null, 2)}`
-  if (text === last) return                                           //! a tap fires per applied record, and one assignment can land more than once (a client's own write shows now and again as its committed echo): redraw only when the picture changed
+  if (text === last) return                                           //! a tap fires per applied record, and the cluster view refolds on every write outcome (pending → committed), so a redraw can carry the same picture: redraw only when it changed
   last = text
   console.clear()
   console.log(text)
