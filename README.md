@@ -359,8 +359,10 @@ When you need more:
    and clears the intent. Retries are safe: the consumer's write is idempotent by
    key, the intent row is the durable cursor, and `confirm: 'persisted'` on the
    first write makes the intent crash-proof before anything acts on it.
-3. **Read-after-cross-partition-write:** the cid overlay gives read-your-writes
-   per client per partition; to OBSERVE another client's cross-partition pair,
+3. **Read-after-cross-partition-write:** a write shows when it commits — inside
+   the assignment on the owning server, as the owner's echo everywhere else
+   (V4-7: read-your-writes by commit, never by a local copy); to OBSERVE
+   another client's cross-partition pair,
    await `confirm: 'replicated'` on the first write before reading the second —
    ordering is then yours, purchased explicitly, not implied by the API.
 
@@ -415,7 +417,7 @@ kernel/   the deterministic core — no I/O, no ambient time/randomness (purity.
 shell/    production adapters (TCP + timers + the fsync WAL/boot-record store), zero protocol decisions
 api/      the public surface: fero(name, opts) → {name, data, methods, cluster, snapshot, destroy} (V4-2: role by declared act; V4-3: bare fero(name) = a client that looks the name up in the box's #directory, a server binds a free port and registers — api/directory.ts)
   substrate.ts  the ONE seam onto the `data` sibling ($() proxies): record-apply ingress, clone-free capture, sync detach
-  data.ts       the binding: capture→ingest, apply→proxy, echo match-and-consume, the cid-keyed overlay (read-your-writes)
+  data.ts       the binding: the lens in, the confirmed fold out, the write-route join (V4-7: no optimistic overlay — a write shows when it commits)
   index.ts      the composer: declared config schema (typos throw), `methods:` = the hosted methods AND the door (V4-5), seams.validation, default write methods over the confirm ladder
   methods.ts    the method plane (M5c): the invoke HOST (flush-on-return via ALS) + the rpc CALLER (dual-mode Handles, failover policies)
   types.ts      the exported unions: Guarantee, WriteResolve/WriteReject, FeroConfig, Fero
@@ -653,7 +655,9 @@ a real multi-process cluster over the wire).
     the proxy = confirmed + the cid-keyed pending overlay (read-your-writes).
     Echo suppression is match-and-consume of one expected echo per apply; the
     overlay needs no value bookkeeping (the beneath is always derivable from
-    kernel state — revert/bounce re-reads it).
+    kernel state — revert/bounce re-reads it). *(Superseded by V4-7: ONE
+    surface — the overlay is deleted, the proxy IS the fold, a write shows
+    when it commits.)*
   - **The write-route join**: Applied now carries the attempt identity
     (iss, cid) on every path that knows one (commit/inbound/replay — pinned),
     so the api resolves its own writes off the ONE apply stream; the cross-epoch
@@ -666,14 +670,16 @@ a real multi-process cluster over the wire).
     (DECISIONS V4-4): the relay is an issuer boundary and validates like one;
     a refusal is the terminal WNACK `invalid` and the client sees the reason.
     Since 2026-09-06 (V4-5) `methods:` is the door: declaring hosted methods
-    makes clients change data ONLY through them ('methods-only' bounces every
-    relayed plain write); spokes are views — they never teach a server and
+    makes clients change data ONLY through them ('methods-only' refuses every
+    relayed plain write — since V4-7 nothing shows on the client meanwhile);
+    spokes are views — they never teach a server and
     resync to the cluster's truth when their feeder's digest is below theirs.
   - ~~Capture-path overlay entries whose attempt the kernel drops at
     MAX_PENDING overflow released only on the cell's next apply~~ — closed by
     M5b: onAck feeds the dedup window (WACK coordinates ARE original commit
     coordinates), and Bind sweeps on every droppedPending change — cleared
-    entries resolve from the window, dropped ones reject + revert visibly.
+    entries resolve from the window, dropped ones reject visibly in
+    cluster.writes (V4-7: nothing to revert — nothing showed).
     Still tracked: the cluster fold rides a post-step hook (first-class
     membership effect is the M5d decision); user methods stash until M5c.
 - **M5b — the CLIENT role — is LIVE**: `fero(name, {hosts})` with no `listen`
@@ -692,7 +698,7 @@ a real multi-process cluster over the wire).
   - **The spoke feed**: servers tap-forward fresh INBOUND records to synced
     client links (commit broadcasts already covered own-origin records), so a
     spoke hears every lane live through its primary instead of at AE cadence —
-    attempt identity intact (the overlay join reads it). Zero cost to members:
+    attempt identity intact (the write-route join reads it). Zero cost to members:
     one set-size check per record when no clients are connected.
   - **Client writes are the plan's §5 contract verbatim**: ae=0 attempts (the
     client marker, regardless of the view the client knows) relayed by the

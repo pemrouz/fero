@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (397 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
+Run from the repo root: `npm test` (399 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -411,3 +411,25 @@ inside the outer apply.
   proof); and a check run by hand on the box directory met the user's own
   terminals — lib's `privateDirectory()` now gives every check its own
   free port (01 too). Battery: 397/397 + 18/18.
+- 2026-09-13 — NO GHOST (DECISIONS V4-7): a write shows when it COMMITS,
+  never before. The user asked whether client writes were applied
+  optimistically by default — they were: every accepted record, on every
+  role, projected into the local proxy before the kernel saw it, with no
+  switch — and chose "only a server owning and writing should commit". The
+  optimistic overlay in api/data.ts is deleted, not ported (#optimistic,
+  #revert, the never-set `fromCapture` switch, the branch that hid foreign
+  commits under an in-flight cell): the proxy IS the confirmed fold; a
+  server's write to a cell it owns shows inside the assignment (the commit
+  is synchronous); a forwarded write — a client's, or a server's to a cell
+  another server owns — shows as the owner's stamped echo; a refused write
+  never shows; an in-flight write is only a `pending` row of
+  cluster.writes. What survives is a settlement index (cell → newest
+  pending cid) that decides promises only, and the lens asks it before
+  swallowing a delete as a no-op (`data.k = v; delete data.k` still issues
+  the remove). Kernel and wire untouched; one apply fewer per issued
+  record. Wording followed: the examples' "shows now and again as its
+  echo", the 02 check's optimistic-copy comment, types/README/CLAUDE's
+  "bounces". Tests: api/data.test.ts (the forwarded-write pin INVERTED,
+  the delete-in-flight pin, a CLIENT-role binding pin — WNACK invisible,
+  echo visible), api/index.test.ts (the three client pins inverted).
+  Battery: 399/399 + 18/18 + perf 41/41.

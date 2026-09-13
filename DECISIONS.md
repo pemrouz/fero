@@ -78,7 +78,8 @@ Decision: reads/writes via ViewProxy assignment; methods are function-valued opt
 value-vs-subscription; no `.on()`, no hooks; reserved top-level keys stay the
 four — new surface nests under one of the three reactive surfaces.
 Consequences: the v2 API's event/hook sprawl is unrepresentable; failover
-policies live on Handles; read-your-writes rides the cid overlay.
+policies live on Handles; read-your-writes rides the cid overlay (V4-7: by
+commit — the overlay is gone).
 
 ## V3-10 — scoped replication: keep-until-confirmed + the one-teacher latch (M6)
 Decision: R-sets via ring.holdersOf; a non-holder sheds ONLY when every current
@@ -156,7 +157,8 @@ Decision: the client overlay's pending writes are visible as rows of the reactiv
 `cluster.writes` fold — never as markers inside `data` (a value that changes shape
 by delivery state would poison every consumer's equality logic).
 Consequences: read-your-writes stays value-clean; UIs that want delivery state join
-`cluster.writes` explicitly.
+`cluster.writes` explicitly. (V4-7: the overlay itself is gone — an in-flight
+write is ONLY a pending row here; `data` shows it when it commits.)
 
 ## V3-19 — the honesty gate verifies DERIVATIONS, not shapes (M7/M8)
 Context: the promotion gate's first run flagged `routes`' composite keys
@@ -455,7 +457,8 @@ Decision:
   spam, but a second refusal mechanism and more kernel; add it only if a
   consumer needs the typed class — IDEAS). Advertising the pin in HELLO for a
   zero-RTT client refusal (a wire-surface change; the round-trip bounce is
-  honest — IDEAS).
+  honest — IDEAS; V4-7: nothing shows meanwhile, so the round trip only
+  decides the outcome row).
 - **A validator-refused write inside a handler FAILS the call.** Bind.issue
   leaves a `Refused {refused, key, reason}` rejection in the live handler
   collector; the Host's flush-on-return and `ctx.flush()` throw
@@ -487,7 +490,7 @@ Decision:
   feeder's r=0 reply — sent after the suffix on the same FIFO link — removes
   every cell held at the reset that did not come back, through the ordinary
   apply effect (a synthesized remove under its own name, seq 0: never logged,
-  never on the wire; the overlay keeps a still-pending own write on top).
+  never on the wire; V4-7: a still-pending own write shows again as its echo).
   The projection is left as it is until then: no remove-everything flicker.
   "Ahead of my feeder" is a TRUE signal on the single-feeder FIFO — at the
   instant a feeder builds a digest its tails cover everything it has shipped.
@@ -611,3 +614,60 @@ knocks, the bound, nothing-to-leave, the rebase), sim/membership.test.ts
 api/index.test.ts (+1: two fero servers over real sockets — destroy one, the
 survivor alone and writable, a new identity joins and catches up).
 Battery: 396/396 + 18/18 + perf 41/41.
+
+## V4-7 — no ghost: a write shows when it commits, never before (2026-09-13)
+Context: the user asked whether client writes are applied optimistically by
+default, and said they should not be. They were: every accepted record —
+plain assignment, the lens builtins, methods.update/insert/remove, the data:
+seed — was projected into the local proxy BEFORE the kernel saw it
+(Bind.#optimistic), on every role, with no switch (the `fromCapture` off-switch
+existed but no caller ever set it). On a server writing a cell it owns that
+was moot: the commit lands inside the same assignment and data's Object.is
+chokepoint drops the second apply. On a client it was the only reason its own
+write showed before the server's echo, and it misled four ways: under
+`methods:` a plain client write is doomed but showed for a round trip and then
+"bounced" (IDEAS' "overlay flicker"); a validator refusal did the same; an
+object-valued write painted twice on a client (the ghost, then the echo — a
+fresh reference); and the 02 check's "echoed back" line was once satisfied by
+the ghost (STATUS 2026-09-12). Nothing depended on it: no handler, test,
+example, fold, diagnostics or debugger read a forwarded write back from the
+proxy; three api/index.test.ts pins and one binding pin asserted it. Five
+readers and five skeptics over the source established all of this.
+Decision: ONE surface. The proxy IS the confirmed fold. A write shows when it
+COMMITS: inside the assignment on the server that owns the cell (the epoch-0
+fast path or the self-owned attempt — read-your-writes by commit), and as the
+owner's stamped echo everywhere else — a client, or a server writing a cell
+another server owns — the same apply every other node sees. Until then the
+in-flight write is a `pending` row of cluster.writes (V3-18: delivery state
+never lives inside `data`). A refused write — the local validator, a relay's
+validator, the methods door — never shows: nothing to revert, nothing to
+bounce. The optimistic overlay (#optimistic, #revert, `fromCapture`, the
+branch that hid foreign commits under an in-flight cell) is DELETED, not
+ported. What survives is a settlement INDEX (#inflight: cell → newest pending
+cid) that decides promises only: the cross-epoch LWW-loss race still resolves
+from the dedup window on the next foreign apply, or rejects 'superseded'. The
+lens asks that index before swallowing a delete as a no-op: `data.k = v;
+delete data.k` still issues the remove (the fold does not show k yet, but k
+is not absent). No opt-in: the user chose "only a server owning and writing
+should commit" — one rule everywhere, no role or per-write flag.
+REJECTED: a role-based default (client off, server on) behind an
+`optimistic:` opt-in — a server's forwarded write has the same ghost, and a
+flag that changes what `data` means per process is the shape-by-delivery-state
+V3-18 banned; keeping the overlay ENTRY without the value (foreign commits
+would hide under a stale fold — worse than either policy); a per-write option
+(plain assignment has no option slot).
+Consequences: a client reads the old value until the echo (`snapshot` too);
+`await methods.update()` resolves on commit, by which time the value is
+visible; a client's tap fires once per own write (the echo), not twice; the
+IDEAS "overlay flicker" item loses its premise (the zero-RTT HELLO
+advertisement is now only the latency of the answer); DESIGN-M6 C6's "no
+optimistic echo for non-held partitions" (never implemented) is the universal
+rule. Amends V3-9's consequence line and V3-18 (pending rows: still
+cluster.writes only). Kernel and wire untouched; the issue path does one apply
+fewer per record. Examples: 02's "shows now and again as its echo" wording and
+the check's optimistic-copy comment are gone (the watcher's count is a
+round-trip proof too). Tests: api/data.test.ts (the forwarded-write pin
+INVERTED — not visible, a foreign commit projects, the echo settles; the
+delete-in-flight pin; a CLIENT-role binding pin — WNACK invisible, echo
+visible), api/index.test.ts (the three client pins inverted: nothing shows,
+refused is invisible, the echo paints). Battery: 399/399 + 18/18 + perf 41/41.
