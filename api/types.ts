@@ -57,12 +57,12 @@ export interface WriteOpts {
 // hash/codec/storage land with their milestones.
 export interface Seams {
   //! validation — a SCHEMA check: what a record may look like, never who may write it. Return true to
-  // admit, or a reason string to reject (assignment bounces + reverts; methods.* rejects with the
-  // reason; inside a hosted method the CALL fails with it — V4-5). Runs at the ONE local ingest, before
+  // admit, or a reason string to reject (a refused assignment never shows — V4-7; methods.* rejects
+  // with the reason; inside a hosted method the CALL fails with it — V4-5). Runs at the ONE local ingest, before
   // anything is issued — the server's own writes, its handlers' ctx.data writes, the data: seed — AND,
   // on an OPEN server, at the relay ingress for the client writes it relays (V4-4: a refused relayed
   // write WNACKs `invalid` with the reason, so the client's promise rejects and a plain client
-  // assignment bounces exactly like a local reject). Under `methods:` no client record ever reaches
+  // assignment is refused exactly like a local reject — nothing ever showed). Under `methods:` no client record ever reaches
   // it — the door refuses first. Keep it a pure function of the record: it runs inside the kernel step,
   // and a retransmit of an already-committed record is dup-ACKed without re-checking. Per-caller rules
   // belong in hosted methods (ctx.peer).
@@ -108,7 +108,7 @@ export interface FeroConfig {
   //! methods (V4-5) — the hosted methods, AND THE DOOR: declaring them means clients change data ONLY
   // through them. Every relayed plain write from a client — assignment, delete, the write builtins,
   // methods.update/insert/remove (one ingest, the same bytes) — is refused at the relay with the
-  // terminal reason 'methods-only' (the client's promise rejects typed; a plain assignment bounces).
+  // terminal reason 'methods-only' (the client's promise rejects typed; a plain assignment never shows).
   // The pin is about the WIRE: the server's own writes and its handlers' ctx.data writes are trusted
   // (they still meet seams.validation). Reads and subscriptions stay open — reads are not writes.
   // Omit it for an OPEN resource (anyone admitted may write anything — the demo shape). Open or

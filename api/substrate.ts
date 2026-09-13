@@ -68,7 +68,8 @@ const laneOf = (p: any) => {
   return l
 }
 
-//! applyRec — one committed/optimistic Rec into the handle via the hot lane. ORPHAN-CELL
+//! applyRec — one committed Rec into the handle via the hot lane (V4-7: only commits are ever
+// projected). ORPHAN-CELL
 // VIVIFY: field-granular LWW lawfully commits a nested cell before (or after the removal
 // of) its row — data v4 keeps deep-writes-cannot-invent-rows LOUD (clause 10c), so the
 // substrate supplies fero's replication semantics here: a rejected deep write vivifies the
@@ -76,7 +77,8 @@ const laneOf = (p: any) => {
 // Everything else that rejects is a genuine fault and rethrows.
 export const applyRec = (p: any, r: Rec): void => {
   //! SAVE/RESTORE, not set/null: applyRec re-enters through data's effect phase (a user
-  // tap issuing a write → #optimistic → applyRec while the outer lane is mid-flush), and a
+  // tap issuing a write → issue → the epoch-0 fast-path commit → #onApply → applyRec while the
+  // outer lane is mid-flush), and a
   // module-level slot nulled by the inner call corrupted the outer's. Note the flush-time
   // wrinkle: a lane call made INSIDE an effect defers its whole batch (clause 5), so its
   // rejects surface during the OUTER call's drain — vivify is exact for the replication
@@ -140,7 +142,8 @@ export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?
 // assignment IS a write). The lens is fero's thin Proxy over the v4 handle: reads and
 // RESERVED names (operators, get/connect/tap/…) delegate to v4; child access returns a
 // nested lens (so deep assignment works); set/delete mint fero Recs and hand them to the
-// SINK (Bind.issue — validation, overlay, owner routing) BEFORE data sees anything. A
+// SINK (Bind.issue — validation, the write-route join, owner routing) BEFORE data sees
+// anything; the proxy changes only when a commit applies (V4-7: no optimistic copy). A
 // root replace ([value] =, or assigning the lens itself) throws PRE-COMMIT — the v3
 // throw-then-heal dance is unnecessary by construction. `then` keeps fero's v2-parity
 // await-for-snapshot on the UNSCOPED surface (the scoped facade overrides it with the
@@ -148,7 +151,10 @@ export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?
 const LENS = Symbol('fero.lens')
 const RESERVED_NAMES: ReadonlySet<string> = new Set(contract().reserved)
 
-export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void): any =>
+//! `inflight(key)` — the binding's settlement index: true while one of OUR writes to that cell is
+// on the wire. The no-op delete filter asks it before swallowing: since V4-7 the fold does not
+// hold our uncommitted writes, so `data.k = v; delete data.k` must still issue the remove.
+export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflight: (key: string[]) => boolean = () => false): any =>
   new Proxy(Object.create(null) as Record<string | symbol, unknown>, {
     get(_t, prop) {
       if (prop === LENS) return h
@@ -161,12 +167,12 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void): any =
       if (prop === 'get')
         //! the total, collision-safe child read — returns a WRITE-CAPABLE lens (keyedRead
         // and user code route here for partition names shadowed by RESERVED)
-        return (k: unknown) => lens(h.get(String(k)), [...path, String(k)], sink)
+        return (k: unknown) => lens(h.get(String(k)), [...path, String(k)], sink, inflight)
       //! data's WRITE builtins must NOT delegate raw (the re-evaluation BLOCKER): h.set/
-      // update/patch mutate the LOCAL projection only — no validation, no overlay, no
+      // update/patch mutate the LOCAL projection only — no validation, no join, no
       // replication — a silent public-surface desync backdoor contradicting §4.1's
       // "validation covers both by construction". The v2-parity typed idioms ROUTE through
-      // the same sink as assignment/delete (Bind.issue — so the validate hook, overlay,
+      // the same sink as assignment/delete (Bind.issue — so the validate hook, the join,
       // and post-destroy pin cover them identically); the verbs that cannot be made
       // replication-correct through a lens THROW with the fero-shaped alternative.
       if (prop === 'set')
@@ -182,7 +188,7 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void): any =
           if (path.length === 0)
             throw new Error('fero: remove() on the resource root is not a write — destroy() the resource instead')
           //! same no-op delete filter as deleteProperty (leaf equivalence, data clause 10c)
-          if (h[VALUE] === undefined) return
+          if (h[VALUE] === undefined && !inflight(path)) return
           sink([{ type: REC.remove, key: path }])
         }
       if (prop === 'patch')
@@ -214,11 +220,11 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void): any =
           const snap = (h[VALUE] ?? {}) as Record<string, unknown>
           const keys = Object.keys(snap)
           const k = prop === 'first' ? keys[0] ?? '0' : keys[keys.length - 1] ?? '0'
-          return lens(h.get(k), [...path, k], sink)
+          return lens(h.get(k), [...path, k], sink, inflight)
         }
       if (RESERVED_NAMES.has(prop)) return h[prop] // operators + READ built-ins: v4's own dispatch
       const child = h.get(prop)
-      return lens(child, [...path, prop], sink)
+      return lens(child, [...path, prop], sink, inflight)
     },
     set(_t, prop, v) {
       if (typeof prop === 'symbol')
@@ -229,8 +235,10 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void): any =
     deleteProperty(_t, prop) {
       //! no-op delete filter (v2 parity — the substrate used to filter these before the
       // capture sink ever saw them): deleting an absent (or undefined-valued — the leaf
-      // equivalence, data clause 10c) target issues NOTHING. One O(depth) leaf read.
-      if ((h.get(String(prop)) as any)[VALUE] === undefined) return true
+      // equivalence, data clause 10c) target issues NOTHING — unless one of our own writes to it is
+      // still on the wire (V4-7: the fold does not show it yet, but it is not absent). One O(depth)
+      // leaf read, one map probe.
+      if ((h.get(String(prop)) as any)[VALUE] === undefined && !inflight([...path, String(prop)])) return true
       sink([{ type: REC.remove, key: [...path, String(prop)] }])
       return true
     },

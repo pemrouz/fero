@@ -192,7 +192,7 @@ export interface Rec {
 // `iss`/`cid` (M5a) are the ATTEMPT IDENTITY when the committed record carried one (forwarded/relayed
 // runs always do; FLAG_ATTEMPT rides replication and the WAL, so inbound and replay applies carry it
 // too) — the api layer joins its own issued cids against the apply stream to resolve write promises
-// and drop cid-overlay entries. Absent on fast-path local commits (epoch-0 genesis writes), which the
+// and drop its settlement-index entries. Absent on fast-path local commits (epoch-0 genesis writes), which the
 // embedder observes synchronously inside its own write() call instead.
 export interface Applied extends Rec {
   origin: string

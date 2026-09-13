@@ -129,7 +129,7 @@ test('the spoke feed: a server tap-forwards fresh inbound records to synced clie
   assert.equal(p.origin, 'bb')
   assert.equal(p.baseSeq, 4)
   const rv = [...f.records()][0]
-  assert.equal(rv.issuer, 'cli9~1', 'attempt identity rides the spoke feed (the overlay join needs it)')
+  assert.equal(rv.issuer, 'cli9~1', 'attempt identity rides the spoke feed (the write-route join needs it)')
   assert.equal(rv.cid, 3)
   //! a duplicate of the same record is NOT re-forwarded (only FRESH records feed the spoke)
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns(

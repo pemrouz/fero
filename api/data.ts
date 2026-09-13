@@ -1,32 +1,33 @@
-//! ── api/data — the $() binding: capture out, apply in, the cid-keyed overlay ──
-// The two-surface model that makes v2's echo/re-entrancy flag family structurally
-// unnecessary (plan §5 read-your-writes, plan §6 apply-as-output):
+//! ── api/data — the $() binding: the lens in, the confirmed fold out, the write-route join ──
+// ONE surface (DECISIONS V4-7): the proxy (this.data) IS the confirmed fold — kernel state
+// (node.state) projected through data's hot lane, nothing layered on top. A write shows
+// when it COMMITS, never before:
 //
-//   KERNEL STATE (node.state)  = the CONFIRMED fold. Only committed records ever
-//                                touch it; it is "beneath" by construction.
-//   THE PROXY (this.data)      = confirmed state + the PENDING OVERLAY: the
-//                                user's issued-but-uncommitted writes stay
-//                                visible on their cells (read-your-writes),
-//                                layered over inbound foreign commits, and are
-//                                released the moment their own commit applies.
+//   - a server writing a cell it OWNS commits inside the assignment (the kernel's epoch-0
+//     fast path, or the self-owned attempt — kernel/write.ts issue/#drain), so the value
+//     is there when the assignment returns: read-your-writes by commit, not by a copy;
+//   - a FORWARDED write (a client's, or a server's to a cell another server owns) shows
+//     when the owner's stamped record echoes back — the same apply every other node sees.
+//     Until then the proxy holds what the cluster holds, and the in-flight write is a
+//     `pending` row of cluster.writes (V3-18) — delivery state never lives inside `data`.
 //
-// Because the confirmed fold lives in the kernel, the overlay needs NO value
-// bookkeeping: an entry is just cell → pending cid. Release re-applies the
-// committed record; revert (validation bounce / superseded resolution) re-reads
-// node.state — the beneath is always derivable, never tracked.
+// A refused write — the local validator, a relay's validator, the methods door — never
+// shows: nothing to revert, nothing to bounce. v3's optimistic overlay (pending values
+// layered over the fold, revert on refusal, foreign commits hidden under an in-flight
+// cell) is DELETED, not ported.
 //
-// The write-route join (env.ts Applied): every apply carries the attempt
-// identity (iss, cid) when one exists. issue() PRE-creates pending entries under
-// the cids the kernel will mint (writes.cid is sampled, mints are contiguous per
-// record), so commits that land synchronously inside the write() call settle
-// through the same join as commits that echo back seconds later off the owner.
+// What survives of it is a settlement INDEX (#inflight: cell → the newest pending cid on
+// it), which the write-route join needs for one race: the kernel no longer holds our
+// attempt (it was WACK'd) but its commit never surfaces on our apply stream because a
+// foreign record out-stamped it (the cross-epoch LWW-loss race). A foreign apply on that
+// cell is the probe — resolve from the dedup window's original coordinates, or reject
+// 'superseded' — and the foreign record projects either way.
 //
-// Echo discipline (probed substrate facts — api/substrate.ts banner): applying a
-// record fans back to our own capture sink synchronously, possibly VERB-REWRITTEN
-// (update→insert), and user writes issued re-entrantly from taps drain INSIDE our
-// apply call. So suppression is match-and-consume of exactly ONE expected echo
-// (cell + value identity; removes match by type — their echo carries the old
-// value), and everything else in the same drain is genuine local work.
+// The write-route join (env.ts Applied): every apply carries the attempt identity
+// (iss, cid) when one exists. issue() PRE-creates pending entries under the cids the
+// kernel will mint (writes.cid is sampled, mints are contiguous per record), so commits
+// that land synchronously inside the write() call settle through the same join as
+// commits that echo back seconds later off the owner.
 
 import { proxy, applyRec, lens } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
@@ -40,7 +41,7 @@ export const cellOf = (r: Rec): string => JSON.stringify(r.key.length ? r.key : 
 export interface Coords { origin: string; seq: number; epoch: number; cid?: number }
 
 //! Issued — per-record outcome of one issue() call: a reason string (validation reject) or a promise
-// of commit coordinates. Capture-path callers drop the promises (assignments have no await surface);
+// of commit coordinates. Lens-path callers drop the promises (assignments have no await surface);
 // methods.* awaits them.
 export type Issued = (Promise<Coords> | string)[]
 
@@ -49,6 +50,8 @@ export type Issued = (Promise<Coords> | string)[]
 // string outcomes ('superseded' | 'dropped' | 'destroyed'), which stay swallowed there.
 export interface Refused { refused: true; key: string; reason: string }
 
+//! Pending — one unsettled write: its cell, the cid the kernel minted (or will mint) for it, and the
+// coordinate promise's settlers.
 interface Pending {
   cell: string
   cid: number
@@ -77,17 +80,18 @@ export class Bind {
   #handle: any // the raw data v4 source handle beneath the lens
   #rt: Runtime
   #iss: string
-  //! pending — 'iss|cid' → the unsettled write; overlay — cell → the NEWEST pending cid holding it
+  //! pending — 'iss|cid' → the unsettled write; inflight — cell → the NEWEST pending cid on it (the
+  // settlement index, see the banner: it decides promises, never what the proxy shows)
   #pending = new Map<string, Pending>()
-  #overlay = new Map<string, number>()
+  #inflight = new Map<string, number>()
   //! frames — a STACK of in-flight fast-path collectors, one per active issue() call (M5-review #0/#1/#4).
   // The epoch-0 fast path mints no kernel cid and applies synchronously inside rt.write(); a user tap
   // reacting to one of those applies drains a RE-ENTRANT issue() INSIDE the outer one (substrate
-  // contract). A single-slot #issuing/#fastApplied let the nested call null the outer's state mid-drain,
-  // orphaning the outer promise (never resolved → flush-on-return hung) and mis-rejecting the outer's
-  // trailing records as 'superseded'. A stack scopes each call's collection: node.commit applies
-  // records sequentially, so while a nested frame is on top ONLY its records apply, and the outer frame
-  // is back on top for its own remaining records. #onApply reads the TOP frame.
+  // contract). A single-slot collector let the nested call null the outer's state mid-drain, orphaning
+  // the outer promise (never resolved → flush-on-return hung) and mis-rejecting the outer's trailing
+  // records as 'superseded'. A stack scopes each call's collection: node.commit applies records
+  // sequentially, so while a nested frame is on top ONLY its records apply, and the outer frame is back
+  // on top for its own remaining records. #onApply reads the TOP frame.
   #frames: { cells: Set<string>; applied: Applied[] }[] = []
   #destroyed = false
   //! outcomes — the bounded write-outcome ring (cluster.writes source). `n` is a version counter the
@@ -110,11 +114,14 @@ export class Bind {
     this.#iss = rt.node.uuid + '~' + rt.node.incarnation
     //! the two-layer surface (DESIGN-DATA3 §4.1): #handle is the data v4 source holding the
     // projection; data is FERO'S OWN LENS over it — assignment/delete trap straight into
-    // issue() (validation, overlay, owner routing) BEFORE data sees anything, so no capture
+    // issue() (validation, the join, owner routing) BEFORE data sees anything, so no capture
     // sink exists and the entire v3 echo family (#expected, verb-rewrite matching,
-    // #healRoot) is deleted, not ported. A root replace throws PRE-COMMIT in the lens.
+    // #healRoot) is deleted, not ported. A root replace throws PRE-COMMIT in the lens. The
+    // lens asks #inflight before swallowing a delete as a no-op: a cell with one of our
+    // writes in flight is absent from the fold but NOT absent — `data.k = v; delete data.k`
+    // must issue the remove (substrate.ts deleteProperty/remove).
     this.#handle = proxy({})
-    this.data = lens(this.#handle, [], (recs) => this.#fromLens(recs))
+    this.data = lens(this.#handle, [], (recs) => this.#fromLens(recs), (key) => this.#inflight.has(JSON.stringify(key)))
     rt.onApply = (a) => { if (!this.#destroyed) this.#onApply(a) }
   }
 
@@ -125,11 +132,11 @@ export class Bind {
   // them at 'committed' — plan §9's flush-on-return, BUILT.
   #tracked?: () => Promise<Coords>[] | undefined
 
-  //! issue — THE one local ingest (assignment sugar and methods.* both land here; the seams.validation
-  // hook therefore covers both by construction — v2's OQ6). `fromCapture` says the proxy already holds
-  // the values (the user's own mutation); direct issues apply them optimistically so
-  // methods.update(x) ≡ data.k = x observationally.
-  issue(recs: Rec[], fromCapture: boolean): Issued {
+  //! issue — THE one local ingest (assignment sugar, the lens's write builtins, methods.* and the
+  // data: seed all land here; the seams.validation hook therefore covers every spelling by
+  // construction — v2's OQ6). Validate, register the pending entries, hand the records to the kernel;
+  // the proxy changes only when a commit applies (#onApply).
+  issue(recs: Rec[]): Issued {
     const node = this.#rt.node
     const out: Issued = new Array(recs.length)
     const valid: Rec[] = []
@@ -137,15 +144,13 @@ export class Bind {
     for (let i = 0; i < recs.length; i++) {
       const v = this.#validate ? this.#validate(recs[i]) : true
       if (v !== true) {
+        //! refused: an outcome row with the reason, and nothing else — the record never touched the
+        // proxy, so there is nothing to undo (a refused write is invisible, not bounced)
         out[i] = v
         this.#outcome({ key: cellOf(recs[i]), state: 'rejected', reason: v })
-        //! a rejected assignment BOUNCES: the cell reverts to the confirmed fold (the user sees the
-        // write refused, not silently dropped — and never sees it replicate)
-        if (fromCapture) this.#revert(cellOf(recs[i]))
         continue
       }
       valid.push(recs[i])
-      if (!fromCapture) this.#optimistic(recs[i])
     }
     if (valid.length === 0) return out
     //! pre-create the pending entries under the cids the kernel is ABOUT to mint (contiguous, one per
@@ -155,13 +160,13 @@ export class Bind {
     // (M5-review #0: the epoch-0 fast path re-uses the same predicted cid, so #pending keys collide).
     const c0 = node.writes.cid
     const promises = new Map<Rec, Promise<Coords>>()
-    const pend: { cell: string; cid: number; resolve: (c: Coords) => void; reject: (r: string) => void }[] = []
+    const pend: Pending[] = []
     for (let i = 0; i < valid.length; i++) {
       const rec = valid[i]
       const cid = c0 + 1 + i
       const cell = cellOf(rec)
       const row = this.#outcome({ key: cell, state: 'pending', cid })
-      let entry!: { cell: string; cid: number; resolve: (c: Coords) => void; reject: (r: string) => void }
+      let entry!: Pending
       const pr = new Promise<Coords>((resolve, reject) => {
         entry = { cell, cid, resolve, reject }
         this.#pending.set(this.#iss + '|' + cid, entry)
@@ -173,7 +178,7 @@ export class Bind {
       )
       promises.set(rec, pr)
       pend.push(entry)
-      this.#overlay.set(cell, cid)
+      this.#inflight.set(cell, cid)
     }
     //! push THIS call's fast-path collector; a nested re-entrant issue pushes its own on top, and node.commit
     // applies sequentially so only the top frame's records apply while it is on top (M5-review #1/#4).
@@ -185,13 +190,11 @@ export class Bind {
     // attempt identity — settle positionally from OUR frame (single-threaded step: this frame collected
     // exactly our records, in record order), resolving OUR OWN promise refs (map keys may have been
     // clobbered by a re-entrant fast-path issue re-using the predicted cid), and clean up OUR entries
-    // (guarded so a nested clobber never cross-deletes another call's pending/overlay).
+    // (guarded so a nested clobber never cross-deletes another call's entries).
     if (node.writes.cid === c0) {
-      const key = (cid: number) => this.#iss + '|' + cid
       for (let i = 0; i < pend.length; i++) {
         const p = pend[i]
-        if (this.#pending.get(key(p.cid)) === p) this.#pending.delete(key(p.cid))
-        if (this.#overlay.get(p.cell) === p.cid) this.#overlay.delete(p.cell)
+        this.#forget(p)
         const a = frame.applied[i]
         if (a) p.resolve({ origin: a.origin, seq: a.seq, epoch: a.epoch })
         else p.reject('not-applied') // an epoch-0 local commit always applies; defensive, never expected
@@ -203,16 +206,23 @@ export class Bind {
     return out
   }
 
+  //! forget — drop one pending entry from both maps, guarded by identity so a nested clobber (same
+  // predicted cid, another call's entry under the same key/cell) is never cross-deleted.
+  #forget(p: Pending) {
+    const key = this.#iss + '|' + p.cid
+    if (this.#pending.get(key) === p) this.#pending.delete(key)
+    if (this.#inflight.get(p.cell) === p.cid) this.#inflight.delete(p.cell)
+  }
+
   //! onApply — every committed record materializing downstream (live, forwarded-echo, replay alike).
-  // Routing: settle the write-route join first; then the overlay policy for foreign records; then the
-  // ONE projection into the proxy.
+  // Routing: settle the write-route join first; then the settlement probe for foreign records; then the
+  // ONE projection into the proxy — every apply projects, nothing is ever held back.
   #onApply(a: Applied) {
     //! 1) the join: an apply carrying an attempt identity we are waiting on IS our commit
     if (a.iss !== undefined) {
       const p = this.#pending.get(a.iss + '|' + a.cid)
       if (p) {
-        this.#pending.delete(a.iss + '|' + a.cid)
-        if (this.#overlay.get(p.cell) === a.cid) this.#overlay.delete(p.cell)
+        this.#forget(p)
         p.resolve({ origin: a.origin, seq: a.seq, epoch: a.epoch, cid: a.cid })
         this.#apply(a)
         return
@@ -228,26 +238,22 @@ export class Bind {
       this.#apply(a)
       return
     }
-    //! 3) the overlay policy: a FOREIGN commit under a cell our pending write holds. While our attempt
-    // is still live in the kernel, the pending value stays on top (read-your-writes — our commit will
-    // out-stamp this one at the owner). If the kernel no longer holds the attempt, our write either
-    // committed without ever surfacing through the join (the cross-epoch LWW-loss race — resolve it
-    // from the dedup window's original coordinates) or is unaccounted for (reject) — either way the
-    // overlay releases and the confirmed world shows through.
-    const holder = this.#overlay.get(cell)
-    if (holder !== undefined) {
-      const key = this.#iss + '|' + holder
-      if (this.#rt.node.writes.pending.has(key)) return // held: ours is still in flight
-      const p = this.#pending.get(key)
+    //! 3) the settlement probe: a FOREIGN commit under a cell with one of our writes in flight. While the
+    // kernel still holds the attempt nothing is decided (our commit will arrive through the join). If it
+    // no longer holds it, our write either committed without ever surfacing here (the cross-epoch
+    // LWW-loss race — resolve it from the dedup window's original coordinates) or is unaccounted for
+    // (reject 'superseded'). The foreign record projects regardless — the proxy is the fold.
+    const holder = this.#inflight.get(cell)
+    if (holder !== undefined && !this.#rt.node.writes.pending.has(this.#iss + '|' + holder)) {
+      const p = this.#pending.get(this.#iss + '|' + holder)
       if (p) {
-        this.#pending.delete(key)
+        this.#forget(p)
         const c = this.#rt.node.writes.committed(this.#iss, holder)
         if (c) p.resolve({ origin: this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: holder })
         else p.reject('superseded')
-      }
-      this.#overlay.delete(cell)
+      } else this.#inflight.delete(cell)
     }
-    //! 4) the ONE projection: kernel record → proxy, with the echo pre-consumed
+    //! 4) the ONE projection: kernel record → proxy
     this.#apply(a)
     this.sweep()
   }
@@ -259,44 +265,27 @@ export class Bind {
     applyRec(this.#handle, rec)
   }
 
-  //! optimistic — a direct issue (methods.*) makes its value visible immediately, exactly like an
-  // assignment already is: the pending layer of the overlay, not a commit claim.
-  #optimistic(rec: Rec) { this.#apply(rec) }
-
   //! shedPartition (M6): the kernel shed partition p — the data lawfully left this node without a
-  // remove record existing anywhere. ONE synthesized subtree remove through the one projection, echo
-  // pre-consumed (the capture arm swallows the fan-back, so nothing re-issues cluster-wide);
-  // downstream operators see an ordinary remove. Overlay cells under p drop with it (their pending
+  // remove record existing anywhere. ONE synthesized subtree remove through the one projection;
+  // downstream operators see an ordinary remove. Index entries under p drop with it (their pending
   // records now resolve at the partition's holders, via the apply-stream join as ever).
   shedPartition(p: string) {
     if (this.#destroyed) return
     this.#apply({ type: REC.remove, key: [p] })
-    for (const cell of [...this.#overlay.keys()]) if ((JSON.parse(cell) as string[])[0] === p) this.#overlay.delete(cell)
+    for (const cell of [...this.#inflight.keys()]) if ((JSON.parse(cell) as string[])[0] === p) this.#inflight.delete(cell)
   }
 
-  //! revert — re-project a cell from the CONFIRMED fold (kernel state): the beneath is derivable,
-  // never tracked (see the banner).
-  #revert(cell: string) {
-    const key = JSON.parse(cell) as string[]
-    const node = this.#rt.node
-    if (node.state.has(cell)) this.#apply({ type: REC.update, key, value: node.state.get(cell) })
-    else this.#apply({ type: REC.remove, key })
-  }
-
-  //! fromLens — the lens's write sink: every assignment/delete lands here as Recs and rides
-  // THE one ingest (issue → validation → optimistic apply → kernel). fromCapture=false:
-  // unlike v3's capture (where the user's mutation had already hit the proxy), the lens
-  // routes BEFORE data — a validation reject never becomes visible, no bounce-revert needed.
-  // Post-destroy, the surface survives as a plain local value (the v3 pin, kept): writes
-  // apply to the local projection only, replicating nowhere.
+  //! fromLens — the lens's write sink: every assignment/delete lands here as Recs and rides THE one
+  // ingest (issue → validation → kernel). Post-destroy, the surface survives as a plain local value
+  // (the v3 pin, kept): writes apply to the local projection only, replicating nowhere.
   #fromLens(recs: Rec[]) {
     if (this.#destroyed) {
       for (const r of recs) this.#apply(r)
       return
     }
-    //! assignments have no await surface — swallow the coordinate promises (their overlay/journal
+    //! assignments have no await surface — swallow the coordinate promises (their journal/outcome
     // effects are the observable outcome), but NEVER let a reject become an unhandledRejection
-    const out = this.issue(recs, false)
+    const out = this.issue(recs)
     const t = this.#tracked?.()
     for (let i = 0; i < out.length; i++) {
       const r = out[i]
@@ -320,12 +309,11 @@ export class Bind {
   // (droppedPending grows) or a relay's validator refused one of ours (rejectedPending grows — the
   // WNACK `invalid` path, kernel/write.ts onNack), find our pending entries the kernel no longer
   // holds. A recorded REASON rejects with it — the client sees the server's seams.validation verbatim:
-  // a plain assignment bounces, methods.* rejects typed, exactly like a local reject. WACK'd-or-
-  // replicated ones have dedup-window coordinates (onAck feeds it) — resolve them; the rest are
-  // genuinely dropped — reject 'dropped'. Either way the overlay releases and the confirmed fold shows
-  // through (the bounce is visible, never silent: counted kernel-side, rejected api-side). Two integer
-  // compares when nothing moved; the composer's post-step fold calls it because a WNACK step applies
-  // nothing — without that hop the promise would wait for an unrelated apply.
+  // a plain assignment's outcome row reads it, methods.* rejects typed, exactly like a local reject
+  // (and exactly as invisible: the value never showed). WACK'd-or-replicated ones have dedup-window
+  // coordinates (onAck feeds it) — resolve them; the rest are genuinely dropped — reject 'dropped'.
+  // Two integer compares when nothing moved; the composer's post-step fold calls it because a WNACK
+  // step applies nothing — without that hop the promise would wait for an unrelated apply.
   #drops = 0
   #rejects = 0
   sweep() {
@@ -338,10 +326,9 @@ export class Bind {
       if (w.pending.has(key)) continue
       const reason = w.rejected.get(key)
       if (reason !== undefined) {
-        this.#pending.delete(key)
         w.rejected.delete(key) // consumed: the reason has one reader
+        this.#forget(p)
         p.reject(reason)
-        if (this.#overlay.get(p.cell) === p.cid) { this.#overlay.delete(p.cell); this.#revert(p.cell) }
         continue
       }
       //! a reject settles ONLY the entries it names. An un-rejected entry the kernel no longer holds
@@ -349,14 +336,10 @@ export class Bind {
       // chunk can carry a WACK and a WNACK in one step) — settling it here from the dedup window would
       // resolve it early and, on a spoke, under the wrong origin. Only a DROP may pre-empt the join.
       if (!drops) continue
-      this.#pending.delete(key)
+      this.#forget(p)
       const c = w.committed(this.#iss, p.cid)
       if (c) p.resolve({ origin: this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: p.cid })
-      else {
-        p.reject('dropped')
-        if (this.#overlay.get(p.cell) === p.cid) { this.#overlay.delete(p.cell); this.#revert(p.cell) }
-      }
-      if (this.#overlay.get(p.cell) === p.cid && c) this.#overlay.delete(p.cell)
+      else p.reject('dropped')
     }
   }
 
@@ -366,6 +349,6 @@ export class Bind {
     this.#destroyed = true
     for (const [, p] of this.#pending) p.reject('destroyed')
     this.#pending.clear()
-    this.#overlay.clear()
+    this.#inflight.clear()
   }
 }

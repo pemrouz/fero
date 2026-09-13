@@ -48,12 +48,18 @@ test('SCALE-TCP 12-node dial storm: 132 real dials dedup to one view, every writ
     //! every node writes concurrently — the fan-in matrix: 12 origins × 11 receivers over real sockets
     nodes.forEach((f, i) => { f.data[`row${i}`] = { by: i, deep: { list: [i, `x${i}`] } } })
     nodes[0].data.shared = 'last'
+    //! convergence = COMPLETE and identical: every row landed on node 0 AND every node agrees. (V4-7:
+    // a writer no longer shows its own in-flight write, so "all identical" alone can be true while one
+    // write is still parked — the ghost used to hold this wait open by accident.)
     assert.ok(
       await until(() => {
-        const first = canon(snapshot(nodes[0].data))
-        return first !== '{}' && nodes.every((f) => canon(snapshot(f.data)) === first)
+        const first = snapshot(nodes[0].data) as Record<string, unknown>
+        for (let i = 0; i < 12; i++) if (first[`row${i}`] === undefined) return false
+        if (first.shared === undefined) return false
+        const c = canon(first)
+        return nodes.every((f) => canon(snapshot(f.data)) === c)
       }, 15_000),
-      'all 12 snapshots identical — replication survived mesh fan-in',
+      'all 12 snapshots complete and identical — replication survived mesh fan-in',
     )
     const s = snapshot(nodes[0].data) as Record<string, unknown>
     for (let i = 0; i < 12; i++) assert.ok(s[`row${i}`], `row${i} present — no origin lane was lost in the storm`)

@@ -1,8 +1,9 @@
 //! Tier-1 binding suite: Bind driven deterministically — a Runtime with NO network, its node fed
 // hand-crafted frames exactly like the kernel suites, the $() proxy asserted on top. Pins the four
 // contracts the api rests on: capture→ingest (assignment IS a write), apply→proxy (inbound records
-// project, echo pre-consumed), the cid-overlay (read-your-writes over foreign commits, release on own
-// commit), and the echo discipline under re-entrant user writes (the probed substrate drain).
+// project, echo pre-consumed), the write-route join (V4-7: a forwarded write shows only as its
+// stamped echo — no optimistic copy, nothing hides a foreign commit, a refusal shows nothing), and
+// the echo discipline under re-entrant user writes (the probed substrate drain).
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -84,7 +85,7 @@ test('a re-entrant user write from a tap reacting to an inbound apply IS capture
   await h.destroy()
 })
 
-test('M5a OVERLAY — a forwarded write stays visible over foreign commits and releases on its OWN commit (read-your-writes)', async () => {
+test('V4-7 NO GHOST — a forwarded write is NOT visible until the owner\'s commit echoes back; a foreign commit meanwhile projects straight through; the echo settles the join', async () => {
   const h = harness()
   h.admit(1, 'bb')
   //! commit view 1 over {aa, bb} so writes take the attempt path; place the partition on bb
@@ -95,29 +96,52 @@ test('M5a OVERLAY — a forwarded write stays visible over foreign commits and r
   h.bind.data.cart = { items: 1 }
   assert.equal(h.node.writes.pending.size, 1, 'forwarded — pending until the ACK')
   assert.equal(h.node.state.size, 0, 'the CONFIRMED fold does not have it')
-  assert.deepEqual(snapshot(h.bind.data), { cart: { items: 1 } }, 'the proxy DOES — the pending layer')
+  assert.deepEqual(snapshot(h.bind.data), {}, 'and neither does the proxy: a write shows when it commits, not before')
+  //! the in-flight write is a pending row of cluster.writes — delivery state lives there, never in data
+  assert.ok([...h.bind.outcomes.rows.values()].some((r) => r.key === JSON.stringify(['cart']) && r.state === 'pending'))
 
-  //! a FOREIGN commit for the same cell lands while ours is in flight: the kernel folds it, the
-  // proxy holds our pending value on top
+  //! a FOREIGN commit for the same cell lands while ours is in flight: it projects straight through —
+  // the proxy is the fold, nothing hides a commit
   h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 1, 1, [{ type: REC.update, key: ['cart'], value: { items: 99 } }]) })
   assert.deepEqual(h.node.state.get(cellOf({ type: 0, key: ['cart'] } as Rec)), { items: 99 }, 'kernel: confirmed fold advanced')
-  assert.deepEqual(snapshot(h.bind.data), { cart: { items: 1 } }, 'proxy: our write still layers over')
+  assert.deepEqual(snapshot(h.bind.data), { cart: { items: 99 } }, 'proxy: the foreign commit shows')
 
   //! now OUR commit replicates back from the owner (attempt identity = our issuer lane, cid 1):
-  // the overlay releases and the committed form shows through
+  // the join settles and the committed form shows — the first time this node sees its own write
   h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 2, 1, [{ type: REC.update, key: ['cart'], value: { items: 1 } }], 'aa~1', 1) })
   assert.equal(h.node.writes.pending.size, 0, 'replication IS the ACK')
   assert.deepEqual(snapshot(h.bind.data), { cart: { items: 1 } })
-  //! a later foreign write now projects straight through (no overlay left)
+  //! a later foreign write projects through exactly the same way
   h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 3, 1, [{ type: REC.update, key: ['cart'], value: { items: 7 } }]) })
   assert.deepEqual(snapshot(h.bind.data), { cart: { items: 7 } })
   await h.destroy()
 })
 
-test('M5a OVERLAY — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
+test('V4-7 NO GHOST — a delete of a cell with our own write in flight is NOT a no-op: the remove issues too', async () => {
+  const h = harness()
+  h.admit(1, 'bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  h.node.writes.ring.place('cart', 'bb')
+  //! absent everywhere: the delete is the v2-parity no-op (nothing issues)
+  delete h.bind.data.cart
+  assert.equal(h.node.writes.pending.size, 0, 'deleting an absent cell issues nothing')
+  //! absent from the fold but on the wire: the delete must follow the update (before V4-7 the optimistic
+  // copy made the cell present; now the lens asks the settlement index instead)
+  h.bind.data.cart = { items: 1 }
+  delete h.bind.data.cart
+  assert.equal(h.node.writes.pending.size, 2, 'update + remove, both forwarded')
+  //! the typed spelling agrees
+  h.bind.data.cart = { items: 2 }
+  h.bind.data.cart.remove()
+  assert.equal(h.node.writes.pending.size, 4)
+  assert.deepEqual(snapshot(h.bind.data), {}, 'and still nothing shows until the owner answers')
+  await h.destroy()
+})
+
+test('M5a — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
   const h = harness()
   //! fast path (epoch 0): coordinates resolve within the call
-  const [fast] = h.bind.issue([{ type: REC.update, key: ['a'], value: 1 }], false)
+  const [fast] = h.bind.issue([{ type: REC.update, key: ['a'], value: 1 }])
   assert.ok(fast instanceof Promise)
   const c1 = await fast
   assert.equal(c1.origin, 'aa')
@@ -126,7 +150,7 @@ test('M5a OVERLAY — issue() resolves coordinates: synchronously on the fast pa
   h.admit(1, 'bb')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
   h.node.writes.ring.place('theirs', 'bb')
-  const [fwd] = h.bind.issue([{ type: REC.update, key: ['theirs'], value: 2 }], false)
+  const [fwd] = h.bind.issue([{ type: REC.update, key: ['theirs'], value: 2 }])
   let settled = false
   ;(fwd as Promise<unknown>).then(() => { settled = true })
   await new Promise((r) => setImmediate(r))
@@ -140,18 +164,18 @@ test('M5a OVERLAY — issue() resolves coordinates: synchronously on the fast pa
   await h.destroy()
 })
 
-test('M5a VALIDATION — the seams hook covers assignment and direct issue alike; a rejected assignment BOUNCES (reverts to the confirmed fold)', async () => {
+test('M5a VALIDATION — the seams hook covers assignment and direct issue alike; a rejected assignment never shows (nothing to bounce)', async () => {
   const h = harness({ validate: (rec) => (rec.key[0] === 'locked' || rec.at === 'locked' ? 'locked cells are read-only' : true) })
   //! seed a confirmed value for the locked cell from a peer
   h.admit(1, 'bb')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 1, 0, [{ type: REC.insert, key: [], value: 'sealed', at: 'locked' }]) })
   assert.deepEqual(snapshot(h.bind.data), { locked: 'sealed' })
-  //! the assignment is refused: nothing issues, and the visible value SNAPS BACK
+  //! the assignment is refused: nothing issues, and the visible value never changed
   h.bind.data.locked = 'overwritten'
   assert.equal(h.jk(JK.writeLocal).length, 0, 'nothing entered the pipeline')
-  assert.deepEqual(snapshot(h.bind.data), { locked: 'sealed' }, 'the bounce reverted the cell')
+  assert.deepEqual(snapshot(h.bind.data), { locked: 'sealed' }, 'the refused write never showed')
   //! direct issue rejects with the reason string
-  const [r] = h.bind.issue([{ type: REC.update, key: ['locked'], value: 'x' }], false)
+  const [r] = h.bind.issue([{ type: REC.update, key: ['locked'], value: 'x' }])
   assert.equal(r, 'locked cells are read-only')
   //! unlocked writes pass
   h.bind.data.open = 1
@@ -178,7 +202,7 @@ test('M5-REVIEW #0/#1/#4 — a re-entrant tap write during an epoch-0 fast-path 
     if ((c.at === 'a' || c.key?.[0] === 'a')) h.bind.data.b = 'mirror'
   })
   //! single-record outer write (finding #0): the outer promise MUST resolve, not orphan
-  const [pa] = h.bind.issue([{ type: REC.update, key: ['a'], value: 1 }], false)
+  const [pa] = h.bind.issue([{ type: REC.update, key: ['a'], value: 1 }])
   const settledA = await Promise.race([
     (pa as Promise<{ seq: number }>).then((c) => `ok:${c.seq}`, (e) => `rej:${e}`),
     new Promise((r) => setTimeout(() => r('ORPHANED'), 300)),
@@ -205,4 +229,41 @@ test('M5-REVIEW #0/#1/#4 — a re-entrant tap write during an epoch-0 fast-path 
   assert.equal(snapshot(h2.bind.data).y, 20)
   assert.equal(snapshot(h2.bind.data).z, 'from-tap')
   await h.destroy(); await h2.destroy()
+})
+
+test("V4-7 NO GHOST — the CLIENT role at the binding tier: a spoke's own write shows only as the server's stamped echo; a refusal shows nothing at all", async () => {
+  //! a client Runtime driven by hand-crafted frames: aa is its primary (HELLO + DIGEST + VIEW)
+  const rt = new Runtime({ uuid: 'zz', heartbeatMs: 0, client: true })
+  const bind = new Bind(rt)
+  const node = rt.node
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:aa' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa' }) })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa']] }) })
+  const rows = () => [...bind.outcomes.rows.values()]
+  //! the write is relayed (ae=0 attempt), nothing commits locally, nothing shows locally
+  bind.data.k = 1
+  assert.equal(node.writes.pending.size, 1, 'relayed — pending until the server answers')
+  assert.equal(node.state.size, 0, 'a client never commits')
+  assert.deepEqual(snapshot(bind.data), {}, 'no optimistic copy: the proxy is what the cluster holds')
+  assert.ok(rows().some((r) => r.key === JSON.stringify(['k']) && r.state === 'pending'), 'cluster.writes carries the in-flight write')
+  //! the server refuses it (a validator, or the methods door): the WNACK is terminal — the outcome row
+  // reads the reason, the promise rejects, and the proxy never moved (the composer's fold calls sweep)
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WNACK, { u: 'zz~1', c: 1, n: 1, r: 'invalid', m: 'reserved', ce: 1 }) })
+  bind.sweep()
+  await new Promise((r) => setImmediate(r))
+  assert.equal(node.writes.pending.size, 0)
+  assert.ok(rows().some((r) => r.key === JSON.stringify(['k']) && r.state === 'rejected' && r.reason === 'reserved'), 'the server\'s reason, verbatim')
+  assert.deepEqual(snapshot(bind.data), {}, 'refused is invisible — there was nothing to bounce')
+  //! an admitted write: the value shows exactly when the server's stamped record echoes back through the
+  // spoke feed, attempt identity intact — the same apply every other node sees
+  bind.data.k = 2
+  assert.deepEqual(snapshot(bind.data), {}, 'still nothing before the echo')
+  node.step({ kind: 'bytesIn', link: 1, bytes: records('aa', 1, 1, [{ type: REC.update, key: ['k'], value: 2 }], 'zz~1', 2) })
+  assert.equal(node.writes.pending.size, 0, 'replication IS the ACK')
+  assert.deepEqual(snapshot(bind.data), { k: 2 }, 'the echo painted it')
+  await new Promise((r) => setImmediate(r))
+  assert.ok(rows().some((r) => r.key === JSON.stringify(['k']) && r.state === 'committed' && r.origin === 'aa'), 'stamped under the server')
+  bind.destroy()
+  await rt.destroy()
 })

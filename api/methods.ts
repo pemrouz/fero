@@ -56,7 +56,7 @@ const settle = async (tracked: Promise<Coords>[]): Promise<void> => {
 export const SYSTEM = '\u0000'
 
 //! Context — the second argument every handler receives. `data` is the server's own resource surface
-// (writes route through the ONE ingest: validation + overlay + owner routing all apply); `flush()`
+// (writes route through the ONE ingest: validation + the write-route join + owner routing all apply); `flush()`
 // awaits everything this handler has written SO FAR at 'committed' (the mid-body barrier — the
 // implicit one runs at return).
 export interface Context {

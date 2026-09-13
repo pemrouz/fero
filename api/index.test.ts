@@ -44,7 +44,7 @@ test('config recognition (V4-5): unknown keys, unknown seams and TOP-LEVEL FUNCT
   await f.destroy()
 })
 
-test("V4-5 the door: `methods:` makes clients change data ONLY through the methods — plain writes and the write builtins bounce 'methods-only'; the server's own writes and its handlers stay trusted; the validator still guards the trusted side", async () => {
+test("V4-5 the door: `methods:` makes clients change data ONLY through the methods — plain writes and the write builtins are refused 'methods-only' and never show; the server's own writes and its handlers stay trusted; the validator still guards the trusted side", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
   const s = await fero('r', {
     uuid: 'aa', listen: addr, heartbeatMs: 50, redialMs: 30,
@@ -59,11 +59,12 @@ test("V4-5 the door: `methods:` makes clients change data ONLY through the metho
   const rows = (f: typeof c) => Object.values(snapshot(f.cluster).writes as Record<string, { key: string; state: string; reason?: string }>)
   try {
     assert.ok(await until(() => view(c).stock === 3, 8000), 'the spoke folded the seed')
-    //! a plain client assignment: visible optimistically, then it BOUNCES with the door's reason
+    //! a plain client assignment: NOTHING shows (V4-7 — a client's write is a request until the server
+    // stamps it), the relay refuses it, and only cluster.writes tells the story, with the door's reason
     c.data.stock = 99
-    assert.equal(view(c).stock, 99, 'read-your-writes until the relay answers')
-    assert.ok(await until(() => view(c).stock === 3, 8000), 'bounced — the relay refused it')
+    assert.equal(view(c).stock, 3, 'no optimistic copy: the proxy is the cluster\'s truth')
     assert.ok(await until(() => rows(c).some((r) => r.key === JSON.stringify(['stock']) && r.state === 'rejected' && r.reason === 'methods-only'), 8000), 'cluster.writes names the door')
+    assert.equal(view(c).stock, 3, 'refused — and it never showed, so there was nothing to bounce')
     //! the write builtins are the same bytes as assignment — refused identically, typed, never a timeout
     const door = (e: { reason: string; reached: string }) => e.reason === 'methods-only' && e.reached === 'issued'
     await assert.rejects(c.methods.update({ key: 'stock', value: 1 }, { timeout: 8000 }), door)
@@ -76,7 +77,7 @@ test("V4-5 the door: `methods:` makes clients change data ONLY through the metho
     //! the pin is about the WIRE: the server's own write lands and replicates…
     s.data.note = 'mine'
     assert.ok(await until(() => view(c).note === 'mine', 8000))
-    //! …and the validator still guards the trusted side: the server's OWN admin write bounces locally
+    //! …and the validator still guards the trusted side: the server's OWN admin write is refused locally
     s.data.admin = 5
     assert.equal(view(s).admin, undefined)
     assert.equal(view(s).stock, 2, 'nothing the client sent directly ever landed')
@@ -128,7 +129,7 @@ test('solo: assignment and methods.update are ONE ingest — both commit, both v
 
 //! Regression (v4 re-evaluation BLOCKER): the lens delegated EVERY reserved name raw —
 // including data's WRITE builtins — so f.data.set('k',v) / f.data.k.update(v) /
-// f.data.patch([...]) mutated the LOCAL projection only: no validation, no overlay, no
+// f.data.patch([...]) mutated the LOCAL projection only: no validation, no join, no
 // replication (the sink saw only assignments). §4.1's "validation covers both by
 // construction" now holds for the typed idioms too: set/update/patch/remove route through
 // the SAME sink as assignment/delete (Bind.issue), and the verbs that cannot be made
@@ -158,9 +159,9 @@ test('D3 lens: data write builtins route through issue() — validated — or th
     assert.ok(seen.length >= 4, 'every routed verb passed the validation seam (issue), not the raw handle')
 
     //! a REJECTED verb write never lands in the projection — the backdoor's exact
-    // signature was "validation bounced it but the handle mutated anyway"
+    // signature was "validation refused it but the handle mutated anyway"
     f.data.set('w', { stock: 13 })
-    assert.deepEqual((snapshot(f.data) as Record<string, unknown>).w, { stock: 2 }, 'rejected verb write bounced PRE-COMMIT')
+    assert.deepEqual((snapshot(f.data) as Record<string, unknown>).w, { stock: 2 }, 'rejected verb write refused PRE-COMMIT — nothing showed')
 
     //! the un-routable verbs throw with the fero-shaped alternative
     assert.throws(() => (f.data as { insert(v: unknown): unknown }).insert({ stock: 9 }), /fero: insert\(\)/)
@@ -293,7 +294,7 @@ test('destroy is clean: sockets down, timers cleared, capture detached — the p
   assert.deepEqual(snapshot(f.data), { k: 1, local: 2 })
 })
 
-test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-your-writes over the relay, failover past a dead server', async () => {
+test('M5b — a CLIENT (hosts, no listen): full state through one feeder, its own write shows as the server-stamped echo, failover past a dead server', async () => {
   //! THREE servers: the failover leg kills one, and a surviving MAJORITY must exist to evict it —
   // with two, a write owned by the dead member would (correctly, CP) park forever
   const ps = [await ports.free(), await ports.free(), await ports.free()]
@@ -311,8 +312,11 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-y
     c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
     //! catch-up: the spoke folds the full state through its primary
     assert.ok(await until(() => (snapshot(c!.data) as Record<string, unknown>).seeded === 'before-client'), 'client caught up')
-    //! read-your-writes: the assigned value is visible NOW (the pending overlay), before any ack
+    //! V4-7: a client never commits, so its own assignment is NOT visible yet — it shows when the
+    // server's stamped record echoes back (the same apply every other node sees)
     c.data.mine = { from: 'client' }
+    assert.equal((snapshot(c.data) as Record<string, unknown>).mine, undefined, 'no optimistic copy')
+    assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).mine !== undefined, 8000), 'the echo painted it')
     assert.deepEqual((snapshot(c.data) as Record<string, unknown>).mine, { from: 'client' })
     const r = await c.methods.update({ key: 'via-method', value: 1 }, { timeout: 8000 })
     assert.notEqual(r.origin, 'zz', 'a client NEVER stamps provenance — the commit is server-stamped')
@@ -333,7 +337,7 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, read-y
   }
 })
 
-test("relayed client writes run the SERVER's seams.validation at the relay: the refused row never lands; the client's assignment bounces and its methods.update rejects with the server's reason", async () => {
+test("relayed client writes run the SERVER's seams.validation at the relay: the refused row never lands anywhere — not even on the client's own screen — and its methods.update rejects with the server's reason", async () => {
   //! the IDEAS probe (2026-09-05): before this fix a server that refused its OWN `data.admin = …` still
   // let a bare client's `data.admin = …` LAND (the relay re-stamped but ran no validator)
   const addr = `127.0.0.1:${await ports.free()}`
@@ -347,15 +351,15 @@ test("relayed client writes run the SERVER's seams.validation at the relay: the 
     //! the server refuses its OWN admin write (the local hook, unchanged)
     s.data.admin = 'local'
     assert.equal((snapshot(s.data) as Record<string, unknown>).admin, undefined)
-    //! a plain client assignment: visible optimistically (read-your-writes), then it BOUNCES when the
-    // relay refuses it — and cluster.writes shows the server's reason on the rejected row
+    //! a plain client assignment: nothing shows (V4-7), the relay refuses it, and cluster.writes shows
+    // the server's reason on the rejected row
     c.data.admin = 'from-client'
-    assert.equal((snapshot(c.data) as Record<string, unknown>).admin, 'from-client', 'pending overlay until the relay answers')
-    assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).admin === undefined, 8000), 'the refusal bounced the cell')
+    assert.equal((snapshot(c.data) as Record<string, unknown>).admin, undefined, 'no optimistic copy on the client')
     //! the outcome row settles in a microtask and folds on the NEXT step (api/data.ts outcomes) — await it
     const rejected = () => rows(c).find((r) => r.key === JSON.stringify(['admin']) && r.state === 'rejected')
     assert.ok(await until(() => rejected() !== undefined, 8000), 'cluster.writes shows the rejected row')
     assert.equal(rejected()?.reason, 'reserved', "the client reads the SERVER's validator verbatim")
+    assert.equal((snapshot(c.data) as Record<string, unknown>).admin, undefined, 'still nothing: refused is invisible, not bounced')
     //! methods.update rejects TYPED with the same reason — the WriteReject contract, not a hang or a timeout
     await assert.rejects(
       c.methods.update({ key: 'admin', value: 1 }, { timeout: 8000 }),
