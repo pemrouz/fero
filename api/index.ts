@@ -7,7 +7,7 @@
 // CONFIG lives under the one reserved `seams` key.
 //
 // M5a scope: the server/solo composer over the shell Runtime — data binding both
-// directions with the cid-overlay (api/data.ts), the default write methods with
+// directions with the write-route join (api/data.ts; V4-7: a write shows when it commits), the default write methods with
 // {confirm, timeout} against the M4c guarantee ladder, restore-before-network when
 // `dir` holds a previous life, and a minimal reactive cluster surface. The client
 // role (M5b) and user-method dispatch (M5c) land next.
@@ -32,7 +32,8 @@ const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartb
 const SEAM_KEYS = new Set(['validation'])
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
 // V4-4's `invalid` WNACK as `m`, surfaces as WriteReject.reason and cluster.writes.reason, and is what a
-// plain client assignment bounces on. A degenerate admission predicate folded into the ONE kernel hook.
+// plain client assignment is refused with (nothing ever showed — V4-7). A degenerate admission predicate
+// folded into the ONE kernel hook.
 export const METHODS_ONLY = 'methods-only'
 const METHODS_ONLY_ADMIT = (_: Rec): true | string => METHODS_ONLY
 
@@ -354,7 +355,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const write = async (rec: Rec, o: WriteOpts = {}): Promise<WriteResolve> => {
     const want: Guarantee = o.confirm ?? 'committed'
     const ms = o.timeout ?? 10_000
-    const r = bind.issue([rec], false)[0]
+    const r = bind.issue([rec])[0]
     if (typeof r === 'string') throw { guarantee: want, reached: 'issued', reason: r } satisfies WriteReject
     //! the timeout timer is CAPTURED and CLEARED on settle (M5-review #3: the bare setTimeout leaked one
     // live timer + reject closure per write for the full `ms` on the hot path). And a POST-ISSUE kernel
@@ -460,7 +461,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   let lastScopeN = -1
   const fold = () => {
     //! settle kernel-side outcomes FIRST (two integer compares when nothing moved): a relay's `invalid`
-    // WNACK removes our attempt inside a step that applies nothing, so the write's promise/overlay
+    // WNACK removes our attempt inside a step that applies nothing, so the write's promise
     // would otherwise wait for the next apply — the sweep rides the post-step hook instead
     bind.sweep()
     //! cluster.writes — the bounded confirm ring (plan §9; Q4 decided: pending rows are visible HERE,
@@ -546,7 +547,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         const v = validate(r)
         if (v !== true) await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' rejected by seams.validation — ${v}`))
       }
-    for (const r of bind.issue(recs, false))
+    for (const r of bind.issue(recs))
       if (typeof r === 'string') await abort(new Error(`fero('${name}'): data seed refused by the kernel — ${r}`))
   }
   try {

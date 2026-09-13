@@ -43,9 +43,14 @@ const canon = (v: unknown): string =>
   v && typeof v === 'object' && !Array.isArray(v)
     ? '{' + Object.keys(v as object).sort().map((k) => JSON.stringify(k) + ':' + canon((v as Record<string, unknown>)[k])).join(',') + '}'
     : Array.isArray(v) ? '[' + v.map(canon).join(',') + ']' : JSON.stringify(v)
-const converged = (nodes: Fero[], timeout = 10_000) =>
+//! converged — COMPLETE and identical: `complete` names what must already be on node 0 (V4-7: a writer
+// no longer shows its own in-flight write, so "all identical" alone can hold while one write is still
+// parked — the ghost used to hold this wait open by accident), then every node must agree.
+const converged = (nodes: Fero[], complete: (s: Record<string, unknown>) => boolean, timeout = 10_000) =>
   until(() => {
-    const first = canon(snapshot(nodes[0].data))
+    const s = snapshot(nodes[0].data) as Record<string, unknown>
+    if (!complete(s)) return false
+    const first = canon(s)
     return nodes.every((f) => canon(snapshot(f.data)) === first) && first !== '{}'
   }, timeout)
 
@@ -60,7 +65,8 @@ test('SCENARIO formation + concurrent writers: five servers form one view and co
     })
     nodes[0].data.row0.nested = true
     delete nodes[1].data.row1
-    assert.ok(await converged(nodes), 'all five snapshots identical')
+    assert.ok(await converged(nodes, (s) => [2, 3, 4].every((i) => s[`row${i}`] !== undefined) && s.shared !== undefined
+      && (s.row0 as Record<string, unknown> | undefined)?.nested === true), 'all five snapshots complete and identical')
     const s = snapshot(nodes[0].data) as Record<string, unknown>
     assert.equal(s.row1, undefined, 'the remove won everywhere')
     assert.deepEqual((s.row0 as Record<string, unknown>).nested, true)
@@ -77,7 +83,7 @@ test('SCENARIO kill/restart: a durable member dies, its heir restores from the W
     assert.ok(await formed(nodes))
     const r = await nodes[0].methods.update({ key: 'durable-fact', value: 42 }, { confirm: 'persisted', timeout: 10_000 })
     assert.equal(r.guarantee, 'persisted', 'a real fsync quorum answered')
-    assert.ok(await converged(nodes))
+    assert.ok(await converged(nodes, (s) => s['durable-fact'] === 42))
     //! kill n03 and resurrect it from its dir alone — same uuid, same fero() call shape
     await nodes[2].destroy()
     heir = await fero('scenario', { uuid: 'n03', listen: addrs[2], hosts: addrs.filter((_, j) => j !== 2), heartbeatMs: 50, redialMs: 30, dir: dirs[2] })
@@ -103,7 +109,7 @@ test('SCENARIO full-cluster kill: every member dies at once; the cluster restore
     for (let i = 0; i < 6; i++) nodes[i % 3].data[`k${i}`] = { v: i }
     const r = await nodes[0].methods.update({ key: 'sealed', value: true }, { confirm: 'persisted', timeout: 10_000 })
     assert.equal(r.guarantee, 'persisted')
-    assert.ok(await converged(nodes))
+    assert.ok(await converged(nodes, (s) => s.sealed === true && [0, 1, 2, 3, 4, 5].every((i) => s[`k${i}`] !== undefined)))
     const before = canon(snapshot(nodes[0].data))
     //! the whole-cluster kill — nothing survives but three directories
     for (const f of nodes) await f.destroy()

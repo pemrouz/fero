@@ -964,8 +964,8 @@ export class Node {
 
   //! #resyncEnd — the feeder's reply arrived: every cell held at the reset that the re-download did not
   // bring back is a GHOST — removed downstream through the ordinary apply effect (a synthesized remove
-  // under this node's own name, seq 0: never logged, never on the wire; the api's overlay policy keeps
-  // a still-pending own write on top of it exactly as for any foreign remove).
+  // under this node's own name, seq 0: never logged, never on the wire; a still-pending own write on
+  // that cell shows again when its stamped echo arrives, exactly as after any foreign remove — V4-7).
   #resyncEnd() {
     const { old } = this.resync!
     this.resync = null
@@ -1484,7 +1484,7 @@ export class Node {
   // loss. Kernel-internal: called by commit and by the write module's inbound ingest, nothing else.
   // `iss`/`cid` (M5a): the attempt identity when the caller holds one — riding the Applied effect so
   // the embedder can join ITS OWN writes against the apply stream (env.ts Applied; the api layer's
-  // write promises and cid-overlay drops key off exactly this join).
+  // write promises and settlement-index drops key off exactly this join).
   apply(rec: Rec, origin: string, seq: number, epoch: number, iss?: string, cid?: number) {
     const k = JSON.stringify(rec.key.length ? rec.key : [rec.at ?? '']) // unambiguous internal key — wire keys stay length-prefixed
     //! LWW: lexicographic (epoch, seq, origin), identical on every node — apply iff strictly newer than the held stamp

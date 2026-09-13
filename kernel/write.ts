@@ -664,7 +664,7 @@ export class Writes {
     //! the spoke feed (M5b): fresh inbound records re-ship to synced CLIENT links — a spoke hears every
     // origin lane through its ONE primary (members still never re-broadcast to members). Same records,
     // same order (this loop runs per fresh record, in arrival order), attempt identity intact (the
-    // client's overlay join reads it). Flushed once per frame by the RECORDS handler.
+    // client's write-route join reads it). Flushed once per frame by the RECORDS handler.
     if (node.clientLinks.size)
       for (const cl of node.clientLinks)
         if (cl.state === LS.admitted && cl.synced && !cl.dead)

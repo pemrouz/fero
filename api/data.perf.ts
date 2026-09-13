@@ -1,7 +1,7 @@
 //! Perf sibling: the api binding sits on BOTH hot paths — every local write crosses capture→issue→
-// commit→echo-consume, every inbound record crosses onApply→overlay-check→proxy-projection. The
+// commit→echo-consume, every inbound record crosses onApply→join-check→proxy-projection. The
 // non-negotiables this pins: the capture path stays clone-free (bare verbs — the plan §10 tax the
-// clone-based sinks would charge is ~30-40%), and the overlay bookkeeping stays O(1) map work per
+// clone-based sinks would charge is ~30-40%), and the settlement bookkeeping stays O(1) map work per
 // record. Absolutes are WSL2 tripwires (swing 2-3x); the structural claim is the design.
 // Rep discipline (the data repo's own perf lesson, kept): every bench.time rep must touch FRESH
 // values/seqs — re-touching identical ones dedups into the no-op path and the median measures nothing.
@@ -33,7 +33,7 @@ test('absolute: 5k assignments/rep through capture→issue→commit→echo-consu
   await rt.destroy()
 })
 
-test('absolute: 5k inbound records/rep through onApply→overlay→proxy under the tripwire ceiling', async () => {
+test('absolute: 5k inbound records/rep through onApply→join→proxy under the tripwire ceiling', async () => {
   const { rt, bind } = harness()
   rt.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
   rt.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
