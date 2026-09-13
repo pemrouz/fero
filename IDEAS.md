@@ -62,8 +62,9 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   networks / tunnel); allowlist object values ({token, scopes}) reserved.
 - [P3] (api,kernel) **Residue of the methods door (DECISIONS V4-4/V4-5, both
   steps LANDED 2026-09-05/06):** (a) advertise the pin in the server→client
-  HELLO so a client refuses at issue() with zero RTT and no overlay flicker
-  (HELLO bytes are a stability surface; the round-trip bounce is honest);
+  HELLO so a client refuses at issue() with zero RTT — a typed local reject
+  instead of a round-trip WNACK (since V4-7 nothing shows meanwhile, so this
+  is only the latency of the answer; HELLO bytes are a stability surface);
   (b) a typed `NACK.methodsOnly` refusing on the tag byte without decoding
   the body — only if a consumer needs the typed class (today the door rides
   `invalid` + `m`); (c) whether the kernel's own outcomes inside a handler
