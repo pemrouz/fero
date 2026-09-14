@@ -118,6 +118,10 @@ export interface FeroConfig {
   // (the built-in writers). Implies server.
   methods?: Record<string, (arg: any, ctx: Context) => unknown>
   seams?: Seams
+  //! signals (V4-8) — the clean stop on Ctrl-C. By default every live instance destroy()s on SIGINT or
+  // SIGTERM (the graceful leave, then teardown) and, if nothing else in the process listens for that
+  // signal, the process exits 0. false keeps this instance out of it: stop it yourself.
+  signals?: boolean
 }
 
 //! FeroOpts — the config bag. Recognition is by DECLARED KEY (V4-5 retired the "any function-valued
