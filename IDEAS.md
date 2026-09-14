@@ -244,3 +244,18 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   instance, so the demo's "just fero(name)" now pins the loop harder). Decide
   deliberately: unref the directory client's timers/sockets, or document
   `destroy()` as the exit protocol.
+
+## The example series (V4-8 residue, 2026-09-14)
+- [P2] (api) **`cluster.writes` out of the cluster tap's domain.** The confirm
+  ring lives in the same view as `members`/`writable`/`peers`, so a bare
+  `cluster.tap` fires on every write outcome (pending, then committed) — the
+  one honest noise left after V4-8's one-batch fold. Options: its own proxy
+  behind a `cluster.writes` getter (rung 03 reads it — the public shape must
+  survive), or data-side child-handle taps (`cluster.members.tap`). Until
+  then the examples render from the DATA tap and read the members there.
+- [P2] (kernel) **A crashed member is evicted only after the redial chain
+  gives up (~20 s at the defaults: MAX_REDIALS × the backoff cap).** During
+  that window the survivors keep writing but the dead member's partitions
+  park, so its rows freeze on every screen and then catch up. Rung 13 will
+  say so; a shorter chain for admitted members (they were reachable a moment
+  ago) is the knob to weigh.

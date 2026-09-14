@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (399 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
+Run from the repo root: `npm test` (405 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -433,3 +433,44 @@ inside the outer apply.
   the delete-in-flight pin, a CLIENT-role binding pin — WNACK invisible,
   echo visible), api/index.test.ts (the three client pins inverted).
   Battery: 399/399 + 18/18 + perf 41/41.
+- 2026-09-14 — V4-8: THE MINIMAL EXAMPLES, AND THE TWO FERO CHANGES THAT
+  MADE THEM POSSIBLE (DECISIONS V4-8). The user found rungs 01/02 "a little
+  bit overwhelming" and asked for the most minimal, fun version that scales
+  down and up, and whether fero should absorb lib.ts's helpers. Four of the
+  nine helpers had leaked into the role files; two were fero's fault. So:
+  (1) Ctrl-C / SIGTERM is a clean stop built in — one listener per signal
+  for the module, every live instance destroy()s (leave, then teardown), the
+  process exits 0 unless the app has its own listener; `signals: false` opts
+  out; destroy() idempotent; `crash()` untracks. (2) The cluster view folds
+  in ONE data batch (`batch` re-exported through the ONE seam) and sets only
+  what changed (signatures for members/peers/partitions), so a bare
+  cluster.tap fires once with the whole picture and never for a no-op
+  refold. (A third change built here — an echo skip so a client's own write
+  paints once — was dropped: V4-7, no ghost, landed underneath it and
+  removed the second apply at the source.) Pinned by three composer tests
+  incl. a real child process with no signal code getting SIGINT; each
+  mutation-checked; perf pins unchanged. The
+  examples were rebuilt by a design panel (three angles, two skeptics each,
+  synthesis by hand after the panel hit a usage limit): 01/server.ts is 8
+  code lines, 02's shop/watcher 9 and 8, no cluster tap, no renderer, no
+  dedupe, no tick bound, no exit hook; lib.ts is four check-only helpers
+  (`stop()` bounds a role's exit so a broken clean stop fails instead of
+  hanging); READMEs under fifty lines with real screens; index rewritten.
+  The skeptics found and the READMEs now say: eviction of a kill -9'd
+  member takes ~20 s (the redial chain — IDEAS), `dir` restores on a fresh
+  port, a joiner prints `members 1 writable false` for a moment, two seeded
+  servers would fight over one row. Filed: ISSUES I-19 (a directory-client
+  race after a fast host restart: `c.methods.lookup is not a function`,
+  seen once in eight). And a real kernel bug: two skeptics saw, about one
+  run in five under CPU load, a clean SIGINT of one of two leave the
+  survivor at `members 2 writable false`. A sim hunt found it — `leave()`
+  answered "nothing to leave" at once while the leaver held no view yet,
+  though it had already granted the genesis ballot and the survivor had
+  installed the two-member view; no LEAVE, nothing journaled, exit 0 —
+  and fixed it: "nothing to leave" needs evidence (V4-6 amended; ISSUES has
+  the fixed entry and I-20 for the second mode, a survivor stalled across
+  the leave window). Three sim regressions, red on the old kernel; 6/80
+  real-socket wedges under load before, 0/80 after. The website's hero inlines 02's files: claims
+  re-anchored, the phase finder follows the new header, re-recorded on a
+  quiet box, rebuilt, checked, republished. Battery: 405/405 + 18/18,
+  perf 41/41.

@@ -8,6 +8,45 @@ decisions in [DECISIONS.md](DECISIONS.md).
 
 ## Open
 
+### I-20 · membership: a survivor stalled across the leave window turns a clean stop into a crash — permanent at n=2
+- **Where:** [kernel/membership.ts](kernel/membership.ts) `tick` (the
+  `LEAVE_TICKS` bound → `#finishLeave(node, false)`).
+- **Symptom:** in a two-member view, if the SURVIVOR's process is stalled (or
+  its frames delayed) for longer than `LEAVE_TICKS × heartbeatMs` (2 s at the
+  defaults, 200 ms at heartbeatMs 50) across the other member's Ctrl-C, the
+  knock is never answered, the leaver goes with `left` b=0, and the survivor
+  then sees a crash it can never evict (`members 2 writable false`, forever).
+- **Evidence:** 2026-09-14 sim sweep (scratch `wedge/probes`): 25 of 384
+  stall schedules wedge — every one "survivor stalled across the leave"; a
+  stalled LEAVER never wedges. The 400-schedule chaos sweep's 84 failures are
+  the same shape (a partition or slow frames covering the window), before and
+  after the V4-6 shortcut fix.
+- **Why it is not fixed here:** for a two-member view the graceful leave is
+  the ONLY exit, so giving up on it is giving up forever; a longer bound just
+  moves the line. Worth weighing: do not spend a tick while no admitted
+  member link exists to knock on; surface `left` b=0 at the api (today it is
+  journal-only, so an operator sees nothing); or the n=2 tie-break V4-6
+  deferred.
+- **Status:** open.
+
+### I-19 · directory: a server booting right after the previous directory host died can reject fero() with `c.methods.lookup is not a function`
+- **Where:** [api/directory.ts](api/directory.ts) `Directory.start` (the client
+  side of the `#directory` system resource).
+- **Symptom:** seen once in eight runs of an A/B harness (2026-09-13, a
+  reviewer of the example series): a `server: true` process started about
+  300 ms after the process hosting the box directory on the same rendezvous
+  port was SIGKILLed had its `fero()` promise reject with
+  `TypeError: c.methods.lookup is not a function`.
+- **Likely cause:** the directory client's link came up (the new host had just
+  bound the port) before the host's method names were discovered, so the
+  `lookup` handle did not exist yet when `start` called it — the door opens
+  before the method table lands.
+- **Suggested fix:** in `Directory.start`, wait for `lookup` to be discovered
+  (or dispatch by name through the caller with a retry) instead of calling
+  `c.methods.lookup` as a bound property; pin it with a test that SIGKILLs the
+  host and boots a new server within a few hundred milliseconds.
+- **Status:** open — not reproduced deterministically yet.
+
 ### I-1 · model: a restarted node's post-restart writes replay ✗ and split into phantom routes
 - **Where:** [tools/debug/model.mjs](tools/debug/model.mjs) `stateAt` (the
   `writeLocal` arm: `applyOne(uuid, e.a)`) and `routes` (the `writeLocal`
@@ -208,3 +247,25 @@ decisions in [DECISIONS.md](DECISIONS.md).
   under `uuid~2`, so `verifyTopology` refuses it (`streams size 2 vs 3`)
   and the viewer shows its end tables `@ end` — and `routes` no longer mints
   `''` for a partition no writeLocal row named (null → rendered as absence).
+
+### F · membership: `leave()` answered "nothing to leave" while a peer held the leaver in a two-member view (fixed e8cd830)
+- **Where:** [kernel/membership.ts](kernel/membership.ts) `leave` — the
+  `view.epoch === 0` / `rejoining()` / `epochStale` shortcuts.
+- **Symptom:** about one clean stop in five under CPU load (two reviewers of
+  the example series, independently): Ctrl-C on one of two copies exited 0 in
+  ~1 ms, the survivor sat at `members 2 writable false` for good, and a third
+  copy was never admitted. Nothing in the leaver's journal: the shortcut
+  emitted no `leave`/`left` row, so it looked like a crash.
+- **Root cause:** the leaver had GRANTED the genesis ballot but not yet
+  installed the VIEW frame (in flight, unread under load — or dropped: one
+  dropped VIEW frame leaves a node at epoch 0 indefinitely, since PING/DIGEST
+  carry no epoch), while the survivor had installed the two-member view. The
+  shortcut treated local ignorance as proof about other nodes.
+- **Evidence:** real-socket journals (`aa`: propose → viewInstall a=1 b=2 →
+  linkDown → gateClose minority; `bb`: vote a=1 … then nothing); 80
+  iterations under a 12-thread busy load: 6 wedges, all in the sub-10 ms
+  window; a deterministic sim repro (three shapes) now in sim/membership.test.ts.
+- **Fix:** "nothing to leave" needs evidence (DECISIONS V4-6, amended
+  2026-09-14): knock while no view has reached me and any admitted non-client
+  link exists; latch the at-once answer; never grant a ballot that votes an
+  answered leaver back in. 80/80 clean after.

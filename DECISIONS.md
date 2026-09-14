@@ -596,6 +596,37 @@ Decision:
   lib helper `coalesce`: the cluster view sets its fields one record at a
   time (`writable` lands before `members`), so a tap that renders inside the
   callback sees a half-updated line — `coalesce` renders once per turn.
+AMENDED 2026-09-14 (the leave shortcut wedge, found by the example series'
+skeptics — "one clean stop in five, under load, left the survivor at
+`members 2 writable false`"; hunted to a deterministic sim repro): `leave()`
+answered "nothing to leave" at once whenever the leaver held no view yet
+(`view.epoch === 0`), and likewise when it was rejoining or epoch-stale. But
+those are statements about how current MY knowledge is, not about whether a
+PEER holds me: the leaver may already have granted the genesis ballot while
+the survivor has installed the two-member view (its VIEW frame in flight,
+unread under CPU load, or dropped from a paused outbox — one dropped VIEW
+frame leaves a node at epoch 0 for good on an idle cluster, since only VIEW
+teaches). The shell tore the node down, exit 0, no LEAVE sent, nothing
+journaled — and a two-member survivor can never shrink alone. Fix: "nothing
+to leave" needs EVIDENCE — a client, or a committed view that does not hold
+me with someone else, or, while I hold no view, no admitted non-client link
+at all; otherwise knock (at epoch 0 LEAVE goes to every admitted peer, and
+the peer that has a view proposes the shrunk one; the knock keeps going
+while epoch 0). The at-once path latches `leaving` so the microtask hop
+before teardown cannot vote the node back in, and `onPropose` refuses a
+ballot that puts a node that has ANSWERED its leave back into a view, while
+a ballot that takes me OUT is grantable even when epoch-stale. Joint
+consensus is untouched: refusing a vote can only cost liveness, and the
+ballot it costs must not commit; the extra grant rests on vote-once plus the
+proposer's joint majorities, never on the voter's freshness. A rejoiner now
+knocks like any member and, unanswered, goes like a crash after LEAVE_TICKS
+— journaled, never silent (kernel/membership.test's rejoiner pin changed to
+say so). Pinned in sim/membership.test.ts (three shapes, red on the old
+kernel); 80 real-socket iterations under a 12-thread CPU load: 6 wedges
+before, 0 after. The second failure mode is filed, not fixed (ISSUES I-20):
+a SURVIVOR stalled longer than LEAVE_TICKS × heartbeatMs across the leave
+never sees the knock, the leaver goes with `left` b=0, and at n=2 that is
+permanent — the graceful leave is the only exit a two-member view has.
 REJECTED/DEFERRED: the n=2 tie-break (one-directional; "two cannot lose the
 primary"); the operator force (the unguarded self-ballot via a hand-edited
 boot.json already exists — a loud guarded door is a last resort to file if
@@ -671,3 +702,98 @@ INVERTED — not visible, a foreign commit projects, the echo settles; the
 delete-in-flight pin; a CLIENT-role binding pin — WNACK invisible, echo
 visible), api/index.test.ts (the three client pins inverted: nothing shows,
 refused is invisible, the echo paints). Battery: 399/399 + 18/18 + perf 41/41.
+
+## V4-8 — the clean stop on Ctrl-C is built in; the cluster view folds in one batch (2026-09-14)
+Context: the user found the first two examples "a little bit overwhelming" —
+the code, the comments and the READMEs — and asked for the most minimal, fun
+version, one that scales down as well as up, and for a look at what
+examples/lib.ts's helpers were doing and whether fero itself should be
+improved to make them unnecessary. Four of the nine helpers had leaked into
+the role files (the lesson): `onExit`, `ticks`, `coalesce`, `logChanges`.
+Two of them were fero's fault. `onExit` existed because a fero process never
+ends on its own (the shell's timers and sockets are ref'd on purpose) and
+because Ctrl-C without a handler is a CRASH as the cluster sees it — no
+leave (V4-6), so a two-member cluster wedged on the most natural gesture a
+reader makes. `coalesce` existed because the composer's cluster fold set
+`epoch`, `writable`, `members`, `peers` one record at a time, and data's bare
+tap fires per record, so a render loop inside the tap saw a half-updated
+view (`epoch 1, members 0`). `ticks` was test plumbing leaking into the
+lesson (a role bounding itself so a check could wait for it). `logChanges`
+hid repeated lines whose real sources were the per-field fold and the
+confirm ring. Verified by experiment: data's `batch(fn)` lands every set
+inside fn as ONE commit and a parameterless tap fires once per batch; a
+same-value primitive set fires nothing, an equal-but-new object fires.
+Decision:
+- **Ctrl-C / SIGTERM is a clean stop, built in.** The composer keeps a
+  registry of live instances and ONE listener per signal for the whole
+  module, installed by the first live instance and removed by the last (a
+  process with no live instance keeps Node's default). On a signal every
+  live instance `destroy()`s — the graceful leave by ballot, then the
+  teardown — and then, if nothing else in the process listens for that
+  signal, the process exits 0: a clean stop is a clean exit. If the host app
+  has its own listener, fero still leaves and tears down but leaves the exit
+  to that listener (Node semantics: any listener disables the default).
+  `signals: false` (a new config key, `api/types.ts`) keeps an instance out
+  of the registry. `destroy()` is idempotent (the handler and the owner's own
+  destroy may race; the second call joins the first), and the diagnostics
+  `crash()` door untracks too. The `#directory` system instance is owned by
+  its host and never tracked. Pinned by three composer tests, including a
+  real child process holding a member with NO signal code that gets SIGINT,
+  leaves, and exits 0 while the survivor is alone and writable — the
+  six-line `node server.ts` a reader writes.
+- **The cluster view folds in one batch, and only what moved is set.** The
+  fold's FOLD branch and the partitions row now land inside data's `batch()`
+  (re-exported by api/substrate.ts — the ONE seam grows by one named import,
+  nothing else touches data), so a bare `cluster.tap(() => …)` fires once
+  per fold with the whole picture landed. `members`, `peers` and the
+  partitions row are compared by signature before they are set (an
+  equal-but-new object would fire), so a refold that changed nothing —
+  `identified`, `linkDown`, `start` — fires nothing. Cost: a short string
+  build per membership event (rare) and a nine-field compare per partitions
+  recompute; nothing on the write path. Pinned: no half-updated picture ever,
+  and a settled view fires nothing more.
+- **What still fires, honestly.** `cluster.writes` (the confirm ring) lives
+  in the same view and changes on every write outcome (pending, then
+  committed), so a bare cluster tap on a copy that writes once a second fires
+  about twice a second; `cluster.me` re-sets on directory events. A client's
+  own write shows once, as the owner's echo (V4-7 — no ghost). The examples
+  render from the DATA tap and read the member count there.
+REJECTED: exiting with the conventional 130/143 instead of 0 (the stop was
+clean; the examples' checks and a reader's shell script both want 0);
+installing the listener only when no other listener exists at fero() time
+(order-dependent, invisible); a per-process opt-out spelling (`signals:
+false` per instance composes: no tracked instance, no listener); moving
+`writes` out of the cluster view to quiet the tap (an API change rung 03
+depends on — deferred, an IDEAS line); an echo skip for a client's own write
+(built and mutation-checked in this session — Pending kept the issued value
+and the join branch skipped an equal echo — then DROPPED: V4-7, no ghost,
+landed underneath it and removed the second apply at the source, so the
+skip would have hidden a client's only apply).
+The examples decision that came with this is recorded below.
+- **The examples carry no plumbing (the same day).** Rungs 01 and 02 were
+  rebuilt at the smallest honest size — a design panel of three angles
+  (fewest lines, most fun to run, README-first), two skeptics per proposal
+  running and mutating each, then one synthesis. 01/server.ts is eight lines
+  of code: `fero('hello', { server: true })`, one data tap that prints
+  `pid … members N writable B` and the object, a one-second timer writing
+  `f.data[process.pid] = { ticks }`. 02's shop and watcher are nine and eight:
+  a seed, one tap that clears the screen and prints a header (the port, the
+  watcher count; the shop the directory found) and the object, one timer. No
+  cluster tap anywhere (the confirm ring would repaint it), no renderer, no
+  dedupe, no tick bound, no exit hook: fero does those. Rows are keyed by
+  `process.pid`, so a second terminal's row appears in the first and a
+  check reads each role's row by `child.pid`. The checks stop roles with
+  Ctrl-C through lib's `stop()`, which SIGKILLs after five seconds and
+  returns null so a broken clean stop FAILS a check instead of hanging it
+  (a skeptic hung one); a check's own Ctrl-C forwards SIGTERM to its roles.
+  lib.ts kept four helpers, all check-only: `until`, `sleep`,
+  `privateDirectory`, `spawnRole`. Gone: `onExit` (fero), `coalesce` (fero),
+  `ticks` (the check stops roles), `logChanges` (V4-7: one apply per write),
+  `story` (the exit hook), and 02's demo-ui.ts. READMEs are under fifty
+  lines: the run lines, one real screen, five bullets, a "scale it" list
+  (down to one copy; up to three, a client, `dir`), a "next" line. The
+  skeptics' corrections folded in: a `kill -9`'d third copy is voted out
+  after ~20 s (the redial chain), not "a few seconds"; `dir` brings a node
+  back as itself on a FRESH port (no listen is persisted); a joining copy
+  prints `members 1 writable false` for a moment; a memory-only copy alone
+  forgets everything; two seeded servers would fight over one row.
