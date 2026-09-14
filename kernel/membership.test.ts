@@ -505,12 +505,17 @@ test('graceful leave (V4-6): nothing to leave answers at once — open genesis, 
   assert.deepEqual(g.of('left'), [['left', true]])
   assert.equal(g.jk(JK.leave).length, 0)
   assert.equal(g.jk(JK.left).length, 0)
-  //! a rejoiner (restored, unconfirmed) has no live view to change
+  //! a rejoiner (restored, unconfirmed) still holds a RESTORED view that names it — and its peers can
+  // be holding it too, so "nothing to leave" would be a lie: it knocks like any other member and
+  // answers only on a survivor's echo, or (unanswered) when the tick bound runs out.
   const r = harness('cc', { hosts: ['sim:aa'], boot: { epoch: 5, members: [['aa', 'sim:aa'], ['cc', 'sim:cc']] } })
   r.node.step({ kind: 'start' })
   r.node.step({ kind: 'leave' })
-  assert.deepEqual(r.of('left'), [['left', true]])
-  assert.equal(r.jk(JK.propose).length, 0)
+  assert.deepEqual(r.of('left'), [], 'not answered at once: a restored view names it')
+  assert.equal(r.jk(JK.leave).length, 1, 'it knocked instead')
+  assert.equal(r.jk(JK.propose).length, 0, 'and never proposed: aa is the lowest live member')
+  for (let i = 0; i <= LEAVE_TICKS; i++) r.tick()
+  assert.deepEqual(r.of('left'), [['left', false]], 'nobody answered: it goes like a crash — journaled, never silent')
   //! a solo view (the full-restart self-ballot committed a one-member view): the last member simply goes
   const s = harness('aa', { boot: { epoch: 5, members: [['aa', 'sim:aa']] } })
   s.node.step({ kind: 'start' })

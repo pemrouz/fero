@@ -11,6 +11,7 @@ import { cluster, formed, writes } from './harness.ts'
 import { converged } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
 import { LS } from '../kernel/link.ts'
+import { VERB } from '../kernel/codec.ts'
 import type { Node } from '../kernel/node.ts'
 import type { Rec } from '../kernel/env.ts'
 
@@ -225,4 +226,65 @@ test('graceful leave (V4-6), n=3 under writes: one member leaves mid-stream; the
   sim.run({ until: 2500 })
   assert.equal(converged(sim), null, 'the survivors agree on everything, including what the leaver wrote before going')
   assert.deepEqual(sim.violations, [])
+})
+
+//! ── the V4-6 wedge (2026-09-14): a graceful stop must never leave a two-member survivor holding a member
+// that is gone. Before the fix, leave() answered "nothing to leave" at once whenever the leaver held no
+// view yet (view.epoch === 0) — but the leaver may already have GRANTED the genesis ballot, and the
+// survivor may already have installed the two-member view (its VIEW frame in flight, unread under CPU
+// load, or dropped from a paused outbox). The shell tore the node down, exit 0, no LEAVE sent, nothing
+// journaled — and the survivor sat at `members 2 writable false` forever: joint consensus needs the old
+// majority (both) to shrink the view. Three shapes, all inside that window. RED on the old kernel.
+//! the shell's half of a stop: the kernel answers `left`, the shell tears the node down.
+const teardownOnLeft = (sim: Sim, n: Node, until: number) => {
+  for (let u = sim.now; u <= until; u += 2) {
+    sim.run({ until: u })
+    if (sim.left.has(n.uuid)) { sim.partition('n01', 'n02'); n.destroy(); sim.nodes.delete(n.uuid); return sim.now }
+  }
+  return -1
+}
+
+test('the leaver has not installed the view yet (the survivor has): the survivor still ends up writable alone', () => {
+  const sim = new Sim(61)
+  const [n01, n02] = cluster(sim, 2, { heartbeatMs: 50 })
+  let t = 0
+  while (t < 2000 && !(n01.epoch === 1 && n02.epoch === 0)) { t += 1; sim.run({ until: t }) }
+  assert.equal(n01.epoch, 1); assert.equal(n02.epoch, 0)
+  sim.post('n02', { kind: 'leave' })
+  const torn = teardownOnLeft(sim, n02, sim.now + 5000)
+  assert.ok(torn > 0, 'the leave was answered')
+  sim.run({ until: sim.now + 5000 })
+  assert.deepEqual(members(n01), ['n01'], 'the survivor committed the view without the leaver')
+  assert.ok(n01.membership.gate(n01).open, 'and is writable alone')
+})
+
+test('the leaver never installed any view (one dropped VIEW frame): same guarantee, 30 seconds later', () => {
+  const sim = new Sim(61)
+  const [n01, n02] = cluster(sim, 2, { heartbeatMs: 50 })
+  const sink = (n01 as unknown as { env: { sink: { send: (l: number, b: Uint8Array) => void } } }).env.sink
+  const send = sink.send.bind(sink)
+  let dropped = 0
+  sink.send = (link: number, bytes: Uint8Array) => { if (bytes[2] === VERB.VIEW && dropped++ === 0) return; send(link, bytes) }
+  sim.run({ until: 30000 })
+  assert.equal(n01.epoch, 1); assert.equal(n02.epoch, 0, 'the leaver never heard of the view')
+  sim.post('n02', { kind: 'leave' })
+  const torn = teardownOnLeft(sim, n02, sim.now + 5000)
+  assert.ok(torn > 0, 'the leave was answered')
+  sim.run({ until: sim.now + 5000 })
+  assert.deepEqual(members(n01), ['n01'])
+  assert.ok(n01.membership.gate(n01).open)
+})
+
+test('a stop BEFORE anything formed never gets voted back in: no view may commit holding the node that left', () => {
+  const sim = new Sim(61)
+  const [n01, n02] = cluster(sim, 2, { heartbeatMs: 50 })
+  sim.post('n02', { kind: 'leave' }, 0)
+  sim.run({ until: 20 })
+  assert.equal(sim.left.get('n02'), true, 'no links, nothing can hold it: answered at once')
+  sim.run({ until: 2000 }) // the teardown hop: the node still steps for a moment
+  assert.ok(!members(n01).includes('n02'), 'the survivor never committed a view holding the node that left')
+  assert.ok(!members(n02).includes('n02'), 'and the leaver never joined one either')
+  sim.partition('n01', 'n02'); n02.destroy(); sim.nodes.delete('n02')
+  sim.run({ until: sim.now + 20000 })
+  assert.ok(n01.membership.gate(n01).open, 'the survivor is writable, not wedged')
 })
