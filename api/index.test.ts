@@ -569,3 +569,80 @@ test('a clean destroy LEAVES (V4-6): two servers, one destroyed — the survivor
     await c?.destroy()
   }
 })
+
+test('the cluster view folds in ONE batch (V4-8): a bare cluster.tap fires once per change with the whole picture landed — never a half-updated view, never for a refold that changed nothing', async () => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30 })
+  type View = { epoch: number; writable: boolean; members: Record<string, string>; peers: Record<string, unknown> }
+  const pictures: { epoch: number; writable: boolean; members: number; peers: number }[] = []
+  //! the tap is attached BEFORE the peer exists, so every fold of the forming view is recorded
+  a.cluster.tap(() => { const v = snapshot(a.cluster) as View; pictures.push({ epoch: v.epoch, writable: v.writable, members: Object.keys(v.members).length, peers: Object.keys(v.peers).length }) })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30 })
+  try {
+    assert.ok(await until(() => pictures.some((p) => p.epoch >= 1 && p.members === 2 && p.peers === 1), 8000), `the view formed and the tap saw it whole (${JSON.stringify(pictures)})`)
+    //! pre-V4-8 the fold set epoch, writable, members, peers one record at a time and the tap fired per
+    // record: a picture with the new epoch but the old (empty) members was observable. Never again.
+    assert.ok(pictures.every((p) => p.epoch === 0 || p.members >= 2), `no half-updated picture (${JSON.stringify(pictures)})`)
+    //! and only real changes fire: the construction fire, the link (peers 0→1), the view (epoch 0→1 with its
+    // members) — a heartbeat's worth of refolds that change nothing adds none
+    const n = pictures.length
+    await new Promise((r) => setTimeout(r, 300))
+    assert.equal(pictures.length, n, 'a settled view fires nothing more')
+    assert.ok(n <= 4, `${n} fires for construction + link + view`)
+    //! a write outcome IS a cluster change (cluster.writes, the confirm ring) — the honest remaining fire
+    a.data.k = 1
+    assert.ok(await until(() => pictures.length > n, 3000), 'the confirm ring moving fires the tap')
+  } finally {
+    await a.destroy()
+    await b.destroy()
+  }
+})
+
+test('the clean stop on Ctrl-C (V4-8): one SIGINT/SIGTERM listener per process while any instance lives, gone after the last destroy; signals: false opts out; destroy() is idempotent', async () => {
+  const count = () => [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')]
+  const before = count()
+  const f = await fero('r', { listen: false })
+  const g = await fero('r2', { listen: false })
+  const h = await fero('r3', { listen: false, signals: false })
+  try {
+    assert.deepEqual(count(), [before[0] + 1, before[1] + 1], 'the first live instance installs one listener per signal; a second shares it; an opted-out one never counts')
+    await f.destroy()
+    assert.deepEqual(count(), [before[0] + 1, before[1] + 1], 'still listening while g lives')
+    const p1 = g.destroy()
+    const p2 = g.destroy()
+    assert.equal(p1, p2, 'the second destroy() joins the first')
+    await p1
+    assert.deepEqual(count(), before, 'the last tracked instance removes the listeners')
+    await assert.rejects(fero('r', { listen: false, signals: 'yes' } as never), /signals must be true or false/)
+  } finally {
+    await f.destroy(); await g.destroy(); await h.destroy()
+  }
+})
+
+test('Ctrl-C by hand (V4-8): a child process holding a member gets SIGINT with NO handler in its code — it leaves by ballot and exits 0; the survivor is alone and writable', async () => {
+  const { spawn } = await import('node:child_process')
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  const script = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'fero-sig-')), 'member.ts')
+  //! the whole child: one server, no signal code — what a reader's `node server.ts` is
+  fs.writeFileSync(script, `import { fero } from ${JSON.stringify(path.join(import.meta.dirname, 'index.ts'))}
+await fero('sig', { uuid: 'aa', listen: '127.0.0.1:${pa}', hosts: ['127.0.0.1:${pb}'], rendezvous: false, heartbeatMs: 50, redialMs: 30 })
+setInterval(() => {}, 1000)
+`)
+  const child = spawn(process.execPath, [script], { stdio: ['ignore', 'pipe', 'pipe'] })
+  let err = ''
+  child.stderr.setEncoding('utf8').on('data', (d: string) => { err += d })
+  const exited = new Promise<number | null>((r) => child.once('exit', (c) => r(c)))
+  const b = await fero('sig', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], rendezvous: false, heartbeatMs: 50, redialMs: 30 })
+  const view = () => snapshot(b.cluster) as { epoch: number; writable: boolean; members: Record<string, string> }
+  try {
+    assert.ok(await until(() => view().epoch >= 1 && Object.keys(view().members).length === 2, 10_000), 'the pair formed')
+    const t0 = Date.now()
+    child.kill('SIGINT')
+    assert.equal(await Promise.race([exited, new Promise<'hung'>((r) => setTimeout(() => r('hung'), 8000))]), 0, `the child exited 0 by itself on SIGINT (stderr: ${err})`)
+    assert.ok(await until(() => Object.keys(view().members).length === 1 && view().writable, 5000), `the survivor is alone and writable (${JSON.stringify(view())})`)
+    assert.ok(Date.now() - t0 < 5000, 'a ballot, not a suspicion timeout')
+  } finally {
+    if (child.exitCode === null) child.kill('SIGKILL')
+    await b.destroy()
+  }
+})

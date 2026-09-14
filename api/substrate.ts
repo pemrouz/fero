@@ -25,7 +25,7 @@
 // now implemented by fero's OWN lens rather than inherited from data.
 
 import {
-  $, value as VALUE, node as NODE, lane, ingest, DataNode, exportContract,
+  $, value as VALUE, node as NODE, lane, ingest, batch as dataBatch, DataNode, exportContract,
 } from '../../data/api/index.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 
@@ -38,6 +38,10 @@ export const ORIGIN: symbol = Symbol('fero')
 //! proxy — mint a resource container (a data v4 source handle; non-callable, non-thenable —
 // fero's thenable/assignable public shape is the LENS, layered by api/data.ts).
 export const proxy = (initial: unknown = {}): any => $(initial)
+
+//! batch — data's consolidated commit: every set inside fn lands as ONE batch, so a bare tap on the
+// container fires once with the whole picture (V4-8's cluster fold; the composer's one use).
+export const batch = <R>(fn: () => R): R => dataBatch(fn)
 
 //! snapshot — the dense current value (v4 [value]: a fresh container per read; rows shared
 // by reference under the path-copy immutability law).

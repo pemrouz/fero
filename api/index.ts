@@ -20,7 +20,7 @@ import { JK } from '../kernel/journal.ts'
 import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
-import { proxy, contract, snapshot as snapshotOf } from './substrate.ts'
+import { proxy, contract, batch, snapshot as snapshotOf } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
@@ -28,8 +28,32 @@ import { captureNode } from '../tools/debug/capture.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'methods', 'seams', 'rendezvous'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'methods', 'seams', 'rendezvous', 'signals'])
 const SEAM_KEYS = new Set(['validation'])
+
+//! ── the clean stop on Ctrl-C (V4-8) ──
+// SIGINT or SIGTERM: every live instance destroy()s — the graceful leave, then teardown — and, when
+// nothing else in the process listens for that signal, the process exits 0. Without this a Ctrl-C is a
+// CRASH as the cluster sees it (no leave: a two-member cluster wedges, DECISIONS V4-6), and a process
+// that never calls destroy() never ends (the shell's timers and sockets are ref'd on purpose). One
+// listener per signal for the whole module, installed by the first live instance and removed by the
+// last, so a process with no live instance keeps Node's default. `signals: false` keeps an instance out.
+const live = new Set<Fero>()
+const SIGNALS = ['SIGINT', 'SIGTERM'] as const
+let listening = false
+const onSignal = (sig: NodeJS.Signals): void => {
+  const others = process.listenerCount(sig) - 1
+  void Promise.allSettled([...live].map((f) => f.destroy())).then(() => { if (others === 0) process.exit(0) })
+}
+const track = (f: Fero): void => {
+  live.add(f)
+  if (!listening) { listening = true; for (const s of SIGNALS) process.on(s, onSignal) }
+}
+const untrack = (f: Fero): void => {
+  if (!live.delete(f) || live.size > 0) return
+  listening = false
+  for (const s of SIGNALS) process.off(s, onSignal)
+}
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
 // V4-4's `invalid` WNACK as `m`, surfaces as WriteReject.reason and cluster.writes.reason, and is what a
 // plain client assignment is refused with (nothing ever showed — V4-7). A degenerate admission predicate
@@ -64,6 +88,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     if (!CONFIG_KEYS.has(k)) throw new Error(`fero('${name}'): unknown option '${k}' — config keys are ${[...CONFIG_KEYS].join(', ')}`)
     config[k] = v
   }
+  if (config.signals !== undefined && typeof config.signals !== 'boolean') throw new Error(`fero('${name}'): signals must be true or false (false = leave Ctrl-C / SIGTERM to you)`)
   //! methods: — the hosted methods AND the door (V4-5). Validated as a whole at fero() time: a PLAIN
   // object of functions (own enumerable handlers — a class instance keeps its methods on the prototype,
   // would host nothing and protect everything: refused here, not discovered by clients at runtime);
@@ -459,6 +484,13 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   let lastPrimary = node.primary
   let lastOutcomes = 0
   let lastScopeN = -1
+  let lastMembers = '0:'
+  let lastPeers = ''
+  let lastPartitions = cluster.snapshot().partitions as ReturnType<typeof partitionsRow>
+  const samePartitions = (a: ReturnType<typeof partitionsRow>, b: ReturnType<typeof partitionsRow>): boolean =>
+    a.replicas === b.replicas && a.epoch === b.epoch && a.w === b.w && a.held === b.held && a.acquiring === b.acquiring &&
+    a.orphaned === b.orphaned && a.acquired === b.acquired && a.shed === b.shed &&
+    a.shedWaitingOn.length === b.shedWaitingOn.length && a.shedWaitingOn.every((u, i) => u === b.shedWaitingOn[i])
   const fold = () => {
     //! settle kernel-side outcomes FIRST (two integer compares when nothing moved): a relay's `invalid`
     // WNACK removes our attempt inside a step that applies nothing, so the write's promise
@@ -494,26 +526,35 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         lastPrimary = node.primary
         if (node.primary !== null) caller.onPrimaryChange()
       }
-      if (events.some((e) => FOLD.has(e.kind))) {
-        refold = true
-        cluster.set('epoch', node.epoch)
-        cluster.set('writable', node.membership.gate(node).open)
-        cluster.set('members', Object.fromEntries(node.membership.view.members))
-        const peers: Record<string, { uuid: string; incarnation: number; up: boolean }> = {}
-        for (const l of node.links.values())
-          if (l.uuid && !l.dead) peers[l.uuid] = { uuid: l.uuid, incarnation: l.incarnation, up: true }
-        cluster.set('peers', peers)
-      }
+      if (events.some((e) => FOLD.has(e.kind))) refold = true
     }
     //! cluster.partitions: ONE O(P) recompute per fold() invocation, AFTER the event loop (M6-review
     // finding 42: the tallies + shedWaitingOn walk used to run once for the scope.n drift check and
     // AGAIN in the FOLD branch — coalesced here so each fold pays the walk at most once, and the row
     // still reflects the final post-step state). The scope.n compare catches tally drift that
     // journals nothing (held-mints at the gate/stamp site) — one int compare on the hot path.
-    if (refold || (node.scope !== null && node.scope.n !== lastScopeN)) {
+    const scopeMoved = node.scope !== null && node.scope.n !== lastScopeN
+    if (!refold && !scopeMoved) return
+    //! ONE batch, and only the fields that moved (V4-8): a bare `cluster.tap(() => …)` fires once per
+    // fold with the whole picture landed — never per field, and never for a refold that changed nothing
+    // (data skips a same-value primitive but not an equal-but-new object, so members, peers and the
+    // partitions row are compared by signature here). A render loop needs no coalescing and no dedupe.
+    batch(() => {
+      if (refold) {
+        cluster.set('epoch', node.epoch)
+        cluster.set('writable', node.membership.gate(node).open)
+        const memberSig = node.epoch + ':' + node.membership.view.members.map(([u]) => u).join(' ')
+        if (memberSig !== lastMembers) { lastMembers = memberSig; cluster.set('members', Object.fromEntries(node.membership.view.members)) }
+        const peers: Record<string, { uuid: string; incarnation: number; up: boolean }> = {}
+        for (const l of node.links.values())
+          if (l.uuid && !l.dead) peers[l.uuid] = { uuid: l.uuid, incarnation: l.incarnation, up: true }
+        const peerSig = Object.keys(peers).sort().map((u) => u + '~' + peers[u].incarnation).join(' ')
+        if (peerSig !== lastPeers) { lastPeers = peerSig; cluster.set('peers', peers) }
+      }
       if (node.scope) lastScopeN = node.scope.n
-      cluster.set('partitions', partitionsRow())
-    }
+      const row = partitionsRow()
+      if (!samePartitions(row, lastPartitions)) { lastPartitions = row; cluster.set('partitions', row) }
+    })
   }
   rt.hook(fold)
 
@@ -603,14 +644,16 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       if (scoped && node.armed) scopedThrow('snapshot', 'holistic', 'a scoped node holds a shard — await data (the gather) or methods.read() for the whole resource')
       return snapshotOf(bind.data)
     },
-    async destroy() {
+    destroy() {
       //! the graceful leave FIRST (V4-6): while the resource is still whole, get the view changed without
       // this node by ballot — a clean stop is not a crash, and a two-member cluster survives it. Bounded
-      // in the shell (Runtime.leave); then the ordinary teardown, unchanged.
-      await rt.leave()
-      await teardown()
+      // in the shell (Runtime.leave); then the ordinary teardown, unchanged. Idempotent (V4-8): the
+      // signal handler and the owner's own destroy() may race — the second call joins the first.
+      if (stopping === null) { untrack(inst); stopping = rt.leave().then(teardown) }
+      return stopping
     },
   }
+  let stopping: Promise<void> | null = null
   //! [diagnostics] (M7, DESIGN-M7 §3): the Symbol-keyed internals seam — attached WITHOUT widening the
   // typed Fero surface (diag() in api/diagnostics.ts is the one sanctioned door). Every member is a
   // pull or a bounded effect; nothing here runs unless called, so the instance's hot paths are untouched.
@@ -633,10 +676,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       return d
     },
     drop: (uuid: string) => rt.drop(uuid),
-    crash: () => teardown(),
+    crash: () => { untrack(inst); return teardown() },
     rendezvous: () => (directory ? { client: directory.client, host: directory.host } : null),
   }
   ;(inst as Fero & { [diagnostics]?: Diagnostics })[diagnostics] = diagHandle
+  if (!isSystem && config.signals !== false) track(inst)   //! the clean stop on Ctrl-C (V4-8); the directory is owned and torn down by its host
   return inst
 }
 
