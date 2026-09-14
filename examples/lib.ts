@@ -1,60 +1,24 @@
-//! ── examples/lib — plain Node process plumbing shared by the examples. ZERO fero code. ──
-// A reader copies one example folder plus this file and has everything. Nothing here touches fero:
-// bounding a run (FERO_EXAMPLE_TICKS), a clean exit on Ctrl-C, a poll, and the child-process helpers
-// a check.ts uses to run the terminals its README names and read what they print.
+// examples/lib — the plain-Node plumbing a check.ts needs: run the terminals a README names, read what
+// they print, stop them, and meet a private directory. Zero fero code. A role file needs nothing from here:
+// Ctrl-C is a clean stop inside fero, and a tap fires once per change.
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import net from 'node:net'
 
-//! ticks() — how many ticks a role runs before it destroys itself: FERO_EXAMPLE_TICKS, or forever.
-// A check.ts sets it; a terminal never does. The role prints the same lines either way.
-export const ticks = (): number => {
-  const v = process.env.FERO_EXAMPLE_TICKS
-  return v === undefined || v === '' ? Infinity : Number(v)
-}
-
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-//! logChanges() — a console.log that skips a repeat of the previous line. Taps fire per applied
-// record and the cluster view refolds on every write outcome (pending → committed), so a render loop
-// can be asked to print the same picture twice — it prints only when the picture changed.
-export const logChanges = (): ((line: string) => void) => {
-  let last = ''
-  return (line) => { if (line !== last) console.log((last = line)) }
-}
-
-//! coalesce — run fn once after the current synchronous batch of records (a microtask), not once per
-// record. A tap fires per applied record, and the cluster view sets its fields one record at a time
-// (epoch, writable, members…), so a render that reads the whole snapshot INSIDE the tap can see a
-// half-updated picture for an instant.
-export const coalesce = (fn: () => unknown): (() => void) => {
-  let queued = false
-  return () => {
-    if (queued) return
-    queued = true
-    queueMicrotask(() => { queued = false; void fn() })
-  }
-}
-
-//! until(check, ms) — poll a sync or async predicate every 25 ms. A throw or a rejection counts as
-// false; resolves false on timeout. Never hangs, never throws — the caller asserts the boolean.
+// Poll a predicate every 25 ms until it is truthy (→ true) or `ms` pass (→ false). A throw counts as false.
 export const until = async (check: () => unknown, ms = 10_000): Promise<boolean> => {
-  const t0 = Date.now()
-  for (;;) {
+  for (const t0 = Date.now(); ; await sleep(25)) {
     try { if (await check()) return true } catch {}
     if (Date.now() - t0 > ms) return false
-    await sleep(25)
   }
 }
 
-//! onExit(fn) — Ctrl-C (SIGINT) or SIGTERM runs fn (destroy the instances), then exits 0. Without
-// destroy() a fero process never ends: the shell's timers and sockets are ref'd on purpose.
-//! privateDirectory() — a check meets its OWN directory, never the box's. On the default rendezvous the
-// roles a check spawns would find whatever is already registered there (your own terminals, say) and
-// the proof would be of the wrong cluster. The smoke tier sets FERO_RENDEZVOUS itself; by hand this
-// picks a free loopback port. Children inherit it through spawnRole's env spread.
+// A check meets its OWN directory (a free port), never the box's 127.0.0.1:3376 — so `node check.ts`
+// never meets the reader's own terminals. The smoke tier sets FERO_RENDEZVOUS itself; roles inherit it.
 export const privateDirectory = async (): Promise<void> => {
-  if (process.env.FERO_RENDEZVOUS !== undefined && process.env.FERO_RENDEZVOUS !== '') return
+  if (process.env.FERO_RENDEZVOUS) return
   const port = await new Promise<number>((resolve, reject) => {
     const s = net.createServer()
     s.once('error', reject)
@@ -63,46 +27,37 @@ export const privateDirectory = async (): Promise<void> => {
   process.env.FERO_RENDEZVOUS = `127.0.0.1:${port}`
 }
 
-export const onExit = (fn: () => unknown): void => {
-  let done = false
-  const go = async () => {
-    if (done) return
-    done = true
-    try { await fn() } finally { process.exit(0) }
+// One spawned terminal: `node <file>` exactly as a reader runs it. `out` is its stdout so far, `pid` the
+// key its rows are written under, `stop()` sends Ctrl-C (SIGINT) and resolves with the exit code — or
+// null after 5 s, when it is SIGKILLed instead, so a broken clean stop FAILS a check instead of hanging it.
+// Whatever happens to the check (a failed assertion, Ctrl-C), every role still running is stopped.
+export interface Role { pid: number; out: string; exited: Promise<number | null>; stop(signal?: NodeJS.Signals): Promise<number | null>; child: ChildProcess }
+const children: ChildProcess[] = []
+process.on('exit', () => { for (const c of children) if (c.exitCode === null && c.signalCode === null) c.kill('SIGKILL') })
+for (const sig of ['SIGINT', 'SIGTERM'] as const) process.once(sig, () => { for (const c of children) c.kill('SIGTERM'); setTimeout(() => process.exit(1), 500) })
+
+export const spawnRole = (file: string, tag: string): Role => {
+  const child = spawn(process.execPath, [file], { env: process.env, stdio: ['ignore', 'pipe', 'pipe'] })
+  children.push(child)
+  const exited = new Promise<number | null>((r) => child.once('exit', (code) => r(code)))
+  const role: Role = {
+    pid: child.pid!, out: '', exited, child,
+    stop: async (signal = 'SIGINT') => {
+      child.kill(signal)
+      const code = await Promise.race([exited, sleep(5000).then(() => 'hung' as const)])
+      if (code !== 'hung') return code
+      child.kill('SIGKILL')
+      return null
+    },
   }
-  process.once('SIGINT', go)
-  process.once('SIGTERM', go)
-}
-
-//! Role — one spawned terminal: its stdout so far, its exit code, and a kill switch.
-export interface Role { out: string; exited: Promise<number | null>; kill(signal?: NodeJS.Signals): void; child: ChildProcess }
-
-//! spawnRole(file, args, {env, tag}) — run `node <file> ...args` exactly as a terminal would (no
-// flags: Node ≥ 22.18 / 23.6 strips types by itself), capture its stdout, echo every line prefixed
-// with the tag, and inherit + extend the environment (the smoke test's private FERO_RENDEZVOUS rides
-// through). NOT detached: the child stays in this process group, so a group kill reaches it.
-export const spawnRole = (file: string, args: string[] = [], opts: { env?: Record<string, string>; tag?: string } = {}): Role => {
-  const child = spawn(process.execPath, [file, ...args], { env: { ...process.env, ...(opts.env ?? {}) }, stdio: ['ignore', 'pipe', 'pipe'] })
-  const tag = opts.tag ?? file.split('/').pop()
-  const role: Role = { out: '', exited: new Promise((r) => child.once('exit', (code) => r(code))), kill: (s = 'SIGTERM') => { child.kill(s) }, child }
-  const echo = (stream: NodeJS.ReadableStream, err: boolean) => {
+  for (const [stream, err] of [[child.stdout!, false], [child.stderr!, true]] as const) {
     let buf = ''
-    stream.setEncoding('utf8')
-    stream.on('data', (d: string) => {
+    stream.setEncoding('utf8').on('data', (d: string) => {
       if (!err) role.out += d
-      buf += d
-      const lines = buf.split('\n')
+      const lines = (buf + d).split('\n')
       buf = lines.pop()!
       for (const l of lines) (err ? console.error : console.log)(`[${tag}] ${l}`)
     })
   }
-  echo(child.stdout!, false)
-  echo(child.stderr!, true)
   return role
-}
-
-//! story(roles, fn) — run a check's story; whatever happens, every role still running is killed.
-export const story = async <T>(roles: Role[], fn: () => Promise<T>): Promise<T> => {
-  try { return await fn() }
-  finally { for (const r of roles) if (r.child.exitCode === null && r.child.signalCode === null) r.kill('SIGKILL') }
 }
