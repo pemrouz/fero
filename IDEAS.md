@@ -74,6 +74,22 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   probably don't want everyone to change anything", protect with `methods:`.
 
 ## api surface
+- [P3] (api) **The `seams:` nest is vestigial since V4-5.** `Seams` exists as
+  "the ONE reserved nested config key for function-valued config, so the
+  'functions are methods' recognition rule survives" (api/types.ts, plan §9).
+  V4-5 retired that rule: recognition is by declared key alone, a top-level
+  function THROWS with the `methods:` pointer, and `seams` is itself just a
+  CONFIG_KEY with one member (SEAM_KEYS = validation, api/index.ts). The
+  nest no longer buys anything; it costs every caller a brace and a name
+  (the owner's 2026-09-13 site comment on the config snippet: "is this
+  seams thing still valid/necessary?"). Options: (a) promote `validation:`
+  to a top-level key and keep `seams.validation` as an alias for one
+  release; (b) keep the nest as the declared home for hash/codec/storage
+  when they land, and say so where Seams is documented. `validation` itself
+  stays valid and is the only hook of its kind: the schema check on an OPEN
+  server's relayed client writes, on the server's own writes, on handler
+  ctx.data writes and on the data: seed (DECISIONS V4-4/V4-5); under
+  `methods:` the door refuses client records before it.
 - [P3] (api) **SUB-leg handler errors are silent at the client.** A handler
   that throws — or, since V4-5, whose ctx.data write the validator refuses —
   on a SUBSCRIPTION answers a RESULT for a sub id, which Caller.#onResult
