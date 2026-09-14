@@ -247,7 +247,9 @@ export class Membership {
     // Once my shrunk view is installed here there is nothing left to knock for: only the echo is awaited.
     if (this.leaving && !this.leaving.done) {
       if (++this.leaving.ticks > LEAVE_TICKS) this.#finishLeave(node, false)
-      else if (this.isMember(node.uuid)) this.#knockLeave(node)
+      //! epoch 0 = no view has reached me yet: keep knocking (a peer that HAS one answers). Past that,
+      // only a member knocks — once my shrunk view is installed here there is nothing left to ask for.
+      else if (this.isMember(node.uuid) || this.view.epoch === 0) this.#knockLeave(node)
     }
     //! stale-epoch pulls: targeted, bounded; then the alarmed release (a wedged gate is named, never silent)
     if (this.epochStale) {
@@ -352,7 +354,19 @@ export class Membership {
     // may vote: voting is not writing). ANY epoch above the committed view is grantable — a ballot
     // above view+1 is a lawful ESCALATION past a burned epoch, not evidence that the middle committed
     // (the old `=== view.epoch + 1` pin plus the e-1-committed inference was the wedge's other half).
-    const grant = v.e > this.view.epoch && !this.epochStale && (this.votedFor.e < v.e || this.votedFor.p === proposer)
+    //! the leave's two vote rules (V4-6 wedge fix). A node that has ANSWERED its leave never grants a
+    // ballot that puts it back IN the view: that vote is exactly what a two-member ballot needs, and
+    // spending it hands the cluster a member that is already gone (the shell is tearing it down). One
+    // still KNOCKING may grant such a ballot — it rebases onto the newer view and re-knocks from there,
+    // so nothing stalls. And a ballot that takes me OUT is grantable even when epoch-stale: removing me
+    // cannot depend on how current my view is (safety rests on vote-once + the proposer's joint
+    // majorities, never on the voter's freshness). Refusing a vote is always safe — it can only cost
+    // liveness, and the ballot it costs here is one that must not commit.
+    const going = this.leaving !== null
+    const inBallot = going && v.m.some((m) => m[0] === node.uuid)
+    const leavingOut = going && !inBallot
+    const backIn = this.leaving?.done === true && inBallot
+    const grant = v.e > this.view.epoch && !backIn && (leavingOut || !this.epochStale) && (this.votedFor.e < v.e || this.votedFor.p === proposer)
     if (grant) {
       this.votedFor = { e: v.e, p: proposer, h }
       //! the vote is DURABLE before the VOTE frame leaves (sink.boot precedes the ship in this step —
@@ -467,7 +481,20 @@ export class Membership {
   // now), later with clean=true on a survivor's echo, or clean=false when LEAVE_TICKS ran out.
   leave(node: Node) {
     if (this.leaving) return
-    if (node.client || this.view.epoch === 0 || !this.isMember(node.uuid) || this.view.members.length < 2 || this.rejoining() || this.epochStale) {
+    //! "nothing to leave" is a claim about OTHER nodes, so it needs EVIDENCE, not a local mood. A client
+    // is never in anyone's view. Otherwise: a committed view that holds me alongside someone else — or,
+    // while I hold NO view yet, any admitted peer at all, because a view that holds me may be committing
+    // this instant (I may already have granted it; a peer may already have installed it and its VIEW
+    // frame may be in flight, unread, or dropped). epochStale/rejoining describe how current MY
+    // knowledge is; they never prove that nobody holds me (V4-6 wedge: they answered clean=true at once,
+    // the shell tore the node down, and a two-member survivor kept a member it can never evict).
+    const held = this.view.epoch > 0
+      ? this.isMember(node.uuid) && this.view.members.length >= 2
+      : this.#admitted(node).some((l) => !l.client)
+    if (node.client || !held) {
+      //! answered at once — but LATCHED as going, so the microtask hop before the shell's teardown
+      // cannot vote this node INTO a view it has already said it left (see onPropose).
+      this.leaving = { ticks: 0, done: true }
       node.env.sink.left?.(true)
       return
     }
@@ -481,6 +508,13 @@ export class Membership {
   // new ballot is the idempotent same-proposer case), else send LEAVE on every admitted member link —
   // the one that is lowest live proposes, the rest ignore it. Idempotent per tick.
   #knockLeave(node: Node) {
+    //! before any view reaches me the knock still means something to a peer that HAS one: I cannot
+    // filter by a membership I do not know, so it goes to every admitted peer. Its lowest live member
+    // proposes the view without me exactly as below, and its VIEW echo is my exit proof (onView).
+    if (this.view.epoch === 0) {
+      this.#send(node, this.#admitted(node).filter((l) => !l.client), encodeControl(VERB.LEAVE, {}))
+      return
+    }
     const shrunk = this.view.members.filter(([u]) => u !== node.uuid)
     if (shrunk.length === 0) { this.#finishLeave(node, true); return } // the last member simply goes
     if (this.#lowestLive() === node.uuid) {
