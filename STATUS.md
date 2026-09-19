@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (405 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
+Run from the repo root: `npm test` (408 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
 `npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier).
 
@@ -474,3 +474,17 @@ inside the outer apply.
   re-anchored, the phase finder follows the new header, re-recorded on a
   quiet box, rebuilt, checked, republished. Battery: 405/405 + 18/18,
   perf 41/41.
+- 2026-09-19 — V4-9 (DECISIONS): `fero.spawn(file, args?)` is public — the
+  other terminal, from code — and the checks meet the box directory
+  (`privateDirectory()` dropped: "just examples, shorter is better"). The
+  V4-8 signal registry moved to api/signals.ts and is generic, so a
+  spawned child is stopped on the parent's Ctrl-C like a live instance; a
+  parent that dies on an error SIGKILLs its children on 'exit'. The review
+  panel found a V4-8 hole this made reachable from one keystroke — destroy()
+  untracked at its START, so a second SIGINT mid-leave (a terminal's Ctrl-C
+  reaches a spawned child from the tty AND from the parent's stop()) killed
+  the child by signal; now a stop untracks when it settles. lib.ts is
+  `until` + `sleep`.
+  Three tests over real processes (api/spawn.test.ts); both checks green
+  by hand on the box directory and on a private port. Battery: 408/408 +
+  18/18.

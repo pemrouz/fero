@@ -797,3 +797,73 @@ The examples decision that came with this is recorded below.
   back as itself on a FRESH port (no listen is persisted); a joining copy
   prints `members 1 writable false` for a moment; a memory-only copy alone
   forgets everything; two seeded servers would fight over one row.
+
+## V4-9 — fero.spawn: the other terminal, from code; a check meets the box (2026-09-19)
+Context: the owner asked why every check called `privateDirectory()` —
+"to not overlap with a similarly named resource? can just prefix resource
+name in that case, but even that is not needed here as just examples,
+shorter is better" — and suggested `fero.spawn` as a built-in for starting
+a role as a separate process. The private directory was never about names:
+a check's roles meet the box directory like anything else, so a check run
+by hand while the same example was open in the owner's terminals joined
+them, its counts never held, and the terminals watched strangers arrive
+and die. A name prefix could not have fixed that (the roles are the lesson
+and carry no plumbing, so a check cannot rename them), and nine lines of
+socket code in lib.ts was the price of running a check with terminals up.
+Decision:
+- **A check meets the box.** `privateDirectory()` is gone. By hand,
+  `node check.ts` runs on the box directory and the README says to close
+  the terminals of that example first; inside `npm test` the smoke tier
+  passes every check its own free port, as it always did (the call was a
+  no-op there).
+- **`fero.spawn(file, args?)` is public** (api/spawn.ts; the handle type
+  is `Spawned`). It runs `node <file> …` as a separate process — the file
+  resolves as the terminal would, against the cwd — and returns `{ pid,
+  out, exited, stop, child }`: `out` is the stdout so far, `exited` the
+  exit code, `stop()` the reader's Ctrl-C (SIGINT; a fero process leaves
+  by ballot and exits 0, V4-8) that gives up after five seconds (SIGKILL,
+  null) so a broken clean stop FAILS a caller instead of hanging it, and
+  `child` Node's handle for the rest. stdout and stderr are echoed
+  prefixed `[name pid]` so two copies of one file tell apart. A spawned
+  child is tracked in the same registry as a live instance (moved to
+  api/signals.ts, generic over anything with a `destroy()`): the parent's
+  own Ctrl-C stops its children and waits for them before exiting 0, and
+  a parent that dies on an error — a thrown assertion — SIGKILLs them on
+  'exit' (the loop is gone; there is nothing left to wait with; a
+  SIGKILLed parent runs nothing and orphans them, which is why the smoke
+  tier kills its whole process group itself). This is
+  the other half of V4-8: fero built the clean stop in, so the thing that
+  sends it and waits for it is fero's too.
+- **A stop untracks when it SETTLES (a V4-8 amendment).** `destroy()`
+  untracked the instance at its start, so for the whole leave — a ballot
+  round trip — the last instance's process had Node's default disposition
+  back, and a second SIGINT killed it by signal mid-leave: a crash, the
+  thing V4-6 and V4-8 exist to avoid. `fero.spawn` made that reachable from
+  ONE keystroke: a terminal's Ctrl-C reaches a spawned child twice, from
+  the tty (the foreground group) and from its parent's `stop()`. Found by
+  the review panel and reproduced by its verifier with a real process
+  group. Now `stopping = rt.leave().then(teardown).finally(() =>
+  untrack(inst))`: the listener stays for the leave and a second signal
+  joins it (destroy() is idempotent; a second `process.exit(0)` is a
+  no-op). The trade, taken knowingly: a second Ctrl-C no longer force-quits
+  mid-leave — the leave is capped in the shell and SIGKILL remains the hard
+  escape, which `stop()`'s own grace sends. The diagnostics `crash()` door
+  still untracks at once: it means a crash. Pinned: a spawned member gets a
+  second SIGINT 20 ms into its stop and still leaves by ballot and exits 0.
+- **lib.ts is `until` and `sleep`.** `spawnRole` and `privateDirectory`
+  are gone with the process plumbing; a check is `fero.spawn`, `until`,
+  `assert`. Pinned by three tests over real processes (api/spawn.test.ts):
+  the member that leaves and exits 0 through `stop()`; the child that
+  ignores SIGINT and is SIGKILLed after the grace (null); a parent whose
+  Ctrl-C stops its child, WAITS for its child's own stop, and exits 0, and
+  whose thrown error takes the child with it, the echo prefixed
+  `[idle <pid>]` and stderr kept out of `out`.
+REJECTED: a `{ grace }` option (one number, one rule; a test eats the five
+seconds); variadic args or a command-line string (`spawn(file, args?)`
+mirrors Node's own); resolving the file against the calling script instead
+of the cwd (two rules to explain; the README already says `cd` into the
+folder and the smoke tier sets cwd); detached children (a terminal's
+Ctrl-C must reach them directly); SIGINT instead of SIGKILL on the parent's
+'exit' (a child whose clean stop wedged would outlive its check as an
+orphan on the box directory); keeping `privateDirectory()` behind an
+option; a resource-name prefix per check (the roles carry no plumbing).
