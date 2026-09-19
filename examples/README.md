@@ -17,7 +17,8 @@ Three rules every example keeps:
 3. **Ctrl-C is the exit.** fero stops cleanly by itself: it leaves the group by a vote before the sockets
    close, so a clean stop is never mistaken for a crash. `destroy()` is the same thing in code.
 
-How a check works: `check.ts` runs the role files as child processes, reads what they print, asserts,
-stops them with Ctrl-C, and ends with `ok <example>`. It meets its own private directory (a free port),
-never the box's, so it can run while your terminals are up. `tests/examples.test.ts` runs every
-`check.ts` the same way inside `npm test`.
+How a check works: `check.ts` starts the role files with `fero.spawn` (each a separate `node <file>`, its
+output echoed here), reads what they print, asserts, stops them with Ctrl-C (`stop()`), and ends with
+`ok <example>`. Close your terminals of that example first: by hand a check meets the box directory like
+everything else. `tests/examples.test.ts` runs every `check.ts` the same way inside `npm test`, each on
+a private directory.

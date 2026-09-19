@@ -1,23 +1,19 @@
 import assert from 'node:assert'
-import path from 'node:path'
-import { privateDirectory, sleep, spawnRole, until, type Role } from '../lib.ts'
-
-const dir = import.meta.dirname
+import { fero, type Spawned } from '../../api/index.ts'
+import { sleep, until } from '../lib.ts'
 
 // the last screen a role drew: its header line and the object
-const screen = (r: Role) => r.out.split('fero two-terminal demo — ').pop() ?? ''
-const stock = (r: Role) => Number(/widgets: \{ stock: (\d+)/.exec(screen(r))?.[1] ?? -1)
-
-await privateDirectory()
+const screen = (r: Spawned) => r.out.split('fero two-terminal demo — ').pop() ?? ''
+const stock = (r: Spawned) => Number(/widgets: \{ stock: (\d+)/.exec(screen(r))?.[1] ?? -1)
 
 // the watcher first: nothing to find yet, so it waits
-const watcher = spawnRole(path.join(dir, 'client.ts'), 'watcher')
+const watcher = fero.spawn('client.ts')
 assert.ok(await until(() => screen(watcher).includes('{}')), 'a watcher alone draws an empty object')
 await sleep(1500)
 assert.ok(screen(watcher).includes('shop not found yet') && stock(watcher) < 0, 'and waits: no shop yet, so no rows')
 
 // the shop appears and stock flows down
-const shop = spawnRole(path.join(dir, 'server.ts'), 'shop')
+const shop = fero.spawn('server.ts')
 assert.ok(await until(() => stock(watcher) > 0, 15_000), 'the watcher found the shop by name and holds its rows')
 const listen = /SHOP on (127\.0\.0\.1:\d+)/.exec(shop.out)?.[1]
 assert.ok(await until(() => screen(watcher).includes(`— shop ${listen}`)), "the watcher's screen names the shop's port")

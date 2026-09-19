@@ -4,7 +4,7 @@
 cd examples/01-two-servers
 node server.ts     # terminal 1
 node server.ts     # terminal 2 — then Ctrl-C it, and run it again
-node check.ts      # proves it, about 11 s, on its own private directory (your terminals are not touched)
+node check.ts      # proves it, about 5 s (close your other terminals of this example first)
 ```
 
 Terminal 1 from a real run. Terminal 2 started at `ticks 2`, got Ctrl-C at `ticks 6`, and a third copy was
