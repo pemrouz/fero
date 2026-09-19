@@ -25,35 +25,14 @@ import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
 import { captureNode } from '../tools/debug/capture.ts'
+import { track, untrack } from './signals.ts'
+import { spawn } from './spawn.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
 const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'methods', 'seams', 'rendezvous', 'signals'])
 const SEAM_KEYS = new Set(['validation'])
 
-//! ── the clean stop on Ctrl-C (V4-8) ──
-// SIGINT or SIGTERM: every live instance destroy()s — the graceful leave, then teardown — and, when
-// nothing else in the process listens for that signal, the process exits 0. Without this a Ctrl-C is a
-// CRASH as the cluster sees it (no leave: a two-member cluster wedges, DECISIONS V4-6), and a process
-// that never calls destroy() never ends (the shell's timers and sockets are ref'd on purpose). One
-// listener per signal for the whole module, installed by the first live instance and removed by the
-// last, so a process with no live instance keeps Node's default. `signals: false` keeps an instance out.
-const live = new Set<Fero>()
-const SIGNALS = ['SIGINT', 'SIGTERM'] as const
-let listening = false
-const onSignal = (sig: NodeJS.Signals): void => {
-  const others = process.listenerCount(sig) - 1
-  void Promise.allSettled([...live].map((f) => f.destroy())).then(() => { if (others === 0) process.exit(0) })
-}
-const track = (f: Fero): void => {
-  live.add(f)
-  if (!listening) { listening = true; for (const s of SIGNALS) process.on(s, onSignal) }
-}
-const untrack = (f: Fero): void => {
-  if (!live.delete(f) || live.size > 0) return
-  listening = false
-  for (const s of SIGNALS) process.off(s, onSignal)
-}
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
 // V4-4's `invalid` WNACK as `m`, surfaces as WriteReject.reason and cluster.writes.reason, and is what a
 // plain client assignment is refused with (nothing ever showed — V4-7). A degenerate admission predicate
@@ -72,6 +51,8 @@ const keyPath = (k: string | string[] | undefined): string[] =>
   k === undefined ? [] : Array.isArray(k) ? k.map(String) : [String(k)]
 
 export const fero = (name: string, opts: FeroOpts = {}): Promise<Fero> => compose(name, opts, false)
+//! fero.spawn(file, args?) (V4-9): `node <file> …` as a separate process — the reader's other terminal, from code (api/spawn.ts)
+fero.spawn = spawn
 
 //! compose — the composer proper. `system` admits a `#`-prefixed name (the directory) and skips the
 // directory for the instance itself (a directory never meets a directory); the public fero() always
@@ -649,7 +630,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       // this node by ballot — a clean stop is not a crash, and a two-member cluster survives it. Bounded
       // in the shell (Runtime.leave); then the ordinary teardown, unchanged. Idempotent (V4-8): the
       // signal handler and the owner's own destroy() may race — the second call joins the first.
-      if (stopping === null) { untrack(inst); stopping = rt.leave().then(teardown) }
+      // Untracked when the stop SETTLES, not when it starts (V4-9): the listener stays for the whole
+      // leave, so a second signal joins it — a terminal's Ctrl-C reaches a spawned child twice, once
+      // from the tty and once from its parent's stop(), and untracking first left Node's default in
+      // place to kill the child by signal mid-ballot (a crash, the thing V4-6 and V4-8 exist to avoid).
+      if (stopping === null) stopping = rt.leave().then(teardown).finally(() => untrack(inst))
       return stopping
     },
   }
@@ -684,4 +669,4 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   return inst
 }
 
-export type { Fero, FeroOpts, Guarantee, WriteResolve, WriteReject, Change, WriteOpts, Methods, Partitions, ScopedError } from './types.ts'
+export type { Fero, FeroOpts, Guarantee, WriteResolve, WriteReject, Change, WriteOpts, Methods, Partitions, ScopedError, Spawned } from './types.ts'
