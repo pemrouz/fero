@@ -4,7 +4,7 @@
 cd examples/02-server-client
 node server.ts     # terminal 1: the shop
 node client.ts     # terminal 2: a watcher — either order; a third terminal is another watcher
-node check.ts      # proves it, about 14 s, on its own private directory (your terminals are not touched)
+node check.ts      # proves it, about 9 s (close your other terminals of this example first)
 ```
 
 Terminal 1 after the watcher's third sale, from a real run (each screen is one header line and the object;
