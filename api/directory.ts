@@ -221,7 +221,7 @@ export class Directory {
     if (this.#o.serve) await this.#tryHost()
     if (this.#destroyed) return
     const o = this.#o
-    this.client = await o.compose(DIRECTORY, { hosts: [o.addr], heartbeatMs: o.heartbeatMs, ...(o.redialMs !== undefined ? { redialMs: o.redialMs } : {}) }, true)
+    this.client = await o.compose(DIRECTORY, { hosts: [o.addr], heartbeat: { ms: o.heartbeatMs }, ...(o.redialMs !== undefined ? { redial: { ms: o.redialMs } } : {}) }, true)
     if (this.#destroyed) { await this.client.destroy(); this.client = null; return }
     const c = this.client
     //! a server that lost the first bind (another host, or a squatter) starts the retry loop NOW — the
@@ -297,7 +297,7 @@ export class Directory {
     try {
       //! `methods:` makes the directory PROTECTED (V4-5): its clients only ever CALL register/lookup, so a
       // stray plain write into the box's directory is refused at the relay, never folded
-      host = await o.compose(DIRECTORY, { listen: o.addr, heartbeatMs: o.heartbeatMs, ...(o.redialMs !== undefined ? { redialMs: o.redialMs } : {}), methods }, true)
+      host = await o.compose(DIRECTORY, { listen: o.addr, heartbeat: { ms: o.heartbeatMs }, ...(o.redialMs !== undefined ? { redial: { ms: o.redialMs } } : {}), methods }, true)
       if (this.#destroyed) { await host.destroy(); return }
       this.host = host
       this.#fails = 0

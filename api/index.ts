@@ -23,6 +23,7 @@ import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, batch, snapshot as snapshotOf } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
+import { resolveConfig, src, CONFIG_LEAVES } from './config.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
 import { captureNode } from '../tools/debug/capture.ts'
 import { track, untrack } from './signals.ts'
@@ -30,7 +31,7 @@ import { spawn } from './spawn.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeatMs', 'redialMs', 'journalCap', 'replicas', 'data', 'methods', 'seams', 'rendezvous', 'signals'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'journal', 'replicas', 'data', 'methods', 'seams', 'rendezvous', 'signals'])
 const SEAM_KEYS = new Set(['validation'])
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -62,12 +63,20 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   if (!isSystem && name.startsWith('#')) throw new Error(`fero('${name}'): names starting with # are reserved for system resources (${DIRECTORY})`)
   //! every option is a DECLARED key (V4-5): a function-valued option is the pre-V4-5 method spelling —
   // refused with the pointer (moving it under `methods:` also declares the door, on purpose)
-  const config: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(opts as Record<string, unknown>)) {
+  for (const [k, v] of Object.entries(opts as Record<string, unknown>))
     if (typeof v === 'function' && k !== 'methods') // `methods: fn` gets the plain-object message below, not a pointer to methods: { methods }
       throw new Error(`fero('${name}'): '${k}' is a function — methods live under methods: { ${k} }, and declaring them makes clients change data only through them`)
+  //! the six layers fold into the call HERE (V4-10, api/config.ts): a launch flag, the call, the
+  // environment, a fero.opt.ts at the project or in $HOME — checked against the declared schema and
+  // coerced before anything below reads them. A system resource gets the explicit opts the composer
+  // handed it. `from(key)` names the layer behind a value; `at(key)` is its suffix for a message.
+  const resolved = isSystem ? { config: opts, from: () => 'the call' } : resolveConfig(name, opts)
+  const from = resolved.from
+  const at = (key: string): string => src(from(key))
+  const config: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(resolved.config as Record<string, unknown>)) {
     if (!CONFIG_KEYS.has(k)) throw new Error(`fero('${name}'): unknown option '${k}' — config keys are ${[...CONFIG_KEYS].join(', ')}`)
-    config[k] = v
+    if (v !== undefined) config[k] = v
   }
   if (config.signals !== undefined && typeof config.signals !== 'boolean') throw new Error(`fero('${name}'): signals must be true or false (false = leave Ctrl-C / SIGTERM to you)`)
   //! methods: — the hosted methods AND the door (V4-5). Validated as a whole at fero() time: a PLAIN
@@ -96,12 +105,24 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // its hosts — or, bare, the name-derived local port. `hosts` is pure dial targets now: alone it
   // keeps the v2 client shape; beside a marker it makes a dialing member (listen+hosts, unchanged).
   // Role is a pure function of the CONFIG — never of timing, launch order, or who answers a dial.
-  if (config.server !== undefined && config.server !== true)
-    throw new Error(`fero('${name}'): server must be true when present — omit it (a bare fero is a client) or pin the role with server: true`)
+  if (config.server !== undefined && typeof config.server !== 'boolean')
+    throw new Error(`fero('${name}'): server must be true (pin the server role) or false (pin the client role)${at('server')} — omit it and a bare fero is a client`)
   if (config.listen !== undefined && config.listen !== false && !isAddr(config.listen, true))
-    throw new Error(`fero('${name}'): listen must be a 'host:port' string (a non-empty host; port 0 = a free port), or false for a socketless solo node`)
-  if (config.data !== undefined && (typeof config.data !== 'object' || config.data === null || Array.isArray(config.data)))
-    throw new Error(`fero('${name}'): data must be a plain object of initial rows — it seeds the resource only when the local fold is empty at boot`)
+    throw new Error(`fero('${name}'): listen must be a 'host:port' string (a non-empty host; port 0 = a free port), or false for a socketless solo node${at('listen')}`)
+  if (config.hosts !== undefined && (!Array.isArray(config.hosts) || (config.hosts as unknown[]).some((h) => typeof h !== 'string' || h === '')))
+    throw new Error(`fero('${name}'): hosts must be an array of 'host:port' strings${at('hosts')}`)
+  if (config.dir !== undefined && (typeof config.dir !== 'string' || config.dir === ''))
+    throw new Error(`fero('${name}'): dir must be a non-empty path${at('dir')}`)
+  const plainObject = (v: unknown): boolean => typeof v === 'object' && v !== null && !Array.isArray(v) && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null)
+  if (config.data !== undefined && !plainObject(config.data))
+    throw new Error(`fero('${name}'): data must be a plain object of initial rows — it seeds the resource only when the local fold is empty at boot${at('data')}`)
+  //! server: false (V4-10) is the CLIENT pin: with the layers, a server marker can now arrive from a flag,
+  // a variable or a file — a process that means to follow refuses every marker, naming it and its source
+  if (config.server === false) {
+    const marker = (['listen', 'dir', 'replicas', 'data', 'methods'] as const).find((k) => config[k] !== undefined)
+    if (marker !== undefined)
+      throw new Error(`fero('${name}'): server: false pins the client role${at('server')}, but '${marker}' makes a server${at(marker)} — drop one`)
+  }
   const isServer = config.server === true || config.listen !== undefined || config.dir !== undefined
     || config.replicas !== undefined || config.data !== undefined || methodsOnly
   const isClient = !isServer
@@ -111,12 +132,31 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   if (config.listen === false && Array.isArray(config.hosts) && (config.hosts as string[]).length > 0)
     throw new Error(`fero('${name}'): an undialable node (listen: false) cannot join a cluster — give it a listen address or drop hosts`)
   if (config.replicas !== undefined && (!Number.isInteger(config.replicas) || (config.replicas as number) < 1))
-    throw new Error(`fero('${name}'): replicas must be an integer ≥ 1 (omit for full replication)`)
+    throw new Error(`fero('${name}'): replicas must be an integer ≥ 1 (omit for full replication)${at('replicas')}`)
+  //! the timing and bound keys (V4-10 nested spelling): a string layer can now carry a non-number —
+  // checked here, because `('abc' ?? 0) > 0` in the kernel would silently turn heartbeats off
+  const num = (key: string, v: unknown, min: number, int: boolean, what: string): number | undefined => {
+    if (v === undefined) return undefined
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < min || (int && !Number.isInteger(v)))
+      throw new Error(`fero('${name}'): ${key} must be ${what}${at(key)}`)
+    return v
+  }
+  const group = (k: 'heartbeat' | 'redial' | 'journal'): Record<string, unknown> => {
+    const g = config[k]
+    if (g === undefined) return {}
+    if (typeof g !== 'object' || g === null || Array.isArray(g)) throw new Error(`fero('${name}'): ${k} is a group — ${k}: { ${k === 'journal' ? 'cap' : 'ms'}: … }${at(k)}`)
+    return g as Record<string, unknown>
+  }
+  const heartbeatMs = num('heartbeat.ms', group('heartbeat').ms, 0, false, 'a finite number of milliseconds ≥ 0 (0 = heartbeats off)')
+  const redialMs = num('redial.ms', group('redial').ms, 0, false, 'a finite number of milliseconds ≥ 0')
+  const journalCap = num('journal.cap', group('journal').cap, 1, true, 'an integer ≥ 1')
   //! the rendezvous (V4-3): the per-box directory this instance meets at — precedence: `rendezvous:`
   // config > FERO_RENDEZVOUS (an address, or 'off') > the constant; false = no directory. A system
   // resource meets none. A malformed env value is refused HERE, loudly, not deep in the shell.
   if (config.rendezvous !== undefined && config.rendezvous !== false && !isAddr(config.rendezvous))
-    throw new Error(`fero('${name}'): rendezvous must be a 'host:port' string (port 1–65535), or false for no directory`)
+    throw new Error(from('rendezvous') === 'FERO_RENDEZVOUS'
+      ? `fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')`
+      : `fero('${name}'): rendezvous must be a 'host:port' string (port 1–65535), or false for no directory${at('rendezvous')}`)
   const envDefault = config.rendezvous === undefined && !isSystem ? rendezvousDefault() : false
   if (envDefault !== false && !isAddr(envDefault))
     throw new Error(`fero('${name}'): FERO_RENDEZVOUS='${process.env.FERO_RENDEZVOUS}' is not a 'host:port' address (or 'off')`)
@@ -150,7 +190,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // adopting a foreign log under a new name is the silent evicted-heir bug, never a default.
   const badUuid = (u: unknown) => typeof u !== 'string' || u === '' || u.includes('~')
   if (config.uuid !== undefined && badUuid(config.uuid))
-    throw new Error(`fero('${name}'): uuid must be a non-empty string without '~' (the incarnation-lane separator)`)
+    throw new Error(`fero('${name}'): uuid must be a non-empty string without '~' (the incarnation-lane separator)${at('uuid')}`)
   //! restore-before-network: a dir holding a previous life boots as its heir (identity recovered,
   // incarnation bumped, clock leased, votedFor honored) — the composer makes the wal.test.ts idiom
   // the default path
@@ -166,7 +206,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   if (restored.uuid !== undefined && badUuid(restored.uuid))
     throw new Error(`fero('${name}'): this dir's boot record carries an invalid uuid (${JSON.stringify(restored.uuid)}) — repair boot.json`)
   if (config.uuid !== undefined && restored.uuid !== undefined && config.uuid !== restored.uuid)
-    throw new Error(`fero('${name}'): uuid '${config.uuid as string}' does not match this dir's previous life '${restored.uuid}' — one dir, one identity (use a fresh dir for a new node)`)
+    throw new Error(`fero('${name}'): uuid '${config.uuid as string}'${at('uuid')} does not match this dir's previous life '${restored.uuid}' — one dir, one identity (use a fresh dir for a new node)`)
   //! the dir records WHAT as well as WHO (v4.1): the same misdial class the name-echo closes on the
   // wire exists one layer down — fero('other', {dir-of-'r'}) would fold r's WAL into 'other' and
   // replicate it outward. A legacy record lacks the field: no check, stated legacy behavior.
@@ -187,10 +227,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     dir: config.dir as string | undefined,
     //! the KERNEL keeps heartbeats explicit (0 = off, the sweep mode); the COMPOSER is where production
     // defaults live: 500ms drives genesis/suspicion on servers and the write-retry clock + AE floor on
-    // clients. Pass heartbeatMs: 0 to opt out.
-    heartbeatMs: (config.heartbeatMs as number | undefined) ?? 500,
-    redialMs: config.redialMs as number | undefined,
-    journalCap: config.journalCap as number | undefined,
+    // clients. Pass heartbeat: { ms: 0 } to opt out.
+    heartbeatMs: heartbeatMs ?? 500,
+    redialMs,
+    journalCap,
     ...(config.replicas !== undefined ? { replicas: config.replicas as number } : {}),
     //! the relay's admission predicate (V4-4, V4-5): a client's plain write relayed through this server
     // meets the kernel's relay ingress (kernel/write.ts onWrite) with THIS predicate — under `methods:`
@@ -330,9 +370,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         return ctx.data.get(k)
       }
       if (!scoped || !node.armed) return ctx.data
-      //! the live cadence is FLOORED (M6-review finding 9): heartbeatMs: 0 is the documented
+      //! the live cadence is FLOORED (M6-review finding 9): heartbeat.ms 0 is the documented
       // heartbeat opt-out, not a request for a ~1ms full-cluster refresh storm
-      if (ctx.live) { const g = gatherOf(); g.live(liveCadence(config.heartbeatMs as number | undefined)); return g.proxy }
+      if (ctx.live) { const g = gatherOf(); g.live(liveCadence(heartbeatMs)); return g.proxy }
       return gatherOf().refresh(rt, { throwOnPartial: true })
     },
     ...(userMethods as Record<string, (arg: unknown, ctx: Context) => unknown>),
@@ -663,6 +703,23 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     drop: (uuid: string) => rt.drop(uuid),
     crash: () => { untrack(inst); return teardown() },
     rendezvous: () => (directory ? { client: directory.client, host: directory.host } : null),
+    //! config (V4-10): every resolved leaf with the layer it came from — the coerced value the composer
+    // read, or the effective default ('the default') where one exists; a function shows as '[function]',
+    // the hosted methods and the data seed as their names (rows are data, not config)
+    config: () => {
+      const out: Record<string, { value: unknown; from: string }> = {}
+      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
+      for (const k of CONFIG_LEAVES) {
+        const v = k.split('.').reduce<unknown>((o, p) => (o !== null && typeof o === 'object' ? (o as Record<string, unknown>)[p] : undefined), config)
+        const shown = v !== undefined ? v : effective[k]
+        if (shown === undefined) continue
+        out[k] = {
+          value: typeof shown === 'function' ? '[function]' : k === 'methods' || k === 'data' ? Object.keys(shown as object) : shown,
+          from: v !== undefined ? from(k) : k === 'rendezvous' && envDefault !== false ? 'FERO_RENDEZVOUS' : 'the default',
+        }
+      }
+      return out
+    },
   }
   ;(inst as Fero & { [diagnostics]?: Diagnostics })[diagnostics] = diagHandle
   if (!isSystem && config.signals !== false) track(inst)   //! the clean stop on Ctrl-C (V4-8); the directory is owned and torn down by its host

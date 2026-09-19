@@ -72,14 +72,22 @@ export interface Seams {
 
 //! FeroConfig — the declared, picked config schema. Unknown keys throw at fero() time; so does a
 // function-valued key (methods live under `methods:` — V4-5).
+//! V4-10: the call is ONE of six layers (api/config.ts): a launch flag `--fero.<key>` beats the call,
+// the call beats `FERO_<KEY>` in the environment, env beats a `fero.opt.ts` at the project or in $HOME,
+// and every layer is beaten by a value scoped to this resource's name (`--fero.shop.dir`,
+// `FERO_SHOP_DIR`, `{ shop: { dir } }`). Keys are nested lowercase words so one spelling survives every
+// layer. Call-only (a function or a per-instance switch): methods, seams, signals; data also rides a
+// file; uuid never comes from a file. `FERO_CONFIG=off` reads the call alone (the test battery).
 //! Role (v4.1) is by DECLARED ACT: any server marker — server: true, listen, dir, replicas, a `data`
 // seed, or `methods:` — makes a server; no marker makes a CLIENT dialing its hosts (or, bare, the
 // servers the directory lists for the name). Role is a pure function of the config.
 export interface FeroConfig {
   uuid?: string
-  //! server — the explicit role pin: serve even with no other marker (binds a free loopback port
-  // and registers it with the directory).
-  server?: true
+  //! server — the explicit role pin: true = serve even with no other marker (binds a free loopback port
+  // and registers it with the directory); false (V4-10) = the CLIENT pin: any server marker from any
+  // layer is refused naming it, so a process meant to follow can never be turned into a server by a
+  // stray flag, variable or file.
+  server?: boolean
   //! listen — the dialable address; omitted on a server = a free loopback port (127.0.0.1:0, the
   // OS picks; cluster.me.listen shows it), published through the directory; false = the socketless
   // solo node (serves nothing, dials nothing, meets no directory — pure local; refuses hosts loudly).
@@ -97,9 +105,16 @@ export interface FeroConfig {
   // A user resource may not listen on a rendezvous socket under any spelling (`0.0.0.0:3376` too).
   rendezvous?: string | false
   dir?: string
-  heartbeatMs?: number
-  redialMs?: number
-  journalCap?: number
+  //! heartbeat.ms (V4-10 spelling; was heartbeatMs) — the one clock: pings, membership ticks, the write
+  // retry clock, compaction and WAL-snapshot arming all run on it. 500 by default; 0 = off (an
+  // explicit protocol mode, the sim's sweep mode). A cluster contract: every member the same.
+  heartbeat?: { ms?: number }
+  //! redial.ms (was redialMs) — the dial backoff base after a peer drops; doubles up to 32× the base,
+  // gives up after 10 tries (heartbeats revive it). 100 by default.
+  redial?: { ms?: number }
+  //! journal.cap (was journalCap) — the diagnostics ring size; older events are dropped and counted.
+  // 4096 by default; captures that want full-history time travel raise it.
+  journal?: { cap?: number }
   //! replicas (M6): scoped replication — each partition lives on exactly R holders. Omit for full
   // replication (every server holds everything). Integer ≥ 1; implies the server role (v4.1).
   replicas?: number

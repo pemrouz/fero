@@ -6,9 +6,9 @@
 // Tier-2's job (sim/scale.test.ts); THIS file proves the shell composition survives fan-in 12 —
 // 12 listeners + 132 sockets ≈ 144 fds, 7x under the default 1024 ulimit.
 
-//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
-// meet a live box directory (the battery's npm script sets the same default)
-process.env.FERO_RENDEZVOUS ??= 'off'
+//! the battery pins (utils/battery.ts), whichever way this suite is run: the directory OFF (a single-file
+// `node --test` must never meet a live box directory) and the config layer OFF (no flag, variable or file reaches a test)
+import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -27,8 +27,8 @@ const spawn = async (n: number): Promise<Fero[]> => {
       uuid: `n${String(i + 1).padStart(2, '0')}`,
       listen,
       hosts: addrs.filter((_, j) => j !== i),
-      heartbeatMs: 50,
-      redialMs: 30,
+      heartbeat: { ms: 50 },
+      redial: { ms: 30 },
     })))
 }
 const canon = (v: unknown): string =>

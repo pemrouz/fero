@@ -4,9 +4,9 @@
 // §3 — the panel's shared-defect fix: a forced member-ranged compaction on a scoped holder could drop
 // the only real copy); drop() is the ungraceful-peer primitive the served() leak guard is proved with.
 
-//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
-// meet a live box directory (the battery's npm script sets the same default)
-process.env.FERO_RENDEZVOUS ??= 'off'
+//! the battery pins (utils/battery.ts), whichever way this suite is run: the directory OFF (a single-file
+// `node --test` must never meet a live box directory) and the config layer OFF (no flag, variable or file reaches a test)
+import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -33,7 +33,7 @@ test('hygiene: the handle is Symbol-keyed — absent from keys/for-in, present v
 })
 
 test('capture ⇄ the replay oracle, and the atomic journal cursor with honest truncation', async () => {
-  const f = await fero('r', { uuid: 'aa', journalCap: 32, listen: false })
+  const f = await fero('r', { uuid: 'aa', journal: { cap: 32 }, listen: false })
   try {
     for (let i = 0; i < 60; i++) f.data[`k${i % 7}`] = { n: i, deep: [i, `s${i}`] }
     await until(() => (snapshot(f.data) as Record<string, { n: number }>).k3?.n === 59, 4000)
@@ -53,8 +53,8 @@ test('capture ⇄ the replay oracle, and the atomic journal cursor with honest t
 
 test('compact() forces the real pass; logSize shrinks; state untouched; confirms drain; destroyed refuses', async () => {
   const [pa, pb] = [await ports.free(), await ports.free()]
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30 })
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30 })
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const d = diag(a)!
   try {
     for (let i = 0; i < 80; i++) a.data.hot = { i } // one cell superseded 80× — pure compaction fodder
@@ -77,11 +77,11 @@ test('compact() forces the real pass; logSize shrinks; state untouched; confirms
 test('served() + drop(): the v2 leak guard — an ungraceful peer drop reaps its live subscription', async () => {
   const pa = await ports.free()
   const a = await fero('r', {
-    uuid: 'aa', listen: `127.0.0.1:${pa}`, heartbeatMs: 50,
+    uuid: 'aa', listen: `127.0.0.1:${pa}`, heartbeat: { ms: 50 },
     methods: { watch: (_: unknown, ctx: { data: unknown }) => ctx.data }, // returns a proxy → subscribable
   })
-  //! redialMs 500 keeps the client's reconnect+resubscribe OUT of the assertion window (WSL2 timing)
-  const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 500 })
+  //! redial.ms 500 keeps the client's reconnect+resubscribe OUT of the assertion window (WSL2 timing)
+  const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 500 } })
   const d = diag(a)!
   try {
     const live = c.methods.watch() as { first?: unknown; close?: () => void }
@@ -94,8 +94,8 @@ test('served() + drop(): the v2 leak guard — an ungraceful peer drop reaps its
 
 test('compact() honest refusal: an ARMED (scoped, committed-view) node answers 0 — the pin, not the pass', async () => {
   const [pa, pb] = [await ports.free(), await ports.free()]
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30, replicas: 1 })
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30, replicas: 1 })
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1 })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1 })
   const d = diag(a)!
   try {
     assert.ok(await until(() => d.capture().epoch > 0, 6000), 'the view commits — scoping arms')

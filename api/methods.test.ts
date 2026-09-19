@@ -5,9 +5,9 @@
 // stays UNRESOLVED while a write is parked at an unreachable owner), confirm-over-RPC (the M5b spoke
 // residual, closed), and failover re-subscribe (v2's OQ2: the live handle survives its server dying).
 
-//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
-// meet a live box directory (the battery's npm script sets the same default)
-process.env.FERO_RENDEZVOUS ??= 'off'
+//! the battery pins (utils/battery.ts), whichever way this suite is run: the directory OFF (a single-file
+// `node --test` must never meet a live box directory) and the config layer OFF (no flag, variable or file reaches a test)
+import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -22,8 +22,8 @@ const pair = async (methods: Record<string, unknown> = {}, extra: Record<string,
   const pa = await ports.free()
   const pb = await ports.free()
   const hosted = Object.keys(methods).length ? { methods } : {}
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30, ...hosted, ...extra } as never)
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30, ...hosted, ...extra } as never)
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, ...hosted, ...extra } as never)
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, ...hosted, ...extra } as never)
   assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
   return { a, b, addrs: [`127.0.0.1:${pa}`, `127.0.0.1:${pb}`] }
 }
@@ -33,7 +33,7 @@ test('one-shot CALL: values round-trip, a returned proxy snapshots, unknown meth
     total: (n: number, ctx: { data: any }) => { void ctx; return n * 2 },
     boom: () => { throw new Error('handler exploded') },
   })
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     assert.equal(await c.methods.total(21), 42, 'a value round-trips')
     //! built-in read: await = snapshot of the resource (a proxy return collapses at the host)
@@ -52,7 +52,7 @@ test('LIVE subscription: reactive touch opens the stream (initial snapshot + del
   const { a, b, addrs } = await pair({
     watch: (_: unknown, ctx: { data: any }) => ctx.data, // returns a ViewProxy → subscribable
   })
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     a.data.first = 1
     const live = c.methods.watch()
@@ -83,7 +83,7 @@ test("flush-on-return: a handler's reply is HELD while its write is parked at an
       return 'committed-before-reply'
     },
   })
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     //! happy path: the reply follows the commit — the value is on the HOST the instant the call returns
     const r = await c.methods.put({ k: 'x', v: 1 })
@@ -109,7 +109,7 @@ test("flush-on-return: a handler's reply is HELD while its write is parked at an
 
 test("confirm-over-RPC: a spoke's methods.update({confirm:'replicated'}) proves at the PRIMARY (the M5b residual, closed)", async () => {
   const { a, b, addrs } = await pair()
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     const r = await c.methods.update({ key: 'proven', value: 1 }, { confirm: 'replicated', timeout: 8000 })
     assert.equal(r.guarantee, 'replicated', 'the spoke proved a majority holds it — via the system plane')
@@ -122,7 +122,7 @@ test("confirm-over-RPC: a spoke's methods.update({confirm:'replicated'}) proves 
 
 test('failover re-subscribe (OQ2): a live handle survives its serving primary dying — the stream resumes off the new feeder', async () => {
   const { a, b, addrs } = await pair({ watch: (_: unknown, ctx: { data: any }) => ctx.data })
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     a.data.pre = 1
     const live = c.methods.watch()
@@ -140,7 +140,7 @@ test('failover re-subscribe (OQ2): a live handle survives its serving primary dy
 
 test("M5-REVIEW #7 — a handler that throws the exact text 'unreachable' rejects typed at the client, never held/hung/re-run", async () => {
   const { a, b, addrs } = await pair({ check: () => { throw new Error('unreachable') } })
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     //! the handler's 'unreachable' arrives as a wire RESULT (local=false) → ordinary rejection, fast,
     // NOT mistaken for the kernel's no-primary pre-dispatch failure (which would hang then re-execute)
@@ -152,7 +152,7 @@ test("M5-REVIEW #7 — a handler that throws the exact text 'unreachable' reject
 
 test('M5-REVIEW #8 — introspecting a one-shot handle (String/JSON/`in`/symbols) never opens a leaked subscription', async () => {
   const { a, b, addrs } = await pair({ total: (n: number) => n * 2 })
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     const h = c.methods.total(21)
     //! every coercion/introspection path must be passive — no SUB frame, no subscription
@@ -167,7 +167,7 @@ test('M5-REVIEW #8 — introspecting a one-shot handle (String/JSON/`in`/symbols
 
 test('M5-REVIEW #11 — a live subscription over a DERIVED (operator) proxy keeps streaming across GC', async () => {
   const { a, b, addrs } = await pair({ actives: (_: unknown, ctx: { data: any }) => ctx.data.filter((r: any) => r.active === true) }) // v4: predicate-only filter (data MIGRATION §3.1)
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     a.data.u1 = { active: true, n: 1 }
     a.data.u2 = { active: false, n: 2 }
@@ -211,7 +211,7 @@ test("V4-5 — a validator-refused write inside a HANDLER fails the call with th
     },
     fine: (_: unknown, ctx: { data: any }) => { ctx.data.ok = 1; return 'fine' },
   }, { seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') } })
-  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const view = (f: typeof c) => snapshot(f.data) as Record<string, unknown>
   try {
     //! before V4-5 this call resolved 'ok' while the write silently vanished — the banned silent partial

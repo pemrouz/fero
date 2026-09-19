@@ -5,7 +5,7 @@
 // FERO_RENDEZVOUS=off — pinned below at import time too, so a single-file run never meets a live
 // box directory — and a fixed port would collide across concurrent checkouts) and pid-suffixed names.
 
-process.env.FERO_RENDEZVOUS ??= 'off'
+import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -19,7 +19,7 @@ import { ports, until } from '#utils'
 import type { Fero } from './types.ts'
 import type { Context } from './methods.ts'
 
-const fast = async () => ({ heartbeatMs: 50, redialMs: 30, rendezvous: `127.0.0.1:${await ports.free()}` })
+const fast = async () => ({ heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous: `127.0.0.1:${await ports.free()}` })
 type Rz = false | { addr: string; hosting: boolean; up: boolean; error?: string }
 type Me = { uuid: string; listen: string; role: string; hosts: string[]; rendezvous: Rz }
 const me = (f: Fero): Me => (snapshot(f.cluster) as { me: Me }).me
@@ -118,16 +118,16 @@ test('directory config: # names are reserved; a user resource may not take a ren
   for (const squat of [o.rendezvous, `0.0.0.0:${port}`, `localhost:${port}`, `[::]:${port}`])
     await assert.rejects(fero(`r-${process.pid}`, { ...o, listen: squat }), /would take the directory's socket/, squat)
   //! the CONSTANT's socket is refused even with the directory off — a later process on this box will dial it
-  await assert.rejects(fero(`r-${process.pid}`, { heartbeatMs: 0, rendezvous: false, listen: RENDEZVOUS }), /would take the directory's socket/)
-  await assert.rejects(fero(`r-${process.pid}`, { heartbeatMs: 0, rendezvous: false }), /needs something to dial.*omitted/)
-  await assert.rejects(fero(`r-${process.pid}`, { heartbeatMs: 0, rendezvous: false, hosts: [] }), /needs something to dial.*empty/)
-  await assert.rejects(fero(`r-${process.pid}`, { heartbeatMs: 0, rendezvous: 'nope' as never }), /rendezvous must be/)
-  await assert.rejects(fero(`r-${process.pid}`, { heartbeatMs: 0, rendezvous: '127.0.0.1:0' as never }), /rendezvous must be/)
-  await assert.rejects(fero(`r-${process.pid}`, { heartbeatMs: 0, listen: ':5' }), /listen must be/)
-  await assert.rejects(fero('', { heartbeatMs: 0 }), /name must be a non-empty string/)
+  await assert.rejects(fero(`r-${process.pid}`, { heartbeat: { ms: 0 }, rendezvous: false, listen: RENDEZVOUS }), /would take the directory's socket/)
+  await assert.rejects(fero(`r-${process.pid}`, { heartbeat: { ms: 0 }, rendezvous: false }), /needs something to dial.*omitted/)
+  await assert.rejects(fero(`r-${process.pid}`, { heartbeat: { ms: 0 }, rendezvous: false, hosts: [] }), /needs something to dial.*empty/)
+  await assert.rejects(fero(`r-${process.pid}`, { heartbeat: { ms: 0 }, rendezvous: 'nope' as never }), /rendezvous must be/)
+  await assert.rejects(fero(`r-${process.pid}`, { heartbeat: { ms: 0 }, rendezvous: '127.0.0.1:0' as never }), /rendezvous must be/)
+  await assert.rejects(fero(`r-${process.pid}`, { heartbeat: { ms: 0 }, listen: ':5' }), /listen must be/)
+  await assert.rejects(fero('', { heartbeat: { ms: 0 } }), /name must be a non-empty string/)
   //! rendezvous: false is the pure-static shape — a server meets no directory, and says so; so does a
   // socketless solo even WITH a rendezvous (it meets none: `false`, never "down")
-  const solo = await fero(`r-${process.pid}`, { server: true, heartbeatMs: 0, rendezvous: false })
+  const solo = await fero(`r-${process.pid}`, { server: true, heartbeat: { ms: 0 }, rendezvous: false })
   assert.equal(me(solo).rendezvous, false)
   assert.equal(diag(solo)!.rendezvous(), null, 'no directory nodes')
   assert.match(me(solo).listen, /^127\.0\.0\.1:[1-9]\d*$/, 'still a free loopback port')
@@ -141,12 +141,12 @@ test('directory config: # names are reserved; a user resource may not take a ren
   const saved = process.env.FERO_RENDEZVOUS
   try {
     process.env.FERO_RENDEZVOUS = 'off'
-    await assert.rejects(fero(`r-${process.pid}`, { heartbeatMs: 0 }), /needs something to dial/)
+    await assert.rejects(fero(`r-${process.pid}`, { heartbeat: { ms: 0 } }), /needs something to dial/)
     const s = await fero(`r-${process.pid}`, { server: true, ...o })
     assert.equal(rz(s).addr, o.rendezvous, 'config beats the env')
     await s.destroy()
     process.env.FERO_RENDEZVOUS = 'garbage'
-    await assert.rejects(fero(`r-${process.pid}`, { server: true, heartbeatMs: 0 }), /FERO_RENDEZVOUS='garbage' is not/)
+    await assert.rejects(fero(`r-${process.pid}`, { server: true, heartbeat: { ms: 0 } }), /FERO_RENDEZVOUS='garbage' is not/)
   } finally { if (saved === undefined) delete process.env.FERO_RENDEZVOUS; else process.env.FERO_RENDEZVOUS = saved }
 })
 
@@ -204,8 +204,8 @@ test('directory host death: a survivor takes the port over, the client fails ove
   const o = await fast()
   const name = `take-${process.pid}`
   //! the eviction wait is the dead host's redial chain giving up (eviction is HELD while a member is
-  // still being dialed), not SUSPECT_TICKS: ≈ redialMs·(1+2+…+32·k) — derive the bound from that
-  const chain = o.redialMs * (1 + 2 + 4 + 8 + 16 + 32 * (MAX_REDIALS - 5)) + MAX_REDIALS * o.redialMs
+  // still being dialed), not SUSPECT_TICKS: ≈ redial.ms·(1+2+…+32·k) — derive the bound from that
+  const chain = o.redial.ms * (1 + 2 + 4 + 8 + 16 + 32 * (MAX_REDIALS - 5)) + MAX_REDIALS * o.redial.ms
   let s1: Fero | undefined, s2: Fero | undefined, s3: Fero | undefined, c: Fero | undefined, late: Fero | undefined, s4: Fero | undefined
   try {
     s1 = await fero(name, { server: true, ...o })
@@ -277,7 +277,7 @@ test('a user resource misdialing the rendezvous is refused by the name echo and 
     s = await fero(`host-${process.pid}`, { server: true, ...o })
     assert.ok(await until(() => rz(s!).hosting && rz(s!).up))
     //! a client of some resource pointed at the directory's socket by hand
-    mis = await fero(`mis-${process.pid}`, { hosts: [o.rendezvous], heartbeatMs: 50, redialMs: 30, rendezvous: false })
+    mis = await fero(`mis-${process.pid}`, { hosts: [o.rendezvous], heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous: false })
     await new Promise((r) => setTimeout(r, 400))
     assert.equal(peers(mis), 0, 'never admitted — the HELLO name echo refuses')
     const j = diag(mis)!.journal(0).events
@@ -290,8 +290,8 @@ test('Context.peer: a wire call carries the caller uuid, a local invoke carries 
   const addr = `127.0.0.1:${await ports.free()}`
   let s: Fero | undefined, c: Fero | undefined
   try {
-    s = await fero(`peer-${process.pid}`, { listen: addr, heartbeatMs: 50, redialMs: 30, rendezvous: false, methods: { who: (_: unknown, ctx: { peer?: string }) => ctx.peer ?? null } })
-    c = await fero(`peer-${process.pid}`, { hosts: [addr], heartbeatMs: 50, redialMs: 30, rendezvous: false })
+    s = await fero(`peer-${process.pid}`, { listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous: false, methods: { who: (_: unknown, ctx: { peer?: string }) => ctx.peer ?? null } })
+    c = await fero(`peer-${process.pid}`, { hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous: false })
     assert.ok(await until(() => peers(c!) === 1))
     assert.equal(await c.methods.who(), me(c).uuid)
     assert.equal(await s.methods.who(), null)
@@ -308,8 +308,8 @@ test('a non-fero squatter on the rendezvous port: the resource itself is unaffec
   const name = `squat-${process.pid}`
   let s: Fero | undefined, c: Fero | undefined
   try {
-    s = await fero(name, { server: true, heartbeatMs: 50, redialMs: 30, rendezvous })
-    c = await fero(name, { heartbeatMs: 50, redialMs: 30, rendezvous })
+    s = await fero(name, { server: true, heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous })
+    c = await fero(name, { heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous })
     assert.deepEqual(me(s).rendezvous, { addr: rendezvous, hosting: false, up: false }, 'EADDRINUSE is the ordinary outcome — no error surfaced for it')
     assert.match(me(s).listen, /^127\.0\.0\.1:[1-9]\d*$/, 'the server serves regardless')
     await new Promise((r) => setTimeout(r, 300))
@@ -326,7 +326,7 @@ test('a rendezvous this box cannot bind at all (an interface that is not here) s
   const rendezvous = `192.0.2.1:${await ports.free()}` // TEST-NET-1: never a local interface
   let s: Fero | undefined
   try {
-    s = await fero(`nobind-${process.pid}`, { server: true, heartbeatMs: 50, redialMs: 30, rendezvous })
+    s = await fero(`nobind-${process.pid}`, { server: true, heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous })
     assert.ok(await until(() => typeof rz(s!).error === 'string' && rz(s!).error!.startsWith('bind '), 5000), `the errno is on me.rendezvous: ${JSON.stringify(rz(s).error)}`)
     assert.equal(rz(s).hosting, false)
     assert.match(me(s).listen, /^127\.0\.0\.1:[1-9]\d*$/, 'the resource itself serves')

@@ -4,9 +4,9 @@
 // meaning-equivalence rules (typed ScopedError, never a silent shard answer), the non-held remote
 // key handle, ScopedError wire rehydration at a spoke, and cluster.partitions.
 
-//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
-// meet a live box directory (the battery's npm script sets the same default)
-process.env.FERO_RENDEZVOUS ??= 'off'
+//! the battery pins (utils/battery.ts), whichever way this suite is run: the directory OFF (a single-file
+// `node --test` must never meet a live box directory) and the config layer OFF (no flag, variable or file reaches a test)
+import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -23,8 +23,8 @@ const spawn = async (n: number, replicas: number, extra: Record<string, unknown>
       uuid: `n${String(i + 1).padStart(2, '0')}`,
       listen,
       hosts: addrs.filter((_, j) => j !== i),
-      heartbeatMs: 50,
-      redialMs: 30,
+      heartbeat: { ms: 50 },
+      redial: { ms: 30 },
       replicas,
       ...extra,
     })))
@@ -117,9 +117,9 @@ test('SCOPED spoke: a client reads the WHOLE resource through its primary\'s gat
   const nodes = await Promise.all(addrs.map((listen, i) =>
     fero('scoped', {
       uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i),
-      heartbeatMs: 50, redialMs: 30, replicas: 2, methods: { boom },
+      heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 2, methods: { boom },
     })))
-  const client = await fero('scoped', { hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const client = await fero('scoped', { hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     assert.ok(await formed(nodes), 'formed')
     for (let i = 0; i < 6; i++) nodes[i % 3].data[`c${i}`] = i
