@@ -8,9 +8,10 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (408 + the 18-clause data contract ride; the directory OFF — FERO_RENDEZVOUS=off) /
-`npm run perf` (41 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
-script-tier).
+Run from the repo root: `npm test` (431 + the 18-clause data contract ride; the directory OFF and
+the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
+`npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
+script-tier). One install step since V4-10: `npm install` (optcascade).
 
 ## Migration ledger (D-phases, per DESIGN-DATA3 §5)
 
@@ -488,3 +489,47 @@ inside the outer apply.
   Three tests over real processes (api/spawn.test.ts); both checks green
   by hand on the box directory and on a private port. Battery: 408/408 +
   18/18.
+- 2026-09-19 — V4-10: THE CONFIG LAYER (DECISIONS V4-10). The owner's copts
+  module, published as `optcascade` 1.0.0, is fero's first npm dependency
+  and `api/config.ts` is its ONE seam. A public `fero()` now folds six
+  layers into the call, highest first: `--fero.<key>` > the call >
+  `FERO_<KEY>` > the project `fero.opt.ts|js` > `$HOME/fero.opt.ts|js` >
+  the default; inside every layer a value scoped to the resource name
+  (`--fero.shop.dir`, `FERO_SHOP_DIR`, `{ shop: { dir } }`) beats the
+  global. Keys are nested lowercase words so one spelling survives every
+  layer: `heartbeat.ms`, `redial.ms`, `journal.cap` — the camelCase
+  spellings are refused with the pointer from every layer (BREAKING within
+  4.x, the V4-3 rule); seven suites and the directory's two system
+  composes renamed. The layer owns what optcascade cannot know: the
+  declared schema (unknown keys throw naming their spelling in that layer
+  with the nearest key; in the global rung of a string layer an undeclared
+  object is another resource's subtree and is skipped unless it is a near
+  miss), the carriers table (`methods`, `seams.validation`, `signals` are
+  the call's alone; `uuid` never from a file), the coercions for the
+  string layers only (`hosts` CSV, `off/false/0`, `server 1/0`, a numeric
+  `uuid`/`dir` refused), and `from(key)` — every composer refusal now names
+  its source, the legacy `FERO_RENDEZVOUS='garbage'` text kept. New in the
+  composer: `server: false` is the client pin from any layer (a marker then
+  throws naming both sources — closes the IDEAS `client: true` line), shape
+  checks on the three numbers (a string layer can carry `abc`), and
+  `diag(f).config()` returning `{ value, from }` per leaf. System resources
+  bypass the layer. `FERO_CONFIG=off` = the call alone with zero optcascade
+  calls; `utils/battery.ts` pins it and `FERO_RENDEZVOUS=off` for the whole
+  battery (imported first by every composing suite, `--import` in the npm
+  scripts). Tests: api/config.test.ts (13, injected sources), tests/
+  config.test.ts (over real children with `FERO_CONFIG` deleted: a
+  project file, a flag over it, a flag alone making a server, two
+  resources two dirs, a `$HOME` file, every refusal's source, the sticky
+  client pin, the door's defaults, `off` for real; plus three guards: no
+  `fero.opt.*` in the checkout, the tracked lockfile pins optcascade, the
+  README table names every leaf). Adversarially reviewed before landing
+  (four lenses, 26 findings folded in: null-prototype schema tables, the
+  own-name and sibling-name rungs, the sticky pin, '' = unset everywhere,
+  dotted keys refused, a fero-prefixed minimist error, `--FERO.*` refused,
+  the battery's pins by plain assignment).
+  Perf: api/config.perf.ts, two tripwires (~30 µs per resolve, ~3 µs off;
+  construction only, nothing on the write path); the existing pins
+  unchanged. `engines.node >= 22.18`. Deferred to IDEAS: the kernel tune
+  table, the `diag` key, a HELLO hash of the contract keys, three
+  optcascade wishes. Battery: 431/431 + 18/18, perf
+  43/43.

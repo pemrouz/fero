@@ -90,6 +90,10 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   server's relayed client writes, on the server's own writes, on handler
   ctx.data writes and on the data: seed (DECISIONS V4-4/V4-5); under
   `methods:` the door refuses client records before it.
+  V4-10 note: no layer but the call can carry a function, so the config
+  layer neither forces nor settles this — `seams.validation` is call-only
+  in the carriers table under either spelling, and a rename here is a
+  one-line table edit.
 - [P3] (api) **SUB-leg handler errors are silent at the client.** A handler
   that throws — or, since V4-5, whose ctx.data write the validator refuses —
   on a SUBSCRIPTION answers a RESULT for a sub id, which Caller.#onResult
@@ -177,9 +181,6 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   slim it when the file is next touched.
 
 ## The v4.1 surface (V4-2 residue)
-- [P3] (api) `client: true` as an explicit role pin — deliberately absent (with
-  client the default it pins nothing); add the day an asymmetric-intent process
-  wants to refuse accidental server markers.
 - [P3] (api,shell) A non-loopback RENDEZVOUS / default listen — never a default
   (unauthenticated peer plane); an explicit `rendezvous: '10.0.0.5:3376'` is an
   operator's declared act today; revisit defaults only alongside peer-to-peer
@@ -259,3 +260,44 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   park, so its rows freeze on every screen and then catch up. Rung 13 will
   say so; a shorter chain for admitted members (they were reachable a moment
   ago) is the knob to weigh.
+
+## The config layer (V4-10 residue, 2026-09-19)
+- [P2] (kernel) **The tune table.** The kernel's timing and bound constants
+  stay constants after V4-10; the config layer exposes only the keys the
+  composer already took. The design (DESIGN-CONFIG.md §7 step 7): a frozen
+  per-node `tune` object built once in the Node constructor, defaults equal
+  to today's constants so sweep bytes stay identical, hot sites reading a
+  field set at construction. Constants: `MAX_REDIALS` (the crashed-member
+  knob, filed above), `SUSPECT_TICKS`, `LEAVE_TICKS`, the redial backoff
+  cap, `COMPACT_AT`, the cid-dedup window, the stream/AE bounds. Read sites
+  to touch: kernel/write.ts:207/219/356/363/498/533, membership.ts:218/249,
+  scope.ts:137/697/702/710, node.ts:324/406/439/719/1045/1099, link.ts:106,
+  log.ts:158, confirm.ts:75, shell/runtime.ts:397, sim/monitors.ts:30.
+  Land only with an interleaved A/B on the write, node, alloc and data
+  perf pins; own DECISIONS line. `MAX_REDIALS` and a separate live-read
+  cadence are the two with a filed need.
+- [P3] (kernel,api) **A HELLO-carried hash of the cluster-contract keys**
+  (`heartbeat.ms`, `replicas`, `seams.validation`). These must be the same
+  on every member, and V4-10 lets one member's shell set them alone
+  (`FERO_HEARTBEAT_MS=50` on one box). Today the mismatch shows as behavior
+  (suspicion at the wrong cadence, a partition map that disagrees), not as
+  a refusal. A short hash in HELLO, checked beside the name echo, would
+  refuse the misdial at the door. Needs a spelling for `seams.validation`
+  (a function hashes by nothing — its source text, or a declared version).
+- [P3] (api) **The `diag` key.** `NodeOpts.diag { allow: { name: token } }`
+  exists (kernel/node.ts) but is not a FeroConfig key, so the M7
+  diagnostics channel's SERVER side is unreachable from the public
+  `fero()`: every `npm run debug -- --attach` against a real cluster is
+  denied. The config layer is its natural home (`diag: { allow: { alice:
+  'token' } }`, `FERO_DIAG_ALLOW_ALICE=token`, refused as a flag — a secret
+  never rides argv). Deferred from V4-10 because its natural env shorthand
+  `FERO_DIAG_TOKEN` is the debug VIEWER's variable (tools/debug/serve.ts),
+  which the layer strips. Land it with `FERO_DIAG_TOKEN` stated as the
+  viewer's only and token values redacted from `diag(f).config()`.
+- [P3] (repo) **optcascade 1.1 wishes** (none blocks; each would let
+  api/config.ts shrink): a declared-keys mode for the PREFIXED form, with
+  case-insensitive env matching as the no-prefix form already does — fero
+  could then drop its own schema walk for unknown keys; provenance per key
+  (which layer, and which file path, won), so a file error and `from(key)`
+  can name the path; a `strings` list of keys never coerced, so
+  `--fero.uuid 12345678` survives without fero's number refusal.
