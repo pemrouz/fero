@@ -33,7 +33,7 @@ exercises, run data's perf suite too.
 
 | Dir | What lives there |
 |---|---|
-| [api/](api) | The public surface: `fero()` ([index.ts](api/index.ts)), the LENS write trap → `Bind.issue` ([data.ts](api/data.ts); **V4-7: a write shows when it COMMITS** — inside the assignment on the server that owns the cell, as the server's stamped echo on a client; no optimistic copy, a refused write never shows, an in-flight write is only a `pending` row of `cluster.writes`), **[substrate.ts](api/substrate.ts) — the ONE seam onto `../../data/api/index.ts`**, methods/RPC, fold, diagnostics, types. V4-2 role model: bare `fero(name)` = a CLIENT; `server: true`/`listen`/`dir`/`replicas`/a `data:` seed/`methods:` ⇒ server; `listen: false` = socketless solo; `f.snapshot` = the sync dense read. **V4-8: Ctrl-C / SIGTERM is a clean stop built in** (every live instance leaves and tears down, then the process exits 0 unless the app has its own listener; `signals: false` opts out); the cluster view folds in ONE batch so a bare `cluster.tap` fires once with the whole picture (the signal registry is [signals.ts](api/signals.ts)). **V4-9: `fero.spawn(file, args?)`** ([spawn.ts](api/spawn.ts)) runs `node <file> …` as a separate process — the reader's other terminal, from code — and returns `{ pid, out, exited, stop, child }`: `stop()` is the reader's Ctrl-C (0 after the clean stop; SIGKILL and null after five seconds), the parent's own Ctrl-C stops its children, a parent that dies on an error takes them along; a stop untracks from the signal registry when it SETTLES, so a second Ctrl-C mid-leave joins the leave instead of killing the process. **V4-5: `methods: {…}` is the ONE spelling for hosted methods and THE DOOR** — its presence makes clients change data only through the methods (every relayed plain write is refused 'methods-only' and never shows on the client; a top-level function throws with the pointer); open or protected, nothing in between. Spokes are VIEWS: never teach a server, resync to the cluster's truth (`resync`/`resynced`). **V4-3 discovery: [directory.ts](api/directory.ts)** — the `#directory` system resource at the per-box rendezvous `127.0.0.1:3376` (`FERO_RENDEZVOUS` env / `rendezvous:` config; the battery runs it `off`): a server binds a FREE port and registers, everyone looks the name up live → the kernel's `discover` event. `#` names are reserved. Spec: [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md). |
+| [api/](api) | The public surface: `fero()` ([index.ts](api/index.ts)), the LENS write trap → `Bind.issue` ([data.ts](api/data.ts); **V4-7: a write shows when it COMMITS** — inside the assignment on the server that owns the cell, as the server's stamped echo on a client; no optimistic copy, a refused write never shows, an in-flight write is only a `pending` row of `cluster.writes`), **[substrate.ts](api/substrate.ts) — the ONE seam onto `../../data/api/index.ts`**, methods/RPC, fold, diagnostics, types. V4-2 role model: bare `fero(name)` = a CLIENT; `server: true`/`listen`/`dir`/`replicas`/a `data:` seed/`methods:` ⇒ server; `listen: false` = socketless solo; `f.snapshot` = the sync dense read. **V4-8: Ctrl-C / SIGTERM is a clean stop built in** (every live instance leaves and tears down, then the process exits 0 unless the app has its own listener; `signals: false` opts out); the cluster view folds in ONE batch so a bare `cluster.tap` fires once with the whole picture (the signal registry is [signals.ts](api/signals.ts)). **V4-9: `fero.spawn(file, args?)`** ([spawn.ts](api/spawn.ts)) runs `node <file> …` as a separate process — the reader's other terminal, from code — and returns `{ pid, out, exited, stop, child }`: `stop()` is the reader's Ctrl-C (0 after the clean stop; SIGKILL and null after five seconds), the parent's own Ctrl-C stops its children, a parent that dies on an error takes them along; a stop untracks from the signal registry when it SETTLES, so a second Ctrl-C mid-leave joins the leave instead of killing the process. **V4-5: `methods: {…}` is the ONE spelling for hosted methods and THE DOOR** — its presence makes clients change data only through the methods (every relayed plain write is refused 'methods-only' and never shows on the client; a top-level function throws with the pointer); open or protected, nothing in between. Spokes are VIEWS: never teach a server, resync to the cluster's truth (`resync`/`resynced`). **V4-3 discovery: [directory.ts](api/directory.ts)** — the `#directory` system resource at the per-box rendezvous `127.0.0.1:3376` (`FERO_RENDEZVOUS` env / `rendezvous:` config; the battery runs it `off`): a server binds a FREE port and registers, everyone looks the name up live → the kernel's `discover` event. `#` names are reserved. Spec: [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md). **V4-10 config: [config.ts](api/config.ts) — the ONE seam onto `optcascade`.** A public `fero()` folds six layers into the call, highest first: `--fero.<key>` > the call > `FERO_<KEY>` > the project `fero.opt.ts|js` > `$HOME/fero.opt.ts|js` > the default; inside every layer the name rung (`--fero.shop.dir`, `FERO_SHOP_DIR`, `{ shop: { dir } }`) beats the global. Keys are nested lowercase words (`heartbeat.ms`, `redial.ms`, `journal.cap`; the camelCase spellings are refused with a pointer). Unknown keys throw naming their layer; coercions apply to the string layers only; `methods`/`seams`/`signals` are call-only and `uuid` never comes from a file; `server: false` is the client pin from any layer. `FERO_CONFIG=off` = the call alone with zero optcascade calls — the battery runs that way ([utils/battery.ts](utils/battery.ts)); `diag(f).config()` says where each value came from. Spec: [DESIGN-CONFIG.md](DESIGN-CONFIG.md). |
 | [kernel/](kernel) | The deterministic kernel: node, write pipeline, ring, membership (joint-consensus views; **V4-6: a clean `destroy()` LEAVES** — the view shrinks by ballot, so a two-member cluster survives a clean stop; a crash still needs three; V4-8 makes Ctrl-C that clean stop), journal/log, codec (frames + runs), confirm, streams, scope, diag. No I/O — everything replayable. |
 | [shell/](shell) | The thin I/O runtime (real sockets/timers around the kernel). |
 | [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep — chaos schedules against the SAME kernel bytes the shell runs. |
@@ -51,12 +51,13 @@ DESIGN-M6/M7, [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md) (V4-3).
 
 | Command | What it does |
 |---|---|
-| `npm test` | 408 unit/sim/scenario tests (incl. the examples smoke tier, the n=100 scale tier and the debugger's DOM/ELI5 gates), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. |
+| `npm test` | 431 unit/sim/scenario tests (incl. the examples smoke tier, the n=100 scale tier, the config layer's unit + real-child tiers, and the debugger's DOM/ELI5 gates), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. Runs with `--import ./utils/battery.ts`: the directory OFF and the config layer OFF. |
 | `npm run perf` | The 41 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
 | `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` / `demo:watch` | Sim executive, shrinker, scenario server, debug viewer, the two-terminal demo (= examples/02-server-client's server.ts / client.ts). |
 | `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200s each; `--only <name>`, `--seeds N`). Script-tier — run it on scale-relevant kernel changes, not per-commit. |
 
 Source-served, no build: everything runs via `--experimental-strip-types`.
+One install step since V4-10: `npm install` (the one dependency, `optcascade`; Node ≥ 22.18).
 
 ## The data coupling (the seam discipline)
 
@@ -73,6 +74,27 @@ Source-served, no build: everything runs via `--experimental-strip-types`.
   (SCHEDULE_VERSION discipline lives data-side). After any data
   seam/kernel/api change, run THIS repo's `npm test` + `npm run perf`;
   data's m3/m4 gates pin the seam budgets from the producer side.
+
+## The config coupling
+
+- `optcascade` (the owner's copts module, published on npm) is the ONLY
+  other dependency, and [api/config.ts](api/config.ts) is its ONLY importer.
+  Nothing else in fero reads `process.argv`, a `FERO_*` variable, or a
+  `fero.opt.*` file — the composer gets one folded config and `from(key)`.
+- Precedence is fixed there: `--fero.<key>` > the call > `FERO_<KEY>` >
+  the project `fero.opt.ts|js` > `$HOME/fero.opt.ts|js` > the default; the
+  name rung beats the global inside every layer. Keys are nested lowercase
+  words. Add a config key by adding a row to `LEAVES` (which layers may
+  carry it, and why not the others) and, if it needs one, a case in the
+  coercion table — then a `README` row and a `config.test.ts` case.
+- `FERO_CONFIG=off` reads the call alone with zero optcascade calls. Every
+  suite that composes a real `fero()` imports [utils/battery.ts](utils/battery.ts)
+  FIRST (it pins `FERO_RENDEZVOUS=off` and `FERO_CONFIG=off`); a test that
+  wants the layer ON injects its sources (`api/config.test.ts`) or spawns a
+  child with `FERO_CONFIG` deleted (`tests/config.test.ts`). Never commit a
+  `fero.opt.*` at the repo root — a guard test refuses it.
+- `FERO_DIAG_TOKEN` is the debug viewer's variable, not fero config; the
+  layer strips it. System resources (`#directory`) bypass the layer.
 
 ## Working conventions (please follow)
 

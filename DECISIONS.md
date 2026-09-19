@@ -867,3 +867,190 @@ Ctrl-C must reach them directly); SIGINT instead of SIGKILL on the parent's
 'exit' (a child whose clean stop wedged would outlive its check as an
 orphan on the box directory); keeping `privateDirectory()` behind an
 option; a resource-name prefix per check (the roles carry no plumbing).
+
+## V4-10 — one config door: a flag, the call, the environment, a file (2026-09-19)
+Context: the call was the only way to configure a resource. The one
+exception was `FERO_RENDEZVOUS`, read by hand in api/directory.ts. So a
+role file could not be turned into a server from the shell, a check could
+not point two copies at two dirs without editing code, and the examples'
+"scale it" lines had to say "change the file". The owner asked for a config
+study (DESIGN-CONFIG.md, 2026-09-15: a 26-agent audit, 401 parameter rows
+checked against file and line) and then decided the open points: the
+owner's own `copts` module is published on npm as `optcascade` 1.0.0; keys
+are nested lowercase words, not camelCase; there is a pre-check layer that
+validates and coerces; scoping is per resource name; and copt itself may
+be amended. The audit had found four problems with a naive wiring, each
+fixed below: an env variable cannot reach a camelCase key
+(`FERO_HEARTBEATMS` arrived as a NEW key beside `heartbeatMs`); an
+undeclared `FERO_*` name leaks through the prefix and would break every
+`fero()` in that shell; some spellings arrive as the wrong type
+(`FERO_HOSTS=a,b` is a string, `FERO_SIGNALS=0` a number); and the file
+layer has a cost (~0.7 ms per resolve on a 9p mount) and a reach (a
+`fero.opt.ts` in `$HOME` reaches the whole test battery).
+Decision:
+- **One door, one seam.** `api/config.ts` is the ONLY importer of
+  `optcascade`. Its `resolveConfig(name, call)` runs once per public
+  `fero()`, before the composer's own checks, and hands back the folded
+  config plus `from(key)` — the layer a value came from. Three optcascade
+  reads per resolve (flags, env, files), each with the other two sources
+  emptied, so every value has exactly one origin and a message can name
+  it. The composer appends that origin to every refusal (`at(key)`):
+  "server must be true or false (from FERO_SERVER)".
+- **Nested lowercase keys.** `heartbeat.ms`, `redial.ms`, `journal.cap`
+  replace `heartbeatMs`, `redialMs`, `journalCap`. In the call that is
+  `heartbeat: { ms: 250 }`; as a flag `--fero.heartbeat.ms 250`; in the
+  environment `FERO_HEARTBEAT_MS=250`; in a file the object itself. One
+  spelling survives every layer because env keys are lowercased and split
+  on `_`, flags nest on `.`, and a file is an object. The old spellings are
+  REFUSED with the pointer, from every layer (`'heartbeatMs' is spelled
+  heartbeat: { ms } since V4-10 — …`). BREAKING within 4.x, the V4-3 rule:
+  a rename that would otherwise be a silent second key is worse than a
+  loud one.
+- **Precedence: `--fero.<key>` > the call > `FERO_<KEY>` > the project
+  `fero.opt.ts|js` (the nearest package.json directory at or above cwd) >
+  `$HOME/fero.opt.ts|js` > the default.** The flag above the call is the
+  ONE new rung (V4-3 settled only key > env > constant). It lets an
+  operator flip a process's role or dir from the command line without
+  touching the file — `node server.ts --fero.dir ./a`. Inside every layer
+  the name rung beats the global one. Arrays and objects replace whole;
+  `''` in a string layer means unset and the fold keeps looking down.
+- **The per-resource rung, and its one softening.** `--fero.shop.dir`,
+  `FERO_SHOP_DIR`, `{ shop: { dir } }` reach only `fero('shop')`, so two
+  resources in one process get two dirs from one shell. The rung's key is
+  the name lowercased, when it can be spelled in every layer
+  (`[a-z0-9]+`: env cannot carry a dash, and `_` is the separator) and does
+  not collide with a declared top-level key (`fero('journal')` would read
+  the group); otherwise the resource has the global rung only. Because the
+  global rung of a string layer now legitimately holds OTHER resources'
+  subtrees, an undeclared OBJECT at its top level is left alone — sibling
+  names one edit apart included (`order` beside `orders`, `shop1` beside
+  `shop2`: the normal way to run several instances) — unless it is a near
+  miss (edit distance ≤ 2) of a declared GROUP, the only declared keys
+  that hold objects (`heartbeats` beside `heartbeat` is a typo and throws,
+  hinting the group's leaf). A misspelt resource name in a scoped variable
+  therefore sets nothing; `diag(f).config()` shows what was read. Every
+  other unknown key throws naming its spelling in that layer, with the
+  nearest declared LEAF as the hint (a group hints its leaf, so the hint is
+  always settable). The call is walked by the same code, so a typo in code
+  and a typo in a shell get the same message; a dotted key in the call or a
+  file (`{ 'heartbeat.ms': 1 }`) is refused as the flat spelling of a
+  nested key. The schema tables are null-prototype: a key named
+  `constructor` is unknown, never a crash. Flags are lowercase: `--FERO.dir`
+  would be parsed under another prefix and silently ignored, so it is
+  refused naming the lowercase spelling.
+- **Coercions for the string layers only.** A flag, a variable and a file
+  can only carry text, so they get the spellings text needs: `hosts`
+  `a:1,b:2` splits on commas (and a repeated flag flattens); `off`, `false`
+  and `0` are `false` for `rendezvous` and `listen`; `server` takes
+  `1/true/0/false`; a `uuid` or `dir` that arrives as a NUMBER is refused
+  (an all-digit value loses its leading zeros — give it a letter, or set it
+  in the call); an EMPTY string from any string layer means unset and the
+  fold keeps looking down (a templated `FERO_DIR=` in a container is not a
+  refusal); a raw minimist failure is rethrown with the fero prefix naming
+  the launch flags. The call is typed and means what it says: `server: 1` or a
+  CSV `hosts` string IN THE CALL is refused by the composer, not coerced.
+  The numeric keys get a shape check in the composer (`heartbeat.ms` a
+  finite number ≥ 0, `redial.ms` ≥ 0, `journal.cap` an integer ≥ 1)
+  because a string layer can now carry `abc`, and `('abc' ?? 0) > 0` in
+  the kernel would silently turn heartbeats off.
+- **Which layer may carry which key (the carriers table).** `methods`,
+  `seams.validation` and `signals` are the CALL's alone: the first two are
+  functions, and `methods` is also the door (V4-5) — a resource closes from
+  the source line that hosts it, never from a shell; `signals` is
+  per instance, never per process (V4-8). `data` rides the call or a file
+  (an object of rows). `uuid` rides a flag, the call or a variable — never
+  a file: one shared file would give every process the same identity.
+  Everything else rides all four. A key from a layer that may not carry
+  it throws naming both.
+- **`server: false` is the client pin, from any layer.** With the layers,
+  a server marker can now arrive from a flag, a variable or a file. A
+  process that means to follow says `server: false`, and any marker
+  (`listen`, `dir`, `replicas`, `data`, `methods`) then throws naming the
+  pin's source and the marker's: `server: false pins the client role, but
+  'dir' makes a server (from --fero.dir) — drop one`. The pin is STICKY:
+  `server: true` from a higher rung (`--fero.server` over the call's false)
+  is refused the same way, so a following process cannot be flipped by a
+  stray flag. Closes the IDEAS `client: true` line: the pin is the false
+  side of the key that exists.
+- **`FERO_CONFIG=off` and `utils/battery.ts`.** `off` means the call
+  alone, with ZERO optcascade calls — no argv parse, no env walk, no
+  filesystem probe — so the battery is deterministic on any box and no
+  `fero.opt.ts` in a checkout or a home directory can reach a test.
+  `utils/battery.ts` sets `FERO_RENDEZVOUS = 'off'` and
+  `FERO_CONFIG = 'off'` (plain assignment — the pins win over whatever the
+  parent shell exports, as the old npm script's `FERO_RENDEZVOUS=off`
+  prefix did; a suite that wants a value sets it after the import, inside
+  its tests); every suite that composes a real `fero()`
+  imports it FIRST, and the npm `test`/`perf`/`perf:alloc` scripts pass
+  it as `--import`, so a single-file `node --test` and the whole battery
+  run under the same two pins. The layer's own suites inject their
+  sources (`api/config.test.ts`, 13 cases) or spawn children with
+  `FERO_CONFIG` DELETED (`tests/config.test.ts`, over real processes: a
+  project file sets `listen`, a flag beats it, a flag alone makes a server
+  and the WAL lands in its dir, two resources get two dirs, a `$HOME` file
+  reaches a process and the project file beats it, every refusal names its
+  source, the sticky client pin, the door's defaults, and `off` in a real
+  process). Three guards: the checkout holds no `fero.opt.*`, the tracked
+  `package-lock.json` pins `optcascade` as the one dependency, and README's
+  Configuration section names every declared leaf (the docs drift gate).
+- **The first npm dependency.** `optcascade ^1.0.0` in `dependencies`,
+  `package-lock.json` tracked, `engines.node >= 22.18` (a `.ts` config
+  file loads through `require()` with type stripping). `npm install` once
+  after a clone is now a step (README, examples/README, CLAUDE.md say so);
+  nothing else changes (still source-served, no build). Cost: ~30 µs per resolve with injected
+  sources, ~3 µs with the layer off, pinned as tripwires
+  (`api/config.perf.ts`: 1000 resolves under 500 ms / 100 ms — wide on
+  purpose for WSL2, never to be widened). The file walk is memoized per
+  `(cwd, home)` for the life of the process. Construction only; nothing
+  on the write path.
+- **System resources bypass the layer.** The `#directory` client and host
+  get the explicit opts the composer hands them, so a `FERO_LISTEN` in the
+  shell never touches the directory's listen (api/directory.test.ts
+  untouched and green).
+- **`diag(f).config()`.** The Symbol door returns every resolved leaf as
+  `{ value, from }` — the coerced value the composer read and the layer it
+  came from, or the effective default (`heartbeat.ms` 500, `redial.ms`
+  100, `journal.cap` 4096, the rendezvous) as `'the default'`; a function
+  shows as `'[function]'`, the hosted methods and the data seed as their
+  names (rows are data, not config). The answer to "why is this node a
+  server?" without a debugger.
+REJECTED: camelCase keys with a case-fold (`FERO_HEARTBEATMS` folded onto
+`heartbeatMs`: one more rule per layer, readable in none of them, and a
+fold hides a typo); silently ignoring unknown `FERO_*` names (a misspelt
+variable would set nothing and say nothing — the call's "typos throw" rule
+holds in every layer; the object-subtree skip is the one bounded
+exception, and a near miss still throws); a `file:` link to the sibling
+copt checkout (a link makes `npm install` fail for anyone without the
+sibling; the published name settles it); vendoring optcascade into
+`utils/` (a fork with no upstream); exposing the kernel constants now
+(`MAX_REDIALS`, `SUSPECT_TICKS`, `LEAVE_TICKS` …: hot read sites, needs an
+interleaved A/B on the write/node/alloc pins — its own series, IDEAS);
+per-name scoping through a separate prefix (`FERO_SHOP__DIR`,
+`optcascade('fero-shop')`: a second vocabulary, and a file would need two
+top-level shapes — the name is a key under the same prefix, one rule in
+every layer); throwing on a near miss of the resource NAME (the review
+showed `order`/`orders`, `cart`/`card`, `shop1`/`shop2` refusing each
+other, and a resource named `host` refusing its own rung as a typo of
+`hosts` — a sibling one edit away is normal, a group one edit away is
+not); coercing the call (`server: 1` in code was a pinned refusal, and a
+typed call should mean what it says); a `diag` key in this landing (its natural env shorthand
+`FERO_DIAG_TOKEN` is the viewer's variable already).
+Consequences: the review's 26 findings (four lenses) are folded in above.
+A role file stays bare and the shell does the scaling
+(`FERO_DIR=./a node server.ts`, `--fero.dir ./b`); the examples' index
+says so. Every `heartbeatMs`/`redialMs`/`journalCap` in the tree moved to
+the nested spelling (seven suites, the directory's two system composes,
+the types banner); a caller on 4.0 gets a pointer, not a silent default.
+`FeroConfig.server` is `boolean`. A stray `FERO_*` variable in a shell is
+now a loud stop for every `fero()` there, on purpose, unless it is another
+resource's subtree. A `$HOME/fero.opt.ts` reaches every fero process of
+that user on the box, so it must never name a routable `listen` or
+`rendezvous` (the V4-3 loopback posture is the file's too). The battery's
+two pins live in one file now and win over the shell; a suite that wants
+a value sets it inside its tests.
+Not in this landing: the kernel tune table (`MAX_REDIALS` and friends stay
+constants; IDEAS); the `diag` key (`diag.allow` is still unreachable from
+the public `fero()`; IDEAS); a HELLO-carried hash of the cluster-contract
+keys (`heartbeat.ms`, `replicas`, `seams.validation`) — today a mismatch
+set by one member's shell shows up as behavior, not as a refusal (IDEAS).
+Battery: 431/431 + 18/18 contract + perf 43/43.
