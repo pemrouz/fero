@@ -4,9 +4,9 @@
 // replication visible through two proxies, the guarantee ladder under methods.update, restore into
 // the proxy, and teardown.
 
-//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
-// meet a live box directory (the battery's npm script sets the same default)
-process.env.FERO_RENDEZVOUS ??= 'off'
+//! the battery pins (utils/battery.ts), whichever way this suite is run: the directory OFF (a single-file
+// `node --test` must never meet a live box directory) and the config layer OFF (no flag, variable or file reaches a test)
+import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -47,14 +47,14 @@ test('config recognition (V4-5): unknown keys, unknown seams and TOP-LEVEL FUNCT
 test("V4-5 the door: `methods:` makes clients change data ONLY through the methods — plain writes and the write builtins are refused 'methods-only' and never show; the server's own writes and its handlers stay trusted; the validator still guards the trusted side", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
   const s = await fero('r', {
-    uuid: 'aa', listen: addr, heartbeatMs: 50, redialMs: 30,
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 },
     data: { stock: 3 },
     seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') },
     //! the handler READ idiom: `await ctx.data.stock` is the current value (the live view is thenable —
     // v2 parity); a bare `ctx.data.stock` is the live child view, not the number
     methods: { sell: async (n: number, ctx: { data: any }) => { const stock = (await ctx.data.stock) as number; ctx.data.stock = stock - n; return stock - n } },
   })
-  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const view = (f: typeof c) => snapshot(f.data) as Record<string, unknown>
   const rows = (f: typeof c) => Object.values(snapshot(f.cluster).writes as Record<string, { key: string; state: string; reason?: string }>)
   try {
@@ -86,7 +86,7 @@ test("V4-5 the door: `methods:` makes clients change data ONLY through the metho
     await s.destroy()
   }
   //! `methods: {}` alone is a server that clients may only read
-  const ro = await fero(`ro-${process.pid}`, { methods: {}, heartbeatMs: 0 })
+  const ro = await fero(`ro-${process.pid}`, { methods: {}, heartbeat: { ms: 0 } })
   try { assert.equal((snapshot(ro.cluster) as { me: { role: string } }).me.role, 'server') } finally { await ro.destroy() }
 })
 
@@ -206,8 +206,8 @@ test("the guarantee ladder under methods: confirm:'replicated' proves against a 
   const pa = await ports.free()
   const pb = await ports.free()
   //! genesis needs the full topology on the proposer (lowest uuid, all configured hosts admitted)
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50 })
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50 })
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 } })
   try {
     //! wait for the mesh + committed view (replicated evidence needs a majority of a real view)
     assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1
@@ -256,9 +256,9 @@ test('restore through the composer: fero(name, {dir}) refills the proxy from the
 
 test('v4.1 name echo: a dial onto a DIFFERENT resource refuses loudly — never admitted, never merged', async () => {
   const p = await ports.free()
-  const alpha = await fero('alpha', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeatMs: 0 })
+  const alpha = await fero('alpha', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 0 } })
   //! 'beta' reaches for alpha's port — the exact misdial that used to silently cross-replicate
-  const beta = await fero('beta', { uuid: 'bb', hosts: [`127.0.0.1:${p}`], heartbeatMs: 0, redialMs: 30 })
+  const beta = await fero('beta', { uuid: 'bb', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 0 }, redial: { ms: 30 } })
   try {
     alpha.data.k = 'alpha-only'
     assert.ok(await until(() => diag(alpha)!.journal().events.some((e) => e.kind === JK.nameReject), 4000), 'the refusal is journal-visible (JK.nameReject)')
@@ -300,7 +300,7 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, its ow
   const ps = [await ports.free(), await ports.free(), await ports.free()]
   const addrs = ps.map((p) => `127.0.0.1:${p}`)
   const mk = (i: number, uuid: string) =>
-    fero('r', { uuid, listen: addrs[i], hosts: addrs.filter((_, j) => j !== i), heartbeatMs: 50, redialMs: 30 })
+    fero('r', { uuid, listen: addrs[i], hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const a = await mk(0, 'aa')
   const b = await mk(1, 'bb')
   const d = await mk(2, 'dd')
@@ -309,7 +309,7 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, its ow
     //! a committed view first, so client writes exercise the relay (ae=0) path, not open genesis
     assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
     a.data.seeded = 'before-client'
-    c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+    c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
     //! catch-up: the spoke folds the full state through its primary
     assert.ok(await until(() => (snapshot(c!.data) as Record<string, unknown>).seeded === 'before-client'), 'client caught up')
     //! V4-7: a client never commits, so its own assignment is NOT visible yet — it shows when the
@@ -342,10 +342,10 @@ test("relayed client writes run the SERVER's seams.validation at the relay: the 
   // let a bare client's `data.admin = …` LAND (the relay re-stamped but ran no validator)
   const addr = `127.0.0.1:${await ports.free()}`
   const s = await fero('r', {
-    uuid: 'aa', listen: addr, heartbeatMs: 50, redialMs: 30,
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 },
     seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') },
   })
-  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const rows = (f: typeof c) => Object.values(snapshot(f.cluster).writes as Record<string, { key: string; state: string; reason?: string }>)
   try {
     //! the server refuses its OWN admin write (the local hook, unchanged)
@@ -377,8 +377,8 @@ test("relayed client writes run the SERVER's seams.validation at the relay: the 
 
 test("a spoke re-syncs to the cluster's truth: a server reborn EMPTY makes the client's stale cells disappear — the client never re-teaches it", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
-  const a = await fero('r', { uuid: 'aa', listen: addr, heartbeatMs: 50, redialMs: 30 })
-  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeatMs: 50, redialMs: 30 })
+  const a = await fero('r', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   let a2: Awaited<ReturnType<typeof fero>> | null = null
   const view = (f: typeof c) => snapshot(f.data) as Record<string, unknown>
   try {
@@ -387,7 +387,7 @@ test("a spoke re-syncs to the cluster's truth: a server reborn EMPTY makes the c
     assert.ok(await until(() => view(c).y === 2, 8000), 'the spoke folded the server')
     await a.destroy()
     //! the server comes back with NOTHING (no dir): the cluster's truth is now empty
-    a2 = await fero('r', { uuid: 'aa2', listen: addr, heartbeatMs: 50, redialMs: 30 })
+    a2 = await fero('r', { uuid: 'aa2', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 } })
     assert.ok(await until(() => view(c).x === undefined && view(c).y === undefined, 12000), 'the stale cells disappeared from the spoke')
     assert.deepEqual(view(a2), {}, 'the spoke taught the reborn server nothing')
   } finally {
@@ -399,9 +399,9 @@ test("a spoke re-syncs to the cluster's truth: a server reborn EMPTY makes the c
 test('v4.1 roles: following is ambient, serving is a declared act — in the battery the directory is OFF, so topologies are explicit', async () => {
   //! no marker = a CLIENT (the open method namespace is the client tell). With no directory (the
   // battery runs FERO_RENDEZVOUS=off) a client needs hosts — bare refuses loudly: nothing to dial.
-  await assert.rejects(fero(`bare-role-${process.pid}`, { heartbeatMs: 0 }), /needs something to dial/)
+  await assert.rejects(fero(`bare-role-${process.pid}`, { heartbeat: { ms: 0 } }), /needs something to dial/)
   const feeder = `127.0.0.1:${await ports.free()}`
-  const bare = await fero(`bare-role-${process.pid}`, { hosts: [feeder], heartbeatMs: 0 })
+  const bare = await fero(`bare-role-${process.pid}`, { hosts: [feeder], heartbeat: { ms: 0 } })
   assert.equal(typeof bare.methods.anything, 'function', 'bare fero is a client — open namespace')
   //! observability: the role, the effective dial targets and the rendezvous state ride cluster.me
   const bm = (snapshot(bare.cluster) as { me: { role: string; hosts: string[]; rendezvous: unknown } }).me
@@ -413,7 +413,7 @@ test('v4.1 roles: following is ambient, serving is a declared act — in the bat
   // server without listen binds a FREE loopback port (V4-3: port 0, the OS picks), visible in me.listen.
   // NB this also retires M5b's durable-client refusal: dir implies server, so a durable spoke is
   // unrepresentable by construction — {hosts, dir} is a durable dialing MEMBER now.
-  const viaData = await fero(`role-via-data-${process.pid}`, { data: { k: 1 }, heartbeatMs: 0 })
+  const viaData = await fero(`role-via-data-${process.pid}`, { data: { k: 1 }, heartbeat: { ms: 0 } })
   assert.equal(typeof viaData.methods.anything, 'undefined', 'a data seed implies server')
   const vm = (snapshot(viaData.cluster) as { me: { role: string; listen: string } }).me
   assert.equal(vm.role, 'server')
@@ -493,7 +493,7 @@ test('v4.1 data seed: applied only when the local fold is empty at boot — a re
 
 test('M5-REVIEW #9 — an async write rejection surfaces as a typed WriteReject, never a bare string', async () => {
   //! drive a MAX_PENDING overflow: a client with no reachable server, flood past the bound → 'dropped'
-  const c = await fero('r', { uuid: 'zz', hosts: ['127.0.0.1:1'], heartbeatMs: 0 })
+  const c = await fero('r', { uuid: 'zz', hosts: ['127.0.0.1:1'], heartbeat: { ms: 0 } })
   try {
     const rejects: unknown[] = []
     //! MAX_PENDING is 1024; issue well past it while nothing can drain (no primary)
@@ -544,8 +544,8 @@ test('M5-REVIEW #12 (v4 form) — an illegal root replace throws PRE-COMMIT: no 
 
 test('a clean destroy LEAVES (V4-6): two servers, one destroyed — the survivor\'s view shrinks by ballot and stays writable ALONE; a new identity then joins it', async () => {
   const [pa, pb, pc] = [await ports.free(), await ports.free(), await ports.free()]
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30 })
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30 })
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const view = () => snapshot(a.cluster) as { epoch: number; writable: boolean; members: Record<string, string> }
   let c: Awaited<ReturnType<typeof fero>> | undefined
   try {
@@ -561,7 +561,7 @@ test('a clean destroy LEAVES (V4-6): two servers, one destroyed — the survivor
     const r = await a.methods.update({ key: 'after', value: 1 }, { timeout: 5000 })
     assert.equal(r.guarantee, 'committed')
     //! the restarted terminal is a NEW identity — it joins the one-member view (old majority = aa alone)
-    c = await fero('r', { uuid: 'cc', listen: `127.0.0.1:${pc}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30 })
+    c = await fero('r', { uuid: 'cc', listen: `127.0.0.1:${pc}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
     assert.ok(await until(() => Object.keys(view().members).length === 2 && (snapshot(c!.cluster) as { epoch: number }).epoch === view().epoch, 8000), 'the newcomer was admitted')
     assert.ok(await until(() => c!.snapshot.after === 1 && c!.snapshot.before === 'from b'), 'and caught up — including the row the leaver wrote')
   } finally {
@@ -572,12 +572,12 @@ test('a clean destroy LEAVES (V4-6): two servers, one destroyed — the survivor
 
 test('the cluster view folds in ONE batch (V4-8): a bare cluster.tap fires once per change with the whole picture landed — never a half-updated view, never for a refold that changed nothing', async () => {
   const [pa, pb] = [await ports.free(), await ports.free()]
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeatMs: 50, redialMs: 30 })
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   type View = { epoch: number; writable: boolean; members: Record<string, string>; peers: Record<string, unknown> }
   const pictures: { epoch: number; writable: boolean; members: number; peers: number }[] = []
   //! the tap is attached BEFORE the peer exists, so every fold of the forming view is recorded
   a.cluster.tap(() => { const v = snapshot(a.cluster) as View; pictures.push({ epoch: v.epoch, writable: v.writable, members: Object.keys(v.members).length, peers: Object.keys(v.peers).length }) })
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeatMs: 50, redialMs: 30 })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     assert.ok(await until(() => pictures.some((p) => p.epoch >= 1 && p.members === 2 && p.peers === 1), 8000), `the view formed and the tap saw it whole (${JSON.stringify(pictures)})`)
     //! pre-V4-8 the fold set epoch, writable, members, peers one record at a time and the tap fired per
@@ -625,14 +625,14 @@ test('Ctrl-C by hand (V4-8): a child process holding a member gets SIGINT with N
   const script = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'fero-sig-')), 'member.ts')
   //! the whole child: one server, no signal code — what a reader's `node server.ts` is
   fs.writeFileSync(script, `import { fero } from ${JSON.stringify(path.join(import.meta.dirname, 'index.ts'))}
-await fero('sig', { uuid: 'aa', listen: '127.0.0.1:${pa}', hosts: ['127.0.0.1:${pb}'], rendezvous: false, heartbeatMs: 50, redialMs: 30 })
+await fero('sig', { uuid: 'aa', listen: '127.0.0.1:${pa}', hosts: ['127.0.0.1:${pb}'], rendezvous: false, heartbeat: { ms: 50 }, redial: { ms: 30 } })
 setInterval(() => {}, 1000)
 `)
   const child = spawn(process.execPath, [script], { stdio: ['ignore', 'pipe', 'pipe'] })
   let err = ''
   child.stderr.setEncoding('utf8').on('data', (d: string) => { err += d })
   const exited = new Promise<number | null>((r) => child.once('exit', (c) => r(c)))
-  const b = await fero('sig', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], rendezvous: false, heartbeatMs: 50, redialMs: 30 })
+  const b = await fero('sig', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], rendezvous: false, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const view = () => snapshot(b.cluster) as { epoch: number; writable: boolean; members: Record<string, string> }
   try {
     assert.ok(await until(() => view().epoch >= 1 && Object.keys(view().members).length === 2, 10_000), 'the pair formed')

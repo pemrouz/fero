@@ -1,6 +1,6 @@
 //! Tier-3: fero.spawn (V4-9) over REAL processes — the reader's other terminal, from code. Every child
 // here is a whole script written to a temp dir: what a reader's `node server.ts` or `node check.ts` is.
-process.env.FERO_RENDEZVOUS ??= 'off'
+import '../utils/battery.ts'
 
 import { test, after } from 'node:test'
 import assert from 'node:assert'
@@ -30,12 +30,12 @@ const kill = (...pids: (number | Spawned)[]) => { for (const p of pids) { try { 
 test("fero.spawn runs `node <file>`: out is what it printed, stop() is the reader's Ctrl-C — and a second SIGINT 20 ms in (the terminal's group delivery) does not cut the leave short: the member leaves by ballot and exits 0, the survivor is alone and writable", async () => {
   const [pa, pb] = [await ports.free(), await ports.free()]
   const member = script('member.ts', `import { fero } from ${INDEX}
-await fero('sp', { uuid: 'aa', listen: '127.0.0.1:${pa}', hosts: ['127.0.0.1:${pb}'], rendezvous: false, heartbeatMs: 50, redialMs: 30 })
+await fero('sp', { uuid: 'aa', listen: '127.0.0.1:${pa}', hosts: ['127.0.0.1:${pb}'], rendezvous: false, heartbeat: { ms: 50 }, redial: { ms: 30 } })
 console.log('up', process.pid)
 setInterval(() => {}, 1000)
 `)
   const child = fero.spawn(member)
-  const b = await fero('sp', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], rendezvous: false, heartbeatMs: 50, redialMs: 30 })
+  const b = await fero('sp', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], rendezvous: false, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const view = () => snapshot(b.cluster) as { epoch: number; writable: boolean; members: Record<string, string> }
   try {
     assert.ok(await until(() => child.out.includes(`up ${child.pid}`), 10_000), "stdout is captured on the handle, and pid is the child's")

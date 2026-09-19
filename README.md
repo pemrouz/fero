@@ -26,6 +26,7 @@ working as designed.
 ## Run it
 
 ```sh
+npm install                    # once after a clone: the one dependency (optcascade); Node 22.18 or later
 npm test                       # 292 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
 npm run perf                   # perf gates: counted invariants first, ratios second, absolutes last — now incl. the alloc gates (--expose-gc) + the baseline gate
 npm run perf:alloc             # just the allocation gates (kernel/alloc.perf.ts)
@@ -50,6 +51,126 @@ under per-pair delay/duplication faults, a mixed-type write workload issued
 DURING formation (deliberately racing the dial-race window), convergence + drain +
 per-event invariant monitors. A failing seed prints itself; re-running that seed
 reproduces the trajectory bit-for-bit.
+
+## Configuration
+
+Every option `fero(name, opts)` takes has one door: [api/config.ts](api/config.ts), the only file that imports `optcascade` (the owner's copts module, fero's one dependency: `npm install` once after a clone, Node 22.18 or later). It folds six layers into the call, highest first: `--fero.<key>` (a launch flag) > the call > `FERO_<KEY>` (a variable) > `fero.opt.ts` or `fero.opt.js` next to the nearest `package.json` at or above the working directory > `fero.opt.ts` or `fero.opt.js` in `$HOME` > the default. Inside every layer a value scoped to this resource's name beats the global one, so `--fero.shop.dir` beats `--fero.dir`, `FERO_SHOP_DIR` beats `FERO_DIR`, and `{ shop: { dir } }` beats `{ dir }` in a file.
+
+Keys are nested lowercase words, so one spelling survives every layer. A flag nests on dots (`--fero.heartbeat.ms 250`). A variable is uppercased with `_` for the dot (`FERO_HEARTBEAT_MS=250`). A file is the object itself (`heartbeat: { ms: 250 }`), and so is the call. The old flat spellings (`heartbeatMs`, `redialMs`, `journalCap`) are refused with a pointer to the new one. Flags are lowercase (`--FERO.dir` is refused, never ignored). A flag takes the next token as its value, so write a boolean or a list with `=` when the next token could be taken for a value: `--fero.server=true`, `--fero.hosts=a:1,b:2`.
+
+The layer checks before the composer reads. An unknown key throws and names its spelling in that layer, with the nearest declared key as a hint (`unknown option 'replica' from --fero.replica, did you mean --fero.replicas`). A key that a layer may not carry throws too (`methods` from a file, `uuid` from a file). Values from the three text layers (flag, variable, file) are coerced: `hosts` splits on commas, `off` / `false` / `0` mean `false` for `listen` and `rendezvous`, `1` / `true` mean `true` for `server`, an empty string means unset (the next layer down answers, so a templated `FERO_DIR=` is not a refusal), and a `uuid` or `dir` that is all digits is refused (a leading zero would be lost). The call is typed and is never coerced: `hosts: 'a,b'` or `server: 1` in code is refused as written. `server: false` from any layer pins the client role: `server: true` from a higher layer, or `listen`, `dir`, `replicas`, `data` or `methods` from any layer, then throws naming both sources. Every error names where the value came from (`(from FERO_HEARTBEAT_MS)`), and `diag(f).config()` (the internals door) lists every leaf with its value and its source, the effective defaults included.
+
+Per-resource scoping is by the name, lowercased. It works when the name is letters and digits only (`fero('Shop')` reads the `shop` rung; a name with a dash or a space gets the global rung only) and is not itself a declared key (`fero('journal')` would read the group). In the global rung of a flag, variable or file layer an undeclared object at the top level is another resource's subtree and is left alone, sibling names one letter apart included (`order` beside `orders`); only a near miss of a declared group (`heartbeats` beside `heartbeat`) is a typo and throws. A misspelt resource name in a scoped variable therefore sets nothing, and the door shows what was read. Two variables are stripped before the layer looks: `FERO_CONFIG` (the switch below) and `FERO_DIAG_TOKEN` (the debug viewer's).
+
+### The spellings
+
+Examples for a resource named `shop`. The per-resource form is shown for the flag, the variable and the file; the call is already this resource's.
+
+| Key | Call | Flag | Env | File (`fero.opt.ts`) | Per resource (`shop`) |
+|---|---|---|---|---|---|
+| `uuid` | `uuid: 'a1'` | `--fero.uuid a1` | `FERO_UUID=a1` | refused | `--fero.shop.uuid a1` · `FERO_SHOP_UUID=a1` |
+| `server` | `server: true` / `false` | `--fero.server=true` / `--no-fero.server` | `FERO_SERVER=true` / `false` / `1` / `0` | `server: true` / `false` | `--fero.shop.server=true` · `FERO_SHOP_SERVER=true` · `shop: { server: true }` |
+| `listen` | `listen: '127.0.0.1:4000'` / `false` | `--fero.listen 127.0.0.1:4000` / `--no-fero.listen` | `FERO_LISTEN=127.0.0.1:4000` / `off` | `listen: '127.0.0.1:4000'` | `--fero.shop.listen …` · `FERO_SHOP_LISTEN=…` · `shop: { listen }` |
+| `hosts` | `hosts: ['a:1', 'b:2']` | `--fero.hosts=a:1,b:2` (or repeated) | `FERO_HOSTS=a:1,b:2` | `hosts: ['a:1', 'b:2']` | `--fero.shop.hosts …` · `FERO_SHOP_HOSTS=…` · `shop: { hosts }` |
+| `dir` | `dir: './state'` | `--fero.dir ./state` | `FERO_DIR=./state` | `dir: './state'` | `--fero.shop.dir ./shop` · `FERO_SHOP_DIR=./shop` · `shop: { dir: './shop' }` |
+| `heartbeat.ms` | `heartbeat: { ms: 250 }` | `--fero.heartbeat.ms 250` | `FERO_HEARTBEAT_MS=250` | `heartbeat: { ms: 250 }` | `--fero.shop.heartbeat.ms 250` · `FERO_SHOP_HEARTBEAT_MS=250` · `shop: { heartbeat: { ms: 250 } }` |
+| `redial.ms` | `redial: { ms: 200 }` | `--fero.redial.ms 200` | `FERO_REDIAL_MS=200` | `redial: { ms: 200 }` | `--fero.shop.redial.ms 200` · `FERO_SHOP_REDIAL_MS=200` · `shop: { redial: { ms: 200 } }` |
+| `journal.cap` | `journal: { cap: 65536 }` | `--fero.journal.cap 65536` | `FERO_JOURNAL_CAP=65536` | `journal: { cap: 65536 }` | `--fero.shop.journal.cap 65536` · `FERO_SHOP_JOURNAL_CAP=65536` · `shop: { journal: { cap: 65536 } }` |
+| `replicas` | `replicas: 3` | `--fero.replicas 3` | `FERO_REPLICAS=3` | `replicas: 3` | `--fero.shop.replicas 3` · `FERO_SHOP_REPLICAS=3` · `shop: { replicas: 3 }` |
+| `rendezvous` | `rendezvous: '127.0.0.1:4000'` / `false` | `--fero.rendezvous …` / `--no-fero.rendezvous` | `FERO_RENDEZVOUS=…` / `off` | `rendezvous: '…'` | `--fero.shop.rendezvous …` · `FERO_SHOP_RENDEZVOUS=…` · `shop: { rendezvous }` |
+| `data` | `data: { … }` | refused | refused | `data: { … }` | `shop: { data: { … } }` |
+| `methods` | `methods: { … }` | refused | refused | refused | the call only |
+| `seams.validation` | `seams: { validation }` | refused | refused | refused | the call only |
+| `signals` | `signals: false` | refused | refused | refused | the call only |
+
+### The table
+
+Scope: *instance* = this node only. *cluster* = must be the same on every member (the deployer's contract; the kernel does not police drift). *process* = one value for the whole process. Every default is the code's.
+
+**Identity and role**
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `uuid` | the dir's saved identity, else 8 random hex chars | instance | call, flag, env. Never a file: one shared file would give every process the same identity | Names this node. It rides HELLO and stamps every write this node makes. Must be unique per member. On a durable `dir` it must match the saved identity, or `fero()` throws. A value that is all digits is refused from a flag or a variable. |
+| `server` | unset: a bare `fero(name)` is a client | instance | call, flag, env, file | `true` pins the server role with no other marker (a free loopback port, registered with the directory). `false` pins the client role: then `listen`, `dir`, `replicas`, `data` or `methods` from any layer throws naming both sources. Any of those five markers also makes a server on its own. |
+| `data` | unset | instance | call, file | Initial rows, applied only when the local fold is empty at boot. A restore or replayed state never re-seeds. Implies the server role. |
+
+**Network and discovery**
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `listen` | server: `127.0.0.1:0` (a free loopback port); client: none | instance | call, flag, env, file | The address this node binds and tells its peers. `false` (or `off`, `--no-fero.listen`) is the socketless solo node: it serves nothing, dials nothing and meets no directory. Dialing a non-local host needs an explicit listen. A user resource may never take the directory's socket. |
+| `hosts` | unset: the directory's discovered set alone | instance | call, flag, env, file | Static addresses to dial on start. Alone on a client they are its feeders; beside a server marker they make a dialing member. The directory's discovered set is unioned in. A comma-separated string is split from a flag or a variable. |
+| `rendezvous` | unset, then `FERO_RENDEZVOUS`, then `127.0.0.1:3376` | instance (the variable is process-wide) | call, flag, env, file | The per-box directory this instance registers with and looks names up in (V4-3). `false` (or `off`, `--no-fero.rendezvous`) means no directory at all. Instances on one box that name different directories never find each other. `FERO_RENDEZVOUS` is read even with the layer off: it sets the process default and never overrides an explicit key. |
+
+**Durability**
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `dir` | unset: memory only | instance | call, flag, env, file | The directory holding `wal.log` and `boot.json`. Its presence turns on the WAL, restores the previous life's identity and view, and implies the server role. One dir is one node of one resource; two resources in one process want the per-resource form (`FERO_SHOP_DIR`, `FERO_USERS_DIR`). |
+
+**Replication**
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `replicas` | unset: every member holds every partition | cluster | call, flag, env, file | Scoped replication (M6): each partition lives on exactly this many holders. An integer of 1 or more. Implies the server role. Must be the same on every member. |
+
+**Membership and timing**
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `heartbeat.ms` | `500` (`0` = off) | cluster | call, flag, env, file | The one clock. Pings, membership ticks, the write retry clock, compaction and WAL snapshot arming all run on it. `0` turns heartbeats off (an explicit protocol mode, the sim's sweep mode). A finite number of milliseconds, 0 or more. Must be the same on every member. |
+| `redial.ms` | `100` | instance | call, flag, env, file | The dial backoff base after a peer drops. It doubles per failure up to 32 times the base and gives up after 10 tries (heartbeats revive it). Also the `#directory` client's redial base. A finite number of milliseconds, 0 or more. |
+
+**Bounds**
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `journal.cap` | `4096` | instance | call, flag, env, file | The size of the diagnostics ring. Older events are dropped and counted. Raise it for captures that want full time travel. An integer of 1 or more. |
+
+**Method plane**
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `methods` | unset: an open resource | instance | the call only | The hosted methods, and the door (V4-5): declaring them means clients change data only through them. A plain object of functions. Never from another layer: it would host code and close the door from outside the source line. `methods: {}` is a resource clients may only read. Implies the server role. |
+| `seams.validation` | unset: every write admitted | cluster | the call only | A schema check on every record at the one local ingest, and on an open server at the relay for client writes. Return `true` to admit or a reason string to refuse. A function, so no other layer can carry it. Every server should run the same predicate. |
+
+**Process**
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `signals` | `true` | process (one listener; opted out per instance) | the call only | Ctrl-C and SIGTERM make every live instance leave cleanly, then the process exits 0 unless the app has its own listener (V4-8). `false` keeps this instance out: stop it yourself. Call only, because the clean stop is per instance and a variable or a file would make it per process. |
+| `FERO_CONFIG` (a switch, not a key) | on | process | env only: `FERO_CONFIG=off` | Turns the layer off. `fero()` then reads the call alone and makes zero `optcascade` calls: no flag parse, no environment walk, no file probe. `off`, `on` and unset are the only values; anything else throws. The test battery sets it (below). |
+
+### Kept fixed
+
+Everything else stays a constant on purpose: the wire format, the ring hash, the quorum thresholds, the membership tick counts, the write pipeline bounds, the write and call timeouts, the on-disk names, and every sim and tooling literal. Each has a reason (a member with a different value would drop frames, compute a different owner, or mean a different thing by "confirmed"). The full list, with the reason per row, is [DESIGN-CONFIG.md](DESIGN-CONFIG.md) section 5. A few of them (the redial give-up count, the membership ticks) are candidates for a later kernel tune table; none is a `fero()` key today.
+
+### For the test battery
+
+Every suite runs with the layer off. [utils/battery.ts](utils/battery.ts) sets `FERO_CONFIG=off` and `FERO_RENDEZVOUS=off` (plain assignment: the pins win over whatever the shell exports); the `npm test` and `npm run perf` scripts pass it as `--import ./utils/battery.ts`, and every suite that composes a real `fero()` imports it first, so a single-file `node --test` runs under the same two pins. With the layer off no `--fero.*` flag, no `FERO_*` variable, and no `fero.opt.ts` in the checkout or in `$HOME` can reach a test. With the directory off an explicit-topology test never meets a live box directory. The layer's own suites inject their sources explicitly ([api/config.test.ts](api/config.test.ts)) or spawn children with `FERO_CONFIG` deleted ([tests/config.test.ts](tests/config.test.ts)); discovery tests opt in with a free rendezvous port each. Children spawned with `process.env` inherit both pins, so the example checks are pinned by the environment alone. A test also asserts that the checkout holds no `fero.opt.*` (a file at the repo root would reach every hand-run example), that `package-lock.json` pins `optcascade`, and that this section names every key.
+
+### A `fero.opt.ts`
+
+A default export. The top level is the global rung; a subtree named after a resource is that resource's rung and beats it. Files load once per process through `require()`, so a file must use erasable TypeScript only (no enums, no top-level `await`); a file that fails to load throws with its path.
+
+```ts
+// fero.opt.ts, next to package.json (or in $HOME for every project)
+export default {
+    heartbeat: { ms: 250 },              // every resource in this project
+    rendezvous: '127.0.0.1:4000',        // this project's own directory
+    shop: {                              // fero('shop') only
+        dir: './state/shop',
+        journal: { cap: 65536 },
+    },
+    users: {                             // fero('users') only
+        dir: './state/users',
+        replicas: 2,
+    },
+}
+```
+
+With that file, `node server.ts` gives `fero('shop')` its dir and a bigger journal, `fero('users')` its own dir and scoped replication, and both the shared heartbeat and directory. `node server.ts --fero.shop.dir /tmp/x` beats the file for `shop` alone; `FERO_HEARTBEAT_MS=100` beats the file for every resource but loses to a value in the call.
 
 ## Green-or-quarantined (the policy, stated)
 
@@ -496,8 +617,9 @@ a real multi-process cluster over the wire).
   the PING side heals loss that NO event announces (transport bugs, future
   non-TCP shells; the sim test injects exactly that). Heartbeats also REVIVE
   given-up dial targets (`JK.revive`), so give-up is a cool-down, never
-  permanent parking. Both are heartbeat-gated: `heartbeatMs: 0` (the sim sweep
-  mode) keeps trajectories quiescent and byte-identical. There is deliberately
+  permanent parking. Both are heartbeat-gated: heartbeats off (`heartbeatMs: 0` in the kernel's
+  NodeOpts, `heartbeat: { ms: 0 }` at the api — the sim sweep mode) keeps
+  trajectories quiescent and byte-identical. There is deliberately
   NO per-frame drop fault in the sim: TCP cannot drop mid-stream on a live link,
   and modelling it would demand interior-gap healing no real shell needs.
 - **M2 membership is LIVE** (kernel/membership.ts): committed views with
@@ -525,7 +647,7 @@ a real multi-process cluster over the wire).
   restart, the lowest restored member self-ballots the restored view). Epoch 0
   is the OPEN genesis — exactly the M0/M1 behaviour until the first view
   commits — and everything membership does rides the heartbeat clock, so
-  `heartbeatMs: 0` sweeps never enter it. The data plane stays open by design:
+  heartbeats-off (`heartbeatMs: 0`) sweeps never enter it. The data plane stays open by design:
   membership gates COMMITS and majority math, never replication — an evicted
   node still converges, its stale-epoch stamps just lose LWW. v2's V1d
   divergence class is a sim MUTATION test: a deliberately-broken self-fencing

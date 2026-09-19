@@ -6,9 +6,9 @@
 // real disks. Partition/heal stays sim-only by design: real-TCP partition injection needs a proxy
 // layer that would test the harness, not fero.
 
-//! the directory is OFF in this suite regardless of how it is run: a single-file `node --test` must never
-// meet a live box directory (the battery's npm script sets the same default)
-process.env.FERO_RENDEZVOUS ??= 'off'
+//! the battery pins (utils/battery.ts), whichever way this suite is run: the directory OFF (a single-file
+// `node --test` must never meet a live box directory) and the config layer OFF (no flag, variable or file reaches a test)
+import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -29,8 +29,8 @@ const spawn = async (n: number, opts: { dirs?: string[] } = {}): Promise<{ nodes
       uuid: `n${String(i + 1).padStart(2, '0')}`,
       listen,
       hosts: addrs.filter((_, j) => j !== i),
-      heartbeatMs: 50,
-      redialMs: 30,
+      heartbeat: { ms: 50 },
+      redial: { ms: 30 },
       ...(opts.dirs ? { dir: opts.dirs[i] } : {}),
     })))
   return { nodes, addrs }
@@ -86,7 +86,7 @@ test('SCENARIO kill/restart: a durable member dies, its heir restores from the W
     assert.ok(await converged(nodes, (s) => s['durable-fact'] === 42))
     //! kill n03 and resurrect it from its dir alone — same uuid, same fero() call shape
     await nodes[2].destroy()
-    heir = await fero('scenario', { uuid: 'n03', listen: addrs[2], hosts: addrs.filter((_, j) => j !== 2), heartbeatMs: 50, redialMs: 30, dir: dirs[2] })
+    heir = await fero('scenario', { uuid: 'n03', listen: addrs[2], hosts: addrs.filter((_, j) => j !== 2), heartbeat: { ms: 50 }, redial: { ms: 30 }, dir: dirs[2] })
     assert.equal((snapshot(heir.data) as Record<string, unknown>)['durable-fact'], 42, 'the heir folded its WAL BEFORE the network')
     assert.equal((snapshot(heir.cluster) as { me: { origin: string } }).me.origin, 'n03~2', 'a reborn lane')
     //! and it is alive, not a museum: fresh writes flow both ways
@@ -114,7 +114,7 @@ test('SCENARIO full-cluster kill: every member dies at once; the cluster restore
     //! the whole-cluster kill — nothing survives but three directories
     for (const f of nodes) await f.destroy()
     reborn = await Promise.all(addrs.map((listen, i) =>
-      fero('scenario', { uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeatMs: 50, redialMs: 30, dir: dirs[i] })))
+      fero('scenario', { uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 }, dir: dirs[i] })))
     //! every persisted-confirmed fact is back BEFORE the mesh re-forms; then the cluster relives
     assert.equal((snapshot(reborn[0].data) as Record<string, unknown>).sealed, true, 'the persisted-confirmed write survived the apocalypse')
     assert.equal(canon(snapshot(reborn[0].data)), before, 'the full fold restored')
@@ -130,7 +130,7 @@ test('SCENARIO full-cluster kill: every member dies at once; the cluster restore
 
 test('SCENARIO observability: cluster.writes shows a write pending → committed (plan Q4: the ring, not data, carries write state)', async () => {
   const { nodes, addrs } = await spawn(2)
-  const c = await fero('scenario', { uuid: 'zz', hosts: addrs, heartbeatMs: 50, redialMs: 30 })
+  const c = await fero('scenario', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     assert.ok(await formed(nodes))
     await c.methods.update({ key: 'observed', value: 1 }, { timeout: 8000 })

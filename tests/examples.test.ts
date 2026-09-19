@@ -4,7 +4,7 @@
 // generous (WSL2 swings 2-3×), a forgotten destroy() shows up as a timeout, and the whole process
 // GROUP is killed in `finally` so a failed assertion never leaks a role server.
 
-process.env.FERO_RENDEZVOUS ??= 'off'
+import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
