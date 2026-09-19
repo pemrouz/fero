@@ -3,6 +3,7 @@
 // outcome unions, the config schema, and the composed instance shape. Substrate
 // `any` is wrapped at api/substrate.ts and never propagates past this surface.
 
+import type { ChildProcess } from 'node:child_process'
 import type { Rec } from '../kernel/env.ts'
 import type { Context } from './methods.ts'
 
@@ -210,4 +211,17 @@ export interface Fero {
   // a sync local read would be the shard, and a silent partial is never an answer (plan §9).
   readonly snapshot: unknown
   destroy(): Promise<void>
+}
+
+//! Spawned (V4-9) — what fero.spawn(file, args?) returns: a separate `node <file> …` process, the
+// reader's other terminal from code. `out` is everything it printed to stdout so far; `exited` its exit
+// code once it has ended and its output has drained (null when a signal ended it); `stop()` is the reader's Ctrl-C (SIGINT — a fero process leaves
+// by ballot and exits 0, V4-8) and resolves that code, or null after five seconds of nothing (SIGKILL).
+// `child` is Node's handle for anything else.
+export interface Spawned {
+  pid: number
+  out: string
+  exited: Promise<number | null>
+  stop(): Promise<number | null>
+  child: ChildProcess
 }
