@@ -11,11 +11,11 @@
     "#utils": "./utils/index.ts"
   },
   "scripts": {
-    "test": "FERO_RENDEZVOUS=off node --experimental-strip-types --no-warnings --test-concurrency=1 --test \"utils/*.test.ts\" \"kernel/*.test.ts\" \"sim/*.test.ts\" \"tests/*.test.ts\" \"api/*.test.ts\" \"tools/debug/*.test.ts\" \"tools/perf/*.test.ts\" && npm run test:contract",
-    "perf": "FERO_RENDEZVOUS=off node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test \"kernel/*.perf.ts\" \"api/*.perf.ts\" \"sim/*.perf.ts\" \"tests/*.perf.ts\"",
+    "test": "node --experimental-strip-types --no-warnings --import ./utils/battery.ts --test-concurrency=1 --test \"utils/*.test.ts\" \"kernel/*.test.ts\" \"sim/*.test.ts\" \"tests/*.test.ts\" \"api/*.test.ts\" \"tools/debug/*.test.ts\" \"tools/perf/*.test.ts\" && npm run test:contract",
+    "perf": "node --experimental-strip-types --expose-gc --no-warnings --import ./utils/battery.ts --test-concurrency=1 --test \"kernel/*.perf.ts\" \"api/*.perf.ts\" \"sim/*.perf.ts\" \"tests/*.perf.ts\"",
     "perf:absolute": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts",
     "perf:pin": "node --experimental-strip-types --no-warnings tools/perf/absolute.ts --pin",
-    "perf:alloc": "node --experimental-strip-types --expose-gc --no-warnings --test-concurrency=1 --test kernel/alloc.perf.ts",
+    "perf:alloc": "node --experimental-strip-types --expose-gc --no-warnings --import ./utils/battery.ts --test-concurrency=1 --test kernel/alloc.perf.ts",
     "sim": "node --experimental-strip-types --no-warnings sim/run.ts",
     "sim:scale": "node --experimental-strip-types --no-warnings sim/scale-run.ts",
     "shrink": "node --experimental-strip-types --no-warnings sim/shrink.ts",
@@ -25,6 +25,12 @@
     "demo:watch": "node examples/02-server-client/client.ts",
     "test:contract": "node --experimental-strip-types --no-warnings --test ../data/conformance/schedule.test.ts"
   },
+  "engines": {
+    "node": ">=22.18"
+  },
   "author": "pemrouz",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "optcascade": "^1.0.0"
+  }
 }
