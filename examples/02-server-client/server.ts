@@ -6,7 +6,7 @@ let t = 0
 
 shop.data.tap(() => {
     console.clear()
-    console.log(`fero two-terminal demo — SHOP on ${shop.cluster.me.snapshot().listen} — watchers ${Object.keys(shop.cluster.snapshot().peers).length}`)
+    console.log(`SHOP ${process.pid} on ${shop.cluster.me.snapshot().listen} — watchers ${Object.keys(shop.cluster.snapshot().peers).length}`)
     console.log(shop.snapshot)
 })
 
