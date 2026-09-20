@@ -1054,3 +1054,93 @@ the public `fero()`; IDEAS); a HELLO-carried hash of the cluster-contract
 keys (`heartbeat.ms`, `replicas`, `seams.validation`) — today a mismatch
 set by one member's shell shows up as behavior, not as a refusal (IDEAS).
 Battery: 431/431 + 18/18 contract + perf 43/43.
+
+## V4-11 — the example series' shape: a README is the terminals, a screen is one line or one frame; rung 03 (2026-09-20)
+Context: the owner asked for "refining and better options for the readme
+and also the output", then one more example. A design panel (three
+proposals, each attacked by an owner's-taste skeptic against the owner's
+own old README and the V4-8 bar; the "does it work" skeptics died on the
+model cap, so the synthesis re-ran every claim itself on private ports)
+produced one template and one screen rule. Both were applied to 01 and
+02, and rung 03 was built in that shape.
+Decision:
+- **The README template, for every rung.** A title; one code block per
+  terminal — the command you type is the block's FIRST line, then the real
+  output of one contiguous run, `^C` at column 0 where it was pressed; at
+  most three bullets for what the screen cannot show; a `sh` block of
+  runnable scale-it commands (`node server.ts --fero.dir ./a` is where
+  V4-10 earns its place); the check as one sentence at the end; `Next:`.
+  No separate run block (the command is already the output block's first
+  line), no right-hand arrows (invisible past a phone's ~45-character cut;
+  `$ node server.ts` and `^C` at column 0 say the same thing). The caveat
+  "close your other terminals of this example first" is said once, in
+  examples/README.md, and in each check's first assertion message — where
+  a reader who forgot will actually look.
+- **The screen rule, two shapes for one reason.** A rung whose lesson is a
+  SEQUENCE logs one line per change with no clear (01: copies come and
+  go; the terminal keeps the history, the README can paste it, the check
+  reads the last line). A rung whose lesson is a LIVE PICTURE redraws a
+  frame after `console.clear()`: a header line beginning with the role
+  word in CAPS, then the object (02: `SHOP` / `WATCHER`; 03: `CLIENT` /
+  `SERVER`). The role word is the frame delimiter a check and the site
+  recorder split on. Every screen names its process (`pid`); where wire
+  identity is the lesson it names its fero id too (`me`). No line wraps
+  at 80 columns.
+- **01 prints `pid` once, then `members N <object>`.** Rows are numbers
+  (`f.data[process.pid] = ++n`): three rows fit one line, five rows in 68
+  characters, where `{ ticks: n }` wrapped at three. `writable` left the
+  line: it never printed `false` in 01's story — a `kill -9` survivor's
+  screen freezes entirely for 8-12 s (its own writes do not commit, so the
+  data tap never fires), so the old bullet "its own ticks still print" was
+  wrong and the word carried a case the reader cannot see. The pid moved
+  off every line so two terminals print the IDENTICAL line for the same
+  state (that is the lesson) and the spawn tag does not repeat it. The
+  check's `writable false` assertion went with it: `members 1` within 5 s
+  IS the clean-leave proof (a crash leaves A at `members 2`).
+- **02 loses the `fero two-terminal demo — ` prefix and gains its pid.**
+  The prefix existed only so the site's recorder could split frames — and
+  the page stripped it before painting, so it bought nothing; a lesson
+  file carried a tool's delimiter, the very thing V4-8 cleared out of the
+  roles; on a phone it ate 25 of ~45 visible characters. The site's
+  recorder, page and checker now split and paint on the role word, and the
+  demo was re-recorded in the same sitting (the half step — new source
+  beside an old recording — is caught by nothing automated).
+- **03-one-write: a client's write is a request.** `client.ts` (10 lines)
+  renders from a CLUSTER tap on purpose, against the 01/02 data-tap rule:
+  a pending write changes nothing in `data` (V4-7), so a data tap could
+  never draw the waiting state, and the confirm ring IS this rung's
+  lesson — the last three rows of `cluster.writes` as `<key> <state> by
+  <origin>`, then the object. `server.ts` (6 lines) writes nothing: it
+  stamps and shows. Verified and pinned by the check: a client alone keeps
+  every assignment `pending` — no timeout, no reject, `{}`; when a server
+  appears every waiting row commits in ONE fold, `origin` = the SERVER's
+  id, and the data lands in the same frame; Ctrl-C the server and the next
+  notes wait again; the next server (new id, new port) stamps them, and
+  the client takes its truth — the notes the old memory-only server held
+  vanish from both screens. Facts kept out of the screen: `hosts` keeps
+  the OLD address after a clean leave until the next server registers
+  (screens use `peers`); a durable server's second life stamps as
+  `uuid~2`; with a server up a new write is pending for 1-41 ms (a blink).
+- **api/spawn.ts is unchanged.** Silencing the child's echo and printing
+  story lines was the panel's most tempting idea and is wrong: the echo is
+  the ONLY failure evidence the smoke tier has (its 12-line tail on a
+  failed check IS the last screens), and the quiet mode costs zero code by
+  hand — `node check.ts | tail -1`. What made the echo unreadable was the
+  screen, not the echo: 01's check now prints 21 one-line screens.
+REJECTED: story lines instead of the echo (above); `pid` on every 01 line;
+`writable` on the line; `{ ticks: n }` rows; `console.clear()` frames for
+01 (a frame erases a sequence); right-hand arrows; a separate `sh` run
+block above the output; the caveat on the check line; a fast-fail so the
+caveat fires in 2 s (two lines to save 28 seconds of an already-failing
+run); `privateDirectory()` or name prefixes (V4-9, not reopened); a
+log-style 03 client (a batch commits in ONE fold, so a log prints one line
+for four transitions); `console.table` for the ring (61-80 columns, a
+dead index column, triple quoting); `cid`/`seq`/`epoch` on the row (three
+more words; at epoch 0 `cid` is 1 for every own write); all 64 ring rows
+(a 64-line screen in two minutes — the "scale down" half of the ask);
+one 03 file with the role from a flag (that is 01's lesson; kept as 03's
+scale-it line); a `hosts`/`links` field in 03's header (stale after a
+leave); a fourth pasted 03 frame; `methods.update` with its timeout reject
+(rung 10's awaited form); a shared `screen()` helper in lib.ts (01 reads a
+line, 03 reads a frame — one helper would drag screen shapes into shared
+glue); keeping 02's prefix "for the site" (the site strips it).

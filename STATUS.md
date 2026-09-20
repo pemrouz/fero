@@ -533,3 +533,22 @@ inside the outer apply.
   table, the `diag` key, a HELLO hash of the contract keys, three
   optcascade wishes. Battery: 431/431 + 18/18, perf
   43/43.
+- 2026-09-20 — Examples, V4-11 (DECISIONS): the README template (one
+  block per terminal, the command first, real contiguous output, `^C` at
+  column 0, at most three bullets, a `sh` block of scale-it commands, the
+  check as one sentence, `Next:`) and the screen rule (a sequence rung
+  logs one line per change; a live-picture rung clears and redraws a frame
+  headed by the role word in CAPS; every screen names its pid) applied to
+  01 (pid once, `members N <object>`, numeric rows, `writable` gone — it
+  never printed `false` in 01's story) and 02 (the `fero two-terminal
+  demo — ` prefix gone, the shop names its pid; the site's recorder, page
+  and checker split on the role word, re-recorded, claims re-pinned, and
+  the page's V4-10 staleness fixed: `heartbeat.ms` / `redial.ms` /
+  `journal.cap`, `server: false` next to a marker is the refusal, one
+  "layers" line). Rung 03-one-write built: a client's write is a request —
+  `client.ts` renders the last three `cluster.writes` rows from a cluster
+  tap (a pending write changes nothing in `data`), `server.ts` only stamps
+  and shows; the check pins pending-forever alone, one-fold commit stamped
+  by the server's id, the wait-again after a clean stop, the next server
+  stamping and the client taking its truth. api/spawn.ts unchanged (the
+  echo is the smoke tier's failure evidence). Battery: 432/432 + 18/18.
