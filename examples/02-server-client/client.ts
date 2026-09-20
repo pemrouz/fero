@@ -6,7 +6,7 @@ let n = 0
 
 shop.data.tap(() => {
     console.clear()
-    console.log(`fero two-terminal demo — WATCHER ${process.pid} — shop ${shop.cluster.me.snapshot().hosts[0] ?? 'not found yet'}`)
+    console.log(`WATCHER ${process.pid} — shop ${shop.cluster.me.snapshot().hosts[0] ?? 'not found yet'}`)
     console.log(shop.snapshot)
 })
 

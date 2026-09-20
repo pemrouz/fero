@@ -3,7 +3,7 @@ import { fero, type Spawned } from '../../api/index.ts'
 import { sleep, until } from '../lib.ts'
 
 // the last screen a role drew: its header line and the object
-const screen = (r: Spawned) => r.out.split('fero two-terminal demo — ').pop() ?? ''
+const screen = (r: Spawned) => r.out.split(/^(?=SHOP |WATCHER )/m).pop() ?? ''
 const stock = (r: Spawned) => Number(/widgets: \{ stock: (\d+)/.exec(screen(r))?.[1] ?? -1)
 
 // the watcher first: nothing to find yet, so it waits
@@ -15,7 +15,7 @@ assert.ok(screen(watcher).includes('shop not found yet') && stock(watcher) < 0, 
 // the shop appears and stock flows down
 const shop = fero.spawn('server.ts')
 assert.ok(await until(() => stock(watcher) > 0, 15_000), 'the watcher found the shop by name and holds its rows')
-const listen = /SHOP on (127\.0\.0\.1:\d+)/.exec(shop.out)?.[1]
+const listen = /SHOP \d+ on (127\.0\.0\.1:\d+)/.exec(shop.out)?.[1]
 assert.ok(await until(() => screen(watcher).includes(`— shop ${listen}`)), "the watcher's screen names the shop's port")
 const s0 = stock(watcher)
 assert.ok(await until(() => stock(watcher) !== s0, 5000), 'stock keeps flowing down: the restock reached the watcher')

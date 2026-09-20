@@ -1,57 +1,55 @@
 # 01 · One file, run it twice
 
+Terminal 1:
+
+```
+$ cd examples/01-two-servers
+$ node server.ts
+pid 1034557
+members 0 {}
+members 0 { '1034557': 1 }
+members 2 { '1034557': 2 }
+members 2 { '1034557': 2, '1034577': 1 }
+members 1 { '1034557': 3, '1034577': 1 }
+members 1 { '1034557': 4, '1034577': 1 }
+members 1 { '1034557': 5, '1034577': 1 }
+members 2 { '1034557': 5, '1034577': 1, '1034596': 1 }
+```
+
+Terminal 2, the same command — Ctrl-C it, and run it again:
+
+```
+$ node server.ts
+pid 1034577
+members 0 {}
+members 0 { '1034557': 1 }
+members 2 { '1034557': 2 }
+members 2 { '1034557': 2, '1034577': 1 }
+^C
+$ node server.ts
+pid 1034596
+members 0 {}
+members 0 { '1034557': 1 }
+members 0 { '1034557': 2 }
+members 0 { '1034557': 3 }
+members 0 { '1034557': 4 }
+members 1 { '1034557': 4, '1034577': 1 }
+members 1 { '1034557': 5, '1034577': 1 }
+members 2 { '1034557': 5, '1034577': 1, '1034596': 1 }
+```
+
+- `fero('hello', { server: true })` is the whole setup. Each copy takes a free port and registers the name
+  `hello` with the directory on your box; that is how they find each other. No addresses in the code.
+- Each copy counts in one row, keyed by its pid: `f.data[process.pid] = ++n`. Plain assignment is the write,
+  `f.data.tap(…)` runs on every change that lands, and every terminal prints the same object.
+- `members` is the agreed group. Ctrl-C is a clean stop: the copy asks the group to shrink before it exits,
+  so terminal 1 drops to `members 1` and counts on, the stopped copy's row still there. Run it again: the
+  new copy replays everything it missed, one line per record, is voted in, and takes a row of its own.
+
 ```sh
-cd examples/01-two-servers
-node server.ts     # terminal 1
-node server.ts     # terminal 2 — then Ctrl-C it, and run it again
-node check.ts      # proves it, about 5 s (close your other terminals of this example first)
+node server.ts                    # a third terminal: a third row, members 3
+node server.ts --fero.dir ./a     # the same copy again after a restart, with its old rows
 ```
 
-Terminal 1 from a real run. Terminal 2 started at `ticks 2`, got Ctrl-C at `ticks 6`, and a third copy was
-started at `ticks 10`:
-
-```
-pid 651328 members 0 writable true {}
-pid 651328 members 0 writable true { '651328': { ticks: 1 } }
-pid 651328 members 0 writable true { '651328': { ticks: 2 } }
-pid 651328 members 2 writable true { '651328': { ticks: 3 } }                          ← terminal 2 is in
-pid 651328 members 2 writable true { '651328': { ticks: 3 }, '651370': { ticks: 1 } }  ← and here is its row
-pid 651328 members 2 writable true { '651328': { ticks: 6 }, '651370': { ticks: 3 } }
-pid 651328 members 1 writable true { '651328': { ticks: 7 }, '651370': { ticks: 3 } }  ← Ctrl-C terminal 2: it left, its row stays
-pid 651328 members 1 writable true { '651328': { ticks: 10 }, '651370': { ticks: 3 } }
-pid 651328 members 2 writable true {                                                   ← node server.ts again: a new pid joins
-  '651328': { ticks: 10 },
-  '651370': { ticks: 3 },
-  '651524': { ticks: 1 }
-}
-```
-
-What is going on:
-
-- `fero('hello', { server: true })` is the whole setup. Each copy picks a free port and registers the name
-  `hello` with the directory on your box; that is how the copies find each other. No addresses in the code.
-- Each copy owns one row, keyed by its pid, and writes it once a second: `f.data[process.pid] = { ticks: n }`.
-  Plain assignment is the write. Every screen shows the same object, one line per change.
-- `f.data.tap(...)` runs once now and again on every change that lands; `f.snapshot` is the plain object.
-  `members` is how many copies are in the agreed group (`0` = alone, still writable). The screen redraws on
-  data changes, so `members` catches up at the next tick.
-- Ctrl-C is a clean stop, built in: the copy asks the group to shrink before it exits, so the other one shows
-  `members 1 writable true` at its next tick and keeps counting. Run the file again: a new pid is voted in
-  and catches up on everything, the stopped copy's old row included (it prints `members 1 writable false`
-  for a moment while the vote runs).
-- `kill -9` instead and the survivor sits at `members 2 writable false`: two cannot outvote a member that
-  just went quiet. Its own ticks still print (they wait in its log), nothing commits. Ctrl-C it and it gives
-  up after a couple of seconds and exits 0.
-
-Scale it — the same file, nothing added:
-
-- Down: run it once. `members 0 writable true`, one row counting on its own. Alone, a stop forgets
-  everything: this copy is memory-only.
-- Three copies: three rows on three screens — and now `kill -9` one: the two left keep writing and vote it
-  out after about 20 seconds (`members 2 writable true`). That is why three is the deployment rule (13).
-- A client: `fero('hello')` with no options, in any file, follows these rows and can write its own — that
-  is [02](../02-server-client/).
-- Durable: `{ server: true, dir: './copy-1' }` (one folder per copy) and a copy comes back after a restart as
-  itself, with its rows, on a fresh port (12).
-
+`node check.ts` runs this story on its own and ends with `ok 01-two-servers`, in under ten seconds.
 Next: [02 · a shop and its watchers](../02-server-client/).
