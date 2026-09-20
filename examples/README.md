@@ -9,6 +9,7 @@ dependency).
 |---|---|---|---|
 | 01 | [two-servers](01-two-servers/) | one file, run twice, is one replicated object; Ctrl-C one and the other carries on | `node server.ts` ×2 |
 | 02 | [server-client](02-server-client/) | a seed makes a server; a bare `fero(name)` finds it by name, follows it, and writes back | `node server.ts` · `node client.ts` |
+| 03 | [one-write](03-one-write/) | a client's write is a request: a `pending` row until a server stamps it; only then does it show, on both screens | `node client.ts` · `node server.ts` |
 
 Three rules every example keeps:
 
