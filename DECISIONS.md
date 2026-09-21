@@ -935,9 +935,11 @@ Decision:
   and a typo in a shell get the same message; a dotted key in the call or a
   file (`{ 'heartbeat.ms': 1 }`) is refused as the flat spelling of a
   nested key. The schema tables are null-prototype: a key named
-  `constructor` is unknown, never a crash. Flags are lowercase: `--FERO.dir`
-  would be parsed under another prefix and silently ignored, so it is
-  refused naming the lowercase spelling.
+  `constructor` is unknown, never a crash. A flag's key is read lowercased
+  at every depth, as a variable's is: `--fero.Dir`, `--FERO.dir` and
+  `FERO_DIR` are one key (optcascade 1.1.0 does this; fero pins `^1.1.0`.
+  Under 1.0.0 `--FERO.dir` was parsed under another prefix and silently
+  ignored, so the landing refused it; 2026-09-21 lifted that with the pin).
 - **Coercions for the string layers only.** A flag, a variable and a file
   can only carry text, so they get the spellings text needs: `hosts`
   `a:1,b:2` splits on commas (and a repeated flag flattens); `off`, `false`

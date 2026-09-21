@@ -52,7 +52,8 @@ test('the nested spelling survives every layer: env is lowercased and split on _
 test('the old camelCase spellings are refused with the pointer, from every layer', () => {
   assert.throws(() => r('r', { heartbeatMs: 5 }), /'heartbeatMs' is spelled heartbeat: \{ ms \} since V4-10 — in the call heartbeat: \{ ms: … \}, as a flag --fero\.heartbeat\.ms, in the environment FERO_HEARTBEAT_MS/)
   assert.throws(() => r('r', {}, { env: { FERO_HEARTBEATMS: '5' } }), /'heartbeatms' is spelled heartbeat: \{ ms \}/)
-  assert.throws(() => r('r', {}, { argv: ['--fero.redialMs', '5'] }), /'redialMs' is spelled redial: \{ ms \}/)
+  //! a flag's key arrives lowercased (optcascade >= 1.1.0), so the pointer names that spelling
+  assert.throws(() => r('r', {}, { argv: ['--fero.redialMs', '5'] }), /'redialms' is spelled redial: \{ ms \}/)
   assert.throws(() => r('r', { journalCap: 5 }), /'journalCap' is spelled journal: \{ cap \}/)
 })
 
@@ -75,11 +76,13 @@ test('unknown keys throw naming their source, with the nearest declared spelling
   assert.throws(() => r('r', { toString: 1 } as never), /unknown option 'toString' from the call/)
   assert.deepEqual(cfg('constructor', {}, { env: { FERO_DIR: './g', FERO_CONSTRUCTOR_DIR: './c' } }), { dir: './c' })
   assert.deepEqual(cfg('r', {}, { env: { FERO_CONSTRUCTOR_DIR: './c' } }), {})
-  //! a raw minimist failure is prefixed and named
-  assert.throws(() => r('r', {}, { argv: ['--fero.heartbeat', '5', '--fero.heartbeat.ms', '7'] }), /fero\('r'\): could not read the launch flags — Cannot create property 'ms'/)
-  //! the prefix is lowercase: an uppercase spelling would be silently ignored, so it is refused
-  assert.throws(() => r('r', {}, { argv: ['--FERO.dir', 'x'] }), /flags are lowercase — --FERO\.dir is not read; spell it --fero\.dir/)
-  assert.throws(() => r('r', {}, { argv: ['--no-Fero.rendezvous'] }), /spell it --no-fero\.rendezvous/)
+  //! a bad flag set is named twice: fero says which layer it was reading, optcascade says what
+  assert.throws(() => r('r', {}, { argv: ['--fero.heartbeat', '5', '--fero.heartbeat.ms', '7'] }), /fero\('r'\): could not read the launch flags — optcascade: bad flags — Cannot create property 'ms'/)
+  //! a flag's key is read lowercased at every depth, as a variable's is (optcascade >= 1.1.0):
+  // `--fero.Dir`, `--FERO.dir` and `FERO_DIR` are one key — nothing is parsed under another name
+  assert.deepEqual(cfg('r', {}, { argv: ['--FERO.dir', 'x'] }), { dir: 'x' })
+  assert.deepEqual(cfg('r', {}, { argv: ['--fero.Dir', 'y'] }), { dir: 'y' })
+  assert.deepEqual(cfg('r', {}, { argv: ['--no-Fero.rendezvous'] }), { rendezvous: false })
   //! a seam keeps its pre-V4-10 message (api/index.test.ts pins it)
   assert.throws(() => r('r', { seams: { hash: () => 0 } }), /unknown seam 'hash' — M5a ships validation/)
   //! the call never carries another resource's subtree: an unknown object in the call is a typo too

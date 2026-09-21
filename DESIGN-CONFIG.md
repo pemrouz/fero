@@ -38,8 +38,10 @@ The owner read the study and settled the open questions:
   (`--fero.server` over the call's `server: false` is refused); an empty
   string from any string layer means unset; a dotted key in the call or a
   file is refused as the flat spelling of a nested key. The schema tables are
-  null-prototype (`constructor` is an unknown key, not a crash), `--FERO.*`
-  is refused rather than ignored, and the battery pins by plain assignment.
+  null-prototype (`constructor` is an unknown key, not a crash), a flag's key
+  is read lowercased at every depth like a variable's (optcascade >= 1.1.0:
+  `--FERO.dir` is `--fero.dir`, neither ignored nor refused), and the battery
+  pins by plain assignment.
 
 Precedence, as built: `--fero.<key>` > the call > `FERO_<KEY>` > `fero.opt.ts`
 at the project > `fero.opt.ts` in `$HOME` > the default; inside every layer the
