@@ -552,3 +552,21 @@ inside the outer apply.
   by the server's id, the wait-again after a clean stop, the next server
   stamping and the client taking its truth. api/spawn.ts unchanged (the
   echo is the smoke tier's failure evidence). Battery: 432/432 + 18/18.
+- 2026-09-21 — optcascade 1.1.0 is published, and fero pins `^1.1.0`. The
+  owner published the 1.1.0 this repo's V4-10 review wrote into `../copt`
+  (flag keys lowercased at every depth; minimist's bare TypeError rethrown
+  as `optcascade: bad flags — …`). The lockfile moved to 1.1.0 and the
+  range to `^1.1.0`; with that, api/config.ts dropped its own `--FERO.*`
+  refusal (it existed only because 1.0.0 parsed an uppercase prefix under
+  another name and silently ignored it): a flag's key is now read
+  lowercased at every depth like a variable's, so `--fero.Dir`, `--FERO.dir`
+  and `FERO_DIR` are one key. api/config.test.ts asserts the 1.1.0 text
+  (the pointer names `'redialms'`; a bad flag set is named by both fero and
+  optcascade) and that the three spellings agree — the unit case doubles as
+  the version guard, since 1.0.0 would refuse `Dir` as unknown. README,
+  DECISIONS V4-10, DESIGN-CONFIG §11, IDEAS (the wishes that remain) and
+  CLAUDE.md say so. Battery: 432/432 + 18/18. Perf: 42/43 on this WSL2
+  box — the miss is kernel/ring.perf.ts's holdersOf tripwire at ~830–900
+  ms against its 800 ms ceiling, which fails on committed HEAD too (826
+  ms one run, green the next); kernel/ is untouched and the ceiling is
+  not widened.

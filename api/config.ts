@@ -12,7 +12,8 @@
 // needs (`FERO_HOSTS=a,b`, `FERO_RENDEZVOUS=off`), and the provenance `from(key)` the composer puts
 // into its error messages and the diagnostics door. The vocabulary is nested lowercase words
 // (`heartbeat.ms`, not `heartbeatMs`) so one spelling survives every layer: env keys are lowercased
-// and split on `_` by envdeep, flags nest on `.`, and a file is the object itself.
+// and split on `_` by envdeep, flag keys are lowercased at every depth and nest on `.` (optcascade
+// >= 1.1.0), and a file is the object itself.
 //
 // Determinism: `FERO_CONFIG=off` makes resolveConfig return the call alone with ZERO optcascade
 // calls — no argv parse, no env walk, no filesystem probe. The test battery runs that way
@@ -261,8 +262,9 @@ const unflatten = (flat: Flat): FeroOpts => {
   return out as FeroOpts
 }
 
-//! read — one optcascade read with a fero-prefixed error (minimist throws a raw TypeError on
-// `--fero.heartbeat 5 --fero.heartbeat.ms 7`; a broken file already carries its path)
+//! read — one optcascade read with a fero-prefixed error naming the layer (optcascade names a bad
+// flag set `optcascade: bad flags — …`, as on `--fero.heartbeat 5 --fero.heartbeat.ms 7`; a broken
+// file already carries its path)
 const read = (resource: string, what: string, fn: () => unknown): unknown => {
   try { return fn() } catch (e) { throw new Error(`fero('${resource}'): could not read ${what} — ${(e as Error).message}`, { cause: e }) }
 }
@@ -288,9 +290,6 @@ export const resolveConfig = (resource: string, call: FeroOpts, sources: Sources
     rungs.push({ layer: 'call', name: null, flat: callFlat })
   } else {
     const argv = sources.argv ?? process.argv.slice(2)
-    //! the prefix is lowercase: `--FERO.dir` would be parsed under another name and silently ignored
-    const shout = argv.find((a) => /^--(no-)?fero([.=]|$)/i.test(a) && !/^--(no-)?fero([.=]|$)/.test(a))
-    if (shout !== undefined) throw new Error(`fero('${resource}'): flags are lowercase — ${shout} is not read; spell it ${shout.replace(/^--(no-)?fero/i, (_, no: string | undefined) => `--${no ?? ''}fero`)}`)
     const scrubbed = scrub(env)
     //! the working directory can be gone (deleted under a running process): then the project file
     // layer is $HOME's — no file, not a raw ENOENT

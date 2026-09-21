@@ -57,7 +57,7 @@ DESIGN-M6/M7, [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md) (V4-3).
 | `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200s each; `--only <name>`, `--seeds N`). Script-tier — run it on scale-relevant kernel changes, not per-commit. |
 
 Source-served, no build: everything runs via `--experimental-strip-types`.
-One install step since V4-10: `npm install` (the one dependency, `optcascade`; Node ≥ 22.18).
+One install step since V4-10: `npm install` (the one dependency, `optcascade` ≥ 1.1.0; Node ≥ 22.18).
 
 ## The data coupling (the seam discipline)
 

@@ -294,8 +294,10 @@ parens. (Merges into the root ledgers when v3 supersedes the root source.)
   `FERO_DIAG_TOKEN` is the debug VIEWER's variable (tools/debug/serve.ts),
   which the layer strips. Land it with `FERO_DIAG_TOKEN` stated as the
   viewer's only and token values redacted from `diag(f).config()`.
-- [P3] (repo) **optcascade 1.1 wishes** (none blocks; each would let
-  api/config.ts shrink): a declared-keys mode for the PREFIXED form, with
+- [P3] (repo) **optcascade wishes** (1.1.0 of 2026-09-21 shipped the
+  lowercased flag keys and the prefixed bad-flag error; these remain — none
+  blocks; each would let api/config.ts shrink): a declared-keys mode for the
+  PREFIXED form, with
   case-insensitive env matching as the no-prefix form already does — fero
   could then drop its own schema walk for unknown keys; provenance per key
   (which layer, and which file path, won), so a file error and `from(key)`

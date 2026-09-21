@@ -31,6 +31,6 @@
   "author": "pemrouz",
   "license": "MIT",
   "dependencies": {
-    "optcascade": "^1.0.0"
+    "optcascade": "^1.1.0"
   }
 }
