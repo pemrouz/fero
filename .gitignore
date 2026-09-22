@@ -5,3 +5,4 @@ tools/perf/results/latest.json
 # examples: the WAL dirs a README's scale-it line creates by hand, and a live capture file
 examples/*/*/
 examples/**/*.capture.json
+examples/**/*.capture.json.tmp
