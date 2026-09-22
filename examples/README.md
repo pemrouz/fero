@@ -24,6 +24,7 @@ dependency).
 | 15 | [static-topology](15-static-topology/) | with the directory off every address is in the call — a member is `listen` + `hosts`, a client is `hosts` — and a shape that cannot work is refused at `fero()` | `node server.ts 4801 4802 4803` ×3, rotated · `node client.ts 4801 4802 4803` · `node refusals.ts` |
 | 16 | [scoped](16-scoped/) | `replicas: 2` puts every row on exactly two members: a shard is never shown as the resource — a sync read or an operator throws typed, `await f.data` gathers the whole, a row not held is one hop away, and a client reads the union | `node server.ts 4811 5811 6811` ×3 rotated · `node client.ts 4811 5811 6811` |
 | 17 | [lww-honesty](17-lww-honesty/) | two members read a cell and write it back plus one, and one increment is lost — a cell keeps its last writer; write one row per event and fold them instead | `node race.ts` |
+| 20 | [inside](20-inside/) | every instance carries a diagnostics handle off the typed surface: the journal, the log, compaction on demand, and a capture file the debugger opens | `node inside.ts` · `npm run debug -- …` |
 
 Three rules every example keeps:
 
