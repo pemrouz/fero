@@ -14,6 +14,7 @@ dependency).
 | 05 | [views](05-views/) | an operator on `f.data` is a live view: it prints itself once, then only when a write moves a row across its edge or rewrites one it holds | `node server.ts` |
 | 06 | [numbers](06-numbers/) | a sale is a new row, never edited; `sum`, `avg`, `median`… are live numbers folded from the rows — tap one, never read-modify-write a total | `node server.ts` |
 | 07 | [ordered](07-ordered/) | a sorted view is an array in rank order: by a column, by a comparator with a tiebreak, the top n; a bounded window rotates in one batch | `node server.ts` |
+| 08 | [methods](08-methods/) | a function under `methods:` runs on the server: a client awaits it, the reply follows the commit, and declaring them is the door | `node server.ts` · `node client.ts` |
 
 Three rules every example keeps:
 
