@@ -19,6 +19,7 @@ dependency).
 | 10 | [confirm](10-confirm/) | the same write awaited at three rungs — committed, replicated, persisted; the reply names the rung it PROVED, and a reject is how far it got, never a rollback | `node server.ts` ×2 · `node client.ts` |
 | 11 | [validation](11-validation/) | `seams.validation` is one rule for every write that enters a server — the seed, its own, a client's; a refused write never shows, only a `rejected` row of `cluster.writes` with the reason | `node server.ts` · `node client.ts` |
 | 12 | [durable](12-durable/) | `dir` makes the node durable: run the file again and it is the SAME node in its next life (`~2`), its rows back before it has a socket; the seed applies once; a solo `persisted` is one disk | `node server.ts` ×2 |
+| 15 | [static-topology](15-static-topology/) | with the directory off every address is in the call — a member is `listen` + `hosts`, a client is `hosts` — and a shape that cannot work is refused at `fero()` | `node server.ts 4801 4802 4803` ×3, rotated · `node client.ts 4801 4802 4803` · `node refusals.ts` |
 | 17 | [lww-honesty](17-lww-honesty/) | two members read a cell and write it back plus one, and one increment is lost — a cell keeps its last writer; write one row per event and fold them instead | `node race.ts` |
 
 Three rules every example keeps:
