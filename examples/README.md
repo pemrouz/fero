@@ -11,6 +11,7 @@ dependency).
 | 02 | [server-client](02-server-client/) | a seed makes a server; a bare `fero(name)` finds it by name, follows it, and writes back | `node server.ts` · `node client.ts` |
 | 03 | [one-write](03-one-write/) | a client's write is a request: a `pending` row until a server stamps it; only then does it show, on both screens | `node client.ts` · `node server.ts` |
 | 04 | [rows](04-rows/) | a write is a record (type, key, value) you can watch land; a row is written whole or by its fields, never both; a refused write never lands | `node server.ts` |
+| 05 | [views](05-views/) | an operator on `f.data` is a live view: it prints itself once, then only when a write moves a row across its edge or rewrites one it holds | `node server.ts` |
 
 Three rules every example keeps:
 
