@@ -26,6 +26,7 @@ dependency).
 | 17 | [lww-honesty](17-lww-honesty/) | two members read a cell and write it back plus one, and one increment is lost — a cell keeps its last writer; write one row per event and fold them instead | `node race.ts` |
 | 20 | [inside](20-inside/) | every instance carries a diagnostics handle off the typed surface: the journal, the log, compaction on demand, and a capture file the debugger opens | `node inside.ts` · `npm run debug -- …` |
 | 21 | [journal](21-journal/) | `diag(f).journal(from)` is a cursor over the kernel's one diagnostics ring: tail it and watch a peer arrive and be voted in, leave by vote, and its link close | `node server.ts` ×2 |
+| 22 | [time-travel](22-time-travel/) | a capture with a story: two writes before the first view are an election (`lww-lost` in the viewer), the same two after it are plain history, a cut heals by anti-entropy, and the scrubber replays any step | `node story.ts` · `npm run debug -- examples/22-time-travel/story.capture.json` |
 
 Three rules every example keeps:
 
