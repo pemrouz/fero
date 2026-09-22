@@ -17,6 +17,7 @@ dependency).
 | 08 | [methods](08-methods/) | a function under `methods:` runs on the server: a client awaits it, the reply follows the commit, and declaring them is the door | `node server.ts` · `node client.ts` |
 | 09 | [live](09-live/) | a method that returns a view streams: `await` it for a snapshot, `.open()` it for a live mirror the operators chain on; `close()` ends it | `node server.ts` · `node client.ts` |
 | 10 | [confirm](10-confirm/) | the same write awaited at three rungs — committed, replicated, persisted; the reply names the rung it PROVED, and a reject is how far it got, never a rollback | `node server.ts` ×2 · `node client.ts` |
+| 11 | [validation](11-validation/) | `seams.validation` is one rule for every write that enters a server — the seed, its own, a client's; a refused write never shows, only a `rejected` row of `cluster.writes` with the reason | `node server.ts` · `node client.ts` |
 | 17 | [lww-honesty](17-lww-honesty/) | two members read a cell and write it back plus one, and one increment is lost — a cell keeps its last writer; write one row per event and fold them instead | `node race.ts` |
 
 Three rules every example keeps:
