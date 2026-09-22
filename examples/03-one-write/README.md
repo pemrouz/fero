@@ -49,4 +49,4 @@ node client.ts --fero.server        # the same file as a server: it stamps its o
 ```
 
 `node check.ts` runs this story on its own and ends with `ok 03-one-write`, in about twenty seconds.
-Next: 04 · rows — the two write styles and the verbs.
+Next: [04 · rows and records](../04-rows/).
