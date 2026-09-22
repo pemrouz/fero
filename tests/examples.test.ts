@@ -17,7 +17,7 @@ const ROOT = path.join(import.meta.dirname, '..', 'examples')
 const dirs = readdirSync(ROOT).filter((d) => /^\d\d-/.test(d)).sort()
 const index = readFileSync(path.join(ROOT, 'README.md'), 'utf8')
 //! per-example wall budgets (ms) — the default suits a two-process story; slow tiers add their own rows
-const BUDGET: Record<string, number> = { '03-one-write': 60_000, '08-methods': 52_000, '09-live': 80_000, '10-confirm': 42_000, '17-lww-honesty': 50_000 }
+const BUDGET: Record<string, number> = { '03-one-write': 60_000, '08-methods': 52_000, '09-live': 80_000, '10-confirm': 42_000, '13-cluster-of-three': 53_000, '17-lww-honesty': 50_000 }
 const budget = (dir: string) => BUDGET[dir] ?? 40_000
 //! the debugger series (2x) is the ONE place an example may import internals; nobody imports #utils
 const mayImportInternals = (dir: string) => dir.startsWith('2')
