@@ -15,6 +15,7 @@ dependency).
 | 06 | [numbers](06-numbers/) | a sale is a new row, never edited; `sum`, `avg`, `median`… are live numbers folded from the rows — tap one, never read-modify-write a total | `node server.ts` |
 | 07 | [ordered](07-ordered/) | a sorted view is an array in rank order: by a column, by a comparator with a tiebreak, the top n; a bounded window rotates in one batch | `node server.ts` |
 | 08 | [methods](08-methods/) | a function under `methods:` runs on the server: a client awaits it, the reply follows the commit, and declaring them is the door | `node server.ts` · `node client.ts` |
+| 09 | [live](09-live/) | a method that returns a view streams: `await` it for a snapshot, `.open()` it for a live mirror the operators chain on; `close()` ends it | `node server.ts` · `node client.ts` |
 
 Three rules every example keeps:
 
