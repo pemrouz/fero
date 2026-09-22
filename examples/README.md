@@ -13,6 +13,7 @@ dependency).
 | 04 | [rows](04-rows/) | a write is a record (type, key, value) you can watch land; a row is written whole or by its fields, never both; a refused write never lands | `node server.ts` |
 | 05 | [views](05-views/) | an operator on `f.data` is a live view: it prints itself once, then only when a write moves a row across its edge or rewrites one it holds | `node server.ts` |
 | 06 | [numbers](06-numbers/) | a sale is a new row, never edited; `sum`, `avg`, `median`… are live numbers folded from the rows — tap one, never read-modify-write a total | `node server.ts` |
+| 07 | [ordered](07-ordered/) | a sorted view is an array in rank order: by a column, by a comparator with a tiebreak, the top n; a bounded window rotates in one batch | `node server.ts` |
 
 Three rules every example keeps:
 
