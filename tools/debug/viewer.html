@@ -1365,22 +1365,34 @@ document.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTra
 // the ELI5 hover layer — one delegated listener set, so every repaint above is covered (./eli5.mjs)
 mountTips(document);
 
-// boot: deep-link state first, then the source — scenario (one-shot) or /capture.json (poll when live)
-(async function boot(){
-  readURL();
+// boot: deep-link state first, then the source — scenario (one-shot) or /capture.json (poll when live).
+// Without ?scenario= a /capture.json that is not there yet is not a failure: the file may land in a second
+// (23-live starts the debugger first, then the role writes `capture 1`) — the page says it is waiting and asks
+// again at the poll cadence, so no reload is ever needed. A capture the reader drops or opens meanwhile wins:
+// a later answer never replaces it.
+async function boot(){
   const url = SCENARIO ? `/capture/${encodeURIComponent(SCENARIO)}.json` : '/capture.json';
   try {
     const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status);
     const capture = await r.json();
+    if (CAP) return;
     if (!SCENARIO && capture.kind === 'live'){
       LIVE = true; applyCapture(capture); render();
       if (T == null) startPoll(); else { PAUSED = true; renderSrc(); }   // a deep-linked scrub point starts paused
     } else { applyCapture(capture); render(); }
   } catch (e){
+    if (CAP) return;
+    if (!SCENARIO){
+      $('tree').innerHTML = `<div class="empty2">Waiting for <b>${esc(url)}</b>… (${esc(e.message)}) — asking again every 1.5 s.<br>` +
+        `Or drop a capture <b>.json</b> anywhere, or press <b>⌘/Ctrl+O</b>.</div>`;
+      setTimeout(boot, 1500);
+      return;
+    }
     $('tree').innerHTML = `<div class="empty2">Couldn't load <b>${esc(url)}</b> (${esc(e.message)}).<br>` +
       `Drop a capture <b>.json</b> anywhere, press <b>⌘/Ctrl+O</b>, or run <b>npm run debug</b>.</div>`;
   }
-})();
+}
+readURL(); boot();
 </script>
 </body>
 </html>

@@ -128,7 +128,15 @@ const server = http.createServer(async (req, res) => {
     } else if (url === '/capture.json') {
       if (flag('live')) json(res, JSON.stringify(captureLive(runtimes.map((r) => r.node))))
       else if (pool) json(res, JSON.stringify(await pool.capture())) // fresh pulls per request; concurrent requests coalesce
-      else if (captureFile) json(res, readFileSync(captureFile).toString())
+      else if (captureFile) {
+        //! a file that is not there YET is not a server error: a role may write it a moment after the debugger
+        // started (23-live) — a typed 404 tells the viewer to wait and ask again, where a 500 read as "broken"
+        try { json(res, readFileSync(captureFile).toString()) }
+        catch (e) {
+          if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
+          res.writeHead(404); res.end(`no capture yet: ${captureFile} is not there — the viewer asks again every 1.5 s`)
+        }
+      }
       else { res.writeHead(404); res.end('no capture source — open a scenario from /, or pass a file / --live / --attach') }
     } else {
       res.writeHead(404); res.end('not found')

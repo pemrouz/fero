@@ -17,7 +17,7 @@ import assert from 'node:assert'
 import { runAll } from './scenarios.ts'
 import { Sim } from '../../sim/exec.ts'
 import { cluster, writes } from '../../sim/harness.ts'
-import { captureSim } from './capture.ts'
+import { captureSim, captureLive } from './capture.ts'
 import { REC } from '../../kernel/env.ts'
 import * as MODEL from './model.mjs'
 import { tip } from './eli5.mjs'
@@ -284,4 +284,27 @@ test('the omni panel never contradicts the count beside it: a fragment with no c
   assert.match(el('omenu').innerHTML, /no completions for “zzzz” — filtering as text/, 'the panel says what it means: completions, not rows')
   type('write:zz')                                              // a facet value that completes to nothing is not "filtering as text"
   assert.match(el('omenu').innerHTML, /no write: value matches “zz”/)
+})
+
+test('a /capture.json that is not there yet is WAITED for, not given up on: the page says so, asks again at the poll cadence, and needs no reload (ISSUES I-39)', async () => {
+  //! the reader's order in 23-live: the debugger is started first, live.ts writes `capture 1` a moment later
+  const sim = new Sim(7); const nodes = cluster(sim, 3); sim.run(); writes(sim, nodes, 12, 20); sim.run()
+  const live = captureLive([...sim.nodes.values()])
+  let present = false
+  const fetch = async () => (present ? { ok: true, json: async () => JSON.parse(JSON.stringify(live)) } : { ok: false, status: 404 })
+  const { el, g, timers } = await bootViewer('live', live, { search: '', fetch })
+  const pump = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)) }
+  assert.equal(g('CAP'), null, 'nothing loaded yet')
+  assert.match(el('tree').innerHTML, /Waiting for <b>\/capture\.json<\/b>/, 'the page says it is waiting, not that it failed')
+  assert.match(el('tree').innerHTML, /HTTP 404/, 'and why, verbatim')
+  assert.doesNotMatch(el('tree').innerHTML, /Couldn't load/)
+  assert.equal(timers.length, 1, 'one retry is scheduled'); assert.equal(timers[0].ms, 1500, 'at the poll cadence')
+  timers.shift()!.fn(); await pump()                            // still absent: the page keeps waiting and re-arms
+  assert.equal(g('CAP'), null); assert.equal(timers.length, 1, 'a failed retry schedules the next')
+  present = true                                                // `capture 1` lands
+  timers.shift()!.fn(); await pump()
+  assert.ok(g('CAP != null'), 'the retry loaded the capture — no reload')
+  assert.equal(g('LIVE'), true, 'a live capture starts the poll path')
+  assert.match(el('srcName').innerHTML, /live · 3 nodes/, 'the source label paints live')
+  assert.doesNotMatch(el('tree').innerHTML, /Waiting for/)
 })

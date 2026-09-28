@@ -127,36 +127,40 @@ const pageScript = (file: string) => {
 //! boot the real viewer script against one capture; returns the live vm context + elements.
 // `search` is the deep-link query (default ?scenario=<id>); a '' search boots the /capture.json path
 // (live captures poll — setInterval is a stub, so the poll never ticks; the test drives repaints itself).
+// `fetch` replaces the one-answer stub with the test's own (a source that is absent, then present); the
+// page's setTimeout is CAPTURED into `timers` (never run), so a test fires a scheduled retry by hand.
 export const bootViewer = async (
   scenarioId: string, capture: unknown,
-  opts: { failFetch?: boolean; search?: string } = {},
+  opts: { failFetch?: boolean; search?: string; fetch?: (url: string) => Promise<unknown> } = {},
 ) => {
   const page = pageScript('viewer.html')
   page.rewire('model', '__MODEL__')
   page.rewire('eli5', '__ELI5__')
   const dom = makeDocument(page.realIds)
   const wire = JSON.parse(JSON.stringify(capture)) // exactly what the HTTP route would serve
+  const timers: { fn: () => void; ms: number }[] = []
   const ctx = vm.createContext({
     document: dom.document, docListeners: dom.docListeners,
     location: { search: opts.search ?? `?scenario=${scenarioId}`, pathname: '/debug' },
     history: { replaceState() {} },
     getSelection: () => ({ isCollapsed: true }),
-    fetch: async () => (opts.failFetch ? { ok: false, status: 503 } : { ok: true, json: async () => wire }),
+    fetch: opts.fetch ?? (async () => (opts.failFetch ? { ok: false, status: 503 } : { ok: true, json: async () => wire })),
     setInterval: () => 0, clearInterval: () => {},
+    setTimeout: (fn: () => void, ms: number) => { timers.push({ fn, ms }); return timers.length }, clearTimeout: () => {},
     URLSearchParams, console,
     __MODEL__: MODEL, __ELI5__: ELI5,
   })
   vm.runInContext(`'use strict';\n${page.src}`, ctx, { filename: 'viewer.html<script>' })
-  // the boot IIFE awaits the fetch stub — pump microtasks until it settles either way
+  // the boot awaits the fetch stub — pump microtasks until it settles either way
   const g = (expr: string) => vm.runInContext(expr, ctx)
   const { el } = dom
   for (let i = 0; i < 20 && !g('CAP != null') && !el('tree').innerHTML; i++)
     await new Promise((r) => setImmediate(r))
-  if (!opts.failFetch) {
+  if (!opts.failFetch && !opts.fetch) {
     assert.ok(g('CAP != null'), 'boot loaded the capture')
     assert.ok(!el('tree').innerHTML.includes("Couldn't load"), 'boot did not fall into the error pane')
   }
-  return { el, g, docListeners: dom.docListeners, fireDoc: dom.fireDoc, hover: dom.hover, document: dom.document }
+  return { el, g, timers, docListeners: dom.docListeners, fireDoc: dom.fireDoc, hover: dom.hover, document: dom.document }
 }
 
 //! drive one scrub through the trange 'input' listener — the exact drag path
