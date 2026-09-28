@@ -18,7 +18,9 @@ import { runAll } from './scenarios.ts'
 import { Sim } from '../../sim/exec.ts'
 import { cluster, writes } from '../../sim/harness.ts'
 import { captureSim, captureLive } from './capture.ts'
-import { REC } from '../../kernel/env.ts'
+import { REC, type EffectSink } from '../../kernel/env.ts'
+import { Node } from '../../kernel/node.ts'
+import { VERB, encodeControl } from '../../kernel/codec.ts'
 import * as MODEL from './model.mjs'
 import { tip } from './eli5.mjs'
 import { bootViewer, dragTo } from './dom-shim.ts'
@@ -385,4 +387,51 @@ test('the route timeline says "never arrived" only where the pill can (a settled
     assert.match(el('insp').innerHTML, /data-tip="stop:never">never arrived</, 'quiesced: the loss is proven')
     assert.match(el('tree').innerHTML, /data-tip="write:never-arrived"/)
   }
+})
+
+//! a node with a debugger ATTACHED — a latched DIAG session on link #9 — beside one admitted peer, then one write
+// (kernel/diag.test's in-process recipe): the capture's link table carries diag:true for the session's own line
+const observed = () => {
+  const sink = { connect() {}, send() {}, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {}, invoke() {}, result() {}, subRecs() {} } as unknown as EffectSink
+  const node = new Node({ uuid: 'aa', listen: 'sim:aa', diag: { allow: { ops: 'tok' } } }, { now: () => 0, rng: () => 0, sink })
+  node.step({ kind: 'start' })
+  node.step({ kind: 'linkUp', link: 8, dialed: true, to: 'sim:bb' })
+  node.step({ kind: 'bytesIn', link: 8, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
+  node.step({ kind: 'linkUp', link: 9, dialed: false })
+  node.step({ kind: 'bytesIn', link: 9, bytes: encodeControl(VERB.HELLO, { u: 'dbg', i: 1, l: '', r: 2, t: 'tok' }) })
+  node.step({ kind: 'write', recs: [{ type: REC.update, key: ['k'], value: 1 }] })
+  const cap = captureLive([node])
+  assert.deepEqual(cap.nodes[0].links.map((l) => [l.id, l.admitted, l.diag]), [[8, true, false], [9, false, true]], 'one admitted peer, one latched debugger — the fixture is what it claims')
+  return cap
+}
+
+test("the debugger's own DIAG session is an OBSERVER, not a stuck pre-admit peer: its own pill, left out of the admitted/total stat, on the end table and under scrub (ISSUES I-6)", async () => {
+  const cap = observed()
+  const { el, g } = await bootViewer('observed', cap, { search: '' })
+  const open = () => g(`expanded.add('g/nodes/aa'); expanded.add('g/nodes/aa/g/links'); render()`)
+  open()
+  const tree = el('tree').innerHTML
+  assert.match(tree, /1\/1<span class="su"> links<\/span>/, 'the links stat counts peers only: 1/1, not 1/2')
+  assert.match(tree, /data-tip="link:observer"/, 'the session row carries the observer pill')
+  assert.doesNotMatch(tree, /data-tip="link:pre-admit"/, 'and is never a pre-admit peer')
+  assert.doesNotMatch(tree, /data-sev="info"/, 'an observer is not a transition: no severity')
+  g(`navTo('g/nodes/aa')`)
+  assert.match(el('insp').innerHTML, /1\/1 admitted</, 'the node inspector counts peers only')
+  assert.match(el('insp').innerHTML, /data-tip="link:observer">observer</, 'and names the session row observer')
+  g(`navTo('g/nodes/aa/g/links/9')`)
+  assert.match(el('insp').innerHTML, /data-tip="link:observer"/, 'the link inspector says what the line is')
+  assert.doesNotMatch(el('insp').innerHTML, /unidentified/, 'not "unidentified": the page knows exactly what it is')
+  assert.match(el('statusRight').innerHTML, /data-tip="link:observer">observer</, 'and so does the status bar')
+  el('q').value = 'link:observer'; el('q').fire('input', { target: { value: 'link:observer' } })
+  assert.match(el('ocount').innerHTML, /<span class="fl">1<\/span> match/, 'link:observer is a filter value')
+  el('q').value = ''; el('q').fire('input', { target: { value: '' } })
+  //! under scrub the replayed table (topologyAt's diagAuth arm) says the same
+  const tAuth = cap.nodes[0].journal.find((e) => e.kind === cap.vocab.diagAuth)!.t
+  assert.ok(tAuth < Number(el('trange').max), 'the write after the latch leaves the latch row scrubbable')
+  dragTo(el, tAuth); open()
+  assert.match(el('tree').innerHTML, /data-tip="links@t"/, 'the topology replays')
+  assert.match(el('tree').innerHTML, /1\/1<span class="su"> links<\/span>/, 'replayed stat: peers only')
+  assert.match(el('tree').innerHTML, /data-tip="link:observer"/, 'replayed row: observer')
+  g(`navTo('g/nodes/aa')`)
+  assert.match(el('statusRight').innerHTML, /1\/1 links/, 'the status bar at t counts peers only')
 })

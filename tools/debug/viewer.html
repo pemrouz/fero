@@ -491,7 +491,10 @@ const buildForest = (capture, T) => {
     // unknown under replay, exactly as it does at present: the verdict's `unverified` list says which
     const unvSynced = !!(tp && tv.unverified && tv.unverified.includes('synced'));
     const lks = tp ? [...tp.links.values()].map(l => unvSynced ? { ...l, synced: null } : l) : n.links;
-    const adm = lks.filter(l => l.admitted).length;
+    //! the admitted/total stat counts PEERS: the debugger's own DIAG session (diag: true, kernel/diag.ts) is a
+    // read-only observer that is never admitted — counting it read as a stuck 2/3 on a healthy pair (ISSUES I-6)
+    const peers = lks.filter(l => !l.diag);
+    const adm = peers.filter(l => l.admitted).length;
     // off the modal fingerprint: DIVERGED (crit) only on a settled capture — elsewhere a change may still be on its
     // way, so the same fact is warn 'differs' (ISSUES I-4: a live view mid-propagation painted the red of a real fault)
     const off = capture.nodes.length > 1 && n.stateHash !== d.modal;
@@ -505,15 +508,17 @@ const buildForest = (capture, T) => {
     const links = lks.map(l => {
       const flags = new Set();
       if (l.closing) flags.add('closing');                              // a dup-race loser awaiting its close echo (replay only)
+      else if (l.diag) flags.add('observer');                           // the debugger's own read-only session — never a peer, not a transition
       else if (!l.admitted) flags.add('pre-admit');
       if (l.paused) flags.add('paused');
       if (l.admitted && l.synced === false && !l.closing) flags.add('syncing');   // synced ABSENT (old capture) → unknown, no claim
       const lp = flags.has('closing') ? { cls:'info', lab:'closing', key:'link:closing' }
+        : flags.has('observer') ? { cls:'info', lab:'observer', key:'link:observer' }
         : flags.has('paused') ? { cls:'warn', lab:'paused', key:'link:paused' }
         : flags.has('syncing') ? { cls:'warn', lab:'syncing', key:'link:syncing' }
         : flags.has('pre-admit') ? { cls:'info', lab:'pre-admit', key:'link:pre-admit' } : null;
       return { key: nk + '/g/links/' + l.id, type: 'link', label: l.uuid ? '→' + l.uuid : 'link#' + l.id, icon: '⇄',
-        sev: lp ? (lp.cls === 'info' ? 'info' : 'warn') : '', pill: lp,
+        sev: !lp || flags.has('observer') ? '' : lp.cls === 'info' ? 'info' : 'warn', pill: lp,   // an observer is quiet: a pill, no severity
         metaRaw: stat('#' + l.id, '', 'link-id', 44)
                + stat(l.dialed ? 'dialed' : 'accepted', '', l.dialed ? 'side:dialed' : 'side:accepted', 82)
                + (l.queued == null ? stat('—', 'queued', 'unknown@t', 84)                // parked-while-paused depth is not a diary fact
@@ -533,8 +538,8 @@ const buildForest = (capture, T) => {
              + stat(n.epoch ?? '—', 'ep', 'epoch', 58)
              + stat(keysN, 'keys', scrub ? 'keys@t' : 'keys', 74)
              + stat(jstat, 'jrnl', scrub ? 'jrnl@t' : 'jrnl', 96, n.dropped > 0 ? 'warn' : '', n.dropped > 0 ? `+${n.dropped} dropped to ring overflow` : '')
-             + (atEnd ? stat(adm + '/' + lks.length, 'links', 'at-end', 100, '', atEnd.fact)   // 100px: mid-formation OPEN counts run to 3 digits (dup-race losers linger until their echo)
-                      : stat(adm + '/' + lks.length, 'links', tp ? 'links@t' : 'links-stat', 100)),
+             + (atEnd ? stat(adm + '/' + peers.length, 'links', 'at-end', 100, '', atEnd.fact)   // 100px: mid-formation OPEN counts run to 3 digits (dup-race losers linger until their echo)
+                      : stat(adm + '/' + peers.length, 'links', tp ? 'links@t' : 'links-stat', 100)),
       //! tp/tv/lks/sts ride the entity so the inspector and status bar read the SAME replayed tables (one fold per node per drag)
       entity: { kind: 'node', node: n, tp, tv, lks, sts }, f: { node: n.uuid, kinds },
       kids: [group(nk + '/g/links', 'Links', '⇄', links, undefined, atEnd, atEnd ? 'info' : ''), group(nk + '/g/streams', 'Streams', '∿', streams, undefined, atEnd, atEnd ? 'info' : '')] };
@@ -659,7 +664,7 @@ const sugValues = (capture, d) => ({
   key: [],                                                   // free text — no closed value set
   write: ['applied', 'lww-lost', 'never-arrived', 'duplicate'],
   cell: ['contested', 'diverged', 'differs'],
-  link: ['syncing', 'paused', 'pre-admit', 'closing'],
+  link: ['syncing', 'paused', 'pre-admit', 'closing', 'observer'],
   kind: Object.keys(capture.vocab).sort((a, b) => (d.kindFreq.get(b) || 0) - (d.kindFreq.get(a) || 0)),
 });
 
@@ -941,7 +946,7 @@ function renderStatus(){
     const tp = t != null ? e.tp : null;                                  // the forest's replay for this node (or null → refused)
     sb.innerHTML = t != null
       ? `${sst('', '@ t' + t, 'tread')} · ${fact(stateAt(CAP, n.uuid, t).size + ' keys', 'keys@t')} · ${fact('journal ' + klog(jAt(n.journal, t)) + '/' + klog(n.journal.length), 'jrnl@t')}`
-        + (tp ? ` · ${fact([...tp.links.values()].filter(l => l.admitted).length + '/' + tp.links.size + ' links', 'links@t')}` : '')
+        + (tp ? ` · ${fact([...tp.links.values()].filter(l => l.admitted).length + '/' + [...tp.links.values()].filter(l => !l.diag).length + ' links', 'links@t')}` : '')
       : `${sst(node.sev, node.pill ? node.pill.lab : 'converged', node.pill ? node.pill.key : 'node:converged')} · ${fact('seq ' + (n.seq ?? '—'), 'seq')} · ${fact(n.state.length + ' keys', 'keys')} · ${fact('journal ' + klog(n.journal.length), 'jrnl')}`;
   } else if (node.type === 'write'){
     sb.innerHTML = `${fact('write ' + esc(node.label), 'write')} · ${sst(node.sev, esc(e.o.summaryText), 'route:summary')}`;
@@ -1038,9 +1043,9 @@ function inspNode(nd){
   const tp = t != null ? nd.entity.tp : null;                       // null → the end tables (labelled with the reason)
   const lks = nd.entity.lks;                                        // display links (unverified fields already unknown)
   const lrows = lks.map(l => {
-    const state = l.closing ? 'closing' : !l.admitted ? 'pre-admit' : l.synced === false ? 'syncing' : l.synced === true ? 'synced' : '—';
-    const skey = l.closing ? 'link:closing' : !l.admitted ? 'link:pre-admit' : l.synced === false ? 'link:syncing' : l.synced === true ? 'synced' : '';
-    const cls = l.closing ? 'min' : !l.admitted ? '' : l.synced === false ? 'min' : l.synced === true ? 'maj' : '';
+    const state = l.closing ? 'closing' : l.diag ? 'observer' : !l.admitted ? 'pre-admit' : l.synced === false ? 'syncing' : l.synced === true ? 'synced' : '—';
+    const skey = l.closing ? 'link:closing' : l.diag ? 'link:observer' : !l.admitted ? 'link:pre-admit' : l.synced === false ? 'link:syncing' : l.synced === true ? 'synced' : '';
+    const cls = l.closing ? 'min' : l.diag || !l.admitted ? '' : l.synced === false ? 'min' : l.synced === true ? 'maj' : '';
     return `<tr><td class="node">${l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '—'} <span style="color:var(--soft)" data-tip="link-id">#${esc(String(l.id))}</span></td>` +
       `<td data-tip="${l.dialed ? 'side:dialed' : 'side:accepted'}">${l.dialed ? 'dialed' : 'accepted'}</td><td class="${cls}"><span${skey ? ` data-tip="${skey}"` : ''}>${state}</span>${l.paused ? ' <span class="min" data-tip="link:paused">· paused</span>' : ''}</td>` +
       (l.queued == null ? `<td data-tip="unknown@t">—</td>` : `<td data-tip="queued">${esc(String(l.queued))}</td>`) + `</tr>`;
@@ -1074,8 +1079,8 @@ function inspNode(nd){
   const atEnd = t != null && !tp ? `<span class="stn" data-tip="at-end"${tv && tv.reason ? ` data-tip-fact="${esc(tv.reason)}"` : ''}>@ capture end</span>` : '';
   return ihead(esc(n.uuid), 'node', nd.sev, sub) +
     seg('Facts', facts, '', 'facts') +
-    seg('Links', links, atEnd || (tp ? `<span class="stn" data-tip="links@t">${lks.filter(l => l.admitted).length}/${lks.length} admitted @ t${t}</span>`
-                                     : `<span class="stn" data-tip="admitted">${n.links.filter(l => l.admitted).length}/${n.links.length} admitted</span>`), 'g:links') +
+    seg('Links', links, atEnd || (tp ? `<span class="stn" data-tip="links@t">${lks.filter(l => l.admitted).length}/${lks.filter(l => !l.diag).length} admitted @ t${t}</span>`
+                                     : `<span class="stn" data-tip="admitted">${n.links.filter(l => l.admitted).length}/${n.links.filter(l => !l.diag).length} admitted</span>`), 'g:links') +
     seg('Streams', streams, atEnd || (tp ? `<span class="stn" data-tip="streams@t">@ t${t}</span>` : ''), 'g:streams') +
     seg('Journal · newest first', jlog, `<span class="stn">last ${jr.length} of ${klog(rows.length)}${t != null ? ` ≤ t${t}` : ''}${n.dropped > 0 ? ' · +' + klog(n.dropped) + ' dropped' : ''}</span>`, 'journal') +
     seg('By kind', `<div class="reason mono" style="font-size:11px">${roll || '—'}</div>`, t != null ? `<span class="stn">≤ t${t}</span>` : '', 'by-kind');
@@ -1166,7 +1171,8 @@ function inspCell(nd){
 }
 function inspLink(nd){
   const { link: l, node: n } = nd.entity;
-  const peer = l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '<span class="warnt">unidentified</span>';
+  const peer = l.diag ? '<span data-tip="link:observer">the debugger (observer)</span>'   // a DIAG session never says a member name: it is not one
+    : l.uuid ? ref(l.uuid, 'g/nodes/' + l.uuid) : '<span class="warnt">unidentified</span>';
   const side = l.dialed ? 'dialed' : 'accepted';
   const tvr = refusedVerdict(n);
   const atEnd = tvr ? `<span class="stn" data-tip="at-end"${tvr.reason ? ` data-tip-fact="${esc(tvr.reason)}"` : ''}>@ capture end</span>` : '';
@@ -1176,9 +1182,9 @@ function inspLink(nd){
       ['link id', '#' + esc(String(l.id)), '', 'link-id'],
       ['peer', peer, '', 'peer'],
       ['side', side, '', 'side:' + side],
-      ['admitted', l.admitted ? 'yes' : 'no', l.admitted ? '' : 'warn', 'admitted'],
+      l.diag ? ['admitted', 'observer — never', '', 'link:observer'] : ['admitted', l.admitted ? 'yes' : 'no', l.admitted ? '' : 'warn', 'admitted'],
       ...(l.closing ? [['closing', 'yes', '', 'link:closing']] : []),              // replay-only: a refused line awaiting its close echo (info, like its pill)
-      ['synced', l.synced === true ? 'yes' : l.synced === false ? 'no' : '—', l.synced === false ? 'warn' : '', 'synced'],   // '—' = field absent from this capture
+      ['synced', l.synced === true ? 'yes' : l.synced === false && !l.diag ? 'no' : '—', l.synced === false && !l.diag ? 'warn' : '', 'synced'],   // '—' = field absent from this capture, or meaningless on an observer
       ['paused', l.paused ? 'yes' : 'no', l.paused ? 'warn' : '', 'paused'],
       l.queued == null ? ['queued', '—', '', 'unknown@t'] : ['queued', String(l.queued), l.queued ? 'warn' : '', 'queued'],
     ]), atEnd, 'facts');
