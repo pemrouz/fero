@@ -829,3 +829,30 @@ test('a client says who feeds it: `cluster.me.primary` is the feeder\'s uuid, nu
     await c.destroy(); await a.destroy().catch(() => {}); await b.destroy().catch(() => {})
   }
 })
+
+test('`cluster.me.origin` is the lane this life stamps under — the bare uuid in life 1, `uuid~2` from life 2 — and `me.incarnation` counts the lives', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-origin-'))
+  type Me = { uuid: string; origin: string; incarnation: number }
+  const me = (f: Awaited<ReturnType<typeof fero>>) => (snapshot(f.cluster) as { me: Me }).me
+  //! life 1: the origin on the me row must be the origin on the stamp — before, the row said `aa~1`
+  // while every WriteResolve and cluster.writes row said `aa`, so "which writes are mine?" failed in life 1
+  const one = await fero('r', { uuid: 'aa', listen: false, dir })
+  try {
+    const r = await one.methods.update({ key: 'k', value: 1 })
+    assert.equal(me(one).origin, 'aa', 'life 1 stamps under the bare uuid')
+    assert.equal(r.origin, me(one).origin, 'the me row and the stamp agree')
+    assert.equal(me(one).incarnation, 1)
+  } finally {
+    await one.destroy()
+  }
+  const two = await fero('r', { listen: false, dir })
+  try {
+    const r = await two.methods.update({ key: 'k', value: 2 })
+    assert.equal(me(two).origin, 'aa~2', 'life 2 is the fenced lane')
+    assert.equal(r.origin, 'aa~2')
+    assert.equal(me(two).incarnation, 2)
+  } finally {
+    await two.destroy()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})

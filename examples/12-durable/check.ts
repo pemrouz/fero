@@ -5,14 +5,14 @@ import { until } from '../lib.ts'
 
 // the last screen a life drew (its header, the object, and the guarantee under it), and the life rows on it
 const screen = (r: Spawned) => r.out.split(/^(?=NOTES )/m).pop() ?? ''
-const rows = (r: Spawned) => screen(r).match(/'\w+~\d+': '[\d:]+'/g) ?? []
+const rows = (r: Spawned) => screen(r).match(/'\w+(~\d+)?': '[\d:]+'/g) ?? []
 
 // a fresh dir: the first life seeds its own pid, writes a row keyed by its origin, and proves it is on disk
 rmSync('./notes', { recursive: true, force: true })
 const first = fero.spawn('server.ts')
 assert.ok(await until(() => screen(first).includes('persisted'), 15_000), 'the first life proved its row persisted (is this example open in another terminal?)')
-const uuid = /life (\w+)~1\n/.exec(screen(first))?.[1]
-assert.ok(uuid && screen(first).includes(`seed: ${first.pid}`) && rows(first)[0]?.startsWith(`'${uuid}~1'`), 'life 1 is uuid~1: the seed is its pid, and one row keyed by that origin')
+const uuid = /life (\w+)\n/.exec(screen(first))?.[1]
+assert.ok(uuid && screen(first).includes(`seed: ${first.pid}`) && rows(first)[0]?.startsWith(`'${uuid}'`), 'life 1 is the bare uuid: the seed is its pid, and one row keyed by that origin')
 assert.equal(await first.stop(), 0, 'stopped cleanly on Ctrl-C')
 
 // the next life: the same uuid at ~2, the old row back as it was, the seed still life 1's

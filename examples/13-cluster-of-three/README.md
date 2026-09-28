@@ -5,7 +5,7 @@ Terminals 1 to 3, one member each. Terminal 1, after the client ran:
 ```
 $ cd examples/13-cluster-of-three
 $ node server.ts 4801
-MEMBER 271476 on 127.0.0.1:4801 — life 12f06eac~1
+MEMBER 271476 on 127.0.0.1:4801 — life 12f06eac
 epoch 2 — members 3 — peers 2 — writable true
 { '4801': 5, '4802': 4, '4803': 3, '271869': 'client' }
 ```
@@ -21,7 +21,7 @@ Terminal 3, over two runs — `kill -9 271607` from terminal 4 (the pid is on it
 
 ```
 $ node server.ts 4803
-MEMBER 271607 on 127.0.0.1:4803 — life 1f47032a~1
+MEMBER 271607 on 127.0.0.1:4803 — life 1f47032a
 epoch 2 — members 3 — peers 2 — writable true
 { '4801': 7, '4802': 6, '4803': 6, '271869': 'client' }
 $ node server.ts 4803
@@ -33,7 +33,7 @@ epoch 4 — members 3 — peers 2 — writable true
 Terminal 1, the moment the vote is in — the link had gone at once (`peers 1`), the vote took six seconds:
 
 ```
-MEMBER 271476 on 127.0.0.1:4801 — life 12f06eac~1
+MEMBER 271476 on 127.0.0.1:4801 — life 12f06eac
 epoch 3 — members 2 — peers 1 — writable true
 { '4801': 7, '4802': 6, '4803': 6, '271869': 'client' }
 ```
@@ -53,7 +53,7 @@ epoch 3 — members 2 — peers 1 — writable true
 ```sh
 node server.ts 4804                       # a fourth member: members 4 on every screen
 node server.ts 4802                       # only two members; kill -9 one: the other stops, writable false
-rm -rf vault-4803 && node server.ts 4803  # no past: a new id at ~1, a new member on the old address
+rm -rf vault-4803 && node server.ts 4803  # no past: a new id in its first life, a new member on the old address
 ```
 
 `node check.ts` runs this story on its own and ends with `ok 13-cluster-of-three`, in about ten seconds.

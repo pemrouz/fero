@@ -5,13 +5,13 @@ One terminal, over two runs. A screen is the header line and the object; the wor
 ```
 $ cd examples/12-durable
 $ node server.ts
-NOTES 220134 — life 9de2f3e3~1
-{ seed: 220134, '9de2f3e3~1': '15:57:28' }
+NOTES 3436569 — life 342d2132
+{ seed: 3436569, '342d2132': '02:43:07' }
 persisted
 ^C
 $ node server.ts
-NOTES 220271 — life 9de2f3e3~2
-{ seed: 220134, '9de2f3e3~1': '15:57:28', '9de2f3e3~2': '15:57:29' }
+NOTES 3436638 — life 342d2132~2
+{ seed: 3436569, '342d2132': '02:43:07', '342d2132~2': '02:43:08' }
 persisted
 ```
 
@@ -28,9 +28,9 @@ persisted
 
 ```sh
 node server.ts                      # a third run: life ~3, three rows
-node server.ts --fero.dir ./other   # a second identity at ~1: every row on both screens, one seed wins (17)
+node server.ts --fero.dir ./other   # a second identity, first life: every row on both screens, one seed wins (17)
 node server.ts --fero.uuid zz       # refused: one dir, one identity
-rm -rf notes && node server.ts      # no dir, no past: a new id at ~1, its own seed, the old rows gone
+rm -rf notes && node server.ts      # no dir, no past: a new id, first life, its own seed, the old rows gone
 ```
 
 `node check.ts` runs this story on its own and ends with `ok 12-durable`, in about two seconds.
