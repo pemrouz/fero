@@ -63,6 +63,7 @@ const pool = attachArg !== null ? new AttachPool(attachArg.split(',').filter(Boo
 // forwarded → sequenced → applied) in the debugger. `--contend` flips to random-origin writes over
 // a shared keyset so LWW elections (and the contested-cells view) can be demonstrated.
 const runtimes: Runtime[] = []
+let traffic: NodeJS.Timeout | null = null // the live workload's clock — cleared by the clean stop
 if (flag('live')) {
   const N = Math.max(2, opt('nodes', 5))
   const ps = await Promise.all(Array.from({ length: N }, () => ports.free()))
@@ -77,7 +78,7 @@ if (flag('live')) {
   const ownerOf = (key: string) => // deterministic key→node: the single-writer rule
     runtimes[[...key].reduce((h, c) => h + c.charCodeAt(0), 0) % runtimes.length]
   let n = 0
-  setInterval(() => {
+  traffic = setInterval(() => {
     const key = keys[Math.floor(Math.random() * keys.length)] + Math.floor(Math.random() * 5)
     const r = flag('contend') ? runtimes[Math.floor(Math.random() * runtimes.length)] : ownerOf(key)
     const roll = Math.random()
@@ -153,3 +154,19 @@ server.listen(port, () => {
   console.log(`fero v4 → http://localhost:${port}/  (${mode})`)
   console.log(`  dashboard http://localhost:${port}/scenarios · debugger http://localhost:${port}/debug`)
 })
+
+//! Ctrl-C / SIGTERM is the clean stop — the rule a fero role follows (V4-8), applied to the debugger: the listener
+// closes, the DIAG sessions hang up, the live runtimes leave, and the process exits 0. Without this Node's default
+// let the signal kill the process (exit null), and a driver holding the pipes — a check, the site recorder,
+// `fero.spawn(...).stop()` — could not stop the debugger the way it stops a role. A stop that stalls (a runtime
+// whose leave never settles) still exits 0 after five seconds, like fero.spawn's own SIGKILL rung.
+const stop = async () => {
+  setTimeout(() => process.exit(0), 5000).unref()
+  if (traffic) clearInterval(traffic)
+  server.closeAllConnections()
+  server.close()
+  pool?.close()
+  for (const r of runtimes) await r.destroy()
+  process.exit(0)
+}
+for (const sig of ['SIGINT', 'SIGTERM'] as const) process.once(sig, () => { void stop() })
