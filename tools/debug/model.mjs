@@ -78,6 +78,22 @@ const logIndex = (node) => {
   return idx
 }
 
+//! laneOf — the provenance lane a node's OWN writes stamp under: the bare uuid for its first life, `uuid~<inc>` after
+// a restart (kernel/node.ts `origin`). A writeLocal row carries only the seq (a=seq, b=partition) and a capture holds
+// no incarnation, so the lane is read off the node's own facts: the highest `uuid~N` among its log and stream lanes,
+// else the bare uuid. Every writeLocal row in a journal belongs to the CURRENT life — a restart starts a fresh
+// journal, and the old life comes back as applyInbound rows from the WAL replay — so one lane per node is exact.
+// ISSUES I-1: joining them to the bare uuid made a reborn node replay ✗ and split each new write into two routes.
+const laneOf = (node) => {
+  let lane = node.uuid, inc = 1
+  for (const o of [...Object.keys(node.logs || {}), ...Object.keys(node.streams || {})]) {
+    if (!o.startsWith(node.uuid + '~')) continue
+    const n = Number(o.slice(node.uuid.length + 1))
+    if (Number.isInteger(n) && n > inc) { inc = n; lane = o }
+  }
+  return lane
+}
+
 //! stateAt — TIME TRAVEL: replay a node's journal to event-index t (its per-node counter) through the LWW
 // fold, joining apply events to the captured logs for the record payloads. Returns Map cellKey → {v (encoded),
 // origin, seq, epoch, removed}. Only valid when the node's journal is untruncated (node.dropped === 0).
@@ -85,6 +101,7 @@ export const stateAt = (capture, uuid, t) => {
   const node = capture.nodes.find((n) => n.uuid === uuid)
   const K = capture.vocab
   const idx = logIndex(node)
+  const lane = laneOf(node) // the node's OWN lane this life — where its writeLocal rows' records live
   const versions = new Map()
   const state = new Map()
   const applyOne = (origin, seq) => {
@@ -100,7 +117,7 @@ export const stateAt = (capture, uuid, t) => {
   }
   for (const e of node.journal) {
     if (e.t > t) break
-    if (e.kind === K.writeLocal) applyOne(uuid, e.a)
+    if (e.kind === K.writeLocal) applyOne(lane, e.a)
     else if (e.kind === K.applyInbound) applyOne(e.a, e.b)
     //! walTaint: the fsyncgate verdict — kernel/node.ts condemn() wipes state, versions, logs and streams, then
     // anti-entropy re-teaches the node. The end-state refold cannot see this (the re-taught fold coincides),
@@ -265,12 +282,13 @@ export const routes = (capture) => {
   }
   for (const node of capture.nodes) {
     const skips = new Set() // lwwSkip fires just before its applyInbound — join them into one status
+    const lane = laneOf(node) // a reborn node's writes are `uuid~inc#seq` routes — its peers apply them under that lane
     for (const e of node.journal) {
       if (e.kind === K.lwwSkip) skips.add(e.a + '#' + e.b)
       else if (e.kind === K.writeLocal) {
-        const r = touch(node.uuid, e.a)
+        const r = touch(lane, e.a)
         r.partition = String(e.b)
-        r.nodes[node.uuid] = { status: skips.has(node.uuid + '#' + e.a) ? 'lww-lost' : 'origin', t: e.t }
+        r.nodes[node.uuid] = { status: skips.has(lane + '#' + e.a) ? 'lww-lost' : 'origin', t: e.t }
       } else if (e.kind === K.applyInbound) {
         const r = touch(e.a, e.b)
         r.nodes[node.uuid] = { status: skips.has(e.a + '#' + e.b) ? 'lww-lost' : 'applied', t: e.t }
