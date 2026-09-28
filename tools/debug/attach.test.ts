@@ -11,6 +11,7 @@ import { AttachPool, DiagClient, pullNode } from './attach.ts'
 import { captureNode } from './capture.ts'
 import { verifyReplay, summarize, routes, verifyTopology } from './model.mjs'
 import { REC } from '../../kernel/env.ts'
+import { JK } from '../../kernel/journal.ts'
 import { ports, until } from '#utils'
 
 const TOKEN = 'attach-token-1234'
@@ -113,4 +114,46 @@ test('vocab: the union renders honest skew; a CONFLICTING mapping demotes that n
     assert.deepEqual(v.nodes.map((n) => n.uuid), [rts[0].node.uuid])
     assert.deepEqual(v.absent, [{ target: liar.target, reason: 'vocab-mismatch' }])
   } finally { c0.close(); c1.close(); await stop() }
+})
+
+//! a key this runtime OWNS: its write stamps a writeLocal row synchronously (a forwarded key would not touch its own
+// journal until the owner's commit came back) — probed, never assumed, so a mid-pull row below is deterministic
+const ownedKey = (r: Runtime): string => {
+  for (let i = 0; i < 32; i++) {
+    const key = `own${i}`, before = r.node.journal.n
+    r.write([{ type: REC.update, key: [key], value: 0 }])
+    if (r.node.journal.read(before).some((e) => e.kind === JK.writeLocal)) return key
+  }
+  assert.fail('no owned key in 32 probes')
+}
+
+//! a client whose FIRST q:'node' reply is followed, synchronously, by one local write on the pulled runtime — the
+// row that lands between the snapshot and the rest of the pull; returns the snapshot's journal head as the reply said it
+const writeAfterSnapshot = (c: DiagClient, r: Runtime, key: string) => {
+  const q = c.q.bind(c)
+  const seen = { jn: -1 }
+  c.q = async (body, ms) => {
+    const v = await q(body, ms)
+    if (body.q === 'node' && seen.jn < 0) { seen.jn = (v.n as { jn: number }).jn; r.write([{ type: REC.update, key: [key], value: 'mid-pull' }]) }
+    return v
+  }
+  return seen
+}
+
+test('a node that writes MID-PULL still pulls as ONE snapshot: the journal is cut at the snapshot head, so its links/streams refold (ISSUES I-18)', async () => {
+  const { rts, addrs, stop } = await spin(2)
+  const c = new DiagClient(addrs[0], TOKEN)
+  try {
+    const key = ownedKey(rts[0])
+    await until(() => rts[1].node.state.size > 0, 4000)
+    const seen = writeAfterSnapshot(c, rts[0], key)
+    const answer = await pullNode(c)
+    assert.ok(seen.jn > 0, 'the mid-pull write fired after the snapshot')
+    const cap = { v: 1, kind: 'live', vocab: answer.vocab, seed: null, nodes: [answer.node] }
+    const [t] = verifyTopology(cap) as { ok: boolean; reason?: string }[]
+    assert.ok(t.ok, `the snapshot's links/streams and its journal are one instant (${t.reason ?? ''})`)
+    //! rows that landed after the snapshot belong to the NEXT pull: the journal ends exactly at the snapshot head
+    assert.ok(answer.node.journal.every((e) => e.t < seen.jn), 'no row past the snapshot head')
+    assert.equal(answer.node.journal[answer.node.journal.length - 1].t, seen.jn - 1, 'and nothing below it is missing')
+  } finally { c.close(); await stop() }
 })
