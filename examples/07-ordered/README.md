@@ -16,6 +16,8 @@ top 2           [ 91, 85 ]
   in rank order (`za` is the same, descending). Two rows share the price 3, and a tie keeps arrival order:
   the order the rows reached this node, which another node need not share. A comparator with a tiebreak,
   `a.price - b.price || a.name.localeCompare(b.name)`, makes the order the same everywhere: bolt first.
+  `za` with a comparator reverses all of it, the tiebreak too (cog before bolt); for descending price
+  with names A→Z, flip the price term — `b.price - a.price || a.name.localeCompare(b.name)` — under `az`.
 - `limit(2)` is the first two rows in arrival order and `reverse()` is that order newest first: no sort,
   just the order the rows came. `za('price', 2)` is a bounded window. The tap prints it once when it
   attaches, and once more when the whole-row rewrite `f.data.w2 = { name: 'nut', price: 9 }` lifts nut in
