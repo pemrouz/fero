@@ -1122,9 +1122,10 @@ function inspWrite(nd){
     if (s.status === 'applied') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:applied">applied</span>${at}</li>`;
     if (s.status === 'lww-lost') return `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="bad" data-tip="stop:lww-lost">lost LWW</span>${beatenBy}${at}</li>`;
     if (s.status === 'duplicate') return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:duplicate">dup discarded — already seen</span>${at}</li>`;
-    return D.live
-      ? `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:inflight">not yet arrived</span></li>`
-      : `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b data-tip="stop:never">never arrived</b></li>`;
+    // the same `settled` predicate as the row's pill: only a quiesced sim can say NEVER (ISSUES I-5)
+    return D.settled
+      ? `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b data-tip="stop:never">never arrived</b></li>`
+      : `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:inflight">not yet arrived</span></li>`;
   }).join('');
   // sev muted under scrub — the crit/warn colour is the END verdict (never-arrived/lww-lost),
   // not a fact at T; the tree row keeps it (with tdim) because the tree is explicitly the ledger
