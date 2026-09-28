@@ -219,6 +219,10 @@ export interface ClusterShape {
 // mint child views); they are typed open here and by their value shapes above.
 export interface Fero {
   name: string
+  //! data — the live view: reads, plain-assignment writes and the operators. `data.tap((r) => …)` delivers
+  // change records `{ type, key, value?, at? }`; a NEW top-level row arrives as
+  // `{ type: 'insert', key: [], value, at: '<row>' }` — the row key rides `at` — while a rewrite or a
+  // remove of that row carries it in key[0].
   data: any
   methods: Methods
   cluster: any
