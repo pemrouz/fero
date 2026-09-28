@@ -12,7 +12,7 @@ import '../utils/battery.ts'
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { fero } from './index.ts'
-import { records, snapshot } from './substrate.ts'
+import { derived, records, snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { ports, until, sleep } from '#utils'
 
@@ -274,6 +274,52 @@ test("I-28 — 'open, then act' right after a client's fero() resolves shows the
     await c.methods.deposit(5)
     assert.ok(await until(() => (snapshot(live) as { balance?: number }).balance === 105, 8000), `the view caught up (${JSON.stringify(frames)})`)
     assert.ok(frames.includes(100), `the view showed the value BEFORE the deposit too (${JSON.stringify(frames)})`)
+  } finally {
+    await c.destroy(); await s.destroy()
+  }
+})
+
+test("I-29 — a derived view minted for a subscription or a one-shot call is DISPOSED when it is done: the source's derived count returns to 0; a shared view and the resource itself are never touched", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  let shared: any = null
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { u1: { who: 'alice', n: 1 }, u2: { who: 'bob', n: 2 } },
+    methods: {
+      feed: (who: string, ctx: { data: any }) => ctx.data.filter((r: { who: string }) => r.who === who),
+      chain: (who: string, ctx: { data: any }) => ctx.data.filter((r: { who: string }) => r.who === who).filter((r: { n: number }) => r.n > 0),
+      all: (_: unknown, ctx: { data: any }) => ctx.data,
+      //! a view built ONCE outside the handler and handed out: not this invocation's to dispose
+      bobs: () => shared,
+    },
+  })
+  shared = s.data.filter((r: { who: string }) => r.who === 'bob')
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    assert.equal(derived(s.data), 1, 'the shared view is the one derived node at the start')
+    //! before: five open/close cycles left five `filter` children on the source, each re-evaluated on
+    // every commit for the server's lifetime (the probe: children 0 → 5)
+    for (let i = 0; i < 5; i++) {
+      const h = c.methods.feed('alice'); const live = h.open()
+      assert.ok(await until(() => Object.keys(snapshot(live) as object).length === 1, 8000), 'the filtered snapshot arrived')
+      h.close()
+    }
+    assert.ok(await until(() => derived(s.data) === 1, 3000), `five closed subscriptions left nothing (${derived(s.data)} derived)`)
+    //! a chain disposes whole; a one-shot CALL and a server-local call release theirs once collapsed
+    const h = c.methods.chain('alice'); const live = h.open()
+    assert.ok(await until(() => Object.keys(snapshot(live) as object).length === 1, 8000))
+    h.close()
+    assert.deepEqual(await c.methods.feed('bob'), { u2: { who: 'bob', n: 2 } })
+    assert.deepEqual(await s.methods.chain('bob'), { u2: { who: 'bob', n: 2 } })
+    assert.ok(await until(() => derived(s.data) === 1, 3000), `the chain, the call and the local call left nothing (${derived(s.data)} derived)`)
+    //! never the resource itself, never the shared view: both still serve after their subscriptions close
+    const whole = c.methods.all(); whole.open(); const bobs = c.methods.bobs(); bobs.open()
+    assert.ok(await until(() => Object.keys(snapshot(whole.open()) as object).length === 2 && Object.keys(snapshot(bobs.open()) as object).length === 1, 8000))
+    whole.close(); bobs.close()
+    assert.equal(derived(s.data), 1, 'the shared view is still on the source')
+    assert.deepEqual(snapshot(shared), { u2: { who: 'bob', n: 2 } }, 'and still live')
+    s.data.u3 = { who: 'bob', n: 3 }
+    assert.equal(Object.keys(snapshot(shared) as object).length, 2, 'it keeps folding')
+    assert.deepEqual(await c.methods.bobs(), snapshot(shared), 'and the next caller gets it whole')
   } finally {
     await c.destroy(); await s.destroy()
   }
