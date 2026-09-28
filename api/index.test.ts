@@ -18,7 +18,7 @@ import { fero, WriteRejectError } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { JK } from '../kernel/journal.ts'
-import { ports, until } from '#utils'
+import { ports, until, sleep } from '#utils'
 import type { WriteReject, WriteResolve } from './types.ts'
 
 test('config recognition (V4-5): unknown keys, unknown seams and TOP-LEVEL FUNCTIONS throw at fero() time; methods live under methods:', async () => {
@@ -533,6 +533,39 @@ test("a write rejection is a WriteRejectError: an Error with a stack whose messa
     assert.deepEqual({ ...e }, { guarantee: 'committed', reached: 'issued', reason: 'reserved' })
   } finally {
     await s.destroy()
+  }
+})
+
+test("I-30: an EMPTY key on methods.update / methods.remove is refused TYPED ('invalid-key') before any stamp — solo and on a two-member cluster; nothing reaches the kernel and the process lives on", async () => {
+  const bad = (e: WriteRejectError) => e instanceof WriteRejectError && e.reason === 'invalid-key' && e.reached === 'issued' && /data\.k/.test(e.message)
+  //! solo: the old code rejected with data's own Error thrown from inside the kernel step
+  const f = await fero('r', { uuid: 'aa', listen: false })
+  try {
+    f.data.k = 1
+    await assert.rejects(f.methods.update({ value: 7 } as never), bad)
+    await assert.rejects(f.methods.remove({ key: [] }), bad)
+    await assert.rejects(f.methods.update({ key: [], value: 7 }), bad)
+    assert.deepEqual(snapshot(f.data), { k: 1 }, 'nothing landed, nothing was lost')
+    assert.equal(diag(f).logSize(), 1, 'nothing was ever stamped')
+  } finally {
+    await f.destroy()
+  }
+  //! two members (epoch ≥ 1 — the attempt path): the old code threw AGAIN from the projection about a
+  // second later, outside any try, and killed the process even though the caller had caught the first
+  const pa = await ports.free()
+  const pb = await ports.free()
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1 && (snapshot(b.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
+    await assert.rejects(a.methods.update({ value: 7 } as never), bad)
+    await assert.rejects(b.methods.remove({ key: [] }), bad)
+    await sleep(1200)
+    a.data.k = 1
+    assert.ok(await until(() => (snapshot(b.data) as { k?: number }).k === 1, 8000), 'the cluster is whole and still replicates')
+  } finally {
+    await a.destroy()
+    await b.destroy()
   }
 })
 
