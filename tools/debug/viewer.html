@@ -380,6 +380,9 @@ const derive = (capture) => {
   }
   const d = { names, routes: routeMap, contested: cmap, modal, maxT, origins, kindFreq,
               quiesced: !!capture.quiesced, live: capture.kind === 'live',
+              // settled: nothing else is coming — only a QUIESCED SIM can prove a write lost or a disagreement final;
+              // a live view or a run stopped at a horizon paints the same facts as warn (in flight), never crit
+              settled: !!capture.quiesced && capture.kind !== 'live',
               truncated: capture.nodes.some(n => n.dropped > 0),
               // per node: may its links/streams be REPLAYED under scrub? verifyTopology's verdict (the drift
               // guard: the fold at t=∞ reproduced the captured end tables) — a page never assumes a fold is faithful
@@ -403,7 +406,7 @@ const outcomeOf = (capture, r, d) => {
   if (lost.length)  flags.add('lww-lost');
   if (never.length) flags.add('never-arrived');
   if (dup.length)   flags.add('duplicate');
-  const settled = d.quiesced && !d.live;                    // only a quiesced sim can PROVE a write is lost
+  const settled = d.settled;                                // only a quiesced sim can PROVE a write is lost
   const sev = never.length ? (settled ? 'crit' : 'warn') : lost.length ? 'warn' : '';
   // a pill names its ELI5 KEY (./eli5.mjs): the write:/cell:/link: filter vocabulary IS the pill vocabulary, one explanation each
   const pill = never.length ? (settled ? { cls:'crit', lab:'never-arrived', key:'write:never-arrived' }
@@ -489,9 +492,13 @@ const buildForest = (capture, T) => {
     const unvSynced = !!(tp && tv.unverified && tv.unverified.includes('synced'));
     const lks = tp ? [...tp.links.values()].map(l => unvSynced ? { ...l, synced: null } : l) : n.links;
     const adm = lks.filter(l => l.admitted).length;
-    const diverged = capture.nodes.length > 1 && n.stateHash !== d.modal;
-    const sev = diverged ? 'crit' : n.dropped > 0 ? 'warn' : '';
+    // off the modal fingerprint: DIVERGED (crit) only on a settled capture — elsewhere a change may still be on its
+    // way, so the same fact is warn 'differs' (ISSUES I-4: a live view mid-propagation painted the red of a real fault)
+    const off = capture.nodes.length > 1 && n.stateHash !== d.modal;
+    const diverged = off && d.settled;
+    const sev = diverged ? 'crit' : off || n.dropped > 0 ? 'warn' : '';
     const pill = diverged ? { cls:'crit', lab:'diverged', key:'node:diverged' }
+      : off ? { cls:'warn', lab:'differs', key:'node:differs' }
       : n.dropped > 0 ? { cls:'warn', lab:'truncated', key:'node:truncated', fact: `${n.dropped} oldest events dropped` } : null;
     const kinds = new Set();
     for (const e of n.journal) kinds.add((d.names[e.kind] || ('kind' + e.kind)).toLowerCase());
@@ -552,13 +559,17 @@ const buildForest = (capture, T) => {
   }).sort((a, b) => b.tmax - a.tmax);
 
   //! Cells — the union of every node's state (or the replayed state @ scrub point)
+  //! a disagreement is DIVERGED (crit) only at the settled end of a quiesced sim; under scrub it is 'differs@t',
+  //  on a live or mid-flight capture 'differs' — the same fact, warn, because a change may still be travelling
   const cellNodes = cellRows(capture, d, scrub ? T : null).map(c => {
-    const sev = c.diverged ? (scrub ? 'warn' : 'crit') : c.contested ? 'warn' : '';
+    const proven = c.diverged && !scrub && d.settled;
+    const sev = c.diverged ? (proven ? 'crit' : 'warn') : c.contested ? 'warn' : '';
     const pill = c.diverged ? (scrub ? { cls:'warn', lab:'differs@t', key:'cell:differs@t' }
-                                     : { cls:'crit', lab:'diverged', key:'cell:diverged' })
+                               : proven ? { cls:'crit', lab:'diverged', key:'cell:diverged' }
+                                        : { cls:'warn', lab:'differs', key:'cell:differs' })
       : c.contested ? { cls:'warn', lab:'contested', key:'cell:contested', fact: `${c.cand} candidates` } : null;
     const flags = new Set();
-    if (c.diverged) flags.add('diverged');
+    if (c.diverged) flags.add(proven ? 'diverged' : 'differs');
     if (c.contested) flags.add('contested');
     return { key: 'g/cells/' + encodeURIComponent(c.ck), type: 'cell', label: prettyCell(c.ck), icon: '▪', sev, pill,
       metaRaw: `<span data-tip="cell-value">= ${esc(fmtVal(c.value))}</span> <span class="x">·</span> <span data-tip="cell-winner">by ${c.winner ? esc(c.winner.origin + '#' + c.winner.seq) : '—'}</span>`
@@ -647,7 +658,7 @@ const sugValues = (capture, d) => ({
   origin: d.origins,
   key: [],                                                   // free text — no closed value set
   write: ['applied', 'lww-lost', 'never-arrived', 'duplicate'],
-  cell: ['contested', 'diverged'],
+  cell: ['contested', 'diverged', 'differs'],
   link: ['syncing', 'paused', 'pre-admit', 'closing'],
   kind: Object.keys(capture.vocab).sort((a, b) => (d.kindFreq.get(b) || 0) - (d.kindFreq.get(a) || 0)),
 });
@@ -889,7 +900,9 @@ function headerFacts(){
   // only honest render; a green badge over an empty set would be the vacuous-true lie the fold refuses
   bits.push(s.converged === null ? sst('warn', 'no nodes', 'no-nodes')
     : s.converged ? fact('converged ✓', 'converged')
-    : (s.shrunk && s.shrunk.atViolation ? sst('warn', 'mid-flight @ violation', 'mid-flight') : sst('crit', 'diverged ✗', 'diverged')));
+    : s.shrunk && s.shrunk.atViolation ? sst('warn', 'mid-flight @ violation', 'mid-flight')
+    : D.settled ? sst('crit', 'diverged ✗', 'diverged')                    // a quiesced sim: nothing else is coming
+    : sst('warn', 'differs (in flight)', 'differs'));                     // live / a horizon: a change may still be on its way
   // absent rows (M7 attach): targets that yielded no slice this rebuild — named with their typed reason,
   // never synthesized into node cards (absence renders as absence)
   if (s.absent && s.absent.length)
@@ -1016,7 +1029,7 @@ function inspNode(nd){
     ['listen', esc(String(n.listen ?? '—')), '', 'listen'],
     ['seq', esc(String(n.seq ?? '—')), '', 'seq'],
     ['epoch', esc(String(n.epoch ?? '—')), '', 'epoch'],
-    ['stateHash', esc(String(n.stateHash)), n.stateHash !== D.modal && CAP.nodes.length > 1 ? 'bad' : '', 'statehash'],
+    ['stateHash', esc(String(n.stateHash)), n.stateHash !== D.modal && CAP.nodes.length > 1 ? (D.settled ? 'bad' : 'warn') : '', 'statehash'],
     ['keys', t != null ? `${stateAt(CAP, n.uuid, t).size} <span class="x">@ t${t} · ${n.state.length} at end</span>` : String(n.state.length), '', t != null ? 'keys@t' : 'keys'],
     ['journal', t != null ? `${klog(rows.length)} <span class="x">≤ t${t} · ${klog(n.journal.length)} retained</span>`
                           : klog(n.journal.length) + (n.dropped > 0 ? ` / ${klog(n.dropped)} dropped` : ' / 0 dropped'), n.dropped > 0 ? 'warn' : '', t != null ? 'jrnl@t' : 'journal'],
