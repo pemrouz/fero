@@ -12,6 +12,7 @@ import os from 'node:os'
 import { Runtime, restoreOpts } from '../shell/runtime.ts'
 import { REC } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
+import { Ring } from '../kernel/ring.ts'
 import { ports, until } from '#utils'
 
 test('a solo durable node survives a hard restart: WAL + boot record restore state, clock, lane, and incarnation', async () => {
@@ -157,6 +158,65 @@ test('the M4e twin on real disks: a two-node cluster is killed whole — both re
     b2.write([{ type: REC.update, key: ['post-restore'], value: 'alive' }])
     assert.ok(await until(() => a2.node.state.size === 4 && a2.node.stateHash === b2.node.stateHash), 'reconverged')
   } finally {
+    for (const r of live) await r.destroy()
+    fs.rmSync(da, { recursive: true, force: true })
+    fs.rmSync(db, { recursive: true, force: true })
+  }
+})
+
+test('I-36 — the WAL dir deleted under a running member: the next boot record condemns the store (durable never advances again), the clean leave still completes, nothing is thrown', async () => {
+  const da = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-gone-a-'))
+  const db = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-gone-b-'))
+  const live: Runtime[] = []
+  //! before the fix the ENOENT escaped a socket 'data' handler (persistBoot inside the vote's bytesIn step)
+  // and killed the process mid-leave — trapped here so a regression reads as a failed assertion
+  const uncaught: unknown[] = []
+  const trap = (e: unknown) => { uncaught.push(e) }
+  process.on('uncaughtException', trap)
+  try {
+    const pa = await ports.free()
+    const pb = await ports.free()
+    //! heartbeats ON and a static mesh both ways (genesis: the lowest uuid proposes once its links cover its
+    // hosts): a committed two-member view, so bb's leave is a real ballot — LEAVE to aa, aa proposes, bb
+    // VOTES — and the vote's boot record is a write into the gone directory
+    const a = new Runtime({ uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], dir: da, heartbeatMs: 50, redialMs: 30 })
+    const b = new Runtime({ uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], dir: db, heartbeatMs: 50, redialMs: 30 })
+    live.push(a, b)
+    await a.start()
+    await b.start()
+    assert.ok(await until(() => a.node.membership.view.members.length === 2 && b.node.membership.view.members.length === 2), 'a two-member view committed')
+    //! keys bb OWNS under the ring: bb stamps and persists them itself (the other half is forwarded to aa
+    // and would prove nothing about bb's disk). The kernel builds its ring lazily on the first write, so
+    // the lookup is a private Ring over the same committed view — ownership is a pure function of it.
+    const ring = new Ring()
+    ring.build(b.node.membership.view.epoch, b.node.membership.view.members)
+    const mine = (i: number) => {
+      for (let n = 0; n < 256; n++) { const k = `k${i}-${n}`; if (ring.ownerOf(k) === 'bb') return k }
+      throw new Error('no key of 256 hashed to bb')
+    }
+    b.write([{ type: REC.update, key: [mine(0)], value: 1 }])
+    assert.ok(await until(() => (b.node.streams.get('bb')?.durable ?? 0) >= 1), 'the store works: the write fsync-resolved')
+    const durable = b.node.streams.get('bb')!.durable
+    //! the dir goes under the running member. The append fd stays open on the unlinked file, so appends and
+    // fsyncs keep SUCCEEDING — only a boot record (a vote, a view install, the Lamport lease) touches the
+    // directory. persistBoot() here IS that next record.
+    fs.rmSync(db, { recursive: true, force: true })
+    b.node.persistBoot()
+    assert.ok(await until(() => b.node.journal.read().some((e) => e.kind === JK.persistFail)), 'the failed boot record is the store\'s death, surfaced')
+    const seq = b.node.seq
+    b.write([{ type: REC.update, key: [mine(1)], value: 2 }])
+    assert.ok(await until(() => b.node.seq > seq), 'bb still stamps — replication is untouched')
+    await new Promise((r) => setTimeout(r, 150))
+    assert.equal(b.node.streams.get('bb')!.durable, durable, 'but durable never advances again: no persisted answer from a dir that is gone')
+    //! the clean leave: the vote ships without its record (the store is dead either way) and the ballot
+    // completes — the process lives and the survivor shrinks the view
+    assert.equal(await b.leave(), true, 'the leave completed by ballot')
+    assert.ok(await until(() => a.node.membership.view.members.length === 1), 'aa alone in the view')
+    await b.destroy()
+    live.splice(live.indexOf(b), 1)
+    assert.deepEqual(uncaught, [], 'nothing escaped')
+  } finally {
+    process.off('uncaughtException', trap)
     for (const r of live) await r.destroy()
     fs.rmSync(da, { recursive: true, force: true })
     fs.rmSync(db, { recursive: true, force: true })

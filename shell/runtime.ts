@@ -103,6 +103,15 @@ export class Runtime {
   // SUCCEED, leaving an interior hole on an HONEST disk — which would then read as a lie at replay
   // and condemn an innocent restore (M4-review: the hole-means-lie premise requires stop-on-failure).
   #walFailed = false
+  //! #bootFailed — the boot record's own latch (I-36). The found case is a dir deleted under a running
+  // member: the append fd stays open on the unlinked file, so appends and fsyncs keep SUCCEEDING, and the
+  // first boot record after it (a vote, a view install, the Lamport lease) is the first write that meets
+  // the missing directory — it used to throw ENOENT out of the kernel's step, uncaught, mid-leave. One
+  // failed boot write now condemns the store like a failed fsync (#walFailed too, so `persisted` is never
+  // answered again), stops every later boot write, and tells the kernel ONCE (persistFail). The leave that
+  // carried the vote completes without its record — the store is dead either way — the process lives,
+  // and the survivors shrink the view by ballot.
+  #bootFailed = false
   onApply: (rec: Applied) => void
   //! onConfirm — the guarantee ladder's answers surface here (M5's confirm option resolves off it)
   onConfirm: (id: number, ok: boolean, count: number) => void = () => {}
@@ -227,15 +236,26 @@ export class Runtime {
         // directory) let the one record everything else fences on — votedFor, the Lamport ceiling, the
         // incarnation — regress across a power crash: a double-vote and cross-life seq reuse in one bug.
         boot(record) {
-          if (!runtime.#opts.dir) return
+          if (!runtime.#opts.dir || runtime.#bootFailed) return
           const p = path.join(runtime.#opts.dir, 'boot.json')
-          const fd = fs.openSync(p + '.tmp', 'w')
           try {
-            fs.writeSync(fd, JSON.stringify(record))
-            fs.fsyncSync(fd)
-          } finally { fs.closeSync(fd) }
-          fs.renameSync(p + '.tmp', p)
-          syncDir(runtime.#opts.dir)
+            const fd = fs.openSync(p + '.tmp', 'w')
+            try {
+              fs.writeSync(fd, JSON.stringify(record))
+              fs.fsyncSync(fd)
+            } finally { fs.closeSync(fd) }
+            fs.renameSync(p + '.tmp', p)
+            syncDir(runtime.#opts.dir)
+          } catch (err) {
+            //! the record did not land (see #bootFailed): latch both stores dead NOW — synchronously, so no
+            // append or echo can slip in — and post the alarm on a microtask, not as a nested step: boot()
+            // runs INSIDE the kernel's own step (persistBoot is synchronous by contract), and the api's
+            // post-step fold must never observe a half-stepped node.
+            runtime.#bootFailed = true
+            runtime.#walFailed = true
+            const reason = (err as NodeJS.ErrnoException).code ?? 'boot'
+            queueMicrotask(() => { if (!runtime.node.destroyed) runtime.node.step({ kind: 'persistFail', batch: 0, reason }) })
+          }
         },
         confirm(id, ok, count) { runtime.onConfirm(id, ok, count) },
         invoke(link, id, mode, m, a) { runtime.onInvoke(link, id, mode, m, a) },
