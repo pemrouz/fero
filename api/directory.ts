@@ -1,4 +1,4 @@
-//! ── api/directory — the per-box rendezvous directory (V4-3, DESIGN-DIRECTORY.md) ──────────────
+//! ── api/directory — the per-box rendezvous directory (V4-3, docs/DESIGN-DIRECTORY.md) ──────────────
 // One fixed loopback address per box (RENDEZVOUS). Whoever binds it hosts the system resource
 // `#directory`: a soft-state registry `name → {uuid: listen}` held in a data proxy on the host —
 // never a log, never a WAL. Every dialable user instance opens a `#directory` CLIENT to it:
