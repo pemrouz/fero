@@ -33,7 +33,9 @@ for (const dir of dirs) {
       assert.ok(!src.includes("'#utils'"), `${dir}/${f} must not import #utils (examples are the public surface)`)
       if (!mayImportInternals(dir)) assert.ok(!src.includes('internals.ts'), `${dir}/${f} must not import internals`)
     }
-    const rendezvous = `127.0.0.1:${await ports.free()}`
+    //! the rendezvous sits OUTSIDE the ephemeral range a check draws its member ports from (bind-0, in a
+    // later process), so a member port can never equal it and be refused for taking the directory's socket
+    const rendezvous = `127.0.0.1:${await ports.outside()}`
     const child = spawn(process.execPath, [path.join(folder, 'check.ts')], {
       cwd: folder,
       env: { ...process.env, FERO_RENDEZVOUS: rendezvous },
