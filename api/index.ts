@@ -456,6 +456,14 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     const localCommit = { origin: coords.origin, seq: coords.seq, epoch: coords.epoch }
     const where = `${coords.origin} seq ${coords.seq} epoch ${coords.epoch}`
     const level = want === 'persisted' ? CONFIRM.persisted : CONFIRM.replicated
+    //! 'persisted' where no disk can ever prove it: this node has no dir AND no member has ever announced
+    // durable evidence (a digest `p` map — Confirm.durablePeer), so the probe could only wait out its
+    // deadline. Rejected AT ONCE instead, with the pointer — after the commit, so the write still landed
+    // and `localCommit` says where (a reject is not a rollback). Servers only: a server hears every
+    // member's digest; a client hears its primary alone and cannot know what the rest of the view holds.
+    // A memory-only member beside a durable majority keeps probing — that majority proves it.
+    if (want === 'persisted' && !caller && !node.durable && !node.membership.view.members.some(([u]) => u !== node.uuid && node.confirm.durablePeer(u)))
+      throw reject({ reached: 'committed', reason: 'not-durable', localCommit }, 'not-durable', ` (${where}; no dir here and no member has announced a disk — pass dir: to persist)`)
     //! a spoke proves its guarantee AT THE PRIMARY (system confirm) — its own evidence is one digest
     // wide. `pt` (M6): the partition rides along so an armed prover ranges the probe over the R-set.
     const pt = partitionOf(rec)
