@@ -41,6 +41,27 @@ const SEAM_KEYS = new Set(['validation'])
 export const METHODS_ONLY = 'methods-only'
 const METHODS_ONLY_ADMIT = (_: Rec): true | string => METHODS_ONLY
 
+//! WriteRejectError — what methods.update/insert/remove REJECT with: the typed WriteReject fields riding
+// on an Error. A bare object died as one line when uncaught — `{ guarantee: 'committed', reached:
+// 'issued', reason: 'timeout' }` — no stack, no verb, no resource, and no hint that the reader forgot
+// `server: true`. The message names them all: `fero('shop') update ["x"]: timeout after 10000ms —
+// reached issued (nobody to write to: …)`. The fields are OWN enumerable properties and `name` sits on
+// the prototype, so `{ ...e }` is exactly the WriteReject, `e.reason` reads as before, and every
+// `satisfies WriteReject` consumer keeps working.
+export class WriteRejectError extends Error implements WriteReject {
+  declare guarantee: Guarantee
+  declare reached: 'issued' | 'committed'
+  declare reason: string
+  declare localCommit?: { origin: string; seq: number; epoch: number }
+  constructor(fields: WriteReject, message: string) {
+    super(message)
+    Object.assign(this, fields)
+  }
+}
+Object.defineProperty(WriteRejectError.prototype, 'name', { value: 'WriteRejectError', configurable: true, writable: true })
+//! VERB_NAMES — REC type → the methods.* verb a message names
+const VERB_NAMES = ['update', 'insert', 'remove'] as const
+
 //! discovery (V4-3, DESIGN-DIRECTORY.md): no name hashing — a server binds a FREE loopback port and
 // registers {name, uuid, listen} with the per-box directory (api/directory.ts, the `#directory`
 // system resource at the rendezvous address); everyone looks the name up LIVE and the addresses feed
@@ -401,21 +422,31 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const write = async (rec: Rec, o: WriteOpts = {}): Promise<WriteResolve> => {
     const want: Guarantee = o.confirm ?? 'committed'
     const ms = o.timeout ?? 10_000
+    const key = rec.key.length ? rec.key : [String(rec.at ?? '')]
+    //! every refusal is ONE WriteRejectError: the typed fields, and a message that names the resource,
+    // the verb, the key, what happened and the rung reached — `tail` is the pointer, when there is one
+    const reject = (fields: Omit<WriteReject, 'guarantee'>, what: string, tail = ''): WriteRejectError =>
+      new WriteRejectError({ guarantee: want, ...fields }, `fero('${name}') ${VERB_NAMES[rec.type]} ${JSON.stringify(key)}: ${what} — reached ${fields.reached}${tail}`)
+    const explain = (reason: string): string => reason === METHODS_ONLY ? `${reason} (the server takes changes only through its methods)` : reason
+    //! the one hint a timed-out client needs most (rung 04's finding): nothing is connected to write to
+    const nobody = (): string => caller && node.primary === null ? ' (nobody to write to: a bare fero(name) is a client; pass server: true to host)' : ''
     const r = bind.issue([rec])[0]
-    if (typeof r === 'string') throw { guarantee: want, reached: 'issued', reason: r } satisfies WriteReject
+    if (typeof r === 'string') throw reject({ reached: 'issued', reason: r }, explain(r))
     //! the timeout timer is CAPTURED and CLEARED on settle (M5-review #3: the bare setTimeout leaked one
     // live timer + reject closure per write for the full `ms` on the hot path). And a POST-ISSUE kernel
     // reject ('superseded'/'dropped'/'destroyed') is normalized to a typed WriteReject (M5-review #9:
     // the bare string escaped the WriteReject contract). Only the coordinate resolution races the timer.
     let timer: ReturnType<typeof setTimeout>
-    const coords = await new Promise<Coords>((resolve, reject) => {
-      timer = setTimeout(() => reject({ guarantee: want, reached: 'issued', reason: 'timeout' } satisfies WriteReject), ms)
+    const coords = await new Promise<Coords>((resolve, rej) => {
+      timer = setTimeout(() => rej(reject({ reached: 'issued', reason: 'timeout' }, `timeout after ${ms}ms`, nobody())), ms)
       timer.unref?.()
       ;(r as Promise<Coords>).then(resolve, (e) =>
-        reject(typeof e === 'string' ? ({ guarantee: want, reached: 'issued', reason: e } satisfies WriteReject) : e))
+        rej(typeof e === 'string' ? reject({ reached: 'issued', reason: e }, explain(e)) : e))
     }).finally(() => clearTimeout(timer))
-    const resolved: WriteResolve = { guarantee: 'committed', key: rec.key.length ? rec.key : [String(rec.at ?? '')], origin: coords.origin, seq: coords.seq, epoch: coords.epoch, cid: coords.cid }
+    const resolved: WriteResolve = { guarantee: 'committed', key, origin: coords.origin, seq: coords.seq, epoch: coords.epoch, cid: coords.cid }
     if (want === 'committed') return resolved
+    const localCommit = { origin: coords.origin, seq: coords.seq, epoch: coords.epoch }
+    const where = `${coords.origin} seq ${coords.seq} epoch ${coords.epoch}`
     const level = want === 'persisted' ? CONFIRM.persisted : CONFIRM.replicated
     //! a spoke proves its guarantee AT THE PRIMARY (system confirm) — its own evidence is one digest
     // wide. `pt` (M6): the partition rides along so an armed prover ranges the probe over the R-set.
@@ -423,7 +454,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     const ok = caller
       ? await caller.call(SYSTEM + 'confirm', { o: coords.origin, s: coords.seq, l: level, t: ms, pt }, { timeout: ms, retry: true }).then((v) => v === true, () => false)
       : await probe(coords, level, ms, pt)
-    if (!ok) throw { guarantee: want, reached: 'committed', reason: 'timeout', localCommit: { origin: coords.origin, seq: coords.seq, epoch: coords.epoch } } satisfies WriteReject
+    if (!ok) throw reject({ reached: 'committed', reason: 'timeout', localCommit }, `timeout after ${ms}ms`, ` (${where})`)
     return { ...resolved, guarantee: want }
   }
 

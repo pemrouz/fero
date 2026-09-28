@@ -26,7 +26,7 @@ export { converged, drained, confirmedIntact, perEvent } from './sim/monitors.ts
 export { Runtime } from './shell/runtime.ts'
 export { captureSim, captureLive, captureNode } from './tools/debug/capture.ts'
 //! M5 api layer — the public surface's building blocks, for embedders composing their own shells.
-export { fero } from './api/index.ts'
+export { fero, WriteRejectError } from './api/index.ts'
 //! M7 [diagnostics] — the Symbol-keyed internals seam on every fero() instance (off the typed surface).
 export { diagnostics, diag, type Diagnostics, type CapturedNode } from './api/diagnostics.ts'
 export { Bind, WRITES_KEEP, cellOf, type Coords, type Outcome } from './api/data.ts'
