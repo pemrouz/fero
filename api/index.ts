@@ -369,7 +369,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         //! `await data` means the RESOURCE — the gather, never the shard (typed reject on shortfall)
         return (F?: (v: unknown) => unknown, R?: (e: unknown) => unknown) => gatherOf().refresh(rt, { throwOnPartial: true }).then(F, R)
       }
-      if (OPERATORS.has(prop)) return scopedThrow(prop, 'holistic', 'materialize first: (await methods.read()).' + prop + '(…) — or define a derived resource')
+      //! the hint is a recipe that RUNS (ISSUES I-26): read() resolves to a PLAIN object, so the rows are
+      // Object.values(…) — with the Array method of the same name when there is one (filter, map, some …)
+      if (OPERATORS.has(prop))
+        return scopedThrow(prop, 'holistic', `materialize first: Object.values(await methods.read())${typeof (Array.prototype as unknown as Record<string, unknown>)[prop] === 'function' ? '.' + prop + '(…)' : ''} — the rows as a plain array (await data is the same gather) — or define a derived resource`)
       if (prop === 'get') return (k: unknown) => (!node.armed || node.scope!.held(String(k)) ? t[String(k)] : remoteKey(String(k)))
       if (!node.armed || node.scope!.held(prop)) return Reflect.get(t, prop, r)
       return remoteKey(prop)
