@@ -2,8 +2,8 @@
  "rev": "102baf2",
  "when": "2026-08-23T15:07:26.058Z",
  "wallMs": 7790,
- "pass": 20,
- "total": 20,
+ "pass": 21,
+ "total": 21,
  "baseline": {
   "rev": "5cb5300",
   "when": "2026-07-12T11:48:31.750Z"
@@ -1461,6 +1461,75 @@
     "events": 4546,
     "wall ms": 476
    }
+  },
+  {
+   "id": "reborn-writer",
+   "title": "Kill −9 one member — it comes back and writes again (M4)",
+   "kind": "unhappy",
+   "desc": "durable mode: one member dies mid-run, is restored from its WAL alone, and keeps writing. A restarted writer never reuses its old stamps — the new life stamps under a second author lane (n01~2) — the peers apply those writes as before, and the replay refold reproduces every end state across the restart",
+   "diagram": {
+    "nodes": [
+     "n01",
+     "n02",
+     "n03"
+    ],
+    "mesh": true,
+    "writers": [
+     "n01"
+    ],
+    "phases": [
+     {
+      "label": "write + fsync",
+      "sev": "gold"
+     },
+     {
+      "label": "kill −9",
+      "sev": "crit"
+     },
+     {
+      "label": "replay WALs",
+      "sev": "info"
+     },
+     {
+      "label": "write again",
+      "sev": "gold"
+     },
+     {
+      "label": "converge",
+      "sev": "ok"
+     }
+    ]
+   },
+   "pass": true,
+   "notes": "",
+   "metrics": [
+    {
+     "k": "writes",
+     "v": 6,
+     "kind": "count"
+    },
+    {
+     "k": "rows replayed",
+     "v": 6,
+     "kind": "count"
+    },
+    {
+     "k": "author lanes",
+     "v": 2,
+     "kind": "count"
+    },
+    {
+     "k": "events",
+     "v": 2010,
+     "kind": "count"
+    },
+    {
+     "k": "wall ms",
+     "v": 31,
+     "kind": "ms"
+    }
+   ],
+   "base": null
   },
   {
    "id": "wire",

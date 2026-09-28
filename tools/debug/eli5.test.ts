@@ -20,6 +20,7 @@ import { ABSENT_REASONS, verifyTopology } from './model.mjs'
 import { REC, type EffectSink } from '../../kernel/env.ts'
 import { Node } from '../../kernel/node.ts'
 import { VERB, encodeControl } from '../../kernel/codec.ts'
+import { frontier, compact } from '../../kernel/log.ts'
 
 type Entry = { t: string; d: string }
 const G = ELI5 as Record<string, Entry>
@@ -178,6 +179,16 @@ const sweepViewer = async () => {
   const observed = captureLive([aa])
   assert.ok(observed.nodes[0].links.some((l) => l.diag), 'the session latched — the fixture is what it claims')
   await drive('observed', observed, '')
+  //! a COMPACTED log: churn on four keys, then every member compacts below the frontier — the journals still name the
+  // collapsed writes but no record book holds them any more, so those routes say "record not captured" (the honest
+  // absence; until I-1 was fixed only the reborn writer's phantom routes painted it)
+  const sim6 = new Sim(92); cluster(sim6, 3, { heartbeatMs: 50, durable: true }); sim6.run({ until: 400 })
+  for (let i = 0; i < 30; i++) sim6.at(50 + i * 15, () => sim6.post(`n0${1 + (i % 3)}`, { kind: 'write', recs: [{ type: REC.update, key: [`c${i % 4}`], value: i }] }))
+  sim6.run({ until: 1500 })
+  let gone = 0
+  for (const n of sim6.nodes.values()) for (const o of n.logs.keys()) { const f = frontier(n, o); if (f > 0) gone += compact(n, o, f) }
+  assert.ok(gone > 0, 'compaction collapsed history — the fixture is what it claims')
+  await drive('compacted', captureSim(sim6))
   //! an ATTACH envelope with every absent reason and no nodes (the honest 'no nodes' header)
   await drive('attached', captureAttached([], ABSENT_REASONS.map((reason: string, i: number) => ({ target: `127.0.0.1:${i + 1}`, reason }))), '')
   return { painted, dangling }

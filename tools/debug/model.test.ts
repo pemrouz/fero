@@ -310,3 +310,25 @@ test('walTaint (a lying disk condemned at replay) resets the fold: streams AND s
   assert.ok((verifyTopology(cap) as { ok: boolean; reason?: string }[]).every((r) => r.ok), JSON.stringify(verifyTopology(cap)))
   assert.ok((verifyReplay(cap) as { ok: boolean; reason?: string }[]).every((r) => r.ok), JSON.stringify(verifyReplay(cap)))
 })
+
+test("a reborn node's own writes join its CURRENT lane (uuid~inc): the replay refolds, and each write is one route — not a phantom pair (ISSUES I-1)", () => {
+  //! a durable pair; n01 is killed and restored from its WAL, then writes again — its new life stamps under n01~2
+  const sim = new Sim(21); const pair = cluster(sim, 2, { durable: true }); writes(sim, pair, 6, 100); sim.run()
+  sim.restart('n01'); sim.run()
+  for (let i = 0; i < 3; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`after${i}`], value: i }] }, i * 5)
+  sim.run()
+  const cap = captureSim(sim)
+  const n01 = cap.nodes.find((n) => n.uuid === 'n01')!
+  assert.ok('n01~2' in n01.logs, 'the new life stamps under n01~2 — the fixture is what it claims')
+  for (const r of verifyReplay(cap)) assert.ok(r.ok, `${r.uuid}: ${r.reason}`)
+  assert.equal(stateAt(cap, 'n01', Infinity).size, n01.state.length, 'time travel on the reborn node ends where its state is')
+  const rs = routes(cap)
+  const after = [...rs.values()].filter((r) => r.origin === 'n01~2')
+  assert.equal(after.length, 3, 'three post-restart writes: one route each, under the new lane')
+  for (const r of after) {
+    assert.equal(r.nodes.n01.status, 'origin', `${r.origin}#${r.seq} was born at n01`)
+    assert.equal(r.nodes.n02.status, 'applied', `${r.origin}#${r.seq} was applied at n02`)
+    assert.ok(r.partition != null, 'the writeLocal row names its partition')
+    assert.ok(!rs.has(`n01#${r.seq}`), `no phantom bare-lane route n01#${r.seq}`)
+  }
+})

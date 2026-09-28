@@ -26,6 +26,7 @@ import { Node } from '../../kernel/node.ts'
 import { CONFIRM } from '../../kernel/confirm.ts'
 import { REC, type Env, type Rec } from '../../kernel/env.ts'
 import { VERB, encodeFrame, encodeControl } from '../../kernel/codec.ts'
+import { Ring } from '../../kernel/ring.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const RESULTS = join(HERE, 'results')
@@ -827,6 +828,64 @@ export const SCENARIOS: Scenario[] = [
           { k: 'writes', v: written, kind: 'count' },
           { k: 'confirmed persisted', v: confirmed, kind: 'count' },
           { k: 'rows replayed', v: replayed, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'reborn-writer',
+    title: 'Kill \u22129 one member \u2014 it comes back and writes again (M4)',
+    kind: 'unhappy',
+    desc: 'durable mode: one member dies mid-run, is restored from its WAL alone, and keeps writing. A restarted writer never reuses its old stamps \u2014 the new life stamps under a second author lane (n01~2) \u2014 the peers apply those writes as before, and the replay refold reproduces every end state across the restart',
+    diagram: {
+      nodes: ids(3), mesh: true, writers: [idOf(1, 3)],
+      phases: [
+        { label: 'write + fsync', sev: 'gold' }, { label: 'kill \u22129', sev: 'crit' },
+        { label: 'replay WALs', sev: 'info' }, { label: 'write again', sev: 'gold' }, { label: 'converge', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(21)
+      cluster(sim, 3, { heartbeatMs: 50, durable: true })
+      sim.run({ until: 400 })
+      //! keys n01 OWNS in its current view, read off the same ring the write pipeline routes by \u2014 any other key
+      // would be forwarded to its owner and stamped there, and the card is about n01 stamping for itself
+      const ownedBy = (uuid: string, prefix: string, n: number) => {
+        const v = sim.nodes.get(uuid)!.membership.view
+        const ring = new Ring(); ring.build(v.epoch, v.members)
+        const keys: string[] = []
+        for (let i = 0; keys.length < n; i++) if (v.epoch === 0 || ring.ownerOf(`${prefix}${i}`) === uuid) keys.push(`${prefix}${i}`)
+        return keys
+      }
+      ownedBy('n01', 'before', 6).forEach((key, i) =>
+        sim.at(50 + i * 20, () => sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [key], value: i }] })))
+      sim.run({ until: 1200 })
+      //! the kill: n01 alone \u2014 the other two keep the view; the reborn member rejoins from its boot record and its WAL
+      sim.restart('n01')
+      sim.run({ until: 2400 })
+      //! ...and writes again: its own writes now stamp under n01~2 (ISSUES I-1 \u2014 the debugger's folds must join them there)
+      ownedBy('n01', 'after', 6).forEach((key, i) =>
+        sim.at(50 + i * 20, () => sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [key], value: i }] })))
+      sim.run({ until: 6000 })
+      const live = [...sim.nodes.values()]
+      const reborn = sim.nodes.get('n01')!
+      const lanes = [...reborn.logs.keys()].filter((o) => o === 'n01' || o.startsWith('n01~')).length
+      const replayed = reborn.journal.read().filter((e) => e.kind === JK.replayed).reduce((x, e) => x + (Number(e.a) || 0), 0)
+      const fail =
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} \u2014 ${sim.violations[0].detail}` : '') ||
+        (reborn.incarnation !== 2 ? `incarnation ${reborn.incarnation} (expected 2)` : '') ||
+        (!formed(live) ? 'mesh did not re-form around the reborn member' : '') ||
+        (converged(sim) ?? '') ||
+        (lanes !== 2 ? `${lanes} author lanes on the reborn member (expected 2: n01 and n01~2)` : '') ||
+        (live.some((n) => !n.membership.gate(n).open) ? 'gate closed after the restart' : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: tally(sim).writes, kind: 'count' },
+          { k: 'rows replayed', v: replayed, kind: 'count' },
+          { k: 'author lanes', v: lanes, kind: 'count' },
           { k: 'events', v: sim.events, kind: 'count' },
         ],
         capture: captureSim(sim),
