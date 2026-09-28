@@ -271,3 +271,17 @@ test('the verdict is HONOURED: a node whose topology replay was refused keeps it
   assert.equal(g('selKey'), sel)
   assert.match(el('insp').innerHTML, /link id/, 'back at present the link inspector is back')
 })
+
+test('the omni panel never contradicts the count beside it: a fragment with no completion says so, and one that names an address is offered as key: (ISSUES I-40)', async () => {
+  const { el } = await bootViewer('replication', captures.get('replication'))
+  const type = (q: string) => { el('q').value = q; el('q').fire('input', { target: { value: q } }) }
+  type('k4')                                                    // a cell + its writes — matched by the text filter, but no filter head, severity, node or kind completes it
+  assert.match(el('ocount').innerHTML, /<span class="fl">[1-9]\d*<\/span> match/, 'the count says the text filter hit rows')
+  assert.doesNotMatch(el('omenu').innerHTML, /no matches/, 'the panel must not say "no matches" beside a live match count')
+  assert.match(el('omenu').innerHTML, /data-pick="key:k4"/, 'a fragment that names a cell/write address is offered as key:k4')
+  type('zzzz')                                                  // names nothing at all
+  assert.match(el('ocount').innerHTML, /<span class="fl">0<\/span> matches/)
+  assert.match(el('omenu').innerHTML, /no completions for “zzzz” — filtering as text/, 'the panel says what it means: completions, not rows')
+  type('write:zz')                                              // a facet value that completes to nothing is not "filtering as text"
+  assert.match(el('omenu').innerHTML, /no write: value matches “zz”/)
+})
