@@ -56,3 +56,20 @@ test('the listen banner says fero v4 — the line three READMEs paste', async ()
     assert.ok(!s.out().includes('v3'), `nothing the server prints says v3:\n${s.out()}`)
   } finally { s.kill(); await s.exited; rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('a capture file that is not there yet answers 404 with a typed body, never 500 — the viewer keys on it and waits (ISSUES I-39)', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'fero-serve-'))
+  const file = path.join(dir, 'later.capture.json')            // does not exist when the server starts
+  const s = await serve(file)
+  try {
+    const r = await fetch(`http://localhost:${s.port}/capture.json`)
+    assert.equal(r.status, 404, 'a file that is not there yet is a 404, not a server error')
+    assert.match(await r.text(), /^no capture yet: .*later\.capture\.json/, 'the body names the file and the wait')
+    const home = await fetch(`http://localhost:${s.port}/`)
+    assert.ok((await home.text()).includes('<title>fero — debug'), 'the debugger page still serves meanwhile')
+    writeFileSync(file, smallCapture())                           // the role writes it a moment later
+    const r2 = await fetch(`http://localhost:${s.port}/capture.json`)
+    assert.equal(r2.status, 200)
+    assert.equal((await r2.json()).kind, 'sim', 'the same URL now serves the capture — no restart')
+  } finally { s.kill(); await s.exited; rmSync(dir, { recursive: true, force: true }) }
+})
