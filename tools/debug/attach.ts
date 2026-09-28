@@ -142,13 +142,16 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
     links: unknown[]
   }
   //! journal: resume via next until the head; the first page's f0 is where retention starts (loss below
-  // it is the node's business — dropped rides the fold; the viewer disables time-travel loudly on it)
+  // it is the node's business — dropped rides the fold; the viewer disables time-travel loudly on it).
+  // CUT at the snapshot's head: a row with t ≥ w.jn landed AFTER the node fold was taken (a busy node keeps
+  // writing while we page), and folding it against the snapshot's links/streams read as drift where there
+  // was only skew (ISSUES I-18). The slice is one instant — the snapshot's; later rows belong to the next pull.
   const journal: { t: number; kind: number; a?: unknown; b?: unknown; c?: unknown }[] = []
   for (let f = 0; ; ) {
     const page = await c.q({ q: 'journal', f }, left())
     for (const row of page.ev as [number, number, unknown, unknown, unknown][])
-      journal.push({ t: row[0], kind: row[1], a: row[2], b: row[3], c: row[4] })
-    if (page.next === undefined) break
+      if (row[0] < w.jn) journal.push({ t: row[0], kind: row[1], a: row[2], b: row[3], c: row[4] })
+    if (page.next === undefined || (page.next as number) >= w.jn) break
     f = page.next as number
   }
   //! logs: EXCLUSIVE cursor per origin — resume from `next` (the last served seq), never re-request it
