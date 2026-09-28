@@ -787,18 +787,25 @@ function renderMenu(){
       items = vals[t].filter(v => v.toLowerCase().includes(frag)).slice(0, 14)
         .map(v => ({ tok: `${t}:${v}`, note: t === 'kind' ? 'journal kind (from capture.vocab)' : t, dot: t === 'is' ? sevDotVar(v) : 'gold-2' }));
     } else {
-      // completing a bare fragment: filter heads, severities, node uuids, kind names
+      // completing a bare fragment: filter heads, severities, node uuids, kind names — and key: when the
+      // fragment names a cell's or a write's address (the text filter already matches those rows; name the facet)
       const p = partial.toLowerCase();
       items = [
         ...FTYPES.filter(t => t.startsWith(p)).map(t => ({ tok: t + ':', note: 'filter head', dot: 'gold-2', nocount: true })),
         ...['crit', 'warn', 'info'].filter(s => s.startsWith(p) || ('is:' + s).includes(p)).map(s => ({ tok: 'is:' + s, note: 'severity rollup', dot: sevDotVar(s) })),
         ...CAP.nodes.filter(n => n.uuid.toLowerCase().includes(p)).slice(0, 6).map(n => ({ tok: 'node:' + n.uuid, note: 'node', dot: 'info' })),
         ...Object.keys(CAP.vocab).filter(k => k.toLowerCase().includes(p)).slice(0, 6).map(k => ({ tok: 'kind:' + k, note: 'journal kind', dot: 'soft' })),
+        ...(!partial.includes(':') && countTok(FOREST, 'key:' + p) ? [{ tok: 'key:' + p, note: 'cells + writes by key text', dot: 'gold-2' }] : []),
       ];
     }
+    // the panel completes TOKENS; the count beside the box counts ROWS — an empty panel says "no completions",
+    // never "no matches", so the two lines cannot contradict each other (a bare word still filters as text)
+    const none = m && vals[m[1].toLowerCase()]
+      ? `no ${esc(m[1].toLowerCase())}: value matches “${esc(m[2])}”`
+      : `no completions for “${esc(partial)}” — filtering as text`;
     const rows = items.length
       ? items.map(it => menuItem(it.tok, it.tok, it.note, it.dot, it.nocount ? '' : countTok(FOREST, it.tok))).join('')
-      : `<div class="oitem" style="cursor:default"><span class="onote">no matches for “${esc(partial)}”</span></div>`;
+      : `<div class="oitem" style="cursor:default"><span class="onote">${none}</span></div>`;
     $('omenu').innerHTML = `<div class="oh">Complete “${esc(partial)}”</div>${rows}`;
     return;
   }
