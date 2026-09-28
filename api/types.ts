@@ -204,7 +204,13 @@ export interface ClusterShape {
   members: Record<string, string>
   peers: Record<string, Peer>
   me: {
-    uuid: string; origin: string; listen: string
+    uuid: string
+    //! origin: the provenance lane this life stamps its writes under — the SAME string WriteResolve.origin
+    // and cluster.writes[*].origin carry: the bare uuid in a node's first life, `uuid~N` from its Nth
+    // (a durable restart bumps it; kernel/node.ts). incarnation: that N, the life counter.
+    origin: string
+    incarnation: number
+    listen: string
     role: 'server' | 'client'
     //! primary: on a CLIENT, the uuid of the ONE server feeding it (a spoke digests exactly one) — null
     // until a link is admitted, and re-set to the survivor on failover; always null on a server

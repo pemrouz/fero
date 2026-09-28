@@ -5,7 +5,7 @@ Terminal 1, the story, cut to the lines that matter:
 ```
 $ cd examples/30-fleet-audit
 $ node fleet.ts
-[member 565256] MEMBER 37473 — pid 565256 — life 0b9528c2~1
+[member 565256] MEMBER 37473 — pid 565256 — life 0b9528c2
 …
 t=0s the fleet is up: members 3
 …

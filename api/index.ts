@@ -547,7 +547,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // says `false`, never "down" (the panel's observability finding)
   const meets = rendezvous !== false && (isClient || listen !== undefined)
   const meRow = () => ({
-    uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: node.listen,
+    //! origin is THE lane this life stamps under — the kernel's spelling (kernel/node.ts: the bare uuid in
+    // life 1, uuid~N after), so it joins with WriteResolve.origin and cluster.writes[*].origin in every
+    // life; `incarnation` is the life counter for screens that want one
+    uuid: node.uuid, origin: node.origin, incarnation: node.incarnation, listen: node.listen,
     role: isClient ? 'client' : 'server',
     //! primary: the ONE server this client digests (kernel/node.ts `primary`, a link id there) — its uuid,
     // null while unconnected and always on a server. Re-folded below on every primary change.

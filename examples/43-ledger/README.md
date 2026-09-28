@@ -7,7 +7,7 @@ second run, then `kill -9 463595` from terminal 5 (the pid is on its screen), an
 ```
 $ cd examples/43-ledger
 $ node member.ts 4902
-MEMBER 463595 on 127.0.0.1:4902 — life 7adc0e79~1
+MEMBER 463595 on 127.0.0.1:4902 — life 7adc0e79
 epoch 2 — members 3 — peers 3 — writable true
 rows 3 — { mint: -100, alice: 90, bob: 10 }
 $ node member.ts 4902
