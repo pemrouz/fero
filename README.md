@@ -27,7 +27,8 @@ working as designed.
 
 ```sh
 npm install                    # once after a clone: the one dependency (optcascade); Node 22.18 or later
-npm test                       # 292 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites
+cd examples/01-two-servers && node server.ts   # the graded example series, 26 rungs: examples/README.md
+npm test                       # 456 tests: Tier-1 unit/fuzz, Tier-2 sim sweeps + AA/disk/scoped fault schedules, Tier-3 real-TCP + real-WAL smoke, debug-model + scenario suites, the 26 example checks
 npm run perf                   # perf gates: counted invariants first, ratios second, absolutes last — now incl. the alloc gates (--expose-gc) + the baseline gate
 npm run perf:alloc             # just the allocation gates (kernel/alloc.perf.ts)
 npm run perf:absolute          # run the persisted-baseline probes, print the delta table (tools/perf/BASELINE.md)
