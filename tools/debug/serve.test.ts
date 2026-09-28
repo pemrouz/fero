@@ -73,3 +73,18 @@ test('a capture file that is not there yet answers 404 with a typed body, never 
     assert.equal((await r2.json()).kind, 'sim', 'the same URL now serves the capture — no restart')
   } finally { s.kill(); await s.exited; rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('Ctrl-C is a clean stop: SIGINT closes the server and exits 0, so a driver holding the pipes can stop the debugger like a fero role', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'fero-serve-'))
+  const file = path.join(dir, 'x.capture.json')
+  writeFileSync(file, smallCapture())
+  const s = await serve(file)
+  try {
+    assert.equal((await fetch(`http://localhost:${s.port}/capture.json`)).status, 200, 'serving before the signal')
+    s.child.kill('SIGINT')
+    const done = await Promise.race([s.exited, new Promise<'hung'>((r) => setTimeout(() => r('hung'), 5000))])
+    assert.notEqual(done, 'hung', 'the process stopped within five seconds of Ctrl-C')
+    assert.deepEqual(done, { code: 0, signal: null }, 'a clean exit 0 — not killed by the signal')
+    await assert.rejects(fetch(`http://localhost:${s.port}/capture.json`), 'the port is released')
+  } finally { s.kill(); await s.exited; rmSync(dir, { recursive: true, force: true }) }
+})
