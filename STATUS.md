@@ -1,622 +1,93 @@
-# fero v4 — status
+# fero — status
 
-*fero v4 = fero v3 migrated onto data v4 (the sibling `data` repo = data v3 +
-the W1–W17 wishlist, ALL LANDED — see ../data/STATUS.md). Scaffolded
-2026-08-01 as a full copy of `v3/` (fero-v2 tip `1d94ad6`); PROMOTED TO THE
-REPO ROOT 2026-08-16 (package `fero` 4.0.0; the v2 surface + frozen v3 tree
-live on at the `master` branch tip — v3 stays the A/B reference there). Plan
-of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
-`master` tip under `v3/`; this file tracks the D-phases.*
+One page. Where fero stands, what is broken, what is worth doing, and what has been decided. The detail behind any line is in [docs/](docs) or in git history. Last updated 2026-09-28.
 
-Run from the repo root: `npm test` (456 + the 18-clause data contract ride; the directory OFF and
-the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
-`npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
-script-tier). One install step since V4-10: `npm install` (optcascade).
+## Where it stands
 
-## Migration ledger (D-phases, per DESIGN-DATA3 §5)
+- fero v4 is the repo root: branch `v4`, package `fero` 4.0.0. The old v2 surface and the frozen v3 tree are on the `master` branch.
+- `npm test`: 495 tests plus the 18-clause `data` contract. `npm run perf`: 43 pins. All green on 2026-09-28.
+- The example series is complete: 26 rungs, 01 to 43 ([examples/README.md](examples/README.md)).
+- On 2026-09-28 the ledgers were folded into this page and 42 small bugs and warts were fixed in one pass (V4-13 below). What is left here is what still needs a decision or real work.
+- The website (`~/fero-site`, outside this repo) shows rung 02 only and does not link the example index yet.
+- No git remote, so no CI. The perf baseline is advisory on this WSL2 box; a pinned baseline needs a quiet runner.
 
-| Phase | Scope | State |
-|---|---|---|
-| D0 | data v4 pinned (substrate imports data's ONE api entry — since both root promotions: `../../data/api/index.ts`); the SCHEDULE suite rides fero CI (`test:contract` chained into `npm test` — now 18 clauses vs data HEAD); cross-version symbol audit clean (the one v2-symbol probe modernized) | DONE |
-| D1 | Substrate swap: v4 handle mint, [value] snapshot (fresh-container semantics), applyRec = the HOT LANE (fero Recs verbatim, zero reshape, ORPHAN-CELL VIVIFY preserving v2's auto-vivify replication semantics), records() = connect(anchor, fn) with REAL synchronous dispose, applyStreamRec = tolerant seam ingest (whole-value diff resubscribe rides legally) | DONE |
-| D2 | Warts DELETED, not ported: the capture sink, #expected echo match-and-consume, verb-rewrite matching, #healRoot (root replace now throws PRE-COMMIT in the lens); no-op delete filter kept (leaf-read, absence ≡ undefined per clause 10c); scoped facade's hand-copied OPERATORS set → data's exportContract(); fold armor retained (now mostly moot under clause 10) | DONE |
-| D3 | The LENS (DESIGN-DATA3 §4.1): fero OWNS the write surface — assignment/delete trap into Bind.issue BEFORE data sees anything (validation covers both by construction, OQ6 kept); reads/operators/RESERVED delegate to the v4 handle; children are nested lenses; v2-parity thenable kept; post-destroy local-value pin kept; cluster fold on .set() (methods-only writes) | DONE |
-| D4 | Perf close-out: fero perf suite 36/36 PASS at the v3-era thresholds (api tripwires, alloc gates, absolute probes); the data-side m3 replication gate pins the seam shape (0.171× at frame-16 vs fero's v2 terminal apply) | DONE |
-| D5 | Ledger close: DECISIONS record, IDEAS residue, README | open |
+## Bugs
 
-## The frames-stack note (D2 review outcome)
+What happens, where, and the fix if one is known. The evidence behind each line (probes, file:line, transcripts) is in the old ledger: `git show 0055e6e:ISSUES.md`.
 
-The v3 #frames stack SURVIVES — it guards FERO-kernel re-entrancy (a nested
-issue() during rt.write's synchronous apply drain), which is independent of
-data's clause-5 queue. What died with the substrate swap is only the DATA-side
-re-entrancy pathology (the c870bde class): a tap-issued write now defers to the
-next data commit (clause 5, pinned by the contract ride) instead of draining
-inside the outer apply.
+### Kernel
 
-## Known residue (IDEAS candidates, D5)
+- **The ring is skewed.** fnv-1a bands a member's 32 vnodes into 4-5 clumps, so at four members one member can own 5-7× its fair share, and a run of sequential row keys lands on one owner. The banner in `kernel/ring.ts` promises about 2×. Fix: finish the hash with murmur3's fmix32 (the probe then reads 1.8× worst, none outside 2×). Every member must run the same hash, and the sim goldens re-derive with it.
+- **A survivor stalled across the leave window turns a clean stop into a crash.** If the surviving member is stalled for longer than LEAVE_TICKS × heartbeat while the other one presses Ctrl-C, the knock is never answered and the leaver goes as a crash. With two members that is permanent. 25 of 384 stall schedules in the sim. No cheap fix: at two members the leave is the only exit. Options: do not spend a tick while no member link exists to knock on; surface `left b=0` at the api; the n=2 tie-break V4-6 deferred.
+- **A client whose view epoch is higher than the re-formed cluster's keeps its stale members row.** Since I-23 a client adopts an equal-epoch view with different members, but a lower epoch would move the epoch-monotone monitor and change what `cluster.epoch` means on a client. Needs a decision.
 
-- Windowed-sort subscription streaming ('move' records) stays client-side-sort:
-  the DATA side now supports move round-trips (W1/W3), but fero mirrors are
-  keyed (object-born) — positional mirror identity is a mirror-keying redesign,
-  not a seam question. Both skips (serve + apply) kept, documented.
-- Inbound applies ride the lane per-record (batch-of-1). The m3 gate measured
-  even that at 0.547× of the v2 path, so frame-batched apply is an OPTIMIZATION
-  (shell frame boundaries → one lane call), not a correctness need.
-- fold.ts cell-isolation armor is now mostly moot (clause 10d isolates in-lane);
-  kept as defense-in-depth, slimming is cosmetic.
+### The api
 
-## Baseline
+- **`cluster.writable` on a client is wrong.** It reads the member gate, so it is `true` before the client holds a view and `false` for ever after, while every write it relays commits. A client needs its own rule: "my feeder's view takes writes", or at least a typed statement that the field is a member's.
+- **A method that returns a live scalar streams nothing on subscribe.** `count: (_, ctx) => ctx.data.count` answers a one-shot fine, but `.open()` stays `{}` for good with no error: the mirror is object-born, cannot hold a number, and the reject is swallowed. Re-mint the mirror as a scalar source on the first root record, or wrap the leaf as `{ value }` and say so.
+- **A handler error on the subscribe leg is silent at the client.** A thrown handler, or a refused write inside it, leaves the live handle `{}` for ever and the re-subscribe on failover runs into the same failure. The call leg is loud already. Surface it on the handle.
+- **A whole-row write and a field write on the same row are two cells.** They are independent LWW cells, so the projected object can depend on the order they were applied and differ per node. Reproduced with a seeded row plus a client's field write across a memory-only restart. The examples avoid it (one write style per row). A parent write should subsume older child cells, or the projection should apply by key depth. Needs a sim oracle on the projection, not only on the cell map.
+- **A clean stop before the listen socket is up hangs `Runtime.start()`.** The composer now races the start against an early Ctrl-C, but the shell's own start promise never settles if its server is closed before `'listening'` fires.
 
-- Post-migration: **297/297 tests + 16/16 contract clauses** (suite unchanged in
-  count from the v3 inherit: every behavioral pin — sim sweeps, Q3A hunts ×2,
-  TCP/WAL tiers, scoped fault schedules — passes on data v4).
-- Migration findings worth naming: (1) the substrate reject-slot needed
-  save/restore (effect-phase re-entrancy corrupted it — caught by the M5-review
-  re-entrancy pins); (2) the gather's parent-tombstone-then-live-child
-  projection (Q3a seed-0 shape) needed the orphan-cell vivify in
-  applyStreamRec too; (3) data's registry filter fail-fast had been bypassed by
-  W10's dep routing — restored loud (fixed data-side).
+### Directory, config, shell
 
-## Log
+- **A server booting right after the directory host died can fail with `c.methods.lookup is not a function`.** Seen once in eight runs: the lookup handle did not exist yet when the directory client called it. Not reproduced deterministically. Wait for the method to be discovered, or dispatch by name with a retry.
+- **A store that failed mid-life is not sound to restore from.** After a boot record fails (a `dir` deleted under a running member), the store is condemned and the process lives on, but its later votes and Lamport ceiling are memory-only. The existing policy already condemns such a dir on restart; this line just says so.
 
-- 2026-08-01 — scaffold: `cp -r v3 v4`, package rename. No source changes yet.
-- 2026-08-01 — D0–D3 landed: substrate rewritten onto data v4 (one seam file,
-  one import), Bind on the lens architecture, cluster fold on .set(), facade on
-  exportContract(), contract ride wired. 297/297 + 16/16.
-- 2026-08-03..16 — D4/D5 closed (perf 36/36 at the v3-era thresholds; ledger
-  close), then the cross-repo ADVERSARIAL RE-EVALUATION's fero-side fixes:
-  the lens write-builtin backdoor closed (set/update/patch/remove route
-  through issue(); insert/ingest/raf/dispose throw fero-shaped;
-  first()/last() wrap as lenses) and the ./internals entry repaired (the
-  deleted capture sink was still re-exported). 299/299 + 18/18 (data's
-  contract grew two clauses-worth of pins, SCHEDULE_VERSION 4).
-- 2026-08-16 — data promoted its v4 tree to its repo root; substrate
-  re-pointed one hop shorter. Then THE FERO ROOT PROMOTION (same day): this
-  tree moved to the repo root (package `fero` 4.0.0), the v2 surface + frozen
-  v3 tree retired to the `master` branch tip, seam paths flattened
-  (substrate `../../data/api/index.ts`, contract ride
-  `../data/conformance/schedule.test.ts`). Full battery green post-move:
-  299/299 + 18/18 + perf 36/36.
-- 2026-08-23 — THE SCALE TIER (n≈100; previous ceiling everywhere was 5).
-  Groundwork fixes: cluster()'s declared-but-dead `fault` option now applies
-  (three suites had silently run without their chaos — re-verified green
-  under the real personalities, timing-neutral A/B); ids pad to
-  max(2, len(n)) so lexicographic uuid order — the lowest-uuid proposer
-  discipline — survives n≥100 (n≤99 byte-identical, goldens pinned);
-  monitor registration idempotent. The enabler: `run({checkEvery})` samples
-  the monitor pass (per-event O(nodes×lanes) walks would cost ~30min per
-  100-node trajectory; the log-cursor monitors lose NOTHING under sampling;
-  default 1 byte-identical, pinned three ways). New tiers: sim/scale.test.ts
-  (six n=50..100 headline laws — 100-member one-ballot genesis, single
-  proposer, fanout-99 overflow/drain, genesis-stall + staggered-start pins,
-  R=3-of-50 inheritance wave), sim/scale-chaos.test.ts (ten n=8..30
-  churn/durability models with ENGAGEMENT guards — both fired during
-  authoring and forced real fixes to vacuous chaos), sim/scale.perf.ts
-  (5 pins: 69,400-event formation golden, O(pairs) flatness ratio 16.43 vs
-  16.50, exact k·n(n-1) digest law, 99-apply fan-out count, 20s wall
-  tripwire), tests/scale-tcp.test.ts (12-node real-socket dial-storm smoke),
-  sim/scale-run.ts + `npm run sim:scale` (11-scenario deep registry; first
-  full run 56M+ events ALL GREEN — 9,603 sheds/zero stalls at R=3-of-100,
-  peak-epoch 21 = perfect join serialization at 80+20, 2,495 torn WAL rows
-  healed, 40 fsync lies detected). One catalogue claim corrected by the
-  kernel: a full-cluster restore resumes its view by mutual equal-epoch
-  re-confirmation — NO self-ballot (the M4e twin's law, now pinned at 25
-  and 100). Battery: 319/319 + 18/18 + perf 41/41.
-- 2026-08-23 (later) — the scale tier reaches THE DASHBOARD: three cards
-  (scale-formation — cluster(sim,100) + 100 writers on the scenarios page;
-  scale-genesis — one ballot/one proposer at 50; scale-overflow — the
-  one-drop-per-paused-link law at fan-out 99), schematic diagrams by the
-  sweep-card precedent, registry 20/20 (wall 2.4s→7.0s, baseline re-pinned
-  with zero counted drift), verified on the REAL page via headless Chromium
-  (cards + 100-node viewer click-through + live scrubber, zero page
-  errors). Plus scenarios.dom.test.ts — the vm harness scenarios.html's
-  header had promised since v3 (8 renderer pins, mutation-checked). NOTE: a
-  long-running `npm run debug` serves the registry loaded at ITS start —
-  restart it to see new cards (?rerun=1 is not enough). Battery: 327/327 +
-  18/18 + perf 41/41.
-- 2026-08-23 (later still) — THE v4.1 SURFACE (V4-2): role by DECLARED ACT —
-  bare fero(name) is a CLIENT now; server: true / listen / dir / replicas /
-  a `data:` seed / any method marks a server; `listen: false` is the
-  socketless solo (BREAKING for the old bare-solo shape). The name-derived
-  default port (fnv1a32 → 127.0.0.1:[44800,45824), loopback only) behind the
-  new HELLO name echo — JK.nameReject (71) closes the silent cross-resource
-  merge on a misdial (both ends refuse, dead+noRedial; absent name = legacy,
-  frames byte-identical). The boot record carries `uuid` and restore
-  recovers it — the silent evicted-heir bug closed (uuid omitted on a
-  durable dir minted a fresh identity over the old life's WAL), with the
-  config/dir mismatch throw and fero()-time uuid validation (non-empty, no
-  '~'). The `data:` seed applies only when the local fold is empty at boot
-  (a restore never re-seeds) through the validated lens ingest. f.snapshot =
-  the sync dense read on the instance (armed-scoped throws typed;
-  JSON.stringify(f.data) stays documented-wrong — toJSON delegation was
-  REJECTED, see V4-2). The demo drops every address, identity, and internals
-  import (smoke-verified live on the derived port). Battery: 331/331 +
-  18/18 + perf 41/41.
-- 2026-08-23 (the V4-2 adversarial review) — 4 lenses × 2-stage verify over
-  the surface stack; 12 confirmed, all triaged. FIXED: legacy-dir poisoning
-  (a v4.0 boot record + omitted uuid now REFUSES with the one-time-upgrade
-  hint instead of letting the random default claim the dir and lock the true
-  owner out); a non-empty wal.log without boot.json refuses as an incomplete
-  dir (the silent foreign-log adoption); restored uuids get the config-grade
-  validation; the boot record now carries the resource NAME (the disk twin
-  of the HELLO echo — fero('other', {dir-of-'r'}) refuses); a seed row the
-  validation seam rejects throws at fero() time, pre-validated whole so a
-  partial seed can never persist; a derived-port bind failure names the
-  mechanism and TEARS DOWN the half-built instance (bind/host/WAL-fd leaked
-  on any start rejection before); explicit listen required when a derived
-  (loopback) address would be gossiped to non-local hosts; hosts: [] on a
-  client refuses; cluster.me carries role + a client's effective dial
-  targets. ACCEPTED AS DESIGNED: the bare-solo→client flip (the V4-2
-  breaking change itself); pre-arm scoped snapshot reads locally; nameReject
-  churn is heartbeat-bounded and self-heals when the right resource appears.
-  Battery: 333/333 + 18/18 + perf 41/41.
-- 2026-08-30 — the two-terminal demo's watcher WRITES: a bare client's plain
-  assignment (`f.data.gadgets.stock = …` every 4s) rides a WRITE frame to its
-  server, is stamped there (origin = the server), and echoes to every watcher
-  as ordinary replication — the relay path api/index.test.ts:240-278 pins for
-  hosts-listed clients, identical by construction for the bare shape
-  (smoke-verified live: the server's frame shows the watcher's write). The
-  server's gadgets tick is gone (one writer per cell keeps the demo legible);
-  the header's restart claim corrected — anti-entropy reconciles BOTH ways,
-  the memory-only server recovers the newer state from its watcher.
-- 2026-08-30 (later) — ELI5 TOOLTIPS throughout the debugger: ONE plain-English
-  glossary + ONE hover layer ([tools/debug/eli5.mjs](tools/debug/eli5.mjs),
-  plain-JS ESM shared verbatim by viewer.html, scenarios.html and the tests,
-  served at /eli5.mjs) replaces the 11 terse native `title=`s with 337
-  entries — every tree stat/pill/group, inspector fact/section/table header,
-  journal-kind badge (all 71 JK kinds), route stop, cell election row, omni
-  filter head/value, status-bar fact, time-travel control, live/attach chrome,
-  and on the dashboard every metric key, phase chip, diagram glyph, pill and
-  delta cell. Copy was written from a 7-lens source research pass over the
-  kernel and then adversarially verified (12 refuters + 3 newcomer readers);
-  it explains what a label MEANS and never claims a fact about the loaded
-  capture (`data-tip-fact` carries a repeated fact, escaped). Gate:
-  eli5.test.ts — no dangling key (a sweep boots the real page scripts over
-  every scenario capture, a mid-flight live capture, an overflowed-ring
-  cluster, a never-healed cut run to quiescence, an attach envelope with every
-  absent reason), no dead copy (an 8-entry documented unreachable list), the
-  JK/metric/phase vocabularies pinned both ways. The DOM shim moved to
-  dom-shim.ts (shared by viewer.dom/scenarios.dom/eli5 suites) and grew the
-  tooltip layer's needs; the wiring test hovers through the registered
-  document listener; honesty (d) now pins the TWO-plane import shape (the
-  model for every fold, eli5 for the hover mount alone, eli5.mjs importing
-  nothing). Six mutation checks (unmounted layer, vanished/typo'd/dead key,
-  dropped dashboard key, new JK kind) each turn a suite red. Verified by
-  driving the real pages in headless Chromium (25 hovers read back,
-  hide-on-leave, zero page errors). The review also surfaced and fixed three
-  pre-existing debugger inaccuracies: the stream inspector's Facts rendered
-  `seen (high-water) undefined` (the entity never carried `seen` — it now
-  shows the watermark ladder it does carry); the lost-ack card drew its
-  severed link as a ≋ dup/delay fault (it is a one-shot ✂ cut that heals);
-  the frameDrop journal line claimed `— link dropped` for every drop (an
-  unknown verb keeps the link). Battery: 341/341 + 18/18.
-- 2026-08-30 (V4-3) — THE DIRECTORY: no name hashing. The derived port
-  measured badly (1024 slots/box → 50% collision odds at 38 names; one bare
-  server per name; a host-less hub made genesis a uuid coin-flip — pinned
-  `aaaa` never forms; a dead hub blinded every new joiner). Replaced by the
-  `#directory` SYSTEM resource (the `#` prefix is reserved) at the per-box
-  rendezvous 127.0.0.1:3376: servers bind a FREE port (port 0 — the shell
-  publishes the real address to the kernel before start) and `register`,
-  everyone opens `lookup(name)` as a live subscription, and the folded
-  addresses feed the kernel's new `discover` event (static ∪ dynamic hosts,
-  cached; forgotten targets park at the cap, never closed; static hosts and
-  members never parked). Soft state on the method plane: entries die with the
-  registrant's link (peer-down cleanup keyed by uuid transitions, read AFTER
-  the fold — the mid-fold read dropped registrations riding the same chunk as
-  their HELLO), takeover = re-subscribe + re-register on every primary. First
-  server to bind hosts; the rest retry the bind on link-down (jittered). A
-  user resource may not listen ON the rendezvous; a non-fero squatter is
-  survived. Config `rendezvous: addr | false`, env FERO_RENDEZVOUS (the
-  battery runs `off`; discovery tests opt in with a free port each).
-  cluster.me: `hosts` on every role + `rendezvous {addr, hosting, up}`;
-  diag.rendezvous() exposes the directory nodes; Context.peer names a wire
-  caller. Pinned: kernel/discover.test.ts (dial/cover/park/re-add/static,
-  sim genesis over a discovered set + late JOIN), tests/tcp.test.ts port 0,
-  api/directory.test.ts (refusals, 3-round no-pin formation, bare client →
-  explicit servers, host death → takeover/failover/NEW joiner/bare restart,
-  entries die with their registrant, two names, Context.peer, squatter).
-  Spec DESIGN-DIRECTORY.md; DECISIONS V4-3. Battery: 355/355 + 18/18 +
-  perf 41/41 (341 + the neighbour-landed ELI5 gates + these 14).
-- 2026-08-30 — debugger: links + streams REPLAY under time travel. The
-  100-node scenario's scrubber moved keys@t/jrnl@t but every node painted
-  99/99 links and 65 streams at t=0 — the tree/inspector read the capture's
-  END snapshot (diagNode's link table/watermark ladder carry no t), and the
-  only statement of that lived in the inspector banner, hidden with nothing
-  selected. Now `topologyAt(capture, uuid, t)` (model.mjs) replays the link
-  lifecycle (linkUp/identified/dupLink→closing/linkDown/pause/drain/
-  dropOldest/digestIn/diagAuth, the client single-feeder rule via the new
-  additive `client` field on diagNode/captureNode/attach) and the watermark
-  ladder (writeLocal/applyInbound/gateDrop; durable claimed only where
-  provable, queued-while-paused an explicit unknown); `verifyTopology` is
-  its drift guard (the fold at t=∞ must reproduce every captured end table —
-  all 20 registry captures, every node, pass) and the viewer replays a
-  node's topology ONLY where that proof holds, else the end tables stay,
-  labelled `@ end` with the reason (a reborn durable writer — I-1's `uuid~2`
-  lane — is the truthful fallback producer in the ELI5 sweep). The
-  adversarial review's per-step oracle (kernel snapshot after EVERY step vs
-  the fold at that row, 60+ seeds) found what the ∞ guard cannot: `walTaint`
-  (condemn wipes streams/state — both replay planes now honour the row);
-  leaf rows of a refused node painted unlabelled end facts (inspector +
-  status bar now say `@ capture end` with the reason); a selection scrubbed
-  to before it existed was dropped (kept now — the pane says "not here
-  yet"); fields an older capture cannot vouch for ride the verdict as
-  `unverified` and paint as unknown; `routes` minted `''` for a partition
-  no writeLocal row named (null now). Documented bounds (ISSUES): a fatal
-  frameDrop's dead link inside a client's re-election window, armed/durable
-  lanes minted without a row, synced settling at the end of the digestIn
-  step. Pinned: model.test (t0 empty / ∞ exact / closing loser / paused
-  unknown / paused-digest no-sync / client single-feeder + failover /
-  durable unknown / walTaint reset / refusal templates), honesty (empties,
-  traceability at linkUp + dupLink rows with the `''` carve-out scoped to
-  the topology fold and proven exercised, typed refusal templates, the
-  reborn producer, import pin), viewer.dom (links 0→mid→full on formation +
-  scale-formation n001 0/0→mid→99/99, streams 0→full; the verdict honoured
-  on every surface, is:info finds `@ end`, kept selection), eli5 (six new
-  keys reachable, `not-captured` now truthfully reachable), diag/attach
-  parity pins `client` and refolds the topology of a wire-pulled slice.
-- 2026-08-30 (V4-3, the implementation panel) — 5 lenses × a skeptic per
-  finding over the landed directory: 25 confirmed (8 major, every one
-  reproduced), 0 refuted. Fixed: the squat strand (the string-compare listen
-  guard was bypassed by `0.0.0.0:3376` / `localhost:3376` / `rendezvous:
-  false` → `sameSocket` refuses every spelling against own/default/constant,
-  AND the kernel parks a name-rejected dialed target given-up so heartbeat
-  revival re-dials it — the V4-2 "heartbeat-bounded churn" claim is true
-  now); owner keys split on the first space (names with spaces never cleaned
-  up → JSON keys); cleanup by (name, uuid) with no ownership (a dir-restored
-  identity re-registering past its wedged predecessor lost its cell when that
-  socket closed → per-cell `owner`, later wins); the battery's isolation
-  lived in one npm script (`FERO_RENDEZVOUS ??= 'off'` pinned in every
-  non-directory suite); the fold-order defect had no deterministic pin
-  (`hostMethods` exported as a seam; GRACE / ownership / space-name / cap
-  unit-pinned); the bind retry composed a full Runtime 4–20×/s against a
-  held port (probe-gated, exponential to 5s, errnos on
-  `cluster.me.rendezvous.error`); discover's park forked the redial chain on
-  re-add (the armed timer is cancelled; entries nothing names are dropped, so
-  #backoff is bounded). Minors: `listen: false` read as "down" (now `false`),
-  env garbage refused at fero() time, isAddr strict, precedence documented,
-  try/finally shapes, a derived takeover bound. Documented not fixed: the
-  loopback trust boundary, hung-but-connected registrants keep entries, ref'd
-  shell timers. Battery: 372/372 + 18/18 + perf 41/41.
+### data (the sibling repo, `../data`)
 
-- 2026-08-31 — THE DEMO, SPLIT AND RECORDED: examples/two-terminals.ts now
-  dispatches to examples/server.ts + examples/client.ts (shared demo-ui.ts);
-  the client writes back (a sale every 4 s by plain assignment). The site's
-  hero replays a RECORDED run of exactly these files (scratch site/record.mjs,
-  22 s: seed → watch → sale → SIGKILL → restart on a new port → redial) and a
-  checker asserts the panes only ever paint recorded frames. The run
-  reproduces IDEAS P2 (overlapping cells) — noted there. Battery green.
+- **`reduce(add, remove, init)` uses an object `init` as the accumulator** and never clones it: two views share one accumulator, and a read inside a batch re-folds onto the full object, so totals compound. Pass a thunk, `() => ({})`, until it is fixed there.
+- **`distinct()` with no function folds every object row into one `[object Object]` bucket**, with no error. Pass a projection, `distinct((r) => r.field)`.
 
-- 2026-09-05 — THE RELAY VALIDATES (IDEAS Security, step 1; DECISIONS V4-4):
-  a bare client's plain write relayed through its primary now meets the
-  server's `seams.validation` at the relay ingress (kernel/write.ts onWrite,
-  ae 0 — `NodeOpts.validate`, handed down by the composer). Before, a server
-  that refused its OWN `data.admin = …` let a client's LAND and read
-  `committed`. A refusal is a fourth, TERMINAL NACK class — WNACK
-  `{r:'invalid', m: reason}`: the issuer drops the attempt for good
-  (`Writes.rejected` + `rejectedPending`; `Bind.sweep` — the droppedPending
-  probe, widened — reads the reason off the composer's post-step fold, since a
-  WNACK step applies nothing), so the client's promise rejects with the
-  server's reason and a plain assignment bounces; a relay hops it onward; a
-  committed retransmit skips the check (dedup window). No validator ⇒
-  trajectories byte-identical. Two adjacent forgeries closed with it: the
-  relay keys on `link.client` (a client forging ae = epoch is relayed, not
-  admitted to the owner leg unvalidated) and ACK/NACK frames on a client link
-  are dropped. Honest scope: a bound on the fero client's write surface, not
-  peer auth (a forged RECORDS frame from a spoke still lands — filed under
-  the r:1 item). Pinned ×7 (kernel/write ×5, sim/client, api/index — the
-  probe), each mutation-checked. Step 2 (the opt-in methods-only door) is
-  under design review — see IDEAS. Battery: 379/379 + 18/18 + perf 41/41.
+### The debugger
 
-- 2026-09-06 — `methods:` IS THE DOOR; SPOKES ARE VIEWS (DECISIONS V4-5). The
-  one spelling for hosted methods is now `methods: { sell(arg, ctx) {…} }` —
-  a top-level function throws with the pointer — and its presence PROTECTS
-  the resource: every relayed client write (assignment, delete, the
-  builtins, methods.update/insert/remove — one ingest) bounces with the
-  terminal reason 'methods-only'; the server's own writes and its handlers
-  stay trusted (and still meet seams.validation); reads stay open. Zero
-  kernel change: the door is a degenerate predicate folded into V4-4's one
-  hook. Open or protected, nothing in between (the panel's `writes:` key and
-  reopen list REJECTED). A validator-refused write inside a handler now
-  FAILS the call (`write refused (<cell>): <reason>`; ctx.flush() throws it).
-  The spoke hole closed: a client never ships a suffix, a server drops
-  RECORDS on client links, and a spoke AHEAD of its feeder RESYNCS to the
-  cluster's truth (fold reset → empty r=1 digest → the r=0 reply completes:
-  ghosts removed downstream; journal resync/resynced, the debug fold model
-  treats resync like walTaint). The `#directory` host is protected for free.
-  BREAKING within 4.x: `fero(name, { sell: fn })` → `methods: { sell }`.
-  Battery: 385/385 + 18/18 + perf 41/41.
+- **Scoped captures paint `never-arrived` in red for every non-holder.** With `replicas` set, non-holders are never meant to receive the record. The fold needs the holder set per partition (the ring is a pure function of the view, so a capture could carry it).
+- **Known limits of the replay**, accepted and written in the fold header of `tools/debug/model.mjs`: a link killed by a fatal frame drop can win a client's primary re-election in the replay for one round trip; armed and durable nodes mint empty stream lanes with no journal row, so a reborn durable writer's links and streams show `@ end` instead of replaying; `synced` flips one row early when the same step ships a suffix.
+- **A truncated journal switches the scrubber off in silence** and paints `replay ✗` in red on a healthy cluster whose ring only did what it was sized to do. A visible word at each site, and warn rather than crit when the only reason is dropped rows.
 
-- 2026-09-05 — THE EXAMPLE SERIES BEGINS: examples/01-three-servers is the
-  pattern every later example follows — one folder, one file per terminal
-  (`node server.ts`, no flags: Node ≥ 22.18 / 23.6 strips types itself), a
-  `check.ts` that runs the terminals as children bounded by
-  FERO_EXAMPLE_TICKS, asserts on the lines they print, and ends with `ok
-  <example>`; examples/lib.ts holds the plain-Node plumbing (ticks, onExit,
-  until, logChanges, spawnRole, story — zero fero code) so a folder plus
-  lib.ts is copyable. tests/examples.test.ts runs every check.ts inside
-  `npm test` under a PRIVATE rendezvous port per example (the battery stays
-  FERO_RENDEZVOUS=off; grandchildren inherit the port), with a per-example
-  budget and a process-group kill in `finally`, plus a drift guard (check.ts
-  + README present, listed in examples/README.md, no #utils/internals
-  imports outside the debugger series). 01 itself: `server: true` run three
-  times forms a view through the directory and each copy's own row (keyed by
-  its uuid, whole-row style) shows on every screen; the check kills one
-  (writes keep committing on the majority), starts the file again (a NEW
-  identity joins and catches up) and SIGTERMs the rest (clean destroy). It
-  was "run it twice" first: the user's by-hand run showed why not — a
-  two-member view cannot evict its dead half or admit the returning one, so
-  the survivor wedges at `writable false` forever (DECISIONS V4-3's rule,
-  now the example's banner). Battery: 386/386 + 18/18.
+## Worth doing
 
-- 2026-09-07 — THE GRACEFUL LEAVE (DECISIONS V4-6): a clean `destroy()`
-  now asks the view for a ballot WITHOUT itself before it tears down — a
-  `leave` stimulus + a LEAVE verb (25); the leaver proposes when it is the
-  lowest live member, else knocks LEAVE on every member link and the lowest
-  proposes; its own grant is the old-majority vote a dead member never has,
-  so a two-member view loses one member cleanly and the survivor is
-  writable ALONE. The leaver goes on a survivor's VIEW echo (the exit
-  proof), or after LEAVE_TICKS (4) like a crash (`left` b=0 — suspicion +
-  eviction follow as before); Runtime.leave() caps it in wall-clock so
-  destroy() cannot hang. A leaver never knocks JOIN back in; its ballot
-  rebases on a newer view; the last member simply goes. `diag(f).crash()`
-  is the no-leave teardown (a process death) for tests and failure
-  stories. Journal `leave`/`left` + ELI5; sink `left(clean)` optional
-  (the sim records it). Example 01: banner + README now say Ctrl-C of one
-  of two WORKS (a real two-copy paste) while a CRASH of one of two still
-  wedges — three plus `dir` stays the rule; lib `coalesce` renders the
-  cluster line once per turn (its fields land one record at a time). Born
-  from the user's question "why does a cluster of 1 or 2 not work" — the
-  option catalog and the rejections are in V4-6. Battery: 396/396 + 18/18
-  + perf 41/41.
+### Next
 
-- 2026-09-12 — 01 IS TWO SERVERS AGAIN: `examples/01-two-servers` (was
-  01-three-servers). Three was only ever a workaround for the two-copy wedge;
-  the graceful leave (V4-6) removed it, so rung 01 is back to the user's
-  original ask — one file, run it twice. The check now STOPS a copy cleanly
-  (SIGTERM) and asserts the survivor prints `members 1 writable true` and
-  keeps committing alone, then a new copy is voted in (`members 2`) and
-  catches up, including the stopped copy's row; ~20 s faster (no eviction
-  wait). The README carries the real two-copy run from both terminals and
-  states the limit: two survive a clean stop, not a crash — three plus `dir`
-  is rung 13. Battery: 396/396 + 18/18.
+- **A crashed member is evicted only after the redial chain gives up**: about 20 s at the defaults. Its rows freeze on every screen meanwhile. The knob is a shorter chain for members that were reachable a moment ago; it belongs to the tune table.
+- **The kernel tune table.** MAX_REDIALS, SUSPECT_TICKS, LEAVE_TICKS, the backoff cap and the queue bounds are constants. One frozen `tune` object built in the Node constructor, defaults equal to today's constants so the sweep bytes stay identical, hot sites reading a field. Land only with an A/B on the write, node and alloc perf pins. Design: [docs/DESIGN-CONFIG.md](docs/DESIGN-CONFIG.md) §7 step 7.
+- **`cluster.writes` out of the cluster tap's domain, and on time.** The confirm ring lives in the same view as `members`, so a bare `cluster.tap` fires on every write outcome, and it lags the value by one kernel step (a screen reads `pending` above an object that already holds the row, for up to `heartbeat.ms`). Publish the ring from a microtask on every outcome and give it its own proxy behind the `cluster.writes` getter.
+- **The r:1 uuid spoof.** A client HELLO presenting a member's uuid trips the dup-link keeper against the real member. The write-plane holes around it are closed (V4-4, V4-5) and a spoke can no longer teach a view (I-23); this is the peer-auth question proper, post-1.0.
+- **A pinned quiet runner and a git remote.** No remote means no CI; the perf baseline machinery is ready for a pinned box. Then the real v2-vs-v4 socket A/B, with p99s.
+- **Every admit ships each missing suffix twice.** Both ends send an r=1 digest on admit, so a join costs twice its bytes. Let the lower uuid open the exchange, or remember the tail shipped per link. A sim golden and the AE perf pin move with it.
+- **A HELLO-carried hash of the cluster-contract keys** (`heartbeat.ms`, `replicas`, `seams.validation`). One member's shell can set them alone since V4-10; a mismatch shows as behaviour, not as a refusal at the door.
 
-- 2026-09-12 — RUNG 02, A SERVER AND A CLIENT: the committed demo split
-  moved into examples/02-server-client (server.ts, client.ts, demo-ui.ts;
-  two-terminals.ts deleted — `npm run demo` / `demo:watch` run the two files
-  directly). The two footguns the plan's critic found are gone: the server
-  rewrites the WHOLE widgets row in the seed's style (never a leaf on a
-  seeded row — IDEAS P2), and the client's sale is a FACT row (one new row
-  per event, never a read-modify-write of gadgets.stock); the server's
-  screen counts sales with a live `filter().length()` and shows `watchers`
-  from cluster.peers; demo-ui's render skips an unchanged picture (a local
-  write applies once now and once as its echo). The check starts the CLIENT
-  first (a bare client waits, `(down)`), then the server; asserts the rows
-  arrive, the label names the server's port, two sales reach the server and
-  echo back, the seeded gadgets row is untouched, both exit 0 by
-  themselves. README: real frames from a kill -9 + restart run, including
-  the honest part — a memory-only restart re-seeds and the watcher's earlier
-  sales vanish when it resyncs (V4-5) — `dir` is rung 12. The website's
-  hero inlines these two files by path and replays a recording of them:
-  paths, prose, claims and the recording were redone in the same sitting
-  (scratch ~/fero-site). Three skeptics then reviewed the rung against the
-  source and five things were wrong and are fixed: the footgun's stated
-  mechanism (post-V4-5 it is the watcher's RESYNC deleting the stale leaf
-  from the re-seeded row — the watcher's row loses the field — not the
-  re-seed landing on the leaf); "a write applies twice" (true of a
-  client's write, not a server's — its echo is a same-reference no-op at
-  data's chokepoint); the label printed `hosts` under the word `peers`
-  (now `servers`); the check's `(down)` assertion was a boot transient
-  every client prints (now it must STAY down with no rows before the
-  server starts) and its "echoed back" line was satisfied by the
-  client's own optimistic copy (reworded; the server's count is the
-  proof); and a check run by hand on the box directory met the user's own
-  terminals — lib's `privateDirectory()` now gives every check its own
-  free port (01 too). Battery: 397/397 + 18/18.
-- 2026-09-13 — NO GHOST (DECISIONS V4-7): a write shows when it COMMITS,
-  never before. The user asked whether client writes were applied
-  optimistically by default — they were: every accepted record, on every
-  role, projected into the local proxy before the kernel saw it, with no
-  switch — and chose "only a server owning and writing should commit". The
-  optimistic overlay in api/data.ts is deleted, not ported (#optimistic,
-  #revert, the never-set `fromCapture` switch, the branch that hid foreign
-  commits under an in-flight cell): the proxy IS the confirmed fold; a
-  server's write to a cell it owns shows inside the assignment (the commit
-  is synchronous); a forwarded write — a client's, or a server's to a cell
-  another server owns — shows as the owner's stamped echo; a refused write
-  never shows; an in-flight write is only a `pending` row of
-  cluster.writes. What survives is a settlement index (cell → newest
-  pending cid) that decides promises only, and the lens asks it before
-  swallowing a delete as a no-op (`data.k = v; delete data.k` still issues
-  the remove). Kernel and wire untouched; one apply fewer per issued
-  record. Wording followed: the examples' "shows now and again as its
-  echo", the 02 check's optimistic-copy comment, types/README/CLAUDE's
-  "bounces". Tests: api/data.test.ts (the forwarded-write pin INVERTED,
-  the delete-in-flight pin, a CLIENT-role binding pin — WNACK invisible,
-  echo visible), api/index.test.ts (the three client pins inverted).
-  Battery: 399/399 + 18/18 + perf 41/41.
-- 2026-09-14 — V4-8: THE MINIMAL EXAMPLES, AND THE TWO FERO CHANGES THAT
-  MADE THEM POSSIBLE (DECISIONS V4-8). The user found rungs 01/02 "a little
-  bit overwhelming" and asked for the most minimal, fun version that scales
-  down and up, and whether fero should absorb lib.ts's helpers. Four of the
-  nine helpers had leaked into the role files; two were fero's fault. So:
-  (1) Ctrl-C / SIGTERM is a clean stop built in — one listener per signal
-  for the module, every live instance destroy()s (leave, then teardown), the
-  process exits 0 unless the app has its own listener; `signals: false` opts
-  out; destroy() idempotent; `crash()` untracks. (2) The cluster view folds
-  in ONE data batch (`batch` re-exported through the ONE seam) and sets only
-  what changed (signatures for members/peers/partitions), so a bare
-  cluster.tap fires once with the whole picture and never for a no-op
-  refold. (A third change built here — an echo skip so a client's own write
-  paints once — was dropped: V4-7, no ghost, landed underneath it and
-  removed the second apply at the source.) Pinned by three composer tests
-  incl. a real child process with no signal code getting SIGINT; each
-  mutation-checked; perf pins unchanged. The
-  examples were rebuilt by a design panel (three angles, two skeptics each,
-  synthesis by hand after the panel hit a usage limit): 01/server.ts is 8
-  code lines, 02's shop/watcher 9 and 8, no cluster tap, no renderer, no
-  dedupe, no tick bound, no exit hook; lib.ts is four check-only helpers
-  (`stop()` bounds a role's exit so a broken clean stop fails instead of
-  hanging); READMEs under fifty lines with real screens; index rewritten.
-  The skeptics found and the READMEs now say: eviction of a kill -9'd
-  member takes ~20 s (the redial chain — IDEAS), `dir` restores on a fresh
-  port, a joiner prints `members 1 writable false` for a moment, two seeded
-  servers would fight over one row. Filed: ISSUES I-19 (a directory-client
-  race after a fast host restart: `c.methods.lookup is not a function`,
-  seen once in eight). And a real kernel bug: two skeptics saw, about one
-  run in five under CPU load, a clean SIGINT of one of two leave the
-  survivor at `members 2 writable false`. A sim hunt found it — `leave()`
-  answered "nothing to leave" at once while the leaver held no view yet,
-  though it had already granted the genesis ballot and the survivor had
-  installed the two-member view; no LEAVE, nothing journaled, exit 0 —
-  and fixed it: "nothing to leave" needs evidence (V4-6 amended; ISSUES has
-  the fixed entry and I-20 for the second mode, a survivor stalled across
-  the leave window). Three sim regressions, red on the old kernel; 6/80
-  real-socket wedges under load before, 0/80 after. The website's hero inlines 02's files: claims
-  re-anchored, the phase finder follows the new header, re-recorded on a
-  quiet box, rebuilt, checked, republished. Battery: 405/405 + 18/18,
-  perf 41/41.
-- 2026-09-19 — V4-9 (DECISIONS): `fero.spawn(file, args?)` is public — the
-  other terminal, from code — and the checks meet the box directory
-  (`privateDirectory()` dropped: "just examples, shorter is better"). The
-  V4-8 signal registry moved to api/signals.ts and is generic, so a
-  spawned child is stopped on the parent's Ctrl-C like a live instance; a
-  parent that dies on an error SIGKILLs its children on 'exit'. The review
-  panel found a V4-8 hole this made reachable from one keystroke — destroy()
-  untracked at its START, so a second SIGINT mid-leave (a terminal's Ctrl-C
-  reaches a spawned child from the tty AND from the parent's stop()) killed
-  the child by signal; now a stop untracks when it settles. lib.ts is
-  `until` + `sleep`.
-  Three tests over real processes (api/spawn.test.ts); both checks green
-  by hand on the box directory and on a private port. Battery: 408/408 +
-  18/18.
-- 2026-09-19 — V4-10: THE CONFIG LAYER (DECISIONS V4-10). The owner's copts
-  module, published as `optcascade` 1.0.0, is fero's first npm dependency
-  and `api/config.ts` is its ONE seam. A public `fero()` now folds six
-  layers into the call, highest first: `--fero.<key>` > the call >
-  `FERO_<KEY>` > the project `fero.opt.ts|js` > `$HOME/fero.opt.ts|js` >
-  the default; inside every layer a value scoped to the resource name
-  (`--fero.shop.dir`, `FERO_SHOP_DIR`, `{ shop: { dir } }`) beats the
-  global. Keys are nested lowercase words so one spelling survives every
-  layer: `heartbeat.ms`, `redial.ms`, `journal.cap` — the camelCase
-  spellings are refused with the pointer from every layer (BREAKING within
-  4.x, the V4-3 rule); seven suites and the directory's two system
-  composes renamed. The layer owns what optcascade cannot know: the
-  declared schema (unknown keys throw naming their spelling in that layer
-  with the nearest key; in the global rung of a string layer an undeclared
-  object is another resource's subtree and is skipped unless it is a near
-  miss), the carriers table (`methods`, `seams.validation`, `signals` are
-  the call's alone; `uuid` never from a file), the coercions for the
-  string layers only (`hosts` CSV, `off/false/0`, `server 1/0`, a numeric
-  `uuid`/`dir` refused), and `from(key)` — every composer refusal now names
-  its source, the legacy `FERO_RENDEZVOUS='garbage'` text kept. New in the
-  composer: `server: false` is the client pin from any layer (a marker then
-  throws naming both sources — closes the IDEAS `client: true` line), shape
-  checks on the three numbers (a string layer can carry `abc`), and
-  `diag(f).config()` returning `{ value, from }` per leaf. System resources
-  bypass the layer. `FERO_CONFIG=off` = the call alone with zero optcascade
-  calls; `utils/battery.ts` pins it and `FERO_RENDEZVOUS=off` for the whole
-  battery (imported first by every composing suite, `--import` in the npm
-  scripts). Tests: api/config.test.ts (13, injected sources), tests/
-  config.test.ts (over real children with `FERO_CONFIG` deleted: a
-  project file, a flag over it, a flag alone making a server, two
-  resources two dirs, a `$HOME` file, every refusal's source, the sticky
-  client pin, the door's defaults, `off` for real; plus three guards: no
-  `fero.opt.*` in the checkout, the tracked lockfile pins optcascade, the
-  README table names every leaf). Adversarially reviewed before landing
-  (four lenses, 26 findings folded in: null-prototype schema tables, the
-  own-name and sibling-name rungs, the sticky pin, '' = unset everywhere,
-  dotted keys refused, a fero-prefixed minimist error, `--FERO.*` refused,
-  the battery's pins by plain assignment).
-  Perf: api/config.perf.ts, two tripwires (~30 µs per resolve, ~3 µs off;
-  construction only, nothing on the write path); the existing pins
-  unchanged. `engines.node >= 22.18`. Deferred to IDEAS: the kernel tune
-  table, the `diag` key, a HELLO hash of the contract keys, three
-  optcascade wishes. Battery: 431/431 + 18/18, perf
-  43/43.
-- 2026-09-20 — Examples, V4-11 (DECISIONS): the README template (one
-  block per terminal, the command first, real contiguous output, `^C` at
-  column 0, at most three bullets, a `sh` block of scale-it commands, the
-  check as one sentence, `Next:`) and the screen rule (a sequence rung
-  logs one line per change; a live-picture rung clears and redraws a frame
-  headed by the role word in CAPS; every screen names its pid) applied to
-  01 (pid once, `members N <object>`, numeric rows, `writable` gone — it
-  never printed `false` in 01's story) and 02 (the `fero two-terminal
-  demo — ` prefix gone, the shop names its pid; the site's recorder, page
-  and checker split on the role word, re-recorded, claims re-pinned, and
-  the page's V4-10 staleness fixed: `heartbeat.ms` / `redial.ms` /
-  `journal.cap`, `server: false` next to a marker is the refusal, one
-  "layers" line). Rung 03-one-write built: a client's write is a request —
-  `client.ts` renders the last three `cluster.writes` rows from a cluster
-  tap (a pending write changes nothing in `data`), `server.ts` only stamps
-  and shows; the check pins pending-forever alone, one-fold commit stamped
-  by the server's id, the wait-again after a clean stop, the next server
-  stamping and the client taking its truth. api/spawn.ts unchanged (the
-  echo is the smoke tier's failure evidence). Battery: 432/432 + 18/18.
-- 2026-09-21 — optcascade 1.1.0 is published, and fero pins `^1.1.0`. The
-  owner published the 1.1.0 this repo's V4-10 review wrote into `../copt`
-  (flag keys lowercased at every depth; minimist's bare TypeError rethrown
-  as `optcascade: bad flags — …`). The lockfile moved to 1.1.0 and the
-  range to `^1.1.0`; with that, api/config.ts dropped its own `--FERO.*`
-  refusal (it existed only because 1.0.0 parsed an uppercase prefix under
-  another name and silently ignored it): a flag's key is now read
-  lowercased at every depth like a variable's, so `--fero.Dir`, `--FERO.dir`
-  and `FERO_DIR` are one key. api/config.test.ts asserts the 1.1.0 text
-  (the pointer names `'redialms'`; a bad flag set is named by both fero and
-  optcascade) and that the three spellings agree — the unit case doubles as
-  the version guard, since 1.0.0 would refuse `Dir` as unknown. README,
-  DECISIONS V4-10, DESIGN-CONFIG §11, IDEAS (the wishes that remain) and
-  CLAUDE.md say so. Battery: 432/432 + 18/18. Perf: 42/43 on this WSL2
-  box — the miss is kernel/ring.perf.ts's holdersOf tripwire at ~830–900
-  ms against its 800 ms ceiling, which fails on committed HEAD too (826
-  ms one run, green the next); kernel/ is untouched and the ceiling is
-  not widened.
-- 2026-09-28 — THE EXAMPLE SERIES IS COMPLETE (DECISIONS V4-12): 26 rungs,
-  01 → 43, every `Next:` a real link and 43 ending "That is the series."
-  The eighteen commits of 2026-09-22 (ffce4ae…175cf96) landed 04-17 (rows,
-  views, numbers, ordered, methods, live, confirm, validation, durable,
-  cluster-of-three, failover, static-topology, scoped, lww-honesty) and the
-  debugger series 20-23 (inside, journal, time-travel, live) with no ledger
-  line; today's five commits land the capstone and the apps: 30-fleet-audit
-  (`node fleet.ts` is the story on one box — three durable members on fixed
-  addresses with `methods: { record, prune }` as the door, three sensors
-  writing a fact a second and keeping a ledger of what each reply proved,
-  kill one / the same command brings it back as itself / kill all three /
-  restore from the disks, then the audit through member-pinned readers: the
-  three agree, every `persisted` receipt is on every member, no phantom
-  rows, the unproven receipts counted and landed, `prune` last;
-  `dashboard.ts` is the reader's second terminal), 40-chat (a message is a
-  new row written by `post` on the server, which stamps `at` and `from` and
-  throws `too long`; every joiner sorts the rows itself with a tiebreak),
-  41-kanban (an OPEN server with `seams.validation` and every editor
-  carrying the same `rules.ts`; two fields of one card from two writers
-  both land; a whole row or an unknown column is refused, an editor's own
-  before it leaves), 42-web-bridge (a bare fero client plus `node:http`:
-  `/events` streams `connect` records to each tab, a form post becomes a
-  whole-row write, `dir` keeps the seed from landing over a browser's rows),
-  43-ledger (transfers as rows on three durable members, `transfer` folds
-  the balance and throws its rule, the intent rides in the row and the
-  notifier — a client of `ledger`, the server of `notices` — clears it
-  through `notified`; a member SIGKILLed mid-run comes back as itself with
-  every id). Each was built against the V4-11 brief, attacked by a skeptic
-  and fixed (2026-09-22), then attacked once more at HEAD before landing:
-  the final skeptics found the capstone's clean stop hanging under load (a
-  shell bug — the listener kept accepting during the WAL flush and
-  `#accept` had no `destroyed` guard; fixed in 717441e with a regression test
-  in tests/tcp.test.ts, ISSUES I-21), its prune audit counting rows
-  instead of checking what survived, 40's check never running `join.ts`,
-  and five README claims to tighten; all applied, three mutations re-proven,
-  15/15 tmpfs runs green. Budgets from this box's 9p mount (where `npm test`
-  runs): 30 → 100 s (~34 s), 43 → 60 s (~13 s); no slow tier, no
-  `test:examples`. The builders' warts from all four phases were verified
-  against HEAD by five agents and filed: ISSUES I-22…I-40 open (membership
-  genesis coin-flip and the spoke-teaches-a-view wedge, fnv ring skew, the
-  lens in arithmetic, the scoped hint, a live scalar on SUB, open-then-call
-  order, undisposed SUB views, `update({ key: undefined })`, two spellings
-  of origin, `me.hosts`, a client's `writable`, the directory's stale entry,
-  a `FERO_*` leaf clobber, a deleted WAL dir, data's `distinct()` and 3-arg
-  `reduce`, two viewer faults), I-21 fixed, 25 IDEAS lines, 12 drops; an
-  I-10 addendum (three READMEs paste the banner). Ledgers: CLAUDE.md
-  (counts, the examples row), STATUS head, README "Run it", examples/
-  README.md (the tiers line). Not done: the website still inlines 02 only.
-  Battery: 456/456 + 18/18. Perf: 43/43, unchanged (the shell fix
-  is on the stop path, not a hot one).
+### Someday
+
+- **api.** The `seams:` nest is vestigial since V4-5: promote `validation:` to the top level and keep the alias for one release. The `diag` config key, so `npm run debug -- --attach` can reach a real cluster (`FERO_DIAG_TOKEN` stays the viewer's variable; redact tokens from `diag(f).config()`). A typed zero-RTT refusal under the door (advertise the pin in HELLO). Whether a kernel outcome inside a handler (`superseded`, `dropped`) should fail the call. `journal.cap` below one step's burst starves the cluster fold: read `j.dropped`, or floor the cap. A leaving member paints its own leave view as its last frame. `isolate` / `heal` on the diagnostics handle (a TCP shell cannot hold a partition honestly; the sketch is in docs/DESIGN-M7.md).
+- **Kernel.** Suspicion keys off link liveness, not PONG round trips, so a hung-but-connected process looks live. MAX_PENDING's oldest-drop is a counted loss; window size vs the retry horizon is unmeasured. Chained-over durable marks would close the newest-row lie. Digest anti-entropy is O(n²) frames per tick, full mesh (couple with announcement-gated AE). MAX_QUEUED drops a whole queue under a full-mesh pause burst.
+- **Scoped replication (the M6 residue).** Announcement-gated AE and un-pinning compaction are coupled: design them together or not at all. Tombstone GC stays pinned when armed. Distributed decomposable folds (`sum`, `max`, `avg`) instead of the materialize-first throw. Subscription-scoped tap-forward for spokes. Explicit-undefined cells across the gather. A push-based claim stream. Chunked transfer for oversized partitions. HAVEQ delta compression. The R=∞ two-teacher residual. Durable-marks shed. Disjoint Σ partials. Remote-handle ergonomics.
+- **Directory.** Cross-box discovery (`hosts: ['10.0.0.5']` meaning "ask that box's directory"; needs the explicit-listen rule). A `#` badge for system resources in the viewer. A failure detector over client links (a hung watcher keeps its entry). Unref the directory client's timers, or document `destroy()` as the exit protocol. A shared per-process directory client.
+- **Sim and scale.** Monitor passes walk every lane even when nothing changed (~15 ms per pass at n=100; scope the walk to the node that stepped). Scale goldens are (n, writes, seed)-scoped; failure captures at n=100 are triage-grade only.
+- **Debugger.** `jf` journal splicing over DIAG so the bridge ships deltas. Caching immutable log entries between rebuilds (evict below the base). A keyed range cursor with a torn-snapshot marker for a state map over MAX_FRAME. `gateClose evicted` on a newcomer that was never in (say `joining`). A clean leave has two spellings in the survivor's diary (`leave` then `propose`, or only `vote`). `topologyAt` still joins a reborn writer's rows to the bare lane on purpose: it is the one truthful producer of a replay refusal three suites rely on.
+- **Examples.** A live-picture role that also takes typed lines wipes the half-typed line on every redraw (40's join, 41's edit); `rl.prompt(true)` prints nothing without an output stream, and a real prompt line means raw mode. A `sell` rung for the website's narrative. The website links the series index.
+- **data (sibling).** Windowed-sort subscription streaming needs a mirror-keying redesign. Frame-batched inbound apply. Slim `fold.ts`'s cell-isolation armor.
+- **Config.** optcascade wishes: a declared-keys mode for the prefixed form, per-key provenance with the file path, a `strings` list so `--fero.uuid 12345678` survives.
+- **Open questions.** Cross-partition ordering beyond the recipe (transactions?). AsyncIterator methods.
+
+## Decided
+
+One line each. The full record, with the context and the rejected options, is [docs/DECISIONS.md](docs/DECISIONS.md); the v3 decisions (V3-1 to V3-21) and the carried v2 rejections are there too.
+
+- **V4-1** fero v4 runs on data v4. fero owns the write surface: the lens traps a write before data sees it.
+- **V4-2** Role by declared act: a bare `fero(name)` is a client; any server marker makes a server. `f.snapshot` is the sync read. A node's identity comes back from its `dir`.
+- **V4-3** Discovery is the per-box `#directory` at `127.0.0.1:3376`. A server binds a free port and registers; `#` names are reserved.
+- **V4-4** The relay validates: `seams.validation` runs on a client's relayed write too, and a refusal is a terminal reject with the reason.
+- **V4-5** `methods:` is the one spelling for hosted methods and the door. Spokes are views: they never teach a server.
+- **V4-6** A clean `destroy()` leaves by ballot, so two members survive a clean stop. Amended: "nothing to leave" needs evidence.
+- **V4-7** No ghost: a write shows when it commits, never before. The optimistic copy is gone.
+- **V4-8** Ctrl-C is a clean stop, built in. The cluster view folds in one batch. The examples carry no plumbing.
+- **V4-9** `fero.spawn` is public. A check meets the box directory. A stop untracks when it settles.
+- **V4-10** One config door: `--fero.<key>` > the call > `FERO_<KEY>` > `fero.opt.ts` > the default. Nested lowercase keys. `optcascade` is the one dependency.
+- **V4-11** A README is the terminals; a screen is one line or one frame.
+- **V4-12** The example series is complete: a story file is a driver, an app may run past ten lines, a check runs every file its README names, no slow tier.
+- **V4-13** One ledger. This page holds the status, the bugs, the ideas and the decisions index; the full records live in `docs/`; 42 obvious warts were fixed instead of filed, and the fixes that touched the public surface are listed there.
+
+## History
+
+[docs/HISTORY.md](docs/HISTORY.md): the v4 status log, day by day, and the v3 milestone record (M0 to M8) from the old README.

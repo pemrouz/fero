@@ -1,13 +1,9 @@
-# DECISIONS — fero v3 (settled; append-only)
+# DECISIONS — fero (settled; append-only)
 
-Seeded at M8 per plan §11: the load-bearing decisions from M0–M7 (full rationale
-lives in the DESIGN-M*.md records and the README milestone entries — this ledger is
-the index of what is SETTLED, so nobody relitigates it by accident), plus the
-carried v2 rejections (plan §12). Never delete a record — supersede it.
-
-NOTE: the repo convention wants one ledger pair at the repo ROOT. The root pair
-belongs to the v1/v2 tree and its active sessions; this file is the v3 pair,
-path-scoped, and merges into the root ledgers when v3 supersedes the root source.
+The load-bearing decisions, V3-1 to V3-21 from the v3 build (full rationale in the DESIGN-M*.md
+records and in HISTORY.md) and V4-1 onward for fero v4, plus the carried v2 rejections. This is
+the index of what is SETTLED, so nobody relitigates it by accident. Never delete a record —
+supersede it. The one-line index, and everything still open, is [../STATUS.md](../STATUS.md).
 
 ## V3-1 — the deterministic kernel behind an effect sink (M0)
 Context: v2 validated all protocol behaviour over real sockets/timers — a
@@ -1256,3 +1252,87 @@ series-wide); a shared `screen()` in lib.ts (V4-11, not reopened); a JSON
 guard on 42's POST (http plumbing, not fero; the curl line shows the
 shape); renaming 30's `FLEET` header to `DASHBOARD` (02's `SHOP` is the
 precedent for the resource word).
+
+## V4-13 — one ledger: STATUS.md is the page, the records live in docs/, the obvious warts are fixed (2026-09-28)
+Context: twelve markdown files sat at the repo root, about 6,250 lines: a README
+that was still the v3 milestone diary ("fero v3 — M0…M8"), a STATUS log,
+DECISIONS, ISSUES with 40 entries, IDEAS with about 80, the pre-M4 checkpoint
+and four design records. The owner asked for them to be consolidated into a
+simpler set, "perhaps even just one I need to look at", with the obvious
+things fixed along the way so that what is left is only what truly needs a
+decision, and written more simply than the ledgers were.
+Decision:
+- **STATUS.md is the one page.** Five sections: where it stands (the counts,
+  the series, the site, no CI); bugs (what happens, where, the fix if known,
+  grouped kernel / api / directory-config-shell / data / debugger); worth doing
+  (next, someday, by area); decided (one line per V4 decision); history (a
+  pointer). Short sentences. A fixed bug leaves the page. The evidence behind
+  an open one is one command away: `git show 0055e6e:ISSUES.md`. ISSUES.md and
+  IDEAS.md are deleted: two open lists beside one page drift.
+- **The records move to docs/**: this file (still append-only), DESIGN-M6,
+  DESIGN-M7, DESIGN-DIRECTORY, DESIGN-CONFIG, CHECKPOINT, and a new HISTORY.md
+  holding the v4 status log and the v3 milestone diary the README carried.
+  Relative links repointed; three source comments and the fold header follow.
+- **README.md says what fero is and how to run it**: the shape in one code
+  block and eight bullets, the ordering and availability posture, the
+  Configuration section verbatim (the docs drift gate and the website's
+  claims check anchor to it), the debugger in one paragraph, the testing
+  policy, the layout, the record. CLAUDE.md is a third of its old size and
+  keeps the four phrases the website's claims check reads.
+- **42 warts fixed in one pass**: six agents in six worktrees, one area each,
+  every fix with a regression test that was red on the old code, all landed
+  under one battery. The ones a user can see:
+  - the api: `WriteRejectError` — every write rejection is an Error with a
+    stack and a message naming the resource, the verb, the key and the rung
+    (`{ ...e }` is still the plain `WriteReject`); two new reject reasons,
+    `invalid-key` (an empty key on `update`/`remove`, refused before any
+    stamp — it used to kill the process) and `not-durable` (`confirm:
+    'persisted'` on a server with no disk anywhere rejects at once instead of
+    waiting out the timeout); a lens coerces to its cell (`data.k + 1` is
+    k+1 and `data.k++` commits k+1; they used to commit the debug label and
+    NaN); a method handle is callable (`h()` is the one-shot promise, so
+    `assert.rejects(f.methods.x())` works); every `hosts` entry is checked as
+    an address and the bad one named; `cluster.me.origin` is the bare uuid in
+    life 1, as the stamps are, and `me.incarnation` is the life counter;
+    `me.primary` names a client's feeder; a Peer row carries `client:
+    boolean`; `ctx.peer` on a server-local call is the server's own uuid; a
+    subscription's derived view is disposed when the subscription ends (one
+    operator node per subscription used to live for ever); "open, then act"
+    right after a client's `fero()` shows the delta; Ctrl-C before `fero()`
+    resolves is the clean stop too; `fero.spawn(file, args, { stdin: 'pipe'
+    })` and `write(line)`; the scoped hint is a recipe that runs; the
+    substrate's three long refusals wrap after the dash.
+  - the kernel: a spoke never teaches a view (VIEW, PROPOSE, VOTE, JOIN and
+    LEAVE on a client link are dropped, a client ships no view, and it adopts
+    an equal-epoch view with different members — reborn memory-only members
+    used to adopt a client's stale view and never re-form); a hostless static
+    listener proposes genesis once one member has dialed it and its uuid is
+    lowest (half of all one-sided pairs used to sit at epoch 0 for ever);
+    `writeAck` is journaled once per cleared attempt. The 1000-seed sweep
+    stays at exactly 237,451 events.
+  - directory, config, shell: a cleanly-left server's entry leaves the
+    directory at once; a `FERO_*` name that extends a leaf is refused naming
+    that name instead of blaming the good variable; a `dir` deleted under a
+    running member condemns the store and the leave completes, instead of an
+    uncaught ENOENT mid-leave.
+  - the debugger: the pages and the banner say v4; a capture file that is not
+    there yet is waited for; `differs (in flight)` in amber where a
+    divergence cannot be proved; an even split says `split`; the debugger's
+    own DIAG link is an `observer`; a reborn writer's own writes replay; a
+    torn attach read is named and attach pulls one instant; zero-row kinds
+    leave the suggestions; the dashboard's baseline note tells the truth;
+    `npm run debug` stops on Ctrl-C.
+  - the harness: the rendezvous port is drawn outside the ephemeral range, and
+    a failed durable check's port-named WAL dirs are swept.
+- **Left on purpose**, on the page: the ring hash (every member must agree
+  and the goldens move — its own decision), the n=2 stall across the leave
+  window (V4-6's reasons stand), a client's `writable` (needs a rule), a live
+  scalar on subscribe (a mirror redesign), the two-cells-per-row projection
+  (needs an oracle), the half-typed line under a redraw (a house choice).
+REJECTED: keeping ISSUES.md and IDEAS.md beside STATUS.md (two lists drift;
+the page is the list); deleting the records (append-only stays append-only,
+one directory down); an archive copy of the old ledgers under docs/ (git
+history is the archive); a per-bug file or an issue tracker (no remote).
+Consequences: three files at the root a reader meets (README, STATUS,
+CLAUDE) and a docs/ folder. Battery after the pass: 495 + 18 contract,
+perf 43.
