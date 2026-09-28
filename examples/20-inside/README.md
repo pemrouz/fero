@@ -36,9 +36,10 @@ fero v4 → http://localhost:4699/  (capture: examples/20-inside/inside.capture.
   top filters the whole tree by a name or a facet. The bottom bar replays every journal into the captured
   end state (`replay ✓`) and compares the two fingerprints (`converged ✓`).
 - The limits this series keeps. `fero()` has no `diag` key, so `npm run debug -- --attach` cannot reach a
-  `fero()` process: a capture file is the public way in. Never capture a scoped cluster (`replicas`, ISSUES
-  I-3) or a node that wrote after a restart from its `dir` (I-1): the viewer paints red where nothing is
-  wrong, or fails the replay.
+  `fero()` process: a capture file is the public way in. Never capture a scoped cluster (`replicas`): the
+  viewer paints `never-arrived` in red on members that were never meant to hold the row (an open bug in
+  STATUS.md). A node that wrote after a restart from its `dir` replays fine; its links and streams stay
+  `@ end`.
 
 ```sh
 node inside.ts --fero.journal.cap 8   # a ring of eight: 65 events fall off; the viewer says replay ✗

@@ -41,9 +41,10 @@ fero v4 → http://localhost:4699/  (capture: examples/23-live/live.capture.json
   journal replays to the state it came with. Drag the scrubber and the polling pauses; reset it and it
   goes on. The call raises `journal.cap`, each node's event ring (4096 by default, about four minutes at
   this rate), so the whole run stays scrubbable: once a ring drops an event the scrubber goes off.
-- A capture is one moment. One taken while a write is still on its way paints `diverged ✗` in red (the
-  three do not agree yet) and the next poll paints it green again — rare here, and not a lost write. After
-  Ctrl-C the last file is often written while the three leave, so it can stay red; run again, it is green.
+- A capture is one moment. One taken while a write is still on its way paints `differs (in flight)` in
+  amber (the three do not agree yet) and the next poll paints it green again — rare here, and not a lost
+  write. After Ctrl-C the last file is often written while the three leave, so it can stay amber; run
+  again, it is green.
 
 ```sh
 node live.ts --fero.journal.cap 64   # 64-event rings: the count stops at 192, drops counted, scrubbing off
