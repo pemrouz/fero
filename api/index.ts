@@ -130,8 +130,18 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     throw new Error(`fero('${name}'): server must be true (pin the server role) or false (pin the client role)${at('server')} — omit it and a bare fero is a client`)
   if (config.listen !== undefined && config.listen !== false && !isAddr(config.listen, true))
     throw new Error(`fero('${name}'): listen must be a 'host:port' string (a non-empty host; port 0 = a free port), or false for a socketless solo node${at('listen')}`)
-  if (config.hosts !== undefined && (!Array.isArray(config.hosts) || (config.hosts as unknown[]).some((h) => typeof h !== 'string' || h === '')))
+  if (config.hosts !== undefined && !Array.isArray(config.hosts))
     throw new Error(`fero('${name}'): hosts must be an array of 'host:port' strings${at('hosts')}`)
+  //! every entry is checked as an ADDRESS and the bad one is NAMED: a role file that reads its ports off
+  // process.argv and is launched with a `--fero.<key>` flag used to build '127.0.0.1:--fero.heartbeat.ms'
+  // and die deep in the shell on Node's raw `Port should be >= 0 and < 65536` (rungs 15 and 16)
+  if (config.hosts !== undefined) {
+    const i = (config.hosts as unknown[]).findIndex((h) => !isAddr(h))
+    if (i !== -1) {
+      const h = (config.hosts as unknown[])[i]
+      throw new Error(`fero('${name}'): hosts[${i}] ${typeof h === 'string' ? `'${h}'` : String(h)} is not a 'host:port' address${at('hosts')}`)
+    }
+  }
   if (config.dir !== undefined && (typeof config.dir !== 'string' || config.dir === ''))
     throw new Error(`fero('${name}'): dir must be a non-empty path${at('dir')}`)
   const plainObject = (v: unknown): boolean => typeof v === 'object' && v !== null && !Array.isArray(v) && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null)

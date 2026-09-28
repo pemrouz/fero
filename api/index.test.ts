@@ -500,6 +500,13 @@ test('v4.1 roles: following is ambient, serving is a declared act — in the bat
   } finally { await new Promise<void>((r) => blocker.close(() => r())) }
 })
 
+test("hosts entries are checked as ADDRESSES and the bad one is named — a role file that read its ports off argv and got a --fero flag used to die deep in the shell on Node's raw port error", async () => {
+  await assert.rejects(fero('r', { hosts: ['127.0.0.1:4801', '--fero.heartbeat.ms', '50'] }), /fero\('r'\): hosts\[1\] '--fero\.heartbeat\.ms' is not a 'host:port' address/)
+  await assert.rejects(fero('r', { hosts: ['127.0.0.1:4801', 7] } as never), /hosts\[1\] 7 is not a 'host:port' address/)
+  await assert.rejects(fero('r', { hosts: ['127.0.0.1'] }), /hosts\[0\] '127\.0\.0\.1' is not a 'host:port' address/)
+  await assert.rejects(fero('r', { hosts: 'nope' } as never), /hosts must be an array/)
+})
+
 test('v4.1 identity hardening: legacy dirs, incomplete dirs, invalid and cross-resource boot records all refuse loudly', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-idh-'))
   try {
