@@ -362,3 +362,27 @@ test('divergence is CRIT only where the capture can PROVE it (a quiesced sim); l
     assert.doesNotMatch(tree, /data-tip="(node|cell):differs"/)
   }
 })
+
+test('the route timeline says "never arrived" only where the pill can (a settled sim); elsewhere a missing stop is "not yet arrived" (ISSUES I-5)', async () => {
+  //! the first route with a node that has no row for it — on a sim capture, routes() marks it never-arrived either way
+  const missingStop = (cap: any) => {
+    for (const r of (MODEL.routes(JSON.parse(JSON.stringify(cap))) as Map<string, any>).values())
+      if (Object.values(r.nodes).some((s: any) => s.status === 'never-arrived')) return `g/writes/${r.origin}#${r.seq}`
+    assert.fail('no route with a missing stop')
+  }
+  {
+    const cap = midFlight()
+    const { el, g } = await bootViewer('mid', cap)
+    g(`navTo(${JSON.stringify(missingStop(cap))})`)
+    assert.match(el('insp').innerHTML, /data-tip="stop:inflight">not yet arrived</, 'mid-flight: the stop is on its way')
+    assert.doesNotMatch(el('insp').innerHTML, /never arrived/, 'a sim that is still moving cannot say never')
+    assert.match(el('tree').innerHTML, /data-tip="write:in-flight"/, 'and the pill agrees')
+  }
+  {
+    const cap = isolatedWriter()
+    const { el, g } = await bootViewer('isolated', cap)
+    g(`navTo(${JSON.stringify(missingStop(cap))})`)
+    assert.match(el('insp').innerHTML, /data-tip="stop:never">never arrived</, 'quiesced: the loss is proven')
+    assert.match(el('tree').innerHTML, /data-tip="write:never-arrived"/)
+  }
+})
