@@ -205,7 +205,9 @@ test('the floor is silent on a paused link; a digest arriving mid-pause defers i
   //! adversarial-review regression: control frames queued into a drop-oldest queue are doomed work,
   // and serialising the missing suffix per inbound digest during a pause is O(suffix) discarded per
   // tick — both must be deferred to the drain-time exchange.
-  const { node, of } = harness('aa', { heartbeatMs: 50 })
+  //! two hosts, one linked: genesis waits for the mesh, so the tick's only business here is the floor
+  // (a hostless listener with one member link would propose view 1 on this tick — I-22)
+  const { node, of } = harness('aa', { heartbeatMs: 50, hosts: ['sim:bb', 'sim:cc'] })
   node.step({ kind: 'start' })
   node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
   node.step({ kind: 'bytesIn', link: 1, bytes: hello('bb') })

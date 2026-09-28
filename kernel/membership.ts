@@ -192,10 +192,14 @@ export class Membership {
     // CLIENT links are invisible here (M5b): a spoke never counts toward formation, never enters the
     // member sweep, and never wins the lowest-uuid race — and a client NODE runs none of the member
     // machinery at all (the node.client guards here and below; stale-pulls + settle stay live for it).
+    // The formation set is the hosts this node was told to dial — or, for a listener given NONE, the
+    // members that dialed it (I-22, 2026-09-28): in a one-sided static pair (`{ listen }` + `{ listen,
+    // hosts: [it] }`) the hostless side never proposed, so whenever its uuid sorted lowest the pair sat at
+    // epoch 0 for good. One admitted member link is enough; a later arrival joins at the next epoch (V4-3).
     if (!node.client && this.view.epoch === 0 && !this.#proposal && !this.rejoining() && !this.epochStale) {
       const hosts = node.hosts
       const links = this.#admitted(node).filter((l) => !l.client) // dedup-race losers are dead and excluded (review: a dead twin once double-counted)
-      if (hosts.length > 0 && links.length >= hosts.length && [node.uuid, ...links.map((l) => l.uuid)].sort()[0] === node.uuid) {
+      if (links.length >= Math.max(1, hosts.length) && [node.uuid, ...links.map((l) => l.uuid)].sort()[0] === node.uuid) {
         const byUuid = new Map<string, string>([[node.uuid, node.listen]])
         for (const l of links) byUuid.set(l.uuid, l.listen)
         this.#propose(node, { epoch: this.#nextEpoch(node), members: sorted([...byUuid.entries()]) })
