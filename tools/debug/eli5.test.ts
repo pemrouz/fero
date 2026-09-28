@@ -139,6 +139,13 @@ const sweepViewer = async () => {
   const lost = captureSim(sim3)
   assert.ok(lost.quiesced, 'the cut cluster ran to quiescence')
   await drive('lost', lost)
+  //! a PROVEN odd one out: two members agree, the third was cut before the writes, run to quiescence — a strict
+  // majority, so the header says diverged (the 1-vs-1 cut above is a SPLIT: no side is the cluster, every node is pilled)
+  const sim5 = new Sim(5); const trio = cluster(sim5, 3); sim5.run()
+  sim5.partition('n01', 'n02'); sim5.partition('n01', 'n03'); writes(sim5, [trio[1]], 4, 10); sim5.run()
+  const isolated = captureSim(sim5)
+  assert.ok(isolated.quiesced && isolated.nodes.filter((n) => n.stateHash === isolated.nodes[1].stateHash).length === 2, 'two agree, one differs — the fixture is what it claims')
+  await drive('isolated', isolated)
   //! a cluster whose journal RING OVERFLOWED (a tiny cap): the truncated pill, replay ✗, time travel switched off —
   // all from a real producer, never a hand-edited capture
   const sim2 = new Sim(11)

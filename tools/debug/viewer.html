@@ -366,11 +366,15 @@ const derive = (capture) => {
   const names = kindNames(capture);
   const routeMap = routes(capture);
   const cmap = new Map(contested(capture).map(c => [c.cell, c]));
-  // the cluster's MODAL stateHash — a node off it has diverged (crit)
+  // the cluster's MODAL stateHash — a node off it has diverged (crit). Only a STRICT majority is a modal side:
+  // in an even split (1 vs 1, 2 vs 2) no fingerprint is "the common one", so every side is off (ISSUES I-7:
+  // the first node's hash used to win the tie, pilling only the other side of a symmetric disagreement)
   const tally = new Map();
   for (const n of capture.nodes) tally.set(n.stateHash, (tally.get(n.stateHash) || 0) + 1);
   let modal = capture.nodes.length ? capture.nodes[0].stateHash : 0, best = -1;
   for (const [h, c] of tally) if (c > best) { best = c; modal = h; }
+  const sides = [...tally.values()].sort((a, b) => b - a);          // side sizes, largest first — the header's "1 vs 1"
+  const split = capture.nodes.length > 1 && best * 2 <= capture.nodes.length;
   const maxT = Math.max(0, ...capture.nodes.map(n => n.journal.length ? n.journal[n.journal.length - 1].t : 0));
   const origins = [...new Set(capture.nodes.flatMap(n => Object.keys(n.logs)))].sort();
   const kindFreq = new Map();
@@ -378,7 +382,7 @@ const derive = (capture) => {
     const nm = names[e.kind] || ('kind' + e.kind);
     kindFreq.set(nm, (kindFreq.get(nm) || 0) + 1);
   }
-  const d = { names, routes: routeMap, contested: cmap, modal, maxT, origins, kindFreq,
+  const d = { names, routes: routeMap, contested: cmap, modal, split, sides, maxT, origins, kindFreq,
               quiesced: !!capture.quiesced, live: capture.kind === 'live',
               // settled: nothing else is coming — only a QUIESCED SIM can prove a write lost or a disagreement final;
               // a live view or a run stopped at a horizon paints the same facts as warn (in flight), never crit
@@ -497,7 +501,7 @@ const buildForest = (capture, T) => {
     const adm = peers.filter(l => l.admitted).length;
     // off the modal fingerprint: DIVERGED (crit) only on a settled capture — elsewhere a change may still be on its
     // way, so the same fact is warn 'differs' (ISSUES I-4: a live view mid-propagation painted the red of a real fault)
-    const off = capture.nodes.length > 1 && n.stateHash !== d.modal;
+    const off = capture.nodes.length > 1 && (d.split || n.stateHash !== d.modal);
     const diverged = off && d.settled;
     const sev = diverged ? 'crit' : off || n.dropped > 0 ? 'warn' : '';
     const pill = diverged ? { cls:'crit', lab:'diverged', key:'node:diverged' }
@@ -906,7 +910,8 @@ function headerFacts(){
   bits.push(s.converged === null ? sst('warn', 'no nodes', 'no-nodes')
     : s.converged ? fact('converged ✓', 'converged')
     : s.shrunk && s.shrunk.atViolation ? sst('warn', 'mid-flight @ violation', 'mid-flight')
-    : D.settled ? sst('crit', 'diverged ✗', 'diverged')                    // a quiesced sim: nothing else is coming
+    : D.settled ? (D.split ? sst('crit', `split ✗ ${D.sides.join(' vs ')}`, 'split')   // no strict majority: no side is "the" cluster
+                            : sst('crit', 'diverged ✗', 'diverged'))                  // a quiesced sim: nothing else is coming
     : sst('warn', 'differs (in flight)', 'differs'));                     // live / a horizon: a change may still be on its way
   // absent rows (M7 attach): targets that yielded no slice this rebuild — named with their typed reason,
   // never synthesized into node cards (absence renders as absence)
@@ -1034,7 +1039,7 @@ function inspNode(nd){
     ['listen', esc(String(n.listen ?? '—')), '', 'listen'],
     ['seq', esc(String(n.seq ?? '—')), '', 'seq'],
     ['epoch', esc(String(n.epoch ?? '—')), '', 'epoch'],
-    ['stateHash', esc(String(n.stateHash)), n.stateHash !== D.modal && CAP.nodes.length > 1 ? (D.settled ? 'bad' : 'warn') : '', 'statehash'],
+    ['stateHash', esc(String(n.stateHash)), (D.split || n.stateHash !== D.modal) && CAP.nodes.length > 1 ? (D.settled ? 'bad' : 'warn') : '', 'statehash'],
     ['keys', t != null ? `${stateAt(CAP, n.uuid, t).size} <span class="x">@ t${t} · ${n.state.length} at end</span>` : String(n.state.length), '', t != null ? 'keys@t' : 'keys'],
     ['journal', t != null ? `${klog(rows.length)} <span class="x">≤ t${t} · ${klog(n.journal.length)} retained</span>`
                           : klog(n.journal.length) + (n.dropped > 0 ? ` / ${klog(n.dropped)} dropped` : ' / 0 dropped'), n.dropped > 0 ? 'warn' : '', t != null ? 'jrnl@t' : 'journal'],
