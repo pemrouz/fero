@@ -1,4 +1,4 @@
-//! Tier-3 directory suite (V4-3, DESIGN-DIRECTORY.md): the per-box rendezvous directory over REAL
+//! Tier-3 directory suite (V4-3, docs/DESIGN-DIRECTORY.md): the per-box rendezvous directory over REAL
 // sockets, the way a consumer meets it — zero addresses, zero identities, zero hashing — plus the
 // host table driven WITHOUT sockets (the fold-order defect and the ownership rules are pinned
 // deterministically). Every socket test opts in with its OWN free rendezvous port (the battery runs

@@ -62,7 +62,7 @@ Object.defineProperty(WriteRejectError.prototype, 'name', { value: 'WriteRejectE
 //! VERB_NAMES — REC type → the methods.* verb a message names
 const VERB_NAMES = ['update', 'insert', 'remove'] as const
 
-//! discovery (V4-3, DESIGN-DIRECTORY.md): no name hashing — a server binds a FREE loopback port and
+//! discovery (V4-3, docs/DESIGN-DIRECTORY.md): no name hashing — a server binds a FREE loopback port and
 // registers {name, uuid, listen} with the per-box directory (api/directory.ts, the `#directory`
 // system resource at the rendezvous address); everyone looks the name up LIVE and the addresses feed
 // the kernel's dial set through the `discover` event. Zero addresses configured, zero collisions.

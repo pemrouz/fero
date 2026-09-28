@@ -172,7 +172,7 @@ export const verifyReplay = (capture) => {
 // whether the PEER is a client (no emit). `n` on a stream is the count of records folded so far.
 // verifyTopology() is the drift guard: this fold at t=∞ must reproduce every captured end table exactly —
 // the viewer replays a node's topology only where that proof holds, and shows the end (labelled) elsewhere.
-// KNOWN BOUNDS the ∞ guard cannot see (per-step oracle findings, recorded in ISSUES.md — each transient,
+// KNOWN BOUNDS the ∞ guard cannot see (per-step oracle findings, each transient,
 // each self-healing at the next journal row that names the fact): (1) a link killed by a FATAL frameDrop
 // is `dead` in the kernel until its linkDown echo, and a CLIENT's primary re-election skips dead links —
 // the fold cannot tell a fatal frameDrop from a non-fatal one (same kind, free-text reason), so it may
