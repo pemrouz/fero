@@ -156,11 +156,14 @@ export interface Methods {
   [method: string]: (...args: unknown[]) => unknown
 }
 
-//! Peer — one row of cluster.peers.
+//! Peer — one row of cluster.peers: every identified live link, members and clients alike.
 export interface Peer {
   uuid: string
   incarnation: number
   up: boolean
+  //! client — the peer's ROLE as it declared it at HELLO: true = a spoke (never a view member), false = a
+  // server. `Object.values(peers).filter((p) => p.client).length` is "my clients"; the row count is "my links".
+  client: boolean
 }
 
 //! Partitions — the cluster.partitions row (M6, DESIGN-M6 C9): bounded, locally-derivable scalars
