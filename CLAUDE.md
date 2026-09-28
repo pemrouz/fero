@@ -1,111 +1,52 @@
 # CLAUDE.md
 
-Guide for Claude sessions working in this repo. Read this before making changes.
+Guide for Claude sessions working in this repo. Read it before making changes.
 
 ## What this is
 
-**fero v4** — distributed, replicated reactive resources: `fero(name, opts)`
-returns `{ name, data, methods, cluster, snapshot, destroy }`, where `data` is a live view
-whose reads, writes (plain assignment), and reactive operators all flow
-through the sibling [`data`](../data/) engine's change records — which are
-also the wire format. Underneath: a **deterministic kernel** (per-cell LWW +
-Lamport clocks, per-origin logs, digest anti-entropy, joint-consensus
-membership, ring-owned single-writer pipeline, WAL durability), **thin I/O
-shells**, and a **simulation executive** that proves the same kernel bytes
-both ways (real TCP and simulated schedules, with shrinking).
+**fero v4** — distributed, replicated reactive resources: `fero(name, opts)` returns `{ name, data, methods, cluster, snapshot, destroy }`. `data` is a live view whose reads, writes (plain assignment) and operators flow through the sibling `data` engine's change records, which are also the wire format. Underneath: a deterministic kernel (per-cell LWW + Lamport clocks, per-origin logs, digest anti-entropy, joint-consensus membership, ring-owned single-writer pipeline, WAL durability), thin I/O shells, and a simulation executive that proves the same kernel bytes on real TCP and on seeded schedules. `f.snapshot` is the sync dense read.
 
-**This root IS the v4 tree** (promoted 2026-08-16, branch `v4`; package
-`fero` 4.0.0). The v2 surface and the frozen v3 tree — including
-DESIGN-DATA3.md, plan.md/plan-v3.md, GLOSSARY.md — live on at the **`master`
-branch tip**. An uncommitted debug/observe WIP is stashed ("pre-promotion
-WIP" — apply it on `master` only). v3's shrunk sim captures sit in
-`captures/v3-legacy/` (gitignored).
+This root IS the v4 tree (branch `v4`, package `fero` 4.0.0, promoted 2026-08-16). The v2 surface and the frozen v3 tree live on `master`. [README.md](README.md) says what fero is and how to run it. [STATUS.md](STATUS.md) is the ONE ledger: where things stand, the open bugs, the ideas, the decisions. [docs/](docs) holds the full decisions record, the design records and the history.
 
-## Performance is a hard requirement
+## Rules
 
-fero is on the hot path of every read, write, and replication hop. A change
-isn't done until its tests AND its perf numbers are green. Per-file
-`*.perf.ts` siblings pin anything hot; **never widen a threshold to make a
-perf test pass** — investigate. When a change touches `data` on a path fero
-exercises, run data's perf suite too.
+- **Performance is a hard requirement.** A change is done when its tests AND its perf pins are green. Never widen a `*.perf.ts` threshold to make a pin pass; investigate. A change on a `data` path fero exercises runs data's perf suite too.
+- **Never push or open a PR without the user's explicit instruction.**
+- **Speak in simple English.** Short sentences, everyday words, one idea at a time. Say the plain thing first, then the detail. Explain a fero term the first time you use it.
+- **Commit granularly**: one logical change per commit, a Conventional-Commits-ish subject, the WHY in the body. Present each change in chat before committing, then commit and keep moving.
+- **`npm test` on every change.** A bug fix ships with the regression test that catches it. Perf on every hot-path change.
+- **Other sessions share this tree.** Validate in a scratch worktree (with `../data` reachable next to it), commit path-scoped, never reset or stash another session's edits.
+- **Keep STATUS.md in sync with the code.** A fixed bug leaves it; a new bug or idea enters it with its evidence; a decision gets one line there and its full record in [docs/DECISIONS.md](docs/DECISIONS.md) (append-only: supersede, never delete).
 
 ## Layout
 
 | Dir | What lives there |
 |---|---|
-| [api/](api) | The public surface: `fero()` ([index.ts](api/index.ts)), the LENS write trap → `Bind.issue` ([data.ts](api/data.ts); **V4-7: a write shows when it COMMITS** — inside the assignment on the server that owns the cell, as the server's stamped echo on a client; no optimistic copy, a refused write never shows, an in-flight write is only a `pending` row of `cluster.writes`), **[substrate.ts](api/substrate.ts) — the ONE seam onto `../../data/api/index.ts`**, methods/RPC, fold, diagnostics, types. V4-2 role model: bare `fero(name)` = a CLIENT; `server: true`/`listen`/`dir`/`replicas`/a `data:` seed/`methods:` ⇒ server; `listen: false` = socketless solo; `f.snapshot` = the sync dense read. **V4-8: Ctrl-C / SIGTERM is a clean stop built in** (every live instance leaves and tears down, then the process exits 0 unless the app has its own listener; `signals: false` opts out); the cluster view folds in ONE batch so a bare `cluster.tap` fires once with the whole picture (the signal registry is [signals.ts](api/signals.ts)). **V4-9: `fero.spawn(file, args?)`** ([spawn.ts](api/spawn.ts)) runs `node <file> …` as a separate process — the reader's other terminal, from code — and returns `{ pid, out, exited, stop, child }`: `stop()` is the reader's Ctrl-C (0 after the clean stop; SIGKILL and null after five seconds), the parent's own Ctrl-C stops its children, a parent that dies on an error takes them along; a stop untracks from the signal registry when it SETTLES, so a second Ctrl-C mid-leave joins the leave instead of killing the process. **V4-5: `methods: {…}` is the ONE spelling for hosted methods and THE DOOR** — its presence makes clients change data only through the methods (every relayed plain write is refused 'methods-only' and never shows on the client; a top-level function throws with the pointer); open or protected, nothing in between. Spokes are VIEWS: never teach a server, resync to the cluster's truth (`resync`/`resynced`). **V4-3 discovery: [directory.ts](api/directory.ts)** — the `#directory` system resource at the per-box rendezvous `127.0.0.1:3376` (`FERO_RENDEZVOUS` env / `rendezvous:` config; the battery runs it `off`): a server binds a FREE port and registers, everyone looks the name up live → the kernel's `discover` event. `#` names are reserved. Spec: [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md). **V4-10 config: [config.ts](api/config.ts) — the ONE seam onto `optcascade`.** A public `fero()` folds six layers into the call, highest first: `--fero.<key>` > the call > `FERO_<KEY>` > the project `fero.opt.ts|js` > `$HOME/fero.opt.ts|js` > the default; inside every layer the name rung (`--fero.shop.dir`, `FERO_SHOP_DIR`, `{ shop: { dir } }`) beats the global. Keys are nested lowercase words (`heartbeat.ms`, `redial.ms`, `journal.cap`; the camelCase spellings are refused with a pointer). Unknown keys throw naming their layer; coercions apply to the string layers only; `methods`/`seams`/`signals` are call-only and `uuid` never comes from a file; `server: false` is the client pin from any layer. `FERO_CONFIG=off` = the call alone with zero optcascade calls — the battery runs that way ([utils/battery.ts](utils/battery.ts)); `diag(f).config()` says where each value came from. Spec: [DESIGN-CONFIG.md](DESIGN-CONFIG.md). |
-| [kernel/](kernel) | The deterministic kernel: node, write pipeline, ring, membership (joint-consensus views; **V4-6: a clean `destroy()` LEAVES** — the view shrinks by ballot, so a two-member cluster survives a clean stop; a crash still needs three; V4-8 makes Ctrl-C that clean stop), journal/log, codec (frames + runs), confirm, streams, scope, diag. No I/O — everything replayable. |
-| [shell/](shell) | The thin I/O runtime (real sockets/timers around the kernel). |
-| [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep — chaos schedules against the SAME kernel bytes the shell runs. |
-| [tests/](tests) | Cross-layer scenarios: api scenarios, TCP tier, WAL tier, internals entry pin, baseline perf. |
-| [tools/](tools) | debug/ (capture viewer, scenario server, honesty checks, the ONE fold model [model.mjs](tools/debug/model.mjs) — `stateAt`/`topologyAt` replay state AND links/streams under time travel, each behind its own `verify*` drift guard that proves the replay reproduces the captured end before the page paints it — the ELI5 tooltip glossary [eli5.mjs](tools/debug/eli5.mjs) — every `data-tip` key on both pages resolves there, gated by eli5.test) + perf/ (absolute probes, BASELINE.md, pin/compare machinery). |
-| [utils/](utils) [examples/](examples) | Shared helpers (`#utils` import map); **the graded example series** ([examples/README.md](examples/README.md)) — 26 rungs, 01 → 43, complete 2026-09-28 (01-17 the ladder, 20-23 the debugger series, 30 the capstone, 40-43 the apps; DECISIONS V4-12): one folder per example, one file per terminal run as plain `node server.ts`, a `check.ts` per folder that proves it (it stops the roles with Ctrl-C and ends with `ok <example>`), the roles are started with `fero.spawn`, [lib.ts](examples/lib.ts) is only `until`/`sleep` — every check runs inside `npm test` via [tests/examples.test.ts](tests/examples.test.ts) under a private rendezvous port. **V4-11: a README is the terminals** (one block per terminal, the command first, the real output, `^C` at column 0, at most three bullets, a `sh` block of scale-it commands, the check as one sentence, `Next:`) **and a screen is one line or one frame**: a sequence rung logs one line per change (01), a live-picture rung clears and redraws a frame headed by the role word in CAPS (02, 03) — the delimiter a check and the site recorder split on; every screen names its pid. |
+| [api/](api) | The public surface. [index.ts](api/index.ts) is the composer: roles by declared act (bare `fero(name)` = a client; `server: true`, `listen`, `dir`, `replicas`, a `data:` seed or `methods:` = a server; `listen: false` = a socketless solo); `methods:` is the door (V4-5: clients change data only through the methods, a relayed plain write is refused `methods-only`); a write shows when it commits (V4-7: no optimistic copy, a refused write never shows, an in-flight write is a `pending` row of `cluster.writes`); Ctrl-C is a clean stop (V4-8, [signals.ts](api/signals.ts)); `fero.spawn(file, args)` runs a role as a child process (V4-9, [spawn.ts](api/spawn.ts)). [substrate.ts](api/substrate.ts) is the ONE seam onto `../../data/api/index.ts`. [config.ts](api/config.ts) is the ONE seam onto `optcascade` (V4-10). [directory.ts](api/directory.ts) is the `#directory` system resource at the per-box rendezvous `127.0.0.1:3376` (V4-3; `FERO_RENDEZVOUS`; the battery runs it `off`). [fold.ts](api/fold.ts) is the gather for scoped reads, [methods.ts](api/methods.ts) the method plane, [diagnostics.ts](api/diagnostics.ts) the Symbol-keyed internals door. |
+| [kernel/](kernel) | The deterministic kernel: node, write pipeline, ring, membership (joint-consensus views; a clean `destroy()` LEAVES by ballot, V4-6), journal, codec, confirm, streams, scope (scoped replication), log (compaction), diag. No I/O; everything replayable. |
+| [shell/](shell) | The thin I/O runtime: real sockets, timers and the fsync WAL around the kernel. |
+| [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep, the n≈100 scale tier. Chaos schedules against the SAME kernel bytes the shell runs. |
+| [tests/](tests) | Cross-layer scenarios, the real-TCP and real-WAL tiers, the config tier, the baseline gate, and [examples.test.ts](tests/examples.test.ts), which runs every example check under a private rendezvous port with a per-rung budget. |
+| [tools/](tools) | debug/ (the capture viewer, the scenario dashboard, the ONE fold model [model.mjs](tools/debug/model.mjs), the ELI5 glossary [eli5.mjs](tools/debug/eli5.mjs), the honesty gate) and perf/ (the persisted absolute baseline, [BASELINE.md](tools/perf/BASELINE.md)). |
+| [utils/](utils) | Shared helpers (`#utils`). [battery.ts](utils/battery.ts) pins `FERO_RENDEZVOUS=off` and `FERO_CONFIG=off` for the whole battery. |
+| [examples/](examples) | The 26-rung series ([examples/README.md](examples/README.md)): one folder per example, one file per terminal run as plain `node server.ts`, a `check.ts` that starts the roles with `fero.spawn`, asserts, stops them with Ctrl-C and ends `ok <example>`. The rules: a README is the terminals (V4-11: one block per terminal, the command first, the real output, `^C` at column 0, at most three bullets, a `sh` block of scale-it commands, the check as one sentence, `Next:`); a screen is one line per change or one cleared frame headed by the role word in CAPS; a role file on the ladder is about ten lines with no plumbing; a check runs every file its README names. Run a check by hand on a fresh private port (`FERO_CONFIG=off FERO_RENDEZVOUS=127.0.0.1:<free port> node check.ts`), never on 3376. A change to a printed line re-records the README block from a real run. |
+| [docs/](docs) | [DECISIONS.md](docs/DECISIONS.md) (append-only), the design records ([DESIGN-M6](docs/DESIGN-M6.md), [M7](docs/DESIGN-M7.md), [DIRECTORY](docs/DESIGN-DIRECTORY.md), [CONFIG](docs/DESIGN-CONFIG.md)), [CHECKPOINT.md](docs/CHECKPOINT.md), [HISTORY.md](docs/HISTORY.md). |
 
-Entries: `.` → [api/index.ts](api/index.ts), `./internals` →
-[internals.ts](internals.ts). Ledger docs: [STATUS.md](STATUS.md) (D-phases +
-log), [DECISIONS.md](DECISIONS.md), [ISSUES.md](ISSUES.md) (bugs found,
-with evidence — open first, fixed at the bottom), [CHECKPOINT.md](CHECKPOINT.md),
-DESIGN-M6/M7, [DESIGN-DIRECTORY.md](DESIGN-DIRECTORY.md) (V4-3).
+Entries: `.` → [api/index.ts](api/index.ts), `./internals` → [internals.ts](internals.ts).
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `npm test` | 456 unit/sim/scenario tests (incl. the 26 example checks, the n=100 scale tier, the config layer's unit + real-child tiers, and the debugger's DOM/ELI5 gates), then `test:contract` — data's 18-clause SCHEDULE suite ridden from `../data/conformance/schedule.test.ts`. Runs with `--import ./utils/battery.ts`: the directory OFF and the config layer OFF. |
+| `npm test` | 495 unit/sim/scenario tests (the 26 example checks, the n=100 scale tier, the config tiers, the debugger's DOM and ELI5 gates), then `test:contract`: data's 18-clause SCHEDULE suite from `../data/conformance/schedule.test.ts`. Runs with `--import ./utils/battery.ts`: directory OFF, config layer OFF. |
 | `npm run perf` | The 43 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
-| `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` / `demo:watch` | Sim executive, shrinker, scenario server, debug viewer, the two-terminal demo (= examples/02-server-client's server.ts / client.ts). |
-| `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200s each; `--only <name>`, `--seeds N`). Script-tier — run it on scale-relevant kernel changes, not per-commit. |
+| `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` / `demo:watch` | Sim executive, shrinker, scenario server, debug viewer, the two-terminal demo (= examples/02). |
+| `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200 s each). Script-tier: run it on scale-relevant kernel changes, not per commit. |
 
-Source-served, no build: everything runs via `--experimental-strip-types`.
-One install step since V4-10: `npm install` (the one dependency, `optcascade` ≥ 1.1.0; Node ≥ 22.18).
+Source-served, no build: everything runs via `--experimental-strip-types`. One install step: `npm install` (`optcascade` ≥ 1.1.0; Node ≥ 22.18).
 
-## The data coupling (the seam discipline)
+## The two seams
 
-- [api/substrate.ts](api/substrate.ts) imports **exactly one** data entry:
-  `../../data/api/index.ts` (`$`, `value`, `node`, `lane`, `ingest`,
-  `DataNode`, `exportContract`). Nothing else in fero touches data directly.
-- **fero owns the write surface** (DESIGN-DATA3 §4.1): the lens traps
-  assignment/delete/write-builtins and routes through `Bind.issue` BEFORE
-  data sees anything — no capture sink, no echo problem, no data-side veto.
-- Replication applies fero Recs (`{type:0|1|2, key:[rowKey,...fieldPath],
-  value, at?}`) VERBATIM through data's HOT `lane()` — that shape is a
-  wire-stability surface in BOTH repos.
-- `test:contract` pins data HEAD to the SCHEDULE contract
-  (SCHEDULE_VERSION discipline lives data-side). After any data
-  seam/kernel/api change, run THIS repo's `npm test` + `npm run perf`;
-  data's m3/m4 gates pin the seam budgets from the producer side.
+**data.** [api/substrate.ts](api/substrate.ts) imports exactly one data entry, `../../data/api/index.ts`. Nothing else in fero touches data. fero owns the write surface: the lens traps assignment, delete and the write builtins and routes them through `Bind.issue` BEFORE data sees anything. Replication applies fero Recs (`{ type: 0|1|2, key: [rowKey, ...fieldPath], value, at? }`) verbatim through data's hot `lane()`; that shape is a wire-stability surface in BOTH repos. After any seam, kernel or api change run this repo's `npm test` + `npm run perf`; `test:contract` pins data HEAD.
 
-## The config coupling
-
-- `optcascade` (the owner's copts module, published on npm) is the ONLY
-  other dependency, and [api/config.ts](api/config.ts) is its ONLY importer.
-  Nothing else in fero reads `process.argv`, a `FERO_*` variable, or a
-  `fero.opt.*` file — the composer gets one folded config and `from(key)`.
-- Precedence is fixed there: `--fero.<key>` > the call > `FERO_<KEY>` >
-  the project `fero.opt.ts|js` > `$HOME/fero.opt.ts|js` > the default; the
-  name rung beats the global inside every layer. Keys are nested lowercase
-  words. Add a config key by adding a row to `LEAVES` (which layers may
-  carry it, and why not the others) and, if it needs one, a case in the
-  coercion table — then a `README` row and a `config.test.ts` case.
-- `FERO_CONFIG=off` reads the call alone with zero optcascade calls. Every
-  suite that composes a real `fero()` imports [utils/battery.ts](utils/battery.ts)
-  FIRST (it pins `FERO_RENDEZVOUS=off` and `FERO_CONFIG=off`); a test that
-  wants the layer ON injects its sources (`api/config.test.ts`) or spawns a
-  child with `FERO_CONFIG` deleted (`tests/config.test.ts`). Never commit a
-  `fero.opt.*` at the repo root — a guard test refuses it.
-- `FERO_DIAG_TOKEN` is the debug viewer's variable, not fero config; the
-  layer strips it. System resources (`#directory`) bypass the layer.
-
-## Working conventions (please follow)
-
-- Keep STATUS.md's ledger/log and this file in sync with the code.
-- Commit granularly with detailed Conventional-Commits-ish messages; one
-  logical change per commit; explain WHY in the body.
-- Present every change in chat before committing (what/why/test/perf), then
-  commit and keep moving.
-- `npm test` on every change; a bug fix ships with the regression test that
-  catches it. Perf on every hot-path change.
-- **Never push / open PRs without the user's explicit instruction.**
-- **Speak in simple English.** Short sentences, everyday words, one idea
-  at a time. Say the plain thing first, then the detail. Avoid jargon unless
-  it is a fero term — and then say what it means the first time.
+**config.** [api/config.ts](api/config.ts) is the only importer of `optcascade`. Nothing else reads `process.argv`, a `FERO_*` variable or a `fero.opt.*` file. Precedence: `--fero.<key>` > the call > `FERO_<KEY>` > the project `fero.opt.ts|js` > `$HOME/fero.opt.ts|js` > the default; inside every layer the name rung (`--fero.shop.dir`) beats the global. Keys are nested lowercase words (`heartbeat.ms`, never `heartbeatMs`). To add a key: a row in `LEAVES` (which layers may carry it, and why not the others), a coercion case if it needs one, a README table row, a `config.test.ts` case. Every suite that composes a real `fero()` imports [utils/battery.ts](utils/battery.ts) FIRST. Never commit a `fero.opt.*` at the repo root (a guard test refuses it). `FERO_DIAG_TOKEN` is the debug viewer's variable, not fero config. System resources (`#directory`) bypass the layer.
