@@ -241,3 +241,14 @@ test("V4-5 — a validator-refused write inside a HANDLER fails the call with th
   try { assert.equal(await s.methods.tryAdmin(), 'refused: reserved', 'the handler handled it — flush-on-return must not override the recovery') }
   finally { await s.destroy() }
 })
+
+test("ctx.peer on a SERVER-local call is the server's own uuid (it IS the caller) — the same handler stamps the same field either way", async () => {
+  const s = await fero('r', { uuid: 'ss', listen: false, methods: { whoami: (_: unknown, ctx: { peer?: string }) => ctx.peer ?? 'nobody' } })
+  try {
+    //! before: a local invoke built its Context without `peer`, so a handler in 40-chat's shape wrote a
+    // row with no `from` when the server called its own method — and every joiner's comparator threw
+    assert.equal(await s.methods.whoami(), 'ss', 'a local call names the server itself')
+  } finally {
+    await s.destroy()
+  }
+})

@@ -65,8 +65,10 @@ export interface Context {
   //! live (M6): true when this invocation opens a SUBSCRIPTION — a dual-mode handler (the scoped
   // default read) returns the live gather proxy on the SUB leg and the one-shot value on CALL.
   live?: boolean
-  //! peer (V4-3): the invoking link's uuid — the caller's identity as admitted at HELLO; undefined for a
-  // local invoke (host.invokeLocal). The directory host keys registrations by it (api/directory.ts).
+  //! peer (V4-3): the invoking link's uuid — the caller's identity as admitted at HELLO. On a SERVER-local
+  // call (host.invokeLocal) it is the server's OWN uuid: the server is the caller, and a handler that stamps
+  // `from: ctx.peer` writes the same field either way. The directory host keys registrations by it
+  // (api/directory.ts). Undefined only on a wire invoke whose link lost its identity mid-flight.
   peer?: string
 }
 
@@ -185,7 +187,8 @@ export class Host {
     const fn = this.#methods[m]
     if (!fn) throw new Error(`unknown method '${m}'`)
     const tracked: Promise<Coords>[] = []
-    const ctx: Context = { data: this.#data, flush: () => settle(tracked.splice(0)) }
+    //! peer is this node: a local call's caller IS the server (the Context doc above)
+    const ctx: Context = { data: this.#data, flush: () => settle(tracked.splice(0)), peer: this.#rt.node.uuid }
     let result: unknown = this.#als.run(tracked, () => fn(a, ctx))
     if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
       result = await result
