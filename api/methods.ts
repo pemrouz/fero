@@ -135,6 +135,12 @@ export class Host {
         // still collapses (promise adoption unwraps thenables — structural to JS) — return live views
         // from SYNC handlers (`read: (a, ctx) => ctx.data`), compute asynchronously via ctx before.
         result = this.#als.run(tracked, () => fn(a, ctx))
+        //! a SYNC handler that wrote nothing has nothing to flush: a SUB opens its stream NOW, inside the
+        // step that carried the SUB frame, so the initial snapshot is the state AT RECEIPT (I-28). This
+        // runs before the first await, so it is synchronous. Without it the hop to the microtask let the
+        // next frame in the same chunk — the caller's CALL that changes the data — commit first, and
+        // "open, then act" folded the act into the snapshot instead of streaming it as a delta.
+        if (entry && isProxy(result) && tracked.length === 0) return this.#open(entry, skey, link, id, result)
         if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
           result = await result
         await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
@@ -161,16 +167,24 @@ export class Host {
         this.#subs.delete(skey) // a value SUB has no live stream to hold; drop the placeholder
         return
       }
-      //! retain the LIVE proxy on the entry (M5-review #11): records() pins only the leaf FunctionSink
-      // via its anchor, NOT the operator chain feeding it — a derived return (ctx.data.filter(...)) is
-      // held only by `result`, so without this strong ref the chain is GC'd and the stream goes silent.
-      entry.live = result
-      const stream = records(result, (rec) => {
-        if (rec.type === 'move') return // documented M5c limitation (banner): sort client-side instead
-        this.#rt.node.step({ kind: 'subOut', link, id, recs: [rec as unknown as Rec] })
-      })
-      entry.stop = () => stream.stop()
+      this.#open(entry, skey, link, id, result)
     })()
+  }
+
+  //! #open — a SUB's live stream over the handler's proxy: the initial snapshot rides the record
+  // interface's attach emit, every later change is one SUBREC. Skipped when the sub was UNSUBbed or its
+  // link reaped meanwhile (M5-review #2/#6).
+  #open(entry: { stop(): void; cancelled: boolean; live: unknown }, skey: string, link: number, id: number, result: unknown) {
+    if (entry.cancelled || this.#subs.get(skey) !== entry) return
+    //! retain the LIVE proxy on the entry (M5-review #11): records() pins only the leaf FunctionSink
+    // via its anchor, NOT the operator chain feeding it — a derived return (ctx.data.filter(...)) is
+    // held only by `result`, so without this strong ref the chain is GC'd and the stream goes silent.
+    entry.live = result
+    const stream = records(result, (rec) => {
+      if (rec.type === 'move') return // documented M5c limitation (banner): sort client-side instead
+      this.#rt.node.step({ kind: 'subOut', link, id, recs: [rec as unknown as Rec] })
+    })
+    entry.stop = () => stream.stop()
   }
 
   #reply(link: number, id: number, ok: boolean, value: unknown) {
@@ -310,7 +324,12 @@ export class Caller {
   //! onPrimaryChange — the failover policies (v2's OQ2, closed): re-subscribe every live sub on the
   // new feeder (same id — server subs are per-link), re-dispatch HELD (never-shipped) and retry-tagged
   // calls, fail the shipped-and-lost rest fast (re-execution is only safe when declared idempotent).
+  //! SUBs FIRST (I-28): both ride the same link in order, and a client's fero() resolves before its
+  // first link — so "open, then act" right after it is a held SUB and a held CALL. Replaying the CALL
+  // first made the view's first frame already hold the call's effect; the delta never rendered.
   onPrimaryChange() {
+    for (const [id, sub] of this.#subs)
+      this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m: sub.m, a: sub.a })
     for (const [id, c] of [...this.#calls]) {
       if (c.held || c.retry) {
         c.held = false
@@ -320,8 +339,6 @@ export class Caller {
         c.reject(new Error(`methods.${c.m}: link-down (the connected server died; pass {retry: true} on idempotent calls)`))
       }
     }
-    for (const [id, sub] of this.#subs)
-      this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m: sub.m, a: sub.a })
   }
 
   destroy() {
