@@ -498,13 +498,17 @@ export class Writes {
     if (typeof v?.u !== 'string' || typeof v.c !== 'number' || typeof v.n !== 'number' || v.n <= 0 || v.n > MAX_PENDING) return
     if (typeof v.s !== 'number' || typeof v.e !== 'number') return // coordinates hop onward to relays — garbage must not
     const j = node.journal
-    j.armed && j.emit(JK.writeAck, v.u, v.c, v.n)
     let hop: { via: number; c: number; n: number; s: number } | null = null
     const flushHop = () => {
       if (!hop) return
       this.#ack(node, hop.via, { u: v.u as string, c: hop.c, n: hop.n, s: hop.s, e: v.e as number })
       hop = null
     }
+    //! the journal row names what this WACK actually CLEARED (first cid, count) — not what it carried. The
+    // same commit reaches an issuer twice, as the replicated record with its attempt identity (the
+    // replication-IS-an-ACK path below) and as this frame; whichever lands second clears nothing, and a
+    // row for it would count one write as two acks (a diary reader did — IDEAS 2026-09-28).
+    let cleared = 0, first = -1
     for (let i = 0; i < v.n; i++) {
       const key = v.u + '|' + (v.c + i)
       const a = this.pending.get(key)
@@ -515,6 +519,7 @@ export class Writes {
       }
       if (a.sent < 0) this.#queued--
       this.pending.delete(key)
+      if (cleared++ === 0) first = v.c + i
       //! the WACK's coordinates feed the dedup window too (M5b): they ARE the original commit
       // coordinates, from the owner of record. This closes the WACK-before-replication window where a
       // cleared attempt had no committed() evidence — the api's drop-sweep (and any dup arriving before
@@ -522,6 +527,7 @@ export class Writes {
       this.#remember(node, v.u, v.c + i, v.s + i, v.e)
     }
     flushHop()
+    if (cleared) j.armed && j.emit(JK.writeAck, v.u, first, cleared)
   }
 
   //! onNack — typed rejection FROM THE OWNER OF RECORD: journal it, absorb the staleness evidence (ce),

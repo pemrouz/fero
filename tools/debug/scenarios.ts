@@ -719,7 +719,7 @@ export const SCENARIOS: Scenario[] = [
       const fail =
         (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
         (committed !== 1 ? `the write committed ${committed} times (must be exactly 1)` : '') ||
-        (acked < 1 ? 'the issuer never observed the commit (no replication-ACK, no duplicate WACK)' : '') ||
+        (acked < 1 ? 'the issuer never observed the commit (no replication-ACK, no re-sent WACK)' : '') ||
         (nodes[0].writes.pending.size ? 'the issuer never cleared its attempt' : '') ||
         (nodes[0].logs.get('n01') ? 'the issuer self-committed — the v2 fallback is supposed to be deleted' : '') ||
         (converged(sim) ?? '')

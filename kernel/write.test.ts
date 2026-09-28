@@ -421,6 +421,24 @@ test('replication IS an ACK: a committed record carrying our issuer clears the p
   assert.ok(h.jk(JK.writeAck).length >= 1)
 })
 
+test('one commit, one writeAck row: a WACK landing AFTER replication cleared the route journals nothing; a partial WACK names only what it cleared', () => {
+  const h = formedView1()
+  h.node.writes.ring.place('theirs', 'bb')
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['theirs'], value: 1 }, { type: REC.update, key: ['theirs', 'sub'], value: 2 }] })
+  assert.equal(h.node.writes.pending.size, 2)
+  //! the first attempt's committed record replicates back before the owner's WACK does — replication IS an ACK
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: recordFrame('bb', 7, 1, 'aa~1', 1, [{ type: REC.update, key: ['theirs'], value: 1 }]) })
+  assert.equal(h.node.writes.pending.size, 1)
+  assert.deepEqual(h.jk(JK.writeAck).map((e) => [e.a, e.b, e.c]), [['aa~1', 1, 1]])
+  //! the WACK covers both attempts; only the second is still pending, so the row says cid 2, count 1
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 2, s: 7, e: 1 }) })
+  assert.equal(h.node.writes.pending.size, 0)
+  assert.deepEqual(h.jk(JK.writeAck).map((e) => [e.a, e.b, e.c]), [['aa~1', 1, 1], ['aa~1', 2, 1]], 'two commits, two rows')
+  //! the second record's replication arrives last: the route is long complete — no third row
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: recordFrame('bb', 8, 1, 'aa~1', 2, [{ type: REC.update, key: ['theirs', 'sub'], value: 2 }]) })
+  assert.equal(h.jk(JK.writeAck).length, 2, 'a WACK or record that clears nothing journals nothing')
+})
+
 test('NACK pacing: a same-epoch withheld/not-owner NACK re-parks onto the TICK clock, not straight back to the wire', () => {
   //! the adversarial-review storm: onNack→settle→flush re-forwarded instantly, spinning at line rate
   // against a minority owner. A same-epoch NACK (ce === my epoch) must wait for the retry clock.
