@@ -192,6 +192,18 @@ test('D3 lens: data write builtins route through issue() — validated — or th
     assert.throws(() => (f.data as { insert(v: unknown): unknown }).insert({ stock: 9 }), /fero: insert\(\)/)
     assert.throws(() => (f.data as { ingest(r: unknown[]): unknown }).ingest([]), /fero: ingest\(\)/)
     assert.throws(() => (f.data as { raf(): unknown }).raf(), /fero: raf\(\)/)
+    //! …and each fits a terminal: no line past 90 characters (the pointer rides a second line), and the
+    // clause before ` — ` is the one examples/04-rows prints — byte-identical to before
+    const firstClause: Record<string, string> = {
+      insert: 'fero: insert() mints a data-side key that would not replicate',
+      ingest: 'fero: ingest() is the replication ingress',
+      raf: 'fero: raf() writes the local projection directly and would not replicate',
+    }
+    for (const verb of ['insert', 'ingest', 'raf'] as const) {
+      const message = (() => { try { (f.data as Record<string, () => unknown>)[verb](); return '' } catch (e) { return (e as Error).message } })()
+      assert.equal(message.split(' — ')[0], firstClause[verb], `${verb}(): the first clause is unchanged`)
+      assert.ok(message.split('\n').every((l) => l.length <= 90), `${verb}(): every line fits — ${JSON.stringify(message)}`)
+    }
     assert.throws(() => (f.data as { dispose(): void }).dispose(), /fero: dispose\(\)/)
     assert.throws(() => (f.data as { update(v: unknown): void }).update({}), /resource root/)
     assert.throws(() => (f.data as { remove(): void }).remove(), /destroy/)
