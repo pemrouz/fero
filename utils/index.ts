@@ -16,6 +16,21 @@ export const ports = {
         s.close(() => resolve(port))
       })
     }),
+  //! outside(): a free port BELOW Linux's ephemeral range (32768-60999 — where bind-0 draws), tried at
+  // random in 20000-32767 until one binds. For the one socket a run must keep apart from every bind-0
+  // pick made LATER in another process (the examples harness's rendezvous vs a check's member ports):
+  // two free() calls can hand out the same number, one from this range and one from bind-0 cannot.
+  outside: async (): Promise<number> => {
+    for (let tries = 0; tries < 100; tries++) {
+      const port = 20000 + Math.floor(Math.random() * 12768)
+      const ok = await new Promise<boolean>((resolve) => {
+        const s = net.createServer().once('error', () => resolve(false))
+        s.listen(port, '127.0.0.1', () => s.close(() => resolve(true)))
+      })
+      if (ok) return port
+    }
+    throw new Error('ports.outside: no free port in 20000-32767 after 100 tries')
+  },
 }
 
 //! ── bench ────────────────────────────────────────────────────────────────────
