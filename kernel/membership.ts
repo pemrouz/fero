@@ -43,6 +43,15 @@
 // and the pre-V4-6 path (suspicion, eviction) takes over. Nothing else moved:
 // ballots, majorities, and vote-once are exactly as above.
 //
+// A CLIENT node is a VIEW of the control plane, never a voice in it (I-23, 2026-09-28
+// — DECISIONS V4-5 carried up from the data plane): it installs the views its
+// servers announce, but never announces one (no view-on-admit, no flood, no PULL
+// answer, no "help a laggard up"), and node.ts drops VIEW/PROPOSE/VOTE/JOIN/LEAVE
+// arriving on a client link. What it holds is a picture of its feeder's cluster —
+// so an EQUAL-epoch view with different members is not split-brain to a client but
+// the cluster having re-formed without it (memory-only members reborn under fresh
+// uuids reuse the epoch numbers), and it adopts that view where a member must refuse.
+//
 // Genesis is the OPEN mode: epoch 0 has no members, no gate, no ballots — byte-
 // for-byte the M0/M1 behaviour, so everything below this milestone is unchanged
 // until the first view commits (the lowest-uuid node proposes view 1 over the
@@ -258,7 +267,7 @@ export class Membership {
     //! stale-epoch pulls: targeted, bounded; then the alarmed release (a wedged gate is named, never silent)
     if (this.epochStale) {
       if (this.#pullTicks++ < MAX_PULLS) {
-        this.#send(node, this.#admitted(node), encodeControl(VERB.PULL, { e: this.view.epoch }))
+        this.#send(node, this.#admitted(node).filter((l) => !l.client), encodeControl(VERB.PULL, { e: this.view.epoch })) // a spoke holds no view of its own to answer with
       } else {
         this.epochStale = false
         j.armed && j.emit(JK.gateAlarm, this.#staleWant)
@@ -292,7 +301,7 @@ export class Membership {
   // view, so a healed partition re-converges its VIEWS even when no epoch-stamped records flow (the
   // plan's split-brain-heal re-announce). A rejoiner/evictee learns its status in one round-trip.
   onAdmit(node: Node, link: Link) {
-    if (this.view.epoch > 0)
+    if (!node.client && this.view.epoch > 0) // a spoke announces nothing: its view is its feeder's, and a reborn feeder must not inherit it
       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
   }
 
@@ -408,9 +417,13 @@ export class Membership {
       this.rejoinFloor = 0
       this.settle(node)
     }
-    if (v.e > this.view.epoch) this.install(node, { epoch: v.e, members: v.m })
-    else if (v.e < this.view.epoch)
-      link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal) // help a laggard up
+    //! a CLIENT adopts an equal-epoch view whose members differ (see the banner): the cluster re-formed
+    // without it and reused the epoch number — its members row would otherwise show the dead ids for good.
+    // A member refuses it: one view per epoch is the safety rule, and a VIEW is not a ballot.
+    const reformed = node.client && v.e === this.view.epoch && hashOf(v.m) !== hashOf(this.view.members)
+    if (v.e > this.view.epoch || reformed) this.install(node, { epoch: v.e, members: v.m })
+    else if (v.e < this.view.epoch && !node.client) // help a laggard up — a spoke never teaches, so it never "helps"
+      link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
     //! the leaver's exit proof (V4-6): a VIEW at or above my committed epoch that does not hold me, from a
     // peer that stays — the commit reached a survivor, so going now cannot un-commit it. Covers both shapes:
     // the proposer's VIEW (installed just above) and a survivor's flood-back of my own self-proposed view.
@@ -420,7 +433,7 @@ export class Membership {
 
   onPull(node: Node, link: Link, v: { e?: unknown }) {
     if (typeof v?.e !== 'number') return
-    if (this.view.epoch > v.e)
+    if (!node.client && this.view.epoch > v.e) // a spoke's view is hearsay — only a member answers a PULL
       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
   }
 
@@ -453,7 +466,7 @@ export class Membership {
     //! THE VIEW FLOODS FIRST (M6-review finding 39): rescope's install round ships HAVEQ on these
     // same FIFO links — a peer still on the old epoch must receive the VIEW before the round, or it
     // deterministically drops the round for epoch skew and the offer waits a full re-round cadence.
-    this.#send(node, this.#admitted(node), encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }))
+    if (!node.client) this.#send(node, this.#admitted(node), encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members })) // a spoke never floods (I-23)
     //! M6: every install re-derives the scope machine against the new ring — held partitions that
     // left the R-set freeze into orphans HERE, the instant the duty changes (kernel/scope.ts)
     if (node.armed) node.scope!.rescope(node)

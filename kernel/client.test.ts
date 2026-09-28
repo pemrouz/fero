@@ -202,6 +202,67 @@ test("a spoke never teaches — and a spoke AHEAD of its feeder resyncs to the f
   assert.deepEqual(d[d.length - 1], { d: { bb: 1 }, r: 0 })
 })
 
+test('a server drops VIEW/JOIN/PROPOSE/VOTE/LEAVE arriving on a CLIENT link — a spoke never teaches membership: frame dropped, link kept, view untouched; its PULL is still answered', () => {
+  const h = harness('aa', { hosts: ['sim:bb'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'bb')
+  h.digestFrom(1)
+  h.admit(2, 'zz', 1)
+  h.digestFrom(2)
+  h.tick() // genesis over {aa, bb}; bb's vote commits it
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 1, g: 1, ce: 0, h: 'aa,bb' }) })
+  assert.equal(h.node.epoch, 1)
+  const views = () => h.sentOn(2, VERB.VIEW).length
+  const v0 = views() // the install flooded view 1 to the spoke — that direction is right
+  //! the I-23 shape: a spoke announcing a HIGHER-epoch view it learned from a cluster that is gone
+  const stale: [string, string][] = [['xx', 'sim:xx'], ['yy', 'sim:yy']]
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 7, m: stale }) })
+  assert.equal(h.node.epoch, 1, 'a VIEW from a spoke installs nothing')
+  assert.deepEqual(h.node.membership.view.members.map((m) => m[0]), ['aa', 'bb'])
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.JOIN, { u: 'zz', i: 1, l: 'sim:zz' }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: [...stale, ['zz', 'sim:zz']], p: 'zz' }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'xx,yy,zz' }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(h.jk(JK.frameDrop).map((e) => e.b), Array(5).fill('membership from client'), 'every teaching verb dropped, named')
+  assert.equal(h.jk(JK.join).length + h.jk(JK.leave).length, 0, 'nothing reached the handlers')
+  assert.equal(h.jk(JK.vote).length, 0, 'no ballot was answered')
+  assert.equal(h.jk(JK.propose).length, 1, 'no ballot beyond genesis was opened')
+  assert.equal(h.sentOn(2, VERB.VOTE).length, 0)
+  assert.equal(h.node.links.get(2)!.dead, false, 'the link is kept — a stale spoke is not a wire fault')
+  //! a PULL is a question, not a teaching: the spoke asks for the live view and gets it
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.PULL, { e: 0 }) })
+  assert.equal(views(), v0 + 1, 'answered with the committed view')
+  assert.equal(h.jk(JK.frameDrop).length, 5, 'and not dropped')
+})
+
+test('a client is a VIEW of the control plane: no view-on-admit, no flood, no PULL answer, no help-a-laggard-up — and it adopts an equal-epoch view whose members differ (the cluster re-formed without it)', () => {
+  const h = harness('cl', { client: true, hosts: ['sim:aa', 'sim:bb'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'aa')
+  h.digestFrom(1)
+  const view = (m: string[]) => encodeControl(VERB.VIEW, { e: 1, m: m.map((u) => [u, `sim:${u}`]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: view(['aa', 'bb']) })
+  assert.equal(h.node.epoch, 1, 'the spoke learned the view')
+  assert.equal(h.sentOn(1, VERB.VIEW).length, 0, 'the install flooded nothing back')
+  h.admit(2, 'bb') // a second server: a MEMBER would announce its view on this admit
+  assert.equal(h.sentOn(2, VERB.VIEW).length, 0, 'no view-on-admit from a spoke')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.PULL, { e: 0 }) })
+  assert.equal(h.sentOn(2, VERB.VIEW).length, 0, 'a PULL goes unanswered — the view is hearsay here')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 0, m: [['bb', 'sim:bb']] }) })
+  assert.equal(h.sentOn(2, VERB.VIEW).length, 0, 'a lower-epoch VIEW is not "helped up" — the reborn-member poison, I-23')
+  assert.equal(h.node.epoch, 1)
+  //! the cluster re-formed without it under fresh uuids and reused the epoch number: adopt, do not refuse
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: view(['cc', 'dd']) })
+  assert.deepEqual(h.node.membership.view.members.map((m) => m[0]), ['cc', 'dd'], 'the members row heals')
+  assert.equal(h.node.epoch, 1)
+  assert.deepEqual(h.jk(JK.viewInstall).map((e) => e.a), [1, 1], 'two installs at the one epoch')
+  assert.deepEqual(h.jk(JK.evict).map((e) => e.a), ['aa', 'bb'], 'the dead ids left the row')
+  assert.deepEqual(h.of('connect').slice(-2).map((e) => e[1]), ['sim:cc', 'sim:dd'], 'and the spoke dials the live members')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: view(['cc', 'dd']) })
+  assert.equal(h.jk(JK.viewInstall).length, 2, 'the same view again is a no-op')
+  assert.equal(h.sentOn(1, VERB.VIEW).length + h.sentOn(2, VERB.VIEW).length, 0, 'through all of it the spoke sent no VIEW')
+})
+
 test('a server drops RECORDS arriving on a CLIENT link — a spoke is never a source: frame dropped, link kept, fold untouched', () => {
   const h = harness('aa')
   h.admit(1, 'bb')

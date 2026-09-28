@@ -17,6 +17,7 @@ import type { Node } from '../kernel/node.ts'
 const key = (k: string) => JSON.stringify([k])
 const pin = (nodes: Node[], k: string, owner: string) => { for (const n of nodes) n.writes.ring.place(k, owner) }
 const jk = (n: Node, kind: number) => n.journal.read().filter((e) => e.kind === kind)
+const members = (n: Node) => n.membership.view.members.map((m) => m[0])
 
 test('spokes converge: two clients on a 3-member cluster fold the identical state through their single feeders', () => {
   const sim = new Sim(71)
@@ -147,6 +148,57 @@ test('feeder failover mid-flight: the primary is partitioned away with attempts 
       if (m.uuid !== 'zc1') commits = Math.max(commits, entries.filter((e) => JSON.stringify(e.rec.key) === key('fk')).length)
   assert.equal(commits, 1, 'one commit of the key in any single lane — dedup absorbed every retransmit')
   assert.equal(JSON.stringify(c.state.get(key('fk'))), '"survives"')
+  assert.deepEqual(sim.violations, [])
+})
+
+//! ── I-23 (2026-09-28): a spoke must never teach a VIEW. Two memory-only members die (kill -9: no leave, no
+// WAL) while a client is still up, and come back on their own addresses under fresh uuids one at a time, the
+// client's redial landing on the first before its peer does. Before the fix the client node ran view-on-admit
+// like a member: the reborn member installed the client's old view (epoch 1 > 0), held a view it was not in
+// (`evicted`), could never run genesis again (that needs epoch 0), and taught the same view to its peer on
+// admit — `members 2 [dead ids] writable false` on both, forever (rung 30's mutation). RED on the old kernel.
+test('reborn memory-only members re-form with a stale spoke connected: the spoke teaches nothing, and its own members row heals to the new cluster', () => {
+  const sim = new Sim(76)
+  const [n01, n02] = cluster(sim, 2, { heartbeatMs: 50 })
+  //! a reboot under fresh uuids is a NEW cluster reusing the epoch numbers — the one-cluster-per-sim
+  // safety monitor would call the new epoch 1 split-brain against the dead one; every other monitor stays
+  sim.monitors = sim.monitors.filter((m) => m.name !== 'one-view-per-epoch')
+  const c = client(sim, 'zc1', [n01, n02], { heartbeatMs: 50 })
+  sim.run({ until: 500 })
+  assert.deepEqual([n01.epoch, n02.epoch, c.epoch], [1, 1, 1], 'genesis; the spoke learned the view')
+  assert.deepEqual(members(c), ['n01', 'n02'])
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['before'], value: 1 }] })
+  sim.run({ until: 700 })
+  assert.equal(JSON.stringify(c.state.get(key('before'))), '1')
+  //! kill -9 both: their ports close (the partitions refuse every redial until a new life binds the address)
+  for (const [a, b] of [['zc1', 'n01'], ['zc1', 'n02'], ['n01', 'n02']]) sim.partition(a, b)
+  for (const n of [n01, n02]) { n.destroy(); sim.nodes.delete(n.uuid) }
+  sim.run({ until: 1000 })
+  assert.equal(c.primary, null, 'the spoke lost its feeder')
+  assert.deepEqual(members(c), ['n01', 'n02'], 'and still holds the dead view')
+  //! the first member comes back on the same address under a fresh uuid; its peer's port is still closed
+  sim.partition('n03', 'n02')
+  const n03 = sim.add({ uuid: 'n03', listen: 'sim:n01', hosts: ['sim:n02'], heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('n03', { kind: 'start' })
+  sim.run({ until: 2000 })
+  assert.deepEqual(n03.admitted(), ['zc1'], "the spoke's redial landed before any peer")
+  assert.equal(n03.epoch, 0, 'and taught it nothing: still open genesis, still able to form')
+  //! the second member comes back; the pair forms a view of its own
+  const n04 = sim.add({ uuid: 'n04', listen: 'sim:n02', hosts: ['sim:n01'], heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('n04', { kind: 'start' })
+  sim.run({ until: 5000 })
+  assert.deepEqual([n03.epoch, n04.epoch], [1, 1], 'the reborn pair committed genesis')
+  assert.deepEqual(members(n03), ['n03', 'n04'])
+  assert.deepEqual(members(n04), ['n03', 'n04'])
+  assert.ok(n03.membership.gate(n03).open && n04.membership.gate(n04).open, 'two of two: writable')
+  //! the other direction: the spoke held epoch 1 {n01, n02}; the live cluster's epoch 1 {n03, n04} heals its row
+  assert.deepEqual(members(c), ['n03', 'n04'], "the spoke's members row shows the live cluster, not the dead ids")
+  //! and the data plane: the spoke resyncs DOWN to the new cluster's truth (V4-5) and its writes flow again
+  sim.post('zc1', { kind: 'write', recs: [{ type: REC.update, key: ['after'], value: 1 }] }, 0)
+  sim.run({ until: 7000 })
+  assert.equal(c.writes.pending.size, 0, 'the route completed through the reborn feeder')
+  assert.equal(JSON.stringify(n03.state.get(key('after'))), '1')
+  assert.equal(converged(sim), null, 'the reborn members and the spoke hold the identical fold')
   assert.deepEqual(sim.violations, [])
 })
 
