@@ -17,7 +17,9 @@ import { captureLive, captureSim, captureAttached } from './capture.ts'
 import { ELI5, tip, tipHTML, phaseKey } from './eli5.mjs'
 import { bootViewer, bootScenarios, bootScenariosPure, dragTo } from './dom-shim.ts'
 import { ABSENT_REASONS, verifyTopology } from './model.mjs'
-import { REC } from '../../kernel/env.ts'
+import { REC, type EffectSink } from '../../kernel/env.ts'
+import { Node } from '../../kernel/node.ts'
+import { VERB, encodeControl } from '../../kernel/codec.ts'
 
 type Entry = { t: string; d: string }
 const G = ELI5 as Record<string, Entry>
@@ -158,6 +160,17 @@ const sweepViewer = async () => {
   const verdicts = verifyTopology(reborn) as { ok: boolean }[]
   assert.ok(verdicts.some((r) => !r.ok) && verdicts.some((r) => r.ok), 'the reborn writer is refused by the topology proof, its peer is not — the fixture is what it claims')
   await drive('reborn', reborn, '')
+  //! a node with a debugger ATTACHED (a latched DIAG session beside one admitted peer, then a write — kernel/diag.test's
+  // in-process recipe): the session's own line paints as an observer, on the end table and under scrub
+  const sink = { connect() {}, send() {}, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {}, invoke() {}, result() {}, subRecs() {} } as unknown as EffectSink
+  const aa = new Node({ uuid: 'aa', listen: 'sim:aa', diag: { allow: { ops: 'tok' } } }, { now: () => 0, rng: () => 0, sink })
+  aa.step({ kind: 'start' })
+  aa.step({ kind: 'linkUp', link: 8, dialed: true, to: 'sim:bb' }); aa.step({ kind: 'bytesIn', link: 8, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
+  aa.step({ kind: 'linkUp', link: 9, dialed: false }); aa.step({ kind: 'bytesIn', link: 9, bytes: encodeControl(VERB.HELLO, { u: 'dbg', i: 1, l: '', r: 2, t: 'tok' }) })
+  aa.step({ kind: 'write', recs: [{ type: REC.update, key: ['k'], value: 1 }] })
+  const observed = captureLive([aa])
+  assert.ok(observed.nodes[0].links.some((l) => l.diag), 'the session latched — the fixture is what it claims')
+  await drive('observed', observed, '')
   //! an ATTACH envelope with every absent reason and no nodes (the honest 'no nodes' header)
   await drive('attached', captureAttached([], ABSENT_REASONS.map((reason: string, i: number) => ({ target: `127.0.0.1:${i + 1}`, reason }))), '')
   return { painted, dangling }
