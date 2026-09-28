@@ -142,6 +142,6 @@ server.listen(port, () => {
     : flag('live') ? `LIVE cluster (${runtimes.length} nodes)`
     : pool ? `ATTACHED via DIAG: ${attachArg}`
     : 'scenario dashboard'
-  console.log(`fero v3 → http://localhost:${port}/  (${mode})`)
+  console.log(`fero v4 → http://localhost:${port}/  (${mode})`)
   console.log(`  dashboard http://localhost:${port}/scenarios · debugger http://localhost:${port}/debug`)
 })
