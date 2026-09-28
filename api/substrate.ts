@@ -273,3 +273,35 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
 //! unwrap — the underlying v4 handle of a lens (or the value itself when not a lens):
 // internal consumers (the gather's projection, diagnostics) that want raw v4 semantics.
 export const unwrap = (x: any): any => (x !== null && typeof x === 'object' || typeof x === 'function' ? (x[LENS] ?? x) : x)
+
+//! mark — the highest live node id in the handle's data runtime. Ids are monotonic, so every node
+// minted after a mark carries a greater id; the Host takes one before a handler runs and hands it to
+// disposeMinted after (I-29). One walk of the runtime's node registry: ~2µs on a twenty-node graph.
+export const mark = (p: any): number => {
+  let m = 0
+  for (const n of (unwrap(p)[NODE] as DataNode<unknown>).runtime.graph()) if (n.id > m) m = n.id
+  return m
+}
+
+//! disposeMinted — release the operator views a handler minted for ONE invocation (I-29): from the
+// view it returned, walk up the parents and dispose every OPERATOR node newer than `mark` — the chain
+// the handler built (ctx.data.filter(…).sort(…)) and nothing older: never a source (the resource, a
+// child path of it, the gather's proxy) and never a view that existed before the call (a shared
+// module-level view a handler hands out). Data keeps every operator in its parents' `children` until
+// dispose() and re-evaluates it on every commit — without this a server carried one dead filter per
+// subscription or one-shot read it ever served.
+export const disposeMinted = (view: any, mark: number): void => {
+  const n = unwrap(view)?.[NODE]
+  if (!(n instanceof DataNode)) return
+  const walk = (x: DataNode<unknown>): void => {
+    if (x.kind !== 'operator' || x.id <= mark || x.disposed) return
+    const parents = x.parents
+    x.dispose()
+    for (const parent of parents) walk(parent)
+  }
+  walk(n)
+}
+
+//! derived — how many views hang directly off a handle's node (data's `children`): the I-29 leak-guard
+// scalar, the way `served` is the host's — a server that closed every subscription reads 0 again.
+export const derived = (p: any): number => (unwrap(p)[NODE] as DataNode<unknown>).children.length

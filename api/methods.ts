@@ -36,7 +36,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { VERB } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
-import { applyStreamRec, isProxy, proxy, records, snapshot } from './substrate.ts'
+import { applyStreamRec, disposeMinted, isProxy, mark, proxy, records, snapshot } from './substrate.ts'
 import type { Coords, Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 
@@ -119,6 +119,9 @@ export class Host {
     //! each invocation gets its own write collector; the handler runs OUTSIDE the kernel step (async),
     // and its return implicitly flushes — the reply provably follows its own commits
     const tracked: Promise<Coords>[] = []
+    //! the views this handler mints are ITS (I-29): marked before it runs, disposed when the reply has
+    // collapsed them (CALL) or the stream they fed closes (SUB) — substrate.disposeMinted
+    const minted = mark(this.#data)
     const ctx: Context = {
       data: this.#data,
       flush: () => settle(tracked.splice(0)),
@@ -140,7 +143,7 @@ export class Host {
         // runs before the first await, so it is synchronous. Without it the hop to the microtask let the
         // next frame in the same chunk — the caller's CALL that changes the data — commit first, and
         // "open, then act" folded the act into the snapshot instead of streaming it as a delta.
-        if (entry && isProxy(result) && tracked.length === 0) return this.#open(entry, skey, link, id, result)
+        if (entry && isProxy(result) && tracked.length === 0) return this.#open(entry, skey, link, id, result, minted)
         if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
           result = await result
         await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
@@ -154,8 +157,12 @@ export class Host {
       }
       if (mode === VERB.CALL) {
         //! a returned ViewProxy collapses to its snapshot for a one-shot call (v2's forWire, kept;
-        // no clone — the reply's codec copies the value into frame bytes synchronously inside step)
-        return this.#reply(link, id, true, isProxy(result) ? snapshot(result) : result)
+        // no clone — the reply's codec copies the value into frame bytes synchronously inside step);
+        // a derived view minted for this call is dead once collapsed — released (I-29)
+        if (!isProxy(result)) return this.#reply(link, id, true, result)
+        const value = snapshot(result)
+        disposeMinted(result, minted)
+        return this.#reply(link, id, true, value)
       }
       //! the sub may have been UNSUBbed or its link reaped during the handler/flush — the entry is gone
       // or cancelled; do not open a stream nobody is listening to (M5-review #2/#6)
@@ -167,15 +174,15 @@ export class Host {
         this.#subs.delete(skey) // a value SUB has no live stream to hold; drop the placeholder
         return
       }
-      this.#open(entry, skey, link, id, result)
+      this.#open(entry, skey, link, id, result, minted)
     })()
   }
 
   //! #open — a SUB's live stream over the handler's proxy: the initial snapshot rides the record
   // interface's attach emit, every later change is one SUBREC. Skipped when the sub was UNSUBbed or its
-  // link reaped meanwhile (M5-review #2/#6).
-  #open(entry: { stop(): void; cancelled: boolean; live: unknown }, skey: string, link: number, id: number, result: unknown) {
-    if (entry.cancelled || this.#subs.get(skey) !== entry) return
+  // link reaped meanwhile (M5-review #2/#6) — the view the handler minted for it is released either way.
+  #open(entry: { stop(): void; cancelled: boolean; live: unknown }, skey: string, link: number, id: number, result: unknown, minted: number) {
+    if (entry.cancelled || this.#subs.get(skey) !== entry) return disposeMinted(result, minted)
     //! retain the LIVE proxy on the entry (M5-review #11): records() pins only the leaf FunctionSink
     // via its anchor, NOT the operator chain feeding it — a derived return (ctx.data.filter(...)) is
     // held only by `result`, so without this strong ref the chain is GC'd and the stream goes silent.
@@ -184,7 +191,10 @@ export class Host {
       if (rec.type === 'move') return // documented M5c limitation (banner): sort client-side instead
       this.#rt.node.step({ kind: 'subOut', link, id, recs: [rec as unknown as Rec] })
     })
-    entry.stop = () => stream.stop()
+    //! stop = the stream AND the view minted for it (I-29): UNSUB, reapLink and destroy all come here.
+    // Only what this invocation minted goes — `read` returns ctx.data itself, the gather hands out its
+    // one shared proxy, a module-level view predates the mark; disposeMinted leaves every one of them.
+    entry.stop = () => { stream.stop(); disposeMinted(result, minted) }
   }
 
   #reply(link: number, id: number, ok: boolean, value: unknown) {
@@ -201,13 +211,17 @@ export class Host {
     const fn = this.#methods[m]
     if (!fn) throw new Error(`unknown method '${m}'`)
     const tracked: Promise<Coords>[] = []
+    const minted = mark(this.#data)
     //! peer is this node: a local call's caller IS the server (the Context doc above)
     const ctx: Context = { data: this.#data, flush: () => settle(tracked.splice(0)), peer: this.#rt.node.uuid }
     let result: unknown = this.#als.run(tracked, () => fn(a, ctx))
     if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
       result = await result
     await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
-    return isProxy(result) ? structuredClone(snapshot(result)) : result
+    if (!isProxy(result)) return result
+    const value = structuredClone(snapshot(result))
+    disposeMinted(result, minted) // the view minted for this call is dead once cloned (I-29)
+    return value
   }
 
   //! reapLink — the caller's link died: stop its streams AND cancel any still opening in a flush window
