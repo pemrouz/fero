@@ -658,10 +658,12 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   }
   rt.hook(fold)
 
-  //! any failure past Runtime construction must tear down what was built — the review caught the
-  // leak: a rejected fero() left the bind, the host, and the open WAL fd alive (a listen collision
-  // is an ordinary start rejection, not an operator typo)
-  const abort = async (err: unknown): Promise<never> => {
+  //! teardown — everything destroy() does AFTER the graceful leave (V4-6): the local surfaces, the
+  // in-flight confirm probes (settled false = could not prove in time — never hang a caller), the
+  // directory client (its link drops ⇒ the host forgets this instance's entries), then the hosted
+  // directory if this instance holds it (⇒ the other servers race for the port), then the runtime.
+  // The diagnostics crash() door runs THIS alone: a process death, as the cluster would see it.
+  const teardown = async () => {
     bind.destroy()
     host!.destroy()
     caller?.destroy()
@@ -669,8 +671,31 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     gather?.destroy()
     for (const [, settle] of probes) settle(false)
     probes.clear()
-    await directory?.destroy().catch(() => {})
-    await rt.destroy().catch(() => {})
+    await directory?.destroy()
+    await rt.destroy()
+  }
+  //! stopping — the ONE stop, whoever starts it (V4-8): the owner's destroy(), the signal handler, or a
+  // signal that lands BEFORE fero() resolves. A second caller joins the first.
+  let stopping: Promise<void> | null = null
+  //! the clean stop is armed HERE, not when compose completes: a SIGINT during a slow start — the listen
+  // bind, a durable server's directory round — used to be Node's default (killed by signal: the port
+  // bound, a directory entry maybe registered, nothing left or torn down). A provisional entry holds the
+  // registry from Runtime construction (no await sits between the two); the instance replaces it at the
+  // end of compose. Its stop is the ordinary one — the leave answers at once while nothing holds this
+  // node, and a view joined during the directory round still gets its ballot.
+  const signals = !isSystem && config.signals !== false
+  //! `stopped` settles when that early stop has finished: start() below races it, because a teardown
+  // that closes the listen socket before its 'listening' fired leaves the bind promise pending forever
+  let stopped!: () => void
+  const stoppedP = new Promise<void>((r) => { stopped = r })
+  const provisional = { destroy: () => (stopping ??= rt.leave().then(teardown).finally(stopped)) }
+  if (signals) track(provisional)
+  //! any failure past Runtime construction must tear down what was built — the review caught the
+  // leak: a rejected fero() left the bind, the host, and the open WAL fd alive (a listen collision
+  // is an ordinary start rejection, not an operator typo). Joins a stop a signal already started.
+  const abort = async (err: unknown): Promise<never> => {
+    if (signals) untrack(provisional)
+    await (stopping ??= teardown()).catch(() => {})
     throw err
   }
   //! the data seed (v4.1): applied ONLY when the local fold is empty at boot — a durable restore or
@@ -692,44 +717,32 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       if (typeof r === 'string') await abort(new Error(`fero('${name}'): data seed refused by the kernel — ${r}`))
   }
   try {
-    await rt.start()
+    await Promise.race([rt.start(), stoppedP])
   } catch (err) {
     await abort(err) // an explicit listen that would not bind (EADDRINUSE …) — the default is port 0, which cannot collide
   }
-  fold()
-  //! the directory (V4-3): wired AFTER start, so a port-0 server registers its REAL address. Servers
-  // register and attempt to host; every dialable instance looks its name up live; the folded address
-  // set posts as `discover` (the kernel dials/parks) and re-folds cluster.me.hosts.
-  if (meets) {
-    directory = new Directory({
-      compose: (n, o) => compose(n, o, true),
-      addr: rendezvous as string, name, uuid: node.uuid,
-      listen: () => (isClient ? undefined : node.listen),
-      serve: !isClient,
-      heartbeatMs: rtOpts.heartbeatMs as number, redialMs: rtOpts.redialMs,
-      onHosts: (hs) => { discovered = hs; node.step({ kind: 'discover', hosts: hs }); cluster.set('me', meRow()) },
-      onState: () => cluster.set('me', meRow()),
-    })
-    try { await directory.start() } catch (err) { await abort(err) }
+  //! a signal during start already stopped this node (the provisional entry above): build nothing more —
+  // the instance resolves stopped, its destroy() joins that stop, and the signal handler exits the process
+  if (stopping === null) {
+    fold()
+    //! the directory (V4-3): wired AFTER start, so a port-0 server registers its REAL address. Servers
+    // register and attempt to host; every dialable instance looks its name up live; the folded address
+    // set posts as `discover` (the kernel dials/parks) and re-folds cluster.me.hosts.
+    if (meets) {
+      directory = new Directory({
+        compose: (n, o) => compose(n, o, true),
+        addr: rendezvous as string, name, uuid: node.uuid,
+        listen: () => (isClient ? undefined : node.listen),
+        serve: !isClient,
+        heartbeatMs: rtOpts.heartbeatMs as number, redialMs: rtOpts.redialMs,
+        onHosts: (hs) => { discovered = hs; node.step({ kind: 'discover', hosts: hs }); cluster.set('me', meRow()) },
+        onState: () => cluster.set('me', meRow()),
+      })
+      try { await directory.start() } catch (err) { await abort(err) }
+    }
   }
   cluster.set('me', meRow())
 
-  //! teardown — everything destroy() does AFTER the graceful leave (V4-6): the local surfaces, the
-  // in-flight confirm probes (settled false = could not prove in time — never hang a caller), the
-  // directory client (its link drops ⇒ the host forgets this instance's entries), then the hosted
-  // directory if this instance holds it (⇒ the other servers race for the port), then the runtime.
-  // The diagnostics crash() door runs THIS alone: a process death, as the cluster would see it.
-  const teardown = async () => {
-    bind.destroy()
-    host!.destroy()
-    caller?.destroy()
-    memberCaller?.destroy()
-    gather?.destroy()
-    for (const [, settle] of probes) settle(false)
-    probes.clear()
-    await directory?.destroy()
-    await rt.destroy()
-  }
   const inst: Fero = {
     name,
     data: dataSurface,
@@ -757,7 +770,6 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       return stopping
     },
   }
-  let stopping: Promise<void> | null = null
   //! [diagnostics] (M7, DESIGN-M7 §3): the Symbol-keyed internals seam — attached WITHOUT widening the
   // typed Fero surface (diag() in api/diagnostics.ts is the one sanctioned door). Every member is a
   // pull or a bounded effect; nothing here runs unless called, so the instance's hot paths are untouched.
@@ -801,7 +813,13 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     },
   }
   ;(inst as Fero & { [diagnostics]?: Diagnostics })[diagnostics] = diagHandle
-  if (!isSystem && config.signals !== false) track(inst)   //! the clean stop on Ctrl-C (V4-8); the directory is owned and torn down by its host
+  //! the clean stop on Ctrl-C (V4-8): the instance takes the provisional entry's place — tracked first so
+  // the listeners never lapse in between — unless a signal already stopped it during start (then nothing
+  // live remains to track; the directory is owned and torn down by its host either way)
+  if (signals) {
+    if (stopping === null) track(inst)
+    untrack(provisional)
+  }
   return inst
 }
 
