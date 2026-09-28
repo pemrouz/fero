@@ -48,7 +48,9 @@ Three rules every example keeps:
 Every option a role file could pass in the call can also come from outside the file: a flag
 (`node server.ts --fero.dir ./shop`), a variable (`FERO_DIR=./shop node server.ts`), or a `fero.opt.ts`
 next to the nearest `package.json` or in your home directory. The README's "Configuration" section has
-the table. The role files here stay bare on purpose.
+the table. The role files here stay bare on purpose. The files that read their ports from the command
+line — 13's `server.ts`, 15's and 16's `server.ts` and `client.ts`, 30's and 43's `member.ts` — take every
+argument as a port, so give those the variable form: `FERO_HEARTBEAT_MS=50 node client.ts 4801`, not a flag.
 
 How a check works: `check.ts` starts the role files with `fero.spawn` (each a separate `node <file>`, its
 output echoed here), reads what they print, asserts, stops them with Ctrl-C (`stop()`), and ends with
