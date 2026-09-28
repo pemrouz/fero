@@ -7,6 +7,8 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { bootScenariosPure } from './dom-shim.ts'
 
 const H = bootScenariosPure()
@@ -102,4 +104,15 @@ test('tallyHTML: all-green pill vs failing crit pill, with rev · reltime · wal
   assert.ok(green.includes('rev abc1234') && green.includes('7010 ms run'))
   const red = tally({ pass: 19, total: 20, scenarios: [] })
   assert.ok(red.includes('19/20 — 1 failing') && red.includes('pill crit big'))
+})
+
+test('both pages and the server say fero v4 — the root has been v4 since 2026-08-16 (ISSUES I-10)', () => {
+  const HERE = import.meta.dirname
+  for (const f of ['scenarios.html', 'viewer.html', 'serve.ts']) {
+    const src = readFileSync(join(HERE, f), 'utf8')
+    assert.ok(!/fero v3\b/.test(src), `${f} still says fero v3`)
+  }
+  const dash = readFileSync(join(HERE, 'scenarios.html'), 'utf8')
+  assert.ok(dash.includes('<title>scenarios — fero v4</title>'), 'the title names v4')
+  assert.ok(dash.includes('fero v4<span class="sep">'), 'the brand names v4')
 })

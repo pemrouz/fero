@@ -27,7 +27,7 @@ $ npm run debug -- examples/23-live/live.capture.json
 > fero@4.0.0 debug
 > node --experimental-strip-types --no-warnings tools/debug/serve.ts examples/23-live/live.capture.json
 
-fero v3 → http://localhost:4699/  (capture: examples/23-live/live.capture.json)
+fero v4 → http://localhost:4699/  (capture: examples/23-live/live.capture.json)
   dashboard http://localhost:4699/scenarios · debugger http://localhost:4699/debug
 ^C
 ```
