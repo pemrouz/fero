@@ -10,6 +10,9 @@ import type { Context } from './methods.ts'
 //! Guarantee — the confirm ladder a write can be awaited at. 'committed' = stamped + applied at the
 // owner (coordinates known); 'replicated' = a majority of the committed view holds it in-log
 // (shippable evidence, M4c); 'persisted' = a majority has fsync-RESOLVED it (durable evidence).
+// The bar is a majority OF THE COMMITTED VIEW, so it is SELF alone at epoch 0 (open genesis has no
+// view) and in a view of one (after a clean leave to one): a majority of one is one — a solo resolves
+// 'replicated' at once and, with dir, 'persisted' as soon as its own fsync lands.
 export type Guarantee = 'committed' | 'replicated' | 'persisted'
 
 //! WriteResolve — a write that reached its asked guarantee: the commit coordinates, plus the attempt
