@@ -180,7 +180,10 @@ export interface Env {
 //! REC: record type discriminants (3 bits on the wire — see kernel/codec.ts).
 export const REC = { update: 0, insert: 1, remove: 2 } as const
 
-//! Rec: one change record. `key` is a path (['user42','active']); `at` is the ordered-insert position key.
+//! Rec: one change record. `key` is a path (['user42','active']); `at` is the ordered-insert position key —
+// and for a NEW top-level row it IS the row key: the record arrives as { type: insert, key: [], value, at: '<row>' }
+// (partitionOf below reads it as the partition of a keyless insert), while a rewrite or a remove of that row
+// carries it in key[0]. A tap sees the same shape (api/types.ts Fero.data).
 export interface Rec {
   type: number
   key: string[]
