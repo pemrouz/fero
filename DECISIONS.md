@@ -1146,3 +1146,113 @@ leave); a fourth pasted 03 frame; `methods.update` with its timeout reject
 (rung 10's awaited form); a shared `screen()` helper in lib.ts (01 reads a
 line, 03 reads a frame — one helper would drag screen shapes into shared
 glue); keeping 02's prefix "for the site" (the site strips it).
+
+## V4-12 — the series is complete: the capstone and the four apps (2026-09-28)
+Context: the owner asked to "finish off the examples series". Rungs 01-23
+were committed by 2026-09-22 (04-23 in eighteen commits that day, with no
+ledger line — this entry is theirs too); 30 and 40-43 had been built by one
+agent each against the V4-11 brief, attacked by a skeptic (two re-runs,
+every README claim against the source, a mutation of its own), fixed, and
+left staged in a landing worktree. Before landing, each was attacked once
+more at HEAD; five verifiers checked every wart the builders had noted
+across the four phases against the source before it was filed; a critic
+asked what was still missing. The final skeptics found three things the
+first round had not: the capstone's clean stop hung under load (a real
+shell bug, fixed in 717441e — ISSUES I-21), its prune audit counted rows
+instead of checking what survived, and 40's check never ran the file the
+reader opens. The two heavier checks were then timed on this box's 9p
+mount, where `npm test` runs, not the tmpfs the builders used.
+Decision:
+- **A story file is a driver, not a role.** 30's `fleet.ts` (89 lines)
+  spawns the members, the sensors and the clock, kills and restarts them,
+  and prints the audit — it is the reader's `node fleet.ts`, but it is the
+  thing that RUNS the roles, so the role-file bar (≤ ~10 code lines, no
+  plumbing) does not apply to it; it imports node built-ins and the api
+  only, every wait in it is loud (`stuck: …`) so the audit can never pass on
+  a fleet that never formed, and it wipes only its own three `fleet-<port>`
+  dirs (a folder-wide wipe clobbered a concurrent story's live WAL dirs).
+  `member.ts`, `sensor.ts` and `dashboard.ts` stay roles. 22's `story.ts`
+  was the precedent. Its README's first block is a run-once output cut to
+  the lines that matter, with the `…` that were really there (nine of
+  them), because a contiguous 60 s transcript is 200 lines.
+- **An app may run past ten lines; the bar otherwise stands.** 40-43 run
+  12-51 lines per file because a chat, a board, a bridge and a ledger are
+  more than one lesson; every line still has to earn its place: a comment
+  is one line above the block, four-space indent, no `//!`, one import from
+  the api, a folder-local `./rules.ts` allowed (41). A check may run to ~47
+  lines (43) where the story has five terminals, and a README to 77 (30),
+  66 (43), 61 (41), 54 (40), 50 (42) — every line real output or an
+  assertion. The ladder's ~10 / ~28 / ~55 bars are unchanged.
+- **The check runs the file the reader runs.** 40's first check drove two
+  scripted bots and never started `join.ts`; a reversed comparator in the
+  reader's own screen passed. Now the check spawns `join.ts` as a watcher
+  too (fero.spawn closes its stdin, so it only draws) and pins its screen
+  equal to a bot's. A check that cannot type into a role (spawn has no
+  stdin — IDEAS) may add a scripted role, but it must still run every file
+  a README names.
+- **An audit checks what survived, not how many.** 30's prune audit
+  compared counts, so a prune that deleted the NEWEST facts passed; it now
+  keeps the cutoff and asserts every surviving row on every member is newer
+  than it. The mutation that flips the comparison fails at `audit prune
+  passed`.
+- **41 is an OPEN server with one shared rule.** The plan had a `move`
+  METHOD beside plain leaf writes; under V4-5 `methods:` is the door and
+  would refuse every editor's write `methods-only`. So the board declares no
+  methods, carries `seams: { validation: rules }`, and every editor imports
+  the same `rules.ts`: a whole row is refused ("this board writes fields,
+  never whole rows"), a status that names no column is refused ("unknown
+  column") — by the editor itself before the write leaves, by the board for
+  a client that carries no rule. 08's rule of thumb holds: a rule about what
+  a record may LOOK like is a seam; a rule a caller must HEAR is thrown
+  from a method.
+- **30's audit has no read-your-writes check.** The plan's RYW line assumed
+  an optimistic copy; V4-7 has none, so a client's own write shows only as
+  the server's echo. The audit keeps convergence, durability of every
+  `persisted` receipt, no phantoms, the unproven receipts counted and landed
+  ("a reject is not a rollback") and `prune` last. `dropped` left the
+  receipt classes (MAX_PENDING is 1024; a fact a second never nears it); the
+  random chaos loop became `node fleet.ts 120` (the same schedule, then
+  quiet facts); the chaos log prints whole seconds — the numbers the reader
+  needs are the receipts' latencies on the sensor lines.
+- **43's genesis is the mint.** No seed (a seed row is a whole row the
+  notifier never sees land): `transfer` lets `mint` alone go below zero, so
+  `node teller.ts mint alice 100` is the first row and the balances always
+  sum to zero. The rule is best-effort on the ONE member the teller reached
+  — two tellers at once can both pass it (17's lesson, said in the README).
+  `await ctx.flush()` before `return id` was dropped: flush-on-return
+  (api/methods.ts) already holds the reply until the write settles.
+- **40's tiebreak is `localeCompare` on `from`.** The plan's `(a.from <
+  b.from ? -1 : 1)` is not symmetric on equal ids; `a.at - b.at ||
+  a.from.localeCompare(b.from)` is a total order, so every joiner's screen
+  is a function of the rows alone. The server orders nothing. The plan's
+  `talkers` histogram and presence rows are gone (the reap predicate orphans
+  presence rows when the server that handled `hello` dies).
+- **No separate slow tier and no `test:examples` script.** The plan put 13,
+  14, 30 and 43 behind a skipped tier; a skipped tier rots. Every check runs
+  inside `npm test` under a per-rung budget measured on this box's 9p mount
+  (30: 100 s for a ~34 s story of fixed sleeps; 43: 60 s for ~13 s, 13's
+  ratio; the rest under the 40 s default). 30's first wait widened from the
+  10 s default to 30 s, as 13's and 14's already were: on 9p under load the
+  dashboard's first frame took longer than 10 s.
+- **The warts go to the ledgers, verified.** Every wart the builders noted
+  (phases 1-4, forty-odd lines) was checked against HEAD by a verifier, with
+  a probe where one was cheap, before it was written: nineteen became ISSUES
+  I-22…I-40 (kernel membership and ring, the write surface and methods, the
+  cluster view, the directory, the config layer, the shell, two in data, two
+  in the viewer), one was fixed on the spot (I-21), twenty-five became IDEAS
+  lines in their workstreams, and twelve were dropped as already filed,
+  unreproducible or plain facts.
+REJECTED: a `move` method on 41 beside plain writes (the door); presence
+rows in 40; a `dropped` receipt class and a seeded random chaos loop in 30;
+`writable` on 30's dashboard (on a CLIENT it is `true` at epoch 0 and
+`false` once it holds a view — I-33, not a screen); `online N` on 40's room
+header (the admitted-link count, refreshed only on a landed message);
+renaming 41's `editors N` (02's `watchers` counts peers the same way; the
+Peer row carries no role — IDEAS); a `console.log` instead of the throw
+when a member's stop hangs in 30 (it would have hidden I-21 from the smoke
+tier); a try/finally in every durable check so a FAILING run removes its
+dirs (lines in every durable rung for a gitignored leftover — IDEAS,
+series-wide); a shared `screen()` in lib.ts (V4-11, not reopened); a JSON
+guard on 42's POST (http plumbing, not fero; the curl line shows the
+shape); renaming 30's `FLEET` header to `DASHBOARD` (02's `SHOP` is the
+precedent for the resource word).

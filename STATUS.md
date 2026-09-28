@@ -8,7 +8,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (431 + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -570,3 +570,53 @@ inside the outer apply.
   ms against its 800 ms ceiling, which fails on committed HEAD too (826
   ms one run, green the next); kernel/ is untouched and the ceiling is
   not widened.
+- 2026-09-28 — THE EXAMPLE SERIES IS COMPLETE (DECISIONS V4-12): 26 rungs,
+  01 → 43, every `Next:` a real link and 43 ending "That is the series."
+  The eighteen commits of 2026-09-22 (ffce4ae…175cf96) landed 04-17 (rows,
+  views, numbers, ordered, methods, live, confirm, validation, durable,
+  cluster-of-three, failover, static-topology, scoped, lww-honesty) and the
+  debugger series 20-23 (inside, journal, time-travel, live) with no ledger
+  line; today's five commits land the capstone and the apps: 30-fleet-audit
+  (`node fleet.ts` is the story on one box — three durable members on fixed
+  addresses with `methods: { record, prune }` as the door, three sensors
+  writing a fact a second and keeping a ledger of what each reply proved,
+  kill one / the same command brings it back as itself / kill all three /
+  restore from the disks, then the audit through member-pinned readers: the
+  three agree, every `persisted` receipt is on every member, no phantom
+  rows, the unproven receipts counted and landed, `prune` last;
+  `dashboard.ts` is the reader's second terminal), 40-chat (a message is a
+  new row written by `post` on the server, which stamps `at` and `from` and
+  throws `too long`; every joiner sorts the rows itself with a tiebreak),
+  41-kanban (an OPEN server with `seams.validation` and every editor
+  carrying the same `rules.ts`; two fields of one card from two writers
+  both land; a whole row or an unknown column is refused, an editor's own
+  before it leaves), 42-web-bridge (a bare fero client plus `node:http`:
+  `/events` streams `connect` records to each tab, a form post becomes a
+  whole-row write, `dir` keeps the seed from landing over a browser's rows),
+  43-ledger (transfers as rows on three durable members, `transfer` folds
+  the balance and throws its rule, the intent rides in the row and the
+  notifier — a client of `ledger`, the server of `notices` — clears it
+  through `notified`; a member SIGKILLed mid-run comes back as itself with
+  every id). Each was built against the V4-11 brief, attacked by a skeptic
+  and fixed (2026-09-22), then attacked once more at HEAD before landing:
+  the final skeptics found the capstone's clean stop hanging under load (a
+  shell bug — the listener kept accepting during the WAL flush and
+  `#accept` had no `destroyed` guard; fixed in 717441e with a regression test
+  in tests/tcp.test.ts, ISSUES I-21), its prune audit counting rows
+  instead of checking what survived, 40's check never running `join.ts`,
+  and five README claims to tighten; all applied, three mutations re-proven,
+  15/15 tmpfs runs green. Budgets from this box's 9p mount (where `npm test`
+  runs): 30 → 100 s (~34 s), 43 → 60 s (~13 s); no slow tier, no
+  `test:examples`. The builders' warts from all four phases were verified
+  against HEAD by five agents and filed: ISSUES I-22…I-40 open (membership
+  genesis coin-flip and the spoke-teaches-a-view wedge, fnv ring skew, the
+  lens in arithmetic, the scoped hint, a live scalar on SUB, open-then-call
+  order, undisposed SUB views, `update({ key: undefined })`, two spellings
+  of origin, `me.hosts`, a client's `writable`, the directory's stale entry,
+  a `FERO_*` leaf clobber, a deleted WAL dir, data's `distinct()` and 3-arg
+  `reduce`, two viewer faults), I-21 fixed, 25 IDEAS lines, 12 drops; an
+  I-10 addendum (three READMEs paste the banner). Ledgers: CLAUDE.md
+  (counts, the examples row), STATUS head, README "Run it", examples/
+  README.md (the tiers line). Not done: the website still inlines 02 only.
+  Battery: 456/456 + 18/18. Perf: 43/43, unchanged (the shell fix
+  is on the stop path, not a hot one).

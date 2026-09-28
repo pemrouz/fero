@@ -34,6 +34,9 @@ dependency).
 | 42 | [web-bridge](42-web-bridge/) | fero speaks TCP, so a browser reaches a resource through a Node bridge that is a bare client: `connect` records streamed to each tab as events, a form post written as a whole row | `node server.ts` · `node web.ts 8080` |
 | 43 | [ledger](43-ledger/) | money is facts: transfers are rows on three durable members, the rule thrown from a method, the intent cleared through the door, every id on a member that comes back | `node member.ts 4901` ×3 (4902, 4903) · `node notifier.ts` · `node teller.ts mint alice 100` |
 
+Four tiers: 01-17 climb one feature at a time, 20-23 open the debugger, 30 is everything at once on one
+box, and 40-43 are apps.
+
 Three rules every example keeps:
 
 1. **Rows live at the top level.** The top-level key is the row (one writer per row); operators chain
