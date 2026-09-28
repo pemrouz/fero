@@ -228,15 +228,21 @@ export interface Fero {
   destroy(): Promise<void>
 }
 
-//! Spawned (V4-9) — what fero.spawn(file, args?) returns: a separate `node <file> …` process, the
+//! Spawned (V4-9) — what fero.spawn(file, args?, opts?) returns: a separate `node <file> …` process, the
 // reader's other terminal from code. `out` is everything it printed to stdout so far; `exited` its exit
 // code once it has ended and its output has drained (null when a signal ended it); `stop()` is the reader's Ctrl-C (SIGINT — a fero process leaves
 // by ballot and exits 0, V4-8) and resolves that code, or null after five seconds of nothing (SIGKILL).
-// `child` is Node's handle for anything else.
+// `write(line)` types a line and Enter into the child's stdin — only a child spawned with
+// `{ stdin: 'pipe' }` has one (the default 'ignore' closes it, so a role's readline ends at once); it
+// throws when there is none or the child has exited. `child` is Node's handle for anything else.
+export interface SpawnOpts {
+  stdin?: 'pipe' | 'ignore'
+}
 export interface Spawned {
   pid: number
   out: string
   exited: Promise<number | null>
   stop(): Promise<number | null>
+  write(line: string): void
   child: ChildProcess
 }

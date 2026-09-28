@@ -101,3 +101,31 @@ setInterval(() => {}, 1000)
     kill(p1, p2, childOf(p1), childOf(p2))
   }
 })
+
+test("fero.spawn(file, args, { stdin: 'pipe' }) keeps the child's stdin open and write(line) types a line and Enter into it — a role's readline hears it; by default stdin is closed as before, so write() throws with the pointer, and a write after the child exited throws too", async () => {
+  const echo = script('echo.ts', `import readline from 'node:readline'
+for await (const line of readline.createInterface({ input: process.stdin })) console.log('heard', line)
+console.log('stdin closed')
+`)
+  const typed = fero.spawn(echo, [], { stdin: 'pipe' })
+  const closed = fero.spawn(echo)
+  try {
+    //! the default is unchanged: no stdin at all, and the pointer names the option
+    assert.equal(closed.child.stdin, null, 'the default spawn has no stdin')
+    assert.throws(() => closed.write('hi'), /has no stdin — spawn it with \{ stdin: 'pipe' \}/, 'write() on it throws with the pointer')
+    assert.equal(await closed.exited, 0, 'its readline ended at once: stdin was closed')
+    assert.ok(closed.out.includes('stdin closed') && !closed.out.includes('heard'), `it heard nothing (${JSON.stringify(closed.out)})`)
+    //! the piped child: each write is one line of the reader's typing
+    typed.write('hello there')
+    assert.ok(await until(() => typed.out.includes('heard hello there'), 10_000), `the child heard the line (${JSON.stringify(typed.out)})`)
+    typed.write('and this')
+    assert.ok(await until(() => typed.out.includes('heard and this'), 10_000), 'and the next one: stdin stays open between lines')
+    assert.ok(!typed.out.includes('stdin closed'), 'its readline is still listening')
+    typed.child.stdin!.end()
+    assert.equal(await typed.exited, 0, 'closing stdin ends the readline and the child exits by itself')
+    assert.ok(typed.out.endsWith('stdin closed\n'), `out is complete (${JSON.stringify(typed.out)})`)
+    assert.throws(() => typed.write('late'), /has exited — nothing reads its stdin/, 'a write to an exited child throws instead of dying on EPIPE')
+  } finally {
+    kill(typed, closed)
+  }
+})
