@@ -1423,6 +1423,13 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'membership-before-hello')
         }
+        //! a SPOKE never teaches membership either (I-23, 2026-09-28 — V4-5 carried to the control plane):
+        // a client is in nobody's view, so it has no VIEW to announce, no ballot to open or answer, nothing
+        // to join or leave. A VIEW accepted from one is how reborn memory-only members adopted a client's
+        // stale view (a view they were not in — `evicted`, genesis impossible, the cluster never re-formed).
+        // Frame dropped, link kept — a pre-fix spoke flooding its view is stale, not a wire fault. Its PULL
+        // is a QUESTION, not a teaching: still answered, so a stale spoke can ask for the live view.
+        if (link.client && f.verb !== VERB.PULL) { j.armed && j.emit(JK.frameDrop, link.id, 'membership from client'); return }
         const v = f.value as Record<string, unknown>
         if (f.verb === VERB.JOIN) this.membership.onJoin(this, link, v)
         else if (f.verb === VERB.PROPOSE) this.membership.onPropose(this, link, v)

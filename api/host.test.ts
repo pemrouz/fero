@@ -28,7 +28,8 @@ test('M5-REVIEW #2/#6 — UNSUB during the flush-on-return window cancels the su
   node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
   node.step({ kind: 'linkUp', link: 2, dialed: false })
   node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', r: 1 }) })
-  node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  //! the view comes from the MEMBER (link 1): a spoke's VIEW is dropped (I-23), and without a view the write would commit at once instead of parking
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
   node.writes.ring.place('owned', 'bb')
 
   //! the handler writes a bb-owned key (parks pending the WACK) then returns the live proxy
@@ -70,7 +71,8 @@ test('M5-REVIEW #2/#6 — an uninterrupted SUB that writes-then-returns DOES ope
   node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
   node.step({ kind: 'linkUp', link: 2, dialed: false })
   node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', r: 1 }) })
-  node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  //! the view comes from the MEMBER (link 1): a spoke's VIEW is dropped (I-23), and without a view the write would commit at once instead of parking
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
   node.writes.ring.place('owned', 'bb')
   const h = new Host(rt, bind.data, { feed: (_a, ctx) => { ctx.data.owned = 1; return ctx.data } }, {})
 
