@@ -206,6 +206,9 @@ export interface ClusterShape {
   me: {
     uuid: string; origin: string; listen: string
     role: 'server' | 'client'
+    //! primary: on a CLIENT, the uuid of the ONE server feeding it (a spoke digests exactly one) — null
+    // until a link is admitted, and re-set to the survivor on failover; always null on a server
+    primary: string | null
     //! hosts (V4-3): the EFFECTIVE dial targets — static ∪ discovered — on every role
     hosts: string[]
     //! rendezvous (V4-3): the directory this node meets at — false when it meets none (disabled, or

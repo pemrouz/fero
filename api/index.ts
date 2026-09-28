@@ -548,6 +548,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const meRow = () => ({
     uuid: node.uuid, origin: node.uuid + '~' + node.incarnation, listen: node.listen,
     role: isClient ? 'client' : 'server',
+    //! primary: the ONE server this client digests (kernel/node.ts `primary`, a link id there) — its uuid,
+    // null while unconnected and always on a server. Re-folded below on every primary change.
+    primary: node.primary !== null ? node.links.get(node.primary)?.uuid ?? null : null,
     hosts: [...new Set([...(hosts ?? []), ...discovered])].filter((h) => h !== node.listen),
     rendezvous: meets
       ? { addr: rendezvous as string, hosting: directory?.hosting ?? false, up: directory?.up ?? false, ...(directory?.error !== undefined ? { error: directory.error } : {}) }
@@ -591,6 +594,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     }
     const j = node.journal
     let refold = false
+    let primaryMoved = false
     if (j.n !== cursor) {
       const events = j.read(cursor)
       cursor = j.n
@@ -607,9 +611,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         // read()/`await data` materializes it, so an idle scoped cluster pays nothing on churn
         else if (e.kind === JK.viewInstall && gather) void gather.refresh(rt, { throwOnPartial: false }).catch(() => {})
       }
-      if (caller && node.primary !== lastPrimary) {
+      if (node.primary !== lastPrimary) {
         lastPrimary = node.primary
-        if (node.primary !== null) caller.onPrimaryChange()
+        primaryMoved = true
+        if (caller && node.primary !== null) caller.onPrimaryChange()
       }
       if (events.some((e) => FOLD.has(e.kind))) refold = true
     }
@@ -619,7 +624,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // still reflects the final post-step state). The scope.n compare catches tally drift that
     // journals nothing (held-mints at the gate/stamp site) — one int compare on the hot path.
     const scopeMoved = node.scope !== null && node.scope.n !== lastScopeN
-    if (!refold && !scopeMoved) return
+    if (!refold && !scopeMoved && !primaryMoved) return
     //! ONE batch, and only the fields that moved (V4-8): a bare `cluster.tap(() => …)` fires once per
     // fold with the whole picture landed — never per field, and never for a refold that changed nothing
     // (data skips a same-value primitive but not an equal-but-new object, so members, peers and the
@@ -639,6 +644,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         const peerSig = Object.keys(peers).sort().map((u) => u + '~' + peers[u].incarnation + (peers[u].client ? 'c' : '')).join(' ')
         if (peerSig !== lastPeers) { lastPeers = peerSig; cluster.set('peers', peers) }
       }
+      //! the feeder changed (a client's first link, or a failover): `me.primary` names the new one in the
+      // same batch, so a screen reads the survivor's name in the picture that shows the link gone
+      if (primaryMoved) cluster.set('me', meRow())
       if (node.scope) lastScopeN = node.scope.n
       const row = partitionsRow()
       if (!samePartitions(row, lastPartitions)) { lastPartitions = row; cluster.set('partitions', row) }
