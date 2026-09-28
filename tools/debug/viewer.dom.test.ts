@@ -435,3 +435,24 @@ test("the debugger's own DIAG session is an OBSERVER, not a stuck pre-admit peer
   g(`navTo('g/nodes/aa')`)
   assert.match(el('statusRight').innerHTML, /1\/1 links/, 'the status bar at t counts peers only')
 })
+
+test('an even split has no modal side: every node is pilled and the header says split — the first-listed node is not "converged" by accident (ISSUES I-7)', async () => {
+  //! two members cut from each other, each with its own writes, run to quiescence: one against one
+  const sim = new Sim(5); const pair = cluster(sim, 2); sim.run()
+  sim.partition(pair[0].uuid, pair[1].uuid); writes(sim, pair, 4, 10); sim.run()
+  const lost = captureSim(sim)
+  assert.ok(lost.quiesced && lost.nodes[0].stateHash !== lost.nodes[1].stateHash, 'a settled 1 vs 1 — the fixture is what it claims')
+  const { el, g } = await bootViewer('lost', lost)
+  assert.match(el('statusRight').innerHTML, /class="sst crit" data-tip="split">split ✗ 1 vs 1</, 'the header names the split')
+  assert.doesNotMatch(el('statusRight').innerHTML, /diverged ✗/)
+  assert.equal((el('tree').innerHTML.match(/data-tip="node:diverged"/g) || []).length, 2, 'both sides are pilled — the situation is symmetric')
+  for (const u of ['n01', 'n02']) {
+    g(`navTo('g/nodes/${u}')`)
+    assert.match(el('statusRight').innerHTML, /data-tip="node:diverged">diverged</, `${u} is not called converged`)
+    assert.match(el('insp').innerHTML, /<dt[^>]*>stateHash<\/dt><dd class="bad">/, `${u}'s fingerprint is red`)
+  }
+  //! a strict majority is still one odd one out: the header says diverged, exactly one node is pilled
+  const { el: e2 } = await bootViewer('isolated', isolatedWriter())
+  assert.match(e2('statusRight').innerHTML, /diverged ✗/)
+  assert.equal((e2('tree').innerHTML.match(/data-tip="node:diverged"/g) || []).length, 1)
+})
