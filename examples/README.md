@@ -32,6 +32,7 @@ dependency).
 | 40 | [chat](40-chat/) | a chat is facts plus one sorted view: `post` runs on the server, throws its rule for every joiner and stamps who (`ctx.peer`) and when; every screen sorts the rows itself with a tiebreak, so they all agree | `node room.ts general` · `node join.ts general ada` · `node join.ts general bob` |
 | 41 | [kanban](41-kanban/) | a card is a row written by its fields: two editors change two fields of one card at once and both land; one rule, carried by the board and every editor, refuses a whole row or an unknown column — an editor refuses its own before it leaves | `node board.ts` · `node edit.ts ada` · `node edit.ts bob` |
 | 42 | [web-bridge](42-web-bridge/) | fero speaks TCP, so a browser reaches a resource through a Node bridge that is a bare client: `connect` records streamed to each tab as events, a form post written as a whole row | `node server.ts` · `node web.ts 8080` |
+| 43 | [ledger](43-ledger/) | money is facts: transfers are rows on three durable members, the rule thrown from a method, the intent cleared through the door, every id on a member that comes back | `node member.ts 4901` ×3 (4902, 4903) · `node notifier.ts` · `node teller.ts mint alice 100` |
 
 Three rules every example keeps:
 
