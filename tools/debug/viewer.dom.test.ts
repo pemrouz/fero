@@ -308,3 +308,57 @@ test('a /capture.json that is not there yet is WAITED for, not given up on: the 
   assert.match(el('srcName').innerHTML, /live · 3 nodes/, 'the source label paints live')
   assert.doesNotMatch(el('tree').innerHTML, /Waiting for/)
 })
+
+//! two producers the severity gates are proven on (never hand-authored): a 3-node sim caught MID-FLIGHT (run to a
+// horizon over slow links — writes still travelling, kind 'sim', not quiesced) and a QUIESCED cluster whose one
+// isolated member provably holds different data (two agree, the cut one never got the writes; nothing more is coming)
+const midFlight = () => {
+  const sim = new Sim(7); const nodes = cluster(sim, 3, { fault: { delay: [1, 30], dupP: 0 } }); sim.run()
+  writes(sim, nodes, 30, 15); sim.run({ until: sim.now + 20 })
+  const cap = captureSim(sim)
+  assert.equal(cap.quiesced, false, 'the horizon stopped the run with things still moving')
+  assert.ok(new Set(cap.nodes.map((n) => n.stateHash)).size > 1, 'the horizon caught the nodes apart — the fixture is what it claims')
+  return cap
+}
+const isolatedWriter = () => {
+  const sim = new Sim(5); const nodes = cluster(sim, 3); sim.run()
+  sim.partition('n01', 'n02'); sim.partition('n01', 'n03'); writes(sim, [nodes[1]], 4, 10); sim.run()
+  const cap = captureSim(sim)
+  assert.ok(cap.quiesced, 'the cut cluster ran to quiescence')
+  const h = (u: string) => cap.nodes.find((n) => n.uuid === u)!.stateHash
+  assert.ok(h('n02') === h('n03') && h('n01') !== h('n02'), 'two agree, the isolated one differs — a strict majority')
+  return cap
+}
+
+test('divergence is CRIT only where the capture can PROVE it (a quiesced sim); live and mid-flight captures paint warn "differs (in flight)" (ISSUES I-4)', async () => {
+  const type = (el: (id: string) => any, q: string) => { el('q').value = q; el('q').fire('input', { target: { value: q } }) }
+  //! mid-flight: the header, the node rows and the cell rows are all warn — nothing is proven wrong
+  {
+    const { el, g } = await bootViewer('mid', midFlight())
+    assert.match(el('statusRight').innerHTML, /class="sst warn" data-tip="differs">differs \(in flight\)</, 'the header says differs (in flight), amber')
+    assert.doesNotMatch(el('statusRight').innerHTML, /diverged ✗/, 'and never claims divergence it cannot prove')
+    g(`expanded.add('g/cells'); render()`)
+    const tree = el('tree').innerHTML
+    assert.doesNotMatch(tree, /data-sev="crit"/, 'no row is crit on a capture that is still moving')
+    assert.match(tree, /data-tip="node:differs"/, 'the off-modal node carries the warn differs pill')
+    assert.match(tree, /data-tip="cell:differs"/, 'a cell the nodes disagree on carries the warn differs pill')
+    assert.doesNotMatch(tree, /data-tip="(node|cell):diverged"/)
+    type(el, 'is:crit'); assert.match(el('ocount').innerHTML, /<span class="fl">0<\/span> matches/, 'is:crit finds nothing')
+    type(el, 'cell:differs'); assert.match(el('ocount').innerHTML, /<span class="fl">[1-9]/, 'cell:differs is the matching filter value')
+    type(el, '')
+    const iNode = g(`(renderTree(), flat.findIndex(r => r.n.type === 'node' && r.n.pill))`) as number
+    assert.ok(iNode >= 0)
+    el('tree').fire('click', { target: { closest: (s: string) => (s === '.trow' ? { dataset: { i: String(iNode) } } : null) } })
+    assert.match(el('insp').innerHTML, /<dt[^>]*>stateHash<\/dt><dd class="warn">/, "the inspector's fingerprint is amber, not red")
+  }
+  //! quiesced: the isolated member IS diverged — crit everywhere, as before
+  {
+    const { el, g } = await bootViewer('isolated', isolatedWriter())
+    assert.match(el('statusRight').innerHTML, /class="sst crit" data-tip="diverged">diverged ✗</)
+    g(`expanded.add('g/cells'); render()`)
+    const tree = el('tree').innerHTML
+    assert.match(tree, /data-type="node"[^>]*data-sev="crit"/, 'the isolated node is crit')
+    assert.match(tree, /data-tip="node:diverged"/); assert.match(tree, /data-tip="cell:diverged"/)
+    assert.doesNotMatch(tree, /data-tip="(node|cell):differs"/)
+  }
+})
