@@ -210,17 +210,20 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
             throw new Error('fero: patch() takes [key, value] TUPLE pairs — patch([[k1, v1], [k2, v2]])')
           sink((pairs as [unknown, unknown][]).map(([k, v]) => ({ type: REC.update, key: [...path, String(k)], value: v })))
         }
+      //! the three refusals below put their pointer on a SECOND line: the one-line forms ran 120-140
+      // characters and were the only lines in the example transcripts that wrapped at 80. The clause
+      // before ` — ` is byte-identical to before (examples/04-rows prints exactly that clause).
       if (prop === 'insert')
         return () => {
-          throw new Error('fero: insert() mints a data-side key that would not replicate — fero owns key identity; write a keyed child (data.k = v) or methods.insert()')
+          throw new Error('fero: insert() mints a data-side key that would not replicate — fero owns the key:\n  write a keyed child (data.k = v) or methods.insert()')
         }
       if (prop === 'ingest')
         return () => {
-          throw new Error("fero: ingest() is the replication ingress — public writes go through assignment / set / update / patch (they route to fero's issue())")
+          throw new Error("fero: ingest() is the replication ingress — public writes go through\n  assignment / set / update / patch (they route to fero's issue())")
         }
       if (prop === 'raf')
         return () => {
-          throw new Error('fero: raf() writes the local projection directly and would not replicate — coalesce in your own frame callback and assign')
+          throw new Error('fero: raf() writes the local projection directly and would not replicate — coalesce\n  in your own frame callback and assign')
         }
       if (prop === 'dispose')
         return () => {
