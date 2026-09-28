@@ -209,7 +209,10 @@ export interface ClusterShape {
     //! primary: on a CLIENT, the uuid of the ONE server feeding it (a spoke digests exactly one) — null
     // until a link is admitted, and re-set to the survivor on failover; always null on a server
     primary: string | null
-    //! hosts (V4-3): the EFFECTIVE dial targets — static ∪ discovered — on every role
+    //! hosts (V4-3): what this node was TOLD to dial — the configured `hosts` ∪ the addresses the
+    // directory published for the name, minus its own listen — on every role. NOT the set the kernel
+    // dials: it also dials every member the committed view teaches it, and a left member's address
+    // stays here until the directory drops it. The LINKED set is `peers`.
     hosts: string[]
     //! rendezvous (V4-3): the directory this node meets at — false when it meets none (disabled, or
     // a socketless solo); `hosting` = this instance binds it; `up` = a directory link is admitted (a
