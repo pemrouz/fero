@@ -803,3 +803,29 @@ test('a Peer row carries the ROLE: `client` is true for a spoke, false for a mem
     await c.destroy(); await a.destroy(); await b.destroy()
   }
 })
+
+test('a client says who feeds it: `cluster.me.primary` is the feeder\'s uuid, null before a link and on a server; when the feeder dies it moves to the survivor', async () => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  type Me = { uuid: string; primary: string | null }
+  const me = (f: typeof a) => (snapshot(f.cluster) as { me: Me }).me
+  const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`, `127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const moves: (string | null)[] = []
+  try {
+    //! the whole cluster view is the tap (a child path is an address, not a view); we record the distinct feeders it showed
+    c.cluster.tap(() => { const p = me(c).primary; if (moves[moves.length - 1] !== p) moves.push(p) })
+    assert.strictEqual(me(a).primary, null, 'a server has no feeder')
+    //! before: the kernel held the feeder as a link id and the composer watched it change to re-subscribe
+    // live handles, but the view exposed nothing — 14's story could not name the survivor
+    assert.ok(await until(() => me(c).primary !== null, 8000), 'the client names its feeder once a link is admitted')
+    const feeder = me(c).primary!
+    assert.ok(feeder === 'aa' || feeder === 'bb', `the feeder is one of the servers (${feeder})`)
+    await diag(feeder === 'aa' ? a : b)!.crash!()
+    const survivor = feeder === 'aa' ? 'bb' : 'aa'
+    assert.ok(await until(() => me(c).primary === survivor, 8000), `primary moved to the survivor (${JSON.stringify(me(c))})`)
+    assert.deepEqual(moves.slice(-2), [feeder, survivor], `the me row re-folded on each change (${JSON.stringify(moves)})`)
+  } finally {
+    await c.destroy(); await a.destroy().catch(() => {}); await b.destroy().catch(() => {})
+  }
+})
