@@ -7,6 +7,10 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
+import fs from 'node:fs'
+import net from 'node:net'
+import os from 'node:os'
+import path from 'node:path'
 import { Runtime } from '../shell/runtime.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 import { ports, until } from '#utils'
@@ -97,4 +101,30 @@ test('port 0 (V4-3): the shell publishes the OS-chosen address to the kernel bef
   assert.equal(link.listen, b.node.listen, 'HELLO carried the resolved address, not the configured :0')
   await a.destroy()
   await b.destroy()
+})
+
+test('destroy() stops accepting before its WAL flush: a dial that lands mid-stop is refused, and the stop settles (I-21)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-stop-'))
+  let sock: net.Socket | undefined
+  try {
+    const a = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir, redialMs: 50 })
+    await a.start()
+    const [host, port] = a.node.listen.split(':')
+    //! a fat append keeps the WAL queue busy: the window in which the old destroy() left the listener open,
+    // so a peer's redial was accepted after the socket loop and server.close() waited on it forever
+    a.write(Array.from({ length: 4096 }, (_, i) => ({ type: REC.update, key: [`k${i}`], value: 'x'.repeat(4096) })))
+    const stopping = a.destroy()
+    sock = net.connect(Number(port), host)
+    const dial = await new Promise<string>((resolve) => {
+      sock.once('connect', () => resolve('connected'))
+      sock.once('error', (e: NodeJS.ErrnoException) => resolve(e.code ?? 'error'))
+    })
+    const stop = await Promise.race([stopping.then(() => 'stopped'), new Promise<string>((r) => setTimeout(r, 5000, 'hung').unref())])
+    assert.equal(stop, 'stopped', `destroy() must settle although a dial (${dial}) landed during its WAL flush`)
+    if (dial === 'connected') assert.ok(await until(() => sock!.destroyed, 2000), 'a socket accepted mid-stop is torn down by the stopping runtime')
+  } finally {
+    //! the client end goes in every case — with the bug, this is what lets the hung close() finish and the run end
+    sock?.destroy()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })

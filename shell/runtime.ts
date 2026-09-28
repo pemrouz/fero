@@ -362,6 +362,9 @@ export class Runtime {
   }
 
   #accept(sock: net.Socket) {
+    //! a dial that lands after destroy() began: refuse it, as #dial's late 'connect' does — the socket
+    // loop in destroy() has already run, so a socket wired now would keep server.close() waiting forever
+    if (this.node.destroyed) return sock.destroy()
     const link = ++this.#linkSeq
     this.#wire(sock, link)
     sock.on('close', () => {
@@ -404,6 +407,10 @@ export class Runtime {
 
   async destroy(): Promise<void> {
     this.node.destroy()
+    //! stop ACCEPTING first: close() refuses new dials at once and settles when the last socket is gone.
+    // It used to run after the WAL flush below — a peer's redial (30 ms in a hurried cluster) accepted
+    // during that wait was never torn down, and the stop hung until fero.spawn's SIGKILL (I-21).
+    const closed = this.#server ? new Promise<void>((resolve) => this.#server!.close(() => resolve())) : null
     for (const t of this.#timers.values()) clearTimeout(t)
     this.#timers.clear()
     for (const s of this.#sockets.values()) s.destroy()
@@ -415,7 +422,7 @@ export class Runtime {
     // here is what makes shutdown durable.
     await this.#ioq.catch(() => {})
     if (this.#wal !== null) { try { fs.closeSync(this.#wal) } catch {} this.#wal = null }
-    if (this.#server) await new Promise<void>((resolve) => this.#server!.close(() => resolve()))
+    if (closed) await closed
   }
 }
 
