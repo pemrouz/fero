@@ -43,6 +43,11 @@ test('one-shot CALL: values round-trip, a returned proxy snapshots, unknown meth
     //! handles are callable proxies — reject-assertions await them inside a closure
     await assert.rejects(async () => { await c.methods.nosuch() }, /unknown method 'nosuch'/)
     await assert.rejects(async () => { await c.methods.boom() }, /handler exploded/)
+    //! …and CALLING a handle is the one-shot call (`apply` trap): `h()` is the promise, so assert.rejects
+    // takes the handle as-is — it used to get undefined back and fail with ERR_INVALID_RETURN_VALUE
+    await assert.rejects(c.methods.boom(), /handler exploded/)
+    await assert.rejects(c.methods.nosuch(), /unknown method 'nosuch'/)
+    assert.equal(await c.methods.total(4)(), 8, 'h() resolves the call')
   } finally {
     await c.destroy(); await a.destroy(); await b.destroy()
   }
