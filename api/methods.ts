@@ -373,5 +373,11 @@ export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: 
     //! `has` (the `in` operator, duck-typing) must NEVER open a sub either — report only the reserved
     // surface plus, if already live, the live proxy's keys
     has(_t, prop) { return reserved(prop) || (live ? prop in live.proxy : false) },
+    //! `apply` — CALLING the handle is the one-shot call: `h()` returns the promise. The target is a
+    // function (so `typeof h === 'function'`), and without this trap `h()` returned undefined — every
+    // promise utility that probes for a function and calls it (assert.rejects, retry wrappers …) failed
+    // with ERR_INVALID_RETURN_VALUE, so the examples had to write `assert.rejects(async () => { await h })`
+    // (rungs 40 and 43). Arguments are ignored: the call's argument was bound when the handle was made.
+    apply() { return caller.call(m, a, opts) },
   })
 }
