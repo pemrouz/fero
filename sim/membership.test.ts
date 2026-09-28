@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed, writes } from './harness.ts'
-import { converged } from './monitors.ts'
+import { converged, perEvent } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
 import { LS } from '../kernel/link.ts'
 import { VERB } from '../kernel/codec.ts'
@@ -171,6 +171,46 @@ test('M4-REVIEW PIN — a burned epoch cannot wedge membership: survivors ESCALA
   assert.ok(!members(n02).includes('n01'), 'the vanished proposer was evicted after all')
   assert.ok(n02.membership.gate(n02).open && n03.membership.gate(n03).open, 'writable — never wedged read-only')
   assert.deepEqual(sim.violations, [], 'one-view-per-epoch + epoch-monotone held through the escalation')
+})
+
+//! ── I-22 (2026-09-28): a one-sided static pair — `{ listen }` and `{ listen, hosts: [it] }` — must form
+// whichever side's uuid sorts lowest. The hostless listener used to need `hosts.length > 0` to propose, so
+// when IT was the lowest nobody ever did: epoch 0 forever, no single writer, `confirm: 'replicated'`
+// resolving alone. Uuids are random, so half of all such pairs never formed. RED on the old kernel for
+// the first order below; the second order is the one that always worked.
+test('a one-sided static pair forms in EITHER uuid order: the hostless listener proposes over the members that dialed it', () => {
+  for (const [listener, dialer] of [['n01', 'n02'], ['n02', 'n01']] as const) {
+    const sim = new Sim(63)
+    sim.monitors.push(...perEvent())
+    const a = sim.add({ uuid: listener, listen: `sim:${listener}`, heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16 })
+    const b = sim.add({ uuid: dialer, listen: `sim:${dialer}`, hosts: [`sim:${listener}`], heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16 })
+    sim.post(listener, { kind: 'start' })
+    sim.post(dialer, { kind: 'start' })
+    sim.run({ until: 1000 })
+    assert.ok(formed([a, b]), `${listener} listens, ${dialer} dials: linked`)
+    assert.deepEqual(epochs([a, b]), [1, 1], `${listener} listens, ${dialer} dials: view 1 committed on both`)
+    assert.deepEqual(members(a), ['n01', 'n02'])
+    assert.deepEqual(members(b), ['n01', 'n02'])
+    assert.ok(a.membership.gate(a).open && b.membership.gate(b).open, 'two of two: writable')
+    sim.post(dialer, { kind: 'write', recs: [{ type: 0, key: ['paired'], value: 1 }] })
+    sim.run({ until: 1400 })
+    assert.equal(converged(sim), null)
+    assert.deepEqual(sim.violations, [])
+  }
+})
+
+test('a hostless listener with no member link still never proposes: a solo `{ listen }` and a server with only clients stay at open genesis', () => {
+  const sim = new Sim(63)
+  sim.monitors.push(...perEvent())
+  const solo = sim.add({ uuid: 'n01', listen: 'sim:n01', heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('n01', { kind: 'start' })
+  const c = sim.add({ uuid: 'zc1', listen: 'sim:zc1', hosts: ['sim:n01'], heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('zc1', { kind: 'start' })
+  sim.run({ until: 1000 })
+  assert.deepEqual(solo.admitted(), ['zc1'], 'the spoke is linked')
+  assert.deepEqual(epochs([solo, c]), [0, 0], 'a spoke is not a formation set — epoch 0, the open mode')
+  assert.equal(solo.journal.read().filter((e) => e.kind === JK.propose).length, 0)
+  assert.deepEqual(sim.violations, [])
 })
 
 //! ── the graceful leave (V4-6, 2026-09-07) end-to-end: the two-member story that used to wedge ──
