@@ -802,9 +802,13 @@ function renderMenu(){
     const m = /^([a-z]+):(.*)$/i.exec(partial);
     let items = [];
     if (m && vals[m[1].toLowerCase()]){
-      // completing a facet value: enumerate that head's value space, filtered by the fragment
+      // completing a facet value: enumerate that head's value space, filtered by the fragment. A bare `kind:` lists
+      // only kinds this capture recorded — the vocabulary is append-only, so reserved / never-emitted names
+      // (holdBack, catchup) would otherwise pad the list; typing a fragment still completes them, with their
+      // zero count, so an old capture stays filterable (ISSUES I-9)
       const t = m[1].toLowerCase(), frag = m[2].toLowerCase();
-      items = vals[t].filter(v => v.toLowerCase().includes(frag)).slice(0, 14)
+      const space = t === 'kind' && !frag ? vals.kind.filter(k => D.kindFreq.get(k)) : vals[t];
+      items = space.filter(v => v.toLowerCase().includes(frag)).slice(0, 14)
         .map(v => ({ tok: `${t}:${v}`, note: t === 'kind' ? 'journal kind (from capture.vocab)' : t, dot: t === 'is' ? sevDotVar(v) : 'gold-2' }));
     } else {
       // completing a bare fragment: filter heads, severities, node uuids, kind names — and key: when the
@@ -837,7 +841,7 @@ function renderMenu(){
     menuItem(t + ':', t + ':', { node: 'a node + its links/streams', origin: 'writes/cells by origin', key: 'cells + writes by key text',
       write: 'route outcome', cell: 'election state', link: 'link state', kind: 'journal kind membership' }[t] || '', 'gold-2', '')).join('');
   const nodes = CAP.nodes.slice(0, 6).map(n => menuItem('node:' + n.uuid, 'node:' + n.uuid, 'node', 'info', countTok(FOREST, 'node:' + n.uuid))).join('');
-  const kinds = vals.kind.slice(0, 8).map(k => menuItem('kind:' + k, 'kind:' + k, (D.kindFreq.get(k) || 0) + ' journal rows', 'soft', countTok(FOREST, 'kind:' + k))).join('');
+  const kinds = vals.kind.filter(k => D.kindFreq.get(k)).slice(0, 8).map(k => menuItem('kind:' + k, 'kind:' + k, D.kindFreq.get(k) + ' journal rows', 'soft', countTok(FOREST, 'kind:' + k))).join('');   // recorded kinds only (ISSUES I-9)
   $('omenu').innerHTML = `<div class="oh">By severity</div>${sev}` +
     `<div class="osep"></div><div class="oh">By type — then a value</div>${heads}` +
     `<div class="osep"></div><div class="oh">By node</div>${nodes}` +

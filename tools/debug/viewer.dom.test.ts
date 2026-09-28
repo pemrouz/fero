@@ -456,3 +456,20 @@ test('an even split has no modal side: every node is pilled and the header says 
   assert.match(e2('statusRight').innerHTML, /diverged ✗/)
   assert.equal((e2('tree').innerHTML.match(/data-tip="node:diverged"/g) || []).length, 1)
 })
+
+test('journal kinds this capture never recorded stay out of the kind: suggestions but remain completable by typing (ISSUES I-9)', async () => {
+  const { el, g } = await bootViewer('formation', captures.get('formation'))
+  const type = (q: string) => { el('q').value = q; el('q').fire('input', { target: { value: q } }) }
+  const picks = () => [...el('omenu').innerHTML.matchAll(/data-pick="kind:([^"]+)"/g)].map((m) => m[1])
+  const rows = (k: string) => g(`D.kindFreq.get(${JSON.stringify(k)}) || 0`) as number
+  assert.equal(rows('holdBack'), 0, 'the reserved kind has no rows anywhere — the fixture is what it claims')
+  type('')                                                      // the curated default
+  assert.ok(picks().length > 0, 'the default lists kinds')
+  for (const k of picks()) assert.ok(rows(k) > 0, `the curated list offers kind:${k}, which this capture never recorded`)
+  type('kind:')                                                 // the head alone: the value space, unfiltered
+  assert.ok(picks().length > 0)
+  for (const k of picks()) assert.ok(rows(k) > 0, `kind: offers kind:${k}, which has zero rows here`)
+  type('kind:hold')                                             // typing a fragment still completes a reserved name — an old capture must stay filterable
+  assert.deepEqual(picks(), ['holdBack'], 'the fragment completes the reserved kind')
+  assert.match(el('omenu').innerHTML, /data-pick="kind:holdBack"[^>]*>[\s\S]*?<span class="oc">0<\/span>/, 'with its honest zero count')
+})
