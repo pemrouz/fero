@@ -29,6 +29,7 @@ dependency).
 | 22 | [time-travel](22-time-travel/) | a capture with a story: two writes before the first view are an election (`lww-lost` in the viewer), the same two after it are plain history, a cut heals by anti-entropy, and the scrubber replays any step | `node story.ts` · `npm run debug -- examples/22-time-travel/story.capture.json` |
 | 23 | [live](23-live/) | a running cluster writes a `kind: 'live'` capture file once a second (temp file, then rename) and `npm run debug -- <file>` polls it: the debugger follows a real fero process on this box with no wire attach | `node live.ts` · `npm run debug -- examples/23-live/live.capture.json` |
 | 30 | [fleet-audit](30-fleet-audit/) | real processes, real disks, real `kill -9`: three durable members, sensors writing facts through the door with receipts, a live dashboard, one member killed and then all three, restored from disk — then an audit: the members agree, every `persisted` receipt is on every member, no phantom rows, and a reject is not a rollback | `node fleet.ts` · `node dashboard.ts` |
+| 40 | [chat](40-chat/) | a chat is facts plus one sorted view: `post` runs on the server, throws its rule for every joiner and stamps who (`ctx.peer`) and when; every screen sorts the rows itself with a tiebreak, so they all agree | `node room.ts general` · `node join.ts general ada` · `node join.ts general bob` |
 
 Three rules every example keeps:
 
