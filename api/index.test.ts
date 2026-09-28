@@ -225,6 +225,41 @@ test("the guarantee ladder under methods: confirm:'replicated' proves against a 
   }
 })
 
+test("confirm:'persisted' where no disk can ever prove it rejects AT ONCE ('not-durable', reached committed, the write landed, the dir: pointer) — and a memory-only member beside a durable majority still reaches it", async () => {
+  //! two memory-only members: nothing can ever fsync, so waiting out the deadline would prove nothing
+  const pa = await ports.free()
+  const pb = await ports.free()
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1 && (snapshot(b.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
+    const t0 = performance.now()
+    const e = await a.methods.update({ key: 'k', value: 1 }, { confirm: 'persisted', timeout: 8000 }).then(() => null, (e: unknown) => e) as WriteRejectError
+    assert.ok(performance.now() - t0 < 4000, `rejected at once, not at the 8s deadline (${(performance.now() - t0).toFixed(0)}ms)`)
+    assert.ok(e instanceof WriteRejectError && e.reason === 'not-durable' && e.reached === 'committed' && e.localCommit !== undefined, `typed: ${String(e)}`)
+    assert.match(e.message, /no member has announced a disk — pass dir: to persist\)$/)
+    assert.equal((snapshot(a.data) as { k?: number }).k, 1, 'a reject is not a rollback: the write landed')
+  } finally {
+    await a.destroy()
+    await b.destroy()
+  }
+  //! three members, two with a disk: the memory-only one asks for 'persisted' and the durable majority proves it
+  const dirs = [fs.mkdtempSync(path.join(os.tmpdir(), 'fero-nd-')), fs.mkdtempSync(path.join(os.tmpdir(), 'fero-nd-'))]
+  const ps: number[] = []
+  for (let i = 0; i < 3; i++) ps.push(await ports.free())
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const n = await Promise.all(addrs.map((listen, i) =>
+    fero('r', { uuid: `n${i}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 }, ...(i < 2 ? { dir: dirs[i] } : {}) })))
+  try {
+    assert.ok(await until(() => n.every((f) => (snapshot(f.cluster) as { epoch: number }).epoch >= 1), 10_000), 'view of three formed')
+    const r = await n[2].methods.update({ key: 'k', value: 2 }, { confirm: 'persisted', timeout: 8000 })
+    assert.equal(r.guarantee, 'persisted', 'the memory-only member proved it on its peers\' disks')
+  } finally {
+    for (const f of n) await f.destroy()
+    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true })
+  }
+})
+
 test('restore through the composer: fero(name, {dir}) refills the proxy from the WAL before the network exists', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-api-'))
   try {
