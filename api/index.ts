@@ -430,6 +430,14 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     const explain = (reason: string): string => reason === METHODS_ONLY ? `${reason} (the server takes changes only through its methods)` : reason
     //! the one hint a timed-out client needs most (rung 04's finding): nothing is connected to write to
     const nobody = (): string => caller && node.primary === null ? ' (nobody to write to: a bare fero(name) is a client; pass server: true to host)' : ''
+    //! an EMPTY key on update/remove is refused HERE, before any stamp (ISSUES I-30): `Change.key` is
+    // optional, so `methods.update({ value })` type-checks — and the kernel's projection was the first to
+    // object, by throwing inside step(): the process died, and on a cluster died a second time when the
+    // record re-applied a second later, outside any try. An insert without a key is fine: `at` is its row.
+    if (rec.key.length === 0 && rec.type !== REC.insert)
+      throw reject({ reached: 'issued', reason: 'invalid-key' }, 'invalid-key', rec.type === REC.remove
+        ? " (a remove needs a key: methods.remove({ key: 'k' }) is delete data.k)"
+        : " (a write needs a key: methods.update({ key: 'k', value }) is data.k = v)")
     const r = bind.issue([rec])[0]
     if (typeof r === 'string') throw reject({ reached: 'issued', reason: r }, explain(r))
     //! the timeout timer is CAPTURED and CLEARED on settle (M5-review #3: the bare setTimeout leaked one
