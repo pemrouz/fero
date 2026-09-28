@@ -535,10 +535,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       shedWaitingOn: node.armed ? node.scope!.shedWaitingOn(node) : [] as string[],
     }
   }
-  //! me carries the ROLE, the EFFECTIVE dial targets (static ∪ discovered — on every role, V4-3) and the
-  // rendezvous state (v4.1's observability finding, extended: a bare client's "nobody registered yet"
-  // ({hosts: [], rendezvous.up: true}) and "no directory on this box" (up: false) read differently;
-  // none of it needs the diagnostics seam). `listen` re-folds after start — port 0 resolves there.
+  //! me carries the ROLE, the TOLD dial targets (`hosts` config ∪ what the directory published — on
+  // every role, V4-3; the kernel dials MORE: every member the view teaches it — `peers` is the linked
+  // set) and the rendezvous state (v4.1's observability finding, extended: a bare client's "nobody
+  // registered yet" ({hosts: [], rendezvous.up: true}) and "no directory on this box" (up: false) read
+  // differently; none of it needs the diagnostics seam). `listen` re-folds after start — port 0 resolves there.
   let discovered: string[] = []
   let directory: Directory | null = null
   //! meets — the ONE predicate for "this instance meets a directory": a rendezvous is set AND the
