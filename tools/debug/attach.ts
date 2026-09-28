@@ -141,6 +141,12 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
     origins: Record<string, { tail: number; base: number }>
     links: unknown[]
   }
+  //! state RIGHT AFTER the snapshot — the shortest window the wire allows between the two instants the replay
+  // oracle compares. The state's own hash (sh) against the snapshot's says whether anything landed in that window:
+  // if so the read is TORN — the state is a later instant than the journal (cut at the snapshot, below) — and the
+  // slice says so, so the viewer paints "torn read" where a replay mismatch would have read as a fault (ISSUES I-2)
+  const st = await c.q({ q: 'state' }, left())
+  const torn = st.sh !== w.stateHash
   //! journal: resume via next until the head; the first page's f0 is where retention starts (loss below
   // it is the node's business — dropped rides the fold; the viewer disables time-travel loudly on it).
   // CUT at the snapshot's head: a row with t ≥ w.jn landed AFTER the node fold was taken (a busy node keeps
@@ -167,7 +173,6 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
     }
     logs[o] = entries
   }
-  const st = await c.q({ q: 'state' }, left())
   return {
     target: c.target,
     vocab: meta.vocab as Record<string, number>,
@@ -177,6 +182,7 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
       journal, logs,
       state: (st.cells as [string, unknown][]).map(([k, v]) => [k, encodeVal(v)]),
       streams: w.streams, links: w.links,
+      ...(torn ? { torn: true } : {}),
     } as AttachAnswer['node'],
   }
 }
