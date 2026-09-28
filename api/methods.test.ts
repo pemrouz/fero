@@ -12,7 +12,7 @@ import '../utils/battery.ts'
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { fero } from './index.ts'
-import { snapshot } from './substrate.ts'
+import { records, snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { ports, until, sleep } from '#utils'
 
@@ -250,5 +250,31 @@ test("ctx.peer on a SERVER-local call is the server's own uuid (it IS the caller
     assert.equal(await s.methods.whoami(), 'ss', 'a local call names the server itself')
   } finally {
     await s.destroy()
+  }
+})
+
+test("I-28 — 'open, then act' right after a client's fero() resolves shows the delta: the held SUB is replayed before the held CALL, so the view shows the value before AND after", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { balance: 100 },
+    methods: {
+      balance: (_: unknown, ctx: { data: any }) => ctx.data,
+      //! SYNC, and this server owns every cell: the deposit COMMITS inside the handler (V4-7)
+      deposit: (n: number, ctx: { data: any }) => { ctx.data.balance = (snapshot(ctx.data) as { balance: number }).balance + n },
+    },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    //! a client's fero() resolves with no admitted link: both the SUB and the CALL are HELD by the caller
+    // and re-dispatched on the first primary. Before: CALLs first — the view's first real frame already
+    // held 105, and 100 → 105 never rendered as a change (4/4 runs in the probe).
+    const frames: unknown[] = []
+    const live = c.methods.balance().open()
+    records(live, () => frames.push((snapshot(live) as { balance?: number }).balance))
+    await c.methods.deposit(5)
+    assert.ok(await until(() => (snapshot(live) as { balance?: number }).balance === 105, 8000), `the view caught up (${JSON.stringify(frames)})`)
+    assert.ok(frames.includes(100), `the view showed the value BEFORE the deposit too (${JSON.stringify(frames)})`)
+  } finally {
+    await c.destroy(); await s.destroy()
   }
 })
