@@ -364,6 +364,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   })
   const dataSurface = !scoped ? bind.data : new Proxy(bind.data, {
     get(t, prop, r) {
+      //! coercing the ROOT on an ARMED node (I-25) is a sync local read of the shard — `snapshot`'s rule:
+      // typed, never a silent partial. A held child coerces to its cell through the lens as everywhere.
+      if ((prop === Symbol.toPrimitive || prop === 'valueOf') && node.armed)
+        return scopedThrow(prop === 'valueOf' ? 'valueOf' : 'toPrimitive', 'holistic', 'a scoped node holds a shard — await data (the gather) or methods.read() for the whole resource')
       if (typeof prop === 'symbol') return Reflect.get(t, prop, r)
       if (prop === 'then') {
         //! `await data` means the RESOURCE — the gather, never the shard (typed reject on shortfall)

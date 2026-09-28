@@ -86,6 +86,9 @@ test('SCOPED §9 equivalence: operators throw TYPED ScopedError (never a silent 
       assert.equal(se.scoped, true)
       assert.equal(se.op, 'snapshot')
     }
+    //! coercing the root (I-25) is the same sync shard read — typed, never '[object Object]' of a partial
+    assert.throws(() => `${nodes[0].data}`, (e: ScopedError) => e.scoped === true && e.op === 'toPrimitive' && e.reason === 'holistic')
+    assert.throws(() => (nodes[0].data as { valueOf(): unknown }).valueOf(), (e: ScopedError) => e.scoped === true && e.op === 'valueOf')
     //! key access: a held key is the raw child; a NON-held key is a one-shot remote handle — await
     // gives the owner's value; sync property reads throw typed (undefined would be a wrong answer)
     const node0 = nodes[0]

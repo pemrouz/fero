@@ -127,6 +127,31 @@ test('solo: assignment and methods.update are ONE ingest — both commit, both v
   await f.destroy()
 })
 
+test('I-25: a lens COERCES to its cell — `data.k = data.k + 1` commits k+1 and `data.k++` routes through the set trap; a row coerces like a plain object, never a debug label; valueOf() is the value', async () => {
+  const f = await fero('r', { uuid: 'aa', listen: false })
+  const view = () => snapshot(f.data) as Record<string, unknown>
+  try {
+    f.data.count = 1
+    f.data.count = f.data.count + 1
+    assert.strictEqual(view().count, 2, "the old lens committed the STRING '[data source#1 .count]1'")
+    f.data.count++
+    assert.strictEqual(view().count, 3, 'the old lens committed NaN')
+    f.data.count += 2
+    assert.strictEqual(view().count, 5)
+    assert.strictEqual(`${f.data.count}`, '5')
+    assert.strictEqual(f.data.count > 4, true)
+    assert.strictEqual(f.data.count.valueOf(), 5)
+    //! an object cell coerces as a plain object would; an absent cell is undefined (NaN in arithmetic)
+    f.data.row = { a: 1 }
+    assert.strictEqual(`${f.data.row}`, '[object Object]')
+    assert.deepEqual(f.data.row.valueOf(), { a: 1 })
+    assert.ok(Number.isNaN(f.data.missing + 1))
+    assert.deepEqual(view(), { count: 5, row: { a: 1 } }, 'only the values landed — no label, no NaN, no stray cell')
+  } finally {
+    await f.destroy()
+  }
+})
+
 //! Regression (v4 re-evaluation BLOCKER): the lens delegated EVERY reserved name raw —
 // including data's WRITE builtins — so f.data.set('k',v) / f.data.k.update(v) /
 // f.data.patch([...]) mutated the LOCAL projection only: no validation, no join, no
