@@ -116,3 +116,11 @@ test('both pages and the server say fero v4 — the root has been v4 since 2026-
   assert.ok(dash.includes('<title>scenarios — fero v4</title>'), 'the title names v4')
   assert.ok(dash.includes('fero v4<span class="sep">'), 'the brand names v4')
 })
+
+test('the first-run note tells the truth on the served page: only the CLI pins a baseline, so it says how (ISSUES I-8)', () => {
+  const dash = readFileSync(join(import.meta.dirname, 'scenarios.html'), 'utf8')
+  assert.ok(!dash.includes('this run becomes the reference'), 'the served page never pins a baseline, so a re-run does not become one')
+  assert.ok(dash.includes('id="basenote" data-tip="no-baseline">no baseline yet — run npm run scenarios once to pin one</div>'), 'the note names the one command that pins')
+  const serve = readFileSync(join(import.meta.dirname, 'serve.ts'), 'utf8')
+  assert.ok(!/writeFileSync/.test(serve), 'and serve.ts still writes nothing — rendering never mutates')
+})
