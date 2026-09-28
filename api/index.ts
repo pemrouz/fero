@@ -52,7 +52,7 @@ const keyPath = (k: string | string[] | undefined): string[] =>
   k === undefined ? [] : Array.isArray(k) ? k.map(String) : [String(k)]
 
 export const fero = (name: string, opts: FeroOpts = {}): Promise<Fero> => compose(name, opts, false)
-//! fero.spawn(file, args?) (V4-9): `node <file> …` as a separate process — the reader's other terminal, from code (api/spawn.ts)
+//! fero.spawn(file, args?, opts?) (V4-9): `node <file> …` as a separate process — the reader's other terminal, from code (api/spawn.ts)
 fero.spawn = spawn
 
 //! compose — the composer proper. `system` admits a `#`-prefixed name (the directory) and skips the
@@ -726,4 +726,4 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   return inst
 }
 
-export type { Fero, FeroOpts, Guarantee, WriteResolve, WriteReject, Change, WriteOpts, Methods, Partitions, ScopedError, Spawned } from './types.ts'
+export type { Fero, FeroOpts, Guarantee, WriteResolve, WriteReject, Change, WriteOpts, Methods, Partitions, ScopedError, Spawned, SpawnOpts } from './types.ts'
