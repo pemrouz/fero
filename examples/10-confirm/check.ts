@@ -24,7 +24,7 @@ const c = await fero('ledger')
 const r = await c.methods.update({ key: 'k', value: 4 }, { confirm: 'replicated', timeout: 5000 })
 assert.deepEqual([r.guarantee, r.key, r.epoch], ['replicated', ['k'], 1], 'a resolve names the rung it proved and the commit coordinates')
 const e = await c.methods.update({ key: 'k', value: 5 }, { confirm: 'persisted', timeout: 1000 }).then(() => null, (e) => e)
-assert.deepEqual([e, c.snapshot.k], [{ guarantee: 'persisted', reached: 'committed', reason: 'timeout', localCommit: { origin: r.origin, seq: r.seq + 1, epoch: 1 } }, 5], 'a reject says how far it got, with the local commit, and the write landed before it')
+assert.deepEqual([{ ...e }, c.snapshot.k], [{ guarantee: 'persisted', reached: 'committed', reason: 'timeout', localCommit: { origin: r.origin, seq: r.seq + 1, epoch: 1 } }, 5], 'a reject says how far it got, with the local commit, and the write landed before it')
 await c.destroy()
 
 for (const r of [a, b]) assert.equal(await r.stop(), 0, 'stopped cleanly')

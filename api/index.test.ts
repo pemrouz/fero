@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import net from 'node:net'
-import { fero } from './index.ts'
+import { fero, WriteRejectError } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { JK } from '../kernel/journal.ts'
@@ -507,6 +507,32 @@ test('M5-REVIEW #9 — an async write rejection surfaces as a typed WriteReject,
     }
   } finally {
     await c.destroy()
+  }
+})
+
+test("a write rejection is a WriteRejectError: an Error with a stack whose message names the resource, the verb, the key and the rung — the typed fields ride on it unchanged, and a client with nobody to write to is told why", async () => {
+  //! a client dialing a dead port: the write is issued and times out with no primary — the rung-04 shape
+  const c = await fero('shop', { uuid: 'zz', hosts: ['127.0.0.1:1'], heartbeat: { ms: 0 } })
+  try {
+    const e = await c.methods.update({ key: 'x', value: 1 }, { timeout: 200 }).then(() => null, (e: unknown) => e) as WriteRejectError
+    assert.ok(e instanceof WriteRejectError && e instanceof Error, 'an Error subclass, so an uncaught one dies with a stack')
+    assert.equal(e.name, 'WriteRejectError')
+    assert.ok(typeof e.stack === 'string' && e.stack.startsWith('WriteRejectError: fero'), 'the stack opens with the message')
+    assert.equal(e.message, `fero('shop') update ["x"]: timeout after 200ms — reached issued (nobody to write to: a bare fero(name) is a client; pass server: true to host)`)
+    //! the fields are own enumerable properties and nothing else is: `{ ...e }` IS the WriteReject
+    assert.deepEqual({ ...e }, { guarantee: 'committed', reached: 'issued', reason: 'timeout' })
+  } finally {
+    await c.destroy()
+  }
+  //! a local refusal (the validator) and a confirm that cannot be proven read the same way
+  const s = await fero('shop', { uuid: 'aa', listen: false, seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') } })
+  try {
+    const e = await s.methods.remove({ key: ['admin', 'role'] }).then(() => null, (e: unknown) => e) as WriteRejectError
+    assert.ok(e instanceof WriteRejectError)
+    assert.equal(e.message, `fero('shop') remove ["admin","role"]: reserved — reached issued`)
+    assert.deepEqual({ ...e }, { guarantee: 'committed', reached: 'issued', reason: 'reserved' })
+  } finally {
+    await s.destroy()
   }
 })
 
