@@ -128,6 +128,23 @@ export const hostMethods = (peersOf: () => Peers): { methods: Record<string, (a:
     owners.delete(peer); seen.delete(peer); grace.delete(peer)
     for (const k of keys) if (owner.get(k) === peer) drop(k)
   }
+  //! peer-down cleanup: every entry a registrant made goes when its uuid is no longer up. Keyed by
+  // uuid TRANSITIONS off the host's cluster.peers fold, read AFTER the fold — a registrant that
+  // reconnects before its old link's close is processed keeps its uuid up, so nothing is deleted; if
+  // the close lands first the entries go and the registrant's link-up re-register restores them.
+  // Entry lifetime IS the registrant's TCP connection: a hung-but-connected process keeps its entry
+  // (the kernel runs no failure detector over client links; a crash or a clean close drops the
+  // socket at once). Runs on every host fold AND at the end of every register (see there).
+  const onPeers = afterFold(() => {
+    const peers = peersOf()
+    for (const [peer, keys] of owners) {
+      if (peers[peer]?.up) { seen.add(peer); grace.delete(peer); continue }
+      if (seen.has(peer)) { forget(peer, keys); continue }
+      const g = (grace.get(peer) ?? 0) + 1
+      if (g >= GRACE) forget(peer, keys)
+      else grace.set(peer, g)
+    }
+  })
   return {
     methods: {
       register: (a: unknown, ctx: Context) => {
@@ -146,6 +163,12 @@ export const hostMethods = (peersOf: () => Peers): { methods: Record<string, (a:
         mine.add(k)
         if (rows()[name] === undefined) registry.set(name, { [uuid]: listen })
         else registry.get(name).set(uuid, listen)
+        //! a pass NOW (coalesced after this fold): the caller's peer row is already published — its HELLO
+        // folded before its call could arrive — so the caller is `seen` from its first entry. A registrant
+        // used to be seen only by a LATER fold at the host, and with two servers and nothing else no later
+        // fold ever came: the second server's clean leave then sat out the GRACE budget while every lookup
+        // handed out its dead address (I-34).
+        onPeers()
         return true
       },
       lookup: (a: unknown) => {
@@ -153,23 +176,7 @@ export const hostMethods = (peersOf: () => Peers): { methods: Record<string, (a:
         return registry.get(a)
       },
     },
-    //! peer-down cleanup: every entry a registrant made goes when its uuid is no longer up. Keyed by
-    // uuid TRANSITIONS off the host's cluster.peers fold, read AFTER the fold — a registrant that
-    // reconnects before its old link's close is processed keeps its uuid up, so nothing is deleted; if
-    // the close lands first the entries go and the registrant's link-up re-register restores them.
-    // Entry lifetime IS the registrant's TCP connection: a hung-but-connected process keeps its entry
-    // (the kernel runs no failure detector over client links; a crash or a clean close drops the
-    // socket at once).
-    onPeers: afterFold(() => {
-      const peers = peersOf()
-      for (const [peer, keys] of owners) {
-        if (peers[peer]?.up) { seen.add(peer); grace.delete(peer); continue }
-        if (seen.has(peer)) { forget(peer, keys); continue }
-        const g = (grace.get(peer) ?? 0) + 1
-        if (g >= GRACE) forget(peer, keys)
-        else grace.set(peer, g)
-      }
-    }),
+    onPeers,
   }
 }
 

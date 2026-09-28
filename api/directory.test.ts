@@ -248,6 +248,26 @@ test('entries die with their registrant: destroying a server removes it from eve
   } finally { await settle([c, s1, s2]) }
 })
 
+test('I-34 — two servers and NOTHING else: a clean leave drops the leaver\'s entry at once, so no lookup hands out the dead address meanwhile', async () => {
+  const o = await fast()
+  const name = `leave2-${process.pid}`
+  let a: Fero | undefined, b: Fero | undefined
+  try {
+    a = await fero(name, { server: true, ...o })
+    b = await fero(name, { server: true, ...o })
+    assert.ok(await until(() => members(a!) === 2 && me(a!).hosts.length === 1, 10_000), 'a found b through the directory alone')
+    const gone = me(b).listen
+    assert.deepEqual(me(a).hosts, [gone])
+    await b.destroy()
+    //! the host's table folds ONLY on the host's own link events. A registrant is `seen` when a pass finds
+    // its peer up — and with two servers and nothing else no pass ever ran after b's register, so b sat in
+    // the GRACE budget: its link-down fold counted one pass and nothing else ever folded (the smoke tier
+    // has a client as a third instance, whose link events supplied the passes). ~a second is the whole
+    // close → fold → drop path, with slack for a loaded box.
+    assert.ok(await until(() => me(a!).hosts.length === 0, 1500), `b's address left the lookup at once (hosts: ${JSON.stringify(me(a).hosts)})`)
+  } finally { await settle([b, a]) }
+})
+
 test('two names on one box never collide, never cross-talk, and the diagnostics seam exposes the directory nodes as real instances', async () => {
   const o = await fast()
   let a: Fero | undefined, b: Fero | undefined, ca: Fero | undefined, cb: Fero | undefined
