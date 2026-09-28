@@ -856,3 +856,40 @@ test('`cluster.me.origin` is the lane this life stamps under — the bare uuid i
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('Ctrl-C before fero() resolves is the clean stop too (V4-8): a provisional entry holds the signal registry from Runtime construction, and a SIGINT in the start window tears down what was built', async () => {
+  const count = () => process.listenerCount('SIGINT')
+  const before = count()
+  //! (a) the registry is armed SYNCHRONOUSLY at the call — before any await in compose — and the instance
+  // replaces the provisional entry without doubling it
+  const p = fero('r', { listen: false })
+  const armed = count()
+  const f = await p
+  try {
+    assert.equal(armed, before + 1, 'armed at the call, before fero() resolves (was: only at the end of compose)')
+    assert.equal(count(), before + 1, 'the instance took the entry over — one listener, not two')
+  } finally {
+    await f.destroy()
+  }
+  assert.equal(count(), before, 'and the last destroy removes it')
+  //! (b) a SIGINT in the start window: the provisional entry's destroy tears down what was built. A second
+  // listener keeps the handler from exiting THIS process (others > 0 — the app-has-its-own-listener rule).
+  const noop = () => {}
+  process.on('SIGINT', noop)
+  const port = await ports.free()
+  const q = fero('r', { listen: `127.0.0.1:${port}`, rendezvous: false })
+  process.emit('SIGINT', 'SIGINT') // lands while rt.start() awaits its listen bind
+  const g = await q
+  try {
+    const refused = await new Promise<boolean>((resolve) => {
+      const s = net.connect(port, '127.0.0.1')
+      s.once('connect', () => { s.destroy(); resolve(false) })
+      s.once('error', () => resolve(true))
+    })
+    assert.ok(refused, 'the port it had bound is released — the runtime was torn down by the signal')
+    assert.equal(count(), before + 1, "nothing live is tracked any more (only the test's own listener remains)")
+  } finally {
+    process.off('SIGINT', noop)
+    await g.destroy() // joins the stop that already ran — resolves, never hangs
+  }
+})
