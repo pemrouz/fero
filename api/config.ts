@@ -45,10 +45,12 @@ export interface Resolved {
 
 //! ── the declared schema ──────────────────────────────────────────────────────
 // Leaves are dotted paths. `layers` says which layers may carry the key: f = flag, c = call, e = env,
-// p = file ("paper"). Anything not listed here is unknown and throws — from every layer. The tables
-// are null-prototype objects: a key named `constructor` or `toString` must look up NOTHING.
+// p = file ("paper"). Anything not listed here is unknown and throws — from every layer. `object` marks
+// the one leaf whose VALUE is a plain object; at every other leaf an object is a longer name folded
+// under it (`FERO_DIR_OLD`) and is refused. The tables are null-prototype objects: a key named
+// `constructor` or `toString` must look up NOTHING.
 const table = <T>(o: Record<string, T>): Record<string, T> => Object.assign(Object.create(null) as Record<string, T>, o)
-const LEAVES = table<{ layers: string; why?: string }>({
+const LEAVES = table<{ layers: string; why?: string; object?: true }>({
   uuid: { layers: 'fce', why: 'one shared file would give every process the same identity' },
   server: { layers: 'fcep' },
   listen: { layers: 'fcep' },
@@ -59,7 +61,7 @@ const LEAVES = table<{ layers: string; why?: string }>({
   'journal.cap': { layers: 'fcep' },
   replicas: { layers: 'fcep' },
   rendezvous: { layers: 'fcep' },
-  data: { layers: 'cp', why: 'an object of rows' },
+  data: { layers: 'cp', why: 'an object of rows', object: true },
   methods: { layers: 'c', why: 'functions — and the door: it closes a resource from the source line that hosts it' },
   'seams.validation': { layers: 'c', why: 'a function' },
   signals: { layers: 'c', why: 'V4-8: the clean stop is per instance, never per process' },
@@ -194,6 +196,16 @@ const walk = (resource: string, layer: Layer, name: string | null, tree: unknown
       if (leaf !== undefined) {
         if (!leaf.layers.includes(LAYER_CODE[layer]))
           throw new Error(`fero('${resource}'): '${path}' cannot come from ${spell(layer, name, path)} — it is set in the call${leaf.layers.includes('p') ? ' or a fero.opt.ts file' : ''} only (${leaf.why})`)
+        //! a LONGER name under a leaf — FERO_RENDEZVOUS_UNUSED beside FERO_RENDEZVOUS, --fero.dir.old — arrives
+        // as an OBJECT at the leaf (envdeep nests on `_`, flags on `.`). Folded, it won the merge over the good
+        // value and the composer's refusal blamed the variable that was right (I-35): refused here instead,
+        // naming the longer spelling. The call is typed (a wrong shape there is the composer's own check) and
+        // `data` IS an object.
+        if (layer !== 'call' && !leaf.object && isPlain(v)) {
+          const sub = Object.keys(v)[0]
+          const longer = sub === undefined ? path : `${path}.${sub}`
+          throw new Error(`fero('${resource}'): unknown option '${longer}' from ${spell(layer, name, longer)} — ${path} takes a value, not a group`)
+        }
         out.set(path, v)
         continue
       }

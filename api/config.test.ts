@@ -210,3 +210,24 @@ test('a config file that fails to load throws with its path (optcascade), and th
   assert.throws(() => r('r', {}, { home }), (e: Error) => e.message.includes(path.join(home, 'fero.opt.js')))
   assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'journal.cap', 'replicas', 'rendezvous', 'data', 'methods', 'seams.validation', 'signals'])
 })
+
+test('I-35 — a LONGER name under a leaf is refused naming THAT name; the good variable beside it is never blamed, and `data` (an object of rows) still rides a file', () => {
+  //! the env layer splits on _, so FERO_RENDEZVOUS_UNUSED is the nested key rendezvous.unused — an OBJECT at a
+  // leaf. It used to win the merge over the good FERO_RENDEZVOUS, reach the composer as {unused: 1}, and the
+  // refusal there blamed FERO_RENDEZVOUS (the one variable that was right)
+  assert.throws(() => r('r', {}, { env: { FERO_RENDEZVOUS: '127.0.0.1:12345', FERO_RENDEZVOUS_UNUSED: '1' } }), /unknown option 'rendezvous\.unused' from FERO_RENDEZVOUS_UNUSED — rendezvous takes a value, not a group$/)
+  assert.throws(() => r('r', {}, { env: { FERO_DIR: './x', FERO_DIR_OLD: './y' } }), /unknown option 'dir\.old' from FERO_DIR_OLD — dir takes a value, not a group$/)
+  assert.throws(() => r('r', {}, { env: { FERO_DIR_OLD: './y' } }), /unknown option 'dir\.old' from FERO_DIR_OLD/, 'alone too — no good value needed to be wrong')
+  //! the same under the name rung, as a flag, and in a file — each named in its own spelling
+  assert.throws(() => r('shop', {}, { env: { FERO_SHOP_DIR: './x', FERO_SHOP_DIR_OLD: './y' } }), /unknown option 'dir\.old' from FERO_SHOP_DIR_OLD — dir takes a value, not a group$/)
+  assert.throws(() => r('r', {}, { argv: ['--fero.rendezvous.unused', '1'] }), /unknown option 'rendezvous\.unused' from --fero\.rendezvous\.unused — rendezvous takes a value, not a group$/)
+  const bad = scratch()
+  fs.writeFileSync(path.join(bad, 'package.json'), '{ "type": "module" }')
+  fs.writeFileSync(path.join(bad, 'fero.opt.js'), "export default { dir: { old: './y' } }")
+  assert.throws(() => r('r', {}, { cwd: bad }), /unknown option 'dir\.old' from a fero\.opt\.ts file \(dir\.old\) — dir takes a value, not a group$/)
+  //! `data` IS an object (rows): the one leaf a file may carry as one (a second cwd — the file walk is memoized per pair)
+  const good = scratch()
+  fs.writeFileSync(path.join(good, 'package.json'), '{ "type": "module" }')
+  fs.writeFileSync(path.join(good, 'fero.opt.js'), "export default { data: { row: { n: 1 } }, dir: './d' }")
+  assert.deepEqual(cfg('r', {}, { cwd: good }), { data: { row: { n: 1 } }, dir: './d' })
+})
