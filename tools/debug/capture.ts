@@ -97,8 +97,10 @@ export interface Absent {
   target: string
   reason: 'refused' | 'timeout' | 'unauthorized' | 'frame' | 'vocab-mismatch' | 'restarted' | 'error'
 }
-//! AttachAnswer — one target's truthful pull: its OWN vocabulary + its captureNode-shaped slice.
-export interface AttachAnswer { target: string; vocab: Record<string, number>; node: ReturnType<typeof captureNode> }
+//! AttachAnswer — one target's truthful pull: its OWN vocabulary + its captureNode-shaped slice. `torn` is the
+// bridge's one addition: the state was pulled a later instant than the journal (rows landed mid-pull), so a
+// replay mismatch on this node is the read, not a fault — the viewer says "torn read" instead of replay ✗.
+export interface AttachAnswer { target: string; vocab: Record<string, number>; node: ReturnType<typeof captureNode> & { torn?: boolean } }
 
 //! captureAttached (M7, DESIGN-M7 §3) — the /capture.json envelope for a REAL (multi-process) cluster,
 // assembled from DIAG pulls. Vocab rule: UNION-if-consistent — JK is append-only, so honest version

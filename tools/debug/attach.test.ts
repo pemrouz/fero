@@ -157,3 +157,30 @@ test('a node that writes MID-PULL still pulls as ONE snapshot: the journal is cu
     assert.equal(answer.node.journal[answer.node.journal.length - 1].t, seen.jn - 1, 'and nothing below it is missing')
   } finally { c.close(); await stop() }
 })
+
+test('a state that moved MID-PULL is a torn read, flagged on the slice and said in the header — never painted as replay ✗ (ISSUES I-2)', async () => {
+  const { bootViewer } = await import('./dom-shim.ts')
+  const { rts, addrs, stop } = await spin(2)
+  const c = new DiagClient(addrs[0], TOKEN)
+  try {
+    const key = ownedKey(rts[0])
+    await until(() => rts[1].node.state.size > 0, 4000)
+    //! quiet: nothing lands during the pull — no flag, and the replay oracle is satisfied
+    const quiet = await pullNode(c)
+    assert.equal(quiet.node.torn, undefined, 'a quiet pull carries no torn flag')
+    const capQ = { v: 1, kind: 'live', vocab: quiet.vocab, seed: null, nodes: [quiet.node] }
+    assert.ok((verifyReplay(capQ) as { ok: boolean }[])[0].ok)
+    const q = await bootViewer('attached', capQ, { search: '' })
+    assert.match(q.el('statusRight').innerHTML, /replay ✓/); assert.doesNotMatch(q.el('statusRight').innerHTML, /torn read/)
+    //! torn: a write lands right after the snapshot, so the state pulled next is a later instant than the journal
+    const seen = writeAfterSnapshot(c, rts[0], key)
+    const answer = await pullNode(c)
+    assert.ok(seen.jn > 0)
+    assert.equal(answer.node.torn, true, 'the slice says it is torn')
+    const cap = { v: 1, kind: 'live', vocab: answer.vocab, seed: null, nodes: [answer.node] }
+    assert.equal((verifyReplay(cap) as { ok: boolean }[])[0].ok, false, 'the state holds the mid-pull write, the journal (cut at the snapshot) does not — a mismatch the flag explains')
+    const { el } = await bootViewer('attached', cap, { search: '' })
+    assert.match(el('statusRight').innerHTML, /class="sst warn" data-tip="torn-read">torn read n1/, 'the header says torn read, amber')
+    assert.doesNotMatch(el('statusRight').innerHTML, /replay ✗/, 'and never claims a replay fault')
+  } finally { c.close(); await stop() }
+})

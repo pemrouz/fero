@@ -922,8 +922,13 @@ function headerFacts(){
   if (s.absent && s.absent.length)
     bits.push(sst('warn', `absent: ${s.absent.map(a => `${esc(a.target)} (<span data-tip="absent:${esc(a.reason)}">${esc(a.reason)}</span>)`).join(', ')}`, 'absent'));
   if (s.converged !== null) { // zero nodes ⇒ no replay basis — claim nothing rather than a vacuous ✓
-    const bad = REPLAY.find(r => !r.ok);
-    bits.push(!bad ? fact('replay ✓', 'replay-ok') : sst('crit', `replay ✗ ${esc(bad.uuid)}: ${esc(bad.reason)}`, 'replay-bad'));
+    //! a TORN attach read (the bridge's `torn` flag, ISSUES I-2): rows landed between a node's snapshot and its state
+    // pull, so its state is a later instant than its journal — a replay mismatch there is the read, not a fault.
+    // Say so, and judge replay over the nodes whose slices are one instant
+    const torn = CAP.nodes.filter(n => n.torn).map(n => n.uuid);
+    const bad = REPLAY.find(r => !r.ok && !torn.includes(r.uuid));
+    if (torn.length < CAP.nodes.length) bits.push(!bad ? fact('replay ✓', 'replay-ok') : sst('crit', `replay ✗ ${esc(bad.uuid)}: ${esc(bad.reason)}`, 'replay-bad'));
+    if (torn.length) bits.push(sst('warn', `torn read ${esc(torn.join(','))} — replay unchecked`, 'torn-read'));
   }
   if (s.violations.length) bits.push(sst('crit', s.violations.length + ' violation' + (s.violations.length === 1 ? '' : 's'), 'violations'));
   bits.push(s.events != null ? fact(s.events + ' events', 'events') : fact(klog(s.journalRows) + ' journal rows', 'journal-rows'));

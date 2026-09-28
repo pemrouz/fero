@@ -214,6 +214,7 @@ const UNREACHABLE_OFFLINE: Record<string, string> = {
   'g:violations': 'same — the group appears only when the capture holds one',
   'route:dup': 'a duplicate-only route needs a dupDrop row with NO apply row in the retained journal — trimmed history, which full-ring producers never show',
   'stop:duplicate': 'same — the route stop for a duplicate-only node',
+  'torn-read': 'needs a REAL attach over sockets with a write landing mid-pull — attach.test paints it; the offline sweep has no wire',
 }
 
 let viewer: Awaited<ReturnType<typeof sweepViewer>>, dash: Awaited<ReturnType<typeof sweepDashboard>>
