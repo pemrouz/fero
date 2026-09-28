@@ -784,3 +784,22 @@ setInterval(() => {}, 1000)
     await b.destroy()
   }
 })
+
+test('a Peer row carries the ROLE: `client` is true for a spoke, false for a member — so a screen can count its clients apart from joined servers', async () => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  type Peers = Record<string, { uuid: string; incarnation: number; up: boolean; client: boolean }>
+  const peers = (f: typeof a) => (snapshot(f.cluster) as { peers: Peers }).peers
+  try {
+    assert.ok(await until(() => peers(a).bb !== undefined && peers(a).zz !== undefined && peers(c).aa !== undefined, 8000), 'aa links both')
+    //! before: a row was { uuid, incarnation, up } — 02's `watchers N` and 11's `clients N` counted a joined server
+    assert.deepEqual(peers(a).zz, { uuid: 'zz', incarnation: 1, up: true, client: true }, 'the spoke reads as a client')
+    assert.deepEqual(peers(a).bb, { uuid: 'bb', incarnation: 1, up: true, client: false }, 'the member does not')
+    assert.equal(peers(c).aa.client, false, 'and from the spoke, its feeder is a server')
+    assert.equal(Object.values(peers(a)).filter((p) => p.client).length, 1, 'clients N is now one filter')
+  } finally {
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+})

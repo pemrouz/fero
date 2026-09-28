@@ -630,10 +630,13 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         cluster.set('writable', node.membership.gate(node).open)
         const memberSig = node.epoch + ':' + node.membership.view.members.map(([u]) => u).join(' ')
         if (memberSig !== lastMembers) { lastMembers = memberSig; cluster.set('members', Object.fromEntries(node.membership.view.members)) }
-        const peers: Record<string, { uuid: string; incarnation: number; up: boolean }> = {}
+        //! `client` is the link's ROLE as declared at HELLO (kernel/link.ts): a screen counts its clients
+        // with one filter instead of counting a joined server as one. In the signature too, so a
+        // same-uuid peer coming back in the other role fires, and an unchanged set still fires nothing.
+        const peers: Record<string, { uuid: string; incarnation: number; up: boolean; client: boolean }> = {}
         for (const l of node.links.values())
-          if (l.uuid && !l.dead) peers[l.uuid] = { uuid: l.uuid, incarnation: l.incarnation, up: true }
-        const peerSig = Object.keys(peers).sort().map((u) => u + '~' + peers[u].incarnation).join(' ')
+          if (l.uuid && !l.dead) peers[l.uuid] = { uuid: l.uuid, incarnation: l.incarnation, up: true, client: l.client }
+        const peerSig = Object.keys(peers).sort().map((u) => u + '~' + peers[u].incarnation + (peers[u].client ? 'c' : '')).join(' ')
         if (peerSig !== lastPeers) { lastPeers = peerSig; cluster.set('peers', peers) }
       }
       if (node.scope) lastScopeN = node.scope.n
