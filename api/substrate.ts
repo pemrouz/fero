@@ -162,7 +162,16 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
   new Proxy(Object.create(null) as Record<string | symbol, unknown>, {
     get(_t, prop) {
       if (prop === LENS) return h
-      if (typeof prop === 'symbol') return h[prop] // [value] / [node] / iterator / toPrimitive
+      //! a lens COERCES to its cell (ISSUES I-25): data's handle answers Symbol.toPrimitive with its
+      // debug label, so `data.k = data.k + 1` committed the STRING '[data source#1 .k]1' and `data.k++`
+      // committed NaN — both replicated, nothing threw. Now a primitive coerces as itself (an absent cell
+      // is undefined: NaN in arithmetic, exactly as a plain object's missing field), and an object as a
+      // plain object would (String(v) / Number(v)) — never a label into a cell. `data.k++` therefore reads
+      // k and routes k+1 through the set trap below.
+      if (prop === Symbol.toPrimitive)
+        return (hint: string) => { const v = h[VALUE]; return v !== null && typeof v === 'object' ? (hint === 'number' ? Number(v) : String(v)) : v }
+      if (typeof prop === 'symbol') return h[prop] // [value] / [node] / iterator
+      if (prop === 'valueOf') return () => h[VALUE]
       if (prop === 'then')
         //! v2 parity: await data (or any child) resolves its current snapshot. then is
         // consume-once per touch; a method handler returning a lens is guarded by the
