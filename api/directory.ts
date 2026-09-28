@@ -109,7 +109,9 @@ export const MAX_PER_CALLER = 4096
 // link is still open), and only the current owner's death drops it. `registry` is the data proxy
 // `lookup` hands out as live child views (rows are never removed — a whole-row remove does not
 // stream to a child-view subscriber — only fields are).
-export const hostMethods = (peersOf: () => Peers): { methods: Record<string, (a: unknown, ctx: Context) => unknown>; onPeers: () => void } => {
+//! `selfOf` is the host's own uuid once it exists: a local invoke carries it as ctx.peer (api/methods.ts),
+// and the host refuses to register under itself — the wire stays the only way in.
+export const hostMethods = (peersOf: () => Peers, selfOf: () => string | undefined = () => undefined): { methods: Record<string, (a: unknown, ctx: Context) => unknown>; onPeers: () => void } => {
   const registry: any = proxy({})
   const owners = new Map<string, Set<string>>()
   const owner = new Map<string, string>()
@@ -152,7 +154,7 @@ export const hostMethods = (peersOf: () => Peers): { methods: Record<string, (a:
         if (typeof name !== 'string' || name === '' || name.startsWith('#')) throw new Error('register: name must be a non-empty user resource name (no # prefix)')
         if (typeof uuid !== 'string' || uuid === '' || uuid.includes('~')) throw new Error('register: uuid must be a non-empty string without ~')
         if (!isAddr(listen)) throw new Error("register: listen must be 'host:port' with a non-empty host and a port 1–65535")
-        if (ctx.peer === undefined) throw new Error('register: only a directory client may register (no caller identity)')
+        if (ctx.peer === undefined || ctx.peer === selfOf()) throw new Error('register: only a directory client may register (no caller identity)')
         let mine = owners.get(ctx.peer)
         if (!mine) owners.set(ctx.peer, (mine = new Set()))
         const k = key(name, uuid)
@@ -300,7 +302,9 @@ export class Directory {
     if (this.#destroyed) return
     if (code !== null) { this.#fails++; if (code !== 'EADDRINUSE') this.#setError(`bind ${o.addr}: ${code}`); return }
     let host: Fero | null = null
-    const { methods, onPeers } = hostMethods(() => (host ? (snapshot(host.cluster) as { peers: Peers }).peers ?? {} : {}))
+    const { methods, onPeers } = hostMethods(
+      () => (host ? (snapshot(host.cluster) as { peers: Peers }).peers ?? {} : {}),
+      () => (host ? (snapshot(host.cluster) as { me: { uuid: string } }).me.uuid : undefined))
     try {
       //! `methods:` makes the directory PROTECTED (V4-5): its clients only ever CALL register/lookup, so a
       // stray plain write into the box's directory is refused at the relay, never folded

@@ -285,7 +285,7 @@ test('two names on one box never collide, never cross-talk, and the diagnostics 
     assert.equal(d.client?.name, '#directory')
     assert.equal(diag(b)!.rendezvous()!.host, null, 'the second does not')
     assert.equal(diag(ca)!.rendezvous()!.client?.name, '#directory')
-    //! the host's register refuses a local invoke (no caller identity) — the wire is the only way in
+    //! the host's register refuses a local invoke (its ctx.peer is the host itself) — the wire is the only way in
     await assert.rejects(d.host!.methods.register({ name: 'x', uuid: 'u', listen: '127.0.0.1:9' }), /no caller identity/)
   } finally { await settle([ca, cb, a, b]) }
 })
@@ -306,7 +306,7 @@ test('a user resource misdialing the rendezvous is refused by the name echo and 
   } finally { await settle([mis, s]) }
 })
 
-test('Context.peer: a wire call carries the caller uuid, a local invoke carries none', async () => {
+test("Context.peer: a wire call carries the caller uuid, a local invoke carries the server's own", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
   let s: Fero | undefined, c: Fero | undefined
   try {
@@ -314,7 +314,7 @@ test('Context.peer: a wire call carries the caller uuid, a local invoke carries 
     c = await fero(`peer-${process.pid}`, { hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous: false })
     assert.ok(await until(() => peers(c!) === 1))
     assert.equal(await c.methods.who(), me(c).uuid)
-    assert.equal(await s.methods.who(), null)
+    assert.equal(await s.methods.who(), me(s).uuid, 'the server IS the caller of its own call')
   } finally { await settle([c, s]) }
 })
 
