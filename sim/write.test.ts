@@ -40,7 +40,7 @@ test('AA#1 lost-ACK: the owner committed but the WACK died with the link — the
   // complete the route without a second commit
   assert.equal(nodes[1].logs.get('n02')!.filter((e) => JSON.stringify(e.rec.key) === key('aa1')).length, 1, 'exactly-once at the commit site')
   assert.equal(nodes[0].writes.pending.size, 0, 'the route completed despite the lost WACK')
-  assert.ok(jk(nodes[0], JK.writeAck).length >= 1, 'the issuer observed the commit (replication-ACK or duplicate WACK)')
+  assert.equal(jk(nodes[0], JK.writeAck).length, 1, 'the issuer observed the commit ONCE — replication-ACK or the re-sent WACK, whichever landed first; the other clears nothing and journals nothing')
   assert.equal(nodes[0].logs.get('n01'), undefined, 'v2 would have fallen back to a LOCAL commit here — that path no longer exists')
   assert.equal(converged(sim), null)
   assert.deepEqual(sim.violations, [], 'single-writer + attempt-exactly-once held through the whole ambiguity window')
