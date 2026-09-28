@@ -72,7 +72,11 @@ test('SCOPED §9 equivalence: operators throw TYPED ScopedError (never a silent 
       assert.equal(se.scoped, true)
       assert.equal(se.reason, 'holistic')
       assert.ok(se.hint.includes('methods.read'), 'the hint names the materialize-first path')
+      //! the hint is a recipe that RUNS (I-26): read() is a plain object, the rows are Object.values(…)
+      assert.ok(se.hint.includes('Object.values(await methods.read()).filter('), `a true recipe, not (await methods.read()).filter: ${se.hint}`)
     }
+    const evens = Object.values(await (nodes[0].methods.read() as Promise<Record<string, { v: number }>>)).filter((r) => r.v % 2 === 0)
+    assert.deepEqual(evens.map((r) => r.v).sort(), [0, 2, 4], 'the recipe from the hint folds the WHOLE resource\'s rows')
     //! v4.1 f.snapshot on an ARMED scoped node: a sync local read could only be the shard — same rule, typed
     try {
       void nodes[0].snapshot
