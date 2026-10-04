@@ -8,8 +8,8 @@ One page. Where fero stands, what is broken, what is worth doing, and what has b
 - `npm test`: 495 tests plus the 18-clause `data` contract. `npm run perf`: 43 pins. All green on 2026-09-28.
 - The example series is complete: 26 rungs, 01 to 43 ([examples/README.md](examples/README.md)).
 - On 2026-09-28 the ledgers were folded into this page and 42 small bugs and warts were fixed in one pass (V4-13 below). What is left here is what still needs a decision or real work.
-- The website (`~/fero-site`, outside this repo) shows rung 02 only and does not link the example index yet.
-- No git remote, so no CI. The perf baseline is advisory on this WSL2 box; a pinned baseline needs a quiet runner.
+- The website lives in [site/](site): one page that runs fero's real kernel and simulator in the tab. The root `index.html` sends GitHub Pages there, the same way `data` does it.
+- The remote is github.com/pemrouz/fero, branch `main`. Its `master` is still the 2017 fero 1.x code. No CI yet. The perf baseline is advisory on this WSL2 box; a pinned baseline needs a quiet runner.
 
 ## Bugs
 
@@ -53,7 +53,7 @@ What happens, where, and the fix if one is known. The evidence behind each line 
 - **The kernel tune table.** MAX_REDIALS, SUSPECT_TICKS, LEAVE_TICKS, the backoff cap and the queue bounds are constants. One frozen `tune` object built in the Node constructor, defaults equal to today's constants so the sweep bytes stay identical, hot sites reading a field. Land only with an A/B on the write, node and alloc perf pins. Design: [docs/DESIGN-CONFIG.md](docs/DESIGN-CONFIG.md) §7 step 7.
 - **`cluster.writes` out of the cluster tap's domain, and on time.** The confirm ring lives in the same view as `members`, so a bare `cluster.tap` fires on every write outcome, and it lags the value by one kernel step (a screen reads `pending` above an object that already holds the row, for up to `heartbeat.ms`). Publish the ring from a microtask on every outcome and give it its own proxy behind the `cluster.writes` getter.
 - **A client can knock out a member's link by claiming its uuid.** A client's hello that presents a member's uuid trips the duplicate-link rule against the real member. The write-plane holes around it are closed (V4-4, V4-5) and a spoke can no longer teach a view (I-23); what is left is peer authentication proper, post-1.0.
-- **A pinned quiet runner and a git remote.** No remote means no CI; the perf baseline machinery is ready for a pinned box. Then the real v2-vs-v4 socket A/B, with p99s.
+- **CI and a pinned quiet runner.** The remote exists but runs nothing yet; the perf baseline machinery is ready for a pinned box. Then the real v2-vs-v4 socket A/B, with p99s.
 - **Every admit ships each missing suffix twice.** Both ends send an r=1 digest on admit, so a join costs twice its bytes. Let the lower uuid open the exchange, or remember the tail shipped per link. A sim golden and the AE perf pin move with it.
 - **A HELLO-carried hash of the cluster-contract keys** (`heartbeat.ms`, `replicas`, `seams.validation`). One member's shell can set them alone since V4-10; a mismatch shows as behaviour, not as a refusal at the door.
 
