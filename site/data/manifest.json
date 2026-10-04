@@ -1,0 +1,79 @@
+{
+ "builtAt": "2026-10-03T11:09:29.661Z",
+ "head": "f196de0",
+ "branch": "v4",
+ "version": "4.0.0",
+ "dependencies": [
+  "optcascade"
+ ],
+ "node": "22.18",
+ "license": {
+  "declared": "MIT",
+  "file": false
+ },
+ "remote": false,
+ "examples": [
+  "01-two-servers",
+  "02-server-client",
+  "03-one-write",
+  "04-rows",
+  "05-views",
+  "06-numbers",
+  "07-ordered",
+  "08-methods",
+  "09-live",
+  "10-confirm",
+  "11-validation",
+  "12-durable",
+  "13-cluster-of-three",
+  "14-failover",
+  "15-static-topology",
+  "16-scoped",
+  "17-lww-honesty",
+  "20-inside",
+  "21-journal",
+  "22-time-travel",
+  "23-live",
+  "30-fleet-audit",
+  "40-chat",
+  "41-kanban",
+  "42-web-bridge",
+  "43-ledger"
+ ],
+ "checks": 26,
+ "kernel": {
+  "modules": 20,
+  "bytes": 529616,
+  "head": "f196de0"
+ },
+ "npm": {
+  "fero": "1.7.1",
+  "data": "4.0.0"
+ },
+ "test": {
+  "at": "2026-10-03T03:00:29+01:00",
+  "fero": {
+   "tests": 495,
+   "pass": 495,
+   "fail": 0
+  },
+  "contract": {
+   "tests": 18,
+   "pass": 18,
+   "fail": 0
+  },
+  "exit": 0
+ },
+ "perf": {
+  "at": "2026-10-03T12:08:37+01:00",
+  "tests": 43,
+  "pass": 43,
+  "fail": 0
+ },
+ "sim": {
+  "seeds": 1000,
+  "green": 1000,
+  "events": 237451,
+  "line": "1000/1000 seeds green · 3 nodes · 40 writes/run · 237,451 events"
+ }
+}

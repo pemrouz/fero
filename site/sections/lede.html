@@ -1,0 +1,88 @@
+<section class="lede" id="lede" aria-label="fero: plain assignment replicates">
+  <div class="opt" data-section="lede">
+
+    <!-- a · the concept. The card is the house cluster (cluster.js `page`): it follows every write to gadgets, the
+         record is decoded from the frame the writer actually sent, and every row is read from that node's kernel. -->
+    <div data-variant="a" data-label="the concept">
+      <p class="kicker">one assignment, one record</p>
+      <h1 class="headline">Plain assignment <em>replicates</em>.</h1>
+      <div class="lede-grid">
+        <div class="lede-text">
+          <p class="standfirst"><code>await fero(name)</code> gives you a live object. Read it like a plain object. Change it by plain assignment. Derive live views from it. Every process that opens the same name sees the same object, on one box or across a cluster.</p>
+          <p class="lede-sub">fero's own examples build a shop, a chat room, a kanban board and a ledger. Each row (a top-level key) has one <b>owner</b>: the one server that stamps its writes. Your assignment becomes one record. The owner gives it a <b>stamp</b>: the number of the <b>view</b> (the agreed list of servers, which only a vote changes), a counter and its name. Then the record lands on every copy. Nothing shows before it commits, and nothing merges.</p>
+        </div>
+        <figure class="lede-fig" aria-label="shop: one write, every copy. The latest write to gadgets, the record it becomes, and that row on every node, read from fero's kernel running in this tab">
+          <div class="fig-head">
+            <span class="fig-src">shop <span class="lf-clock"></span></span>
+            <span class="fig-head-r"><span class="lf-view"></span></span>
+          </div>
+          <div class="fig-io">
+            <div class="fig-line"><span class="fig-lab">write</span><span class="lf-write"><span class="dim">…</span></span></div>
+            <div class="fig-line"><span class="fig-lab">record</span><span class="lf-rec"><span class="dim">…</span></span></div>
+            <p class="fig-hint"><span class="lf-hint">the page posts the record this line becomes</span></p>
+          </div>
+          <div class="fig-scroll" data-scroll-x><table class="fig-table">
+            <thead><tr><th scope="col" class="c-node">node</th><th scope="col" class="c-role">role</th><th scope="col" class="c-val"><span class="lf-rowname">gadgets</span><span class="ph-only"> · stamp</span></th><th scope="col" class="c-stamp" title="the stamp: the view number, the owner's counter, the owner's name. A copy keeps the record with the biggest stamp.">stamp</th><th scope="col" class="c-land" title="when this copy applied the record, counted from the moment the owner stamped it; simulated time over simulated links">landed</th></tr></thead>
+            <tbody class="lf-rows"><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr></tbody>
+          </table></div>
+          <div class="fig-foot"><span class="lf-foot">…</span></div>
+        </figure>
+      </div>
+      <div class="cta lede-cta">
+        <span class="lede-status pending" title="this version of fero has no npm release and no public repository yet, checked when this page was built">fero <b class="lede-major">·</b> · not published yet</span>
+        <button class="install lede-copy" type="button" data-copy="const shop = await fero('shop', { data: { widgets: { stock: 3 } } })" title="click to copy: the first fero() call in the README's shape block" aria-label="Copy this line from the README"><code><span class="t-kw">const</span> shop <span class="t-p">=</span> <span class="t-kw">await</span> fero<span class="t-p">(</span><span class="tok-str">'shop'</span><span class="t-p">, {</span> <span class="t-k">data</span><span class="t-p">: {</span> <span class="t-k">widgets</span><span class="t-p">: {</span> <span class="t-k">stock</span><span class="t-p">:</span> <span class="tok-num">3</span> <span class="t-p">} } })</span></code></button>
+        <!-- the links travel together: where the row is short of room they drop to the next line as one group -->
+        <span class="lede-links">
+          <a class="cta-link" href="#break">break it ↓</a>
+          <a class="cta-link" href="#start">from zero ↓</a>
+          <!-- held until data/lede/links.json (tools/lede-links.mjs) finds the data site free of CONCEPT §8's claims about fero -->
+          <a class="cta-link lede-datalink" href="https://pemrouz.github.io/data/" target="_blank" rel="noopener" hidden>data ↗</a>
+        </span>
+      </div>
+      <p class="trust lede-trust"></p>
+    </div>
+
+    <!-- b · the application. The same card, plus one button that crashes the owner of gadgets (or restarts it).
+         The story lines print only when the kernel produces them (journal rows, views, stamps).
+         `hidden` here keeps the default page from painting both variants before variants.js picks one. -->
+    <div data-variant="b" data-label="the application" hidden>
+      <p class="kicker">one row, one writer</p>
+      <h1 class="headline lede-h-b">Kill the owner.<br class="br-wide"> The write still <em>lands</em>.</h1>
+      <div class="lede-grid lede-grid-b">
+        <div class="lede-text">
+          <p class="standfirst">Each row (a top-level key) has one <b>owner</b>: the one server that stamps its writes. Kill it, and a write to its row waits. Nothing shows early.</p>
+          <p class="lede-sub">The other servers vote the dead one out: a new <b>view</b> (the agreed list of servers). A survivor takes the row and gives the write its <b>stamp</b>: the view number, a counter and its name. The write lands on every live copy. That needs a majority: two servers cannot survive a crash, so run three. <button class="act lb-btn" type="button" disabled title="the servers are still voting">crash the owner ▸</button></p>
+        </div>
+        <figure class="lede-fig" aria-label="shop: one write, every copy. The latest write to gadgets, the record it becomes, and that row on every node, read from fero's kernel running in this tab">
+          <div class="fig-head">
+            <span class="fig-src">shop <span class="lf-clock"></span></span>
+            <span class="fig-head-r"><span class="lf-view"></span></span>
+          </div>
+          <div class="fig-io">
+            <div class="fig-line"><span class="fig-lab">write</span><span class="lf-write"><span class="dim">…</span></span></div>
+            <div class="fig-line"><span class="fig-lab">record</span><span class="lf-rec"><span class="dim">…</span></span></div>
+            <p class="fig-hint"><span class="lf-hint">the page posts the record this line becomes</span></p>
+          </div>
+          <div class="fig-scroll" data-scroll-x><table class="fig-table">
+            <thead><tr><th scope="col" class="c-node">node</th><th scope="col" class="c-role">role</th><th scope="col" class="c-val"><span class="lf-rowname">gadgets</span><span class="ph-only"> · stamp</span></th><th scope="col" class="c-stamp" title="the stamp: the view number, the owner's counter, the owner's name. A copy keeps the record with the biggest stamp.">stamp</th><th scope="col" class="c-land" title="when this copy applied the record, counted from the moment the owner stamped it; simulated time over simulated links">landed</th></tr></thead>
+            <tbody class="lf-rows"><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr></tbody>
+          </table></div>
+          <div class="fig-foot"><span class="lf-foot">…</span><p class="lede-settings lb-settings">simulated clock · here: <b>heartbeat <span class="s-hb" data-ph="··· ms">··· ms</span></b>, <b>redial <span class="s-rd" data-ph="·· ms">·· ms</span></b> · at fero's defaults (<b>heartbeat <span class="s-dhb" data-ph="··· ms">··· ms</span></b>, <b>redial <span class="s-drd" data-ph="··· ms">··· ms</span></b>) a crashed server was voted out after <b><span class="s-z" data-ph="··.· s">··.· s</span></b> · <span class="nw">own run · seed <b class="s-seed" data-ph="·">·</b></span></p></div>
+        </figure>
+        <div class="lede-storybox"><ol class="lede-story lb-story" aria-label="what the kernel did, line by line"></ol></div>
+      </div>
+      <div class="cta lede-cta">
+        <span class="lede-status pending" title="this version of fero has no npm release and no public repository yet, checked when this page was built">fero <b class="lede-major">·</b> · not published yet</span>
+        <button class="install lede-copy" type="button" data-copy="const shop = await fero('shop', { data: { widgets: { stock: 3 } } })" title="click to copy: the first fero() call in the README's shape block" aria-label="Copy this line from the README"><code><span class="t-kw">const</span> shop <span class="t-p">=</span> <span class="t-kw">await</span> fero<span class="t-p">(</span><span class="tok-str">'shop'</span><span class="t-p">, {</span> <span class="t-k">data</span><span class="t-p">: {</span> <span class="t-k">widgets</span><span class="t-p">: {</span> <span class="t-k">stock</span><span class="t-p">:</span> <span class="tok-num">3</span> <span class="t-p">} } })</span></code></button>
+        <span class="lede-links">
+          <a class="cta-link" href="#break">break it ↓</a>
+          <a class="cta-link" href="#start">from zero ↓</a>
+          <a class="cta-link lede-datalink" href="https://pemrouz.github.io/data/" target="_blank" rel="noopener" hidden>data ↗</a>
+        </span>
+      </div>
+      <p class="trust lede-trust"></p>
+    </div>
+
+  </div>
+  <span class="sr-only lede-live" aria-live="polite"></span>
+</section>

@@ -1,0 +1,80 @@
+<section class="fsec" id="start">
+  <div class="opt" data-section="start">
+
+    <!-- ── a · example 02: the two files, a live margin, a real run, the series ─────────────────── -->
+    <div data-variant="a" data-label="the two files" id="start-a">
+      <div class="sec-head">
+        <span class="sec-no">03</span><h2>From zero</h2>
+        <span class="st-chip st-pub" title="the build checks npm and the repo: fero 4 is not on npm and the repository has no public remote">fero <b data-b="major"></b> · not published yet</span>
+      </div>
+
+      <div class="st-top">
+        <p class="lead-para"><span class="st-pub">fero <span data-b="major"></span> is not published yet, and its repository is not public yet, so today it runs from a checkout.</span> It also needs <code>data</code>, the engine fero's live views come from, checked out beside it (<code>../data</code>). <code>npm install</code> fetches its one npm dependency, and <span class="nw">Node <span data-b="node"></span></span> or later runs the <code>.ts</code> files as they are (<span class="nw">on Node <span data-b="node23line"></span>,</span> <span class="nw"><span data-b="node23"></span> or later</span>).</p>
+        <p class="st-intro">The two files below are in <code class="st-dirname" data-b="exdir"></code> at <span data-b="head"></span>. Each <span class="st-arrow">// →</span> note is read live from the cluster above. The files write on timers; here, <b>run this line ▸</b> posts the record its line becomes, and the note follows it.</p>
+      </div>
+
+      <div class="st-files" data-files></div>
+      <div class="st-rec st-rec-tl" data-rec></div>
+
+      <!-- three options, spelled as in fero's README: what turns on the disk the page restarts from, the door, and
+           scoped replication (facts.md §1 19–21, §3). Static: the page runs none of them as fero() would -->
+      <div class="st-head st-head-opts">
+        <span class="race-title">three more options</span>
+        <span class="st-path">spelled as in fero's README · any of them also makes a process a server</span>
+      </div>
+      <dl class="st-opts">
+        <div class="st-opt"><dt><code>dir: './state'</code></dt><dd>A disk: a write-ahead log and a boot record. Run the same file again and it is the same node in its next life, its rows back before it has a socket. The page's servers each have one, and the <i>restart from disk</i> and <i>pull every plug</i> chips in <a href="#break">break it</a> read it back.</dd></div>
+        <div class="st-opt"><dt><code>methods: { … }</code></dt><dd>Functions that run on the server. Declaring them is the door: clients then change data only through them, and a client's plain write is refused. Reads stay open. The page runs no methods.</dd></div>
+        <div class="st-opt"><dt><code>replicas: 2</code></dt><dd>Each row lives on exactly two members, its holders, not on every member. In <a href="#contract">the contract</a>, the rules marked <i>only with replicas</i> are about it.</dd></div>
+      </dl>
+
+      <div class="st-head st-head-series">
+        <span class="race-title">the series · <span data-b="rungs"></span> rungs</span>
+        <span class="st-path">each a folder of terminals and a check that must end <code>ok</code> · <span data-rung-hint>hover a rung for its lesson</span></span>
+      </div>
+      <div class="st-rungs" data-rungs aria-label="the example series"></div>
+      <p class="st-rungs-foot" data-rungs-foot></p>
+    </div>
+
+    <!-- ── b · the README's shape block, with the same live margin ──────────────────────────────── -->
+    <div data-variant="b" data-label="the README shape" id="start-b">
+      <div class="sec-head">
+        <span class="sec-no">03</span><h2>From zero</h2>
+        <span class="st-chip st-pub" title="the build checks npm and the repo: fero 4 is not on npm and the repository has no public remote">fero <b data-b="major"></b> · not published yet</span>
+      </div>
+
+      <div class="st-top">
+        <p class="lead-para"><span class="st-pub">fero <span data-b="major"></span> is not published yet, and its repository is not public yet, so today it runs from a checkout.</span> It also needs <code>data</code>, the engine fero's live views come from, checked out beside it (<code>../data</code>). <code>npm install</code> fetches its one npm dependency, and <span class="nw">Node <span data-b="node"></span></span> or later runs the <code>.ts</code> files as they are (<span class="nw">on Node <span data-b="node23line"></span>,</span> <span class="nw"><span data-b="node23"></span> or later</span>).</p>
+        <p class="st-intro">Below is the shape block from fero's README at <span data-b="head"></span>, its checkout comment kept. A <span class="st-arrow">// →</span> note under a line is read live from the cluster above; <b>run this line ▸</b> posts the record the line becomes, and the note follows it.</p>
+      </div>
+
+      <div class="st-files st-files-one" data-files></div>
+
+      <div class="st-head st-head-rec">
+        <span class="race-title">recorded from a real run</span>
+        <span class="st-path"><span data-b="recorded"></span> · example <span data-b="exno"></span> runs the same two roles as two processes on one box</span>
+      </div>
+      <div class="st-rec" data-rec></div>
+
+      <!-- three options, spelled as in fero's README: what turns on the disk the page restarts from, the door, and
+           scoped replication (facts.md §1 19–21, §3). Static: the page runs none of them as fero() would -->
+      <div class="st-head st-head-opts">
+        <span class="race-title">three more options</span>
+        <span class="st-path">spelled as in fero's README · any of them also makes a process a server</span>
+      </div>
+      <dl class="st-opts">
+        <div class="st-opt"><dt><code>dir: './state'</code></dt><dd>A disk: a write-ahead log and a boot record. Run the same file again and it is the same node in its next life, its rows back before it has a socket. The page's servers each have one, and the <i>restart from disk</i> and <i>pull every plug</i> chips in <a href="#break">break it</a> read it back.</dd></div>
+        <div class="st-opt"><dt><code>methods: { … }</code></dt><dd>Functions that run on the server. Declaring them is the door: clients then change data only through them, and a client's plain write is refused. Reads stay open. The page runs no methods.</dd></div>
+        <div class="st-opt"><dt><code>replicas: 2</code></dt><dd>Each row lives on exactly two members, its holders, not on every member. In <a href="#contract">the contract</a>, the rules marked <i>only with replicas</i> are about it.</dd></div>
+      </dl>
+
+      <div class="st-head st-head-series">
+        <span class="race-title">the series · <span data-b="rungs"></span> rungs</span>
+        <span class="st-path">each a folder of terminals and a check that must end <code>ok</code> · <span data-rung-hint>hover a rung for its lesson</span></span>
+      </div>
+      <div class="st-rungs" data-rungs aria-label="the example series"></div>
+      <p class="st-rungs-foot" data-rungs-foot></p>
+    </div>
+
+  </div>
+</section>

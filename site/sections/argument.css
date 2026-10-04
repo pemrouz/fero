@@ -1,0 +1,270 @@
+/* sections/argument.css — §01 The argument. data's argument strip (sections/argument.css on the data site),
+   five cards wide, plus fero's confirm ladder (a) and a frame log (b).
+   Colour means state, never identity: the accent is the write and the stamp its owner gives it (the card the
+   write is in; the fresh stamp; the owner's ★); --pos = a copy holds the stamp / a rung is proven;
+   --wait = a write that waits; --neg = down. Every state also carries a word or a shape. Node names are ink. */
+
+/* fero.css sizes .rec and .nid for standalone use; inside this section's panels they take the panel's type */
+#argument .rec { font: inherit; }
+#argument .arg-cell-v .nid, #argument .arg-note .nid, #argument .arg-subject .nid, #argument .arg-status .nid { font-size: inherit; }
+#argument .arg-cell[hidden] { display: none; }
+
+/* ---- the head line over the figure ---- */
+#argument .arg-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.35rem 1rem; margin: 1.4rem 0 0.55rem; }
+#argument .arg-kick { font: 500 0.7rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+#argument .arg-where { font: 0.72rem var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
+#argument .arg-where b { font-weight: 500; color: var(--dim); }
+#argument .arg-where .waiting { color: var(--wait); }
+/* the cards (b: the frame list) are behind the live cluster while they play a write back (the centrepiece's slow-motion pill) */
+#argument .arg-slow { font: 500 0.62rem var(--mono); color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 0.05rem 0.5rem; letter-spacing: 0.02em; }
+
+/* ---- a · the strip ---- */
+#argument .arg-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) auto minmax(0, 1.1fr) auto minmax(0, 0.95fr) auto minmax(0, 1.05fr) auto minmax(0, 1.4fr);
+  align-items: stretch;
+  gap: 0.35rem;
+}
+#argument .arg-card {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-2);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 0.75rem 0.75rem 0.7rem;
+  transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+#argument .arg-k { font: 500 0.7rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); transition: color 160ms ease; }
+#argument .arg-k-row { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+#argument .arg-k-note { font-size: 0.62rem; letter-spacing: 0.04em; text-transform: none; color: var(--faint); }
+#argument .arg-code {
+  display: block;
+  font: 0.7rem/1.55 var(--mono);
+  color: var(--ink);
+  white-space: pre;
+  overflow-x: auto;
+  margin: 0;
+}
+#argument .arg-code .tok-path { color: var(--accent); }
+#argument .arg-recbox .rec { font: inherit; }
+#argument .arg-sub {
+  margin-top: auto;
+  padding-top: 0.3rem;
+  font: 0.7rem/1.45 var(--mono);
+  color: var(--faint);
+  text-wrap: pretty;
+}
+#argument .arg-sub b { color: var(--dim); font-weight: 500; }
+#argument .arg-arrow { align-self: center; justify-self: center; font: 500 1.05rem/1 var(--mono); color: var(--faint); transition: color 160ms ease; }
+#argument .arg-arrow::before { content: '→'; }
+
+/* key/value panels inside a card (data's .arg-cell) */
+#argument .arg-cell {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem;
+  padding: 0.28rem 0.45rem;
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 3px;
+  font: 0.72rem var(--mono);
+  min-width: 0;
+}
+#argument .arg-cell-k { color: var(--faint); white-space: nowrap; }
+#argument .arg-cell-v { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; border-radius: 2px; }
+#argument .arg-cell-v.dimv { color: var(--dim); font-weight: 400; }
+#argument .arg-cell-v .rec, #argument .arg-cell-v .p { font: inherit; }
+#argument .arg-cell-v .stamp { font-size: 0.68rem; padding: 0 0.3rem; }
+#argument .arg-cell.col { flex-direction: column; align-items: flex-start; gap: 0.2rem; }
+#argument .arg-cell.col .arg-cell-v { max-width: 100%; }
+
+/* owner */
+#argument .arg-big { font: 500 1.35rem/1.1 var(--mono); color: var(--ink); letter-spacing: -0.01em; white-space: nowrap; }
+#argument .arg-big .nid { font: inherit; }
+#argument .arg-big .was { font: 0.72rem var(--mono); color: var(--faint); margin-left: 0.4rem; letter-spacing: 0; }
+#argument .arg-note { font: 0.7rem/1.45 var(--mono); color: var(--dim); margin-top: -0.25rem; text-wrap: pretty; }
+#argument .arg-note:empty { display: none; }
+#argument .arg-note.waiting { color: var(--wait); }
+/* OWNER grows the most through a write (a second note line while it waits, a third row under it): the card keeps
+   room for its tallest state, so the strip holds one height from rest to done. The spare room sits above the ring line. */
+/* measured: its tallest state is 16.33rem wide-screen, after a vote and before the stamp (the hop to the new owner in
+   flight, wrapping under its label, plus "sent again") */
+#argument .arg-card[data-step="owner"] { min-height: 16.35rem; }
+#argument .arg-hops { display: flex; flex-direction: column; gap: 0.25rem; }
+#argument .arg-hop { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 0.4rem; padding: 0.24rem 0.45rem; background: var(--bg); border: 1px solid var(--rule); border-radius: 3px; font: 0.72rem var(--mono); }
+#argument .arg-hop b { font-weight: 500; color: var(--ink); white-space: nowrap; }
+/* margin-left: auto — a value that does not fit beside its label drops under it, never clips */
+#argument .arg-hop i { margin-left: auto; font-style: normal; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#argument .arg-hop i.agree-ok { color: var(--pos); }  /* every server names the same owner */
+#argument .arg-hop i.waiting { color: var(--wait); }  /* they do not, yet (a view is still being installed) */
+#argument .arg-hop.pending i { color: var(--faint); }
+#argument .arg-hop.held { border-style: dashed; }
+#argument .arg-hop.held i { color: var(--wait); }
+#argument .arg-hop.again { background: transparent; border-color: transparent; padding-top: 0; padding-bottom: 0; }
+#argument .arg-hop.again b, #argument .arg-hop.again i { color: var(--faint); font-weight: 400; }
+
+/* stamp */
+#argument .arg-stampbox { display: block; min-height: 1.4rem; }
+#argument .arg-stampbox .stamp { font-size: 0.74rem; padding: 0.12rem 0.4rem; }
+#argument .arg-legend { font: 0.66rem var(--mono); color: var(--faint); margin-top: -0.3rem; letter-spacing: 0.02em; text-wrap: balance; }
+#argument [data-step="stamp"] .arg-note { color: var(--faint); margin-top: 0; }
+#argument [data-step="stamp"] .arg-note .nid { color: var(--dim); }
+
+/* every copy */
+#argument .arg-copies { display: flex; flex-direction: column; gap: 0.25rem; }
+#argument .arg-copy {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 0.45rem;
+  padding: 0.24rem 0.45rem; background: var(--bg); border: 1px solid var(--rule); border-radius: 3px;
+  font: 0.72rem var(--mono);
+}
+#argument .arg-copy .nid { font-size: inherit; }
+#argument .arg-copy .v { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#argument .arg-copy .v .rec, #argument .arg-copy .v .p { font: inherit; }
+#argument .arg-copy .t { color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#argument .arg-copy.old .v { opacity: 0.55; }
+#argument .arg-copy.old .t { color: var(--faint); }
+#argument .arg-copy.waiting .t { color: var(--wait); }
+#argument .arg-copy.cut .t { color: var(--neg); cursor: help; }   /* cut off: red, like the hero's LANDED and down ✕ */
+#argument .arg-copy.holds { border-color: color-mix(in srgb, var(--pos) 35%, var(--rule)); }
+#argument .arg-copy.is-down { opacity: 0.5; }
+#argument .arg-copy.is-down .nid { text-decoration: line-through; text-decoration-color: var(--neg); }
+#argument .arg-copy.is-down .t { color: var(--neg); }
+#argument .arg-agree { font: 0.72rem var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+#argument .arg-agree.agree-ok { color: var(--pos); }
+#argument .arg-agree.waiting { color: var(--wait); }
+
+/* ---- where the write is: its card lit (on the kernel's own timeline, played back), the cards ahead dimmed ---- */
+#argument .arg-card.wait { opacity: 0.45; }
+#argument .arg-card.lit { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
+#argument .arg-card.lit .arg-k { color: var(--accent); }
+#argument .arg-card.held { border-color: color-mix(in srgb, var(--wait) 55%, var(--rule)); }
+#argument .arg-card.held .arg-k { color: var(--wait); }
+#argument .arg-arrow.lit { color: var(--accent); }
+
+/* ---- run row + status (data's .arg-run) ---- */
+/* baseline-aligned and packed at the top: the status may take one line or three, the button never moves */
+#argument .arg-run { display: flex; flex-wrap: wrap; align-items: baseline; align-content: flex-start; gap: 0.6rem 0.75rem; margin: 0.85rem 0 0; }
+#argument .arg-run + .muted { margin-top: 1.25rem; }
+#argument .arg-run .stream-btn { margin-left: 0; font-size: 0.76rem; padding: 0.38rem 0.75rem; color: var(--ink); }
+#argument .arg-run .stream-btn:hover:not([aria-disabled="true"]) { color: var(--accent); border-color: var(--accent); }
+/* busy: dimmed but still focusable (aria-disabled, never `disabled`, so the keyboard keeps its place) */
+#argument .arg-run .stream-btn[aria-disabled="true"] { color: var(--faint); border-color: var(--rule); cursor: default; }
+#argument .arg-status { font: 0.72rem/1.5 var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; flex: 1 1 22rem; min-width: 0; text-wrap: pretty; }
+#argument .arg-status b { font-weight: 500; color: var(--dim); }
+#argument .arg-status code { font: inherit; color: var(--dim); white-space: nowrap; } /* the posted line never breaks inside its { } */
+#argument .arg-status .waiting { color: var(--wait); }
+#argument .arg-status .broken { color: var(--neg); }
+
+/* ---- a · the confirm ladder: three lamps ---- */
+#argument .arg-ladder-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.75rem; margin: 0.9rem 0 0.4rem; }
+#argument .arg-ladder-k { font: 500 0.66rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+#argument .arg-ladder-note { font: 0.7rem/1.45 var(--mono); color: var(--faint); }
+#argument .arg-ladder {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 0.4rem;
+  margin: 0 0 1.25rem;
+}
+#argument .arg-rung {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 0.1rem 0.5rem;
+  padding: 0.4rem 0.6rem; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 6px;
+  font: 0.72rem/1.45 var(--mono); min-width: 0; align-content: start;
+}
+#argument .arg-rung .arg-rung-v { grid-column: 2 / 4; }
+#argument .arg-rung-t { color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#argument .arg-rung b { font-weight: 500; color: var(--dim); white-space: nowrap; }
+#argument .arg-rung-v { color: var(--faint); min-width: 0; }
+#argument .arg-rung-v b { color: var(--ink); font-weight: 500; }
+#argument .arg-lamp { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; border: 1px solid var(--faint); transform: translateY(-0.02rem); }
+#argument .arg-rung.on { border-color: color-mix(in srgb, var(--pos) 40%, var(--rule)); }
+#argument .arg-rung.on .arg-lamp { background: var(--pos); border-color: var(--pos); }
+#argument .arg-rung.on b { color: var(--pos); }
+#argument .arg-rung.on .arg-rung-v { color: var(--dim); }
+#argument .arg-rung.asking .arg-lamp { border-color: var(--wait); }
+#argument .arg-rung.asking b { color: var(--wait); }
+#argument .arg-rung.no .arg-lamp { border-color: var(--neg); }
+#argument .arg-rung.no b { color: var(--neg); }
+
+#argument .caption { margin-top: 0.5rem; font-size: 0.86rem; max-width: 100ch; text-wrap: pretty; }   /* no one-word last line */
+#argument .caption code { font-size: 0.85em; }
+
+/* ---- b · the frame log ---- */
+#argument .arg-bytes { --lanes: 4; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 10px; padding: 0.6rem 0.75rem 0.5rem; }
+/* the subject is one line for your write and two for a writer's write: room for two (four on a phone), so the list
+   and the button below it never move when a run starts */
+#argument .arg-subject { font: 0.74rem/1.5 var(--mono); color: var(--dim); padding: 0.1rem 0.15rem 0.5rem; border-bottom: 1px solid var(--rule); margin-bottom: 0.2rem; min-height: calc(2 * 1.5 * 0.74rem + 0.6rem + 1px); }
+#argument .arg-subject b { color: var(--ink); font-weight: 500; }
+#argument .arg-subject code { color: var(--ink); white-space: nowrap; }
+/* a fixed height: the box never collapses between writes, so the button below it never moves under the cursor */
+#argument .arg-frames { height: 17rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+#argument .arg-frames-list { list-style: none; margin: 0; padding: 0; }
+#argument .arg-fr {
+  display: grid;
+  grid-template-columns: calc(var(--lanes) * 1.4rem) 7.7rem 4.7rem 4.7rem 3.2rem minmax(0, 1fr);
+  grid-template-areas: "lanes t route verb size what";
+  align-items: baseline; gap: 0.5rem;
+  padding: 0.14rem 0.15rem;
+  font: 0.72rem/1.45 var(--mono); color: var(--dim);
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 60%, transparent);
+}
+#argument .arg-fr:last-child { border-bottom: 0; }
+#argument .arg-fr-cols { color: var(--faint); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+#argument .arg-fr-cols > span { color: inherit; }
+#argument .arg-fr-lanes { grid-area: lanes; align-self: center; }
+#argument .arg-fr-lanes svg { display: block; width: 100%; height: 0.95rem; overflow: visible; }
+#argument .arg-fr-cols .arg-fr-lanes { display: grid; text-align: center; font-size: 0.62rem; letter-spacing: 0; text-transform: none; }
+#argument .arg-fr-t { grid-area: t; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#argument .arg-fr-route { grid-area: route; color: var(--ink); white-space: nowrap; }
+#argument .arg-fr-verb { grid-area: verb; white-space: nowrap; }
+#argument .arg-fr-size { grid-area: size; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+#argument .arg-fr-what { grid-area: what; min-width: 0; color: var(--dim); text-wrap: pretty; }
+#argument .arg-fr-what .rec, #argument .arg-fr-what .p { font: inherit; }
+#argument .arg-fr-what .note { color: var(--faint); }
+#argument .arg-fr-what .note b { color: var(--dim); font-weight: 500; }
+#argument .arg-fr .vb { display: inline-block; padding: 0 0.3rem; border: 1px solid var(--rule); border-radius: 3px; color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--rule)); }
+#argument .arg-fr.again { color: var(--faint); }
+#argument .arg-fr.again .arg-fr-route { color: var(--dim); }
+#argument .arg-fr.again .vb { color: var(--dim); border-color: var(--rule); }
+#argument .arg-fr.flight .arg-fr-t { color: var(--faint); }
+#argument .arg-fr.ev { color: var(--ink); }
+#argument .arg-fr.ev .arg-fr-route { color: var(--ink); }
+#argument .arg-fr.ev .arg-fr-what { color: var(--ink); }
+#argument .arg-fr.new { animation: argrow 700ms ease-out; }
+@keyframes argrow { 0% { background: color-mix(in srgb, var(--accent) 22%, transparent); } 100% { background: transparent; } }
+#argument .lane-dot { fill: var(--faint); }
+#argument .lane-line { stroke: var(--accent); stroke-width: 1.4; fill: none; }
+#argument .lane-head { fill: var(--accent); }
+#argument .again .lane-line { stroke: var(--faint); }
+#argument .again .lane-head { fill: var(--faint); }
+#argument .lane-mark { fill: var(--accent); }
+
+/* ---- five abreast only at the full 1044px column (above 1140px, data's strip breakpoint): narrower, values clip.
+   Three over two below it, then one column ---- */
+@media (max-width: 1140px) and (min-width: 761px) {
+  #argument .arg-strip { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); row-gap: 0.6rem; }
+  #argument .arg-arrow[data-arrow="3"] { display: none; }
+  #argument .arg-card[data-step="stamp"] { grid-column: 1; }
+  #argument .arg-arrow[data-arrow="4"] { grid-column: 2; }
+  #argument .arg-card[data-step="copies"] { grid-column: 3 / 6; }
+  #argument .arg-card[data-step="owner"] { min-height: 14.75rem; } /* measured: 14.7rem at 770px */
+  #argument .arg-card[data-step="stamp"] { min-height: 13.75rem; } /* row two's tallest state: 13.6rem at 770px */
+  /* the status and the rungs wrap differently by state at these widths: room for two lines each */
+  #argument .arg-status { min-height: calc(2 * 1.5 * 0.72rem); }
+  #argument .arg-rung-v { min-height: calc(2 * 1.45 * 0.72rem); }
+}
+/* below ~860px the ladder's in-write note wraps under its kicker: keep room for it at rest too */
+@media (max-width: 860px) and (min-width: 761px) {
+  #argument .arg-ladder-head { min-height: calc(2 * 1.45 * 0.7rem + 0.2rem); align-content: flex-start; }
+}
+@media (max-width: 760px) {
+  #argument .arg-strip { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
+  #argument .arg-arrow { font-size: 0.85rem; }
+  #argument .arg-arrow::before { content: '↓'; }
+  #argument .arg-ladder { grid-template-columns: minmax(0, 1fr); }
+  #argument .arg-card[data-step="owner"] { min-height: 0; }
+  #argument .arg-run.above { margin: 0.2rem 0 0.75rem; }
+  /* the head wraps on a phone, and "slow motion" (or "paused") adds a line while it shows: keep room for it, so
+     nothing below — the button included — moves when a write starts */
+  #argument .arg-head { min-height: calc(0.7rem * 1.2 + 0.35rem + 2 * 0.72rem * 1.45); align-content: flex-start; }
+  #argument .arg-where { line-height: 1.45; }
+  #argument .arg-fr { grid-template-columns: calc(var(--lanes) * 1.05rem) minmax(0, 1fr) auto auto; grid-template-areas: "lanes route verb size" "t t t t" "what what what what"; gap: 0.1rem 0.5rem; padding: 0.4rem 0.1rem; }
+  #argument .arg-fr-cols { display: none; }
+  #argument .arg-fr-t { color: var(--faint); }
+  #argument .arg-frames { height: 24rem; overscroll-behavior: auto; }
+  #argument .arg-subject { min-height: calc(5 * 1.5 * 0.74rem + 0.6rem + 1px); }
+}

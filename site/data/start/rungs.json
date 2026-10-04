@@ -1,0 +1,229 @@
+{
+ "syncedAt": "2026-10-03T04:22:27.258Z",
+ "head": "f196de0",
+ "path": "examples/README.md",
+ "count": 26,
+ "checks": 26,
+ "rungs": [
+  {
+   "no": "01",
+   "name": "two-servers",
+   "dir": "01-two-servers",
+   "lesson": "one file, run twice, is one replicated object; Ctrl-C one and the other carries on",
+   "terminals": "`node server.ts` ×2",
+   "check": true
+  },
+  {
+   "no": "02",
+   "name": "server-client",
+   "dir": "02-server-client",
+   "lesson": "a seed makes a server; a bare `fero(name)` finds it by name, follows it, and writes back",
+   "terminals": "`node server.ts` · `node client.ts`",
+   "check": true
+  },
+  {
+   "no": "03",
+   "name": "one-write",
+   "dir": "03-one-write",
+   "lesson": "a client's write is a request: a `pending` row until a server stamps it; only then does it show, on both screens",
+   "terminals": "`node client.ts` · `node server.ts`",
+   "check": true
+  },
+  {
+   "no": "04",
+   "name": "rows",
+   "dir": "04-rows",
+   "lesson": "a write is a record (type, key, value) you can watch land; a row is written whole or by its fields, never both; a refused write never lands",
+   "terminals": "`node server.ts`",
+   "check": true
+  },
+  {
+   "no": "05",
+   "name": "views",
+   "dir": "05-views",
+   "lesson": "an operator on `f.data` is a live view: it prints itself once, then only when a write moves a row across its edge or rewrites one it holds",
+   "terminals": "`node server.ts`",
+   "check": true
+  },
+  {
+   "no": "06",
+   "name": "numbers",
+   "dir": "06-numbers",
+   "lesson": "a sale is a new row, never edited; `sum`, `avg`, `median`… are live numbers folded from the rows — tap one, never read-modify-write a total",
+   "terminals": "`node server.ts`",
+   "check": true
+  },
+  {
+   "no": "07",
+   "name": "ordered",
+   "dir": "07-ordered",
+   "lesson": "a sorted view is an array in rank order: by a column, by a comparator with a tiebreak, the top n; a bounded window rotates in one batch",
+   "terminals": "`node server.ts`",
+   "check": true
+  },
+  {
+   "no": "08",
+   "name": "methods",
+   "dir": "08-methods",
+   "lesson": "a function under `methods:` runs on the server: a client awaits it, the reply follows the commit, and declaring them is the door",
+   "terminals": "`node server.ts` · `node client.ts`",
+   "check": true
+  },
+  {
+   "no": "09",
+   "name": "live",
+   "dir": "09-live",
+   "lesson": "a method that returns a view streams: `await` it for a snapshot, `.open()` it for a live mirror the operators chain on; `close()` ends it",
+   "terminals": "`node server.ts` · `node client.ts`",
+   "check": true
+  },
+  {
+   "no": "10",
+   "name": "confirm",
+   "dir": "10-confirm",
+   "lesson": "the same write awaited at three rungs — committed, replicated, persisted; the reply names the rung it PROVED, and a reject is how far it got, never a rollback",
+   "terminals": "`node server.ts` ×2 · `node client.ts`",
+   "check": true
+  },
+  {
+   "no": "11",
+   "name": "validation",
+   "dir": "11-validation",
+   "lesson": "`seams.validation` is one rule for every write that enters a server — the seed, its own, a client's; a refused write never shows, only a `rejected` row of `cluster.writes` with the reason",
+   "terminals": "`node server.ts` · `node client.ts`",
+   "check": true
+  },
+  {
+   "no": "12",
+   "name": "durable",
+   "dir": "12-durable",
+   "lesson": "`dir` makes the node durable: run the file again and it is the SAME node in its next life (`~2`), its rows back before it has a socket; the seed applies once; a solo `persisted` is one disk",
+   "terminals": "`node server.ts` ×2",
+   "check": true
+  },
+  {
+   "no": "13",
+   "name": "cluster-of-three",
+   "dir": "13-cluster-of-three",
+   "lesson": "three members on fixed addresses with disks: kill one, the two left vote it out in six seconds and still prove `persisted` on two disks, and the same command brings the dead one back as itself from its disk",
+   "terminals": "`node server.ts 4801` · `node server.ts 4802` · `node server.ts 4803` · `node client.ts`",
+   "check": true
+  },
+  {
+   "no": "14",
+   "name": "failover",
+   "dir": "14-failover",
+   "lesson": "`kill -9` the server feeding a client: its `peers` drops at once, its live handle re-subscribes by itself, its next write commits on a survivor (after the vote if the dead one stamped that row), and a call in flight fails fast unless `{ retry: true }`",
+   "terminals": "`node server.ts` ×3 · `node client.ts`",
+   "check": true
+  },
+  {
+   "no": "15",
+   "name": "static-topology",
+   "dir": "15-static-topology",
+   "lesson": "with the directory off every address is in the call — a member is `listen` + `hosts`, a client is `hosts` — and a shape that cannot work is refused at `fero()`",
+   "terminals": "`node server.ts 4801 4802 4803` ×3, rotated · `node client.ts 4801 4802 4803` · `node refusals.ts`",
+   "check": true
+  },
+  {
+   "no": "16",
+   "name": "scoped",
+   "dir": "16-scoped",
+   "lesson": "`replicas: 2` puts every row on exactly two members: a shard is never shown as the resource — a sync read or an operator throws typed, `await f.data` gathers the whole, a row not held is one hop away, and a client reads the union",
+   "terminals": "`node server.ts 4811 5811 6811` ×3 rotated · `node client.ts 4811 5811 6811`",
+   "check": true
+  },
+  {
+   "no": "17",
+   "name": "lww-honesty",
+   "dir": "17-lww-honesty",
+   "lesson": "two members read a cell and write it back plus one, and one increment is lost — a cell keeps its last writer; write one row per event and fold them instead",
+   "terminals": "`node race.ts`",
+   "check": true
+  },
+  {
+   "no": "20",
+   "name": "inside",
+   "dir": "20-inside",
+   "lesson": "every instance carries a diagnostics handle off the typed surface: the journal, the log, compaction on demand, and a capture file the debugger opens",
+   "terminals": "`node inside.ts` · `npm run debug -- …`",
+   "check": true
+  },
+  {
+   "no": "21",
+   "name": "journal",
+   "dir": "21-journal",
+   "lesson": "`diag(f).journal(from)` is a cursor over the kernel's one diagnostics ring: tail it and watch a peer arrive and be voted in, leave by vote, and its link close",
+   "terminals": "`node server.ts` ×2",
+   "check": true
+  },
+  {
+   "no": "22",
+   "name": "time-travel",
+   "dir": "22-time-travel",
+   "lesson": "a capture with a story: two writes before the first view are an election (`lww-lost` in the viewer), the same two after it are plain history, a cut heals by anti-entropy, and the scrubber replays any step",
+   "terminals": "`node story.ts` · `npm run debug -- examples/22-time-travel/story.capture.json`",
+   "check": true
+  },
+  {
+   "no": "23",
+   "name": "live",
+   "dir": "23-live",
+   "lesson": "a running cluster writes a `kind: 'live'` capture file once a second (temp file, then rename) and `npm run debug -- <file>` polls it: the debugger follows a real fero process on this box with no wire attach",
+   "terminals": "`node live.ts` · `npm run debug -- examples/23-live/live.capture.json`",
+   "check": true
+  },
+  {
+   "no": "30",
+   "name": "fleet-audit",
+   "dir": "30-fleet-audit",
+   "lesson": "real processes, real disks, real `kill -9`: three durable members, sensors writing facts through the door with receipts, a live dashboard, one member killed and then all three, restored from disk — then an audit: the members agree, every `persisted` receipt is on every member, no phantom rows, and a reject is not a rollback",
+   "terminals": "`node fleet.ts` · `node dashboard.ts`",
+   "check": true
+  },
+  {
+   "no": "40",
+   "name": "chat",
+   "dir": "40-chat",
+   "lesson": "a chat is facts plus one sorted view: `post` runs on the server, throws its rule for every joiner and stamps who (`ctx.peer`) and when; every screen sorts the rows itself with a tiebreak, so they all agree",
+   "terminals": "`node room.ts general` · `node join.ts general ada` · `node join.ts general bob`",
+   "check": true
+  },
+  {
+   "no": "41",
+   "name": "kanban",
+   "dir": "41-kanban",
+   "lesson": "a card is a row written by its fields: two editors change two fields of one card at once and both land; one rule, carried by the board and every editor, refuses a whole row or an unknown column — an editor refuses its own before it leaves",
+   "terminals": "`node board.ts` · `node edit.ts ada` · `node edit.ts bob`",
+   "check": true
+  },
+  {
+   "no": "42",
+   "name": "web-bridge",
+   "dir": "42-web-bridge",
+   "lesson": "fero speaks TCP, so a browser reaches a resource through a Node bridge that is a bare client: `connect` records streamed to each tab as events, a form post written as a whole row",
+   "terminals": "`node server.ts` · `node web.ts 8080`",
+   "check": true
+  },
+  {
+   "no": "43",
+   "name": "ledger",
+   "dir": "43-ledger",
+   "lesson": "money is facts: transfers are rows on three durable members, the rule thrown from a method, the intent cleared through the door, every id on a member that comes back",
+   "terminals": "`node member.ts 4901` ×3 (4902, 4903) · `node notifier.ts` · `node teller.ts mint alice 100`",
+   "check": true
+  }
+ ],
+ "tiers": "Four tiers: 01-17 climb one feature at a time, 20-23 open the debugger, 30 is everything at once on one box, and 40-43 are apps.",
+ "runs": "No build, no flags — Node 22.18+ or 23.6+ runs the `.ts` files as they are, after one `npm install` at the repo root (fero's one dependency).",
+ "node": {
+  "floor": "22.18",
+  "line23": "23.6",
+  "engines": ">=22.18"
+ },
+ "vote": {
+  "no": "13",
+  "path": "examples/13-cluster-of-three/README.md",
+  "text": "The link drops at once; the vote waits for the dead member's redials to give up — six seconds at 30 ms, twenty at the default 100."
+ }
+}

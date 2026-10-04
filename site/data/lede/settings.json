@@ -1,0 +1,11 @@
+{
+ "builtAt": "2026-10-03T02:14:58.921Z",
+ "head": "f196de0",
+ "defaults": {
+  "heartbeatMs": 500,
+  "redialMs": 100
+ },
+ "harness": {
+  "redialMs": 20
+ }
+}

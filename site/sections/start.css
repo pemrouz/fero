@@ -1,0 +1,198 @@
+/* sections/start.css — 03 "From zero" (id="start"). Reuses v2.css (.sec-head, .lead-para, .race-title, the .tok-*
+   colours) and fero.css (.rec, .stamp, .nid, .act, .waiting, .agree-ok, .broken). Everything new is scoped here.
+   Colour means state: the accent is the write and its stamp; --wait a waiting write; --pos copies agree; --neg down. */
+
+/* ── head: the status chip sits on the title row ───────────────────────────────────────────────────── */
+#start .sec-head { flex-wrap: wrap; row-gap: 0.6rem; margin-bottom: 1.25rem; }
+#start .st-chip { margin-left: auto; align-self: center; font: 500 0.74rem var(--mono); color: var(--ink); background: var(--bg-2); border: 1px solid var(--rule); border-radius: 5px; padding: 0.38rem 0.75rem; white-space: nowrap; letter-spacing: 0.01em; }
+#start .st-chip b { font-weight: 500; }
+#start.st-unverified .st-pub { display: none; }
+/* the status in the lead; how to read the cards in a small aside beside it */
+#start .st-top { display: grid; grid-template-columns: minmax(0, 64ch) minmax(0, 1fr); column-gap: 2.6rem; align-items: start; }
+#start .st-top .lead-para { margin: 0; }
+#start .st-intro { margin: 0.2rem 0 0; max-width: 48ch; justify-self: end; font-size: 0.84rem; line-height: 1.55; color: var(--dim); }
+#start .st-intro b { color: var(--ink); font: 500 0.94em var(--mono); white-space: nowrap; }
+#start .st-intro code { font-size: 0.9em; white-space: nowrap; }
+#start .st-arrow { font: italic 0.88em var(--mono); color: var(--faint); white-space: nowrap; }
+
+/* a sub-head in the race grammar: the title, then a mono path */
+#start .st-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 1.1rem; margin: 1.4rem 0 0.7rem; padding-bottom: 0.55rem; border-bottom: 1px solid var(--rule); }
+#start .st-path { font: 0.72rem var(--mono); color: var(--faint); }
+#start .st-path code { font-size: 1em; }
+#start .nw { white-space: nowrap; }
+#start .term { text-decoration: underline dotted var(--faint); text-underline-offset: 0.2em; cursor: help; }
+#start .st-note b { color: var(--ink); font-weight: 500; white-space: nowrap; }
+
+/* ── the files ──────────────────────────────────────────────────────────────────────────────────────── */
+#start .st-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; align-items: stretch; margin-top: 1.5rem; }
+#start .st-files-one { grid-template-columns: minmax(0, 1fr); }
+#start .st-file { margin: 0; display: flex; flex-direction: column; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 8px; min-width: 0; overflow: hidden; }
+#start .st-file-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.7rem; padding: 0.5rem 0.85rem; background: var(--bg-3); border-bottom: 1px solid var(--rule); font: 0.7rem var(--mono); color: var(--faint); }
+#start .st-file-name { font: 600 0.8rem var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+#start .st-file-name .dir { font-weight: 400; color: var(--faint); }
+#start .st-role { font: 500 0.64rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+#start .st-here { margin-left: auto; }
+#start .st-here .nid { font-size: 0.72rem; }
+#start .st-here code { font-size: 1em; }
+
+/* the listing: a two-column grid (line number · source); a note spans the card under its line */
+#start .st-code { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr); column-gap: 0.7rem; padding: 0.6rem 0.5rem 0.55rem 0.4rem; font: 0.7rem/1.5 var(--mono); color: var(--ink); counter-reset: ln; }
+#start .st-ln { display: contents; }
+#start .st-no { counter-increment: ln; text-align: right; color: var(--faint); font-size: 0.58rem; line-height: calc(0.7rem * 1.5); user-select: none; }
+#start .st-no::before { content: counter(ln, decimal-leading-zero); }
+/* hanging indent: a wrapped line continues 3ch inside its own indentation (--ind is the line's leading spaces) */
+#start .st-src { min-width: 0; min-height: 1.5em; white-space: pre-wrap; overflow-wrap: anywhere; padding-left: calc(var(--ind, 0ch) + 3ch); text-indent: calc(-1 * (var(--ind, 0ch) + 3ch)); }
+#start .st-ln.bound .st-no { color: var(--dim); }
+
+/* a note: the line's live margin, set under it — not part of the file, so not selected with it */
+#start .st-note { grid-column: 1 / -1; margin: 0.08rem 0 0.32rem 0.2rem; padding: 0.24rem 0.5rem 0.28rem; border-left: 2px solid var(--rule); background: var(--bg); border-radius: 0 4px 4px 0; font: 0.68rem/1.55 var(--mono); color: var(--dim); user-select: none; min-width: 0; transition: border-color 700ms ease; }
+#start .st-note.lit { border-left-color: var(--accent); transition: none; }
+/* rows: the first carries the // → marker hanging in the indent; the rest line up under its text */
+#start .st-note .r { padding-left: 5ch; min-width: 0; overflow-wrap: anywhere; }
+#start .st-note .r:first-child { text-indent: -5ch; }
+/* rowFit (start.js): the row stacked on an unseen copy of its longer text, so it keeps one height (the indent is
+   inherited, so both copies hang their // → the same way) */
+#start .st-note .st-fit { display: grid; }
+#start .st-note .st-fit > div { grid-area: 1 / 1; min-width: 0; }
+#start .st-note .st-fit-r { visibility: hidden; }
+#start .st-note .m { display: inline-block; width: 5ch; text-indent: 0; color: var(--faint); font-style: italic; white-space: nowrap; }
+#start .st-note .obj { color: var(--ink); margin-left: 0.4em; }
+#start .st-note code { font-size: 0.96em; }
+#start .st-note a { color: inherit; }
+#start .st-note .rec { font-size: inherit; overflow-wrap: anywhere; }
+#start .st-note .rec .nw { white-space: nowrap; }   /* a record that must wrap breaks before value:, never inside it */
+#start .st-note .stamp { font-size: 0.66rem; padding: 0 0.35rem; }
+#start .st-note .nid { font-size: inherit; }
+#start .st-note .row { color: var(--ink); }
+#start .st-note .sep { color: var(--faint); }
+#start .st-note .on { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#start .st-note .on.agree-ok { color: var(--pos); }
+#start .st-note .waiting { color: var(--wait); }
+#start .st-note .broken { color: var(--neg); }
+#start .st-note .why { color: var(--faint); }
+#start .st-note .st-seed { display: flex; flex-wrap: wrap; column-gap: 1.2rem; }
+#start .st-note .pair { white-space: nowrap; }
+/* a line that runs: its record, then the state beside the button. The state keeps a fixed height (two lines;
+   three for the sale, which also says process.pid), so pressing never moves the cards */
+#start .st-note .f { display: flex; align-items: flex-start; gap: 0.3rem 0.8rem; padding: 0.14rem 0 0 5ch; }
+#start .st-note .st-state { flex: 1 1 auto; min-width: 0; min-height: calc(2 * 1.55em); }
+#start .st-note.sale .st-state { min-height: calc(3 * 1.55em); }
+/* B's one wide card: every state fits one line beside the button */
+#start .st-files-one .st-note .st-state { min-height: 1.55em; }
+#start .st-note .act { flex: none; order: 2; margin-top: 0.05rem; font-size: 0.68rem; min-height: 24px; padding: 0.2rem 0.6rem; user-select: none; }
+@media (pointer: coarse) { #start .st-note .act { min-height: 32px; } }
+
+/* ── the recorded run ──────────────────────────────────────────────────────────────────────────────── */
+#start .st-rec { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 0.8rem; }
+#start .st-rec-tl { margin-top: 0.1rem; }
+/* a terminal: its head (the README's command, the process's state, the badge), then ONLY the recorded screen */
+#start .st-print { margin-top: auto; padding: 0.2rem 0.75rem 0.75rem; min-width: 0; }
+#start .st-rec .st-print { padding: 0; }
+#start .st-print-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.7rem; margin: 0 0.1rem 0.35rem; font: 0.64rem var(--mono); color: var(--faint); }
+#start .st-cmd { color: var(--dim); cursor: help; }
+#start .st-cmd::before { content: '$ '; color: var(--faint); }
+#start .st-tstate { color: var(--faint); font-style: italic; }
+#start .st-tstate.dead { color: var(--neg); font-style: normal; }
+#start .st-badge { margin-left: auto; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; }
+#start .st-badge span { letter-spacing: 0.04em; }
+#start .st-term { margin: 0; min-width: 0; background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; padding: 0.5rem 0.8rem; font: 0.66rem/1.42 var(--mono); color: var(--ink); white-space: pre; overflow-x: auto; min-height: calc(var(--rows, 8) * 1.42em + 1rem + 2px); }
+#start .st-term.dead { color: var(--dim); }
+/* the run's timeline: the recorded events as ticks and the replay's playhead (display only, not a control) */
+#start .st-tl { grid-column: 1 / -1; position: relative; height: 2.3rem; margin: 0.55rem 0.25rem 0; }
+#start .st-tl-rail, #start .st-tl-fill { position: absolute; left: 0; right: 0; top: 0.42rem; height: 1px; background: var(--rule); }
+#start .st-tl-fill { background: var(--dim); transform-origin: 0 50%; transform: scaleX(0); }
+#start .st-tl-ev { position: absolute; top: 0; transform: translateX(-0.25rem); font: 0.62rem var(--mono); color: var(--faint); white-space: nowrap; }
+#start .st-tl-ev::before { content: ''; display: block; width: 0.5rem; height: 0.5rem; margin: 0.17rem 0 0.3rem; border-radius: 50%; background: var(--bg); border: 1px solid var(--faint); }
+#start .st-tl-ev.past { color: var(--dim); }
+#start .st-tl-ev.past::before { background: var(--dim); border-color: var(--dim); }
+#start .st-tl-ev.kill { color: var(--neg); }
+#start .st-tl-ev.kill::before { border-color: var(--neg); }
+#start .st-tl-ev.kill.past::before { background: var(--neg); }
+#start .st-tl-ev.end { transform: translateX(calc(-100% + 0.25rem)); text-align: right; }
+#start .st-tl-ev.end::before { margin-left: auto; }
+#start .st-tl-now { display: none; }
+#start .st-rec-cap { grid-column: 1 / -1; margin: 0.1rem 0 0; max-width: none; font-size: 0.84rem; line-height: 1.55; color: var(--dim); }
+#start .st-rec-cap q { color: var(--ink); }
+
+/* ── the series ────────────────────────────────────────────────────────────────────────────────────── */
+/* names only, in columns read down then across; a rung's whole lesson shows on hover or focus */
+/* ── three more options: static, the README's own spellings ────────────────────────────────────────── */
+#start .st-head-opts { margin-top: 1.6rem; }
+#start .st-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; margin: 0; }
+#start .st-opt { min-width: 0; padding: 0.7rem 0.9rem 0.8rem; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 8px; }
+#start .st-opt dt { margin: 0 0 0.35rem; }
+#start .st-opt dt code { font-size: 0.8rem; white-space: nowrap; }
+#start .st-opt dd { margin: 0; font-size: 0.86rem; line-height: 1.55; color: var(--dim); }
+#start .st-opt dd i { font-style: normal; color: var(--ink); white-space: nowrap; }
+#start .st-opt dd a { color: inherit; }
+@media (max-width: 900px) { #start .st-opts { grid-template-columns: minmax(0, 1fr); } }
+
+#start .st-rungs { --gap: 1.6rem; display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); column-gap: var(--gap); container-type: inline-size; }
+#start .st-rung-col { display: flex; flex-direction: column; min-width: 0; }
+#start .st-rung { position: relative; display: grid; grid-template-columns: 1.9rem minmax(0, 1fr); column-gap: 0.45rem; align-items: baseline; padding: 0.05rem 0.15rem; border-bottom: 1px solid var(--rule); outline-offset: -2px; cursor: default; }
+#start .st-rung .no { font: 500 0.64rem var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#start .st-rung .no .up { margin-left: 0.2em; }
+#start .st-rung .nm { font: 500 0.74rem/1.5 var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the lesson: not drawn until its rung is hovered or focused (a screen reader reads it as the rung's description); then
+   a card under the row, as wide as the whole list (--i is the rung's column), over the rows below. Nothing moves, and the
+   pointer passes through the card to the next rung. */
+#start .st-rung .ls { display: none; }
+#start .st-rung:hover .ls, #start .st-rung:focus-visible .ls, #start.st-tap .st-rung:focus .ls {
+  display: block; position: absolute; top: calc(100% + 3px); left: calc(-1 * var(--i, 0) * (100cqw + var(--gap)) / var(--cols, 2)); z-index: 6; width: 100cqw;
+  overflow-wrap: anywhere; pointer-events: none;
+  background: var(--bg-3); border: 1px solid var(--rule); border-radius: 6px; padding: 0.45rem 0.75rem 0.5rem; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  font: 0.82rem/1.5 var(--sans); color: var(--ink);
+}
+#start:not(.st-tap) .st-rungs:hover .st-rung:focus-visible:not(:hover) .ls { display: none; }   /* the pointer's rung wins over a focused one */
+#start .st-rung .ls code { font-size: 0.86em; }
+#start .st-rung .lsn { font: 500 0.92em var(--mono); color: var(--dim); }
+#start .st-rung:hover, #start .st-rung:focus-visible, #start.st-tap .st-rung:focus { background: var(--bg-2); }
+#start .st-rung.marked .no { color: var(--ink); }
+#start .up { color: var(--dim); font-family: var(--sans); }
+#start .st-rungs-foot { margin: 0.6rem 0 0; max-width: none; font-size: 0.84rem; line-height: 1.55; color: var(--dim); }
+#start .st-rungs-foot .ln { display: block; }
+#start .st-rungs-foot b { font: 500 0.78rem var(--mono); color: var(--ink); }
+#start .st-rungs-foot q { color: var(--ink); }
+
+/* ── widths ────────────────────────────────────────────────────────────────────────────────────────── */
+/* below ~1100 px the two card heads would wrap unevenly (WATCHER is longer than SHOP): the folder is in the aside */
+@media (max-width: 1100px) {
+  #start .st-file-name .dir { display: none; }
+}
+/* the narrowest two-card band: one more reserved line for each state, so a press still never moves the cards */
+@media (min-width: 981px) and (max-width: 1100px) {
+  #start .st-files:not(.st-files-one) .st-note .st-state { min-height: calc(3 * 1.55em); }
+  #start .st-files:not(.st-files-one) .st-note.sale .st-state { min-height: calc(4 * 1.55em); }
+}
+@media (max-width: 980px) {
+  #start .st-top { grid-template-columns: minmax(0, 1fr); row-gap: 0.8rem; }
+  #start .st-intro { justify-self: start; max-width: 70ch; }
+  #start .st-files, #start .st-rec { grid-template-columns: minmax(0, 1fr); }
+  #start .st-rec { row-gap: 0.6rem; }
+  #start .st-file-name .dir { display: inline; }   /* one card a row again: room for the folder */
+}
+/* the timeline's labels collide below ~860 px: show the current event under the rail instead */
+@media (max-width: 860px) {
+  #start .st-tl-ev span { display: none; }
+  #start .st-tl-now { display: block; position: absolute; left: 0; right: 0; top: 1.15rem; font: 0.66rem var(--mono); color: var(--dim); }
+}
+@media (max-width: 760px) {
+  #start .st-chip { margin-left: 0; }
+}
+@media (max-width: 640px) {
+  #start .st-code { font-size: 0.66rem; padding-right: 0.6rem; column-gap: 0.5rem; grid-template-columns: 1.2rem minmax(0, 1fr); }
+  #start .st-no { line-height: calc(0.66rem * 1.5); }
+  #start .st-note { font-size: 0.66rem; margin-left: 0; }
+  #start .st-note .f { padding-left: 0; flex-wrap: wrap; }
+  #start .st-note .st-state, #start .st-note.sale .st-state { min-height: 0; flex-basis: 100%; }
+  #start .st-note .act { margin-left: auto; }
+  #start .st-term { font-size: 0.64rem; padding: 0.55rem 0.65rem; }
+  #start .st-file-name .dir { display: none; }   /* the folder is in the aside above; the head keeps one line */
+  #start .st-badge { margin-left: 0; flex-basis: 100%; }
+  #start .st-rungs { --gap: 1rem; }
+  #start .st-rung { grid-template-columns: 1.8rem minmax(0, 1fr); column-gap: 0.4rem; }
+}
+@media (max-width: 420px) {
+  #start .st-note .pair { white-space: normal; }
+  #start .st-rung { grid-template-columns: 1.55rem minmax(0, 1fr); column-gap: 0.3rem; padding: 0.05rem 0.1rem; }   /* "cluster-of-three" whole at 360 */
+}

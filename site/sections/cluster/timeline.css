@@ -1,0 +1,233 @@
+/* sections/cluster/timeline.css — variant b, the timeline (imported by sections/cluster.css). One card in data's
+   rcard grammar: a head row, a column header, the lane heads beside one SVG of lanes, and the frame panel as the
+   card's lower pane. Colour means state, never identity: the accent is the write and the stamp its owner gives
+   it; ink is a ballot; --wait a waiting write; --neg a crash or a cut; lanes and names are plain ink. */
+
+#cluster .tl { background: var(--bg-2); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+
+/* head row: what it is, the legend (the real verbs, drawn the way the lines are drawn), the hidden counts */
+#cluster .tl-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.35rem 1.1rem; padding: 0.6rem 1rem; background: var(--bg-3); border-bottom: 1px solid var(--rule); font: 0.62rem var(--mono); color: var(--faint); }
+#cluster .tl-k { text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.58rem; color: var(--dim); }
+#cluster .tl-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; }
+#cluster .tl-lg { display: inline-flex; align-items: center; gap: 0.35rem; }
+#cluster .tl-lg .lg { font: 500 0.52rem/1 var(--mono); font-style: normal; padding: 0.12rem 0.3rem; border-radius: 3px; border: 1px solid transparent; letter-spacing: 0.02em; }
+#cluster .tl-lg .lg.k-write { background: var(--accent); color: var(--accent-ink); }
+#cluster .tl-lg .lg.k-repl { border-color: var(--accent); color: var(--accent); }
+#cluster .tl-lg .lg.k-vote { border-color: var(--ink); color: var(--ink); }
+#cluster .tl-lg .lg.again { opacity: 0.45; }
+#cluster .tl-lg .lg.k-link { width: 14px; height: 0; padding: 0; border: 0; border-top: 1px dashed var(--k-link); border-radius: 0; margin-left: 0.25rem; }
+#cluster .tl-lg .lg.tk { width: 2px; height: 11px; padding: 0; border: 0; border-radius: 0; background: var(--accent); }
+#cluster .tl-lg .lg.ap { width: 5px; height: 5px; padding: 0; border: 0; border-radius: 50%; background: var(--accent); margin-left: 0.3rem; }
+#cluster .tl-lg .lg.bar { width: 14px; height: 4px; padding: 0; border: 0; border-radius: 1px; background: var(--wait); margin-left: 0.3rem; }
+#cluster .tl-lg .lg.x { padding: 0; border: 0; color: var(--neg); font-size: 0.7rem; margin-left: 0.3rem; }
+
+/* the column header (data's ladder header: PRICE · QTY · CUM) */
+#cluster .tl-cols { display: grid; grid-template-columns: var(--tl-hw, 14rem) minmax(0, 1fr); font: 500 0.56rem var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: 0.09em; border-bottom: 1px solid var(--rule); }
+#cluster .tl-cols > span { padding: 0.45rem 0.85rem 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cluster .tl-cols-l { border-right: 1px solid var(--rule); }
+/* the right header wraps rather than cut a word: the hidden-frames counts take their own row when both do not fit,
+   and the window's words wrap inside theirs (a held plot, 4×, counts that have grown long) */
+#cluster .tl-cols > .tl-cols-r { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 1rem; white-space: normal; overflow: visible; }
+#cluster .tl-win { flex: 0 1 auto; min-width: 0; }
+#cluster .tl-hidden { margin-left: auto; flex: 0 1 auto; min-width: 0; text-transform: none; letter-spacing: 0; font: 0.6rem var(--mono); color: var(--faint); }
+
+/* body: the lane heads beside the plot */
+#cluster .tl-body { display: grid; grid-template-columns: var(--tl-hw, 14rem) minmax(0, 1fr); }
+#cluster .tl-heads { border-right: 1px solid var(--rule); min-width: 0; }
+#cluster .tl-lane { height: var(--tl-L, 76px); padding: 0 0.85rem; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; justify-content: center; gap: 0.12rem; min-width: 0; overflow: hidden; }
+#cluster .tl-lane.is-target { box-shadow: inset 2px 0 0 var(--dim); }
+#cluster .tl-lane.is-cut { box-shadow: inset 2px 0 0 var(--neg); }
+#cluster .tl-lane-ax { height: var(--tl-ax, 24px); padding: 0 0.85rem; display: flex; align-items: center; font: 0.56rem var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: 0.09em; }
+#cluster .tl-h1 { display: flex; align-items: baseline; gap: 0.45rem; min-width: 0; }
+#cluster .tl-role { font: 500 0.54rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+#cluster .tl-name .nid { font: 600 0.9rem var(--mono); letter-spacing: -0.01em; cursor: pointer; }
+#cluster .tl-lane.down .tl-name .nid { text-decoration: line-through; text-decoration-color: var(--neg); color: var(--dim); }
+#cluster .tl-via { font: 0.6rem var(--mono); color: var(--faint); white-space: nowrap; }
+#cluster .tl-via .nid { font-size: inherit; color: var(--dim); }
+#cluster .tl-pill { margin-left: auto; font: 500 0.56rem var(--mono); color: var(--dim); border: 1px solid var(--rule); border-radius: 999px; padding: 0 0.4rem; white-space: nowrap; }
+#cluster .tl-pill.neg { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 50%, transparent); }
+#cluster .tl-pill.wait { color: var(--wait); border-color: color-mix(in srgb, var(--wait) 45%, transparent); }
+#cluster .tl-pill.dim { color: var(--faint); }
+#cluster .tl-h2 { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+#cluster .tl-v { font: 500 1.3rem/1.15 var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; padding: 0 0.2rem; margin-left: -0.2rem; border-radius: 3px; min-width: 1.1em; }
+#cluster .tl-v.word { font-size: 0.72rem; line-height: 1.6rem; letter-spacing: 0; color: var(--dim); }
+#cluster .tl-lane.down .tl-v.word { color: var(--neg); }
+#cluster .tl-star { color: var(--accent); font-size: 0.8rem; }
+#cluster .tl-star[hidden] { display: none; }
+/* hollow and faint: gadgets is this server's only in its old view; read-only, it stamps nothing */
+#cluster .tl-star.old { color: var(--faint); }
+#cluster .tl-st { min-width: 0; overflow: hidden; }
+#cluster .tl-st .stamp { font-size: 0.62rem; padding: 0 0.3rem; gap: 0.25rem; }
+#cluster .tl-h3 { font: 0.6rem var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* the plot */
+/* the left edge fades, as data's race tape does, so words and chips scrolling out are never cut mid-word */
+#cluster .tl-plot { position: relative; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px); mask-image: linear-gradient(90deg, transparent, #000 40px); }
+#cluster .tl-svg { display: block; width: 100%; }
+#cluster .tl-svg text { font-family: var(--mono); font-size: 9px; fill: var(--faint); }
+#cluster .tl-sep .sl { stroke: var(--rule); }
+#cluster .tl-sep .axl { stroke: var(--rule); }
+#cluster .tl-grid .gl { stroke: var(--rule); stroke-opacity: 0.55; }
+#cluster .tl-grid .at { stroke: var(--faint); }
+#cluster .tl-grid .am { stroke: var(--faint); stroke-opacity: 0.5; }
+#cluster .tl-grid .al { fill: var(--faint); }
+/* a lane's own view: alternate views tint the lane, a dashed edge where the node installed the next one */
+#cluster .band rect { fill: transparent; }
+#cluster .band.even rect { fill: #ffffff; fill-opacity: 0.03; }
+#cluster .band .bd { stroke: var(--dim); stroke-opacity: 0.55; stroke-dasharray: 2 3; }
+#cluster .band .bl { fill: var(--faint); font-size: 8.5px; }
+/* a life: the lane's line while the process runs; ✕ where it crashed */
+#cluster .life .bl { stroke: var(--faint); stroke-opacity: 0.55; }
+#cluster .life .x { fill: var(--neg); font-size: 13px; font-weight: 600; }
+#cluster .cut .cl { stroke: var(--neg); stroke-width: 1.5; stroke-dasharray: 5 4; }
+#cluster .mk tspan.cut { fill: var(--neg); }
+#cluster .mk.cut .mt { stroke: var(--neg); }
+#cluster .mk tspan.healed { fill: var(--dim); }
+#cluster .mk tspan.crash { fill: var(--neg); }
+#cluster .mk tspan.life { fill: var(--ink); }
+#cluster .mk tspan.left { fill: var(--dim); }
+/* waiting writes: amber from issue to commit; faded once committed, fainter if a crash dropped it */
+#cluster .bar rect { fill: var(--wait); }
+#cluster .bar.done rect, #cluster .bar.lost rect { transform: translateY(1.5px); height: 1.5px; }
+#cluster .bar.done { opacity: 0.8; }
+#cluster .bar.lost { opacity: 0.5; }
+/* frames: a slanted line from the sender's lane to the receiver's */
+#cluster .fr .ln { fill: none; stroke-linecap: round; }
+#cluster .fr .hit { stroke: transparent; stroke-width: 9; pointer-events: stroke; cursor: pointer; }
+/* held: the plot stands still while the pointer is on it, or for a few seconds after a tap (timeline.js setHeld); the
+   column header says so in words, in place of "the last few seconds" */
+#cluster .tl-held .tl-win { color: var(--ink); }
+#cluster .tl-held .tl-nowl .nl { stroke: var(--ink); }
+#cluster .fr.k-write .ln { stroke: var(--accent); stroke-width: 1.8; }
+#cluster .fr.k-repl .ln { stroke: var(--accent); stroke-width: 1.15; }
+#cluster .fr.k-vote .ln { stroke: var(--ink); stroke-width: 1.15; }
+#cluster .fr.k-link .ln { stroke: var(--k-link); stroke-width: 1; stroke-dasharray: 2 2.5; stroke-opacity: 0.75; }
+#cluster .fr.hid .ln { stroke: var(--k-beat); stroke-width: 0.8; stroke-dasharray: none; }
+#cluster .fr.hid.k-heal .ln { stroke: var(--k-heal); }
+#cluster .fr .tip, #cluster .fr .end { stroke: none; }
+#cluster .fr.k-write .tip, #cluster .fr.k-write .end, #cluster .fr.k-repl .tip, #cluster .fr.k-repl .end { fill: var(--accent); }
+#cluster .fr.k-vote .tip, #cluster .fr.k-vote .end { fill: var(--ink); }
+#cluster .fr.k-link .tip, #cluster .fr.k-link .end { fill: var(--k-link); }
+#cluster .fr.hid .tip { fill: var(--k-beat); }
+#cluster .fr.again { opacity: 0.4; }
+#cluster .fr.again.k-write .ln { stroke-width: 1; }
+#cluster .fr:hover .ln { stroke-width: 2.6; }
+#cluster .fr.sel { opacity: 1; }
+#cluster .fr.sel .ln { stroke-width: 3; }
+#cluster .fr.sel.k-vote .ln, #cluster .fr.sel.k-link .ln { stroke: var(--ink); stroke-dasharray: none; stroke-opacity: 1; }
+/* a verb tag on a landed line (its own layer, above every line) */
+#cluster .tl-tags { pointer-events: none; }
+#cluster .tag text { font: 600 8px var(--mono); letter-spacing: 0.02em; }
+#cluster .tag.k-write rect { fill: var(--accent); }
+#cluster .tag.k-write text { fill: var(--accent-ink); }
+#cluster .tag.k-repl rect { fill: var(--bg-2); stroke: var(--accent); stroke-width: 0.8; }
+#cluster .tag.k-repl text { fill: var(--accent); }
+#cluster .tag.k-vote rect { fill: var(--bg-2); stroke: var(--ink); stroke-width: 0.8; }
+#cluster .tag.k-vote text { fill: var(--ink); }
+#cluster .tag.sel rect { stroke-width: 1.6; }
+/* words on the plot keep a halo of the card's colour, so a line crossing them never cuts a letter */
+#cluster .mk text, #cluster .band .bl, #cluster .tl-grid .al, #cluster .tl-nowl .nt, #cluster .tl-nowl .gw { paint-order: stroke; stroke: var(--bg-2); stroke-width: 3px; stroke-linejoin: round; }
+/* commits and landings: a tick with the stamp at the owner, a dot where a copy applied the record */
+#cluster .tl-marks { pointer-events: none; }
+#cluster .tick .tk { stroke: var(--accent); stroke-width: 2; }
+#cluster .tick .ap { fill: var(--accent); }
+#cluster .chip rect { fill: var(--bg); stroke: var(--rule); stroke-width: 1; }
+#cluster .chip text { fill: var(--ink); font-size: 8.6px; }
+#cluster .chip.st rect { stroke: color-mix(in srgb, var(--accent) 70%, var(--rule)); }
+#cluster .chip.more text { fill: var(--faint); }
+#cluster .mk .mt { stroke: var(--faint); stroke-opacity: 0.7; }
+#cluster .mk text { fill: var(--faint); font-size: 8.5px; }
+#cluster .mk tspan.wal { fill: var(--dim); }
+#cluster .mk tspan.gate { fill: color-mix(in srgb, var(--wait) 70%, var(--dim)); }
+/* the now line and its gutter */
+#cluster .tl-nowl .nl { stroke: var(--dim); stroke-width: 1; stroke-dasharray: 2 3; }
+#cluster .tl-nowl .nt { fill: var(--ink); font-size: 9px; }
+#cluster .tl-nowl .gp text { font: 600 8px var(--mono); letter-spacing: 0.02em; }
+#cluster .tl-nowl .gp.k-write rect { fill: var(--accent); }
+#cluster .tl-nowl .gp.k-write text { fill: var(--accent-ink); }
+#cluster .tl-nowl .gp.k-repl rect { fill: var(--bg-2); stroke: var(--accent); stroke-width: 0.8; }
+#cluster .tl-nowl .gp.k-repl text { fill: var(--accent); }
+#cluster .tl-nowl .gp.k-vote rect { fill: var(--bg-2); stroke: var(--ink); stroke-width: 0.8; }
+#cluster .tl-nowl .gp.k-vote text { fill: var(--ink); }
+#cluster .tl-nowl .gp.k-link rect { fill: var(--bg-2); stroke: var(--k-link); stroke-width: 0.6; }
+#cluster .tl-nowl .gp.k-link text { fill: var(--k-link); }
+#cluster .tl-nowl .gp.again { opacity: 0.5; }
+#cluster .tl-nowl .gw { fill: var(--wait); font-size: 8.6px; }
+
+/* the frame panel: the card's lower pane (data's .rcard-wave grammar) */
+#cluster .tl-fr { border-top: 1px solid var(--rule); padding: 0.7rem 1rem 0.85rem; min-height: 8.6rem; }
+#cluster .tl-fr-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin-bottom: 0.45rem; }
+#cluster .tl-fr-k { font: 0.58rem var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: 0.1em; }
+#cluster .tl-fr-mode { font: 0.62rem var(--mono); color: var(--faint); }
+#cluster .tl-fr-nav { margin-left: auto; display: inline-flex; gap: 0.3rem; }
+#cluster .tl-fr-nav button { background: transparent; color: var(--dim); border: 1px solid var(--rule); font: 500 0.64rem var(--mono); padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; }
+#cluster .tl-fr-nav button:hover:not(:disabled) { color: var(--ink); border-color: var(--dim); }
+#cluster .tl-fr-nav button:disabled { opacity: 0.4; cursor: default; }
+#cluster .tl-fr-nav button[aria-pressed="true"] { color: var(--ink); background: var(--bg-3); border-color: var(--dim); }
+#cluster .tl-fr-body { font: 0.74rem/1.55 var(--mono); color: var(--dim); }
+#cluster .tl-fr-none { color: var(--faint); }
+#cluster .tl-fr-l1 { color: var(--ink); }
+#cluster .tl-fr-l1 .nid { font-size: inherit; }
+#cluster .tl-fv { font: 600 0.66rem var(--mono); padding: 0.05rem 0.4rem; border-radius: 3px; border: 1px solid var(--rule); color: var(--dim); letter-spacing: 0.02em; margin-right: 0.2rem; }
+#cluster .tl-fv.k-write { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#cluster .tl-fv.k-repl { border-color: var(--accent); color: var(--accent); }
+#cluster .tl-fv.k-vote { border-color: var(--ink); color: var(--ink); }
+#cluster .tl-arrow { color: var(--faint); }
+#cluster .tl-fr-t { color: var(--faint); }
+#cluster .tl-fr-gist { color: var(--dim); font-family: var(--sans); font-size: 0.8rem; margin: 0.1rem 0 0.35rem; }
+#cluster .tl-fr-gist code, #cluster .tl-fh code { font-size: 0.92em; }
+#cluster .tl-fr-r { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); column-gap: 0.6rem; align-items: baseline; }
+#cluster .tl-fk { font-size: 0.6rem; color: var(--faint); text-transform: uppercase; letter-spacing: 0.08em; }
+#cluster .tl-fo { color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+#cluster .tl-fo .rec { font-size: 0.74rem; }
+#cluster .tl-fo .stamp { font-size: 0.66rem; margin-right: 0.35rem; }
+#cluster .tl-fo .stamp.un { color: var(--faint); border-style: dashed; }
+#cluster .tl-fh { grid-column: 2; font-size: 0.64rem; color: var(--faint); }
+#cluster .tl-fh code { color: var(--dim); }
+
+/* narrower screens: the heads get thinner; phones: a two-line head, the window shortens (timeline.js) */
+@media (max-width: 860px) {
+  #cluster .tl { --tl-hw: 10.4rem; }
+  #cluster .tl-cols > span, #cluster .tl-win { white-space: normal; }
+  #cluster .tl-cols-r { flex-wrap: wrap; row-gap: 0.15rem; }
+  #cluster .tl-hidden { margin-left: 0; }
+  /* the head keeps its four lines inside the lane: the stamp takes its own line, the numeral steps down */
+  #cluster .tl-lane { padding: 0 0.6rem; gap: 0.1rem; line-height: 1.25; }
+  #cluster .tl-role { display: none; }
+  #cluster .tl-st { line-height: 1; }
+  #cluster .tl-life-m { display: none; }
+  #cluster .tl-h2 { flex-wrap: wrap; row-gap: 0.08rem; column-gap: 0.3rem; }
+  #cluster .tl-v { font-size: 1.1rem; line-height: 1.15; }
+  #cluster .tl-st { flex-basis: 100%; overflow: visible; }
+  #cluster .tl-st .stamp { font-size: 0.56rem; padding: 0 0.25rem; gap: 0.2rem; }
+}
+@media (max-width: 640px) {
+  #cluster .tl { --tl-hw: 7.2rem; border-radius: 10px; }
+  #cluster .tl-plot { -webkit-mask-image: linear-gradient(90deg, transparent, #000 20px); mask-image: linear-gradient(90deg, transparent, #000 20px); }
+  #cluster .tl-head { padding: 0.55rem 0.7rem; }
+  #cluster .tl-cols { grid-template-columns: minmax(0, 1fr); }
+  #cluster .tl-cols-l { display: none; }
+  #cluster .tl-cols > span { padding: 0.4rem 0.7rem; white-space: normal; }
+  #cluster .tl-cols-r { flex-wrap: wrap; row-gap: 0.15rem; }
+  #cluster .tl-win { white-space: normal; }
+  #cluster .tl-hidden { margin-left: 0; }
+  #cluster .tl-lane { padding: 0 0.5rem; gap: 0.08rem; }
+  #cluster .tl-lane-ax { padding: 0 0.5rem; font-size: 0; }
+  #cluster .tl-lane-ax::after { content: 'clock'; font-size: 0.54rem; }
+  #cluster .tl-h1 { flex-wrap: wrap; column-gap: 0.35rem; row-gap: 0; }
+  #cluster .tl-role { display: none; }
+  #cluster .tl-name .nid { font-size: 0.82rem; }
+  #cluster .tl-via { font: 0.6rem var(--mono); color: var(--faint); white-space: nowrap; }
+#cluster .tl-via .nid { font-size: inherit; color: var(--dim); }
+#cluster .tl-pill { margin-left: auto; font-size: 0.5rem; }
+  #cluster .tl-h2 { flex-wrap: wrap; row-gap: 0.12rem; column-gap: 0.3rem; }
+  #cluster .tl-v { font-size: 1.05rem; line-height: 1.1; }
+  #cluster .tl-v.word { font-size: 0.62rem; line-height: 1.2rem; }
+  #cluster .tl-st { flex-basis: 100%; overflow: visible; }
+  #cluster .tl-st .stamp { font-size: 0.5rem; padding: 0 0.25rem; gap: 0.2rem; white-space: normal; flex-wrap: wrap; row-gap: 0; }
+  #cluster .tl-h3 { display: none; }
+  #cluster .tl-fr { padding: 0.6rem 0.7rem 0.75rem; }
+  #cluster .tl-fr-nav { margin-left: 0; }
+  #cluster .tl-fr-r { grid-template-columns: 1fr; }
+  #cluster .tl-fh { grid-column: 1; }
+}

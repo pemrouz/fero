@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>fero — plain assignment replicates</title>
+  <meta name="description" content="fero: distributed, replicated reactive resources for JavaScript. await fero(name) gives you a live object; read it like a plain object, change it by plain assignment, and every process that opens the same name sees the same object.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230c0c0d'/%3E%3Ctext x='8' y='12.5' text-anchor='middle' font-family='monospace' font-size='13' font-weight='600' fill='%239d7bff'%3E%E2%88%B4%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./v2.css">
+  <link rel="stylesheet" href="./fero.css">
+  <link rel="stylesheet" href="./variants.css">
+  <link rel="stylesheet" href="./sections/lede.css">
+  <link rel="stylesheet" href="./sections/cluster.css">
+  <link rel="stylesheet" href="./sections/argument.css">
+  <link rel="stylesheet" href="./sections/break.css">
+  <link rel="stylesheet" href="./sections/start.css">
+  <link rel="stylesheet" href="./sections/inside.css">
+  <link rel="stylesheet" href="./sections/contract.css">
+  <link rel="stylesheet" href="./sections/wire.css">
+  <link rel="stylesheet" href="./sections/data.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <a class="mark" href="./index.html" title="∴ — three members plus dir, the README's deployment rule"><b>∴</b> fero</a>
+    <span class="rule"></span>
+    <span class="date">distributed, replicated reactive resources for javascript</span>
+    <nav class="mast-nav">
+      <a href="#cluster">demo</a>
+      <a href="#break">break it</a>
+      <a href="#start">start</a>
+      <a href="#contract">contract</a>
+    </nav>
+  </header>
+
+  <main id="main">
+
+  <!-- ===== lede ===== -->
+<section class="lede" id="lede" aria-label="fero: plain assignment replicates">
+  <div class="opt" data-section="lede">
+
+    <!-- a · the concept. The card is the house cluster (cluster.js `page`): it follows every write to gadgets, the
+         record is decoded from the frame the writer actually sent, and every row is read from that node's kernel. -->
+    <div data-variant="a" data-label="the concept">
+      <p class="kicker">one assignment, one record</p>
+      <h1 class="headline">Plain assignment <em>replicates</em>.</h1>
+      <div class="lede-grid">
+        <div class="lede-text">
+          <p class="standfirst"><code>await fero(name)</code> gives you a live object. Read it like a plain object. Change it by plain assignment. Derive live views from it. Every process that opens the same name sees the same object, on one box or across a cluster.</p>
+          <p class="lede-sub">fero's own examples build a shop, a chat room, a kanban board and a ledger. Each row (a top-level key) has one <b>owner</b>: the one server that stamps its writes. Your assignment becomes one record. The owner gives it a <b>stamp</b>: the number of the <b>view</b> (the agreed list of servers, which only a vote changes), a counter and its name. Then the record lands on every copy. Nothing shows before it commits, and nothing merges.</p>
+        </div>
+        <figure class="lede-fig" aria-label="shop: one write, every copy. The latest write to gadgets, the record it becomes, and that row on every node, read from fero's kernel running in this tab">
+          <div class="fig-head">
+            <span class="fig-src">shop <span class="lf-clock"></span></span>
+            <span class="fig-head-r"><span class="lf-view"></span></span>
+          </div>
+          <div class="fig-io">
+            <div class="fig-line"><span class="fig-lab">write</span><span class="lf-write"><span class="dim">…</span></span></div>
+            <div class="fig-line"><span class="fig-lab">record</span><span class="lf-rec"><span class="dim">…</span></span></div>
+            <p class="fig-hint"><span class="lf-hint">the page posts the record this line becomes</span></p>
+          </div>
+          <div class="fig-scroll" data-scroll-x><table class="fig-table">
+            <thead><tr><th scope="col" class="c-node">node</th><th scope="col" class="c-role">role</th><th scope="col" class="c-val"><span class="lf-rowname">gadgets</span><span class="ph-only"> · stamp</span></th><th scope="col" class="c-stamp" title="the stamp: the view number, the owner's counter, the owner's name. A copy keeps the record with the biggest stamp.">stamp</th><th scope="col" class="c-land" title="when this copy applied the record, counted from the moment the owner stamped it; simulated time over simulated links">landed</th></tr></thead>
+            <tbody class="lf-rows"><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr></tbody>
+          </table></div>
+          <div class="fig-foot"><span class="lf-foot">…</span></div>
+        </figure>
+      </div>
+      <div class="cta lede-cta">
+        <span class="lede-status pending" title="this version of fero has no npm release and no public repository yet, checked when this page was built">fero <b class="lede-major">·</b> · not published yet</span>
+        <button class="install lede-copy" type="button" data-copy="const shop = await fero('shop', { data: { widgets: { stock: 3 } } })" title="click to copy: the first fero() call in the README's shape block" aria-label="Copy this line from the README"><code><span class="t-kw">const</span> shop <span class="t-p">=</span> <span class="t-kw">await</span> fero<span class="t-p">(</span><span class="tok-str">'shop'</span><span class="t-p">, {</span> <span class="t-k">data</span><span class="t-p">: {</span> <span class="t-k">widgets</span><span class="t-p">: {</span> <span class="t-k">stock</span><span class="t-p">:</span> <span class="tok-num">3</span> <span class="t-p">} } })</span></code></button>
+        <!-- the links travel together: where the row is short of room they drop to the next line as one group -->
+        <span class="lede-links">
+          <a class="cta-link" href="#break">break it ↓</a>
+          <a class="cta-link" href="#start">from zero ↓</a>
+          <!-- held until data/lede/links.json (tools/lede-links.mjs) finds the data site free of CONCEPT §8's claims about fero -->
+          <a class="cta-link lede-datalink" href="https://pemrouz.github.io/data/" target="_blank" rel="noopener" hidden>data ↗</a>
+        </span>
+      </div>
+      <p class="trust lede-trust"></p>
+    </div>
+
+    <!-- b · the application. The same card, plus one button that crashes the owner of gadgets (or restarts it).
+         The story lines print only when the kernel produces them (journal rows, views, stamps).
+         `hidden` here keeps the default page from painting both variants before variants.js picks one. -->
+    <div data-variant="b" data-label="the application" hidden>
+      <p class="kicker">one row, one writer</p>
+      <h1 class="headline lede-h-b">Kill the owner.<br class="br-wide"> The write still <em>lands</em>.</h1>
+      <div class="lede-grid lede-grid-b">
+        <div class="lede-text">
+          <p class="standfirst">Each row (a top-level key) has one <b>owner</b>: the one server that stamps its writes. Kill it, and a write to its row waits. Nothing shows early.</p>
+          <p class="lede-sub">The other servers vote the dead one out: a new <b>view</b> (the agreed list of servers). A survivor takes the row and gives the write its <b>stamp</b>: the view number, a counter and its name. The write lands on every live copy. That needs a majority: two servers cannot survive a crash, so run three. <button class="act lb-btn" type="button" disabled title="the servers are still voting">crash the owner ▸</button></p>
+        </div>
+        <figure class="lede-fig" aria-label="shop: one write, every copy. The latest write to gadgets, the record it becomes, and that row on every node, read from fero's kernel running in this tab">
+          <div class="fig-head">
+            <span class="fig-src">shop <span class="lf-clock"></span></span>
+            <span class="fig-head-r"><span class="lf-view"></span></span>
+          </div>
+          <div class="fig-io">
+            <div class="fig-line"><span class="fig-lab">write</span><span class="lf-write"><span class="dim">…</span></span></div>
+            <div class="fig-line"><span class="fig-lab">record</span><span class="lf-rec"><span class="dim">…</span></span></div>
+            <p class="fig-hint"><span class="lf-hint">the page posts the record this line becomes</span></p>
+          </div>
+          <div class="fig-scroll" data-scroll-x><table class="fig-table">
+            <thead><tr><th scope="col" class="c-node">node</th><th scope="col" class="c-role">role</th><th scope="col" class="c-val"><span class="lf-rowname">gadgets</span><span class="ph-only"> · stamp</span></th><th scope="col" class="c-stamp" title="the stamp: the view number, the owner's counter, the owner's name. A copy keeps the record with the biggest stamp.">stamp</th><th scope="col" class="c-land" title="when this copy applied the record, counted from the moment the owner stamped it; simulated time over simulated links">landed</th></tr></thead>
+            <tbody class="lf-rows"><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr><tr class="ph"><td class="c-node">…</td><td class="c-role"></td><td class="c-val">…<span class="sub"><span class="stamp">…</span></span></td><td class="c-stamp"><span class="stamp">…</span></td><td class="c-land">…</td></tr></tbody>
+          </table></div>
+          <div class="fig-foot"><span class="lf-foot">…</span><p class="lede-settings lb-settings">simulated clock · here: <b>heartbeat <span class="s-hb" data-ph="··· ms">··· ms</span></b>, <b>redial <span class="s-rd" data-ph="·· ms">·· ms</span></b> · at fero's defaults (<b>heartbeat <span class="s-dhb" data-ph="··· ms">··· ms</span></b>, <b>redial <span class="s-drd" data-ph="··· ms">··· ms</span></b>) a crashed server was voted out after <b><span class="s-z" data-ph="··.· s">··.· s</span></b> · <span class="nw">own run · seed <b class="s-seed" data-ph="·">·</b></span></p></div>
+        </figure>
+        <div class="lede-storybox"><ol class="lede-story lb-story" aria-label="what the kernel did, line by line"></ol></div>
+      </div>
+      <div class="cta lede-cta">
+        <span class="lede-status pending" title="this version of fero has no npm release and no public repository yet, checked when this page was built">fero <b class="lede-major">·</b> · not published yet</span>
+        <button class="install lede-copy" type="button" data-copy="const shop = await fero('shop', { data: { widgets: { stock: 3 } } })" title="click to copy: the first fero() call in the README's shape block" aria-label="Copy this line from the README"><code><span class="t-kw">const</span> shop <span class="t-p">=</span> <span class="t-kw">await</span> fero<span class="t-p">(</span><span class="tok-str">'shop'</span><span class="t-p">, {</span> <span class="t-k">data</span><span class="t-p">: {</span> <span class="t-k">widgets</span><span class="t-p">: {</span> <span class="t-k">stock</span><span class="t-p">:</span> <span class="tok-num">3</span> <span class="t-p">} } })</span></code></button>
+        <span class="lede-links">
+          <a class="cta-link" href="#break">break it ↓</a>
+          <a class="cta-link" href="#start">from zero ↓</a>
+          <a class="cta-link lede-datalink" href="https://pemrouz.github.io/data/" target="_blank" rel="noopener" hidden>data ↗</a>
+        </span>
+      </div>
+      <p class="trust lede-trust"></p>
+    </div>
+
+  </div>
+  <span class="sr-only lede-live" aria-live="polite"></span>
+</section>
+
+  <!-- ===== cluster ===== -->
+<section class="race cl" id="cluster" aria-label="the cluster: one cluster you can break">
+
+  <!-- the head: the kicker and the story; under it the verbs and the clock. This IS the dock while it is on
+       screen; once it scrolls away, the same controls float (#cl-dock below) -->
+  <div class="cl-head" id="cl-head">
+    <div class="race-head cl-head1">
+      <span class="race-title" id="cl-kicker">one cluster · three servers · one client · break it</span>
+      <div class="race-ctrl cl-ctrl">
+        <span class="ctrl cl-story" role="group" aria-label="the story">
+          <button type="button" data-act="story-prev" id="cl-story-prev" title="start the story over: the cluster is rebuilt from its seed" aria-label="start the story over: the cluster is rebuilt from its seed">↺ start over</button>
+          <span class="cl-story-pos" id="cl-story-pos" data-literal>0 / 6</span>
+          <button type="button" data-act="story-next" id="cl-story-next" title="the next step of the story" aria-label="next step of the story">›</button>
+          <span class="cl-story-name" id="cl-story-name">start the story</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="cl-bar" id="cl-bar">
+      <div class="cl-verbs" id="cl-verbs" role="group" aria-label="break the cluster">
+        <button type="button" class="act" data-act="write" title="post one whole-row write">write</button>
+        <button type="button" class="act danger" data-act="crash" aria-haspopup="menu" title="crash a server, like kill -9: its links drop, its disk is kept">crash ▾</button>
+        <button type="button" class="act" data-act="restart" aria-haspopup="menu" title="restart a crashed server from its disk">restart ▾</button>
+        <button type="button" class="act danger" data-act="cut" aria-haspopup="menu" title="cut a node off from everyone">cut ▾</button>
+        <button type="button" class="act" data-act="heal" hidden title="put every cut link back">heal</button>
+        <button type="button" class="act" data-act="reset" title="rebuild the whole run from its seed">↺ reset</button>
+      </div>
+      <div class="race-ctrl cl-clock" role="group" aria-label="the clock">
+        <span class="cl-slow" id="cl-slow" aria-hidden="true">slow<span class="cl-slow-w"> motion</span></span>
+        <span class="ctrl cl-speed" role="group" aria-label="speed">
+          <button type="button" data-act="speed" data-speed="watch" aria-pressed="true" title="1× on the simulated clock, slowed to a quarter while a new frame is on the wire">watch</button>
+          <button type="button" data-act="speed" data-speed="1" aria-pressed="false" data-literal title="simulated time runs at wall-clock speed">1×</button>
+          <button type="button" data-act="speed" data-speed="4" aria-pressed="false" data-literal title="simulated time runs four times faster than the wall clock">4×</button>
+        </span>
+        <button type="button" data-act="pause" class="cl-pause" aria-pressed="false" aria-label="pause">⏸<span class="cl-pw"> pause</span></button>
+        <button type="button" data-act="seed" class="cl-seed" title="pick a new seed: the whole cluster is rebuilt from it">seed <b id="cl-seed" data-attested="runtime">—</b></button>
+      </div>
+    </div>
+  </div>
+
+  <p class="cl-now" id="cl-now">The servers start and dial each other.</p>
+
+  <div class="opt" data-section="cluster">
+
+    <!-- ===== a · cards: four node screens under a band of links ===== -->
+    <div data-variant="a" data-label="cards" class="cl-a" id="cl-a">
+      <div class="cl-stage" id="cl-stage-a">
+        <svg class="cl-band" id="cl-band-a" aria-hidden="true"></svg>
+        <div class="cl-band-foot">
+          <span class="cl-band-k" id="cl-band-k-a">frames on the wire · times on the simulated clock</span>
+          <span class="cl-hidden" id="cl-hidden-a"></span>
+        </div>
+        <div class="cl-cards" id="cl-cards-a"></div>
+      </div>
+      <div class="cl-tape" id="cl-tape-a">
+        <div class="cl-tape-h"><span class="cl-tape-k">last records</span><span class="cl-tape-sub">stamp · the record · copies that applied it · simulated time</span></div>
+        <ol class="cl-tape-list" id="cl-tape-list-a"></ol>
+      </div>
+    </div>
+
+    <!-- ===== b · timeline: one lane per node, simulated time left to right, every frame a slanted line ===== -->
+    <div data-variant="b" data-label="timeline" class="cl-b" id="cl-b">
+      <div class="tl" id="cl-tl-b">
+        <div class="tl-head">
+          <span class="tl-k">timeline · one lane per node</span>
+          <span class="tl-legend" id="cl-tl-legend-b"></span>
+        </div>
+        <div class="tl-cols">
+          <span class="tl-cols-l" aria-hidden="true">node · gadgets.stock · stamp</span>
+          <span class="tl-cols-r"><span class="tl-win" id="cl-tl-win-b" aria-hidden="true">frames on the wire · simulated clock</span><span class="tl-hidden" id="cl-tl-hidden-b"></span></span>
+        </div>
+        <div class="tl-body" id="cl-tl-body-b">
+          <div class="tl-heads" id="cl-tl-heads-b"></div>
+          <div class="tl-plot" id="cl-tl-plot-b">
+            <svg class="tl-svg" id="cl-tl-svg-b" data-attested="runtime" role="img" aria-label="the timeline: one lane per node; each slanted line is one frame from its sender's lane to its receiver's, drawn at its real send and arrival times on the simulated clock"></svg>
+          </div>
+        </div>
+        <div class="tl-fr" id="cl-tl-fr-b">
+          <div class="tl-fr-h">
+            <span class="tl-fr-k">the frame</span>
+            <span class="tl-fr-mode" id="cl-tl-fr-mode-b">click any line to take that frame apart</span>
+            <span class="tl-fr-nav" role="group" aria-label="step through the frames">
+              <button type="button" data-tl="prev" title="the frame sent before this one">‹ earlier</button>
+              <button type="button" data-tl="next" title="the frame sent after this one">later ›</button>
+              <button type="button" data-tl="latest" aria-pressed="true" title="follow the latest WRITE frame">latest</button>
+            </span>
+          </div>
+          <div class="tl-fr-body" id="cl-tl-fr-body-b"><span class="tl-fr-none">no frame yet</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="statstrip cl-strip" id="cl-strip">
+    <div class="fstat"><span class="fstat-k">view</span><b class="fstat-v" id="cl-s-view" data-attested="runtime">—</b><span class="cl-sub" id="cl-s-members" data-attested="runtime">—</span></div>
+    <div class="fstat"><span class="fstat-k">writes</span><b class="fstat-v"><span id="cl-s-commits" data-attested="runtime">—</span> <span class="cl-unit">committed</span></b><span class="cl-sub"><span id="cl-s-wait" data-attested="runtime">—</span> waiting</span></div>
+    <div class="fstat"><span class="fstat-k">copies</span><b class="fstat-v" id="cl-s-copies-v"><span id="cl-s-agree" data-attested="runtime">—</span> <span class="cl-unit">of</span> <span id="cl-s-of" data-attested="runtime">—</span></b><span class="cl-sub" id="cl-s-copies">agree</span></div>
+    <div class="fstat"><span class="fstat-k">checks</span><b class="fstat-v" id="cl-s-checks-v"><span id="cl-s-broken" data-attested="runtime">—</span> <span class="cl-unit">broken</span></b><span class="cl-sub"><span class="broken" id="cl-s-broken-n" hidden></span> <span id="cl-s-rules" data-attested="runtime">—</span> rules · <span id="cl-s-events" data-attested="runtime">—</span> events</span></div>
+  </div>
+
+  <p class="race-caption cl-caption" id="cl-caption">
+    This is <b>fero's kernel</b>: the same kernel files its TCP shell runs, with the types stripped.
+    A simulator gives it a network, disks and a clock, and "the kernel cannot tell it isn't on a real
+    network; that is the design" (<code>sim/exec.ts</code>). The page cannot call <code>fero()</code> itself,
+    because that needs Node's sockets and files. So a write here posts the record an assignment becomes:
+    <code id="cl-cap-assign">shop.data.gadgets = { stock: … }</code> is <code id="cl-cap-rec">{ type: … }</code>.
+    Times are on the simulated clock, and links are set to <b id="cl-cap-delay" data-attested="runtime">—</b>
+    so a write is slow enough to watch.<span class="cl-cap-b" id="cl-cap-b" hidden> Each slanted line is one message, drawn at its real send and arrival times.</span> A crashed server is voted out when the others' redials give up:
+    <b id="cl-cap-x" data-attested="runtime">—</b> at redial <b id="cl-cap-redial" data-attested="build">—</b>,
+    and <b id="cl-cap-z" data-attested="runtime">—</b> at fero's defaults
+    (<span id="cl-cap-runs">own runs, seeded from the dock</span>). Every other number is read from the kernel as it runs.
+  </p>
+
+  <!-- the dock, floating: the same controls once the head has scrolled away. It never sits over the page's text:
+       at 1400 px and wider it is a narrow rail in the right margin, outside the column; narrower, a slim tab in the
+       right gutter (the state as a shape; the tab opens every verb, with the full status line) -->
+  <div class="cl-dock" id="cl-dock" hidden role="region" aria-label="cluster controls">
+    <div class="cl-dock-status" id="cl-dock-status"></div>
+    <div class="cl-dock-verbs" role="group" aria-label="break the cluster">
+      <button type="button" data-act="write" title="post one whole-row write">write</button>
+      <button type="button" data-act="crash" aria-haspopup="menu" title="crash a server, like kill -9">crash ▾</button>
+      <button type="button" data-act="restart" aria-haspopup="menu" title="restart a crashed server from its disk">restart ▾</button>
+      <button type="button" data-act="cut" aria-haspopup="menu" title="cut a node off from everyone">cut ▾</button>
+      <button type="button" data-act="heal" hidden title="put every cut link back">heal</button>
+      <button type="button" data-act="pause" class="cl-pause" aria-pressed="false" aria-label="pause">⏸</button>
+      <button type="button" data-act="reset" title="rebuild the whole run from its seed" aria-label="reset: rebuild from the seed">↺ reset</button>
+    </div>
+    <button type="button" class="cl-dock-more" data-act="more" aria-haspopup="menu" aria-label="the cluster · open for write, crash, restart, cut, pause and reset"><span class="ds-e" aria-hidden="true">⋮</span></button>
+  </div>
+
+  <div class="cl-menu" id="cl-menu" role="menu" hidden></div>
+</section>
+
+  <!-- ===== argument ===== -->
+<section class="fsec" id="argument">
+  <div class="opt" data-section="argument">
+
+    <!-- a · five cards: one write, followed by its bytes through the house cluster (sections/argument.js) -->
+    <div data-variant="a" data-label="five cards">
+      <div class="sec-head"><span class="sec-no" data-literal>01</span><h2>The argument</h2></div>
+      <p class="lead-para">
+        You change one row, and fero turns that line into one record: a type, a key and a value.
+        The row's owner stamps the record and sends it to every copy.
+        Each copy keeps the record with the biggest stamp, so two copies that hold the same records show the same value.
+      </p>
+
+      <div class="arg-head">
+        <span class="arg-kick">one write, followed by its bytes</span>
+        <span class="arg-where" id="arg-where-a"></span>
+      </div>
+      <div class="arg-strip" id="arg-strip-a">
+        <div class="arg-card" data-step="assign">
+          <span class="arg-k">assign</span>
+          <code class="arg-code" id="arg-line-a"></code>
+          <span class="arg-cell"><span class="arg-cell-k">from</span><span class="arg-cell-v dimv" id="arg-from-a"></span></span>
+          <span class="arg-cell"><span class="arg-cell-k" id="arg-held-k-a" title="what c1's copy of the row holds">now</span><span class="arg-cell-v" id="arg-held-a"></span></span>
+          <span class="arg-sub" id="arg-assign-sub-a">the page picks the next value from a fixed list</span>
+        </div>
+        <span class="arg-arrow" data-arrow="1" aria-hidden="true"></span>
+        <div class="arg-card" data-step="record">
+          <span class="arg-k">record</span>
+          <code class="arg-code arg-recbox" id="arg-rec-a"></code>
+          <span class="arg-cell"><span class="arg-cell-k">sent as</span><span class="arg-cell-v" id="arg-frame-a"></span></span>
+          <span class="arg-cell"><span class="arg-cell-k">stamp</span><span class="arg-cell-v dimv">none</span></span>
+          <span class="arg-sub arg-sub-wrap" id="arg-type-a"></span>
+        </div>
+        <span class="arg-arrow" data-arrow="2" aria-hidden="true"></span>
+        <div class="arg-card" data-step="owner">
+          <span class="arg-k">owner</span>
+          <span class="arg-big" id="arg-owner-a"></span>
+          <span class="arg-note" id="arg-owner-note-a"></span>
+          <div class="arg-hops" id="arg-hops-a"></div>
+          <span class="arg-sub arg-sub-wrap" id="arg-ring-a">every server builds the same ring from the same view</span>
+        </div>
+        <span class="arg-arrow" data-arrow="3" aria-hidden="true"></span>
+        <div class="arg-card" data-step="stamp">
+          <span class="arg-k">stamp</span>
+          <span class="arg-stampbox" id="arg-stamp-a"></span>
+          <span class="arg-legend">view&nbsp;· counter&nbsp;· who&nbsp;stamped&nbsp;it</span>
+          <span class="arg-note" id="arg-stamp-note-a"></span>
+          <span class="arg-cell col" id="arg-beats-cell-a" hidden><span class="arg-cell-k" id="arg-beats-k-a">beats</span><span class="arg-cell-v" id="arg-beats-a"></span></span>
+          <span class="arg-cell" id="arg-at-cell-a" hidden><span class="arg-cell-k">at</span><span class="arg-cell-v dimv" id="arg-stamped-a"></span></span>
+          <span class="arg-sub">the biggest stamp wins</span>
+        </div>
+        <span class="arg-arrow" data-arrow="4" aria-hidden="true"></span>
+        <div class="arg-card" data-step="copies">
+          <span class="arg-k arg-k-row"><span>every copy</span><span class="arg-k-note" id="arg-copies-note-a"></span></span>
+          <div class="arg-copies" id="arg-copies-a"></div>
+          <span class="arg-agree" id="arg-agree-a"></span>
+          <span class="arg-sub">each copy keeps the biggest stamp</span>
+        </div>
+      </div>
+
+      <div class="arg-run">
+        <button type="button" class="stream-btn" id="arg-run-a" aria-describedby="arg-status-a">run it ▸</button>
+        <span class="arg-status" id="arg-status-a"></span>
+      </div>
+      <div class="arg-ladder-head"><span class="arg-ladder-k">confirm ladder</span><span class="arg-ladder-note" id="arg-ladder-note-a">three rungs a write can be waited for</span></div>
+      <div class="arg-ladder" id="arg-ladder-a">
+        <div class="arg-rung" data-rung="committed"><i class="arg-lamp" aria-hidden="true"></i><b>committed</b><span class="arg-rung-t" id="arg-t-committed-a"></span><span class="arg-rung-v" id="arg-l-committed-a">the owner stamped it</span></div>
+        <div class="arg-rung" data-rung="replicated"><i class="arg-lamp" aria-hidden="true"></i><b>replicated</b><span class="arg-rung-t" id="arg-t-replicated-a"></span><span class="arg-rung-v" id="arg-l-replicated-a">a majority of the view holds it in its log</span></div>
+        <div class="arg-rung" data-rung="persisted"><i class="arg-lamp" aria-hidden="true"></i><b>persisted</b><span class="arg-rung-t" id="arg-t-persisted-a"></span><span class="arg-rung-v" id="arg-l-persisted-a">a majority has it on disk</span></div>
+      </div>
+
+      <p class="muted">
+        Nothing shows before it commits, and nothing merges. Watch <span data-literal>c1</span>'s line in the last card:
+        it keeps its old value until the owner's record comes back. If two writes race for one cell, the bigger stamp
+        wins, and the other value is gone.
+      </p>
+      <!-- argument.js keeps it: how the cards play a write back (dropped under reduced motion), and any link a fault gave another delay -->
+      <p class="caption" id="arg-caption-a"><span class="arg-delay">While a write's frames are on the wire, the cards play it at a quarter of the cluster's pace; every time shown is still the kernel's.</span></p>
+    </div>
+
+    <!-- b · follow the bytes: the same write as every frame it caused, top to bottom, each decoded from its bytes -->
+    <div data-variant="b" data-label="follow the bytes">
+      <div class="sec-head"><span class="sec-no" data-literal>01</span><h2>The argument</h2></div>
+      <p class="lead-para">
+        You change one row, and fero turns that line into one record: a type, a key and a value.
+        The row's owner stamps the record and sends it to every copy.
+        Each copy keeps the record with the biggest stamp, so two copies that hold the same records show the same value.
+      </p>
+
+      <div class="arg-head">
+        <span class="arg-kick">every frame one write caused</span>
+        <span class="arg-where" id="arg-where-b"></span>
+      </div>
+      <div class="arg-bytes" id="arg-bytes-b">
+        <div class="arg-subject" id="arg-subject-b"></div>
+        <div class="arg-fr arg-fr-cols" aria-hidden="true">
+          <span class="arg-fr-lanes" id="arg-lanes-b"></span>
+          <span class="arg-fr-t">sent → landed</span>
+          <span class="arg-fr-route">route</span>
+          <span class="arg-fr-verb">frame</span>
+          <span class="arg-fr-size">size</span>
+          <span class="arg-fr-what">what its bytes say</span>
+        </div>
+        <div class="arg-frames" id="arg-frames-b"><ol class="arg-frames-list" id="arg-frames-list-b"></ol></div>
+      </div>
+
+      <div class="arg-run">
+        <button type="button" class="stream-btn" id="arg-run-b" aria-describedby="arg-status-b">run it ▸</button>
+        <span class="arg-status" id="arg-status-b"></span>
+      </div>
+
+      <p class="muted">
+        Each line is one frame a node sent, taken apart by <code>kernel/codec.js</code>. The ◆ line is the owner
+        stamping the record. Grey lines are repeats. A write is sent again when no receipt has come back in time, and
+        <span data-literal>c1</span>'s server passes each resend on, unless it owns the row. A record is sent again
+        when a digest says it is missing. A digest is a node's list of the highest counter it holds from each writer,
+        and it can be out of date by the time it lands.
+      </p>
+      <p class="caption" id="arg-caption-b"><span class="arg-delay">While a write's frames are on the wire, the list plays it at a quarter of the cluster's pace; every time shown is still the kernel's.</span></p>
+    </div>
+
+  </div>
+</section>
+
+  <!-- ===== break ===== -->
+<section class="fsec" id="break">
+  <div class="opt" data-section="break">
+
+    <!-- ===== a · the chips and one panel (data's operator surface) ===== -->
+    <div data-variant="a" data-label="chips + one panel">
+      <div class="sec-head"><span class="sec-no" data-literal>02</span><h2>Break it</h2></div>
+      <p class="lead-para">A cluster earns trust on its bad days. Each chip below does one bad thing to the cluster above: cut a server off, kill one, make a disk lie about a save. The panel shows what the kernel did about it, from its own journal: the messages it sent, the vote it held, the writes that waited. The faults come from the simulator. Every answer is the real kernel&rsquo;s.</p>
+      <!-- no status line here: the dock beside the page shows the cluster's state and carries pause and reset -->
+
+      <div class="brk-grid" id="brk-grid-a">
+        <div class="brk-card" data-group="network">
+          <span class="brk-kicker">network</span>
+          <p class="brk-card-def">the links between the nodes</p>
+          <div class="demo-chips brk-chips" data-group="network"></div>
+        </div>
+        <div class="brk-card" data-group="process">
+          <span class="brk-kicker">process</span>
+          <p class="brk-card-def">kill, stop or start one server</p>
+          <div class="demo-chips brk-chips" data-group="process"></div>
+        </div>
+        <div class="brk-card" data-group="disk">
+          <span class="brk-kicker">disk</span>
+          <p class="brk-card-def">each server&rsquo;s log on disk</p>
+          <div class="demo-chips brk-chips" data-group="disk"></div>
+        </div>
+        <div class="brk-card" data-group="writes">
+          <span class="brk-kicker">writes</span>
+          <p class="brk-card-def">writes at a bad moment</p>
+          <div class="demo-chips brk-chips" data-group="writes"></div>
+        </div>
+      </div>
+
+      <div class="brk-panel" id="brk-panel-a">
+        <div class="brk-l">
+          <div class="brk-head"><span class="brk-cat" id="brk-cat-a">process</span><span class="brk-name" id="brk-name-a">crash the owner</span></div>
+          <p class="brk-did" id="brk-did-a"></p>
+          <div class="brk-node">
+            <div class="brk-label"><span>in Node this is</span><span class="brk-src" id="brk-src-a"></span></div>
+            <pre class="code brk-cmd" id="brk-cmd-a" data-hl="off"></pre>
+            <p class="brk-say" id="brk-say-a"></p>
+          </div>
+          <blockquote class="brk-promise" id="brk-promise-a"></blockquote>
+          <div class="brk-next" id="brk-next-wrap-a" hidden><button type="button" class="act" id="brk-next-a">next ▸</button></div>
+        </div>
+        <div class="brk-m">
+          <div class="col-head"><span class="col-head-label" id="brk-lines-label-a">what the kernel did since the click</span><span class="col-head-count" id="brk-count-a"></span></div>
+          <div class="brk-lines-box">
+            <ol class="brk-lines" id="brk-lines-a" aria-live="off"></ol>
+            <button type="button" class="brk-earlier" id="brk-earlier-a" hidden>↑ <b>…</b> <i>earlier lines</i></button>
+            <button type="button" class="brk-more" id="brk-more-a" hidden>↓ <b>…</b> <i>more lines</i></button>
+          </div>
+          <p class="brk-routine" id="brk-routine-a"></p>
+        </div>
+        <div class="brk-r">
+          <div class="brk-title"><span id="brk-facts-title-a">the numbers</span><span class="brk-title-sub">times on the simulated clock</span></div>
+          <div class="brk-facts" id="brk-facts-a"></div>
+        </div>
+        <div class="brk-rulestrip">
+          <p class="brk-rulesum"><span class="brk-rulekick">rules</span> <span class="brk-rulewhen">checked after every event</span> · <span id="brk-rulesum-a"></span></p>
+          <p class="brk-rules" id="brk-rules-a"></p>
+          <p class="brk-scoped" id="brk-scoped-a"></p>
+          <div class="brk-rulebad" id="brk-rulebad-a" hidden></div>
+        </div>
+      </div>
+
+      <p class="cat-foot muted brk-foot">Each chip acts on the one shared cluster, so every figure on the page sees the same fault. An own run is a separate simulation from the same seed, kept apart from the cluster above. Times are on the simulated clock. Here, links take <span class="nw"><b id="brk-delay-a">…</b> ms</span>, the heartbeat is <span class="nw"><b id="brk-hb-a">…</b> ms</span> and the redial wait is <span class="nw"><b id="brk-rd-a">…</b> ms</span>. fero&rsquo;s defaults are a <span class="nw"><b id="brk-dhb-a">…</b> ms</span> heartbeat and a <span class="nw"><b id="brk-drd-a">…</b> ms</span> redial wait, so a crash vote is faster here.</p>
+    </div>
+
+    <!-- ===== b · three own runs side by side ===== -->
+    <div data-variant="b" data-label="three runs side by side">
+      <div class="sec-head"><span class="sec-no" data-literal>02</span><h2>Break it</h2></div>
+      <p class="lead-para">A cluster earns trust on its bad days. Below are three runs of fero&rsquo;s kernel, each in its own simulator, from the same seed as the cluster above. In each, the client makes the same write just after a server is crashed or asked to stop: crashed, stopped cleanly, or crashed when only two servers are left. The line under each run is its view over time, and the amber bar is how long the write waited.</p>
+      <p class="brk-feed" id="brk-feed-b"><span class="brk-feed-src">own runs</span> · seed <b id="brk-seed-b">…</b> · the same write in each: <span class="brk-feed-rec" id="brk-rec-b">…</span><span class="brk-same" id="brk-same-b"></span><span class="brk-feed-btns"><button type="button" class="stream-btn" id="brk-rerun-b" title="run the three again from the same seed">↻ run again</button></span></p>
+      <div class="brk-runs" id="brk-runs-b">
+        <article class="brk-run" data-kind="crash">
+          <header class="brk-run-head"><span class="brk-run-name">crash</span><span class="brk-run-tag">three servers · <code>kill -9</code></span></header>
+          <div class="brk-run-body"></div>
+        </article>
+        <article class="brk-run" data-kind="stop">
+          <header class="brk-run-head"><span class="brk-run-name">clean stop</span><span class="brk-run-tag">three servers · Ctrl-C</span></header>
+          <div class="brk-run-body"></div>
+        </article>
+        <article class="brk-run" data-kind="crash2">
+          <header class="brk-run-head"><span class="brk-run-name">crash, two servers</span><span class="brk-run-tag">two servers · <code>kill -9</code></span></header>
+          <div class="brk-run-body"></div>
+        </article>
+      </div>
+      <p class="cat-foot muted brk-foot" id="brk-foot-b">Each run is a separate simulation, so nothing here touches the cluster above. A crash waits: the survivors redial the dead server until they give up, and only then vote. A clean stop asks for its own vote, so it is gone almost at once. With two servers, the one left is not a majority. It cannot vote the dead one out, so the write waits until the page restarts the dead server from its disk. Times are on the simulated clock.</p>
+    </div>
+
+  </div>
+</section>
+
+  <!-- ===== start ===== -->
+<section class="fsec" id="start">
+  <div class="opt" data-section="start">
+
+    <!-- ── a · example 02: the two files, a live margin, a real run, the series ─────────────────── -->
+    <div data-variant="a" data-label="the two files" id="start-a">
+      <div class="sec-head">
+        <span class="sec-no" data-literal>03</span><h2>From zero</h2>
+        <span class="st-chip st-pub" title="the build checks npm and the repo: fero 4 is not on npm and the repository has no public remote">fero <b data-b="major"></b> · not published yet</span>
+      </div>
+
+      <div class="st-top">
+        <p class="lead-para"><span class="st-pub">fero <span data-b="major"></span> is not published yet, and its repository is not public yet, so today it runs from a checkout.</span> It also needs <code>data</code>, the engine fero's live views come from, checked out beside it (<code>../data</code>). <code>npm install</code> fetches its one npm dependency, and <span class="nw">Node <span data-b="node"></span></span> or later runs the <code>.ts</code> files as they are (<span class="nw">on Node <span data-b="node23line"></span>,</span> <span class="nw"><span data-b="node23"></span> or later</span>).</p>
+        <p class="st-intro">The two files below are in <code class="st-dirname" data-b="exdir"></code> at <span data-b="head"></span>. Each <span class="st-arrow">// →</span> note is read live from the cluster above. The files write on timers; here, <b>run this line ▸</b> posts the record its line becomes, and the note follows it.</p>
+      </div>
+
+      <div class="st-files" data-files></div>
+      <div class="st-rec st-rec-tl" data-rec></div>
+
+      <!-- three options, spelled as in fero's README: what turns on the disk the page restarts from, the door, and
+           scoped replication (facts.md §1 19–21, §3). Static: the page runs none of them as fero() would -->
+      <div class="st-head st-head-opts">
+        <span class="race-title">three more options</span>
+        <span class="st-path">spelled as in fero's README · any of them also makes a process a server</span>
+      </div>
+      <dl class="st-opts">
+        <div class="st-opt"><dt><code>dir: './state'</code></dt><dd>A disk: a write-ahead log and a boot record. Run the same file again and it is the same node in its next life, its rows back before it has a socket. The page's servers each have one, and the <i>restart from disk</i> and <i>pull every plug</i> chips in <a href="#break">break it</a> read it back.</dd></div>
+        <div class="st-opt"><dt><code>methods: { … }</code></dt><dd>Functions that run on the server. Declaring them is the door: clients then change data only through them, and a client's plain write is refused. Reads stay open. The page runs no methods.</dd></div>
+        <div class="st-opt"><dt><code>replicas: 2</code></dt><dd>Each row lives on exactly two members, its holders, not on every member. In <a href="#contract">the contract</a>, the rules marked <i>only with replicas</i> are about it.</dd></div>
+      </dl>
+
+      <div class="st-head st-head-series">
+        <span class="race-title">the series · <span data-b="rungs"></span> rungs</span>
+        <span class="st-path">each a folder of terminals and a check that must end <code>ok</code> · <span data-rung-hint>hover a rung for its lesson</span></span>
+      </div>
+      <div class="st-rungs" data-rungs aria-label="the example series"></div>
+      <p class="st-rungs-foot" data-rungs-foot></p>
+    </div>
+
+    <!-- ── b · the README's shape block, with the same live margin ──────────────────────────────── -->
+    <div data-variant="b" data-label="the README shape" id="start-b">
+      <div class="sec-head">
+        <span class="sec-no" data-literal>03</span><h2>From zero</h2>
+        <span class="st-chip st-pub" title="the build checks npm and the repo: fero 4 is not on npm and the repository has no public remote">fero <b data-b="major"></b> · not published yet</span>
+      </div>
+
+      <div class="st-top">
+        <p class="lead-para"><span class="st-pub">fero <span data-b="major"></span> is not published yet, and its repository is not public yet, so today it runs from a checkout.</span> It also needs <code>data</code>, the engine fero's live views come from, checked out beside it (<code>../data</code>). <code>npm install</code> fetches its one npm dependency, and <span class="nw">Node <span data-b="node"></span></span> or later runs the <code>.ts</code> files as they are (<span class="nw">on Node <span data-b="node23line"></span>,</span> <span class="nw"><span data-b="node23"></span> or later</span>).</p>
+        <p class="st-intro">Below is the shape block from fero's README at <span data-b="head"></span>, its checkout comment kept. A <span class="st-arrow">// →</span> note under a line is read live from the cluster above; <b>run this line ▸</b> posts the record the line becomes, and the note follows it.</p>
+      </div>
+
+      <div class="st-files st-files-one" data-files></div>
+
+      <div class="st-head st-head-rec">
+        <span class="race-title">recorded from a real run</span>
+        <span class="st-path"><span data-b="recorded"></span> · example <span data-b="exno"></span> runs the same two roles as two processes on one box</span>
+      </div>
+      <div class="st-rec" data-rec></div>
+
+      <!-- three options, spelled as in fero's README: what turns on the disk the page restarts from, the door, and
+           scoped replication (facts.md §1 19–21, §3). Static: the page runs none of them as fero() would -->
+      <div class="st-head st-head-opts">
+        <span class="race-title">three more options</span>
+        <span class="st-path">spelled as in fero's README · any of them also makes a process a server</span>
+      </div>
+      <dl class="st-opts">
+        <div class="st-opt"><dt><code>dir: './state'</code></dt><dd>A disk: a write-ahead log and a boot record. Run the same file again and it is the same node in its next life, its rows back before it has a socket. The page's servers each have one, and the <i>restart from disk</i> and <i>pull every plug</i> chips in <a href="#break">break it</a> read it back.</dd></div>
+        <div class="st-opt"><dt><code>methods: { … }</code></dt><dd>Functions that run on the server. Declaring them is the door: clients then change data only through them, and a client's plain write is refused. Reads stay open. The page runs no methods.</dd></div>
+        <div class="st-opt"><dt><code>replicas: 2</code></dt><dd>Each row lives on exactly two members, its holders, not on every member. In <a href="#contract">the contract</a>, the rules marked <i>only with replicas</i> are about it.</dd></div>
+      </dl>
+
+      <div class="st-head st-head-series">
+        <span class="race-title">the series · <span data-b="rungs"></span> rungs</span>
+        <span class="st-path">each a folder of terminals and a check that must end <code>ok</code> · <span data-rung-hint>hover a rung for its lesson</span></span>
+      </div>
+      <div class="st-rungs" data-rungs aria-label="the example series"></div>
+      <p class="st-rungs-foot" data-rungs-foot></p>
+    </div>
+
+  </div>
+</section>
+
+  <!-- ===== inside ===== -->
+<section class="fsec" id="inside">
+  <div class="sec-head"><span class="sec-no" data-literal>04</span><h2>See inside</h2></div>
+  <div class="in-cols">
+    <div class="in-prose">
+      <p class="lead-para">Every kernel event is a line in a node's journal. fero's debugger reads those lines in order and builds views from them: where each write went, where a node set a write aside, and what every node held at any moment. Before it draws, it replays the journals and checks that they rebuild every node's end state exactly.</p>
+      <p>This card runs the debugger's own file, <code>model.mjs</code>, without a change, over the cluster above. Drag its time bar and every node rewinds.</p>
+      <ul class="prop-list in-props">
+        <li><span class="op">replay<code>verifyReplay</code></span><span class="d">rebuilds each node from its whole journal. If one cell differs, the card draws nothing.</span></li>
+        <li><span class="op">writes<code>routes</code></span><span class="d">where each write went: <em class="st">origin</em> (stamped there), <em class="st">applied</em>, <em class="st">lww-lost</em> (lost to a bigger stamp: the last writer wins), <em class="st">duplicate</em> or <em class="st">never-arrived</em> (not there yet).</span></li>
+        <li><span class="op">races<code>contested</code></span><span class="d">the cells where a node set a write aside, because a bigger stamp was already there.</span></li>
+        <li><span class="op">rewind<code>stateAt</code></span><span class="d">a node's state after one line of its journal. The time bar uses it to rewind every node.</span></li>
+      </ul>
+    </div>
+    <div class="in-side">
+      <aside class="in-card" id="inside-card" aria-label="fero's debugger, run over the cluster above">
+        <div class="ic-head">
+          <span class="ic-brand"><b>∴</b> fero · debugger</span>
+          <span class="ic-src" id="inside-src"><code>model.mjs</code> over the cluster above</span>
+          <span class="ic-live is-paused" id="inside-live"><i></i><span id="inside-live-t" data-tip="not-quiesced">waiting</span></span>
+        </div>
+        <div class="ic-gate" id="inside-gate" aria-live="polite"><span class="ic-verdict">reading…</span></div>
+        <div class="ic-bar" id="inside-bar">
+          <div class="ic-track">
+            <svg class="ic-marks" id="inside-marks" aria-hidden="true" preserveAspectRatio="none"></svg>
+            <input type="range" id="inside-t" min="0" max="1" step="any" value="1" aria-label="rewind every node to a moment on the simulated clock" disabled>
+          </div>
+          <div class="ic-tread"><span id="inside-tread" data-tip="kind:sim">waiting for the first read</span><span class="ic-legend" id="inside-legend"><span class="lw" data-tip="write">write</span><span class="ld">crash</span><span class="lu">restart</span><span class="ll" data-tip="jk:leave">left</span><span class="lj" data-tip="jk:join">join</span></span><button type="button" class="ic-now" id="inside-now" data-tip="time-travel-reset" hidden>back to now ▸</button></div>
+        </div>
+        <div class="ic-body" id="inside-body" hidden>
+          <div class="ic-tablewrap" data-scroll-x>
+            <table class="ic-t">
+              <thead><tr id="inside-thead"></tr></thead>
+              <tbody id="inside-holds"></tbody>
+              <tbody id="inside-writes"></tbody>
+            </table>
+          </div>
+          <div class="ic-cpane">
+            <div class="ic-ph"><span data-tip="stop:lww-lost">cells where a node set a write aside</span><span class="r" id="inside-cont-n"></span></div>
+            <div class="ic-cont" id="inside-cont"></div>
+          </div>
+        </div>
+        <div class="ic-foot" id="inside-foot"><span id="inside-foot-l"></span><span class="r" id="inside-foot-r"></span></div>
+      </aside>
+      <div class="dt-actions in-actions" id="inside-actions" hidden>
+        <button type="button" class="stream-btn" id="inside-rebuild">rebuild from the seed ▸</button>
+        <span class="muted" id="inside-rstatus"></span>
+      </div>
+      <p class="muted in-under" id="inside-under">The card reads the journals again when you scroll to it and after each change to the cluster. <span id="inside-hint">Hover a label for the debugger's own plain-English note.</span></p>
+      <p class="muted in-under in-foot">In a checkout, <code>npm run debug</code> serves the full debugger at <code>localhost:4699/debug</code>, with the same plain-English note (<code>eli5.mjs</code>) on every label. Rungs <span id="inside-rungs"></span> of the examples walk through it.</p>
+    </div>
+  </div>
+</section>
+
+  <!-- ===== contract ===== -->
+<section class="fsec" id="contract">
+  <div class="sec-head"><span class="sec-no" data-literal>05</span><h2>The contract</h2></div>
+  <p class="lead-para">The simulator checks <span id="ct-nrules">ten</span> rules after every event, so a broken rule is caught at the event that broke it, and its <span class="ct-term" title="seed: the number that fixes every random choice in a simulated run">seed</span> replays it. Below: each rule and how often this page has checked it, then the sweep <code>npm run sim</code> runs, on its first hundred seeds, in your tab.</p>
+
+  <div class="ct-top">
+
+    <!-- the rules: sim/monitors.ts perEvent(), checked after every event of the house cluster -->
+    <div class="ct-law" id="ct-law">
+      <div class="ct-law-head"><span>rule</span><span>what it checks · <span class="ct-file">sim/monitors.ts</span></span><span class="ct-law-ok" id="ct-law-ok" title="no rule broken on the cluster above">·</span></div>
+      <ol class="ct-rules" id="ct-rules">
+        <li class="ct-rule" data-rule="queued-implies-paused"><span class="ct-rname">queued-implies-paused</span><span class="ct-gist"><span class="ct-term" title="frame: one message between two nodes, as bytes on the wire">frames</span> wait in a link's queue only while that link is paused (its pipe is full).</span><span class="ct-rok">·</span></li>
+        <li class="ct-rule" data-rule="one-view-per-epoch"><span class="ct-rname">one-view-per-epoch</span><span class="ct-gist">no two nodes ever install different member lists under one <span class="ct-term" title="view: the agreed list of servers, with a number. A new view needs a vote.">view number</span>. No split brain.</span><span class="ct-rok">·</span></li>
+        <li class="ct-rule" data-rule="epoch-monotone"><span class="ct-rname">epoch-monotone</span><span class="ct-gist">a node's view number never goes down.</span><span class="ct-rok">·</span></li>
+        <li class="ct-rule" data-rule="log-monotone"><span class="ct-rname">log-monotone</span><span class="ct-gist">each writer's log stays in strictly rising counter order.</span><span class="ct-rok">·</span></li>
+        <li class="ct-rule" data-rule="single-writer"><span class="ct-rname">single-writer</span><span class="ct-gist">for any row and any view after the first vote, at most one writer ever <span class="ct-term" title="stamp: the view number first, then the owner's counter, then the owner's name. The biggest wins.">stamps</span> it.</span><span class="ct-rok">·</span></li>
+        <li class="ct-rule" data-rule="attempt-exactly-once"><span class="ct-rname">attempt-exactly-once</span><span class="ct-gist">one write attempt commits at most one stamp, anywhere in the cluster.</span><span class="ct-rok">·</span></li>
+        <li class="ct-rule" data-rule="watermark-monotone"><span class="ct-rname">watermark-monotone</span><span class="ct-gist">a node's “dealt with up to here” mark for each writer never goes down.</span><span class="ct-rok">·</span></li>
+        <li class="ct-rule" data-rule="watermark-ordering"><span class="ct-rname">watermark-ordering</span><span class="ct-gist">for each writer, <span class="ct-term" title="applied — looked at: the highest counter this node has dealt with for that writer">applied</span> ≥ <span class="ct-term" title="shippable — in the record book: the highest counter written into this node's copy of that writer's log">shippable</span> ≥ <span class="ct-term" title="durable — saved to disk: the highest counter this node has saved in a way that survives a crash">durable</span>, at every instant.</span><span class="ct-rok">·</span></li>
+        <li class="ct-rule ct-scoped" data-rule="scoped-lawful-holding"><span class="ct-rname">scoped-lawful-holding<span class="ct-only" title="this rule looks only at nodes run with replicas (each row on exactly N servers); the cluster above has none, so it has nothing to look at">only with replicas</span></span><span class="ct-gist">a node holds only rows the current <span class="ct-term" title="ring: how every server works out the same owner for a row from the view">ring</span> gives it.</span><span class="ct-rok"></span></li>
+        <li class="ct-rule ct-scoped" data-rule="orphan-frozen"><span class="ct-rname">orphan-frozen<span class="ct-only" title="this rule looks only at nodes run with replicas (each row on exactly N servers); the cluster above has none, so it has nothing to look at">only with replicas</span></span><span class="ct-gist">a row a node should no longer hold stays frozen until it can be dropped safely.</span><span class="ct-rok"></span></li>
+      </ol>
+      <div class="ct-law-foot">
+        <span>checked after every event of the cluster above: <b id="ct-checked">…</b> times each</span>
+        <span class="ct-law-broken"><b id="ct-broken">…</b> broken</span>
+      </div>
+      <ol class="ct-viol" id="ct-viol" hidden></ol>
+    </div>
+
+    <div class="ct-side">
+
+      <!-- the sweep: sim/run.ts's loop over sweepBuild(seed, nodes, writes), in a module Worker -->
+      <div class="rcard ct-sweep" id="ct-sweep">
+        <div class="rcard-head">
+          <span class="rcard-name">npm run sim</span>
+          <span class="rcard-tag">in a worker</span>
+          <span class="ct-own" id="ct-sweep-own">own runs</span>
+        </div>
+        <div class="ct-sweep-body">
+          <div class="ct-grid-wrap">
+            <div class="ct-grid" id="ct-grid" role="img" aria-label="one square per seed, green once the seed passed every check"></div>
+            <div class="ct-grid-key" id="ct-grid-key">one square = one seed</div>
+          </div>
+          <div class="ct-totals">
+            <div class="fstat"><span class="fstat-k">seeds</span><span class="fstat-v" id="ct-s-seeds">…</span></div>
+            <div class="fstat"><span class="fstat-k">events</span><span class="fstat-v" id="ct-s-events">…</span></div>
+            <div class="fstat"><span class="fstat-k">failed</span><span class="fstat-v" id="ct-s-failed">…</span></div>
+            <div class="fstat"><span class="fstat-k">time · this machine</span><span class="fstat-v"><span id="ct-s-time">…</span> s</span></div>
+          </div>
+        </div>
+        <p class="ct-sweep-note">Each seed: <span id="ct-p-nodes">three</span> servers, <span id="ct-p-writes">forty</span> writes, uneven link delays, duplicate frames, and on odd seeds a cut that heals. It is <span class="ct-term" title="a seed passes when no rule broke, every server reached every other, nothing is left to happen or queued, and every copy is the same">judged</span> as <code>sim/run.ts</code> judges it.</p>
+        <div class="ct-sweep-act">
+          <button class="act" id="ct-run100" type="button">run <span data-literal>100</span> seeds ▸</button>
+          <button class="act" id="ct-run1000" type="button">all <span id="ct-n1000" data-literal>1000</span> ▸</button>
+          <span class="ct-sweep-status" id="ct-sweep-status" aria-live="polite"></span>
+        </div>
+        <div class="ct-cmp" id="ct-cmp" hidden></div>
+        <div class="ct-fails" id="ct-fails" hidden></div>
+      </div>
+
+      <!-- same seed, same run: a twin of this page's session, rebuilt from the seed in a module Worker and kept in step -->
+      <div class="ct-replay" id="ct-replay">
+        <div class="ct-replay-head"><span class="race-title">same seed, same run</span><span class="ct-own" id="ct-replay-own">own run</span></div>
+        <div class="ct-verdict" id="ct-verdict" aria-live="polite"><span class="ct-pending">runs when this section is on screen</span></div>
+        <div class="ct-verdict-sub" id="ct-verdict-sub">A worker rebuilds the cluster above from its seed and your actions, and checks that both runs match at every event.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- stated plainly: rung 17 on the house cluster -->
+  <div class="ct-plain">
+    <div class="ct-plain-head"><span class="race-title">stated plainly</span><span class="ct-plain-sub">what last-writer-wins loses</span></div>
+    <p class="ct-plain-p">A <span class="ct-term" title="cell: one stored value at one address (row · field). Here it is the whole counter row.">cell</span> keeps the record with the biggest <span class="ct-term" title="stamp: the view number first, then the owner's counter, then the owner's name. The biggest wins.">stamp</span>, and nothing merges, so two servers that read a counter and write back one more lose an increment. Nothing reports it. Write one row per increment and count the rows: fero orders one writer's writes to one row, and nothing across rows.</p>
+
+    <div class="ct-cases">
+      <div class="ct-case" id="ct-race">
+        <div class="ct-case-head">
+          <span class="ct-case-title">read, add one, write back</span>
+          <button class="act" id="ct-race-go" type="button" disabled>two servers add one ▸</button>
+        </div>
+<pre class="code ct-case-code">shop.data.counter <span class="tok-pun">=</span> <span class="tok-pun">{</span> n: (shop.data.counter?.n <span class="tok-pun">??</span> <span class="tok-num">0</span>) <span class="tok-pun">+</span> <span class="tok-num">1</span> <span class="tok-pun">}</span></pre>
+        <div class="ct-case-body" id="ct-race-body">
+          <p class="ct-hint" id="ct-race-hint">The page reads two servers' copies, then posts on each the record this line becomes, at the same simulated moment.</p>
+        </div>
+        <div class="ct-case-foot">
+          <div class="fstat" title="writes that committed: the row's owner stamped them"><span class="fstat-k">adds</span><span class="fstat-v" id="ct-race-adds">…</span></div>
+          <div class="fstat" title="the counter under the biggest stamp: the value every copy keeps"><span class="fstat-k">count</span><span class="fstat-v" id="ct-race-count">…</span></div>
+          <div class="fstat" title="adds that committed but are missing from the count"><span class="fstat-k">lost</span><span class="fstat-v" id="ct-race-lost">…</span></div>
+        </div>
+      </div>
+
+      <div class="ct-case" id="ct-rows">
+        <div class="ct-case-head">
+          <span class="ct-case-title">one row per increment</span>
+          <button class="act" id="ct-rows-go" type="button" disabled>two servers add a row ▸</button>
+        </div>
+<pre class="code ct-case-code">shop.data[<span class="tok-str">`add-${me}-${i}`</span>] <span class="tok-pun">=</span> <span class="tok-pun">{</span> n: <span class="tok-num">1</span> <span class="tok-pun">}</span></pre>
+        <div class="ct-case-body" id="ct-rows-body">
+          <p class="ct-hint" id="ct-rows-hint">The page posts on two servers the record this line becomes, each to a new row named after that server (<code>me</code>).</p>
+        </div>
+        <div class="ct-case-foot">
+          <div class="fstat" title="writes that committed: the row's owner stamped them"><span class="fstat-k">adds</span><span class="fstat-v" id="ct-rows-adds">…</span></div>
+          <div class="fstat" title="add rows held by the live copies"><span class="fstat-k">rows</span><span class="fstat-v" id="ct-rows-count">…</span></div>
+          <div class="fstat" title="adds that committed but are missing from the rows"><span class="fstat-k">lost</span><span class="fstat-v" id="ct-rows-lost">…</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+  <!-- ===== wire ===== -->
+<section class="fsec wire" id="wire">
+  <div class="opt" data-section="wire">
+
+    <!-- ===== a · one frame, byte for byte (REAL: the house cluster's own frames, read with kernel/codec.js) ===== -->
+    <div data-variant="a" data-label="one frame, byte for byte" id="wire-a">
+      <div class="sec-head"><span class="sec-no" data-literal>06</span><h2>On the wire</h2></div>
+      <p class="lead-para">
+        A write crosses the wire as one frame: a short header, the writer, the counter it starts at, the view
+        number, then the records. Most also carry the attempt: who issued the write, and its own counter for it.
+        Below is a real frame from the cluster above, taken apart by
+        <code>kernel/codec.ts</code>. The owner writes these same bytes to its write-ahead log (the WAL, its log on
+        disk), and the page checks them byte for byte. When a node comes back, each side sends a <b>digest</b>, the
+        highest counter it holds from each writer, and the other sends only what is missing.
+      </p>
+
+      <!-- card 1: one frame -->
+      <div class="wire-card" id="wire-frame">
+        <div class="wire-head">
+          <span class="wire-kicker">one frame</span>
+          <div class="wire-pick demo-chips" id="wire-pick" role="group" aria-label="pick a frame by its verb"></div>
+        </div>
+        <div class="wire-meta" id="wire-meta"><span class="wire-wait">waiting for the cluster's first frame …</span></div>
+        <div class="wire-carry" id="wire-carry" aria-label="what the frame carries, decoded"></div>
+        <div class="wire-dump-box">
+          <div class="wire-dump" id="wire-dump"></div>
+          <div class="wire-more" id="wire-more" aria-hidden="true" hidden>the rest of the frame ↓</div>
+        </div>
+        <div class="wire-foot" id="wire-foot">
+          <div class="wire-col" id="wire-onwire-col">
+            <div class="wire-k" id="wire-onwire-k">the same bytes on the wire</div>
+            <div class="wire-list" id="wire-onwire"></div>
+          </div>
+          <div class="wire-col" id="wire-ondisk-col">
+            <div class="wire-k"><span id="wire-ondisk-k">the same bytes on disk</span> <span class="wire-k-sub">· a WAL entry is one frame’s bytes</span></div>
+            <div class="wire-list" id="wire-ondisk"></div>
+          </div>
+        </div>
+      </div>
+      <p class="wire-status" id="wire-status"></p>
+
+      <!-- card 2: when a node comes back -->
+      <div class="wire-card wire-ae" id="wire-ae">
+        <div class="wire-head">
+          <span class="wire-kicker">when a node comes back</span>
+          <span class="wire-actrow">
+            <span class="wire-actnote" id="wire-act-note"></span>
+            <button type="button" class="act" id="wire-act" disabled>…</button>
+          </span>
+        </div>
+        <div class="wire-ae-body">
+          <div class="wire-highs-col">
+            <div class="wire-k">what each node holds now <span class="wire-k-sub">· what its digest sends</span></div>
+            <div class="wire-highs-box" data-scroll-x>
+              <div class="wire-highs" id="wire-highs" role="table" aria-label="the highest counter each node holds from each writer"></div>
+            </div>
+            <div class="wire-hfoot" id="wire-hfoot"></div>
+          </div>
+          <div class="wire-ex-col">
+            <div class="wire-k" id="wire-ex-k">the last exchange</div>
+            <div class="wire-ex" id="wire-ex"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== off · hidden (?wire=off removes the section, data's idiom) ===== -->
+    <div data-variant="off" data-label="hidden"></div>
+
+  </div>
+</section>
+
+  <!-- ===== data ===== -->
+<section class="fsec" id="data">
+  <div class="sec-head"><span class="sec-no" data-literal>07</span><h2>Built on data</h2></div>
+  <p class="lead-para">fero's live views are data's: filters, sums and sorted views. Each record fero applies goes into data as it is, through one call: <code>lane()</code>. <span id="dt-below">Below, data runs in this tab on the records the client <span data-literal>c1</span> applied.</span></p>
+
+  <!-- the live fold: the records c1 applied (left) → data's source, filled by lane() (middle) → the README's view (right) -->
+  <div class="dt-card" id="dt-card">
+
+    <div class="dt-col dt-fero">
+      <div class="dt-kicker"><span>fero · <span class="nm" data-literal>c1</span> applied</span><span class="tag"><b id="dt-nrec">…</b> records</span></div>
+      <ol class="dt-tape" id="dt-tape" aria-label="the last records c1 applied, newest first"><li class="dt-empty">waiting for <span data-literal>c1</span>'s first record</li></ol>
+      <div class="dt-last" id="dt-wait"><span class="dt-w"><span data-literal>c1</span> has not written yet</span></div>
+      <div class="dt-act"><button class="act" id="dt-write" type="button" aria-disabled="true">write</button><span class="dt-hint">the page posts the record this line becomes</span></div>
+    </div>
+
+    <div class="dt-col dt-src">
+      <div class="dt-kicker"><span>data · the source</span><span class="tag"><b id="dt-nsrc">…</b> rows</span></div>
+      <pre class="dt-code"><code><span class="tok-com">// the source under shop.data</span>
+const src <span class="tok-pun">=</span> $(<span class="tok-pun">{}</span>)
+const apply <span class="tok-pun">=</span> lane(src)</code></pre>
+      <div class="dt-tbl" id="dt-src-rows"><div class="dt-empty">data loads from jsDelivr when this section comes near</div></div>
+      <div class="dt-last" id="dt-report"><code>apply([record])</code> for each record <span data-literal>c1</span> applies</div>
+    </div>
+
+    <div class="dt-col dt-view">
+      <div class="dt-kicker"><span>data · the live view</span><span class="tag"><b id="dt-nlow">…</b> rows</span></div>
+      <pre class="dt-code"><code><span class="tok-com">// the README's view: shop.data.filter(…)</span>
+const low <span class="tok-pun">=</span> <span class="nw">src.filter((r) <span class="tok-pun">=&gt;</span> r.stock <span class="tok-pun">&lt;</span> <span class="tok-num">2</span>)</span></code></pre>
+      <div class="dt-tbl" id="dt-low-rows"><div class="dt-empty">the README's view, once data is here</div></div>
+      <div class="dt-last dt-changes">
+        <div class="dt-sub">data's changes to <code>low</code> · newest first</div>
+        <ol class="dt-tape" id="dt-delta" aria-label="data's changes to the view low, newest first, each with the stamp of the record that caused it"><li class="dt-empty">none yet</li></ol>
+      </div>
+    </div>
+
+  </div>
+  <div class="dt-status" id="dt-status"><span class="pending">data loads from jsDelivr when this section comes near</span></div>
+
+  <div class="gallery dt-cards">
+    <div class="gcard dt-ties">
+      <dl class="dt-kv" aria-label="how fero is tied to data">
+        <dt>one import</dt>
+        <dd>
+          <p id="dt-import">Outside the tests, only <code>api/substrate.ts</code> imports data. It takes <b id="dt-nnames">…</b> names:</p>
+          <div class="dt-names" id="dt-names" aria-label="the names api/substrate.ts imports from data"></div>
+        </dd>
+        <dt>one shape</dt>
+        <dd>
+          <p>data's <code>lane()</code> takes fero's records as they are. The type numbers, in this tab:</p>
+          <div class="dt-types" id="dt-types" aria-label="the record type numbers in each engine, read in this tab"><span class="dt-tl">fero's <code>REC</code> …</span></div>
+        </dd>
+        <dt>timing rules</dt>
+        <dd>
+          <p>fero's <code>npm test</code> ends with data's <b id="dt-ntests">…</b> contract tests, run on the checkout beside it. They check timing rules, such as when a change reaches a view, and in what order.</p>
+          <div class="dt-types" id="dt-sched" aria-label="the version of data's timing rules in this tab"><span class="dt-tl">the data in this tab: …</span></div>
+        </dd>
+      </dl>
+    </div>
+    <div class="gcard dt-link">
+      <span class="gcard-tag">the engine</span>
+      <h3>data</h3>
+      <p>The engine under fero's live views. This page loads it from npm. fero reads it from a checkout beside it (<code>../data</code>).</p>
+      <!-- held until data/lede/links.json finds the data site free of CONCEPT §8's claims about fero (chrome.js) -->
+      <span class="gcard-links data-site" hidden><a href="https://pemrouz.github.io/data/" target="_blank" rel="noopener">pemrouz.github.io/data ↗</a></span>
+    </div>
+  </div>
+</section>
+
+  </main>
+
+  <footer>
+    <span class="engine-line"><span id="kernel">kernel · loading</span> · this page runs fero's kernel, simulator and debugger model, types stripped, at <b id="head" data-attested="build">—</b> (<b id="mods" data-attested="build">—</b> modules · <b id="kb" data-attested="build">—</b> KB) · not <code>fero()</code> itself</span>
+    <span class="spacer"></span>
+    <!-- the link waits for data/lede/links.json to find the data site free of CONCEPT §8's claims about fero (chrome.js) -->
+    <a class="data-site" href="https://pemrouz.github.io/data/" target="_blank" rel="noopener" title="data — the reactive engine fero's live views come from" hidden>built on data ↗</a>
+    <span class="data-site-held" title="data — the reactive engine fero's live views come from">built on data</span>
+  </footer>
+
+</div>
+
+<noscript><p class="muted" style="padding:2rem 0">This page runs fero's kernel in your browser and needs JavaScript.</p></noscript>
+<script src="./variants.js"></script>
+<script type="module" src="./chrome.js"></script>
+<script type="module" src="./sections/lede.js"></script>
+<script type="module" src="./sections/cluster.js"></script>
+<script type="module" src="./sections/argument.js"></script>
+<script type="module" src="./sections/break.js"></script>
+<script type="module" src="./sections/start.js"></script>
+<script type="module" src="./sections/inside.js"></script>
+<script type="module" src="./sections/contract.js"></script>
+<script type="module" src="./sections/wire.js"></script>
+<script type="module" src="./sections/data.js"></script>
+</body>
+</html>
