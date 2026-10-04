@@ -1,0 +1,147 @@
+{
+ "builtAt": "2026-10-03T04:54:56.316Z",
+ "data": {
+  "url": "https://pemrouz.github.io/data/",
+  "ok": false,
+  "checked": [
+   "https://pemrouz.github.io/data/",
+   "https://pemrouz.github.io/data/site/",
+   "/mnt/c/Users/pemrouz/cloud/data/site/index.html"
+  ],
+  "failed": [],
+  "hits": [
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1303,
+    "claim": "in production",
+    "text": "the engine in production; the essay is why the engine has the shape it has; the"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1309,
+    "claim": "in production",
+    "text": "<span class=\"gcard-tag\">consumer · in production</span>"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1315,
+    "claim": "seven names",
+    "text": "uses seven names from it. Its <code>npm test</code> runs data's conformance"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1321,
+    "claim": "seven names",
+    "text": "<div class=\"g-names\" aria-label=\"the seven names\"><span class=\"g-name\"><b>$</b></span><span class=\"g-name\">value</span><"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1326,
+    "claim": "fero['’]s CI",
+    "text": "<dt>ride</dt><dd><code>conformance/schedule.test.ts</code> <span class=\"g-kv-note g-nb\">· fero's CI · against data HEAD<"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1342,
+    "claim": "fero['’]s CI",
+    "text": "<p>The executable contract — one version assert and seventeen clause tests — running here through <code>node:test</code>"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1370,
+    "claim": "in production",
+    "text": "One consumer in production today: <b>fero</b>, a replicated, durable data kernel —"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1380,
+    "claim": "in production",
+    "text": "<span class=\"gcard-tag\">consumer · in production</span>"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1381,
+    "claim": "github\\.com\\/pemrouz\\/fero(?![\\w-])",
+    "text": "<h3><a href=\"https://github.com/pemrouz/fero\">fero</a></h3>"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1390,
+    "claim": "github\\.com\\/pemrouz\\/fero(?![\\w-])",
+    "text": "<span class=\"gcard-links\"><a href=\"https://github.com/pemrouz/fero\">fero →</a></span>"
+   },
+   {
+    "where": "https://pemrouz.github.io/data/site/",
+    "line": 1394,
+    "claim": "fero['’]s CI",
+    "text": "<dt>ride</dt><dd><code>conformance/schedule.test.ts</code><span class=\"g-kv-b-note\">in fero's CI · against data HEAD</sp"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1313,
+    "claim": "in production",
+    "text": "the engine in production; the essay is why the engine has the shape it has; the"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1319,
+    "claim": "in production",
+    "text": "<span class=\"gcard-tag\">consumer · in production</span>"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1325,
+    "claim": "seven names",
+    "text": "uses seven names from it. Its <code>npm test</code> runs data's conformance"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1331,
+    "claim": "seven names",
+    "text": "<div class=\"g-names\" aria-label=\"the seven names\"><span class=\"g-name\"><b>$</b></span><span class=\"g-name\">value</span><"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1336,
+    "claim": "fero['’]s CI",
+    "text": "<dt>ride</dt><dd><code>conformance/schedule.test.ts</code> <span class=\"g-kv-note g-nb\">· fero's CI · against data HEAD<"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1352,
+    "claim": "fero['’]s CI",
+    "text": "<p>The executable contract — one version assert and seventeen clause tests — running here through <code>node:test</code>"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1380,
+    "claim": "in production",
+    "text": "One consumer in production today: <b>fero</b>, a replicated, durable data kernel —"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1390,
+    "claim": "in production",
+    "text": "<span class=\"gcard-tag\">consumer · in production</span>"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1391,
+    "claim": "github\\.com\\/pemrouz\\/fero(?![\\w-])",
+    "text": "<h3><a href=\"https://github.com/pemrouz/fero\">fero</a></h3>"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1400,
+    "claim": "github\\.com\\/pemrouz\\/fero(?![\\w-])",
+    "text": "<span class=\"gcard-links\"><a href=\"https://github.com/pemrouz/fero\">fero →</a></span>"
+   },
+   {
+    "where": "/mnt/c/Users/pemrouz/cloud/data/site/index.html",
+    "line": 1404,
+    "claim": "fero['’]s CI",
+    "text": "<dt>ride</dt><dd><code>conformance/schedule.test.ts</code><span class=\"g-kv-b-note\">in fero's CI · against data HEAD</sp"
+   }
+  ]
+ }
+}

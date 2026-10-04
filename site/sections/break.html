@@ -1,0 +1,92 @@
+<section class="fsec" id="break">
+  <div class="opt" data-section="break">
+
+    <!-- ===== a · the chips and one panel (data's operator surface) ===== -->
+    <div data-variant="a" data-label="chips + one panel">
+      <div class="sec-head"><span class="sec-no">02</span><h2>Break it</h2></div>
+      <p class="lead-para">A cluster earns trust on its bad days. Each chip below does one bad thing to the cluster above: cut a server off, kill one, make a disk lie about a save. The panel shows what the kernel did about it, from its own journal: the messages it sent, the vote it held, the writes that waited. The faults come from the simulator. Every answer is the real kernel&rsquo;s.</p>
+      <!-- no status line here: the dock beside the page shows the cluster's state and carries pause and reset -->
+
+      <div class="brk-grid" id="brk-grid-a">
+        <div class="brk-card" data-group="network">
+          <span class="brk-kicker">network</span>
+          <p class="brk-card-def">the links between the nodes</p>
+          <div class="demo-chips brk-chips" data-group="network"></div>
+        </div>
+        <div class="brk-card" data-group="process">
+          <span class="brk-kicker">process</span>
+          <p class="brk-card-def">kill, stop or start one server</p>
+          <div class="demo-chips brk-chips" data-group="process"></div>
+        </div>
+        <div class="brk-card" data-group="disk">
+          <span class="brk-kicker">disk</span>
+          <p class="brk-card-def">each server&rsquo;s log on disk</p>
+          <div class="demo-chips brk-chips" data-group="disk"></div>
+        </div>
+        <div class="brk-card" data-group="writes">
+          <span class="brk-kicker">writes</span>
+          <p class="brk-card-def">writes at a bad moment</p>
+          <div class="demo-chips brk-chips" data-group="writes"></div>
+        </div>
+      </div>
+
+      <div class="brk-panel" id="brk-panel-a">
+        <div class="brk-l">
+          <div class="brk-head"><span class="brk-cat" id="brk-cat-a">process</span><span class="brk-name" id="brk-name-a">crash the owner</span></div>
+          <p class="brk-did" id="brk-did-a"></p>
+          <div class="brk-node">
+            <div class="brk-label"><span>in Node this is</span><span class="brk-src" id="brk-src-a"></span></div>
+            <pre class="code brk-cmd" id="brk-cmd-a" data-hl="off"></pre>
+            <p class="brk-say" id="brk-say-a"></p>
+          </div>
+          <blockquote class="brk-promise" id="brk-promise-a"></blockquote>
+          <div class="brk-next" id="brk-next-wrap-a" hidden><button type="button" class="act" id="brk-next-a">next ▸</button></div>
+        </div>
+        <div class="brk-m">
+          <div class="col-head"><span class="col-head-label" id="brk-lines-label-a">what the kernel did since the click</span><span class="col-head-count" id="brk-count-a"></span></div>
+          <div class="brk-lines-box">
+            <ol class="brk-lines" id="brk-lines-a" aria-live="off"></ol>
+            <button type="button" class="brk-earlier" id="brk-earlier-a" hidden>↑ <b>…</b> <i>earlier lines</i></button>
+            <button type="button" class="brk-more" id="brk-more-a" hidden>↓ <b>…</b> <i>more lines</i></button>
+          </div>
+          <p class="brk-routine" id="brk-routine-a"></p>
+        </div>
+        <div class="brk-r">
+          <div class="brk-title"><span id="brk-facts-title-a">the numbers</span><span class="brk-title-sub">times on the simulated clock</span></div>
+          <div class="brk-facts" id="brk-facts-a"></div>
+        </div>
+        <div class="brk-rulestrip">
+          <p class="brk-rulesum"><span class="brk-rulekick">rules</span> <span class="brk-rulewhen">checked after every event</span> · <span id="brk-rulesum-a"></span></p>
+          <p class="brk-rules" id="brk-rules-a"></p>
+          <p class="brk-scoped" id="brk-scoped-a"></p>
+          <div class="brk-rulebad" id="brk-rulebad-a" hidden></div>
+        </div>
+      </div>
+
+      <p class="cat-foot muted brk-foot">Each chip acts on the one shared cluster, so every figure on the page sees the same fault. An own run is a separate simulation from the same seed, kept apart from the cluster above. Times are on the simulated clock. Here, links take <span class="nw"><b id="brk-delay-a">…</b> ms</span>, the heartbeat is <span class="nw"><b id="brk-hb-a">…</b> ms</span> and the redial wait is <span class="nw"><b id="brk-rd-a">…</b> ms</span>. fero&rsquo;s defaults are a <span class="nw"><b id="brk-dhb-a">…</b> ms</span> heartbeat and a <span class="nw"><b id="brk-drd-a">…</b> ms</span> redial wait, so a crash vote is faster here.</p>
+    </div>
+
+    <!-- ===== b · three own runs side by side ===== -->
+    <div data-variant="b" data-label="three runs side by side">
+      <div class="sec-head"><span class="sec-no">02</span><h2>Break it</h2></div>
+      <p class="lead-para">A cluster earns trust on its bad days. Below are three runs of fero&rsquo;s kernel, each in its own simulator, from the same seed as the cluster above. In each, the client makes the same write just after a server is crashed or asked to stop: crashed, stopped cleanly, or crashed when only two servers are left. The line under each run is its view over time, and the amber bar is how long the write waited.</p>
+      <p class="brk-feed" id="brk-feed-b"><span class="brk-feed-src">own runs</span> · seed <b id="brk-seed-b">…</b> · the same write in each: <span class="brk-feed-rec" id="brk-rec-b">…</span><span class="brk-same" id="brk-same-b"></span><span class="brk-feed-btns"><button type="button" class="stream-btn" id="brk-rerun-b" title="run the three again from the same seed">↻ run again</button></span></p>
+      <div class="brk-runs" id="brk-runs-b">
+        <article class="brk-run" data-kind="crash">
+          <header class="brk-run-head"><span class="brk-run-name">crash</span><span class="brk-run-tag">three servers · <code>kill -9</code></span></header>
+          <div class="brk-run-body"></div>
+        </article>
+        <article class="brk-run" data-kind="stop">
+          <header class="brk-run-head"><span class="brk-run-name">clean stop</span><span class="brk-run-tag">three servers · Ctrl-C</span></header>
+          <div class="brk-run-body"></div>
+        </article>
+        <article class="brk-run" data-kind="crash2">
+          <header class="brk-run-head"><span class="brk-run-name">crash, two servers</span><span class="brk-run-tag">two servers · <code>kill -9</code></span></header>
+          <div class="brk-run-body"></div>
+        </article>
+      </div>
+      <p class="cat-foot muted brk-foot" id="brk-foot-b">Each run is a separate simulation, so nothing here touches the cluster above. A crash waits: the survivors redial the dead server until they give up, and only then vote. A clean stop asks for its own vote, so it is gone almost at once. With two servers, the one left is not a majority. It cannot vote the dead one out, so the write waits until the page restarts the dead server from its disk. Times are on the simulated clock.</p>
+    </div>
+
+  </div>
+</section>

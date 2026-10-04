@@ -1,0 +1,213 @@
+{
+ "builtAt": "2026-10-03T04:36:50.133Z",
+ "head": "f196de0",
+ "quotes": {
+  "crash": {
+   "text": "A crash is different: voting a dead member out needs a majority of the whole old view, and one of two is not a majority, so two members cannot survive a crash.",
+   "src": "README.md",
+   "line": 39,
+   "where": "README · Membership"
+  },
+  "stop": {
+   "text": "A clean stop (Ctrl-C, or `destroy()`) leaves by a vote, so two members survive a clean stop.",
+   "src": "README.md",
+   "line": 39,
+   "where": "README · Membership"
+  },
+  "restart": {
+   "text": "Run the same file again and it is the same node in its next life, its rows back before it has a socket.",
+   "src": "README.md",
+   "line": 40,
+   "where": "README · Durability"
+  },
+  "plugs": {
+   "text": "Kill -9 a whole cluster and restore it from the disks: no `persisted` write is lost.",
+   "src": "README.md",
+   "line": 40,
+   "where": "README · Durability"
+  },
+  "minority": {
+   "text": "Writes need a majority. On the minority side of a split, writes wait in one bounded buffer and go through when the split heals.",
+   "src": "README.md",
+   "line": 55,
+   "where": "README · Ordering and availability"
+  },
+  "reads": {
+   "text": "Reads never wait: every node keeps serving its local copy, through a split and after it is voted out.",
+   "src": "README.md",
+   "line": 55,
+   "where": "README · Ordering and availability"
+  },
+  "digests": {
+   "text": "Every node keeps one log per writer and heals gaps by comparing digests with its peers.",
+   "src": "README.md",
+   "line": 5,
+   "where": "README"
+  },
+  "vote": {
+   "text": "Members join and leave by vote.",
+   "src": "README.md",
+   "line": 5,
+   "where": "README"
+  },
+  "owner": {
+   "text": "Each row has one owner, and only the owner stamps writes to it.",
+   "src": "README.md",
+   "line": 5,
+   "where": "README"
+  },
+  "lww": {
+   "text": "A cell keeps the record with the biggest stamp. Nothing merges.",
+   "src": "README.md",
+   "line": 42,
+   "where": "README · Conflicts"
+  },
+  "committed": {
+   "text": "`committed` means the owner stamped it.",
+   "src": "README.md",
+   "line": 37,
+   "where": "README · Writes"
+  },
+  "persisted": {
+   "text": "`persisted` means a majority has it on disk.",
+   "src": "README.md",
+   "line": 37,
+   "where": "README · Writes"
+  },
+  "fsync": {
+   "text": "Durability is explicit: `persisted` means a majority finished the fsync.",
+   "src": "README.md",
+   "line": 55,
+   "where": "README · Ordering and availability"
+  },
+  "liar": {
+   "text": "one lying disk cannot fake a majority",
+   "src": "kernel/confirm.ts",
+   "line": 11,
+   "where": "kernel/confirm.ts"
+  },
+  "deadwal": {
+   "text": "the kernel treats a failed WAL as DEAD thereafter",
+   "src": "kernel/env.ts",
+   "line": 89,
+   "where": "kernel/env.ts"
+  },
+  "cable": {
+   "text": "both ends observe linkDown, exactly like a real cable cut",
+   "src": "sim/exec.ts",
+   "line": 191,
+   "where": "sim/exec.ts"
+  },
+  "lie": {
+   "text": "the batch resolves, but its rows do not survive a crash",
+   "src": "sim/exec.ts",
+   "line": 48,
+   "where": "sim/exec.ts · lieP"
+  },
+  "silence": {
+   "text": "it is the missing line that counts, not silence on a live one",
+   "src": "tools/debug/eli5.mjs",
+   "line": 218,
+   "where": "tools/debug/eli5.mjs · suspect"
+  },
+  "harmless": {
+   "text": "Harmless: two paths delivered the same thing.",
+   "src": "tools/debug/eli5.mjs",
+   "line": 209,
+   "where": "tools/debug/eli5.mjs · dupDrop"
+  },
+  "tombstone": {
+   "text": "A small marker of the deletion is kept for a while so an older, late-arriving change cannot bring the value back.",
+   "src": "tools/debug/eli5.mjs",
+   "line": 164,
+   "where": "tools/debug/eli5.mjs · remove"
+  },
+  "lease": {
+   "text": "A restore resumes AT the ceiling, so no seq can ever be issued twice across lives",
+   "src": "kernel/node.ts",
+   "line": 98,
+   "where": "kernel/node.ts · LAMPORT_LEASE"
+  },
+  "twoalone": {
+   "text": "two members alone cannot vote a dead one out",
+   "src": "examples/13-cluster-of-three/README.md",
+   "line": 51,
+   "where": "examples/13 · README"
+  },
+  "killcmd": {
+   "text": "`kill -9 271607` from terminal 4 (the pid is on its screen)",
+   "src": "examples/13-cluster-of-three/README.md",
+   "line": 20,
+   "where": "examples/13 · README"
+  },
+  "samecmd": {
+   "text": "The same command again is the SAME member",
+   "src": "examples/13-cluster-of-three/README.md",
+   "line": 49,
+   "where": "examples/13 · README"
+  },
+  "addcmd": {
+   "text": "node server.ts 4804                       # a fourth member: members 4 on every screen",
+   "src": "examples/13-cluster-of-three/README.md",
+   "line": 54,
+   "where": "examples/13 · README"
+  },
+  "twocmd": {
+   "text": "node server.ts 4802                       # only two members; kill -9 one: the other stops, writable false",
+   "src": "examples/13-cluster-of-three/README.md",
+   "line": 55,
+   "where": "examples/13 · README"
+  },
+  "ctrlc": {
+   "text": "Ctrl-C and SIGTERM are a clean stop for every live instance, then the process exits 0.",
+   "src": "README.md",
+   "line": 43,
+   "where": "README · Process"
+  },
+  "removerec": {
+   "text": "sink([{ type: REC.remove, key: [...path, String(prop)] }])",
+   "src": "api/substrate.ts",
+   "line": 258,
+   "where": "api/substrate.ts"
+  },
+  "defaultsHb": {
+   "text": "heartbeatMs: heartbeatMs ?? 500",
+   "src": "api/index.ts",
+   "line": 262,
+   "where": "api/index.ts"
+  },
+  "defaultsRd": {
+   "text": "'redial.ms': redialMs ?? 100",
+   "src": "api/index.ts",
+   "line": 802,
+   "where": "api/index.ts"
+  },
+  "harnessRd": {
+   "text": "redialMs: 20,",
+   "src": "sim/harness.ts",
+   "line": 32,
+   "where": "sim/harness.ts"
+  },
+  "ladder": {
+   "text": "`committed` means the owner stamped it. `replicated` means a majority of the view holds it. `persisted` means a majority has it on disk.",
+   "src": "README.md",
+   "line": 37,
+   "where": "README · Writes"
+  },
+  "residual": {
+   "text": "a retry can still outrace the ORIGINAL commit's replication to the new owner",
+   "src": "kernel/write.ts",
+   "line": 56,
+   "where": "kernel/write.ts · Residual, stated"
+  }
+ },
+ "consts": {
+  "heartbeatMs": 500,
+  "redialMs": 100,
+  "harnessRedialMs": 20,
+  "suspectTicks": 3,
+  "leaveTicks": 4,
+  "maxRedials": 10,
+  "lease": 4096
+ }
+}

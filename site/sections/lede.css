@@ -1,0 +1,227 @@
+/* sections/lede.css — the lede's own rules, all scoped under #lede. The kicker / headline / standfirst /
+   lede-sub / cta / install / trust grammar comes straight from v2.css (data's lede); the card follows data's
+   lede figure (fig-head · fig-write · fig-table · fig-delta), widened for fero's five columns.
+   Colour means state: the accent is the write and its stamp; --wait a waiting write; --neg down or cut off; --pos agree. */
+
+/* a little less air above the lede than data's keeps the centrepiece's kicker inside a 900 px fold at 1440 and 1280:
+   A's sub-lede also names what fero's examples build (one line more), and b carries the kernel's lines as well */
+#lede { padding-top: clamp(2.5rem, 6vw, 3.75rem); }
+#lede:has(> .opt > [data-variant="b"]:not([hidden])) { padding-top: clamp(2.5rem, 6vw, 3rem); }
+#lede [data-variant="b"] .lede-cta { margin-top: 1.5rem; }
+
+/* ---------- the two-column grid (data's: the card sits beside the standfirst + sub only) ---------- */
+#lede .lede-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; align-items: start; }
+#lede .lede-text { min-width: 0; }
+@media (min-width: 1100px) {
+  #lede .lede-grid { grid-template-columns: minmax(0, 1fr) 480px; gap: 2.5rem; margin-top: 1.6rem; }
+  #lede .lede-grid .standfirst { margin-top: 0; }
+  /* b: the kernel's lines grow into the room beside the card, under the text, without moving the page */
+  #lede .lede-grid-b { grid-template-rows: auto 1fr; grid-template-areas: "text card" "story card"; row-gap: 0; margin-top: 0.75rem; }
+  #lede .lede-grid-b .lede-text { grid-area: text; }
+  #lede .lede-grid-b .lede-fig { grid-area: card; }
+  #lede .lede-grid-b .lede-storybox { grid-area: story; align-self: stretch; contain: size; contain-intrinsic-size: 0 0; overflow: hidden; }
+}
+#lede .standfirst code, #lede .lede-sub code { font-size: 0.9em; }
+
+/* b's headline is two sentences: one per line where the column is wide enough to hold the second */
+#lede .lede-h-b { max-width: 18ch; }
+#lede .br-wide { display: none; }
+@media (min-width: 900px) {
+  #lede .lede-h-b { max-width: none; }
+  #lede .br-wide { display: inline; }
+}
+
+/* ---------- the card ---------- */
+#lede .lede-fig {
+  position: relative;
+  margin: 0; max-width: 36rem; min-width: 0;
+  background: var(--bg-2); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden;
+  font: 0.74rem/1.5 var(--mono); color: var(--ink); font-variant-numeric: tabular-nums;
+}
+@media (min-width: 1100px) { #lede .lede-fig { max-width: none; margin-top: 0.3rem; } }
+/* the column-width probe: built, measured and removed in one go by lede.js (never painted) */
+#lede .lf-measure { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; pointer-events: none; }
+#lede .lf-measure > span { display: block; }
+#lede .lf-measure .sub { display: inline; }
+
+#lede .fig-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  padding: 0.6rem 1rem; background: var(--bg-3); border-bottom: 1px solid var(--rule);
+}
+#lede .fig-src { color: var(--ink); font-weight: 500; font-size: 0.8rem; white-space: nowrap; }
+#lede .lf-clock { color: var(--faint); font-weight: 400; font-size: 0.68rem; margin-left: 0.2rem; }
+#lede .lf-clock b { color: var(--dim); font-weight: 500; }
+#lede .lf-clock .sep { margin: 0 0.25em 0 0; }
+#lede .fig-head-r { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); white-space: nowrap; }
+#lede .fig-head-r b { color: var(--dim); font-weight: 500; }
+/* the view's members by name, as the dock and 02 print them (a name keeps its case; a down member is struck) */
+#lede .fig-head-r .nid { font-size: 0.66rem; font-weight: 500; color: var(--dim); text-transform: none; letter-spacing: 0.02em; }
+#lede .fig-head-r .is-down { opacity: 1; }
+#lede .fig-head-r .is-down .nid { opacity: 0.6; }
+
+#lede .fig-io { padding: 0.55rem 1rem 0.5rem; border-bottom: 1px solid var(--rule); }
+#lede .fig-line { display: flex; align-items: baseline; gap: 0.6rem; min-height: 1.7em; }   /* the 0.8rem code line's box: no shift at the first write */
+#lede .fig-line + .fig-line { margin-top: 0.2rem; }
+#lede .fig-lab { flex: none; width: 3.1rem; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); }
+#lede .lf-write, #lede .lf-rec { min-width: 0; overflow-wrap: anywhere; }
+#lede .lf-write { font-size: 0.8rem; line-height: 1.5; }        /* placeholder and code share one line box */
+#lede .fig-foot .nid { font-size: 1em; }                         /* the foot's line box never grows with a name */
+#lede .lf-write code { font-size: 0.8rem; color: var(--ink); }
+#lede .lf-write code .p { color: var(--dim); }
+#lede .lf-write .who { color: var(--ink); }
+#lede .lf-write .sep, #lede .fig-foot .sep, #lede .fig-hint .sep { color: var(--faint); margin: 0 0.15em; }
+#lede .lf-rec .rec { font-size: 0.74rem; }
+#lede .fig-hint { margin: 0.25rem 0 0 3.7rem; min-height: 1.45em; font-size: 0.64rem; line-height: 1.45; color: var(--faint); }
+#lede .fig-hint b { color: var(--dim); font-weight: 500; }
+#lede .fig-hint abbr { text-decoration: none; }
+
+/* the copies: one row per node, the owner first, then servers and clients by name, crashed nodes last.
+   Fixed columns: lede.js sets each header cell's width (the widest content that column has held since the last
+   reset or resize), so a write never moves a column. Rows are opaque, so a row that moves covers the one it passes. */
+#lede .fig-scroll { overflow-x: auto; }
+#lede .fig-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+#lede .fig-table th, #lede .fig-table td { padding: 0.33rem 0.34rem; text-align: left; white-space: nowrap; overflow: hidden; }
+#lede .fig-table th:first-child, #lede .fig-table td:first-child { padding-left: 1rem; }
+#lede .fig-table th:last-child, #lede .fig-table td:last-child { padding-right: 0.85rem; }
+#lede .fig-table tbody tr { background: var(--bg-2); }
+/* starting widths = the reserves lede.js measures, so its first layout barely moves a column */
+#lede .fig-table thead .c-node { width: 3.75rem; }
+#lede .fig-table thead .c-role { width: 3.45rem; }
+#lede .fig-table thead .c-val { width: 6rem; }
+#lede .fig-table thead .c-stamp { width: 9.2rem; }
+#lede .fig-table thead .c-land { width: 7.2rem; }
+/* when a restart's long stamps would not fit, the role column folds away (the ★ still marks the owner) */
+#lede .lede-fig.tight .fig-table .c-role { display: none; }   /* the table's cells only: never lede.js's hidden measure node */
+#lede .fig-table th { padding-top: 0.55rem; padding-bottom: 0.3rem; font-weight: 500; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); }
+#lede .fig-table th[title] { cursor: help; }
+#lede .fig-table td { border-top: 1px solid var(--rule); }
+#lede .c-role { color: var(--dim); }
+#lede .c-val .rec { font-size: 0.72rem; display: inline-block; padding: 0 0.3em; margin: 0 -0.3em; border-radius: 2px; }
+#lede .c-val .none { color: var(--faint); }
+#lede .c-val .sub, #lede .ph-only { display: none; }             /* phones: the stamp under the value */
+#lede .c-land { font-size: 0.7rem; }
+#lede .c-land .acc { color: var(--accent); }
+#lede .c-land .dim { color: var(--dim); }
+#lede .c-land .faint { color: var(--faint); }
+#lede .c-land .wait { color: var(--wait); }
+#lede .c-land .neg { color: var(--neg); }
+#lede .c-stamp .stamp, #lede .c-val .sub .stamp { font-size: 0.68rem; gap: 0.25rem; padding: 0.05rem 0.34rem; }
+#lede .stamp.gone { color: var(--faint); }
+
+/* a crashed node: struck through and greyed (fero.css .is-down), its word in red */
+#lede tr.is-down td { opacity: 0.5; }
+#lede tr.is-down td.c-land { opacity: 1; }
+#lede tr.is-down .nid { text-decoration: line-through; text-decoration-color: var(--neg); }
+#lede tr.is-down .c-val .rec, #lede tr.is-down .stamp { text-decoration: line-through; text-decoration-color: var(--neg); }
+/* the writer's row while its write waits */
+#lede tr.is-wait .nid { color: var(--wait); }
+
+/* motion: the owner's row lights when it stamps; each copy's value flashes as it applies (v2.css cellflash).
+   Rows move only when the order changes (a new owner, a node down or back). Nothing animates under reduced motion. */
+#lede tr.lit { animation: lede-lit 1.2s ease-out; }
+#lede tr.lit td:first-child { animation: lede-lit-edge 1.2s ease-out; }
+@keyframes lede-lit { 0% { background: color-mix(in srgb, var(--accent) 16%, var(--bg-2)); } 100% { background: var(--bg-2); } }
+@keyframes lede-lit-edge { 0%, 65% { box-shadow: inset 2px 0 0 var(--accent); } 100% { box-shadow: inset 2px 0 0 transparent; } }
+#lede .c-val .rec.flash { animation: cellflash 600ms ease-out; }
+#lede .c-val .rec.flash .n, #lede .c-val .rec.flash .k, #lede .c-val .rec.flash .p { color: inherit; }
+@media (prefers-reduced-motion: reduce) {
+  #lede tr.lit, #lede tr.lit td, #lede .c-val .rec.flash { animation: none; }
+  #lede .fig-table tbody tr { transition: none !important; }
+}
+
+#lede .fig-foot {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 1rem;
+  padding: 0.6rem 1rem; border-top: 1px solid var(--rule); background: var(--bg);
+  font-size: 0.68rem; color: var(--dim);
+}
+#lede .lf-foot { min-width: 0; min-height: 3em; }   /* two lines from the start: a cut or a lost majority needs the second */
+#lede .nw, #lede .trust .ti { white-space: nowrap; }
+#lede .lf-foot .ok { color: var(--pos); }
+#lede .lf-foot .wait { color: var(--wait); }
+#lede .lf-foot .neg { color: var(--neg); }
+#lede .lf-foot .faint { color: var(--faint); }
+#lede .lf-foot .dur-foot { display: none; }
+@media (max-width: 520px) { #lede .lf-foot .dur-foot { display: inline; } }
+
+/* ---------- the cta row and the trust line ---------- */
+#lede .lede-cta { gap: 0.6rem 1rem; }
+/* the links never part: short of room, they drop to the next line together */
+#lede .lede-links { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 1rem; white-space: nowrap; }
+#lede .lede-links .cta-link[hidden] { display: none; }
+#lede .lede-status {
+  display: inline-flex; align-items: baseline; gap: 0.4em;
+  font: 500 0.72rem var(--mono); color: var(--dim); white-space: nowrap;
+  padding: 0.5rem 0.7rem; border: 1px dashed var(--rule); border-radius: 5px;
+}
+#lede .lede-status b { color: var(--ink); font-weight: 500; }
+#lede .lede-status[hidden] { display: none; }
+#lede .lede-status.pending { visibility: hidden; }   /* its room is held until data/manifest.json confirms it */
+#lede tr.ph td { color: var(--faint); }
+#lede .lede-copy { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+#lede .lede-copy code { font-size: 0.78rem; color: var(--ink); }
+#lede .lede-copy .t-kw { color: var(--dim); }
+#lede .lede-copy .t-p { color: var(--faint); }
+#lede .lede-copy .t-k { color: var(--dim); }
+#lede .trust { min-height: 1.4em; overflow: hidden; }
+#lede .trust b.v { color: var(--ink); font-weight: 500; }
+/* each item carries its dot in front, and an item never breaks inside. A wrapped line would start with a dot, so the
+   list sits one dot-width to the left and the trust line clips it: every line starts and ends on an item */
+#lede .trust .tl { display: flex; flex-wrap: wrap; row-gap: 0.2rem; margin-left: calc(-1.8em - 0.4rem); }
+#lede .trust .ti::before { content: '·'; display: inline-block; width: calc(1.8em + 0.4rem); text-align: center; color: var(--faint); }
+
+/* ---------- b · the button, the kernel's lines, the settings line ---------- */
+#lede .lb-btn { display: inline-block; font-size: 0.74rem; padding: 0.3rem 0.7rem; margin: 0.3rem 0 0 0.15rem; vertical-align: baseline; }
+#lede .lb-btn.danger:hover:not(:disabled) { border-color: var(--neg); color: var(--neg); }
+#lede .lede-storybox { min-width: 0; margin-top: 0.9rem; }
+#lede .lede-story { list-style: none; margin: 0; padding: 0; font: 0.72rem/1.4 var(--mono); color: var(--dim); }
+#lede .lede-story li { display: grid; grid-template-columns: 3.7rem minmax(0, 1fr); gap: 0.6rem; padding: 0.14rem 0; border-top: 1px solid var(--rule); animation: rowin 240ms ease-out; }
+#lede .lede-story li[hidden] { display: none; }
+#lede .lede-story li:last-child { border-bottom: 1px solid var(--rule); }
+/* the caption row an episode keeps: what the times are and where they count from */
+#lede .lede-story li.cap { grid-template-columns: minmax(0, 1fr); padding-left: 4.3rem; font-size: 0.66rem; }
+#lede .lede-story li.cap .t { display: none; }
+#lede .lede-story .t { color: var(--faint); text-align: right; }
+#lede .lede-story .x { color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+#lede .lede-story .wait { color: var(--wait); }
+#lede .lede-story .ok { color: var(--pos); }
+#lede .lede-story .neg { color: var(--neg); }
+#lede .lede-story .faint { color: var(--faint); }
+@media (prefers-reduced-motion: reduce) { #lede .lede-story li { animation: none; } }
+#lede .fig-foot .lede-settings { flex-basis: 100%; margin: 0.3rem 0 0; padding-top: 0.3rem; border-top: 1px dashed var(--rule); font: 0.62rem/1.5 var(--mono); color: var(--faint); }
+#lede .lede-settings b { color: var(--dim); font-weight: 500; white-space: nowrap; }   /* a setting and its value never part */
+#lede .lede-settings[hidden] { display: none; }
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 1099px) {
+  #lede .lede-copy code { font-size: 0.72rem; }   /* the chip, the copy line and both links fit one row at 1024 */
+  #lede .lede-fig { margin-top: 0.5rem; }
+  #lede .lede-grid-b { row-gap: 1.25rem; }
+  #lede .lede-grid-b .lede-storybox { margin-top: 0; height: 9.2rem; overflow: hidden; }   /* fixed: the caption, the crash line and the most important lines that fit */
+}
+@media (max-width: 520px) {
+  /* phones: three columns — the node, the value with its stamp under it, and when it landed */
+  #lede .fig-table .c-role, #lede .fig-table .c-stamp { display: none; }
+  #lede .c-val .sub { display: block; margin-top: 0.15rem; }
+  #lede .fig-table thead .c-node { width: 3.25rem; }
+  #lede .fig-table thead .c-val { width: 8.7rem; }
+  #lede .fig-table thead .c-land { width: 3.9rem; }
+  #lede .ph-only { display: inline; }
+  #lede .fig-table th, #lede .fig-table td { padding-left: 0.28rem; padding-right: 0.28rem; }
+  #lede .c-stamp .stamp, #lede .c-val .sub .stamp { font-size: 0.64rem; padding: 0.05rem 0.3rem; gap: 0.25rem; }
+  #lede .c-val .rec { font-size: 0.68rem; }
+  #lede .c-land { font-size: 0.66rem; }
+  #lede .nid { font-size: 0.72rem; }
+  #lede .fig-table th:first-child, #lede .fig-table td:first-child { padding-left: 0.75rem; }
+  #lede .fig-table th:last-child, #lede .fig-table td:last-child { padding-right: 0.75rem; }
+  #lede .fig-head, #lede .fig-io, #lede .fig-foot { padding-left: 0.75rem; padding-right: 0.75rem; }
+  #lede .fig-line { display: block; }
+  #lede .fig-line + .fig-line { margin-top: 0.35rem; }
+  #lede .fig-lab { display: block; width: auto; margin-bottom: 0.05rem; }
+  #lede .lf-rec .rec { font-size: min(0.68rem, calc((100vw - 72px) / 30)); }   /* the 50-character record on one line down to 360 px */
+  #lede .fig-hint { margin-left: 0; min-height: 2.9em; }       /* two lines from the start: the size wraps here */
+  #lede .lf-foot { min-height: 4.5em; }                         /* three lines from the start: a wait's reason wraps here */
+  #lede .fig-head-r { display: none; }
+  #lede .c-land .dur { display: none; }
+  #lede .lede-story li { grid-template-columns: 3.4rem minmax(0, 1fr); }
+  #lede .lede-story li.cap { grid-template-columns: minmax(0, 1fr); padding-left: 4rem; }
+}

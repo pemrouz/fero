@@ -1,0 +1,71 @@
+<section class="fsec wire" id="wire">
+  <div class="opt" data-section="wire">
+
+    <!-- ===== a · one frame, byte for byte (REAL: the house cluster's own frames, read with kernel/codec.js) ===== -->
+    <div data-variant="a" data-label="one frame, byte for byte" id="wire-a">
+      <div class="sec-head"><span class="sec-no">06</span><h2>On the wire</h2></div>
+      <p class="lead-para">
+        A write crosses the wire as one frame: a short header, the writer, the counter it starts at, the view
+        number, then the records. Most also carry the attempt: who issued the write, and its own counter for it.
+        Below is a real frame from the cluster above, taken apart by
+        <code>kernel/codec.ts</code>. The owner writes these same bytes to its write-ahead log (the WAL, its log on
+        disk), and the page checks them byte for byte. When a node comes back, each side sends a <b>digest</b>, the
+        highest counter it holds from each writer, and the other sends only what is missing.
+      </p>
+
+      <!-- card 1: one frame -->
+      <div class="wire-card" id="wire-frame">
+        <div class="wire-head">
+          <span class="wire-kicker">one frame</span>
+          <div class="wire-pick demo-chips" id="wire-pick" role="group" aria-label="pick a frame by its verb"></div>
+        </div>
+        <div class="wire-meta" id="wire-meta"><span class="wire-wait">waiting for the cluster's first frame …</span></div>
+        <div class="wire-carry" id="wire-carry" aria-label="what the frame carries, decoded"></div>
+        <div class="wire-dump-box">
+          <div class="wire-dump" id="wire-dump"></div>
+          <div class="wire-more" id="wire-more" aria-hidden="true" hidden>the rest of the frame ↓</div>
+        </div>
+        <div class="wire-foot" id="wire-foot">
+          <div class="wire-col" id="wire-onwire-col">
+            <div class="wire-k" id="wire-onwire-k">the same bytes on the wire</div>
+            <div class="wire-list" id="wire-onwire"></div>
+          </div>
+          <div class="wire-col" id="wire-ondisk-col">
+            <div class="wire-k"><span id="wire-ondisk-k">the same bytes on disk</span> <span class="wire-k-sub">· a WAL entry is one frame’s bytes</span></div>
+            <div class="wire-list" id="wire-ondisk"></div>
+          </div>
+        </div>
+      </div>
+      <p class="wire-status" id="wire-status"></p>
+
+      <!-- card 2: when a node comes back -->
+      <div class="wire-card wire-ae" id="wire-ae">
+        <div class="wire-head">
+          <span class="wire-kicker">when a node comes back</span>
+          <span class="wire-actrow">
+            <span class="wire-actnote" id="wire-act-note"></span>
+            <button type="button" class="act" id="wire-act" disabled>…</button>
+          </span>
+        </div>
+        <div class="wire-ae-body">
+          <div class="wire-highs-col">
+            <div class="wire-k">what each node holds now <span class="wire-k-sub">· what its digest sends</span></div>
+            <div class="wire-highs-box" data-scroll-x>
+              <div class="wire-highs" id="wire-highs" role="table" aria-label="the highest counter each node holds from each writer"></div>
+            </div>
+            <div class="wire-hfoot" id="wire-hfoot"></div>
+          </div>
+          <div class="wire-ex-col">
+            <div class="wire-k" id="wire-ex-k">the last exchange</div>
+            <div class="wire-ex" id="wire-ex"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== off · hidden (?wire=off removes the section, data's idiom) ===== -->
+    <div data-variant="off" data-label="hidden"></div>
+
+  </div>
+</section>

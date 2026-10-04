@@ -1,0 +1,35 @@
+{
+ "head": "f196de0",
+ "entries": [
+  "sim/exec.ts",
+  "sim/monitors.ts",
+  "sim/harness.ts",
+  "kernel/ring.ts",
+  "kernel/codec.ts",
+  "sim/shrink.ts",
+  "tools/debug/eli5.mjs"
+ ],
+ "modules": [
+  "kernel/codec.js",
+  "kernel/confirm.js",
+  "kernel/diag.js",
+  "kernel/env.js",
+  "kernel/journal.js",
+  "kernel/link.js",
+  "kernel/log.js",
+  "kernel/membership.js",
+  "kernel/node.js",
+  "kernel/ring.js",
+  "kernel/scope.js",
+  "kernel/streams.js",
+  "kernel/write.js",
+  "sim/exec.js",
+  "sim/harness.js",
+  "sim/monitors.js",
+  "sim/shrink.js",
+  "tools/debug/capture.js",
+  "tools/debug/eli5.mjs",
+  "tools/debug/model.mjs"
+ ],
+ "bytes": 529616
+}

@@ -1,0 +1,306 @@
+/* sections/cluster.css — the centrepiece over data's race grammar (.race-head / .race-title / .race-ctrl /
+   .race-caption from v2.css; .statstrip / .fstat / .stamp / .nid / .act / .rec from v2.css + fero.css).
+   Colour means state, never identity: the accent is the write and its stamp (the frames that carry it, the
+   ★ an owner wears, a cell lighting as a record lands); --pos copies agree / a check passed; --wait a waiting
+   write; --neg down, cut, broken. Node names are plain ink. Everything is scoped under #cluster. */
+@import url('./cluster/timeline.css');   /* variant b, the timeline */
+
+#cluster { padding: 1rem 0 3.5rem; position: relative; }
+
+/* ---------- the head: row 1 the kicker and the story; row 2 the verbs (left) and the clock (right) ----------
+   Each group keeps its buttons on one line while it fits; a group that does not fit moves to its own line as a
+   whole, and only then wraps inside itself. */
+#cluster .cl-head1 { margin-bottom: 0.75rem; padding-bottom: 0; border-bottom: 0; }
+#cluster .cl-ctrl { gap: 0.85rem; }
+#cluster .cl-story { gap: 0.35rem; flex-wrap: wrap; }
+#cluster .cl-story button { line-height: 1; padding: 0.3rem 0.55rem; }
+#cluster #cl-story-next { font-size: 1rem; padding: 0.22rem 0.6rem; }
+#cluster #cl-story-next.ready { color: var(--ink); border-color: var(--ink); }
+#cluster .cl-story-pos { color: var(--faint); font-variant-numeric: tabular-nums; min-width: 2.6rem; text-align: center; }
+#cluster .cl-story-name { color: var(--ink); min-width: 10.5rem; }
+#cluster .cl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.5rem; padding-bottom: 0.9rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--rule); }
+#cluster .cl-verbs { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+#cluster .cl-verbs .act { padding: 0.32rem 0.62rem; font-size: 0.72rem; }
+#cluster .cl-verbs .act[hidden] { display: none; }
+#cluster .cl-clock { gap: 0.6rem 0.85rem; }
+#cluster .cl-speed { gap: 0; }
+#cluster .cl-speed button { border-radius: 0; margin-left: -1px; }
+#cluster .cl-speed button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+#cluster .cl-speed button:nth-child(3) { border-radius: 0 4px 4px 0; }
+#cluster .cl-speed button[aria-pressed="true"] { color: var(--ink); background: var(--bg-3); border-color: var(--dim); position: relative; z-index: 1; }
+/* the slow-motion badge keeps its place whether or not it shows, so nothing in the head moves when it toggles */
+#cluster .cl-slow { margin-right: -0.35rem; font: 500 0.62rem var(--mono); color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 0.05rem 0.5rem; letter-spacing: 0.02em; white-space: nowrap; visibility: hidden; }
+#cluster .cl-slow.on { visibility: visible; }
+#cluster .cl-seed b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* ---------- the sentence: what is happening now, the full width of the column ---------- */
+#cluster .cl-now { margin: 0 0 0.5rem; font: 0.84rem/1.6 var(--mono); color: var(--dim); min-height: 3.2em; max-width: none; }
+#cluster .cl-now .nid { font-size: inherit; }
+#cluster .cl-now .stamp { font-size: 0.74rem; }
+#cluster .cl-now .rec, #cluster .cl-now .p, #cluster .cl-now .k { font-size: inherit; }
+#cluster .cl-now .n { color: #b8e872; } #cluster .cl-now .k { color: var(--dim); } #cluster .cl-now .p { color: var(--faint); } #cluster .cl-now .s { color: #b8e872; }
+#cluster .cl-row { color: var(--ink); }
+
+/* ---------- a · the stage: a band of links over four node cards ---------- */
+#cluster .cl-stage { position: relative; }
+#cluster .cl-band { display: block; width: 100%; height: 96px; overflow: visible; }
+#cluster .cl-band-foot { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font: 0.6rem var(--mono); color: var(--faint); pointer-events: none; }
+#cluster .cl-band-foot button { pointer-events: auto; }
+#cluster .cl-band-k { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+#cluster .cl-band-t { text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.56rem; }
+#cluster .cl-lg { display: inline-flex; align-items: center; gap: 0.35rem; }
+#cluster .cl-lg .lg { font: 500 0.52rem/1 var(--mono); font-style: normal; padding: 0.12rem 0.3rem; border-radius: 3px; border: 1px solid transparent; letter-spacing: 0.02em; }
+#cluster .cl-lg .lg.k-write { background: var(--accent); color: var(--accent-ink); }
+#cluster .cl-lg .lg.k-repl { border-color: var(--accent); color: var(--accent); }
+#cluster .cl-lg .lg.k-vote { border-color: var(--ink); color: var(--ink); }
+#cluster .cl-lg .lg.k-link { width: 6px; height: 6px; padding: 0; border-radius: 50%; background: var(--k-link); margin-left: 0.25rem; }
+#cluster .cl-band-n { font-size: 0.58rem; }
+#cluster .cl-hidden { text-align: right; }
+#cluster .cl-hidden .cl-hv { color: var(--faint); }
+#cluster .cl-show { appearance: none; background: none; border: 0; padding: 0 0 0 0.35rem; font: inherit; color: var(--dim); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+#cluster .cl-show:hover { color: var(--ink); }
+
+/* the links */
+#cluster .arc { fill: none; stroke: var(--faint); stroke-width: 1.25; stroke-opacity: 0.4; transition: stroke-opacity 0.25s; }
+#cluster .arc.primary { stroke-opacity: 0.75; }
+#cluster .arc.spare { stroke-dasharray: 2 4; }
+#cluster .arc.forming { stroke-opacity: 0.22; stroke-dasharray: 1 4; }
+#cluster .arc.cut { stroke: var(--neg); stroke-opacity: 0.9; stroke-dasharray: 5 4; }
+#cluster .arc.down { display: none; }
+#cluster .arc.carry.k-write, #cluster .arc.carry.k-repl { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
+#cluster .arc.carry.k-vote { stroke: var(--ink); stroke-opacity: 1; stroke-width: 1.6; }
+/* the frames on them */
+#cluster .fr text { font: 600 9px var(--mono); letter-spacing: 0.02em; }
+#cluster .fr.k-write rect { fill: var(--accent); }
+#cluster .fr.k-write text { fill: var(--accent-ink); }
+#cluster .fr.k-repl rect { fill: var(--bg); stroke: var(--accent); stroke-width: 1; }
+#cluster .fr.k-repl text { fill: var(--accent); }
+#cluster .fr.k-vote rect { fill: var(--bg); stroke: var(--ink); stroke-width: 1; }
+#cluster .fr.k-vote text { fill: var(--ink); }
+#cluster .fr.again { opacity: 0.5; }
+#cluster .fr.dot circle { fill: var(--k-link); }
+#cluster .fr.dot.k-write circle, #cluster .fr.dot.k-repl circle { fill: var(--accent); }
+#cluster .fr.dot.k-vote circle { fill: var(--ink); }
+#cluster .fr.k-beat circle { fill: var(--k-beat); }
+#cluster .fr.k-heal circle { fill: var(--k-heal); }
+
+/* ---------- the node cards ---------- */
+#cluster .cl-cards { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 1rem; }
+#cluster .cl-card { display: flex; flex-direction: column; min-width: 0; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 10px; transition: opacity 0.3s, border-color 0.3s; }
+/* a crashed card fades, but its disk line stays bright: the disk is what survives a crash */
+#cluster .cl-card.cl-down .cl-card-head, #cluster .cl-card.cl-down .cl-gone, #cluster .cl-card.cl-down .cl-card-foot, #cluster .cl-card.cl-down .cl-wait { opacity: 0.5; }
+#cluster .cl-card.cl-down .cl-name .nid { text-decoration: line-through; text-decoration-color: var(--neg); }
+#cluster .cl-card.cl-down .cl-disk:not(.cl-nodisk) { color: var(--ink); }
+#cluster .cl-card.is-cut { border-color: color-mix(in srgb, var(--neg) 55%, transparent); border-style: dashed; }
+#cluster .cl-card.is-target { box-shadow: 0 0 0 1px var(--dim); }
+#cluster .cl-card-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; column-gap: 0.5rem; row-gap: 0.1rem; padding: 0.65rem 0.9rem 0.55rem; background: var(--bg-3); border-bottom: 1px solid var(--rule); border-radius: 10px 10px 0 0; }
+#cluster .cl-role { font: 500 0.58rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+#cluster .cl-name .nid { font: 600 1.02rem var(--mono); letter-spacing: -0.01em; cursor: pointer; }
+#cluster .cl-pill { justify-self: end; font: 500 0.6rem var(--mono); color: var(--dim); border: 1px solid var(--rule); border-radius: 999px; padding: 0.04rem 0.45rem; white-space: nowrap; }
+#cluster .cl-pill.neg { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 50%, transparent); }
+#cluster .cl-pill.wait { color: var(--wait); border-color: color-mix(in srgb, var(--wait) 45%, transparent); }
+#cluster .cl-pill.dim { color: var(--faint); }
+#cluster .cl-life { grid-column: 1 / -1; font: 0.62rem var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1em; }
+#cluster .cl-body { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.65rem 0.9rem 0.55rem; flex: 1; min-width: 0; }
+#cluster .cl-vals[hidden], #cluster .cl-gone[hidden], #cluster .cl-more[hidden] { display: none; }
+#cluster .cl-big-k { font: 0.62rem var(--mono); color: var(--faint); letter-spacing: 0.02em; }
+#cluster .cl-big-k .cl-row { color: var(--dim); }
+#cluster .cl-big { font: 500 2.6rem/1.05 var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; width: fit-content; padding: 0 0.25rem; margin: 0.05rem 0 0.15rem -0.25rem; border-radius: 4px; }
+#cluster .cl-big-st { min-height: 1.35rem; }
+#cluster .cl-big.word { font-size: 1.05rem; line-height: 2.6rem; letter-spacing: 0; color: var(--dim); }
+#cluster .cl-r-v.word { color: var(--dim); }
+#cluster .cl-star { color: var(--accent); margin-left: 0.3rem; }
+#cluster .cl-star[hidden] { display: none; }
+/* hollow and faint: the row is this server's only in its old view; read-only, it stamps nothing (cards.js) */
+#cluster .cl-star.old { color: var(--faint); }
+#cluster .cl-rows { display: grid; gap: 0.3rem; margin-top: 0.35rem; padding-top: 0.45rem; border-top: 1px solid var(--rule); }
+/* a small row: its key and value on one line, its stamp on the next — a stamp is never clipped (a restart's counter
+   lease like #4101 and an origin like n02~2 make it longer) */
+#cluster .cl-r { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 0.45rem; row-gap: 0.1rem; font: 0.74rem var(--mono); min-width: 0; }
+#cluster .cl-r-k { color: var(--dim); white-space: nowrap; min-width: 0; }
+#cluster .cl-r-k .cl-row { color: var(--dim); }
+#cluster .cl-r-v { color: var(--ink); min-width: 1.5rem; text-align: right; font-variant-numeric: tabular-nums; padding: 0 0.15rem; border-radius: 3px; }
+#cluster .cl-r-st { grid-column: 1 / -1; min-width: 0; }
+#cluster .cl-r-st:empty { display: none; }
+#cluster .cl-r .stamp { font-size: 0.62rem; padding: 0 0.3rem; gap: 0.25rem; max-width: 100%; }
+#cluster .cl-more { font: 0.62rem var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the waiting slot keeps its two lines whether or not something waits, so nothing below it jumps */
+#cluster .cl-wait { font: 0.66rem/1.45 var(--mono); color: var(--wait); min-height: 2.9em; }
+#cluster .cl-wait.quiet { color: var(--faint); }
+#cluster .cl-wait.quiet .nid { color: var(--dim); }
+#cluster .cl-wait.gated { color: color-mix(in srgb, var(--wait) 78%, var(--dim)); }
+#cluster .cl-wait .nid { color: var(--wait); font-size: inherit; }
+#cluster .cl-wait-why { color: color-mix(in srgb, var(--wait) 70%, var(--dim)); }
+#cluster .cl-wait .rec, #cluster .cl-wait .p, #cluster .cl-wait .k, #cluster .cl-wait .n { color: inherit; font-size: inherit; }
+#cluster .cl-gone { font: 0.72rem/1.55 var(--mono); color: var(--dim); padding: 1.4rem 0 1rem; min-height: 9.4rem; }
+#cluster .cl-gone b { color: var(--neg); font-weight: 600; }
+#cluster .cl-gone b.ok { color: var(--ink); }
+/* the disk line wraps rather than clip (a crashed card's "disk kept · … · saved view N" is the longest) */
+#cluster .cl-disk { margin-top: auto; padding-top: 0.4rem; font: 0.62rem/1.45 var(--mono); color: var(--faint); }
+/* fit (cards.js): the text shown, stacked on an unseen template of the longer text it can become for a moment (a
+   record not yet saved, a write on its way). The box is as big as the larger of the two, so nothing moves */
+#cluster .cl-fit { display: grid; min-width: 0; }
+#cluster .cl-fit > span { grid-area: 1 / 1; min-width: 0; }
+#cluster .cl-fit-r { visibility: hidden; }
+#cluster .cl-disk .cl-fit-v { align-self: end; }
+#cluster .cl-links { display: none; }
+#cluster .cl-card-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; padding: 0.5rem 0.9rem; border-top: 1px solid var(--rule); font: 0.62rem var(--mono); color: var(--faint); white-space: nowrap; }
+#cluster .cl-view { color: var(--dim); }
+#cluster .cl-fp { min-width: 0; }
+#cluster .cl-fp-k { color: var(--faint); }
+#cluster .cl-fp [data-attested] { color: var(--dim); }
+/* the copy's verdict: beside the fingerprint, or (phones) beside the view — cards.js writes both, one shows */
+#cluster .cl-verd-n { display: none; }
+/* a cell lights in the accent as its node applies a record (two names, so a second record restarts it) */
+#cluster .fl0 { animation: cl-flash-a 700ms ease-out; }
+#cluster .fl1 { animation: cl-flash-b 700ms ease-out; }
+@keyframes cl-flash-a { 0% { background: var(--accent); color: var(--accent-ink); } 100% { background: transparent; } }
+@keyframes cl-flash-b { 0% { background: var(--accent); color: var(--accent-ink); } 100% { background: transparent; } }
+
+/* narrow cards (measured in cards.js): the small rows' stamps drop to their own line, the footer stacks */
+#cluster .cl-cards.narrow .cl-card-foot { flex-direction: column; gap: 0.1rem; }
+#cluster .cl-cards.narrow .cl-disk, #cluster .cl-cards.narrow .cl-life { white-space: normal; }
+#cluster .cl-cards.narrow .cl-big { font-size: 2.2rem; }
+/* a stamp can grow after a restart (a counter lease like #4100, an origin like n02~2): on a narrow card it
+   shrinks a step and may wrap, never runs past the card */
+#cluster .cl-cards.narrow .stamp, #cluster .cl-cards.narrow .cl-r .stamp { font-size: 0.6rem; white-space: normal; flex-wrap: wrap; max-width: 100%; row-gap: 0; }
+#cluster .cl-cards.narrow .cl-fp { white-space: normal; }
+
+/* ---------- the tape: the last records the cluster stamped ---------- */
+#cluster .cl-tape { margin-top: 1rem; padding: 0.6rem 1rem 0.7rem; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 10px; }
+#cluster .cl-tape-h { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 0.35rem; }
+#cluster .cl-tape-k { font: 0.56rem var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: 0.1em; }
+#cluster .cl-tape-sub { font: 0.6rem var(--mono); color: var(--faint); }
+#cluster .cl-tape-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.12rem; }
+#cluster .cl-tr { display: grid; grid-template-columns: 9.6rem minmax(0, 1fr) 5.6rem 3.6rem; gap: 0.9rem; align-items: baseline; font: 0.72rem var(--mono); color: var(--dim); min-height: 1.4rem; }
+#cluster .cl-tr .stamp { font-size: 0.68rem; }
+#cluster .cl-tr-rec { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cluster .cl-tr-rec .rec { font-size: 0.72rem; }
+#cluster .cl-tr-on { color: var(--dim); white-space: nowrap; }
+#cluster .cl-tr-on.agree-ok { color: var(--pos); }
+#cluster .cl-tr-t { color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; }
+#cluster .cl-tr-none { color: var(--faint); display: block; }
+#cluster .cl-tr-pad { visibility: hidden; }
+
+/* ---------- the stat strip + caption ---------- */
+#cluster .cl-strip { margin-top: 1rem; }
+#cluster .cl-strip .fstat { min-width: 0; }
+#cluster .cl-strip .fstat-v { white-space: nowrap; }
+#cluster .cl-strip .fstat-v.cl-wait-v { color: var(--wait); }
+#cluster .cl-unit { font-size: 0.68rem; font-weight: 400; color: var(--dim); }
+#cluster .fstat-v.ok .cl-unit, #cluster .fstat-v.bad .cl-unit, #cluster .fstat-v.cl-wait-v .cl-unit { color: inherit; opacity: 0.85; }
+#cluster .cl-sub { font: 0.64rem var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cluster .cl-sub.waiting { color: var(--wait); }
+#cluster .cl-sub .nid { font: inherit; color: inherit; }
+#cluster .cl-sub.cl-sub-wrap { white-space: normal; }
+#cluster .cl-caption { margin-top: 1.25rem; }
+#cluster .cl-caption code { font-size: 0.86em; }
+#cluster .cl-caption code .rec, #cluster .cl-caption code .p, #cluster .cl-caption code .k, #cluster .cl-caption code .s, #cluster .cl-caption code .n { font-size: inherit; line-height: inherit; }
+
+/* ---------- the floating dock: the same controls once the head has scrolled away ----------
+   A fixed control must never sit over the page's text, so it lives beside the 1140 px column, never on it. At
+   1400 px and wider it is a narrow rail in the right margin: the status, then the verbs. Narrower, it is a slim tab
+   in the right gutter: the cluster's state as a shape (✓ copies agree, ✕ a node down or cut off, ⋯ a write
+   waiting), and the whole tab is the button that opens every verb, with the full status line at the menu's head.
+   Nothing to reserve at the page's end: the dock never enters the column, where the footer's line is. */
+#cluster .cl-dock { position: fixed; right: 0; bottom: 16px; z-index: 900; font: 0.68rem/1.4 var(--mono); color: var(--dim); }
+#cluster .cl-dock[hidden] { display: none; }
+#cluster .cl-dock.beside-bar { bottom: calc(var(--cl-ob-h, 0px) + 26px); }
+#cluster .cl-dock-status, #cluster .cl-dock-verbs { display: none; }
+#cluster .cl-dock button { background: transparent; color: var(--dim); border: 1px solid var(--rule); font: 500 0.66rem var(--mono); padding: 0.26rem 0.42rem; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+#cluster .cl-dock button:hover:not(:disabled) { color: var(--ink); border-color: var(--dim); }
+#cluster .cl-dock button[data-act="crash"]:hover:not(:disabled), #cluster .cl-dock button[data-act="cut"]:hover:not(:disabled) { color: var(--neg); border-color: var(--neg); }
+#cluster .cl-dock button:disabled { opacity: 0.4; cursor: default; }
+#cluster .cl-dock button[hidden] { display: none; }
+/* the tab: one button, a shape over a vertical ellipsis */
+#cluster .cl-dock-more { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; width: 20px; padding: 0.4rem 0 0.3rem; background: var(--bg-2); border-radius: 6px 0 0 6px; border-right: 0; box-shadow: 0 8px 22px -12px rgba(0, 0, 0, 0.9); line-height: 1; }
+#cluster .cl-dock-more .ds-g { font-size: 0.78rem; font-weight: 600; }
+#cluster .cl-dock-more .ds-g.ok { color: var(--pos); }
+#cluster .cl-dock-more .ds-g.wait { color: var(--wait); }
+#cluster .cl-dock-more .ds-g.bad { color: var(--neg); }
+#cluster .cl-dock-more .ds-e { font-size: 0.9rem; color: var(--ink); }
+@media (min-width: 900px) {
+  #cluster .cl-dock { right: 6px; }
+  #cluster .cl-dock-more { width: 28px; border-radius: 6px; border-right: 1px solid var(--rule); }
+}
+/* the rail */
+#cluster .cl-dock .ds-l { display: block; }
+#cluster .cl-dock .ds-k { font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+#cluster .cl-dock .ds-mode { color: var(--ink); }
+#cluster .cl-dock-status .nid { font-size: inherit; color: var(--ink); }
+@media (min-width: 1400px) {
+  #cluster .cl-dock { right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: stretch; gap: 0.6rem; width: min(212px, calc((100% - 1140px) / 2 + 24px)); padding: 0.65rem 0.7rem 0.7rem; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.9); }
+  #cluster .cl-dock-status { display: grid; gap: 0.05rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
+  #cluster .cl-dock-verbs { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  #cluster .cl-dock-verbs button { flex: 1 1 auto; text-align: center; }
+  #cluster .cl-dock-more { display: none; }
+}
+
+/* ---------- the verb menu ---------- */
+/* a menu taller than the room beside its button (a phone held sideways) scrolls inside; dock.js caps it tighter */
+#cluster .cl-menu { position: fixed; z-index: 950; min-width: 13rem; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding: 0.3rem; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 14px 36px -16px rgba(0, 0, 0, 0.9); }
+#cluster .cl-menu > * { flex: none; }
+#cluster .cl-menu[hidden] { display: none; }
+#cluster .cl-menu button { display: flex; justify-content: space-between; align-items: baseline; gap: 1.2rem; text-align: left; background: transparent; border: 0; border-radius: 4px; color: var(--ink); font: 0.74rem var(--mono); padding: 0.42rem 0.6rem; cursor: pointer; }
+#cluster .cl-menu button:hover:not(:disabled), #cluster .cl-menu button:focus-visible { background: var(--bg-3); outline: none; }
+#cluster .cl-menu button:disabled { cursor: default; color: var(--faint); }
+#cluster .cl-menu button:disabled .nid { color: var(--faint); }
+#cluster .cl-menu .nid { font-size: inherit; }
+#cluster .mi-s { color: var(--faint); font-size: 0.66rem; }
+/* the ⋯ menu opens with the whole status line (the pill keeps only the most pressing state) */
+#cluster .cl-menu .mi-h { padding: 0.3rem 0.6rem 0.5rem; margin-bottom: 0.25rem; border-bottom: 1px solid var(--rule); font: 0.66rem/1.55 var(--mono); color: var(--dim); max-width: 20rem; }
+#cluster .cl-menu .mi-h .nid { font-size: inherit; color: var(--ink); }
+
+/* ---------- narrower: four cards stay in a row down to ~860px ---------- */
+/* the card footer stacks below 1100 px: "fingerprint e4a46c differs" never has to share a line with "view 2" */
+@media (max-width: 1100px) {
+  #cluster .cl-card-foot { flex-direction: column; gap: 0.1rem; }
+}
+@media (max-width: 860px) {
+  #cluster .cl-now { min-height: 6.4em; }
+  #cluster .cl-band, #cluster .cl-band-foot { display: none; }
+  #cluster .cl-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #cluster .cl-links { display: flex; flex-wrap: wrap; gap: 0.25rem 0.45rem; align-items: baseline; padding-top: 0.35rem; font: 0.64rem var(--mono); color: var(--faint); }
+  #cluster .cl-lk { color: var(--dim); padding: 0 0.2rem; border-radius: 3px; }
+  #cluster .cl-lk.cut { color: var(--neg); text-decoration: line-through; }
+  #cluster .cl-lk.down { color: var(--faint); opacity: 0.6; text-decoration: line-through; }
+  #cluster .cl-lk.forming { color: var(--faint); }
+  #cluster .cl-lk.hot { background: var(--accent); color: var(--accent-ink); }
+  #cluster .cl-lk-k { text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.54rem; }
+  #cluster .cl-tr { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "st on t" "rec rec rec"; row-gap: 0.05rem; padding: 0.2rem 0; border-bottom: 1px solid var(--rule); }
+  #cluster .cl-tr:last-child { border-bottom: 0; }
+  #cluster .cl-tr > :first-child { grid-area: st; }
+  #cluster .cl-tr-rec { grid-area: rec; }
+  #cluster .cl-tr-on { grid-area: on; justify-self: end; }
+  #cluster .cl-tr-t { grid-area: t; }
+}
+@media (max-width: 720px) {
+  #cluster .cl-story-name { min-width: 0; }
+  /* the clock keeps one line: the badge moves to the row's end and says "slow", the pause button keeps its icon */
+  #cluster .cl-clock { gap: 0.5rem 0.6rem; }
+  #cluster .cl-slow { order: 9; margin: 0; }
+  #cluster .cl-slow-w, #cluster .cl-pw { display: none; }
+  #cluster .cl-tape-sub { display: none; }
+}
+@media (max-width: 480px) {
+  #cluster .cl-cards { gap: 0.6rem; }
+  #cluster .cl-card .stamp { font-size: 0.6rem; white-space: normal; flex-wrap: wrap; max-width: 100%; row-gap: 0; }
+  #cluster .cl-fp { white-space: normal; }
+  #cluster .cl-disk, #cluster .cl-life, #cluster .cl-more { white-space: normal; }
+  #cluster .cl-tr-rec { white-space: normal; overflow: visible; }
+  #cluster .cl-gone { min-height: 7rem; padding-top: 0.8rem; }
+  #cluster .cl-card-head { padding: 0.55rem 0.65rem 0.5rem; column-gap: 0.35rem; }
+  #cluster .cl-body { padding: 0.55rem 0.65rem 0.5rem; }
+  #cluster .cl-card-foot { padding: 0.45rem 0.65rem; flex-direction: column; gap: 0.1rem; }
+  #cluster .cl-big { font-size: 2.1rem; }
+  #cluster .cl-pill { grid-column: 1 / -1; justify-self: start; grid-row: 3; }
+  #cluster .cl-life { grid-row: 2; }
+  #cluster .cl-verd-n { display: inline; }
+  #cluster .cl-verd-w { display: none; }
+  /* a waiting write's row and value take their own line, so "{ stock: 4 }" never breaks inside its braces */
+  #cluster .cl-wait .cl-sep { display: none; }
+  #cluster .cl-wait .cl-wait-why { display: block; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #cluster .fl0, #cluster .fl1 { animation: none; }
+}

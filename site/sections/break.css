@@ -1,0 +1,230 @@
+/* sections/break.css — §02 Break it. Scoped under #break; layers on v2.css (demo-chips, col-head, cat-foot,
+   stream-btn, pre.code) and fero.css (nid, stamp, rec, waiting, agree-ok, broken, act). Colour means state:
+   the accent is a write's stamp (and, as data does, the chip the panel shows); --pos a check passed or copies
+   agree; --wait a waiting write; --neg down, cut, broken, or a fault switched on. Every state also carries a
+   word or a shape. */
+
+/* ---------- b's feed line: the own runs (a has none: the dock shows the shared cluster's state) ---------- */
+#break .brk-feed { margin: -0.35rem 0 1.5rem; font: 0.74rem/1.9 var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; max-width: none; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.4em; }
+#break .brk-feed b { color: var(--dim); font-weight: 500; }
+#break .brk-feed .brk-feed-src { color: var(--ink); }
+#break .brk-feed .brk-feed-btns { display: inline-flex; gap: 0.35rem; margin-left: auto; }
+#break .brk-feed .stream-btn { margin-left: 0; }
+#break .brk-feed .brk-feed-rec { color: var(--dim); }
+#break .brk-feed .brk-feed-rec .rec { font-size: 0.74rem; }
+#break .brk-feed .brk-same { color: var(--faint); }
+#break .brk-feed .brk-same.agree-ok { color: var(--pos); }
+#break .brk-feed .brk-same.broken { color: var(--neg); }
+
+/* a value never wraps away from its unit ('100 ms', '4.9 s'): the figures (.tv) and the label pieces built around them (.nw) */
+#break .tv, #break .nw { white-space: nowrap; }
+
+/* ---------- the four chip cards (data's .op-grid) ---------- */
+#break .brk-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
+#break .brk-card { background: var(--bg-2); padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+#break .brk-kicker { font: 500 0.72rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); }
+#break .brk-card-def { margin: 0; font: 0.8rem/1.45 var(--sans); color: var(--dim); }
+#break .brk-chips { margin: 0.15rem 0 0; gap: 0.3rem; }
+/* one grid row: the label and the red ON share a baseline (align-items), and the row sits in the middle of the chip
+   (align-content), so the label stays centred when v2.css grows a chip to 34 px on touch screens */
+#break .brk-chips .chip { padding: 0.22rem 0.5rem; font-size: 0.74rem; display: inline-grid; grid-auto-flow: column; align-items: baseline; align-content: center; column-gap: 0.35em; }
+/* the chip the panel shows: an accent outline (not a fill: a fill would read as "on" or "done") */
+#break .brk-chips .chip.sel { color: var(--accent); border-color: var(--accent); }
+#break .brk-chips .chip:disabled { color: var(--faint); border-color: var(--rule); opacity: 0.55; cursor: default; }
+#break .brk-chips .chip:disabled:hover { color: var(--faint); border-color: var(--rule); }
+#break .brk-chips .chip.sel:disabled, #break .brk-chips .chip.sel:disabled:hover { color: var(--dim); border-color: color-mix(in srgb, var(--accent) 50%, var(--rule)); opacity: 1; }
+/* a fault that stays on (a slow link, a lying disk): a red ON inside the chip, a red edge */
+#break .brk-chips .chip .brk-live { font: 600 0.6rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--neg); font-style: normal; }
+#break .brk-chips .chip.is-live:not(.sel) { border-color: color-mix(in srgb, var(--neg) 55%, var(--rule)); }
+
+/* ---------- the one panel: l = what it is · m = what the kernel did · r = the numbers and the rules ---------- */
+#break .brk-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-areas: "l m" "r r" "f f"; grid-template-rows: minmax(25rem, auto) auto auto; gap: 1.1rem 1.75rem; background: var(--bg-2); border: 1px solid var(--rule); border-radius: 8px; padding: 1.1rem 1.25rem 1.2rem; font: 0.78rem var(--mono); margin-bottom: 1rem; }
+#break .brk-l { grid-area: l; min-width: 0; }
+#break .brk-m { grid-area: m; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+#break .brk-r { grid-area: r; min-width: 0; border-top: 1px solid var(--rule); padding-top: 0.9rem; }
+/* f: the rules strip across the foot of the panel (data's card-foot grammar) */
+#break .brk-rulestrip { grid-area: f; min-width: 0; border-top: 1px solid var(--rule); padding-top: 0.65rem; }
+
+/* l: the name, what the page did, the command, the promise */
+#break .brk-head { display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.45rem; }
+#break .brk-cat { font: 500 0.62rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+#break .brk-name { font: 600 1.1rem/1.25 var(--mono); color: var(--ink); letter-spacing: -0.01em; }
+#break .brk-did { margin: 0 0 0.85rem; font: 0.74rem/1.5 var(--mono); color: var(--dim); max-width: none; }
+#break .brk-did b { color: var(--ink); font-weight: 500; }
+#break .brk-did code { font-size: 0.95em; }
+#break .brk-did .nid { font-size: 0.74rem; }
+#break .brk-node { margin: 0 0 0.85rem; }
+#break .brk-label { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.1rem 0.6rem; font: 500 0.62rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 0.3rem; }
+#break .brk-label .brk-src cite { letter-spacing: 0; text-transform: none; }
+#break pre.code.brk-cmd { margin: 0 0 0.4rem; padding: 0.5rem 0.75rem; background: var(--bg); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.74rem; line-height: 1.55; }
+#break pre.code.brk-cmd:empty { display: none; }
+#break pre.code.brk-cmd .brk-prompt { color: var(--faint); user-select: none; }
+#break pre.code.brk-cmd .brk-comment { color: var(--faint); }
+#break .brk-say { margin: 0; font: 0.8rem/1.5 var(--sans); color: var(--dim); max-width: none; }
+#break .brk-say:empty { display: none; }
+#break kbd { font: 500 0.72rem var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 3px; padding: 0 0.3em; }
+#break cite { font: 0.64rem var(--mono); font-style: normal; color: var(--faint); }
+#break .brk-promise { margin: 0; padding: 0.1rem 0 0.1rem 0.8rem; border-left: 2px solid var(--rule); }
+#break .brk-promise p { margin: 0 0 0.2rem; font: 0.84rem/1.5 var(--sans); color: var(--ink); max-width: none; }
+#break .brk-promise cite { display: block; }
+#break .brk-promise code, #break .brk-say code { font-size: 0.85em; }
+#break .brk-next { margin-top: 0.8rem; }
+#break .brk-next .act { font-size: 0.74rem; white-space: normal; max-width: 100%; text-align: left; }
+
+/* m: the journal, one line per kind of event, in a box that never jumps by itself */
+#break .brk-m .col-head { margin-bottom: 0.25rem; }
+#break .brk-m .col-head-label { color: var(--ink); }
+#break .brk-lines-box { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+#break .brk-lines { position: relative; list-style: none; margin: 0; padding: 0; flex: 1 1 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+#break .brk-line { display: grid; grid-template-columns: 4.1rem minmax(0, 1fr); column-gap: 0.6rem; padding: 0.2rem 0; border-bottom: 1px solid var(--rule); font: 0.74rem/1.45 var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+#break .brk-line.fresh { animation: brk-in 260ms ease-out; }
+#break .brk-line .t { color: var(--faint); text-align: right; white-space: nowrap; }
+#break .brk-line .w { min-width: 0; }
+#break .brk-line .who { color: var(--ink); margin-right: 0.45em; }
+#break .brk-line .who .each { color: var(--faint); }
+#break .brk-line .who .nid { font-size: 0.74rem; }
+#break .brk-line .jk { margin-left: 0.5em; font-size: 0.64rem; color: var(--faint); border-bottom: 1px dotted var(--rule); cursor: help; white-space: nowrap; }
+#break .brk-line .x { margin-left: 0.35em; color: var(--faint); white-space: nowrap; }
+#break .brk-line.is-page .who { color: var(--faint); }
+#break .brk-line.is-page .w { color: var(--ink); }
+#break .brk-line.is-write .w { color: var(--ink); }
+#break .brk-line .waiting { color: var(--wait); }
+#break .brk-line .agree-ok { color: var(--pos); }
+#break .brk-line .broken { color: var(--neg); }
+#break .brk-line.is-vote .w { color: var(--ink); }
+#break .brk-line .stamp { font-size: 0.68rem; padding: 0 0.3rem; }
+#break .brk-line .rec { font-size: 0.72rem; }
+#break .brk-line.is-gap .w { color: var(--faint); font-style: italic; }
+/* what the box hides: "↑ 3 earlier lines" above it, "↓ 7 more lines" under it (counted from the lines). Each is
+   its own row inside the fixed box, so it never covers a line and the box never changes height */
+#break .brk-more, #break .brk-earlier { flex: none; display: flex; justify-content: center; align-items: center; gap: 0.35em; width: 100%; border: 0; border-top: 1px solid var(--rule); background: transparent; padding: 0.3rem 0 0.1rem; font: 500 0.66rem var(--mono); color: var(--dim); cursor: pointer; }
+#break .brk-earlier { order: -1; border-top: 0; border-bottom: 1px solid var(--rule); padding: 0.1rem 0 0.3rem; }
+#break .brk-more b, #break .brk-earlier b { color: var(--ink); font-weight: 500; }
+#break .brk-more i, #break .brk-earlier i { font-style: normal; }
+#break .brk-more:hover, #break .brk-earlier:hover { color: var(--accent); }
+#break .brk-more[hidden], #break .brk-earlier[hidden] { display: none; }
+#break .brk-routine { margin: 0.45rem 0 0; font: 0.7rem/1.5 var(--mono); color: var(--faint); max-width: none; }
+#break .brk-routine b { color: var(--dim); font-weight: 500; }
+#break .brk-empty { padding: 0.5rem 0; color: var(--faint); font: 0.76rem/1.55 var(--sans); }
+@keyframes brk-in { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
+
+/* r: the numbers (a bar per vote, like data's peers strip) and the rules */
+#break .brk-title { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.6rem; font: 500 0.66rem/1.5 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-bottom: 0.45rem; }
+#break .brk-title .brk-title-sub { letter-spacing: 0.02em; text-transform: none; color: var(--faint); font-weight: 400; }
+#break .brk-facts { display: grid; gap: 0.5rem 1.25rem; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); align-items: start; }
+#break .brk-fact { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.6rem; row-gap: 0.15rem; align-items: baseline; font: 0.74rem var(--mono); font-variant-numeric: tabular-nums; }
+#break .brk-fact .k { color: var(--dim); min-width: 0; }
+#break .brk-fact .v { color: var(--ink); font-weight: 500; text-align: right; white-space: nowrap; }
+#break .brk-fact .v.waiting { color: var(--wait); }
+#break .brk-fact .v.ok { color: var(--pos); }
+#break .brk-fact .v.bad { color: var(--neg); }
+#break .brk-fact .v.pend { color: var(--faint); font-weight: 400; }
+#break .brk-fact .bar { grid-column: 1 / -1; display: block; height: 5px; background: var(--bg); border: 1px solid var(--rule); border-radius: 2px; overflow: hidden; }
+#break .brk-fact .bar i { display: block; height: 100%; width: 0; min-width: 2px; background: var(--k-link); transition: width 300ms cubic-bezier(.2,.7,.2,1); }
+#break .brk-fact .n { grid-column: 1 / -1; font-size: 0.66rem; color: var(--faint); line-height: 1.45; }
+#break .brk-fact .n code { font-size: 0.95em; }
+#break .brk-fact .stamp { font-size: 0.68rem; padding: 0 0.3rem; }
+#break .brk-fact .v .stamp { font-weight: 500; }
+#break .brk-fact.wide, #break .brk-fact.say, #break .brk-fact.quote { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); }
+#break .brk-fact.wide .v { text-align: left; white-space: normal; }
+#break .brk-fact.say .k { color: var(--ink); font: 0.8rem/1.5 var(--sans); }
+#break .brk-fact.say .k .waiting { color: var(--wait); }
+#break .brk-fact.say .k .broken { color: var(--neg); }
+#break .brk-fact.quote .k { color: var(--ink); border-left: 2px solid var(--rule); padding-left: 0.6rem; }
+#break .brk-fact.quote p { margin: 0 0 0.15rem; font: 0.78rem/1.5 var(--sans); max-width: none; }
+#break .brk-fact.quote cite { display: block; }
+#break .brk-rulesum { margin: 0 0 0.2rem; font: 0.68rem/1.5 var(--mono); color: var(--faint); max-width: none; font-variant-numeric: tabular-nums; }
+#break .brk-rulesum .brk-rulekick { font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+#break .brk-rulesum b { color: var(--dim); font-weight: 500; }
+#break .brk-rulesum .agree-ok, #break .brk-rulesum .agree-ok b { color: var(--pos); }
+#break .brk-rulesum .broken, #break .brk-rulesum .broken b { color: var(--neg); }
+#break .brk-rules { display: inline; margin: 0; font: 0.64rem/1.7 var(--mono); color: var(--faint); max-width: none; }
+#break .brk-rules .rule { white-space: nowrap; cursor: help; margin-right: 0.75rem; }
+#break .brk-rules .rule i { font-style: normal; color: var(--pos); margin-right: 0.3em; }
+#break .brk-rules .rule.bad { color: var(--neg); }
+#break .brk-rules .rule.bad i { color: var(--neg); }
+#break .brk-scoped { display: inline; margin: 0; font: 0.64rem/1.7 var(--mono); color: var(--faint); max-width: none; }
+#break .brk-scoped .rule { white-space: nowrap; }
+#break .brk-scoped code { font-size: 1em; color: var(--dim); }
+#break .brk-rulebad { margin: 0.35rem 0 0; font: 0.66rem/1.5 var(--mono); color: var(--dim); }
+#break .brk-rulebad p { margin: 0 0 0.2rem; max-width: none; }
+#break .brk-rulebad .stamp { font-size: 0.64rem; padding: 0 0.25rem; }
+#break .brk-foot { margin-top: 1.25rem; max-width: none; }
+#break .brk-foot b { color: var(--dim); font-weight: 500; }
+
+/* wide screens: three columns, one fixed height for every chip (the page below never moves) */
+@media (min-width: 1100px) {
+  #break .brk-panel { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.72fr) minmax(0, 0.86fr); grid-template-areas: "l m r" "f f f"; grid-template-rows: minmax(25rem, auto) auto; column-gap: 1.4rem; }
+  #break .brk-r { border-top: 0; padding-top: 0; border-left: 1px solid var(--rule); padding-left: 1.2rem; }
+  #break .brk-facts { grid-template-columns: minmax(0, 1fr); }
+}
+/* phones: one column; the journal grows with the page instead of scrolling inside it */
+@media (max-width: 760px) {
+  #break .brk-panel { grid-template-columns: minmax(0, 1fr); grid-template-areas: "l" "m" "r" "f"; grid-template-rows: auto; }
+  #break .brk-m { display: block; }
+  #break .brk-lines-box { display: block; }
+  #break .brk-lines { overflow: visible; max-height: none; }
+  #break .brk-more, #break .brk-earlier { display: none; }
+  #break .brk-facts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- b: three own runs side by side ---------- */
+#break .brk-runs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+#break .brk-run { background: var(--bg-2); border: 1px solid var(--rule); border-radius: 8px; padding: 0.95rem 1.05rem 1.05rem; min-width: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+#break .brk-run-head { display: flex; flex-direction: column; gap: 0.15rem; }
+#break .brk-run-name { font: 600 1rem var(--mono); color: var(--ink); }
+#break .brk-run-tag { font: 0.66rem var(--mono); color: var(--faint); letter-spacing: 0.04em; }
+#break .brk-run-tag code { color: var(--dim); }
+#break .brk-run-body { display: flex; flex-direction: column; gap: 0.6rem; min-height: 21rem; }
+#break .brk-run-own { font: 0.66rem var(--mono); color: var(--faint); letter-spacing: 0.06em; text-transform: uppercase; }
+#break .brk-run-big { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+#break .brk-run-big .v { font: 600 1.6rem var(--mono); color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums; }
+#break .brk-run-big .v.waiting { color: var(--wait); }
+#break .brk-run-big .k { font: 0.72rem var(--mono); color: var(--faint); }
+#break .brk-run-svg { display: block; width: 100%; height: auto; overflow: visible; }
+#break .brk-run-svg text { font-family: var(--mono); }
+#break .brk-run-rows { display: grid; gap: 0.3rem; font: 0.72rem var(--mono); font-variant-numeric: tabular-nums; }
+#break .brk-run-rows .r { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); column-gap: 0.75rem; align-items: baseline; }
+#break .brk-run-rows .r .k { color: var(--dim); white-space: nowrap; }
+#break .brk-run-rows .r .v { color: var(--ink); text-align: right; }
+#break .brk-run-rows .r .v .then { color: var(--faint); }
+#break .brk-run-rows .stamp { font-size: 0.68rem; padding: 0 0.3rem; }
+#break .brk-run-say { margin: 0; font: 0.8rem/1.5 var(--sans); color: var(--ink); max-width: none; }
+#break .brk-run-say .waiting { color: var(--wait); }
+#break .brk-run-q { margin: 0; padding: 0 0 0 0.6rem; border-left: 2px solid var(--rule); }
+#break .brk-run-q p { margin: 0 0 0.15rem; font: 0.76rem/1.5 var(--sans); color: var(--dim); max-width: none; }
+#break .brk-run-q cite { display: block; }
+#break .brk-run-lines { list-style: none; margin: 0; padding: 0.4rem 0 0; border-top: 1px solid var(--rule); font: 0.68rem/1.5 var(--mono); color: var(--dim); }
+#break .brk-run-lines li { display: grid; grid-template-columns: 3.6rem minmax(0, 1fr); column-gap: 0.5rem; padding: 0.1rem 0; }
+#break .brk-run-lines li .t { color: var(--faint); text-align: right; }
+#break .brk-run-lines li .who { color: var(--ink); }
+#break .brk-run-lines li .who .each { color: var(--faint); }
+#break .brk-run-wait { color: var(--faint); font: 0.76rem/1.55 var(--sans); }
+@media (max-width: 980px) { #break .brk-runs { grid-template-columns: minmax(0, 1fr); } #break .brk-run-body { min-height: 0; } }
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 900px) { #break .brk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  #break .brk-grid { grid-template-columns: minmax(0, 1fr); }
+  #break .brk-feed .brk-feed-btns { margin-left: 0; width: 100%; }
+  #break .brk-line { grid-template-columns: 3.4rem minmax(0, 1fr); column-gap: 0.45rem; }
+  #break .brk-panel { padding: 0.95rem 0.9rem 1.05rem; }
+}
+@media (prefers-reduced-motion: reduce) { #break .brk-line.fresh { animation: none; } #break .brk-fact .bar i { transition: none; } }
+
+/* attested values keep their row's type; the attribute is provenance, not emphasis */
+#break .tv { font-weight: inherit; color: inherit; }
+
+/* b · the view timeline (one lane per node; a band per view; ✕ a crash; amber the write's wait; ● its stamp) */
+#break .brk-run-svg .lbl { fill: var(--ink); font-size: 10px; }
+#break .brk-run-svg .lane.e1 { fill: var(--bg-3); stroke: var(--rule); stroke-width: 0.6; }
+#break .brk-run-svg .lane.e0 { fill: color-mix(in srgb, var(--ink) 10%, var(--bg-2)); stroke: var(--rule); stroke-width: 0.6; }
+#break .brk-run-svg .vlbl { fill: var(--dim); font-size: 8.5px; }
+#break .brk-run-svg .vlbl.back { fill: var(--ink); }
+#break .brk-run-svg .dead { stroke: var(--neg); stroke-width: 0.8; stroke-dasharray: 2 3; opacity: 0.7; }
+#break .brk-run-svg .xmark { fill: var(--neg); font-size: 11px; font-weight: 700; }
+#break .brk-run-svg .leftmark { fill: var(--dim); font-size: 8.5px; }
+#break .brk-run-svg .wait { fill: var(--wait); opacity: 0.85; }
+#break .brk-run-svg .stampmark { fill: var(--accent); stroke: var(--bg-2); stroke-width: 1; }
+#break .brk-run-svg .axis, #break .brk-run-svg .tick { stroke: var(--faint); stroke-width: 0.6; }
+#break .brk-run-svg .tl { fill: var(--faint); font-size: 8.5px; }

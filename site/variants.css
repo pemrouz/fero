@@ -1,0 +1,21 @@
+/* the prototype-only options bar + variant plumbing (not part of the site) */
+.opt > [data-variant][hidden] { display: none !important; }
+/* before variants.js runs, only the first variant shows (no flash of the others) */
+.opt:not(.opt-ready) > [data-variant] ~ [data-variant] { display: none; }
+.opt > [data-variant] { position: relative; }
+.opt-ribbon { display: none; }
+html.opt-all .opt > [data-variant] { border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent); padding: 1rem; margin: 0 0 1.5rem; border-radius: 6px; }
+html.opt-all .opt-ribbon { display: block; position: absolute; top: -0.7rem; left: 0.75rem; background: #0c0c0d; color: var(--accent); font: 500 0.7rem ui-monospace, Menlo, monospace; letter-spacing: .08em; padding: 0 .4rem; text-transform: uppercase; }
+#optbar { position: fixed; right: 14px; bottom: 14px; z-index: 1000; background: rgba(20,20,23,.96); border: 1px solid #26262b; border-radius: 8px; padding: 10px 12px; font: 11.5px/1.7 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #9a9a93; max-width: 360px; box-shadow: 0 12px 40px -12px rgba(0,0,0,.8); }
+#optbar[hidden] { display: none; }
+/* a fixed width and a fixed hint line: hovering a button never moves the bar */
+#optbar { width: 360px; max-width: calc(100vw - 28px); box-sizing: border-box; }
+#optbar .hint { height: 1.7em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #5c5c58; }
+#optbar .row { display: flex; gap: 6px; align-items: baseline; white-space: nowrap; }
+#optbar .row b { color: #edece8; font-weight: 500; min-width: 6.5em; }
+#optbar button { background: transparent; border: 1px solid #26262b; color: #9a9a93; border-radius: 3px; padding: 0 6px; font: inherit; cursor: pointer; line-height: 1.5; }
+#optbar button:hover { border-color: #9a9a93; color: #edece8; }
+#optbar button.on { border-color: var(--accent); color: var(--accent); }
+#optbar .foot { margin-top: 6px; padding-top: 6px; border-top: 1px solid #26262b; display: flex; gap: 8px; }
+#optbar .foot a { color: #80807a; border: 0; cursor: pointer; }
+#optbar .foot a:hover { color: var(--accent); }
