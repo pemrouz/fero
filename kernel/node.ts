@@ -1143,15 +1143,22 @@ export class Node {
         if (link.to) this.#backoff.delete(link.to)
         if (v.l) this.#backoff.delete(v.l)
         j.armed && j.emit(JK.identified, link.id, v.u, v.i)
-        //! digest-on-admit, from BOTH ends (direction-independent — v2's dialer-gated catch-up trap is the
-        // counterexample this rule exists for): each side announces what it holds; the peer ships the missing
-        // suffixes. Every admit heals — first link, keeper-after-dup-race, reconnect-after-heal.
+        //! digest-on-admit, ONE opener: the LOWER uuid sends the r=1 digest, the higher answers r=0
+        // (2026-10-06). The rule is direction-independent — it asks who sorts lowest, never who dialed
+        // (v2's dialer-gated catch-up trap is the counterexample) — and it is the PING/floor rule the
+        // heartbeat already uses, so admit, drain and floor are all single-opener exchanges. One r=1
+        // heals BOTH ways: the higher side ships what the opener's tails lack and then replies; that
+        // reply's tails pull what the higher side lacks. Every admit heals — first link,
+        // keeper-after-dup-race, reconnect-after-heal — and each missing suffix ships ONCE. (Both ends
+        // used to open: each r=0 reply was built before the peer's first suffix had landed, so every
+        // suffix shipped twice and the second copy dup-dropped.)
         // CLIENT exception (M5b): a client digests exactly ONE server — its primary. The first admit
         // elects it; every other link stays un-digested (and un-answered — see the DIGEST handler), so
         // synced never rises there and this client has ONE feeder: per-origin ordering by construction.
+        // A server never opens toward a client: the client's own r=1 is what syncs that link.
         if (this.client) {
           if (this.primary === null) { this.primary = link.id; this.#sendDigest(link, 1) }
-        } else this.#sendDigest(link, 1)
+        } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
         //! view-on-admit (symmetric with digest-on-admit): announce the committed view so a healed peer's
         // membership converges even when no epoch-stamped records flow; then settle — an admitted member
         // can flip the gate back to majority, flushing any parked writes

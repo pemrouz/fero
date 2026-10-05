@@ -295,6 +295,102 @@ test('digest anti-entropy: admit exchanges digests; a peer digest pulls exactly 
   assert.ok(node.journal.read().some((e) => e.kind === JK.aeShip && e.b === 2))
 })
 
+//! ── the admit exchange has ONE opener (2026-10-06) ───────────────────────────────────────────────
+// Two real kernels wired back to back, frames delivered in FIFO order (what TCP gives). Each side
+// holds records the other lacks, then the link comes up. The old rule had BOTH ends open with an
+// r=1 digest: each end shipped its suffix on the peer's r=1, then shipped it AGAIN on the peer's
+// r=0 reply (that reply's tails were built before the first suffix landed), and the receiver
+// dup-dropped the second copy. RED on the old kernel: aeShip 2+2, four digest frames, dupDrops.
+const pair = (a: ReturnType<typeof harness>, b: ReturnType<typeof harness>) => {
+  const cur = [0, 0]
+  const pump = () => {
+    for (let moved = true; moved;) {
+      moved = false
+      for (const [i, from, to] of [[0, a, b], [1, b, a]] as const) {
+        const sends = from.of('send')
+        while (cur[i] < sends.length) { to.node.step({ kind: 'bytesIn', link: 1, bytes: sends[cur[i]++][2] as Uint8Array }); moved = true }
+      }
+    }
+  }
+  const up = () => {
+    a.node.step({ kind: 'linkUp', link: 1, dialed: true, to: `sim:${b.node.uuid}` })
+    b.node.step({ kind: 'linkUp', link: 1, dialed: false })
+    pump()
+  }
+  const jk = (h: ReturnType<typeof harness>, kind: number) => h.node.journal.read().filter((e) => e.kind === kind)
+  return { up, pump, jk }
+}
+const put = (h: ReturnType<typeof harness>, keys: string[]) => {
+  for (const k of keys) h.node.step({ kind: 'write', recs: [{ type: REC.update, key: [k], value: k }] })
+}
+
+test('admit: the lower uuid opens the digest exchange, so each missing suffix ships ONCE (aeShip 1+1, dupDrop 0+0, two digest frames)', () => {
+  //! whichever side DIALS, the lower uuid opens — the rule is direction-independent
+  for (const dialer of ['aa', 'bb']) {
+    const [aa, bb] = [harness('aa'), harness('bb')]
+    put(aa, ['a1', 'a2', 'a3'])
+    put(bb, ['b1', 'b2', 'b3', 'b4'])
+    const p = dialer === 'aa' ? pair(aa, bb) : pair(bb, aa)
+    p.up()
+    assert.deepEqual(p.jk(aa, JK.digestOut).map((e) => e.b), [1], `${dialer} dials: aa (lower) opens with r=1, once`)
+    assert.deepEqual(p.jk(bb, JK.digestOut).map((e) => e.b), [0], `${dialer} dials: bb (higher) only answers, r=0`)
+    assert.deepEqual(p.jk(aa, JK.aeShip).map((e) => e.b), [3], `${dialer} dials: aa ships its 3 records once`)
+    assert.deepEqual(p.jk(bb, JK.aeShip).map((e) => e.b), [4], `${dialer} dials: bb ships its 4 records once`)
+    assert.equal(p.jk(aa, JK.dupDrop).length + p.jk(bb, JK.dupDrop).length, 0, `${dialer} dials: nothing arrives twice`)
+    assert.equal(aa.node.state.size, 7)
+    assert.equal(aa.node.stateHash, bb.node.stateHash, `${dialer} dials: converged`)
+    assert.ok(aa.node.links.get(1)!.synced && bb.node.links.get(1)!.synced, `${dialer} dials: BOTH ends synced by the one exchange`)
+    //! live records flow both ways afterwards, still nothing twice
+    put(aa, ['a4']); put(bb, ['b5']); p.pump()
+    assert.equal(aa.node.stateHash, bb.node.stateHash)
+    assert.equal(aa.node.state.size, 9)
+    assert.equal(p.jk(aa, JK.dupDrop).length + p.jk(bb, JK.dupDrop).length, 0)
+  }
+})
+
+test('admit: one side holds everything — the single exchange heals in BOTH directions', () => {
+  //! lower has it all: its r=1 says so; bb has nothing to ship and answers r=0 with empty tails; aa ships
+  //! higher has it all: aa's r=1 carries empty tails, so bb ships at once; bb's r=0 reply pulls nothing
+  for (const full of ['aa', 'bb']) {
+    const [aa, bb] = [harness('aa'), harness('bb')]
+    put(full === 'aa' ? aa : bb, ['k1', 'k2', 'k3'])
+    const p = pair(aa, bb)
+    p.up()
+    const [has, lacks] = full === 'aa' ? [aa, bb] : [bb, aa]
+    assert.deepEqual(p.jk(has, JK.aeShip).map((e) => e.b), [3], `${full} holds all: it ships 3, once`)
+    assert.equal(p.jk(lacks, JK.aeShip).length, 0, `${full} holds all: the empty side ships nothing`)
+    assert.equal(p.jk(aa, JK.digestOut).length + p.jk(bb, JK.digestOut).length, 2, 'two digest frames, not four')
+    assert.equal(p.jk(aa, JK.dupDrop).length + p.jk(bb, JK.dupDrop).length, 0)
+    assert.equal(lacks.node.state.size, 3)
+    assert.equal(aa.node.stateHash, bb.node.stateHash)
+    assert.ok(aa.node.links.get(1)!.synced && bb.node.links.get(1)!.synced)
+  }
+})
+
+test('admit: the higher uuid stays quiet until the opener speaks; a server never opens toward a client', () => {
+  const frames = (h: ReturnType<typeof harness>) => h.of('send').flatMap((e) => new Framer().push(e[2] as Uint8Array))
+  const bb = harness('bb')
+  bb.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:aa' })
+  bb.node.step({ kind: 'bytesIn', link: 1, bytes: hello('aa') })
+  assert.deepEqual(frames(bb).map((f) => f.verb), [VERB.HELLO], 'bb > aa: admitted, no digest of its own')
+  bb.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+  assert.deepEqual(frames(bb).map((f) => f.verb), [VERB.HELLO, VERB.DIGEST], 'it answers the opener')
+  assert.deepEqual(frames(bb)[1].value, { d: {}, r: 0 })
+  //! a client link: the CLIENT opens (to its primary). The server never does, whichever uuid is lower —
+  // a client never answered a non-primary digest anyway, so the old r=1 toward it was a wasted frame
+  for (const client of ['zz', '00']) {
+    const aa = harness('aa')
+    aa.node.step({ kind: 'linkUp', link: 1, dialed: false })
+    aa.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: client, i: 1, l: '', r: 1 }) })
+    assert.deepEqual(frames(aa).map((f) => f.verb), [VERB.HELLO], `server aa, client ${client}: no digest from the server`)
+    put(aa, ['held'])
+    aa.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+    const out = frames(aa).slice(1)
+    assert.deepEqual(out.map((f) => f.verb), [VERB.RECORDS, VERB.DIGEST], `client ${client} opened: the server ships, then answers r=0`)
+    assert.equal(aa.node.links.get(1)!.synced, true)
+  }
+})
+
 test('a digest with Lamport gaps ships valid split frames (encodeRuns), and losers are served too', () => {
   const { node, of } = harness('aa')
   node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })

@@ -160,13 +160,22 @@ test('M4-REVIEW PIN — a burned epoch cannot wedge membership: survivors ESCALA
   sim.partition('n03', 'n01')
   sim.partition('n03', 'n02')
   sim.severOnFrame('n02', 'n01', 8 /* VERB.VOTE — the grant dies on the wire */)
+  //! cut at the FLIP, one virtual millisecond at a time (2026-10-06). The trap kills only the FIRST
+  // VOTE; n01 re-proposes on its next tick and n02 re-grants the same ballot, so a coarse step can
+  // run past the retry: view 2 = {n01, n02} COMMITS, n03 is out, and nothing was burned. The old
+  // 200 ms step dodged that by luck of the schedule — the one-opener admit moved the timing and the
+  // luck ran out. Stopping within 1 ms of the grant leaves no room for a retry (the severed link
+  // must redial first), and the two asserts below prove the precondition instead of assuming it.
   let t = 400
-  while (sim.nodes.get('n02')!.membership.votedFor.e < 2 && t < 60000) { t += 200; sim.run({ until: t }) }
+  while (sim.nodes.get('n02')!.membership.votedFor.e < 2 && t < 60000) { t += 1; sim.run({ until: t }) }
   assert.equal(sim.nodes.get('n02')!.membership.votedFor.e, 2, 'the vote is durably spent on n01')
+  assert.equal(sim.nodes.get('n01')!.epoch, 1, 'n01 never counted the grant: epoch 2 is uncommitted')
+  assert.equal(sim.nodes.get('n02')!.epoch, 1, 'and n02 never saw it commit')
   sim.partition('n01', 'n02') // n01 is gone forever, its ballot uncommitted
   sim.heal('n03', 'n02')      // {n02, n03} is a live majority of view 1
   sim.run({ until: t + 25000 })
   const [n02, n03] = [sim.nodes.get('n02')!, sim.nodes.get('n03')!]
+  assert.equal(sim.nodes.get('n01')!.epoch, 1, 'epoch 2 stayed burned: its proposer never committed it')
   assert.ok(n02.epoch >= 3 && n02.epoch === n03.epoch, `the survivors escalated past the burn (epochs ${n02.epoch}/${n03.epoch})`)
   assert.ok(!members(n02).includes('n01'), 'the vanished proposer was evicted after all')
   assert.ok(n02.membership.gate(n02).open && n03.membership.gate(n03).open, 'writable — never wedged read-only')

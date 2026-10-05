@@ -29,18 +29,23 @@ const formOnly = (n: number): { sim: Sim; nodes: Node[] } => {
 const jtotal = (sim: Sim, kind: number): number =>
   [...sim.nodes.values()].reduce((s, n) => s + n.journal.read().filter((e) => e.kind === kind).length, 0)
 
-test('counted: 100-node formation is EXACTLY 69,400 events at seed 0 — the whole protocol cost of a 9,900-dial mesh, pinned', () => {
+test('counted: 100-node formation is EXACTLY 59,500 events at seed 0 — the whole protocol cost of a 9,900-dial mesh, pinned', () => {
+  //! RE-PINNED 2026-10-06, 69,400 → 59,500: the admit digest exchange has ONE opener now (the lower
+  // uuid sends r=1, the higher answers r=0). It used to have two, so every pair paid four digest
+  // frames where two do the job. The drop is exactly 2 frames × 4,950 pairs = 9,900 deliveries;
+  // nothing else in formation moved. The DECISIONS record is "the lower uuid opens the admit
+  // digest exchange".
   const { sim } = formOnly(100)
   assert.equal(
-    sim.events, 69_400,
-    `100-node formation cost ${sim.events} events (pinned 69,400) — the formation protocol changed: ` +
+    sim.events, 59_500,
+    `100-node formation cost ${sim.events} events (pinned 59,500) — the formation protocol changed: ` +
     're-pin deliberately with a DECISIONS entry, never to green a drifted count',
   )
 })
 
 test('counted ratio: formation scales with PAIRS — events(n=100)/events(n=25) stays under 25 (pair ratio 16.5, measured ~16.4)', () => {
   //! the anti-superquadratic tripwire: dials, HELLOs, dedup, and digest-on-admit are all per-pair,
-  // so formation events / pairs is empirically FLAT (18.5/pair at n=100 vs 18.1 at n=25 — 1.02x).
+  // so formation events / pairs is empirically FLAT (12.02/pair at n=100 vs 12.08 at n=25 — 59,500 / 3,625).
   // Any change that makes formation worse than O(pairs) blows through the 1.5x slack long before
   // it needs a wall clock to see.
   const a = formOnly(25).sim.events
