@@ -377,7 +377,8 @@ test('admit: the higher uuid stays quiet until the opener speaks; a server never
   assert.deepEqual(frames(bb).map((f) => f.verb), [VERB.HELLO, VERB.DIGEST], 'it answers the opener')
   assert.deepEqual(frames(bb)[1].value, { d: {}, r: 0 })
   //! a client link: the CLIENT opens (to its primary). The server never does, whichever uuid is lower —
-  // a client never answered a non-primary digest anyway, so the old r=1 toward it was a wasted frame
+  // a client never ANSWERED a non-primary digest (single-feeder rule); it only consumed it as confirm
+  // evidence, and no guarantee a client gives reads those marks (a spoke proves its writes at the primary)
   for (const client of ['zz', '00']) {
     const aa = harness('aa')
     aa.node.step({ kind: 'linkUp', link: 1, dialed: false })

@@ -1159,7 +1159,7 @@ export class Node {
         if (this.client) {
           if (this.primary === null) { this.primary = link.id; this.#sendDigest(link, 1) }
         } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
-        //! view-on-admit (symmetric with digest-on-admit): announce the committed view so a healed peer's
+        //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
         // membership converges even when no epoch-stamped records flow; then settle — an admitted member
         // can flip the gate back to majority, flushing any parked writes
         this.membership.onAdmit(this, link)
