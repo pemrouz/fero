@@ -628,15 +628,26 @@ test('#nextEpoch never goes back below my own ballot: granted at 2, proposed at 
   assert.deepEqual(h.node.membership.votedFor, { e: 2, p: 'bb', h: 'aa,bb,cc,dd' }, 'granted bb at 2')
   //! cc is gone for good: aa evicts it — at 3, past the vote it gave bb
   h.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  //! suspect first, then exhaust the chain (V4-20): a chain exhausted before suspicion is revived by the
+  // heartbeat, and the revived dial holds eviction until it gives up too
+  for (let i = 0; i < 3; i++) h.tick()
   for (let i = 0; i < 11; i++) {
     const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
     if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
     h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:cc' })
   }
-  for (let i = 0; i < 4; i++) h.tick()
+  h.tick()
   assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [3, 2]], 'the eviction ballot opened at 3')
-  //! the ballot ages out unanswered (bb never votes); the next one must open at 3 again, not at 2
-  for (let i = 0; i < 12; i++) h.tick()
+  //! the ballot ages out unanswered (bb never votes); the next one must open at 3 again, not at 2. Every tick
+  // revives the given-up dial to cc (V4-20), so the chain is exhausted again after each tick, or the hold never ends
+  for (let i = 0; i < 12; i++) {
+    h.tick()
+    for (let k = 0; k < 11; k++) {
+      const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
+      if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+      h.node.step({ kind: 'linkDown', link: 900 + i * 11 + k, reason: 'refused', to: 'sim:cc' })
+    }
+  }
   const later = h.jk(JK.propose).slice(2).map((e) => [e.a, e.b])
   assert.ok(later.length >= 1, 'proposed again after the ballot aged out')
   assert.ok(later.every(([e]) => e >= 3), `every later ballot is at 3 or above: ${JSON.stringify(later)}`)
@@ -702,8 +713,9 @@ test('the double vote splits the cluster: aa granted bb at 2, lost its own ballo
   //! 3. cc drops out of aa's sight and the dial gives up: aa evicts cc — at 3, past the vote it gave bb.
   // Then cc is back, and the eviction ballot is abandoned (nobody voted on it).
   aa.down('cc'); cc.down('aa')
+  for (let i = 0; i < 3; i++) aa.tick() // suspect first, then exhaust the chain (V4-20)
   aa.giveUp('cc')
-  for (let i = 0; i < 4; i++) aa.tick()
+  aa.tick()
   assert.deepEqual(aa.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [3, 2]], 'aa evicted cc at 3')
   aa.admitPeer('cc'); cc.admitPeer('aa')
   aa.tick()
@@ -712,8 +724,9 @@ test('the double vote splits the cluster: aa granted bb at 2, lost its own ballo
   assert.equal(viewOf(bb), '2:aa,bb,cc,ee')
   //! 5. bb drops out of aa's sight for good (its VIEW@2 dies with the link): aa evicts bb
   aa.down('bb'); bb.down('aa')
+  for (let i = 0; i < 3; i++) aa.tick() // suspect first, then exhaust the chain (V4-20)
   aa.giveUp('bb')
-  for (let i = 0; i < 4; i++) aa.tick()
+  aa.tick()
   const evictBb = aa.jk(JK.propose).slice(2).map((e) => [e.a, e.b])
   assert.equal(evictBb.length, 1, 'aa proposed the view without bb')
   //! cc never saw bb's ballot: its vote at this epoch is free, so it grants aa — and aa's ballot commits
