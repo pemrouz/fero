@@ -26,7 +26,12 @@
 //     grants for an abandoned same-epoch ballot cannot be miscounted;
 //   - proposer identity is the LINK's authenticated uuid, never a frame field;
 //   - proposing spends your own vote — and you cannot propose an epoch your
-//     vote is already spent on for another proposer.
+//     vote is already spent on for another proposer;
+//   - my own ballots never go DOWN in epoch (2026-10-08, the I-20 salvage):
+//     votedFor remembers only the latest ballot, so a fresh ballot of mine
+//     below my last one could re-spend a vote given away in between — the
+//     proposer-side double vote (see #nextEpoch; pinned in membership.test.ts
+//     and drawn by chance in sim/explore.test.ts).
 // Single-proposer discipline keeps honest contention out of the ballot layer:
 // every proposal path (genesis, eviction, join, rejoin, leave) requires being
 // the lowest-uuid LIVE member; a JOIN landing elsewhere is relayed one hop.
