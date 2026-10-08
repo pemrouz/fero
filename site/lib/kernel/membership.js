@@ -480,9 +480,12 @@ export class Membership {
     if (this.leaving && !this.leaving.done && this.#proposal && this.isMember(node.uuid)) this.#proposal = null
     for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u) }
     if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear() } // an evictee's grudges expire with its membership
-    //! dial any member this node holds no link to (the joiner's side of a join, a healed evictee's peers)
+    //! dial any member this node holds no link to (the joiner's side of a join, a healed evictee's peers),
+    // unless a redial chain is still trying it: that chain owns the target until it ends. A dial over it
+    // failed into the same chain entry and armed a second timer line that shared the tries, so the chain
+    // (and the eviction hold it carries) gave up in about half its time. A given-up chain is not dialing.
     for (const [u, listen] of this.view.members) {
-      if (u === node.uuid || node.byUuid.has(u) || !listen || listen === node.listen) continue
+      if (u === node.uuid || node.byUuid.has(u) || !listen || listen === node.listen || node.dialing(listen)) continue
       j.armed && j.emit(JK.dial, listen)
       node.env.sink.connect(listen)
     }

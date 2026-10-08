@@ -25,6 +25,8 @@ export const captureNode = (node      ) => {
   const d = diagNode(node)
   return {
     uuid: d.uuid,
+    //! the resource name (a `#` name is a system resource — the viewer badges it); absent on a sim node
+    ...(d.name !== undefined ? { name: d.name } : {}),
     listen: d.listen,
     seq: d.seq,     // Lamport clock — the node's own next-write stamp
     epoch: d.epoch,
