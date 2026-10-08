@@ -483,6 +483,32 @@ test("a spoke re-syncs to the cluster's truth: a server reborn EMPTY makes the c
   }
 })
 
+test("V4-18 overlapping cells — a seeded row plus a client's field write across a memory-only restart: the reborn server re-seeds the row, the spoke's re-download keeps it whole, and both snapshots are equal", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  const seed = () => ({ gadgets: { stock: 3, name: 'gizmo' } })
+  const a = await fero('cells', { uuid: 'aa', listen: addr, data: seed(), heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const c = await fero('cells', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  let a2: Awaited<ReturnType<typeof fero>> | null = null
+  const view = (f: typeof c) => snapshot(f.data) as { gadgets?: { stock?: number; name?: string } }
+  try {
+    assert.ok(await until(() => view(c).gadgets?.stock === 3, 8000), 'the spoke folded the seed')
+    c.data.gadgets.stock = 9 // a FIELD write on the seeded row, relayed and stamped by the server
+    assert.ok(await until(() => view(c).gadgets?.stock === 9 && view(a).gadgets?.stock === 9, 8000), 'the field write shows on both')
+    await a.destroy()
+    //! the server comes back memory-only: a fresh identity, the seed applied again, the client's field gone
+    a2 = await fero('cells', { uuid: 'aa2', listen: addr, data: seed(), heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    assert.ok(await until(() => view(c).gadgets?.stock === 3, 12000), `the spoke re-synced to the reborn seed (it shows ${JSON.stringify(view(c))})`)
+    //! before V4-18 the spoke's resync removed its stale ['gadgets','stock'] cell as a ghost — tearing the
+    // field out of the row it had just re-downloaded whole — and the two screens disagreed for good
+    await sleep(200)
+    assert.deepEqual(view(c), view(a2), 'both snapshots equal')
+    assert.deepEqual(view(a2), seed())
+  } finally {
+    await c.destroy()
+    await a2?.destroy()
+  }
+})
+
 test('v4.1 roles: following is ambient, serving is a declared act — in the battery the directory is OFF, so topologies are explicit', async () => {
   //! no marker = a CLIENT (the open method namespace is the client tell). With no directory (the
   // battery runs FERO_RENDEZVOUS=off) a client needs hosts — bare refuses loudly: nothing to dial.
