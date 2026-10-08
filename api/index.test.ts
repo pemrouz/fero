@@ -896,6 +896,34 @@ test('a Peer row carries the ROLE: `client` is true for a spoke, false for a mem
   }
 })
 
+test("a client's `cluster.writable` is its feeder's gate (I-33): false before a link, true once a writable member feeds it, false when the feeder's gate closes", async () => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  type View = { writable: boolean; epoch: number; me: { primary: string | null } }
+  const view = (f: { cluster: unknown }) => snapshot((f as { cluster: unknown }).cluster) as View
+  //! the client comes first: nothing to write to, so not writable (it used to read a member's open genesis gate: true)
+  const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`, `127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  let a: Awaited<ReturnType<typeof fero>> | undefined, b: typeof a
+  try {
+    assert.strictEqual(view(c).writable, false, 'no feeder: not writable')
+    a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    assert.ok(await until(() => view(a!).epoch >= 1 && view(b!).epoch >= 1 && view(c).me.primary !== null && view(c).writable, 8000), `fed by a writable member (${JSON.stringify(view(c))})`)
+    //! the OTHER server dies: the feeder stays linked, but one of two is not a majority — its gate closes,
+    // and the next digest tells the client (one heartbeat behind)
+    const feeder = view(c).me.primary!
+    const [fed, other] = feeder === 'aa' ? [a, b] : [b, a]
+    await diag(other!)!.crash!()
+    assert.ok(await until(() => view(fed!).writable === false, 4000), "the feeder's gate closed")
+    assert.ok(await until(() => view(c).writable === false, 500), `the client follows within a few heartbeats (${JSON.stringify(view(c))})`)
+    assert.equal(view(c).me.primary, feeder, 'still fed by the same member — only its gate moved')
+    await diag(fed!)!.crash!()
+    assert.ok(await until(() => view(c).me.primary === null, 4000))
+    assert.strictEqual(view(c).writable, false, 'no feeder again: not writable')
+  } finally {
+    await c.destroy(); await a?.destroy().catch(() => {}); await b?.destroy().catch(() => {})
+  }
+})
+
 test('a client says who feeds it: `cluster.me.primary` is the feeder\'s uuid, null before a link and on a server; when the feeder dies it moves to the survivor', async () => {
   const [pa, pb] = [await ports.free(), await ports.free()]
   const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })

@@ -565,9 +565,13 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       ? { addr: rendezvous as string, hosting: directory?.hosting ?? false, up: directory?.up ?? false, ...(directory?.error !== undefined ? { error: directory.error } : {}) }
       : false as const,
   })
+  //! writable, by role (I-33): a member reads its own write-gate; a client has no gate — it reads its
+  // feeder's, which rides every digest the feeder sends it (`w`, kernel/node.ts feederOpen), so it is
+  // one heartbeat behind at worst, and false with no feeder or before the feeder has said
+  const writableNow = (): boolean => isClient ? node.primary !== null && node.feederOpen === true : node.membership.gate(node).open
   const cluster: any = proxy({
     epoch: node.epoch,
-    writable: node.membership.gate(node).open,
+    writable: writableNow(),
     members: {},
     peers: {},
     writes: {},
@@ -579,6 +583,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     JK.shed, JK.acquire, JK.orphaned, JK.acquireStart, JK.acquireAbort, JK.shedStall])
   let cursor = 0
   let lastPrimary = node.primary
+  let lastFeederOpen = node.feederOpen
   let lastOutcomes = 0
   let lastScopeN = -1
   let lastMembers = '0:'
@@ -655,7 +660,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // still reflects the final post-step state). The scope.n compare catches tally drift that
     // journals nothing (held-mints at the gate/stamp site) — one int compare on the hot path.
     const scopeMoved = node.scope !== null && node.scope.n !== lastScopeN
-    if (!refold && !scopeMoved && !primaryMoved) return
+    //! a client's feeder gate moved (a field compare: the gate's journal rows are the member's, not ours)
+    const feederMoved = node.feederOpen !== lastFeederOpen
+    if (feederMoved) lastFeederOpen = node.feederOpen
+    if (!refold && !scopeMoved && !primaryMoved && !feederMoved) return
     //! a stopping node paints no more frames: the leave ballot installs the shrunk view HERE too, and a
     // screen would end on `writable false — members N−1` — the survivors' picture, not this node's. The
     // housekeeping above (settled writes, reaped streams, the cursor) still runs to the end.
@@ -665,9 +673,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // (data skips a same-value primitive but not an equal-but-new object, so members, peers and the
     // partitions row are compared by signature here). A render loop needs no coalescing and no dedupe.
     batch(() => {
+      if (refold || feederMoved || primaryMoved) cluster.set('writable', writableNow())
       if (refold) {
         cluster.set('epoch', node.epoch)
-        cluster.set('writable', node.membership.gate(node).open)
         const memberSig = node.epoch + ':' + node.membership.view.members.map(([u]) => u).join(' ')
         if (memberSig !== lastMembers) { lastMembers = memberSig; cluster.set('members', Object.fromEntries(node.membership.view.members)) }
         //! `client` is the link's ROLE as declared at HELLO (kernel/link.ts): a screen counts its clients
