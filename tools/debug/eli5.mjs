@@ -109,6 +109,8 @@ export const ELI5 = {
   'keys':         { t: 'fields held', d: "How many separate fields this computer currently holds. Writing one field many times still counts once; a delete takes one away." },
   'jrnl':         { t: 'diary lines', d: "How many lines of this computer's event diary are kept. The diary has a fixed number of pages; +N says how many of the oldest were torn out to make room." },
   'links-stat':   { t: 'admitted / total', d: "Connections admitted as peers, out of all open ones. A line carries no data until its hello is done. The debugger's own read-only line (the observer, when the page is attached to running computers) is not a peer and is left out of both numbers." },
+  'resource':     { t: 'resource', d: "The name of the shared object this computer keeps a copy of — the name a program opened, like 'shop'. Two computers only ever share data when they share this name." },
+  'node:system':  { t: 'system resource', d: "A name starting with # is fero's own bookkeeping, not your data: #directory is the phone book that tells programs on this box where each name is served. Programs can never open a # name themselves." },
   'listen':       { t: 'address', d: "Where other computers can knock on this one's door. Computers that only visit and never host (clients) have none, which is fine." },
   'statehash':    { t: 'fingerprint', d: "One number summing up every field this computer holds. Two computers with the same number hold exactly the same data; the number alone means nothing, only equality does." },
   'journal':      { t: 'the diary', d: "This computer's own log of what happened to it, one numbered line per event: calls made, hellos, changes stamped or received, check-ins, votes. Newest first." },

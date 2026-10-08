@@ -12,6 +12,9 @@
 // If the viewer grows a DOM API this shim lacks, the script throws at load and this suite fails
 // loudly — extend the shim (./dom-shim.ts, shared with eli5.test.ts); never stub the assertion.
 
+//! the battery pins first: one case composes a real fero() and its #directory (config layer off)
+import '../../utils/battery.ts'
+
 import { test, before } from 'node:test'
 import assert from 'node:assert'
 import { runAll } from './scenarios.ts'
@@ -24,6 +27,9 @@ import { VERB, encodeControl } from '../../kernel/codec.ts'
 import * as MODEL from './model.mjs'
 import { tip } from './eli5.mjs'
 import { bootViewer, dragTo } from './dom-shim.ts'
+import { fero } from '../../api/index.ts'
+import { diag } from '../../api/diagnostics.ts'
+import { ports } from '#utils'
 
 let captures: Map<string, unknown>
 before(() => { captures = runAll().captures as Map<string, unknown> })
@@ -542,4 +548,28 @@ test('a scoped capture paints a write a new holder copied in with its row as "go
   const meant = Object.values(moved.nodes).filter((x) => x.status !== 'not-a-holder').length
   assert.match(insp, new RegExp(`applied ${meant}/${meant} holders`), 'a hand-off counts as received')
   assert.doesNotMatch(insp, /stop:(never|inflight)/)
+})
+
+test('a SYSTEM resource wears a quiet # badge: a real server and the #directory it hosts, captured through the internals door — the user node carries no badge', async () => {
+  const rz = `127.0.0.1:${await ports.free()}`
+  const f = await fero('shop', { server: true, rendezvous: rz, heartbeat: { ms: 100 } })
+  let cap: { nodes: { uuid: string; name?: string }[] }
+  try {
+    const host = diag(f)!.rendezvous()!.host
+    assert.ok(host, 'this server won the bind and hosts the directory — the fixture is what it claims')
+    cap = { ...captureLive([]), nodes: [diag(f)!.capture(), diag(host)!.capture()] }
+  } finally { await f.destroy() }
+  assert.deepEqual(cap.nodes.map((n) => n.name), ['shop', '#directory'], 'the name rides the capture (diagNode)')
+  const [shop, dir] = cap.nodes.map((n) => n.uuid)
+  const { el, g } = await bootViewer('named', cap, { search: '' })
+  const row = (uuid: string) => (el('tree').innerHTML.match(new RegExp(`<div class="trow[^"]*"[^>]*data-type="node"[^>]*>(?:(?!<div class="trow).)*?>${uuid}<(?:(?!<div class="trow).)*`, 's')) ?? [''])[0]
+  assert.ok(row(shop).includes(`>${shop}<`) && row(dir).includes(`>${dir}<`) && !row(shop).includes(`>${dir}<`), 'each row is found, and alone')
+  assert.match(row(dir), /<span class="pill info" data-tip="node:system"><span class="pd"><\/span>#directory<\/span>/, 'the #directory row carries the # pill')
+  assert.doesNotMatch(row(dir), /data-sev="(warn|crit)"/, 'a badge, not a problem: no severity')
+  assert.doesNotMatch(row(shop), /node:system/, 'the user resource carries no badge')
+  g(`navTo('g/nodes/${dir}')`)
+  assert.match(el('insp').innerHTML, /<dt data-tip="node:system">resource<\/dt><dd class="">#directory <span class="x">system<\/span><\/dd>/, 'the inspector names the resource and says system')
+  g(`navTo('g/nodes/${shop}')`)
+  assert.match(el('insp').innerHTML, /<dt data-tip="resource">resource<\/dt><dd class="">shop<\/dd>/, 'a user node shows its name plainly')
+  assert.ok(tip('node:system') && tip('resource'), 'both keys explain themselves')
 })
