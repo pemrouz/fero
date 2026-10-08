@@ -386,9 +386,12 @@ export class Node {
 
   //! #revivable — the give-up revival target set: static hosts ∪ committed-view member listens (a
   // joiner learned via a VIEW is as entitled to revival as a configured host — it may OWN partitions).
-  #revivable(): Set<string> {
-    const targets = new Set(this.hosts)
-    for (const [u, listen] of this.membership.view.members) if (u !== this.uuid && listen) targets.add(listen)
+  // The value says whether the target is a committed member's listen: a revived MEMBER keeps the
+  // member chain (see the revive loop), a plain host gets the generic one.
+  #revivable(): Map<string, boolean> {
+    const targets = new Map<string, boolean>()
+    for (const h of this.hosts) targets.set(h, false)
+    for (const [u, listen] of this.membership.view.members) if (u !== this.uuid && listen) targets.set(listen, true)
     return targets
   }
 
@@ -663,8 +666,10 @@ export class Node {
         // Deliberate closes (dup-link/self-reject) never redial: that would just re-create the race.
         //! a lost ADMITTED MEMBER link is a crashed member: its chain is the short one (tune.memberRedials), because
         // eviction is held while this chain runs — see MEMBER_REDIALS. A link that died before HELLO is not.
+        // Nor is anything a CLIENT dials: a client evicts nobody, so its chain is no clock, and with
+        // heartbeats off a short chain would strand it from a restarting server (review finding).
         const redialTo = link.noRedial ? '' : link.dialed ? link.to ?? '' : link.listen
-        if (redialTo) this.#redial(redialTo, link.state === LS.admitted && this.membership.isMember(link.uuid))
+        if (redialTo) this.#redial(redialTo, !this.client && link.state === LS.admitted && this.membership.isMember(link.uuid))
         //! a lost member link can flip the write-gate to minority — journal the transition NOW, not at the next tick
         if (link.state === LS.admitted) this.membership.settle(this)
         return
@@ -731,13 +736,21 @@ export class Node {
           // gave up was parked FOREVER, stranding every attempt owner-routed to it). A live link to the
           // target — including one the PEER dialed — clears the stale give-up instead of dialing into a
           // dup race.
-          for (const to of this.#revivable()) {
+          //! a revived COMMITTED MEMBER keeps the member chain: the entry is re-seeded `member` before the
+          // dial, so the failed dial (which lands in the no-link linkDown path, which knows no link state)
+          // continues a short chain, not a fresh long one. Otherwise, when the member chain ends before
+          // suspicion (three heartbeats longer than about 31 × redial.ms — heartbeat.ms 2000 at the
+          // default base, or redial.ms 30 at the default heartbeat), the revival would hold eviction for
+          // ten more tries — slower than before the short chain existed (review finding). A client's
+          // chain is never a clock (see linkDown), so a client revives with the generic chain.
+          for (const [to, member] of this.#revivable()) {
             if (to === this.listen) continue
             if (!this.#backoff.get(to)?.gaveUp) continue // never failed, or the redial chain still owns it
             let held = false
             for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) { held = true; break }
             this.#backoff.delete(to)
             if (held) continue
+            if (member && !this.client) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: 0, member: true }) // the dial in flight — visible to a park, like discover's
             j.armed && j.emit(JK.revive, to)
             this.env.sink.connect(to)
           }

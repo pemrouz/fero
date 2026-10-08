@@ -213,6 +213,41 @@ test('a dead MEMBER link runs the short chain (memberRedials = 5); a dial that n
   assert.ok(!node.dialing('sim:bb') && !node.dialing('sim:cc'), 'both chains ended — the eviction hold is released')
 })
 
+test('the other half of the gate: an admitted NON-member link, and a CLIENT\'s member link, both keep the long chain', () => {
+  //! only a SERVER's lost MEMBER link is an eviction clock. A peer outside the committed view (cc, admitted
+  // while the view is {aa, bb}) is not; nor is anything a client dials — a client evicts nobody, and with
+  // heartbeats off it would give up on a restarting server after 3 s instead of 19 s and never come back.
+  const exhaust = (h: ReturnType<typeof harness>) => {
+    let fired = 0
+    for (;;) {
+      const timers = h.of('timer').filter((x) => x[2] === TAG.redial)
+      if (fired >= timers.length) break
+      const t = timers[fired++]
+      const to = h.node.journal.read().filter((e) => e.kind === JK.redial)[fired - 1].b as string
+      h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+      h.node.step({ kind: 'linkDown', link: 900 + fired, reason: 'refused', to })
+    }
+    return (to: string) => h.node.journal.read().filter((e) => e.kind === JK.redial && e.b === to).length
+  }
+  const s = harness('aa', { redialMs: 10, hosts: ['sim:cc'], boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb']] } })
+  s.node.step({ kind: 'start' })
+  s.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:cc' })
+  s.node.step({ kind: 'bytesIn', link: 1, bytes: hello('cc') })
+  assert.equal(s.node.links.get(1)!.state, LS.admitted)
+  assert.ok(!s.node.membership.isMember('cc'), 'admitted, but outside the committed view')
+  s.node.step({ kind: 'linkDown', link: 1, reason: 'cut' })
+  assert.equal(exhaust(s)('sim:cc'), 10, 'a non-member link: the generic chain')
+  const c = harness('zz', { redialMs: 10, client: true, hosts: ['sim:bb'] })
+  c.node.step({ kind: 'start' })
+  c.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: hello('bb') })
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.ok(c.node.membership.isMember('bb'), 'the client follows its feeder\'s view: bb IS a member')
+  assert.equal(c.node.links.get(1)!.state, LS.admitted)
+  c.node.step({ kind: 'linkDown', link: 1, reason: 'cut' })
+  assert.equal(exhaust(c)('sim:bb'), 10, 'a client\'s member link: the generic chain — a client evicts nobody')
+})
+
 test('revival: only a FAILED final attempt revives; the pending window and a peer-dialed link do not', () => {
   //! adversarial-review regression: tries increments at ARM time, so tries==MAX during the 10th
   // attempt's pending window is NOT parked — a revive there orphans the live timer into a second
