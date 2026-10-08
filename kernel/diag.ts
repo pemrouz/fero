@@ -97,14 +97,16 @@ export const diagHello = (node: Node, link: Link, v: Record<string, unknown>): v
 // only: a route's partition is named by its origin's writeLocal row, so the origin's slice answers it.
 // The stale-ring guard is the scope.ts one — a lazy rebuild to the committed view, the same arrays the
 // write path would build on its next record. Armed nodes only (scoped, view committed).
+// The own writeLocal journal rows are walked too: a partition this node wrote but no longer holds (it
+// shed it, or wrote it before the view armed and was never one of its holders) has left the log, yet
+// its route still needs the holder fact. The rows are the routes' own source, so the two always match.
 const ownHolders = (node: Node): Record<string, string[]> => {
   const ring = node.writes.ring
   if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
   const out = new Map<string, string[]>()
-  for (const e of node.logs.get(node.origin) ?? []) {
-    const p = partitionOf(e.rec)
-    if (!out.has(p)) out.set(p, [...ring.holders(p, node.replicas)])
-  }
+  const add = (p: string) => { if (!out.has(p)) out.set(p, [...ring.holders(p, node.replicas)]) }
+  for (const e of node.logs.get(node.origin) ?? []) add(partitionOf(e.rec))
+  for (const e of node.journal.read(0)) if (e.kind === JK.writeLocal) add(String(e.b))
   return Object.fromEntries(out)
 }
 

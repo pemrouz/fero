@@ -374,3 +374,41 @@ test('scoped captures: a member outside a write\'s holder set is not-a-holder, n
   assert.ok(!statuses.includes('not-a-holder'), 'no holder facts, no not-a-holder claim')
   assert.equal(statuses.filter((s) => s === 'never-arrived').length, seen)
 })
+
+//! the two harder scoped cases (the wave-2 review of I-3): writes stamped BEFORE the view arms, and a 5th member
+// that joins later. (1) A writer may stamp a row before the view arms and then hand it off: its own log no longer
+// names that row, but its writeLocal rows do, so the capture still carries the row's holders. (2) A new holder
+// copies a moved row whole (journal acquire) — no applyInbound per write — so its stop is `acquired`, at the
+// acquire row, with the teacher. Before each fix those stops were painted never-arrived.
+let moved: { cap: ReturnType<typeof captureSim>; ring: ReturnType<typeof cluster>[number]['writes']['ring'] } | null = null
+const movedCapture = () => {
+  if (moved) return moved
+  const sim = new Sim(11)
+  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2 })
+  writes(sim, nodes, 6, 100)
+  sim.run({ until: 1500 })
+  writes(sim, nodes, 8, 200)
+  sim.run({ until: 4000 })
+  sim.add({ uuid: 'n05', listen: 'sim:n05', hosts: nodes.map((n) => n.listen), heartbeatMs: 50, replicas: 2, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('n05', { kind: 'start' })
+  sim.run({ until: 12000 })
+  assert.deepEqual(sim.violations, [])
+  assert.ok([...sim.nodes.values()].every((n) => n.epoch === 2), 'the join view committed everywhere — the fixture is what it claims')
+  return (moved = { cap: captureSim(sim), ring: nodes[0].writes.ring })
+}
+
+test('scoped captures: a write stamped before the view armed, to a row its writer then handed off, still carries the row\'s holders (ISSUES I-3)', () => {
+  const { cap, ring } = movedCapture()
+  let shed = 0
+  for (const r of (routes(cap) as Map<string, Route>).values()) {
+    const origin = cap.nodes.find((n) => n.uuid === r.origin)!
+    assert.ok(r.partition != null)
+    if (!(origin.logs[origin.uuid] || []).some((x: { k: string[] }) => x.k[0] === r.partition)) shed++
+    //! the holder fact is there even when the origin's own log no longer holds the row
+    assert.deepEqual(origin.holders![r.partition!], [...ring.holders(r.partition!, 2)], `${r.origin}#${r.seq} carries the ring's holders for ${r.partition}`)
+    for (const n of cap.nodes)
+      if (!origin.holders![r.partition!].includes(n.uuid) && r.nodes[n.uuid].status !== 'origin' && r.nodes[n.uuid].status !== 'applied')
+        assert.equal(r.nodes[n.uuid].status, 'not-a-holder', `non-holder ${n.uuid} of ${r.origin}#${r.seq} (${r.partition})`)
+  }
+  assert.ok(shed > 0, `some route's row left its writer's log — the fixture is what it claims (${shed})`)
+})
