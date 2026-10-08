@@ -40,6 +40,35 @@ test('balance sanity: with vnodes, no member owns a degenerate share', () => {
   assert.equal(count.size, 3, 'every member owns something')
 })
 
+//! I-24 spread pin. Real member ids are 8 hex chars (api/index.ts mints them). Under plain fnv-1a,
+// `uuid#0..#31` differ only in the tail, so one member's 32 points bunch into ~4 narrow bands and
+// shares go wild (2.85x fair worst, 160 of 300 sets outside [0.5x, 2x]). Sim ids like n01 spread
+// fine under plain fnv, which is why no sim test caught it: this pin MUST use hex-shaped ids.
+test('spread: hex-shaped member ids get a fair share, and k1..k24 do not pile onto one owner (I-24)', () => {
+  let seed = 0x2545f491
+  const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32
+  const hex8 = () => Math.floor(rnd() * 2 ** 32).toString(16).padStart(8, '0')
+  const sets = Array.from({ length: 50 }, () => Array.from({ length: 4 }, hex8).sort())
+  const outside: string[] = []
+  const piled: string[] = []
+  for (const uuids of sets) {
+    const r = new Ring()
+    r.build(1, members(...uuids))
+    const count = new Map<string, number>()
+    for (let i = 0; i < 20_000; i++) { const o = r.ownerOf(hex8()); count.set(o, (count.get(o) ?? 0) + 1) }
+    for (const u of uuids) {
+      const share = ((count.get(u) ?? 0) / 20_000) * uuids.length
+      if (share < 0.5 || share > 2) outside.push(`${u} in [${uuids}] owns ${share.toFixed(2)}x fair`)
+    }
+    const seq = new Map<string, number>()
+    for (let i = 1; i <= 24; i++) { const o = r.ownerOf(`k${i}`); seq.set(o, (seq.get(o) ?? 0) + 1) }
+    const most = Math.max(...seq.values())
+    if (most > 16) piled.push(`[${uuids}]: one owner holds ${most} of k1..k24`)
+  }
+  assert.deepEqual(outside, [], `${outside.length}/200 members outside [0.5x, 2x] of fair`)
+  assert.deepEqual(piled, [], `${piled.length}/50 sets pile k1..k24 onto one owner`)
+})
+
 test('minimal motion: removing a member moves ONLY its keys — survivors keep theirs (the consistent-hash property)', () => {
   const r = new Ring()
   r.build(1, members('n01', 'n02', 'n03'))

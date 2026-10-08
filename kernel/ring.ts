@@ -19,16 +19,23 @@
 // OVERRIDE (place()) exists for tests that need a named partition on a named
 // node (the AA fault schedules pin ownership so a scenario reads as intent, not
 // as reverse-engineered hash collisions). Both are test seams; production uses
-// the default fnv-1a and an empty override map.
+// the default hash (fnv-1a finished with fmix32) and an empty override map.
 
 //! VNODES: hash points per member — enough to keep ownership spread within ~2x of fair at small
 // cluster sizes without making rebuilds or the arrays noticeable (128 members = 4096 points = 24KB).
 export const VNODES = 32
 
-//! fnv — fnv-1a over a string (same primitive the state hash uses); >>> 0 for the u32 point space.
+//! fnv — fnv-1a finished with murmur3's fmix32; >>> 0 for the u32 point space. The state hash in
+// node.ts is a separate plain fnv. Plain fnv-1a ends on `(h ^ c) * P`, so `uuid#0..#31` differ only
+// in the tail and one member's 32 points bunch into ~4 narrow bands (worst member 2.85x fair over
+// 4-member sets of 8-hex ids). fmix32 spreads every input bit over the word: worst 1.57x (I-24).
+// This exact function is part of the wire contract: every member must compute the same ownership.
 const fnv = (s: string): number => {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) }
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b)
+  h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35)
+  h ^= h >>> 16
   return h >>> 0
 }
 
