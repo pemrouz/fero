@@ -1827,3 +1827,150 @@ per epoch; STATUS, kernel; DESIGN-LEAVE §9's argument).
 Consequences: kernel/membership.ts's BALLOT IDENTITY list names the rule;
 the explorer's reach floors are a third of today's measured values and are
 meant to trip on a kernel change that moves the random trajectories a lot.
+
+## V4-18 — overlapping cells: the newer stamp wins across depth (2026-10-08; numbered before V4-19 to V4-25, which landed first)
+Context: a cell is a full key path, so a whole-row write (`['gadgets']`)
+and a field write (`['gadgets','stock']`) were two cells that never met in
+the LWW election. Each kept its own last writer; the projection downstream
+applied them in kernel-apply order, which differs per node (own commits
+apply at once, a peer's lane arrives later, the suffix ship walks lanes one
+by one, a spoke's resync ghost-removed a field under a re-seeded row). Two
+nodes with the same cell map could show different rows for ever. STATUS
+reproduced it with a seeded row plus a client's field write across a
+memory-only restart; the sim sweeps never saw it, because converged()
+compared cells only and the sim sink threw every apply away. The owner
+chose option A on 2026-10-05. Four review rounds found one more interaction
+each (a fast-path regression, non-object row values, the scoped gather, an
+in-flight write that never settled under an ownership move); all are closed
+below, and the array edge is stated as it is.
+Decision: the newer stamp wins across depth, with the one stamp order fero
+already has, lexicographic (epoch, seq, origin), the `newer` predicate, now
+one exported function used by both elections. In apply(): (1) a cell of
+depth ≥ 2 loses to ANY ancestor whose stamp is at or above its own, at every
+depth; journaled as the new kind `subsumed`. (2) A write that wins its cell
+sweeps every cell under it stamped at or below it: a live field leaves
+state, the entry hash and the rolling hash exactly like a remove; a field
+remove's tombstone under it leaves the index; both get the parent's stamp as
+their version, so a late copy loses for free. No remove goes downstream for
+a swept cell: the parent's apply carries the whole value. (3) A cell under
+it stamped ABOVE it stays and is re-applied downstream after the parent's
+apply, shallowest first, under its own stamp and no attempt identity (a live
+field is set again from its log entry, a field remove is deleted again), so
+the object reads the same as if it had arrived after. A row remove is a
+parent write like any other. (4) A field remove takes back what the field
+alone had made up: the projection vivifies the rows a field write lands in,
+and makes `{}` up over a value a field cannot land in (a number, null, a
+string); after a remove the kernel walks up from the removed cell's parent
+to the nearest live ancestor and emits, at seq 0, a repair for each level
+with nothing live left under it that the live ancestor's own value does not
+hold, and re-emits the ancestor's own value when nothing live is left under
+it and that value is not a plain object; an array put back that way has
+the newer removes under it taken out again, shallowest first, as repairs
+(never the array's own keys, which data refuses). A repair is never logged
+and never on the wire; the api's fast-path collector takes no settlement from a seq-0
+apply, and inside our own issue() no settlement probe runs at all. (5)
+Tombstone GC keeps a field remove that a live ancestor still fences (its
+stamp stays the winner, so compaction keeps the entry and a late joiner
+folds the same row); a row write above it sweeps and releases it. (6) A
+refused record that carries an attempt identity is a settlement: when
+apply() refuses a record at its own cell (lwwSkip) or under an ancestor
+(subsumed) and the record carries iss/cid, the kernel calls the sink's
+optional `lost(iss, cid, origin, seq, epoch)`: the record committed at
+exactly those coordinates (the WACK's) and lost, and no apply will ever
+carry it; the runtime surfaces it as onLost and Bind settles the write
+committed on the owner's lane.
+The index: `node.deep` is keyed by ANCESTOR key: every cell of depth ≥ 2,
+live or tombstone, is registered under each of its ancestors, so a write at
+any depth finds exactly its own subtree in one lookup and a row-only
+partition has no entry. Invariant, checked by the sim oracle: an indexed
+cell's stamp is strictly newer than every ancestor's version; no set is
+ever empty. Kept by apply, dropCell, tombstone GC and #resetFold; shed walks
+it. A spoke's resync skips a ghost field whose ancestor is live now or was
+held at the reset, and puts newer fields back on top of a ghost row.
+The api: a parent's apply probes our in-flight field writes under its own
+cell (the in-flight index is keyed by every ancestor like the kernel's; one
+lookup, no copy; a row apply asks only after the kernel let one of ours
+go), settling a swept field from the dedup window or as 'superseded'; a
+write settled from the window names the owner's lane. Both probes are
+skipped while one of our own issue() calls is on the stack. The `lost`
+effect settles a write of ours the kernel refused at its echo as committed
+from the refused record's own stamp: before it, a field write of ours whose
+newer foreign row reached us before our WACK stayed `pending` for ever and
+methods.update failed with a false timeout; the same-cell twin hung on the
+base tree too. A local `delete data.g[i]` of an owned array element is
+refused before it commits, with data's own message (write the spliced
+array); the substrate folds a REPLICATED remove under an array-valued row
+that data would refuse (a sparse hole) as a no-op, the array stays whole,
+instead of the refusal killing the process in the orders where the kernel
+re-applied a newer field over an older array.
+The gather (scoped reads, `await data` and methods.read()): the winner per
+cell as before, then across depth a field cell whose winning stamp is at or
+below an ancestor's winning stamp is dropped (at or below: a swept field
+ships as a tombstone at exactly its row's stamp), and the survivors project
+shallow to deep, a live cell set, a tombstone deleted at its own depth,
+after the unstamped coverage drops of parked cells; then the gather's own
+un-vivify: for each deep cell deleted this generation, the parent levels
+are walked up, and an empty object nobody claims, that the nearest projected
+ancestor's own value does not hold, goes (a level whose own live claim
+projected stays, `{}` included; a parked level keeps its last value). So
+the gather's object no longer depends on which generations it saw, and it
+agrees with the node's screen.
+The sim: every node's sink folds its applies into the object a screen would
+show (sim/fold.ts, modelling data); projected(), run by converged(), checks
+the index, the stamps, that the sink object equals the kernel's cells folded
+by depth, and that it is one object across nodes; the cells workload draws
+non-object row and field values. The debugger's stateAt mirrors the rule on
+state and the honesty gate holds it to the kernel.
+REJECTED: B, the field always wins (one stale field write would shadow
+every later whole-row write for ever). C, refuse mixing with a typed reject
+(unenforceable across concurrent writers, a reborn server, or records
+already in logs; a `data:` seed plus field writes is the natural app shape).
+Emitting downstream removes for swept children. Indexing live cells only (a
+field remove stamped above its row is a fact a late older row must meet
+again: 112 of 600 random histories still depended on order). Indexing by
+partition (a mid-depth write walked every field cell of the partition: 155×
+on a 10k-cell partition). Keying the api's in-flight index by row (2.3-2.5×
+per foreign field apply with 1k in flight). Leaving a vivified empty row
+behind after its last field is removed, on the screen or in the gather.
+Skipping every un-vivify repair when the live ancestor's value is any
+non-plain value (data makes `{}` up over a scalar and a live sibling field
+keeps it; only an array is the value nothing is made up inside). Skipping
+the api's settlement probes for every seq-0 apply. Settling a WACKed write
+from the window at the post-step sweep instead of the `lost` effect (it
+would resolve early, and on a spoke under the spoke's own uuid). Keeping
+the gather's removes-then-updates order with a special case. Letting data's
+sparse-hole refusal of a replicated remove throw out of step().
+Consequences, what is guaranteed: for plain-object, number, null and string
+values, writes and removes at any depth fold to the same object on every
+node (by value, not by key order), in every arrival order, on the node's
+own screen, in the sim's sink and in the scoped gather (0 order-dependent
+histories in 3,620 random ones and in a 500-history array brute force); a
+write of ours that commits settles as committed once its echo arrives,
+whether the echo projects, is swept, or is refused at its election. What is
+not: an ARRAY row. data does write into arrays (an index write replaces the
+element, a field inside an element lands, a non-index key becomes a hidden
+array property), the kernel makes no repair inside an array, so an
+array-valued row's screen can still depend on arrival order; write the
+spliced array. `methods.remove({ key: ['g', 0] })` does not go through the
+lens, so it still commits a tombstone that shows nothing; a typed reject
+for it is the next step (STATUS). A field remove under a STRING row with a numeric key can
+depend on order, and the sim's fold models strings differently from data
+(both self-consistent). A parked level (a handover window) is never
+un-vivified by the gather until it is claimed or covered. A write of ours
+whose refused echo never arrives (the owner died after its WACK) still
+waits for a later foreign write on that cell or row to probe it, the base's
+rule. A seq-0 repair that reaches the api outside our own issue() still
+runs the settlement probes, the base's rule for ghost removes. A spoke's
+write settled from the window names the spoke's own uuid when the WACK came
+through its relay. The sim's object oracle compares at the end of a run.
+Cost: a field-cell apply pays one ancestor key string, one Map lookup and
+one Set add per ancestor; a parent write pays its own subtree; the two
+refusal paths pay one compare; the whole-row and duplicate paths pay
+nothing measurable (R0a, RB1, RB2 unchanged); three ratio pins guard it
+(mid-depth 0.95×, in-flight field 1.0×, in-flight row apply) under a 1.6×
+budget. examples/README.md's rule 2 ("one write style per row") is advice
+now. JK.subsumed is 76. The sweep golden of V4-19 (20 seeds by event count
+and trace hash) is re-recorded: every event count stayed, every trace hash
+moved, because the state hash over a mixed history now follows the
+across-depth election (a swept field leaves the rolling hash, a tombstone
+takes its parent's stamp).
