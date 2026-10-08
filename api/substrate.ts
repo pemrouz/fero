@@ -302,23 +302,52 @@ export const mark = (p: any): number => {
   return m
 }
 
-//! disposeMinted — release the operator views a handler minted for ONE invocation (I-29): from the
-// view it returned, walk up the parents and dispose every OPERATOR node newer than `mark` — the chain
-// the handler built (ctx.data.filter(…).sort(…)) and nothing older: never a source (the resource, a
-// child path of it, the gather's proxy) and never a view that existed before the call (a shared
-// module-level view a handler hands out). Data keeps every operator in its parents' `children` until
-// dispose() and re-evaluates it on every commit — without this a server carried one dead filter per
-// subscription or one-shot read it ever served.
+//! disposeMinted — release the derived views a handler minted for ONE invocation (I-29): from the
+// view it returned, walk up the parents and dispose every DERIVED node (an operator, or a scalar such
+// as sum()) newer than `mark` — the chain the handler built (ctx.data.filter(…).sort(…)) and nothing
+// older: never a source (the resource, a child path of it, the gather's proxy) and never a view that
+// existed before the call (a shared module-level view a handler hands out). Data keeps every derived
+// node in its parents' `children` until dispose() and re-evaluates it on every commit — without this a
+// server carried one dead filter per subscription or one-shot read it ever served.
 export const disposeMinted = (view: any, mark: number): void => {
   const n = unwrap(view)?.[NODE]
   if (!(n instanceof DataNode)) return
   const walk = (x: DataNode<unknown>): void => {
-    if (x.kind !== 'operator' || x.id <= mark || x.disposed) return
+    if (x.kind === 'source' || x.id <= mark || x.disposed) return
     const parents = x.parents
     x.dispose()
     for (const parent of parents) walk(parent)
   }
   walk(n)
+}
+
+//! mintedSince — the derived nodes below a handle's node with an id above `mark`: what was minted on that
+// resource since the mark (the I-29 residue: a handler that minted a chain and returned a plain VALUE has
+// no returned view to walk up from). Taken the moment a handler's synchronous part returns, so the window
+// holds that invocation's views and nobody else's — single-threaded, nothing else ran meanwhile. A walk
+// over `children` (never a source's own registry); null when nothing was minted, so the common case
+// allocates nothing. Views minted after a handler's first await are not attributable and stay.
+export const mintedSince = (p: any, mark: number): DataNode<unknown>[] | null => {
+  const root = unwrap(p)?.[NODE]
+  if (!(root instanceof DataNode)) return null
+  let out: DataNode<unknown>[] | null = null
+  const walk = (x: DataNode<unknown>): void => {
+    for (const ch of x.children) {
+      if (ch.id > mark && ch.kind !== 'source' && !ch.disposed && !(out ??= []).includes(ch)) out.push(ch)
+      walk(ch)
+    }
+  }
+  walk(root)
+  return out
+}
+
+//! disposeUnused — dispose the nodes of a mintedSince window that nothing consumes, newest first so a
+// chain goes leaf to root. A node with an effect (a sink the handler hooked on: a live consumer, so the
+// server's now) or a child that stays is kept, and so is every node above it.
+export const disposeUnused = (minted: DataNode<unknown>[] | null): void => {
+  if (minted === null) return
+  minted.sort((x, y) => y.id - x.id)
+  for (const n of minted) if (!n.disposed && n.effects.length === 0 && n.children.length === 0) n.dispose()
 }
 
 //! derived — how many views hang directly off a handle's node (data's `children`): the I-29 leak-guard

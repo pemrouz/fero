@@ -422,3 +422,43 @@ test("a kernel outcome fails the call (the reply is true): an ASSIGNMENT in a ha
     await a.destroy().catch(() => {}); await b.destroy().catch(() => {})
   }
 })
+
+test("I-29 residue — a handler that mints views and returns a plain VALUE releases them too (a call, the plain-value SUB, a local call, an async handler's first stretch); a returned sum is released on close; a view the handler hooked a sink onto stays", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  const seen: number[] = []
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { u1: { who: 'alice', n: 1 }, u2: { who: 'bob', n: 2 } },
+    methods: {
+      howMany: (who: string, ctx: { data: any }) => Object.keys(snapshot(ctx.data.filter((r: { who: string }) => r.who === who).filter((r: { n: number }) => r.n > 0)) as object).length,
+      later: async (who: string, ctx: { data: any }) => {
+        const n = Object.keys(snapshot(ctx.data.filter((r: { who: string }) => r.who === who)) as object).length
+        await sleep(1)
+        return n
+      },
+      total: (_: unknown, ctx: { data: any }) => ctx.data.sum('n'),
+      //! a sink the handler hooked on is a live consumer: that view is the server's now, not dead
+      hook: (_: unknown, ctx: { data: any }) => { records(ctx.data.filter((r: { n: number }) => r.n > 1), () => seen.push(1)); return 'hooked' },
+    },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    assert.equal(derived(s.data), 0)
+    //! before: each of these left its filter chain on the source for good (the probe: 0 → 6)
+    assert.equal(await c.methods.howMany('alice'), 1)
+    const h = c.methods.howMany('bob'); const live = h.open()
+    assert.ok(await until(() => (snapshot(live) as { value?: number }).value === 1, 8000), 'the plain-value SUB arrived')
+    h.close()
+    assert.equal(await s.methods.howMany('bob'), 1)
+    assert.equal(await c.methods.later('bob'), 1)
+    assert.ok(await until(() => derived(s.data) === 0, 3000), `the value paths left nothing (${derived(s.data)} derived)`)
+    //! a returned SCALAR view (a sum) streams as { value } and is released on close like an operator
+    const t = c.methods.total(); const sum = t.open()
+    assert.ok(await until(() => (snapshot(sum) as { value?: number }).value === 3, 8000), `the sum streamed (${JSON.stringify(snapshot(sum))})`)
+    t.close()
+    assert.ok(await until(() => derived(s.data) === 0, 3000), `the closed sum left nothing (${derived(s.data)} derived)`)
+    assert.equal(await c.methods.hook(), 'hooked')
+    assert.equal(derived(s.data), 1, 'the hooked view stays')
+  } finally {
+    await c.destroy(); await s.destroy()
+  }
+})
