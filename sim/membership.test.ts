@@ -257,6 +257,24 @@ test('graceful leave (V4-6), n=2: the leaver knocks, the survivor proposes the v
   assert.deepEqual(sim.violations, [], 'one-view-per-epoch + epoch-monotone held throughout')
 })
 
+//! a newcomer is handed the member list when it connects, before its JOIN is voted. It is not on that
+// list, so its gate closes — and the reason must say joining: it was never a member, so it cannot have
+// been evicted. A member that IS voted out still says evicted (kernel/membership.test.ts pins that side).
+test('a newcomer waiting for its JOIN ballot closes its gate as joining, never evicted; once voted in it opens', () => {
+  const sim = new Sim(51)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+  sim.run({ until: 400 })
+  assert.deepEqual(epochs(nodes), [1, 1, 1])
+  const n04 = sim.add({ uuid: 'n04', listen: 'sim:n04', hosts: ['sim:n01'], heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('n04', { kind: 'start' })
+  sim.run({ until: 2000 })
+  const closes = n04.journal.read().filter((e) => e.kind === JK.gateClose).map((e) => e.a)
+  assert.deepEqual(closes, ['joining'], 'the newcomer waited as joining')
+  assert.deepEqual(members(n04), ['n01', 'n02', 'n03', 'n04'], 'and was voted in')
+  assert.ok(n04.membership.gate(n04).open, 'its gate is open now')
+  assert.deepEqual(sim.violations, [])
+})
+
 test('graceful leave (V4-6), n=3 under writes: one member leaves mid-stream; the two survivors commit the shrunk view and keep converging; the monitors stay quiet', () => {
   const sim = new Sim(62)
   const nodes = cluster(sim, 3, { heartbeatMs: 50 })

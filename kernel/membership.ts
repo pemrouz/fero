@@ -162,6 +162,11 @@ export class Membership {
   //! leaving — the graceful exit in progress (V4-6): ticks spent waiting, and whether it is over
   leaving: { ticks: number; done: boolean } | null = null
   #wasOpen = true // last journaled gate state, for transition events
+  //! wasMember — has any view this node held ever named it? Set in install() (the boot view counts: it is
+  // the view install() replaces). It splits the not-a-member gate word: a node that was in a view and is
+  // not any more was voted out ('evicted'); one never named yet is a newcomer waiting for its JOIN ballot
+  // ('joining') — onView hands a joiner the current view at admit time, before anyone votes it in.
+  #wasMember = false
 
   constructor(boot?: { epoch: number; members: [string, string][]; votedFor?: { e: number; p: string; h: string } }) {
     if (boot && boot.epoch > 0 && viewOk(boot.members)) {
@@ -186,7 +191,7 @@ export class Membership {
     if (this.epochStale) return { open: false, reason: 'stale-epoch' }
     if (this.rejoining()) return { open: false, reason: 'rejoining' }
     if (this.view.epoch === 0) return { open: true, reason: '' } // open genesis — the M0/M1 mode
-    if (!this.isMember(node.uuid)) return { open: false, reason: 'evicted' }
+    if (!this.isMember(node.uuid)) return { open: false, reason: this.#wasMember ? 'evicted' : 'joining' }
     let reachable = 1 // self
     for (const l of node.links.values())
       if (l.state === LS.admitted && !l.dead && this.isMember(l.uuid)) reachable++
@@ -455,7 +460,9 @@ export class Membership {
     const j = node.journal
     for (const [u] of this.view.members)
       if (!view.members.some((m) => m[0] === u)) j.armed && j.emit(JK.evict, u)
+    if (this.isMember(node.uuid)) this.#wasMember = true // the view being replaced (a restored boot view too)
     this.view = { epoch: view.epoch, members: sorted(view.members) }
+    if (this.isMember(node.uuid)) this.#wasMember = true
     node.epoch = view.epoch
     node.persistBoot() // the committed view is a durable fact from the instant it installs
     node.confirm.recount(node) // the view-change recount: thresholds are majorities OF THE COMMITTED VIEW
