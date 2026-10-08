@@ -43,7 +43,10 @@ Three rules every example keeps:
 
 1. **Rows live at the top level.** The top-level key is the row (one writer per row); operators chain
    from the root view only.
-2. **One write style per subtree.** Whole rows or single fields — never both on one row.
+2. **One write style per subtree, by preference.** Whole rows or single fields. Mixing them on one row
+   is safe since V4-18 (the newer stamp wins across depth: a whole-row write hides every older field
+   write, a newer field write shows on top of the row), but a reader of a role file should not have to
+   work that out, so the examples keep to one style per row.
 3. **Ctrl-C is the exit.** fero stops cleanly by itself: it leaves the group by a vote before the sockets
    close, so a clean stop is never mistaken for a crash. `destroy()` is the same thing in code.
 
