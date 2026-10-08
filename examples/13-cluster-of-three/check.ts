@@ -22,7 +22,7 @@ assert.ok(await client.exited === 0 && /^CLIENT \d+ — persisted by \w+ seq \d+
 // kill one: the link drops at once, the vote waits for the redial chain, then two of three still persist a write
 m[2].child.kill('SIGKILL')
 assert.ok(await until(() => view(m[0]).startsWith('members 3 — peers 1')), 'the survivor lost the link at once, and still shows members 3')
-const chain = 30 * (1 + 2 + 4 + 8 + 16 + 32 * 5) + 10 * 30
+const chain = 30 * (1 + 2 + 4 + 8 + 16) + 5 * 30 // a dead member is dialed 5 times at redial.ms 30, each with up to one base of jitter
 assert.ok(await until(() => m.slice(0, 2).every((r) => view(r) === 'members 2 — peers 1 — writable true'), 3 * chain), `members 2 and writable once the dead member's redial chain gave up (~${chain} ms)`)
 const c = await fero('vault')
 assert.equal((await c.methods.update({ key: 'outage', value: 1 }, { confirm: 'persisted' })).guarantee, 'persisted', 'with one member down a write still lands on two disks')

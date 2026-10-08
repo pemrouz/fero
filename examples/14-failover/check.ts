@@ -21,7 +21,7 @@ feeder.child.kill('SIGKILL')
 assert.ok(await until(() => header(client, 'peers') === 2, 2000), "the client's peers dropped to 2 at once")
 
 // a client write meanwhile, through the door: it waits for the vote if the dead server stamped that row (retry is the by-hand idiom — this call starts after the drop)
-const chain = 30 * (1 + 2 + 4 + 8 + 16 + 32 * 5) + 10 * 30
+const chain = 30 * (1 + 2 + 4 + 8 + 16) + 5 * 30 // a dead member is dialed 5 times at redial.ms 30, each with up to one base of jitter
 const c = await fero('feed')
 await c.methods.mark('failover', { retry: true, timeout: 3 * chain })
 assert.equal(await c.methods.read('after'), 'failover', 'the write committed on a survivor and reads back')
