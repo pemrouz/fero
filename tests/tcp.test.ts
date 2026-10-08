@@ -128,3 +128,38 @@ test('destroy() stops accepting before its WAL flush: a dial that lands mid-stop
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
+
+//! settle a promise or name it 'hung' after ms — the bounded race both start() tests below need
+const settled = (p: Promise<unknown>, ms: number) =>
+  Promise.race([p.then(() => 'resolved', (e: NodeJS.ErrnoException) => `rejected ${e?.code ?? e?.message}`), new Promise<string>((r) => setTimeout(r, ms, 'hung').unref())])
+
+test('a stop before the listen socket is up settles start() with a typed reject (code stopped) and frees the port', async () => {
+  const port = await ports.free()
+  const a = new Runtime({ uuid: 'aa', listen: `127.0.0.1:${port}` })
+  const starting = a.start()
+  await a.destroy()
+  //! the bug: destroy()'s server.close() runs before 'listening', Node never fires it, and start() hung for ever
+  assert.equal(await settled(starting, 2000), 'rejected stopped', 'start() settles when the runtime stops before it listened')
+  assert.equal(await settled(starting, 0), 'rejected stopped')
+  const refused = await new Promise<boolean>((resolve) => {
+    const s = net.connect(port, '127.0.0.1')
+    s.once('connect', () => { s.destroy(); resolve(false) })
+    s.once('error', () => resolve(true))
+  })
+  assert.ok(refused, 'the port is not held by the stopped runtime')
+})
+
+test('start() after destroy() neither binds nor hangs', async () => {
+  const port = await ports.free()
+  const a = new Runtime({ uuid: 'aa', listen: `127.0.0.1:${port}` })
+  await a.destroy()
+  const starting = a.start()
+  assert.equal(await settled(starting, 2000), 'rejected stopped', 'a start() on a stopped runtime is refused, typed')
+  const refused = await new Promise<boolean>((resolve) => {
+    const s = net.connect(port, '127.0.0.1')
+    s.once('connect', () => { s.destroy(); resolve(false) })
+    s.once('error', () => resolve(true))
+  })
+  //! the bug: the late start() bound a server that nothing would ever close
+  assert.ok(refused, 'nothing listens on the port after a start() on a destroyed runtime')
+})
