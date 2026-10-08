@@ -564,12 +564,34 @@ test('a SYSTEM resource wears a quiet # badge: a real server and the #directory 
   const { el, g } = await bootViewer('named', cap, { search: '' })
   const row = (uuid: string) => (el('tree').innerHTML.match(new RegExp(`<div class="trow[^"]*"[^>]*data-type="node"[^>]*>(?:(?!<div class="trow).)*?>${uuid}<(?:(?!<div class="trow).)*`, 's')) ?? [''])[0]
   assert.ok(row(shop).includes(`>${shop}<`) && row(dir).includes(`>${dir}<`) && !row(shop).includes(`>${dir}<`), 'each row is found, and alone')
-  assert.match(row(dir), /<span class="pill info" data-tip="node:system"><span class="pd"><\/span>#directory<\/span>/, 'the #directory row carries the # pill')
+  assert.match(row(dir), /<span class="tag" data-tip="node:system">#directory<\/span>/, 'the #directory row carries the # tag beside its label')
   assert.doesNotMatch(row(dir), /data-sev="(warn|crit)"/, 'a badge, not a problem: no severity')
+  assert.doesNotMatch(row(dir), /class="pill /, 'the pill slot stays for problems')
   assert.doesNotMatch(row(shop), /node:system/, 'the user resource carries no badge')
   g(`navTo('g/nodes/${dir}')`)
   assert.match(el('insp').innerHTML, /<dt data-tip="node:system">resource<\/dt><dd class="">#directory <span class="x">system<\/span><\/dd>/, 'the inspector names the resource and says system')
   g(`navTo('g/nodes/${shop}')`)
   assert.match(el('insp').innerHTML, /<dt data-tip="resource">resource<\/dt><dd class="">shop<\/dd>/, 'a user node shows its name plainly')
   assert.ok(tip('node:system') && tip('resource'), 'both keys explain themselves')
+})
+
+//! the capture the badge is FOR: the user's resource holding data beside its #directory. The viewer's fingerprint
+// assumes one resource, so two resources with different state paint both nodes 'differs' (a known limit, in
+// STATUS: group by the node's name). The badge must survive that: it is a tag beside the label, not the pill.
+test('the # badge survives a problem pill: a server holding a row beside its #directory — both rows differ today, the # tag still shows', async () => {
+  const rz = `127.0.0.1:${await ports.free()}`
+  const f = await fero('shop', { server: true, rendezvous: rz, heartbeat: { ms: 100 }, data: { widgets: { stock: 3 } } })
+  let cap: { nodes: { uuid: string; name?: string; stateHash: number }[] }
+  try {
+    const host = diag(f)!.rendezvous()!.host
+    assert.ok(host, 'this server won the bind and hosts the directory')
+    cap = { ...captureLive([]), nodes: [diag(f)!.capture(), diag(host)!.capture()] }
+  } finally { await f.destroy() }
+  assert.notEqual(cap.nodes[0].stateHash, cap.nodes[1].stateHash, 'the fixture is mixed: the two resources hold different state')
+  const [shop, dir] = cap.nodes.map((n) => n.uuid)
+  const { el } = await bootViewer('mixed', cap, { search: '' })
+  const row = (uuid: string) => (el('tree').innerHTML.match(new RegExp(`<div class="trow[^"]*"[^>]*data-type="node"[^>]*>(?:(?!<div class="trow).)*?>${uuid}<(?:(?!<div class="trow).)*`, 's')) ?? [''])[0]
+  assert.match(row(dir), /data-tip="node:differs"/, 'the known limit, pinned: a mixed capture paints the # node differs (flips when the fold groups by name)')
+  assert.match(row(dir), /<span class="tag" data-tip="node:system">#directory<\/span>/, 'and the # tag still shows beside the label')
+  assert.doesNotMatch(row(shop), /node:system/, 'the user resource carries no badge')
 })

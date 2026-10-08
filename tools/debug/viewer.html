@@ -138,6 +138,9 @@
   .trow[data-type=group][data-depth="0"] .ic{color:var(--gold-2)}
   .trow[data-type=group][data-depth="0"] .lab{font-size:11px;color:var(--dim)}
   .trow[data-type=more] .lab{color:var(--soft);font-family:var(--ui);font-size:11.5px;font-style:italic}
+  /* an identity tag beside the label (a system resource's `#` name): quiet info, never a severity, never the pill slot */
+  .trow .tag{flex:0 0 auto;margin-left:8px;font-family:var(--mono);font-size:10.5px;color:var(--info);background:var(--info-bg);
+    border:1px solid #234055;border-radius:3px;padding:0 5px;white-space:nowrap}
   .trow .grow{flex:1 1 auto;min-width:10px}
   .trow .meta{display:inline-flex;align-items:center;font-family:var(--mono);font-size:11px;color:#93939c;font-variant-numeric:tabular-nums;min-width:0;overflow:hidden}
   /* each stat is a fixed-width, right-aligned cell → the same column lines up across sibling rows */
@@ -514,10 +517,11 @@ const buildForest = (capture, T) => {
     const sev = diverged ? 'crit' : off || n.dropped > 0 ? 'warn' : '';
     const pill = diverged ? { cls:'crit', lab:'diverged', key:'node:diverged' }
       : off ? { cls:'warn', lab:'differs', key:'node:differs' }
-      : n.dropped > 0 ? { cls:'warn', lab:'truncated +' + klog(n.dropped), key:'node:truncated', fact: `${n.dropped} oldest events dropped` }
-      // a SYSTEM resource (a `#` name: fero's own `#directory`) is not the user's data — badged quietly, info only,
-      // and only when nothing is wrong (a problem pill outranks an identity badge; the inspector still says it)
-      : isSystem(n) ? { cls:'info', lab: n.name, key:'node:system' } : null;
+      : n.dropped > 0 ? { cls:'warn', lab:'truncated +' + klog(n.dropped), key:'node:truncated', fact: `${n.dropped} oldest events dropped` } : null;
+    // a SYSTEM resource (a `#` name: fero's own `#directory`) is not the user's data — badged quietly beside the
+    // label, info only, never in the pill slot: an identity is not a problem, and a problem pill there must not hide
+    // it (a capture that mixes resources paints every node 'differs' today — STATUS — and that hid the pill badge)
+    const tag = isSystem(n) ? { lab: n.name, key: 'node:system' } : null;
     const kinds = new Set();
     for (const e of n.journal) kinds.add((d.names[e.kind] || ('kind' + e.kind)).toLowerCase());
     const links = lks.map(l => {
@@ -548,7 +552,7 @@ const buildForest = (capture, T) => {
     // under scrub the jrnl stat becomes a PROGRESS readout (rows ≤ T / retained) — on a
     // write-free capture (mesh formation) this is the row that shows time actually moving
     const jstat = (scrub ? klog(jAt(n.journal, T)) + '/' : '') + klog(n.journal.length) + (n.dropped > 0 ? ' +' + klog(n.dropped) : '');
-    return { key: nk, type: 'node', label: n.uuid, icon: '▢', sev, pill,
+    return { key: nk, type: 'node', label: n.uuid, icon: '▢', sev, pill, tag,
       metaRaw: stat(n.seq ?? '—', 'seq', 'seq', 66)
              + stat(n.epoch ?? '—', 'ep', 'epoch', 58)
              + stat(keysN, 'keys', scrub ? 'keys@t' : 'keys', 74)
@@ -758,6 +762,7 @@ function rowHTML(row, i){
     `<span class="sd"></span>` +
     `<span class="ic">${n.icon || ''}</span>` +
     `<span class="lab" data-tip="${tipKey}">${esc(n.label)}${gc}</span>` +
+    (n.tag ? `<span class="tag" data-tip="${esc(n.tag.key)}">${esc(n.tag.lab)}</span>` : '') +
     `<span class="grow"></span>` +
     `<span class="pillwrap">${pill}</span>` +
     `<span class="meta">${n.metaRaw || ''}</span></div>`;
