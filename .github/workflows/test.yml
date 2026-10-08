@@ -1,0 +1,76 @@
+# The deterministic tiers on a standard GitHub runner: the whole `npm test` battery
+# (unit, sim, scenarios, the real-TCP and real-WAL tiers, the 26 example checks, the
+# config tiers, data's 18-clause SCHEDULE contract) plus the counted wire laws.
+#
+# What is NOT here, on purpose: `npm run perf`. Its absolute tripwires measure wall
+# time, and a shared runner swings too much for a time pin to mean anything.
+# tools/perf/BASELINE.md says a pinned quiet box is the place for those; that box
+# does not exist yet. The one perf piece that IS deterministic runs below: the
+# count tier of tests/baseline.perf.ts (bytes per record, frames per burst), which
+# is exact on any machine.
+
+name: test
+
+on:
+  push:
+  pull_request:
+
+# A new push to the same branch or PR cancels the run still going for the old one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # fero reaches its sibling engine by path: api/substrate.ts imports
+      # ../../data/api/index.ts and test:contract runs ../data/conformance/.
+      # So the two repos must sit side by side: <workspace>/fero and <workspace>/data.
+      - name: Check out fero
+        uses: actions/checkout@v4
+        with:
+          path: fero
+
+      - name: Check out data (the sibling engine, branch v4)
+        uses: actions/checkout@v4
+        with:
+          repository: pemrouz/data
+          ref: v4
+          path: data
+
+      - name: Set up Node 26
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: fero/package-lock.json
+
+      # data needs no install: fero runs its TypeScript source directly and the
+      # contract suite imports only node: builtins.
+      - name: Install fero's one dependency
+        working-directory: fero
+        run: npm ci
+
+      # tests/examples-tty.test.ts drives two examples on a pseudo-terminal through
+      # python3's pty module and SKIPS without it. Fail here instead, so a runner
+      # image change cannot turn that tier into a silent skip.
+      - name: Check python3 has the pty module
+        run: python3 -c "import pty, fcntl, termios"
+
+      # The examples tier starts real processes on loopback TCP; the battery pins
+      # FERO_RENDEZVOUS=off and FERO_CONFIG=off itself (utils/battery.ts).
+      - name: npm test
+        working-directory: fero
+        run: npm test
+
+      - name: Perf count tier (the counted wire laws only, no wall time)
+        working-directory: fero
+        run: >-
+          node --experimental-strip-types --expose-gc --no-warnings
+          --import ./utils/battery.ts --test
+          --test-name-pattern="^counts:" tests/baseline.perf.ts
