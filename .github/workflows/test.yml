@@ -36,6 +36,9 @@ jobs:
         with:
           path: fero
 
+      # This takes the HEAD of data's v4 branch on GitHub, the same rule as local
+      # `test:contract` (it pins data HEAD). So: push data's v4 before the fero commit
+      # that needs it, and read a red run right after a data push as a data change.
       - name: Check out data (the sibling engine, branch v4)
         uses: actions/checkout@v4
         with:
