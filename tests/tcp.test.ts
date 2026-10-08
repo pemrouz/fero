@@ -163,3 +163,23 @@ test('start() after destroy() neither binds nor hangs', async () => {
   //! the bug: the late start() bound a server that nothing would ever close
   assert.ok(refused, 'nothing listens on the port after a start() on a destroyed runtime')
 })
+
+test('a second start() is refused, typed, and binds no second server', async () => {
+  const a = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0' })
+  await a.start()
+  const first = Number(a.node.listen.split(':')[1])
+  try {
+    //! the bug: the second start() replaced #server without closing the first, so destroy() closed only the
+    // second and the first port listened on for the life of the process
+    assert.equal(await settled(a.start(), 2000), 'rejected started', 'a second start() is refused, typed')
+    assert.equal(a.node.listen, `127.0.0.1:${first}`, 'the published address is still the first bind')
+  } finally {
+    await a.destroy()
+  }
+  const refused = await new Promise<boolean>((resolve) => {
+    const s = net.connect(first, '127.0.0.1')
+    s.once('connect', () => { s.destroy(); resolve(false) })
+    s.once('error', () => resolve(true))
+  })
+  assert.ok(refused, 'destroy() frees the one port the runtime bound')
+})
