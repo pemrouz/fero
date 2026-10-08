@@ -41,7 +41,8 @@ epoch 3 — members 2 — peers 1 — writable true
 - `listen: '127.0.0.1:4801'` is a fixed address and `dir: './vault-4801'` a disk; the name `vault` is still
   found through the directory. Three members with both is the deployment rule: two of three is a majority,
   so one can die and the other two go on. `persisted by 4f13ed90`: two of three disks hold the write, and
-  `4f13ed90` is terminal 2's id — a member that stamped it and is still up; nothing was lost when 3 died.
+  `4f13ed90` is terminal 2 (not shown; its first line is `MEMBER 994648 on 127.0.0.1:4802 — life 4f13ed90`,
+  the rest like terminal 1's) — a member that stamped the write and is still up; nothing was lost when 3 died.
 - `peers` is who this member has a live link to; `members` is the agreed group, changed only by a vote.
   The link drops at once; the vote waits for the dead member's redials to give up — five tries, about a
   second at 30 ms, about four at the default 100. A row the dead member was stamping stands still until
