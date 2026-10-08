@@ -19,7 +19,7 @@
 //! the CLOSED enums (M7 honesty gate): every fold-minted status string lives in one of these two lists —
 // the string-leaf traceability test walks fold outputs and rejects any leaf outside capture-strings ∪
 // these enums ∪ vocab names ∪ cellKey encodings. Add a status HERE (and to its fold) or the gate fails.
-export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived']
+export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived', 'not-a-holder']
 export const ABSENT_REASONS = ['refused', 'timeout', 'unauthorized', 'frame', 'vocab-mismatch', 'restarted', 'error']
 
 export const encodeVal = (v) => {
@@ -273,7 +273,12 @@ export const verifyTopology = (capture) => {
 
 //! routes — the write-route join (v2's flagship debug feature, impossible there because origin was
 // re-stamped at commit; trivial here because provenance is a real join key): for every (origin, seq),
-// what happened at every node — origin / applied / lww-lost / duplicate / never-arrived.
+// what happened at every node — origin / applied / lww-lost / duplicate / never-arrived / not-a-holder.
+// not-a-holder (ISSUES I-3): scoped replication sends a write to its partition's holders only. A node with
+// no row for it that is a member of the origin's view, not a client, and outside the holder set the ORIGIN's
+// capture carries for that partition (kernel/diag.ts ownHolders — the ring's answer at capture end, never
+// re-derived here) was never meant to get it. No holder facts (unscoped, an older capture, a partition
+// compacted out of the origin's log) → absent is never-arrived, exactly as before.
 export const routes = (capture) => {
   const K = capture.vocab
   const map = new Map() // 'origin#seq' → { origin, seq, partition, nodes: {uuid: {status, t}} }
@@ -300,10 +305,20 @@ export const routes = (capture) => {
       }
     }
   }
-  //! absent entries are REAL information: a node with no row for (origin, seq) never saw that write
-  for (const r of map.values())
+  //! absent entries are REAL information: a node with no row for (origin, seq) never saw that write —
+  // or, on a scoped capture, was never one of its holders
+  const byLane = new Map()
+  for (const node of capture.nodes) byLane.set(laneOf(node), node)
+  for (const r of map.values()) {
+    const o = byLane.get(r.origin)
+    const holders = o && o.holders && r.partition != null ? o.holders[r.partition] : null
+    const members = holders && o.view ? o.view.members : null
     for (const node of capture.nodes)
-      if (!r.nodes[node.uuid]) r.nodes[node.uuid] = { status: 'never-arrived', t: null }
+      if (!r.nodes[node.uuid]) {
+        const quiet = members && node.client !== true && members.includes(node.uuid) && !holders.includes(node.uuid)
+        r.nodes[node.uuid] = { status: quiet ? 'not-a-holder' : 'never-arrived', t: null }
+      }
+  }
   return map
 }
 

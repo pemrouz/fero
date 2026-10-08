@@ -398,15 +398,19 @@ const derive = (capture) => {
 // ── outcomeOf: fold a route row into flags / summary / severity / pill ──
 // never-arrived is CRIT on a quiesced sim (nothing else is coming) but WARN on
 // a live capture (in-flight is normal); lww-lost is always warn; fully-applied is quiet.
+// not-a-holder (scoped replication, ISSUES I-3) is QUIET: those nodes were never meant to get the write,
+// so they leave the denominator — "applied 2/2 holders" — and raise no flag, pill or severity.
 const outcomeOf = (capture, r, d) => {
   const st = (u) => r.nodes[u] ? r.nodes[u].status : 'never-arrived';
-  const uuids = capture.nodes.map(n => n.uuid);
+  const all   = capture.nodes.map(n => n.uuid);
+  const quiet = all.filter(u => st(u) === 'not-a-holder');
+  const uuids = quiet.length ? all.filter(u => st(u) !== 'not-a-holder') : all;   // the nodes meant to get it
   const ok    = uuids.filter(u => st(u) === 'origin' || st(u) === 'applied');
   const lost  = uuids.filter(u => st(u) === 'lww-lost');
   const never = uuids.filter(u => st(u) === 'never-arrived');
   const dup   = uuids.filter(u => st(u) === 'duplicate');
   const flags = new Set();                                  // the write: filter vocabulary
-  if (ok.length === uuids.length) flags.add('applied');     // write:applied ⇒ FULLY applied everywhere
+  if (ok.length === uuids.length) flags.add('applied');     // write:applied ⇒ FULLY applied everywhere it was meant to go
   if (lost.length)  flags.add('lww-lost');
   if (never.length) flags.add('never-arrived');
   if (dup.length)   flags.add('duplicate');
@@ -416,14 +420,15 @@ const outcomeOf = (capture, r, d) => {
   const pill = never.length ? (settled ? { cls:'crit', lab:'never-arrived', key:'write:never-arrived' }
                                        : { cls:'warn', lab:'in-flight', key:'write:in-flight' })
     : lost.length ? { cls:'warn', lab:'lww-lost', key:'write:lww-lost' } : null;
-  const parts = [`<span class="${ok.length === uuids.length ? 'x' : ''}" data-tip="route:applied">applied ${ok.length}/${uuids.length}</span>`];
+  const of = quiet.length ? `${uuids.length} holders` : `${uuids.length}`;
+  const parts = [`<span class="${ok.length === uuids.length ? 'x' : ''}" data-tip="${quiet.length ? 'route:holders' : 'route:applied'}">applied ${ok.length}/${of}</span>`];
   if (lost.length)  parts.push(`<span class="warnt" data-tip="route:lost">lost@${esc(lost.join(','))}</span>`);
   if (never.length) parts.push(`<span class="${settled ? 'bad' : 'warnt'}" data-tip="${settled ? 'route:never' : 'route:inflight'}">⊘ ${esc(never.join(','))}</span>`);
   if (dup.length)   parts.push(`<span class="x" data-tip="route:dup">dup@${esc(dup.join(','))}</span>`);
-  const summaryText = [`applied ${ok.length}/${uuids.length}`,
+  const summaryText = [`applied ${ok.length}/${of}`,
     ...(lost.length ? ['lost@' + lost.join(',')] : []),
     ...(never.length ? ['⊘ ' + never.join(',')] : [])].join(' · ');
-  return { flags, sev, pill, ok, lost, never, dup, summaryHtml: parts.join(' <span class="x">·</span> '), summaryText };
+  return { flags, sev, pill, ok, lost, never, dup, quiet, summaryHtml: parts.join(' <span class="x">·</span> '), summaryText };
 };
 
 // ── cellRows: the Cells union — end state from the CAPTURED per-node states
@@ -1117,7 +1122,8 @@ function inspWrite(nd){
   const t = scrubT();
   const allStops = CAP.nodes.map(n => ({ uuid: n.uuid, ...(r.nodes[n.uuid] || { status: 'never-arrived', t: null }) }));
   const okAtT = t != null ? allStops.filter(s => s.t != null && s.t <= t && (s.status === 'origin' || s.status === 'applied')).length : 0;
-  const rollup = t != null ? `applied ${okAtT}/${CAP.nodes.length} by t${t}` : o.summaryText;
+  const meant = CAP.nodes.length - o.quiet.length;   // not-a-holder stops were never meant to get it (ISSUES I-3)
+  const rollup = t != null ? `applied ${okAtT}/${o.quiet.length ? meant + ' holders' : meant} by t${t}` : o.summaryText;
   const sub = rec
     ? `<span class="mono" data-tip="rec-key">${esc(key)}</span>${rec.ty === 2 ? ' <span class="warnt" data-tip="rec:remove">removed</span>' : ' = <span class="mono" data-tip="rec-value">' + esc(fmtVal(rec.v, 48)) + '</span>'} · <span data-tip="route:summary">${esc(rollup)}</span>`
     : `<span data-tip="not-captured">record not captured</span> · <span data-tip="route:summary">${esc(rollup)}</span>`;
@@ -1143,6 +1149,9 @@ function inspWrite(nd){
   // so instead of its end-of-run verdict (whose severity would be a claim about the future)
   const stops = [...allStops].sort((a, b) => (a.t == null) - (b.t == null) || (a.t ?? 0) - (b.t ?? 0));
   const lis = stops.map(s => {
+    //! a non-holder is quiet at every step: the write was never meant for it, rewound or not (holders as of the capture end)
+    if (s.status === 'not-a-holder')
+      return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="x" data-tip="stop:not-a-holder">not a holder — never meant to get it</span></li>`;
     if (t != null && (s.t == null || s.t > t))
       return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="x" data-tip="stop:not-yet">not arrived by t${t}</span></li>`;
     const at = s.t != null ? ` <span class="x" data-tip="t">· t${s.t}</span>` : '';

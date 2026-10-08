@@ -18,9 +18,9 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Sim } from '../../sim/exec.ts'
 import { cluster, formed, writes } from '../../sim/harness.ts'
-import { converged, drained, confirmedIntact } from '../../sim/monitors.ts'
+import { converged, drained, confirmedIntact, exactlyR, scopedConverged } from '../../sim/monitors.ts'
 import { captureSim } from './capture.ts'
-import { contested } from './model.mjs'
+import { contested, routes } from './model.mjs'
 import { JK } from '../../kernel/journal.ts'
 import { Node } from '../../kernel/node.ts'
 import { CONFIRM } from '../../kernel/confirm.ts'
@@ -247,6 +247,52 @@ export const SCENARIOS: Scenario[] = [
           { k: 'events', v: sim.events, kind: 'count' },
         ],
         capture: captureSim(sim),
+      }
+    },
+  },
+  {
+    id: 'scoped',
+    title: 'Scoped replication — each row lives on its holders only',
+    kind: 'happy',
+    desc: '4 members with replicas: 2 — once view 1 commits, each row has 2 holders (from the ring), and a write is copied to those two and nobody else. The other two never get it, by design: the debugger paints them quiet "not a holder", never never-arrived (ISSUES I-3). Heartbeats never quiesce, so the run is bounded in virtual time',
+    diagram: {
+      nodes: ids(4), mesh: true, writers: ids(4),
+      phases: [
+        { label: 'form', sev: 'ok' }, { label: 'arm', sev: 'info' }, { label: 'write', sev: 'gold' },
+        { label: 'holders only', sev: 'info' }, { label: 'holders agree', sev: 'ok' },
+      ],
+    },
+    run() {
+      const sim = new Sim(11)
+      const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2 })
+      sim.run({ until: 1500 }) // heartbeats never quiesce — a virtual-time bound
+      const armed = nodes.every((n) => n.armed)
+      writes(sim, nodes, 8, 200)
+      sim.run({ until: 4000 })
+      const t = tally(sim)
+      const capture = captureSim(sim)
+      //! the I-3 pin, inside the scenario: every stop a write did not reach is a non-holder's — nothing is lost
+      const stops = [...routes(capture).values()].flatMap((r: { nodes: Record<string, { status: string }> }) => Object.values(r.nodes).map((x) => x.status))
+      const quiet = stops.filter((x) => x === 'not-a-holder').length
+      const never = stops.filter((x) => x === 'never-arrived').length
+      const fail =
+        (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
+        (!formed(nodes) ? 'mesh never fully formed' : '') ||
+        (!armed ? 'the view never armed scoping' : '') ||
+        (exactlyR(sim) ?? '') ||
+        (scopedConverged(sim) ?? '') ||
+        (drained(sim) ?? '') ||
+        (never ? `${never} stops painted never-arrived on a scoped run` : '') ||
+        (!quiet ? 'no non-holder stop — scoping never engaged' : '')
+      return {
+        pass: !fail, notes: fail,
+        metrics: [
+          { k: 'writes', v: t.writes, kind: 'count' },
+          { k: 'applied', v: t.applied, kind: 'count' },
+          { k: 'not-a-holder stops', v: quiet, kind: 'count' },
+          { k: 'events', v: sim.events, kind: 'count' },
+        ],
+        capture,
       }
     },
   },
