@@ -47,8 +47,10 @@ export interface Fault { delay?: [number, number]; dupP?: number }
 //! StoreFault: the per-node STORAGE personality (M4b, plan §4 sim table) — delay is fsync latency;
 // lieP is the FSYNC LIE (the batch resolves, but its rows do not survive a crash — firmware/page-cache
 // betrayal); failP surfaces a persistFail. Torn writes need no probability: any batch still UNRESOLVED
-// at crash time is the torn tail, dropped by restart()'s harvest.
-export interface StoreFault { delay?: [number, number]; lieP?: number; failP?: number }
+// at crash time is the torn tail, dropped by restart()'s harvest. bootFailP fails a BOOT record (I-36,
+// the shell's EIO/EACCES/ENOSPC on boot.json): the record never lands, the store is condemned, and
+// persistFail is posted once — the shell's boot() catch, mirrored.
+export interface StoreFault { delay?: [number, number]; lieP?: number; failP?: number; bootFailP?: number }
 
 //! SimStore: one node's disk — the boot record + the WAL rows exactly as persisted (bytes + the
 // per-origin chain link). Survives restart() (it IS the disk); rows lost to torn tails / fsync lies
@@ -57,6 +59,9 @@ export interface StoreFault { delay?: [number, number]; lieP?: number; failP?: n
 // the phantom new file (doomed with it), while the old rows quietly return at harvest.
 export interface SimStore {
   boot: BootRecord | null
+  //! condemned (I-36): a boot record failed while the node lived on and kept voting from memory, so `boot`
+  // is stale — the shell's `condemned` marker on disk. restart() refuses such a store.
+  condemned?: boolean
   wal: { batch: number; bytes: Uint8Array; prev: number; resolved: boolean; lied: boolean }[]
   swapLied?: boolean
 }
@@ -133,11 +138,14 @@ export class Sim {
   // way a real recovery would (unresolved batches are the torn tail — gone; fsync-lied batches are gone
   // and their lie is only discovered now), then boot a fresh incarnation from the boot record and replay
   // the surviving WAL through source=replay, before 'start' brings the network up. Returns the new node.
+  // A CONDEMNED store (I-36) is refused before anything is touched, like the shell's restoreOpts: its boot
+  // record is stale, and booting from it could vote twice in one epoch.
   restart(uuid: string): Node {
+    const store = this.stores.get(uuid)!
+    if (store.condemned) throw new Error(`restart: ${uuid} is a store that failed mid-life — its boot record is stale; refusing to restore from it`)
     const old = this.nodes.get(uuid)!
     const opts = this.#nodeOpts.get(uuid)!
     old.destroy()
-    const store = this.stores.get(uuid)!
     store.wal = store.wal.filter((r) => r.resolved && !r.lied)
     store.swapLied = false // the new life reopens the REAL file; the phantom died with the crash
     const b = store.boot
@@ -395,7 +403,21 @@ export class Sim {
         }
         sim.#schedule(at - sim.now, () => sim.#step(me, { kind: 'persisted', batch }))
       },
-      boot(record) { sim.stores.get(me)!.boot = record },
+      //! boot: synchronous-durable like the shell's. bootFailP (I-36) fails it: the record never lands, the
+      // store is condemned and takes no later record (the shell's #bootFailed latch), and persistFail is
+      // posted as its own event — the shell posts it on a microtask, never as a nested step. The rng is
+      // drawn only when the fault is set, so every existing trajectory is unchanged.
+      boot(record) {
+        const store = sim.stores.get(me)!
+        if (store.condemned) return
+        const f = sim.#storeFaults.get(me)
+        if (f?.bootFailP && sim.rng() < f.bootFailP) {
+          store.condemned = true
+          sim.post(me, { kind: 'persistFail', batch: 0, reason: 'io' }, 0)
+          return
+        }
+        store.boot = record
+      },
       confirm(id, ok, count) {
         const c = sim.confirms.get(me + '|' + id)
         if (c) { c.ok = ok; c.count = count }

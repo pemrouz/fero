@@ -238,3 +238,31 @@ test('persistFail is surfaced and durable never advances past the hole — the c
   assert.equal(converged(sim), null, 'replication is untouched by a broken store')
   assert.deepEqual(sim.violations, [])
 })
+
+test('I-36 — a boot record that fails mid-life condemns the store: the node lives on, and restart() refuses its stale boot record', () => {
+  const sim = new Sim(85)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+  sim.run({ until: 400 })
+  assert.ok(formed(nodes), 'a three-member view committed')
+  const store = sim.stores.get('n02')!
+  assert.ok(store.boot !== null, 'a healthy life landed its boot records')
+  const stale = store.boot
+  //! the disk turns on n02 mid-life: its NEXT boot record (here forced; a vote or a view install in the wild) fails
+  sim.storeFault('n02', { bootFailP: 1 })
+  sim.at(10, () => nodes[1].persistBoot())
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['w'], value: 1 }] })
+  sim.run({ until: 1200 })
+  assert.equal(jk(nodes[1], JK.persistFail).length, 1, 'the failed boot record is the store\'s death, surfaced once')
+  assert.equal(store.condemned, true, 'the store is condemned')
+  assert.equal(store.boot, stale, 'the record never landed: the disk still holds the old, now stale, one')
+  assert.equal(converged(sim), null, 'the node lives on: replication is untouched')
+  //! the bug: restart() booted from that stale record (its old votedFor) as if the disk were sound
+  assert.throws(() => sim.restart('n02'), /failed mid-life/, 'a restart refuses the condemned store')
+  assert.equal(sim.nodes.get('n02'), nodes[1], 'and touches nothing: the live node is still the one running')
+  //! a sound store still restarts as before
+  const reborn = sim.restart('n03')
+  sim.run({ until: 4000 })
+  assert.equal(reborn.incarnation, nodes[2].incarnation + 1)
+  assert.equal(converged(sim), null)
+  assert.deepEqual(sim.violations, [])
+})
