@@ -7,9 +7,11 @@ const b = await fero('probe', { uuid: 'b', listen: '127.0.0.1:0', rendezvous: fa
 const a = await fero('probe', { uuid: 'a', listen: '127.0.0.1:0', hosts: [b.cluster.me.snapshot().listen], rendezvous: false })
 await new Promise<void>((ok) => b.cluster.tap(() => b.cluster.snapshot().epoch && ok()))
 
-// five cells, each rewritten twelve times: fifty-five entries nobody needs once b holds the last one
+// five cells, each rewritten twelve times: fifty-five entries nobody needs once both hold the last ones
+// (each cell's owner stamps it, so a's writes to a cell b owns come back to a from b)
 for (let i = 0; i < 60; i++) a.data[`k${i % 5}`] = { i }
-await new Promise<void>((ok) => b.data.tap(() => b.snapshot.k4?.i === 59 && ok()))
+const last = (f: typeof a) => [0, 1, 2, 3, 4].every((k) => f.snapshot[`k${k}`]?.i === 55 + k)
+while (!last(a) || !last(b)) await new Promise((r) => setTimeout(r, 25))
 
 // the diagnostics handle is off the typed surface: internals is the door
 const d = diag(a)!

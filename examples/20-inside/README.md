@@ -5,7 +5,7 @@ Terminal 1, one run:
 ```
 $ cd examples/20-inside
 $ node inside.ts
-journal 73 (0 dropped) · log 60 · confirms { api: 0, kernel: 0 } · served 0
+journal 121 (0 dropped) · log 60 · confirms { api: 0, kernel: 0 } · served 0
 compacted 55 entries; log now 5
 open it:  npm run debug -- examples/20-inside/inside.capture.json
 ```
@@ -42,7 +42,7 @@ fero v4 → http://localhost:4699/  (capture: examples/20-inside/inside.capture.
   `@ end`.
 
 ```sh
-node inside.ts --fero.journal.cap 8   # a ring of eight: 65 events fall off; the viewer says replay ✗
+node inside.ts --fero.journal.cap 8   # a ring of eight: 113 events fall off; the viewer says replay ✗
 npm run debug                         # no file: the debugger's own dashboard of simulated runs
 npm run debug -- --port 4700 examples/20-inside/inside.capture.json   # the same file on another port
 ```
