@@ -1,6 +1,6 @@
 # fero — the record
 
-This file is the history: the v4 status log (2026-08-01 to 2026-09-28), then the v3 milestone record that the old README carried (M0 to M8, the adversarial reviews, the comparison with v2). Nothing here is a to-do. The live one-page view is [../STATUS.md](../STATUS.md); the settled decisions are [DECISIONS.md](DECISIONS.md).
+This file is the history: the v4 status log (2026-08-01 to 2026-10-08), then the v3 milestone record that the old README carried (M0 to M8, the adversarial reviews, the comparison with v2). Nothing here is a to-do. The live one-page view is [../STATUS.md](../STATUS.md); the settled decisions are [DECISIONS.md](DECISIONS.md).
 
 ---
 
@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 on 2026-10-08 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -655,6 +655,16 @@ and the honesty promotion gate) over a debug tool (capture → typed model → v
 time-travel replay) that has co-evolved with the protocol since M0 — each piece pulled
 forward exactly when a seed sweep or review demanded it, which is the architecture
 working as designed.
+
+- 2026-10-08 — the first wave of the STATUS work plan (the 2026-10-03 plan, the
+  owner's answers of 2026-10-05): V4-14 the ring hash finished with fmix32 (a
+  spread pin and a golden), V4-15 the one-opener admit (formation 69,400 →
+  59,500), V4-16 the method plane (a live scalar as `{ value }`, `ready` per
+  attempt + `onError`, a kernel outcome fails the call, the I-29 residue stays),
+  V4-17 `start()` settles + the condemned store; data: reduce clones its init,
+  distinct() keys objects by structure, za's tiebreak line. Six lanes in scratch
+  worktrees, each reviewed by a second model; the I-20 lane went to a second fix
+  round. 515/515 + 18/18, perf 43/43.
 
 ## The debug tool
 
