@@ -1663,15 +1663,22 @@ export class Node {
     for (let j = above.length - 1; j > live; j--) {
       const kids = this.deep.get(above[j])
       if (kids !== undefined) for (const c of kids) if (this.state.has(c)) return
-      let v: unknown = undefined, has = false
+      let v: unknown = undefined, has = false, ignored = false
       if (live >= 0 && j < cut) {
         v = this.state.get(above[live]); has = true
         for (let i = live + 1; i <= j && has; i++) {
           if (isPlain(v) && Object.hasOwn(v, path[i])) v = v[path[i]]
-          else has = false
+          else { has = false; ignored = typeof v === 'object' && v !== null && !isPlain(v) }
         }
-        if (has && isPlain(v)) return
+        //! the value holds this level itself (an object, or an array): never made up — it and every
+        // level above it stay
+        if (has && typeof v === 'object' && v !== null) return
       }
+      //! an ARRAY (or a typed array) sits above this level in the value: the projection does not make
+      // `{}` up inside one — a field write under an array is ignored by data's lane — so nothing was
+      // made up here, and a remove of an array's element can THROW there (data refuses a sparse hole).
+      // No repair; the levels under the array were never on the screen.
+      if (ignored) continue
       const key = path.slice(0, j + 1)
       if (has) this.env.sink.apply({ type: REC.update, key, value: v, origin: this.uuid, seq: 0, epoch: 0 })
       else this.env.sink.apply({ type: REC.remove, key, origin: this.uuid, seq: 0, epoch: 0 })
