@@ -473,3 +473,33 @@ test('journal kinds this capture never recorded stay out of the kind: suggestion
   assert.deepEqual(picks(), ['holdBack'], 'the fragment completes the reserved kind')
   assert.match(el('omenu').innerHTML, /data-pick="kind:holdBack"[^>]*>[\s\S]*?<span class="oc">0<\/span>/, 'with its honest zero count')
 })
+
+//! a cluster whose journal RING OVERFLOWED (journalCap 8 — model.test's recipe): a real producer, never a hand-edited capture
+const truncatedPair = () => {
+  const sim = new Sim(11)
+  const small = ['s1', 's2'].map((uuid, i, all) => sim.add({ uuid, listen: `sim:${uuid}`, hosts: all.filter((_, j) => j !== i).map((u) => `sim:${u}`), redialMs: 20, journalCap: 8 }))
+  for (const n of small) sim.post(n.uuid, { kind: 'start' })
+  writes(sim, small, 6, 40); sim.run()
+  const cap = captureLive(small)
+  assert.ok(cap.nodes.every((n) => n.dropped > 0), 'both rings overflowed — the fixture is what it claims')
+  return cap
+}
+
+test('a truncated journal is a WARNING said out loud: the header says replay unchecked, the scrubber says rewind off, the pill carries the count — never replay ✗', async () => {
+  const cap = truncatedPair()
+  const { el } = await bootViewer('truncated', cap, { search: '' })
+  const head = el('statusRight').innerHTML
+  const drop = (u: string) => cap.nodes.find((n) => n.uuid === u)!.dropped
+  assert.match(head, new RegExp(`class="sst warn" data-tip="replay-truncated">replay unchecked — journal truncated \\(s1: ${drop('s1')} dropped, s2: ${drop('s2')} dropped\\)<`), 'amber, with every truncated node and its count')
+  assert.doesNotMatch(head, /replay ✗/, 'a lost diary page is not a replay fault')
+  assert.doesNotMatch(head, /replay ✓/, 'and nothing was checked, so no tick either')
+  assert.equal(el('trange').disabled, true, 'the scrubber is off')
+  assert.equal(el('tread').textContent, 'rewind off — truncated', 'and the bar says why, in words — not only in a hover')
+  assert.equal(el('tread').dataset.tip, 'time-travel-off', 'its hover explains it')
+  assert.equal(el('treset').style.display, 'none')
+  const tree = el('tree').innerHTML
+  assert.match(tree, new RegExp(`data-tip="node:truncated"[^>]*><span class="pd"></span>truncated \\+${drop('s1')}<`), 'the pill carries the count')
+  //! the journal stat keeps its short form (`8 +7 jrnl`, amber, the count in its hover): `8 +7 dropped jrnl` was
+  // driven in Chromium and clipped its 96 px column (134 px) — the pill and the header carry the word instead
+  assert.match(tree, new RegExp(`${cap.nodes[0].journal.length} \\+${drop('s1')}<span class="su"> jrnl`), 'and so does the journal stat')
+})
