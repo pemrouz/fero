@@ -1563,6 +1563,9 @@ export class Node {
     const cur = this.versions.get(k)
     if (cur && !newer(epoch, seq, origin, cur)) {
       this.journal.armed && this.journal.emit(JK.lwwSkip, origin, seq)
+      //! a refused record that carries an attempt identity is a write somebody is waiting on: it
+      // committed at these coordinates and lost — say so downstream (env.ts lost), since no apply will
+      if (iss !== undefined) this.env.sink.lost?.(iss, cid!, origin, seq, epoch)
       return
     }
     //! ACROSS DEPTH (V4-18, overlapping cells): a field cell loses to ANY ancestor stamped at or above
@@ -1581,6 +1584,7 @@ export class Node {
         const va = this.versions.get(ak)
         if (va !== undefined && !newer(epoch, seq, origin, va)) {
           this.journal.armed && this.journal.emit(JK.subsumed, origin, seq, 0)
+          if (iss !== undefined) this.env.sink.lost?.(iss, cid!, origin, seq, epoch) // committed, then lost (as above)
           return
         }
         above.push(ak)

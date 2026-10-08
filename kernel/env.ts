@@ -114,6 +114,13 @@ export interface EffectSink {
   // clean=true: the view without this node committed and a survivor echoed it (or there was nothing to
   // leave); false: LEAVE_TICKS ran out — the node goes like a crash. Fires exactly once per leave.
   left?(clean: boolean): void
+  //! lost(iss, cid, origin, seq, epoch) (V4-18, OPTIONAL — only an env that joins its own writes cares):
+  // a committed record carrying an attempt identity was REFUSED by the LWW election (its own cell holds
+  // a newer stamp, or an ancestor does — overlapping cells). It committed at (origin, seq, epoch) and
+  // lost; nothing projects, so the embedder's apply join never hears of it. This is the settlement for
+  // that write: committed, at exactly these coordinates (the WACK's). Never fires for a record without
+  // an attempt identity (a fast-path commit, a repair).
+  lost?(iss: string, cid: number, origin: string, seq: number, epoch: number): void
   //! snapshot(batch, rows) (M4e): ATOMICALLY REPLACE the whole WAL with `rows` — the disk counterpart
   // of compaction (a swap is not an append; it gets its own verb). Rows are [frame + fresh chain link]
   // in replay order; the store must make the swap all-or-nothing (write-tmp + fsync + rename in the
