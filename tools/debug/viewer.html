@@ -405,7 +405,7 @@ const outcomeOf = (capture, r, d) => {
   const all   = capture.nodes.map(n => n.uuid);
   const quiet = all.filter(u => st(u) === 'not-a-holder');
   const uuids = quiet.length ? all.filter(u => st(u) !== 'not-a-holder') : all;   // the nodes meant to get it
-  const ok    = uuids.filter(u => st(u) === 'origin' || st(u) === 'applied');
+  const ok    = uuids.filter(u => st(u) === 'origin' || st(u) === 'applied' || st(u) === 'acquired');   // acquired: came in a hand-off
   const lost  = uuids.filter(u => st(u) === 'lww-lost');
   const never = uuids.filter(u => st(u) === 'never-arrived');
   const dup   = uuids.filter(u => st(u) === 'duplicate');
@@ -1121,7 +1121,7 @@ function inspWrite(nd){
   // verdict and would contradict the banner; same reason the sev colour is muted while scrubbing
   const t = scrubT();
   const allStops = CAP.nodes.map(n => ({ uuid: n.uuid, ...(r.nodes[n.uuid] || { status: 'never-arrived', t: null }) }));
-  const okAtT = t != null ? allStops.filter(s => s.t != null && s.t <= t && (s.status === 'origin' || s.status === 'applied')).length : 0;
+  const okAtT = t != null ? allStops.filter(s => s.t != null && s.t <= t && (s.status === 'origin' || s.status === 'applied' || s.status === 'acquired')).length : 0;
   const meant = CAP.nodes.length - o.quiet.length;   // not-a-holder stops were never meant to get it (ISSUES I-3)
   const rollup = t != null ? `applied ${okAtT}/${o.quiet.length ? meant + ' holders' : meant} by t${t}` : o.summaryText;
   const sub = rec
@@ -1157,6 +1157,7 @@ function inspWrite(nd){
     const at = s.t != null ? ` <span class="x" data-tip="t">· t${s.t}</span>` : '';
     if (s.status === 'origin') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><b data-tip="stop:origin">origin</b> — wrote seq ${esc(String(r.seq))}${at}</li>`;
     if (s.status === 'applied') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:applied">applied</span>${at}</li>`;
+    if (s.status === 'acquired') return `<li class="done"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:acquired">got it in a hand-off</span>${s.from ? ' from ' + ref(String(s.from), 'g/nodes/' + s.from) : ''}${at}</li>`;
     if (s.status === 'lww-lost') return `<li class="bad"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="bad" data-tip="stop:lww-lost">lost LWW</span>${beatenBy}${at}</li>`;
     if (s.status === 'duplicate') return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span data-tip="stop:duplicate">dup discarded — already seen</span>${at}</li>`;
     // the same `settled` predicate as the row's pill: only a quiesced sim can say NEVER (ISSUES I-5)

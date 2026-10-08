@@ -413,6 +413,31 @@ test('scoped captures: a write stamped before the view armed, to a row its write
   assert.ok(shed > 0, `some route's row left its writer's log — the fixture is what it claims (${shed})`)
 })
 
+test('scoped captures: a write a new holder copied in with the whole row (journal acquire) is `acquired`, at that row, from its teacher — never never-arrived (ISSUES I-3)', () => {
+  const { cap } = movedCapture()
+  const K = cap.vocab
+  let handoff = 0
+  for (const r of (routes(cap) as Map<string, Route>).values()) {
+    const origin = cap.nodes.find((n) => n.uuid === r.origin)!
+    for (const n of cap.nodes) {
+      const s = r.nodes[n.uuid] as { status: string; t: number | null; from?: string }
+      assert.notEqual(s.status, 'never-arrived', `${n.uuid} of ${r.origin}#${r.seq} (${r.partition}) is not lost`)
+      if (s.status !== 'acquired') continue
+      //! acquired = the record book holds it AND the node journaled an acquire of that row, at that row
+      handoff++
+      assert.ok((n.logs[r.origin] || []).some((x: { seq: number }) => x.seq === r.seq), `${n.uuid} holds ${r.origin}#${r.seq}`)
+      const row = n.journal.find((e) => e.t === s.t)!
+      assert.equal(row.kind, K.acquire); assert.equal(String(row.a), r.partition); assert.equal(s.from, row.c)
+      assert.ok(origin.holders![r.partition!].includes(n.uuid), 'a node that copied the row in is one of its holders')
+    }
+  }
+  assert.ok(handoff > 0, `some write came in a hand-off — the fixture is what it claims (${handoff})`)
+  //! one fact alone is not enough: without the acquire rows a held record keeps today's rule
+  const noAcq = { ...cap, nodes: cap.nodes.map((n) => ({ ...n, journal: n.journal.filter((e) => e.kind !== K.acquire) })) }
+  const st = [...(routes(noAcq) as Map<string, Route>).values()].flatMap((r) => Object.values(r.nodes).map((x) => x.status))
+  assert.ok(!st.includes('acquired'), 'no acquire row, no acquired claim')
+})
+
 test('the replay folds hand-offs: shed drops a row\'s cells, acquire copies a row in — every node of a scoped capture with a join refolds to its captured state', () => {
   const { cap } = movedCapture()
   const K = cap.vocab

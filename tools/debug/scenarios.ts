@@ -254,42 +254,53 @@ export const SCENARIOS: Scenario[] = [
     id: 'scoped',
     title: 'Scoped replication — each row lives on its holders only',
     kind: 'happy',
-    desc: '4 members with replicas: 2 — once view 1 commits, each row has 2 holders (from the ring), and a write is copied to those two and nobody else. The other two never get it, by design: the debugger paints them quiet "not a holder", never never-arrived (ISSUES I-3). Heartbeats never quiesce, so the run is bounded in virtual time',
+    desc: '4 members with replicas: 2 — each row has 2 holders (from the ring), and a write is copied to those two and nobody else. The other two never get it, by design: the debugger paints them quiet "not a holder", never never-arrived (ISSUES I-3). Some writes land before the first view arms, so a writer may stamp a row it then hands off; later a 5th member joins and new holders copy whole rows in one hand-off (acquire), which the route shows as "got it in a hand-off". Heartbeats never quiesce, so the run is bounded in virtual time',
     diagram: {
-      nodes: ids(4), mesh: true, writers: ids(4),
+      nodes: ids(5), mesh: true, writers: ids(4),
       phases: [
-        { label: 'form', sev: 'ok' }, { label: 'arm', sev: 'info' }, { label: 'write', sev: 'gold' },
-        { label: 'holders only', sev: 'info' }, { label: 'holders agree', sev: 'ok' },
+        { label: 'form', sev: 'ok' }, { label: 'write', sev: 'gold' }, { label: 'arm', sev: 'info' },
+        { label: 'holders only', sev: 'info' }, { label: 'join + hand-off', sev: 'info' }, { label: 'holders agree', sev: 'ok' },
       ],
     },
     run() {
       const sim = new Sim(11)
       const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2 })
+      writes(sim, nodes, 6, 100) // before the view arms: each writer stamps its own, then hands off what it does not hold
       sim.run({ until: 1500 }) // heartbeats never quiesce — a virtual-time bound
       const armed = nodes.every((n) => n.armed)
       writes(sim, nodes, 8, 200)
       sim.run({ until: 4000 })
+      //! a 5th member joins: the ring moves some rows to it, and it copies each one whole from an old holder
+      sim.add({ uuid: 'n05', listen: 'sim:n05', hosts: nodes.map((n) => n.listen), heartbeatMs: 50, replicas: 2, redialMs: 20, journalCap: 1 << 16 })
+      sim.post('n05', { kind: 'start' })
+      sim.run({ until: 12000 })
+      const all = [...sim.nodes.values()]
       const t = tally(sim)
       const capture = captureSim(sim)
-      //! the I-3 pin, inside the scenario: every stop a write did not reach is a non-holder's — nothing is lost
+      //! the I-3 pin, inside the scenario: every stop a write did not reach is a non-holder's, and a write that came
+      // in a hand-off is "acquired" — nothing is painted lost
       const stops = [...routes(capture).values()].flatMap((r: { nodes: Record<string, { status: string }> }) => Object.values(r.nodes).map((x) => x.status))
       const quiet = stops.filter((x) => x === 'not-a-holder').length
+      const handoff = stops.filter((x) => x === 'acquired').length
       const never = stops.filter((x) => x === 'never-arrived').length
       const fail =
         (sim.violations.length ? `monitor: ${sim.violations[0].monitor} — ${sim.violations[0].detail}` : '') ||
-        (!formed(nodes) ? 'mesh never fully formed' : '') ||
+        (!formed(all) ? 'mesh never fully formed' : '') ||
         (!armed ? 'the view never armed scoping' : '') ||
+        (all.some((n) => n.epoch !== 2) ? `the join view did not commit everywhere (epochs ${all.map((n) => n.epoch)})` : '') ||
         (exactlyR(sim) ?? '') ||
         (scopedConverged(sim) ?? '') ||
         (drained(sim) ?? '') ||
         (never ? `${never} stops painted never-arrived on a scoped run` : '') ||
-        (!quiet ? 'no non-holder stop — scoping never engaged' : '')
+        (!quiet ? 'no non-holder stop — scoping never engaged' : '') ||
+        (!handoff ? 'no write came in a hand-off — the join moved no written row' : '')
       return {
         pass: !fail, notes: fail,
         metrics: [
           { k: 'writes', v: t.writes, kind: 'count' },
           { k: 'applied', v: t.applied, kind: 'count' },
           { k: 'not-a-holder stops', v: quiet, kind: 'count' },
+          { k: 'hand-off stops', v: handoff, kind: 'count' },
           { k: 'events', v: sim.events, kind: 'count' },
         ],
         capture,
