@@ -249,11 +249,28 @@ interface PendingCall {
   reject: (e: Error) => void
 }
 
+//! Sub — one live subscription on the caller. `ready` is made EAGERLY when the sub opens: it resolves (with
+// nothing — the mirror is THENABLE, so resolving with it would collapse it to a snapshot) on the first frame,
+// and rejects when the host fails the SUB or the mirror refuses a record. Eager on purpose: a failure nobody
+// handles is an unhandled rejection, which exits the process with the reason — as loud as an uncaught call.
+// `error` is set once, when the sub failed; the handle reads it (mode 'failed', every read throws it).
+export interface Sub {
+  id: number
+  m: string
+  a: unknown
+  proxy: any
+  ready: Promise<void>
+  error: Error | null
+  framed: boolean
+  resolve: () => void
+  reject: (e: Error) => void
+}
+
 export class Caller {
   #rt: Runtime
   #seq = 0
   #calls = new Map<number, PendingCall>()
-  #subs = new Map<number, { m: string; a: unknown; proxy: any }>()
+  #subs = new Map<number, Sub>()
 
   constructor(rt: Runtime) {
     this.#rt = rt
@@ -285,12 +302,23 @@ export class Caller {
 
   //! subscribe — open a live stream into a fresh local proxy. The id doubles as the subscription
   // identity server-side (keyed by link|id there, so the same id re-used on a NEW primary is clean).
-  subscribe(m: string, a: unknown): { id: number; proxy: any } {
+  subscribe(m: string, a: unknown): Sub {
     const id = ++this.#seq
-    const p = proxy({})
-    this.#subs.set(id, { m, a, proxy: p })
+    let resolve!: () => void, reject!: (e: Error) => void
+    const ready = new Promise<void>((res, rej) => { resolve = res; reject = rej })
+    const sub: Sub = { id, m, a, proxy: proxy({}), ready, error: null, framed: false, resolve, reject }
+    this.#subs.set(id, sub)
     this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m, a })
-    return { id, proxy: p }
+    return sub
+  }
+
+  //! #fail — the sub is over, loudly: the reason is kept for the handle, `ready` rejects, and the sub
+  // leaves #subs so no primary change re-subscribes it into the same failure
+  #fail(sub: Sub, e: Error) {
+    if (sub.error !== null) return
+    sub.error = e
+    this.#subs.delete(sub.id)
+    sub.reject(e)
   }
 
   unsubscribe(id: number) {
@@ -300,7 +328,14 @@ export class Caller {
 
   #onResult(id: number, ok: boolean, value: unknown, local: boolean) {
     const c = this.#calls.get(id)
-    if (!c) return
+    if (!c) {
+      //! a SUB's only RESULT is a failure: the host's handler threw, or a write it made was refused
+      // (V4-5). A LOCAL failure (no primary yet, the frame never shipped) is NOT one: that SUB is held
+      // and replayed on the next primary (I-28) — the local bit is load-bearing.
+      const sub = this.#subs.get(id)
+      if (sub && !ok && !local) this.#fail(sub, rehydrate(sub.m, value))
+      return
+    }
     //! a LOCAL failure is pre-dispatch (the kernel never shipped the frame ⇒ the handler never ran) —
     // hold it for the next primary (safe for EVERY call — the handler didn't run; the timeout bounds
     // the wait). `local` is the channel bit (M5-review #7): a wire RESULT whose value happens to equal
@@ -327,14 +362,23 @@ export class Caller {
     //! M6: a typed ScopedError crosses the wire as the RESULT error value and rehydrates AS-IS —
     // the `scoped: true` discriminant is the contract (api/types.ts); everything else keeps the
     // Error-string wrap
-    else if (typeof value === 'object' && value !== null && (value as { scoped?: boolean }).scoped === true) c.reject(value)
-    else c.reject(new Error(`methods.${c.m}: ${String(value)}`))
+    else c.reject(rehydrate(c.m, value))
   }
 
   #onSubRecs(id: number, recs: Rec[]) {
     const sub = this.#subs.get(id)
     if (!sub) return
-    for (const r of recs) applyStreamRec(sub.proxy, r as unknown as { type: string; key?: string[]; value?: unknown; at?: unknown })
+    for (const r of recs) {
+      const rejected = applyStreamRec(sub.proxy, r as unknown as { type: string; key?: string[]; value?: unknown; at?: unknown })
+      //! a record the mirror could not fold: the mirror is stale from here on, so the sub fails loudly
+      // (and the host stops streaming into it) instead of showing old data as if it were live
+      if (rejected !== null) {
+        this.#fail(sub, new Error(`methods.${sub.m}: the mirror refused a streamed record — ${(rejected as Error)?.message ?? String(rejected)}`))
+        this.#rt.node.step({ kind: 'rpc', id, mode: VERB.UNSUB })
+        return
+      }
+    }
+    if (!sub.framed) { sub.framed = true; sub.resolve() }
   }
 
   //! onPrimaryChange — the failover policies (v2's OQ2, closed): re-subscribe every live sub on the
@@ -364,6 +408,14 @@ export class Caller {
   }
 }
 
+//! rehydrate — a wire RESULT's error value as the Error the caller throws. M6: a typed ScopedError crosses
+// the wire as the value and rehydrates AS-IS (the `scoped: true` discriminant is the contract, api/types.ts);
+// everything else is the message string, wrapped and named by its method.
+const rehydrate = (m: string, value: unknown): Error =>
+  typeof value === 'object' && value !== null && (value as { scoped?: boolean }).scoped === true
+    ? value as Error
+    : new Error(`methods.${m}: ${String(value)}`)
+
 //! COERCION — property names that are introspection/coercion hooks, NOT reactive reads: touching them
 // must never open a subscription (M5-review #8: `String(h)`, template literals, JSON.stringify/toJSON,
 // util.inspect, duck-typing all hit the get trap; opening a live sub on any of them leaks a client+
@@ -373,12 +425,19 @@ const COERCION = new Set(['toJSON', 'toString', 'valueOf', 'constructor', 'nodeT
 
 //! handle — the tagged dual-mode Handle (plan §9): `await` (then) is a one-shot CALL; any reactive
 // touch opens the live subscription ONCE and delegates every subsequent trap to the local mirror
-// proxy. Reserved surface on a handle: then / open / close / mode — everything else is the live view.
-// Writes through a handle throw: subscription results are read-only projections.
+// proxy. Reserved surface on a handle: then / catch / finally / open / close / mode / ready — everything
+// else is the live view. Writes through a handle throw: subscription results are read-only projections.
+//! A FAILED sub (the host threw, a write was refused, the mirror refused a record): `ready` rejects with
+// the reason, `mode` reads 'failed', `open()` and every reactive read throw that reason, `close()` is a
+// no-op. Passive touches (symbols, coercion hooks) never throw — inspecting a dead handle is not a read.
 export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: number; retry?: boolean } = {}): any => {
-  let live: { id: number; proxy: any } | null = null
-  const open = () => (live ??= caller.subscribe(m, a))
-  const reserved = (prop: string | symbol) => prop === 'then' || prop === 'open' || prop === 'close' || prop === 'mode'
+  let live: Sub | null = null
+  const open = (): Sub => {
+    live ??= caller.subscribe(m, a)
+    if (live.error !== null) throw live.error
+    return live
+  }
+  const reserved = (prop: string | symbol) => prop === 'then' || prop === 'open' || prop === 'close' || prop === 'mode' || prop === 'ready'
   //! a bare touch that is NOT a reactive read (a symbol, a coercion hook) must NOT open the sub. Coercion
   // hooks return a MARKER (so `String(h)`/templates yield '[fero handle]' rather than throwing 'cannot
   // convert to primitive'); toJSON returns undefined (serializes to nothing); every other symbol/passive
@@ -400,8 +459,11 @@ export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: 
       if (prop === 'catch') return (onR?: (e: unknown) => unknown) => caller.call(m, a, opts).catch(onR)
       if (prop === 'finally') return (onD?: () => void) => caller.call(m, a, opts).finally(onD)
       if (prop === 'open') return () => open().proxy
-      if (prop === 'close') return () => { if (live) { caller.unsubscribe(live.id); live = null } }
-      if (prop === 'mode') return live ? 'live' : 'oneshot'
+      //! `ready` opens the sub (waiting for its first frame IS a reactive intent) and is the SAME promise
+      // every time — made when the sub opened, so a failure before anyone looked is still delivered
+      if (prop === 'ready') return (live ??= caller.subscribe(m, a)).ready
+      if (prop === 'close') return () => { if (live && live.error === null) { caller.unsubscribe(live.id); live = null } }
+      if (prop === 'mode') return live === null ? 'oneshot' : live.error !== null ? 'failed' : 'live'
       if (isPassive(prop)) return passive(prop)
       return open().proxy[prop]
     },

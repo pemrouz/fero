@@ -355,3 +355,44 @@ test("I-27 — a method that returns a live NUMBER streams it: the mirror reads 
     await c.destroy(); await s.destroy()
   }
 })
+
+test("the subscribe leg is LOUD: a handler that throws on SUB rejects `ready`, the handle reads 'failed' and every read throws; a refused write inside a SUB handler rejects the same way; a good sub resolves `ready`; a failed sub is dropped, never re-subscribed", async () => {
+  let boomRuns = 0
+  const { a, b, addrs } = await pair({
+    watch: (_: unknown, ctx: { data: any }) => ctx.data,
+    boom: () => { boomRuns++; throw new Error('handler exploded') },
+    //! V4-5 on the SUB leg: the write is refused, so the stream must never open
+    pokeLive: (_: unknown, ctx: { data: any }) => { ctx.data.admin = 1; return ctx.data },
+  }, { seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') } })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    a.data.pre = 1
+    //! touching `ready` opens the subscription; it resolves on the first frame
+    const good = c.methods.watch()
+    await good.ready
+    assert.equal(good.mode, 'live')
+    assert.ok(await until(() => (snapshot(good.open()) as { pre?: number }).pre === 1, 8000), 'the good sub folded')
+    //! before: the host's ok:false RESULT for a SUB id was looked up in the CALLS only — dropped; the
+    // mirror stayed {} forever and the client said nothing
+    const h = c.methods.boom(); h.open()
+    await assert.rejects(h.ready, /methods\.boom: handler exploded/)
+    assert.equal(h.mode, 'failed')
+    assert.throws(() => h.anything, /methods\.boom: handler exploded/, 'a read on a failed handle throws the reason')
+    assert.throws(() => h.open(), /methods\.boom: handler exploded/)
+    h.close() // a no-op on a failed sub
+    assert.equal(h.mode, 'failed')
+    const r = c.methods.pokeLive(); r.open()
+    await assert.rejects(r.ready, /methods\.pokeLive: write refused \(\["admin"\]\): reserved/)
+    //! a failed sub is DROPPED: a primary change re-subscribes the good sub, not the failed one
+    const primary = (snapshot(c.cluster) as { me: { primary: string } }).me.primary
+    const [gone, kept] = primary === 'aa' ? [a, b] : [b, a]
+    await gone.destroy()
+    assert.ok(await until(() => {
+      kept.data['post' + Date.now()] = true
+      return Object.keys(snapshot(good.open()) as object).some((k) => k.startsWith('post'))
+    }, 15_000), 'the good sub resumed on the survivor')
+    assert.equal(boomRuns, 1, 'the failed sub was not re-run on the new primary')
+  } finally {
+    await c.destroy(); await a.destroy().catch(() => {}); await b.destroy().catch(() => {})
+  }
+})
