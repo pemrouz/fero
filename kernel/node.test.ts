@@ -160,6 +160,30 @@ test('a dialed link that drops redials with backoff; attempts are bounded and gi
   assert.ok(of('timer').length <= 12, `unbounded redial: ${of('timer').length} timers`)
 })
 
+test('tune: { redials: 2 } — the chain gives up after two tries, and the curve follows redialGrowth / redialCap', () => {
+  const { node, of } = harness('aa', { redialMs: 10, tune: { redials: 2, redialGrowth: 3, redialCap: 4 } })
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  for (let i = 0; i < 6; i++) {
+    const t = of('timer')[of('timer').length - 1]
+    node.step({ kind: 'timer', id: t[1] as number, tag: t[2] as number })
+    node.step({ kind: 'linkDown', link: 900 + i, reason: 'refused', to: 'sim:bb' })
+  }
+  assert.equal(of('timer').length, 2, 'two tries, then give-up')
+  assert.deepEqual(of('timer').map((t) => t[3]), [10, 30], 'base, then ×3 (rng pinned to 0)')
+  assert.equal(node.journal.read().filter((e) => e.kind === JK.giveUp).length, 1, 'give-up journaled once')
+  //! the cap: base × redialCap = 40 — a longer chain never waits past it
+  const { node: n2, of: of2 } = harness('aa', { redialMs: 10, tune: { redials: 5, redialGrowth: 3, redialCap: 4 } })
+  n2.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  n2.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  for (let i = 0; i < 6; i++) {
+    const t = of2('timer')[of2('timer').length - 1]
+    n2.step({ kind: 'timer', id: t[1] as number, tag: t[2] as number })
+    n2.step({ kind: 'linkDown', link: 900 + i, reason: 'refused', to: 'sim:bb' })
+  }
+  assert.deepEqual(of2('timer').map((t) => t[3]), [10, 30, 40, 40, 40])
+})
+
 test('revival: only a FAILED final attempt revives; the pending window and a peer-dialed link do not', () => {
   //! adversarial-review regression: tries increments at ARM time, so tries==MAX during the 10th
   // attempt's pending window is NOT parked — a revive there orphans the live timer into a second
