@@ -18,7 +18,7 @@ What happens, where, and the fix if one is known. The evidence behind each line 
 
 ### Kernel
 
-- **A survivor stalled across the leave window turns a clean stop into a crash.** When one of two members presses Ctrl-C, it asks the other to vote it out and waits about four heartbeats for the answer. If the other member is stalled for longer than that, the leaver gives up and goes anyway, and the survivor sees a crash it can never vote out. With two members that is permanent. 25 of 384 stall schedules in the sim. No cheap fix, because at two members the vote is the only exit. Options: wait only while there is a member to ask; show a failed leave at the api (today it is a journal row only); the two-member tie-break V4-6 set aside.
+- **A survivor stalled across the leave window turns a clean stop into a crash.** When one of two members presses Ctrl-C, it asks the other to vote it out and waits about four heartbeats for the answer. If the other member is stalled for longer than that, the leaver gives up and goes anyway, and the survivor sees a crash it can never vote out. With two members that is permanent. 25 of 384 stall schedules in the sim. A fix was built on 2026-10-08 (the leaver's vote carried in the LEAVE, then a pledge protocol) and parked after three review rounds each found a new safety hole; the schedules, the holes, the salvage and the options for two-member crashes are in [docs/DESIGN-LEAVE.md](docs/DESIGN-LEAVE.md). Design first, then code; the branch is `w1/membership`.
 
 ### The api
 
