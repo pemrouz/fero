@@ -68,6 +68,7 @@ export const lostAssignment = (p: Promise<Coords>, why: unknown): { key: string;
 // coordinate promise's settlers.
 interface Pending {
   cell: string
+  row?: string // the row key when the cell is a FIELD (depth ≥ 2) — the #fields index entry it sits in
   cid: number
   resolve: (c: Coords) => void
   reject: (reason: string) => void
@@ -100,6 +101,9 @@ export class Bind {
   // settlement index, see the banner: it decides promises, never what the proxy shows)
   #pending = new Map<string, Pending>()
   #inflight = new Map<string, number>()
+  //! fields — row key → our in-flight FIELD cells under it (V4-18): a foreign row apply probes exactly
+  // these, so the probe costs nothing when no field write of ours is in flight on that row
+  #fields = new Map<string, Set<string>>()
   //! frames — a STACK of in-flight fast-path collectors, one per active issue() call (M5-review #0/#1/#4).
   // The epoch-0 fast path mints no kernel cid and applies synchronously inside rt.write(); a user tap
   // reacting to one of those applies drains a RE-ENTRANT issue() INSIDE the outer one (substrate
@@ -198,6 +202,7 @@ export class Bind {
       const pr = new Promise<Coords>((resolve, reject) => {
         entry = {
           cell, cid,
+          ...(rec.key.length > 1 ? { row: JSON.stringify([rec.key[0]]) } : {}),
           resolve: (c) => {
             if (row.state === 'pending') { row.state = 'committed'; row.origin = c.origin; row.seq = c.seq; row.epoch = c.epoch; this.#onOutcome?.(id) }
             resolve(c)
@@ -215,6 +220,11 @@ export class Bind {
       promises.set(rec, pr)
       pend.push(entry)
       this.#inflight.set(cell, cid)
+      if (entry.row !== undefined) {
+        let under = this.#fields.get(entry.row)
+        if (under === undefined) this.#fields.set(entry.row, under = new Set())
+        under.add(cell)
+      }
     }
     //! push THIS call's fast-path collector; a nested re-entrant issue pushes its own on top, and node.commit
     // applies sequentially so only the top frame's records apply while it is on top (M5-review #1/#4).
@@ -247,7 +257,13 @@ export class Bind {
   #forget(p: Pending) {
     const key = this.#iss + '|' + p.cid
     if (this.#pending.get(key) === p) this.#pending.delete(key)
-    if (this.#inflight.get(p.cell) === p.cid) this.#inflight.delete(p.cell)
+    if (this.#inflight.get(p.cell) === p.cid) { this.#inflight.delete(p.cell); if (p.row !== undefined) this.#unfield(p.row, p.cell) }
+  }
+
+  //! #unfield — drop a field cell from the per-row in-flight index (an emptied row leaves the map).
+  #unfield(row: string, cell: string) {
+    const under = this.#fields.get(row)
+    if (under !== undefined && under.delete(cell) && under.size === 0) this.#fields.delete(row)
   }
 
   //! onApply — every committed record materializing downstream (live, forwarded-echo, replay alike).
@@ -282,13 +298,17 @@ export class Bind {
     // LWW-loss race — resolve it from the dedup window's original coordinates) or is unaccounted for
     // (reject 'superseded'). The foreign record projects regardless — the proxy is the fold.
     this.#probe(cell)
-    //! 3b) the same probe for our in-flight writes on the cells UNDER this one (V4-18, overlapping
+    //! 3b) the same probe for our in-flight FIELD writes on the cells UNDER this one (V4-18, overlapping
     // cells): a whole-row write or a row remove is a parent of every field cell in the row, and a
     // field write of ours stamped at or below it is swept (or refused) in the kernel — its apply never
-    // comes. Only when something of ours is in flight at all; the no-writes path pays one size check.
-    if (this.#inflight.size > 0) {
-      const pfx = cell.slice(0, -1) + ','
-      for (const c of this.#inflight.keys()) if (c.startsWith(pfx)) this.#probe(c) // a Map survives deletes mid-walk
+    // comes. The #fields index keys by row, so only the cells of ours in flight under THIS row are
+    // looked at; with no field write of ours in flight anywhere this is one size check.
+    if (this.#fields.size > 0) {
+      const under = this.#fields.get(a.key.length > 1 ? JSON.stringify([a.key[0]]) : cell)
+      if (under !== undefined) {
+        const pfx = a.key.length > 1 ? cell.slice(0, -1) + ',' : null
+        for (const c of [...under]) if (pfx === null || c.startsWith(pfx)) this.#probe(c) // #probe settles, which edits `under`
+      }
     }
     //! 4) the ONE projection: kernel record → proxy
     this.#apply(a)
@@ -304,9 +324,13 @@ export class Bind {
       if (p) {
         this.#forget(p)
         const c = this.#rt.node.writes.committed(this.#iss, holder)
-        if (c) p.resolve({ origin: this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: holder })
+        if (c) p.resolve({ origin: c.o ?? this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: holder })
         else p.reject('superseded')
-      } else this.#inflight.delete(cell)
+      } else {
+        this.#inflight.delete(cell)
+        const path = JSON.parse(cell) as string[]
+        if (path.length > 1) this.#unfield(JSON.stringify([path[0]]), cell)
+      }
     }
   }
 
@@ -325,6 +349,7 @@ export class Bind {
     if (this.#destroyed) return
     this.#apply({ type: REC.remove, key: [p] })
     for (const cell of [...this.#inflight.keys()]) if ((JSON.parse(cell) as string[])[0] === p) this.#inflight.delete(cell)
+    this.#fields.delete(JSON.stringify([p]))
   }
 
   //! fromLens — the lens's write sink: every assignment/delete lands here as Recs and rides THE one
@@ -394,7 +419,7 @@ export class Bind {
       if (!drops) continue
       this.#forget(p)
       const c = w.committed(this.#iss, p.cid)
-      if (c) p.resolve({ origin: this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: p.cid })
+      if (c) p.resolve({ origin: c.o ?? this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: p.cid })
       else p.reject('dropped')
     }
   }
@@ -406,5 +431,6 @@ export class Bind {
     for (const [, p] of this.#pending) p.reject('destroyed')
     this.#pending.clear()
     this.#inflight.clear()
+    this.#fields.clear()
   }
 }
