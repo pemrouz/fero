@@ -38,7 +38,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { VERB } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
-import { applyStreamRec, disposeMinted, disposeUnused, isProxy, mark, mintedSince, proxy, records, snapshot } from './substrate.ts'
+import { applyStreamRec, disposeMinted, isProxy, mark, proxy, records, snapshot } from './substrate.ts'
 import { lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 
@@ -142,9 +142,9 @@ export class Host {
     }
     void (async () => {
       let result: unknown
-      //! the views a handler minted and did not return (I-29 residue): taken when its synchronous part
-      // returns, released once the plain value is answered (CALL, the plain-value SUB) or the call failed
-      let spent: ReturnType<typeof mintedSince> = null
+      //! a handler that returns a plain VALUE keeps every view it minted (the I-29 residue stays open):
+      // nothing tells a view it dropped from one it cached for its next call (`cached ??= ctx.data.filter(…)`
+      // in module scope) — the graph holds both alike — and disposing a cached one froze it silently
       try {
         //! NEVER blind-await the handler result: a ViewProxy is THENABLE (data's await-for-snapshot
         // feature), so `await proxy` would collapse the live view to a value before isProxy could see
@@ -159,12 +159,10 @@ export class Host {
         // next frame in the same chunk — the caller's CALL that changes the data — commit first, and
         // "open, then act" folded the act into the snapshot instead of streaming it as a delta.
         if (entry && isProxy(result) && tracked.length === 0) return this.#open(entry, skey, link, id, result, minted)
-        if (!isProxy(result)) spent = mintedSince(this.#data, minted)
         if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
           result = await result
         await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
       } catch (err) {
-        disposeUnused(spent)
         if (entry && this.#subs.get(skey) === entry) this.#subs.delete(skey)
         //! M6: a thrown ScopedError ships AS the error value (rehydrated typed at the caller);
         // everything else keeps the message-string reply
@@ -176,20 +174,20 @@ export class Host {
         //! a returned ViewProxy collapses to its snapshot for a one-shot call (v2's forWire, kept;
         // no clone — the reply's codec copies the value into frame bytes synchronously inside step);
         // a derived view minted for this call is dead once collapsed — released (I-29)
-        if (!isProxy(result)) { this.#reply(link, id, true, result); return disposeUnused(spent) }
+        if (!isProxy(result)) return this.#reply(link, id, true, result)
         const value = snapshot(result)
         disposeMinted(result, minted)
         return this.#reply(link, id, true, value)
       }
       //! the sub may have been UNSUBbed or its link reaped during the handler/flush — the entry is gone
       // or cancelled; do not open a stream nobody is listening to (M5-review #2/#6)
-      if (!entry || entry.cancelled || this.#subs.get(skey) !== entry) return disposeUnused(spent)
+      if (!entry || entry.cancelled || this.#subs.get(skey) !== entry) return
       //! SUB: a proxy streams (initial snapshot rides the record interface's attach emit); a plain
       // value degrades to a single-shot stream (one root update) — same consumption shape either way
       if (!isProxy(result)) {
         this.#rt.node.step({ kind: 'subOut', link, id, recs: [{ type: 'update', key: [], value: result } as unknown as Rec] })
         this.#subs.delete(skey) // a value SUB has no live stream to hold; drop the placeholder
-        return disposeUnused(spent)
+        return
       }
       this.#open(entry, skey, link, id, result, minted)
     })()
@@ -232,13 +230,10 @@ export class Host {
     //! peer is this node: a local call's caller IS the server (the Context doc above)
     const ctx: Context = { data: this.#data, flush: () => settle(tracked.splice(0)), peer: this.#rt.node.uuid }
     let result: unknown = this.#als.run(tracked, () => fn(a, ctx))
-    const spent = isProxy(result) ? null : mintedSince(this.#data, minted) // I-29 residue (#invoke's note)
-    try {
-      if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
-        result = await result
-      await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
-    } catch (err) { disposeUnused(spent); throw err }
-    if (!isProxy(result)) { disposeUnused(spent); return result }
+    if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
+      result = await result
+    await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
+    if (!isProxy(result)) return result // a plain value keeps the views it minted (#invoke's note)
     const value = structuredClone(snapshot(result))
     disposeMinted(result, minted) // the view minted for this call is dead once cloned (I-29)
     return value

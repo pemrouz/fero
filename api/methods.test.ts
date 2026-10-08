@@ -423,18 +423,12 @@ test("a kernel outcome fails the call (the reply is true): an ASSIGNMENT in a ha
   }
 })
 
-test("I-29 residue — a handler that mints views and returns a plain VALUE releases them too (a call, the plain-value SUB, a local call, an async handler's first stretch); a returned sum is released on close; a view the handler hooked a sink onto stays", async () => {
+test("I-29 — a returned SUM (a scalar view) is released on close like an operator; a view the handler hooked a sink onto stays", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
   const seen: number[] = []
   const s = await fero('r', {
     uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { u1: { who: 'alice', n: 1 }, u2: { who: 'bob', n: 2 } },
     methods: {
-      howMany: (who: string, ctx: { data: any }) => Object.keys(snapshot(ctx.data.filter((r: { who: string }) => r.who === who).filter((r: { n: number }) => r.n > 0)) as object).length,
-      later: async (who: string, ctx: { data: any }) => {
-        const n = Object.keys(snapshot(ctx.data.filter((r: { who: string }) => r.who === who)) as object).length
-        await sleep(1)
-        return n
-      },
       total: (_: unknown, ctx: { data: any }) => ctx.data.sum('n'),
       //! a sink the handler hooked on is a live consumer: that view is the server's now, not dead
       hook: (_: unknown, ctx: { data: any }) => { records(ctx.data.filter((r: { n: number }) => r.n > 1), () => seen.push(1)); return 'hooked' },
@@ -443,15 +437,8 @@ test("I-29 residue — a handler that mints views and returns a plain VALUE rele
   const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     assert.equal(derived(s.data), 0)
-    //! before: each of these left its filter chain on the source for good (the probe: 0 → 6)
-    assert.equal(await c.methods.howMany('alice'), 1)
-    const h = c.methods.howMany('bob'); const live = h.open()
-    assert.ok(await until(() => (snapshot(live) as { value?: number }).value === 1, 8000), 'the plain-value SUB arrived')
-    h.close()
-    assert.equal(await s.methods.howMany('bob'), 1)
-    assert.equal(await c.methods.later('bob'), 1)
-    assert.ok(await until(() => derived(s.data) === 0, 3000), `the value paths left nothing (${derived(s.data)} derived)`)
     //! a returned SCALAR view (a sum) streams as { value } and is released on close like an operator
+    // (before: disposeMinted stopped at any non-operator, so every closed sum stayed on the source)
     const t = c.methods.total(); const sum = t.open()
     assert.ok(await until(() => (snapshot(sum) as { value?: number }).value === 3, 8000), `the sum streamed (${JSON.stringify(snapshot(sum))})`)
     t.close()
@@ -460,5 +447,86 @@ test("I-29 residue — a handler that mints views and returns a plain VALUE rele
     assert.equal(derived(s.data), 1, 'the hooked view stays')
   } finally {
     await c.destroy(); await s.destroy()
+  }
+})
+
+test("a view a plain-value handler minted and KEPT (a lazily cached module-level view) stays live: a later call reads the new rows, and a sub on it follows", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  let cached: any = null
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { r1: { n: 1 } },
+    methods: {
+      cachedCount: (_: unknown, ctx: { data: any }) => Object.keys(snapshot(cached ??= ctx.data.filter((r: { n: number }) => r.n > 0)) as object).length,
+      cachedView: () => cached,
+      add: (k: string, ctx: { data: any }) => { ctx.data[k] = { n: 1 } },
+    },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    assert.equal(await c.methods.cachedCount(), 1)
+    await c.methods.add('r2')
+    //! before: the plain-value path disposed every view minted in the call that nothing hooked — the
+    // handler's own cache among them — so the second call read the frozen first answer
+    assert.equal(await c.methods.cachedCount(), 2, 'the cached view saw the new row')
+    const h = c.methods.cachedView(); const live = h.open()
+    assert.ok(await until(() => Object.keys(snapshot(live) as object).length === 2, 8000), `the sub on the cached view folded (${JSON.stringify(snapshot(live))})`)
+    await c.methods.add('r3')
+    assert.ok(await until(() => Object.keys(snapshot(live) as object).length === 3, 8000), `the sub on the cached view follows (${JSON.stringify(snapshot(live))})`)
+    h.close()
+  } finally {
+    await c.destroy(); await s.destroy()
+  }
+})
+
+test("a sub that fails AFTER its first frame is loud too: re-subscribed on a new primary whose handler throws, `onError` hears it, the fresh `ready` rejects, and the handle reads 'failed'", async () => {
+  let runs = 0
+  const { a, b, addrs } = await pair({
+    //! the first run streams; the second (on the new primary) throws after a beat, so the test can take
+    // the fresh `ready` before it rejects
+    watch: (_: unknown, ctx: { data: any }) => {
+      if (++runs === 1) return ctx.data
+      return sleep(300).then(() => { throw new Error('second primary exploded') })
+    },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const heard: Error[] = []
+  try {
+    a.data.pre = 1
+    const h = c.methods.watch(undefined, { onError: (e: Error) => heard.push(e) })
+    await h.ready
+    assert.ok(await until(() => (snapshot(h.open()) as { pre?: number }).pre === 1, 8000), 'the sub folded')
+    const primary = (snapshot(c.cluster) as { me: { primary: string } }).me.primary
+    await (primary === 'aa' ? a : b).destroy()
+    assert.ok(await until(() => runs === 2, 15_000), 'the sub was re-run on the new primary')
+    //! before: `ready` had resolved on the first frame, so the failure rejected nothing; the mirror kept
+    // the old primary's data as if live and nobody holding it heard a thing
+    await assert.rejects(h.ready, /methods\.watch: second primary exploded/)
+    assert.ok(await until(() => heard.length === 1, 3000), 'onError heard the failure')
+    assert.match(heard[0].message, /second primary exploded/)
+    assert.equal(h.mode, 'failed')
+  } finally {
+    await c.destroy(); await a.destroy().catch(() => {}); await b.destroy().catch(() => {})
+  }
+})
+
+test("`ready` settles when the sub ends without a frame: close() rejects it 'closed' and does not re-open; destroy() rejects it 'destroyed' — neither hangs nor stops the process", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { k: 1 },
+    methods: { slow: async () => { await sleep(400); return 1 } },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const bounded = (p: Promise<unknown>) => Promise.race([p, sleep(1500).then(() => { throw new Error('ready still pending') })])
+  try {
+    const h = c.methods.slow(); h.open(); h.close()
+    //! before: reading `ready` on a closed handle opened a NEW sub (`live ??= subscribe`), which then framed
+    await assert.rejects(bounded(h.ready), /methods\.slow: closed/)
+    assert.equal(h.mode, 'oneshot', 'reading ready did not re-open the closed sub')
+    const d = c.methods.slow(); d.open()
+    await c.destroy()
+    //! before: destroy() cleared the subs without settling them — `await d.ready` hung forever
+    await assert.rejects(bounded(d.ready), /methods\.slow: destroyed/)
+  } finally {
+    await c.destroy().catch(() => {}); await s.destroy()
   }
 })
