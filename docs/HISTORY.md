@@ -664,7 +664,8 @@ working as designed.
   V4-17 `start()` settles + the condemned store; data: reduce clones its init,
   distinct() keys objects by structure, za's tiebreak line. Six lanes in scratch
   worktrees, each reviewed by a second model; the I-20 lane went to a second fix
-  round. 515/515 + 18/18, perf 43/43.
+  round; its client-view half (a client follows its feeder, I-23 amended)
+  landed on its own. 515/515 + 18/18, perf 43/43.
 
 ## The debug tool
 
