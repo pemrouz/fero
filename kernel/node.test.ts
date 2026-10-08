@@ -592,6 +592,85 @@ test('stateHash is order-insensitive and remove-aware — identical states hash 
   assert.equal(a.state.size, b.state.size)
 })
 
+//! overlapping cells (V4-18): a whole-row write and a field write on one row are two cells. The rule:
+// the newer stamp wins ACROSS depth — a row write at T hides every field cell at or below T, a field
+// write newer than T shows on top. Both arrival orders must give the same cells AND the same object.
+// `project` folds the apply effects the way the api's lane does (replace at the path, delete at the
+// path, a deep write under an absent row vivifies it) — the object a screen would show.
+const project = (effects: unknown[][]): Record<string, unknown> => {
+  const root: Record<string, unknown> = {}
+  for (const e of effects) {
+    if (e[0] !== 'apply') continue
+    const r = e[1] as { type: number; key: string[]; value?: unknown; at?: string }
+    const path = r.key.length ? r.key : [r.at ?? '']
+    let o: Record<string, unknown> = root
+    for (let i = 0; i < path.length - 1; i++) {
+      if (typeof o[path[i]] !== 'object' || o[path[i]] === null) o[path[i]] = {}
+      o = o[path[i]] as Record<string, unknown>
+    }
+    if (r.type === REC.remove) delete o[path[path.length - 1]]
+    else o[path[path.length - 1]] = structuredClone(r.value)
+  }
+  return root
+}
+//! a node fed `recs` in the given order, each from its own origin at its own seq (epoch 0 throughout)
+const fed = (recs: { seq: number; origin: string; rec: { type: number; key: string[]; value?: unknown } }[]) => {
+  const h = harness('aa')
+  h.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: hello('bb') })
+  for (const r of recs) h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeFrame([r.rec], { origin: r.origin, baseSeq: r.seq, epoch: 0 }) })
+  return h
+}
+const cells = (n: Node) => Object.fromEntries([...n.state].sort())
+const bothOrders = (a: Parameters<typeof fed>[0][number], b: Parameters<typeof fed>[0][number]) => [fed([a, b]), fed([b, a])]
+
+test('overlapping cells (V4-18): a newer stamp wins across depth — both arrival orders of a row write and a field write agree on the cells and the object', () => {
+  const row = (seq: number, v: unknown) => ({ seq, origin: 'bb', rec: { type: REC.update, key: ['g'], value: v } })
+  const gone = (seq: number) => ({ seq, origin: 'bb', rec: { type: REC.remove, key: ['g'] } })
+  const leaf = (seq: number, v: unknown) => ({ seq, origin: 'cc', rec: { type: REC.update, key: ['g', 'stock'], value: v } })
+  //! (a) the field write is NEWER than the row write: it shows on top, in both orders
+  for (const h of bothOrders(row(5, { stock: 3 }), leaf(7, 9))) {
+    assert.deepEqual(cells(h.node), { '["g"]': { stock: 3 }, '["g","stock"]': 9 })
+    assert.deepEqual(project(h.effects), { g: { stock: 9 } })
+  }
+  //! (b) the row write is NEWER: the older field is hidden — swept when it arrived first, refused when
+  // it arrived second — and never comes back
+  for (const h of bothOrders(row(7, { stock: 3 }), leaf(5, 9))) {
+    assert.deepEqual(cells(h.node), { '["g"]': { stock: 3 } })
+    assert.deepEqual(project(h.effects), { g: { stock: 3 } })
+    assert.equal(h.node.journal.read().filter((e) => e.kind === JK.subsumed).length, 1, 'the loser is journaled as subsumed')
+    h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeFrame([leaf(6, 11).rec], { origin: 'dd', baseSeq: 6, epoch: 0 }) })
+    assert.deepEqual(cells(h.node), { '["g"]': { stock: 3 } }, 'a late field write still below the row stamp loses')
+    assert.deepEqual(project(h.effects), { g: { stock: 3 } })
+  }
+  //! (c) a row REMOVE is a parent write too: newer than the field, both are gone
+  for (const h of bothOrders(gone(7), leaf(5, 9))) {
+    assert.deepEqual(cells(h.node), {})
+    assert.deepEqual(project(h.effects), {})
+  }
+  //! (d) a field newer than the row's remove survives it (the row is reborn with that one field)
+  for (const h of bothOrders(gone(5), leaf(7, 9))) {
+    assert.deepEqual(cells(h.node), { '["g","stock"]': 9 })
+    assert.deepEqual(project(h.effects), { g: { stock: 9 } })
+  }
+  //! the two orders hash identically — the sweep maintains the rolling hash exactly like a remove
+  const [x, y] = bothOrders(row(7, { stock: 3 }), leaf(5, 9))
+  assert.equal(x.node.stateHash, y.node.stateHash)
+})
+
+test('overlapping cells (V4-18): ancestors at EVERY depth — a three-level history folds the same in all six orders', () => {
+  const a = { seq: 5, origin: 'cc', rec: { type: REC.update, key: ['g', 'a', 'b'], value: 'leaf' } }
+  const b = { seq: 7, origin: 'bb', rec: { type: REC.update, key: ['g', 'a'], value: { b: 'mid' } } }
+  const c = { seq: 6, origin: 'dd', rec: { type: REC.update, key: ['g'], value: { a: { b: 'row' }, z: 1 } } }
+  const orders = [[a, b, c], [a, c, b], [b, a, c], [b, c, a], [c, a, b], [c, b, a]]
+  for (const o of orders) {
+    const h = fed(o)
+    //! ['g','a','b']@5 loses to ['g','a']@7; ['g','a']@7 beats ['g']@6 and stays on top of it
+    assert.deepEqual(cells(h.node), { '["g"]': { a: { b: 'row' }, z: 1 }, '["g","a"]': { b: 'mid' } }, o.map((r) => r.seq).join(','))
+    assert.deepEqual(project(h.effects), { g: { a: { b: 'mid' }, z: 1 } }, o.map((r) => r.seq).join(','))
+  }
+})
+
 test('M6 arming predicate: scoped is config, armed requires a committed view — open genesis is never scoped', () => {
   const { node: plain } = harness('aa')
   assert.equal(plain.scoped, false)

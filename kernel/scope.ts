@@ -677,7 +677,9 @@ export class Scope {
       if (kept.length !== entries.length) { dropped += entries.length - kept.length; node.logs.set(origin, kept) }
       node.streams.get(origin)?.parts?.delete(p)
     }
-    for (const k of [...node.state.keys()]) if (keyPartition(k) === p) node.dropCell(k)
+    //! the live cells of p are its row cell plus the deep index's field cells (V4-18) — no full scan
+    node.dropCell(JSON.stringify([p]))
+    for (const k of [...(node.deep.get(p)?.cells ?? [])]) node.dropCell(k)
     for (const k of [...node.versions.keys()]) if (keyPartition(k) === p) node.versions.delete(k)
     node.journal.armed && node.journal.emit(JK.shed, p, dropped)
     if (node.durable) node.snapshot()
