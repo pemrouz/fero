@@ -324,3 +324,34 @@ test("I-29 — a derived view minted for a subscription or a one-shot call is DI
     await c.destroy(); await s.destroy()
   }
 })
+
+test("I-27 — a method that returns a live NUMBER streams it: the mirror reads { value } and follows the server; a plain-value SUB arrives the same way; the one-shot stays the bare number", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { count: 0 },
+    methods: {
+      count: (_: unknown, ctx: { data: any }) => ctx.data.count,
+      five: () => 5,
+      bump: (_: unknown, ctx: { data: any }) => { ctx.data.count = (snapshot(ctx.data) as { count: number }).count + 7 },
+      drop: (_: unknown, ctx: { data: any }) => { delete ctx.data.count },
+    },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    assert.equal(await c.methods.count(), 0, 'the one-shot is the bare number')
+    //! before: the client mirror is object-born, data refused the root number, and the refusal was
+    // swallowed — the mirror stayed {} forever (the probe: `live after open: {}`)
+    const live = c.methods.count().open()
+    assert.ok(await until(() => (snapshot(live) as { value?: number }).value === 0, 8000), `the first frame is { value: 0 } (${JSON.stringify(snapshot(live))})`)
+    await c.methods.bump()
+    assert.ok(await until(() => (snapshot(live) as { value?: number }).value === 7, 8000), `a server write streams as { value: 7 } (${JSON.stringify(snapshot(live))})`)
+    //! the cell goes away: the mirror empties instead of holding the last number
+    await c.methods.drop()
+    assert.ok(await until(() => JSON.stringify(snapshot(live)) === '{}', 8000), `a removed cell empties the mirror (${JSON.stringify(snapshot(live))})`)
+    const five = c.methods.five().open()
+    assert.ok(await until(() => (snapshot(five) as { value?: number }).value === 5, 8000), `a plain-value SUB arrives as { value: 5 } (${JSON.stringify(snapshot(five))})`)
+    assert.equal(await c.methods.five(), 5)
+  } finally {
+    await c.destroy(); await s.destroy()
+  }
+})

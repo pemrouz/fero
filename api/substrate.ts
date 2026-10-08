@@ -123,22 +123,41 @@ export const records = (p: any, fn: (rec: { type: string; key: string[]; value?:
 // snapshot root-replace rides this, legally). 'move' records are skipped: mirrors are
 // keyed (object-born) sources, and positional identity is not a mirror shape — the
 // documented consequence stands (sort on the client proxy); the serve side keeps its skip.
-export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?: unknown; at?: unknown }): void => {
-  if (r.type === 'move') return
-  const rec = { type: r.type, key: Array.isArray(r.key) ? r.key : [], value: r.value, ...(r.at !== undefined ? { at: r.at } : {}) }
+//! A LIVE SCALAR arrives as { value } (I-27): a method that returns a live number (`ctx.data.count`)
+// or a plain number on the SUB leg streams ROOT records carrying the bare leaf, and a mirror is
+// object-born — data has no scalar-born source, so it refused the number. A ROOT record (key [] and no
+// `at`) whose value is a primitive is reshaped here into a WHOLE-VALUE update of { value: v } (whole-
+// value, so the old keys drop on an object → scalar flip), and a root REMOVE (the cell went away) empties
+// the mirror instead of leaving the last value standing. `at` is the guard: an object-born source's
+// keyed insert is ALSO key [] (`{ type:'insert', key:[], value, at:'k' }`) and must pass untouched.
+// The one-shot call is untouched: it stays the bare number.
+//! Returns the reject data still raised (null when the record folded) instead of swallowing it, so a
+// caller can tell a mirror that went stale from one that folded.
+export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?: unknown; at?: unknown }): unknown => {
+  if (r.type === 'move') return null
+  const key = Array.isArray(r.key) ? r.key : []
+  let type = r.type, value = r.value
+  if (key.length === 0 && r.at === undefined) {
+    if (type === 'remove') { type = 'update'; value = {} }
+    else if (type === 'update' && value !== null && value !== undefined && typeof value !== 'object') value = { value }
+  }
+  const rec = { type, key, value, ...(r.at !== undefined ? { at: r.at } : {}) }
   //! the same ORPHAN-CELL VIVIFY as applyRec: the gather lawfully projects a parent
   // tombstone FIRST and re-projects the live nested cell after (fold.ts two-phase order —
   // the Q3a seed-0 shape), which needs the deep update to re-invent the row exactly as
-  // data v2's auto-vivifying res did. Everything else that rejects keeps v2-armor
-  // tolerance (fold.ts wraps every cell in isolation anyway).
+  // data v2's auto-vivifying res did. Everything else that rejects is RETURNED: fold.ts
+  // ignores it (it wraps every cell in isolation anyway).
   let rejected: unknown = null
   ingest(p, [rec as never], { origin: ORIGIN, onReject: (rj) => (rejected = rj.error) })
   if (
     rejected !== null && r.type === 'update' && rec.key.length > 1 &&
     String((rejected as Error)?.message ?? '').includes('not live')
   ) {
-    ingest(p, [{ type: 'update', key: [rec.key[0]], value: {} } as never, rec as never], { origin: ORIGIN, onReject: () => {} })
+    let again: unknown = null
+    ingest(p, [{ type: 'update', key: [rec.key[0]], value: {} } as never, rec as never], { origin: ORIGIN, onReject: (rj) => (again ??= rj.error) })
+    return again
   }
+  return rejected
 }
 
 //! ── the LENS: fero's OWN write surface (DESIGN-DATA3 §4.1) ────────────────────

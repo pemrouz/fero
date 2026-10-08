@@ -37,7 +37,8 @@ bob total 15 top [ 10, 5 ]
   On the client, `bank.methods.feed(who)` is a handle with two modes. `await` it and the bank answers once,
   with a snapshot. `.open()` it and the bank streams the view into a mirror here: every row that matches,
   kept up to date as long as it is open. `sum` and `za` (the three biggest) chain on the mirror, so the sort
-  runs on the client, not at the bank.
+  runs on the client, not at the bank. A method that returns one number streams it as `{ value }`; `await`
+  still gives the bare number.
 - The mirror starts empty (`total 0`). Its first frame is the fold — everything so far, the deposit made
   before the open included. `live` is `feed.mode`. The deposit made after the open arrives as one delta.
   `deposit` is a method too: under `methods:` it is the only way a client changes the bank (a plain write
