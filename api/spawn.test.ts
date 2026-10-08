@@ -70,9 +70,12 @@ test('stop() gives up: a child that ignores SIGINT is SIGKILLed after five secon
 })
 
 test("a parent's Ctrl-C stops the children it spawned, waits for their own stop, and exits 0; a parent that dies on a thrown error takes them with it; the echo names the file and the pid, and out is stdout only", async () => {
-  const idle = script('idle.ts', `console.log('hello')
+  //! the SIGINT handler goes in BEFORE 'hello': 'hello' is what tells the test the child is ready for its Ctrl-C.
+  // Printed first, a busy box could stall the child between the two lines; the Ctrl-C then met Node's default
+  // (death by SIGINT, no 'bye') and the parent — which did wait — looked as if it had not.
+  const idle = script('idle.ts', `process.on('SIGINT', () => setTimeout(() => { console.log('bye'); process.exit(0) }, 300))
+console.log('hello')
 console.error('oops')
-process.on('SIGINT', () => setTimeout(() => { console.log('bye'); process.exit(0) }, 300))
 setInterval(() => {}, 1000)
 `)
   const parent = script('parent.ts', `import { fero } from ${INDEX}
@@ -91,7 +94,7 @@ setInterval(() => {}, 1000)
     assert.ok(p1.out.includes(`[idle ${childOf(p1)}] hello`), `the echo is prefixed with the file and the pid (${p1.out})`)
     assert.ok(!p1.out.includes('oops'), 'stderr is echoed to stderr and never lands in out')
     assert.equal(await p1.stop(), 0, 'the parent exited 0 on SIGINT: nothing of its own listens, so fero exits for it')
-    assert.ok(p1.out.includes(`[idle ${childOf(p1)}] bye`), "the parent WAITED for its child's own stop before exiting")
+    assert.ok(p1.out.includes(`[idle ${childOf(p1)}] bye`), `the parent WAITED for its child's own stop before exiting (${JSON.stringify(p1.out)})`)
     assert.ok(await gone(childOf(p1)), 'the grandchild is gone: the parent stopped it before exiting')
     //! a thrown error: the parent dies with code 1 and its exit hook SIGKILLs the child
     assert.equal(await p2.exited, 1, 'the parent died on the throw')
