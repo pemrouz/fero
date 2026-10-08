@@ -208,7 +208,7 @@ test('a config file that fails to load throws with its path (optcascade), and th
   const home = scratch()
   fs.writeFileSync(path.join(home, 'fero.opt.js'), 'export default {')
   assert.throws(() => r('r', {}, { home }), (e: Error) => e.message.includes(path.join(home, 'fero.opt.js')))
-  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'journal.cap', 'replicas', 'rendezvous', 'data', 'methods', 'seams.validation', 'signals'])
+  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'data', 'methods', 'seams.validation', 'signals'])
 })
 
 test('I-35 — a LONGER name under a leaf is refused naming THAT name; the good variable beside it is never blamed, and `data` (an object of rows) still rides a file', () => {

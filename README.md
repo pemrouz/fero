@@ -77,6 +77,7 @@ Examples for a resource named `shop`. The per-resource form is shown for the fla
 | `dir` | `dir: './state'` | `--fero.dir ./state` | `FERO_DIR=./state` | `dir: './state'` | `--fero.shop.dir ./shop` · `FERO_SHOP_DIR=./shop` · `shop: { dir: './shop' }` |
 | `heartbeat.ms` | `heartbeat: { ms: 250 }` | `--fero.heartbeat.ms 250` | `FERO_HEARTBEAT_MS=250` | `heartbeat: { ms: 250 }` | `--fero.shop.heartbeat.ms 250` · `FERO_SHOP_HEARTBEAT_MS=250` · `shop: { heartbeat: { ms: 250 } }` |
 | `redial.ms` | `redial: { ms: 200 }` | `--fero.redial.ms 200` | `FERO_REDIAL_MS=200` | `redial: { ms: 200 }` | `--fero.shop.redial.ms 200` · `FERO_SHOP_REDIAL_MS=200` · `shop: { redial: { ms: 200 } }` |
+| `redial.tries` | `redial: { tries: 5 }` | `--fero.redial.tries 5` | `FERO_REDIAL_TRIES=5` | `redial: { tries: 5 }` | `--fero.shop.redial.tries 5` · `FERO_SHOP_REDIAL_TRIES=5` · `shop: { redial: { tries: 5 } }` |
 | `journal.cap` | `journal: { cap: 65536 }` | `--fero.journal.cap 65536` | `FERO_JOURNAL_CAP=65536` | `journal: { cap: 65536 }` | `--fero.shop.journal.cap 65536` · `FERO_SHOP_JOURNAL_CAP=65536` · `shop: { journal: { cap: 65536 } }` |
 | `replicas` | `replicas: 3` | `--fero.replicas 3` | `FERO_REPLICAS=3` | `replicas: 3` | `--fero.shop.replicas 3` · `FERO_SHOP_REPLICAS=3` · `shop: { replicas: 3 }` |
 | `rendezvous` | `rendezvous: '127.0.0.1:4000'` / `false` | `--fero.rendezvous …` / `--no-fero.rendezvous` | `FERO_RENDEZVOUS=…` / `off` | `rendezvous: '…'` | `--fero.shop.rendezvous …` · `FERO_SHOP_RENDEZVOUS=…` · `shop: { rendezvous }` |
@@ -122,7 +123,8 @@ Scope: *instance* = this node only. *cluster* = must be the same on every member
 | Key | Default | Scope | Set via | What it does |
 |---|---|---|---|---|
 | `heartbeat.ms` | `500` (`0` = off) | cluster | call, flag, env, file | The one clock. Pings, membership ticks, the write retry clock, compaction and WAL snapshot arming all run on it. `0` turns heartbeats off (an explicit protocol mode, the sim's sweep mode). A finite number of milliseconds, 0 or more. Must be the same on every member. |
-| `redial.ms` | `100` | instance | call, flag, env, file | The dial backoff base after a peer drops. It doubles per failure up to 32 times the base and gives up after 10 tries (heartbeats revive it). Also the `#directory` client's redial base. A finite number of milliseconds, 0 or more. |
+| `redial.ms` | `100` | instance | call, flag, env, file | The dial backoff base after a peer drops. It doubles per failure up to 32 times the base; `redial.tries` says when it gives up. Also the `#directory` client's redial base. A finite number of milliseconds, 0 or more. |
+| `redial.tries` | `10` | instance | call, flag, env, file | How many times a dropped peer is dialed before the chain gives up (heartbeats revive it). A dead member is dialed 5 times (that chain is the eviction clock: about four seconds at the default base), or this many if that is lower. Not passed to the `#directory` client. An integer, 0 or more. |
 
 **Bounds**
 
@@ -146,7 +148,7 @@ Scope: *instance* = this node only. *cluster* = must be the same on every member
 
 ### Kept fixed
 
-Everything else stays a constant on purpose: the wire format, the ring hash, the quorum thresholds, the membership tick counts, the write pipeline bounds, the write and call timeouts, the on-disk names, and every sim and tooling literal. Each has a reason (a member with a different value would drop frames, compute a different owner, or mean a different thing by "confirmed"). The full list, with the reason per row, is [docs/DESIGN-CONFIG.md](docs/DESIGN-CONFIG.md) section 5. A few of them (the redial give-up count, the membership ticks) are candidates for a later kernel tune table; none is a `fero()` key today.
+Everything else stays a constant on purpose: the wire format, the ring hash, the quorum thresholds, the write and call timeouts, the on-disk names, and every sim and tooling literal. Each has a reason (a member with a different value would drop frames, compute a different owner, or mean a different thing by "confirmed"). The full list, with the reason per row, is [docs/DESIGN-CONFIG.md](docs/DESIGN-CONFIG.md) section 5. The membership tick counts, the write pipeline bounds, the redial curve and the member chain are rows of the kernel tune table ([kernel/tune.ts](kernel/tune.ts)): one frozen object per node, defaults equal to the old constants, every read site reading a row. `redial.tries` is the one row with a `fero()` key today.
 
 ### For the test battery
 
