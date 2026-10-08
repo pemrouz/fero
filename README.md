@@ -40,7 +40,7 @@ watcher.data.sale1 = { item: 'widgets', qty: 1 }              // a client's writ
 - **Durability.** `dir` turns on a write-ahead log and a boot record. Run the same file again and it is the same node in its next life, its rows back before it has a socket. Kill -9 a whole cluster and restore it from the disks: no `persisted` write is lost.
 - **Scoped replication.** `replicas: N` puts every partition (a top-level row) on exactly N members. A shard is never shown as the resource: a sync read or an operator on a scoped server throws a typed error, and `await f.data` gathers the whole.
 - **Conflicts.** A cell keeps the record with the biggest stamp. Nothing merges. Two members that read a counter and write it back plus one lose an increment. Write one row per event and fold the rows (`sum`, `avg`, a sorted view) instead.
-- **Process.** Ctrl-C and SIGTERM are a clean stop for every live instance, then the process exits 0. `fero.spawn(file, args, { stdin: 'pipe' })` starts a role as a separate `node` process and returns `{ pid, out, exited, stop, write, child }`; `stop()` is the reader's Ctrl-C and `write(line)` types a line into it.
+- **Process.** Ctrl-C and SIGTERM are a clean stop for every live instance, then the process exits 0. A client holds its process open while it follows, just as a server does: a script that reads and is done ends with `await f.destroy()`. `fero.spawn(file, args, { stdin: 'pipe' })` starts a role as a separate `node` process and returns `{ pid, out, exited, stop, write, child }`; `stop()` is the reader's Ctrl-C and `write(line)` types a line into it.
 
 Every point above is a runnable folder in the example series: [examples/README.md](examples/README.md).
 
