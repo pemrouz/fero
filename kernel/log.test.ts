@@ -164,12 +164,43 @@ test('V4-18 overlapping cells — a MIXED row/field history compacts to the winn
   for (const bytes of encodeRuns(full.map((e) => ({ rec: e.rec, origin: 'aa', seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))))
     t2.node.step({ kind: 'bytesIn', link: 1, bytes })
   assert.equal(t2.node.stateHash, h.node.stateHash, 'the full history sweeps the same way')
-  assert.deepEqual([...t2.node.deep.get('m')!.cells], [kb], 'the deep index holds exactly the live field')
+  assert.deepEqual(t2.node.fields('m'), [kb], 'the deep index holds exactly the live field')
   //! tombstone GC at quiescence releases the swept field's stamp — the row's own stamp still fences it
   gcTombstones(h.node)
   assert.equal(h.node.versions.has(ka), false)
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: { type: REC.update, key: ['m', 'a'], value: 'late' }, origin: 'bb', seq: 1, epoch: 0 }])[0] })
   assert.equal(h.node.state.has(ka), false, 'a late older field still loses to the row')
+})
+
+test('V4-18 overlapping cells — a field remove above a LIVE row is fenced: tombstone GC keeps its stamp, compaction keeps its entry, a late joiner folds the same row; a row write above it releases both', () => {
+  const h = churned()
+  h.node.writes.ring.place('m', 'aa')
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['m'], value: { a: 1, b: 2 } }] })
+  h.node.step({ kind: 'write', recs: [{ type: REC.remove, key: ['m', 'a'] }] })
+  const km = JSON.stringify(['m']), ka = JSON.stringify(['m', 'a'])
+  caughtUp(h)
+  compact(h.node, 'aa', frontier(h.node, 'aa'))
+  assert.equal(gcTombstones(h.node) > 0, true, "the churn's 'gone' tombstone is released — quiescence held")
+  assert.deepEqual(h.node.versions.get(ka), { epoch: 1, seq: h.node.seq, origin: 'aa' }, 'the field remove keeps its stamp: its row is live')
+  assert.deepEqual(h.node.logs.get('aa')!.filter((e) => e.rec.key[0] === 'm').map((e) => JSON.stringify(e.rec.key)), [km, ka], 'row and remove both survive compaction')
+  //! a late joiner fed the compacted log shows the row WITHOUT the removed field
+  const t = harness('yy')
+  const seen: unknown[] = []
+  t.node.env.sink.apply = (r) => seen.push([r.type, r.key])
+  t.admit(1, 'aa')
+  for (const bytes of encodeRuns(h.node.logs.get('aa')!.map((e) => ({ rec: e.rec, origin: 'aa', seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))))
+    t.node.step({ kind: 'bytesIn', link: 1, bytes })
+  assert.deepEqual(seen.filter((x) => (x as unknown[])[1] && ((x as unknown[])[1] as string[])[0] === 'm'), [[REC.update, ['m']], [REC.remove, ['m', 'a']]])
+  assert.equal(t.node.stateHash, h.node.stateHash)
+  //! a row write above the remove sweeps the tombstone: its stamp becomes the row's, GC then releases it
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['m'], value: { a: 5 } }] })
+  assert.deepEqual(h.node.versions.get(ka), h.node.versions.get(km))
+  caughtUp(h)
+  compact(h.node, 'aa', frontier(h.node, 'aa'))
+  assert.deepEqual(h.node.logs.get('aa')!.filter((e) => e.rec.key[0] === 'm').map((e) => JSON.stringify(e.rec.key)), [km], 'the swept remove is no winner: dropped')
+  gcTombstones(h.node)
+  assert.equal(h.node.versions.has(ka), false, 'released')
+  assert.equal(h.node.deep.size, 0)
 })
 
 test('tombstone GC: the stamp survives while a straggler could resurrect, and is released once every lane quiesces', () => {

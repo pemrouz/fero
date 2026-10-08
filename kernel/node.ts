@@ -188,12 +188,16 @@ export class Node {
   state = new Map<string, unknown>()
   #entryHash = new Map<string, number>()
   #hash = 0
-  //! deep (V4-18, overlapping cells): per partition, the LIVE cells of depth ≥ 2 — the field cells a
-  // whole-row write (or row remove) can sweep — and the deepest path seen there (an upper bound; it
-  // never shrinks). A row cell (depth 1) is nobody's descendant, so a partition written only as whole
-  // rows has no entry here and the index costs it nothing. Kept in step with `state` by apply, dropCell
-  // and #resetFold; shed walks it instead of scanning every key.
-  deep = new Map<string, { cells: Set<string>; max: number }>()
+  //! deep (V4-18, overlapping cells): the field cells, by ancestor. Key = an ancestor path's key
+  // ('["g"]', '["g","a"]'); value = every cell of depth ≥ 2 under it — LIVE ones and TOMBSTONES alike,
+  // each registered under each of its ancestors. So a write at any depth finds exactly its own subtree
+  // in one lookup (its own key), and a field REMOVE stamped above its row is found again after a late
+  // older row write and re-applied downstream. The invariant: an indexed cell's stamp is strictly newer
+  // than every ancestor's version. A row cell (depth 1) is nobody's descendant, so a partition written
+  // only as whole rows has no entry here and the index costs it nothing. Kept in step by apply (link
+  // on apply, unlink on sweep), dropCell, tombstone GC and #resetFold; shed walks it instead of
+  // scanning every key. No set is ever left empty.
+  deep = new Map<string, Set<string>>()
   //! timers — kernel-minted ids; fired ids not in #timers are stale (cancel raced the fire) and ignored
   #timerSeq = 0
   #timers = new Map<number, { tag: number; to?: string }>()
@@ -996,10 +1000,10 @@ export class Node {
   // bring back is a GHOST — removed downstream through the ordinary apply effect (a synthesized remove
   // under this node's own name, seq 0: never logged, never on the wire; a still-pending own write on
   // that cell shows again when its stamped echo arrives, exactly as after any foreign remove — V4-7).
-  // Across depth (V4-18): a ghost FIELD whose row (or any ancestor) was held at the reset is covered by
-  // that row — re-applied, its whole value is the truth and a remove here would tear a field out of it;
-  // itself a ghost, its remove took the field with it. A ghost ROW whose newer fields came back has
-  // erased them downstream: they go back on top, as after a sweep.
+  // Across depth (V4-18): a ghost FIELD is covered when its row (or any ancestor) is LIVE now — the
+  // re-download applied the whole row, which is the truth, and a remove here would tear a field out of
+  // it — or was held at the reset and is a ghost itself: its remove takes the field with it. A ghost
+  // ROW whose newer fields came back has erased them downstream: they go back on top, as after a sweep.
   #resyncEnd() {
     const { old } = this.resync!
     this.resync = null
@@ -1009,12 +1013,15 @@ export class Node {
       const path = JSON.parse(cell) as string[]
       if (path.length > 1) {
         let covered = false
-        for (let d = 1; d < path.length && !covered; d++) covered = old.has(JSON.stringify(path.slice(0, d)))
+        for (let d = 1; d < path.length && !covered; d++) {
+          const a = JSON.stringify(path.slice(0, d))
+          covered = this.state.has(a) || old.has(a)
+        }
         if (covered) continue
       }
       ghosts++
       this.env.sink.apply({ type: REC.remove, key: path, origin: this.uuid, seq: 0, epoch: 0 })
-      const back = this.#under(path)
+      const back = this.#under(cell)
       if (back.length) this.#reapply(back)
     }
     this.journal.armed && this.journal.emit(JK.resynced, ghosts)
@@ -1561,16 +1568,21 @@ export class Node {
     // it — the whole-row write (or row remove) at stamp T carried, or erased, this field, and a field
     // write older than T is the older fact. Same `newer`, every depth: ['r','a','b'] asks ['r'] then
     // ['r','a']. A duplicate never gets here (the cell's own stamp refused it above), and a row write
-    // (depth 1) has no ancestor, so the whole-row path pays nothing.
+    // (depth 1) has no ancestor, so the whole-row path pays nothing. The ancestor keys are kept: the
+    // index registers this cell under each of them below.
     const depth = path.length
+    let above: string[] | null = null
     if (depth > 1) {
+      above = []
       let a = '[' + JSON.stringify(path[0])
       for (let d = 1; ; d++) {
-        const va = this.versions.get(a + ']')
+        const ak = a + ']'
+        const va = this.versions.get(ak)
         if (va !== undefined && !newer(epoch, seq, origin, va)) {
           this.journal.armed && this.journal.emit(JK.subsumed, origin, seq, 0)
           return
         }
+        above.push(ak)
         if (d === depth - 1) break
         a += ',' + JSON.stringify(path[d])
       }
@@ -1579,66 +1591,97 @@ export class Node {
     this.versions.set(k, stamp) // a remove leaves this as a tombstone deliberately
     const old = this.#entryHash.get(k)
     if (old !== undefined) { this.#hash = (this.#hash - old) | 0 }
-    const p = path[0]
-    let under = this.deep.get(p)
     if (rec.type === REC.remove) {
       this.state.delete(k)
       this.#entryHash.delete(k)
-      if (depth > 1 && under !== undefined) under.cells.delete(k)
     } else {
       this.state.set(k, rec.value)
-      const h = fnv(k + '' + stable(rec.value))
+      const h = fnv(k + '' + stable(rec.value))
       this.#entryHash.set(k, h)
       this.#hash = (this.#hash + h) | 0
-      if (depth > 1) {
-        if (under === undefined) this.deep.set(p, under = { cells: new Set(), max: depth })
-        else if (depth > under.max) under.max = depth
-        under.cells.add(k)
-      }
     }
+    //! the index: a field cell — live, or the tombstone a field remove leaves — goes under each ancestor
+    if (above !== null)
+      for (const ak of above) {
+        let s = this.deep.get(ak)
+        if (s === undefined) this.deep.set(ak, s = new Set())
+        s.add(k)
+      }
     //! THE SWEEP: this write won its cell, so every field cell UNDER it stamped at or below it is an
     // older fact it carried or erased — out of state, the entry hash and the rolling hash, exactly like
     // a remove; its version becomes this stamp (a tombstone, so a late copy of the swept record loses
-    // for free). No remove goes downstream for a swept cell: this record's apply carries the whole
-    // value. A descendant stamped ABOVE this write stays, and is re-applied downstream on top of this
-    // value once it has landed — the projection must read the same as if it had arrived after. Only a
-    // partition with field cells deeper than this write can have anything to sweep.
+    // for free) and it leaves the index. No remove goes downstream for a swept cell: this record's
+    // apply carries the whole value. A descendant stamped ABOVE this write stays, and is re-applied
+    // downstream on top of this value once it has landed — a live field set again, a field REMOVE
+    // deleted again — so the projection reads the same as if it had arrived after. One lookup finds
+    // exactly this write's subtree; a partition with nothing under this path pays that lookup only.
     let survivors: string[] | null = null
-    if (under !== undefined && depth < under.max) {
-      const pfx = depth > 1 ? k.slice(0, -1) + ',' : null
-      for (const c of under.cells) {
-        if (pfx !== null && !c.startsWith(pfx)) continue
+    const kids = this.deep.get(k)
+    if (kids !== undefined) {
+      for (const c of kids) { // unlink deletes c from this very set mid-walk — a Set tolerates that
         const vc = this.versions.get(c)!
         if (newer(vc.epoch, vc.seq, vc.origin, stamp)) { (survivors ??= []).push(c); continue }
-        this.#hash = (this.#hash - this.#entryHash.get(c)!) | 0
-        this.#entryHash.delete(c)
-        this.state.delete(c)
-        under.cells.delete(c)
+        if (this.state.delete(c)) {
+          this.#hash = (this.#hash - this.#entryHash.get(c)!) | 0
+          this.#entryHash.delete(c)
+          this.journal.armed && this.journal.emit(JK.subsumed, vc.origin, vc.seq, 1)
+        }
         this.versions.set(c, stamp)
-        this.journal.armed && this.journal.emit(JK.subsumed, vc.origin, vc.seq, 1)
+        this.unlink(c)
       }
-      if (under.cells.size === 0) this.deep.delete(p)
     }
     this.env.sink.apply({ type: rec.type, key: rec.key, value: rec.value, at: rec.at, origin, seq, epoch, iss, cid })
     if (survivors !== null) this.#reapply(survivors)
   }
 
-  //! #reapply — put live field cells back on top downstream, shallowest first, after a write ABOVE them
-  // (an older row write arriving late, a ghost row removed at a resync) replaced or erased the object
-  // they live in. Each goes out as its own record again (the log entry, so a keyed insert re-inserts;
-  // an update of the held value when the entry is gone) under its own stamp, with no attempt identity —
-  // this is a projection repair, not a commit, and the api's join must not mistake it for one.
+  //! #reapply — put field cells back on top downstream, shallowest first, after a write ABOVE them (an
+  // older row write arriving late, a ghost row removed at a resync) replaced or erased the object they
+  // live in. A live cell goes out as its own record again (the log entry, so a keyed insert re-inserts;
+  // an update of the held value when the entry is gone); a tombstone goes out as a remove, so the field
+  // the newer remove took is taken out of the late row's value too. Each rides its own stamp, with no
+  // attempt identity — this is a projection repair, not a commit, and the api's join must not mistake
+  // it for one.
   #reapply(cells: string[]) {
     const paths = cells.map((c) => JSON.parse(c) as string[])
     const order = paths.map((_, i) => i).sort((i, j) => paths[i].length - paths[j].length || (cells[i] < cells[j] ? -1 : 1))
     for (const i of order) {
       const c = cells[i]
       const v = this.versions.get(c)!
+      if (!this.state.has(c)) { this.env.sink.apply({ type: REC.remove, key: paths[i], origin: v.origin, seq: v.seq, epoch: v.epoch }); continue }
       const e = this.#entryAt(v.origin, v.seq)
       if (e !== null) this.env.sink.apply({ type: e.rec.type, key: e.rec.key, value: e.rec.value, at: e.rec.at, origin: v.origin, seq: v.seq, epoch: v.epoch })
       else this.env.sink.apply({ type: REC.update, key: paths[i], value: this.state.get(c), origin: v.origin, seq: v.seq, epoch: v.epoch })
     }
   }
+
+  //! unlink — take a cell out of the deep index (every ancestor's set; an emptied set leaves the map).
+  // Called where a field cell stops being an independent fact: swept by a parent write, dropped by a
+  // shed, or released by tombstone GC. A cold path when the cell is not indexed: a depth-1 key is
+  // never indexed, and with no field cells at all nothing is parsed.
+  unlink(k: string) {
+    if (this.deep.size === 0) return
+    const path = JSON.parse(k) as string[]
+    for (let d = 1; d < path.length; d++) {
+      const ak = JSON.stringify(path.slice(0, d))
+      const s = this.deep.get(ak)
+      if (s !== undefined && s.delete(k) && s.size === 0) this.deep.delete(ak)
+    }
+  }
+
+  //! fenced — is this tombstone one a LIVE ancestor still needs? A field remove stamped above its row
+  // took one field out of a row that is still there: the remove must stay the winner of its cell, so
+  // compaction keeps its entry and a late joiner folds the same row (kernel/log.ts gcTombstones asks).
+  // A tombstone a parent write swept is no longer indexed and goes with the rest.
+  fenced(k: string): boolean {
+    if (this.deep.size === 0) return false
+    const path = JSON.parse(k) as string[]
+    if (path.length < 2 || !this.deep.get(JSON.stringify([path[0]]))?.has(k)) return false
+    for (let d = 1; d < path.length; d++) if (this.state.has(JSON.stringify(path.slice(0, d)))) return true
+    return false
+  }
+
+  //! fields — every indexed cell of partition p (live fields and fenced tombstones), as a copy.
+  fields(p: string): string[] { return [...(this.deep.get(JSON.stringify([p])) ?? [])] }
 
   //! #entryAt — the log entry stamped (origin, seq), by binary search (lanes are seq-ascending); null
   // when the lane is gone (shed, condemned) or the entry is not there.
@@ -1655,13 +1698,12 @@ export class Node {
     return null
   }
 
-  //! #under — the live field cells strictly below `path` (its descendants), from the deep index.
-  #under(path: string[]): string[] {
-    const e = this.deep.get(path[0])
-    if (e === undefined || path.length >= e.max) return []
-    const pfx = path.length > 1 ? JSON.stringify(path).slice(0, -1) + ',' : null
+  //! #under — the LIVE field cells strictly below the cell `k` (its descendants), from the deep index.
+  #under(k: string): string[] {
+    const kids = this.deep.get(k)
+    if (kids === undefined) return []
     const out: string[] = []
-    for (const c of e.cells) if (pfx === null || c.startsWith(pfx)) out.push(c)
+    for (const c of kids) if (this.state.has(c)) out.push(c)
     return out
   }
 
@@ -1674,13 +1716,8 @@ export class Node {
   dropCell(k: string) {
     const old = this.#entryHash.get(k)
     if (old !== undefined) { this.#hash = (this.#hash - old) | 0; this.#entryHash.delete(k) }
-    if (!this.state.delete(k)) return
-    //! the deep index follows state (V4-18); a cold path, so the key is parsed rather than scanned
-    const path = JSON.parse(k) as string[]
-    if (path.length > 1) {
-      const e = this.deep.get(path[0])
-      if (e !== undefined && e.cells.delete(k) && e.cells.size === 0) this.deep.delete(path[0])
-    }
+    this.state.delete(k)
+    this.unlink(k) // the deep index follows (V4-18): a dropped field, live or tombstone, is no fact here any more
   }
 
   //! admitted — identified peer uuids (harness predicate: cluster formed ⇔ everyone admits everyone).

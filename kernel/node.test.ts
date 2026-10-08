@@ -653,9 +653,44 @@ test('overlapping cells (V4-18): a newer stamp wins across depth — both arriva
     assert.deepEqual(cells(h.node), { '["g","stock"]': 9 })
     assert.deepEqual(project(h.effects), { g: { stock: 9 } })
   }
+  //! (e) a field REMOVE newer than the row takes that one field out of the row — in both orders. The
+  // remove is a tombstone, not a live cell: arriving first, it must be found again when the older row
+  // lands and be re-applied on top of it (the row's value still carries the field)
+  const drop = (seq: number) => ({ seq, origin: 'cc', rec: { type: REC.remove, key: ['g', 'stock'] } })
+  for (const h of bothOrders(row(5, { stock: 3, name: 'n' }), drop(7))) {
+    assert.deepEqual(cells(h.node), { '["g"]': { stock: 3, name: 'n' } })
+    assert.deepEqual(project(h.effects), { g: { name: 'n' } })
+    assert.deepEqual(h.node.fields('g'), ['["g","stock"]'], 'the tombstone stays indexed above its live row')
+  }
+  //! (f) a field remove OLDER than the row is hidden by it, in both orders, and leaves the index
+  for (const h of bothOrders(row(7, { stock: 3 }), drop(5))) {
+    assert.deepEqual(cells(h.node), { '["g"]': { stock: 3 } })
+    assert.deepEqual(project(h.effects), { g: { stock: 3 } })
+    assert.deepEqual(h.node.fields('g'), [])
+  }
   //! the two orders hash identically — the sweep maintains the rolling hash exactly like a remove
   const [x, y] = bothOrders(row(7, { stock: 3 }), leaf(5, 9))
   assert.equal(x.node.stateHash, y.node.stateHash)
+})
+
+test('overlapping cells (V4-18): a field remove above its row rides out a late older row, and a row write above it releases it', () => {
+  const h = fed([
+    { seq: 7, origin: 'cc', rec: { type: REC.remove, key: ['g', 'a'] } },
+    { seq: 5, origin: 'bb', rec: { type: REC.update, key: ['g'], value: { a: 1, b: 2 } } },
+  ])
+  const ka = JSON.stringify(['g', 'a']), kg = JSON.stringify(['g'])
+  assert.deepEqual(project(h.effects), { g: { b: 2 } })
+  assert.deepEqual(h.node.versions.get(ka), { epoch: 0, seq: 7, origin: 'cc' }, 'the remove is still the winner of its cell')
+  //! a late field write between the two stamps loses to the tombstone, not to the row
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeFrame([{ type: REC.update, key: ['g', 'a'], value: 3 }], { origin: 'dd', baseSeq: 6, epoch: 0 }) })
+  assert.deepEqual(project(h.effects), { g: { b: 2 } })
+  //! a row write ABOVE the remove carries the whole row again: the tombstone is swept (its version becomes
+  // the row's stamp, it leaves the index) and the field shows
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeFrame([{ type: REC.update, key: ['g'], value: { a: 4 } }], { origin: 'bb', baseSeq: 9, epoch: 0 }) })
+  assert.deepEqual(project(h.effects), { g: { a: 4 } })
+  assert.deepEqual(h.node.versions.get(ka), h.node.versions.get(kg))
+  assert.deepEqual(h.node.fields('g'), [])
+  assert.equal(h.node.deep.size, 0, 'no empty set is left behind')
 })
 
 test('overlapping cells (V4-18): ancestors at EVERY depth — a three-level history folds the same in all six orders', () => {

@@ -48,6 +48,24 @@ test('the probe: a row write newer than a field write, each on its own lane at g
   }
 })
 
+test('the probe with a REMOVE: a field remove newer than a row write — every node shows the row without that field, whichever arrived first', () => {
+  const sim = new Sim(1801)
+  const nodes = cluster(sim, 3)
+  //! n01's row reaches n02 at once and n03 late; n02's remove (stamped after it saw the row: newer) reaches
+  // n03 first. So n01 and n02 fold row-then-remove, n03 folds remove-then-row.
+  sim.fault('n01', 'n03', { delay: [60, 61] })
+  sim.fault('n02', 'n03', { delay: [1, 2] })
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['g'], value: { a: 1, b: 2 } }] }, 1)
+  sim.post('n02', { kind: 'write', recs: [{ type: REC.remove, key: ['g', 'a'] }] }, 30)
+  sim.run()
+  assert.ok(formed(nodes) && sim.quiesced)
+  assert.equal(converged(sim), null)
+  for (const n of nodes) {
+    assert.deepEqual(n.state.get(key('g')), { a: 1, b: 2 }, `${n.uuid} holds the row cell whole`)
+    assert.deepEqual(sim.folds.get(n.uuid), { g: { b: 2 } }, `${n.uuid}'s screen shows the row without the removed field`)
+  }
+})
+
 test('the sweep: 120 seeds of mixed row/field/remove writes racing formation under delay, duplication and a partition window — one object everywhere', () => {
   const failures: string[] = []
   for (let seed = 0; seed < 120; seed++) {

@@ -9,7 +9,8 @@
 
 import { Node, stable, newer } from '../kernel/node.ts'
 import { SCOPE } from '../kernel/scope.ts'
-import { partitionOf } from '../kernel/env.ts'
+import { partitionOf, REC } from '../kernel/env.ts'
+import { foldInto, type Folded } from './fold.ts'
 import type { Sim } from './exec.ts'
 
 //! perEvent — invariants that must hold at every instant, checked after every event.
@@ -368,60 +369,57 @@ export const converged = (sim: Sim): string | null => {
 
 //! projected — the OBJECT oracle (V4-18, overlapping cells). The cell map agreeing is not enough: a
 // whole-row write and a field write on one row are two cells, and what a screen shows is their fold
-// by depth. Two claims, per node: (1) no live field cell sits at or below an ancestor's stamp (the
-// kernel's across-depth rule — a violation means apply let an older field survive a newer row, and
-// the projection then depends on arrival order); (2) the fold of the cells into one object — a row
-// cell replaces the row, a field cell lands inside it (vivifying an absent row, as the api does) —
-// is the same on every node. With identical cell maps (2) follows from (1) and a deterministic fold;
-// it is checked anyway so the oracle says the thing the user cares about, in the shape they see it.
+// by depth. Per node: (1) every indexed field cell — live, or the tombstone a field remove left — is
+// stamped strictly above every ancestor's version (the kernel's across-depth rule; a violation means
+// an older field survived a newer row, and the projection then depends on arrival order); (2) the
+// index holds every live field cell, under every ancestor, with no empty set; (3) the object that
+// REACHED THE SINK (sim/exec.ts folds, record by record — the downstream half) equals the fold of the
+// kernel's cells by depth (live cells set, fenced tombstones deleted) — so a sweep, a re-apply or a
+// resync that left the screen different from the kernel is caught here, not by a reader. Across
+// nodes: one object everywhere.
 export const projected = (sim: Sim): string | null => {
   let ref: string | null = null, refId = ''
   for (const [id, n] of sim.nodes) {
-    let fields = 0
-    for (const c of n.state.keys()) {
+    const indexed = new Set<string>()
+    for (const [a, s] of n.deep) {
+      if (s.size === 0) return `${id}: the deep index holds an empty set under ${a}`
+      for (const c of s) {
+        indexed.add(c)
+        if (!c.startsWith(a.slice(0, -1) + ',')) return `${id}: deep index of ${a} holds ${c}, which is not under it`
+        if (!n.versions.has(c)) return `${id}: deep index of ${a} holds ${c}, which has no version`
+      }
+    }
+    for (const c of n.state.keys()) if (!indexed.has(c) && (JSON.parse(c) as string[]).length > 1) return `${id}: live field ${c} is missing from the deep index`
+    const cells: [string, string[]][] = []
+    for (const c of indexed) {
       const path = JSON.parse(c) as string[]
-      if (path.length < 2) continue
-      fields++
       const vc = n.versions.get(c)!
       for (let d = 1; d < path.length; d++) {
         const a = JSON.stringify(path.slice(0, d))
+        if (!n.deep.get(a)?.has(c)) return `${id}: field ${c} is not indexed under its ancestor ${a}`
         const va = n.versions.get(a)
         if (va !== undefined && !newer(vc.epoch, vc.seq, vc.origin, va))
-          return `${id}: field ${c} @${vc.epoch}/${vc.seq}/${vc.origin} is live under ${a} @${va.epoch}/${va.seq}/${va.origin} — an older field survived a newer row`
+          return `${id}: ${n.state.has(c) ? 'field' : 'field remove'} ${c} @${vc.epoch}/${vc.seq}/${vc.origin} is ${n.state.has(c) ? 'live' : 'indexed'} under ${a} @${va.epoch}/${va.seq}/${va.origin} — an older field survived a newer row`
       }
-      if (!n.deep.get(path[0])?.cells.has(c)) return `${id}: live field ${c} is missing from the deep index`
+      cells.push([c, path])
     }
-    //! the index holds exactly the live field cells (the sweep and shed walk it instead of state)
-    let indexed = 0
-    for (const [p, e] of n.deep)
-      for (const c of e.cells) {
-        indexed++
-        if (!n.state.has(c) || !c.startsWith('[' + JSON.stringify(p) + ',')) return `${id}: deep index of '${p}' holds ${c}, state ${n.state.has(c) ? 'does too' : 'does not'}`
-      }
-    if (indexed !== fields) return `${id}: deep index holds ${indexed} cells, state holds ${fields} field cells`
-    const s = stable(foldByDepth(n.state))
-    if (ref === null) { ref = s; refId = id } else if (s !== ref) return `${refId} vs ${id}: the projected objects differ (${ref.length > 200 ? ref.slice(0, 200) + '…' : ref} vs ${s.length > 200 ? s.slice(0, 200) + '…' : s})`
+    for (const c of n.state.keys()) if (!indexed.has(c)) cells.push([c, JSON.parse(c) as string[]])
+    //! the fold by depth: rows first, then each deeper cell inside — a live cell set, a tombstone deleted
+    cells.sort((x, y) => x[1].length - y[1].length || (x[0] < y[0] ? -1 : 1))
+    const byDepth: Folded = {}
+    for (const [c, path] of cells) foldInto(byDepth, n.state.has(c) ? { type: REC.update, key: path, value: n.state.get(c) } : { type: REC.remove, key: path })
+    const s = stable(byDepth)
+    const sunk = sim.folds.get(id)
+    if (sunk !== undefined) {
+      const t = stable(sunk)
+      if (t !== s) return `${id}: the object that reached the sink differs from the kernel's cells folded by depth (${clip(t)} vs ${clip(s)})`
+    }
+    if (ref === null) { ref = s; refId = id } else if (s !== ref) return `${refId} vs ${id}: the projected objects differ (${clip(ref)} vs ${clip(s)})`
   }
   return null
 }
 
-//! foldByDepth — the cells as one object: shallow cells first, deeper cells inside them. Every object
-// walked into is copied first, so the fold never writes into a value the kernel's state still holds.
-const foldByDepth = (state: Map<string, unknown>): Record<string, unknown> => {
-  const plain = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array)
-  const keys = [...state.keys()].map((k) => [k, JSON.parse(k) as string[]] as const).sort((a, b) => a[1].length - b[1].length || (a[0] < b[0] ? -1 : 1))
-  const root: Record<string, unknown> = {}
-  for (const [k, path] of keys) {
-    let o = root
-    for (let i = 0; i < path.length - 1; i++) {
-      const v = o[path[i]]
-      o[path[i]] = plain(v) ? { ...v } : {}
-      o = o[path[i]] as Record<string, unknown>
-    }
-    o[path[path.length - 1]] = state.get(k)
-  }
-  return root
-}
+const clip = (s: string) => (s.length > 200 ? s.slice(0, 200) + '…' : s)
 
 //! confirmedIntact — the no-confirmed-write-lost check (plan §6): every probe the ladder answered OK
 // names a record whose effect must survive — at every live node it is either still IN the log, or the

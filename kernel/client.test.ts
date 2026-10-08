@@ -202,6 +202,62 @@ test("a spoke never teaches — and a spoke AHEAD of its feeder resyncs to the f
   assert.deepEqual(d[d.length - 1], { d: { bb: 1 }, r: 0 })
 })
 
+//! V4-18 (overlapping cells) at a resync: what the re-download folds downstream, as an object
+const resyncing = () => {
+  const h = harness('cl', { client: true, hosts: ['sim:aa'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'aa')
+  h.digestFrom(1)
+  const lane = (origin: string, seq: number, rec: Rec) => encodeRuns([{ rec, origin, seq, epoch: 1 }])[0]
+  const folded = () => {
+    const root: Record<string, unknown> = {}
+    for (const e of h.of('apply')) {
+      const r = e[1] as Rec
+      let o = root
+      for (let i = 0; i < r.key.length - 1; i++) {
+        if (typeof o[r.key[i]] !== 'object' || o[r.key[i]] === null) o[r.key[i]] = {}
+        o = o[r.key[i]] as Record<string, unknown>
+      }
+      if (r.type === REC.remove) delete o[r.key[r.key.length - 1]]
+      else o[r.key[r.key.length - 1]] = structuredClone(r.value)
+    }
+    return root
+  }
+  return { ...h, lane, folded }
+}
+
+test('V4-18 resync — a ghost FIELD under a row the re-download brought back (a row the spoke never held) is covered by that row: no remove tears the field out', () => {
+  const h = resyncing()
+  //! the spoke holds only a field, from lane xx; its feeder says xx is at tail 0: ahead → resync
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: h.lane('xx', 1, { type: REC.update, key: ['g', 'a'], value: 5 }) })
+  assert.deepEqual(h.folded(), { g: { a: 5 } })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { xx: 0 }, r: 1 }) })
+  assert.notEqual(h.node.resync, null)
+  //! the re-download brings the WHOLE row from another lane, nothing on xx, then r=0
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: h.lane('bb', 1, { type: REC.update, key: ['g'], value: { a: 1, b: 2 } }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1 }, r: 0 }) })
+  assert.equal(h.node.resync, null)
+  assert.deepEqual([...h.node.state], [[JSON.stringify(['g']), { a: 1, b: 2 }]])
+  assert.deepEqual(h.folded(), { g: { a: 1, b: 2 } }, 'the row is the truth — the stale field was not removed from it')
+  assert.deepEqual(h.jk(JK.resynced).map((e) => e.a), [0], 'no ghost: the row covered it')
+})
+
+test('V4-18 resync — a ghost ROW whose newer field came back: the row is removed downstream and the field is put back on top', () => {
+  const h = resyncing()
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: h.lane('bb', 1, { type: REC.update, key: ['g'], value: { a: 1, b: 2 } }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: h.lane('xx', 1, { type: REC.update, key: ['g', 'a'], value: 9 }) }) // xx > bb at seq 1: newer
+  assert.deepEqual(h.folded(), { g: { a: 9, b: 2 } })
+  //! the feeder lost lane bb: ahead → resync; the re-download returns only lane xx
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { bb: 0, xx: 1 }, r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: h.lane('xx', 1, { type: REC.update, key: ['g', 'a'], value: 9 }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: { xx: 1 }, r: 0 }) })
+  assert.deepEqual([...h.node.state], [[JSON.stringify(['g', 'a']), 9]])
+  assert.deepEqual(h.jk(JK.resynced).map((e) => e.a), [1], 'the row is the one ghost')
+  const tail = h.of('apply').slice(-2).map((e) => { const r = e[1] as Rec; return [r.type, r.key] })
+  assert.deepEqual(tail, [[REC.remove, ['g']], [REC.update, ['g', 'a']]], 'the ghost remove, then the field re-applied')
+  assert.deepEqual(h.folded(), { g: { a: 9 } }, 'the screen shows the field the kernel holds')
+})
+
 test('a server drops VIEW/JOIN/PROPOSE/VOTE/LEAVE arriving on a CLIENT link — a spoke never teaches membership: frame dropped, link kept, view untouched; its PULL is still answered', () => {
   const h = harness('aa', { hosts: ['sim:bb'] })
   h.node.step({ kind: 'start' })
