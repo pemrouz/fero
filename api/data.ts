@@ -47,8 +47,22 @@ export type Issued = (Promise<Coords> | string)[]
 
 //! Refused — the rejection a validator-refused write leaves in a HANDLER's collector (V4-5): the Host's
 // flush-on-return fails the call with it. `refused: true` is the discriminant against the kernel's
-// string outcomes ('superseded' | 'dropped' | 'destroyed'), which stay swallowed there.
+// string outcomes ('superseded' | 'dropped' | 'destroyed'), which reach settle as bare strings.
 export interface Refused { refused: true; key: string; reason: string }
+
+//! ASSIGNED — the coordinate promises of ASSIGNMENTS (the lens path) made inside a handler, with their
+// record. issue() puts every write's promise in the handler's collector; an assignment has no await
+// surface, so a kernel outcome on it ('dropped' | 'superseded' | 'destroyed', or an owner's refusal) is
+// one the handler never saw — flush-on-return fails the call with it (api/methods.ts settle). A methods.*
+// write is NOT here: its caller gets the typed reject and decides (a handler that catches it and
+// recovers must not be overridden at flush — V4-5's double-report rule). Weak: an entry lives as long as
+// the promise; one set per assignment inside a handler, nothing outside one.
+const ASSIGNED = new WeakMap<Promise<Coords>, Rec>()
+//! lostAssignment — the cell and outcome when `p` is an assignment the node did not commit, else null
+export const lostAssignment = (p: Promise<Coords>, why: unknown): { key: string; outcome: string } | null => {
+  const rec = ASSIGNED.get(p)
+  return rec !== undefined && typeof why === 'string' ? { key: cellOf(rec), outcome: why } : null
+}
 
 //! Pending — one unsettled write: its cell, the cid the kernel minted (or will mint) for it, and the
 // coordinate promise's settlers.
@@ -289,7 +303,11 @@ export class Bind {
     const t = this.#tracked?.()
     for (let i = 0; i < out.length; i++) {
       const r = out[i]
-      if (typeof r !== 'string') { (r as Promise<Coords>).catch(() => {}); continue }
+      if (typeof r !== 'string') {
+        (r as Promise<Coords>).catch(() => {})
+        if (t) ASSIGNED.set(r as Promise<Coords>, recs[i]) // the same promise issue() put in the collector
+        continue
+      }
       //! a refused ASSIGNMENT inside a HANDLER is not allowed to be silent (V4-5): a reply that claims an
       // effect that never happened is §9's banned silent partial, and under `methods:` the handler is the
       // client's only door. The lens path has no await surface of its own, so the refusal is left in the

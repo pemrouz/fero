@@ -39,18 +39,28 @@ import { VERB } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, isProxy, mark, proxy, records, snapshot } from './substrate.ts'
-import type { Coords, Refused } from './data.ts'
+import { lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 
 //! settle — flush-on-return's wait (V4-5): every tracked write reaches an outcome; a write the validator
 // REFUSED (api/data.ts Refused) fails the handler with the reason — a reply that claims an effect that
 // never happened is §9's banned silent partial, and under `methods:` the handler is the client's only
-// door. The kernel's own string outcomes ('superseded' | 'dropped' | 'destroyed') stay swallowed here,
-// as before — whether they should fail the call too is a separate decision (retry semantics).
+// door. The same rule for a KERNEL outcome (the reply is true): an assignment the node did not commit —
+// dropped at queue overflow, superseded, the node destroyed — fails the call with `write <outcome>`, and
+// one an owner refused with `write refused`. Only ASSIGNMENTS (api/data.ts lostAssignment): a handler's
+// own awaited methods.* write already told it, and its recovery stands.
+const OUTCOMES = new Set(['dropped', 'superseded', 'destroyed', 'not-applied'])
 const settle = async (tracked: Promise<Coords>[]): Promise<void> => {
-  for (const r of await Promise.allSettled(tracked))
-    if (r.status === 'rejected' && (r.reason as Refused | null)?.refused === true)
+  const out = await Promise.allSettled(tracked)
+  for (let i = 0; i < out.length; i++) {
+    const r = out[i]
+    if (r.status !== 'rejected') continue
+    if ((r.reason as Refused | null)?.refused === true)
       throw new Error(`write refused (${(r.reason as Refused).key}): ${(r.reason as Refused).reason}`)
+    const lost = lostAssignment(tracked[i], r.reason)
+    if (lost !== null)
+      throw new Error(OUTCOMES.has(lost.outcome) ? `write ${lost.outcome} (${lost.key})` : `write refused (${lost.key}): ${lost.outcome}`)
+  }
 }
 
 //! SYSTEM — the reserved method-name prefix (unreachable from fero() opts: the composer rejects it):

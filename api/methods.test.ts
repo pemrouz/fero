@@ -396,3 +396,29 @@ test("the subscribe leg is LOUD: a handler that throws on SUB rejects `ready`, t
     await c.destroy(); await a.destroy().catch(() => {}); await b.destroy().catch(() => {})
   }
 })
+
+test("a kernel outcome fails the call (the reply is true): an ASSIGNMENT in a handler that the node never commits rejects the call with `write destroyed`; a handler that awaited its own methods.update and caught the loss keeps its recovery", async () => {
+  let self: any = null
+  const { a, b } = await pair({
+    put: (_: unknown, ctx: { data: any }) => { ctx.data.parked = 1; return 'ok' },
+    careful: async () => {
+      try { await self.methods.update({ key: 'parked2', value: 1 }); return 'landed' } catch { return 'recovered' }
+    },
+  })
+  self = a
+  try {
+    //! crash bb (no leave): {aa} is a minority, the gate closes and every write parks — never committed
+    await diag(b)!.crash!()
+    assert.ok(await until(() => (snapshot(a.cluster) as { writable: boolean }).writable === false, 10_000), 'gate closed (minority)')
+    const put = a.methods.put(); put.catch(() => {})
+    const careful = a.methods.careful(); careful.catch(() => {})
+    await sleep(200)
+    //! the node goes away with both writes parked: each write's promise rejects 'destroyed'. Before: settle
+    // swallowed every kernel outcome, so `put` resolved 'ok' for a write that never happened
+    await a.destroy()
+    await assert.rejects(put, /write destroyed \(\["parked"\]\)/)
+    assert.equal(await careful, 'recovered', 'the handler saw the loss itself and decided — not overridden at flush')
+  } finally {
+    await a.destroy().catch(() => {}); await b.destroy().catch(() => {})
+  }
+})
