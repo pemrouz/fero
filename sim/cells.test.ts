@@ -67,9 +67,10 @@ test('the probe with a REMOVE: a field remove newer than a row write — every n
 })
 
 test('the probe with a NON-OBJECT row: a field written into a number, a null, a string or an ARRAY and then removed — every node shows the value again, whichever order the three arrived in', () => {
-  //! an array is the one value the projection does NOT make `{}` up over: data ignores a field write
-  // under an array (and the substrate folds a remove under one as the no-op it is), so the sim's fold
-  // models the same — the array stays whole on every node
+  //! an array is the one value the projection does NOT make `{}` up over: data writes the field INTO
+  // the array (a non-index key becomes a hidden array property). The sim's fold models an array as a
+  // whole value and ignores what lands under it (sim/fold.ts), so this checks the kernel's re-emit and
+  // the convergence of the cells, not data's array behaviour — arrays are the guarantee's limit
   for (const v of [5, null, 'txt', [], [1]]) {
     const sim = new Sim(1801)
     const nodes = cluster(sim, 3)
@@ -106,9 +107,11 @@ const cellsPlan = (rng: () => number, uuids: string[], count: number): { at: num
   return out
 }
 
-test('the probe with an ARRAY row and a live sibling field: the fold ignores what lands under an array, like data — the array stays whole on every node', () => {
+test('the probe with an ARRAY row and a live sibling field: the sim\'s fold models an array as a whole value — every node folds the same array', () => {
   //! n01's g.c lands under the array too: with a live sibling the kernel re-emits nothing after the
-  // remove, so only the fold's own rule decides — a model that made `{}` up over the array showed {g:{c:2}}
+  // remove, so only the fold's own rule decides — a model that made `{}` up over the array showed {g:{c:2}}.
+  // On data's real lane g.c and g.b are hidden array properties, and the screen is NOT promised to agree
+  // across arrival orders — the array limit
   const sim = new Sim(1802)
   const nodes = cluster(sim, 3)
   sim.fault('n02', 'n01', { delay: [120, 121] })

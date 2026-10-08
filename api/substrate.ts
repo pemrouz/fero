@@ -101,12 +101,14 @@ export const applyRec = (p: any, r: Rec): void => {
         if (rejects.length > 0) throw rejects[0].error
         return
       }
-      //! a REMOVE under an ARRAY (V4-18): data refuses to leave a sparse hole in an array ("write the
-      // spliced array instead") — and it silently ignores a field WRITE under one, so a field cell
-      // under an array-valued row never shows. A committed remove there is the same non-event: the
-      // array stays whole, exactly as on a node that never saw the field. Throwing here killed the
-      // process (the I-30 class) in the arrival orders where a newer field was re-applied over an
-      // older array row; a replicated record cannot be refused, so the no-op is the only honest fold.
+      //! a REMOVE of an ARRAY's own key (V4-18): data refuses to leave a sparse hole ("write the spliced
+      // array instead"). Data does write under an array — an index write replaces the element, a field
+      // inside an element lands, a non-index key becomes a hidden array property — so this remove is
+      // the one record under an array it will not fold. Throwing here killed the process (the I-30
+      // class) in the arrival orders where a newer field was re-applied over an older array row; a
+      // REPLICATED record cannot be refused, so it folds as a no-op and the element stays. That is part
+      // of the array limit: an array row's screen can still differ by arrival order. A LOCAL delete of
+      // an element never gets here — the lens refuses it before it commits (`hole` below).
       if (r.type === REC.remove && r.key.length > 1 && msg.includes('array element')) return
       throw rj.error
     }

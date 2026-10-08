@@ -597,11 +597,13 @@ test('stateHash is order-insensitive and remove-aware — identical states hash 
 // write newer than T shows on top. Both arrival orders must give the same cells AND the same object.
 // `project` folds the apply effects the way the api's lane does (replace at the path, delete at the
 // path, a deep write under an absent or non-object row vivifies `{}` there, a remove under one is a
-// no-op; under an ARRAY a deep write is ignored and a deep remove is a no-op — but a remove of an
-// array's own element can THROW in data (it refuses a sparse hole), so a REPAIR the kernel makes up
-// there (seq 0) is modelled as the crash out of step() it is; a user's own record removing an array
-// element is the pre-existing data hazard the kernel does not own, modelled as the no-op) — the
-// object a screen would show. Probed against data's lane.
+// no-op) — the object a screen would show, for OBJECT rows and scalars. Probed against data's lane.
+// ARRAYS are modelled, not mirrored: here a deep write and a deep remove under an array are ignored,
+// where data writes into an array (an index write replaces the element, a field inside an element
+// lands, a non-index key becomes a hidden array property) and refuses only a remove of the array's own
+// key (a sparse hole). So a REPAIR the kernel makes up directly under an array (seq 0) is modelled as
+// the crash it would be without the substrate's no-op; a user's own record removing an array element
+// is modelled as that no-op. What lands under an array is the guarantee's limit, not checked here.
 const project = (effects: unknown[][]): Record<string, unknown> => {
   const root: Record<string, unknown> = {}
   for (const e of effects) {
@@ -782,10 +784,11 @@ test('overlapping cells (V4-18): a field written INTO a non-object value and the
     const h = fed(o)
     assert.deepEqual(project(h.effects), { g: { c: 2 } }, `depth 3, order ${o.map((r) => r.seq).join(',')}`)
   }
-  //! an ARRAY row: data's lane ignores a field write under an array and a remove of an array's element
-  // THROWS there — so the kernel must make up NO repair under one. The reviewer's history: before this
-  // the un-vivify emitted `remove ['g','a']` at seq 0 after the field remove, and data threw out of
-  // node.step() in the orders where the array was live (the base tree never threw in these orders).
+  //! an ARRAY row: data writes the field into the array (g.a becomes a hidden array property), and a
+  // remove of an array's own key THROWS there (a sparse hole) — so the kernel must make up no per-level
+  // repair under one. The reviewer's history: before this the un-vivify emitted `remove ['g','a']` at
+  // seq 0 after the field remove, and data threw out of node.step() in the orders where the array was
+  // live (the base tree never threw in these orders). The model ignores what lands under an array.
   for (const v of [[], [1], { a: [] }]) {
     for (const o of permutations([put(3, 'bb', ['g'], v), put(5, 'cc', ['g', 'a', 'y'], 5), cut(6, ['g', 'a', 'y'])])) {
       const h = fed(o)

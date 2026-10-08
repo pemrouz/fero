@@ -16,9 +16,12 @@ export type Folded = Record<string, unknown>
 const plain = (v: unknown): v is Folded => typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array)
 
 //! foldInto — apply one record to the folded object: set or delete at its path, vivifying the rows
-// above a field (the substrate's orphan-cell vivify); a remove under a row that is not there is a no-op;
-// under an ARRAY (or a typed array) a write and a remove are both ignored, as data's lane does (the
-// substrate turns data's refusal of an array-element remove into the same no-op).
+// above a field (the substrate's orphan-cell vivify); a remove under a row that is not there is a no-op.
+// Under an ARRAY (or a typed array) a write and a remove are both ignored. That is a MODEL, not what
+// data does: data writes into an array (an index write replaces the element, a field inside an element
+// lands, a non-index key becomes a hidden array property) and refuses only a remove of the array's own
+// key. The sim's oracle therefore says nothing about what lands under an array — the array limit of the
+// across-depth guarantee, which is for object rows (and numbers, null and strings).
 export const foldInto = (root: Folded, rec: { type: number; key: string[]; value?: unknown; at?: string }) => {
   const path = rec.key.length ? rec.key : [rec.at ?? '']
   let o = root
