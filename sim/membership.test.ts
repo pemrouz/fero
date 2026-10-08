@@ -275,6 +275,27 @@ test('a newcomer waiting for its JOIN ballot closes its gate as joining, never e
   assert.deepEqual(sim.violations, [])
 })
 
+//! one spelling for a clean leave. A leaver that is NOT the lowest live member sends LEAVE, and every
+// member journals leave(leaver). The lowest live member proposes the view without itself instead, so the
+// survivors saw only vote + viewInstall. They now journal leave(proposer) when a ballot leaves its own
+// proposer out — the same diary line either way.
+test('a leaver that proposes its own exit reads as leave(leaver) at every survivor, like a knocked leave', () => {
+  const sim = new Sim(62)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+  sim.run({ until: 400 })
+  assert.deepEqual(epochs(nodes), [1, 1, 1])
+  sim.post('n01', { kind: 'leave' }) // the lowest live member: it proposes {n02, n03} itself
+  sim.run({ until: 1500 })
+  assert.equal(sim.left.get('n01'), true)
+  for (const n of nodes.slice(1)) {
+    const j = n.journal.read()
+    assert.ok(j.some((e) => e.kind === JK.leave && e.a === 'n01'), `${n.uuid} journaled leave(n01)`)
+    assert.ok(!j.some((e) => e.kind === JK.leave && e.a !== 'n01'), `${n.uuid} names no one else`)
+    assert.deepEqual(members(n), ['n02', 'n03'])
+  }
+  assert.deepEqual(sim.violations, [])
+})
+
 test('graceful leave (V4-6), n=3 under writes: one member leaves mid-stream; the two survivors commit the shrunk view and keep converging; the monitors stay quiet', () => {
   const sim = new Sim(62)
   const nodes = cluster(sim, 3, { heartbeatMs: 50 })

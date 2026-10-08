@@ -374,6 +374,10 @@ export class Membership {
     const j = node.journal
     const proposer = link.uuid // authenticated by HELLO — never trust a frame field for identity
     const h = hashOf(v.m)
+    //! one spelling for a clean leave: a ballot that leaves its OWN proposer out is a leave (the lowest live
+    // leaver proposes its exit itself, see #knockLeave). Journal it as leave(proposer) — the row a knocked
+    // leave writes in onLeave — so a survivor's diary reads the same either way. Journal only.
+    if (!v.m.some((m) => m[0] === proposer)) j.armed && j.emit(JK.leave, proposer)
     //! the vote-once rule with same-proposer idempotency (see banner): unspent epoch, or re-grant to the
     // same proposer (his abandoned/re-offered ballots — at most one of HIS can commit; a rejoining node
     // may vote: voting is not writing). ANY epoch above the committed view is grantable — a ballot
