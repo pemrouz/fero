@@ -5,48 +5,44 @@ Terminal 1:
 ```
 $ cd examples/21-journal
 $ node server.ts
-pid 291441
+pid 225833
     0 start
-    1 writeLocal 1 291441
-    2 dial 127.0.0.1:38747
+    1 writeLocal 1 225833
+    2 dial 127.0.0.1:41757
     3 linkUp 1 1
     4 linkUp 2 0
-    5 identified 1 5ee562a9
+    5 identified 1 d977cc5f
     7 dupLink 2 1
     8 linkDown 2 close
-   10 aeShip 5ee562a9 1
-   12 applyInbound 5ee562a9 1
-   14 aeShip 5ee562a9 1
-   15 dupDrop 5ee562a9 1
-   18 propose 1 2
-   20 viewInstall 1 2
-   27 leave 5ee562a9
-   28 propose 2 1
-   29 evict 5ee562a9
-   30 viewInstall 2 1
-   31 linkDown 1 close
+    9 applyInbound d977cc5f 1
+   11 aeShip d977cc5f 1
+   14 propose 1 2
+   16 viewInstall 1 2
+   23 leave d977cc5f
+   24 propose 2 1
+   25 evict d977cc5f
+   26 viewInstall 2 1
+   27 linkDown 1 close
 ```
 
 Terminal 2, the same command — Ctrl-C it:
 
 ```
 $ node server.ts
-pid 291639
+pid 225910
     0 start
-    1 writeLocal 1 291639
-    2 dial 127.0.0.1:39527
+    1 writeLocal 1 225910
+    2 dial 127.0.0.1:42385
     3 linkUp 2 0
     4 linkUp 1 1
-    5 identified 1 533b75c5
-    7 dupLink 1 2
-    8 identified 2 533b75c5
-   11 aeShip 533b75c5 1
-   13 linkDown 1 close
-   14 applyInbound 533b75c5 1
-   16 aeShip 533b75c5 1
-   17 dupDrop 533b75c5 1
-   20 vote 1 1
-   21 viewInstall 1 2
+    5 identified 1 9bc02bcd
+    6 dupLink 1 2
+    7 identified 2 9bc02bcd
+    9 aeShip 9bc02bcd 1
+   11 linkDown 1 close
+   12 applyInbound 9bc02bcd 1
+   15 vote 1 1
+   16 viewInstall 1 2
 ^C
 ```
 
@@ -56,9 +52,9 @@ pid 291639
   heartbeat's three kinds (`ping`, `digestOut`, `digestIn`: three lines every 500 ms) are left out, which is
   why `t` skips.
 - Terminal 2 arrives: `dial`, `linkUp`, `identified` with its id. Both dialed at once, so one link is kept
-  (`dupLink`). Each ships the other the row it lacks (`aeShip`; `applyInbound` on the other side; the second
-  ship is a duplicate, `dupDrop`). A ballot (`propose`, `vote`) ends in `viewInstall 1 2`: epoch 1, two
-  members.
+  (`dupLink`). The copy with the lower id opens one digest exchange, and each ships the other the row it
+  lacks, once (`aeShip`; `applyInbound` on the other side). A ballot (`propose`, `vote`) ends in
+  `viewInstall 1 2`: epoch 1, two members.
 - Ctrl-C is a leave by vote: `leave` asks for the view without it (when the leaving copy has the lower id
   it proposes that view itself, and the survivor logs `vote 2 1` instead), `evict` and `viewInstall 2 1`
   grant it, and only then does the socket close: `linkDown 1 close`. The ring holds the last 4096 events;
