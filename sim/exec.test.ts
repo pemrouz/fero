@@ -30,6 +30,8 @@ test('same seed ⇒ identical trajectory (event count + per-event state-hash tra
 
 //! the frozen golden (the tune table, 2026-10-08): 20 sweep seeds pinned by event count and a hash of
 // the per-event state-hash trace, recorded on the tree BEFORE the kernel read its bounds from node.tune.
+// Re-recorded the same day for V4-18 (overlapping cells): every event count stayed, every trace hash
+// moved, because the state hash over a mixed history now follows the across-depth election.
 // The canary above proves a run equals itself; this proves a run equals the kernel of that day. A
 // deliberate trajectory change (a wire law, a new default) re-records these rows with a DECISIONS line.
 test('golden: 20 sweep seeds match the recorded event counts and trace hashes', () => {
@@ -44,10 +46,10 @@ test('golden: 20 sweep seeds match the recorded event counts and trace hashes', 
     return h.toString(16).padStart(8, '0')
   }
   const golden: [seed: number, events: number, trace: string][] = [
-    [0, 185, 'c80c5870'], [1, 213, '37943bf7'], [2, 222, 'edb7f020'], [3, 215, '604a0f42'], [4, 178, 'b69f22a8'],
-    [5, 220, '520c4210'], [6, 162, 'ddeb45e4'], [7, 219, '7c0d5821'], [8, 202, '6b8206de'], [9, 237, '9d73dc6d'],
-    [10, 247, '8f46e8a7'], [11, 270, 'c600881f'], [12, 182, '51ee18ca'], [13, 187, '46f79803'], [14, 168, '3fd3357e'],
-    [15, 241, 'b1e05360'], [16, 193, 'b71da040'], [17, 224, '93bdfa8c'], [18, 204, 'd4fe3ee7'], [19, 197, 'f6e7301c'],
+    [0, 185, '41066e03'], [1, 213, '8f707e3c'], [2, 222, '7d73d321'], [3, 215, '11309116'], [4, 178, 'dceb35f8'],
+    [5, 220, 'ced4fcaf'], [6, 162, '2406f5c8'], [7, 219, 'f9b53da4'], [8, 202, 'fbbd3c54'], [9, 237, 'bfbfdbb0'],
+    [10, 247, '101df47e'], [11, 270, 'cbca5fb3'], [12, 182, '73d7603e'], [13, 187, 'f46dd08c'], [14, 168, '5cd4dfa4'],
+    [15, 241, '183d893a'], [16, 193, 'f20c4cec'], [17, 224, '8871eab1'], [18, 204, 'e2aa438b'], [19, 197, 'db4d38a3'],
   ]
   const got = golden.map(([seed]) => {
     const b = sweepBuild(seed)(null)
