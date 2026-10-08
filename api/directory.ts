@@ -66,9 +66,10 @@ export const isAddr = (a: unknown, zero = false): a is string => {
 export const hostOf = (a: string): string => a.slice(0, a.lastIndexOf(':'))
 export const portOf = (a: string): string => a.slice(a.lastIndexOf(':') + 1)
 //! localish — a host spelling that reaches THIS box's loopback listeners: a loopback literal,
-// `localhost`, or a wildcard (a wildcard bind answers on 127.0.0.1 too)
+// `localhost` (in any case: host names are case-blind), or a wildcard (a wildcard bind answers on
+// 127.0.0.1 too)
 export const localish = (h: string): boolean =>
-  h === '' || h === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1' || h === '0.0.0.0' || h === '::' || h === '[::]'
+  h === '' || h.toLowerCase() === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1' || h === '0.0.0.0' || h === '::' || h === '[::]'
 //! sameSocket — would binding `listen` take the socket `rendezvous` dials? Same port, and a host that
 // lands on the same interface class (both localish, or the identical spelling). The compose-time
 // guard uses this so `0.0.0.0:3376` / `localhost:3376` / `[::]:3376` cannot squat the directory.
@@ -82,7 +83,7 @@ export const sameSocket = (listen: string, rendezvous: string): boolean =>
 
 //! loopbackHost — a host spelling that only THIS box can reach (a wildcard is not one: a socket bound
 // to 0.0.0.0 answers other boxes too)
-export const loopbackHost = (h: string): boolean => h === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1'
+export const loopbackHost = (h: string): boolean => h.toLowerCase() === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1'
 //! isBox — a bare host with no port: a DNS name or dotted IPv4 (labels of letters, digits and inner
 // hyphens), or a bracketed IPv6. An all-digit entry is refused: it is a port missing its host, and a
 // flag such as `--fero.heartbeat.ms` read off argv is not a host either.
@@ -90,8 +91,13 @@ const LABEL = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?'
 const NAME = new RegExp(`^${LABEL}(?:\\.${LABEL})*$`)
 export const isBox = (h: unknown): h is string =>
   typeof h === 'string' && ((NAME.test(h) && !/^\d+$/.test(h)) || /^\[[0-9A-Fa-f:.]+\]$/.test(h))
-//! canon — one spelling per loopback name, so 'localhost' and '127.0.0.1' read as one box
-const canon = (h: string): string => (h === 'localhost' ? '127.0.0.1' : h === '::1' ? '[::1]' : h)
+//! canon — one spelling per host a dial lands on, so 'localhost', 'LOCALHOST', '0.0.0.0' and '127.0.0.1'
+// read as one box: names are case-blind, and a wildcard dialed reaches loopback (a wildcard directory
+// answers there too). '[::1]' stays apart from '127.0.0.1': two sockets, not one.
+const canon = (h: string): string => {
+  const l = h.toLowerCase()
+  return l === 'localhost' || l === '0.0.0.0' ? '127.0.0.1' : l === '::1' || l === '::' || l === '[::]' ? '[::1]' : l
+}
 //! boxDirectory — the directory address a bare host names, at this instance's rendezvous port
 export const boxDirectory = (box: string, rendezvous: string): string => `${box}:${portOf(rendezvous)}`
 //! sameDirectory — two directory addresses that dial the same socket (same port, same host after canon)
