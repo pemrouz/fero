@@ -126,6 +126,34 @@ test("a feeder dies holding a record only it and its spoke had: the spoke fails 
   assert.deepEqual(sim.violations, [])
 })
 
+test("a spoke follows its feeder's write-gate (I-33): the feeder is cut off from the other members, its gate closes, and the spoke's feederOpen follows within a heartbeat or two; healed, it opens again", () => {
+  const sim = new Sim(76)
+  const members = cluster(sim, 3, { heartbeatMs: 50 })
+  const c = client(sim, 'zc1', members, { heartbeatMs: 50 })
+  sim.run({ until: 500 })
+  assert.equal(c.feederOpen, true, 'a writable member feeds the spoke')
+  const primary = [...c.links.values()].find((l) => l.id === c.primary)!.uuid
+  const feeder = members.find((m) => m.uuid === primary)!
+  const others = members.map((m) => m.uuid).filter((u) => u !== primary)
+  sim.at(10, () => { for (const o of others) sim.partition(primary, o) })
+  //! step in heartbeat-sized slices until the feeder's own gate has closed (its links to the others time out)
+  let closedAt = -1
+  for (let t = sim.now + 50; t <= 6000 && closedAt < 0; t += 50) {
+    sim.run({ until: t })
+    if (!feeder.membership.gate(feeder).open) closedAt = sim.now
+  }
+  assert.ok(closedAt > 0, "the cut-off feeder's gate closed (one of three is no majority)")
+  assert.equal(c.primary !== null && [...c.links.values()].find((l) => l.id === c.primary)!.uuid, primary, 'the spoke still hangs off the same feeder')
+  sim.run({ until: closedAt + 100 })
+  assert.equal(c.feederOpen, false, `the spoke knows within two heartbeats (closed at ${closedAt})`)
+  //! healed: the feeder rejoins, its gate opens, and the next digest says so
+  sim.at(0, () => { for (const o of others) sim.heal(primary, o) })
+  sim.run({ until: closedAt + 8000 })
+  assert.ok(feeder.membership.gate(feeder).open, 'the healed feeder is writable again')
+  assert.equal(c.primary !== null && c.feederOpen, true, 'and the spoke follows it back')
+  assert.deepEqual(sim.violations, [])
+})
+
 test('feeder failover mid-flight: the primary is partitioned away with attempts in the air — repark, re-relay, dedup; exactly-once', () => {
   const sim = new Sim(73)
   const members = cluster(sim, 3, { heartbeatMs: 50 })

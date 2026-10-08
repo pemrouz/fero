@@ -202,6 +202,9 @@ export interface ScopedError {
 // query and connect it like any resource.
 export interface ClusterShape {
   epoch: number
+  //! writable (I-33), by role. A member: its own write-gate is open (it is in the committed view and
+  // reaches a majority of it). A client: its feeder says its gate is open — read off the feeder's
+  // digests, so one heartbeat behind at worst; false with no feeder, or before the feeder has said.
   writable: boolean
   members: Record<string, string>
   peers: Record<string, Peer>

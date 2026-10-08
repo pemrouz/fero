@@ -347,6 +347,10 @@ export class Node {
   //! primary — the client's ONE feeder link id (null while unconnected). Kernel-internal to the client
   // role; the write drain targets it, digests flow only over it, failover re-elects on its linkDown.
   primary: number | null = null
+  //! feederOpen — the client's copy of its PRIMARY's write-gate, from the `w` its digests carry (I-33):
+  // null while unknown (no feeder, a fresh feeder that has not digested yet, or an older server that
+  // sends no `w`). One heartbeat behind the feeder at worst; the api's `cluster.writable` on a client.
+  feederOpen: boolean | null = null
 
   //! clientLinks — the admitted CLIENT links this node serves (maintained at HELLO/linkDown). The
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
@@ -652,6 +656,7 @@ export class Node {
         // the in-flight attempts so the write drain re-targets the new relay NOW, not at RETRY_TICKS.
         if (this.client && this.primary === e.link) {
           this.primary = null
+          this.feederOpen = null
           for (const l of this.links.values())
             if (l.state === LS.admitted && !l.dead) { this.primary = l.id; break }
           if (this.primary !== null) {
@@ -1321,7 +1326,7 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'digest-before-hello')
         }
-        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown> }
+        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown>; w?: number }
         if (typeof v?.d !== 'object' || v.d === null) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed digest')
           return
@@ -1360,6 +1365,8 @@ export class Node {
         // "Ahead of my feeder" is a TRUE signal on the single-feeder FIFO: at the instant a feeder builds a
         // digest, its tails cover everything it has ever shipped us (live tap-forwards included).
         if (this.client) {
+          //! the feeder's gate rides its digests to us (I-33): read it before anything can return
+          if (v.w === 1 || v.w === 0) this.feederOpen = v.w === 1
           if (this.resync === null) {
             for (const [origin, d] of this.streams)
               if (d.applied > (typeof v.d[origin] === 'number' ? (v.d[origin] as number) : 0)) return this.#resyncBegin(link)
@@ -1502,12 +1509,15 @@ export class Node {
   #sendDigest(link: Link, r: 0 | 1) {
     const d: Record<string, number> = {}
     for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
-    let body: { d: Record<string, number>; r: number; p?: Record<string, number> }
+    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number }
     if (this.durable) {
       const p: Record<string, number> = {}
       for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
       body = { d, r, p }
     } else body = { d, r }
+    //! toward a CLIENT, the digest also carries this node's write-gate (I-33): the client has no gate of
+    // its own, and a closed gate here parks its relayed writes. Member-to-member digests are unchanged.
+    if (link.client) body.w = this.membership.gate(this).open ? 1 : 0
     link.ship(encodeControl(VERB.DIGEST, body), this.env.sink, this.journal)
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }
