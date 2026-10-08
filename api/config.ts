@@ -64,6 +64,10 @@ const LEAVES = table<{ layers: string; why?: string; object?: true }>({
   'journal.cap': { layers: 'fcep' },
   replicas: { layers: 'fcep' },
   rendezvous: { layers: 'fcep' },
+  //! diag.allow — the DIAG channel's allowlist, name → bearer token (kernel NodeOpts.diag). An OBJECT
+  // value: `FERO_DIAG_ALLOW_OPS=tok` nests to { ops: 'tok' }. Never a flag: a secret on the command line
+  // is readable by every user on the box (`ps`), so the flag layer refuses it with its own message.
+  'diag.allow': { layers: 'cep', why: 'a secret never rides the command line', object: true },
   data: { layers: 'cp', why: 'an object of rows', object: true },
   methods: { layers: 'c', why: 'functions — and the door: it closes a resource from the source line that hosts it' },
   validation: { layers: 'c', why: 'a function' },
@@ -74,7 +78,7 @@ const LEAVES = table<{ layers: string; why?: string; object?: true }>({
 })
 const LEAF_KEYS = Object.keys(LEAVES)
 //! GROUPS — the object-valued declared keys (a group holds leaves; a resource may not be named after one).
-const GROUPS = new Set(['heartbeat', 'redial', 'journal', 'seams'])
+const GROUPS = new Set(['heartbeat', 'redial', 'journal', 'diag', 'seams'])
 //! TOP — every declared top-level name; a name subtree in the global layer must not collide with one.
 const TOP = new Set([...GROUPS, ...LEAF_KEYS.filter((k) => !k.includes('.'))])
 //! RENAMED — the pre-V4-10 spellings, refused with the pointer (lowercased: env arrives that way).
@@ -171,6 +175,14 @@ const groupMiss = (k: string): string | null => {
   return null
 }
 
+//! diagFlag — a diag token on the command line: refused in plain words, the variable and the file named
+// instead. The message names the KEY only — never the value, which is the secret.
+const diagFlag = (resource: string, name: string | null, allow: unknown): never => {
+  const who = isPlain(allow) ? Object.keys(allow)[0] : undefined
+  const n = who ?? '<name>'
+  throw new Error(`fero('${resource}'): a diag token cannot come from a launch flag (${spell('flag', name, 'diag.allow' + (who !== undefined ? '.' + who : ''))}) — every user on this box can read a command line; set ${spell('env', name, 'diag.allow.' + n)}=<token>, or diag: { allow: { ${n}: … } } in the call or a fero.opt.ts file`)
+}
+
 //! walk — validate `tree` as one layer's contribution and flatten it. `name` is the rung (null =
 // global). In the GLOBAL rung of a flag, env or file layer an undeclared OBJECT at the top level is
 // another resource's subtree (this resource's own, `mine`, included — its rung was folded already)
@@ -194,12 +206,14 @@ const walk = (resource: string, layer: Layer, name: string | null, tree: unknown
         throw new Error(`fero('${resource}'): '${path}' is spelled ${g}: { ${l} } since V4-10 — in the call ${g}: { ${l}: … }, as a flag ${spell('flag', name, renamed)}, in the environment ${spell('env', name, renamed)}`)
       }
       if (GROUPS.has(path)) {
+        if (path === 'diag' && layer === 'flag') diagFlag(resource, name, isPlain(v) ? v.allow : undefined)
         if (!isPlain(v)) throw new Error(`fero('${resource}'): '${path}' from ${spell(layer, name, path)} is a group, not a value — did you mean ${hint(layer, name, firstLeaf(path)!)}`)
         visit(v, path)
         continue
       }
       const leaf = LEAVES[path]
       if (leaf !== undefined) {
+        if (path === 'diag.allow' && layer === 'flag') diagFlag(resource, name, v)
         if (!leaf.layers.includes(LAYER_CODE[layer]))
           throw new Error(`fero('${resource}'): '${path}' cannot come from ${spell(layer, name, path)} — it is set in the call${leaf.layers.includes('p') ? ' or a fero.opt.ts file' : ''} only (${leaf.why})`)
         //! a LONGER name under a leaf — FERO_RENDEZVOUS_UNUSED beside FERO_RENDEZVOUS, --fero.dir.old — arrives
@@ -255,6 +269,21 @@ const coerce = (resource: string, key: string, raw: unknown, from: string): unkn
       if (v === 1 || v === '1' || v === 'true' || v === true) return true
       if (v === 0 || v === '0' || v === 'false' || v === false) return false
       return v
+    case 'diag.allow': {
+      //! name → token. A variable or a file carries text; envdeep turns an all-digits value into a number
+      // (its leading zeros gone) and nests a longer name into an object — both refused, naming the KEY,
+      // never the value. An empty token is unset, like an empty value anywhere.
+      if (!isPlain(v)) throw new Error(`fero('${resource}'): diag.allow must be an object of name → token${src(from)}`)
+      const out: Record<string, string> = {}
+      for (const [who, tok] of Object.entries(v)) {
+        const t = typeof tok === 'string' ? tok.trim() : tok
+        if (t === '') continue
+        if (typeof t === 'number') throw new Error(`fero('${resource}'): the diag token for '${who}' is all digits${src(from)} — a variable or a flag loses its leading zeros; give it a letter`)
+        if (typeof t !== 'string') throw new Error(`fero('${resource}'): diag.allow.${who} must be a token string${src(from)}`)
+        out[who] = t
+      }
+      return Object.keys(out).length === 0 ? undefined : out
+    }
     case 'uuid':
     case 'dir':
       if (typeof v === 'number')

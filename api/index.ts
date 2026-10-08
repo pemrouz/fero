@@ -33,7 +33,7 @@ import { spawn } from './spawn.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'journal', 'replicas', 'data', 'methods', 'validation', 'seams', 'rendezvous', 'signals'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'journal', 'replicas', 'data', 'methods', 'validation', 'seams', 'rendezvous', 'diag', 'signals'])
 const SEAM_KEYS = new Set(['validation'])
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -125,6 +125,17 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const validate = (config.validation ?? seams.validation) as ((rec: Rec) => true | string) | undefined
   if (validate !== undefined && typeof validate !== 'function')
     throw new Error(`fero('${name}'): validation must be a function (record) => true | 'the reason' — it runs on every write that enters`)
+  //! diag: { allow: { name: token } } — the DIAG channel's allowlist (kernel NodeOpts.diag): absent, the
+  // channel is dead and every debugger attach is denied. The string layers were checked in api/config.ts;
+  // the call is checked here. The tokens never reach a message or the diagnostics door.
+  const diagGroup = config.diag
+  if (diagGroup !== undefined && !plainObject(diagGroup)) throw new Error(`fero('${name}'): diag is a group — diag: { allow: { <name>: <token> } }${at('diag.allow')}`)
+  const diagAllow = (diagGroup as { allow?: unknown } | undefined)?.allow
+  if (diagAllow !== undefined) {
+    if (!plainObject(diagAllow)) throw new Error(`fero('${name}'): diag.allow must be an object of name → token${at('diag.allow')}`)
+    for (const [who, tok] of Object.entries(diagAllow as Record<string, unknown>))
+      if (typeof tok !== 'string' || tok === '') throw new Error(`fero('${name}'): diag.allow.${who} must be a non-empty token string${at('diag.allow')}`)
+  }
 
   //! role by DECLARED ACT (v4.1 — supersedes the v2 hosts-without-listen rule): following is the
   // ambient case, serving is a declared act. Any server MARKER makes a server — server: true, listen
@@ -281,6 +292,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // INTO the one hook. Inert on a client (nobody relays through a spoke).
     ...(methodsOnly ? { validate: METHODS_ONLY_ADMIT }
       : validate !== undefined ? { validate } : {}),
+    //! the DIAG allowlist (M7): present = `npm run debug -- --attach` may read this node with one of its tokens
+    ...(diagAllow !== undefined ? { diag: { allow: { ...(diagAllow as Record<string, string>) } } } : {}),
     ...(restored.boot !== undefined ? { boot: restored.boot } : {}),
     ...(restored.incarnation !== undefined ? { incarnation: restored.incarnation } : {}),
   }
@@ -873,7 +886,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         const shown = v !== undefined ? v : effective[k]
         if (shown === undefined) continue
         out[k] = {
-          value: typeof shown === 'function' ? '[function]' : k === 'methods' || k === 'data' ? Object.keys(shown as object) : shown,
+          //! a diag token is a secret: the door shows WHO may attach, never the token
+          value: typeof shown === 'function' ? '[function]' : k === 'methods' || k === 'data' ? Object.keys(shown as object)
+            : k === 'diag.allow' ? Object.fromEntries(Object.keys(shown as object).map((who) => [who, '[redacted]'])) : shown,
           from: v !== undefined ? from(k) : k === 'rendezvous' && envDefault !== false ? 'FERO_RENDEZVOUS' : 'the default',
         }
       }

@@ -177,3 +177,13 @@ test('validation: and its old spelling seams.validation both guard writes in a r
   assert.equal(notes.length, 1, `one note for two resources:\n${old.stderr}`)
   assert.equal(notes[0], "fero('shop'): seams: { validation } is now spelled validation: — the old spelling still works in this release and goes in the next")
 })
+
+test('diag.allow from FERO_DIAG_ALLOW_<NAME> arms a real process; the door shows the name, never the token; a flag is refused without echoing it; FERO_DIAG_TOKEN stays the viewer\'s', async () => {
+  const r = await run('shop', { env: { FERO_DIAG_ALLOW_OPS: 'Tok-77', FERO_DIAG_TOKEN: 'viewer-only' }, call: { server: true } })
+  assert.equal(r.err, null, r.err ?? '')
+  assert.deepEqual(r.lines[0].config['diag.allow'], { value: { ops: '[redacted]' }, from: 'FERO_DIAG_ALLOW' })
+  assert.ok(!JSON.stringify(r.lines).includes('Tok-77') && !JSON.stringify(r.lines).includes('viewer-only'), 'no token in the door')
+  const flag = await run('shop', { argv: ['--fero.diag.allow.ops', 'Tok-78'], call: { server: true } })
+  assert.match(flag.err ?? '', /a diag token cannot come from a launch flag \(--fero\.diag\.allow\.ops\) — every user on this box can read a command line; set FERO_DIAG_ALLOW_OPS=<token>/)
+  assert.ok(!(flag.err ?? '').includes('Tok-78'), 'the refusal never echoes the token')
+})
