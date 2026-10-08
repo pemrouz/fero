@@ -16,7 +16,7 @@
 import { Sim } from './lib/sim/exec.js'
 import { cluster as harnessCluster, client as harnessClient } from './lib/sim/harness.js'
 import { REC } from './lib/kernel/env.js'
-import { Ring, VNODES } from './lib/kernel/ring.js'
+import { Ring, VNODES, fnv } from './lib/kernel/ring.js'
 import { VERB, Frame } from './lib/kernel/codec.js'
 import { LS } from './lib/kernel/link.js'
 import { JK } from './lib/kernel/journal.js'
@@ -66,7 +66,7 @@ export function toObject(state) {
 }
 
 // ── the ring, drawn exactly (kernel/ring.ts: VNODES points per member at fnv(member + '#' + v)) ──────────
-const fnv = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) } return h >>> 0 }
+// fnv is the kernel's own (fnv-1a finished with fmix32 since DECISIONS V4-14), imported, so the page cannot drift
 export const ringHash = fnv
 export function ringPoints(members) {
   const pts = []
