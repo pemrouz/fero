@@ -29,7 +29,7 @@
 // that land synchronously inside the write() call settle through the same join as
 // commits that echo back seconds later off the owner.
 
-import { proxy, applyRec, lens } from './substrate.ts'
+import { proxy, applyRec, lens, holeAt, SPARSE_HOLE } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
@@ -194,9 +194,22 @@ export class Bind {
   // them at 'committed' — plan §9's flush-on-return, BUILT.
   #tracked?: () => Promise<Coords>[] | undefined
 
+  //! admit — the one admission rule for a record, here and at the relay: the embedder's validator, then
+  // the sparse hole. A remove that names an array's own element is refused SPARSE_HOLE before it is
+  // stamped: data would refuse it at apply, so it would commit a tombstone that shows nothing (V4-18's
+  // array limit). The lens throws for a local delete first; this catches the spellings that skip the
+  // lens (methods.remove({ key: ['g', 0] })) and, as the server's relay predicate, a client's relayed
+  // remove (api/index.ts). Reads THIS node's projection: a node that does not hold the row cannot see
+  // the array, so a scoped non-holder forwards it as before. One type compare for every other record.
+  admit(rec: Rec): true | string {
+    const v = this.#validate ? this.#validate(rec) : true
+    if (v === true && rec.type === REC.remove && rec.key.length > 1 && holeAt(this.#handle, rec.key)) return SPARSE_HOLE
+    return v
+  }
+
   //! issue — THE one local ingest (assignment sugar, the lens's write builtins, methods.* and the
   // data: seed all land here; the validation: hook therefore covers every spelling by
-  // construction — v2's OQ6). Validate, register the pending entries, hand the records to the kernel;
+  // construction — v2's OQ6). Admit, register the pending entries, hand the records to the kernel;
   // the proxy changes only when a commit applies (#onApply).
   issue(recs: Rec[]): Issued {
     const node = this.#rt.node
@@ -204,7 +217,7 @@ export class Bind {
     const valid: Rec[] = []
     const t = this.#tracked?.()
     for (let i = 0; i < recs.length; i++) {
-      const v = this.#validate ? this.#validate(recs[i]) : true
+      const v = this.admit(recs[i])
       if (v !== true) {
         //! refused: an outcome row with the reason, and nothing else — the record never touched the
         // proxy, so there is nothing to undo (a refused write is invisible, not bounced)
