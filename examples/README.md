@@ -36,7 +36,7 @@ dependency).
 | 44 | [sell](44-sell/) | an open server lets every client change every row, the price included; declaring `methods:` is the door: the same write is refused `methods-only`, and `sell` writes the sale at the server's price | `node open.ts`, then `node door.ts` · `node customer.ts` ×2 |
 
 Four tiers: 01-17 climb one feature at a time, 20-23 open the debugger, 30 is everything at once on one
-box, and 40-43 are apps. 44 is the story the website tells, in three files: an open shop anyone can change,
+box, and 40-44 are apps, the last of them the story the website tells: an open shop anyone can change,
 then the same shop behind a door.
 
 Three rules every example keeps:
