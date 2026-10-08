@@ -49,16 +49,23 @@ export interface RuntimeOpts extends NodeOpts { dir?: string }
 // own over the dir's boot facts). Compare explicitly like the composer does (api/index.ts): a
 // config/dir identity contradiction should THROW, never resolve by spread order.
 export const restoreOpts = (dir: string): { uuid?: string; name?: string; boot?: NodeOpts['boot']; incarnation?: number } => {
+  //! a store that failed mid-life (I-36): its boot record stopped landing while the process lived on and kept
+  // voting from memory, so whatever boot.json still says (votedFor, the Lamport ceiling) is stale — restoring
+  // it could vote twice in one epoch. boot() marks the dir when a record fails; this refuses it.
+  const condemnedPath = path.join(dir, CONDEMNED)
+  if (fs.existsSync(condemnedPath))
+    throw new Error(`restoreOpts: ${dir} is a store that failed mid-life (${fs.readFileSync(condemnedPath, 'utf8').trim() || 'a boot record did not land'}) — its boot record is stale; refusing to restore from it (move the dir aside to start this node fresh)`)
   const bootPath = path.join(dir, 'boot.json')
   if (!fs.existsSync(bootPath)) {
     //! a NON-EMPTY wal.log with no boot record is an incomplete dir (partial copy, deleted
     // boot.json, a rename that never survived a foreign fs) — replaying it would adopt an unowned
     // log under whatever identity the caller happens to hold: the silent merge v4.1 refuses. An
     // EMPTY wal.log is the honest crash-before-first-boot-write window (the append fd creates the
-    // file at construction) — a pristine fresh boot, not an adoption.
+    // file at construction) — a pristine fresh boot, not an adoption. A store that failed mid-life lands
+    // here too when only boot()'s unlink got through (its marker write did not).
     const walPath = path.join(dir, 'wal.log')
     if (fs.existsSync(walPath) && fs.statSync(walPath).size > 0)
-      throw new Error(`restoreOpts: ${dir} holds a wal.log but no boot.json — an incomplete dir (partial copy?); refusing to adopt an unowned log`)
+      throw new Error(`restoreOpts: ${dir} holds a wal.log but no boot.json — an incomplete dir (a partial copy, or a store that failed mid-life); refusing to adopt an unowned log`)
     return {}
   }
   const b = JSON.parse(fs.readFileSync(bootPath, 'utf8')) as BootRecord
@@ -254,6 +261,14 @@ export class Runtime {
             runtime.#bootFailed = true
             runtime.#walFailed = true
             const reason = (err as NodeJS.ErrnoException).code ?? 'boot'
+            //! and mark the DIR (I-36): the process lives on and votes from memory, so the boot.json on disk
+            // is stale from here — a restart must refuse it, not replay an honest prefix under an old votedFor.
+            // Two best-effort steps, each alone enough for restoreOpts to refuse: the marker (survives an
+            // empty wal.log), then the unlink (works where a write cannot, e.g. ENOSPC). A dir that is gone
+            // (the found case) takes neither — and holds nothing to restore from.
+            const dir = runtime.#opts.dir!
+            try { fs.writeFileSync(path.join(dir, CONDEMNED), `boot record failed: ${reason}\n`) } catch { /* the disk refuses this too */ }
+            try { fs.unlinkSync(p) } catch { /* absent, or the disk refuses this too */ }
             queueMicrotask(() => { if (!runtime.node.destroyed) runtime.node.step({ kind: 'persistFail', batch: 0, reason }) })
           }
         },
@@ -457,6 +472,9 @@ export class Runtime {
     if (closed) await closed
   }
 }
+
+//! CONDEMNED — the marker boot() leaves in a dir whose boot record failed mid-life (I-36); restoreOpts refuses it
+const CONDEMNED = 'condemned'
 
 //! the typed reject start() settles with when the runtime stopped before it listened
 const stoppedError = () => Object.assign(new Error('runtime stopped before it listened'), { code: 'stopped' })
