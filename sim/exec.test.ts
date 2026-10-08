@@ -7,6 +7,7 @@ import { cluster, formed, writes } from './harness.ts'
 import { converged, drained } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
 import { Ring } from '../kernel/ring.ts'
+import { sweepBuild } from './shrink.ts'
 
 //! the determinism canary (plan §3.1): the same seed twice must produce byte-identical trajectories.
 // This catches unrecorded nondeterminism (Map-iteration dependence, ambient time,
@@ -25,6 +26,35 @@ test('same seed ⇒ identical trajectory (event count + per-event state-hash tra
   const b = runOnce()
   assert.equal(a.events, b.events)
   assert.equal(a.trace, b.trace)
+})
+
+//! the frozen golden (the tune table, 2026-10-08): 20 sweep seeds pinned by event count and a hash of
+// the per-event state-hash trace, recorded on the tree BEFORE the kernel read its bounds from node.tune.
+// The canary above proves a run equals itself; this proves a run equals the kernel of that day. A
+// deliberate trajectory change (a wire law, a new default) re-records these rows with a DECISIONS line.
+test('golden: 20 sweep seeds match the recorded event counts and trace hashes', () => {
+  const fnv = (xs: number[]): string => {
+    let h = 0x811c9dc5
+    for (const x of xs) {
+      h ^= x >>> 0
+      h = Math.imul(h, 0x01000193) >>> 0
+      h ^= x >>> 16
+      h = Math.imul(h, 0x01000193) >>> 0
+    }
+    return h.toString(16).padStart(8, '0')
+  }
+  const golden: [seed: number, events: number, trace: string][] = [
+    [0, 185, 'c80c5870'], [1, 213, '37943bf7'], [2, 222, 'edb7f020'], [3, 215, '604a0f42'], [4, 178, 'b69f22a8'],
+    [5, 220, '520c4210'], [6, 162, 'ddeb45e4'], [7, 219, '7c0d5821'], [8, 202, '6b8206de'], [9, 237, '9d73dc6d'],
+    [10, 247, '8f46e8a7'], [11, 270, 'c600881f'], [12, 182, '51ee18ca'], [13, 187, '46f79803'], [14, 168, '3fd3357e'],
+    [15, 241, 'b1e05360'], [16, 193, 'b71da040'], [17, 224, '93bdfa8c'], [18, 204, 'd4fe3ee7'], [19, 197, 'f6e7301c'],
+  ]
+  const got = golden.map(([seed]) => {
+    const b = sweepBuild(seed)(null)
+    b.sim.run()
+    return [seed, b.sim.events, fnv(b.sim.trace)]
+  })
+  assert.deepEqual(got, golden)
 })
 
 test('different seeds explore different trajectories', () => {
