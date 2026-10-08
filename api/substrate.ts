@@ -185,7 +185,18 @@ const RESERVED_NAMES: ReadonlySet<string> = new Set(contract().reserved)
 //! `inflight(key)` — the binding's settlement index: true while one of OUR writes to that cell is
 // on the wire. The no-op delete filter asks it before swallowing: since V4-7 the fold does not
 // hold our uncommitted writes, so `data.k = v; delete data.k` must still issue the remove.
-export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflight: (key: string[]) => boolean = () => false): any =>
+//! `up` — the PARENT handle (absent at the root): remove() reads it to refuse an array element.
+//! hole — data refuses to delete an own key of an ARRAY (an element would leave a sparse hole), and it
+// refuses only AFTER the commit, when the record applies. A local delete is refused HERE instead, before
+// anything is stamped, with data's message — the way a root replace is (V4-18; the substrate's no-op in
+// applyRec is for a REPLICATED remove, which cannot be refused). The root's parent is the resource
+// object, never an array, so a depth-1 delete reads nothing more.
+const hole = (parent: unknown, path: string[], k: string): void => {
+  if (Array.isArray(parent) && Object.hasOwn(parent, k))
+    throw new Error(`fero: remove() of array element [${[...path, k].join('.')}] would leave a sparse hole — write the spliced array instead`)
+}
+
+export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflight: (key: string[]) => boolean = () => false, up?: any): any =>
   new Proxy(Object.create(null) as Record<string | symbol, unknown>, {
     get(_t, prop) {
       if (prop === LENS) return h
@@ -207,7 +218,7 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
       if (prop === 'get')
         //! the total, collision-safe child read — returns a WRITE-CAPABLE lens (keyedRead
         // and user code route here for partition names shadowed by RESERVED)
-        return (k: unknown) => lens(h.get(String(k)), [...path, String(k)], sink, inflight)
+        return (k: unknown) => lens(h.get(String(k)), [...path, String(k)], sink, inflight, h)
       //! data's WRITE builtins must NOT delegate raw (the re-evaluation BLOCKER): h.set/
       // update/patch mutate the LOCAL projection only — no validation, no join, no
       // replication — a silent public-surface desync backdoor contradicting §4.1's
@@ -229,6 +240,7 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
             throw new Error('fero: remove() on the resource root is not a write — destroy() the resource instead')
           //! same no-op delete filter as deleteProperty (leaf equivalence, data clause 10c)
           if (h[VALUE] === undefined && !inflight(path)) return
+          if (path.length > 1 && up !== undefined) hole(up[VALUE], path.slice(0, -1), path[path.length - 1])
           sink([{ type: REC.remove, key: path }])
         }
       if (prop === 'patch')
@@ -263,11 +275,11 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
           const snap = (h[VALUE] ?? {}) as Record<string, unknown>
           const keys = Object.keys(snap)
           const k = prop === 'first' ? keys[0] ?? '0' : keys[keys.length - 1] ?? '0'
-          return lens(h.get(k), [...path, k], sink, inflight)
+          return lens(h.get(k), [...path, k], sink, inflight, h)
         }
       if (RESERVED_NAMES.has(prop)) return h[prop] // operators + READ built-ins: v4's own dispatch
       const child = h.get(prop)
-      return lens(child, [...path, prop], sink, inflight)
+      return lens(child, [...path, prop], sink, inflight, h)
     },
     set(_t, prop, v) {
       if (typeof prop === 'symbol')
@@ -282,6 +294,7 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
       // still on the wire (V4-7: the fold does not show it yet, but it is not absent). One O(depth)
       // leaf read, one map probe.
       if ((h.get(String(prop)) as any)[VALUE] === undefined && !inflight([...path, String(prop)])) return true
+      if (path.length > 0) hole(h[VALUE], path, String(prop))
       sink([{ type: REC.remove, key: [...path, String(prop)] }])
       return true
     },
