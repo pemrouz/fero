@@ -673,6 +673,34 @@ test('overlapping cells (V4-18): a newer stamp wins across depth — both arriva
   assert.equal(x.node.stateHash, y.node.stateHash)
 })
 
+test('overlapping cells (V4-18): a field remove takes back what the field alone had made up — a row or a level only a vivify created goes, a scalar it was written over comes back', () => {
+  const put = (seq: number, key: string[], value: unknown) => ({ seq, origin: 'cc', rec: { type: REC.update, key, value } })
+  const cut = (seq: number, key: string[]) => ({ seq, origin: 'dd', rec: { type: REC.remove, key } })
+  //! (a) no row at all: the field made the row, the remove un-makes it — the node that refused the write shows the same
+  for (const h of bothOrders(put(5, ['g', 'a'], 1), cut(7, ['g', 'a']))) {
+    assert.deepEqual(cells(h.node), {})
+    assert.deepEqual(project(h.effects), {})
+  }
+  //! (b) a live row without `f`: the deep write made `f`, the remove of x leaves no `f: {}` behind
+  for (const h of bothOrders(put(5, ['g', 'f', 'x'], 1), cut(7, ['g', 'f', 'x']))) {
+    h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeFrame([{ type: REC.update, key: ['g'], value: { k: 0 } }], { origin: 'bb', baseSeq: 3, epoch: 0 }) })
+    assert.deepEqual(cells(h.node), { '["g"]': { k: 0 } })
+    assert.deepEqual(project(h.effects), { g: { k: 0 } })
+  }
+  //! (c) the row HAS `f` as an object: it was never made up, it stays (with x gone)
+  const hc = fed([put(3, ['g'], { f: { x: 1, y: 2 } }), put(5, ['g', 'f', 'x'], 9), cut(7, ['g', 'f', 'x'])])
+  assert.deepEqual(project(hc.effects), { g: { f: { y: 2 } } })
+  //! (d) the row has `f` as a scalar the deep write was written over: the scalar comes back
+  const hd = fed([put(3, ['g'], { f: 5 }), put(5, ['g', 'f', 'x'], 9), cut(7, ['g', 'f', 'x'])])
+  assert.deepEqual(project(hd.effects), { g: { f: 5 } })
+  //! (e) a level a NEWER field remove took out stays gone, even though the row's value has it as an object
+  const he = fed([put(3, ['g'], { f: { y: 2 } }), cut(5, ['g', 'f']), put(7, ['g', 'f', 'x'], 9), cut(9, ['g', 'f', 'x'])])
+  assert.deepEqual(project(he.effects), { g: {} })
+  //! (f) a sibling field keeps the level alive
+  const hf = fed([put(5, ['g', 'f', 'x'], 1), put(6, ['g', 'f', 'y'], 2), cut(7, ['g', 'f', 'x'])])
+  assert.deepEqual(project(hf.effects), { g: { f: { y: 2 } } })
+})
+
 test('overlapping cells (V4-18): a field remove above its row rides out a late older row, and a row write above it releases it', () => {
   const h = fed([
     { seq: 7, origin: 'cc', rec: { type: REC.remove, key: ['g', 'a'] } },

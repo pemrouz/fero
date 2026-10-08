@@ -12,7 +12,7 @@ import { Sim } from './exec.ts'
 import { cluster, formed, writes } from './harness.ts'
 import { converged, projected, drained } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
-import { REC } from '../kernel/env.ts'
+import { REC, type Rec } from '../kernel/env.ts'
 
 const key = (...k: string[]) => JSON.stringify(k)
 
@@ -64,6 +64,56 @@ test('the probe with a REMOVE: a field remove newer than a row write — every n
     assert.deepEqual(n.state.get(key('g')), { a: 1, b: 2 }, `${n.uuid} holds the row cell whole`)
     assert.deepEqual(sim.folds.get(n.uuid), { g: { b: 2 } }, `${n.uuid}'s screen shows the row without the removed field`)
   }
+})
+
+//! cellsPlan — a workload built for THIS rule: a few rows, written whole, by field and two levels down,
+// removed whole, by field and two levels down. (writesPlan's draw order is pinned by the shrinker's
+// golden, so the field removes and the depth-3 keys live here, not there.)
+const cellsPlan = (rng: () => number, uuids: string[], count: number): { at: number; uuid: string; recs: Rec[] }[] => {
+  const out: { at: number; uuid: string; recs: Rec[] }[] = []
+  for (let i = 0; i < count; i++) {
+    const uuid = uuids[Math.floor(rng() * uuids.length)]
+    const row = 'r' + Math.floor(rng() * 3)
+    const f = 'f' + Math.floor(rng() * 2)
+    const roll = rng()
+    const key = roll < 0.4 ? [row] : roll < 0.8 ? [row, f] : [row, f, 'x']
+    const rec: Rec = rng() < 0.3 ? { type: REC.remove, key } : { type: REC.update, key, value: key.length === 1 ? { f0: i, f1: { x: i } } : key.length === 2 ? { x: i } : i }
+    out.push({ at: 1 + rng() * 300, uuid, recs: [rec] })
+  }
+  return out
+}
+
+test('the sweep with removes and three levels: 100 seeds of row/field/deep writes and removes under delay, duplication and a partition window — one object everywhere, and the screen equals the kernel', () => {
+  const failures: string[] = []
+  for (let seed = 0; seed < 100; seed++) {
+    try {
+      const sim = new Sim(2000 + seed)
+      const nodes = cluster(sim, 3)
+      for (let i = 0; i < 3; i++)
+        for (let j = i + 1; j < 3; j++)
+          sim.fault(nodes[i].uuid, nodes[j].uuid, { delay: [1, 1 + sim.rng() * 25], dupP: sim.rng() * 0.25 })
+      for (const s of cellsPlan(sim.rng, nodes.map((n) => n.uuid), 40)) sim.post(s.uuid, { kind: 'write', recs: s.recs }, s.at)
+      if (seed % 2) {
+        const a = nodes[Math.floor(sim.rng() * 3)].uuid
+        let b = a
+        while (b === a) b = nodes[Math.floor(sim.rng() * 3)].uuid
+        const cut = 20 + sim.rng() * 150
+        sim.at(cut, () => sim.partition(a, b))
+        sim.at(cut + 30 + sim.rng() * 250, () => sim.heal(a, b))
+      }
+      const violations = sim.run()
+      const bad =
+        (violations.length && `monitor ${violations[0].monitor}: ${violations[0].detail}`) ||
+        (!formed(nodes) && 'never formed') ||
+        (!sim.quiesced && 'never quiesced') ||
+        converged(sim) ||
+        drained(sim)
+      if (bad) failures.push(`seed ${2000 + seed}: ${bad}`)
+    } catch (e) {
+      failures.push(`seed ${2000 + seed}: threw ${e}`)
+    }
+  }
+  assert.deepEqual(failures, [], `${failures.length} seeds failed the object oracle:\n${failures.join('\n')}`)
 })
 
 test('the sweep: 120 seeds of mixed row/field/remove writes racing formation under delay, duplication and a partition window — one object everywhere', () => {
