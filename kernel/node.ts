@@ -591,7 +591,7 @@ export class Node {
         return
       }
       case 'linkUp': {
-        const link = new Link(e.link, e.dialed, e.to)
+        const link = new Link(e.link, e.dialed, e.to, this.tune.queued)
         this.links.set(e.link, link)
         j.armed && j.emit(JK.linkUp, e.link, e.dialed ? 1 : 0)
         //! both sides open with HELLO — identity first, before anything routes. Clients declare the
