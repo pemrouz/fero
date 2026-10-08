@@ -27,9 +27,9 @@
 // never saw the first ballot — none of these families draw that shape (measured: every family stays green with the
 // fix reverted). The kernel pins in kernel/membership.test.ts and the random explorer over real Nodes in
 // sim/explore.test.ts carry that rule; this file is the breadth behind V4-6.
-// Bounded: the three families together run in about 5 s at low priority on the WSL2 box, under 20 s when it is loaded (50 + 40 + 24 schedules; the
-// tails after the last leaver goes — 7 s and 9 s of virtual time — are kept, so a heal through the eviction chain
-// still counts as live). The generators and runners live in sim/leave-sweep.ts (a plain module, so a scratch script
+// Bounded: the three families together run in about 6 s at low priority on the idle WSL2 box (100 + 100 + 40
+// schedules; measured 1.9 + 2.8 + 1.3 s on 2026-10-08), under 20 s when it is loaded. The tails after the last leaver goes — 7 s
+// and 9 s of virtual time — are kept, so a heal through the eviction chain still counts as live. The generators and runners live in sim/leave-sweep.ts (a plain module, so a scratch script
 // can import them to run more seeds, or re-derive the known-not-live sets when the kernel's liveness changes on
 // purpose, without running this sweep as a side effect).
 
@@ -54,30 +54,30 @@ const sweep = <S extends { seed: number }>(count: number, gen: (seed: number) =>
   assert.deepEqual(newlyLive, [], 'a schedule known to wedge is live now: take it off the pin')
 }
 
-//! family 1 on today's kernel: the seeds it is NOT live on inside 1..50 — every one is I-20's shape: a survivor stalled
+//! family 1 on today's kernel: the seeds it is NOT live on inside 1..100 — every one is I-20's shape: a survivor stalled
 // across the leave window wakes to a leaver that is already gone, and the ballot that needs the leaver's vote never
-// completes, so it sits `minority` in the old view (36 of the first 100 seeds; the same shape on all of them). Pinned
-// exactly; the sweep is red if the set moves either way.
-const KNOWN_NOT_LIVE_1 = new Set<number>([1, 2, 8, 9, 13, 15, 20, 21, 26, 27, 31, 34, 35, 38, 40, 42, 44, 46, 50])
-//! family 2 on today's kernel: the seeds it is NOT live on inside 1..40 (13 of the first 100): two-member pairs cut
+// completes, so it sits `minority` in the old view (36 of 100; the same shape on all of them). Pinned exactly; the
+// sweep is red if the set moves either way.
+const KNOWN_NOT_LIVE_1 = new Set<number>([1, 2, 8, 9, 13, 15, 20, 21, 26, 27, 31, 34, 35, 38, 40, 42, 44, 46, 50, 57, 60, 61, 65, 66, 67, 71, 74, 75, 78, 81, 85, 87, 88, 90, 92, 95])
+//! family 2 on today's kernel: the seeds it is NOT live on inside 1..100 (13 of 100): two-member pairs cut
 // apart inside the leave window — the knock or the answer dies with the link and the leaver is gone before it heals;
 // a three-member view with the survivor cut from a leaver whose vote it needs; and a leaver restarted from its dir
 // that cannot rejoin a survivor left read-only (seed 4: n01 holds the view without itself, `evicted`, while n02 sits
 // `minority` in that view because n03 is gone for good). Pinned exactly; the sweep is red if the set moves either way.
-const KNOWN_NOT_LIVE_2 = new Set<number>([4, 13, 15, 31, 35])
+const KNOWN_NOT_LIVE_2 = new Set<number>([4, 13, 15, 31, 35, 44, 48, 56, 70, 75, 87, 89, 94])
 
-test('leave sweep, family 1: 50 seeded clean-stop schedules — n 2..5, up to three leavers at once, slow links, a stalled survivor, lingering leavers, a join mid-leave — SAFE on every one; the not-live set is exactly the pinned one', () => {
-  sweep(50, schedule, run, shape1, KNOWN_NOT_LIVE_1)
+test('leave sweep, family 1: 100 seeded clean-stop schedules — n 2..5, up to three leavers at once, slow links, a stalled survivor, lingering leavers, a join mid-leave — SAFE on every one; the not-live set is exactly the pinned one', () => {
+  sweep(100, schedule, run, shape1, KNOWN_NOT_LIVE_1)
 })
 
-test('leave sweep, family 2: 40 seeded clean-stop schedules with cuts between pairs and leavers restarted from their dirs — SAFE on every one; the not-live set is exactly the pinned one', () => {
-  sweep(40, schedule2, run2, shape2, KNOWN_NOT_LIVE_2)
+test('leave sweep, family 2: 100 seeded clean-stop schedules with cuts between pairs and leavers restarted from their dirs — SAFE on every one; the not-live set is exactly the pinned one', () => {
+  sweep(100, schedule2, run2, shape2, KNOWN_NOT_LIVE_2)
 })
 
-test('leave sweep, family 3: 24 seeded shapes of the two splits the parked I-20 drafts had — two clean stops with the two lowest cut apart at n=4, the restart split at n=3 — no monitor fires and no two nodes are ever writable in different views at a quiet point', () => {
+test('leave sweep, family 3: 40 seeded shapes of the two splits the parked I-20 drafts had — two clean stops with the two lowest cut apart at n=4, the restart split at n=3 — no monitor fires and no two nodes are ever writable in different views at a quiet point', () => {
   const unsafeOnes: string[] = []
   const reached = { 'cut-apart': 0, 'restart-split': 0 }
-  for (let seed = 1; seed <= 24; seed++) {
+  for (let seed = 1; seed <= 40; seed++) {
     const s = schedule3(seed)
     const problems = run3(s)
     //! a seed whose timing misses the shape (the two give-ups race; a slow knock commits the leave the normal way) proves
@@ -88,5 +88,5 @@ test('leave sweep, family 3: 24 seeded shapes of the two splits the parked I-20 
     if (problems.length) unsafeOnes.push(`${shape3(s)}: ${problems.join('; ')}`)
   }
   assert.deepEqual(unsafeOnes, [], 'a split')
-  assert.ok(reached['cut-apart'] >= 6 && reached['restart-split'] >= 6, `too few schedules reached their shape: ${JSON.stringify(reached)}`)
+  assert.ok(reached['cut-apart'] >= 10 && reached['restart-split'] >= 10, `too few schedules reached their shape: ${JSON.stringify(reached)}`)
 })
