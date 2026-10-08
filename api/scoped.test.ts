@@ -216,6 +216,9 @@ test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the ke
     // coverage drop of the FIELD cell must not tear `c` out of the row's own value
     5: { h1: { c: { [g]: { v: { a: 1, c: 3 }, st: [1, 11, 'bb'] } }, att: ['g'] }, h2: { c: { [gc]: { v: 9, st: [1, 12, 'cc'] } }, att: ['g'] } },
     6: { h1: { c: { [g]: { v: { a: 1, c: 3 }, st: [1, 11, 'bb'] } }, att: ['g'] }, h2: { c: {}, att: ['g'] } },
+    //! gen 7: the TIE — a swept field ships as a tombstone at exactly its row's stamp (the kernel gives a
+    // swept cell the parent's stamp): at or below hides it, so the row's own `a` must stay
+    7: { h1: { c: { [g]: { v: { a: 1, c: 3 }, st: [1, 13, 'bb'] }, [ga]: { st: [1, 13, 'bb'], t: 1 } }, att: ['g'] }, h2: { c: {}, att: ['g'] } },
     //! gen 8-9: NOBODY claims the row any more (h1 attests its absence — the coverage drop takes it);
     // a field alone makes the row up; then that field's remove — the row the field alone had made up
     // must go too (the kernel's un-vivify), not stay as {} (the reviewer's shape: the base tree and the
@@ -241,6 +244,7 @@ test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the ke
   phase = 4; await expect({ g: { c: 9 } }, 'gen 4: a field above the row remove re-makes the row with that field')
   phase = 5; await expect({ g: { a: 1, c: 9 } }, 'gen 5: the row is back, the newer field on top')
   phase = 6; await expect({ g: { a: 1, c: 3 } }, 'gen 6: the field cell dropped by coverage — the row\'s own `c` stands')
+  phase = 7; await expect({ g: { a: 1, c: 3 } }, 'gen 7: a tombstone at EXACTLY the row\'s stamp is hidden — the row keeps its own `a`')
   phase = 8; await expect({ g: { b: 1 } }, 'gen 8: a field alone makes the row up (nobody claims the row)')
   phase = 9; await expect({}, 'gen 9: that field\'s remove takes the row it alone had made up with it')
   phase = 10; await expect({ g: { a: { x: 1 } } }, 'gen 10: a depth-3 field makes two levels up')
