@@ -11,8 +11,11 @@
 
 name: test
 
+# Pushes to main, and every pull request. A push to a PR branch is not also run
+# as a plain push, so one change runs once, not twice.
 on:
   push:
+    branches: [main]
   pull_request:
 
 # A new push to the same branch or PR cancels the run still going for the old one.
