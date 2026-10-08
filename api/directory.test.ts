@@ -11,7 +11,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import net from 'node:net'
 import { fero, RENDEZVOUS } from './index.ts'
-import { GRACE, MAX_PER_CALLER, hostMethods, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
+import { Directory, GRACE, MAX_PER_CALLER, hostMethods, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { MAX_REDIALS } from '../kernel/node.ts'
@@ -351,4 +351,24 @@ test('a rendezvous this box cannot bind at all (an interface that is not here) s
     assert.equal(rz(s).hosting, false)
     assert.match(me(s).listen, /^127\.0\.0\.1:[1-9]\d*$/, 'the resource itself serves')
   } finally { await settle([s]) }
+})
+
+test("a lookup the directory host FAILS shows on rendezvous.error — it is not an unhandled `ready` rejection that exits the server", async () => {
+  //! a stand-in host whose lookup throws, under a user name (a `#` name is the composer's alone); the
+  // Directory is the real one, composing its client through the same seam the composer hands it
+  const name = `dirx${process.pid}`
+  const addr = `127.0.0.1:${await ports.free()}`
+  const host = await fero(name, { listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, methods: { lookup: () => { throw new Error('lookup exploded') }, register: () => true } })
+  const d = new Directory({
+    compose: (_n, o) => fero(name, o), addr, name: 'r', uuid: 'u1', listen: () => undefined, serve: false,
+    heartbeatMs: 50, redialMs: 30, onHosts: () => {}, onState: () => {},
+  })
+  try {
+    await d.start()
+    //! before: the subscribe leg's failure was dropped at the caller — the lookup mirror stayed {} and
+    // nothing said why. With an eager `ready` and no catch here, it would exit the server instead.
+    assert.ok(await until(() => d.error?.includes('lookup exploded') === true, 8000), `the failure is on the state (${d.error})`)
+  } finally {
+    await d.destroy(); await host.destroy()
+  }
 })

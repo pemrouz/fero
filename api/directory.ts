@@ -252,7 +252,10 @@ export class Directory {
     }))
     //! the live lookup: one subscription, re-subscribed by the Caller on every primary change (a fresh
     // host's snapshot root-replaces the mirror). Folds to the address set minus own listen.
-    const h = c.methods.lookup(o.name) as { tap: (fn: () => void) => void }
+    const h = c.methods.lookup(o.name) as { tap: (fn: () => void) => void; ready: Promise<void> }
+    //! a failed lookup (the host's handler threw) is the directory's trouble, not the server's: it shows on
+    // cluster.me.rendezvous.error instead of exiting the process as an unhandled `ready` rejection would
+    h.ready.catch((e: unknown) => { if (!this.#destroyed) this.#setError(`lookup: ${(e as Error)?.message ?? String(e)}`) })
     let last = ''
     h.tap(afterFold(() => {
       if (this.#destroyed) return
