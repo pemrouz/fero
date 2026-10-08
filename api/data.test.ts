@@ -199,6 +199,25 @@ test('V4-18 overlapping cells — on the epoch-0 fast path, removing the last fi
   await h.destroy()
 })
 
+test('V4-18 overlapping cells — through data\'s real lane: a field written into a non-object row and then removed shows the row\'s value again, in all six arrival orders', async () => {
+  const permutations = <T>(xs: T[]): T[][] => xs.length <= 1 ? [xs] : xs.flatMap((x, i) => permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((p) => [x, ...p]))
+  //! three lanes, one record each (bb the row at seq 3, cc the field at 5, dd the remove at 7), fed in every order
+  for (const v of [5, null, 'txt', {}]) {
+    const frames: [number, Uint8Array][] = [
+      [1, records('bb', 3, 0, [{ type: REC.update, key: ['g'], value: v }])],
+      [2, records('cc', 5, 0, [{ type: REC.update, key: ['g', 'b'], value: 1 }])],
+      [3, records('dd', 7, 0, [{ type: REC.remove, key: ['g', 'b'] }])],
+    ]
+    for (const order of permutations(frames)) {
+      const h = harness()
+      h.admit(1, 'bb'); h.admit(2, 'cc'); h.admit(3, 'dd')
+      for (const [link, bytes] of order) h.node.step({ kind: 'bytesIn', link, bytes })
+      assert.deepEqual(snapshot(h.bind.data), { g: v }, `row ${JSON.stringify(v)}, order ${order.map((f) => f[0]).join(',')}`)
+      await h.destroy()
+    }
+  }
+})
+
 test('M5a — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
   const h = harness()
   //! fast path (epoch 0): coordinates resolve within the call

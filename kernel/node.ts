@@ -1646,8 +1646,10 @@ export class Node {
   // (its own indexed tombstone), or anything under such a level, goes; a level the live ancestor's
   // value holds as an object stays (it was never made up); any other level was made up by the field —
   // it goes back to the value's own thing there (a scalar the field was written over) or away. The
-  // repairs ride this node's own name at seq 0, like a resync's ghost removes: never logged, never on
-  // the wire, and the api collects no settlement from them.
+  // live ancestor itself is the last level: its own value is not an object (5, null, 'txt' — a value
+  // a field cannot land in, so the projection made `{}` up OVER it) and nothing live is left under it —
+  // the value comes back as itself. The repairs ride this node's own name at seq 0, like a resync's
+  // ghost removes: never logged, never on the wire, and the api collects no settlement from them.
   #unvivify(path: string[], above: string[]) {
     let live = -1
     for (let j = above.length - 1; j >= 0; j--) if (this.state.has(above[j])) { live = j; break }
@@ -1670,6 +1672,12 @@ export class Node {
       if (has) this.env.sink.apply({ type: REC.update, key, value: v, origin: this.uuid, seq: 0, epoch: 0 })
       else this.env.sink.apply({ type: REC.remove, key, origin: this.uuid, seq: 0, epoch: 0 })
     }
+    if (live < 0) return
+    const own = this.state.get(above[live])
+    if (isPlain(own)) return
+    const kids = this.deep.get(above[live])
+    if (kids !== undefined) for (const c of kids) if (this.state.has(c)) return
+    this.env.sink.apply({ type: REC.update, key: path.slice(0, live + 1), value: own, origin: this.uuid, seq: 0, epoch: 0 })
   }
 
   //! #reapply — put field cells back on top downstream, shallowest first, after a write ABOVE them (an

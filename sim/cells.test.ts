@@ -66,9 +66,28 @@ test('the probe with a REMOVE: a field remove newer than a row write — every n
   }
 })
 
+test('the probe with a NON-OBJECT row: a field written into a number, a null or a string and then removed — every node shows the value again, whichever order the three arrived in', () => {
+  for (const v of [5, null, 'txt']) {
+    const sim = new Sim(1801)
+    const nodes = cluster(sim, 3)
+    //! n02's field write reaches n01 after n03's remove of it: n01 refuses the write (it loses to the newer
+    // tombstone) and never made `{}` up; n02 and n03 made it up and must take it back
+    sim.fault('n02', 'n01', { delay: [120, 121] })
+    sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['g'], value: v }] }, 1)
+    sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: ['g', 'b'], value: 1 }] }, 40)
+    sim.post('n03', { kind: 'write', recs: [{ type: REC.remove, key: ['g', 'b'] }] }, 80)
+    sim.run()
+    assert.ok(formed(nodes) && sim.quiesced)
+    assert.equal(converged(sim), null, `row ${JSON.stringify(v)}`)
+    for (const n of nodes) assert.deepEqual(sim.folds.get(n.uuid), { g: v }, `${n.uuid}'s screen shows the row's own value again (${JSON.stringify(v)})`)
+  }
+})
+
 //! cellsPlan — a workload built for THIS rule: a few rows, written whole, by field and two levels down,
-// removed whole, by field and two levels down. (writesPlan's draw order is pinned by the shrinker's
-// golden, so the field removes and the depth-3 keys live here, not there.)
+// removed whole, by field and two levels down; one row or field value in four is NOT an object (a
+// number, null, a string) — a value a deeper field cannot land in, which the projection vivifies `{}`
+// over and must put back once the field is removed. (writesPlan's draw order is pinned by the
+// shrinker's golden, so the field removes and the depth-3 keys live here, not there.)
 const cellsPlan = (rng: () => number, uuids: string[], count: number): { at: number; uuid: string; recs: Rec[] }[] => {
   const out: { at: number; uuid: string; recs: Rec[] }[] = []
   for (let i = 0; i < count; i++) {
@@ -77,7 +96,8 @@ const cellsPlan = (rng: () => number, uuids: string[], count: number): { at: num
     const f = 'f' + Math.floor(rng() * 2)
     const roll = rng()
     const key = roll < 0.4 ? [row] : roll < 0.8 ? [row, f] : [row, f, 'x']
-    const rec: Rec = rng() < 0.3 ? { type: REC.remove, key } : { type: REC.update, key, value: key.length === 1 ? { f0: i, f1: { x: i } } : key.length === 2 ? { x: i } : i }
+    const flat = rng() < 0.25 ? [i, null, 's' + i][i % 3] : undefined
+    const rec: Rec = rng() < 0.3 ? { type: REC.remove, key } : { type: REC.update, key, value: key.length === 3 ? i : flat !== undefined ? flat : key.length === 1 ? { f0: i, f1: { x: i } } : { x: i } }
     out.push({ at: 1 + rng() * 300, uuid, recs: [rec] })
   }
   return out
