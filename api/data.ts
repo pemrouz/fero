@@ -268,9 +268,11 @@ export class Bind {
     //! 2) fast-path settlement capture: an iss-less apply inside our own rt.write() is collected by the
     // TOP frame (the currently-executing issue()); node.commit is sequential, so the top frame is always
     // the call whose rt.write is on the stack when this record applies (M5-review #0/#1/#4).
+    // A seq-0 apply is a projection repair the kernel made up under its own name (a resync's ghost remove,
+    // V4-18's un-vivify after a field remove): never a commit of ours — project it, collect nothing.
     const top = this.#frames[this.#frames.length - 1]
     if (top && a.iss === undefined && top.cells.has(cell)) {
-      top.applied.push(a)
+      if (a.seq !== 0) top.applied.push(a)
       this.#apply(a)
       return
     }

@@ -1023,6 +1023,7 @@ export class Node {
       this.env.sink.apply({ type: REC.remove, key: path, origin: this.uuid, seq: 0, epoch: 0 })
       const back = this.#under(cell)
       if (back.length) this.#reapply(back)
+      if (path.length > 1) this.#unvivify(path, ancestorsOf(path))
     }
     this.journal.armed && this.journal.emit(JK.resynced, ghosts)
   }
@@ -1632,6 +1633,43 @@ export class Node {
     }
     this.env.sink.apply({ type: rec.type, key: rec.key, value: rec.value, at: rec.at, origin, seq, epoch, iss, cid })
     if (survivors !== null) this.#reapply(survivors)
+    if (above !== null && rec.type === REC.remove) this.#unvivify(path, above)
+  }
+
+  //! #unvivify — after a field REMOVE lands downstream, take back what the removed field alone had made
+  // up. The projection vivifies the rows a field write lands in (api/substrate.ts): ['r','f','x'] = 1
+  // under a row with no `f` creates `f: {}` on the screen, and a later remove of x leaves that `{}`
+  // behind — where a node that refused the write (or a late joiner) shows nothing. The cells say what
+  // is right: the nearest LIVE ancestor's own value at that level, or nothing at all. So, walking up
+  // from the removed cell's parent to just below the nearest live ancestor: a level with a live field
+  // still under it stays (the fields keep it, on every node); a level a newer field remove took out
+  // (its own indexed tombstone), or anything under such a level, goes; a level the live ancestor's
+  // value holds as an object stays (it was never made up); any other level was made up by the field —
+  // it goes back to the value's own thing there (a scalar the field was written over) or away. The
+  // repairs ride this node's own name at seq 0, like a resync's ghost removes: never logged, never on
+  // the wire, and the api collects no settlement from them.
+  #unvivify(path: string[], above: string[]) {
+    let live = -1
+    for (let j = above.length - 1; j >= 0; j--) if (this.state.has(above[j])) { live = j; break }
+    let cut = above.length // the shallowest level under `live` that a newer remove took out
+    for (let j = live + 1; j < above.length; j++)
+      if (j > 0 && this.versions.has(above[j]) && this.deep.get(above[j - 1])?.has(above[j])) { cut = j; break }
+    for (let j = above.length - 1; j > live; j--) {
+      const kids = this.deep.get(above[j])
+      if (kids !== undefined) for (const c of kids) if (this.state.has(c)) return
+      let v: unknown = undefined, has = false
+      if (live >= 0 && j < cut) {
+        v = this.state.get(above[live]); has = true
+        for (let i = live + 1; i <= j && has; i++) {
+          if (isPlain(v) && Object.hasOwn(v, path[i])) v = v[path[i]]
+          else has = false
+        }
+        if (has && isPlain(v)) return
+      }
+      const key = path.slice(0, j + 1)
+      if (has) this.env.sink.apply({ type: REC.update, key, value: v, origin: this.uuid, seq: 0, epoch: 0 })
+      else this.env.sink.apply({ type: REC.remove, key, origin: this.uuid, seq: 0, epoch: 0 })
+    }
   }
 
   //! #reapply — put field cells back on top downstream, shallowest first, after a write ABOVE them (an
@@ -1647,7 +1685,11 @@ export class Node {
     for (const i of order) {
       const c = cells[i]
       const v = this.versions.get(c)!
-      if (!this.state.has(c)) { this.env.sink.apply({ type: REC.remove, key: paths[i], origin: v.origin, seq: v.seq, epoch: v.epoch }); continue }
+      if (!this.state.has(c)) {
+        this.env.sink.apply({ type: REC.remove, key: paths[i], origin: v.origin, seq: v.seq, epoch: v.epoch })
+        this.#unvivify(paths[i], ancestorsOf(paths[i]))
+        continue
+      }
       const e = this.#entryAt(v.origin, v.seq)
       if (e !== null) this.env.sink.apply({ type: e.rec.type, key: e.rec.key, value: e.rec.value, at: e.rec.at, origin: v.origin, seq: v.seq, epoch: v.epoch })
       else this.env.sink.apply({ type: REC.update, key: paths[i], value: this.state.get(c), origin: v.origin, seq: v.seq, epoch: v.epoch })
@@ -1745,6 +1787,16 @@ export class Node {
 // (apply), so the two can never drift; tools/debug/model.mjs mirrors it by name.
 export const newer = (epoch: number, seq: number, origin: string, cur: { epoch: number; seq: number; origin: string }): boolean =>
   epoch > cur.epoch || (epoch === cur.epoch && (seq > cur.seq || (seq === cur.seq && origin > cur.origin)))
+
+//! isPlain — a value the projection walks INTO (an object a field can land in); arrays and bytes are leaves.
+const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array)
+
+//! ancestorsOf — the keys of a path's proper prefixes, shallowest first (the cold-path twin of apply's loop).
+const ancestorsOf = (path: string[]): string[] => {
+  const out: string[] = []
+  for (let d = 1; d < path.length; d++) out.push(JSON.stringify(path.slice(0, d)))
+  return out
+}
 
 //! fnv — fnv-1a over a string; the per-entry hash the rolling state hash sums.
 const fnv = (s: string): number => {
