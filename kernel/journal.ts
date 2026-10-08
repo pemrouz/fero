@@ -110,6 +110,8 @@ export const JK = {
   //! ── the graceful leave (2026-09-07, DECISIONS V4-6) ──
   leave: 74,         // a=uuid — a LEAVE sent (a=self: this node is stopping on purpose) or received (a=the leaver): "propose the view without me"
   left: 75,          // a=epoch, b=clean(0|1) — the leaver's exit: 1 = the view without it committed and a survivor echoed it; 0 = LEAVE_TICKS ran out, it goes like a crash (suspicion + eviction follow)
+  //! ── overlapping cells (2026-10-08, DECISIONS V4-18) ──
+  subsumed: 76,      // a=origin, b=seq, c=swept(0|1) — a field cell lost to a whole-row write (or row remove) stamped at or above it: refused on arrival (c=0) or swept out of state by the row write arriving later (c=1)
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

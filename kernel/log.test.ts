@@ -137,6 +137,41 @@ test('PROPERTY compacted catch-up ≡ uncompacted: two lagging peers, one served
   assert.equal(viaCompacted.stateHash, t2.node.stateHash, 'the snapshot records ARE the history, LWW-wise')
 })
 
+test('V4-18 overlapping cells — a MIXED row/field history compacts to the winners and replays to the swept state, compacted or not', () => {
+  const h = churned()
+  h.node.writes.ring.place('m', 'aa')
+  //! row, field, a NEWER row (sweeps the field), a newer field on top, then a row remove and a field after it
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['m'], value: { a: 1 } }] })
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['m', 'a'], value: 2 }] })
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['m'], value: { a: 3 } }] })
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['m', 'b'], value: 4 }] })
+  const km = JSON.stringify(['m']), ka = JSON.stringify(['m', 'a']), kb = JSON.stringify(['m', 'b'])
+  assert.deepEqual([h.node.state.get(km), h.node.state.has(ka), h.node.state.get(kb)], [{ a: 3 }, false, 4])
+  assert.equal(h.node.journal.read().filter((e) => e.kind === JK.subsumed).length, 1, 'the field was swept by the newer row')
+  assert.deepEqual(h.node.versions.get(ka), h.node.versions.get(km), 'the swept field carries the row\'s stamp as its tombstone')
+  const full = h.node.logs.get('aa')!.map((e) => ({ ...e }))
+  caughtUp(h)
+  const dropped = compact(h.node, 'aa', frontier(h.node, 'aa'))
+  assert.ok(dropped >= 2, 'the first row and the swept field are not winners of their cells: dropped')
+  const kept = h.node.logs.get('aa')!.filter((e) => e.rec.key[0] === 'm').map((e) => JSON.stringify(e.rec.key))
+  assert.deepEqual(kept, [km, kb], 'only the winning row and the field on top of it survive')
+  //! replay-from-0 of the compacted log, and of the UNcompacted history, both reach the live fold
+  const viaCompacted = catchUpTwin(h.node, 'aa')
+  assert.equal(viaCompacted.stateHash, h.node.stateHash)
+  assert.deepEqual([...viaCompacted.state].filter(([k]) => k.startsWith('["m"')).sort(), [...h.node.state].filter(([k]) => k.startsWith('["m"')).sort())
+  const t2 = harness('yy')
+  t2.admit(1, 'aa')
+  for (const bytes of encodeRuns(full.map((e) => ({ rec: e.rec, origin: 'aa', seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid }))))
+    t2.node.step({ kind: 'bytesIn', link: 1, bytes })
+  assert.equal(t2.node.stateHash, h.node.stateHash, 'the full history sweeps the same way')
+  assert.deepEqual([...t2.node.deep.get('m')!.cells], [kb], 'the deep index holds exactly the live field')
+  //! tombstone GC at quiescence releases the swept field's stamp — the row's own stamp still fences it
+  gcTombstones(h.node)
+  assert.equal(h.node.versions.has(ka), false)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: { type: REC.update, key: ['m', 'a'], value: 'late' }, origin: 'bb', seq: 1, epoch: 0 }])[0] })
+  assert.equal(h.node.state.has(ka), false, 'a late older field still loses to the row')
+})
+
 test('tombstone GC: the stamp survives while a straggler could resurrect, and is released once every lane quiesces', () => {
   const h = churned()
   const k = JSON.stringify(['gone'])
