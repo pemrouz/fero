@@ -43,7 +43,8 @@ export interface Diagnostics {
   //! the directory nodes this instance runs (V4-3): its `#directory` client and, when it won the bind,
   // the hosted `#directory` server — real Fero instances, so a tool can capture/diag them like any node.
   // null when the instance meets no directory (rendezvous: false, listen: false, a system resource).
-  rendezvous(): { client: Fero | null; host: Fero | null } | null
+  // `boxes`: the ask-only directory clients of OTHER boxes (bare `hosts` entries), keyed by directory address.
+  rendezvous(): { client: Fero | null; host: Fero | null; boxes: Record<string, Fero> } | null
   //! config (V4-10): the resolved config leaves and where each came from — 'the call', a flag, an env
   // variable, a fero.opt.ts file — the answer to "why is this node a server?" without a debugger.
   // Values are the coerced ones the composer read; function-valued keys show as '[function]', and a

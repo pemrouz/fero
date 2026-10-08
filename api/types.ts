@@ -98,10 +98,15 @@ export interface FeroConfig {
   //! listen — the dialable address; omitted on a server = a free loopback port (127.0.0.1:0, the
   // OS picks; cluster.me.listen shows it), published through the directory; false = the socketless
   // solo node (serves nothing, dials nothing, meets no directory — pure local; refuses hosts loudly).
+  // The explicit-listen rule (docs/DESIGN-DIRECTORY.md §11): whenever the listen would leave this box —
+  // a rendezvous that is not loopback, or a `hosts` entry on another box — a loopback or wildcard
+  // listen (the default included) is refused: "to be reachable from another box, listen on a routable address".
   listen?: string | false
   //! hosts — static dial targets: alone = a client's feeders; beside a server marker = a dialing
   // member (the listen+hosts cluster shape). The directory's discovered set is UNIONED with them;
-  // omitted on a bare client = the discovered set alone.
+  // omitted on a bare client = the discovered set alone. An entry with NO port ('10.0.0.5', 'box-b')
+  // names another box: this node asks that box's directory at its own rendezvous port and dials what
+  // it lists for the name — it never registers or hosts there (§11). Refused with the directory off.
   hosts?: string[]
   //! rendezvous (V4-3) — the per-box directory every dialable node meets at. Precedence: this key >
   // the FERO_RENDEZVOUS environment variable (an address, or 'off' — it sets the PROCESS DEFAULT and
@@ -245,8 +250,10 @@ export interface ClusterShape {
     // a socketless solo); `hosting` = this instance binds it; `up` = a directory link is admitted (a
     // bare client with `up: false` and `hosts: []` is "no directory on this box", distinct from
     // "nobody registered yet"); `error` = the last bind errno other than EADDRINUSE (EACCES: a
-    // reserved band …) or the host's register refusal — absent when all is well
-    rendezvous: { addr: string; hosting: boolean; up: boolean; error?: string } | false
+    // reserved band …) or the host's register refusal — absent when all is well; `boxes` (§11) = the
+    // other boxes' directories this node asks (its bare `hosts` entries at the rendezvous port), each
+    // with its own `up` and lookup `error` — present only when hosts names another box
+    rendezvous: { addr: string; hosting: boolean; up: boolean; error?: string; boxes?: Record<string, { up: boolean; error?: string }> } | false
   }
   partitions: Partitions
 }

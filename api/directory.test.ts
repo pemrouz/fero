@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fero, RENDEZVOUS } from './index.ts'
-import { Directory, GRACE, MAX_PER_CALLER, hostMethods, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
+import { Directory, GRACE, MAX_PER_CALLER, boxDirectory, fromBox, hostMethods, isAddr, isBox, leavesBox, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { MEMBER_REDIALS } from '../kernel/node.ts'
@@ -23,7 +23,7 @@ import type { Fero } from './types.ts'
 import type { Context } from './methods.ts'
 
 const fast = async () => ({ heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous: `127.0.0.1:${await ports.free()}` })
-type Rz = false | { addr: string; hosting: boolean; up: boolean; error?: string }
+type Rz = false | { addr: string; hosting: boolean; up: boolean; error?: string; boxes?: Record<string, { up: boolean; error?: string }> }
 type Me = { uuid: string; listen: string; role: string; hosts: string[]; rendezvous: Rz }
 const me = (f: Fero): Me => (snapshot(f.cluster) as { me: Me }).me
 const rz = (f: Fero) => me(f).rendezvous as Exclude<Rz, false>
@@ -346,14 +346,26 @@ test('a non-fero squatter on the rendezvous port: the resource itself is unaffec
   } finally { await settle([c, s]); squatter.close() }
 })
 
-test('a rendezvous this box cannot bind at all (an interface that is not here) surfaces the errno on cluster.me.rendezvous.error', async () => {
+//! routableHere — an IPv4 address this machine owns that is not spelled as loopback: one on the loopback
+// interface first (WSL's 10.255.255.254 — routable-looking, reachable from nowhere else), else a real
+// interface's; undefined when there is none (the test that needs it skips)
+const routableHere = (): string | undefined => {
+  const all = Object.values(os.networkInterfaces()).flat().filter((a) => a !== undefined && a.family === 'IPv4' && !a.address.startsWith('127.'))
+  return (all.find((a) => a!.internal) ?? all.find((a) => !a!.internal))?.address
+}
+
+test('a rendezvous this box cannot bind at all (an interface that is not here) surfaces the errno on cluster.me.rendezvous.error', async (t) => {
   const rendezvous = `192.0.2.1:${await ports.free()}` // TEST-NET-1: never a local interface
+  //! a directory on a routable address answers other boxes, so the explicit-listen rule (§11) wants a
+  // routable listen beside it — one this machine owns
+  const ip = routableHere()
+  if (ip === undefined) return t.skip('no non-loopback IPv4 address on this machine')
   let s: Fero | undefined
   try {
-    s = await fero(`nobind-${process.pid}`, { server: true, heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous })
+    s = await fero(`nobind-${process.pid}`, { listen: `${ip}:0`, heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous })
     assert.ok(await until(() => typeof rz(s!).error === 'string' && rz(s!).error!.startsWith('bind '), 5000), `the errno is on me.rendezvous: ${JSON.stringify(rz(s).error)}`)
     assert.equal(rz(s).hosting, false)
-    assert.match(me(s).listen, /^127\.0\.0\.1:[1-9]\d*$/, 'the resource itself serves')
+    assert.ok(me(s).listen.startsWith(`${ip}:`) && !me(s).listen.endsWith(':0'), 'the resource itself serves')
   } finally { await settle([s]) }
 })
 
@@ -423,4 +435,119 @@ setInterval(() => {}, 1000)
     for (const k of kids) if (k.child.exitCode === null && k.child.signalCode === null) { k.child.kill('SIGKILL'); await k.exited }
     fs.rmSync(dir, { recursive: true, force: true })
   }
+})
+
+//! ── cross-box discovery (docs/DESIGN-DIRECTORY.md §11): a bare host asks that box's directory ──
+
+test('cross-box helpers: a bare host (isBox) names a box, its directory sits at the rendezvous port, the same directory is spotted under either spelling, another box may not add loopback addresses, and leavesBox says exactly when a listen leaves this box', () => {
+  for (const ok of ['10.0.0.5', 'box-b', 'box-b.lan', '127.0.0.2', '[fe80::1]', 'a']) assert.ok(isBox(ok), ok)
+  for (const bad of ['', '50', '--fero.heartbeat.ms', '-box', 'box-', 'a b', '10.0.0.5:4000', '::1', 7, undefined]) assert.equal(isBox(bad), false, String(bad))
+  assert.equal(boxDirectory('10.0.0.5', '127.0.0.1:3376'), '10.0.0.5:3376', "the port is this instance's rendezvous port")
+  assert.equal(boxDirectory('[fe80::1]', '127.0.0.1:4100'), '[fe80::1]:4100')
+  assert.ok(sameDirectory('localhost:3376', '127.0.0.1:3376'), "'localhost' is this box's own directory")
+  assert.equal(sameDirectory('127.0.0.2:3376', '127.0.0.1:3376'), false, 'another loopback IP stands for another box')
+  assert.equal(sameDirectory('10.0.0.5:3377', '10.0.0.5:3376'), false)
+  //! fromBox: a loopback or wildcard address from ANOTHER box's directory would dial THIS box — dropped,
+  // unless it is the very host the directory was reached on
+  assert.deepEqual(fromBox('10.0.0.5:3376', { a: '10.0.0.5:4000', b: '127.0.0.1:4001', c: '0.0.0.0:4002', d: 'localhost:4003', e: '10.0.0.9:4004', f: 7 }), ['10.0.0.5:4000', '10.0.0.9:4004'])
+  assert.deepEqual(fromBox('127.0.0.2:3376', { a: '127.0.0.2:4000', b: '127.0.0.1:4001' }), ['127.0.0.2:4000'], 'the loopback IP the directory answered on is that box')
+  //! leavesBox — the explicit-listen rule's trigger, every case
+  assert.equal(leavesBox('127.0.0.1:3376', []), null, 'nothing set: the one-box shape, no rule')
+  assert.equal(leavesBox(false, ['127.0.0.1:4801', 'localhost:4802', '127.0.0.2']), null, 'every host on this box')
+  assert.equal(leavesBox('localhost:3376', ['[::1]:4801']), null)
+  assert.match(leavesBox('127.0.0.1:3376', ['10.0.0.5'])!, /hosts names 10\.0\.0\.5, another box/, 'a bare host naming another box')
+  assert.match(leavesBox(false, ['10.0.0.5:4800'])!, /hosts names 10\.0\.0\.5:4800, another box/, 'a ported host on another box: HELLO carries the listen there')
+  assert.match(leavesBox('10.0.0.5:3376', [])!, /its directory 10\.0\.0\.5:3376 answers other boxes/, 'a routable directory')
+  assert.match(leavesBox('0.0.0.0:3376', [])!, /answers other boxes/, 'a wildcard directory answers other boxes too')
+})
+
+test('the explicit-listen rule: a server whose listen is loopback (or a wildcard, or the default) is refused at fero() whenever it would leave this box; a routable listen passes; a bare host with the directory off is refused; nothing set is untouched', async () => {
+  const o = await fast()
+  const rule = /fero\('r'\): to be reachable from another box, listen on a routable address — /
+  //! a bare host naming another box: the default listen, an explicit loopback, a wildcard
+  await assert.rejects(fero('r', { ...o, server: true, hosts: ['10.0.0.5'] }), (e: Error) => rule.test(e.message) && /hosts names 10\.0\.0\.5, another box, but listen 127\.0\.0\.1:0 \(the default, a free loopback port\) only reaches this box$/.test(e.message))
+  await assert.rejects(fero('r', { ...o, listen: '127.0.0.1:0', hosts: ['box-b'] }), (e: Error) => rule.test(e.message) && /but listen 127\.0\.0\.1:0 only reaches this box$/.test(e.message))
+  await assert.rejects(fero('r', { ...o, listen: '0.0.0.0:0', hosts: ['10.0.0.5'] }), /listen 0\.0\.0\.0:0 is a wildcard, not an address another box can dial/)
+  //! a ported host on another box with an EXPLICIT loopback listen — V4-2's guard caught only the default
+  await assert.rejects(fero('r', { heartbeat: { ms: 0 }, rendezvous: false, listen: 'localhost:0', hosts: ['10.0.0.5:4800'] }), rule)
+  //! a directory other boxes can ask: a server registering a loopback listen there is refused; its clients are not servers
+  for (const rv of ['192.0.2.1:3376', '0.0.0.0:3376'])
+    await assert.rejects(fero('r', { heartbeat: { ms: 0 }, rendezvous: rv, server: true }), /its directory .* answers other boxes/, rv)
+  //! a ROUTABLE listen passes the rule: it gets as far as the bind, which fails here only because
+  // 192.0.2.1 (TEST-NET-1, never assigned) is not this box's address
+  await assert.rejects(fero('r', { ...o, listen: '192.0.2.1:0', hosts: ['192.0.2.2'] }), (e: Error) => !/routable/.test(e.message) && /EADDRNOTAVAIL|EINVAL|bind|listen/i.test(e.message))
+  //! a bare host and the directory off: no port to ask at — refused, naming the layer
+  await assert.rejects(fero('r', { heartbeat: { ms: 0 }, rendezvous: false, hosts: ['10.0.0.5'] }), /hosts entry '10\.0\.0\.5' has no port, which means "ask that box's directory" — but the directory is off \(rendezvous: false\): give the entry its port, or turn the directory on/)
+  //! nothing set, or every address on this box: no rule, as before
+  const s = await fero(`r-${process.pid}`, { ...o, server: true, hosts: ['127.0.0.2', 'localhost'] })
+  try {
+    assert.match(me(s).listen, /^127\.0\.0\.1:[1-9]\d*$/)
+    assert.deepEqual(Object.keys(rz(s).boxes ?? {}), [`127.0.0.2:${o.rendezvous.split(':')[1]}`], "'localhost' is this box's own directory: not asked twice")
+    assert.deepEqual(me(s).hosts, [], 'a bare host is never a dial target itself')
+  } finally { await s.destroy() }
+})
+
+//! a second "box" on this machine: 127.0.0.2 is loopback on Linux and Windows (macOS needs an alias — skipped there)
+const bindable = (host: string, port = 0): Promise<boolean> => new Promise((res) => {
+  const s = net.createServer()
+  s.once('error', () => res(false))
+  s.listen(port, host, () => s.close(() => res(true)))
+})
+//! one rendezvous port free on BOTH boxes — every box runs its directory on the same port
+const boxPort = async (): Promise<number> => {
+  for (let i = 0; i < 20; i++) { const p = await ports.free(); if (await bindable('127.0.0.2', p)) return p }
+  throw new Error('no port free on both 127.0.0.1 and 127.0.0.2')
+}
+
+test('two boxes on one machine (127.0.0.1 and 127.0.0.2, one rendezvous port, a directory each): a server on box A told the bare host 127.0.0.2 asks box B\'s directory, the two servers form ONE view, a bare client on either box reads it, and box A\'s directory never learns box B\'s server', async (t) => {
+  if (!(await bindable('127.0.0.2'))) return t.skip('127.0.0.2 is not a loopback address on this machine')
+  const port = await boxPort()
+  const A = `127.0.0.1:${port}`, B = `127.0.0.2:${port}`
+  const name = `xbox-${process.pid}`
+  const base = { heartbeat: { ms: 50 }, redial: { ms: 30 } }
+  let sb: Fero | undefined, sa: Fero | undefined, ca: Fero | undefined, cb: Fero | undefined, cx: Fero | undefined
+  try {
+    //! box B: a server on 127.0.0.2, with box B's directory — it is told nothing about box A
+    sb = await fero(name, { ...base, rendezvous: B, listen: '127.0.0.2:0' })
+    assert.ok(await until(() => rz(sb!).hosting && rz(sb!).up, 5000), 'box B hosts its own directory')
+    //! box A: a server whose hosts names box B with no port
+    sa = await fero(name, { ...base, rendezvous: A, server: true, hosts: ['127.0.0.2'] })
+    assert.ok(await until(() => members(sa!) === 2 && members(sb!) === 2, 10_000), `one view across the boxes (${members(sa)}, ${members(sb)})`)
+    assert.ok(rz(sa).hosting, 'box A hosts its own directory: asking another box hosts nothing there')
+    assert.deepEqual(rz(sa).boxes, { [B]: { up: true } }, "box B's directory, asked and up, on cluster.me.rendezvous.boxes")
+    assert.ok(me(sa).hosts.includes(me(sb).listen), "box B's server, found through box B's directory")
+    assert.equal(rz(sb).boxes, undefined, 'box B was told nothing: no boxes row')
+    //! a bare client on each box, told nothing but its own box's directory, finds the one cluster
+    ca = await fero(name, { ...base, rendezvous: A })
+    cb = await fero(name, { ...base, rendezvous: B })
+    assert.ok(await until(() => me(ca!).hosts.length === 1, 5000), 'the client on box A found its box\'s server')
+    assert.deepEqual(me(ca).hosts, [me(sa).listen], "box A's directory lists only box A's server — asking registers nothing")
+    sb.data.k = 'from-b'
+    sa.data.j = 'from-a'
+    assert.ok(await until(() => data(ca!).k === 'from-b' && data(cb!).j === 'from-a', 10_000), 'a write on either box reaches a client on the other')
+    //! a client on box A that asks box B ALONE (its own box's server is not in its hosts) still reads the cluster
+    cx = await fero(name, { ...base, rendezvous: A, hosts: ['127.0.0.2'] })
+    assert.ok(await until(() => me(cx!).hosts.includes(me(sb!).listen) && data(cx!).k === 'from-b', 10_000), 'a client asking box B finds box B\'s server')
+    assert.equal(me(cx).role, 'client', 'a bare host is not a server marker')
+  } finally { await settle([cx, cb, ca, sa, sb]) }
+})
+
+test("a misdial: a bare host whose rendezvous port holds a user resource, not a directory, is refused by the HELLO name echo — the box reads down, nothing links, the resource is untouched", async (t) => {
+  if (!(await bindable('127.0.0.2'))) return t.skip('127.0.0.2 is not a loopback address on this machine')
+  const port = await boxPort()
+  const base = { heartbeat: { ms: 50 }, redial: { ms: 30 } }
+  let other: Fero | undefined, c: Fero | undefined
+  try {
+    //! box B's rendezvous port is held by a user resource named 'other' (its own directory off)
+    other = await fero(`other-${process.pid}`, { ...base, rendezvous: false, listen: `127.0.0.2:${port}` })
+    c = await fero(`shop-${process.pid}`, { ...base, rendezvous: `127.0.0.1:${port}`, hosts: ['127.0.0.2'] })
+    await sleep(400)
+    assert.deepEqual(rz(c).boxes, { [`127.0.0.2:${port}`]: { up: false } }, 'the box reads down')
+    assert.equal(peers(other), 0, "the resource admitted nobody: '#directory' is not its name")
+    assert.deepEqual(me(c).hosts, [], 'nothing discovered')
+    //! the box's directory client dialed and was name-rejected, again at heartbeat cadence — a bounded nuisance, not a strand
+    const bc = diag(c)!.rendezvous()!.boxes[`127.0.0.2:${port}`]
+    const rejects = diag(bc)!.journal(0).events.filter((e) => e.kind === 71 /* JK.nameReject */).length
+    assert.ok(rejects >= 2, `re-dialed and refused again (${rejects} rejects)`)
+  } finally { await settle([c, other]) }
 })

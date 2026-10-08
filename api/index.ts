@@ -24,7 +24,7 @@ import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, batch, snapshot as snapshotOf } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
-import { Directory, DIRECTORY, RENDEZVOUS, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
+import { Directory, DIRECTORY, RENDEZVOUS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
 import { resolveConfig, src, CONFIG_LEAVES } from './config.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
 import { captureNode } from '../tools/debug/capture.ts'
@@ -152,12 +152,14 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     throw new Error(`fero('${name}'): hosts must be an array of 'host:port' strings${at('hosts')}`)
   //! every entry is checked as an ADDRESS and the bad one is NAMED: a role file that reads its ports off
   // process.argv and is launched with a `--fero.<key>` flag used to build '127.0.0.1:--fero.heartbeat.ms'
-  // and die deep in the shell on Node's raw `Port should be >= 0 and < 65536` (rungs 15 and 16)
+  // and die deep in the shell on Node's raw `Port should be >= 0 and < 65536` (rungs 15 and 16). A BARE
+  // host (no port) is the other legal spelling: it names another box, whose directory this instance asks
+  // (docs/DESIGN-DIRECTORY.md §11) — a flag or a lone port number is neither.
   if (config.hosts !== undefined) {
-    const i = (config.hosts as unknown[]).findIndex((h) => !isAddr(h))
+    const i = (config.hosts as unknown[]).findIndex((h) => !isAddr(h) && !isBox(h))
     if (i !== -1) {
       const h = (config.hosts as unknown[])[i]
-      throw new Error(`fero('${name}'): hosts[${i}] ${typeof h === 'string' ? `'${h}'` : String(h)} is not a 'host:port' address${at('hosts')}`)
+      throw new Error(`fero('${name}'): hosts[${i}] ${typeof h === 'string' ? `'${h}'` : String(h)} is not a 'host:port' address (nor a bare host, which asks that box's directory)${at('hosts')}`)
     }
   }
   if (config.dir !== undefined && (typeof config.dir !== 'string' || config.dir === ''))
@@ -214,7 +216,17 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // the directory publishes it) — the demo's two terminals need zero addresses, real deployments keep
   // explicit ones; a bare client dials whatever the directory lists for the name
   const listen = isServer && config.listen !== false ? ((config.listen as string | undefined) ?? '127.0.0.1:0') : undefined
-  const hosts = config.hosts as string[] | undefined
+  //! hosts split in two (§11): an entry WITH a port is a dial target, as ever; a bare host names another
+  // box, and this instance asks that box's directory at its own rendezvous port. Asking needs a port to
+  // ask at: with the directory off there is none, and 3376 picked in silence could meet a stranger's
+  // directory — so the bare spelling is refused there, with both fixes named.
+  const allHosts = config.hosts as string[] | undefined
+  const hosts = allHosts?.filter((h) => isAddr(h))
+  const bare = allHosts?.filter((h) => !isAddr(h)) ?? []
+  if (bare.length > 0 && rendezvous === false)
+    throw new Error(`fero('${name}'): hosts entry '${bare[0]}' has no port, which means "ask that box's directory" — but the directory is off${config.rendezvous === false ? ` (rendezvous: false${at('rendezvous')})` : ' (from FERO_RENDEZVOUS)'}: give the entry its port, or turn the directory on`)
+  //! the other boxes' directories: one per distinct bare host, this box's own directory left out
+  const boxes = rendezvous === false ? [] : [...new Set(bare.map((b) => boxDirectory(b, rendezvous)))].filter((d) => !sameDirectory(d, rendezvous))
   //! a user resource may not listen ON a rendezvous socket — its own, the process default's, or the
   // constant's — under ANY spelling that lands on the same loopback socket (`0.0.0.0:3376`,
   // `localhost:3376`, `[::]:3376` all bind what 127.0.0.1:3376 dials): every directory client on the
@@ -226,12 +238,17 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     if (taken !== undefined)
       throw new Error(`fero('${name}'): listen ${listen} would take the directory's socket (${taken}) — pick another port, or move the directory with rendezvous:`)
   }
-  //! the default listen is a LOOPBACK convenience: gossiping 127.0.0.1 as "my dialable address" to a
-  // non-local peer would have every dial-back reach the peer's OWN box — a futile redial forever, or
-  // a same-named stranger silently welded into membership. Dialing past loopback demands explicit listen.
-  const loopback = (h: string) => h.startsWith('127.') || h.startsWith('localhost:') || h.startsWith('[::1]')
-  if (isServer && config.listen === undefined && hosts !== undefined && hosts.some((h) => !loopback(h)))
-    throw new Error(`fero('${name}'): explicit listen required when dialing non-local hosts — the default listen is a free loopback port (peers would be told 127.0.0.1 is this node's address)`)
+  //! the explicit-listen rule (§11; it grew out of V4-2's loopback guard): a server's listen is the address
+  // it is published and gossiped under. Handed to ANOTHER box, a loopback listen dials that box's own
+  // loopback (a futile redial forever, or a same-named stranger welded into membership) and a wildcard
+  // (0.0.0.0, ::) is no address at all. So whenever the listen would leave this box — its directory
+  // answers other boxes, or its hosts name another box, with a port or without — it must be an address
+  // another box can dial. The default listen (127.0.0.1:0) is loopback, so it is refused there too.
+  if (!isSystem && listen !== undefined && localish(hostOf(listen))) {
+    const why = leavesBox(rendezvous, allHosts ?? [])
+    if (why !== null)
+      throw new Error(`fero('${name}'): to be reachable from another box, listen on a routable address — ${why}, but listen ${listen}${config.listen === undefined ? ' (the default, a free loopback port)' : at('listen')} ${loopbackHost(hostOf(listen)) ? 'only reaches this box' : 'is a wildcard, not an address another box can dial'}`)
+  }
   //! uuid discipline (v4.1): the string is validated (an empty uuid, or one containing '~' — the
   // incarnation-lane separator — could alias another node's lane in origin-string space), and a
   // durable dir's RESTORED identity beats the random default: fero(name, {dir}) with uuid omitted
@@ -607,7 +624,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     primary: node.primary !== null ? node.links.get(node.primary)?.uuid ?? null : null,
     hosts: [...new Set([...(hosts ?? []), ...discovered])].filter((h) => h !== node.listen),
     rendezvous: meets
-      ? { addr: rendezvous as string, hosting: directory?.hosting ?? false, up: directory?.up ?? false, ...(directory?.error !== undefined ? { error: directory.error } : {}) }
+      ? {
+          addr: rendezvous as string, hosting: directory?.hosting ?? false, up: directory?.up ?? false, ...(directory?.error !== undefined ? { error: directory.error } : {}),
+          //! boxes (§11): the other boxes' directories this instance asks — present only when hosts names one
+          ...(boxes.length > 0 ? { boxes: directory?.boxes ?? Object.fromEntries(boxes.map((b) => [b, { up: false }])) } : {}),
+        }
       : false as const,
   })
   //! writable, by role (I-33): a member reads its own write-gate; a client has no gate — it reads its
@@ -814,7 +835,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         compose: (n, o) => compose(n, o, true),
         addr: rendezvous as string, name, uuid: node.uuid,
         listen: () => (isClient ? undefined : node.listen),
-        serve: !isClient,
+        serve: !isClient, boxes,
         heartbeatMs: rtOpts.heartbeatMs as number, redialMs: rtOpts.redialMs,
         onHosts: (hs) => { discovered = hs; node.step({ kind: 'discover', hosts: hs }); if (stopping === null) cluster.set('me', meRow()) },
         onState: () => { if (stopping === null) cluster.set('me', meRow()) },
@@ -874,7 +895,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     },
     drop: (uuid: string) => rt.drop(uuid),
     crash: () => { untrack(inst); return teardown() },
-    rendezvous: () => (directory ? { client: directory.client, host: directory.host } : null),
+    rendezvous: () => (directory ? { client: directory.client, host: directory.host, boxes: Object.fromEntries(directory.boxClients) } : null),
     //! config (V4-10): every resolved leaf with the layer it came from — the coerced value the composer
     // read, or the effective default ('the default') where one exists; a function shows as '[function]',
     // the hosted methods and the data seed as their names (rows are data, not config)

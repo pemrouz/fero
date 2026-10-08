@@ -31,7 +31,7 @@ CLIENT 271157 — hosts 127.0.0.1:4801 127.0.0.1:4802 127.0.0.1:4803 — linked 
 $ node refusals.ts
 refused: a client needs something to dial
 refused: an undialable node (listen: false) cannot join a cluster
-refused: explicit listen required when dialing non-local hosts
+refused: to be reachable from another box, listen on a routable address
 refused: server: false pins the client role, but 'listen' makes a server
 refused: listen 0.0.0.0:3376 would take the directory's socket (127.0.0.1:3376)
 refused: names starting with # are reserved for system resources (#directory)
@@ -39,8 +39,9 @@ refused: 'update' is a function
 ```
 
 - `rendezvous: false` turns the directory off — each member says so — and every address is in the call: a
-  member gets `listen` (its own port) and `hosts` (the others), a client gets `hosts`. Nothing is looked up:
-  cross-box discovery is not implemented, and this is the one-box shape, so every address here is loopback.
+  member gets `listen` (its own port) and `hosts` (the others), a client gets `hosts`. Nothing is looked up.
+  This is the one-box shape, so every address is loopback; a member that names another box must listen on
+  an address that box can dial (the third refusal).
 - Each member counts in its own row, keyed by its pid. The client writes one row, once: a member stamps it
   and every screen shows it, the client's too. `linked 3` is the members it reaches; a client joins no vote.
 - A shape that cannot work is refused at `fero()`: a rejected promise, never a node that runs and finds
