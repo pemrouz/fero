@@ -19,7 +19,7 @@
 //! the CLOSED enums (M7 honesty gate): every fold-minted status string lives in one of these two lists —
 // the string-leaf traceability test walks fold outputs and rejects any leaf outside capture-strings ∪
 // these enums ∪ vocab names ∪ cellKey encodings. Add a status HERE (and to its fold) or the gate fails.
-export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived']
+export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived', 'not-a-holder', 'acquired']
 export const ABSENT_REASONS = ['refused', 'timeout', 'unauthorized', 'frame', 'vocab-mismatch', 'restarted', 'error']
 
 export const encodeVal = (v) => {
@@ -63,6 +63,8 @@ export const kindNames = (capture) => {
 
 //! cellKey — the kernel's state-cell identity, mirrored exactly (full key path; root inserts key by `at`).
 export const cellKey = (k, at) => JSON.stringify(k.length ? k : [at ?? ''])
+//! partOf — a captured log entry's partition, the kernel's partitionOf (kernel/env.ts): key[0], or `at` for a root insert
+const partOf = (x) => String(x.k.length ? x.k[0] : (x.at ?? ''))
 
 //! newer — the ONE conflict rule, mirrored from kernel/node.ts #apply: lexicographic (epoch, seq, origin).
 const newer = (a, b) => // is `a` strictly newer than `b`?
@@ -108,17 +110,48 @@ export const stateAt = (capture, uuid, t) => {
     const entry = idx[origin]?.get(seq)
     if (!entry) return // record absent from this node's capture — render as unknown, never invent
     const key = cellKey(entry.k, entry.at)
-    const cand = { epoch: entry.epoch, seq, origin }
+    const cand = { epoch: entry.epoch, seq, origin, p: partOf(entry) }
     const cur = versions.get(key)
     if (cur && !newer(cand, cur)) return // the LWW election, identical to the kernel's
     versions.set(key, cand)
     if (entry.ty === 2 /* remove */) state.delete(key)
     else state.set(key, { v: entry.v, origin, seq, epoch: entry.epoch })
   }
+  //! hand-offs (scoped replication, kernel/scope.ts). shed(a=p): the row lawfully leaves this node — its cells AND
+  // their versions go, outside the election (#shed + dropCell). acquire(a=p): the one-teacher fold puts the
+  // teacher's entries for p into this node's book and state with NO per-write row. The ones it taught are the
+  // captured entries of p that do not arrive by their own row later on: an entry with an apply row after the
+  // acquire came in live (the kernel's covered-below-the-cut rule makes a taught entry's later copy a dupDrop,
+  // never an applyInbound). Re-folding one already held is a no-op (the election). Built on first need only,
+  // so a capture without hand-offs pays nothing. A row compacted or shed again before capture end is absent
+  // from the book — rendered unknown, never invented, like every other absent record.
+  let byPart = null
+  const taught = (p, ta) => {
+    if (!byPart) {
+      const rowsAt = new Map() // 'origin#seq' → the journal t of every apply row for it at this node
+      const row = (k, at) => { if (!rowsAt.has(k)) rowsAt.set(k, []); rowsAt.get(k).push(at) }
+      for (const e of node.journal)
+        if (e.kind === K.writeLocal) row(lane + '#' + e.a, e.t)
+        else if (e.kind === K.applyInbound) row(e.a + '#' + e.b, e.t)
+      byPart = new Map()
+      for (const [origin, entries] of Object.entries(node.logs || {}))
+        for (const x of entries) {
+          const q = partOf(x)
+          if (!byPart.has(q)) byPart.set(q, [])
+          byPart.get(q).push({ origin, seq: x.seq, rows: rowsAt.get(origin + '#' + x.seq) || [] })
+        }
+    }
+    for (const x of byPart.get(p) || []) if (!x.rows.some((r) => r > ta)) applyOne(x.origin, x.seq)
+  }
   for (const e of node.journal) {
     if (e.t > t) break
     if (e.kind === K.writeLocal) applyOne(lane, e.a)
     else if (e.kind === K.applyInbound) applyOne(e.a, e.b)
+    else if (e.kind === K.acquire) taught(String(e.a), e.t)
+    else if (e.kind === K.shed) {
+      const p = String(e.a)
+      for (const [k, v] of versions) if (v.p === p) { versions.delete(k); state.delete(k) }
+    }
     //! walTaint: the fsyncgate verdict — kernel/node.ts condemn() wipes state, versions, logs and streams, then
     // anti-entropy re-teaches the node. The end-state refold cannot see this (the re-taught fold coincides),
     // so the row is honoured HERE: everything replayed before the hole is gone at this step.
@@ -135,7 +168,9 @@ export const stateAt = (capture, uuid, t) => {
 // mirror matches the kernel's — the drift guard for the whole debug stack.
 export const verifyReplay = (capture) => {
   return capture.nodes.map((node) => {
-    if (node.dropped > 0) return { uuid: node.uuid, ok: false, reason: `journal truncated (${node.dropped} dropped)` }
+    //! truncated: the replay is UNCHECKED, not failed — the reason string is the honesty-gate template, the flag
+    // lets the viewer say "unchecked" in amber instead of painting a lost diary page as a replay fault
+    if (node.dropped > 0) return { uuid: node.uuid, ok: false, truncated: true, reason: `journal truncated (${node.dropped} dropped)` }
     const replayed = stateAt(capture, node.uuid, Infinity)
     const actual = new Map(node.state)
     if (replayed.size !== actual.size)
@@ -243,7 +278,7 @@ export const topologyAt = (capture, uuid, t) => {
 export const verifyTopology = (capture) => {
   const LINK_FIELDS = ['uuid', 'dialed', 'admitted', 'synced', 'paused', 'queued', 'diag']
   return capture.nodes.map((node) => {
-    if (node.dropped > 0) return { uuid: node.uuid, ok: false, reason: `journal truncated (${node.dropped} dropped)` }
+    if (node.dropped > 0) return { uuid: node.uuid, ok: false, truncated: true, reason: `journal truncated (${node.dropped} dropped)` }
     const bad = (reason) => ({ uuid: node.uuid, ok: false, reason })
     const { links, streams } = topologyAt(capture, node.uuid, Infinity)
     const end = node.links || []
@@ -271,7 +306,16 @@ export const verifyTopology = (capture) => {
 
 //! routes — the write-route join (v2's flagship debug feature, impossible there because origin was
 // re-stamped at commit; trivial here because provenance is a real join key): for every (origin, seq),
-// what happened at every node — origin / applied / lww-lost / duplicate / never-arrived.
+// what happened at every node — origin / applied / lww-lost / duplicate / never-arrived / not-a-holder.
+// not-a-holder (ISSUES I-3): scoped replication sends a write to its partition's holders only. A node with
+// no row for it that is a member of the origin's view, not a client, and outside the holder set the ORIGIN's
+// capture carries for that partition (kernel/diag.ts ownHolders — the ring's answer at capture end, never
+// re-derived here) was never meant to get it. No holder facts (unscoped, an older capture, a partition
+// compacted out of the origin's log) → absent is never-arrived, exactly as before.
+// acquired: when the holders change, a new holder copies the row's whole history from an old one in one
+// fold (journal acquire, a=partition, c=teacher) — no applyInbound row per write. A node with no row for
+// the write whose record book HOLDS (origin, seq) and that journaled an acquire of the write's partition got
+// it that way: closed status `acquired`, at the last such acquire row, with the teacher. Both facts or none.
 export const routes = (capture) => {
   const K = capture.vocab
   const map = new Map() // 'origin#seq' → { origin, seq, partition, nodes: {uuid: {status, t}} }
@@ -280,11 +324,16 @@ export const routes = (capture) => {
     if (!map.has(id)) map.set(id, { origin, seq, partition: null, nodes: {} }) // null until a writeLocal row names it — a route seen only inbound (a reborn origin's old life) has no partition FACT
     return map.get(id)
   }
+  const acquired = new Map() // uuid → Map<partition, {t, from}> — the LAST acquire of each partition at that node
   for (const node of capture.nodes) {
     const skips = new Set() // lwwSkip fires just before its applyInbound — join them into one status
     const lane = laneOf(node) // a reborn node's writes are `uuid~inc#seq` routes — its peers apply them under that lane
     for (const e of node.journal) {
       if (e.kind === K.lwwSkip) skips.add(e.a + '#' + e.b)
+      else if (e.kind === K.acquire) {
+        if (!acquired.has(node.uuid)) acquired.set(node.uuid, new Map())
+        acquired.get(node.uuid).set(String(e.a), { t: e.t, from: e.c })
+      }
       else if (e.kind === K.writeLocal) {
         const r = touch(lane, e.a)
         r.partition = String(e.b)
@@ -298,10 +347,28 @@ export const routes = (capture) => {
       }
     }
   }
-  //! absent entries are REAL information: a node with no row for (origin, seq) never saw that write
-  for (const r of map.values())
+  //! absent entries are REAL information: a node with no row for (origin, seq) never saw that write —
+  // or, on a scoped capture, was never one of its holders
+  const byLane = new Map()
+  for (const node of capture.nodes) byLane.set(laneOf(node), node)
+  const seqs = new Map() // 'uuid lane' → Set of the seqs that node's record book holds (built on first need)
+  const holds = (node, lane, seq) => {
+    const k = node.uuid + ' ' + lane
+    if (!seqs.has(k)) seqs.set(k, new Set(((node.logs || {})[lane] || []).map((x) => x.seq)))
+    return seqs.get(k).has(seq)
+  }
+  for (const r of map.values()) {
+    const o = byLane.get(r.origin)
+    const holders = o && o.holders && r.partition != null ? o.holders[r.partition] : null
+    const members = holders && o.view ? o.view.members : null
     for (const node of capture.nodes)
-      if (!r.nodes[node.uuid]) r.nodes[node.uuid] = { status: 'never-arrived', t: null }
+      if (!r.nodes[node.uuid]) {
+        const got = r.partition != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(r.partition) : null
+        if (got && holds(node, r.origin, r.seq)) { r.nodes[node.uuid] = { status: 'acquired', t: got.t, from: got.from }; continue }
+        const quiet = members && node.client !== true && members.includes(node.uuid) && !holders.includes(node.uuid)
+        r.nodes[node.uuid] = { status: quiet ? 'not-a-holder' : 'never-arrived', t: null }
+      }
+  }
   return map
 }
 

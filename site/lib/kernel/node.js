@@ -33,7 +33,12 @@ import { Confirm } from './confirm.js'
 import { Scope, SCOPE } from './scope.js'
 import { diagHello, onDiagQ } from './diag.js'
 import { maybeCompact } from './log.js'
+import { tuneOf,           } from './tune.js'
 import { REC, TAG, partitionOf,                                } from './env.js'
+
+//! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
+// would be an import cycle); re-exported under their old names for the tests and tools that import them
+export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.js'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
                            
@@ -89,22 +94,16 @@ import { REC, TAG, partitionOf,                                } from './env.js'
                                                                                                    
                                                                                                        
                                         
+                                                                                                       
+                                                                                                       
+                                                                                                  
+                      
  
 
-//! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
-// heartbeats on, the heartbeat tick revives given-up targets (JK.revive) — give-up is a cool-down.
-export const MAX_REDIALS = 10
-//! LAMPORT_LEASE: how far past the durable clock ceiling a node may stamp before re-persisting the
-// boot record. A restore resumes AT the ceiling, so no seq can ever be issued twice across lives —
-// the lease is what keeps that guarantee off the per-write hot path (one cold boot-write per LEASE).
-export const LAMPORT_LEASE = 4096
-//! SNAPSHOT_AT: WAL rows appended since the last snapshot that arm a whole-WAL snapshot+swap on the
-// heartbeat tick (M4e — the disk counterpart of COMPACT_AT). Counting rows-since-snapshot (not file
-// rows) bounds RELATIVE growth: even when the log itself is large (frontier pinned), at most
-// SNAPSHOT_AT appended rows separate swaps, so the file is O(log entries + SNAPSHOT_AT) always.
-export const SNAPSHOT_AT = 4096
-
 export class Node {
+  //! tune — the frozen table every read site consults (`node.tune.<row>`). Assigned FIRST in the
+  // constructor, before anything that could read a row; never read from a field initializer.
+           tune                
            uuid        
   //! name — the resource identity this node replicates; rides HELLO so a misdial onto another
   // resource's port refuses instead of silently merging logs (see NodeOpts.name). Optional: absent
@@ -199,7 +198,10 @@ export class Node {
   //! parked (V4-3): a forgotten DYNAMIC target that a live link (or an in-flight dial) still names —
   // kept only so that link's eventual linkDown ends the chain instead of starting one; nothing dials,
   // revives, or counts a parked target, and #redial drops the entry the moment it is consulted
-  #backoff = new Map                                                                           ()
+  //! member (2026-10-08): the chain started by the death of an ADMITTED MEMBER link — a crashed member.
+  // It is capped at tune.memberRedials (never more than tune.redials); every other chain at tune.redials.
+  // Set on a FRESH chain only: a chain already running when the member link dies keeps its cap.
+  #backoff = new Map                                                                                             ()
   //! highest incarnation ever identified per peer uuid — a HELLO above it means the peer was REBORN,
   // and every evidence mark its previous life announced is void (confirm.forget; see that banner).
   #peerInc = new Map                ()
@@ -248,6 +250,7 @@ export class Node {
   tainted = false
 
   constructor(opts          , env     ) {
+    this.tune = tuneOf(opts.tune) // first: validated and frozen before any row can be read
     this.env = env
     this.journal = new Journal(opts.journalCap)
     this.uuid = opts.uuid
@@ -321,7 +324,7 @@ export class Node {
     if (!this.durable) return
     const n = this.#dirty.get(p)
     this.#dirty.set(p, (n ?? 0) + 1)
-    this.#walRows = SNAPSHOT_AT // arm: the next heartbeat tick swaps the WAL
+    this.#walRows = this.tune.snapshotAt // arm: the next heartbeat tick swaps the WAL
     if (n === undefined) this.persistBoot()
   }
 
@@ -344,6 +347,10 @@ export class Node {
   //! primary — the client's ONE feeder link id (null while unconnected). Kernel-internal to the client
   // role; the write drain targets it, digests flow only over it, failover re-elects on its linkDown.
   primary                = null
+  //! feederOpen — the client's copy of its PRIMARY's write-gate, from the `w` its digests carry (I-33):
+  // null while unknown (no feeder, a fresh feeder that has not digested yet, or an older server that
+  // sends no `w`). One heartbeat behind the feeder at worst; the api's `cluster.writable` on a client.
+  feederOpen                 = null
 
   //! clientLinks — the admitted CLIENT links this node serves (maintained at HELLO/linkDown). The
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
@@ -383,9 +390,12 @@ export class Node {
 
   //! #revivable — the give-up revival target set: static hosts ∪ committed-view member listens (a
   // joiner learned via a VIEW is as entitled to revival as a configured host — it may OWN partitions).
-  #revivable()              {
-    const targets = new Set(this.hosts)
-    for (const [u, listen] of this.membership.view.members) if (u !== this.uuid && listen) targets.add(listen)
+  // The value says whether the target is a committed member's listen: a revived MEMBER keeps the
+  // member chain (see the revive loop), a plain host gets the generic one.
+  #revivable()                       {
+    const targets = new Map                 ()
+    for (const h of this.hosts) targets.set(h, false)
+    for (const [u, listen] of this.membership.view.members) if (u !== this.uuid && listen) targets.set(listen, true)
     return targets
   }
 
@@ -403,7 +413,7 @@ export class Node {
         //! restored dirtyParts arm the snapshot swap immediately (M6-review finding 54): the dirty
         // ledger's only clear site is a snapshot echo, and nothing else would schedule one — the
         // floors stayed pinned at 0 and the ledger persisted forever.
-        if (this.durable && this.#dirty.size) this.#walRows = SNAPSHOT_AT
+        if (this.durable && this.#dirty.size) this.#walRows = this.tune.snapshotAt
         this.persistBoot() // the incarnation bump is a durable fact from the first instant
         for (const to of this.hosts) {
           j.armed && j.emit(JK.dial, to)
@@ -436,7 +446,7 @@ export class Node {
         for (const to of prev) {
           if (next.has(to) || statics.has(to) || this.membership.view.members.some(([, l]) => l === to)) continue
           for (const [id, m] of this.#timers) if (m.tag === TAG.redial && m.to === to) { this.#timers.delete(id); this.env.sink.cancel(id) }
-          if (covered(to) || this.dialing(to)) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: MAX_REDIALS, gaveUp: true, parked: true })
+          if (covered(to) || this.dialing(to)) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true, parked: true })
           else this.#backoff.delete(to)
         }
         for (const to of next) {
@@ -591,7 +601,7 @@ export class Node {
         return
       }
       case 'linkUp': {
-        const link = new Link(e.link, e.dialed, e.to)
+        const link = new Link(e.link, e.dialed, e.to, this.tune.queued)
         this.links.set(e.link, link)
         j.armed && j.emit(JK.linkUp, e.link, e.dialed ? 1 : 0)
         //! both sides open with HELLO — identity first, before anything routes. Clients declare the
@@ -646,6 +656,7 @@ export class Node {
         // the in-flight attempts so the write drain re-targets the new relay NOW, not at RETRY_TICKS.
         if (this.client && this.primary === e.link) {
           this.primary = null
+          this.feederOpen = null
           for (const l of this.links.values())
             if (l.state === LS.admitted && !l.dead) { this.primary = l.id; break }
           if (this.primary !== null) {
@@ -658,8 +669,12 @@ export class Node {
         // dialing-hold symmetrically (review: a 3-tick blip once evicted a live member from the acceptor
         // side, which held no chain) — crossing dials collapse via the one-link-per-pair dedup as usual.
         // Deliberate closes (dup-link/self-reject) never redial: that would just re-create the race.
+        //! a lost ADMITTED MEMBER link is a crashed member: its chain is the short one (tune.memberRedials), because
+        // eviction is held while this chain runs — see MEMBER_REDIALS. A link that died before HELLO is not.
+        // Nor is anything a CLIENT dials: a client evicts nobody, so its chain is no clock, and with
+        // heartbeats off a short chain would strand it from a restarting server (review finding).
         const redialTo = link.noRedial ? '' : link.dialed ? link.to ?? '' : link.listen
-        if (redialTo) this.#redial(redialTo)
+        if (redialTo) this.#redial(redialTo, !this.client && link.state === LS.admitted && this.membership.isMember(link.uuid))
         //! a lost member link can flip the write-gate to minority — journal the transition NOW, not at the next tick
         if (link.state === LS.admitted) this.membership.settle(this)
         return
@@ -716,7 +731,7 @@ export class Node {
           // timeouts, and the probe-driven handshake re-round (kernel/scope.ts tick banner)
           if (this.armed) this.scope .tick(this)
           //! the WAL snapshot (M4e) arms AFTER compaction so the swap captures the just-compacted log
-          if (this.durable && this.#walRows >= SNAPSHOT_AT) this.snapshot()
+          if (this.durable && this.#walRows >= this.tune.snapshotAt) this.snapshot()
           //! give-up revival: a target whose final redial attempt FAILED (gaveUp — never merely "tries
           // exhausted": the last armed attempt may still be pending, and dialing over it would fork a
           // second chain) is parked, not dead — each heartbeat re-dials any parked target we hold no link
@@ -726,13 +741,21 @@ export class Node {
           // gave up was parked FOREVER, stranding every attempt owner-routed to it). A live link to the
           // target — including one the PEER dialed — clears the stale give-up instead of dialing into a
           // dup race.
-          for (const to of this.#revivable()) {
+          //! a revived COMMITTED MEMBER keeps the member chain: the entry is re-seeded `member` before the
+          // dial, so the failed dial (which lands in the no-link linkDown path, which knows no link state)
+          // continues a short chain, not a fresh long one. Otherwise, when the member chain ends before
+          // suspicion (three heartbeats longer than about 31 × redial.ms — heartbeat.ms 2000 at the
+          // default base, or redial.ms 30 at the default heartbeat), the revival would hold eviction for
+          // ten more tries — slower than before the short chain existed (review finding). A client's
+          // chain is never a clock (see linkDown), so a client revives with the generic chain.
+          for (const [to, member] of this.#revivable()) {
             if (to === this.listen) continue
             if (!this.#backoff.get(to)?.gaveUp) continue // never failed, or the redial chain still owns it
             let held = false
             for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) { held = true; break }
             this.#backoff.delete(to)
             if (held) continue
+            if (member && !this.client) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: 0, member: true }) // the dial in flight — visible to a park, like discover's
             j.armed && j.emit(JK.revive, to)
             this.env.sink.connect(to)
           }
@@ -985,7 +1008,7 @@ export class Node {
   persistBoot() {
     if (!this.durable) return
     const m = this.membership
-    this.#seqCeiling = this.seq + LAMPORT_LEASE
+    this.#seqCeiling = this.seq + this.tune.lamportLease
     this.env.sink.boot({
       //! identity rides the record (v4.1): restore recovers WHO this dir belongs to, so an omitted
       // config uuid can never half-restore under a fresh random identity (the silent evicted-heir
@@ -1033,16 +1056,18 @@ export class Node {
   // sim's event queue (and a real process's timer wheel) alive forever; it is
   // journal-visible, and the heartbeat tick revives a given-up target (so with
   // heartbeats on, one exhausted chain re-arms per heartbeat interval, bounded).
-  // A successful identify resets the counter.
-  #redial(to        ) {
+  // A successful identify resets the counter. `member` marks a FRESH chain as a crashed member's
+  // (the short cap, tune.memberRedials); an existing chain keeps whatever it was.
+  #redial(to        , member = false) {
     if (this.destroyed) return
     const base = this.#opts.redialMs ?? 100
-    const b = this.#backoff.get(to) ?? { ms: base, tries: 0 }
+    const t = this.tune
+    const b = this.#backoff.get(to) ?? { ms: base, tries: 0, member }
     //! a PARKED target (discover forgot it while a link/dial still named it): the chain ends here and
     // the entry goes with it — no timer, no revival, nothing left to grow (#backoff stays bounded by
     // the live link set, not by every address a port-0 server ever had)
     if (b.parked) { this.#backoff.delete(to); return }
-    if (b.tries >= MAX_REDIALS) {
+    if (b.tries >= (b.member ? Math.min(t.memberRedials, t.redials) : t.redials)) {
       //! the final ARMED attempt has now FAILED — only here does the target become truly parked
       if (!b.gaveUp) {
         b.gaveUp = true
@@ -1051,7 +1076,7 @@ export class Node {
       }
       return
     }
-    this.#backoff.set(to, { ms: Math.min(b.ms * 2, base * 32), tries: b.tries + 1 })
+    this.#backoff.set(to, { ms: Math.min(b.ms * t.redialGrowth, base * t.redialCap), tries: b.tries + 1, member: b.member })
     const delay = b.ms + Math.floor(this.env.rng() * base)
     const id = ++this.#timerSeq
     this.#timers.set(id, { tag: TAG.redial, to })
@@ -1096,7 +1121,7 @@ export class Node {
             // resource that moves onto the right port later, heals at heartbeat cadence instead of
             // stranding this node forever (V4-3 panel: noRedial alone never started a chain, so
             // revival — which keys on gaveUp — could never reach the target)
-            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: MAX_REDIALS, gaveUp: true })
+            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
             return this.env.sink.close(link.id, 'name-mismatch')
           }
         }
@@ -1301,7 +1326,7 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'digest-before-hello')
         }
-        const v = f.value                                                                            
+        const v = f.value                                                                                        
         if (typeof v?.d !== 'object' || v.d === null) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed digest')
           return
@@ -1340,6 +1365,8 @@ export class Node {
         // "Ahead of my feeder" is a TRUE signal on the single-feeder FIFO: at the instant a feeder builds a
         // digest, its tails cover everything it has ever shipped us (live tap-forwards included).
         if (this.client) {
+          //! the feeder's gate rides its digests to us (I-33): read it before anything can return
+          if (v.w === 1 || v.w === 0) this.feederOpen = v.w === 1
           if (this.resync === null) {
             for (const [origin, d] of this.streams)
               if (d.applied > (typeof v.d[origin] === 'number' ? (v.d[origin]          ) : 0)) return this.#resyncBegin(link)
@@ -1482,12 +1509,15 @@ export class Node {
   #sendDigest(link      , r       ) {
     const d                         = {}
     for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
-    let body                                                                      
+    let body                                                                                  
     if (this.durable) {
       const p                         = {}
       for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
       body = { d, r, p }
     } else body = { d, r }
+    //! toward a CLIENT, the digest also carries this node's write-gate (I-33): the client has no gate of
+    // its own, and a closed gate here parks its relayed writes. Member-to-member digests are unchanged.
+    if (link.client) body.w = this.membership.gate(this).open ? 1 : 0
     link.ship(encodeControl(VERB.DIGEST, body), this.env.sink, this.journal)
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }
