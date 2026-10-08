@@ -38,7 +38,7 @@ import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
 //! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
 // would be an import cycle); re-exported under their old names for the tests and tools that import them
-export { MAX_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.ts'
+export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.ts'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
 export interface NodeOpts {
@@ -198,7 +198,10 @@ export class Node {
   //! parked (V4-3): a forgotten DYNAMIC target that a live link (or an in-flight dial) still names —
   // kept only so that link's eventual linkDown ends the chain instead of starting one; nothing dials,
   // revives, or counts a parked target, and #redial drops the entry the moment it is consulted
-  #backoff = new Map<string, { ms: number; tries: number; gaveUp?: boolean; parked?: boolean }>()
+  //! member (2026-10-08): the chain started by the death of an ADMITTED MEMBER link — a crashed member.
+  // It is capped at tune.memberRedials (never more than tune.redials); every other chain at tune.redials.
+  // Set on a FRESH chain only: a chain already running when the member link dies keeps its cap.
+  #backoff = new Map<string, { ms: number; tries: number; gaveUp?: boolean; parked?: boolean; member?: boolean }>()
   //! highest incarnation ever identified per peer uuid — a HELLO above it means the peer was REBORN,
   // and every evidence mark its previous life announced is void (confirm.forget; see that banner).
   #peerInc = new Map<string, number>()
@@ -658,8 +661,10 @@ export class Node {
         // dialing-hold symmetrically (review: a 3-tick blip once evicted a live member from the acceptor
         // side, which held no chain) — crossing dials collapse via the one-link-per-pair dedup as usual.
         // Deliberate closes (dup-link/self-reject) never redial: that would just re-create the race.
+        //! a lost ADMITTED MEMBER link is a crashed member: its chain is the short one (tune.memberRedials), because
+        // eviction is held while this chain runs — see MEMBER_REDIALS. A link that died before HELLO is not.
         const redialTo = link.noRedial ? '' : link.dialed ? link.to ?? '' : link.listen
-        if (redialTo) this.#redial(redialTo)
+        if (redialTo) this.#redial(redialTo, link.state === LS.admitted && this.membership.isMember(link.uuid))
         //! a lost member link can flip the write-gate to minority — journal the transition NOW, not at the next tick
         if (link.state === LS.admitted) this.membership.settle(this)
         return
@@ -1033,16 +1038,18 @@ export class Node {
   // sim's event queue (and a real process's timer wheel) alive forever; it is
   // journal-visible, and the heartbeat tick revives a given-up target (so with
   // heartbeats on, one exhausted chain re-arms per heartbeat interval, bounded).
-  // A successful identify resets the counter.
-  #redial(to: string) {
+  // A successful identify resets the counter. `member` marks a FRESH chain as a crashed member's
+  // (the short cap, tune.memberRedials); an existing chain keeps whatever it was.
+  #redial(to: string, member = false) {
     if (this.destroyed) return
     const base = this.#opts.redialMs ?? 100
-    const b = this.#backoff.get(to) ?? { ms: base, tries: 0 }
+    const t = this.tune
+    const b = this.#backoff.get(to) ?? { ms: base, tries: 0, member }
     //! a PARKED target (discover forgot it while a link/dial still named it): the chain ends here and
     // the entry goes with it — no timer, no revival, nothing left to grow (#backoff stays bounded by
     // the live link set, not by every address a port-0 server ever had)
     if (b.parked) { this.#backoff.delete(to); return }
-    if (b.tries >= this.tune.redials) {
+    if (b.tries >= (b.member ? Math.min(t.memberRedials, t.redials) : t.redials)) {
       //! the final ARMED attempt has now FAILED — only here does the target become truly parked
       if (!b.gaveUp) {
         b.gaveUp = true
@@ -1051,7 +1058,7 @@ export class Node {
       }
       return
     }
-    this.#backoff.set(to, { ms: Math.min(b.ms * this.tune.redialGrowth, base * this.tune.redialCap), tries: b.tries + 1 })
+    this.#backoff.set(to, { ms: Math.min(b.ms * t.redialGrowth, base * t.redialCap), tries: b.tries + 1, member: b.member })
     const delay = b.ms + Math.floor(this.env.rng() * base)
     const id = ++this.#timerSeq
     this.#timers.set(id, { tag: TAG.redial, to })

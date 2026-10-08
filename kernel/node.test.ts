@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
 import { JK } from './journal.ts'
-import { MAX_QUEUED } from './link.ts'
+import { LS, MAX_QUEUED } from './link.ts'
 import { Framer, VERB, encodeControl, encodeFrame, crcFrame } from './codec.ts'
 import { REC, TAG, type EffectSink, type Env } from './env.ts'
 
@@ -182,6 +182,35 @@ test('tune: { redials: 2 } — the chain gives up after two tries, and the curve
     n2.step({ kind: 'linkDown', link: 900 + i, reason: 'refused', to: 'sim:bb' })
   }
   assert.deepEqual(of2('timer').map((t) => t[3]), [10, 30, 40, 40, 40])
+})
+
+test('a dead MEMBER link runs the short chain (memberRedials = 5); a dial that never linked up still runs the long one', () => {
+  //! a restored view with bb as a member: the link to bb is admitted, then dies — that is a crashed member,
+  // and its chain is what holds eviction, so it is capped at memberRedials. The dial to cc (in hosts, never
+  // linked up) is the generic chain and keeps the long cap.
+  const { node, of } = harness('aa', { redialMs: 10, hosts: ['sim:bb', 'sim:cc'], boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb']] } })
+  node.step({ kind: 'start' })
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: hello('bb') })
+  assert.equal(node.links.get(1)!.state, LS.admitted)
+  node.step({ kind: 'linkDown', link: 1, reason: 'cut' })
+  node.step({ kind: 'linkDown', link: 900, reason: 'refused', to: 'sim:cc' }) // cc never linked up
+  //! drive both chains: fire every armed redial timer in arming order and fail its dial. The i-th redial
+  // timer and the i-th JK.redial row are the same arm (#redial emits both), so the row names the target.
+  let fired = 0
+  for (;;) {
+    const timers = of('timer').filter((x) => x[2] === TAG.redial)
+    if (fired >= timers.length) break
+    const t = timers[fired++]
+    const to = node.journal.read().filter((e) => e.kind === JK.redial)[fired - 1].b as string
+    node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    node.step({ kind: 'linkDown', link: 900 + fired, reason: 'refused', to })
+  }
+  const redials = (to: string) => node.journal.read().filter((e) => e.kind === JK.redial && e.b === to).length
+  assert.equal(redials('sim:bb'), 5, 'the member chain: memberRedials tries, then give-up')
+  assert.equal(redials('sim:cc'), 10, 'the generic chain: redials tries')
+  assert.deepEqual(node.journal.read().filter((e) => e.kind === JK.giveUp).map((e) => e.a).sort(), ['sim:bb', 'sim:cc'])
+  assert.ok(!node.dialing('sim:bb') && !node.dialing('sim:cc'), 'both chains ended — the eviction hold is released')
 })
 
 test('revival: only a FAILED final attempt revives; the pending window and a peer-dialed link do not', () => {

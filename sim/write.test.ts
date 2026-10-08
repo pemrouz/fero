@@ -80,13 +80,17 @@ test('AA#2 the view-install window: a laggard\'s writes crossing an eviction com
   sim.run({ until: 500 })
   assert.deepEqual(nodes.map((n) => n.epoch), [1, 1, 1, 1, 1])
   pin(nodes, 'aa2', 'n03')
-  //! n05 goes dark for good → its give-up (~4.4s) triggers the eviction ballot
+  //! n05 goes dark for good → its give-up (the member chain, MEMBER_REDIALS 5 at base 20: ≈ 1205 for this seed)
+  // triggers the eviction ballot; view 2 commits ≈ 1260 everywhere but n02
   for (const other of ['n01', 'n02', 'n03', 'n04']) sim.partition('n05', other)
-  //! n02 is cut just before the commit — a member of the new view that will MISS the install
-  sim.at(3800, () => { for (const other of ['n01', 'n03', 'n04']) sim.partition('n02', other) })
-  sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: ['aa2'], value: 'laggard' }] }, 4000)
-  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['aa2'], value: 'current' }] }, 4800)
-  sim.run({ until: 4950 })
+  //! n02 is cut just before the commit — a member of the new view that will MISS the install (at() and
+  // post() delays are relative to now = 500: the cut lands at 1150, the writes at 1250 and 1300)
+  sim.at(650, () => { for (const other of ['n01', 'n03', 'n04']) sim.partition('n02', other) })
+  sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: ['aa2'], value: 'laggard' }] }, 750)
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['aa2'], value: 'current' }] }, 800)
+  //! probe and heal BEFORE n01's chain to n02 gives up (≈ 1420 for this seed: the view-2 install at 1209 dials
+  // n02 too and that failed dial spends one of the five tries): n02 must stay a member of view 2
+  sim.run({ until: 1350 })
   assert.deepEqual(nodes.filter((n) => !['n02', 'n05'].includes(n.uuid)).map((n) => n.epoch), [2, 2, 2], 'view 2 committed while n02 was away')
   assert.equal(nodes[1].epoch, 1, 'n02 still holds view 1 — the stale issuer')
   assert.equal(nodes[1].writes.pending.size, 1, 'its write is parked under the minority gate')
@@ -129,14 +133,15 @@ test('AA#3 the parked flush re-validates OWNERSHIP: it forwards to the owner —
       }
     }
     //! n03 into the minority with a parked write; the OWNER commits the same partition meanwhile —
-    // the collision partner. Heal BEFORE give-up: no eviction, everyone stays at view 1 — so the
-    // mutant's local flush lands at the SAME epoch as the owner's commit: the exact AA #3 conflict.
+    // the collision partner. Heal BEFORE give-up (the member chain, MEMBER_REDIALS 5 at base 20: n01 gives up
+    // ≈ 1090 for this seed): no eviction, everyone stays at view 1 — so the mutant's local flush lands at
+    // the SAME epoch as the owner's commit: the exact AA #3 conflict.
     sim.partition('n01', 'n03')
     sim.partition('n02', 'n03')
     sim.run({ until: 600 })
     sim.post('n03', { kind: 'write', recs: [{ type: REC.update, key: ['aa3'], value: 'parked' }] })
     sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['aa3'], value: 'owner-value' }] }, 100)
-    sim.run({ until: 2000 })
+    sim.run({ until: 900 })
     assert.equal(nodes[2].writes.pending.size, 1, 'the write is still parked under the minority gate')
     sim.heal('n01', 'n03')
     sim.heal('n02', 'n03')

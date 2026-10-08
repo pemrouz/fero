@@ -5,7 +5,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { Node } from './node.ts'
+import { Node, MAX_REDIALS, MEMBER_REDIALS } from './node.ts'
 import { LEAVE_TICKS, MAX_PULLS } from './membership.ts'
 import { MAX_PENDING } from './write.ts'
 import { JK } from './journal.ts'
@@ -205,6 +205,44 @@ test('suspicion + eviction: suspect after 3 ticks, but eviction WAITS for the di
   assert.equal(h.node.epoch, 2, 'aa+bb = majority of OLD (2/3) and of NEW (2/2) — joint consensus commits')
   assert.deepEqual(h.node.membership.view.members.map((m) => m[0]), ['aa', 'bb'])
   assert.deepEqual(h.jk(JK.evict).map((e) => e.a), ['cc'])
+})
+
+test('a crashed member runs the SHORT chain (memberRedials 5): the eviction hold ends after five failed redials, not ten', () => {
+  const h = formedView1()
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' }) // cc's admitted member link dies → the member chain
+  let n = 0
+  const fail = () => {
+    const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()!
+    h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    h.node.step({ kind: 'linkDown', link: 800 + ++n, reason: 'refused', to: 'sim:cc' })
+  }
+  fail(); fail()
+  h.tick(); h.tick(); h.tick()
+  assert.deepEqual(h.jk(JK.suspect).map((e) => e.a), ['cc'], 'suspect after three ticks')
+  assert.ok(h.node.dialing('sim:cc') && !h.jk(JK.propose).some((e) => e.a === 2), 'held: the chain is still running')
+  fail(); fail()
+  h.tick()
+  assert.ok(h.node.dialing('sim:cc') && !h.jk(JK.propose).some((e) => e.a === 2), 'held: the fifth attempt is pending')
+  fail() // the fifth attempt fails — the member chain gives up here, where the generic chain would arm a sixth
+  assert.equal(h.jk(JK.redial).filter((e) => e.b === 'sim:cc').length, MEMBER_REDIALS, 'five arms, no sixth')
+  assert.deepEqual(h.jk(JK.giveUp).map((e) => e.a), ['sim:cc'])
+  assert.ok(!h.node.dialing('sim:cc'), 'give-up ends the hold')
+  h.tick()
+  assert.ok(h.jk(JK.propose).some((e) => e.a === 2), 'the eviction ballot opens at the next tick')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,bb' }) })
+  assert.equal(h.node.epoch, 2)
+  assert.deepEqual(h.jk(JK.evict).map((e) => e.a), ['cc'])
+  //! the same node, a target that never linked up: the long chain (MAX_REDIALS) — the two caps are independent
+  const g = harness('aa', { hosts: ['sim:zz'] })
+  g.node.step({ kind: 'start' })
+  g.node.step({ kind: 'linkDown', link: 700, reason: 'refused', to: 'sim:zz' })
+  for (let i = 0; i < 12; i++) {
+    const t = g.of('timer').filter((x) => x[2] === TAG.redial).pop()
+    if (!t) break
+    g.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    g.node.step({ kind: 'linkDown', link: 701 + i, reason: 'refused', to: 'sim:zz' })
+  }
+  assert.equal(g.jk(JK.redial).length, MAX_REDIALS)
 })
 
 test('join: a member receiving JOIN from an admitted non-member proposes the grown view', () => {

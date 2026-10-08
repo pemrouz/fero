@@ -17,7 +17,7 @@ import { fero, RENDEZVOUS } from './index.ts'
 import { Directory, GRACE, MAX_PER_CALLER, hostMethods, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
-import { MAX_REDIALS } from '../kernel/node.ts'
+import { MEMBER_REDIALS } from '../kernel/node.ts'
 import { ports, sleep, until } from '#utils'
 import type { Fero } from './types.ts'
 import type { Context } from './methods.ts'
@@ -207,8 +207,9 @@ test('directory host death: a survivor takes the port over, the client fails ove
   const o = await fast()
   const name = `take-${process.pid}`
   //! the eviction wait is the dead host's redial chain giving up (eviction is HELD while a member is
-  // still being dialed), not SUSPECT_TICKS: ≈ redial.ms·(1+2+…+32·k) — derive the bound from that
-  const chain = o.redial.ms * (1 + 2 + 4 + 8 + 16 + 32 * (MAX_REDIALS - 5)) + MAX_REDIALS * o.redial.ms
+  // still being dialed), not SUSPECT_TICKS. A dead MEMBER runs the short chain (MEMBER_REDIALS, kernel/tune.ts):
+  // ≈ redial.ms·(1+2+4+…, capped at 32) plus up to one base of jitter per try — derive the bound from that
+  const chain = Array.from({ length: MEMBER_REDIALS }, (_, i) => Math.min(2 ** i, 32) + 1).reduce((a, b) => a + b, 0) * o.redial.ms
   let s1: Fero | undefined, s2: Fero | undefined, s3: Fero | undefined, c: Fero | undefined, late: Fero | undefined, s4: Fero | undefined
   try {
     s1 = await fero(name, { server: true, ...o })
