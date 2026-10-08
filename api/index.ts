@@ -3,8 +3,9 @@
 // everything reactive is a ViewProxy you connect or tap. Config recognition is by
 // DECLARED KEY: every option must be a known FeroConfig key, typos throw at fero()
 // time, and hosted methods live under `methods:` — whose presence is THE DOOR (V4-5:
-// clients change a protected resource only through its methods). Function-valued
-// CONFIG lives under the one reserved `seams` key.
+// clients change a protected resource only through its methods). The one other
+// function-valued key is `validation:` (once `seams.validation`, still accepted for
+// one release — api/config.ts folds it).
 //
 // M5a scope: the server/solo composer over the shell Runtime — data binding both
 // directions with the write-route join (api/data.ts; V4-7: a write shows when it commits), the default write methods with
@@ -32,7 +33,7 @@ import { spawn } from './spawn.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'journal', 'replicas', 'data', 'methods', 'seams', 'rendezvous', 'signals'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'journal', 'replicas', 'data', 'methods', 'validation', 'seams', 'rendezvous', 'signals'])
 const SEAM_KEYS = new Set(['validation'])
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -86,7 +87,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   //! every option is a DECLARED key (V4-5): a function-valued option is the pre-V4-5 method spelling —
   // refused with the pointer (moving it under `methods:` also declares the door, on purpose)
   for (const [k, v] of Object.entries(opts as Record<string, unknown>))
-    if (typeof v === 'function' && k !== 'methods') // `methods: fn` gets the plain-object message below, not a pointer to methods: { methods }
+    if (typeof v === 'function' && k !== 'methods' && k !== 'validation') // `methods: fn` gets the plain-object message below, not a pointer to methods: { methods }
       throw new Error(`fero('${name}'): '${k}' is a function — methods live under methods: { ${k} }, and declaring them makes clients change data only through them`)
   //! the six layers fold into the call HERE (V4-10, api/config.ts): a launch flag, the call, the
   // environment, a fero.opt.ts at the project or in $HOME — checked against the declared schema and
@@ -105,20 +106,25 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // object of functions (own enumerable handlers — a class instance keeps its methods on the prototype,
   // would host nothing and protect everything: refused here, not discovered by clients at runtime);
   // names off the system plane and off the built-in writers.
+  const plainObject = (v: unknown): boolean => typeof v === 'object' && v !== null && !Array.isArray(v) && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null)
   const m = config.methods
-  const plain = typeof m === 'object' && m !== null && !Array.isArray(m) && (Object.getPrototypeOf(m) === Object.prototype || Object.getPrototypeOf(m) === null)
-  if (m !== undefined && !plain)
+  if (m !== undefined && !plainObject(m))
     throw new Error(`fero('${name}'): methods must be a plain object of handlers — methods: { sell(arg, ctx) { … } } (own functions, not a class instance) — its presence makes the resource protected (clients change data only through them)`)
   const userMethods = (config.methods ?? {}) as Record<string, (...args: unknown[]) => unknown>
   for (const [k, v] of Object.entries(userMethods)) {
     if (typeof v !== 'function') throw new Error(`fero('${name}'): methods.${k} must be a function (arg, ctx) => …`)
     if (k.startsWith(SYSTEM)) throw new Error(`fero('${name}'): method names may not start with \\u0000 (reserved for the system plane)`)
-    if (k === 'update' || k === 'insert' || k === 'remove') throw new Error(`fero('${name}'): methods.${k} is a built-in writer — wrap it via seams.validation or name the method differently`)
+    if (k === 'update' || k === 'insert' || k === 'remove') throw new Error(`fero('${name}'): methods.${k} is a built-in writer — guard it with validation: or name the method differently`)
   }
   const methodsOnly = config.methods !== undefined
   const seams = (config.seams ?? {}) as Record<string, unknown>
   for (const k of Object.keys(seams))
     if (!SEAM_KEYS.has(k)) throw new Error(`fero('${name}'): unknown seam '${k}' — M5a ships ${[...SEAM_KEYS].join(', ')}; hash/codec/storage land with their milestones`)
+  //! validation: — the schema check on every record that enters (V4-4). api/config.ts folds the old
+  // `seams.validation` spelling into it for a public fero(); a system compose passes its opts as given.
+  const validate = (config.validation ?? seams.validation) as ((rec: Rec) => true | string) | undefined
+  if (validate !== undefined && typeof validate !== 'function')
+    throw new Error(`fero('${name}'): validation must be a function (record) => true | 'the reason' — it runs on every write that enters`)
 
   //! role by DECLARED ACT (v4.1 — supersedes the v2 hosts-without-listen rule): following is the
   // ambient case, serving is a declared act. Any server MARKER makes a server — server: true, listen
@@ -145,7 +151,6 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   }
   if (config.dir !== undefined && (typeof config.dir !== 'string' || config.dir === ''))
     throw new Error(`fero('${name}'): dir must be a non-empty path${at('dir')}`)
-  const plainObject = (v: unknown): boolean => typeof v === 'object' && v !== null && !Array.isArray(v) && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null)
   if (config.data !== undefined && !plainObject(config.data))
     throw new Error(`fero('${name}'): data must be a plain object of initial rows — it seeds the resource only when the local fold is empty at boot${at('data')}`)
   //! server: false (V4-10) is the CLIENT pin: with the layers, a server marker can now arrive from a flag,
@@ -271,11 +276,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     //! the relay's admission predicate (V4-4, V4-5): a client's plain write relayed through this server
     // meets the kernel's relay ingress (kernel/write.ts onWrite) with THIS predicate — under `methods:`
     // the door itself (every relayed record refused 'methods-only', before any user code runs);
-    // otherwise the server's seams.validation, exactly as for its own issues; otherwise nothing (open —
+    // otherwise the server's validation:, exactly as for its own issues; otherwise nothing (open —
     // the relay loop is the pre-V4-4 loop). Zero kernel change for the door: it is what the composer puts
     // INTO the one hook. Inert on a client (nobody relays through a spoke).
     ...(methodsOnly ? { validate: METHODS_ONLY_ADMIT }
-      : seams.validation !== undefined ? { validate: seams.validation as (rec: Rec) => true | string } : {}),
+      : validate !== undefined ? { validate } : {}),
     ...(restored.boot !== undefined ? { boot: restored.boot } : {}),
     ...(restored.incarnation !== undefined ? { incarnation: restored.incarnation } : {}),
   }
@@ -307,7 +312,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     movedWrites.clear()
   }
   const bind = new Bind(rt, {
-    validate: seams.validation as ((rec: Rec) => true | string) | undefined,
+    validate,
     tracked: () => host?.tracked(),
     onOutcome: (id) => {
       movedWrites.add(id)
@@ -767,11 +772,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // existing cluster, LWW resolves collisions (higher-epoch cluster stamps win; fresh keys ride in).
   if (config.data !== undefined && rt.node.versions.size === 0) {
     const recs: Rec[] = Object.entries(config.data as Record<string, unknown>).map(([k, v]) => ({ type: REC.update, key: [k], value: v }))
-    const validate = seams.validation as ((rec: Rec) => true | string) | undefined
     if (validate)
       for (const r of recs) {
         const v = validate(r)
-        if (v !== true) await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' rejected by seams.validation — ${v}`))
+        if (v !== true) await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' rejected by validation — ${v}`))
       }
     for (const r of bind.issue(recs))
       if (typeof r === 'string') await abort(new Error(`fero('${name}'): data seed refused by the kernel — ${r}`))

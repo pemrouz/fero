@@ -20,7 +20,7 @@ assert.ok([shop, client].every((r) => !r.out.includes(`'hammer-${client.pid}'`))
 // in this process: the awaited spelling rejects with the same reason, and a seed row the rule refuses stops fero() itself
 const c = await fero('shop')
 await assert.rejects(c.methods.update({ key: 'axe', value: { stock: -1 } }), (e: { reason: string }) => e.reason === 'negative stock', 'methods.update rejects typed, with the reason')
-await assert.rejects(fero('shop', { listen: false, data: { axe: { stock: -1 } }, seams: { validation: rule } }), /data seed row 'axe' rejected by seams\.validation — negative stock/, 'a bad seed row is a config error')
+await assert.rejects(fero('shop', { listen: false, data: { axe: { stock: -1 } }, validation: rule }), /data seed row 'axe' rejected by validation — negative stock/, 'a bad seed row is a config error')
 await c.destroy()
 
 for (const r of [shop, client]) assert.equal(await r.stop(), 0, 'stopped cleanly')

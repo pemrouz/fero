@@ -36,7 +36,7 @@ export interface WriteReject {
   reached: 'issued' | 'committed'
   //! reason — 'timeout' | 'superseded' | 'dropped' | 'destroyed' (the kernel's outcomes), 'methods-only'
   // (the server takes client changes only through its `methods:` — V4-5), or the server's own
-  // seams.validation string for a relayed record it refused (V4-4).
+  // validation: string for a relayed record it refused (V4-4).
   reason: string
   localCommit?: { origin: string; seq: number; epoch: number }
 }
@@ -55,22 +55,26 @@ export interface WriteOpts {
   timeout?: number
 }
 
-//! Seams — the ONE reserved nested config key for function-valued config (plan §9), so the
-// "functions are methods" recognition rule survives. M5a ships `validation` (the user-overridable
-// hook BOTH assignment and methods.update pass through — v2's OQ6 closed by construction);
-// hash/codec/storage land with their milestones.
+//! Validation — the schema check, `validation:` in the call (owner question 5, 2026-10-05: promoted
+// from `seams.validation`, which still works for one release with a one-time note on stderr). The
+// user-overridable hook BOTH assignment and methods.update pass through — v2's OQ6 closed by construction.
+//! validation — a SCHEMA check: what a record may look like, never who may write it. Return true to
+// admit, or a reason string to reject (a refused assignment never shows — V4-7; methods.* rejects
+// with the reason; inside a hosted method the CALL fails with it — V4-5). Runs at the ONE local ingest, before
+// anything is issued — the server's own writes, its handlers' ctx.data writes, the data: seed — AND,
+// on an OPEN server, at the relay ingress for the client writes it relays (V4-4: a refused relayed
+// write WNACKs `invalid` with the reason, so the client's promise rejects and a plain client
+// assignment is refused exactly like a local reject — nothing ever showed). Under `methods:` no client record ever reaches
+// it — the door refuses first. Keep it a pure function of the record: it runs inside the kernel step,
+// and a retransmit of an already-committed record is dup-ACKed without re-checking. Per-caller rules
+// belong in hosted methods (ctx.peer).
+export type Validation = (rec: Rec) => true | string
+
+//! Seams — the old home of function-valued config. `seams: { validation }` is the pre-promotion spelling of
+// `validation:`; kept for one release. hash/codec/storage would land here with their milestones.
 export interface Seams {
-  //! validation — a SCHEMA check: what a record may look like, never who may write it. Return true to
-  // admit, or a reason string to reject (a refused assignment never shows — V4-7; methods.* rejects
-  // with the reason; inside a hosted method the CALL fails with it — V4-5). Runs at the ONE local ingest, before
-  // anything is issued — the server's own writes, its handlers' ctx.data writes, the data: seed — AND,
-  // on an OPEN server, at the relay ingress for the client writes it relays (V4-4: a refused relayed
-  // write WNACKs `invalid` with the reason, so the client's promise rejects and a plain client
-  // assignment is refused exactly like a local reject — nothing ever showed). Under `methods:` no client record ever reaches
-  // it — the door refuses first. Keep it a pure function of the record: it runs inside the kernel step,
-  // and a retransmit of an already-committed record is dup-ACKed without re-checking. Per-caller rules
-  // belong in hosted methods (ctx.peer).
-  validation?: (rec: Rec) => true | string
+  /** @deprecated spelled `validation:` at the top level now; this spelling goes in the next release */
+  validation?: Validation
 }
 
 //! FeroConfig — the declared, picked config schema. Unknown keys throw at fero() time; so does a
@@ -79,7 +83,7 @@ export interface Seams {
 // the call beats `FERO_<KEY>` in the environment, env beats a `fero.opt.ts` at the project or in $HOME,
 // and every layer is beaten by a value scoped to this resource's name (`--fero.shop.dir`,
 // `FERO_SHOP_DIR`, `{ shop: { dir } }`). Keys are nested lowercase words so one spelling survives every
-// layer. Call-only (a function or a per-instance switch): methods, seams, signals; data also rides a
+// layer. Call-only (a function or a per-instance switch): methods, validation, signals; data also rides a
 // file; uuid never comes from a file. `FERO_CONFIG=off` reads the call alone (the test battery).
 //! Role (v4.1) is by DECLARED ACT: any server marker — server: true, listen, dir, replicas, a `data`
 // seed, or `methods:` — makes a server; no marker makes a CLIENT dialing its hosts (or, bare, the
@@ -131,13 +135,15 @@ export interface FeroConfig {
   // methods.update/insert/remove (one ingest, the same bytes) — is refused at the relay with the
   // terminal reason 'methods-only' (the client's promise rejects typed; a plain assignment never shows).
   // The pin is about the WIRE: the server's own writes and its handlers' ctx.data writes are trusted
-  // (they still meet seams.validation). Reads and subscriptions stay open — reads are not writes.
+  // (they still meet validation:). Reads and subscriptions stay open — reads are not writes.
   // Omit it for an OPEN resource (anyone admitted may write anything — the demo shape). Open or
   // protected, nothing in between. `methods: {}` is a resource clients may only read. A handler gets
   // (arg, ctx): ctx.data is the server's own surface, ctx.peer the caller's uuid, ctx.flush() the
   // mid-body barrier. Names may not start with \u0000 (the system plane) or be update/insert/remove
   // (the built-in writers). Implies server.
   methods?: Record<string, (arg: any, ctx: Context) => unknown>
+  //! validation — the schema check every write meets as it enters (see Validation above). Call only.
+  validation?: Validation
   seams?: Seams
   //! signals (V4-8) — the clean stop on Ctrl-C. By default every live instance destroy()s on SIGINT or
   // SIGTERM (the graceful leave, then teardown) and, if nothing else in the process listens for that
