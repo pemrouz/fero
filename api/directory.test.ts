@@ -445,6 +445,14 @@ test('cross-box helpers: a bare host (isBox) names a box, its directory sits at 
   assert.equal(boxDirectory('10.0.0.5', '127.0.0.1:3376'), '10.0.0.5:3376', "the port is this instance's rendezvous port")
   assert.equal(boxDirectory('[fe80::1]', '127.0.0.1:4100'), '[fe80::1]:4100')
   assert.ok(sameDirectory('localhost:3376', '127.0.0.1:3376'), "'localhost' is this box's own directory")
+  //! every spelling that DIALS this box's directory is this box: names are case-blind, and a wildcard
+  // dialed reaches loopback (a wildcard directory answers on loopback too). '[::1]' is a different socket
+  // from 127.0.0.1 — nothing answers there, so it is honestly another (down) box.
+  for (const own of ['LOCALHOST:3376', 'LocalHost:3376', '0.0.0.0:3376'])
+    assert.ok(sameDirectory(own, '127.0.0.1:3376'), `${own} dials this box's own directory`)
+  assert.ok(sameDirectory('127.0.0.1:3376', '0.0.0.0:3376'), 'a wildcard directory answers on loopback')
+  assert.ok(sameDirectory('[::]:3376', '[::1]:3376'))
+  assert.equal(sameDirectory('[::1]:3376', '127.0.0.1:3376'), false, '::1 and 127.0.0.1 are two sockets')
   assert.equal(sameDirectory('127.0.0.2:3376', '127.0.0.1:3376'), false, 'another loopback IP stands for another box')
   assert.equal(sameDirectory('10.0.0.5:3377', '10.0.0.5:3376'), false)
   //! fromBox: a loopback or wildcard address from ANOTHER box's directory would dial THIS box — dropped,
@@ -455,6 +463,8 @@ test('cross-box helpers: a bare host (isBox) names a box, its directory sits at 
   assert.equal(leavesBox('127.0.0.1:3376', []), null, 'nothing set: the one-box shape, no rule')
   assert.equal(leavesBox(false, ['127.0.0.1:4801', 'localhost:4802', '127.0.0.2']), null, 'every host on this box')
   assert.equal(leavesBox('localhost:3376', ['[::1]:4801']), null)
+  assert.equal(leavesBox('LOCALHOST:3376', ['LocalHost:4801', 'LOCALHOST']), null, 'host names are case-blind: LOCALHOST is this box')
+  assert.ok(sameSocket('LOCALHOST:3376', '127.0.0.1:3376'), 'LOCALHOST cannot squat the directory either')
   assert.match(leavesBox('127.0.0.1:3376', ['10.0.0.5'])!, /hosts names 10\.0\.0\.5, another box/, 'a bare host naming another box')
   assert.match(leavesBox(false, ['10.0.0.5:4800'])!, /hosts names 10\.0\.0\.5:4800, another box/, 'a ported host on another box: HELLO carries the listen there')
   assert.match(leavesBox('10.0.0.5:3376', [])!, /its directory 10\.0\.0\.5:3376 answers other boxes/, 'a routable directory')
@@ -468,6 +478,7 @@ test('the explicit-listen rule: a server whose listen is loopback (or a wildcard
   await assert.rejects(fero('r', { ...o, server: true, hosts: ['10.0.0.5'] }), (e: Error) => rule.test(e.message) && /hosts names 10\.0\.0\.5, another box, but listen 127\.0\.0\.1:0 \(the default, a free loopback port\) only reaches this box$/.test(e.message))
   await assert.rejects(fero('r', { ...o, listen: '127.0.0.1:0', hosts: ['box-b'] }), (e: Error) => rule.test(e.message) && /but listen 127\.0\.0\.1:0 only reaches this box$/.test(e.message))
   await assert.rejects(fero('r', { ...o, listen: '0.0.0.0:0', hosts: ['10.0.0.5'] }), /listen 0\.0\.0\.0:0 is a wildcard, not an address another box can dial/)
+  await assert.rejects(fero('r', { ...o, listen: 'LOCALHOST:0', hosts: ['10.0.0.5'] }), /but listen LOCALHOST:0 only reaches this box$/, 'a loopback name in capitals is still loopback')
   //! a ported host on another box with an EXPLICIT loopback listen — V4-2's guard caught only the default
   await assert.rejects(fero('r', { heartbeat: { ms: 0 }, rendezvous: false, listen: 'localhost:0', hosts: ['10.0.0.5:4800'] }), rule)
   //! a directory other boxes can ask: a server registering a loopback listen there is refused; its clients are not servers
