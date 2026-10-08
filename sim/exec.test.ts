@@ -6,6 +6,7 @@ import { Sim } from './exec.ts'
 import { cluster, formed, writes } from './harness.ts'
 import { converged, drained } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
+import { Ring } from '../kernel/ring.ts'
 
 //! the determinism canary (plan §3.1): the same seed twice must produce byte-identical trajectories.
 // This catches unrecorded nondeterminism (Map-iteration dependence, ambient time,
@@ -174,12 +175,18 @@ test('the periodic AE floor heals loss that NO event announces (digest exchange 
   for (const id of ids) sim.post(id, { kind: 'start' })
   sim.run({ until: 500 })
   assert.ok(formed(nodes))
-  sim.post('n01', { kind: 'write', recs: [{ type: 0, key: ['x'], value: 42 }] })
+  //! a key n01 OWNS, read off the ring the write pipeline routes by: n01 stamps it, so the record lives on
+  // n02 as n01's stream (any other key is stamped by n02 and there would be no n01 stream to forget)
+  const v = nodes[0].membership.view
+  const ring = new Ring(); ring.build(v.epoch, v.members)
+  let x = 'x'
+  for (let i = 0; ring.ownerOf(x) !== 'n01'; i++) x = `x${i}`
+  sim.post('n01', { kind: 'write', recs: [{ type: 0, key: [x], value: 42 }] })
   sim.run({ until: 700 })
   assert.equal(converged(sim), null, 'replicated before the injected loss')
   //! the injected transport bug: n02 forgets the record ever arrived — state, stamp, watermark, log copy
   const b = nodes[1]
-  const k = JSON.stringify(['x'])
+  const k = JSON.stringify([x])
   b.state.delete(k)
   b.versions.delete(k)
   const w = b.streams.get('n01')!
