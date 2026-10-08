@@ -56,7 +56,7 @@ test("V4-5 the door: `methods:` makes clients change data ONLY through the metho
   })
   const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const view = (f: typeof c) => snapshot(f.data) as Record<string, unknown>
-  const rows = (f: typeof c) => Object.values(snapshot(f.cluster).writes as Record<string, { key: string; state: string; reason?: string }>)
+  const rows = (f: typeof c) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string; reason?: string }>)
   try {
     assert.ok(await until(() => view(c).stock === 3, 8000), 'the spoke folded the seed')
     //! a plain client assignment: NOTHING shows (V4-7 — a client's write is a request until the server
@@ -434,7 +434,7 @@ test("relayed client writes run the SERVER's seams.validation at the relay: the 
     seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') },
   })
   const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
-  const rows = (f: typeof c) => Object.values(snapshot(f.cluster).writes as Record<string, { key: string; state: string; reason?: string }>)
+  const rows = (f: typeof c) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string; reason?: string }>)
   try {
     //! the server refuses its OWN admin write (the local hook, unchanged)
     s.data.admin = 'local'
@@ -443,7 +443,6 @@ test("relayed client writes run the SERVER's seams.validation at the relay: the 
     // the server's reason on the rejected row
     c.data.admin = 'from-client'
     assert.equal((snapshot(c.data) as Record<string, unknown>).admin, undefined, 'no optimistic copy on the client')
-    //! the outcome row settles in a microtask and folds on the NEXT step (api/data.ts outcomes) — await it
     const rejected = () => rows(c).find((r) => r.key === JSON.stringify(['admin']) && r.state === 'rejected')
     assert.ok(await until(() => rejected() !== undefined, 8000), 'cluster.writes shows the rejected row')
     assert.equal(rejected()?.reason, 'reserved', "the client reads the SERVER's validator verbatim")
@@ -743,9 +742,15 @@ test('the cluster view folds in ONE batch (V4-8): a bare cluster.tap fires once 
     await new Promise((r) => setTimeout(r, 300))
     assert.equal(pictures.length, n, 'a settled view fires nothing more')
     assert.ok(n <= 4, `${n} fires for construction + link + view`)
-    //! a write outcome IS a cluster change (cluster.writes, the confirm ring) — the honest remaining fire
-    a.data.k = 1
-    assert.ok(await until(() => pictures.length > n, 3000), 'the confirm ring moving fires the tap')
+    //! a write outcome is NOT a picture change: the ring is its own handle (f.cluster.writes), so the
+    // cluster tap stays quiet across writes — a render loop over the view repaints only when the view moves
+    let ring = 0
+    a.cluster.writes.tap(() => { ring++ })
+    for (let i = 0; i < 10; i++) a.data['k' + i] = i
+    assert.ok(await until(() => b.snapshot.k9 === 9, 3000), 'the writes landed')
+    await sleep(150)
+    assert.equal(pictures.length, n, `ten writes fire the cluster tap NOT AT ALL (${JSON.stringify(pictures.slice(n))})`)
+    assert.ok(ring >= 1, 'the ring has its own tap')
   } finally {
     await a.destroy()
     await b.destroy()
@@ -825,6 +830,70 @@ test("a leaving member paints no frame after destroy(): its own shrunk view is t
   } finally {
     await a.destroy()
     await b.destroy()
+  }
+})
+
+test('cluster.writes is its own handle and on time: committed one microtask after a solo write, no timer; its tap fires per outcome; the cluster tap does not', async () => {
+  //! a heartbeat of a whole second: the old ring folded only on the NEXT kernel step, so `committed`
+  // showed up to heartbeat.ms late, under an object that already held the value
+  const f = await fero('r', { listen: false, heartbeat: { ms: 1000 } })
+  try {
+    type Row = { key: string; state: string; origin?: string; seq?: number }
+    const rows = () => Object.values(f.cluster.writes.snapshot() as Record<string, Row>)
+    let views = 0
+    f.cluster.tap(() => { views++ })
+    const seen: string[][] = []
+    f.cluster.writes.tap(() => { seen.push(rows().map((r) => `${r.key} ${r.state}`)) })
+    seen.length = 0 // a tap fires once as it attaches; count from here
+    views = 0
+    f.data.k = 1
+    assert.equal(f.snapshot.k, 1, 'the value is there at once')
+    await Promise.resolve()
+    assert.deepEqual(rows().map((r) => [r.key, r.state, r.origin]), [[JSON.stringify(['k']), 'committed', f.cluster.snapshot().me.origin]], 'committed one microtask later — no timer')
+    assert.deepEqual(seen, [[`${JSON.stringify(['k'])} committed`]], 'ONE ring fire for the issue and its settle in one tick')
+    for (let i = 0; i < 10; i++) f.data['n' + i] = i
+    await Promise.resolve()
+    assert.equal(rows().length, 11)
+    assert.ok(rows().every((r) => r.state === 'committed'))
+    assert.equal(seen.length, 2, 'a burst of ten is one more fire, not ten')
+    assert.equal(views, 0, 'the cluster view did not move')
+    assert.equal('writes' in (f.cluster.snapshot() as object), false, 'the ring is not a key of the cluster view')
+    //! the wrapper forwards everything else: a data operator over the cluster view still works
+    const epochs = f.cluster.map((v: unknown) => v)
+    assert.ok(epochs !== undefined)
+    //! a full ring keeps the last 64, oldest evicted, in order
+    for (let i = 0; i < 70; i++) f.data['m' + i] = i
+    await Promise.resolve()
+    const last = rows()
+    assert.equal(last.length, 64)
+    assert.equal(last[last.length - 1].key, JSON.stringify(['m69']))
+  } finally {
+    await f.destroy()
+  }
+})
+
+test('cluster.writes on a client: a relayed write is `pending` until the server commits it (V4-7), then `committed` — one ring fire each', async () => {
+  const pa = await ports.free()
+  const s = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, heartbeat: { ms: 50 } })
+  const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    type Row = { key: string; state: string; origin?: string }
+    const rows = () => Object.values(c.cluster.writes.snapshot() as Record<string, Row>)
+    assert.ok(await until(() => (snapshot(c.cluster) as { me: { primary: string | null } }).me.primary !== null, 8000), 'the client is fed')
+    const seen: string[] = []
+    c.cluster.writes.tap(() => { seen.push(rows().map((r) => r.state).join()) })
+    seen.length = 0 // a tap fires once as it attaches; count from here
+    c.data.k = 1
+    await Promise.resolve()
+    assert.deepEqual(rows().map((r) => r.state), ['pending'], 'a request until the server stamps it')
+    assert.equal(c.snapshot.k, undefined, 'and nothing shows early')
+    assert.ok(await until(() => rows()[0]?.state === 'committed', 3000), 'committed once the server stamped it')
+    assert.equal(rows()[0].origin, 'aa', "under the server's lane")
+    assert.equal(c.snapshot.k, 1)
+    assert.deepEqual(seen, ['pending', 'committed'], 'one fire per outcome')
+  } finally {
+    await c.destroy()
+    await s.destroy()
   }
 })
 

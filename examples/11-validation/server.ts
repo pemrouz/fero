@@ -8,10 +8,10 @@ const shop = await fero('shop', { data: { nails: { stock: 5 } }, seams: { valida
 const draw = () => {
     console.clear()
     console.log(`SHOP ${process.pid} — clients ${Object.keys(shop.cluster.snapshot().peers).length}`)
-    for (const w of Object.values(shop.cluster.snapshot().writes)) console.log(`${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
+    for (const w of Object.values(shop.cluster.writes.snapshot())) console.log(`${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
     console.log(shop.snapshot)
 }
-for (const v of [shop.data, shop.cluster]) v.tap(draw)
+for (const v of [shop.data, shop.cluster, shop.cluster.writes]) v.tap(draw)
 
 // its own writes meet the rule too: this one never shows, and nails keeps 5
 shop.data.nails = { stock: -1 }

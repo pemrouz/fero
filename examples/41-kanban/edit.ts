@@ -8,10 +8,10 @@ const f = await fero('board', { seams: { validation: rules } })
 const columns = f.data.group((c) => c.status)
 
 // the screen: my last three writes, each with its outcome, then the board
-for (const v of [f.data, f.cluster]) v.tap(() => {
+for (const v of [f.data, f.cluster, f.cluster.writes]) v.tap(() => {
     console.clear()
     console.log(`EDIT ${who} ${process.pid}`)
-    for (const w of Object.values(f.cluster.snapshot().writes).slice(-3)) console.log(`${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
+    for (const w of Object.values(f.cluster.writes.snapshot()).slice(-3)) console.log(`${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
     console.log(columns.snapshot())
 })
 

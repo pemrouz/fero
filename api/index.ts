@@ -283,9 +283,35 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   //! the binding wires rt.onApply BEFORE restore, so the WAL replay refills the proxy. `tracked` is
   // late-bound to the method host (flush-on-return attribution — api/methods.ts).
   let host: Host | null = null
+  //! cluster.writes — the confirm ring as its OWN data source (not a key of the cluster view): a write
+  // outcome is not a picture change, so a bare `cluster.tap` never fires for one. Bind names each row
+  // that moved; ONE microtask per burst publishes them (a burst of a thousand assignments is one batch),
+  // so a solo write reads `committed` one microtask after it applied — never a kernel step later.
+  const writes: any = proxy({})
+  const movedWrites = new Set<number>()
+  const shownWrites = new Set<number>()
+  let writesQueued = false
+  const publishWrites = () => {
+    writesQueued = false
+    //! after destroy the ring is frozen as it last read: the 'destroyed' rejects of teardown never paint
+    if (bind.destroyed) { movedWrites.clear(); return }
+    const rows = bind.outcomes.rows
+    batch(() => {
+      for (const id of movedWrites) {
+        const row = rows.get(id)
+        if (row !== undefined) { writes.set(String(id), { ...row }); shownWrites.add(id) }
+        else if (shownWrites.delete(id)) writes.get(String(id)).remove()
+      }
+    })
+    movedWrites.clear()
+  }
   const bind = new Bind(rt, {
     validate: seams.validation as ((rec: Rec) => true | string) | undefined,
     tracked: () => host?.tracked(),
+    onOutcome: (id) => {
+      movedWrites.add(id)
+      if (!writesQueued) { writesQueued = true; queueMicrotask(publishWrites) }
+    },
   })
   if (config.dir) rt.restore()
 
@@ -574,7 +600,6 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     writable: writableNow(),
     members: {},
     peers: {},
-    writes: {},
     me: meRow(),
     partitions: partitionsRow(),
   })
@@ -584,7 +609,6 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   let cursor = 0
   let lastPrimary = node.primary
   let lastFeederOpen = node.feederOpen
-  let lastOutcomes = 0
   let lastScopeN = -1
   let lastMembers = '0:'
   let lastPeers = ''
@@ -602,14 +626,6 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // WNACK removes our attempt inside a step that applies nothing, so the write's promise
     // would otherwise wait for the next apply — the sweep rides the post-step hook instead
     bind.sweep()
-    //! cluster.writes — the bounded confirm ring (plan §9; Q4 decided: pending rows are visible HERE,
-    // never marked inside `data`): folded whole when the ring version moved, one compare otherwise
-    if (bind.outcomes.n !== lastOutcomes) {
-      lastOutcomes = bind.outcomes.n
-      const rows: Record<string, unknown> = {}
-      for (const [id, o] of bind.outcomes.rows) rows[id] = { ...o }
-      cluster.set('writes', rows)
-    }
     const j = node.journal
     let refold = false
     let primaryMoved = false
@@ -696,6 +712,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     })
   }
   rt.hook(fold)
+  //! the public cluster handle: the view, with `writes` answered by the ring's own source. A thin Proxy —
+  // every other key (snapshot, tap, the operators, [value]) forwards to the data proxy untouched (data's
+  // methods close over their own state, never `this`), so `f.cluster.writes.tap(…)` and
+  // `f.cluster.writes.snapshot()` work, and `f.cluster.snapshot()` is the picture without the ring.
+  const clusterSurface: any = new Proxy(cluster, { get: (t, k) => (k === 'writes' ? writes : Reflect.get(t, k)) })
 
   //! teardown — everything destroy() does AFTER the graceful leave (V4-6): the local surfaces, the
   // in-flight confirm probes (settled false = could not prove in time — never hang a caller), the
@@ -787,7 +808,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     name,
     data: dataSurface,
     methods: methodSurface,
-    cluster,
+    cluster: clusterSurface,
     //! snapshot (v4.1): the sanctioned SYNCHRONOUS whole-resource read — data's [value] materialize,
     // surfaced first-class so render loops need no internals import. A fresh top container per
     // access; rows shared by reference (stringify-and-discard is the intended use — methods.read()

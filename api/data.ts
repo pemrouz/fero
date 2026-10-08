@@ -73,6 +73,8 @@ interface Pending {
   reject: (reason: string) => void
 }
 
+const NOOP = (): void => {}
+
 //! WRITES_KEEP: the cluster.writes ring bound — the last N write outcomes, oldest evicted.
 export const WRITES_KEEP = 64
 
@@ -108,23 +110,32 @@ export class Bind {
   // on top for its own remaining records. #onApply reads the TOP frame.
   #frames: { cells: Set<string>; applied: Applied[] }[] = []
   #destroyed = false
-  //! outcomes — the bounded write-outcome ring (cluster.writes source). `n` is a version counter the
-  // composer's fold compares (outcomes settle in microtasks — the NEXT step folds them, and writes
-  // themselves cause steps, so the lag is one event, not unbounded).
-  outcomes = { n: 0, rows: new Map<number, Outcome>() }
+  get destroyed(): boolean { return this.#destroyed }
+  //! outcomes — the bounded write-outcome ring (the cluster.writes source). A row is created when the
+  // write is issued and settles in the SAME call that settles its promise — not a microtask later — and
+  // every move (a new row, a settle, an eviction) calls onOutcome with the row's id: the composer
+  // publishes the ring from one microtask per burst (api/index.ts), never from the post-step fold.
+  outcomes = { rows: new Map<number, Outcome>() }
   #outSeq = 0
-  #outcome(row: Outcome): Outcome {
+  #onOutcome?: (id: number) => void
+  #outcome(row: Outcome): number {
     const id = ++this.#outSeq
-    this.outcomes.rows.set(id, row)
-    if (this.outcomes.rows.size > WRITES_KEEP) this.outcomes.rows.delete(this.outcomes.rows.keys().next().value!)
-    this.outcomes.n++
-    return row
+    const rows = this.outcomes.rows
+    rows.set(id, row)
+    if (rows.size > WRITES_KEEP) {
+      const old = rows.keys().next().value!
+      rows.delete(old)
+      this.#onOutcome?.(old)
+    }
+    this.#onOutcome?.(id)
+    return id
   }
 
-  constructor(rt: Runtime, opts: { validate?: (rec: Rec) => true | string; tracked?: () => Promise<Coords>[] | undefined } = {}) {
+  constructor(rt: Runtime, opts: { validate?: (rec: Rec) => true | string; tracked?: () => Promise<Coords>[] | undefined; onOutcome?: (id: number) => void } = {}) {
     this.#rt = rt
     this.#validate = opts.validate
     this.#tracked = opts.tracked
+    this.#onOutcome = opts.onOutcome
     this.#iss = rt.node.uuid + '~' + rt.node.incarnation
     //! the two-layer surface (DESIGN-DATA3 §4.1): #handle is the data v4 source holding the
     // projection; data is FERO'S OWN LENS over it — assignment/delete trap straight into
@@ -179,17 +190,28 @@ export class Bind {
       const rec = valid[i]
       const cid = c0 + 1 + i
       const cell = cellOf(rec)
-      const row = this.#outcome({ key: cell, state: 'pending', cid })
+      const row: Outcome = { key: cell, state: 'pending', cid }
+      const id = this.#outcome(row)
       let entry!: Pending
+      //! the ring row settles IN the settle call, before the promise's own reactions run: a solo write's
+      // row reads `committed` in the tick its value applied. The first settle wins, as for the promise.
       const pr = new Promise<Coords>((resolve, reject) => {
-        entry = { cell, cid, resolve, reject }
+        entry = {
+          cell, cid,
+          resolve: (c) => {
+            if (row.state === 'pending') { row.state = 'committed'; row.origin = c.origin; row.seq = c.seq; row.epoch = c.epoch; this.#onOutcome?.(id) }
+            resolve(c)
+          },
+          reject: (e) => {
+            if (row.state === 'pending') { row.state = 'rejected'; row.reason = String(e); this.#onOutcome?.(id) }
+            reject(e)
+          },
+        }
         this.#pending.set(this.#iss + '|' + cid, entry)
       })
-      //! the ring row settles with its promise (microtask — the version bump makes the next fold see it)
-      pr.then(
-        (c) => { row.state = 'committed'; row.origin = c.origin; row.seq = c.seq; row.epoch = c.epoch; this.outcomes.n++ },
-        (e) => { row.state = 'rejected'; row.reason = String(e); this.outcomes.n++ },
-      )
+      //! the ring row used to settle in a .then with both arms, which also marked the promise handled; keep
+      // that: a caller that drops the promise (the data seed, a swallowed assignment) never surfaces a reject
+      pr.catch(NOOP)
       promises.set(rec, pr)
       pend.push(entry)
       this.#inflight.set(cell, cid)

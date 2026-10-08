@@ -5,7 +5,7 @@ import { until } from '../lib.ts'
 // the last full screen a role drew (it starts with its role word and ends with the columns object), one card on it, a ring as an editor prints it
 const screen = (r: Spawned) => r.out.split(/^(?=BOARD |EDIT )/m).filter((s) => s.trimEnd().endsWith('}')).pop() ?? ''
 const card = (r: Spawned, id: string) => new RegExp(`(\\w+): \\{ ${id}: \\{ status: '\\1', title: '([^']*)' \\}`).exec(screen(r))?.slice(1).join()
-const ring = (f) => Object.values(f.cluster.snapshot().writes).map((w) => `${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
+const ring = (f) => Object.values(f.cluster.writes.snapshot()).map((w) => `${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
 
 // an editor adds a card by its fields: it lands in todo on the board and on the editor
 const board = fero.spawn('board.ts')
