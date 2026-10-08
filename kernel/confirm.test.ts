@@ -123,3 +123,9 @@ test('cancel is an honest reject: false, with the count reached; the registry is
   assert.equal(rejected.length, 2, 'the cancel + exactly one overflow eviction')
   assert.equal(rejected[1].id, 100, 'drop-OLDEST')
 })
+
+test('tune: { probes: 2 } — the registry bound is the row: the third unresolvable probe answers the oldest false', () => {
+  const h = harness('aa', { tune: { probes: 2 } })
+  for (let i = 0; i < 3; i++) h.node.step({ kind: 'confirm', id: 100 + i, origin: 'zz', seq: 1e9, level: CONFIRM.persisted })
+  assert.deepEqual(h.answers(), [{ id: 100, ok: false, count: 0 }], 'drop-OLDEST at the tuned bound, not at MAX_PROBES')
+})
