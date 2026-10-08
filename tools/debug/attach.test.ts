@@ -84,6 +84,32 @@ test('the pool: answering nodes render, every failure is a typed absent row, not
   } finally { pool.close(); badPool.close(); await stop() }
 })
 
+//! a node whose answer is too big for one frame says so ({ok:0, e:'too-large'}, kernel/diag.ts reply) — the
+// absent row must name it 'frame' (the answer does not fit in a message), not 'error' (a question it cannot
+// answer). A stub DIAG node: it latches any HELLO and answers every DIAGQ with the kernel's own too-large reply.
+test("an answer too big for one frame is absent 'frame', not 'error'", async () => {
+  const net = await import('node:net')
+  const { Framer, VERB: V, encodeControl: enc } = await import('../../kernel/codec.ts')
+  const server = net.createServer((sock) => {
+    const framer = new Framer()
+    sock.on('data', (chunk: Buffer) => {
+      for (const f of framer.push(new Uint8Array(chunk))) {
+        if (f.verb === V.HELLO) sock.write(enc(V.DIAGA, { id: 0, ok: 1, u: 'big', i: 1, p: 1 }))
+        else if (f.verb === V.DIAGQ) sock.write(enc(V.DIAGA, { id: (f.value as { id: number }).id, u: 'big', i: 1, ok: 0, e: 'too-large' }))
+      }
+    })
+    sock.on('error', () => {})
+  })
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()))
+  const addr = `127.0.0.1:${(server.address() as { port: number }).port}`
+  const pool = new AttachPool([addr], TOKEN)
+  try {
+    const cap = await pool.capture()
+    assert.deepEqual(cap.nodes, [])
+    assert.deepEqual(cap.absent, [{ target: addr, reason: 'frame' }])
+  } finally { pool.close(); await new Promise<void>((r) => server.close(() => r())) }
+})
+
 test('the coalescer: concurrent rebuilds share ONE fan-out (the poll is the only cadence)', async () => {
   const { addrs, stop } = await spin(1)
   const pool = new AttachPool(addrs, TOKEN)

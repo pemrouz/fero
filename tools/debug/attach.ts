@@ -116,7 +116,9 @@ export class DiagClient {
       this.#teardown(new Error('restarted'))
       throw new Error('restarted')
     }
-    if (v.ok !== 1) throw new Error('error') // typed per-op failure (too-large/bad-op) — absent 'error', never invented data
+    //! a typed per-op failure is absent, never invented data: 'too-large' (the answer does not fit in one frame)
+    // keeps its own word so reasonOf can name it 'frame'; anything else (bad-op, bad-args) is 'error'
+    if (v.ok !== 1) throw new Error(v.e === 'too-large' ? 'too-large' : 'error')
     return v
   }
 
@@ -188,9 +190,11 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
 }
 
 //! reasonOf — map a pull failure onto the CLOSED absent-reason set (anything unrecognized is 'refused':
-// the dial-level default, never a fabricated specific)
+// the dial-level default, never a fabricated specific). 'too-large' is 'frame': the node's answer is bigger
+// than one frame may be — a message-size fault, not a question the node cannot answer.
 const reasonOf = (e: unknown): Absent['reason'] => {
   const m = e instanceof Error ? e.message : ''
+  if (m === 'too-large') return 'frame'
   return (['refused', 'timeout', 'unauthorized', 'frame', 'restarted', 'error'] as const).includes(m as Absent['reason'])
     ? (m as Absent['reason'])
     : 'refused'
