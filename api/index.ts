@@ -17,6 +17,7 @@ import { Runtime, restoreOpts, type RuntimeOpts } from '../shell/runtime.ts'
 import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
+import { TUNE } from '../kernel/tune.ts'
 import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
@@ -807,7 +808,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // the hosted methods and the data seed as their names (rows are data, not config)
     config: () => {
       const out: Record<string, { value: unknown; from: string }> = {}
-      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'redial.tries': redialTries ?? 10, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
+      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'redial.tries': redialTries ?? TUNE.redials, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
       for (const k of CONFIG_LEAVES) {
         const v = k.split('.').reduce<unknown>((o, p) => (o !== null && typeof o === 'object' ? (o as Record<string, unknown>)[p] : undefined), config)
         const shown = v !== undefined ? v : effective[k]
