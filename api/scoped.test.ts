@@ -231,6 +231,18 @@ test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the ke
     //! gen 12-13: the control — an empty object the row's OWN value holds was never made up: it stays
     12: { h1: { c: { [g]: { v: { a: {} }, st: [1, 19, 'bb'] } }, att: ['g'] }, h2: { c: { [gax]: { v: 1, st: [1, 20, 'cc'] } }, att: ['g'] } },
     13: { h1: { c: { [g]: { v: { a: {} }, st: [1, 19, 'bb'] } }, att: ['g'] }, h2: { c: { [gax]: { st: [1, 21, 'cc'], t: 1 } }, att: ['g'] } },
+    //! gen 14-15: the USER wrote the row as `{}` (its own live claim); a field lands in it, then that
+    // field's remove — the row's own `{}` projected whole this generation, so it stays
+    14: { h1: { c: { [g]: { v: {}, st: [1, 22, 'bb'] } }, att: ['g'] }, h2: { c: { [gb]: { v: 1, st: [1, 23, 'cc'] } }, att: ['g'] } },
+    15: { h1: { c: { [g]: { v: {}, st: [1, 22, 'bb'] } }, att: ['g'] }, h2: { c: { [gb]: { st: [1, 24, 'cc'], t: 1 } }, att: ['g'] } },
+    //! gen 16-17: the same one level down — the user wrote the FIELD ['g','a'] as `{}` over the row's a:1
+    16: { h1: { c: { [g]: { v: { a: 1 }, st: [1, 25, 'bb'] } }, att: ['g'] }, h2: { c: { [ga]: { v: {}, st: [1, 26, 'cc'] }, [gax]: { v: 1, st: [1, 27, 'cc'] } }, att: ['g'] } },
+    17: { h1: { c: { [g]: { v: { a: 1 }, st: [1, 25, 'bb'] } }, att: ['g'] }, h2: { c: { [ga]: { v: {}, st: [1, 26, 'cc'] }, [gax]: { st: [1, 28, 'cc'], t: 1 } }, att: ['g'] } },
+    //! gen 18-19: a PARKED level — the row's holder h1 answers without attesting `g` (still acquiring),
+    // so nobody claims the row this generation but it is not covered: its last value stands, and the
+    // field remove under it takes only the field
+    18: { h1: { c: { [g]: { v: {}, st: [1, 30, 'bb'] } }, att: ['g'] }, h2: { c: { [gb]: { v: 1, st: [1, 31, 'cc'] } }, att: ['g'] } },
+    19: { h1: { c: {}, att: [] }, h2: { c: { [gb]: { st: [1, 32, 'cc'], t: 1 } }, att: ['g'] } },
   }
   const gather = new Gather({ node: fake } as never, async (uuid: string) => answers[phase][uuid] as never)
   const expect = async (want: unknown, why: string) => {
@@ -251,6 +263,12 @@ test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the ke
   phase = 11; await expect({}, 'gen 11: its remove takes both made-up levels back')
   phase = 12; await expect({ g: { a: { x: 1 } } }, 'gen 12: the row holds `a` as an empty object itself, the field lands in it')
   phase = 13; await expect({ g: { a: {} } }, 'gen 13: the field\'s remove leaves the row\'s own empty object — it was never made up')
+  phase = 14; await expect({ g: { b: 1 } }, 'gen 14: a field lands in the row the user wrote as {}')
+  phase = 15; await expect({ g: {} }, 'gen 15: the field\'s remove leaves the user\'s own {} row — its own claim projected')
+  phase = 16; await expect({ g: { a: { x: 1 } } }, 'gen 16: a field lands in the field the user wrote as {}')
+  phase = 17; await expect({ g: { a: {} } }, 'gen 17: the deeper field\'s remove leaves the user\'s own {} field')
+  phase = 18; await expect({ g: { b: 1 } }, 'gen 18: a field lands in the {} row')
+  phase = 19; await expect({ g: {} }, 'gen 19: the row is PARKED (its holder attests nothing yet) — its last value stands, only the field goes')
   gather.destroy()
 })
 
