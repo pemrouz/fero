@@ -314,6 +314,31 @@ test('V4-18 overlapping cells — through data\'s real lane: a field written int
   }
 })
 
+test('V4-18 overlapping cells — a field removed INSIDE an array element stays removed: `delete data.todos[0].done` shows, and a newer remove is never put back by a repair', async () => {
+  //! the everyday shape: one local delete, nothing concurrent
+  const h = harness()
+  h.bind.data.todos = [{ done: true, n: 1 }]
+  delete h.bind.data.todos[0].done
+  assert.deepEqual(snapshot(h.bind.data), { todos: [{ n: 1 }] }, 'the field is gone from the screen')
+  await h.destroy()
+  //! the reviewer's history (a), every order: the row [{d:0}]@3, g.0.e=1@4, g.0.d=1@5, rm g.0.d@6 — the
+  // remove is newer than the row, so `d` is gone and `e` shows: [{e:1}]
+  const permutations = <T>(xs: T[]): T[][] => xs.length <= 1 ? [xs] : xs.flatMap((x, i) => permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((p) => [x, ...p]))
+  const frames: [number, Uint8Array][] = [
+    [1, records('bb', 3, 0, [{ type: REC.update, key: ['g'], value: [{ d: 0 }] }])],
+    [2, records('cc', 4, 0, [{ type: REC.update, key: ['g', '0', 'e'], value: 1 }])],
+    [3, records('dd', 5, 0, [{ type: REC.update, key: ['g', '0', 'd'], value: 1 }])],
+    [4, records('ee', 6, 0, [{ type: REC.remove, key: ['g', '0', 'd'] }])],
+  ]
+  for (const order of permutations(frames)) {
+    const m = harness()
+    m.admit(1, 'bb'); m.admit(2, 'cc'); m.admit(3, 'dd'); m.admit(4, 'ee')
+    for (const [link, bytes] of order) m.node.step({ kind: 'bytesIn', link, bytes })
+    assert.deepEqual(snapshot(m.bind.data), { g: [{ e: 1 }] }, `order ${order.map((f) => f[0]).join(',')}`)
+    await m.destroy()
+  }
+})
+
 test('V4-18 overlapping cells — a LOCAL delete of an array element is refused before it commits, with data\'s message; a REPLICATED remove under an array row still folds as the no-op', async () => {
   const h = harness()
   h.bind.data.g = [1, 2]
