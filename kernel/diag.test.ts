@@ -267,10 +267,34 @@ test('parity by construction: captureNode is diagNode + the chunked planes (deep
   const wire = h.lastA(9).n as ReturnType<typeof diagNode>
   const cap = captureNode(h.node)
   //! every scalar/topology fact in the capture IS the wire's fold output — one producer, two consumers
-  for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'client', 'stateHash', 'streams'] as const)
+  for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'client', 'replicas', 'holders', 'stateHash', 'streams'] as const)
     assert.deepEqual(cap[k], wire[k], `capture.${k} must equal the wire fold's`)
   assert.deepEqual(cap.links, wire.links)
   assert.equal(cap.dropped, wire.dropped)
+})
+
+//! scoped replication (ISSUES I-3): an ARMED node's fold carries replicas and, per partition of its OWN lane,
+// the ring's holder set — over the wire and in the capture alike. An unarmed node carries no holders at all.
+test('an armed node serves replicas + its own-lane holder sets (the ring\'s answer, carried); an unarmed node serves none', () => {
+  const plain = diagged()
+  assert.equal(diagNode(plain.node).replicas, 0)
+  assert.equal('holders' in diagNode(plain.node), false, 'unscoped: no holder claim')
+  const h = diagged({ replicas: 2, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] } })
+  h.admit(1, 'bb'); h.admit(2, 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.node.armed, true)
+  //! pin two partitions to aa (the test-only placement seam) so its own writes stamp locally
+  h.node.writes.ring.place('p1', 'aa', 'cc')
+  h.node.writes.ring.place('p2', 'aa', 'bb')
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['p1', 'x'], value: 1 }] })
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['p2'], value: 2 }] })
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['p1', 'y'], value: 3 }] })
+  h.open(9); h.attach(9)
+  h.q(9, { id: 2, q: 'node' })
+  const wire = h.lastA(9).n as ReturnType<typeof diagNode>
+  assert.equal(wire.replicas, 2)
+  assert.deepEqual(wire.holders, { p1: ['aa', 'cc'], p2: ['aa', 'bb'] }, 'one entry per own-lane partition, the ring\'s list')
+  assert.deepEqual(captureNode(h.node).holders, wire.holders, 'the capture carries the same fact')
 })
 
 test('structural non-membership: a live session sees ZERO replication bytes while members converge', () => {

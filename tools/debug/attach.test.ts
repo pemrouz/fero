@@ -40,7 +40,7 @@ test('parity: a slice pulled over the DIAG wire deepEquals the in-process captur
     const local = captureNode(rts[0].node)
     //! the moving parts (the pull's own journal rows, and the links table the session itself appears in)
     // are compared by prefix/identity; everything else must be byte-equal
-    for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'client', 'stateHash', 'streams', 'logs', 'state'] as const)
+    for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'client', 'replicas', 'holders', 'stateHash', 'streams', 'logs', 'state'] as const)
       assert.deepEqual(answer.node[k], local[k], `${k} must match the in-process fold`)
     assert.deepEqual(answer.node.journal.slice(0, 20), local.journal.slice(0, 20), 'journal prefix identical')
     //! the pulled slice is a REAL capture: the model's replay oracle refolds it to the same end state
