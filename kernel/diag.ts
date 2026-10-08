@@ -112,6 +112,9 @@ const ownHolders = (node: Node): Record<string, string[]> => {
 
 export const diagNode = (node: Node) => ({
   uuid: node.uuid,
+  //! name: the resource this node replicates (NodeOpts.name, the HELLO echo) — the debugger paints a `#`
+  // badge on a system resource (`#directory`); absent on an unnamed node (the sim), so additive
+  ...(node.name !== undefined ? { name: node.name } : {}),
   listen: node.listen,
   seq: node.seq,
   epoch: node.epoch,

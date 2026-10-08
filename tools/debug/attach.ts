@@ -136,7 +136,7 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
   const meta = await c.q({ q: 'meta' }, left())
   const nq = await c.q({ q: 'node' }, left())
   const w = nq.n as {
-    uuid: string; listen: string; seq: number; epoch: number
+    uuid: string; name?: string; listen: string; seq: number; epoch: number
     view: { epoch: number; members: string[] }; gate: string
     pendingWrites: number; client?: boolean; replicas?: number; holders?: Record<string, string[]>
     stateHash: number; jn: number; dropped: number
@@ -180,7 +180,7 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
     target: c.target,
     vocab: meta.vocab as Record<string, number>,
     node: {
-      uuid: w.uuid, listen: w.listen, seq: w.seq, epoch: w.epoch, view: w.view, gate: w.gate,
+      uuid: w.uuid, ...(w.name !== undefined ? { name: w.name } : {}), listen: w.listen, seq: w.seq, epoch: w.epoch, view: w.view, gate: w.gate,
       pendingWrites: w.pendingWrites, client: w.client, replicas: w.replicas,
       ...(w.holders ? { holders: w.holders } : {}),
       stateHash: w.stateHash, dropped: w.dropped,
