@@ -1,5 +1,5 @@
 {
- "head": "a220e63",
+ "head": "08428ca",
  "entries": [
   "sim/exec.ts",
   "sim/monitors.ts",
@@ -25,6 +25,7 @@
   "kernel/tune.js",
   "kernel/write.js",
   "sim/exec.js",
+  "sim/fold.js",
   "sim/harness.js",
   "sim/monitors.js",
   "sim/shrink.js",
@@ -32,5 +33,5 @@
   "tools/debug/eli5.mjs",
   "tools/debug/model.mjs"
  ],
- "bytes": 558003
+ "bytes": 583957
 }

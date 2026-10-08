@@ -146,6 +146,11 @@ export class Writes {
   // not grow it forever. A RELAY records nothing here — it hops the refusal onward to its client.
   rejected = new Map                ()
   rejectedPending = 0
+  //! released — how many attempts have ever LEFT the queue (WACKed, committed here, dropped, refused): a
+  // monotonic counter the api reads to skip work while nothing moved. While it stands still, every
+  // attempt the embedder saw queued is still queued (api/data.ts Bind: a foreign row apply asks about
+  // our in-flight field writes in that row only when the kernel let one of ours go since it last asked).
+  released = 0
   #cid = 0
   //! cid — the attempt counter, read-only (M5a): the embedder samples it around a synchronous write()
   // to learn which cids its batch minted (issue() assigns one per record, contiguous, in record order;
@@ -154,7 +159,9 @@ export class Writes {
   #queued = 0 // attempts with sent < 0 — lets #drain no-op when everything is in flight
   //! per-issuer dedup window: cid → original commit coordinates, oldest-first (Map order), fed by BOTH
   // the local commit site and replicated attempt identities (the ownership-move exactly-once story)
-  #seen = new Map                                               ()
+  // (`o`: the owner of record — the lane the commit was stamped on — when this node can know it: its own
+  // commits, replicated records, and a WACK straight from the owner; a spoke's WACK comes via its relay)
+  #seen = new Map                                                           ()
 
   //! issuer — my cid-lane identity: uuid + incarnation, so a restarted node opens a FRESH dedup lane
   // instead of aliasing cids its predecessor already spent (the counter is volatile until M4's boot record).
@@ -169,7 +176,7 @@ export class Writes {
   //! committed — read-only dedup-window probe (M5a): the ORIGINAL commit coordinates of an attempt, if
   // still inside the exact window. The api layer resolves a pending write that committed but never
   // surfaced through its own apply join (the cross-epoch LWW-loss race) from exactly this evidence.
-  committed(issuer        , cid        )                                       {
+  committed(issuer        , cid        )                                                   {
     return this.#seen.get(issuer)?.get(cid)
   }
 
@@ -229,6 +236,7 @@ export class Writes {
       this.pending.delete(oldest)
       if (dropped.sent < 0) this.#queued--
       this.droppedPending++
+      this.released++
       node.journal.armed && node.journal.emit(JK.writeBufferDrop, this.droppedPending)
     }
   }
@@ -340,7 +348,7 @@ export class Writes {
       const s0 = node.commit(run.map((x) => x.rec), { issuer: a.issuer, baseCid: a.cid })
       for (let k = 0; k < run.length; k++) {
         const x = run[k]
-        this.#remember(node, x.issuer, x.cid, s0 + k, node.epoch)
+        this.#remember(node, x.issuer, x.cid, s0 + k, node.epoch, node.uuid)
         this.#remove(x)
       }
       this.#ack(node, a.via, { u: a.issuer, c: a.cid, n: run.length, s: s0, e: node.epoch })
@@ -350,12 +358,12 @@ export class Writes {
 
   //! #remove — drop an attempt from the queue with counter bookkeeping (no-op for never-queued attempts).
   #remove(a         ) {
-    if (this.pending.delete(a.issuer + '|' + a.cid) && a.sent < 0) this.#queued--
+    if (this.pending.delete(a.issuer + '|' + a.cid)) { this.released++; if (a.sent < 0) this.#queued-- }
   }
 
   //! #remember — record a committed cid in the issuer's exact dedup window (oldest-first eviction), with
   // the lane count itself bounded: the oldest LANE evicts (journal-surfaced) past MAX_ISSUERS.
-  #remember(node      , issuer        , cid        , s        , e        ) {
+  #remember(node      , issuer        , cid        , s        , e        , o         ) {
     let lane = this.#seen.get(issuer)
     if (!lane) {
       lane = new Map()
@@ -366,7 +374,7 @@ export class Writes {
         node.journal.armed && node.journal.emit(JK.dedupEvict, oldest)
       }
     }
-    lane.set(cid, { s, e })
+    lane.set(cid, o === undefined ? { s, e } : { s, e, o })
     if (lane.size > node.tune.dedupKeep) lane.delete(lane.keys().next().value )
   }
 
@@ -526,12 +534,13 @@ export class Writes {
       }
       if (a.sent < 0) this.#queued--
       this.pending.delete(key)
+      this.released++
       if (cleared++ === 0) first = v.c + i
       //! the WACK's coordinates feed the dedup window too (M5b): they ARE the original commit
       // coordinates, from the owner of record. This closes the WACK-before-replication window where a
       // cleared attempt had no committed() evidence — the api's drop-sweep (and any dup arriving before
       // the record replicates back) reads the answer from here.
-      this.#remember(node, v.u, v.c + i, v.s + i, v.e)
+      this.#remember(node, v.u, v.c + i, v.s + i, v.e, node.client ? undefined : link.uuid) // a member's WACK comes from the owner
     }
     flushHop()
     if (cleared) j.armed && j.emit(JK.writeAck, v.u, first, cleared)
@@ -683,7 +692,7 @@ export class Writes {
         if (cl.state === LS.admitted && cl.synced && !cl.dead)
           cl.add(rec, { origin, baseSeq: seq, epoch }, rv.issuer ? { issuer: rv.issuer, baseCid: rv.cid } : undefined)
     if (rv.issuer) {
-      this.#remember(node, rv.issuer, rv.cid, seq, epoch)
+      this.#remember(node, rv.issuer, rv.cid, seq, epoch, origin)
       const a = this.pending.get(rv.issuer + '|' + rv.cid)
       if (a) {
         //! replication IS an ACK: the commit is visible with its coordinates — clear the route
@@ -757,7 +766,7 @@ export class Writes {
         if (cl.state === LS.admitted && cl.synced && !cl.dead)
           cl.add(rec, { origin, baseSeq: seq, epoch }, rv.issuer ? { issuer: rv.issuer, baseCid: rv.cid } : undefined)
     if (rv.issuer) {
-      this.#remember(node, rv.issuer, rv.cid, seq, epoch)
+      this.#remember(node, rv.issuer, rv.cid, seq, epoch, origin)
       const a = this.pending.get(rv.issuer + '|' + rv.cid)
       if (a) {
         j.armed && j.emit(JK.writeAck, rv.issuer, rv.cid, 1)
