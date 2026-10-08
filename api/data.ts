@@ -297,6 +297,12 @@ export class Bind {
     // no longer holds it, our write either committed without ever surfacing here (the cross-epoch
     // LWW-loss race — resolve it from the dedup window's original coordinates) or is unaccounted for
     // (reject 'superseded'). The foreign record projects regardless — the proxy is the fold.
+    //! Inside our own issue() (a frame on the stack) nothing that applies is a foreign commit: the kernel
+    // commits only our records there, and makes its seq-0 repairs for them (V4-18's un-vivify after a
+    // field remove of ours, whose cell — the row — is not in the batch). On the epoch-0 fast path the
+    // kernel holds no attempt and the window has no coordinates, so a probe there would reject a write
+    // that is committing in this very call as 'superseded'. Both probes wait for a foreign apply.
+    if (top !== undefined) { this.#apply(a); return }
     this.#probe(cell)
     //! 3b) the same probe for our in-flight FIELD writes on the cells UNDER this one (V4-18, overlapping
     // cells): a whole-row write or a row remove is a parent of every field cell in the row, and a
