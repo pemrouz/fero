@@ -37,6 +37,15 @@ import type { Runtime } from '../shell/runtime.ts'
 // LWW cell is its key path, or [at] for a root insert.
 export const cellOf = (r: Rec): string => JSON.stringify(r.key.length ? r.key : [r.at ?? ''])
 
+//! ancestorKeys — the cell keys of a field path's proper prefixes, shallowest first, built the way the
+// kernel's apply() builds them (the #fields index is keyed by them).
+const ancestorKeys = (path: string[]): string[] => {
+  const out: string[] = []
+  let a = '[' + JSON.stringify(path[0])
+  for (let d = 1; d < path.length; d++) { out.push(a + ']'); if (d < path.length - 1) a += ',' + JSON.stringify(path[d]) }
+  return out
+}
+
 //! Coords — where a write committed (the WriteResolve core).
 export interface Coords { origin: string; seq: number; epoch: number; cid?: number }
 
@@ -68,7 +77,7 @@ export const lostAssignment = (p: Promise<Coords>, why: unknown): { key: string;
 // coordinate promise's settlers.
 interface Pending {
   cell: string
-  row?: string // the row key when the cell is a FIELD (depth ≥ 2) — the #fields index entry it sits in
+  above?: string[] // a FIELD cell's ancestor keys, shallowest first (depth ≥ 2) — the #fields entries it sits in
   cid: number
   resolve: (c: Coords) => void
   reject: (reason: string) => void
@@ -101,8 +110,11 @@ export class Bind {
   // settlement index, see the banner: it decides promises, never what the proxy shows)
   #pending = new Map<string, Pending>()
   #inflight = new Map<string, number>()
-  //! fields — row key → our in-flight FIELD cells under it (V4-18): a foreign row apply probes exactly
-  // these, so the probe costs nothing when no field write of ours is in flight on that row
+  //! fields — ancestor key → our in-flight FIELD cells under it (V4-18), keyed by EVERY ancestor like the
+  // kernel's deep index: a foreign apply at any depth finds exactly the cells of ours under its own
+  // path in one lookup — a row write finds every field of ours in that row, a field write finds only
+  // what is deeper than itself (nothing, usually). Keyed by row alone, every foreign field apply on a
+  // row copied and scanned the row's whole set: about 8x per apply with 1k of ours in flight.
   #fields = new Map<string, Set<string>>()
   //! frames — a STACK of in-flight fast-path collectors, one per active issue() call (M5-review #0/#1/#4).
   // The epoch-0 fast path mints no kernel cid and applies synchronously inside rt.write(); a user tap
@@ -218,7 +230,7 @@ export class Bind {
       const pr = new Promise<Coords>((resolve, reject) => {
         entry = {
           cell, cid,
-          ...(rec.key.length > 1 ? { row: JSON.stringify([rec.key[0]]) } : {}),
+          ...(rec.key.length > 1 ? { above: ancestorKeys(rec.key) } : {}),
           resolve: (c) => {
             if (row.state === 'pending') { row.state = 'committed'; row.origin = c.origin; row.seq = c.seq; row.epoch = c.epoch; this.#onOutcome?.(id) }
             resolve(c)
@@ -236,11 +248,12 @@ export class Bind {
       promises.set(rec, pr)
       pend.push(entry)
       this.#inflight.set(cell, cid)
-      if (entry.row !== undefined) {
-        let under = this.#fields.get(entry.row)
-        if (under === undefined) this.#fields.set(entry.row, under = new Set())
-        under.add(cell)
-      }
+      if (entry.above !== undefined)
+        for (const ak of entry.above) {
+          let under = this.#fields.get(ak)
+          if (under === undefined) this.#fields.set(ak, under = new Set())
+          under.add(cell)
+        }
     }
     //! push THIS call's fast-path collector; a nested re-entrant issue pushes its own on top, and node.commit
     // applies sequentially so only the top frame's records apply while it is on top (M5-review #1/#4).
@@ -273,13 +286,15 @@ export class Bind {
   #forget(p: Pending) {
     const key = this.#iss + '|' + p.cid
     if (this.#pending.get(key) === p) this.#pending.delete(key)
-    if (this.#inflight.get(p.cell) === p.cid) { this.#inflight.delete(p.cell); if (p.row !== undefined) this.#unfield(p.row, p.cell) }
+    if (this.#inflight.get(p.cell) === p.cid) { this.#inflight.delete(p.cell); if (p.above !== undefined) this.#unfield(p.above, p.cell) }
   }
 
-  //! #unfield — drop a field cell from the per-row in-flight index (an emptied row leaves the map).
-  #unfield(row: string, cell: string) {
-    const under = this.#fields.get(row)
-    if (under !== undefined && under.delete(cell) && under.size === 0) this.#fields.delete(row)
+  //! #unfield — drop a field cell from the in-flight index under each of its ancestors (an emptied set leaves the map).
+  #unfield(above: string[], cell: string) {
+    for (const ak of above) {
+      const under = this.#fields.get(ak)
+      if (under !== undefined && under.delete(cell) && under.size === 0) this.#fields.delete(ak)
+    }
   }
 
   //! onApply — every committed record materializing downstream (live, forwarded-echo, replay alike).
@@ -323,14 +338,13 @@ export class Bind {
     //! 3b) the same probe for our in-flight FIELD writes on the cells UNDER this one (V4-18, overlapping
     // cells): a whole-row write or a row remove is a parent of every field cell in the row, and a
     // field write of ours stamped at or below it is swept (or refused) in the kernel — its apply never
-    // comes. The #fields index keys by row, so only the cells of ours in flight under THIS row are
-    // looked at; with no field write of ours in flight anywhere this is one size check.
+    // comes. The #fields index keys by ancestor, so one lookup finds exactly the cells of ours in
+    // flight under THIS cell (a field apply finds only what is deeper than itself); with no field
+    // write of ours in flight anywhere this is one size check. #probe settles, which deletes from the
+    // set being walked — a Set tolerates that, so nothing is copied.
     if (this.#fields.size > 0) {
-      const under = this.#fields.get(a.key.length > 1 ? JSON.stringify([a.key[0]]) : cell)
-      if (under !== undefined) {
-        const pfx = a.key.length > 1 ? cell.slice(0, -1) + ',' : null
-        for (const c of [...under]) if (pfx === null || c.startsWith(pfx)) this.#probe(c) // #probe settles, which edits `under`
-      }
+      const under = this.#fields.get(cell)
+      if (under !== undefined) for (const c of under) this.#probe(c)
     }
     //! 4) the ONE projection: kernel record → proxy
     this.#apply(a)
@@ -351,7 +365,7 @@ export class Bind {
       } else {
         this.#inflight.delete(cell)
         const path = JSON.parse(cell) as string[]
-        if (path.length > 1) this.#unfield(JSON.stringify([path[0]]), cell)
+        if (path.length > 1) this.#unfield(ancestorKeys(path), cell)
       }
     }
   }
@@ -371,7 +385,7 @@ export class Bind {
     if (this.#destroyed) return
     this.#apply({ type: REC.remove, key: [p] })
     for (const cell of [...this.#inflight.keys()]) if ((JSON.parse(cell) as string[])[0] === p) this.#inflight.delete(cell)
-    this.#fields.delete(JSON.stringify([p]))
+    for (const ak of [...this.#fields.keys()]) if ((JSON.parse(ak) as string[])[0] === p) this.#fields.delete(ak)
   }
 
   //! fromLens — the lens's write sink: every assignment/delete lands here as Recs and rides THE one

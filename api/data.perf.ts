@@ -12,7 +12,7 @@ import { Runtime } from '../shell/runtime.ts'
 import { Bind } from './data.ts'
 import { VERB, encodeControl, encodeRuns } from '../kernel/codec.ts'
 import { REC, type Rec } from '../kernel/env.ts'
-import { bench } from '#utils'
+import { bench, ratio } from '#utils'
 
 const harness = () => {
   const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0 })
@@ -61,4 +61,43 @@ test('absolute: 5k inbound records/rep through onApply→join→proxy under the 
   assert.ok(ms < 400, `5k inbound applies took ${ms.toFixed(1)}ms (ceiling 400ms)`)
   bind.destroy()
   await rt.destroy()
+})
+
+//! RATIO (V4-18, overlapping cells): a foreign apply pays for the in-flight writes of ours UNDER ITS
+// OWN CELL only. With 1k of our field writes in flight on a row (forwarded to the owner, no answer
+// yet), a foreign FIELD apply on that row must cost what it costs with none in flight: the #fields
+// index is keyed by ancestor, so the lookup under a depth-2 cell finds nothing and walks nothing.
+// Keyed by row alone it copied and scanned the row's whole set on every apply — about 8x. Both sides
+// are inbound frames with advancing seqs on their own node (the fresh-record path, never dupDrop).
+test('ratio: a foreign field apply with 1k of our field writes in flight on that row costs the same as with none', async () => {
+  const formed = (inflight: number) => {
+    const { rt, bind } = harness()
+    const node = rt.node
+    node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+    node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
+    node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+    node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+    node.writes.ring.place('cart', 'bb')
+    for (let i = 0; i < inflight; i++) bind.issue([{ type: REC.update, key: ['cart', 'f' + i], value: i }])
+    assert.equal(node.writes.pending.size, inflight)
+    return { rt, bind, node }
+  }
+  const none = formed(0), many = formed(1000)
+  //! 8 rounds (warmup + 7) of 500 foreign field applies each, the same bytes to both nodes
+  const BATCH = 500
+  const frames: Uint8Array[] = []
+  for (let r = 0; r < 8; r++) {
+    const recs: { rec: Rec; origin: string; seq: number; epoch: number }[] = []
+    for (let k = 0; k < BATCH; k++) recs.push({ rec: { type: REC.update, key: ['cart', 'theirs' + (k % 10)], value: r * BATCH + k }, origin: 'bb', seq: 1 + r * BATCH + k, epoch: 1 })
+    frames.push(encodeRuns(recs)[0])
+  }
+  let i = 0, j = 0
+  const r = ratio.interleaved(
+    () => { none.node.step({ kind: 'bytesIn', link: 1, bytes: frames[i++] }) },
+    () => { many.node.step({ kind: 'bytesIn', link: 1, bytes: frames[j++] }) },
+  )
+  assert.equal(many.node.writes.pending.size, 1000, 'ours are still in flight — none settled, none dropped')
+  assert.ok(r < 1.6, `foreign field apply with 1k of ours in flight / with none = ${r.toFixed(2)}x — the probe is walking the row's whole set (budget 1.6x; keyed by row it read 2.3-2.5x here, keyed by ancestor 1.0x)`)
+  none.bind.destroy(); many.bind.destroy()
+  await none.rt.destroy(); await many.rt.destroy()
 })
