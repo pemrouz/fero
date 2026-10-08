@@ -5,7 +5,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { Ring, VNODES } from './ring.ts'
+import { Ring, VNODES, fnv } from './ring.ts'
 
 const members = (...uuids: string[]): [string, string][] => uuids.map((u) => [u, `sim:${u}`])
 const keys = Array.from({ length: 1000 }, (_, i) => `part${i}`)
@@ -67,6 +67,38 @@ test('spread: hex-shaped member ids get a fair share, and k1..k24 do not pile on
   }
   assert.deepEqual(outside, [], `${outside.length}/200 members outside [0.5x, 2x] of fair`)
   assert.deepEqual(piled, [], `${piled.length}/50 sets pile k1..k24 onto one owner`)
+})
+
+//! I-24 golden. The ring hash is part of the wire contract: every member must pick the same owner.
+// The spread pin above cannot tell fmix32 from a weaker mix that still spreads well but moves every
+// owner, so this pins the exact function: known vectors, a BigInt reference of fnv-1a + fmix32
+// (written apart from the kernel's Math.imul code) over many inputs, and owners for fixed keys.
+test('golden: the default ring hash is exactly fnv-1a finished with fmix32 (wire contract, I-24)', () => {
+  const M = 0xffffffffn
+  const ref = (s: string): number => {
+    let h = 0x811c9dc5n
+    for (let i = 0; i < s.length; i++) { h ^= BigInt(s.charCodeAt(i)); h = (h * 0x01000193n) & M }
+    h ^= h >> 16n; h = (h * 0x85ebca6bn) & M
+    h ^= h >> 13n; h = (h * 0xc2b2ae35n) & M
+    h ^= h >> 16n
+    return Number(h)
+  }
+  const vectors: [string, number][] = [['', 0xab3e7c0b], ['a', 0x1a80b1b3], ['k1', 0xde1cf9f2], ['3f2a9c01#0', 0x76f939c5], ['3f2a9c01#31', 0x1dbe8e1d]]
+  for (const [s, h] of vectors) {
+    assert.equal(ref(s), h, `reference hash of ${JSON.stringify(s)}`)
+    assert.equal(fnv(s), h, `ring hash of ${JSON.stringify(s)}`)
+  }
+  for (let i = 0; i < 2000; i++) {
+    const s = `${(Math.imul(i, 0x9e3779b1) >>> 0).toString(16).padStart(8, '0')}#${i % VNODES}`
+    assert.equal(fnv(s), ref(s), `ring hash of ${s} is not fnv-1a + fmix32`)
+  }
+  const real = new Ring()
+  real.build(1, members('3f2a9c01', '7be04d12', 'a91c5e33', 'e4d07f54'))
+  const owners = Array.from({ length: 12 }, (_, i) => real.ownerOf(`k${i + 1}`))
+  assert.deepEqual(owners, [
+    '7be04d12', 'e4d07f54', 'a91c5e33', '7be04d12', '3f2a9c01', 'e4d07f54',
+    '7be04d12', 'e4d07f54', 'a91c5e33', 'a91c5e33', 'e4d07f54', '3f2a9c01',
+  ], 'owners of k1..k12 moved: the ring hash changed, and mixed versions would disagree on owners')
 })
 
 test('minimal motion: removing a member moves ONLY its keys — survivors keep theirs (the consistent-hash property)', () => {

@@ -30,7 +30,8 @@ export const VNODES = 32
 // in the tail and one member's 32 points bunch into ~4 narrow bands (worst member 2.85x fair over
 // 4-member sets of 8-hex ids). fmix32 spreads every input bit over the word: worst 1.57x (I-24).
 // This exact function is part of the wire contract: every member must compute the same ownership.
-const fnv = (s: string): number => {
+// Exported only so ring.test.ts can pin its exact values.
+export const fnv = (s: string): number => {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) }
   h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b)
