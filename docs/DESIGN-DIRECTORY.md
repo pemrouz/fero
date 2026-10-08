@@ -109,7 +109,8 @@ Role rules are V4-2's, verbatim. Topology:
   pure-static shape: today's behavior byte-for-byte).
 - The loopback guard survives: a server dialing non-local `hosts` needs an
   explicit `listen` (an ephemeral 127.0.0.1 listen gossiped to a remote peer is
-  the same futile-dial-back V4-2 refused).
+  the same futile-dial-back V4-2 refused). Widened in §11 into the
+  explicit-listen rule.
 - `derivedAddr` is deleted (4.x pre-release; V4-2 shipped a week ago). Every
   "derived port" error/comment goes with it.
 - `cluster.me` grows: `hosts` on EVERY role (the effective static ∪ discovered
@@ -295,3 +296,143 @@ entry (the kernel has no client-link failure detector — IDEAS); the shell's
 timers are ref'd, so a process holding only a bare client does not exit
 without `destroy()` (pre-existing; IDEAS); 3376 sits inside the band Windows'
 Hyper-V may reserve at random — the errno surfaces and the retry backs off.
+
+## §11 Cross-box discovery: `hosts: ['10.0.0.5']` (2026-10-08)
+
+Until now a box knew only its own directory. A server on another box could be
+reached only by writing its full `host:port` in `hosts`.
+
+### The spelling
+
+A `hosts` entry with NO port names another box: "ask that box's directory".
+
+- **The port** is this instance's rendezvous port: `rendezvous:` if set, else
+  `FERO_RENDEZVOUS`'s port, else 3376. Every box runs its directory on the
+  same port, so a box is named by its host alone.
+- **A bare host** is a DNS name or a dotted IPv4 (labels of letters, digits and
+  inner hyphens), or a bracketed IPv6 (`[fe80::1]`). A lone number (`'50'`, a
+  port missing its host) and a stray flag read off argv (`--fero.heartbeat.ms`)
+  are still refused as hosts, naming the entry.
+- **The directory off** (`rendezvous: false`, `FERO_RENDEZVOUS=off`) refuses a
+  bare host: there is no port to ask at, and picking 3376 in silence could
+  meet a stranger's directory. The message names both fixes (give the entry
+  its port, or turn the directory on). This also keeps the battery, which runs
+  with the directory off, from ever dialing the box's real directory.
+- **This box's own directory** (`'localhost'` or `'127.0.0.1'` when the
+  rendezvous is `127.0.0.1:3376`) is not asked twice: one canonical spelling
+  per loopback name.
+
+### What asking does
+
+For each distinct bare host the instance opens one more `#directory` CLIENT,
+dialing `<host>:<rendezvous port>`, and opens `lookup(name)` on it as a live
+subscription, exactly as §6 does for its own box. The addresses of every
+source (its own box's directory and each asked box) are unioned, minus its own
+listen, and post as ONE `discover`. Nothing in the kernel changes.
+
+- **Ask only.** It never registers on another box and never tries to host
+  there (that socket is on another machine). A box's directory keeps listing
+  exactly that box's servers, and an entry's lifetime stays its registrant's
+  link to its OWN box's directory (§9). **Rejected:** registering on every
+  asked box. It would make each box's directory a copy of the cluster (the
+  view already gossips that), and an entry's life would hang on a cross-box
+  link. A cluster still forms whichever uuid sorts lowest: a server that was
+  told nothing proposes over the members that dialed it (I-22).
+- **The other box must answer.** A directory binds its rendezvous address, and
+  the default is loopback. So the box being asked runs with a routable
+  rendezvous, `FERO_RENDEZVOUS=10.0.0.5:3376` on that box. Making a box
+  askable is the operator's explicit act, never a default (the trust boundary
+  in §0 is unchanged: the directory is as unauthenticated as the peer plane).
+- **A misdial** (the far port holds a user resource, not a directory) is
+  refused by the HELLO name echo: `#directory` is not its name. The asked box
+  reads down, nothing links, the resource is untouched, and the kernel
+  re-dials at heartbeat cadence (§9's squat rule), so the box is found the
+  moment a real directory answers there.
+- **The asking side's guard.** An address another box's directory hands out
+  whose host is loopback or a wildcard would dial THIS box, so it is dropped,
+  unless it sits on the very host that directory answered on (two loopback IPs
+  standing for two boxes, as the tests do). The compose-time rule below keeps
+  such addresses out of an askable directory in the first place; this guard
+  covers a registrant composed under a different rendezvous spelling on that
+  box (`127.0.0.1:3376` registering into a host bound to `0.0.0.0:3376`).
+- **Observability.** `cluster.me.rendezvous.boxes` maps each asked directory
+  to `{ up, error? }` (`error` is a failed lookup). Present only when `hosts`
+  names another box, so every existing shape reads as before. The internals
+  door's `diag(f).rendezvous().boxes` holds the asked clients themselves.
+
+### The explicit-listen rule
+
+A server's `listen` is the address other nodes are told: its box's directory
+publishes it, and HELLO carries it to every peer, which gossips it on. If that
+address leaves this box, a loopback listen points the other box at ITSELF (a
+futile redial forever, or a same-named stranger welded into membership), and
+a wildcard (`0.0.0.0`, `::`) is no address at all.
+
+So a server is refused at `fero()` with
+
+> to be reachable from another box, listen on a routable address
+
+followed by the reason and the listen, exactly when BOTH hold:
+
+1. **Its listen is loopback or a wildcard**: `127.*`, `localhost`, `::1`,
+   `0.0.0.0`, `::`. The default listen (`127.0.0.1:0`) is loopback, so a
+   server that names another box must name its listen too.
+2. **The listen would leave this box**, for either reason:
+   - its **rendezvous is not loopback** (a routable address, or a wildcard,
+     which answers other boxes too): other boxes can ask that directory, and
+     it would hand them this listen; or
+   - its **hosts name another box**, with a port (a member there learns this
+     listen from HELLO and gossips it) or without one (it asks that box's
+     directory and dials what it finds, with the same HELLO).
+
+"Another box" means a host that is not loopback and not a wildcard. Two
+loopback IPs (`127.0.0.1`, `127.0.0.2`) are this box: that is what lets the
+tests stand two boxes up on one machine.
+
+Clients are never refused: a client has no listen and is never published.
+The directory's own system resources skip the rule (they are composed with
+explicit addresses by the composer).
+
+This replaces V4-2's narrower guard ("explicit listen required when dialing
+non-local hosts"), which refused only the DEFAULT listen beside a ported
+remote host. Two shapes it let through are refused now, on purpose: an
+explicit loopback listen beside a remote host (`listen: '127.0.0.1:4000',
+hosts: ['10.0.0.5:4000']`), and a wildcard listen beside one (`0.0.0.0:4000`).
+Both were broken already: the peer was told an address that dials its own box.
+fero has no "bind everywhere, advertise this" split; `listen` is both.
+
+With nothing set (no `hosts`, the loopback default rendezvous) neither
+trigger holds, so every one-box shape, the examples included, is untouched.
+
+### Tests (api/directory.test.ts)
+
+- Two boxes on one machine: box A at `127.0.0.1:P`, box B at `127.0.0.2:P`
+  (one rendezvous port, a directory each). A server on box A told the bare
+  host `127.0.0.2` asks box B's directory; the two servers form one view;
+  `rendezvous.boxes` reads B up; a bare client on each box reads writes made
+  on the other; box A's directory never lists box B's server (asking
+  registers nothing); a client on box A told only `127.0.0.2` finds box B's
+  server. Skipped where `127.0.0.2` is not loopback (macOS without an alias).
+- A misdial: box B's rendezvous port held by a user resource. The box reads
+  down, the resource admits nobody, and the name rejects repeat.
+- Every case of the rule (default, explicit loopback, wildcard; a bare and a
+  ported remote host; a routable and a wildcard rendezvous), a routable
+  listen passing the rule (it reaches the bind), the directory-off refusal,
+  and the helpers (`isBox`, `boxDirectory`, `sameDirectory`, `fromBox`,
+  `leavesBox`) unit-pinned.
+- The two-box tests fail with the asking path removed (mutation-checked).
+
+The task asked for "two private rendezvous ports on this box". That shape
+cannot stand for two boxes: a bare host asks at the asker's OWN rendezvous
+port, so two directories on one IP at two ports cannot name each other. Two
+loopback IPs at one port is the faithful shape, and the one used.
+
+### Left open
+
+- A routable directory is reachable by anyone who can reach the box, and the
+  peer plane is unauthenticated. Peer authentication (wave 3's door) is what
+  makes an askable directory safe off a trusted network.
+- A box asked by name is resolved once per dial by the OS (no caching, no
+  SRV records). A box whose directory is down costs one dial per heartbeat
+  after the redial chain gives up, like any parked target.
+
