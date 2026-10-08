@@ -111,12 +111,13 @@ test('a vote only counts for the exact proposal it granted: a stale grant for di
   const h = formedView1()
   //! aa proposes evict-cc (drive give-up then suspicion), then receives a VOTE echoing the WRONG members-hash
   h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  h.tick(); h.tick(); h.tick() // suspect first (the default order: 1.5 s), held by the running chain
   for (let i = 0; i < 11; i++) {
     const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
     if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
     h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:cc' })
   }
-  h.tick(); h.tick(); h.tick(); h.tick()
+  h.tick() // give-up ended the hold: the ballot opens here, before the revival re-dials cc
   assert.ok(h.jk(JK.propose).some((e) => e.a === 2), 'eviction ballot for epoch 2 is out')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,bb,zz' }) })
   assert.equal(h.node.epoch, 1, 'a grant echoing a different proposal identity must not commit')
@@ -245,6 +246,35 @@ test('a crashed member runs the SHORT chain (memberRedials 5): the eviction hold
   assert.equal(g.jk(JK.redial).length, MAX_REDIALS)
 })
 
+test('a crashed member whose chain gave up BEFORE suspicion: the heartbeat revival runs the SHORT chain too, so eviction never waits on a long one', () => {
+  //! heartbeat.ms 2000 at redial.ms 100: the member chain (about 3 s) ends before the third tick (6 s), so
+  // the tick-2 revival re-dials the dead member and that dial starts a fresh chain. If that chain were the
+  // long one, the hold would last 10 more tries — eviction at about 23 s, SLOWER than before the short chain.
+  // A revived target that is still a committed member must get the member chain again (review finding).
+  const h = formedView1()
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  let n = 0
+  const fail = () => {
+    const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()!
+    h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    h.node.step({ kind: 'linkDown', link: 800 + ++n, reason: 'refused', to: 'sim:cc' })
+  }
+  for (let i = 0; i < MEMBER_REDIALS; i++) fail()
+  assert.deepEqual(h.jk(JK.giveUp).map((e) => e.a), ['sim:cc'], 'the member chain gave up before any tick')
+  h.tick() // tick 1: not yet suspect; the revival re-dials cc from scratch
+  assert.deepEqual(h.jk(JK.revive).map((e) => e.a), ['sim:cc'])
+  h.node.step({ kind: 'linkDown', link: 800 + ++n, reason: 'refused', to: 'sim:cc' }) // the revived dial fails → a fresh chain
+  h.tick(); h.tick() // ticks 2 and 3: suspect
+  assert.deepEqual(h.jk(JK.suspect).map((e) => e.a), ['cc'])
+  assert.ok(h.node.dialing('sim:cc') && !h.jk(JK.propose).some((e) => e.a === 2), 'held: the revived chain is running')
+  for (let i = 0; i < MEMBER_REDIALS; i++) fail()
+  assert.equal(h.jk(JK.redial).filter((e) => e.b === 'sim:cc').length, 2 * MEMBER_REDIALS, 'the revived chain is the member chain too: five arms, no sixth')
+  assert.deepEqual(h.jk(JK.giveUp).map((e) => e.a), ['sim:cc', 'sim:cc'], 'it gave up again')
+  assert.ok(!h.node.dialing('sim:cc'), 'give-up ends the hold')
+  h.tick()
+  assert.ok(h.jk(JK.propose).some((e) => e.a === 2), 'the eviction ballot opens at the next tick — within the member chain plus three ticks of the crash')
+})
+
 test('join: a member receiving JOIN from an admitted non-member proposes the grown view', () => {
   const h = formedView1()
   //! evict cc first (via a VIEW install), then cc knocks
@@ -357,12 +387,13 @@ test('a returned suspect abandons the in-flight eviction ballot: a late vote mus
   //! mutation-killer (review): deleting the abandon-on-return branch survived the suite
   const h = formedView1()
   h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  h.tick(); h.tick(); h.tick() // suspect first (the default order: 1.5 s), held by the running chain
   for (let i = 0; i < 11; i++) {
     const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
     if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
     h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:cc' })
   }
-  h.tick(); h.tick(); h.tick(); h.tick()
+  h.tick() // give-up ended the hold: the ballot opens here, before the revival re-dials cc
   assert.ok(h.jk(JK.propose).some((e) => e.a === 2), 'eviction ballot in flight')
   h.admit(9, 'cc') // cc RETURNS before any vote lands
   h.tick()
@@ -374,12 +405,13 @@ test('an aged-out proposal unblocks membership: a later JOIN can ballot the same
   //! review finding: a zombie proposal (voter down, votes unreachable) swallowed all JOINs forever
   const h = formedView1()
   h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  h.tick(); h.tick(); h.tick() // suspect first (the default order: 1.5 s), held by the running chain
   for (let i = 0; i < 11; i++) {
     const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
     if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
     h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:cc' })
   }
-  for (let i = 0; i < 16; i++) h.tick() // suspect → propose → ... no votes arrive → PROPOSAL_AGE expiry
+  for (let i = 0; i < 13; i++) h.tick() // propose → ... no votes arrive → PROPOSAL_AGE expiry
   assert.ok(h.jk(JK.propose).some((e) => e.a === 2))
   h.admit(7, 'dd')
   h.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.JOIN, { u: 'dd', i: 1, l: 'sim:dd' }) })
