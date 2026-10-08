@@ -930,6 +930,27 @@ test('cluster.writes on a client: a relayed write is `pending` until the server 
   }
 })
 
+test('cluster.writes after destroy(): a write still in flight reads `rejected destroyed`, as its promise does — never `pending` for ever', async () => {
+  //! a client whose server is not there: its write parks as a `pending` row and never commits
+  const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${await ports.free()}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  type Row = { key: string; state: string; reason?: string }
+  const rows = () => Object.values(c.cluster.writes.snapshot() as Record<string, Row>)
+  const seen: string[] = []
+  c.cluster.writes.tap(() => { seen.push(rows().map((r) => r.state).join()) })
+  seen.length = 0 // a tap fires once as it attaches; count from here
+  c.data.q = 1
+  await Promise.resolve()
+  assert.deepEqual(rows().map((r) => r.state), ['pending'], 'in flight')
+  await c.destroy()
+  await sleep(20)
+  assert.deepEqual(rows().map((r) => [r.key, r.state, r.reason]), [[JSON.stringify(['q']), 'rejected', 'destroyed']], 'the stop rejected it, and the ring says so')
+  assert.deepEqual(seen, ['pending', 'rejected'], 'one last fire for the stop, then nothing')
+  c.data.r = 2 // after the stop the surface is a local value: nothing new enters the ring
+  await sleep(20)
+  assert.equal(rows().length, 1)
+  assert.equal(seen.length, 2)
+})
+
 test('the clean stop on Ctrl-C (V4-8): one SIGINT/SIGTERM listener per process while any instance lives, gone after the last destroy; signals: false opts out; destroy() is idempotent', async () => {
   const count = () => [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')]
   const before = count()
