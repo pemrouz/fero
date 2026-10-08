@@ -11,11 +11,14 @@
    and every frame a server received (722) was a row of that server's WAL. The page re-checks it live (the status
    line) and prints what is true when it fails.
    Card 2 reads each node's per-writer logs (node.logs: what #sendDigest puts in a digest's d). After a restart, a
-   heal or a join it captures THE EXCHANGE, defined by node.ts exactly: the digest each side sends in the step it
-   journals `identified` for the other (digest-on-admit, from both ends), and the RECORDS a receiver sends in the
-   step one of those digests lands (the missing suffix, shipped inside the digestIn step). The r=0 replies and the
-   periodic digests (every heartbeat, from the lower-named side) are not part of it: what answers them re-sends
-   writes made after the exchange began, so a later write is never shown as a gap fill. */
+   heal or a join it captures THE EXCHANGE, defined by node.ts exactly. ONE side opens it (DECISIONS V4-15): between
+   two servers the lower-named one, and a client toward the server it follows; a server never opens toward a client.
+   The exchange is: the opener's r=1 digest, sent in the step it journals `identified` for the other; the RECORDS
+   the other side ships in the step that digest lands (what the opener lacks, shipped inside the digestIn step);
+   that side's r=0 reply, sent in the same step after its ship; and the RECORDS the opener ships in the step the
+   reply lands (what the other side lacks). A client never ships back. The reply's tails are built after its
+   sender's ship, so the opener's answer to them is a real gap, not a second copy. The periodic digests (every
+   heartbeat, from the lower-named side) and their replies are not part of it. */
 import { page, fmt, decode, VERB_NAME, onFrame, REDUCED, pair } from '../cluster.js'
 import { Cursor, VT, VERB, HEADER, FLAG_PROV, FLAG_ATTEMPT, FLAG_PP, crcFrame } from '../lib/kernel/codec.js'
 import { nid, stamp, rec, inspect, vt, esc } from '../ui.js'
@@ -484,15 +487,26 @@ function init(root) {
     if (f.sentAt < c.at - 1e-6) return
     const peer = f.from === c.subj ? f.to : f.to === c.subj ? f.from : null
     if (!peer || !relevant(c, peer)) return
-    // digest-on-admit: sent in the step its sender identified this peer (journal `identified`, then #sendDigest);
-    // in a dial race each end can admit twice, one digest per link
-    if (S.idStep.get(f.from + '>' + f.to) !== page.sim.events) return
-    const L = link(c, peer)
-    if (L.digs.length >= 6) return
-    L.digs.push({ f, admit: true, out: f.from === c.subj })
+    let r; try { r = D(f).value?.r } catch { return }
+    // the opener's digest (r=1): sent in the step its sender identified this peer (journal `identified`, then
+    // #sendDigest); in a dial race an opener can admit twice, one digest per link
+    if (r === 1 && S.idStep.get(f.from + '>' + f.to) === page.sim.events) {
+      const L = link(c, peer)
+      if (L.digs.length >= 6) return
+      L.digs.push({ f, admit: true, out: f.from === c.subj })
+      c.lastAt = page.now; want.ex = true
+      return
+    }
+    // the reply (r=0): sent in the step its sender read one of the opener's digests above
+    const read = r === 0 && S.digestStep.get(f.from) === page.sim.events ? S.dinFrame.get(f.from) : null
+    const L = read && c.links.get(peer)
+    const of = L && L.digs.find((x) => x.admit && x.f === read && x.f.from === f.to)
+    if (!of || L.digs.length >= 6) return
+    L.digs.push({ f, admit: false, reply: true, of, out: f.from === c.subj })
     c.lastAt = page.now; want.ex = true
   }
-  // a RECORDS frame sent in the step one of the admit digests was read, by that digest's receiver, back to its sender
+  // a RECORDS frame sent in the step one of the exchange's digests (the opener's, or the reply) was read, by that
+  // digest's receiver, back to its sender
   function capShip(f) {
     const c = S.cap
     const peer = f.from === c.subj ? f.to : f.to === c.subj ? f.from : null
@@ -511,20 +525,24 @@ function init(root) {
     if ((Ls.length && landed && page.now - c.lastAt > 1200) || page.now - c.at > 9000) { c.done = true; want.ex = true }
   }
   const allLanded = (L) => L.digs.every((g) => g.f.recvAt <= page.now) && L.ships.every((s) => s.f.recvAt <= page.now)
-  const lastAdmit = (L, out) => { let g = null; for (const x of L.digs) if (x.admit && x.out === out) g = x; return g }
+  // the link's latest opener digest, and the reply to it (null until one came)
+  const lastOpen = (L) => { let g = null; for (const x of L.digs) if (x.admit) g = x; return g }
+  const replyTo = (L, g) => (g && L.digs.find((x) => x.reply && x.of === g)) || null
   // does `has`'s digest show records `ask`'s digest lacks?
   const ahead = (ask, has) => { try { const a = D(ask.f).value?.d ?? {}, b = D(has.f).value?.d ?? {}; return Object.keys(b).some((o) => (b[o] ?? 0) > (a[o] ?? 0)) } catch { return false } }
-  // a link whose digests drew no answer: nothing was missing, or the digest that asked was never read
+  // a link whose digests drew no records: nothing was missing, a client does not teach, or the digest that asked was
+  // never read
   function unanswered(L) {
-    const out = lastAdmit(L, true), inn = lastAdmit(L, false)
-    if (!out || !inn) return ''
-    for (const [ask, has] of [[out, inn], [inn, out]]) if (ahead(ask, has)) {
+    const open = lastOpen(L), reply = replyTo(L, open)
+    if (!open || !reply) return ''
+    for (const [ask, has] of [[open, reply], [reply, open]]) if (ahead(ask, has)) {
       const r = ask.f.to
+      if (page.role(r) === 'client') return `${I(r)} is a client: it never sends records back`
       return S.readDigs.has(ask.f) ? `${I(r)} read ${I(ask.f.from)}’s digest, but no records came back in that step` : `${I(r)} never read ${I(ask.f.from)}’s digest: it landed on a link ${I(r)} had just closed`
     }
     return 'nothing was missing, so no records were sent'
   }
-  // an answer's sender's own admit digest on that link: the latest one it sent before the answer
+  // an answer's sender's own digest on that link (the opener's, or its reply): the latest one it sent by then
   const ownAdmit = (L, f) => { let g = null; for (const x of L.digs) if (x.f.from === f.from && x.f.sentAt <= f.sentAt + 1e-6) g = x; return g }
 
   // ── drawing ──
@@ -910,7 +928,7 @@ function init(root) {
     for (const L of Ls) {
       L.best = null
       for (const s of L.ships) { const r = shipRank(s.f); if (!L.best || r < L.best.r || (r === L.best.r && s.f.sentAt < L.best.s.f.sentAt)) L.best = { s, r } }
-      L.both = !!(lastAdmit(L, true) && lastAdmit(L, false))
+      L.both = !!replyTo(L, lastOpen(L))   // the exchange ran: the opener's digest, and the reply to it
     }
     Ls.sort((x, y) => (x.best?.r ?? 9) - (y.best?.r ?? 9) || (y.both - x.both) || (x.best?.s.f.sentAt ?? 1e15) - (y.best?.s.f.sentAt ?? 1e15) || x.peer.localeCompare(y.peer))
     return Ls
@@ -934,10 +952,11 @@ function init(root) {
     if (!Ls.length) { setButtons(el.ex, `<p class="ex-none">${I(c.subj)} ${c.done ? 'traded no digest on the way back' : 'has not traded a digest yet: its links are still coming up'}.</p>`, 'data-ship'); return }
     const first = Ls[0]
     const rows = []
-    // the first link in full: its admit digests, one each way, in the order they were sent, then what answered them.
-    // With an answer, the digest it answered and its sender's own; else the latest each way (in a dial race, the link
-    // that is kept)
-    const ds = (first.best ? [first.best.s.g, ownAdmit(first, first.best.s.f)] : [lastAdmit(first, true), lastAdmit(first, false)]).filter(Boolean).sort((x, y) => x.f.sentAt - y.f.sentAt)
+    // the first link in full: the opener's digest and the reply, in the order they were sent, then what answered them.
+    // With an answer, the digest it answered and its sender's own; else the latest opener digest and its reply (in a
+    // dial race, the link that is kept)
+    const open = lastOpen(first)
+    const ds = (first.best ? [first.best.s.g, ownAdmit(first, first.best.s.f)] : [open, replyTo(first, open)]).filter(Boolean).sort((x, y) => x.f.sentAt - y.f.sentAt)
     for (const g of ds) {
       const note = !g.out ? '' : c.why === 'restart' ? (c.role === 'server' ? 'its counters, back from its WAL' : 'a client keeps no disk, so it comes back empty')
         : c.why === 'join' ? (c.role === 'server' ? 'a new server starts empty' : 'a new client starts empty') : ''
@@ -953,20 +972,20 @@ function init(root) {
       }
     } else if (allLanded(first)) {
       const quiet = quietClient(first, c)
-      rows.push(`<div class="ex-row ex-more"><span class="ex-what wl-note">${quiet || unanswered(first) || 'one digest so far'}</span></div>`)
+      rows.push(`<div class="ex-row ex-more"><span class="ex-what wl-note">${quiet || unanswered(first) || (first.both ? 'answered, nothing sent yet' : 'opened, no answer yet')}</span></div>`)
     }
     // the other links, one line each
     for (const L of Ls.slice(1)) rows.push(`<div class="ex-row ex-more"><span class="ex-what">${otherLine(L, first, c)}</span></div>`)
     setButtons(el.ex, rows.join(''), 'data-ship')
   }
-  // a client answers digests only from the server it follows (node.ts: "a digest arriving on a NON-primary link goes
-  // unanswered"), so a link to any other server stays one-sided
+  // a client opens an exchange only with the server it follows, and a server never opens toward a client (node.ts:
+  // "a client digests exactly ONE server — its primary"), so a link to any other server trades no digest
   function quietClient(L, c) {
     const cl = page.role(L.peer) === 'client' ? L.peer : page.role(c.subj) === 'client' ? c.subj : null
     if (!cl) return ''
     const srv = cl === L.peer ? c.subj : L.peer
     const p = primaryOf(cl)
-    return p && p !== srv && !lastAdmit(L, cl === c.subj) ? `${I(cl)} follows ${I(p)}, so it does not answer ${I(srv)}’s digest` : ''
+    return p && p !== srv && !L.digs.some((x) => x.f.from === cl) ? `${I(cl)} follows ${I(p)}, so it trades no digest with ${I(srv)}` : ''
   }
   function shipRow(s, L, c) {
     const f = s.f
@@ -987,10 +1006,10 @@ function init(root) {
     if (!L.ships.length) {
       const quiet = quietClient(L, c)
       if (quiet) return quiet
-      if (!L.both) return `${NI(peer)}: one digest so far`
-      if (!allLanded(L)) return `${NI(peer)} traded digests too`
+      if (!L.both) return `${NI(peer)}: opened, no answer yet`
+      if (!allLanded(L)) return `${NI(peer)}: opened and answered`
       const u = unanswered(L)
-      return u.startsWith('nothing') ? `${NI(peer)} traded digests too · nothing was missing` : `${NI(peer)} traded digests too · ${u}`
+      return u.startsWith('nothing') ? `${NI(peer)}: opened and answered · nothing was missing` : `${NI(peer)}: opened and answered · ${u}`
     }
     const froms = new Set(L.ships.map((s) => s.f.from))
     const sameAsFirst = first.ships.length === L.ships.length && L.total === first.total && L.ships.every((s, k) => same(s.f.bytes, first.ships[k].f.bytes))

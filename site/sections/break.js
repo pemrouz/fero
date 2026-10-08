@@ -534,7 +534,7 @@ function healFacts(c) {
   const lu = c.seen.identified ?? []
   rows.push(F('links back', lu.length ? T(new Set(lu.map((e) => pair(e.node, e.b))).size) : esc('…'), { cls: lu.length ? '' : 'pend', note: lu.length ? `the first at ${T(plus(lu[0].at - c.t0))}` : '' }))
   const ae = c.seen.aeShip ?? []
-  rows.push(F('records resent', T(ae.reduce((s, e) => s + (e.b || 0), 0)), { note: 'each side sends a digest; the other sends only what is missing' }))
+  rows.push(F('records resent', T(ae.reduce((s, e) => s + (e.b || 0), 0)), { note: 'one side opens with a digest; each sends only what the other is missing' }))
   const went = page.writes.filter((w) => c.waitingBefore?.includes(w.id) && w.state === 'committed')
   if (c.waitingBefore?.length) rows.push(F('waiting writes that went out', `${T(went.length)} of ${T(c.waitingBefore.length)}`))
   rows.push(copiesFact(c))
@@ -620,7 +620,7 @@ function lieFacts(c) {
   else if (!lost) rows.push(F('the kernel', '<span class="agree-ok">lost nothing</span>', { wide: true, note: 'no save lied before the crash' }))
   else rows.push(F('the kernel', esc('saw no gap'), { wide: true, note: `the lost ${lost === 1 ? 'save was the last one' : 'saves were the last ones'}, so it cannot tell ${lost === 1 ? 'it' : 'them'} from saves never made. The others send what it is missing.` }))
   const ship = (c.seen.aeShip ?? []).filter((e) => bare(e.a) === t && e.at >= c.restartAt).reduce((s, e) => s + (e.b || 0), 0)
-  rows.push(F('records the others sent it', T(ship), { note: 'aeShip, after the restart: each side sends a digest, the other sends what is missing' }))
+  rows.push(F('records the others sent it', T(ship), { note: 'aeShip, after the restart: one side opens with a digest, and each sends what the other is missing' }))
   rows.push(copiesFact(c))
   return rows
 }

@@ -518,6 +518,7 @@
       </div>
       <div class="st-rungs" data-rungs aria-label="the example series"></div>
       <p class="st-rungs-foot" data-rungs-foot></p>
+      <p class="st-rungs-foot">All <span data-b="rungs"></span> rungs are one table, each with its lesson and the terminals to open: <a data-repo href="https://github.com/pemrouz/fero/blob/main/examples/README.md" target="_blank" rel="noopener"><code>examples/README.md</code> ↗</a></p>
     </div>
 
     <!-- ── b · the README's shape block, with the same live margin ──────────────────────────────── -->
@@ -558,6 +559,7 @@
       </div>
       <div class="st-rungs" data-rungs aria-label="the example series"></div>
       <p class="st-rungs-foot" data-rungs-foot></p>
+      <p class="st-rungs-foot">All <span data-b="rungs"></span> rungs are one table, each with its lesson and the terminals to open: <a data-repo href="https://github.com/pemrouz/fero/blob/main/examples/README.md" target="_blank" rel="noopener"><code>examples/README.md</code> ↗</a></p>
     </div>
 
   </div>
@@ -740,8 +742,9 @@
         number, then the records. Most also carry the attempt: who issued the write, and its own counter for it.
         Below is a real frame from the cluster above, taken apart by
         <code>kernel/codec.ts</code>. The owner writes these same bytes to its write-ahead log (the WAL, its log on
-        disk), and the page checks them byte for byte. When a node comes back, each side sends a <b>digest</b>, the
-        highest counter it holds from each writer, and the other sends only what is missing.
+        disk), and the page checks them byte for byte. When a node comes back, one side opens with a <b>digest</b>, the
+        highest counter it holds from each writer. The other sends only what is missing, then answers with its own
+        digest, and the first side fills that gap too.
       </p>
 
       <!-- card 1: one frame -->
