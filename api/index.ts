@@ -609,6 +609,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     let refold = false
     let primaryMoved = false
     if (j.n !== cursor) {
+      //! the ring overflowed past our cursor (journal.cap below one step's burst — or one huge catch-up
+      // step): the rows this loop rides on may be gone. `dropped` is the oldest row still held, so this
+      // is one compare. What they would have done is re-derived from live state below the loop.
+      const lost = j.dropped > cursor
       const events = j.read(cursor)
       cursor = j.n
       //! method-plane housekeeping rides the same fold: dead links reap their served subscriptions
@@ -630,6 +634,20 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         if (caller && node.primary !== null) caller.onPrimaryChange()
       }
       if (events.some((e) => FOLD.has(e.kind))) refold = true
+      if (lost) {
+        refold = true
+        //! a lost linkDown: reap every stream whose link is gone
+        host!.reapGone((id) => { const l = node.links.get(id); return l !== undefined && !l.dead })
+        //! a lost shed: a row this node still shows whose partition the kernel no longer has at all —
+        // no scope entry and no cell — left lawfully; mirror it out (a lost acquire only undercounts)
+        if (node.armed) {
+          const kept = new Set<string>(node.scope!.entries.keys())
+          for (const k of node.state.keys()) kept.add((JSON.parse(k) as string[])[0] ?? '')
+          for (const p of Object.keys(snapshotOf(bind.data) as object)) if (!kept.has(p)) { shedEver++; bind.shedPartition(p) }
+        }
+        //! a lost view install: re-gather against the ring, as the install would have
+        if (gather) void gather.refresh(rt, { throwOnPartial: false }).catch(() => {})
+      }
     }
     //! cluster.partitions: ONE O(P) recompute per fold() invocation, AFTER the event loop (M6-review
     // finding 42: the tallies + shedWaitingOn walk used to run once for the scope.n drift check and

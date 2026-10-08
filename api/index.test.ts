@@ -752,6 +752,61 @@ test('the cluster view folds in ONE batch (V4-8): a bare cluster.tap fires once 
   }
 })
 
+test('journal.cap below one step\'s burst never starves the cluster view: the fold sees the ring overflow (journal.dropped) and refolds from live state', async () => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  //! a ring of 2: a link coming up or a view install emits more rows in one step than the ring holds, so
+  // the rows the fold rides on (identified, viewInstall, linkDown) can be gone before the fold reads them
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, journal: { cap: 2 },
+    methods: { watch: (_: unknown, ctx: { data: unknown }) => ctx.data } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, journal: { cap: 2 },
+    methods: { watch: (_: unknown, ctx: { data: unknown }) => ctx.data } })
+  type View = { epoch: number; writable: boolean; members: Record<string, string>; peers: Record<string, unknown> }
+  const view = (f: typeof a) => snapshot(f.cluster) as View
+  const d = diag(a)!
+  let c: Awaited<ReturnType<typeof fero>> | undefined
+  try {
+    assert.ok(await until(() => view(a).epoch >= 1 && Object.keys(view(a).members).length === 2 && view(a).writable, 5000), `the view formed (${JSON.stringify(view(a))})`)
+    //! the client arrives into a SETTLED view: the step that admits it is the only one that names it, and
+    // nothing after it refolds — the picture must follow the live links, not the rows that survived
+    //! redial.ms 500 keeps the client's reconnect out of the window after the drop (as in the served() test)
+    c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 500 } })
+    assert.ok(await until(() => Object.keys(view(a).peers).sort().join() === 'bb,zz', 3000), `the server's picture names the client (${JSON.stringify(view(a).peers)})`)
+    assert.ok(await until(() => (snapshot(c!.cluster) as { me: { primary: string | null } }).me.primary === 'aa', 3000), 'the client is fed by aa')
+    assert.ok(d.journal().dropped > 0, 'the ring did overflow')
+    const live = c.methods.watch() as { first?: unknown }
+    void live.first
+    assert.ok(await until(() => d.served() === 1, 4000), 'the host serves the sub')
+    assert.equal(d.drop!('zz'), true)
+    assert.ok(await until(() => d.served() === 0 && Object.keys(view(a).peers).join() === 'bb', 2000), `linkDown reaped the serve and the client left the picture (${JSON.stringify(view(a).peers)})`)
+    await b.destroy()
+    assert.ok(await until(() => view(a).epoch >= 2 && Object.keys(view(a).members).length === 1 && view(a).writable, 5000), `the survivor's view shrank (${JSON.stringify(view(a))})`)
+  } finally {
+    await c?.destroy()
+    await a.destroy()
+    await b.destroy()
+  }
+})
+
+test('journal.cap 2 on a SCOPED pair: the overflow refold keeps every held row (it mirrors out only a partition the kernel no longer has at all)', async () => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1, journal: { cap: 2 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1, journal: { cap: 2 } })
+  try {
+    assert.ok(await until(() => [a, b].every((f) => (snapshot(f.cluster) as { epoch: number; writable: boolean }).epoch >= 1 && (snapshot(f.cluster) as { writable: boolean }).writable), 5000), 'the view formed')
+    for (let i = 0; i < 20; i++) a.data['p' + i] = i
+    const all = Array.from({ length: 20 }, (_, i) => 'p' + i).sort().join()
+    //! the gather asks every holder for its rows: a row the refold wrongly mirrored out would be missing
+    assert.ok(await until(async () => Object.keys((await a.data) as object).sort().join() === all, 5000), 'every row is on its holder')
+    assert.ok(diag(a)!.journal().dropped > 0 && diag(b)!.journal().dropped > 0, 'both rings overflowed')
+    await sleep(300) // heartbeats and folds over the settled shards
+    assert.equal(Object.keys((await a.data) as object).sort().join(), all, 'and stays there after a few more folds')
+    assert.equal(Object.keys((await b.data) as object).sort().join(), all, 'seen from the other member too')
+  } finally {
+    await a.destroy()
+    await b.destroy()
+  }
+})
+
 test("a leaving member paints no frame after destroy(): its own shrunk view is the survivors' picture, not its last frame", async () => {
   const [pa, pb] = [await ports.free(), await ports.free()]
   const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })

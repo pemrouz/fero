@@ -246,6 +246,16 @@ export class Host {
       if (key.startsWith(link + '|')) { sub.cancelled = true; sub.stop(); this.#subs.delete(key) }
   }
 
+  //! reapGone — reapLink for every link that is no longer live: the composer's fold calls it when the
+  // journal ring overflowed past its cursor (journal.cap below one step's burst), so a linkDown row it
+  // never read cannot leak the streams that link held
+  reapGone(live: (link: number) => boolean) {
+    for (const [key, sub] of this.#subs) {
+      const bar = key.indexOf('|')
+      if (bar > 0 && !live(Number(key.slice(0, bar)))) { sub.cancelled = true; sub.stop(); this.#subs.delete(key) }
+    }
+  }
+
   destroy() {
     for (const [, sub] of this.#subs) sub.stop()
     this.#subs.clear()
