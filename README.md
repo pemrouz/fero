@@ -109,7 +109,7 @@ Scope: *instance* = this node only. *cluster* = must be the same on every member
 
 | Key | Default | Scope | Set via | What it does |
 |---|---|---|---|---|
-| `dir` | unset: memory only | instance | call, flag, env, file | The directory holding `wal.log` and `boot.json`. Its presence turns on the WAL, restores the previous life's identity and view, and implies the server role. One dir is one node of one resource; two resources in one process want the per-resource form (`FERO_SHOP_DIR`, `FERO_USERS_DIR`). |
+| `dir` | unset: memory only | instance | call, flag, env, file | The directory holding `wal.log` and `boot.json` (and, after a boot record failed, a `condemned` marker that refuses the next restart). Its presence turns on the WAL, restores the previous life's identity and view, and implies the server role. One dir is one node of one resource; two resources in one process want the per-resource form (`FERO_SHOP_DIR`, `FERO_USERS_DIR`). |
 
 **Replication**
 
