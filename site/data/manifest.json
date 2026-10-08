@@ -1,7 +1,7 @@
 {
- "builtAt": "2026-10-08T17:25:02.443Z",
- "head": "ca8e077",
- "branch": "w1/integ",
+ "builtAt": "2026-10-08T18:19:30.633Z",
+ "head": "497ebc3",
+ "branch": "v4",
  "version": "4.0.0",
  "dependencies": [
   "optcascade"
@@ -52,10 +52,10 @@
   "data": "4.0.0"
  },
  "test": {
-  "at": "2026-10-03T03:00:29+01:00",
+  "at": "2026-10-08T19:19:30+01:00",
   "fero": {
-   "tests": 495,
-   "pass": 495,
+   "tests": 560,
+   "pass": 560,
    "fail": 0
   },
   "contract": {
@@ -66,7 +66,7 @@
   "exit": 0
  },
  "perf": {
-  "at": "2026-10-03T12:08:37+01:00",
+  "at": "2026-10-08T19:19:30+01:00",
   "tests": 43,
   "pass": 43,
   "fail": 0
@@ -74,7 +74,7 @@
  "sim": {
   "seeds": 1000,
   "green": 1000,
-  "events": 237451,
-  "line": "1000/1000 seeds green · 3 nodes · 40 writes/run · 237,451 events"
+  "events": 211160,
+  "line": "1000/1000 seeds green · 3 nodes · 40 writes/run · 211,160 events"
  }
 }
