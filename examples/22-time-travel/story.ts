@@ -10,20 +10,21 @@ const write = (f: Fero, key: string, value: string) => f.methods.update({ key, v
 const settle = async (key: string) => { while (!nodes.every((n) => n.cluster.snapshot().epoch && n.data[key].snapshot() === a.data[key].snapshot())) await new Promise((r) => setTimeout(r, 25)) }
 
 // act 1, the open window: before the first view every member stamps for itself, so two writes to one cell are an election
-const [ra, rb] = await Promise.all([write(a, 'hot', 'from a'), write(b, 'hot', 'from b')])
-await settle('hot')
-console.log(`race: 'from a' is ${ra.origin}:${ra.seq}, 'from b' is ${rb.origin}:${rb.seq} → hot is '${a.data.hot.snapshot()}' on a, b, c`)
+const [ra, rb] = await Promise.all([write(a, 'spot', 'from a'), write(b, 'spot', 'from b')])
+await settle('spot')
+console.log(`race: 'from a' is ${ra.origin}:${ra.seq}, 'from b' is ${rb.origin}:${rb.seq} → spot is '${a.data.spot.snapshot()}' on a, b, c`)
 
 // act 2, history: with a view one member stamps every write to a cell, in turn — no election
-const [sa, sb] = await Promise.all([write(a, 'hot', 'a again'), write(b, 'hot', 'b again')])
-await settle('hot')
-console.log(`history: 'a again' is ${sa.origin}:${sa.seq}, 'b again' is ${sb.origin}:${sb.seq} → hot is '${a.data.hot.snapshot()}' on a, b, c`)
+// (the key names are picked for their owners: the ring hash puts 'spot' on b and 'missed' on c)
+const [sa, sb] = await Promise.all([write(a, 'spot', 'a again'), write(b, 'spot', 'b again')])
+await settle('spot')
+console.log(`history: 'a again' is ${sa.origin}:${sa.seq}, 'b again' is ${sb.origin}:${sb.seq} → spot is '${a.data.spot.snapshot()}' on a, b, c`)
 
 // act 3, the cut: a drops its socket to c — c's write reaches b at once and a when the link heals, by anti-entropy
 diag(a)!.drop!('c')
-const rc = await write(c, 'during', 'the cut')
-await settle('during')
-console.log(`cut: a dropped its link to c, 'the cut' is ${rc.origin}:${rc.seq} → during is '${a.data.during.snapshot()}' on a, b, c`)
+const rc = await write(c, 'missed', 'the cut')
+await settle('missed')
+console.log(`cut: a dropped its link to c, 'the cut' is ${rc.origin}:${rc.seq} → missed is '${a.data.missed.snapshot()}' on a, b, c`)
 
 writeFileSync('story.capture.json', JSON.stringify({ v: 1, kind: 'live', vocab: JK, seed: null, nodes: nodes.map((n) => diag(n)!.capture()) }))
 console.log('open it: npm run debug -- examples/22-time-travel/story.capture.json')
