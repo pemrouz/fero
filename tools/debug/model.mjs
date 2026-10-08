@@ -19,7 +19,7 @@
 //! the CLOSED enums (M7 honesty gate): every fold-minted status string lives in one of these two lists —
 // the string-leaf traceability test walks fold outputs and rejects any leaf outside capture-strings ∪
 // these enums ∪ vocab names ∪ cellKey encodings. Add a status HERE (and to its fold) or the gate fails.
-export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived', 'not-a-holder']
+export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived', 'not-a-holder', 'acquired']
 export const ABSENT_REASONS = ['refused', 'timeout', 'unauthorized', 'frame', 'vocab-mismatch', 'restarted', 'error']
 
 export const encodeVal = (v) => {
@@ -312,6 +312,10 @@ export const verifyTopology = (capture) => {
 // capture carries for that partition (kernel/diag.ts ownHolders — the ring's answer at capture end, never
 // re-derived here) was never meant to get it. No holder facts (unscoped, an older capture, a partition
 // compacted out of the origin's log) → absent is never-arrived, exactly as before.
+// acquired: when the holders change, a new holder copies the row's whole history from an old one in one
+// fold (journal acquire, a=partition, c=teacher) — no applyInbound row per write. A node with no row for
+// the write whose record book HOLDS (origin, seq) and that journaled an acquire of the write's partition got
+// it that way: closed status `acquired`, at the last such acquire row, with the teacher. Both facts or none.
 export const routes = (capture) => {
   const K = capture.vocab
   const map = new Map() // 'origin#seq' → { origin, seq, partition, nodes: {uuid: {status, t}} }
@@ -320,11 +324,16 @@ export const routes = (capture) => {
     if (!map.has(id)) map.set(id, { origin, seq, partition: null, nodes: {} }) // null until a writeLocal row names it — a route seen only inbound (a reborn origin's old life) has no partition FACT
     return map.get(id)
   }
+  const acquired = new Map() // uuid → Map<partition, {t, from}> — the LAST acquire of each partition at that node
   for (const node of capture.nodes) {
     const skips = new Set() // lwwSkip fires just before its applyInbound — join them into one status
     const lane = laneOf(node) // a reborn node's writes are `uuid~inc#seq` routes — its peers apply them under that lane
     for (const e of node.journal) {
       if (e.kind === K.lwwSkip) skips.add(e.a + '#' + e.b)
+      else if (e.kind === K.acquire) {
+        if (!acquired.has(node.uuid)) acquired.set(node.uuid, new Map())
+        acquired.get(node.uuid).set(String(e.a), { t: e.t, from: e.c })
+      }
       else if (e.kind === K.writeLocal) {
         const r = touch(lane, e.a)
         r.partition = String(e.b)
@@ -342,12 +351,20 @@ export const routes = (capture) => {
   // or, on a scoped capture, was never one of its holders
   const byLane = new Map()
   for (const node of capture.nodes) byLane.set(laneOf(node), node)
+  const seqs = new Map() // 'uuid lane' → Set of the seqs that node's record book holds (built on first need)
+  const holds = (node, lane, seq) => {
+    const k = node.uuid + ' ' + lane
+    if (!seqs.has(k)) seqs.set(k, new Set(((node.logs || {})[lane] || []).map((x) => x.seq)))
+    return seqs.get(k).has(seq)
+  }
   for (const r of map.values()) {
     const o = byLane.get(r.origin)
     const holders = o && o.holders && r.partition != null ? o.holders[r.partition] : null
     const members = holders && o.view ? o.view.members : null
     for (const node of capture.nodes)
       if (!r.nodes[node.uuid]) {
+        const got = r.partition != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(r.partition) : null
+        if (got && holds(node, r.origin, r.seq)) { r.nodes[node.uuid] = { status: 'acquired', t: got.t, from: got.from }; continue }
         const quiet = members && node.client !== true && members.includes(node.uuid) && !holders.includes(node.uuid)
         r.nodes[node.uuid] = { status: quiet ? 'not-a-holder' : 'never-arrived', t: null }
       }

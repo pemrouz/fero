@@ -505,21 +505,41 @@ test('a truncated journal is a WARNING said out loud: the header says replay unc
 })
 
 test('a scoped capture paints a non-holder QUIET: no in-flight pill, "applied 2/2 holders", and a "not a holder" stop at every step (ISSUES I-3)', async () => {
-  const { el, g } = await bootViewer('scoped', captures.get('scoped'))
+  const cap = captures.get('scoped') as { nodes: { uuid: string; holders?: Record<string, string[]> }[] }
+  const { el, g } = await bootViewer('scoped', cap)
   g(`expanded.add('g/writes'); render()`)
   const tree = el('tree').innerHTML
   assert.match(tree, /data-type="write"/, 'the writes are painted')
   assert.doesNotMatch(tree, /data-tip="write:(in-flight|never-arrived)"/, 'no write is flagged as still travelling or lost')
   assert.match(tree, /data-tip="route:holders">applied 2\/2 holders</, 'the denominator is the holders, not the cluster')
   assert.doesNotMatch(tree, /⊘/, 'nobody is listed as missing it')
-  const key = g('(function(){ const q=[...FOREST]; while(q.length){ const n=q.shift(); if(n.type==="write") return n.key; if(n.kids) q.push(...n.kids) } return "" })()') as string
-  g(`navTo(${JSON.stringify(key)})`)
+  //! a plain route: written by one of its 2 holders, applied by the other, quiet at the other 3 of the 5 members
+  type R = { origin: string; seq: number; partition: string; nodes: Record<string, { status: string; t: number | null; from?: string }> }
+  const all = [...(MODEL.routes(cap) as Map<string, R>).values()]
+  const plain = all.find((r) => Object.values(r.nodes).filter((x) => x.status === 'not-a-holder').length === 3 && Object.values(r.nodes).filter((x) => x.status === 'applied').length === 1)!
+  assert.ok(plain, 'the scoped scenario has a route that never moved — the fixture is what it claims')
+  g(`navTo(${JSON.stringify(`g/writes/${plain.origin}#${plain.seq}`)})`)
   const insp = el('insp').innerHTML
-  assert.equal((insp.match(/data-tip="stop:not-a-holder">not a holder — never meant to get it</g) || []).length, 2, 'two of four stops are non-holders')
+  assert.equal((insp.match(/data-tip="stop:not-a-holder">not a holder — never meant to get it</g) || []).length, 3, 'three of five stops are non-holders')
   assert.doesNotMatch(insp, /stop:(never|inflight)/)
   //! rewound to t0: the non-holders stay "not a holder" (never meant to get it at any step); the holders have not got it yet
   dragTo(el, 0)
   const insp0 = el('insp').innerHTML
-  assert.equal((insp0.match(/data-tip="stop:not-a-holder"/g) || []).length, 2)
+  assert.equal((insp0.match(/data-tip="stop:not-a-holder"/g) || []).length, 3)
   assert.match(insp0, /applied 0\/2 holders by t0/, 'the rewound rollup counts holders too')
+})
+
+test('a scoped capture paints a write a new holder copied in with its row as "got it in a hand-off" from its teacher, counted as received (ISSUES I-3)', async () => {
+  const cap = captures.get('scoped')
+  type R = { origin: string; seq: number; nodes: Record<string, { status: string; t: number | null; from?: string }> }
+  const moved = [...(MODEL.routes(cap) as Map<string, R>).values()].find((r) => Object.values(r.nodes).some((x) => x.status === 'acquired'))!
+  assert.ok(moved, 'the join moved a written row — the fixture is what it claims')
+  const [who, stop] = Object.entries(moved.nodes).find(([, x]) => x.status === 'acquired')!
+  const { el, g } = await bootViewer('scoped', cap)
+  g(`navTo(${JSON.stringify(`g/writes/${moved.origin}#${moved.seq}`)})`)
+  const insp = el('insp').innerHTML
+  assert.ok(insp.includes(`<span class="ref" data-rkey="g/nodes/${who}">${who}</span></span><span data-tip="stop:acquired">got it in a hand-off</span> from <span class="ref" data-rkey="g/nodes/${stop.from}">${stop.from}</span> <span class="x" data-tip="t">· t${stop.t}</span>`), 'the stop names the teacher and the acquire row')
+  const meant = Object.values(moved.nodes).filter((x) => x.status !== 'not-a-holder').length
+  assert.match(insp, new RegExp(`applied ${meant}/${meant} holders`), 'a hand-off counts as received')
+  assert.doesNotMatch(insp, /stop:(never|inflight)/)
 })
