@@ -52,12 +52,15 @@ export const perEvent = () => [
     })(),
   },
   {
-    //! committed epochs never go backwards — install() only accepts strictly newer views
+    //! committed epochs never go backwards — install() only accepts strictly newer views. MEMBERS only: a
+    // client's epoch is its feeder's number (I-23, amended 2026-10-08), and the cluster it looks at may be
+    // reborn under fresh uuids at epoch 1 after it saw epoch 2 — the row follows the feeder, by design.
     name: 'epoch-monotone',
     check: (() => {
       const last = new Map<string, number>()
       return (sim: Sim): string | null => {
         for (const [id, n] of sim.nodes) {
+          if (n.client) continue
           const prev = last.get(id) ?? 0
           if (n.epoch < prev) return `${id} epoch went backwards: ${n.epoch} < ${prev}`
           last.set(id, n.epoch)

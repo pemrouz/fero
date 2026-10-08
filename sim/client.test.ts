@@ -170,12 +170,19 @@ test('reborn memory-only members re-form with a stale spoke connected: the spoke
   sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['before'], value: 1 }] })
   sim.run({ until: 700 })
   assert.equal(JSON.stringify(c.state.get(key('before'))), '1')
-  //! kill -9 both: their ports close (the partitions refuse every redial until a new life binds the address)
-  for (const [a, b] of [['zc1', 'n01'], ['zc1', 'n02'], ['n01', 'n02']]) sim.partition(a, b)
-  for (const n of [n01, n02]) { n.destroy(); sim.nodes.delete(n.uuid) }
-  sim.run({ until: 1000 })
+  //! the spoke's number goes ABOVE the reborn cluster's first (I-23 amended, 2026-10-08): n02 leaves by
+  // ballot, so the spoke holds epoch 2 {n01} — a bigger number than the epoch 1 the reborn pair will commit
+  sim.post('n02', { kind: 'leave' })
+  sim.run({ until: 900 })
+  assert.equal(sim.left.get('n02'), true)
+  assert.deepEqual([n01.epoch, c.epoch, members(c)], [2, 2, ['n01']], 'the spoke followed its feeder to epoch 2')
+  sim.partition('zc1', 'n02'); sim.partition('n01', 'n02'); n02.destroy(); sim.nodes.delete('n02')
+  //! kill -9 the last member: its port closes (the partition refuses every redial until a new life binds the address)
+  sim.partition('zc1', 'n01')
+  n01.destroy(); sim.nodes.delete('n01')
+  sim.run({ until: 1200 })
   assert.equal(c.primary, null, 'the spoke lost its feeder')
-  assert.deepEqual(members(c), ['n01', 'n02'], 'and still holds the dead view')
+  assert.deepEqual(members(c), ['n01'], 'and still holds the dead view')
   //! the first member comes back on the same address under a fresh uuid; its peer's port is still closed
   sim.partition('n03', 'n02')
   const n03 = sim.add({ uuid: 'n03', listen: 'sim:n01', hosts: ['sim:n02'], heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16 })
@@ -191,8 +198,10 @@ test('reborn memory-only members re-form with a stale spoke connected: the spoke
   assert.deepEqual(members(n03), ['n03', 'n04'])
   assert.deepEqual(members(n04), ['n03', 'n04'])
   assert.ok(n03.membership.gate(n03).open && n04.membership.gate(n04).open, 'two of two: writable')
-  //! the other direction: the spoke held epoch 1 {n01, n02}; the live cluster's epoch 1 {n03, n04} heals its row
+  //! the other direction: the spoke held epoch 2 {n01}; the live cluster's epoch 1 {n03, n04} is a LOWER number
+  // with other members on its new feeder — it follows the feeder (I-23 amended): the row heals, the number too
   assert.deepEqual(members(c), ['n03', 'n04'], "the spoke's members row shows the live cluster, not the dead ids")
+  assert.equal(c.epoch, 1, "and its epoch is its feeder's number, down from 2")
   //! and the data plane: the spoke resyncs DOWN to the new cluster's truth (V4-5) and its writes flow again
   sim.post('zc1', { kind: 'write', recs: [{ type: REC.update, key: ['after'], value: 1 }] }, 0)
   sim.run({ until: 7000 })

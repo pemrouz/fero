@@ -261,6 +261,20 @@ test('a client is a VIEW of the control plane: no view-on-admit, no flood, no PU
   h.node.step({ kind: 'bytesIn', link: 1, bytes: view(['cc', 'dd']) })
   assert.equal(h.jk(JK.viewInstall).length, 2, 'the same view again is a no-op')
   assert.equal(h.sentOn(1, VERB.VIEW).length + h.sentOn(2, VERB.VIEW).length, 0, 'through all of it the spoke sent no VIEW')
+  //! a client FOLLOWS ITS FEEDER (I-23, amended 2026-10-08): a LOWER number from the primary with other
+  // members is the cluster reborn from scratch — adopt it; `epoch` on a client is the feeder's number
+  const at = (e: number, m: string[]) => encodeControl(VERB.VIEW, { e, m: m.map((u) => [u, `sim:${u}`]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: at(3, ['cc', 'dd']) })
+  assert.equal(h.node.epoch, 3, 'pushed to 3 by the feeder')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: at(1, ['ee', 'ff']) })
+  assert.equal(h.node.epoch, 3, 'a non-primary\'s lower view teaches nothing: "higher only" there')
+  assert.deepEqual(h.node.membership.view.members.map((m) => m[0]), ['cc', 'dd'])
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: at(1, ['ee', 'ff']) })
+  assert.equal(h.node.epoch, 1, 'the feeder says 1: the spoke follows it down')
+  assert.deepEqual(h.node.membership.view.members.map((m) => m[0]), ['ee', 'ff'], 'and shows the reborn cluster')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: at(0, ['gg']) })
+  assert.equal(h.node.epoch, 1, 'epoch 0 is open genesis, never a view to adopt — even from the feeder')
+  assert.equal(h.sentOn(1, VERB.VIEW).length + h.sentOn(2, VERB.VIEW).length, 0, 'still no VIEW sent')
 })
 
 test('a server drops RECORDS arriving on a CLIENT link — a spoke is never a source: frame dropped, link kept, fold untouched', () => {

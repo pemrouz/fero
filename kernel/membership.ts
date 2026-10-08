@@ -48,9 +48,11 @@
 // servers announce, but never announces one (no view-on-admit, no flood, no PULL
 // answer, no "help a laggard up"), and node.ts drops VIEW/PROPOSE/VOTE/JOIN/LEAVE
 // arriving on a client link. What it holds is a picture of its feeder's cluster —
-// so an EQUAL-epoch view with different members is not split-brain to a client but
-// the cluster having re-formed without it (memory-only members reborn under fresh
-// uuids reuse the epoch numbers), and it adopts that view where a member must refuse.
+// so a view from its PRIMARY link with different members, at an equal or even LOWER
+// epoch, is not split-brain to a client but the cluster having re-formed without it
+// (memory-only members reborn under fresh uuids start the epoch count again), and it
+// adopts that view where a member must refuse (I-23, amended 2026-10-08: a client
+// follows its feeder; its epoch is the feeder's number). Other links stay higher-only.
 //
 // Genesis is the OPEN mode: epoch 0 has no members, no gate, no ballots — byte-
 // for-byte the M0/M1 behaviour, so everything below this milestone is unchanged
@@ -417,11 +419,14 @@ export class Membership {
       this.rejoinFloor = 0
       this.settle(node)
     }
-    //! a CLIENT adopts an equal-epoch view whose members differ (see the banner): the cluster re-formed
-    // without it and reused the epoch number — its members row would otherwise show the dead ids for good.
-    // A member refuses it: one view per epoch is the safety rule, and a VIEW is not a ballot.
-    const reformed = node.client && v.e === this.view.epoch && hashOf(v.m) !== hashOf(this.view.members)
-    if (v.e > this.view.epoch || reformed) this.install(node, { epoch: v.e, members: v.m })
+    //! a CLIENT follows its FEEDER (I-23, amended 2026-10-08): on its primary link a view whose members
+    // differ installs at ANY epoch — equal or lower too. The cluster it looks at re-formed without it
+    // (memory-only members reborn under fresh uuids start the count again at 1); its members row and its
+    // epoch must show what its feeder shows, never dead ids kept for their bigger number. Every other
+    // link stays "higher only": a stale non-primary server must not teach a stale row. A member refuses
+    // all of it: one view per epoch is the safety rule, and a VIEW is not a ballot.
+    const feeder = node.client && v.e >= 1 && link.id === node.primary && hashOf(v.m) !== hashOf(this.view.members)
+    if (v.e > this.view.epoch || feeder) this.install(node, { epoch: v.e, members: v.m })
     else if (v.e < this.view.epoch && !node.client) // help a laggard up — a spoke never teaches, so it never "helps"
       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
     //! the leaver's exit proof (V4-6): a VIEW at or above my committed epoch that does not hold me, from a
