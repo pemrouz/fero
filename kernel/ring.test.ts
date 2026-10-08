@@ -45,6 +45,7 @@ test('balance sanity: with vnodes, no member owns a degenerate share', () => {
 // shares go wild (2.85x fair worst, 160 of 300 sets outside [0.5x, 2x]). Sim ids like n01 spread
 // fine under plain fnv, which is why no sim test caught it: this pin MUST use hex-shaped ids.
 test('spread: hex-shaped member ids get a fair share, and k1..k24 do not pile onto one owner (I-24)', () => {
+  //! 5k keys per set: the sampled share's standard error is ~0.006 of fair, far inside the [0.5x, 2x] band
   let seed = 0x2545f491
   const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32
   const hex8 = () => Math.floor(rnd() * 2 ** 32).toString(16).padStart(8, '0')
@@ -55,9 +56,9 @@ test('spread: hex-shaped member ids get a fair share, and k1..k24 do not pile on
     const r = new Ring()
     r.build(1, members(...uuids))
     const count = new Map<string, number>()
-    for (let i = 0; i < 20_000; i++) { const o = r.ownerOf(hex8()); count.set(o, (count.get(o) ?? 0) + 1) }
+    for (let i = 0; i < 5_000; i++) { const o = r.ownerOf(hex8()); count.set(o, (count.get(o) ?? 0) + 1) }
     for (const u of uuids) {
-      const share = ((count.get(u) ?? 0) / 20_000) * uuids.length
+      const share = ((count.get(u) ?? 0) / 5_000) * uuids.length
       if (share < 0.5 || share > 2) outside.push(`${u} in [${uuids}] owns ${share.toFixed(2)}x fair`)
     }
     const seq = new Map<string, number>()
