@@ -200,6 +200,7 @@ test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the ke
     versions: new Map(), state: new Map(),
   }
   const g = JSON.stringify(['g']), ga = JSON.stringify(['g', 'a']), gc = JSON.stringify(['g', 'c'])
+  const gb = JSON.stringify(['g', 'b']), gax = JSON.stringify(['g', 'a', 'x'])
   const row = { v: { a: 1, b: 2 }, st: [1, 5, 'bb'] as [number, number, string] }
   let phase = 0
   const answers: Record<number, Record<string, { c: Record<string, unknown>; att: string[] }>> = {
@@ -215,6 +216,18 @@ test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the ke
     // coverage drop of the FIELD cell must not tear `c` out of the row's own value
     5: { h1: { c: { [g]: { v: { a: 1, c: 3 }, st: [1, 11, 'bb'] } }, att: ['g'] }, h2: { c: { [gc]: { v: 9, st: [1, 12, 'cc'] } }, att: ['g'] } },
     6: { h1: { c: { [g]: { v: { a: 1, c: 3 }, st: [1, 11, 'bb'] } }, att: ['g'] }, h2: { c: {}, att: ['g'] } },
+    //! gen 8-9: NOBODY claims the row any more (h1 attests its absence — the coverage drop takes it);
+    // a field alone makes the row up; then that field's remove — the row the field alone had made up
+    // must go too (the kernel's un-vivify), not stay as {} (the reviewer's shape: the base tree and the
+    // first fold-by-depth left {g:{}} here, where the node's own screen shows {})
+    8: { h1: { c: {}, att: ['g'] }, h2: { c: { [gb]: { v: 1, st: [1, 15, 'cc'] } }, att: ['g'] } },
+    9: { h1: { c: {}, att: ['g'] }, h2: { c: { [gb]: { st: [1, 16, 'cc'], t: 1 } }, att: ['g'] } },
+    //! gen 10-11: the same two levels deep — both made-up levels go
+    10: { h1: { c: {}, att: ['g'] }, h2: { c: { [gax]: { v: 1, st: [1, 17, 'cc'] } }, att: ['g'] } },
+    11: { h1: { c: {}, att: ['g'] }, h2: { c: { [gax]: { st: [1, 18, 'cc'], t: 1 } }, att: ['g'] } },
+    //! gen 12-13: the control — an empty object the row's OWN value holds was never made up: it stays
+    12: { h1: { c: { [g]: { v: { a: {} }, st: [1, 19, 'bb'] } }, att: ['g'] }, h2: { c: { [gax]: { v: 1, st: [1, 20, 'cc'] } }, att: ['g'] } },
+    13: { h1: { c: { [g]: { v: { a: {} }, st: [1, 19, 'bb'] } }, att: ['g'] }, h2: { c: { [gax]: { st: [1, 21, 'cc'], t: 1 } }, att: ['g'] } },
   }
   const gather = new Gather({ node: fake } as never, async (uuid: string) => answers[phase][uuid] as never)
   const expect = async (want: unknown, why: string) => {
@@ -228,6 +241,12 @@ test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the ke
   phase = 4; await expect({ g: { c: 9 } }, 'gen 4: a field above the row remove re-makes the row with that field')
   phase = 5; await expect({ g: { a: 1, c: 9 } }, 'gen 5: the row is back, the newer field on top')
   phase = 6; await expect({ g: { a: 1, c: 3 } }, 'gen 6: the field cell dropped by coverage — the row\'s own `c` stands')
+  phase = 8; await expect({ g: { b: 1 } }, 'gen 8: a field alone makes the row up (nobody claims the row)')
+  phase = 9; await expect({}, 'gen 9: that field\'s remove takes the row it alone had made up with it')
+  phase = 10; await expect({ g: { a: { x: 1 } } }, 'gen 10: a depth-3 field makes two levels up')
+  phase = 11; await expect({}, 'gen 11: its remove takes both made-up levels back')
+  phase = 12; await expect({ g: { a: { x: 1 } } }, 'gen 12: the row holds `a` as an empty object itself, the field lands in it')
+  phase = 13; await expect({ g: { a: {} } }, 'gen 13: the field\'s remove leaves the row\'s own empty object — it was never made up')
   gather.destroy()
 })
 

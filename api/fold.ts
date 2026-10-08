@@ -15,7 +15,10 @@
 //               R-fold double-claim (two holders claiming a key land it once).
 //               Then ACROSS DEPTH (V4-18): a field cell at or below an
 //               ancestor's winning stamp is hidden, and what survives projects
-//               shallow→deep — the kernel's own fold of overlapping cells.
+//               shallow→deep — the kernel's own fold of overlapping cells; a
+//               level only a removed field had made up is taken back
+//               (the kernel's un-vivify), so the object does not depend on
+//               which generations the gather happened to see.
 //   parking   — a key whose claimant set EMPTIES without a dominating
 //               tombstone is PARKED: the last value stands. This is the Q3a
 //               fix: v2's root-replace union transiently LOST a key when the
@@ -181,6 +184,7 @@ export class Gather {
     }
     const dropped: string[][] = []
     const stamped: { key: string[]; v: unknown; t: boolean }[] = []
+    const shown = new Map<string, unknown>() // the live cells that project this generation (not hidden), with their values
     for (const [cell, win] of wins) {
       const key = JSON.parse(cell) as string[]
       if (win === null) {
@@ -208,7 +212,7 @@ export class Gather {
         const a = wins.get(JSON.stringify(key.slice(0, d)))
         if (a != null && !newer(win.st, a.st)) hidden = true
       }
-      if (!hidden) stamped.push({ key, v: win.v, t: win.t === 1 })
+      if (!hidden) { stamped.push({ key, v: win.v, t: win.t === 1 }); if (win.t !== 1) shown.set(cell, win.v) }
     }
     //! a DEEP remove into an absent subtree is a no-op — and must be skipped: the substrate's
     // deep-remove crashes on missing intermediates, and one doomed remove aborts the whole
@@ -229,22 +233,63 @@ export class Gather {
     // still shows through whatever of its siblings/parent projected (the kernel's own flat fold
     // holds both cells; nesting-under-null is the documented §5 materialization ambiguity).
     let root = snapshot(this.proxy) as Record<string, unknown>
+    const emptied: string[][] = [] // the deep cells deleted this generation — their parent levels may be made-up ones
     for (const key of dropped)
-      if (key.length === 1 || present(root, key)) { try { applyCell(this.proxy, key, undefined, true) } catch { /* absent subtree */ } }
+      if (key.length === 1 || present(root, key)) { try { applyCell(this.proxy, key, undefined, true); if (key.length > 1) emptied.push(key) } catch { /* absent subtree */ } }
     stamped.sort((a, b) => a.key.length - b.key.length)
     let depth = 1
     for (const s of stamped) {
       if (!s.t) { try { applyCell(this.proxy, s.key, s.v, false) } catch { /* blocked intermediate */ } continue }
       //! a deep tombstone looks at the object as the shallower cells left it (one fresh read per depth)
       if (s.key.length > depth) { root = snapshot(this.proxy) as Record<string, unknown>; depth = s.key.length }
-      if (s.key.length === 1 || present(root, s.key)) { try { applyCell(this.proxy, s.key, undefined, true) } catch { /* absent subtree */ } }
+      if (s.key.length === 1 || present(root, s.key)) { try { applyCell(this.proxy, s.key, undefined, true); if (s.key.length > 1) emptied.push(s.key) } catch { /* absent subtree */ } }
     }
+    //! UN-VIVIFY (V4-18, the kernel's #unvivify for the gather): the projection makes `{}` up for the
+    // levels a field lands in (applyStreamRec's orphan-cell vivify), so after a field's tombstone (or
+    // its coverage drop) deletes it, a row or level that only that field had made up is left behind as
+    // an empty object — where the node's own screen shows nothing, and where a gather that first saw
+    // the history AFTER the remove shows nothing either. So, walking up from each deleted deep cell's
+    // parent: a level with its own live claim projected whole (an empty object the user wrote stays);
+    // a PARKED level keeps its last value (conservative — parking is the handover window); an object
+    // with anything in it stays (the fields keep it, on every node); an empty object held by the
+    // nearest projected ancestor's own value was never made up; any other empty object was — it goes,
+    // and the level above is asked the same question.
+    for (const key of emptied) this.#unvivify(key, shown, wins)
     //! the one-shot answer is a CLONE (M6-review finding 8): snapshot() is the proxy's live internal
     // root — `await data` and local methods.read() hand this value straight to user code, and a
     // mutation there must never write through into the union every live subscriber shares. The wire
     // path copies into frame bytes anyway; local must match. (The live SUB path hands out `proxy`
     // itself — a read-only projection by contract — and stays as-is.)
     return structuredClone(snapshot(this.proxy))
+  }
+
+  //! #unvivify — take back the levels a deleted field cell alone had made up (see the projection above).
+  #unvivify(key: string[], shown: Map<string, unknown>, wins: Map<string, Claim | null>) {
+    for (let j = key.length - 1; j >= 1; j--) {
+      const level = key.slice(0, j)
+      const lk = JSON.stringify(level)
+      if (shown.has(lk)) return // its own stamped value projected whole, `{}` included
+      if (wins.get(lk) === null && this.#registry.has(lk)) return // parked: the last value stands
+      let cur: unknown = snapshot(this.proxy)
+      for (const k of level) cur = cur !== null && typeof cur === 'object' ? (cur as Record<string, unknown>)[k] : undefined
+      if (cur === null || typeof cur !== 'object' || Array.isArray(cur) || Object.keys(cur as object).length > 0) return
+      //! an empty object nobody claims: the nearest projected ancestor's own value says whether it was made up
+      let held = false
+      for (let i = j - 1; i >= 1; i--) {
+        const ak = JSON.stringify(key.slice(0, i))
+        if (shown.has(ak)) {
+          let v = shown.get(ak)
+          for (let d = i; d < j && v !== null && typeof v === 'object'; d++) v = (v as Record<string, unknown>)[key[d]]
+          held = v !== null && typeof v === 'object'
+          break
+        }
+        const aw = wins.get(ak)
+        if (aw === null && this.#registry.has(ak)) { held = true; break } // a parked ancestor: its last value stands
+        if (aw != null && aw.t === 1) break // a row remove at this level: whatever is under it was re-made by a field
+      }
+      if (held) return
+      try { applyCell(this.proxy, level, undefined, true) } catch { return }
+    }
   }
 
   //! live — arm the paced re-gather (the composer also refreshes on every view install). Idempotent.
