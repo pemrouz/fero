@@ -33,7 +33,12 @@ import { Confirm } from './confirm.ts'
 import { Scope, SCOPE } from './scope.ts'
 import { diagHello, onDiagQ } from './diag.ts'
 import { maybeCompact } from './log.ts'
+import { tuneOf, MAX_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT, type Tune } from './tune.ts'
 import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
+
+//! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
+// would be an import cycle); re-exported under their old names for the tests and tools that import them
+export { MAX_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.ts'
 
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
 export interface NodeOpts {
@@ -89,22 +94,16 @@ export interface NodeOpts {
   // (ae > 0) peer attempts are NOT re-validated: the issuing server already ran its validator, and
   // peers are trusted at this layer — same code, same config (the deployer's contract, like replicas).
   validate?: (rec: Rec) => true | string
+  //! tune (the tune table, kernel/tune.ts): per-node overrides of the kernel's bounds and tick counts.
+  // Absent = the defaults, which equal the old constants (trajectories stay byte-identical). Validated
+  // once in the constructor and frozen: an unknown row or a non-integer or negative value throws.
+  tune?: Partial<Tune>
 }
 
-//! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
-// heartbeats on, the heartbeat tick revives given-up targets (JK.revive) — give-up is a cool-down.
-export const MAX_REDIALS = 10
-//! LAMPORT_LEASE: how far past the durable clock ceiling a node may stamp before re-persisting the
-// boot record. A restore resumes AT the ceiling, so no seq can ever be issued twice across lives —
-// the lease is what keeps that guarantee off the per-write hot path (one cold boot-write per LEASE).
-export const LAMPORT_LEASE = 4096
-//! SNAPSHOT_AT: WAL rows appended since the last snapshot that arm a whole-WAL snapshot+swap on the
-// heartbeat tick (M4e — the disk counterpart of COMPACT_AT). Counting rows-since-snapshot (not file
-// rows) bounds RELATIVE growth: even when the log itself is large (frontier pinned), at most
-// SNAPSHOT_AT appended rows separate swaps, so the file is O(log entries + SNAPSHOT_AT) always.
-export const SNAPSHOT_AT = 4096
-
 export class Node {
+  //! tune — the frozen table every read site consults (`node.tune.<row>`). Assigned FIRST in the
+  // constructor, before anything that could read a row; never read from a field initializer.
+  readonly tune: Readonly<Tune>
   readonly uuid: string
   //! name — the resource identity this node replicates; rides HELLO so a misdial onto another
   // resource's port refuses instead of silently merging logs (see NodeOpts.name). Optional: absent
@@ -248,6 +247,7 @@ export class Node {
   tainted = false
 
   constructor(opts: NodeOpts, env: Env) {
+    this.tune = tuneOf(opts.tune) // first: validated and frozen before any row can be read
     this.env = env
     this.journal = new Journal(opts.journalCap)
     this.uuid = opts.uuid

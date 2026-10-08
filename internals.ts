@@ -6,6 +6,7 @@
 // and sweeps validate (plan §3.3).
 
 export { Node, MAX_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT, stable, type NodeOpts } from './kernel/node.ts'
+export { TUNE, tuneOf, type Tune } from './kernel/tune.ts'
 export { Membership, SUSPECT_TICKS, MAX_PULLS, type View } from './kernel/membership.ts'
 export { Writes, NACK, MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './kernel/write.ts'
 export { Ring, VNODES } from './kernel/ring.ts'
