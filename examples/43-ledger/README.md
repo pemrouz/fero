@@ -51,7 +51,7 @@ n-6a924243 → bob 5 — cleared
   per transfer: twice is the same notice) and clears the intent through `notified` — a method, the only
   way a client changes a row once `methods:` is declared (the door, 08). The row is rewritten without its
   `outbox`; the money on it is never edited.
-- `kill -9` one member: the other two vote it out (`members 2`, six seconds at redial 30) and keep
+- `kill -9` one member: the other two vote it out (`members 2`, about a second at redial 30) and keep
   committing. The same command is the same member in its next life (`~2`): its three rows back from its
   disk before it has reached anyone, then voted back in (`epoch 4 — members 3`) with the one it missed
   (`rows 4`).

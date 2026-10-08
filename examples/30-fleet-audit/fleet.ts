@@ -30,7 +30,7 @@ const watcher = await fero('fleet')
 await at(5)
 members[1].child.kill('SIGKILL')
 say(`kill -9 member ${ports[1]}`)
-const chain = 30 * (1 + 2 + 4 + 8 + 16 + 32 * 5) + 10 * 30
+const chain = 30 * (1 + 2 + 4 + 8 + 16) + 5 * 30 // a dead member is dialed 5 times at redial.ms 30, each with up to one base of jitter
 await wait('members 2: the dead one is voted out', () => [members[0], members[2]].every((r) => /members 2 —/.test(last(r))), 3 * chain)
 
 // the same command again: the same member, back from its disk and voted back in
