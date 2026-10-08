@@ -28,7 +28,7 @@ The owner read the study and settled the open questions:
   version: its first `dependencies` entry, `engines.node >= 22.18`, and an
   `npm install` before the first run. No copt-side change was needed for the
   landing; the 1.1 wishes (§9) stay filed.
-- **`diag` stays deferred** (§4); the kernel tune table stays a later series
+- **`diag` stays deferred** (§4); the kernel tune table was a later series (landed 2026-10-08, §7 step 7)
   (§7 step 7).
 - **The review before landing (four adversarial lenses, 26 findings) changed
   four rules from the study:** the near-miss test in the global rung applies
@@ -409,10 +409,8 @@ only, and with token values redacted from the `from` trace (Q4).
 | The ring hash (ring.ts `fnv`: fnv-1a, its basis and prime, finished with murmur3's fmix32 and its two multipliers; I-24), the state hash's FNV basis and prime (node.ts `fnv`, a separate plain fnv-1a), `VNODES` 32, the `#` vnode separator, the injectable ring hash and `place()` | kernel/node.ts, kernel/ring.ts | Every member must compute the same ownership: the ring hash is part of the wire contract, and members on different ring hashes are unsupported before 1.0. Test seams by declaration. |
 | `incarnation`, `boot`, `durable`, `client`, `name` | kernel/node.ts NodeOpts | Durable protocol state or derived modes. A hand-set value can double-vote or reuse a lane. `name` is the positional argument. |
 | The view-majority and R-set quorum thresholds, `cluster.partitions.w` | kernel/confirm.ts:180/183, api/index.ts:447 | The definition of "confirmed". api/types.ts:153 says never configurable. |
-| `SUSPECT_TICKS` 3, `MAX_PULLS` 5, `PROPOSAL_AGE` 10, `REJOIN_TICKS` 10, `LEAVE_TICKS` 4, the 2-tick re-offer, the 4096 member bound | kernel/membership.ts:95-99, 112, 241 | Kernel constants. Exposing them needs a NodeOpts field and a kernel series. `LEAVE_TICKS` is welded to shell/runtime.ts:397. Deferred to the tune table (§7), not dropped. |
-| `MAX_PENDING` 1024, `RETRY_TICKS` 2, `DEDUP_KEEP` 1024, `MAX_ISSUERS` 1024, `REASON_MAX` 256 | kernel/write.ts:101-114 | Read per attempt or per record; exposing them touches kernel/write.perf.ts pins. Deferred; `REASON_MAX` stays wire hygiene. |
-| `MAX_QUEUED` 256, `COMPACT_AT` 4096, `SNAPSHOT_AT` 4096, `LAMPORT_LEASE` 4096, `MAX_PROBES` 1024, `SHED_TICKS` 2, `STAGE_TICKS` 8, `ACQ_LIVE_MAX` 8192, `STALL_AT` 8, `DIAG_MAX` 4096, `DIAG_P` 1 | kernel/link.ts, log.ts, node.ts, confirm.ts, scope.ts, diag.ts | Hot or per-tick paths, or a protocol version. sim/monitors.ts:30 pins `MAX_QUEUED`. Deferred. |
-| `MAX_REDIALS` 10, the 32× cap, the ×2 growth, the jitter, the 1024-record snapshot chunk | kernel/node.ts:96, 888, 1054-1055 | api/directory.test.ts:208 pins the chain math. The IDEAS "about 20 s to evict a crashed member" line (IDEAS.md:256) makes `MAX_REDIALS` the first candidate for the tune table. |
+| The kernel tune table (2026-10-08): `redials` 10, `memberRedials` 5, `redialGrowth` 2, `redialCap` 32, `suspectTicks` 3, `leaveTicks` 4, `pulls` 5, `proposalAge` 10, `rejoinTicks` 10, `retryTicks` 2, `pending` 1024, `dedupKeep` 1024, `issuers` 1024, `probes` 1024, `queued` 256, `compactAt` 4096, `snapshotAt` 4096, `lamportLease` 4096, `shedTicks` 2, `stageTicks` 8, `acqLiveMax` 8192, `stallAt` 8 | kernel/tune.ts (`Tune`, `TUNE`, `tuneOf`); the old constants (`MAX_REDIALS`, `SUSPECT_TICKS`, `MAX_PENDING` …) are the defaults, by name, where they always were | One frozen object per node (`node.tune`), built first in the Node constructor from `TUNE` plus `NodeOpts.tune`, validated (an unknown row or a non-integer or negative value throws). Every read site reads a row; the shell weld (`LEAVE_TICKS` in shell/runtime.ts) and the sim monitor read the node's rows. Defaults equal the old constants: the 200-seed trace diff and the 20-seed golden in sim/exec.test.ts are byte-identical. `redial.tries` (→ `redials`) is the one row with a `fero()` key; `memberRedials` is the eviction clock (its own DECISIONS line); the rest are rows without keys until a need is filed. `suspect.ticks` waits for the HELLO contract hash (a cluster contract). `pending` is table-only until measured. |
+| `REASON_MAX` 256, `MAX_RUN` 1024, the 2-tick re-offer, the 4096 member bound, `DIAG_MAX` 4096, `DIAG_P` 1, the 1024-record snapshot chunk, the jitter | kernel/write.ts, membership.ts, diag.ts, node.ts | Wire hygiene and protocol identity, NOT tune rows: a member with a different value would drop legal frames or mean something else by a frame. `MAX_RUN` is the longest WACK/WNACK run accepted off the wire — it used to share `MAX_PENDING`'s value and is split off so tuning the queue cannot change what the wire accepts. |
 | Write default `'committed'`, write timeout 10 000, call timeout 10 000, gather and remote-read timeout 8000, the 60 s system-probe cap, `liveCadence` ×4 and its 1 s floor, `WRITES_KEEP` 64 | api/index.ts:381-382, 297, 367; api/methods.ts:235; api/fold.ts:124, 249; api/data.ts:63 | Per-call options exist for the timeouts. A global default is a second design with its own duplicate-literal cleanup (two 10 000s, two 8000s, a duplicate 500 at fold.ts:249). `WRITES_KEEP` is read per issued record under api/data.perf.ts. |
 | `SIGNALS` list, exit code 0, `METHODS_ONLY`, `SYSTEM`, the `#` prefix, the `~` separator, the `''` root-insert sentinel, the 8-char uuid width, the `127.0.0.1:0` default listen | api/index.ts, api/methods.ts, api/data.ts | Protocol vocabulary and settled contracts. A routable default is never a default (V4-2, V4-3). |
 | `DIRECTORY`, `RENDEZVOUS`, `GRACE` 3, `MAX_PER_CALLER` 4096, `RETRY_BASE` 50, `RETRY_CAP` 5000, the jitter, the exponent cap, register timeout 5000, register `retry: true` | api/directory.ts | Box-wide names and host-side policy; DESIGN-DIRECTORY pins them as test seams. |
@@ -495,17 +493,14 @@ drive the kernel and Runtime directly, so the layer never touches them.
    show `FERO_DIR=./a node server.ts` in their "scale it" lines; role files
    stay untouched (the site inlines 02's files by path: re-record on a quiet
    box if they change).
-7. **Later, separate series, own DECISIONS line: the tune table.** A frozen
-   per-node `tune` object built once in the Node constructor, defaults equal
-   to today's constants so sweep bytes stay identical, hot sites reading a
-   field set at construction. Read sites to touch: write.ts:207/219/356/363/
-   498/533, membership.ts:218/249, scope.ts:137/697/702/710, node.ts:324/406/
-   439/719/1045/1099, link.ts:106, log.ts:158, confirm.ts:75,
-   shell/runtime.ts:397, sim/monitors.ts:30. Land only with an interleaved
-   A/B on the write, node, alloc and data perf pins. `MAX_REDIALS` (the
-   crashed-member knob) and a separate live-read cadence are the two with a
-   filed need. Then `diag` (§4). Then publish copts, flip the import, add the
-   `dependencies` entry.
+7. **The tune table — landed 2026-10-08** (see §5's tune-table row): kernel/tune.ts,
+   `node.tune`, every read site reading a row, the shell weld and the sim monitor
+   gone, `redial.tries` the one config key, `memberRedials` 5 the first live row
+   (its own DECISIONS line). Proven byte-identical (the 200-seed trace diff, the
+   20-seed golden) and perf-neutral (interleaved A/B on the write, node, alloc
+   and data pins). Still to come: `suspect.ticks` after the HELLO contract hash,
+   `pending` after it is measured, a live-read cadence if a need is filed. Then
+   `diag` (§4). Then publish copts, flip the import, add the `dependencies` entry.
 
 ## §8 Risks
 
