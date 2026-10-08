@@ -157,7 +157,7 @@ test('V4-18 overlapping cells — our in-flight FIELD write loses to a newer who
   p.then((v) => { settled = v }, (e) => { settled = e })
   h.node.step({ kind: 'bytesIn', link: 2, bytes: records('cc', 9, 1, [{ type: REC.update, key: ['cart'], value: { items: 7 } }]) })
   await new Promise((r) => setTimeout(r, 20))
-  assert.deepEqual(settled, { origin: 'aa', seq: 2, epoch: 1, cid: 1 }, 'settled from the WACK\'s coordinates — it committed, then lost')
+  assert.deepEqual(settled, { origin: 'bb', seq: 2, epoch: 1, cid: 1 }, 'settled from the WACK\'s coordinates, on the owner\'s lane — it committed, then lost')
   //! the echo of our commit now arrives — refused across depth (subsumed), so it never projects
   h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 2, 1, [{ type: REC.update, key: ['cart', 'items'], value: 1 }], 'aa~1', 1) })
   assert.equal(h.jk(JK.subsumed).length, 1)
