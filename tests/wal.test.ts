@@ -222,3 +222,33 @@ test('I-36 — the WAL dir deleted under a running member: the next boot record 
     fs.rmSync(db, { recursive: true, force: true })
   }
 })
+
+test('I-36 — a store whose boot record failed mid-life refuses to restart: boot() marks the dir and restoreOpts names the case', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-condemned-'))
+  let a: Runtime | null = null
+  try {
+    a = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir })
+    await a.start()
+    a.write([{ type: REC.update, key: ['x'], value: 1 }])
+    assert.ok(await until(() => (a!.node.streams.get('aa')?.durable ?? 0) >= 1), 'the store works: the write fsync-resolved')
+    a.node.persistBoot()
+    assert.ok(fs.existsSync(path.join(dir, 'boot.json')), 'a healthy life leaves a boot record')
+    //! the deterministic failure: a DIRECTORY where the temp file goes, so openSync(…, 'w') throws EISDIR
+    // while the dir itself stays — the case nothing on disk used to mark (EIO, EACCES look the same)
+    fs.mkdirSync(path.join(dir, 'boot.json.tmp'))
+    a.node.persistBoot()
+    assert.ok(await until(() => a!.node.journal.read().some((e) => e.kind === JK.persistFail)), 'the failed boot record is the store\'s death, surfaced')
+    await a.destroy()
+    a = null
+    //! the bug: boot.json (the last good record, now stale: the process kept voting from memory) still sat
+    // there, and a restart replayed the honest prefix under its old votedFor
+    assert.throws(() => restoreOpts(dir), /failed mid-life/, 'a restart refuses the condemned dir')
+    assert.ok(!fs.existsSync(path.join(dir, 'boot.json')), 'and the stale boot record is gone')
+    //! each mark alone is enough: with the marker lost, the unlink still trips the no-boot-record refusal
+    fs.rmSync(path.join(dir, 'condemned'))
+    assert.throws(() => restoreOpts(dir), /failed mid-life/, 'the wal-without-boot refusal names this case too')
+  } finally {
+    await a?.destroy()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
