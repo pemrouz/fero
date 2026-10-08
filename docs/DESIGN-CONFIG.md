@@ -353,7 +353,7 @@ the whole process. Defaults are the tree's, verified.
 
 | Key | Default | Scope | Set via | What it does |
 |---|---|---|---|---|
-| `dir` | unset (memory only) | instance | call `dir: './state'` · env `FERO_DIR=./state` · CLI `--fero.dir ./state` · file `dir: './state'` | The directory holding `wal.log` and `boot.json`. Presence turns on the WAL, restores the previous life's identity and view, and implies the server role. Two processes on one dir are two lives of one node; keep it per process (per-name scoping, §3). |
+| `dir` | unset (memory only) | instance | call `dir: './state'` · env `FERO_DIR=./state` · CLI `--fero.dir ./state` · file `dir: './state'` | The directory holding `wal.log` and `boot.json` (and, after a boot record failed, a `condemned` marker that refuses the next restart). Presence turns on the WAL, restores the previous life's identity and view, and implies the server role. Two processes on one dir are two lives of one node; keep it per process (per-name scoping, §3). |
 
 ### Replication and scoping
 
@@ -416,7 +416,7 @@ only, and with token values redacted from the `from` trace (Q4).
 | Write default `'committed'`, write timeout 10 000, call timeout 10 000, gather and remote-read timeout 8000, the 60 s system-probe cap, `liveCadence` ×4 and its 1 s floor, `WRITES_KEEP` 64 | api/index.ts:381-382, 297, 367; api/methods.ts:235; api/fold.ts:124, 249; api/data.ts:63 | Per-call options exist for the timeouts. A global default is a second design with its own duplicate-literal cleanup (two 10 000s, two 8000s, a duplicate 500 at fold.ts:249). `WRITES_KEEP` is read per issued record under api/data.perf.ts. |
 | `SIGNALS` list, exit code 0, `METHODS_ONLY`, `SYSTEM`, the `#` prefix, the `~` separator, the `''` root-insert sentinel, the 8-char uuid width, the `127.0.0.1:0` default listen | api/index.ts, api/methods.ts, api/data.ts | Protocol vocabulary and settled contracts. A routable default is never a default (V4-2, V4-3). |
 | `DIRECTORY`, `RENDEZVOUS`, `GRACE` 3, `MAX_PER_CALLER` 4096, `RETRY_BASE` 50, `RETRY_CAP` 5000, the jitter, the exponent cap, register timeout 5000, register `retry: true` | api/directory.ts | Box-wide names and host-side policy; DESIGN-DIRECTORY pins them as test seams. |
-| `wal.log`, `boot.json`, `.tmp`, the 250 ms leave floor and +2 slack ticks, the mirrored header offsets, `prev: -1` | shell/runtime.ts | On-disk layout and protocol sentinels. A rename orphans every existing dir. |
+| `wal.log`, `boot.json`, `.tmp`, `condemned`, the 250 ms leave floor and +2 slack ticks, the mirrored header offsets, `prev: -1` | shell/runtime.ts | On-disk layout and protocol sentinels. A rename orphans every existing dir. |
 | `Journal.armed`, the codec scratch sizes and growth factor | kernel/journal.ts:124, kernel/codec.ts:155-159, 452 | Perf-fixture flag and allocation-count constants pinned by alloc.perf.ts. |
 | Every sim, tools, tests, examples and utils literal (harness `redialMs` 20 and `journalCap` 65536, PRNG constants, fault ranges, scenario seeds, capture paths `captures/seed-*.json`, shrink budget 2000, `PULL_BUDGET_MS` 1200, the viewer's 1.5 s poll, the examples' 40 s budget) | sim/, tools/, tests/, examples/, utils/ | Tooling, not runtime config (§6). |
 
