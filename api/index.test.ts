@@ -108,6 +108,22 @@ test('M6 config: replicas validates loudly (integer ≥ 1, servers only) and sur
   await f.destroy()
 })
 
+test('redial.tries reaches the kernel: a client dialing a dead port gives up after exactly that many tries', async () => {
+  //! the tune table's one config key (kernel/tune.ts row `redials`): the composer hands it to the node, and
+  // the dial chain to a port nothing listens on ends after `tries` arms — journal-visible (JK.redial ×2, then
+  // JK.giveUp). Heartbeats off, so nothing revives the chain; no directory, so the dead port is the only target.
+  const dead = `127.0.0.1:${await ports.free()}`
+  const c = await fero(`tries-${process.pid}`, { hosts: [dead], rendezvous: false, heartbeat: { ms: 0 }, redial: { ms: 10, tries: 2 } })
+  try {
+    const events = () => diag(c)!.journal().events
+    assert.ok(await until(() => events().some((e) => e.kind === JK.giveUp), 5000), 'the chain gave up')
+    assert.equal(events().filter((e) => e.kind === JK.redial).length, 2, 'exactly two redials before give-up')
+    assert.deepEqual(diag(c)!.config()['redial.tries'], { value: 2, from: 'the call' })
+  } finally { await c.destroy() }
+  await assert.rejects(fero('r', { redial: { tries: 1.5 } } as never), /redial\.tries must be an integer ≥ 0/)
+  await assert.rejects(fero('r', { redial: { tries: -1 } } as never), /redial\.tries must be an integer ≥ 0/)
+})
+
 test('solo: assignment and methods.update are ONE ingest — both commit, both visible, coordinates resolve', async () => {
   const f = await fero('inventory', { uuid: 'aa', listen: false })
   assert.equal(f.name, 'inventory')

@@ -118,6 +118,19 @@ test('a $HOME fero.opt.js reaches a process; the project file beats it', async (
   assert.equal(over.lines[0].config['redial.ms'].value, 40)
 })
 
+test('redial.tries (the tune table\'s one config key): the default shows as 10, a variable and a file set it, a fraction is refused naming its source', async () => {
+  const dflt = await run('shop', { call: { server: true } })
+  assert.equal(dflt.err, null, dflt.err ?? '')
+  assert.deepEqual(dflt.lines[0].config['redial.tries'], { value: 10, from: 'the default' })
+  const env = await run('shop', { env: { FERO_REDIAL_TRIES: '3' }, call: { server: true } })
+  assert.equal(env.err, null, env.err ?? '')
+  assert.deepEqual(env.lines[0].config['redial.tries'], { value: 3, from: 'FERO_REDIAL_TRIES' })
+  const file = await run('shop', { cwd: project('{ redial: { ms: 40, tries: 2 } }'), call: { server: true } })
+  assert.equal(file.err, null, file.err ?? '')
+  assert.deepEqual([file.lines[0].config['redial.tries'], file.lines[0].config['redial.ms'].value], [{ value: 2, from: 'a fero.opt.ts file (redial.tries)' }, 40])
+  assert.match((await run('shop', { argv: ['--fero.redial.tries', '1.5'], call: { server: true } })).err ?? '', /redial\.tries must be an integer ≥ 0 \(from --fero\.redial\.tries\)/)
+})
+
 test('refusals name their source: the legacy FERO_RENDEZVOUS text, a non-number, a stray old spelling, a typo', async () => {
   assert.match((await run('shop', { env: { FERO_RENDEZVOUS: 'garbage' }, call: { server: true } })).err ?? '', /FERO_RENDEZVOUS='garbage' is not a 'host:port' address \(or 'off'\)/)
   assert.match((await run('shop', { env: { FERO_HEARTBEAT_MS: 'abc' }, call: { server: true } })).err ?? '', /heartbeat\.ms must be a finite number of milliseconds ≥ 0 \(0 = heartbeats off\) \(from FERO_HEARTBEAT_MS\)/)

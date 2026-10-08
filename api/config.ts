@@ -58,6 +58,7 @@ const LEAVES = table<{ layers: string; why?: string; object?: true }>({
   dir: { layers: 'fcep' },
   'heartbeat.ms': { layers: 'fcep' },
   'redial.ms': { layers: 'fcep' },
+  'redial.tries': { layers: 'fcep' },
   'journal.cap': { layers: 'fcep' },
   replicas: { layers: 'fcep' },
   rendezvous: { layers: 'fcep' },

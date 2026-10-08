@@ -112,9 +112,11 @@ export interface FeroConfig {
   // retry clock, compaction and WAL-snapshot arming all run on it. 500 by default; 0 = off (an
   // explicit protocol mode, the sim's sweep mode). A cluster contract: every member the same.
   heartbeat?: { ms?: number }
-  //! redial.ms (was redialMs) — the dial backoff base after a peer drops; doubles up to 32× the base,
-  // gives up after 10 tries (heartbeats revive it). 100 by default.
-  redial?: { ms?: number }
+  //! redial.ms (was redialMs) — the dial backoff base after a peer drops; doubles up to 32× the base.
+  // 100 by default. redial.tries — how many times a dropped peer is dialed before the chain gives up
+  // (heartbeats revive it); 10 by default, the kernel tune row `redials`. A dead MEMBER is dialed 5
+  // times (the eviction clock, tune row `memberRedials`), or `tries` if that is lower.
+  redial?: { ms?: number; tries?: number }
   //! journal.cap (was journalCap) — the diagnostics ring size; older events are dropped and counted.
   // 4096 by default; captures that want full-history time travel raise it.
   journal?: { cap?: number }

@@ -180,6 +180,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   }
   const heartbeatMs = num('heartbeat.ms', group('heartbeat').ms, 0, false, 'a finite number of milliseconds ≥ 0 (0 = heartbeats off)')
   const redialMs = num('redial.ms', group('redial').ms, 0, false, 'a finite number of milliseconds ≥ 0')
+  const redialTries = num('redial.tries', group('redial').tries, 0, true, 'an integer ≥ 0')
   const journalCap = num('journal.cap', group('journal').cap, 1, true, 'an integer ≥ 1')
   //! the rendezvous (V4-3): the per-box directory this instance meets at — precedence: `rendezvous:`
   // config > FERO_RENDEZVOUS (an address, or 'off') > the constant; false = no directory. A system
@@ -262,6 +263,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     heartbeatMs: heartbeatMs ?? 500,
     redialMs,
     journalCap,
+    //! the tune table (kernel/tune.ts): redial.tries is the one row with a config key — the generic chain;
+    // the member chain (memberRedials) keeps its own default and never exceeds it (the kernel caps it)
+    ...(redialTries !== undefined ? { tune: { redials: redialTries } } : {}),
     ...(config.replicas !== undefined ? { replicas: config.replicas as number } : {}),
     //! the relay's admission predicate (V4-4, V4-5): a client's plain write relayed through this server
     // meets the kernel's relay ingress (kernel/write.ts onWrite) with THIS predicate — under `methods:`
@@ -803,7 +807,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // the hosted methods and the data seed as their names (rows are data, not config)
     config: () => {
       const out: Record<string, { value: unknown; from: string }> = {}
-      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
+      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'redial.tries': redialTries ?? 10, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
       for (const k of CONFIG_LEAVES) {
         const v = k.split('.').reduce<unknown>((o, p) => (o !== null && typeof o === 'object' ? (o as Record<string, unknown>)[p] : undefined), config)
         const shown = v !== undefined ? v : effective[k]
