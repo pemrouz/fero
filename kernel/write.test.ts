@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
-import { RETRY_TICKS, MAX_ISSUERS } from './write.ts'
+import { RETRY_TICKS, MAX_ISSUERS, MAX_RUN } from './write.ts'
 import { JK } from './journal.ts'
 import { Framer, VERB, encodeControl, encodeRuns } from './codec.ts'
 import { REC, TAG, type EffectSink, type Env, type Rec } from './env.ts'
@@ -125,6 +125,22 @@ test('a WACK clears exactly its pending attempts; a malformed one is ignored', (
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 2, s: 10, e: 1 }) })
   assert.equal(h.node.writes.pending.size, 0)
   assert.equal(h.jk(JK.writeAck).length, 1)
+})
+
+test('tune: { pending } bounds the queue, NOT the wire: a WACK run longer than the tuned queue (within MAX_RUN) still clears its attempts', () => {
+  //! MAX_PENDING was once both the queue bound and the longest WACK/WNACK run accepted off the wire. The
+  // wire half is the fixed constant MAX_RUN now, so tuning the queue can never change what a peer may say.
+  const h = formedView1('aa', { tune: { pending: 1 } })
+  h.node.writes.ring.place('theirs', 'bb')
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['theirs'], value: 1 }] })
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['theirs'], value: 2 }] })
+  assert.equal(h.node.writes.pending.size, 1, 'the tuned queue: drop-oldest at 1')
+  assert.equal(h.node.writes.droppedPending, 1)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 2, s: 10, e: 1 }) }) // a run of 2: over the tuned queue, within MAX_RUN
+  assert.equal(h.node.writes.pending.size, 0, 'accepted off the wire — the run cleared the surviving attempt')
+  assert.equal(h.jk(JK.writeAck).length, 1)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 3, n: MAX_RUN + 1, s: 10, e: 1 }) }) // over the wire bound
+  assert.equal(h.jk(JK.writeAck).length, 1, 'a run past MAX_RUN is dropped whatever the queue bound is')
 })
 
 test('cid dedup: a retransmitted attempt commits ONCE; the duplicate ACK re-carries the ORIGINAL coordinates', () => {
