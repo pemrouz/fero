@@ -10,12 +10,15 @@ import '../utils/battery.ts'
 import { test } from 'node:test'
 import assert from 'node:assert'
 import net from 'node:net'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { fero, RENDEZVOUS } from './index.ts'
 import { Directory, GRACE, MAX_PER_CALLER, hostMethods, isAddr, rendezvousDefault, sameSocket } from './directory.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { MAX_REDIALS } from '../kernel/node.ts'
-import { ports, until } from '#utils'
+import { ports, sleep, until } from '#utils'
 import type { Fero } from './types.ts'
 import type { Context } from './methods.ts'
 
@@ -370,5 +373,53 @@ test("a lookup the directory host FAILS shows on rendezvous.error — it is not 
     assert.ok(await until(() => d.error?.includes('lookup exploded') === true, 8000), `the failure is on the state (${d.error})`)
   } finally {
     await d.destroy(); await host.destroy()
+  }
+})
+
+test("I-19 guard: a directory client that composes as anything but a client fails start() NAMING the role, not with `c.methods.lookup is not a function`", async () => {
+  //! the one way `lookup` is not a function: the compose handed back a SERVER (its methods are its own
+  // table). Forced here through the compose seam; the guard turns a bare TypeError into the cause.
+  const d = new Directory({
+    compose: (_n, o) => fero(`i19g${process.pid}`, { ...o, hosts: undefined, listen: false }), addr: '127.0.0.1:1', name: 'r', uuid: 'u1',
+    listen: () => undefined, serve: false, heartbeatMs: 50, redialMs: 30, onHosts: () => {}, onState: () => {},
+  })
+  try {
+    await assert.rejects(d.start(), /#directory: the directory client composed as a server/)
+  } finally {
+    await d.destroy()
+  }
+})
+
+test("I-19 — the directory host is SIGKILLed and a new server boots 0-500 ms later: its fero() resolves and it takes the directory over (the race the one sighting came from)", async () => {
+  //! the host is a real process (`node host.ts`), killed the hard way; the newcomer is in-process. Each
+  // round its own private rendezvous port, so a slow socket close in one round cannot leak into the next.
+  const name = `i19${process.pid}`
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-i19-'))
+  const script = path.join(dir, 'host.ts')
+  fs.writeFileSync(script, `import { fero } from ${JSON.stringify(path.join(import.meta.dirname, 'index.ts'))}
+import { snapshot } from ${JSON.stringify(path.join(import.meta.dirname, 'substrate.ts'))}
+const f = await fero(process.argv[2], { server: true, rendezvous: process.argv[3], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+console.log('hosting ' + (snapshot(f.cluster) as { me: { rendezvous: { hosting: boolean } } }).me.rendezvous.hosting)
+setInterval(() => {}, 1000)
+`)
+  const kids: ReturnType<typeof fero.spawn>[] = []
+  try {
+    for (const gap of [0, 50, 200, 500]) {
+      const addr = `127.0.0.1:${await ports.free()}`
+      const host = fero.spawn(script, [name, addr]); kids.push(host)
+      assert.ok(await until(() => /hosting true/.test(host.out), 15_000), `gap ${gap}: the spawned server hosts the directory (${host.out})`)
+      host.child.kill('SIGKILL')
+      await host.exited
+      await sleep(gap)
+      const b = await fero(name, { server: true, rendezvous: addr, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+      try {
+        assert.ok(await until(() => rz(b).hosting, 10_000), `gap ${gap}: the newcomer took the directory over (${JSON.stringify(rz(b))})`)
+      } finally {
+        await b.destroy()
+      }
+    }
+  } finally {
+    for (const k of kids) if (k.child.exitCode === null && k.child.signalCode === null) { k.child.kill('SIGKILL'); await k.exited }
+    fs.rmSync(dir, { recursive: true, force: true })
   }
 })
