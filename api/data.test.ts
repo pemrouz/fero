@@ -296,6 +296,28 @@ test('V4-18 overlapping cells — through data\'s real lane: a field written int
   }
 })
 
+test('V4-18 overlapping cells — a LOCAL delete of an array element is refused before it commits, with data\'s message; a REPLICATED remove under an array row still folds as the no-op', async () => {
+  const h = harness()
+  h.bind.data.g = [1, 2]
+  const seq = h.node.seq, rows = h.bind.outcomes.rows.size
+  //! data refuses to leave a sparse hole in an array; the lens says so to the caller, the way it
+  // refuses a root replace — nothing is stamped, no tombstone, no row of cluster.writes
+  assert.throws(() => { delete h.bind.data.g[0] }, /remove\(\) of array element \[g\.0\] would leave a sparse hole — write the spliced array instead/)
+  assert.throws(() => h.bind.data.g.get('1').remove(), /array element \[g\.1\] would leave a sparse hole/, 'the remove() verb too')
+  assert.equal(h.node.seq, seq, 'nothing committed')
+  assert.equal(h.node.versions.has(JSON.stringify(['g', '0'])), false, 'no tombstone')
+  assert.equal(h.bind.outcomes.rows.size, rows, 'no write outcome')
+  assert.deepEqual(snapshot(h.bind.data), { g: [1, 2] })
+  //! an index past the end is absent: the no-op delete filter issues nothing, as before
+  delete h.bind.data.g[5]
+  assert.equal(h.node.seq, seq)
+  //! a replicated remove of an array element cannot be refused: the substrate folds it as the no-op
+  h.admit(1, 'bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 1, 0, [{ type: REC.update, key: ['r'], value: [7, 8] }, { type: REC.remove, key: ['r', '0'] }]) })
+  assert.deepEqual((snapshot(h.bind.data) as { r: unknown }).r, [7, 8], 'the array stays whole')
+  await h.destroy()
+})
+
 test('M5a — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
   const h = harness()
   //! fast path (epoch 0): coordinates resolve within the call
