@@ -53,8 +53,9 @@ pid 225910
   why `t` skips.
 - Terminal 2 arrives: `dial`, `linkUp`, `identified` with its id. Both dialed at once, so one link is kept
   (`dupLink`). The copy with the lower id opens one digest exchange, and each ships the other the row it
-  lacks, once (`aeShip`; `applyInbound` on the other side). A ballot (`propose`, `vote`) ends in
-  `viewInstall 1 2`: epoch 1, two members.
+  lacks (`aeShip`; `applyInbound` on the other side), so each row arrives once. In a dial race a second
+  `aeShip` can go down the link that is closing; it never arrives (no `dupDrop`). A ballot (`propose`,
+  `vote`) ends in `viewInstall 1 2`: epoch 1, two members.
 - Ctrl-C is a leave by vote: `leave` asks for the view without it (when the leaving copy has the lower id
   it proposes that view itself, and the survivor logs `vote 2 1` instead), `evict` and `viewInstall 2 1`
   grant it, and only then does the socket close: `linkDown 1 close`. The ring holds the last 4096 events;
