@@ -1532,3 +1532,27 @@ can carry no mark, so its next life starts fresh like any wiped dir; neither
 mark is fsynced, so a power loss right after the failure can lose both. README
 and docs/DESIGN-CONFIG.md name the `condemned` marker. Five new tests
 (tests/tcp.test.ts, tests/wal.test.ts, sim/durability.test.ts).
+
+## V4-13 amended — a client follows its feeder's view, even to a lower number (I-23, 2026-10-08)
+Context: since 348dfa5 a client adopted a view with the SAME number but other
+members (I-23). A LOWER number fell through: when a client had seen epoch 2
+and the memory-only members were reborn under fresh uuids at epoch 1, the
+client kept the dead ids in its members row for good, because its number was
+bigger. The stale number never poisoned a server (a client's attempts carry
+ae 0 and `staleObserved` never sees it); the damage was the screen and
+`cluster.epoch`.
+Decision: a client is a picture of its feeder's cluster, not a vote in it. On
+its PRIMARY link, a view whose members differ installs at any epoch of 1 or
+more, equal or lower (epoch 0 is open genesis, never a view). Every other
+link stays "higher only", so a stale non-primary server cannot teach a stale
+row; the old equal-epoch rule from ANY link is gone. A member refuses all of
+it: one view per epoch is the safety rule, and a VIEW is not a ballot.
+`cluster.epoch` on a client therefore means "my feeder's number", and the
+sim's epoch-monotone monitor skips clients (it checks members' numbers only).
+REJECTED: resetting the client to epoch 0 when its last member link dies (the
+row would flash empty on every redial blip).
+Consequences: kernel/client.test.ts pins the primary's lower view adopted and
+a non-primary's lower view ignored; sim/client.test.ts's I-23 pin bumps the
+spoke to epoch 2 before the kill and expects members [n03, n04] at epoch 1
+after the rebirth. The `evict` rows a feeder install journals are harmless:
+the debugger's topologyAt does not read them.

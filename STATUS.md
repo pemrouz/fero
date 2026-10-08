@@ -19,7 +19,6 @@ What happens, where, and the fix if one is known. The evidence behind each line 
 ### Kernel
 
 - **A survivor stalled across the leave window turns a clean stop into a crash.** When one of two members presses Ctrl-C, it asks the other to vote it out and waits about four heartbeats for the answer. If the other member is stalled for longer than that, the leaver gives up and goes anyway, and the survivor sees a crash it can never vote out. With two members that is permanent. 25 of 384 stall schedules in the sim. No cheap fix, because at two members the vote is the only exit. Options: wait only while there is a member to ask; show a failed leave at the api (today it is a journal row only); the two-member tie-break V4-6 set aside.
-- **A client whose view number is higher than the re-formed cluster's keeps its stale members row.** A client now adopts a view with the same number but different members (I-23, commit 348dfa5). Adopting a lower number would break the rule that a node's view number never goes down, and change what `cluster.epoch` means on a client. Needs a decision.
 
 ### The api
 
@@ -87,7 +86,7 @@ One line each. The full record, with the context and the rejected options, is [d
 - **V4-10** One config door: `--fero.<key>` > the call > `FERO_<KEY>` > `fero.opt.ts` > the default. Nested lowercase keys. `optcascade` is the one dependency.
 - **V4-11** A README is the terminals; a screen is one line or one frame.
 - **V4-12** The example series is complete: a story file is a driver, an app may run past ten lines, a check runs every file its README names, no slow tier.
-- **V4-13** One ledger. This page holds the status, the bugs, the ideas and the decisions index; the full records live in `docs/`; 42 obvious warts were fixed instead of filed, and the fixes that touched the public surface are listed there.
+- **V4-13** One ledger. This page holds the status, the bugs, the ideas and the decisions index; the full records live in `docs/`; 42 obvious warts were fixed instead of filed, and the fixes that touched the public surface are listed there. Amended 2026-10-08: a client follows its feeder's view even to a lower number, so `cluster.epoch` on a client is its feeder's number (I-23).
 - **V4-14** The ring hash is fnv-1a finished with fmix32, and it is part of the wire contract; mixed versions are unsupported before 1.0.
 - **V4-15** The lower uuid opens the admit digest exchange, so a join ships each missing row once; the formation count re-pins 69,400 → 59,500.
 - **V4-16** The method plane: a live scalar arrives as `{ value }`; a subscription has a `ready` per attempt and an `onError`; a kernel outcome on an assignment fails the call; a plain-value handler keeps its views.
