@@ -94,12 +94,20 @@ export const applyRec = (p: any, r: Rec): void => {
     const mine = rejects
     if (mine.length > 0) {
       const rj = mine[0]
-      if (r.type === REC.update && r.key.length > 1 && String((rj.error as Error)?.message ?? '').includes('not live')) {
+      const msg = String((rj.error as Error)?.message ?? '')
+      if (r.type === REC.update && r.key.length > 1 && msg.includes('not live')) {
         rejects = [] // the retry's rejects stay LOUD — a post-vivify failure is a genuine fault
         laneOf(p)([{ type: REC.update, key: [r.key[0]], value: {} }, r])
         if (rejects.length > 0) throw rejects[0].error
         return
       }
+      //! a REMOVE under an ARRAY (V4-18): data refuses to leave a sparse hole in an array ("write the
+      // spliced array instead") — and it silently ignores a field WRITE under one, so a field cell
+      // under an array-valued row never shows. A committed remove there is the same non-event: the
+      // array stays whole, exactly as on a node that never saw the field. Throwing here killed the
+      // process (the I-30 class) in the arrival orders where a newer field was re-applied over an
+      // older array row; a replicated record cannot be refused, so the no-op is the only honest fold.
+      if (r.type === REC.remove && r.key.length > 1 && msg.includes('array element')) return
       throw rj.error
     }
   } finally {

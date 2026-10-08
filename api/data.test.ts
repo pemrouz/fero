@@ -256,9 +256,27 @@ test('V4-18 overlapping cells — through data\'s real lane: a field written int
       await h.destroy()
     }
   }
-  //! an ARRAY row, the field two levels under it: data ignores the write, so the row stays [] — and the
-  // kernel's un-vivify must make up no repair under the array (a seq-0 `remove ['g','a']` THREW here,
-  // out of node.step, in the orders where the array was live). A scalar row with a live sibling field:
+  //! an ARRAY row: data ignores a field write under an array and REFUSES a remove of an array's element
+  // (a sparse hole) — the substrate folds that remove as the no-op it is (the array stays whole, as on a
+  // node that never saw the field); before, data's throw came out of node.step in the orders where the
+  // newer field was re-applied over the older array. Depth 2 (the remove's parent IS the array) and
+  // depth 3 (where the kernel's un-vivify must make up no repair under the array — its seq-0
+  // `remove ['g','a']` threw here too).
+  for (const v of [[1], []]) {
+    const frames: [number, Uint8Array][] = [
+      [1, records('bb', 3, 0, [{ type: REC.update, key: ['g'], value: v }])],
+      [2, records('cc', 5, 0, [{ type: REC.update, key: ['g', 'b'], value: 1 }])],
+      [3, records('dd', 6, 0, [{ type: REC.remove, key: ['g', 'b'] }])],
+    ]
+    for (const order of permutations(frames)) {
+      const h = harness()
+      h.admit(1, 'bb'); h.admit(2, 'cc'); h.admit(3, 'dd')
+      for (const [link, bytes] of order) h.node.step({ kind: 'bytesIn', link, bytes })
+      assert.deepEqual(snapshot(h.bind.data), { g: v }, `array row ${JSON.stringify(v)}, a depth-2 field, order ${order.map((f) => f[0]).join(',')}`)
+      await h.destroy()
+    }
+  }
+  //! …the field two levels under the array; and a scalar row with a live sibling field:
   // the level the deeper field made up (g.a) goes, the sibling keeps the made-up object — {g:{c:2}},
   // the same as on a node that refused the field.
   for (const [v, want, extra] of [[[], { g: [] }, null], [5, { g: { c: 2 } }, [4, records('ee', 4, 0, [{ type: REC.update, key: ['g', 'c'], value: 2 }])]]] as [unknown, unknown, [number, Uint8Array] | null][]) {
