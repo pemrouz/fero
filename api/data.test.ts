@@ -175,6 +175,30 @@ test('V4-18 overlapping cells — our in-flight FIELD write loses to a newer who
   await h.destroy()
 })
 
+test('V4-18 overlapping cells — on the epoch-0 fast path, removing the last field of a row that only fields made up settles committed: the kernel\'s seq-0 repair of the row is never mistaken for a foreign commit', async () => {
+  const h = harness()
+  const seqs = async (ps: unknown[]) => Promise.all(ps.map((p) => (p as Promise<{ seq: number }>).then((c) => c.seq, (e) => `rejected ${e}`)))
+  //! a field write makes the row on the screen; removing that one field un-makes it (a seq-0 repair of
+  // ['cart'] rides along) — and the remove's own promise resolves with ITS seq, not 'superseded'
+  assert.deepEqual(await seqs(h.bind.issue([{ type: REC.update, key: ['cart', 'item'], value: 1 }])), [1])
+  assert.deepEqual(snapshot(h.bind.data), { cart: { item: 1 } })
+  assert.deepEqual(await seqs(h.bind.issue([{ type: REC.remove, key: ['cart', 'item'] }])), [2])
+  assert.deepEqual(snapshot(h.bind.data), {}, 'the row only the field had made up is gone')
+  //! one batch: remove a field, write its sibling — the repair after the remove must not reject the
+  // sibling's still-pending promise; each settles positionally with its own seq
+  assert.deepEqual(await seqs(h.bind.issue([{ type: REC.update, key: ['g', 'a'], value: 1 }])), [3])
+  assert.deepEqual(await seqs(h.bind.issue([{ type: REC.remove, key: ['g', 'a'] }, { type: REC.update, key: ['g', 'b'], value: 2 }])), [4, 5])
+  assert.deepEqual(snapshot(h.bind.data), { g: { b: 2 } })
+  //! the repair's cell can be IN the batch too: [remove the field, remove the row] — the row's remove
+  // settles with the kernel's stamp (seq 7), never with the repair's seq 0 (the fast-path collector
+  // takes no settlement from a seq-0 apply)
+  assert.deepEqual(await seqs(h.bind.issue([{ type: REC.update, key: ['h', 'a'], value: 1 }])), [6])
+  assert.deepEqual(await seqs(h.bind.issue([{ type: REC.remove, key: ['h', 'a'] }, { type: REC.remove, key: ['h'] }])), [7, 8])
+  assert.deepEqual(snapshot(h.bind.data), { g: { b: 2 } })
+  assert.ok([...h.bind.outcomes.rows.values()].every((r) => r.state === 'committed'), 'every row of cluster.writes is committed')
+  await h.destroy()
+})
+
 test('M5a — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
   const h = harness()
   //! fast path (epoch 0): coordinates resolve within the call
