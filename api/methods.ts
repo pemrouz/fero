@@ -30,7 +30,9 @@
 // to the kernel). 'move' records (bounded-sort rotations) are SKIPPED with this
 // documented consequence: subscribe to the source and sort on the CLIENT proxy
 // (operators work there) — a server-side windowed sort is not a streamable
-// shape in M5c.
+// shape in M5c. A LIVE SCALAR (a handler returning `ctx.data.count`, or a plain
+// number on the SUB leg) arrives in the mirror as `{ value }` — mirrors are
+// object-born (substrate.applyStreamRec, I-27); the one-shot stays the bare number.
 
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { VERB } from '../kernel/codec.ts'
