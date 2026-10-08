@@ -279,6 +279,23 @@ export class Bind {
     // no longer holds it, our write either committed without ever surfacing here (the cross-epoch
     // LWW-loss race — resolve it from the dedup window's original coordinates) or is unaccounted for
     // (reject 'superseded'). The foreign record projects regardless — the proxy is the fold.
+    this.#probe(cell)
+    //! 3b) the same probe for our in-flight writes on the cells UNDER this one (V4-18, overlapping
+    // cells): a whole-row write or a row remove is a parent of every field cell in the row, and a
+    // field write of ours stamped at or below it is swept (or refused) in the kernel — its apply never
+    // comes. Only when something of ours is in flight at all; the no-writes path pays one size check.
+    if (this.#inflight.size > 0) {
+      const pfx = cell.slice(0, -1) + ','
+      for (const c of this.#inflight.keys()) if (c.startsWith(pfx)) this.#probe(c) // a Map survives deletes mid-walk
+    }
+    //! 4) the ONE projection: kernel record → proxy
+    this.#apply(a)
+    this.sweep()
+  }
+
+  //! #probe — the settlement probe for one cell (step 3 above): settle our in-flight write there if
+  // the kernel no longer holds its attempt — from the dedup window's coordinates, or 'superseded'.
+  #probe(cell: string) {
     const holder = this.#inflight.get(cell)
     if (holder !== undefined && !this.#rt.node.writes.pending.has(this.#iss + '|' + holder)) {
       const p = this.#pending.get(this.#iss + '|' + holder)
@@ -289,9 +306,6 @@ export class Bind {
         else p.reject('superseded')
       } else this.#inflight.delete(cell)
     }
-    //! 4) the ONE projection: kernel record → proxy
-    this.#apply(a)
-    this.sweep()
   }
 
   //! apply — project one record into the projection handle (the hot lane, fero's origin).

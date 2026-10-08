@@ -138,6 +138,43 @@ test('V4-7 NO GHOST — a delete of a cell with our own write in flight is NOT a
   await h.destroy()
 })
 
+test('V4-18 overlapping cells — our in-flight FIELD write loses to a newer whole-row write: the row\'s apply settles it (the join never fires for a swept record), and the proxy shows the row', async () => {
+  const h = harness()
+  h.admit(1, 'bb')
+  h.admit(2, 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  h.node.writes.ring.place('cart', 'bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 1, 1, [{ type: REC.update, key: ['cart'], value: { items: 0 } }]) })
+  assert.deepEqual(snapshot(h.bind.data), { cart: { items: 0 } })
+  //! our field write forwards to the owner; its WACK clears the attempt and remembers the coordinates
+  const [p] = h.bind.issue([{ type: REC.update, key: ['cart', 'items'], value: 1 }]) as Promise<unknown>[]
+  assert.equal(h.node.writes.pending.size, 1)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 1, s: 2, e: 1 }) })
+  assert.equal(h.node.writes.pending.size, 0, 'WACKed — the kernel no longer holds the attempt')
+  //! a whole-row write from another lane, stamped ABOVE our field's commit, lands BEFORE our echo:
+  // the row is the parent of our cell, so this apply is the probe for our in-flight field write
+  let settled: unknown = 'pending'
+  p.then((v) => { settled = v }, (e) => { settled = e })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: records('cc', 9, 1, [{ type: REC.update, key: ['cart'], value: { items: 7 } }]) })
+  await new Promise((r) => setTimeout(r, 20))
+  assert.deepEqual(settled, { origin: 'aa', seq: 2, epoch: 1, cid: 1 }, 'settled from the WACK\'s coordinates — it committed, then lost')
+  //! the echo of our commit now arrives — refused across depth (subsumed), so it never projects
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 2, 1, [{ type: REC.update, key: ['cart', 'items'], value: 1 }], 'aa~1', 1) })
+  assert.equal(h.jk(JK.subsumed).length, 1)
+  assert.deepEqual(snapshot(h.bind.data), { cart: { items: 7 } }, 'the proxy shows the newer row, never our older field')
+  assert.ok([...h.bind.outcomes.rows.values()].every((r) => r.state !== 'pending'), 'no row of cluster.writes is left pending')
+  //! and when the window has no coordinates for it, the same probe says 'superseded'
+  const [q] = h.bind.issue([{ type: REC.update, key: ['cart', 'qty'], value: 2 }]) as Promise<unknown>[]
+  let out: unknown = 'pending'
+  q.then((v) => { out = v }, (e) => { out = e })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 2, n: 1, s: 3, e: 1 }) })
+  h.node.writes.reset() // the window forgot the coordinates (condemn's path) — nothing can vouch for the commit
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: records('cc', 10, 1, [{ type: REC.update, key: ['cart'], value: { items: 8 } }]) })
+  await new Promise((r) => setTimeout(r, 20))
+  assert.equal(out, 'superseded')
+  await h.destroy()
+})
+
 test('M5a — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
   const h = harness()
   //! fast path (epoch 0): coordinates resolve within the call
