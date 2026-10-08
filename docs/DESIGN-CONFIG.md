@@ -28,8 +28,7 @@ The owner read the study and settled the open questions:
   version: its first `dependencies` entry, `engines.node >= 22.18`, and an
   `npm install` before the first run. No copt-side change was needed for the
   landing; the 1.1 wishes (§9) stay filed.
-- **`diag` stays deferred** (§4); the kernel tune table was a later series (landed 2026-10-08, §7 step 7)
-  (§7 step 7).
+- **`diag` stays deferred** (§4); the kernel tune table was a later series (landed 2026-10-08, §7 step 7).
 - **The review before landing (four adversarial lenses, 26 findings) changed
   four rules from the study:** the near-miss test in the global rung applies
   only to declared GROUPS (`heartbeats` beside `heartbeat` throws; a sibling

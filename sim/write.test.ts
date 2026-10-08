@@ -89,7 +89,8 @@ test('AA#2 the view-install window: a laggard\'s writes crossing an eviction com
   sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: ['aa2'], value: 'laggard' }] }, 750)
   sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['aa2'], value: 'current' }] }, 800)
   //! probe and heal BEFORE n01's chain to n02 gives up (≈ 1420 for this seed: the view-2 install at 1209 dials
-  // n02 too and that failed dial spends one of the five tries): n02 must stay a member of view 2
+  // n02 too while the chain's timer is pending, and that failed dial FORKS the chain into two timer lines
+  // that share the five tries, so it gives up in about half the time): n02 must stay a member of view 2
   sim.run({ until: 1350 })
   assert.deepEqual(nodes.filter((n) => !['n02', 'n05'].includes(n.uuid)).map((n) => n.epoch), [2, 2, 2], 'view 2 committed while n02 was away')
   assert.equal(nodes[1].epoch, 1, 'n02 still holds view 1 — the stale issuer')
