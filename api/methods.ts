@@ -262,10 +262,13 @@ interface PendingCall {
   reject: (e: Error) => void
 }
 
-//! Sub — one live subscription on the caller. `ready` is made EAGERLY when the sub opens: it resolves (with
-// nothing — the mirror is THENABLE, so resolving with it would collapse it to a snapshot) on the first frame,
-// and rejects when the host fails the SUB or the mirror refuses a record. Eager on purpose: a failure nobody
-// handles is an unhandled rejection, which exits the process with the reason — as loud as an uncaught call.
+//! Sub — one live subscription on the caller. `ready` is one ATTEMPT's promise, made EAGERLY: when the sub
+// opens, and again when a primary change re-subscribes a sub that had framed (the new primary's answer is a
+// new attempt). It resolves (with nothing — the mirror is THENABLE, so resolving with it would collapse it to
+// a snapshot) on that attempt's first frame, and rejects when the host fails the SUB or the mirror refuses a
+// record. Eager on purpose: a failure nobody handles is an unhandled rejection, which exits the process with
+// the reason — as loud as an uncaught call, and after a failover too. `onError` (the handle's option) is the
+// one place that hears EVERY failure, before or after a frame; with it set no attempt goes unhandled.
 // `error` is set once, when the sub failed; the handle reads it (mode 'failed', every read throws it).
 export interface Sub {
   id: number
@@ -275,8 +278,18 @@ export interface Sub {
   ready: Promise<void>
   error: Error | null
   framed: boolean
+  onError: ((e: Error) => void) | null
   resolve: () => void
   reject: (e: Error) => void
+}
+
+const noop = () => {}
+
+//! arm — a fresh attempt: a new eager `ready`, pre-handled when an onError hears the failures instead
+const arm = (sub: Sub): void => {
+  sub.framed = false
+  sub.ready = new Promise<void>((res, rej) => { sub.resolve = res; sub.reject = rej })
+  if (sub.onError !== null) sub.ready.catch(noop)
 }
 
 export class Caller {
@@ -315,11 +328,10 @@ export class Caller {
 
   //! subscribe — open a live stream into a fresh local proxy. The id doubles as the subscription
   // identity server-side (keyed by link|id there, so the same id re-used on a NEW primary is clean).
-  subscribe(m: string, a: unknown): Sub {
+  subscribe(m: string, a: unknown, onError: ((e: Error) => void) | null = null): Sub {
     const id = ++this.#seq
-    let resolve!: () => void, reject!: (e: Error) => void
-    const ready = new Promise<void>((res, rej) => { resolve = res; reject = rej })
-    const sub: Sub = { id, m, a, proxy: proxy({}), ready, error: null, framed: false, resolve, reject }
+    const sub = { id, m, a, proxy: proxy({}), error: null, onError } as Sub
+    arm(sub)
     this.#subs.set(id, sub)
     this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m, a })
     return sub
@@ -332,6 +344,10 @@ export class Caller {
     sub.error = e
     this.#subs.delete(sub.id)
     sub.reject(e)
+    //! a microtask: onError is user code, and this runs inside a kernel step — a throw there is the
+    // user's own uncaught error, never a broken step
+    const hear = sub.onError
+    if (hear !== null) queueMicrotask(() => hear(e))
   }
 
   unsubscribe(id: number) {
@@ -401,8 +417,12 @@ export class Caller {
   // first link — so "open, then act" right after it is a held SUB and a held CALL. Replaying the CALL
   // first made the view's first frame already hold the call's effect; the delta never rendered.
   onPrimaryChange() {
-    for (const [id, sub] of this.#subs)
+    for (const [id, sub] of this.#subs) {
+      //! a sub that had framed starts a NEW attempt (a fresh eager `ready`): the new primary may fail it,
+      // and that must not land on a promise already resolved — silent, the mirror kept as if live
+      if (sub.framed) arm(sub)
       this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m: sub.m, a: sub.a })
+    }
     for (const [id, c] of [...this.#calls]) {
       if (c.held || c.retry) {
         c.held = false
@@ -443,10 +463,13 @@ const COERCION = new Set(['toJSON', 'toString', 'valueOf', 'constructor', 'nodeT
 //! A FAILED sub (the host threw, a write was refused, the mirror refused a record): `ready` rejects with
 // the reason, `mode` reads 'failed', `open()` and every reactive read throw that reason, `close()` is a
 // no-op. Passive touches (symbols, coercion hooks) never throw — inspecting a dead handle is not a read.
-export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: number; retry?: boolean } = {}): any => {
+//! `ready` is the CURRENT attempt (a failover starts a new one, the Sub note); to hear every failure of a
+// long-lived sub, pass `{ onError }` (`methods.feed(arg, { onError })`) — then no failure stops the process.
+export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: number; retry?: boolean; onError?: (e: Error) => void } = {}): any => {
   let live: Sub | null = null
+  const subscribe = (): Sub => caller.subscribe(m, a, opts.onError ?? null)
   const open = (): Sub => {
-    live ??= caller.subscribe(m, a)
+    live ??= subscribe()
     if (live.error !== null) throw live.error
     return live
   }
@@ -472,9 +495,9 @@ export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: 
       if (prop === 'catch') return (onR?: (e: unknown) => unknown) => caller.call(m, a, opts).catch(onR)
       if (prop === 'finally') return (onD?: () => void) => caller.call(m, a, opts).finally(onD)
       if (prop === 'open') return () => open().proxy
-      //! `ready` opens the sub (waiting for its first frame IS a reactive intent) and is the SAME promise
-      // every time — made when the sub opened, so a failure before anyone looked is still delivered
-      if (prop === 'ready') return (live ??= caller.subscribe(m, a)).ready
+      //! `ready` opens the sub (waiting for its first frame IS a reactive intent) and is the same promise
+      // for the whole attempt — made when it began, so a failure before anyone looked is still delivered
+      if (prop === 'ready') return (live ??= subscribe()).ready
       if (prop === 'close') return () => { if (live && live.error === null) { caller.unsubscribe(live.id); live = null } }
       if (prop === 'mode') return live === null ? 'oneshot' : live.error !== null ? 'failed' : 'live'
       if (isPassive(prop)) return passive(prop)
