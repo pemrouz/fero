@@ -8,7 +8,6 @@
 // plan's semantics section.
 
 import { Node, stable } from '../kernel/node.ts'
-import { MAX_QUEUED } from '../kernel/link.ts'
 import { SCOPE } from '../kernel/scope.ts'
 import { partitionOf } from '../kernel/env.ts'
 import type { Sim } from './exec.ts'
@@ -20,14 +19,14 @@ export const perEvent = () => [
   {
     //! the REAL send-plane invariant: frames may sit queued ONLY while the link is paused — a drain that
     // fails to release the queue, or a ship that queues while flowing, violates this immediately. (The raw
-    // MAX_QUEUED bound is deliberately NOT monitored alone: ship() enforces it at the only push site, so a
+    // queued bound (the node's tune row) is deliberately NOT monitored alone: ship() enforces it at the only push site, so a
     // bound-only check is a tautology — an adversarial-review finding.)
     name: 'queued-implies-paused',
     check: (sim: Sim): string | null => {
       for (const [id, n] of sim.nodes)
         for (const l of n.links.values()) {
           if (l.queued.length > 0 && !l.paused) return `${id} link ${l.id} has ${l.queued.length} queued frames while FLOWING`
-          if (l.queued.length > MAX_QUEUED) return `${id} link ${l.id} queued ${l.queued.length} > ${MAX_QUEUED}`
+          if (l.queued.length > n.tune.queued) return `${id} link ${l.id} queued ${l.queued.length} > ${n.tune.queued}`
         }
       return null
     },
