@@ -94,6 +94,7 @@ export class Runtime {
   #paused = new Set<number>()
   #timers = new Map<number, NodeJS.Timeout>()
   #server: net.Server | null = null
+  #started = false // start() runs once: a second call would leak the first bind (see start())
   #linkSeq = 0
   #opts: RuntimeOpts
   //! the graceful leave (V4-6): one promise per runtime, settled by the kernel's `left` effect or the cap
@@ -330,9 +331,14 @@ export class Runtime {
   // REJECTS too, typed `code: 'stopped'`: destroy()'s server.close() means 'listening' never fires
   // (Node 26 binds an IP literal asynchronously; Node 22 binds it at once and drops the queued
   // 'listening' when the handle closes), so the old promise stayed pending for ever. A start() after
-  // destroy() binds nothing: that server would have had nobody left to close it.
+  // destroy() binds nothing: that server would have had nobody left to close it. A second start()
+  // REJECTS typed `code: 'started'`: it would have replaced #server and leaked the first bind, which
+  // destroy() could then never close. So the promise can reject on an ordinary stop: await it or
+  // attach a handler (the composer races it), or a stop before 'listening' is an unhandled rejection.
   async start(): Promise<void> {
     if (this.node.destroyed) throw stoppedError()
+    if (this.#started) throw Object.assign(new Error('runtime already started'), { code: 'started' })
+    this.#started = true
     if (this.#opts.listen) {
       const [host, port] = split(this.#opts.listen)
       const server = net.createServer((sock) => this.#accept(sock))
