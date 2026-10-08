@@ -5,15 +5,16 @@ Terminal 1, a member. Its screen is the committed view and the object — this i
 ```
 $ cd examples/10-confirm
 $ node server.ts
-MEMBER 1621883 — me a69c0c97 — epoch 1 — writable true — members 2
+MEMBER 910205 — me 632d42ad — epoch 1 — writable true — members 2
 { k: 3 }
+^C
 ```
 
 Terminal 2, the same command. A majority needs two, and the view commits once both are in:
 
 ```
 $ node server.ts
-MEMBER 1622035 — me 3d2f4f23 — epoch 1 — writable true — members 2
+MEMBER 910206 — me e58ae634 — epoch 1 — writable true — members 2
 { k: 3 }
 ```
 
@@ -21,17 +22,17 @@ Terminal 3, a client, run once — the same write, awaited at three rungs:
 
 ```
 $ node client.ts
-CLIENT 1622386
-k=1 committed by a69c0c97 seq 1 epoch 1
-k=2 replicated by a69c0c97 seq 2 epoch 1
-k=3 persisted timeout — reached committed by a69c0c97 seq 3 epoch 1
+CLIENT 910240
+k=1 committed by 632d42ad seq 1 epoch 1
+k=2 replicated by 632d42ad seq 2 epoch 1
+k=3 persisted timeout — reached committed by 632d42ad seq 3 epoch 1
 { k: 3 }
 ```
 
 - `methods.update({ key: 'k', value: 1 })` is `c.data.k = 1` with a reply, and `confirm` names the rung to
   wait for: `committed` (the default: a member stamped it and applied it), `replicated` (a majority of the
   members hold it), `persisted` (a majority have it on disk). The reply names the rung it PROVED and the
-  commit's coordinates — `by a69c0c97` is the member that stamped it, the `me` on terminal 1; `seq` is its
+  commit's coordinates — `by 632d42ad` is the member that stamped it, the `me` on terminal 1; `seq` is its
   place in that member's log; `epoch` the view it was committed under.
 - A reject is not a rollback. Nobody here has a disk, so the third rung can never be proven, and when the
   deadline passes (`timeout`, 3 s here, 10 s unless you say) the reply says how far it got instead:

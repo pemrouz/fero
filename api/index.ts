@@ -588,6 +588,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     a.replicas === b.replicas && a.epoch === b.epoch && a.w === b.w && a.held === b.held && a.acquiring === b.acquiring &&
     a.orphaned === b.orphaned && a.acquired === b.acquired && a.shed === b.shed &&
     a.shedWaitingOn.length === b.shedWaitingOn.length && a.shedWaitingOn.every((u, i) => u === b.shedWaitingOn[i])
+  //! stopping — the ONE stop, whoever starts it (V4-8): the owner's destroy(), the signal handler, or a
+  // signal that lands BEFORE fero() resolves. A second caller joins the first. Declared before the fold:
+  // the fold reads it (a stopping node paints no more cluster frames).
+  let stopping: Promise<void> | null = null
   const fold = () => {
     //! settle kernel-side outcomes FIRST (two integer compares when nothing moved): a relay's `invalid`
     // WNACK removes our attempt inside a step that applies nothing, so the write's promise
@@ -634,6 +638,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // journals nothing (held-mints at the gate/stamp site) — one int compare on the hot path.
     const scopeMoved = node.scope !== null && node.scope.n !== lastScopeN
     if (!refold && !scopeMoved && !primaryMoved) return
+    //! a stopping node paints no more frames: the leave ballot installs the shrunk view HERE too, and a
+    // screen would end on `writable false — members N−1` — the survivors' picture, not this node's. The
+    // housekeeping above (settled writes, reaped streams, the cursor) still runs to the end.
+    if (stopping !== null) return
     //! ONE batch, and only the fields that moved (V4-8): a bare `cluster.tap(() => …)` fires once per
     // fold with the whole picture landed — never per field, and never for a refold that changed nothing
     // (data skips a same-value primitive but not an equal-but-new object, so members, peers and the
@@ -679,9 +687,6 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     await directory?.destroy()
     await rt.destroy()
   }
-  //! stopping — the ONE stop, whoever starts it (V4-8): the owner's destroy(), the signal handler, or a
-  // signal that lands BEFORE fero() resolves. A second caller joins the first.
-  let stopping: Promise<void> | null = null
   //! the clean stop is armed HERE, not when compose completes: a SIGINT during a slow start — the listen
   // bind, a durable server's directory round — used to be Node's default (killed by signal: the port
   // bound, a directory entry maybe registered, nothing left or torn down). A provisional entry holds the
@@ -744,8 +749,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         listen: () => (isClient ? undefined : node.listen),
         serve: !isClient,
         heartbeatMs: rtOpts.heartbeatMs as number, redialMs: rtOpts.redialMs,
-        onHosts: (hs) => { discovered = hs; node.step({ kind: 'discover', hosts: hs }); cluster.set('me', meRow()) },
-        onState: () => cluster.set('me', meRow()),
+        onHosts: (hs) => { discovered = hs; node.step({ kind: 'discover', hosts: hs }); if (stopping === null) cluster.set('me', meRow()) },
+        onState: () => { if (stopping === null) cluster.set('me', meRow()) },
       })
       try { await directory.start() } catch (err) { await abort(err) }
     }

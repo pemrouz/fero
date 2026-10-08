@@ -752,6 +752,27 @@ test('the cluster view folds in ONE batch (V4-8): a bare cluster.tap fires once 
   }
 })
 
+test("a leaving member paints no frame after destroy(): its own shrunk view is the survivors' picture, not its last frame", async () => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    type View = { epoch: number; writable: boolean; members: Record<string, string> }
+    assert.ok(await until(() => [a, b].every((f) => (snapshot(f.cluster) as View).epoch >= 1 && Object.keys((snapshot(f.cluster) as View).members).length === 2), 8000), 'the view formed')
+    let stopped = false
+    const after: string[] = []
+    b.cluster.tap(() => { if (stopped) { const v = snapshot(b.cluster) as View; after.push(`epoch ${v.epoch} writable ${v.writable} members ${Object.keys(v.members).length}`) } })
+    stopped = true
+    await b.destroy()
+    assert.ok(diag(b)!.journal().events.some((e) => e.kind === JK.left && e.b === 1), 'the leave went through the ballot (so the leaver DID install the shrunk view)')
+    await sleep(100)
+    assert.deepEqual(after, [], 'no cluster frame follows destroy() on the leaver')
+  } finally {
+    await a.destroy()
+    await b.destroy()
+  }
+})
+
 test('the clean stop on Ctrl-C (V4-8): one SIGINT/SIGTERM listener per process while any instance lives, gone after the last destroy; signals: false opts out; destroy() is idempotent', async () => {
   const count = () => [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')]
   const before = count()
