@@ -7,7 +7,7 @@
 // exactly-R at M6) — the monitor list is the machine-checkable form of the
 // plan's semantics section.
 
-import { Node, stable } from '../kernel/node.ts'
+import { Node, stable, newer } from '../kernel/node.ts'
 import { SCOPE } from '../kernel/scope.ts'
 import { partitionOf } from '../kernel/env.ts'
 import type { Sim } from './exec.ts'
@@ -341,7 +341,8 @@ export const exactlyR = (sim: Sim): string | null => {
   return null
 }
 
-//! converged — the quiescence check: every node holds the identical state (hash first, then a real diff for the report).
+//! converged — the quiescence check: every node holds the identical state (hash first, then a real diff for the report),
+// and (V4-18) the identical OBJECT with every field cell lawfully on top of its row — projected() below.
 // Null = converged; otherwise a human-readable divergence description — the
 // monitor's job is not just to fail but to say WHERE (plan §8 honesty rules).
 export const converged = (sim: Sim): string | null => {
@@ -362,7 +363,64 @@ export const converged = (sim: Sim): string | null => {
     }
     return `${refId} vs ${id}: hash differs (${ref.stateHash} vs ${n.stateHash}) but entries match — hash bug`
   }
+  return projected(sim)
+}
+
+//! projected — the OBJECT oracle (V4-18, overlapping cells). The cell map agreeing is not enough: a
+// whole-row write and a field write on one row are two cells, and what a screen shows is their fold
+// by depth. Two claims, per node: (1) no live field cell sits at or below an ancestor's stamp (the
+// kernel's across-depth rule — a violation means apply let an older field survive a newer row, and
+// the projection then depends on arrival order); (2) the fold of the cells into one object — a row
+// cell replaces the row, a field cell lands inside it (vivifying an absent row, as the api does) —
+// is the same on every node. With identical cell maps (2) follows from (1) and a deterministic fold;
+// it is checked anyway so the oracle says the thing the user cares about, in the shape they see it.
+export const projected = (sim: Sim): string | null => {
+  let ref: string | null = null, refId = ''
+  for (const [id, n] of sim.nodes) {
+    let fields = 0
+    for (const c of n.state.keys()) {
+      const path = JSON.parse(c) as string[]
+      if (path.length < 2) continue
+      fields++
+      const vc = n.versions.get(c)!
+      for (let d = 1; d < path.length; d++) {
+        const a = JSON.stringify(path.slice(0, d))
+        const va = n.versions.get(a)
+        if (va !== undefined && !newer(vc.epoch, vc.seq, vc.origin, va))
+          return `${id}: field ${c} @${vc.epoch}/${vc.seq}/${vc.origin} is live under ${a} @${va.epoch}/${va.seq}/${va.origin} — an older field survived a newer row`
+      }
+      if (!n.deep.get(path[0])?.cells.has(c)) return `${id}: live field ${c} is missing from the deep index`
+    }
+    //! the index holds exactly the live field cells (the sweep and shed walk it instead of state)
+    let indexed = 0
+    for (const [p, e] of n.deep)
+      for (const c of e.cells) {
+        indexed++
+        if (!n.state.has(c) || !c.startsWith('[' + JSON.stringify(p) + ',')) return `${id}: deep index of '${p}' holds ${c}, state ${n.state.has(c) ? 'does too' : 'does not'}`
+      }
+    if (indexed !== fields) return `${id}: deep index holds ${indexed} cells, state holds ${fields} field cells`
+    const s = stable(foldByDepth(n.state))
+    if (ref === null) { ref = s; refId = id } else if (s !== ref) return `${refId} vs ${id}: the projected objects differ (${ref.length > 200 ? ref.slice(0, 200) + '…' : ref} vs ${s.length > 200 ? s.slice(0, 200) + '…' : s})`
+  }
   return null
+}
+
+//! foldByDepth — the cells as one object: shallow cells first, deeper cells inside them. Every object
+// walked into is copied first, so the fold never writes into a value the kernel's state still holds.
+const foldByDepth = (state: Map<string, unknown>): Record<string, unknown> => {
+  const plain = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array)
+  const keys = [...state.keys()].map((k) => [k, JSON.parse(k) as string[]] as const).sort((a, b) => a[1].length - b[1].length || (a[0] < b[0] ? -1 : 1))
+  const root: Record<string, unknown> = {}
+  for (const [k, path] of keys) {
+    let o = root
+    for (let i = 0; i < path.length - 1; i++) {
+      const v = o[path[i]]
+      o[path[i]] = plain(v) ? { ...v } : {}
+      o = o[path[i]] as Record<string, unknown>
+    }
+    o[path[path.length - 1]] = state.get(k)
+  }
+  return root
 }
 
 //! confirmedIntact — the no-confirmed-write-lost check (plan §6): every probe the ladder answered OK

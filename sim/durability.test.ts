@@ -226,6 +226,60 @@ test('snapshot+swap under the executive: the swapped disk restores the same fold
   assert.equal(reborn.state.get(key('c1')), 'post-swap', 'the post-swap write survived the restart via its chained row')
 })
 
+test('V4-18 overlapping cells — a WAL replay of a MIXED row/field history restores the swept fold, before and after a snapshot swap', () => {
+  const sim = new Sim(93)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+  sim.run({ until: 400 })
+  assert.deepEqual(nodes.map((n) => n.epoch), [1, 1, 1])
+  //! one row, written both ways by different members: row, field, a newer row (sweeps the field), a
+  // newer field on top; then the row removed and a field written after the remove (the row is reborn
+  // with that one field). Through the owner, so the stamps are in this order on one lane.
+  const steps = [
+    ['n01', { type: REC.update, key: ['m'], value: { a: 1 } }],
+    ['n02', { type: REC.update, key: ['m', 'a'], value: 2 }],
+    ['n03', { type: REC.update, key: ['m'], value: { a: 3 } }],
+    ['n01', { type: REC.update, key: ['m', 'b'], value: 4 }],
+    ['n02', { type: REC.update, key: ['r'], value: { x: 1 } }],
+    ['n03', { type: REC.update, key: ['r', 'x'], value: 2 }],
+    ['n01', { type: REC.remove, key: ['r'] }],
+    ['n02', { type: REC.update, key: ['r', 'y'], value: 5 }],
+  ] as const
+  steps.forEach(([who, rec], i) => sim.at(450 + i * 60, () => sim.post(who, { kind: 'write', recs: [rec] })))
+  sim.run({ until: 1500 })
+  const expect = (n: Node, label: string) => {
+    assert.deepEqual(n.state.get(key('m')), { a: 3 }, `${label}: the newer row`)
+    assert.equal(n.state.has(JSON.stringify(['m', 'a'])), false, `${label}: the swept field is gone`)
+    assert.equal(n.state.get(JSON.stringify(['m', 'b'])), 4, `${label}: the field on top stays`)
+    assert.equal(n.state.has(key('r')), false, `${label}: the removed row`)
+    assert.equal(n.state.has(JSON.stringify(['r', 'x'])), false, `${label}: the field the remove erased`)
+    assert.equal(n.state.get(JSON.stringify(['r', 'y'])), 5, `${label}: the field written after the remove`)
+  }
+  for (const n of nodes) expect(n, n.uuid)
+  assert.equal(converged(sim), null)
+  //! restart every member from its own disk: the WAL holds the swept field's row too, and the replay
+  // folds it through the same apply — swept again
+  const hashBefore = nodes[0].stateHash
+  const reborn = ['n01', 'n02', 'n03'].map((id) => sim.restart(id))
+  sim.run({ until: 4000 })
+  for (const n of reborn) { expect(n, `${n.uuid} reborn`); assert.equal(n.stateHash, hashBefore, `${n.uuid}: the same fold`) }
+  assert.equal(converged(sim), null)
+  assert.deepEqual(sim.violations, [])
+  //! compact + swap on one member, then restart it from the swapped file: the swept field's row is not
+  // its cell's winner and leaves the disk; the restore is the same fold
+  sim.at(10, () => {
+    const n = sim.nodes.get('n02')!
+    for (const o of n.logs.keys()) { const f = frontier(n, o); if (f > 0) compact(n, o, f) }
+    n.snapshot()
+  })
+  sim.run({ until: 1000 })
+  const again = sim.restart('n02')
+  sim.run({ until: 6000 })
+  expect(again, 'n02 from the swapped file')
+  assert.equal(again.stateHash, hashBefore)
+  assert.equal(converged(sim), null)
+  assert.deepEqual(sim.violations, [])
+})
+
 test('persistFail is surfaced and durable never advances past the hole — the cluster still converges', () => {
   const sim = new Sim(84)
   const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
