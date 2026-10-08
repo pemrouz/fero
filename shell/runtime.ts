@@ -311,15 +311,27 @@ export class Runtime {
   //! start — listen (if this node is dialable), then post the boot stimulus.
   // Listen failure (EADDRINUSE etc.) REJECTS — net.Server signals it as an 'error'
   // event, which with no listener would crash the process while start() hung forever.
+  // A stop that lands first — destroy() before 'listening', or before start() was even called —
+  // REJECTS too, typed `code: 'stopped'`: destroy()'s server.close() means 'listening' never fires
+  // (Node 26 binds an IP literal asynchronously; Node 22 binds it at once and drops the queued
+  // 'listening' when the handle closes), so the old promise stayed pending for ever. A start() after
+  // destroy() binds nothing: that server would have had nobody left to close it.
   async start(): Promise<void> {
+    if (this.node.destroyed) throw stoppedError()
     if (this.#opts.listen) {
       const [host, port] = split(this.#opts.listen)
       const server = net.createServer((sock) => this.#accept(sock))
       this.#server = server
       await new Promise<void>((resolve, reject) => {
-        server.once('error', reject)
+        //! whichever settles first removes all three listeners — the 'close' that a later stop fires on a
+        // server that DID listen must not reach a promise that already resolved
+        const off = () => { server.removeListener('error', onError); server.removeListener('close', onClose) }
+        const onError = (err: Error) => { off(); reject(err) }
+        const onClose = () => { off(); reject(stoppedError()) }
+        server.once('error', onError)
+        server.once('close', onClose)
         server.listen(port, host, () => {
-          server.removeListener('error', reject)
+          off()
           server.on('error', () => {}) // post-start server errors must not become uncaughtException
           //! port 0 (V4-3): the OS chose — publish the real address to the kernel NOW, inside the listen
           // callback: before the start stimulus dials anyone and before any accepted socket can HELLO
@@ -445,6 +457,9 @@ export class Runtime {
     if (closed) await closed
   }
 }
+
+//! the typed reject start() settles with when the runtime stopped before it listened
+const stoppedError = () => Object.assign(new Error('runtime stopped before it listened'), { code: 'stopped' })
 
 const split = (addr: string): [string, number] => {
   const i = addr.lastIndexOf(':')

@@ -719,7 +719,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   try {
     await Promise.race([rt.start(), stoppedP])
   } catch (err) {
-    await abort(err) // an explicit listen that would not bind (EADDRINUSE …) — the default is port 0, which cannot collide
+    //! a stop that closed the socket before it listened rejects start() typed 'stopped': that IS the stop
+    // path (the instance resolves stopped below), never an abort — abort would untrack and reject fero().
+    // Wait for that stop to finish, so fero() still resolves only once the teardown is done.
+    if (stopping !== null) await stoppedP
+    else await abort(err) // an explicit listen that would not bind (EADDRINUSE …) — the default is port 0, which cannot collide
   }
   //! a signal during start already stopped this node (the provisional entry above): build nothing more —
   // the instance resolves stopped, its destroy() joins that stop, and the signal handler exits the process
