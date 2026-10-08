@@ -45,6 +45,12 @@ Three rules every example keeps:
 3. **Ctrl-C is the exit.** fero stops cleanly by itself: it leaves the group by a vote before the sockets
    close, so a clean stop is never mistaken for a crash. `destroy()` is the same thing in code.
 
+A screen is one line per change, or one frame redrawn after `console.clear()` and headed by the role
+word in CAPS (`SHOP`, `CHAT`). A role that also reads what you type (40's `join.ts`, 41's `edit.ts`)
+gives its readline the screen too and ends every frame with `rl.prompt(true)`, so a half-typed line
+comes back after a redraw. That readline then owns Ctrl-C, so it hands it on to fero's clean stop:
+`rl.on('SIGINT', () => process.kill(process.pid, 'SIGINT'))`.
+
 Every option a role file could pass in the call can also come from outside the file: a flag
 (`node server.ts --fero.dir ./shop`), a variable (`FERO_DIR=./shop node server.ts`), or a `fero.opt.ts`
 next to the nearest `package.json` or in your home directory. The README's "Configuration" section has
