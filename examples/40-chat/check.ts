@@ -27,7 +27,7 @@ await me.methods.post({ nick: 'cy', text: 'hi' })
 assert.ok(await until(() => Object.values(me.snapshot).some((m) => m.text === 'hi' && m.from === me.cluster.me.snapshot().uuid && Date.now() - m.at < 10_000)), "my line came back with from = my id and at from the server's clock: the server's word, not mine")
 assert.ok(await until(() => shown().length === 11 && shown().slice(0, 10).join('\n') === lines(ada).join('\n')), "the joiner's screen: the same ten in the same order, then mine")
 me.data.hack = { nick: 'cy', text: 'hack', at: 0, from: 'cy' }
-assert.ok(await until(() => Object.values(me.cluster.snapshot().writes).some((w) => w.state === 'rejected' && w.reason === 'methods-only')), "a plain write is refused 'methods-only': post is the one way in")
+assert.ok(await until(() => Object.values(me.cluster.writes.snapshot()).some((w) => w.state === 'rejected' && w.reason === 'methods-only')), "a plain write is refused 'methods-only': post is the one way in")
 assert.ok(!('hack' in me.snapshot) && Object.keys(me.snapshot).length === 11, 'and never showed: eleven messages, no hack')
 await me.destroy()
 

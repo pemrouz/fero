@@ -7,10 +7,10 @@ const shop = await fero('shop')
 const draw = () => {
     console.clear()
     console.log(`CLIENT ${process.pid}`)
-    for (const w of Object.values(shop.cluster.snapshot().writes)) console.log(`${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
+    for (const w of Object.values(shop.cluster.writes.snapshot())) console.log(`${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
     console.log(shop.snapshot)
 }
-for (const v of [shop.data, shop.cluster]) v.tap(draw)
+for (const v of [shop.data, shop.cluster, shop.cluster.writes]) v.tap(draw)
 
 shop.data[`saw-${process.pid}`] = { stock: 1 }
 shop.data[`hammer-${process.pid}`] = { stock: -3 }

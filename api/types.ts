@@ -199,7 +199,11 @@ export interface ScopedError {
 
 //! ClusterShape — the value under the `cluster` ViewProxy: the committed view {epoch, members,
 // writable} reactive, peers as rows, `me` a derived row (v2 OQ5 closed). It IS a data proxy —
-// query and connect it like any resource.
+// query and connect it like any resource. The confirm ring is NOT in it: `cluster.writes` is its own
+// handle (the last 64 write outcomes of THIS node, keyed by a counter: `{ key, state, origin?, seq?,
+// epoch?, cid?, reason? }`) — `f.cluster.writes.snapshot()`, `f.cluster.writes.tap(…)` — so a bare
+// `cluster.tap` repaints only when the view moves, and the ring is published one microtask after a write
+// settles.
 export interface ClusterShape {
   epoch: number
   //! writable (I-33), by role. A member: its own write-gate is open (it is in the committed view and

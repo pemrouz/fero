@@ -21,7 +21,7 @@ assert.ok(await until(() => screen(server).includes(`'deposit-${server.pid}-2'`)
 // a caller in this process: a plain assignment is refused, then the deposit after it counts the two before
 const bank = await fero('bank')
 bank.data.hack = { who: 'alice', amount: 1000 }
-assert.ok(await until(() => Object.values(bank.cluster.snapshot().writes).some((w) => w.state === 'rejected' && w.reason === 'methods-only')), "a client's assignment is refused 'methods-only'")
+assert.ok(await until(() => Object.values(bank.cluster.writes.snapshot()).some((w) => w.state === 'rejected' && w.reason === 'methods-only')), "a client's assignment is refused 'methods-only'")
 assert.equal(await bank.methods.deposit({ who: 'alice', amount: 5 }), 115, 'the total counts every deposit committed before the reply')
 assert.ok(await until(() => screen(server).includes(`'deposit-${server.pid}-3'`)) && !server.out.includes('hack') && !('hack' in bank.snapshot), 'the third deposit landed after the refusal, and hack never showed on either side')
 await bank.destroy()
