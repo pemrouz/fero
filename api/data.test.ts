@@ -274,12 +274,14 @@ test('V4-18 overlapping cells — through data\'s real lane: a field written int
       await h.destroy()
     }
   }
-  //! an ARRAY row: data ignores a field write under an array and REFUSES a remove of an array's element
-  // (a sparse hole) — the substrate folds that remove as the no-op it is (the array stays whole, as on a
-  // node that never saw the field); before, data's throw came out of node.step in the orders where the
-  // newer field was re-applied over the older array. Depth 2 (the remove's parent IS the array) and
-  // depth 3 (where the kernel's un-vivify must make up no repair under the array — its seq-0
-  // `remove ['g','a']` threw here too).
+  //! an ARRAY row: data writes the field INTO the array (g.b becomes a hidden array property) and
+  // REFUSES a remove of an array's own key (a sparse hole) — the substrate folds a replicated one as a
+  // no-op; before, data's throw came out of node.step in the orders where the newer field was
+  // re-applied over the older array. The screen here is the array alone because the kernel re-emits
+  // the array's own value once nothing live is left under it; with a live sibling, or with index keys,
+  // an array row can still differ by order (the array limit). Depth 2 (the remove's parent IS the
+  // array) and depth 3 (where the kernel's un-vivify must make up no repair under the array — its
+  // seq-0 `remove ['g','a']` threw here too).
   for (const v of [[1], []]) {
     const frames: [number, Uint8Array][] = [
       [1, records('bb', 3, 0, [{ type: REC.update, key: ['g'], value: v }])],

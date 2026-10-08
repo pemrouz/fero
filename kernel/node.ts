@@ -1650,10 +1650,20 @@ export class Node {
   // (its own indexed tombstone), or anything under such a level, goes; a level the live ancestor's
   // value holds as an object stays (it was never made up); any other level was made up by the field —
   // it goes back to the value's own thing there (a scalar the field was written over) or away. The
-  // live ancestor itself is the last level: its own value is not an object (5, null, 'txt' — a value
-  // a field cannot land in, so the projection made `{}` up OVER it) and nothing live is left under it —
-  // the value comes back as itself. The repairs ride this node's own name at seq 0, like a resync's
-  // ghost removes: never logged, never on the wire, and the api collects no settlement from them.
+  // live ancestor itself is the last level: its own value is not a plain object (5, null, 'txt' — a
+  // value a field cannot land in, so the projection made `{}` up OVER it — or an array) and nothing
+  // live is left under it — the value comes back as itself. The repairs ride this node's own name at
+  // seq 0, like a resync's ghost removes: never logged, never on the wire, and the api collects no
+  // settlement from them.
+  //! The guarantee (the same screen in every arrival order) is for OBJECT rows, and for numbers, null
+  // and strings as the tests cover them; a string row under a NUMERIC field key is outside it (data
+  // spreads the string's characters into the object it makes up, and a remove there can depend on
+  // order). ARRAYS are the limit: data writes into an array like into an object — an index write
+  // replaces the element, a field inside an element lands (making up any level missing inside it),
+  // and a non-index key becomes a hidden array property — but it refuses to remove an array's own key
+  // (a sparse hole), which the substrate folds as a no-op for a replicated record. So an array row's
+  // screen can still differ by arrival order (an index write under a newer index remove, a level made
+  // up inside an element next to a live sibling). This walk makes no per-level repair under an array.
   #unvivify(path: string[], above: string[]) {
     let live = -1
     for (let j = above.length - 1; j >= 0; j--) if (this.state.has(above[j])) { live = j; break }
@@ -1674,10 +1684,11 @@ export class Node {
         // level above it stay
         if (has && typeof v === 'object' && v !== null) return
       }
-      //! an ARRAY (or a typed array) sits above this level in the value: the projection does not make
-      // `{}` up inside one — a field write under an array is ignored by data's lane — so nothing was
-      // made up here, and a remove of an array's element can THROW there (data refuses a sparse hole).
-      // No repair; the levels under the array were never on the screen.
+      //! an ARRAY (or a typed array) sits above this level in the value: no per-level repair here. Data
+      // does write under an array (see the banner: elements, fields inside them, hidden properties), but
+      // a repair that removes an array's own key would be refused (data will not leave a sparse hole),
+      // and the array's own value is re-emitted whole below when nothing live is left under it. What
+      // a field made up inside an element next to a live sibling stays — the array limit.
       if (ignored) continue
       const key = path.slice(0, j + 1)
       if (has) this.env.sink.apply({ type: REC.update, key, value: v, origin: this.uuid, seq: 0, epoch: 0 })
@@ -1819,7 +1830,8 @@ export class Node {
 export const newer = (epoch: number, seq: number, origin: string, cur: { epoch: number; seq: number; origin: string }): boolean =>
   epoch > cur.epoch || (epoch === cur.epoch && (seq > cur.seq || (seq === cur.seq && origin > cur.origin)))
 
-//! isPlain — a value the projection walks INTO (an object a field can land in); arrays and bytes are leaves.
+//! isPlain — a plain object: a value the kernel's repairs walk INTO. Arrays and bytes are not — data does
+// write into an array (see #unvivify's banner), but the kernel treats one as a whole value: the array limit.
 const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array)
 
 //! ancestorsOf — the keys of a path's proper prefixes, shallowest first (the cold-path twin of apply's loop).
