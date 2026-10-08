@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node, MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './node.ts'
-import { TUNE, tuneOf } from './tune.ts'
+import { TUNE, tuneOf, type Tune } from './tune.ts'
 import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS } from './membership.ts'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.ts'
 import { MAX_PROBES } from './confirm.ts'
@@ -53,11 +53,21 @@ test('an override lands on its row only; the table is frozen; TUNE is untouched'
 
 test('a bad override fails closed in the constructor: unknown row, a fraction, a negative, a string, a non-object', () => {
   assert.throws(() => new Node({ uuid: 'aa', tune: { redialz: 3 } as never }, env()), /unknown row 'redialz'/)
-  assert.throws(() => new Node({ uuid: 'aa', tune: { redials: 1.5 } }, env()), /redials must be a non-negative integer, got 1.5/)
-  assert.throws(() => new Node({ uuid: 'aa', tune: { pending: -1 } }, env()), /pending must be a non-negative integer/)
-  assert.throws(() => new Node({ uuid: 'aa', tune: { pending: '8' as never } }, env()), /pending must be a non-negative integer, got 8/)
+  assert.throws(() => new Node({ uuid: 'aa', tune: { redials: 1.5 } }, env()), /redials must be an integer ≥ 0, got 1.5/)
+  assert.throws(() => new Node({ uuid: 'aa', tune: { pending: -1 } }, env()), /pending must be an integer ≥ 1/)
+  assert.throws(() => new Node({ uuid: 'aa', tune: { pending: '8' as never } }, env()), /pending must be an integer ≥ 1, got 8/)
   assert.throws(() => new Node({ uuid: 'aa', tune: [] as never }, env()), /tune must be an object/)
   assert.throws(() => tuneOf({ constructor: 1 } as never), /unknown row 'constructor'/)
   //! an explicit undefined is "not given", like an absent key
   assert.strictEqual(tuneOf({ redials: undefined }).redials, MAX_REDIALS)
+})
+
+test('zero: allowed for the two redial counts (no redial at all), refused for every other row — a 0 there would switch a guarantee off, not tune it', () => {
+  assert.equal(tuneOf({ redials: 0 }).redials, 0)
+  assert.equal(tuneOf({ memberRedials: 0 }).memberRedials, 0)
+  for (const k of Object.keys(TUNE) as (keyof Tune)[]) {
+    if (k === 'redials' || k === 'memberRedials') continue
+    assert.throws(() => tuneOf({ [k]: 0 }), new RegExp(`${k} must be an integer ≥ 1, got 0`), k)
+    assert.equal(tuneOf({ [k]: 1 })[k], 1, `${k}: 1 is the floor`)
+  }
 })
