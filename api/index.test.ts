@@ -746,11 +746,13 @@ test('the cluster view folds in ONE batch (V4-8): a bare cluster.tap fires once 
     // cluster tap stays quiet across writes — a render loop over the view repaints only when the view moves
     let ring = 0
     a.cluster.writes.tap(() => { ring++ })
+    assert.equal(ring, 1, 'a tap fires once as it attaches')
+    ring = 0
     for (let i = 0; i < 10; i++) a.data['k' + i] = i
     assert.ok(await until(() => b.snapshot.k9 === 9, 3000), 'the writes landed')
     await sleep(150)
     assert.equal(pictures.length, n, `ten writes fire the cluster tap NOT AT ALL (${JSON.stringify(pictures.slice(n))})`)
-    assert.ok(ring >= 1, 'the ring has its own tap')
+    assert.ok(ring >= 1, `the ring has its own tap, and the writes fired it (${ring})`)
   } finally {
     await a.destroy()
     await b.destroy()
@@ -792,21 +794,52 @@ test('journal.cap below one step\'s burst never starves the cluster view: the fo
   }
 })
 
-test('journal.cap 2 on a SCOPED pair: the overflow refold keeps every held row (it mirrors out only a partition the kernel no longer has at all)', async () => {
-  const [pa, pb] = [await ports.free(), await ports.free()]
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1, journal: { cap: 2 } })
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1, journal: { cap: 2 } })
+test('journal.cap 2 on a SCOPED cluster: the overflow refold keeps every held row in the LOCAL lens, and a partition that moved away leaves it', async () => {
+  const [pa, pb, pc] = [await ports.free(), await ports.free(), await ports.free()]
+  const opts = (uuid: string, port: number, hosts: number[]) =>
+    ({ uuid, listen: `127.0.0.1:${port}`, hosts: hosts.map((h) => `127.0.0.1:${h}`), heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1, journal: { cap: 2 } })
+  const a = await fero('r', opts('aa', pa, [pb]))
+  const b = await fero('r', opts('bb', pb, [pa]))
+  let c: Awaited<ReturnType<typeof fero>> | undefined
+  let z: Awaited<ReturnType<typeof fero>> | undefined
+  type View = { epoch: number; writable: boolean; members: Record<string, string> }
+  //! the LOCAL lens (the shard this node shows), never the gather: `await f.data` asks every holder for
+  // its rows, so it would hide a row the refold wrongly mirrored out of this node's own lens
+  const shown = (f: typeof a) => Object.keys(snapshot(f.data) as object).sort()
+  const all = Array.from({ length: 20 }, (_, i) => 'p' + i).sort()
+  //! replicas 1: once the shards settle, every row is in exactly one member's lens and none is missing
+  const split = (fs: (typeof a)[]) => {
+    const seen = fs.flatMap(shown)
+    return seen.length === all.length && seen.sort().join() === all.join()
+  }
   try {
-    assert.ok(await until(() => [a, b].every((f) => (snapshot(f.cluster) as { epoch: number; writable: boolean }).epoch >= 1 && (snapshot(f.cluster) as { writable: boolean }).writable), 5000), 'the view formed')
+    assert.ok(await until(() => [a, b].every((f) => (snapshot(f.cluster) as View).epoch >= 1 && (snapshot(f.cluster) as View).writable), 5000), 'the view formed')
     for (let i = 0; i < 20; i++) a.data['p' + i] = i
-    const all = Array.from({ length: 20 }, (_, i) => 'p' + i).sort().join()
-    //! the gather asks every holder for its rows: a row the refold wrongly mirrored out would be missing
-    assert.ok(await until(async () => Object.keys((await a.data) as object).sort().join() === all, 5000), 'every row is on its holder')
+    assert.ok(await until(() => split([a, b]), 5000), `every row is in exactly one lens (aa ${shown(a)} | bb ${shown(b)})`)
+    const [heldA, heldB] = [shown(a).join(), shown(b).join()]
+    assert.ok(heldA !== '' && heldB !== '', 'both members hold some rows')
     assert.ok(diag(a)!.journal().dropped > 0 && diag(b)!.journal().dropped > 0, 'both rings overflowed')
-    await sleep(300) // heartbeats and folds over the settled shards
-    assert.equal(Object.keys((await a.data) as object).sort().join(), all, 'and stays there after a few more folds')
-    assert.equal(Object.keys((await b.data) as object).sort().join(), all, 'seen from the other member too')
+    //! more lost folds over the settled shards: a client coming up (one step of many rows) and a burst
+    // of writes to a key of its own. A refold that mirrored out a held row would empty a lens here.
+    z = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 500 } })
+    assert.ok(await until(() => (snapshot(z!.cluster) as { me: { primary: string | null } }).me.primary === 'aa', 3000), 'the client is fed by aa')
+    for (let i = 0; i < 10; i++) a.data.extra = i
+    await sleep(300)
+    assert.deepEqual([shown(a).filter((k) => k !== 'extra').join(), shown(b).filter((k) => k !== 'extra').join()], [heldA, heldB], 'the lost folds kept every held row in its lens')
+    await z.destroy()
+    z = undefined
+    delete a.data.extra
+    //! a third member takes some partitions: the old holders SHED them, and a ring of 2 can lose the
+    // shed row before the fold reads it. The refold mirrors out exactly the rows whose partition the
+    // kernel no longer has, so the three lenses still split the rows with none twice and none missing.
+    c = await fero('r', opts('cc', pc, [pa, pb]))
+    assert.ok(await until(() => [a, b, c!].every((f) => Object.keys((snapshot(f.cluster) as View).members).length === 3), 8000), 'the view grew to three')
+    assert.ok(await until(() => shown(c!).length > 0 && split([a, b, c!]), 15000), `the shards re-split (aa ${shown(a)} | bb ${shown(b)} | cc ${shown(c)})`)
+    await sleep(300)
+    assert.ok(split([a, b, c]), `and stay split (aa ${shown(a)} | bb ${shown(b)} | cc ${shown(c)})`)
   } finally {
+    await z?.destroy()
+    await c?.destroy()
     await a.destroy()
     await b.destroy()
   }
