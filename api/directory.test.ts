@@ -505,7 +505,7 @@ test('two boxes on one machine (127.0.0.1 and 127.0.0.2, one rendezvous port, a 
   const A = `127.0.0.1:${port}`, B = `127.0.0.2:${port}`
   const name = `xbox-${process.pid}`
   const base = { heartbeat: { ms: 50 }, redial: { ms: 30 } }
-  let sb: Fero | undefined, sa: Fero | undefined, ca: Fero | undefined, cb: Fero | undefined, cx: Fero | undefined
+  let sb: Fero | undefined, sa: Fero | undefined, ca: Fero | undefined, cb: Fero | undefined, cx: Fero | undefined, sa2: Fero | undefined
   try {
     //! box B: a server on 127.0.0.2, with box B's directory — it is told nothing about box A
     sb = await fero(name, { ...base, rendezvous: B, listen: '127.0.0.2:0' })
@@ -529,7 +529,13 @@ test('two boxes on one machine (127.0.0.1 and 127.0.0.2, one rendezvous port, a 
     cx = await fero(name, { ...base, rendezvous: A, hosts: ['127.0.0.2'] })
     assert.ok(await until(() => me(cx!).hosts.includes(me(sb!).listen) && data(cx!).k === 'from-b', 10_000), 'a client asking box B finds box B\'s server')
     assert.equal(me(cx).role, 'client', 'a bare host is not a server marker')
-  } finally { await settle([cx, cb, ca, sa, sb]) }
+    //! the union over sources: a second server on box A changes box A's OWN row, so box A's source
+    // re-publishes — box B's server must stay in the dial set (the kernel's discover replaces the set
+    // wholesale; publishing only the latest source would drop box B until its row changed again)
+    sa2 = await fero(name, { ...base, rendezvous: A, server: true })
+    assert.ok(await until(() => me(sa!).hosts.includes(me(sa2!).listen), 10_000), "box A's second server reaches sa through box A's directory")
+    assert.ok(me(sa).hosts.includes(me(sb).listen), `box B's server is still in sa's dial set after box A's row changed (${me(sa).hosts})`)
+  } finally { await settle([sa2, cx, cb, ca, sa, sb]) }
 })
 
 test("a misdial: a bare host whose rendezvous port holds a user resource, not a directory, is refused by the HELLO name echo — the box reads down, nothing links, the resource is untouched", async (t) => {
