@@ -412,3 +412,55 @@ test('scoped captures: a write stamped before the view armed, to a row its write
   }
   assert.ok(shed > 0, `some route's row left its writer's log — the fixture is what it claims (${shed})`)
 })
+
+test('the replay folds hand-offs: shed drops a row\'s cells, acquire copies a row in — every node of a scoped capture with a join refolds to its captured state', () => {
+  const { cap } = movedCapture()
+  const K = cap.vocab
+  const has = (k: number) => cap.nodes.filter((n) => n.journal.some((e) => e.kind === k)).length
+  assert.ok(has(K.shed) > 0 && has(K.acquire) > 0, 'rows were shed and acquired — the fixture is what it claims')
+  for (const r of verifyReplay(cap) as { uuid: string; ok: boolean; reason?: string }[]) assert.ok(r.ok, `${r.uuid}: ${r.reason}`)
+})
+
+//! the rewind steps around a hand-off (end-state refolds cannot see these: a shed row's records leave the book
+// with it, and re-folding a held record is a no-op). A 5th member joins, then leaves cleanly, so rows move to it
+// and back: an old holder sheds a row and later acquires it again. Two kernel laws, checked at the step itself:
+// right after shed(p) the node holds no cell of p (scope.ts #shed drops them all), and right after acquire(p) it
+// holds no record that later arrives by its own applyInbound row (a taught record's later copy is a dupDrop).
+test('the replay at a hand-off step: no cell of a row just shed, and no record an acquire did not teach', () => {
+  const sim = new Sim(11)
+  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2 })
+  sim.run({ until: 1500 }); writes(sim, nodes, 10, 200); sim.run({ until: 4000 })
+  const n5 = sim.add({ uuid: 'n05', listen: 'sim:n05', hosts: nodes.map((n) => n.listen), heartbeatMs: 50, replicas: 2, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('n05', { kind: 'start' }); sim.run({ until: 9000 })
+  writes(sim, [...nodes, n5], 6, 150); sim.run({ until: 10500 })
+  sim.post('n05', { kind: 'leave' }); sim.run({ until: 16000 })
+  writes(sim, nodes, 8, 150); sim.run({ until: 20000 }) // writes after the rows came back: live arrivals after an acquire
+  assert.deepEqual(sim.violations, [])
+  const cap = captureSim(sim)
+  const K = cap.vocab
+  for (const r of verifyReplay(cap) as { uuid: string; ok: boolean; reason?: string }[]) assert.ok(r.ok, `${r.uuid}: ${r.reason}`)
+  let backAgain = 0, liveAfter = 0
+  for (const n of cap.nodes) {
+    const shedSeen = new Set<string>()
+    const rows = new Map<string, number[]>()
+    for (const e of n.journal) if (e.kind === K.applyInbound) { const k = e.a + '#' + e.b; rows.set(k, [...(rows.get(k) || []), e.t]) }
+    for (const e of n.journal) {
+      const p = String(e.a)
+      if (e.kind === K.shed) {
+        shedSeen.add(p)
+        for (const k of (stateAt(cap, n.uuid, e.t) as Map<string, unknown>).keys())
+          assert.notEqual(JSON.parse(k)[0], p, `${n.uuid} still holds ${k} right after shedding ${p}`)
+      } else if (e.kind === K.acquire) {
+        if (shedSeen.has(p)) backAgain++
+        for (const [o, entries] of Object.entries(n.logs) as [string, { k: string[]; seq: number }[]][])
+          for (const x of entries) if (x.k[0] === p && (rows.get(o + '#' + x.seq) || []).some((r) => r > e.t)) liveAfter++
+        for (const [k, c] of stateAt(cap, n.uuid, e.t) as Map<string, { origin: string; seq: number }>) {
+          const at = rows.get(c.origin + '#' + c.seq) || []
+          assert.ok(!at.length || at.some((x) => x <= e.t), `${n.uuid} holds ${k} (${c.origin}#${c.seq}) at acquire(${p}), but it only arrived later`)
+        }
+      }
+    }
+  }
+  assert.ok(backAgain > 0, `a node shed a row and acquired it back — the fixture is what it claims (${backAgain})`)
+  assert.ok(liveAfter > 0, `a held record of an acquired row arrived live after the acquire — the fixture is what it claims (${liveAfter})`)
+})

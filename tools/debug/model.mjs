@@ -63,6 +63,8 @@ export const kindNames = (capture) => {
 
 //! cellKey — the kernel's state-cell identity, mirrored exactly (full key path; root inserts key by `at`).
 export const cellKey = (k, at) => JSON.stringify(k.length ? k : [at ?? ''])
+//! partOf — a captured log entry's partition, the kernel's partitionOf (kernel/env.ts): key[0], or `at` for a root insert
+const partOf = (x) => String(x.k.length ? x.k[0] : (x.at ?? ''))
 
 //! newer — the ONE conflict rule, mirrored from kernel/node.ts #apply: lexicographic (epoch, seq, origin).
 const newer = (a, b) => // is `a` strictly newer than `b`?
@@ -108,17 +110,48 @@ export const stateAt = (capture, uuid, t) => {
     const entry = idx[origin]?.get(seq)
     if (!entry) return // record absent from this node's capture — render as unknown, never invent
     const key = cellKey(entry.k, entry.at)
-    const cand = { epoch: entry.epoch, seq, origin }
+    const cand = { epoch: entry.epoch, seq, origin, p: partOf(entry) }
     const cur = versions.get(key)
     if (cur && !newer(cand, cur)) return // the LWW election, identical to the kernel's
     versions.set(key, cand)
     if (entry.ty === 2 /* remove */) state.delete(key)
     else state.set(key, { v: entry.v, origin, seq, epoch: entry.epoch })
   }
+  //! hand-offs (scoped replication, kernel/scope.ts). shed(a=p): the row lawfully leaves this node — its cells AND
+  // their versions go, outside the election (#shed + dropCell). acquire(a=p): the one-teacher fold puts the
+  // teacher's entries for p into this node's book and state with NO per-write row. The ones it taught are the
+  // captured entries of p that do not arrive by their own row later on: an entry with an apply row after the
+  // acquire came in live (the kernel's covered-below-the-cut rule makes a taught entry's later copy a dupDrop,
+  // never an applyInbound). Re-folding one already held is a no-op (the election). Built on first need only,
+  // so a capture without hand-offs pays nothing. A row compacted or shed again before capture end is absent
+  // from the book — rendered unknown, never invented, like every other absent record.
+  let byPart = null
+  const taught = (p, ta) => {
+    if (!byPart) {
+      const rowsAt = new Map() // 'origin#seq' → the journal t of every apply row for it at this node
+      const row = (k, at) => { if (!rowsAt.has(k)) rowsAt.set(k, []); rowsAt.get(k).push(at) }
+      for (const e of node.journal)
+        if (e.kind === K.writeLocal) row(lane + '#' + e.a, e.t)
+        else if (e.kind === K.applyInbound) row(e.a + '#' + e.b, e.t)
+      byPart = new Map()
+      for (const [origin, entries] of Object.entries(node.logs || {}))
+        for (const x of entries) {
+          const q = partOf(x)
+          if (!byPart.has(q)) byPart.set(q, [])
+          byPart.get(q).push({ origin, seq: x.seq, rows: rowsAt.get(origin + '#' + x.seq) || [] })
+        }
+    }
+    for (const x of byPart.get(p) || []) if (!x.rows.some((r) => r > ta)) applyOne(x.origin, x.seq)
+  }
   for (const e of node.journal) {
     if (e.t > t) break
     if (e.kind === K.writeLocal) applyOne(lane, e.a)
     else if (e.kind === K.applyInbound) applyOne(e.a, e.b)
+    else if (e.kind === K.acquire) taught(String(e.a), e.t)
+    else if (e.kind === K.shed) {
+      const p = String(e.a)
+      for (const [k, v] of versions) if (v.p === p) { versions.delete(k); state.delete(k) }
+    }
     //! walTaint: the fsyncgate verdict — kernel/node.ts condemn() wipes state, versions, logs and streams, then
     // anti-entropy re-teaches the node. The end-state refold cannot see this (the re-taught fold coincides),
     // so the row is honoured HERE: everything replayed before the hole is gone at this step.
