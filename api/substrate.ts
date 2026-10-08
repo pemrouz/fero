@@ -321,35 +321,6 @@ export const disposeMinted = (view: any, mark: number): void => {
   walk(n)
 }
 
-//! mintedSince — the derived nodes below a handle's node with an id above `mark`: what was minted on that
-// resource since the mark (the I-29 residue: a handler that minted a chain and returned a plain VALUE has
-// no returned view to walk up from). Taken the moment a handler's synchronous part returns, so the window
-// holds that invocation's views and nobody else's — single-threaded, nothing else ran meanwhile. A walk
-// over `children` (never a source's own registry); null when nothing was minted, so the common case
-// allocates nothing. Views minted after a handler's first await are not attributable and stay.
-export const mintedSince = (p: any, mark: number): DataNode<unknown>[] | null => {
-  const root = unwrap(p)?.[NODE]
-  if (!(root instanceof DataNode)) return null
-  let out: DataNode<unknown>[] | null = null
-  const walk = (x: DataNode<unknown>): void => {
-    for (const ch of x.children) {
-      if (ch.id > mark && ch.kind !== 'source' && !ch.disposed && !(out ??= []).includes(ch)) out.push(ch)
-      walk(ch)
-    }
-  }
-  walk(root)
-  return out
-}
-
-//! disposeUnused — dispose the nodes of a mintedSince window that nothing consumes, newest first so a
-// chain goes leaf to root. A node with an effect (a sink the handler hooked on: a live consumer, so the
-// server's now) or a child that stays is kept, and so is every node above it.
-export const disposeUnused = (minted: DataNode<unknown>[] | null): void => {
-  if (minted === null) return
-  minted.sort((x, y) => y.id - x.id)
-  for (const n of minted) if (!n.disposed && n.effects.length === 0 && n.children.length === 0) n.dispose()
-}
-
 //! derived — how many views hang directly off a handle's node (data's `children`): the I-29 leak-guard
 // scalar, the way `served` is the host's — a server that closed every subscription reads 0 again.
 export const derived = (p: any): number => (unwrap(p)[NODE] as DataNode<unknown>).children.length
