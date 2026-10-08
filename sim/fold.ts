@@ -16,13 +16,15 @@ export type Folded = Record<string, unknown>
 const plain = (v: unknown): v is Folded => typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array)
 
 //! foldInto — apply one record to the folded object: set or delete at its path, vivifying the rows
-// above a field (the substrate's orphan-cell vivify); a remove under a row that is not there is a no-op.
+// above a field (the substrate's orphan-cell vivify); a remove under a row that is not there is a no-op;
+// under an ARRAY (or a typed array) a write and a remove are both ignored, as data's lane does (the
+// substrate turns data's refusal of an array-element remove into the same no-op).
 export const foldInto = (root: Folded, rec: { type: number; key: string[]; value?: unknown; at?: string }) => {
   const path = rec.key.length ? rec.key : [rec.at ?? '']
   let o = root
   for (let i = 0; i < path.length - 1; i++) {
     const v = o[path[i]]
-    if (!plain(v) && rec.type === REC.remove) return
+    if (!plain(v) && (rec.type === REC.remove || (typeof v === 'object' && v !== null))) return
     o = o[path[i]] = plain(v) ? { ...v } : {}
   }
   if (rec.type === REC.remove) delete o[path[path.length - 1]]
