@@ -503,3 +503,23 @@ test('a truncated journal is a WARNING said out loud: the header says replay unc
   // driven in Chromium and clipped its 96 px column (134 px) — the pill and the header carry the word instead
   assert.match(tree, new RegExp(`${cap.nodes[0].journal.length} \\+${drop('s1')}<span class="su"> jrnl`), 'and so does the journal stat')
 })
+
+test('a scoped capture paints a non-holder QUIET: no in-flight pill, "applied 2/2 holders", and a "not a holder" stop at every step (ISSUES I-3)', async () => {
+  const { el, g } = await bootViewer('scoped', captures.get('scoped'))
+  g(`expanded.add('g/writes'); render()`)
+  const tree = el('tree').innerHTML
+  assert.match(tree, /data-type="write"/, 'the writes are painted')
+  assert.doesNotMatch(tree, /data-tip="write:(in-flight|never-arrived)"/, 'no write is flagged as still travelling or lost')
+  assert.match(tree, /data-tip="route:holders">applied 2\/2 holders</, 'the denominator is the holders, not the cluster')
+  assert.doesNotMatch(tree, /⊘/, 'nobody is listed as missing it')
+  const key = g('(function(){ const q=[...FOREST]; while(q.length){ const n=q.shift(); if(n.type==="write") return n.key; if(n.kids) q.push(...n.kids) } return "" })()') as string
+  g(`navTo(${JSON.stringify(key)})`)
+  const insp = el('insp').innerHTML
+  assert.equal((insp.match(/data-tip="stop:not-a-holder">not a holder — never meant to get it</g) || []).length, 2, 'two of four stops are non-holders')
+  assert.doesNotMatch(insp, /stop:(never|inflight)/)
+  //! rewound to t0: the non-holders stay "not a holder" (never meant to get it at any step); the holders have not got it yet
+  dragTo(el, 0)
+  const insp0 = el('insp').innerHTML
+  assert.equal((insp0.match(/data-tip="stop:not-a-holder"/g) || []).length, 2)
+  assert.match(insp0, /applied 0\/2 holders by t0/, 'the rewound rollup counts holders too')
+})

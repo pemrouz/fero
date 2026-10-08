@@ -332,3 +332,45 @@ test("a reborn node's own writes join its CURRENT lane (uuid~inc): the replay re
     assert.ok(!rs.has(`n01#${r.seq}`), `no phantom bare-lane route n01#${r.seq}`)
   }
 })
+
+//! ── scoped replication (ISSUES I-3) — the capture carries each origin's holder sets; routes() says not-a-holder ──
+// 4 members, replicas: 2, 8 writes after the view is armed: every write lands on exactly its 2 holders, so the
+// other 2 members never get it — by design. Before the capture carried holders, routes() painted 16 of the 32
+// stops never-arrived (the reported false alarm).
+const scopedCapture = () => {
+  const sim = new Sim(11)
+  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2 })
+  sim.run({ until: 1500 })
+  assert.ok(formed(nodes) && nodes.every((n) => n.armed), 'formed and armed — the fixture is what it claims')
+  writes(sim, nodes, 8, 200)
+  sim.run({ until: 4000 })
+  assert.deepEqual(sim.violations, [])
+  return { cap: captureSim(sim), nodes }
+}
+
+type Route = { origin: string; seq: number; partition: string | null; nodes: Record<string, { status: string; t: number | null }> }
+
+test('scoped captures: a member outside a write\'s holder set is not-a-holder, never never-arrived (ISSUES I-3)', () => {
+  const { cap, nodes } = scopedCapture()
+  const ring = nodes[0].writes.ring
+  for (const n of cap.nodes) assert.equal(n.replicas, 2, `${n.uuid} carries its replicas`)
+  let seen = 0
+  for (const r of (routes(cap) as Map<string, Route>).values()) {
+    assert.ok(r.partition != null, 'every route here was stamped after arming')
+    const holders = new Set(ring.holders(r.partition!, 2))
+    //! the capture's holder list is the ring's own answer, carried — never recomputed by the page
+    const origin = cap.nodes.find((n) => n.uuid === r.origin)!
+    assert.deepEqual(origin.holders![r.partition!], [...ring.holders(r.partition!, 2)])
+    for (const n of cap.nodes) {
+      const st = r.nodes[n.uuid].status
+      if (holders.has(n.uuid)) assert.ok(st === 'origin' || st === 'applied', `holder ${n.uuid} of ${r.origin}#${r.seq}: ${st}`)
+      else { assert.equal(st, 'not-a-holder', `non-holder ${n.uuid} of ${r.origin}#${r.seq}`); seen++ }
+    }
+  }
+  assert.ok(seen >= 16, `every route has two quiet non-holders (${seen})`)
+  //! a capture WITHOUT holders (an older bridge) keeps today's rule: absent is never-arrived
+  const bare = { ...cap, nodes: cap.nodes.map(({ holders: _h, ...n }) => n) }
+  const statuses = [...(routes(bare) as Map<string, Route>).values()].flatMap((r) => Object.values(r.nodes).map((s) => s.status))
+  assert.ok(!statuses.includes('not-a-holder'), 'no holder facts, no not-a-holder claim')
+  assert.equal(statuses.filter((s) => s === 'never-arrived').length, seen)
+})
