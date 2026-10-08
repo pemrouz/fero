@@ -116,10 +116,18 @@ export const TUNE: Readonly<Tune> = Object.freeze({
   stallAt: STALL_AT,
 })
 
+//! ZERO_OK — the rows where 0 means something: no redial at all (the config key redial.tries allows
+// it). Every other row is a tick count, a bound, a growth or a cap, and 0 would switch a guarantee
+// off instead of tuning it: shedTicks 0 makes `% shedTicks` NaN so no orphan ever polls, dedupKeep
+// or issuers 0 turns exactly-once dedup off, pending 0 drops every attempt, redialGrowth 0 makes
+// every later wait pure jitter (review finding). Those start at 1.
+const ZERO_OK: ReadonlySet<string> = new Set(['redials', 'memberRedials'])
+
 //! tuneOf — the validated, frozen table for one node: TUNE under the embedder's overrides. Fails
-// closed: a row that is not in TUNE, or a value that is not a non-negative integer, throws — a
-// typo must never silently leave a bound at its default, and a fraction or a negative bound has no
-// meaning the kernel could honour. No overrides ⇒ the shared frozen TUNE itself (zero allocation).
+// closed: a row that is not in TUNE, or a value that is not an integer at or above the row's floor
+// (0 for the two redial counts, 1 for everything else), throws — a typo must never silently leave a
+// bound at its default, and a fraction or a negative bound has no meaning the kernel could honour.
+// No overrides ⇒ the shared frozen TUNE itself (zero allocation).
 export const tuneOf = (over?: Partial<Tune>): Readonly<Tune> => {
   if (over === undefined) return TUNE
   if (typeof over !== 'object' || over === null || Array.isArray(over)) throw new Error('tune must be an object of rows')
@@ -128,7 +136,8 @@ export const tuneOf = (over?: Partial<Tune>): Readonly<Tune> => {
     if (!Object.hasOwn(TUNE, k)) throw new Error(`tune: unknown row '${k}'`)
     const v = (over as Record<string, unknown>)[k]
     if (v === undefined) continue
-    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) throw new Error(`tune: ${k} must be a non-negative integer, got ${String(v)}`)
+    const floor = ZERO_OK.has(k) ? 0 : 1
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < floor) throw new Error(`tune: ${k} must be an integer ≥ ${floor}, got ${String(v)}`)
     out[k as keyof Tune] = v
   }
   return Object.freeze(out)
