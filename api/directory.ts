@@ -381,6 +381,9 @@ export class Directory {
       lastPeers = key
       this.#setBox(addr, { ...this.#boxes[addr], up: key !== '' })
     }))
+    //! a failed lookup is over for good: the Caller drops a failed sub and never re-subscribes it on a
+    // later primary (api/methods.ts, Caller.#fail), so this box adds nothing more. `error` stays set on
+    // purpose — clearing it when the link comes back would read a dead lookup as a healthy box.
     const onError = (e: Error) => { if (!this.#destroyed) this.#setBox(addr, { ...this.#boxes[addr], error: `lookup: ${e?.message ?? String(e)}` }) }
     const h = c.methods.lookup(this.#o.name, { onError }) as { tap: (fn: () => void) => void }
     h.tap(afterFold(() => {

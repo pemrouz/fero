@@ -320,7 +320,10 @@ A `hosts` entry with NO port names another box: "ask that box's directory".
   with the directory off, from ever dialing the box's real directory.
 - **This box's own directory** (`'localhost'` or `'127.0.0.1'` when the
   rendezvous is `127.0.0.1:3376`) is not asked twice: one canonical spelling
-  per loopback name.
+  per loopback name. Names are case-blind (`'LOCALHOST'`), and a wildcard
+  dialed lands on loopback (`'0.0.0.0'` is `127.0.0.1`, `'[::]'` is
+  `[::1]`). `'[::1]'` is NOT `127.0.0.1`: that is another socket, so it is
+  asked like another box and reads down.
 
 ### What asking does
 
@@ -356,7 +359,10 @@ listen, and post as ONE `discover`. Nothing in the kernel changes.
   covers a registrant composed under a different rendezvous spelling on that
   box (`127.0.0.1:3376` registering into a host bound to `0.0.0.0:3376`).
 - **Observability.** `cluster.me.rendezvous.boxes` maps each asked directory
-  to `{ up, error? }` (`error` is a failed lookup). Present only when `hosts`
+  to `{ up, error? }` (`error` is a failed lookup). A failed lookup is over
+  for good (the Caller never re-subscribes a failed sub), so `error` stays
+  set even when the link comes back: clearing it would read a dead lookup as
+  a healthy box. Present only when `hosts`
   names another box, so every existing shape reads as before. The internals
   door's `diag(f).rendezvous().boxes` holds the asked clients themselves.
 
@@ -409,6 +415,8 @@ trigger holds, so every one-box shape, the examples included, is untouched.
 - Two boxes on one machine: box A at `127.0.0.1:P`, box B at `127.0.0.2:P`
   (one rendezvous port, a directory each). A server on box A told the bare
   host `127.0.0.2` asks box B's directory; the two servers form one view;
+  a second server on box A changes box A's own row and box B's server stays
+  in the dial set (the union over sources, mutation-checked);
   `rendezvous.boxes` reads B up; a bare client on each box reads writes made
   on the other; box A's directory never lists box B's server (asking
   registers nothing); a client on box A told only `127.0.0.2` finds box B's
