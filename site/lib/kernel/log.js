@@ -137,7 +137,11 @@ export const gcTombstones = (node      )         => {
   let dropped = 0
   for (const [k] of node.versions) {
     if (node.state.has(k)) continue // a live cell's stamp is its guard — never GC'd
+    //! V4-18: a field remove stamped above a row that is still live is a fact a late joiner needs (the
+    // row's value still carries that field) — its stamp stays, so compaction keeps its entry
+    if (node.fenced(k)) continue
     node.versions.delete(k)
+    node.unlink(k)
     dropped++
   }
   if (dropped) node.journal.armed && node.journal.emit(JK.tombstoneGC, dropped)

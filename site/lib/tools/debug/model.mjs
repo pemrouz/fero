@@ -106,16 +106,34 @@ export const stateAt = (capture, uuid, t) => {
   const lane = laneOf(node) // the node's OWN lane this life — where its writeLocal rows' records live
   const versions = new Map()
   const state = new Map()
+  let deepest = 1 // the deepest live path seen — a write can only sweep cells deeper than itself
   const applyOne = (origin, seq) => {
     const entry = idx[origin]?.get(seq)
     if (!entry) return // record absent from this node's capture — render as unknown, never invent
     const key = cellKey(entry.k, entry.at)
+    const path = entry.k.length ? entry.k : [entry.at ?? '']
     const cand = { epoch: entry.epoch, seq, origin, p: partOf(entry) }
     const cur = versions.get(key)
     if (cur && !newer(cand, cur)) return // the LWW election, identical to the kernel's
+    //! across depth (V4-18, kernel/node.ts apply): a field cell loses to ANY ancestor stamped at or above it
+    for (let d = 1; d < path.length; d++) {
+      const va = versions.get(JSON.stringify(path.slice(0, d)))
+      if (va && !newer(cand, va)) return
+    }
     versions.set(key, cand)
     if (entry.ty === 2 /* remove */) state.delete(key)
-    else state.set(key, { v: entry.v, origin, seq, epoch: entry.epoch })
+    else { state.set(key, { v: entry.v, origin, seq, epoch: entry.epoch }); if (path.length > deepest) deepest = path.length }
+    //! the sweep (same site): every live cell UNDER this one stamped at or below it leaves, its version
+    // becoming this stamp — the kernel's tombstone for a late copy of the swept record
+    if (path.length < deepest) {
+      const pfx = key.slice(0, -1) + ','
+      for (const c of [...state.keys()]) {
+        if (!c.startsWith(pfx)) continue
+        if (newer(versions.get(c), cand)) continue
+        state.delete(c)
+        versions.set(c, cand)
+      }
+    }
   }
   //! hand-offs (scoped replication, kernel/scope.ts). shed(a=p): the row lawfully leaves this node — its cells AND
   // their versions go, outside the election (#shed + dropCell). acquire(a=p): the one-teacher fold puts the

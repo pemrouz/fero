@@ -28,6 +28,7 @@
 
 import { Node,               } from '../kernel/node.js'
                                                                      
+import { foldInto,             } from './fold.js'
 
 //! mulberry32 — the seeded PRNG. Tiny, splittable-enough, deterministic across platforms.
 export const mulberry32 = (seed        ) => () => {
@@ -78,6 +79,9 @@ export class Sim {
   violations              = []
   monitors                                                         = []
   nodes = new Map              ()
+  //! V4-18: what reached each node's sink, folded into the object a screen would show (sim/fold.ts) —
+  // the downstream half of the object oracle (monitors.ts projected()). Reset with each life (add()).
+  folds = new Map                ()
   //! V4-6: the graceful-leave outcome per uuid (the kernel's `left` effect) — a scenario destroys the node after it
   left = new Map                 ()
   #byListen = new Map                ()
@@ -125,6 +129,7 @@ export class Sim {
     const sink = this.#sinkFor(opts.uuid)
     const node = new Node(opts, { now: () => this.now, rng: this.rng, sink })
     this.nodes.set(opts.uuid, node)
+    this.folds.set(opts.uuid, {})
     this.#nodeOpts.set(opts.uuid, opts)
     if (!this.stores.has(opts.uuid)) this.stores.set(opts.uuid, { boot: null, wal: [] })
     if (opts.listen) this.#byListen.set(opts.listen, opts.uuid)
@@ -353,7 +358,7 @@ export class Sim {
       close(link        , reason        ) { sim.#sever(link, reason) },
       timer(id        , tag        , ms        ) { sim.post(me, { kind: 'timer', id, tag }, ms) },
       cancel() { /* fires are ignored by the kernel's live-id check; leaving them queued costs one no-op event */ },
-      apply() { /* downstream state is read via node.state in sim; the api layer binds here in M5 */ },
+      apply(rec) { foldInto(sim.folds.get(me) , rec) }, // the downstream object (V4-18); the api layer binds its proxy here
       //! M4b storage: append the row, then resolve (or fail) on the fsync clock with the node's store
       // personality. A LIED batch resolves normally — the kernel advances durable, the row silently
       // will not survive a crash: exactly the betrayal the M4e proof must catch.
