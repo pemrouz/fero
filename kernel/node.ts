@@ -1689,6 +1689,18 @@ export class Node {
     const kids = this.deep.get(above[live])
     if (kids !== undefined) for (const c of kids) if (this.state.has(c)) return
     this.env.sink.apply({ type: REC.update, key: path.slice(0, live + 1), value: own, origin: this.uuid, seq: 0, epoch: 0 })
+    //! an ARRAY comes back whole — and data writes into an array (a field inside an element lands), so the
+    // array's own value still holds what a NEWER remove under it took out (`delete todos[0].done`: the
+    // re-emit alone put `done` back on the screen). Every cell under it is a tombstone here (a live one
+    // returned above), each newer than the array: take them out again, shallowest first, as repairs.
+    // Not the ones directly under the array: data refuses to delete an array's own key (a sparse hole),
+    // and the whole value just replaced whatever a field had put there.
+    if (Array.isArray(own) && kids !== undefined) {
+      const under: string[][] = []
+      for (const c of kids) { const p = JSON.parse(c) as string[]; if (p.length > live + 2) under.push(p) }
+      under.sort((a, b) => a.length - b.length)
+      for (const key of under) this.env.sink.apply({ type: REC.remove, key, origin: this.uuid, seq: 0, epoch: 0 })
+    }
   }
 
   //! #reapply — put field cells back on top downstream, shallowest first, after a write ABOVE them (an
