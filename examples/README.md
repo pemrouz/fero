@@ -33,9 +33,11 @@ dependency).
 | 41 | [kanban](41-kanban/) | a card is a row written by its fields: two editors change two fields of one card at once and both land; one rule, carried by the board and every editor, refuses a whole row or an unknown column — an editor refuses its own before it leaves | `node board.ts` · `node edit.ts ada` · `node edit.ts bob` |
 | 42 | [web-bridge](42-web-bridge/) | fero speaks TCP, so a browser reaches a resource through a Node bridge that is a bare client: `connect` records streamed to each tab as events, a form post written as a whole row | `node server.ts` · `node web.ts 8080` |
 | 43 | [ledger](43-ledger/) | money is facts: transfers are rows on three durable members, the rule thrown from a method, the intent cleared through the door, every id on a member that comes back | `node member.ts 4901` ×3 (4902, 4903) · `node notifier.ts` · `node teller.ts mint alice 100` |
+| 44 | [sell](44-sell/) | an open server lets every client change every row, the price included; declaring `methods:` is the door: the same write is refused `methods-only`, and `sell` writes the sale at the server's price | `node open.ts`, then `node door.ts` · `node customer.ts` ×2 |
 
 Four tiers: 01-17 climb one feature at a time, 20-23 open the debugger, 30 is everything at once on one
-box, and 40-43 are apps.
+box, and 40-43 are apps. 44 is the story the website tells, in three files: an open shop anyone can change,
+then the same shop behind a door.
 
 Three rules every example keeps:
 
