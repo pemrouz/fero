@@ -20,7 +20,7 @@ const spin = async (n: number) => {
   const ps = await Promise.all(Array.from({ length: n }, () => ports.free()))
   const addrs = ps.map((p) => `127.0.0.1:${p}`)
   const rts = addrs.map((a, i) => new Runtime({
-    uuid: `n${i + 1}`, listen: a, hosts: addrs.filter((_, j) => j !== i),
+    uuid: `n${i + 1}`, name: 'r', listen: a, hosts: addrs.filter((_, j) => j !== i),
     redialMs: 100, heartbeatMs: 500, journalCap: 1 << 14,
     diag: { allow: { ops: TOKEN } },
   }))
@@ -40,7 +40,7 @@ test('parity: a slice pulled over the DIAG wire deepEquals the in-process captur
     const local = captureNode(rts[0].node)
     //! the moving parts (the pull's own journal rows, and the links table the session itself appears in)
     // are compared by prefix/identity; everything else must be byte-equal
-    for (const k of ['uuid', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'client', 'replicas', 'holders', 'stateHash', 'streams', 'logs', 'state'] as const)
+    for (const k of ['uuid', 'name', 'listen', 'seq', 'epoch', 'view', 'gate', 'pendingWrites', 'client', 'replicas', 'holders', 'stateHash', 'streams', 'logs', 'state'] as const)
       assert.deepEqual(answer.node[k], local[k], `${k} must match the in-process fold`)
     assert.deepEqual(answer.node.journal.slice(0, 20), local.journal.slice(0, 20), 'journal prefix identical')
     //! the pulled slice is a REAL capture: the model's replay oracle refolds it to the same end state
