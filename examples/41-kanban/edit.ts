@@ -6,7 +6,7 @@ import { rules } from './rules.ts'
 const [who, ...first] = process.argv.slice(2)
 const f = await fero('board', { seams: { validation: rules } })
 const columns = f.data.group((c) => c.status)
-// readline holds the line you are typing, so a redraw can put it back; it hands Ctrl-C on to fero's clean stop
+// readline holds the line you are typing, so a redraw can put it back (on a fresh row: prevRows = 0); it hands Ctrl-C on to fero's clean stop
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: '' })
 rl.on('SIGINT', () => process.kill(process.pid, 'SIGINT'))
 
@@ -16,7 +16,7 @@ for (const v of [f.data, f.cluster, f.cluster.writes]) v.tap(() => {
     console.log(`EDIT ${who} ${process.pid}`)
     for (const w of Object.values(f.cluster.writes.snapshot()).slice(-3)) console.log(`${w.key} ${w.state}${w.reason ? `: ${w.reason}` : ''}`)
     console.log(columns.snapshot())
-    if (!rl.closed) rl.prompt(true)
+    if (!rl.closed) { rl.prevRows = 0; rl.prompt(true) }
 })
 
 // add <id> <title> · move <id> <column> · set <id> <field> <text> — each one a write to a field of one card

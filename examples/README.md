@@ -49,9 +49,12 @@ Three rules every example keeps:
 
 A screen is one line per change, or one frame redrawn after `console.clear()` and headed by the role
 word in CAPS (`SHOP`, `CHAT`). A role that also reads what you type (40's `join.ts`, 41's `edit.ts`)
-gives its readline the screen too and ends every frame with `rl.prompt(true)`, so a half-typed line
-comes back after a redraw. That readline then owns Ctrl-C, so it hands it on to fero's clean stop:
-`rl.on('SIGINT', () => process.kill(process.pid, 'SIGINT'))`.
+gives its readline the screen too and ends every frame with `rl.prevRows = 0; rl.prompt(true)`, so a
+half-typed line comes back after a redraw. The `prevRows = 0` says the line starts on a fresh row: the
+screen was just cleared, and without it a line wider than the terminal would climb back over the
+frame. That readline then owns Ctrl-C, so it hands it on to fero's clean stop:
+`rl.on('SIGINT', () => process.kill(process.pid, 'SIGINT'))`. `tests/examples-tty.test.ts` checks both
+roles on a real terminal.
 
 Every option a role file could pass in the call can also come from outside the file: a flag
 (`node server.ts --fero.dir ./shop`), a variable (`FERO_DIR=./shop node server.ts`), or a `fero.opt.ts`
