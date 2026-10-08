@@ -511,6 +511,9 @@ async function boot() {
   const dataNo = document.querySelector('#data .sec-no')?.textContent.trim() ?? ''
   B = { major, node: rr.node?.floor, node23: rr.node?.line23, node23line: String(rr.node?.line23 ?? '').split('.')[0], exno: ex.example.no, exdir: `examples/${ex.example.dir}/`, head: ex.head, recorded: String(demo.recorded).slice(0, 10), rungs: rr.count, dataNo }
   for (const el of root.querySelectorAll('[data-b]')) { const v = B[el.dataset.b]; if (v !== undefined && v !== '') attest(el, String(v), 'build') }
+  // the series table links to the repository on GitHub only while the build saw a remote (the chip above reads the
+  // same field); without one the path stays, unlinked
+  if (man.remote !== true) for (const a of root.querySelectorAll('a[data-repo]')) a.replaceWith(a.querySelector('code'))
 
   const views = []
   for (const v of root.querySelectorAll('.opt > [data-variant]')) {
