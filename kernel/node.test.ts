@@ -596,7 +596,8 @@ test('stateHash is order-insensitive and remove-aware — identical states hash 
 // the newer stamp wins ACROSS depth — a row write at T hides every field cell at or below T, a field
 // write newer than T shows on top. Both arrival orders must give the same cells AND the same object.
 // `project` folds the apply effects the way the api's lane does (replace at the path, delete at the
-// path, a deep write under an absent row vivifies it) — the object a screen would show.
+// path, a deep write under an absent or non-object row vivifies `{}` there, a remove under one is a
+// no-op — probed against data's lane) — the object a screen would show.
 const project = (effects: unknown[][]): Record<string, unknown> => {
   const root: Record<string, unknown> = {}
   for (const e of effects) {
@@ -604,10 +605,15 @@ const project = (effects: unknown[][]): Record<string, unknown> => {
     const r = e[1] as { type: number; key: string[]; value?: unknown; at?: string }
     const path = r.key.length ? r.key : [r.at ?? '']
     let o: Record<string, unknown> = root
+    let blocked = false
     for (let i = 0; i < path.length - 1; i++) {
-      if (typeof o[path[i]] !== 'object' || o[path[i]] === null) o[path[i]] = {}
+      if (typeof o[path[i]] !== 'object' || o[path[i]] === null) {
+        if (r.type === REC.remove) { blocked = true; break }
+        o[path[i]] = {}
+      }
       o = o[path[i]] as Record<string, unknown>
     }
+    if (blocked) continue
     if (r.type === REC.remove) delete o[path[path.length - 1]]
     else o[path[path.length - 1]] = structuredClone(r.value)
   }
@@ -719,6 +725,48 @@ test('overlapping cells (V4-18): a field remove above its row rides out a late o
   assert.deepEqual(h.node.versions.get(ka), h.node.versions.get(kg))
   assert.deepEqual(h.node.fields('g'), [])
   assert.equal(h.node.deep.size, 0, 'no empty set is left behind')
+})
+
+//! every order of a short history, as `fed` takes it
+const permutations = <T>(xs: T[]): T[][] => xs.length <= 1 ? [xs] : xs.flatMap((x, i) => permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((p) => [x, ...p]))
+
+test('overlapping cells (V4-18): a field written INTO a non-object value and then removed — the value comes back, in every order, at depths 1 to 3', () => {
+  const put = (seq: number, origin: string, key: string[], value: unknown) => ({ seq, origin, rec: { type: REC.update, key, value } })
+  const cut = (seq: number, key: string[]) => ({ seq, origin: 'dd', rec: { type: REC.remove, key } })
+  //! 5, null and 'txt' are values a field cannot land in: the projection vivifies `{}` over them for the
+  // field, and after the field's remove nothing live is left there — the value itself must come back.
+  // {} is the control: an object was never made up, it stays
+  for (const v of [5, null, 'txt', {}]) {
+    const label = JSON.stringify(v)
+    //! depth 1: the row is the value
+    for (const o of permutations([put(3, 'bb', ['g'], v), put(5, 'cc', ['g', 'b'], 1), cut(7, ['g', 'b'])])) {
+      const h = fed(o)
+      assert.deepEqual(cells(h.node), { '["g"]': v }, `row ${label}, order ${o.map((r) => r.seq).join(',')}: the cells`)
+      assert.deepEqual(project(h.effects), { g: v }, `row ${label}, order ${o.map((r) => r.seq).join(',')}: the screen`)
+    }
+    //! depth 2: the row holds the value at `f`, a deeper field lands in it
+    for (const o of permutations([put(3, 'bb', ['g'], { f: v }), put(5, 'cc', ['g', 'f', 'x'], 1), cut(7, ['g', 'f', 'x'])])) {
+      const h = fed(o)
+      assert.deepEqual(project(h.effects), { g: { f: v } }, `row {f:${label}}, order ${o.map((r) => r.seq).join(',')}: the screen`)
+    }
+    //! depth 2 as a FIELD cell: the value is itself a field, the deeper field lands in it
+    for (const o of permutations([put(3, 'bb', ['g', 'f'], v), put(5, 'cc', ['g', 'f', 'x'], 1), cut(7, ['g', 'f', 'x'])])) {
+      const h = fed(o)
+      assert.deepEqual(cells(h.node), { '["g","f"]': v }, `field ${label}, order ${o.map((r) => r.seq).join(',')}: the cells`)
+      assert.deepEqual(project(h.effects), { g: { f: v } }, `field ${label}, order ${o.map((r) => r.seq).join(',')}: the screen`)
+    }
+    //! depth 3: two fields made up two levels over the value; removing both brings it back
+    for (const o of permutations([put(3, 'bb', ['g'], v), put(5, 'cc', ['g', 'a', 'b'], 1), cut(7, ['g', 'a', 'b'])])) {
+      const h = fed(o)
+      assert.deepEqual(project(h.effects), { g: v }, `row ${label} under a depth-3 field, order ${o.map((r) => r.seq).join(',')}: the screen`)
+    }
+  }
+  //! a live sibling field keeps the made-up object: {g:{c:2}} everywhere, the scalar stays hidden
+  // (each record on its own lane — two seqs of one origin must arrive in order, the stream dedup drops the other)
+  for (const o of permutations([put(3, 'bb', ['g'], 5), put(4, 'ee', ['g', 'c'], 2), put(5, 'cc', ['g', 'b'], 1), cut(7, ['g', 'b'])])) {
+    const h = fed(o)
+    assert.deepEqual(project(h.effects), { g: { c: 2 } }, `order ${o.map((r) => r.seq).join(',')}`)
+  }
 })
 
 test('overlapping cells (V4-18): ancestors at EVERY depth — a three-level history folds the same in all six orders', () => {
