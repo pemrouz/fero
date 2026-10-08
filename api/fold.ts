@@ -13,6 +13,9 @@
 //               (epoch, seq, origin) order the kernel's LWW election uses; a
 //               dominating tombstone claim removes the key. Idempotent under
 //               R-fold double-claim (two holders claiming a key land it once).
+//               Then ACROSS DEPTH (V4-18): a field cell at or below an
+//               ancestor's winning stamp is hidden, and what survives projects
+//               shallow→deep — the kernel's own fold of overlapping cells.
 //   parking   — a key whose claimant set EMPTIES without a dominating
 //               tombstone is PARKED: the last value stands. This is the Q3a
 //               fix: v2's root-replace union transiently LOST a key when the
@@ -156,42 +159,56 @@ export class Gather {
     const alive = new Set(members)
     for (const [, per] of this.#registry)
       for (const uuid of per.keys()) if (!alive.has(uuid)) per.delete(uuid)
-    //! fold the touched cells, then project in TWO PHASES: removes first, live updates second,
-    // shallow→deep. Field-granular LWW lawfully leaves a PARENT tombstone above a LIVE nested cell
-    // (plan §5's documented cross-hierarchy shape) — projecting the parent remove after the child
-    // update wiped the live subtree from the union while the kernel fold kept it (found by the Q3a
-    // hunt's LWW oracle at seed 0). Removes-then-updates re-projects survivors on top, matching the
-    // kernel's own materialization.
+    //! fold the touched cells — the winner per cell by the kernel's stamp order — then ACROSS DEPTH
+    // (V4-18, overlapping cells): a field cell whose winning stamp is at or below an ancestor's winning
+    // stamp is the older fact that ancestor's whole-row write carried (or its remove erased) — it is
+    // dropped, exactly as the kernel's apply refuses or sweeps it. What survives projects in TWO
+    // PHASES: the coverage drops first (a parked cell nobody claims any more — unstamped, so it says
+    // nothing against a live ancestor's own value, which the next phase re-projects whole), then the
+    // stamped cells shallow→deep, a live cell set and a tombstone deleted at its depth. Shallow-first
+    // is what makes the fold order-free: a parent tombstone under a NEWER live field projects before
+    // the field re-makes the row on top of it (plan §5's cross-hierarchy shape, the Q3a hunt's seed-0
+    // finding), and a field remove NEWER than its row deletes the field after the row's update put the
+    // whole value there — the same object the kernel's own sink shows (sim/monitors.ts projected()).
     const ring = node.writes.ring
     if (node.epoch > 0 && ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
-    const removes: string[][] = []
-    const updates: { key: string[]; v: unknown }[] = []
+    const wins = new Map<string, Claim | null>()
     for (const cell of touched) {
       const per = this.#registry.get(cell)
-      const key = JSON.parse(cell) as string[]
       let win: Claim | null = null
       if (per) for (const c of per.values()) if (win === null || newer(c.st, win.st)) win = c
-      if (win === null || win.t === 1) {
-        //! zero-claim or tombstone: a tombstone is a real delete; zero-claim drops ONLY when every
-        // current holder answered this generation AND ATTESTED the partition and none claims it (the
-        // coverage sweep) — else the key PARKS: the last projected value stands until the handover
-        // settles (the Q3a fix). The attestation qualifier (M6-review findings 0/28/53) is what makes
-        // "answered" mean "attested absence": an answer taken while the holder was still ACQUIRING
-        // (or under epoch skew, before it even knew it was assigned) carries no att for p and counts
-        // for nothing — DESIGN-M6 C5's "answered, current-epoch subscription", enforced.
+      wins.set(cell, win)
+    }
+    const dropped: string[][] = []
+    const stamped: { key: string[]; v: unknown; t: boolean }[] = []
+    for (const [cell, win] of wins) {
+      const key = JSON.parse(cell) as string[]
+      if (win === null) {
+        //! zero-claim: drops ONLY when every current holder answered this generation AND ATTESTED the
+        // partition and none claims it (the coverage sweep) — else the key PARKS: the last projected
+        // value stands until the handover settles (the Q3a fix). The attestation qualifier (M6-review
+        // findings 0/28/53) is what makes "answered" mean "attested absence": an answer taken while the
+        // holder was still ACQUIRING (or under epoch skew, before it even knew it was assigned) carries
+        // no att for p and counts for nothing — DESIGN-M6 C5's "answered, current-epoch subscription".
         const p = key[0] ?? ''
         const holders = node.armed ? ring.holders(p, node.replicas) : node.membership.view.members.map((m) => m[0])
-        const covered = win?.t === 1 || holders.every((h) => {
+        const covered = holders.every((h) => {
           const a = att.get(h)
           return a !== undefined && (a === null || a.has(p)) // undefined = did not answer this generation
         })
         if (covered) {
-          if (per) this.#registry.delete(cell)
-          removes.push(key)
+          this.#registry.delete(cell)
+          dropped.push(key)
         }
         continue
       }
-      updates.push({ key, v: win.v })
+      //! the across-depth check: every proper prefix with a stamped winner at or above this one hides it
+      let hidden = false
+      for (let d = 1; d < key.length && !hidden; d++) {
+        const a = wins.get(JSON.stringify(key.slice(0, d)))
+        if (a != null && !newer(win.st, a.st)) hidden = true
+      }
+      if (!hidden) stamped.push({ key, v: win.v, t: win.t === 1 })
     }
     //! a DEEP remove into an absent subtree is a no-op — and must be skipped: the substrate's
     // deep-remove crashes on missing intermediates, and one doomed remove aborts the whole
@@ -211,11 +228,17 @@ export class Gather {
     // went stale as collateral). A cell that cannot materialize is skipped — its top-level key
     // still shows through whatever of its siblings/parent projected (the kernel's own flat fold
     // holds both cells; nesting-under-null is the documented §5 materialization ambiguity).
-    const root = snapshot(this.proxy) as Record<string, unknown>
-    for (const key of removes)
+    let root = snapshot(this.proxy) as Record<string, unknown>
+    for (const key of dropped)
       if (key.length === 1 || present(root, key)) { try { applyCell(this.proxy, key, undefined, true) } catch { /* absent subtree */ } }
-    updates.sort((a, b) => a.key.length - b.key.length)
-    for (const u of updates) { try { applyCell(this.proxy, u.key, u.v, false) } catch { /* blocked intermediate */ } }
+    stamped.sort((a, b) => a.key.length - b.key.length)
+    let depth = 1
+    for (const s of stamped) {
+      if (!s.t) { try { applyCell(this.proxy, s.key, s.v, false) } catch { /* blocked intermediate */ } continue }
+      //! a deep tombstone looks at the object as the shallower cells left it (one fresh read per depth)
+      if (s.key.length > depth) { root = snapshot(this.proxy) as Record<string, unknown>; depth = s.key.length }
+      if (s.key.length === 1 || present(root, s.key)) { try { applyCell(this.proxy, s.key, undefined, true) } catch { /* absent subtree */ } }
+    }
     //! the one-shot answer is a CLONE (M6-review finding 8): snapshot() is the proxy's live internal
     // root — `await data` and local methods.read() hand this value straight to user code, and a
     // mutation there must never write through into the union every live subscriber shares. The wire
