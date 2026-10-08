@@ -597,7 +597,11 @@ test('stateHash is order-insensitive and remove-aware — identical states hash 
 // write newer than T shows on top. Both arrival orders must give the same cells AND the same object.
 // `project` folds the apply effects the way the api's lane does (replace at the path, delete at the
 // path, a deep write under an absent or non-object row vivifies `{}` there, a remove under one is a
-// no-op — probed against data's lane) — the object a screen would show.
+// no-op; under an ARRAY a deep write is ignored and a deep remove is a no-op — but a remove of an
+// array's own element can THROW in data (it refuses a sparse hole), so a REPAIR the kernel makes up
+// there (seq 0) is modelled as the crash out of step() it is; a user's own record removing an array
+// element is the pre-existing data hazard the kernel does not own, modelled as the no-op) — the
+// object a screen would show. Probed against data's lane.
 const project = (effects: unknown[][]): Record<string, unknown> => {
   const root: Record<string, unknown> = {}
   for (const e of effects) {
@@ -607,6 +611,10 @@ const project = (effects: unknown[][]): Record<string, unknown> => {
     let o: Record<string, unknown> = root
     let blocked = false
     for (let i = 0; i < path.length - 1; i++) {
+      if (Array.isArray(o[path[i]])) {
+        if (r.type === REC.remove && i === path.length - 2 && (e[1] as { seq: number }).seq === 0) throw new Error(`a seq-0 repair removes array element [${path[i + 1]}] under ${JSON.stringify(path.slice(0, i + 1))}`)
+        blocked = true; break
+      }
       if (typeof o[path[i]] !== 'object' || o[path[i]] === null) {
         if (r.type === REC.remove) { blocked = true; break }
         o[path[i]] = {}
@@ -766,6 +774,23 @@ test('overlapping cells (V4-18): a field written INTO a non-object value and the
   for (const o of permutations([put(3, 'bb', ['g'], 5), put(4, 'ee', ['g', 'c'], 2), put(5, 'cc', ['g', 'b'], 1), cut(7, ['g', 'b'])])) {
     const h = fed(o)
     assert.deepEqual(project(h.effects), { g: { c: 2 } }, `order ${o.map((r) => r.seq).join(',')}`)
+  }
+  //! …and at depth 3 the level the deeper field made up over the scalar (g.a) must still go: the
+  // per-level repair is what makes {g:{c:2}} match the node that refused the field (data vivifies `{}`
+  // over a scalar, so the repair is a real remove there)
+  for (const o of permutations([put(3, 'bb', ['g'], 5), put(4, 'ee', ['g', 'c'], 2), put(5, 'cc', ['g', 'a', 'y'], 1), cut(7, ['g', 'a', 'y'])])) {
+    const h = fed(o)
+    assert.deepEqual(project(h.effects), { g: { c: 2 } }, `depth 3, order ${o.map((r) => r.seq).join(',')}`)
+  }
+  //! an ARRAY row: data's lane ignores a field write under an array and a remove of an array's element
+  // THROWS there — so the kernel must make up NO repair under one. The reviewer's history: before this
+  // the un-vivify emitted `remove ['g','a']` at seq 0 after the field remove, and data threw out of
+  // node.step() in the orders where the array was live (the base tree never threw in these orders).
+  for (const v of [[], [1], { a: [] }]) {
+    for (const o of permutations([put(3, 'bb', ['g'], v), put(5, 'cc', ['g', 'a', 'y'], 5), cut(6, ['g', 'a', 'y'])])) {
+      const h = fed(o)
+      assert.deepEqual(project(h.effects), { g: v }, `array row ${JSON.stringify(v)}, order ${o.map((r) => r.seq).join(',')}: no repair under an array, the screen`)
+    }
   }
 })
 

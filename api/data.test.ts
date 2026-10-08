@@ -256,6 +256,26 @@ test('V4-18 overlapping cells — through data\'s real lane: a field written int
       await h.destroy()
     }
   }
+  //! an ARRAY row, the field two levels under it: data ignores the write, so the row stays [] — and the
+  // kernel's un-vivify must make up no repair under the array (a seq-0 `remove ['g','a']` THREW here,
+  // out of node.step, in the orders where the array was live). A scalar row with a live sibling field:
+  // the level the deeper field made up (g.a) goes, the sibling keeps the made-up object — {g:{c:2}},
+  // the same as on a node that refused the field.
+  for (const [v, want, extra] of [[[], { g: [] }, null], [5, { g: { c: 2 } }, [4, records('ee', 4, 0, [{ type: REC.update, key: ['g', 'c'], value: 2 }])]]] as [unknown, unknown, [number, Uint8Array] | null][]) {
+    const frames: [number, Uint8Array][] = [
+      [1, records('bb', 3, 0, [{ type: REC.update, key: ['g'], value: v }])],
+      [2, records('cc', 5, 0, [{ type: REC.update, key: ['g', 'a', 'y'], value: 5 }])],
+      [3, records('dd', 6, 0, [{ type: REC.remove, key: ['g', 'a', 'y'] }])],
+    ]
+    if (extra) frames.push(extra)
+    for (const order of permutations(frames)) {
+      const h = harness()
+      h.admit(1, 'bb'); h.admit(2, 'cc'); h.admit(3, 'dd'); h.admit(4, 'ee')
+      for (const [link, bytes] of order) h.node.step({ kind: 'bytesIn', link, bytes })
+      assert.deepEqual(snapshot(h.bind.data), want, `row ${JSON.stringify(v)} under a depth-3 field, order ${order.map((f) => f[0]).join(',')}`)
+      await h.destroy()
+    }
+  }
 })
 
 test('M5a — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
