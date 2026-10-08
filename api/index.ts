@@ -22,7 +22,7 @@ import { TUNE } from '../kernel/tune.ts'
 import { Bind, type Coords } from './data.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
-import { proxy, contract, batch, snapshot as snapshotOf } from './substrate.ts'
+import { proxy, contract, batch, snapshot as snapshotOf, SPARSE_HOLE, holeMessage } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
 import { resolveConfig, src, CONFIG_LEAVES } from './config.ts'
@@ -304,11 +304,12 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     //! the relay's admission predicate (V4-4, V4-5): a client's plain write relayed through this server
     // meets the kernel's relay ingress (kernel/write.ts onWrite) with THIS predicate — under `methods:`
     // the door itself (every relayed record refused 'methods-only', before any user code runs);
-    // otherwise the server's validation:, exactly as for its own issues; otherwise nothing (open —
-    // the relay loop is the pre-V4-4 loop). Zero kernel change for the door: it is what the composer puts
-    // INTO the one hook. Inert on a client (nobody relays through a spoke).
-    ...(methodsOnly ? { validate: METHODS_ONLY_ADMIT }
-      : validate !== undefined ? { validate } : {}),
+    // otherwise the binding's admit: the server's validation:, exactly as for its own issues, then
+    // the sparse hole (a relayed remove of an array's own element is refused 'sparse-hole' before it is
+    // stamped; the client's own projection may not show the array yet). Zero kernel change for the door:
+    // it is what the composer puts INTO the one hook. Inert on a client (nobody relays through a spoke).
+    // `bind` is created below, before the runtime can step.
+    validate: methodsOnly ? METHODS_ONLY_ADMIT : (rec: Rec) => bind.admit(rec),
     //! the DIAG allowlist (M7): present = `npm run debug -- --attach` may read this node with one of its tokens
     ...(diagAllow !== undefined ? { diag: { allow: { ...(diagAllow as Record<string, string>) } } } : {}),
     ...(restored.boot !== undefined ? { boot: restored.boot } : {}),
@@ -511,7 +512,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // the verb, the key, what happened and the rung reached — `tail` is the pointer, when there is one
     const reject = (fields: Omit<WriteReject, 'guarantee'>, what: string, tail = ''): WriteRejectError =>
       new WriteRejectError({ guarantee: want, ...fields }, `fero('${name}') ${VERB_NAMES[rec.type]} ${JSON.stringify(key)}: ${what} — reached ${fields.reached}${tail}`)
-    const explain = (reason: string): string => reason === METHODS_ONLY ? `${reason} (the server takes changes only through its methods)` : reason
+    const explain = (reason: string): string => reason === METHODS_ONLY ? `${reason} (the server takes changes only through its methods)`
+      : reason === SPARSE_HOLE ? `${reason} (${holeMessage(key)})` : reason
     //! the one hint a timed-out client needs most (rung 04's finding): nothing is connected to write to
     const nobody = (): string => caller && node.primary === null ? ' (nobody to write to: a bare fero(name) is a client; pass server: true to host)' : ''
     //! an EMPTY key on update/remove is refused HERE, before any stamp (ISSUES I-30): `Change.key` is

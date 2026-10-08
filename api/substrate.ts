@@ -194,8 +194,26 @@ const RESERVED_NAMES: ReadonlySet<string> = new Set(contract().reserved)
 // applyRec is for a REPLICATED remove, which cannot be refused). The root's parent is the resource
 // object, never an array, so a depth-1 delete reads nothing more.
 const hole = (parent: unknown, path: string[], k: string): void => {
-  if (Array.isArray(parent) && Object.hasOwn(parent, k))
-    throw new Error(`fero: remove() of array element [${[...path, k].join('.')}] would leave a sparse hole — write the spliced array instead`)
+  if (Array.isArray(parent) && Object.hasOwn(parent, k)) throw new Error(`fero: ${holeMessage([...path, k])}`)
+}
+//! holeMessage — data's own words for the refusal, shared by the lens throw and the typed reject
+export const holeMessage = (key: readonly string[]): string =>
+  `remove() of array element [${key.join('.')}] would leave a sparse hole — write the spliced array instead`
+
+//! SPARSE_HOLE — the typed reason for a remove record that names an array's own element: what
+// methods.remove({ key: ['g', 0] }) and a client's relayed remove of the same element are refused with,
+// BEFORE anything is stamped (the lens throws for a local delete; a record that skips the lens is
+// refused at the ingest instead, as a reason string like 'methods-only').
+export const SPARSE_HOLE = 'sparse-hole'
+
+//! holeAt — does this remove record name an OWN element of an array in this projection? Walks the
+// handle to the parent (one child handle per level, as the lens does) and reads its value. Only a
+// remove at depth ≥ 2 can: the root's parent is the resource object, never an array.
+export const holeAt = (p: any, key: readonly string[]): boolean => {
+  let h = p
+  for (let i = 0; i < key.length - 1; i++) h = h.get(key[i])
+  const parent = h[VALUE]
+  return Array.isArray(parent) && Object.hasOwn(parent, key[key.length - 1])
 }
 
 export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflight: (key: string[]) => boolean = () => false, up?: any): any =>

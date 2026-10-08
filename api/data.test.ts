@@ -363,6 +363,28 @@ test('V4-18 overlapping cells — a LOCAL delete of an array element is refused 
   await h.destroy()
 })
 
+test("a remove record that skips the lens (methods.remove's spelling) is refused 'sparse-hole' at the ingest — the same rule as the lens, typed, before any stamp", async () => {
+  const h = harness()
+  h.bind.data.g = [1, { x: 1 }]
+  h.bind.data.o = { a: 1 }
+  const seq = h.node.seq
+  //! an array's own element: refused, a rejected outcome row, nothing stamped
+  assert.deepEqual(h.bind.issue([{ type: REC.remove, key: ['g', '0'] }]), ['sparse-hole'])
+  assert.equal(h.node.seq, seq, 'nothing committed')
+  assert.equal(h.node.versions.has(JSON.stringify(['g', '0'])), false, 'no tombstone')
+  assert.ok([...h.bind.outcomes.rows.values()].some((r) => r.key === JSON.stringify(['g', '0']) && r.state === 'rejected' && r.reason === 'sparse-hole'))
+  assert.equal(h.bind.admit({ type: REC.remove, key: ['g', '0'] }), 'sparse-hole', 'the relay predicate reads the same rule')
+  //! everything else still goes through: a field inside an element (data folds it), a field of an object
+  // row, a whole-row remove, and an index past the end (not an own key; data's remove is idempotent)
+  for (const key of [['g', '1', 'x'], ['o', 'a'], ['g', '5'], ['o']]) {
+    const [r] = h.bind.issue([{ type: REC.remove, key }])
+    assert.notEqual(typeof r, 'string', `${key.join('.')} admitted`)
+    await r
+  }
+  assert.deepEqual(snapshot(h.bind.data), { g: [1, {}] })
+  await h.destroy()
+})
+
 test('M5a — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
   const h = harness()
   //! fast path (epoch 0): coordinates resolve within the call

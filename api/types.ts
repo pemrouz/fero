@@ -35,7 +35,8 @@ export interface WriteReject {
   guarantee: Guarantee
   reached: 'issued' | 'committed'
   //! reason — 'timeout' | 'superseded' | 'dropped' | 'destroyed' (the kernel's outcomes), 'methods-only'
-  // (the server takes client changes only through its `methods:` — V4-5), or the server's own
+  // (the server takes client changes only through its `methods:` — V4-5), 'sparse-hole' (a remove of an
+  // array's own element, which data will not fold — write the spliced array), or the server's own
   // validation: string for a relayed record it refused (V4-4).
   reason: string
   localCommit?: { origin: string; seq: number; epoch: number }

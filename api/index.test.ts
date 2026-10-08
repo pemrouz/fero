@@ -90,6 +90,48 @@ test("V4-5 the door: `methods:` makes clients change data ONLY through the metho
   try { assert.equal((snapshot(ro.cluster) as { me: { role: string } }).me.role, 'server') } finally { await ro.destroy() }
 })
 
+test("a remove of an array's own element is refused 'sparse-hole' before it commits: the server's methods.remove, and a client's relayed remove (refused at the client, or at the relay when the client cannot see the array yet)", async () => {
+  //! data will not delete an array's own key (a sparse hole), so such a remove used to commit a tombstone that
+  // showed nothing anywhere. The lens refuses `delete data.g[0]`; methods.remove skips the lens, so the
+  // ingest refuses it now, typed, with data's message, the way the door refuses 'methods-only'.
+  const addr = `127.0.0.1:${await ports.free()}`
+  const s = await fero('r', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { g: [1, 2] } })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const view = (f: typeof c) => snapshot(f.data) as Record<string, unknown>
+  const rows = (f: typeof c) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string; reason?: string }>)
+  const hole = (path: string) => (e: unknown) => {
+    assert.ok(e instanceof WriteRejectError, 'one WriteRejectError, like every refusal')
+    assert.equal(e.reason, 'sparse-hole')
+    assert.equal(e.reached, 'issued', 'refused before anything was stamped')
+    assert.ok(e.message.includes(`remove() of array element [${path}] would leave a sparse hole — write the spliced array instead`), e.message)
+    return true
+  }
+  try {
+    assert.ok(await until(() => JSON.stringify(view(c).g) === '[1,2]', 8000), 'the spoke folded the seed')
+    const logged = diag(s)!.logSize()
+    //! the server's own call: refused at its ingest — no tombstone in any log, a rejected row in cluster.writes
+    await assert.rejects(s.methods.remove({ key: ['g', 0] as never }, { timeout: 8000 }), hole('g.0'))
+    assert.equal(diag(s)!.logSize(), logged, 'nothing committed')
+    assert.ok(await until(() => rows(s).some((r) => r.key === JSON.stringify(['g', '0']) && r.state === 'rejected' && r.reason === 'sparse-hole'), 2000), 'cluster.writes names the reason')
+    //! the client sees the array: its own ingest refuses, nothing is relayed
+    await assert.rejects(c.methods.remove({ key: ['g', '1'] }, { timeout: 8000 }), hole('g.1'))
+    //! the client cannot see the array yet (the server wrote it this tick): the remove is relayed, and the
+    // server's relay predicate refuses it with the same reason, which rides the WNACK back
+    s.data.h = [3, 4]
+    assert.equal(view(c).h, undefined, 'the spoke has not folded h yet')
+    await assert.rejects(c.methods.remove({ key: ['h', '0'] }, { timeout: 8000 }), hole('h.0'))
+    assert.equal(diag(s)!.logSize(), logged + 1, 'only the write of h committed')
+    //! the arrays are whole everywhere, and the spliced array is the way to remove an element
+    assert.ok(await until(() => JSON.stringify(view(c).h) === '[3,4]', 8000))
+    assert.deepEqual(view(s).g, [1, 2])
+    await c.methods.update({ key: 'g', value: [2] }, { timeout: 8000 })
+    assert.ok(await until(() => JSON.stringify(view(s).g) === '[2]' && JSON.stringify(view(c).g) === '[2]', 8000))
+  } finally {
+    await c.destroy()
+    await s.destroy()
+  }
+})
+
 test('M6 config: replicas validates loudly (integer ≥ 1, servers only) and surfaces on cluster.partitions; unscoped shows zeros', async () => {
   await assert.rejects(fero('r', { replicas: 0 } as never), /replicas must be an integer/)
   await assert.rejects(fero('r', { replicas: 1.5 } as never), /replicas must be an integer/)
