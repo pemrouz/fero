@@ -29,6 +29,13 @@ import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT } from './scope.ts'
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
 // heartbeats on, the heartbeat tick revives given-up targets (JK.revive) — give-up is a cool-down.
 export const MAX_REDIALS = 10
+//! MEMBER_REDIALS (2026-10-08): the chain for an ADMITTED MEMBER link that died — a crashed member.
+// Eviction is HELD while the proposer is still dialing the suspect (reachability unknown), so this
+// chain sets the time from a crash to the eviction ballot: 5 tries at the 100 ms base is
+// 100+200+400+800+1600 = 3.1 s plus jitter, eviction at the next tick ≈ 4 s (10 tries was ≈ 20 s).
+// A dial that never linked up, or a link that died before HELLO, keeps the long chain. Never more
+// than `redials` (the cap reads the lower of the two).
+export const MEMBER_REDIALS = 5
 //! LAMPORT_LEASE: how far past the durable clock ceiling a node may stamp before re-persisting the
 // boot record. A restore resumes AT the ceiling, so no seq can ever be issued twice across lives —
 // the lease is what keeps that guarantee off the per-write hot path (one cold boot-write per LEASE).
@@ -42,6 +49,9 @@ export const SNAPSHOT_AT = 4096
 export interface Tune {
   //! redials — dial attempts per target before the chain gives up (JK.giveUp; heartbeats revive it)
   redials: number
+  //! memberRedials — the shorter chain for an admitted MEMBER link that died (see MEMBER_REDIALS): it sets
+  // the time from a member's crash to its eviction. Never more than `redials`.
+  memberRedials: number
   //! redialGrowth / redialCap — the backoff curve: the delay grows ×growth per try, capped at base × cap
   redialGrowth: number
   redialCap: number
@@ -83,6 +93,7 @@ export interface Tune {
 //! TUNE — the defaults: today's constants, by name. Frozen; a node copies it, never mutates it.
 export const TUNE: Readonly<Tune> = Object.freeze({
   redials: MAX_REDIALS,
+  memberRedials: MEMBER_REDIALS,
   redialGrowth: 2,
   redialCap: 32,
   suspectTicks: SUSPECT_TICKS,

@@ -50,8 +50,11 @@ test('CHAOS install-crosses-the-burst: an epoch bump lands mid-write-storm — s
 })
 
 test('CHAOS batch-eviction: suspicion holds while dialing, then a BATCH ballot evicts the cut 4; CP minority parks; heal → join wave home', () => {
+  //! heartbeat 100 (2026-10-08): a dead MEMBER runs the short chain (MEMBER_REDIALS 5 ≈ 620 ms at base 20 + jitter),
+  // so suspicion must fire INSIDE that runway for the hold to be observable: at 100 ms it fires at 1800, the
+  // first give-up is ≈ 2160 and the first ballot ≈ 2210 — the probe at 2000 sits between them
   const sim = new Sim(11)
-  const nodes = cluster(sim, 30, { heartbeatMs: 200 })
+  const nodes = cluster(sim, 30, { heartbeatMs: 100 })
   const cut = ['n27', 'n28', 'n29', 'n30']
   const kept = nodes.filter((n) => !cut.includes(n.uuid))
   for (const c of cut) for (const k of kept) sim.at(1500, () => sim.partition(c, k.uuid))
@@ -59,7 +62,7 @@ test('CHAOS batch-eviction: suspicion holds while dialing, then a BATCH ballot e
   for (let i = 0; i < 12; i++) sim.post('n02', { kind: 'write', recs: [{ type: 0, key: [`mw${i}`], value: i }] }, 1600 + i * 600)
   sim.post('n28', { kind: 'write', recs: [{ type: 0, key: ['minority'], value: 'parked' }] }, 2600)
 
-  sim.run({ until: 2500, checkEvery: 500, maxEvents: 5_000_000 })
+  sim.run({ until: 2000, checkEvery: 500, maxEvents: 5_000_000 })
   assert.deepEqual(epochs(nodes), Array(30).fill(1), 'suspects held while dialing — "gone" means the dial chain exhausted, not "one tick late"')
   assert.ok(kept.some((n) => jcount(n, JK.suspect) > 0), 'suspicion IS firing — the hold is the dialing-hold, not blindness')
 
@@ -302,10 +305,11 @@ test('CHAOS pending-overflow-is-counted-loss: 1500 gated writes at one issuer �
   assert.deepEqual(n20.membership.gate(n20), { open: false, reason: 'minority' }, 'cut from all 19: gated')
   //! 1500 parked writes vs MAX_PENDING=1024: drop-OLDEST — p0..p475 die counted, p476..p1499 park
   for (let i = 0; i < 1500; i++) sim.post('n20', { kind: 'write', recs: [{ type: 0, key: [`p${i}`], value: i }] }, i * 0.05)
-  sim.run({ until: 2400, checkEvery: 500, maxEvents: 3_000_000 })
+  sim.run({ until: 1700, checkEvery: 500, maxEvents: 3_000_000 })
   assert.equal(n20.writes.droppedPending, 476, 'the loss is EXACT and surfaced — never silent')
   assert.ok(jcount(n20, JK.writeBufferDrop) > 0, 'and journal-visible')
-  //! heal INSIDE the dial-chain runway (~4s): the suspects return, every eviction ballot aborts
+  //! heal INSIDE the dial-chain runway (a dead MEMBER's chain: MEMBER_REDIALS 5 ≈ 620 ms at base 20 — the first
+  // give-up is ≈ 1860 for this seed): the suspects return, every eviction ballot aborts
   for (const p of peers) sim.heal('n20', p.uuid)
   const violations = sim.run({ until: 8000, checkEvery: 500, maxEvents: 5_000_000 })
   assert.deepEqual(violations, [], 'attempt-exactly-once across the park-then-flush (cursor monitor: full fidelity under sampling)')
