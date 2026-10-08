@@ -1,7 +1,7 @@
 {
- "builtAt": "2026-10-03T11:09:29.661Z",
- "head": "f196de0",
- "branch": "v4",
+ "builtAt": "2026-10-08T17:25:02.443Z",
+ "head": "ca8e077",
+ "branch": "w1/integ",
  "version": "4.0.0",
  "dependencies": [
   "optcascade"
@@ -11,7 +11,7 @@
   "declared": "MIT",
   "file": false
  },
- "remote": false,
+ "remote": true,
  "examples": [
   "01-two-servers",
   "02-server-client",
@@ -38,13 +38,14 @@
   "40-chat",
   "41-kanban",
   "42-web-bridge",
-  "43-ledger"
+  "43-ledger",
+  "44-sell"
  ],
- "checks": 26,
+ "checks": 27,
  "kernel": {
-  "modules": 20,
-  "bytes": 529616,
-  "head": "f196de0"
+  "modules": 21,
+  "bytes": 558003,
+  "head": "a220e63"
  },
  "npm": {
   "fero": "1.7.1",
