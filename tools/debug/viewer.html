@@ -279,6 +279,9 @@ import { mountTips } from './eli5.mjs';
 // through here before touching innerHTML; capture content is arbitrary user data.
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const klog = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+'k' : ''+n;
+// isSystem — a node of a SYSTEM resource: its name starts with `#` (fero's own `#directory`; the public fero()
+// refuses such names, so a user resource never wears the badge). A capture without names (the sim) has none.
+const isSystem = n => typeof n.name === 'string' && n.name.startsWith('#');
 // watermark normalizer: M4a captures carry the ladder {a: applied, s: shippable, d: durable};
 // pre-M4a captures carried a bare number (the applied watermark) — both stay renderable.
 const wm = v => typeof v === 'number' ? { a: v, s: v, d: 0 } : (v || { a: 0, s: 0, d: 0 });
@@ -511,7 +514,10 @@ const buildForest = (capture, T) => {
     const sev = diverged ? 'crit' : off || n.dropped > 0 ? 'warn' : '';
     const pill = diverged ? { cls:'crit', lab:'diverged', key:'node:diverged' }
       : off ? { cls:'warn', lab:'differs', key:'node:differs' }
-      : n.dropped > 0 ? { cls:'warn', lab:'truncated +' + klog(n.dropped), key:'node:truncated', fact: `${n.dropped} oldest events dropped` } : null;
+      : n.dropped > 0 ? { cls:'warn', lab:'truncated +' + klog(n.dropped), key:'node:truncated', fact: `${n.dropped} oldest events dropped` }
+      // a SYSTEM resource (a `#` name: fero's own `#directory`) is not the user's data — badged quietly, info only,
+      // and only when nothing is wrong (a problem pill outranks an identity badge; the inspector still says it)
+      : isSystem(n) ? { cls:'info', lab: n.name, key:'node:system' } : null;
     const kinds = new Set();
     for (const e of n.journal) kinds.add((d.names[e.kind] || ('kind' + e.kind)).toLowerCase());
     const links = lks.map(l => {
@@ -1059,6 +1065,7 @@ function inspNode(nd){
   const rows = t != null ? n.journal.slice(0, jAt(n.journal, t)) : n.journal;
   const sub = `<span class="mono" data-tip="listen">${esc(n.listen ?? '—')}</span> · ${fact('seq ' + esc(String(n.seq ?? '—')), 'seq')} · ${fact('epoch ' + esc(String(n.epoch ?? '—')), 'epoch')}`;
   const facts = kv([
+    ...(n.name != null ? [['resource', esc(String(n.name)) + (isSystem(n) ? ' <span class="x">system</span>' : ''), '', isSystem(n) ? 'node:system' : 'resource']] : []),
     ['listen', esc(String(n.listen ?? '—')), '', 'listen'],
     ['seq', esc(String(n.seq ?? '—')), '', 'seq'],
     ['epoch', esc(String(n.epoch ?? '—')), '', 'epoch'],

@@ -179,6 +179,16 @@ const sweepViewer = async () => {
   const observed = captureLive([aa])
   assert.ok(observed.nodes[0].links.some((l) => l.diag), 'the session latched — the fixture is what it claims')
   await drive('observed', observed, '')
+  //! NAMED nodes — a user resource and a SYSTEM one (a `#` name, the directory's): the inspector's resource row
+  // and the quiet # badge (kernel Nodes carry NodeOpts.name exactly as a composed fero() passes it)
+  const named = ['shop', '#directory'].map((name, i) => {
+    const n = new Node({ uuid: `m${i}`, name, listen: `sim:m${i}` }, { now: () => 0, rng: () => 0, sink })
+    n.step({ kind: 'start' })
+    return n
+  })
+  const namedCap = captureLive(named)
+  assert.deepEqual(namedCap.nodes.map((n) => n.name), ['shop', '#directory'], 'the names ride the capture — the fixture is what it claims')
+  await drive('named', namedCap, '')
   //! a COMPACTED log: churn on four keys, then every member compacts below the frontier — the journals still name the
   // collapsed writes but no record book holds them any more, so those routes say "record not captured" (the honest
   // absence; until I-1 was fixed only the reborn writer's phantom routes painted it)
