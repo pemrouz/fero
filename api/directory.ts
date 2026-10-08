@@ -233,6 +233,11 @@ export class Directory {
     this.client = await o.compose(DIRECTORY, { hosts: [o.addr], heartbeat: { ms: o.heartbeatMs }, ...(o.redialMs !== undefined ? { redial: { ms: o.redialMs } } : {}) }, true)
     if (this.#destroyed) { await this.client.destroy(); this.client = null; return }
     const c = this.client
+    //! I-19's guard: a client's `methods` hands out a handle maker for ANY name, so `lookup` is not a function
+    // only when this compose came back as something else (a server's methods are its own table). Not
+    // reproduced (30/30 and the host-death race test green), so if it ever recurs, say the cause.
+    if (typeof (c.methods as Record<string, unknown>).lookup !== 'function')
+      throw new Error(`#directory: the directory client composed as a ${(snapshot(c.cluster) as { me?: { role?: string } }).me?.role ?? 'non-client'} — its methods have no lookup (I-19)`)
     //! a server that lost the first bind (another host, or a squatter) starts the retry loop NOW — the
     // link-down transition below never fires for a directory that was never up
     if (o.serve && !this.hosting) this.#armRetry()
