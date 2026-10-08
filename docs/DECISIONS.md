@@ -1556,3 +1556,274 @@ a non-primary's lower view ignored; sim/client.test.ts's I-23 pin bumps the
 spoke to epoch 2 before the kill and expects members [n03, n04] at epoch 1
 after the rebirth. The `evict` rows a feeder install journals are harmless:
 the debugger's topologyAt does not read them.
+
+## V4-19 — the kernel tune table: one frozen `node.tune`, defaults equal to the old constants (2026-10-08)
+Context: MAX_REDIALS, SUSPECT_TICKS, LEAVE_TICKS, the backoff cap and the
+queue bounds were constants spread over seven kernel files, with a shell
+weld (shell/runtime.ts read LEAVE_TICKS) and a sim monitor reading a kernel
+bound. The filed need was a shorter redial chain for a dead member (V4-20),
+and docs/DESIGN-CONFIG.md §5 listed these constants as the next config
+candidates. A table with one validator and one read idiom is cheaper than a
+NodeOpts field per knob.
+Decision: every kernel bound and tick count is a row of one frozen object
+per node, `node.tune` (kernel/tune.ts: the `Tune` type, `TUNE` the defaults,
+`tuneOf` the validator). It is built FIRST in the Node constructor from TUNE
+plus `NodeOpts.tune`; an unknown row, a fraction, or an integer under the
+row's floor throws. The floor is 0 for the two redial counts (no redial at
+all) and 1 for every other row, because 0 there is an off switch, not a
+tuning (shedTicks 0 makes `% shedTicks` NaN so no orphan ever polls;
+dedupKeep or issuers 0 turns exactly-once dedup off; pending 0 drops every
+attempt; redialGrowth 0 makes every later wait pure jitter). No overrides
+means the shared frozen TUNE itself. Rows: redials 10, memberRedials 5,
+redialGrowth 2, redialCap 32, suspectTicks 3, leaveTicks 4, pulls 5,
+proposalAge 10, rejoinTicks 10, retryTicks 2, pending 1024, dedupKeep 1024,
+issuers 1024, probes 1024, queued 256, compactAt 4096, snapshotAt 4096,
+lamportLease 4096, shedTicks 2, stageTicks 8, acqLiveMax 8192, stallAt 8. The
+old constants keep their names and exports as the defaults (MAX_REDIALS,
+LAMPORT_LEASE and SNAPSHOT_AT live in tune.ts; node.ts re-exports them,
+because node.ts imports tune.ts). Every read site reads a row: the hot ones
+(the write pipeline, the confirm registry, the paused-link queue — a Link
+has no node, so the node hands its `queued` row in at construction) and the
+cold ones (membership, scope, log, the WAL snapshot arm, the clock lease,
+the redial chain and its curve). The shell's leave cap reads
+node.tune.leaveTicks (the weld is gone); the sim's queue monitor reads the
+node's row. MAX_PENDING was also the wire bound on a WACK/WNACK run; that
+use is split into the fixed constant MAX_RUN, so tuning a queue can never
+change what the wire accepts (a test pins it). Config: one key now,
+`redial.tries` (call, flag, env, file; an integer ≥ 0; not passed to the
+#directory client; `diag(f).config()` shows TUNE.redials as its default).
+Evidence that it is the same kernel: a 200-seed trace diff against the
+previous tree, four variants (the sweep build; heartbeats on with a client
+and a partition/heal window; a member crash; scoped replicas), comparing
+event counts, a hash of the per-event state-hash trace and the bytes sent:
+identical; 20 sweep seeds are frozen as a golden in sim/exec.test.ts.
+Evidence that it is perf-neutral: interleaved base/tune runs of the write,
+node, alloc and data perf files, three rounds each, one at a time: 0
+failures in 24 runs, medians within this box's noise (write-path ceiling
+293 → 263 ms, issuer leg 34.9 → 30.4 ms, 2k inbound apply 105.0 → 104.3 ms,
+5k assignments 518 → 524 ms); the COUNT tier is identical.
+REJECTED: a config key per row now (`suspect.ticks` waits for the HELLO
+contract hash because it is a cluster contract; `pending` stays table-only
+until it is measured); keeping the constants as the read sites; a NodeOpts
+field per knob; the table in node.ts (an import cycle); allowing 0 on every
+row.
+Consequences: what stays fixed on purpose: REASON_MAX, MAX_RUN, the 4096
+member bound, DIAG_*, VNODES, the snapshot chunk, the jitter (wire hygiene
+and protocol identity). docs/DESIGN-CONFIG.md's §5 constant rows are the
+tune-table row now; its §7 step 7 is landed.
+
+## V4-20 — a dead member is dialed 5 times, not 10: eviction in about 4 s instead of 20 (2026-10-08)
+Context: eviction is held while the proposer is still dialing the suspect
+(an un-exhausted chain means reachability is unknown), so the redial chain's
+length IS the time from a crash to the eviction ballot: 10 tries at the
+100 ms base was 19.1 s plus jitter. Its rows froze on every screen
+meanwhile.
+Decision: on a SERVER, the chain started by the death of an ADMITTED MEMBER
+link is capped at the tune row memberRedials (MEMBER_REDIALS = 5), never
+more than `redials`: 100+200+400+800+1600 = 3.1 s plus up to 0.5 s of
+jitter, eviction at the next tick, about 4 s. A dial that never linked up,
+a link that died before HELLO, an admitted peer outside the committed view,
+and anything a CLIENT dials keep the long chain. The backoff entry carries a
+`member` flag, set on a fresh chain only. The heartbeat revival of a
+given-up target keeps the member chain when the target is still a committed
+member's listen (the revive loop re-seeds the flag before it dials);
+without that, whenever the member chain ended before suspicion fired
+(heartbeat.ms 2000 at the default base, or redial.ms 30 at the default
+heartbeat), the revived dial started a fresh 10-try chain and the hold
+covered all of it: 23.9 s at heartbeat 2000, slower than before. A revived
+dial in flight now holds eviction like any timer-fired dial (the shell has
+no connect timeout; the revival was the one accidental exception). A client
+is excluded because it evicts nobody, so its chain is no clock, and with
+heartbeats off a short chain would strand it from a restarting server.
+Measured in the sim (3 servers, one crashed): 3.4 s at the defaults against
+19.9 s; 1.4 s at redial.ms 30; 7.9 s at heartbeat.ms 2000. On examples 13
+and 14 at redial.ms 30 the vote is in 1.1 s and 1.4 s after the kill (was
+about six); both READMEs are re-recorded. This is a behaviour change, so it
+does not ride V4-19's "defaults equal today" rule: the 200-seed trace diff
+moves exactly the crash-variant rows, and with memberRedials pinned at 10
+the crash rows are identical.
+REJECTED: 4 tries (about 2 s, the same as suspicion — too close to a blip);
+making redial.tries set the member chain directly (the member row keeps its
+own default; the kernel caps it at redials, so a lower redial.tries still
+shortens it); marking a revived chain by the old entry's flag rather than
+by current membership (a host evicted meanwhile would keep the short chain
+for ever).
+Consequences: four sim tests whose windows were derived from the 10-chain
+were re-derived from measured trajectories (sim/write.test.ts AA#2 and AA#3;
+sim/scale-chaos.test.ts batch-eviction, now at heartbeat 100, and
+pending-overflow); three membership tests now suspect first, then exhaust,
+then tick, the order the defaults produce. Known and not changed: a view
+install dials every member it holds no link to even when a chain to that
+member is mid-backoff, and that failed dial forks the chain into two timer
+lines that share the tries (STATUS, kernel). The glossary (tools/debug/
+eli5.mjs) names the member chain.
+
+## V4-21 — a client's `cluster.writable` is its feeder's gate, carried on the DIGEST reply (I-33) (2026-10-08)
+Context: every role read `writable` from its own write-gate, which is a
+member's rule (in the committed view, reaching a majority). A client is
+never in the view, so it read open genesis (`true`) before it had any link,
+`false` once it learned a view, and `false` while its relayed writes
+committed in 13 ms. What decides whether a client's write goes through is
+its feeder's gate: a closed gate at the feeder parks the relayed write.
+Decision: a server's DIGEST toward a CLIENT link carries `w: 0|1`, the
+server's gate at that moment; member-to-member digests are unchanged. The
+client reads `w` only off its primary, into `node.feederOpen` (null =
+unknown), resets it to null whenever the primary changes, and an older
+server that sends no `w` leaves it null. The api sets `writable` by role: a
+member reads its own gate; a client reads `primary !== null && feederOpen
+=== true`, and starts `false`. The client refolds on a field compare, not a
+journal row (the gate's journal rows are the member's). A digest crosses
+every client link every heartbeat, so a client is one heartbeat behind its
+feeder at worst.
+REJECTED: VIEW as the carrier (sent on install and on PULL only, never when
+a gate opens or closes); `writable: null` on a client (honest but useless
+to a screen; it stays the fallback if a feeder-side signal ever proves too
+costly).
+Consequences: kernel/client.test.ts pins that `w` rides only to client
+links and only the primary's `w` counts, reset on failover; sim/client.test.ts
+pins that a feeder cut off from the other two closes its gate and the spoke
+follows within two heartbeats, then reopens on heal; api/index.test.ts pins
+false before a link, true once fed, false when the feeder's gate closes.
+
+## V4-22 — `cluster.writes` is its own handle, published one microtask after an outcome (2026-10-08)
+Context: the confirm ring (the last 64 write outcomes of this node) was a
+key of the one `cluster` data source, so a bare `cluster.tap` fired on
+every write outcome, and the ring was published only from the post-step
+fold while a row settled in a promise microtask after that step: on a solo
+node with heartbeat.ms 1000 a write read `pending` for over a second under
+an object that already held the value.
+Decision: Bind settles a ring row in the same call that settles the write's
+promise (first settle wins) and names every row that moved (`onOutcome(id)`:
+new, settled, evicted). The composer keeps the ring in its own data source
+and publishes only the moved rows, in one batch, from one queueMicrotask
+per burst. `f.cluster` is a thin Proxy over the view: its `writes` key
+returns the ring's source, every other key forwards. So
+`f.cluster.writes.snapshot()` and `f.cluster.writes.tap(...)` work, and
+`f.cluster.snapshot()` is the picture without the ring. A solo write reads
+`committed` one microtask after it applied; a burst of a thousand
+assignments is one ring fire; the cluster tap fires only when the view
+moves. destroy() rejects a write still in flight with 'destroyed', and the
+ring shows that reject once, then never moves again: the ring tells the
+same story as the write's promise. With it: a `journal.cap` below one step's
+burst no longer starves the fold (the fold reads `journal.dropped` past its
+cursor and reconciles from live state), and a leaving member paints no
+cluster frame after destroy().
+REJECTED: merging `writes` back into the cluster view's value, snapshot and
+toJSON (puts the ring back in the tap's domain, which is the bug); the
+settle in the promise's `.then` (two microtasks before `committed` shows);
+publishing the whole ring per microtask (64 changed rows per publish
+downstream); freezing the ring at destroy (an in-flight write read
+`pending` for ever after its promise had rejected).
+Consequences: `cluster.snapshot().writes` is gone; readers use
+`cluster.writes.snapshot()`; screens that show the ring also tap
+`cluster.writes` (examples 03, 08, 11, 40, 41), or a refused write, which
+changes no data, would never repaint. examples/10-confirm's README is
+re-recorded (no goodbye frame after Ctrl-C).
+
+## V4-23 — the debugger says what it knows and no more (2026-10-08)
+Context: four debugger lines on the page. Scoped captures painted
+`never-arrived` in red for every non-holder; a truncated journal switched
+the scrubber off in silence and painted `replay ✗`; a newcomer's first gate
+row said `evicted`; a clean leave had two spellings in the survivor's diary;
+a too-big DIAG answer was named `error`.
+Decision: (1) the capture carries scoped placement facts: diagNode adds
+`replicas` and, on an armed node, `holders`: for each row the node itself
+wrote (from its own log and its own writeLocal journal rows, so a row it
+stamped before the view armed and then handed off still has its list), the
+ring's own holder list. routes() calls a member outside that list
+`not-a-holder` (quiet) instead of `never-arrived`; the viewer counts
+"applied n/m holders". The browser cannot import ring.ts and a re-implemented
+hash would drift, so the ring's answer travels in the capture. (2) Hand-offs
+are facts the page folds: routes() gives `acquired` when the node's record
+book holds the write and the node journaled an acquire of that row; stateAt
+follows the kernel (shed drops the row's cells outside the election; acquire
+folds the row's captured entries). (3) A truncated journal makes the replay
+unchecked, not failed: the fold adds `truncated: true`, the header says in
+amber "replay unchecked — journal truncated (node: N dropped)", the bar
+says "rewind off — truncated". (4) The gate has a fifth word, `joining`: the
+node is not in the view and no view it held ever named it; a member voted
+out still says `evicted`. (5) A survivor writes leave(proposer) in its
+journal when a proposal leaves out its own proposer. (6) A DIAG answer too
+big for one frame is absent `frame`, not `error`; the paged read stays
+Someday.
+REJECTED: recomputing placement in model.mjs; carrying the whole ring;
+painting a copied-in write as plain `applied`; a new journal kind for the
+self-proposed leave; a registry scenario for truncation (every scenario must
+replay-verify); the plan's longer bar text (it ran into the crumb at 820 px).
+Consequences: a `scoped` registry scenario replay-verifies the fold; the
+real page was driven in Chromium. Limits, on the page: the holder list is
+as of capture end; a client, and a member that left, keep the old rule; a
+scoped capture paints every node `differs` (a new bug line).
+
+## V4-24 — the sell rung, the half-typed line, and the series on the website (2026-10-08)
+Context: the owner's questions 6 and 7: yes to the sell rung (an example
+with methods:), and the house choice for the half-typed line left to us.
+Decision: the series is 27 rungs. 44-sell is the story the website tells,
+in three files: open.ts is a seeded shop with no methods:, so every client
+may change every row, the price included; door.ts is the same shop with
+`methods: { sell }`, where a sale is a new row at the shop's own price;
+customer.ts does the same two things to either shop (set the price to 0,
+then sell one): against the open shop the price lands and there is no sell;
+against the door the price write is refused `methods-only` and the sale
+comes back at 10. It sits in the apps tier (40-44) because it repeats 02 and
+08 as one story. The screen rule gains one sentence: a role that also reads
+typed lines gives its readline the screen (output: process.stdout, an empty
+prompt) and ends every frame with `rl.prevRows = 0; rl.prompt(true)`, so a
+half-typed line comes back after a redraw (the prevRows reset is needed
+because readline climbs back over the rows its last copy wrapped onto; after
+console.clear() the line starts on a fresh row). Giving readline the screen
+puts the terminal in raw mode, so the role hands Ctrl-C on with
+`rl.on('SIGINT', () => process.kill(process.pid, 'SIGINT'))`. A
+terminal-only behaviour gets a terminal test: tests/examples-tty.test.ts
+runs 40's join and 41's edit on a real pseudo-terminal (a python3 pty
+bridge; the suite skips without one). The website's section 03 links the
+series table and the wire card tells the one-opener story (V4-15).
+REJECTED: a fixed prompt line under the picture (a visible prompt would land
+in every check's output); sequencing the interactive rungs (loses the live
+picture); writing the typed line back by hand (readline's row memory stays
+wrong); a pty library as a dependency; a cluster.writes-based screen for the
+customer; an always-on GitHub link beside a "not public yet" chip.
+Consequences: examples/README.md's tiers sentence names 40-44 in one
+sentence (the website's sync reads only the first sentence); 43 points to
+44; the battery has one more example check and three terminal tests.
+
+## V4-25 — a fresh ballot of mine never opens below my own last ballot: a double vote latent since M2, closed (2026-10-08)
+Context: a node remembers only its latest vote (votedFor). One that granted
+another proposer at epoch 2, then opened a ballot of its own at 3 and lost
+it, held votedFor = {3, me}; the epoch for its next ballot treated "my own
+ballot" as nothing to step past and started again at view+1 = 2, spending at
+2 a vote it had already given away there. With two old-set majorities that
+share only this voter, two views commit at one epoch. The parked I-20 branch
+found it with a random explorer (docs/DESIGN-LEAVE.md §8.2); it is now
+reproduced three ways on today's kernel: by hand on three real nodes with a
+chosen delivery order (kernel/membership.test.ts: both proposers end
+writable in different views at epoch 2), and by chance in the explorer
+(sim/explore.test.ts: seeds 947 and 1855 of 1..2000 split at epoch 3; an
+in-life split with no restart at n=4 at seed 3512 of a wider run).
+Decision: the epoch a fresh ballot targets is max(the committed view, every
+known burn, my own last ballot if the vote is mine, else the epoch my vote
+is spent at) + 1: my own ballots never go down in epoch, within a life and
+across a restart (votedFor is durable). The same epoch again stays allowed
+(the same-proposer case the kernel already permits; at most one of my
+ballots at an epoch can commit). One view per epoch rests on one vote per
+epoch; grants were already monotone, proposals now are too, and a
+same-proposer re-grant at a lower epoch cannot happen because a proposer's
+offers travel one FIFO link in the order it made them. Cost: nothing on the
+normal path; only a lost ballot of mine above view+1 now re-proposes at its
+own epoch instead of lower. Formation never re-proposes; the 59,500-event
+formation pin is unchanged. Guards: the two kernel pins; the random
+explorer over real Nodes (sim/mesh.ts, sim/explore.test.ts: 2000 seeds of
+leaves, cuts, heals, give-ups, teardowns, restarts and a join, every frame
+delivery chosen by the seed, red on the kernel before the fix, clean over
+40,000 seeds with it); the seeded leave sweep (sim/leave-sweep.ts and its
+test: 100 + 100 + 40 schedules, safety asserted on every one, liveness
+pinned as exact not-live seed sets) guards the clean stop on today's kernel,
+the breadth behind V4-6, though it cannot draw this shape.
+REJECTED: bringing the rest of the parked I-20 branch (the pledge protocol)
+with it; trimming the sweep to 50/40/24 seeds (the timing behind the trim
+was taken under load). Not fixed here: a ballot built on an older view still
+commits after a newer view installs (on the base, does not break one view
+per epoch; STATUS, kernel; DESIGN-LEAVE §9's argument).
+Consequences: kernel/membership.ts's BALLOT IDENTITY list names the rule;
+the explorer's reach floors are a third of today's measured values and are
+meant to trip on a kernel change that moves the random trajectories a lot.

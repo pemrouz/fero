@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 on 2026-10-08 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 560 on 2026-10-08 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -666,6 +666,16 @@ working as designed.
   worktrees, each reviewed by a second model; the I-20 lane went to a second fix
   round; its client-view half (a client follows its feeder, I-23 amended)
   landed on its own. 515/515 + 18/18, perf 43/43.
+- 2026-10-08 (later) — wave 2 of the STATUS plan: V4-19 the kernel tune table
+  (kernel/tune.ts; a 200-seed trace diff and interleaved perf A/Bs prove it the
+  same kernel), V4-20 a dead member dialed 5 times (eviction ~4 s, examples 13
+  and 14 re-recorded), V4-21 a client's `writable` from its feeder's digest,
+  V4-22 `cluster.writes` as its own handle and on time, V4-23 the debugger's
+  holders / acquired / truncated / joining / one leave spelling, V4-24 the
+  44-sell rung + the half-typed line + a real-terminal test, V4-25 the
+  #nextEpoch double vote closed with a leave sweep and a random explorer. The
+  I-20 pledge branch is parked (docs/DESIGN-LEAVE.md); overlapping cells (V4-18)
+  awaits its second review. 560/560 + 18/18, perf 43/43, sim:scale green.
 
 ## The debug tool
 
