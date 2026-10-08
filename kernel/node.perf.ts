@@ -71,6 +71,29 @@ test('absolute: 2k-record inbound apply under the tripwire ceiling', () => {
   assert.ok(ms < 100, `2k inbound apply took ${ms.toFixed(1)}ms (ceiling 100ms)`)
 })
 
+//! RATIO (V4-18, overlapping cells): a field write pays for ITS OWN subtree only. A partition holding
+// 10k deeper cells (['users', uK, 'name']) must not make a write at ['users', uK] cost more than the
+// same write into a partition with nothing under it: the sweep finds the write's subtree in one
+// lookup (the deep index is keyed by ancestor) and never walks the partition. With the index keyed
+// by partition this ratio was about 300x. Both sides are inbound frames on their own lanes with
+// advancing seqs (every timed pass is the fresh-record path, never dupDrop).
+test('ratio: a mid-depth write into a partition holding 10k deeper cells costs the same as into an empty one', () => {
+  const node = formedNode()
+  const o = new Outbox()
+  const frame = (origin: string, baseSeq: number, recs: Rec[]) => { o.begin(VERB.RECORDS, { origin, baseSeq, epoch: 0 }); for (const r of recs) o.add(r); return o.finish()! }
+  for (let i = 0; i < 10_000; i += 1000)
+    node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', 1 + i, Array.from({ length: 1000 }, (_, j) => ({ type: REC.update, key: ['users', 'u' + (i + j), 'name'], value: 'n' })) ) })
+  const mid = (p: string): Rec[] => Array.from({ length: BATCH }, (_, i) => ({ type: REC.update, key: [p, 'u' + i], value: { name: 'm' } }))
+  const empty: Uint8Array[] = [], full: Uint8Array[] = []
+  for (let r = 0; r < 8; r++) { empty.push(frame('cc', 1 + r * BATCH, mid('empty'))); full.push(frame('dd', 1 + r * BATCH, mid('users'))) }
+  let i = 0, j = 0
+  const r = ratio.interleaved(
+    () => { node.step({ kind: 'bytesIn', link: 1, bytes: empty[i++] }) },
+    () => { node.step({ kind: 'bytesIn', link: 1, bytes: full[j++] }) },
+  )
+  assert.ok(r < 3, `mid-depth write with 10k deeper cells / into an empty partition = ${r.toFixed(2)}x — the sweep is walking the partition, not the subtree (budget 3x)`)
+})
+
 //! COUNTED + ABSOLUTE (M8, plan §7's "digest build at realistic origins×partitions"): a caught-up
 // peer's r:1 digest asks for OURS and ships nothing back (its claim covers every lane) — so the step
 // isolates the digest BUILD: walk 100 origin lanes, encode one control frame. Entry count is the
