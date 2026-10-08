@@ -610,6 +610,18 @@ test('validation: is a top-level function (not a method pointer); a non-function
   }
 })
 
+test('diag.allow: the DIAG allowlist reaches the kernel; the door names who may attach and never shows a token; a bad shape is refused', async () => {
+  const f = await fero('r', { listen: false, diag: { allow: { ops: 'tok-123', alice: 'tok-456' } } })
+  try {
+    assert.deepEqual(diag(f)!.config()['diag.allow'], { value: { ops: '[redacted]', alice: '[redacted]' }, from: 'the call' })
+    assert.ok(!JSON.stringify(diag(f)!.config()).includes('tok-'), 'no token anywhere in the door')
+  } finally { await f.destroy() }
+  const plain = await fero('r', { listen: false })
+  try { assert.equal(diag(plain)!.config()['diag.allow'], undefined, 'absent: the channel is dead, nothing to show') } finally { await plain.destroy() }
+  await assert.rejects(fero('r', { listen: false, diag: { allow: { ops: 7 } } } as never), /diag\.allow\.ops must be a non-empty token string/)
+  await assert.rejects(fero('r', { listen: false, diag: { allow: 'tok' } } as never), /diag\.allow must be an object of name → token/)
+})
+
 test('v4.1 data seed: applied only when the local fold is empty at boot — a restore never re-seeds', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-seed-'))
   const seed = { widgets: { stock: 10 } }

@@ -4,9 +4,13 @@
 // The parity pin is the load-bearing one: a slice pulled over the wire must deepEqual the in-process
 // captureNode of the same node (one fold, two consumers — DESIGN-M7 §1).
 
+//! the battery pins first: one case below composes a real fero() (directory off, config layer off)
+import '../../utils/battery.ts'
+
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Runtime } from '../../shell/runtime.ts'
+import { fero } from '../../api/index.ts'
 import { AttachPool, DiagClient, pullNode } from './attach.ts'
 import { captureNode } from './capture.ts'
 import { verifyReplay, summarize, routes, verifyTopology } from './model.mjs'
@@ -209,4 +213,20 @@ test('a state that moved MID-PULL is a torn read, flagged on the slice and said 
     assert.match(el('statusRight').innerHTML, /class="sst warn" data-tip="torn-read">torn read n1/, 'the header says torn read, amber')
     assert.doesNotMatch(el('statusRight').innerHTML, /replay ✗/, 'and never claims a replay fault')
   } finally { c.close(); await stop() }
+})
+
+test('diag.allow on a REAL fero(): the attach pool reads a composed cluster with the token, and a node without the key is denied (the config door, end to end)', async () => {
+  const [a, b] = [`127.0.0.1:${await ports.free()}`, `127.0.0.1:${await ports.free()}`]
+  //! one server opens the channel through the public config key; its peer does not
+  const s1 = await fero('shop', { uuid: 's1', listen: a, hosts: [b], heartbeat: { ms: 100 }, diag: { allow: { ops: TOKEN } } })
+  const s2 = await fero('shop', { uuid: 's2', listen: b, hosts: [a], heartbeat: { ms: 100 } })
+  const pool = new AttachPool([a, b], TOKEN)
+  try {
+    s1.data.k = 1
+    await until(() => (s2.snapshot as Record<string, unknown>).k === 1, 4000)
+    const cap = await pool.capture()
+    assert.deepEqual(cap.nodes.map((n) => [n.uuid, n.name, n.listen]), [['s1', 'shop', a]], 'the composed node answered, its resource name riding the slice')
+    assert.deepEqual(cap.absent, [{ target: b, reason: 'unauthorized' }], 'a fero() with no diag key keeps the channel dead')
+    assert.ok(cap.nodes[0].state.some(([k]) => String(k).includes('"k"')), 'and the slice is the real node: its row is there')
+  } finally { pool.close(); await s2.destroy(); await s1.destroy() }
 })

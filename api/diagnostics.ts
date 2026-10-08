@@ -46,7 +46,8 @@ export interface Diagnostics {
   rendezvous(): { client: Fero | null; host: Fero | null } | null
   //! config (V4-10): the resolved config leaves and where each came from — 'the call', a flag, an env
   // variable, a fero.opt.ts file — the answer to "why is this node a server?" without a debugger.
-  // Values are the coerced ones the composer read; function-valued keys show as '[function]'.
+  // Values are the coerced ones the composer read; function-valued keys show as '[function]', and a
+  // diag token as '[redacted]' (the names who may attach show; the secret never does).
   config(): Record<string, { value: unknown; from: string }>
 }
 

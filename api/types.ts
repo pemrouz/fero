@@ -84,7 +84,7 @@ export interface Seams {
 // and every layer is beaten by a value scoped to this resource's name (`--fero.shop.dir`,
 // `FERO_SHOP_DIR`, `{ shop: { dir } }`). Keys are nested lowercase words so one spelling survives every
 // layer. Call-only (a function or a per-instance switch): methods, validation, signals; data also rides a
-// file; uuid never comes from a file. `FERO_CONFIG=off` reads the call alone (the test battery).
+// file; uuid never comes from a file; diag.allow (a secret) never comes from a flag. `FERO_CONFIG=off` reads the call alone (the test battery).
 //! Role (v4.1) is by DECLARED ACT: any server marker — server: true, listen, dir, replicas, a `data`
 // seed, or `methods:` — makes a server; no marker makes a CLIENT dialing its hosts (or, bare, the
 // servers the directory lists for the name). Role is a pure function of the config.
@@ -145,6 +145,12 @@ export interface FeroConfig {
   //! validation — the schema check every write meets as it enters (see Validation above). Call only.
   validation?: Validation
   seams?: Seams
+  //! diag.allow — who may attach a debugger (`npm run debug -- --attach`), name → bearer token (kernel
+  // NodeOpts.diag, DESIGN-M7 §1). Absent = the DIAG channel is dead: every attach is denied. From the
+  // call, `FERO_DIAG_ALLOW_<NAME>=<token>` or a fero.opt.ts file; never a flag (a command line is
+  // readable by every user on the box). `diag(f).config()` shows the names, never the tokens. The token
+  // crosses the wire in cleartext: attach on a trusted network or through a tunnel.
+  diag?: { allow?: Record<string, string> }
   //! signals (V4-8) — the clean stop on Ctrl-C. By default every live instance destroy()s on SIGINT or
   // SIGTERM (the graceful leave, then teardown) and, if nothing else in the process listens for that
   // signal, the process exits 0. false keeps this instance out of it: stop it yourself.

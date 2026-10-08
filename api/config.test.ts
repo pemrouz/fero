@@ -53,6 +53,38 @@ test('validation: is a top-level key; seams.validation is its old spelling for o
   assert.equal(nameKey('validation'), null, 'a declared key is never a resource rung')
 })
 
+test('diag.allow: from the call, a variable (FERO_DIAG_ALLOW_<NAME>) or a file — never a flag; the refusal never echoes the token', () => {
+  //! the call and a variable; envdeep lowercases the name and keeps the token as written
+  assert.deepEqual(cfg('shop', { diag: { allow: { ops: 'Tok-1' } } }), { diag: { allow: { ops: 'Tok-1' } } })
+  const env = r('shop', {}, { env: { FERO_DIAG_ALLOW_OPS: 'Tok-2' } })
+  assert.deepEqual(env.config, { diag: { allow: { ops: 'Tok-2' } } })
+  assert.equal(env.from('diag.allow'), 'FERO_DIAG_ALLOW')
+  //! the per-resource rung, like every key
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SHOP_DIAG_ALLOW_OPS: 'Tok-3', FERO_DIAG_ALLOW_OPS: 'other' } }), { diag: { allow: { ops: 'Tok-3' } } })
+  //! a file
+  const home = scratch()
+  fs.writeFileSync(path.join(home, 'fero.opt.js'), "export default { diag: { allow: { alice: 'Tok-4' } } }")
+  assert.deepEqual(cfg('shop', {}, { home }), { diag: { allow: { alice: 'Tok-4' } } })
+  //! the viewer's own variable is still not config, beside a real allow
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_DIAG_TOKEN: 'viewer', FERO_DIAG_ALLOW_OPS: 'Tok-5' } }), { diag: { allow: { ops: 'Tok-5' } } })
+  //! never a flag, under any spelling, and the message carries the name but never the token
+  for (const argv of [['--fero.diag.allow.ops', 'Sekrit-9'], ['--fero.shop.diag.allow.ops', 'Sekrit-9'], ['--fero.diag', 'Sekrit-9']]) {
+    assert.throws(() => r('shop', {}, { argv }), (e: Error) => {
+      assert.match(e.message, /a diag token cannot come from a launch flag \(--fero\.(shop\.)?diag(\.allow(\.ops)?)?\) — every user on this box can read a command line; set FERO_(SHOP_)?DIAG_ALLOW_(OPS|<NAME>)=<token>, or diag: \{ allow: \{ (ops|<name>): … \} \} in the call or a fero\.opt\.ts file/)
+      assert.ok(!e.message.includes('Sekrit-9'), `the secret is not in the message: ${e.message}`)
+      return true
+    }, argv.join(' '))
+  }
+  //! a variable can only carry text: an all-digits token lost its leading zeros, a longer name is not a token
+  assert.throws(() => r('shop', {}, { env: { FERO_DIAG_ALLOW_OPS: '0123' } }), (e: Error) => /the diag token for 'ops' is all digits \(from FERO_DIAG_ALLOW\) — a variable or a flag loses its leading zeros; give it a letter/.test(e.message) && !e.message.includes('123'))
+  assert.throws(() => r('shop', {}, { env: { FERO_DIAG_ALLOW_OPS_X: 'Tok' } }), /diag\.allow\.ops must be a token string \(from FERO_DIAG_ALLOW\)/)
+  //! an empty token is unset, like an empty value anywhere
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_DIAG_ALLOW_OPS: '' } }), {})
+  //! a typo inside the group gets the leaf as its hint
+  assert.throws(() => r('shop', { diag: { alow: {} } }), /unknown option 'diag\.alow' from the call — did you mean diag: \{ allow: … \}/)
+  assert.equal(nameKey('diag'), null, 'a declared group is never a resource rung')
+})
+
 test('precedence: flag > call > env > project file > home file, per key', () => {
   const cwd = scratch(); const home = scratch()
   fs.writeFileSync(path.join(cwd, 'package.json'), '{ "type": "module" }')
@@ -234,7 +266,7 @@ test('a config file that fails to load throws with its path (optcascade), and th
   const home = scratch()
   fs.writeFileSync(path.join(home, 'fero.opt.js'), 'export default {')
   assert.throws(() => r('r', {}, { home }), (e: Error) => e.message.includes(path.join(home, 'fero.opt.js')))
-  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
+  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'diag.allow', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
 })
 
 test('I-35 — a LONGER name under a leaf is refused naming THAT name; the good variable beside it is never blamed, and `data` (an object of rows) still rides a file', () => {
