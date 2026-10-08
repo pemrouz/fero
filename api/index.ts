@@ -293,8 +293,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   let writesQueued = false
   const publishWrites = () => {
     writesQueued = false
-    //! after destroy the ring is frozen as it last read: the 'destroyed' rejects of teardown never paint
-    if (bind.destroyed) { movedWrites.clear(); return }
+    //! no destroyed guard: the stop's own rejects ('destroyed') paint here once, so a screen left open
+    // reads what the write's promise said, not `pending` for ever. Nothing moves after that: a destroyed
+    // Bind issues nothing (the surface is a local value), and `writes` is a local source with no I/O.
     const rows = bind.outcomes.rows
     batch(() => {
       for (const id of movedWrites) {

@@ -203,7 +203,7 @@ export interface ScopedError {
 // handle (the last 64 write outcomes of THIS node, keyed by a counter: `{ key, state, origin?, seq?,
 // epoch?, cid?, reason? }`) — `f.cluster.writes.snapshot()`, `f.cluster.writes.tap(…)` — so a bare
 // `cluster.tap` repaints only when the view moves, and the ring is published one microtask after a write
-// settles.
+// settles. destroy() rejects a write still in flight ('destroyed'); the ring shows that once, then stops.
 export interface ClusterShape {
   epoch: number
   //! writable (I-33), by role. A member: its own write-gate is open (it is in the committed view and
