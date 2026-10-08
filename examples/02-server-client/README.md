@@ -34,7 +34,8 @@ WATCHER 1034692 — shop 127.0.0.1:41687
 
 - `fero('shop', { data: {…} })` — a seed makes the server. It picks a free port and registers the name `shop`
   with the directory on your box. `fero('shop')` with nothing else is a client: it looks `shop` up and
-  follows. Start them in either order.
+  follows, and like a server it holds the process open until Ctrl-C or `await shop.destroy()`. Start them
+  in either order.
 - Stock flows down: the shop rewrites `widgets` whole every second and every watcher's screen follows. Sales
   flow up: a watcher's `shop.data['sale-<pid>-<n>'] = { item, qty }` is a NEW row; it goes up to the shop, is
   stamped there, and comes back to everyone — the watcher's own screen included. A write shows when it
