@@ -270,6 +270,7 @@ interface PendingCall {
 // the reason — as loud as an uncaught call, and after a failover too. `onError` (the handle's option) is the
 // one place that hears EVERY failure, before or after a frame; with it set no attempt goes unhandled.
 // `error` is set once, when the sub failed; the handle reads it (mode 'failed', every read throws it).
+// A sub that ends without a frame (close, destroy) rejects its pending `ready` as handled — not a failure.
 export interface Sub {
   id: number
   m: string
@@ -290,6 +291,14 @@ const arm = (sub: Sub): void => {
   sub.framed = false
   sub.ready = new Promise<void>((res, rej) => { sub.resolve = res; sub.reject = rej })
   if (sub.onError !== null) sub.ready.catch(noop)
+}
+
+//! end — the sub stopped without failing (close, destroy): a `ready` still waiting rejects with why, marked
+// handled — an awaiting caller learns it, a caller who never looked is not stopped by its own shutdown
+const end = (sub: Sub, why: string): void => {
+  if (sub.framed || sub.error !== null) return
+  sub.ready.catch(noop)
+  sub.reject(new Error(`methods.${sub.m}: ${why}`))
 }
 
 export class Caller {
@@ -351,7 +360,10 @@ export class Caller {
   }
 
   unsubscribe(id: number) {
-    if (!this.#subs.delete(id)) return
+    const sub = this.#subs.get(id)
+    if (sub === undefined) return
+    this.#subs.delete(id)
+    end(sub, 'closed')
     this.#rt.node.step({ kind: 'rpc', id, mode: VERB.UNSUB })
   }
 
@@ -437,6 +449,7 @@ export class Caller {
   destroy() {
     for (const [, c] of this.#calls) c.reject(new Error(`methods.${c.m}: destroyed`))
     this.#calls.clear()
+    for (const [, sub] of this.#subs) end(sub, 'destroyed')
     this.#subs.clear()
   }
 }
@@ -465,8 +478,10 @@ const COERCION = new Set(['toJSON', 'toString', 'valueOf', 'constructor', 'nodeT
 // no-op. Passive touches (symbols, coercion hooks) never throw — inspecting a dead handle is not a read.
 //! `ready` is the CURRENT attempt (a failover starts a new one, the Sub note); to hear every failure of a
 // long-lived sub, pass `{ onError }` (`methods.feed(arg, { onError })`) — then no failure stops the process.
+// After close(), `ready` is the closed sub's (rejected 'closed' if it never framed); it never re-opens.
 export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: number; retry?: boolean; onError?: (e: Error) => void } = {}): any => {
   let live: Sub | null = null
+  let last: Sub | null = null // the sub close() ended: `ready` keeps answering from it
   const subscribe = (): Sub => caller.subscribe(m, a, opts.onError ?? null)
   const open = (): Sub => {
     live ??= subscribe()
@@ -496,9 +511,10 @@ export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: 
       if (prop === 'finally') return (onD?: () => void) => caller.call(m, a, opts).finally(onD)
       if (prop === 'open') return () => open().proxy
       //! `ready` opens the sub (waiting for its first frame IS a reactive intent) and is the same promise
-      // for the whole attempt — made when it began, so a failure before anyone looked is still delivered
-      if (prop === 'ready') return (live ??= subscribe()).ready
-      if (prop === 'close') return () => { if (live && live.error === null) { caller.unsubscribe(live.id); live = null } }
+      // for the whole attempt — made when it began, so a failure before anyone looked is still delivered;
+      // on a closed handle it is the closed sub's, never a new sub
+      if (prop === 'ready') return (live ?? last ?? (live = subscribe())).ready
+      if (prop === 'close') return () => { if (live && live.error === null) { caller.unsubscribe(live.id); last = live; live = null } }
       if (prop === 'mode') return live === null ? 'oneshot' : live.error !== null ? 'failed' : 'live'
       if (isPassive(prop)) return passive(prop)
       return open().proxy[prop]

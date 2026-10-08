@@ -508,3 +508,25 @@ test("a sub that fails AFTER its first frame is loud too: re-subscribed on a new
     await c.destroy(); await a.destroy().catch(() => {}); await b.destroy().catch(() => {})
   }
 })
+
+test("`ready` settles when the sub ends without a frame: close() rejects it 'closed' and does not re-open; destroy() rejects it 'destroyed' — neither hangs nor stops the process", async () => {
+  const addr = `127.0.0.1:${await ports.free()}`
+  const s = await fero('r', {
+    uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { k: 1 },
+    methods: { slow: async () => { await sleep(400); return 1 } },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const bounded = (p: Promise<unknown>) => Promise.race([p, sleep(1500).then(() => { throw new Error('ready still pending') })])
+  try {
+    const h = c.methods.slow(); h.open(); h.close()
+    //! before: reading `ready` on a closed handle opened a NEW sub (`live ??= subscribe`), which then framed
+    await assert.rejects(bounded(h.ready), /methods\.slow: closed/)
+    assert.equal(h.mode, 'oneshot', 'reading ready did not re-open the closed sub')
+    const d = c.methods.slow(); d.open()
+    await c.destroy()
+    //! before: destroy() cleared the subs without settling them — `await d.ready` hung forever
+    await assert.rejects(bounded(d.ready), /methods\.slow: destroyed/)
+  } finally {
+    await c.destroy().catch(() => {}); await s.destroy()
+  }
+})
