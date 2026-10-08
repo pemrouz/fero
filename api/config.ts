@@ -270,15 +270,24 @@ const coerce = (resource: string, key: string, raw: unknown, from: string): unkn
       if (v === 0 || v === '0' || v === 'false' || v === false) return false
       return v
     case 'diag.allow': {
-      //! name → token. A variable or a file carries text; envdeep turns an all-digits value into a number
-      // (its leading zeros gone) and nests a longer name into an object — both refused, naming the KEY,
-      // never the value. An empty token is unset, like an empty value anywhere.
+      //! name → token. A variable carries text, and envdeep reads it: a value that looks like a number or a
+      // boolean (`0123`, `1e5`, `Infinity`, `true`) arrives coerced, its text lost, and an `_` in the name nests
+      // (FERO_DIAG_ALLOW_OPS_TEAM is `ops` with `team` under it). Each is refused in words that say what the
+      // user typed, naming the VARIABLE, never the value. A file is typed: a wrong shape there is just wrong.
+      // An empty token is unset, like an empty value anywhere.
       if (!isPlain(v)) throw new Error(`fero('${resource}'): diag.allow must be an object of name → token${src(from)}`)
+      const fromEnv = from.startsWith('FERO_')
       const out: Record<string, string> = {}
       for (const [who, tok] of Object.entries(v)) {
         const t = typeof tok === 'string' ? tok.trim() : tok
         if (t === '') continue
-        if (typeof t === 'number') throw new Error(`fero('${resource}'): the diag token for '${who}' is all digits${src(from)} — a variable or a flag loses its leading zeros; give it a letter`)
+        const variable = `${from}_${who.toUpperCase()}`
+        if (fromEnv && isPlain(t)) {
+          const sub = Object.keys(t)[0] ?? ''
+          throw new Error(`fero('${resource}'): ${variable}_${sub.toUpperCase()} is not a diag name — a name in a variable is one word of letters and digits (an _ nests it); set ${variable}${sub.toUpperCase()}=<token>, or diag: { allow: { ${who}_${sub}: … } } in the call or a fero.opt.ts file`)
+        }
+        if (fromEnv && (typeof t === 'number' || typeof t === 'boolean'))
+          throw new Error(`fero('${resource}'): the diag token in ${variable} reads as a number or a boolean, so its text is lost (a leading zero, 1e5, true) — give it a letter`)
         if (typeof t !== 'string') throw new Error(`fero('${resource}'): diag.allow.${who} must be a token string${src(from)}`)
         out[who] = t
       }
