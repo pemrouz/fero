@@ -173,6 +173,24 @@ test('V4-18 overlapping cells — our in-flight FIELD write loses to a newer who
   await new Promise((r) => setTimeout(r, 20))
   assert.equal(out, 'superseded')
   await h.destroy()
+  //! a MID-DEPTH parent settles too: our depth-3 write ['cart','a','x'] is WACKed, then a newer foreign
+  // ['cart','a'] lands from another member and our echo never comes. The in-flight index is keyed by
+  // EVERY ancestor, so the mid-depth apply finds our write (keyed by the row alone it stayed pending)
+  const m = harness()
+  m.admit(1, 'bb'); m.admit(2, 'cc')
+  m.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  m.node.writes.ring.place('cart', 'bb')
+  const [d] = m.bind.issue([{ type: REC.update, key: ['cart', 'a', 'x'], value: 1 }]) as Promise<unknown>[]
+  let deep: unknown = 'pending'
+  d.then((v) => { deep = v }, (e) => { deep = `rejected ${e}` })
+  m.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 1, s: 2, e: 1 }) })
+  assert.equal(m.node.writes.pending.size, 0, 'WACKed')
+  m.node.step({ kind: 'bytesIn', link: 2, bytes: records('cc', 9, 1, [{ type: REC.update, key: ['cart', 'a'], value: { y: 2 } }]) })
+  await new Promise((r) => setTimeout(r, 20))
+  assert.deepEqual(deep, { origin: 'bb', seq: 2, epoch: 1, cid: 1 }, 'the mid-depth apply settled our deeper write from the WACK\'s coordinates')
+  assert.deepEqual(snapshot(m.bind.data), { cart: { a: { y: 2 } } })
+  assert.ok([...m.bind.outcomes.rows.values()].every((r) => r.state === 'committed'), 'no row of cluster.writes is left pending')
+  await m.destroy()
 })
 
 test('V4-18 overlapping cells — our in-flight write settles when the kernel REFUSES its echo: a newer foreign row (or a newer same-cell write) lands before our WACK, then the WACK, then the echo — committed from the echo\'s own coordinates, never pending for ever', async () => {
