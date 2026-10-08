@@ -25,6 +25,7 @@ import { JK, type Journal } from './journal.ts'
 import type { EffectSink } from './env.ts'
 
 //! MAX_QUEUED: frames a paused link may hold before drop-oldest kicks in. M0 policy — M1 replaces the drop with spill-to-log (the log IS the retransmit buffer).
+// The default of the tune row `queued` (kernel/tune.ts): a Link has no node, so the node hands its row in at construction (Link.maxQueued).
 export const MAX_QUEUED = 256
 
 //! LinkState: the admission ladder. M0 collapses identified→admitted (no membership yet); the distinct states exist so M2 can insert a view-admission step without reshaping the machine.
@@ -67,7 +68,9 @@ export class Link {
   id: number
   dialed: boolean
   to?: string
-  constructor(id: number, dialed: boolean, to?: string) { this.id = id; this.dialed = dialed; this.to = to }
+  //! maxQueued — the paused-queue bound, the node's tune row `queued` handed in at construction (a Link has no node)
+  maxQueued: number
+  constructor(id: number, dialed: boolean, to?: string, maxQueued = MAX_QUEUED) { this.id = id; this.dialed = dialed; this.to = to; this.maxQueued = maxQueued }
 
   //! addRecord: append to the step's RECORDS frame, opening it with this run's provenance (and, for
   // committed attempt runs, its attempt identity) on first use. Run continuity is CHECKED, not
@@ -103,7 +106,7 @@ export class Link {
     if (this.dead) return
     if (!this.paused) return sink.send(this.id, bytes)
     this.queued.push(bytes)
-    if (this.queued.length > MAX_QUEUED) {
+    if (this.queued.length > this.maxQueued) {
       j.armed && j.emit(JK.dropOldest, this.id, this.queued.length)
       this.queued.length = 0
       this.droppedWhilePaused = true
