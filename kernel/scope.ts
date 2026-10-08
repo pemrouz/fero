@@ -44,6 +44,8 @@ import type { Node } from './node.ts'
 //! SCOPE: the state discriminants (journal/capture-stable).
 export const SCOPE = { held: 1, acquiring: 2, orphan: 3 } as const
 
+//! The four pacing constants below are the DEFAULTS of their tune-table rows (kernel/tune.ts: shedTicks,
+// stageTicks, acqLiveMax, stallAt); the read sites consult `node.tune.<row>`.
 //! SHED_TICKS: heartbeat ticks between an orphan's shed polls / a probing holder's re-HAVEQs.
 export const SHED_TICKS = 2
 //! STAGE_TICKS: latch ticks without ACQDONE before the attempt aborts ('timeout') and re-offers.
@@ -134,7 +136,7 @@ export class Scope {
   stage(node: Node, p: string, origin: string, seq: number, epoch: number, rec: Rec, iss?: string, cid?: number, pp?: number) {
     const e = this.entries.get(p)!
     e.buf!.push({ origin, seq, epoch, rec, iss, cid, live: true, pp })
-    if (++e.liveN! > ACQ_LIVE_MAX) this.#abort(node, p, 'overflow')
+    if (++e.liveN! > node.tune.acqLiveMax) this.#abort(node, p, 'overflow')
   }
 
   //! mintHeld — the STAMP-SITE twin of verdict(): an armed owner committing a record for p holds p
@@ -171,7 +173,7 @@ export class Scope {
       if (cur.state === SCOPE.held && !assigned) {
         cur.state = SCOPE.orphan
         cur.polls = 0
-        cur.nextStall = STALL_AT
+        cur.nextStall = node.tune.stallAt
         cur.tails = this.#tailsOf(node, p) // the FREEZE capture: the shed evidence, fixed from here
         cur.sealed = undefined
         this.n++
@@ -213,7 +215,7 @@ export class Scope {
     if (!assigned) {
       const e = this.entries.get(p)!
       e.polls = 0
-      e.nextStall = STALL_AT
+      e.nextStall = node.tune.stallAt
       e.tails = this.#tailsOf(node, p) // freeze capture (rescope runs after replay — lanes are full)
       node.journal.armed && node.journal.emit(JK.orphaned, p, node.epoch)
     }
@@ -621,7 +623,7 @@ export class Scope {
       e.liveN = undefined
       e.ticks = undefined
       e.polls = 0
-      e.nextStall = STALL_AT
+      e.nextStall = node.tune.stallAt
       e.tails = this.#tailsOf(node, p) // freeze capture — the residue IS the retained content
       node.journal.armed && node.journal.emit(JK.orphaned, p, node.epoch)
     } else {
@@ -690,24 +692,25 @@ export class Scope {
   #ticks = 0
   tick(node: Node) {
     if (!node.armed) return
+    const { shedTicks, stageTicks, stallAt } = node.tune
     this.#ticks++
     let pollDue = false
     for (const [p, e] of this.entries) {
       if (e.state === SCOPE.acquiring) {
-        if (++e.ticks! >= STAGE_TICKS) this.#abort(node, p, 'timeout')
+        if (++e.ticks! >= stageTicks) this.#abort(node, p, 'timeout')
         continue
       }
       if (e.state !== SCOPE.orphan) continue
       e.polls = (e.polls ?? 0) + 1
-      if (e.polls % SHED_TICKS === 0) pollDue = true
-      if (e.polls >= (e.nextStall ?? STALL_AT)) {
-        e.nextStall = (e.nextStall ?? STALL_AT) * 2
+      if (e.polls % shedTicks === 0) pollDue = true
+      if (e.polls >= (e.nextStall ?? stallAt)) {
+        e.nextStall = (e.nextStall ?? stallAt) * 2
         node.journal.armed && node.journal.emit(JK.shedStall, p, e.polls)
       }
     }
     this.evaluateSheds(node)
     if (pollDue || node.confirm.pendingScoped() ||
-        (this.#ticks % SHED_TICKS === 0 && this.#lagging(node))) this.round(node)
+        (this.#ticks % shedTicks === 0 && this.#lagging(node))) this.round(node)
   }
 
   //! #lagging — is any co-holder's attested evidence missing or behind our announceable floors?

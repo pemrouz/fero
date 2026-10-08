@@ -107,7 +107,8 @@ import type { Node } from './node.ts'
 //! View: the committed membership fact — epoch + [uuid, listen] pairs, sorted by uuid (deterministic everywhere).
 export interface View { epoch: number; members: [string, string][] }
 
-//! protocol constants — ticks are heartbeat ticks (the membership clock)
+//! protocol constants — ticks are heartbeat ticks (the membership clock). Each is the DEFAULT of its
+// tune-table row (kernel/tune.ts: suspectTicks, pulls, proposalAge, rejoinTicks, leaveTicks); tick() reads node.tune.
 export const SUSPECT_TICKS = 3    // member unreachable this many consecutive ticks → suspect
 export const MAX_PULLS = 5        // targeted view-pull retries before the alarmed gate release
 export const PROPOSAL_AGE = 10    // ticks before an uncommitted proposal is abandoned (unblocks JOINs; re-grants make retry safe)
@@ -226,8 +227,9 @@ export class Membership {
         this.#propose(node, { epoch: this.#nextEpoch(node), members: sorted([...byUuid.entries()]) })
       }
     }
-    //! suspicion: a committed-view member with no admitted link for SUSPECT_TICKS ticks is suspect
+    //! suspicion: a committed-view member with no admitted link for suspectTicks (SUSPECT_TICKS) ticks is suspect
     if (!node.client && this.view.epoch > 0 && this.isMember(node.uuid) && !this.rejoining()) {
+      const suspectTicks = node.tune.suspectTicks
       for (const [uuid] of this.view.members) {
         if (uuid === node.uuid) continue
         const id = node.byUuid.get(uuid)
@@ -240,7 +242,7 @@ export class Membership {
         }
         const t = (this.#suspectTicks.get(uuid) ?? 0) + 1
         this.#suspectTicks.set(uuid, t)
-        if (t >= SUSPECT_TICKS && !this.#suspects.has(uuid)) {
+        if (t >= suspectTicks && !this.#suspects.has(uuid)) {
           this.#suspects.add(uuid)
           j.armed && j.emit(JK.suspect, uuid)
         }
@@ -262,7 +264,7 @@ export class Membership {
     // make it HEAL a lost VOTE frame); abandon when the epoch passed or the ballot aged out (an aged-out
     // ballot was blocking every JOIN — the review's zombie-proposal wedge).
     if (this.#proposal) {
-      if (this.#proposal.view.epoch <= this.view.epoch || ++this.#proposal.age > PROPOSAL_AGE) this.#proposal = null
+      if (this.#proposal.view.epoch <= this.view.epoch || ++this.#proposal.age > node.tune.proposalAge) this.#proposal = null
       else if (++this.#proposal.ticks >= 2) {
         this.#proposal.ticks = 0
         this.#send(node, this.#proposalTargets(node), this.#proposeFrame(node))
@@ -271,14 +273,14 @@ export class Membership {
     //! leaving (V4-6): re-knock every tick until a survivor's echo, bounded — then go like a crash.
     // Once my shrunk view is installed here there is nothing left to knock for: only the echo is awaited.
     if (this.leaving && !this.leaving.done) {
-      if (++this.leaving.ticks > LEAVE_TICKS) this.#finishLeave(node, false)
+      if (++this.leaving.ticks > node.tune.leaveTicks) this.#finishLeave(node, false)
       //! epoch 0 = no view has reached me yet: keep knocking (a peer that HAS one answers). Past that,
       // only a member knocks — once my shrunk view is installed here there is nothing left to ask for.
       else if (this.isMember(node.uuid) || this.view.epoch === 0) this.#knockLeave(node)
     }
     //! stale-epoch pulls: targeted, bounded; then the alarmed release (a wedged gate is named, never silent)
     if (this.epochStale) {
-      if (this.#pullTicks++ < MAX_PULLS) {
+      if (this.#pullTicks++ < node.tune.pulls) {
         this.#send(node, this.#admitted(node).filter((l) => !l.client), encodeControl(VERB.PULL, { e: this.view.epoch })) // a spoke holds no view of its own to answer with
       } else {
         this.epochStale = false
@@ -291,7 +293,7 @@ export class Membership {
     if (!node.client && this.rejoining() && !this.epochStale) {
       const memberLinks = this.#admitted(node).filter((l) => this.isMember(l.uuid))
       this.#send(node, memberLinks, encodeControl(VERB.PULL, { e: this.view.epoch }))
-      if (++this.#rejoinTicks >= REJOIN_TICKS && !this.#proposal && this.#lowestLive() === node.uuid)
+      if (++this.#rejoinTicks >= node.tune.rejoinTicks && !this.#proposal && this.#lowestLive() === node.uuid)
         this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members })
     }
     //! evicted: ask the lowest admitted MEMBER of my view to propose me back in (a fellow evictee would

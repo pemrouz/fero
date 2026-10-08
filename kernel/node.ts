@@ -33,7 +33,7 @@ import { Confirm } from './confirm.ts'
 import { Scope, SCOPE } from './scope.ts'
 import { diagHello, onDiagQ } from './diag.ts'
 import { maybeCompact } from './log.ts'
-import { tuneOf, MAX_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT, type Tune } from './tune.ts'
+import { tuneOf, type Tune } from './tune.ts'
 import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
 //! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
@@ -321,7 +321,7 @@ export class Node {
     if (!this.durable) return
     const n = this.#dirty.get(p)
     this.#dirty.set(p, (n ?? 0) + 1)
-    this.#walRows = SNAPSHOT_AT // arm: the next heartbeat tick swaps the WAL
+    this.#walRows = this.tune.snapshotAt // arm: the next heartbeat tick swaps the WAL
     if (n === undefined) this.persistBoot()
   }
 
@@ -403,7 +403,7 @@ export class Node {
         //! restored dirtyParts arm the snapshot swap immediately (M6-review finding 54): the dirty
         // ledger's only clear site is a snapshot echo, and nothing else would schedule one — the
         // floors stayed pinned at 0 and the ledger persisted forever.
-        if (this.durable && this.#dirty.size) this.#walRows = SNAPSHOT_AT
+        if (this.durable && this.#dirty.size) this.#walRows = this.tune.snapshotAt
         this.persistBoot() // the incarnation bump is a durable fact from the first instant
         for (const to of this.hosts) {
           j.armed && j.emit(JK.dial, to)
@@ -436,7 +436,7 @@ export class Node {
         for (const to of prev) {
           if (next.has(to) || statics.has(to) || this.membership.view.members.some(([, l]) => l === to)) continue
           for (const [id, m] of this.#timers) if (m.tag === TAG.redial && m.to === to) { this.#timers.delete(id); this.env.sink.cancel(id) }
-          if (covered(to) || this.dialing(to)) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: MAX_REDIALS, gaveUp: true, parked: true })
+          if (covered(to) || this.dialing(to)) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true, parked: true })
           else this.#backoff.delete(to)
         }
         for (const to of next) {
@@ -716,7 +716,7 @@ export class Node {
           // timeouts, and the probe-driven handshake re-round (kernel/scope.ts tick banner)
           if (this.armed) this.scope!.tick(this)
           //! the WAL snapshot (M4e) arms AFTER compaction so the swap captures the just-compacted log
-          if (this.durable && this.#walRows >= SNAPSHOT_AT) this.snapshot()
+          if (this.durable && this.#walRows >= this.tune.snapshotAt) this.snapshot()
           //! give-up revival: a target whose final redial attempt FAILED (gaveUp — never merely "tries
           // exhausted": the last armed attempt may still be pending, and dialing over it would fork a
           // second chain) is parked, not dead — each heartbeat re-dials any parked target we hold no link
@@ -985,7 +985,7 @@ export class Node {
   persistBoot() {
     if (!this.durable) return
     const m = this.membership
-    this.#seqCeiling = this.seq + LAMPORT_LEASE
+    this.#seqCeiling = this.seq + this.tune.lamportLease
     this.env.sink.boot({
       //! identity rides the record (v4.1): restore recovers WHO this dir belongs to, so an omitted
       // config uuid can never half-restore under a fresh random identity (the silent evicted-heir
@@ -1042,7 +1042,7 @@ export class Node {
     // the entry goes with it — no timer, no revival, nothing left to grow (#backoff stays bounded by
     // the live link set, not by every address a port-0 server ever had)
     if (b.parked) { this.#backoff.delete(to); return }
-    if (b.tries >= MAX_REDIALS) {
+    if (b.tries >= this.tune.redials) {
       //! the final ARMED attempt has now FAILED — only here does the target become truly parked
       if (!b.gaveUp) {
         b.gaveUp = true
@@ -1051,7 +1051,7 @@ export class Node {
       }
       return
     }
-    this.#backoff.set(to, { ms: Math.min(b.ms * 2, base * 32), tries: b.tries + 1 })
+    this.#backoff.set(to, { ms: Math.min(b.ms * this.tune.redialGrowth, base * this.tune.redialCap), tries: b.tries + 1 })
     const delay = b.ms + Math.floor(this.env.rng() * base)
     const id = ++this.#timerSeq
     this.#timers.set(id, { tag: TAG.redial, to })
@@ -1096,7 +1096,7 @@ export class Node {
             // resource that moves onto the right port later, heals at heartbeat cadence instead of
             // stranding this node forever (V4-3 panel: noRedial alone never started a chain, so
             // revival — which keys on gaveUp — could never reach the target)
-            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: MAX_REDIALS, gaveUp: true })
+            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
             return this.env.sink.close(link.id, 'name-mismatch')
           }
         }
