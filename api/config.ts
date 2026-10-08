@@ -33,6 +33,8 @@ export interface Sources {
   env?: Record<string, string | undefined>
   cwd?: string
   home?: string
+  //! note — where a one-time deprecation note goes (default: stderr). Each sink hears a note once.
+  note?: (line: string) => void
 }
 
 //! Resolved — the folded config (FeroOpts-shaped, nested groups) and, per leaf key, where it came from.
@@ -64,6 +66,9 @@ const LEAVES = table<{ layers: string; why?: string; object?: true }>({
   rendezvous: { layers: 'fcep' },
   data: { layers: 'cp', why: 'an object of rows', object: true },
   methods: { layers: 'c', why: 'functions — and the door: it closes a resource from the source line that hosts it' },
+  validation: { layers: 'c', why: 'a function' },
+  //! the pre-promotion spelling of `validation`, kept for one release: folded into `validation` below,
+  // with a one-time note on stderr (the leaf stays declared so the old spelling is not an unknown key)
   'seams.validation': { layers: 'c', why: 'a function' },
   signals: { layers: 'c', why: 'V4-8: the clean stop is per instance, never per process' },
 })
@@ -351,7 +356,31 @@ export const resolveConfig = (resource: string, call: FeroOpts, sources: Sources
         throw new Error(`fero('${resource}'): server: true${src(origin.get('server')!)} but server: false pins the client role${src(got.from)} — drop one`)
     }
   }
+  //! seams.validation → validation (owner question 5, 2026-10-05): the one function-valued config key is
+  // a top-level key now. The old spelling is folded into the new one for one release, with a note once
+  // per process; both at once is one key set twice, refused rather than silently picking one.
+  if (flat.has('seams.validation')) {
+    if (flat.has('validation')) throw new Error(`fero('${resource}'): validation and seams.validation are one key, set twice — keep validation and drop seams`)
+    flat.set('validation', flat.get('seams.validation'))
+    origin.set('validation', origin.get('seams.validation')!)
+    flat.delete('seams.validation')
+    origin.delete('seams.validation')
+    noteOnce(sources.note ?? toStderr, `fero('${resource}'): seams: { validation } is now spelled validation: — the old spelling still works in this release and goes in the next\n`)
+  }
   return { config: unflatten(flat), from: (key) => origin.get(key) ?? 'the default' }
+}
+
+//! noteOnce — each sink hears a given note once: the real process has one sink (stderr), so a note
+// prints once per process however many resources it composes; a test injects its own sink
+const toStderr = (line: string): void => { process.stderr.write(line) }
+const noted = new WeakMap<(line: string) => void, Set<string>>()
+const noteOnce = (sink: (line: string) => void, line: string): void => {
+  const key = line.replace(/^fero\('[^']*'\): /, '')
+  let seen = noted.get(sink)
+  if (seen === undefined) noted.set(sink, (seen = new Set()))
+  if (seen.has(key)) return
+  seen.add(key)
+  sink(line)
 }
 
 //! CONFIG_LEAVES — the declared leaves, exported for the docs drift test (README's table must name each)

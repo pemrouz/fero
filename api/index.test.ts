@@ -425,13 +425,13 @@ test('M5b — a CLIENT (hosts, no listen): full state through one feeder, its ow
   }
 })
 
-test("relayed client writes run the SERVER's seams.validation at the relay: the refused row never lands anywhere — not even on the client's own screen — and its methods.update rejects with the server's reason", async () => {
+test("relayed client writes run the SERVER's validation: at the relay: the refused row never lands anywhere — not even on the client's own screen — and its methods.update rejects with the server's reason", async () => {
   //! the IDEAS probe (2026-09-05): before this fix a server that refused its OWN `data.admin = …` still
   // let a bare client's `data.admin = …` LAND (the relay re-stamped but ran no validator)
   const addr = `127.0.0.1:${await ports.free()}`
   const s = await fero('r', {
     uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 },
-    seams: { validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved') },
+    validation: (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved'),
   })
   const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   const rows = (f: typeof c) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string; reason?: string }>)
@@ -586,14 +586,28 @@ test('v4.1 identity hardening: legacy dirs, incomplete dirs, invalid and cross-r
   } finally { fs.rmSync(dir2, { recursive: true, force: true }) }
 })
 
-test('v4.1 data seed: a row the validation seam refuses throws at fero() time — never a silent partial seed', async () => {
-  await assert.rejects(
-    fero('r', {
-      listen: false,
-      data: { a: { stock: 1 }, b: { stock: -5 } },
-      seams: { validation: (r: { value?: { stock?: number } }) => ((r.value?.stock ?? 0) >= 0 ? true : 'negative stock') },
-    }),
-    /data seed row 'b' rejected by seams\.validation — negative stock/)
+test('v4.1 data seed: a row the validation refuses throws at fero() time — never a silent partial seed (both spellings)', async () => {
+  const rule = (r: { value?: { stock?: number } }) => ((r.value?.stock ?? 0) >= 0 ? true : 'negative stock')
+  await assert.rejects(fero('r', { listen: false, data: { a: { stock: 1 }, b: { stock: -5 } }, validation: rule }),
+    /data seed row 'b' rejected by validation — negative stock/)
+  await assert.rejects(fero('r', { listen: false, data: { a: { stock: 1 }, b: { stock: -5 } }, seams: { validation: rule } }),
+    /data seed row 'b' rejected by validation — negative stock/, 'the old spelling is the same rule (one release)')
+})
+
+test('validation: is a top-level function (not a method pointer); a non-function is refused; the door shows it as [function] under either spelling', async () => {
+  const rule = (r: { key: string[] }) => (r.key[0] !== 'admin' || 'reserved')
+  await assert.rejects(fero('r', { listen: false, validation: 'strict' } as never), /fero\('r'\): validation must be a function \(record\) => true \| 'the reason' — it runs on every write that enters/)
+  for (const opts of [{ validation: rule }, { seams: { validation: rule } }]) {
+    const f = await fero('r', { listen: false, ...opts } as never)
+    try {
+      f.data.admin = 1
+      f.data.ok = 1
+      assert.deepEqual(f.snapshot, { ok: 1 }, 'the rule ran on the local ingest')
+      await assert.rejects(f.methods.update({ key: 'admin', value: 2 }), (e: WriteReject) => e.reason === 'reserved')
+      assert.deepEqual(diag(f)!.config().validation, { value: '[function]', from: 'the call' })
+      assert.equal(diag(f)!.config()['seams.validation'], undefined, 'one key: the old spelling is folded into it')
+    } finally { await f.destroy() }
+  }
 })
 
 test('v4.1 data seed: applied only when the local fold is empty at boot — a restore never re-seeds', async () => {

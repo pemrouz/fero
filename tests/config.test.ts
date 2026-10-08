@@ -31,7 +31,7 @@ const home = (file?: string): string => {
   return d
 }
 
-interface Line { name: string; config: Record<string, { value: unknown; from: string }>; me: { listen: string; role: string; hosts: string[] } }
+interface Line { name: string; config: Record<string, { value: unknown; from: string }>; me: { listen: string; role: string; hosts: string[] }; refused?: string | null }
 //! run — spawn the child with the layer ON (FERO_CONFIG deleted), the directory OFF, the given argv,
 // extra env, cwd and HOME; resolve with the parsed lines or the ERR message
 const run = async (names: string, o: { argv?: string[]; env?: Record<string, string>; cwd?: string; home?: string; call?: Record<string, unknown> } = {}): Promise<{ lines: Line[]; err: string | null; stderr: string }> => {
@@ -163,4 +163,17 @@ test('FERO_CONFIG=off in a real process: flags and files are not read', async ()
   const r = await run('shop', { env, argv: ['--fero.dir', path.join(scratch(), 'x')], cwd: project("{ server: true }") })
   //! with the layer off, nothing made this a server and nothing gave it hosts: the bare client's refusal
   assert.match(r.err ?? '', /a client needs something to dial/)
+})
+
+test('validation: and its old spelling seams.validation both guard writes in a real process; the old one prints its note to stderr once, however many resources', async () => {
+  const top = await run('shop,users', { env: { CHILD_VALIDATION: 'top' }, call: { listen: false } })
+  assert.equal(top.err, null, top.err ?? '')
+  assert.deepEqual(top.lines.map((l) => [l.name, l.refused, l.config.validation]), [['shop', 'no bad rows', { value: '[function]', from: 'the call' }], ['users', 'no bad rows', { value: '[function]', from: 'the call' }]])
+  assert.doesNotMatch(top.stderr, /seams/, 'the new spelling prints nothing')
+  const old = await run('shop,users', { env: { CHILD_VALIDATION: 'seams' }, call: { listen: false } })
+  assert.equal(old.err, null, old.err ?? '')
+  assert.deepEqual(old.lines.map((l) => [l.name, l.refused, l.config.validation?.from]), [['shop', 'no bad rows', 'the call'], ['users', 'no bad rows', 'the call']])
+  const notes = old.stderr.split('\n').filter((l) => l.includes('seams: { validation } is now spelled validation:'))
+  assert.equal(notes.length, 1, `one note for two resources:\n${old.stderr}`)
+  assert.equal(notes[0], "fero('shop'): seams: { validation } is now spelled validation: — the old spelling still works in this release and goes in the next")
 })

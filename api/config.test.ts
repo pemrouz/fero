@@ -21,10 +21,36 @@ const r = (name: string, call: Record<string, unknown>, s: Partial<ReturnType<ty
 const cfg = (...a: Parameters<typeof r>) => r(...a).config as Record<string, unknown>
 
 test('the call alone folds through unchanged, nested groups included', () => {
-  const { config, from } = r('shop', { server: true, heartbeat: { ms: 250 }, hosts: ['a:1'], seams: { validation: () => true } })
-  assert.deepEqual(config, { server: true, heartbeat: { ms: 250 }, hosts: ['a:1'], seams: { validation: (config as { seams: { validation: unknown } }).seams.validation } })
+  const rule = () => true as const
+  const { config, from } = r('shop', { server: true, heartbeat: { ms: 250 }, hosts: ['a:1'], validation: rule })
+  assert.deepEqual(config, { server: true, heartbeat: { ms: 250 }, hosts: ['a:1'], validation: rule })
   assert.equal(from('heartbeat.ms'), 'the call')
   assert.equal(from('redial.ms'), 'the default')
+})
+
+test('validation: is a top-level key; seams.validation is its old spelling for one release — folded into it, with a note once per process', () => {
+  const rule = () => true as const
+  const notes: string[] = []
+  const note = (line: string) => { notes.push(line) }
+  //! the new spelling: no note
+  assert.deepEqual(r('shop', { validation: rule }, { note } as never).config, { validation: rule })
+  assert.deepEqual(notes, [])
+  //! the old spelling lands on the SAME key (the composer reads one), named the call, and the note says what to write
+  const old = r('shop', { seams: { validation: rule } }, { note } as never)
+  assert.deepEqual(old.config, { validation: rule })
+  assert.equal(old.from('validation'), 'the call')
+  assert.equal(notes.length, 1)
+  assert.match(notes[0], /^fero\('shop'\): seams: \{ validation \} is now spelled validation: — the old spelling still works in this release and goes in the next\n$/)
+  //! once per sink (the real process has one, stderr): a second resource, a second call — no second note
+  r('users', { seams: { validation: rule } }, { note } as never)
+  r('shop', { seams: { validation: rule } }, { note } as never)
+  assert.equal(notes.length, 1, 'the note prints once')
+  //! both at once is one key set twice: refused, never a silent pick
+  assert.throws(() => r('shop', { validation: rule, seams: { validation: rule } }, { note } as never), /fero\('shop'\): validation and seams\.validation are one key, set twice — keep validation and drop seams/)
+  //! a function: the call only, under either spelling
+  assert.throws(() => r('r', {}, { argv: ['--fero.validation', '1'] }), /'validation' cannot come from --fero\.validation — it is set in the call only \(a function\)/)
+  assert.throws(() => r('r', {}, { env: { FERO_VALIDATION: 'x' } }), /'validation' cannot come from FERO_VALIDATION — it is set in the call only/)
+  assert.equal(nameKey('validation'), null, 'a declared key is never a resource rung')
 })
 
 test('precedence: flag > call > env > project file > home file, per key', () => {
@@ -208,7 +234,7 @@ test('a config file that fails to load throws with its path (optcascade), and th
   const home = scratch()
   fs.writeFileSync(path.join(home, 'fero.opt.js'), 'export default {')
   assert.throws(() => r('r', {}, { home }), (e: Error) => e.message.includes(path.join(home, 'fero.opt.js')))
-  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'data', 'methods', 'seams.validation', 'signals'])
+  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
 })
 
 test('I-35 — a LONGER name under a leaf is refused naming THAT name; the good variable beside it is never blamed, and `data` (an object of rows) still rides a file', () => {

@@ -2,7 +2,7 @@ import { fero } from '../../api/index.ts'
 
 // one rule for every write that enters here: the seed, its own, and what a client sends in
 const rule = (r) => (r.value?.stock ?? 0) >= 0 || 'negative stock'
-const shop = await fero('shop', { data: { nails: { stock: 5 } }, seams: { validation: rule } })
+const shop = await fero('shop', { data: { nails: { stock: 5 } }, validation: rule })
 
 // the screen: the writes this shop issued, each with its outcome, then the object
 const draw = () => {

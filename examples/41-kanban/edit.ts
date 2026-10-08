@@ -4,7 +4,7 @@ import { rules } from './rules.ts'
 
 // an editor: a client that carries the board's rule, so its own bad write is refused here and never leaves
 const [who, ...first] = process.argv.slice(2)
-const f = await fero('board', { seams: { validation: rules } })
+const f = await fero('board', { validation: rules })
 const columns = f.data.group((c) => c.status)
 // readline holds the line you are typing, so a redraw can put it back (on a fresh row: prevRows = 0); it hands Ctrl-C on to fero's clean stop
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: '' })

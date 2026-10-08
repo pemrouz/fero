@@ -21,7 +21,7 @@ CLIENT 1623681
 { nails: { stock: 5 }, 'saw-1623681': { stock: 1 } }
 ```
 
-- `seams: { validation: rule }` — the rule sees each record (its `key`, its `value`) and answers `true` or
+- `validation: rule` — the rule sees each record (its `key`, its `value`) and answers `true` or
   the reason. It runs wherever a write enters the shop: the seed, the shop's own assignment, and a client's
   write as it arrives. A seed row it refuses stops `fero()` itself, naming the row and the reason.
 - A refused write never shows, anywhere: nothing lands, no value comes back to undo. Its one trace is a

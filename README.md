@@ -35,7 +35,7 @@ watcher.data.sale1 = { item: 'widgets', qty: 1 }              // a client's writ
 
 - **Roles.** A bare `fero(name)` is a client. Any server marker makes a server: `server: true`, `listen`, `dir`, `replicas`, a `data:` seed, or `methods:`. A server binds a free loopback port and registers with the box's directory at `127.0.0.1:3376`; a client looks the name up there. With the directory off, every address is in the call: `listen` plus `hosts`.
 - **Writes.** A write shows when it commits: inside the assignment on the server that owns the row, and as the owner's echo everywhere else. Nothing shows early. A refused write never shows. Until it commits, a write is a `pending` row of `cluster.writes`. `await shop.methods.update(record, { confirm })` waits for one rung of the ladder. `committed` means the owner stamped it. `replicated` means a majority of the view holds it. `persisted` means a majority has it on disk. A reject says how far the write got. It is never a rollback.
-- **Methods, and the door.** A function under `methods:` runs on the server; a client awaits it, and the reply follows the commit of every write it made. Declaring methods protects the resource: clients then change data only through them, and a client's plain write is refused `methods-only`. Reads stay open. `seams.validation` is a rule about what a record may look like, run on every write that enters a server.
+- **Methods, and the door.** A function under `methods:` runs on the server; a client awaits it, and the reply follows the commit of every write it made. Declaring methods protects the resource: clients then change data only through them, and a client's plain write is refused `methods-only`. Reads stay open. `validation:` is a rule about what a record may look like, run on every write that enters a server.
 - **Membership.** Servers form a view by ballot. A write needs the majority side of the view. Reads never wait. A clean stop (Ctrl-C, or `destroy()`) leaves by a vote, so two members survive a clean stop. A crash is different: voting a dead member out needs a majority of the whole old view, and one of two is not a majority, so two members cannot survive a crash. The deployment rule is three members plus `dir`.
 - **Durability.** `dir` turns on a write-ahead log and a boot record. Run the same file again and it is the same node in its next life, its rows back before it has a socket. Kill -9 a whole cluster and restore it from the disks: no `persisted` write is lost.
 - **Scoped replication.** `replicas: N` puts every partition (a top-level row) on exactly N members. A shard is never shown as the resource: a sync read or an operator on a scoped server throws a typed error, and `await f.data` gathers the whole.
@@ -83,7 +83,8 @@ Examples for a resource named `shop`. The per-resource form is shown for the fla
 | `rendezvous` | `rendezvous: '127.0.0.1:4000'` / `false` | `--fero.rendezvous …` / `--no-fero.rendezvous` | `FERO_RENDEZVOUS=…` / `off` | `rendezvous: '…'` | `--fero.shop.rendezvous …` · `FERO_SHOP_RENDEZVOUS=…` · `shop: { rendezvous }` |
 | `data` | `data: { … }` | refused | refused | `data: { … }` | `shop: { data: { … } }` |
 | `methods` | `methods: { … }` | refused | refused | refused | the call only |
-| `seams.validation` | `seams: { validation }` | refused | refused | refused | the call only |
+| `validation` | `validation: rule` | refused | refused | refused | the call only |
+| `seams.validation` | `seams: { validation: rule }`, the old spelling of `validation` | refused | refused | refused | the call only |
 | `signals` | `signals: false` | refused | refused | refused | the call only |
 
 ### The table
@@ -137,7 +138,8 @@ Scope: *instance* = this node only. *cluster* = must be the same on every member
 | Key | Default | Scope | Set via | What it does |
 |---|---|---|---|---|
 | `methods` | unset: an open resource | instance | the call only | The hosted methods, and the door (V4-5): declaring them means clients change data only through them. A plain object of functions. Never from another layer: it would host code and close the door from outside the source line. `methods: {}` is a resource clients may only read. Implies the server role. |
-| `seams.validation` | unset: every write admitted | cluster | the call only | A schema check on every record at the one local ingest, and on an open server at the relay for client writes. Return `true` to admit or a reason string to refuse. A function, so no other layer can carry it. Every server should run the same predicate. |
+| `validation` | unset: every write admitted | cluster | the call only | A schema check on every record at the one local ingest (the server's own writes, its handlers', the `data:` seed), and on an open server at the relay for client writes. Return `true` to admit or a reason string to refuse. A function, so no other layer can carry it. Every server should run the same rule. |
+| `seams.validation` | unset | cluster | the call only | The old spelling of `validation`. It still works in this release and prints a one-line note to stderr once per process; it goes in the next. Setting both is refused. |
 
 **Process**
 

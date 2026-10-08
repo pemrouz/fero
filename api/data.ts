@@ -195,7 +195,7 @@ export class Bind {
   #tracked?: () => Promise<Coords>[] | undefined
 
   //! issue — THE one local ingest (assignment sugar, the lens's write builtins, methods.* and the
-  // data: seed all land here; the seams.validation hook therefore covers every spelling by
+  // data: seed all land here; the validation: hook therefore covers every spelling by
   // construction — v2's OQ6). Validate, register the pending entries, hand the records to the kernel;
   // the proxy changes only when a commit applies (#onApply).
   issue(recs: Rec[]): Issued {
@@ -438,7 +438,7 @@ export class Bind {
   // widened to TERMINAL REJECTS (2026-09-05). When the kernel drops the oldest attempt at overflow
   // (droppedPending grows) or a relay's validator refused one of ours (rejectedPending grows — the
   // WNACK `invalid` path, kernel/write.ts onNack), find our pending entries the kernel no longer
-  // holds. A recorded REASON rejects with it — the client sees the server's seams.validation verbatim:
+  // holds. A recorded REASON rejects with it — the client sees the server's validation: verbatim:
   // a plain assignment's outcome row reads it, methods.* rejects typed, exactly like a local reject
   // (and exactly as invisible: the value never showed). WACK'd-or-replicated ones have dedup-window
   // coordinates (onAck feeds it) — resolve them; the rest are genuinely dropped — reject 'dropped'.

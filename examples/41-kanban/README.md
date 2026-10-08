@@ -42,7 +42,7 @@ EDIT bob 414137
 - A card is a row written by its fields: `add` patches `status` and `title`, `move` and `set` write one
   field; `group((c) => c.status)` is the board. Each field is its own cell, so ada's retitle and bob's
   move of one card at the same moment both land; the same field from two at once keeps the last write (17).
-- The board and every editor carry `rules.ts` as `seams.validation`: a whole row is refused (`this board
+- The board and every editor carry `rules.ts` as their `validation` rule: a whole row is refused (`this board
   writes fields, never whole rows`), and a status that names no column, or none at all (`move c2`). An
   editor refuses its own bad write before it leaves: bob's `nowhere` is a `rejected` row of his
   `cluster.writes` (the lines over his board: his own writes, 03) that was never `pending`; a client with
