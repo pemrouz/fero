@@ -26,7 +26,12 @@
 //     grants for an abandoned same-epoch ballot cannot be miscounted;
 //   - proposer identity is the LINK's authenticated uuid, never a frame field;
 //   - proposing spends your own vote — and you cannot propose an epoch your
-//     vote is already spent on for another proposer.
+//     vote is already spent on for another proposer;
+//   - my own ballots never go DOWN in epoch (2026-10-08, the I-20 salvage):
+//     votedFor remembers only the latest ballot, so a fresh ballot of mine
+//     below my last one could re-spend a vote given away in between — the
+//     proposer-side double vote (see #nextEpoch; pinned in membership.test.ts
+//     and drawn by chance in sim/explore.test.ts).
 // Single-proposer discipline keeps honest contention out of the ballot layer:
 // every proposal path (genesis, eviction, join, rejoin, leave) requires being
 // the lowest-uuid LIVE member; a JOIN landing elsewhere is relayed one hop.
@@ -48,9 +53,11 @@
 // servers announce, but never announces one (no view-on-admit, no flood, no PULL
 // answer, no "help a laggard up"), and node.ts drops VIEW/PROPOSE/VOTE/JOIN/LEAVE
 // arriving on a client link. What it holds is a picture of its feeder's cluster —
-// so an EQUAL-epoch view with different members is not split-brain to a client but
-// the cluster having re-formed without it (memory-only members reborn under fresh
-// uuids reuse the epoch numbers), and it adopts that view where a member must refuse.
+// so a view from its PRIMARY link with different members, at an equal or even LOWER
+// epoch, is not split-brain to a client but the cluster having re-formed without it
+// (memory-only members reborn under fresh uuids start the epoch count again), and it
+// adopts that view where a member must refuse (I-23, amended 2026-10-08: a client
+// follows its feeder; its epoch is the feeder's number). Other links stay higher-only.
 //
 // Genesis is the OPEN mode: epoch 0 has no members, no gate, no ballots — byte-
 // for-byte the M0/M1 behaviour, so everything below this milestone is unchanged
@@ -100,7 +107,8 @@ import { JK } from './journal.js'
 //! View: the committed membership fact — epoch + [uuid, listen] pairs, sorted by uuid (deterministic everywhere).
                                                                     
 
-//! protocol constants — ticks are heartbeat ticks (the membership clock)
+//! protocol constants — ticks are heartbeat ticks (the membership clock). Each is the DEFAULT of its
+// tune-table row (kernel/tune.ts: suspectTicks, pulls, proposalAge, rejoinTicks, leaveTicks); tick() reads node.tune.
 export const SUSPECT_TICKS = 3    // member unreachable this many consecutive ticks → suspect
 export const MAX_PULLS = 5        // targeted view-pull retries before the alarmed gate release
 export const PROPOSAL_AGE = 10    // ticks before an uncommitted proposal is abandoned (unblocks JOINs; re-grants make retry safe)
@@ -155,6 +163,11 @@ export class Membership {
   //! leaving — the graceful exit in progress (V4-6): ticks spent waiting, and whether it is over
   leaving                                          = null
   #wasOpen = true // last journaled gate state, for transition events
+  //! wasMember — has any view this node held ever named it? Set in install() (the boot view counts: it is
+  // the view install() replaces). It splits the not-a-member gate word: a node that was in a view and is
+  // not any more was voted out ('evicted'); one never named yet is a newcomer waiting for its JOIN ballot
+  // ('joining') — onView hands a joiner the current view at admit time, before anyone votes it in.
+  #wasMember = false
 
   constructor(boot                                                                                                 ) {
     if (boot && boot.epoch > 0 && viewOk(boot.members)) {
@@ -179,7 +192,7 @@ export class Membership {
     if (this.epochStale) return { open: false, reason: 'stale-epoch' }
     if (this.rejoining()) return { open: false, reason: 'rejoining' }
     if (this.view.epoch === 0) return { open: true, reason: '' } // open genesis — the M0/M1 mode
-    if (!this.isMember(node.uuid)) return { open: false, reason: 'evicted' }
+    if (!this.isMember(node.uuid)) return { open: false, reason: this.#wasMember ? 'evicted' : 'joining' }
     let reachable = 1 // self
     for (const l of node.links.values())
       if (l.state === LS.admitted && !l.dead && this.isMember(l.uuid)) reachable++
@@ -214,8 +227,9 @@ export class Membership {
         this.#propose(node, { epoch: this.#nextEpoch(node), members: sorted([...byUuid.entries()]) })
       }
     }
-    //! suspicion: a committed-view member with no admitted link for SUSPECT_TICKS ticks is suspect
+    //! suspicion: a committed-view member with no admitted link for suspectTicks (SUSPECT_TICKS) ticks is suspect
     if (!node.client && this.view.epoch > 0 && this.isMember(node.uuid) && !this.rejoining()) {
+      const suspectTicks = node.tune.suspectTicks
       for (const [uuid] of this.view.members) {
         if (uuid === node.uuid) continue
         const id = node.byUuid.get(uuid)
@@ -228,7 +242,7 @@ export class Membership {
         }
         const t = (this.#suspectTicks.get(uuid) ?? 0) + 1
         this.#suspectTicks.set(uuid, t)
-        if (t >= SUSPECT_TICKS && !this.#suspects.has(uuid)) {
+        if (t >= suspectTicks && !this.#suspects.has(uuid)) {
           this.#suspects.add(uuid)
           j.armed && j.emit(JK.suspect, uuid)
         }
@@ -250,7 +264,7 @@ export class Membership {
     // make it HEAL a lost VOTE frame); abandon when the epoch passed or the ballot aged out (an aged-out
     // ballot was blocking every JOIN — the review's zombie-proposal wedge).
     if (this.#proposal) {
-      if (this.#proposal.view.epoch <= this.view.epoch || ++this.#proposal.age > PROPOSAL_AGE) this.#proposal = null
+      if (this.#proposal.view.epoch <= this.view.epoch || ++this.#proposal.age > node.tune.proposalAge) this.#proposal = null
       else if (++this.#proposal.ticks >= 2) {
         this.#proposal.ticks = 0
         this.#send(node, this.#proposalTargets(node), this.#proposeFrame(node))
@@ -259,14 +273,14 @@ export class Membership {
     //! leaving (V4-6): re-knock every tick until a survivor's echo, bounded — then go like a crash.
     // Once my shrunk view is installed here there is nothing left to knock for: only the echo is awaited.
     if (this.leaving && !this.leaving.done) {
-      if (++this.leaving.ticks > LEAVE_TICKS) this.#finishLeave(node, false)
+      if (++this.leaving.ticks > node.tune.leaveTicks) this.#finishLeave(node, false)
       //! epoch 0 = no view has reached me yet: keep knocking (a peer that HAS one answers). Past that,
       // only a member knocks — once my shrunk view is installed here there is nothing left to ask for.
       else if (this.isMember(node.uuid) || this.view.epoch === 0) this.#knockLeave(node)
     }
     //! stale-epoch pulls: targeted, bounded; then the alarmed release (a wedged gate is named, never silent)
     if (this.epochStale) {
-      if (this.#pullTicks++ < MAX_PULLS) {
+      if (this.#pullTicks++ < node.tune.pulls) {
         this.#send(node, this.#admitted(node).filter((l) => !l.client), encodeControl(VERB.PULL, { e: this.view.epoch })) // a spoke holds no view of its own to answer with
       } else {
         this.epochStale = false
@@ -279,7 +293,7 @@ export class Membership {
     if (!node.client && this.rejoining() && !this.epochStale) {
       const memberLinks = this.#admitted(node).filter((l) => this.isMember(l.uuid))
       this.#send(node, memberLinks, encodeControl(VERB.PULL, { e: this.view.epoch }))
-      if (++this.#rejoinTicks >= REJOIN_TICKS && !this.#proposal && this.#lowestLive() === node.uuid)
+      if (++this.#rejoinTicks >= node.tune.rejoinTicks && !this.#proposal && this.#lowestLive() === node.uuid)
         this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members })
     }
     //! evicted: ask the lowest admitted MEMBER of my view to propose me back in (a fellow evictee would
@@ -362,6 +376,10 @@ export class Membership {
     const j = node.journal
     const proposer = link.uuid // authenticated by HELLO — never trust a frame field for identity
     const h = hashOf(v.m)
+    //! one spelling for a clean leave: a ballot that leaves its OWN proposer out is a leave (the lowest live
+    // leaver proposes its exit itself, see #knockLeave). Journal it as leave(proposer) — the row a knocked
+    // leave writes in onLeave — so a survivor's diary reads the same either way. Journal only.
+    if (!v.m.some((m) => m[0] === proposer)) j.armed && j.emit(JK.leave, proposer)
     //! the vote-once rule with same-proposer idempotency (see banner): unspent epoch, or re-grant to the
     // same proposer (his abandoned/re-offered ballots — at most one of HIS can commit; a rejoining node
     // may vote: voting is not writing). ANY epoch above the committed view is grantable — a ballot
@@ -417,11 +435,14 @@ export class Membership {
       this.rejoinFloor = 0
       this.settle(node)
     }
-    //! a CLIENT adopts an equal-epoch view whose members differ (see the banner): the cluster re-formed
-    // without it and reused the epoch number — its members row would otherwise show the dead ids for good.
-    // A member refuses it: one view per epoch is the safety rule, and a VIEW is not a ballot.
-    const reformed = node.client && v.e === this.view.epoch && hashOf(v.m) !== hashOf(this.view.members)
-    if (v.e > this.view.epoch || reformed) this.install(node, { epoch: v.e, members: v.m })
+    //! a CLIENT follows its FEEDER (I-23, amended 2026-10-08): on its primary link a view whose members
+    // differ installs at ANY epoch — equal or lower too. The cluster it looks at re-formed without it
+    // (memory-only members reborn under fresh uuids start the count again at 1); its members row and its
+    // epoch must show what its feeder shows, never dead ids kept for their bigger number. Every other
+    // link stays "higher only": a stale non-primary server must not teach a stale row. A member refuses
+    // all of it: one view per epoch is the safety rule, and a VIEW is not a ballot.
+    const feeder = node.client && v.e >= 1 && link.id === node.primary && hashOf(v.m) !== hashOf(this.view.members)
+    if (v.e > this.view.epoch || feeder) this.install(node, { epoch: v.e, members: v.m })
     else if (v.e < this.view.epoch && !node.client) // help a laggard up — a spoke never teaches, so it never "helps"
       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
     //! the leaver's exit proof (V4-6): a VIEW at or above my committed epoch that does not hold me, from a
@@ -445,7 +466,9 @@ export class Membership {
     const j = node.journal
     for (const [u] of this.view.members)
       if (!view.members.some((m) => m[0] === u)) j.armed && j.emit(JK.evict, u)
+    if (this.isMember(node.uuid)) this.#wasMember = true // the view being replaced (a restored boot view too)
     this.view = { epoch: view.epoch, members: sorted(view.members) }
+    if (this.isMember(node.uuid)) this.#wasMember = true
     node.epoch = view.epoch
     node.persistBoot() // the committed view is a durable fact from the instant it installs
     node.confirm.recount(node) // the view-change recount: thresholds are majorities OF THE COMMITTED VIEW
@@ -551,9 +574,14 @@ export class Membership {
   }
 
   //! #nextEpoch — the epoch a fresh proposal must target: past the committed view, past every KNOWN
-  // burn, and past this node's own vote if it is spent on someone else (see #burned).
+  // burn, past this node's own vote if it is spent on someone else (see #burned) — and never BELOW a
+  // ballot of its own (the same epoch again is the idempotent same-proposer case). votedFor remembers
+  // only the LATEST ballot: a node that granted another proposer at 2, then opened its own ballot at 3
+  // and lost it, once started again at view+1 = 2 — spending at 2 a vote it had already given away
+  // there, which nothing remembered any more. That is a double vote, and with two old-set majorities
+  // sharing only that voter it committed two views at one epoch (pinned in membership.test.ts, 2026-10-08).
   #nextEpoch(node      )         {
-    return Math.max(this.view.epoch, this.#burned, this.votedFor.p === node.uuid ? 0 : this.votedFor.e) + 1
+    return Math.max(this.view.epoch, this.#burned, this.votedFor.p === node.uuid ? this.votedFor.e - 1 : this.votedFor.e) + 1
   }
 
   #propose(node      , view      ) {

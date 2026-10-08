@@ -8,7 +8,6 @@
 // plan's semantics section.
 
 import { Node, stable } from '../kernel/node.js'
-import { MAX_QUEUED } from '../kernel/link.js'
 import { SCOPE } from '../kernel/scope.js'
 import { partitionOf } from '../kernel/env.js'
                                     
@@ -20,14 +19,14 @@ export const perEvent = () => [
   {
     //! the REAL send-plane invariant: frames may sit queued ONLY while the link is paused — a drain that
     // fails to release the queue, or a ship that queues while flowing, violates this immediately. (The raw
-    // MAX_QUEUED bound is deliberately NOT monitored alone: ship() enforces it at the only push site, so a
+    // queued bound (the node's tune row) is deliberately NOT monitored alone: ship() enforces it at the only push site, so a
     // bound-only check is a tautology — an adversarial-review finding.)
     name: 'queued-implies-paused',
     check: (sim     )                => {
       for (const [id, n] of sim.nodes)
         for (const l of n.links.values()) {
           if (l.queued.length > 0 && !l.paused) return `${id} link ${l.id} has ${l.queued.length} queued frames while FLOWING`
-          if (l.queued.length > MAX_QUEUED) return `${id} link ${l.id} queued ${l.queued.length} > ${MAX_QUEUED}`
+          if (l.queued.length > n.tune.queued) return `${id} link ${l.id} queued ${l.queued.length} > ${n.tune.queued}`
         }
       return null
     },
@@ -52,12 +51,15 @@ export const perEvent = () => [
     })(),
   },
   {
-    //! committed epochs never go backwards — install() only accepts strictly newer views
+    //! committed epochs never go backwards — install() only accepts strictly newer views. MEMBERS only: a
+    // client's epoch is its feeder's number (I-23, amended 2026-10-08), and the cluster it looks at may be
+    // reborn under fresh uuids at epoch 1 after it saw epoch 2 — the row follows the feeder, by design.
     name: 'epoch-monotone',
     check: (() => {
       const last = new Map                ()
       return (sim     )                => {
         for (const [id, n] of sim.nodes) {
+          if (n.client) continue
           const prev = last.get(id) ?? 0
           if (n.epoch < prev) return `${id} epoch went backwards: ${n.epoch} < ${prev}`
           last.set(id, n.epoch)

@@ -40,7 +40,7 @@ import { JK } from './journal.js'
 //! CONFIRM: the guarantee levels (wire/api-stable discriminants, REC-style).
 export const CONFIRM = { replicated: 0, persisted: 1 }         
 
-//! MAX_PROBES: registry bound — overflow answers the OLDEST probe false (surfaced), never grows silently.
+//! MAX_PROBES: registry bound — overflow answers the OLDEST probe false (surfaced), never grows silently. The default of the tune row `probes` (kernel/tune.ts); register() reads node.tune.probes.
 export const MAX_PROBES = 1024
 
 //! `part` (M6): the record's partition — armed nodes range the count over holdersOf(part) at the
@@ -72,7 +72,7 @@ export class Confirm {
     if (node.armed && part !== undefined) probe.part = part
     this.#probes.set(id, probe)
     j.armed && j.emit(JK.confirmReq, id, level, origin)
-    if (this.#probes.size > MAX_PROBES) {
+    if (this.#probes.size > node.tune.probes) {
       const oldest = this.#probes.keys().next().value 
       this.#answer(node, this.#probes.get(oldest) , false, 0)
     }

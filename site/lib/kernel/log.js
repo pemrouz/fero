@@ -47,7 +47,7 @@
 import { JK } from './journal.js'
                                      
 
-//! COMPACT_AT: per-origin entry count that arms a compaction pass (the size-aware trigger).
+//! COMPACT_AT: per-origin entry count that arms a compaction pass (the size-aware trigger). The default of the tune row `compactAt` (kernel/tune.ts); maybeCompact reads node.tune.compactAt.
 export const COMPACT_AT = 4096
 
 //! frontier — the highest seq of origin `o` that EVERY committed-view member is provably past, on
@@ -154,8 +154,9 @@ export const maybeCompact = (node      ) => {
   // pinning is the safe direction (memory over loss; DESIGN-M6 C3 lands the scoped frontier: min over
   // holdersOf(p) ∪ announcers of the per-(o,p) stable marks, with acquiring holders contributing 0).
   if (node.armed) return
+  const compactAt = node.tune.compactAt
   for (const [o, entries] of node.logs) {
-    if (entries.length < COMPACT_AT) continue
+    if (entries.length < compactAt) continue
     const f = frontier(node, o)
     if (f > 0) compact(node, o, f)
   }

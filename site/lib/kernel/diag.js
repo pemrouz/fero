@@ -17,6 +17,7 @@
 import { VERB, encodeControl, FrameError } from './codec.js'
 import { LS,           } from './link.js'
 import { JK } from './journal.js'
+import { partitionOf } from './env.js'
                                      
 
 //! DIAG_MAX: rows per journal/logs chunk — chunked cursor pulls are what keep a big node servable
@@ -90,6 +91,25 @@ export const diagHello = (node      , link      , v                         )   
 // re-bases captureNode onto this): one producer, two consumers, drift impossible by construction.
 // Every field is a codec-safe scalar/array; `origins` adds the per-lane {tail, base} the logs cursor
 // needs (base = the compaction floor: empty-answer-with-tail>f means "compacted past you", not "caught up").
+//! ownHolders — the holder set of every partition in this node's OWN lane (ISSUES I-3): the ring's own
+// answer (holders(p, replicas), holder[0] = the owner), carried in the capture so the debugger never
+// re-derives placement (the page cannot import ring.ts, and a re-implemented hash would drift). Own lane
+// only: a route's partition is named by its origin's writeLocal row, so the origin's slice answers it.
+// The stale-ring guard is the scope.ts one — a lazy rebuild to the committed view, the same arrays the
+// write path would build on its next record. Armed nodes only (scoped, view committed).
+// The own writeLocal journal rows are walked too: a partition this node wrote but no longer holds (it
+// shed it, or wrote it before the view armed and was never one of its holders) has left the log, yet
+// its route still needs the holder fact. The rows are the routes' own source, so the two always match.
+const ownHolders = (node      )                           => {
+  const ring = node.writes.ring
+  if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+  const out = new Map                  ()
+  const add = (p        ) => { if (!out.has(p)) out.set(p, [...ring.holders(p, node.replicas)]) }
+  for (const e of node.logs.get(node.origin) ?? []) add(partitionOf(e.rec))
+  for (const e of node.journal.read(0)) if (e.kind === JK.writeLocal) add(String(e.b))
+  return Object.fromEntries(out)
+}
+
 export const diagNode = (node      ) => ({
   uuid: node.uuid,
   listen: node.listen,
@@ -101,6 +121,10 @@ export const diagNode = (node      ) => ({
   //! client: this node's OWN role (M5b spoke) — the debugger's topology replay needs it for the single-feeder
   // synced rule (a client digests only its primary); additive, so an older bridge simply never sees it
   client: node.client,
+  //! replicas + holders (ISSUES I-3): scoped replication sends a write to its holders only, so a member
+  // outside the set never getting it is the design, not a loss — additive, an older bridge never sees them
+  replicas: node.replicas,
+  ...(node.armed ? { holders: ownHolders(node) } : {}),
   stateHash: node.stateHash,
   jn: node.journal.n,
   dropped: node.journal.dropped,

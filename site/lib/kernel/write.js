@@ -97,14 +97,20 @@ import { partitionOf,          } from './env.js'
                                                     
                                      
 
-//! MAX_PENDING: the ONE attempt-queue bound (drop-oldest, surfaced) — M2's buffer bound, moved here with the queue.
+//! The four bounds below are the DEFAULTS of their tune-table rows (kernel/tune.ts); the read sites
+// consult `node.tune.<row>`. MAX_RUN is NOT a row: it is a wire bound, fixed on purpose.
+//! MAX_PENDING: the ONE attempt-queue bound (drop-oldest, surfaced) — M2's buffer bound, moved here with the queue. Row: pending.
 export const MAX_PENDING = 1024
-//! RETRY_TICKS: heartbeat ticks a forwarded attempt waits for its ACK/NACK before re-resolving + re-forwarding.
+//! RETRY_TICKS: heartbeat ticks a forwarded attempt waits for its ACK/NACK before re-resolving + re-forwarding. Row: retryTicks.
 export const RETRY_TICKS = 2
-//! DEDUP_KEEP: committed cids retained per issuer for the exact-window duplicate test + duplicate-ACK coordinates.
+//! DEDUP_KEEP: committed cids retained per issuer for the exact-window duplicate test + duplicate-ACK coordinates. Row: dedupKeep.
 export const DEDUP_KEEP = 1024
-//! MAX_ISSUERS: dedup lanes retained (oldest-evicted, surfaced) — lanes must not grow with every client that ever wrote.
+//! MAX_ISSUERS: dedup lanes retained (oldest-evicted, surfaced) — lanes must not grow with every client that ever wrote. Row: issuers.
 export const MAX_ISSUERS = 1024
+//! MAX_RUN: the longest WACK/WNACK run (`n`) accepted off the wire — a peer claiming more cids in one
+// frame than any queue could hold is garbage and the frame is dropped. It used to share MAX_PENDING's
+// value; it is split off so that tuning a node's queue can never change what its wire accepts.
+export const MAX_RUN = 1024
 
 //! NACK: the typed rejection vocabulary (plan §5, verbatim) — plus `invalid` (2026-09-05): the relay's
 // admission predicate refused the record. Unlike the three routing reasons it is TERMINAL — no retry can
@@ -203,8 +209,9 @@ export class Writes {
   // (onNack re-parks onto THIS clock, never straight back onto the wire). Dedup absorbs every duplicate.
   tick(node      ) {
     if (this.pending.size === 0) return
+    const retry = node.tune.retryTicks
     for (const a of this.pending.values())
-      if (a.sent >= 0 && ++a.sent >= RETRY_TICKS) { a.sent = -1; this.#queued++ }
+      if (a.sent >= 0 && ++a.sent >= retry) { a.sent = -1; this.#queued++ }
     this.#drain(node)
   }
 
@@ -216,7 +223,7 @@ export class Writes {
     if (old && old.sent < 0) this.#queued--
     this.pending.set(key, a)
     this.#queued++
-    if (this.pending.size > MAX_PENDING) {
+    if (this.pending.size > node.tune.pending) {
       const oldest = this.pending.keys().next().value 
       const dropped = this.pending.get(oldest) 
       this.pending.delete(oldest)
@@ -353,14 +360,14 @@ export class Writes {
     if (!lane) {
       lane = new Map()
       this.#seen.set(issuer, lane)
-      if (this.#seen.size > MAX_ISSUERS) {
+      if (this.#seen.size > node.tune.issuers) {
         const oldest = this.#seen.keys().next().value 
         this.#seen.delete(oldest)
         node.journal.armed && node.journal.emit(JK.dedupEvict, oldest)
       }
     }
     lane.set(cid, { s, e })
-    if (lane.size > DEDUP_KEEP) lane.delete(lane.keys().next().value )
+    if (lane.size > node.tune.dedupKeep) lane.delete(lane.keys().next().value )
   }
 
   //! remember — the ACQ-fold's doorway into the dedup window (M6): acquired records carry attempt
@@ -495,7 +502,7 @@ export class Writes {
   // batches the coordinates onward per contiguous run toward the client (`via`) — one WACK in, one WACK
   // out (the review measured the previous per-cid fan-out at n frames + n allocations per batch).
   onAck(node      , link      , v                                                                     ) {
-    if (typeof v?.u !== 'string' || typeof v.c !== 'number' || typeof v.n !== 'number' || v.n <= 0 || v.n > MAX_PENDING) return
+    if (typeof v?.u !== 'string' || typeof v.c !== 'number' || typeof v.n !== 'number' || v.n <= 0 || v.n > MAX_RUN) return
     if (typeof v.s !== 'number' || typeof v.e !== 'number') return // coordinates hop onward to relays — garbage must not
     const j = node.journal
     let hop                                                          = null
@@ -536,7 +543,7 @@ export class Writes {
   // the next flush boundary when ce reveals a newer view (the install is the fresh routing state that
   // makes an immediate retry meaningful). The relay owns re-resolution for client attempts identically.
   onNack(node      , link      , v                                                                                   ) {
-    if (typeof v?.u !== 'string' || typeof v.c !== 'number' || typeof v.n !== 'number' || v.n <= 0 || v.n > MAX_PENDING) return
+    if (typeof v?.u !== 'string' || typeof v.c !== 'number' || typeof v.n !== 'number' || v.n <= 0 || v.n > MAX_RUN) return
     const j = node.journal
     j.armed && j.emit(JK.writeNack, typeof v.r === 'string' ? v.r : '?', typeof v.ce === 'number' ? v.ce : -1, v.c)
     const newer = typeof v.ce === 'number' && v.ce > node.epoch
@@ -565,7 +572,7 @@ export class Writes {
           hop ? hop.n++ : (hop = { via: a.via, c: v.c + i, n: 1 })
         } else {
           this.rejected.set(key, m)
-          if (this.rejected.size > MAX_PENDING) this.rejected.delete(this.rejected.keys().next().value )
+          if (this.rejected.size > node.tune.pending) this.rejected.delete(this.rejected.keys().next().value )
           this.rejectedPending++
         }
         this.#remove(a)
