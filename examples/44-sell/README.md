@@ -44,5 +44,5 @@ node customer.ts                 # again, against the door: a second sale row, s
 node door.ts --fero.dir ./shop   # the sales come back after a restart, and the seed applies once
 ```
 
-`node check.ts` runs this story on its own and ends with `ok 44-sell`, in about five seconds.
+`node check.ts` runs this story on its own and ends with `ok 44-sell`, in about three seconds.
 That is the series.
