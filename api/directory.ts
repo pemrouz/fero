@@ -75,6 +75,45 @@ export const localish = (h: string): boolean =>
 export const sameSocket = (listen: string, rendezvous: string): boolean =>
   portOf(listen) === portOf(rendezvous) && (hostOf(listen) === hostOf(rendezvous) || (localish(hostOf(listen)) && localish(hostOf(rendezvous))))
 
+//! ── cross-box discovery (docs/DESIGN-DIRECTORY.md §11) ──
+// A `hosts` entry with NO port names another box: "ask that box's directory". The port is this
+// instance's rendezvous port (every box runs its directory on the same port, 3376 unless moved). The
+// instance only ASKS there — it looks its name up, it never registers and never hosts on another box.
+
+//! loopbackHost — a host spelling that only THIS box can reach (a wildcard is not one: a socket bound
+// to 0.0.0.0 answers other boxes too)
+export const loopbackHost = (h: string): boolean => h === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1'
+//! isBox — a bare host with no port: a DNS name or dotted IPv4 (labels of letters, digits and inner
+// hyphens), or a bracketed IPv6. An all-digit entry is refused: it is a port missing its host, and a
+// flag such as `--fero.heartbeat.ms` read off argv is not a host either.
+const LABEL = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?'
+const NAME = new RegExp(`^${LABEL}(?:\\.${LABEL})*$`)
+export const isBox = (h: unknown): h is string =>
+  typeof h === 'string' && ((NAME.test(h) && !/^\d+$/.test(h)) || /^\[[0-9A-Fa-f:.]+\]$/.test(h))
+//! canon — one spelling per loopback name, so 'localhost' and '127.0.0.1' read as one box
+const canon = (h: string): string => (h === 'localhost' ? '127.0.0.1' : h === '::1' ? '[::1]' : h)
+//! boxDirectory — the directory address a bare host names, at this instance's rendezvous port
+export const boxDirectory = (box: string, rendezvous: string): string => `${box}:${portOf(rendezvous)}`
+//! sameDirectory — two directory addresses that dial the same socket (same port, same host after canon)
+export const sameDirectory = (a: string, b: string): boolean => portOf(a) === portOf(b) && canon(hostOf(a)) === canon(hostOf(b))
+//! fromBox — what another box's directory row may add to this instance's dial set. An address bound
+// to loopback or a wildcard on THAT box would dial THIS box, so it is dropped — unless its host is
+// the very host the directory was reached on (two loopback IPs standing for two boxes, as the tests
+// do). The compose-time rule below keeps such addresses out of a reachable directory in the first
+// place; this is the asking side's guard against a registrant composed elsewhere.
+export const fromBox = (directory: string, row: Record<string, unknown>): string[] =>
+  Object.values(row).filter((a): a is string => isAddr(a) && (!localish(hostOf(a)) || canon(hostOf(a)) === canon(hostOf(directory))))
+//! leavesBox — the explicit-listen rule's trigger: why a server's listen would be handed to ANOTHER box,
+// or null. Its directory answers other boxes (a rendezvous that is not loopback: other boxes ask it,
+// and it hands them this server's listen), or its hosts name another box (with a port: a member there
+// learns this listen from HELLO and gossips it; without one: it asks that box's directory and dials
+// what it finds, with the same HELLO). Either way the listen must be an address another box can dial.
+export const leavesBox = (rendezvous: string | false, hosts: readonly string[]): string | null => {
+  if (rendezvous !== false && !loopbackHost(hostOf(rendezvous))) return `its directory ${rendezvous} answers other boxes`
+  const far = hosts.find((h) => !localish(isAddr(h) ? hostOf(h) : h))
+  return far === undefined ? null : `hosts names ${far}, another box`
+}
+
 //! Compose — the composer's internal entry (api/index.ts): system=true admits a `#` name and skips
 // the directory for the instance itself (a directory never meets a directory).
 export type Compose = (name: string, opts: FeroOpts, system: true) => Promise<Fero>
@@ -182,7 +221,8 @@ export const hostMethods = (peersOf: () => Peers, selfOf: () => string | undefin
   }
 }
 
-export interface DirectoryState { hosting: boolean; up: boolean; error?: string }
+export interface BoxState { up: boolean; error?: string }
+export interface DirectoryState { hosting: boolean; up: boolean; error?: string; boxes?: Record<string, BoxState> }
 
 export interface DirectoryOpts {
   compose: Compose
@@ -193,6 +233,9 @@ export interface DirectoryOpts {
   uuid: string
   listen: () => string | undefined
   serve: boolean
+  //! boxes — the directories of OTHER boxes this instance asks (bare `hosts` entries at the rendezvous
+  // port, deduplicated, its own directory left out): lookup only, never register, never host
+  boxes?: string[]
   heartbeatMs: number
   redialMs?: number
   //! onHosts — the folded address set (minus own listen): the composer posts it as `discover`
@@ -217,12 +260,58 @@ export class Directory {
   #lastPeers = ''
   #retry: NodeJS.Timeout | null = null
   #fails = 0
-  constructor(o: DirectoryOpts) { this.#o = o }
+  //! the other boxes' directory clients (ask-only), their state, and every source's folded addresses
+  // ('' = this box's directory, else the box directory's address)
+  boxClients = new Map<string, Fero>()
+  #boxes: Record<string, BoxState> = {}
+  #rows = new Map<string, string[]>()
+  #last = ''
+  constructor(o: DirectoryOpts) {
+    this.#o = o
+    for (const b of o.boxes ?? []) this.#boxes[b] = { up: false }
+  }
   get hosting(): boolean { return this.host !== null }
   get up(): boolean { return this.#up }
   get error(): string | undefined { return this.#error }
-  #state(): DirectoryState { return { hosting: this.hosting, up: this.#up, ...(this.#error !== undefined ? { error: this.#error } : {}) } }
+  //! boxes — a copy per read: cluster.me folds it into a proxy row
+  get boxes(): Record<string, BoxState> | undefined {
+    const ks = Object.keys(this.#boxes)
+    return ks.length === 0 ? undefined : Object.fromEntries(ks.map((k) => [k, { ...this.#boxes[k] }]))
+  }
+  #state(): DirectoryState { return { hosting: this.hosting, up: this.#up, ...(this.#error !== undefined ? { error: this.#error } : {}), ...(this.boxes ? { boxes: this.boxes } : {}) } }
   #setError(e: string | undefined) { if (e !== this.#error) { this.#error = e; this.#o.onState(this.#state()) } }
+  #setBox(addr: string, s: BoxState) {
+    const b = this.#boxes[addr]
+    if (b.up === s.up && b.error === s.error) return
+    this.#boxes[addr] = s
+    this.#o.onState(this.#state())
+  }
+  //! #publish — one source's addresses changed: the union over every source, minus own listen, posts
+  // as ONE discover when it differs from the last one posted
+  #publish(source: string, addrs: string[]) {
+    if (this.#destroyed) return
+    this.#rows.set(source, addrs)
+    const me = this.#o.listen()
+    const hosts = [...new Set([...this.#rows.values()].flat().filter((a) => a !== me))].sort()
+    const key = hosts.join(',')
+    if (key === this.#last) return
+    this.#last = key
+    this.#o.onHosts(hosts)
+  }
+  //! #client — compose one `#directory` client dialing `addr`, with the I-19 guard
+  async #client(addr: string): Promise<Fero> {
+    const o = this.#o
+    const c = await o.compose(DIRECTORY, { hosts: [addr], heartbeat: { ms: o.heartbeatMs }, ...(o.redialMs !== undefined ? { redial: { ms: o.redialMs } } : {}) }, true)
+    //! I-19's guard: a client's `methods` hands out a handle maker for ANY name, so `lookup` is not a function
+    // only when this compose came back as something else (a server's methods are its own table). Not
+    // reproduced (30/30 and the host-death race test green), so if it ever recurs, say the cause.
+    if (typeof (c.methods as Record<string, unknown>).lookup !== 'function') {
+      const role = (snapshot(c.cluster) as { me?: { role?: string } }).me?.role ?? 'non-client'
+      await c.destroy()
+      throw new Error(`#directory: the directory client composed as a ${role} — its methods have no lookup (I-19)`)
+    }
+    return c
+  }
 
   //! start — (servers) one bind attempt first, so a fresh box gets its directory on the first server
   // with no round trip; then the client, its registration on every primary, and the live lookup.
@@ -230,14 +319,9 @@ export class Directory {
     if (this.#o.serve) await this.#tryHost()
     if (this.#destroyed) return
     const o = this.#o
-    this.client = await o.compose(DIRECTORY, { hosts: [o.addr], heartbeat: { ms: o.heartbeatMs }, ...(o.redialMs !== undefined ? { redial: { ms: o.redialMs } } : {}) }, true)
+    this.client = await this.#client(o.addr)
     if (this.#destroyed) { await this.client.destroy(); this.client = null; return }
     const c = this.client
-    //! I-19's guard: a client's `methods` hands out a handle maker for ANY name, so `lookup` is not a function
-    // only when this compose came back as something else (a server's methods are its own table). Not
-    // reproduced (30/30 and the host-death race test green), so if it ever recurs, say the cause.
-    if (typeof (c.methods as Record<string, unknown>).lookup !== 'function')
-      throw new Error(`#directory: the directory client composed as a ${(snapshot(c.cluster) as { me?: { role?: string } }).me?.role ?? 'non-client'} — its methods have no lookup (I-19)`)
     //! a server that lost the first bind (another host, or a squatter) starts the retry loop NOW — the
     // link-down transition below never fires for a directory that was never up
     if (o.serve && !this.hosting) this.#armRetry()
@@ -262,16 +346,40 @@ export class Directory {
     // cluster.me.rendezvous.error instead of exiting the process as an unhandled `ready` rejection would
     const onError = (e: Error) => { if (!this.#destroyed) this.#setError(`lookup: ${e?.message ?? String(e)}`) }
     const h = c.methods.lookup(o.name, { onError }) as { tap: (fn: () => void) => void }
-    let last = ''
     h.tap(afterFold(() => {
       if (this.#destroyed) return
       const row = (snapshot(h) as Row | undefined) ?? {}
-      const me = o.listen()
-      const hosts = [...new Set(Object.values(row).filter((a) => typeof a === 'string' && a !== me))].sort()
-      const key = hosts.join(',')
-      if (key === last) return
-      last = key
-      o.onHosts(hosts)
+      this.#publish('', Object.values(row).filter((a) => typeof a === 'string'))
+    }))
+    //! the other boxes (§11): one ask-only client each, after this box's own
+    for (const b of o.boxes ?? []) {
+      if (this.#destroyed) return
+      await this.#ask(b)
+    }
+  }
+
+  //! #ask — another box's directory: look the name up there, fold what that box may add (fromBox), and
+  // keep its up/error on cluster.me.rendezvous.boxes. Never registers (this server's listen is published
+  // by its OWN box's directory), never hosts (that socket is on another box). An unreachable box is a
+  // link that redials like any other; a misdial onto a non-directory is refused by the HELLO name echo.
+  async #ask(addr: string): Promise<void> {
+    const c = await this.#client(addr)
+    if (this.#destroyed) { await c.destroy(); return }
+    this.boxClients.set(addr, c)
+    let lastPeers = ''
+    c.cluster.tap(afterFold(() => {
+      if (this.#destroyed) return
+      const peers = (snapshot(c.cluster) as { peers: Peers }).peers ?? {}
+      const key = Object.keys(peers).filter((u) => peers[u].up).sort().join(',')
+      if (key === lastPeers) return
+      lastPeers = key
+      this.#setBox(addr, { ...this.#boxes[addr], up: key !== '' })
+    }))
+    const onError = (e: Error) => { if (!this.#destroyed) this.#setBox(addr, { ...this.#boxes[addr], error: `lookup: ${e?.message ?? String(e)}` }) }
+    const h = c.methods.lookup(this.#o.name, { onError }) as { tap: (fn: () => void) => void }
+    h.tap(afterFold(() => {
+      if (this.#destroyed) return
+      this.#publish(addr, fromBox(addr, (snapshot(h) as Row | undefined) ?? {}))
     }))
   }
 
@@ -355,6 +463,8 @@ export class Directory {
     this.#stopRetry()
     const c = this.client; this.client = null
     if (c) await c.destroy()
+    const bs = [...this.boxClients.values()]; this.boxClients.clear()
+    await Promise.allSettled(bs.map((b) => b.destroy()))
     const h = this.host; this.host = null
     if (h) await h.destroy()
   }

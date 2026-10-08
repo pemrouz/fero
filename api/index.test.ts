@@ -541,7 +541,7 @@ test('v4.1 roles: following is ambient, serving is a declared act — in the bat
   await assert.rejects(fero('r', { listen: false, hosts: ['127.0.0.1:1'] }), /undialable/)
   await assert.rejects(fero('r', { server: 1 } as never), /server must be true/)
   await assert.rejects(fero('r', { hosts: [] }), /needs something to dial/)
-  await assert.rejects(fero('r', { server: true, hosts: ['10.0.0.5:4800'] }), /explicit listen required/)
+  await assert.rejects(fero('r', { server: true, hosts: ['10.0.0.5:4800'] }), /to be reachable from another box, listen on a routable address — hosts names 10\.0\.0\.5:4800, another box, but listen 127\.0\.0\.1:0 \(the default/)
   //! an EXPLICIT listen that cannot bind still rejects (and the failure path tears the runtime down,
   // not leaks it); the default listen is port 0, which cannot collide
   const caddr = `127.0.0.1:${await ports.free()}`
@@ -556,7 +556,10 @@ test('v4.1 roles: following is ambient, serving is a declared act — in the bat
 test("hosts entries are checked as ADDRESSES and the bad one is named — a role file that read its ports off argv and got a --fero flag used to die deep in the shell on Node's raw port error", async () => {
   await assert.rejects(fero('r', { hosts: ['127.0.0.1:4801', '--fero.heartbeat.ms', '50'] }), /fero\('r'\): hosts\[1\] '--fero\.heartbeat\.ms' is not a 'host:port' address/)
   await assert.rejects(fero('r', { hosts: ['127.0.0.1:4801', 7] } as never), /hosts\[1\] 7 is not a 'host:port' address/)
-  await assert.rejects(fero('r', { hosts: ['127.0.0.1'] }), /hosts\[0\] '127\.0\.0\.1' is not a 'host:port' address/)
+  await assert.rejects(fero('r', { hosts: ['127.0.0.1:4801', '50'] }), /hosts\[1\] '50' is not a 'host:port' address/)
+  //! a host with no port is legal now — it asks that box's directory (docs/DESIGN-DIRECTORY.md §11) — but
+  // never in silence with the directory off (the battery's FERO_RENDEZVOUS=off): there is no port to ask at
+  await assert.rejects(fero('r', { hosts: ['127.0.0.1'] }), /hosts entry '127\.0\.0\.1' has no port, which means "ask that box's directory" — but the directory is off \(from FERO_RENDEZVOUS\)/)
   await assert.rejects(fero('r', { hosts: 'nope' } as never), /hosts must be an array/)
 })
 
