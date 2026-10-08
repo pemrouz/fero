@@ -50,7 +50,7 @@ export const JK = {
   vote: 27,          // a=epoch, b=granted(0|1), c=proposer — this node answered a ballot
   viewInstall: 28,   // a=epoch, b=memberCount — a view became committed fact here
   epochStale: 29,    // a=observedEpoch — evidence of a higher committed view; the write-gate closes
-  gateClose: 30,     // a=reason ('stale-epoch'|'rejoining'|'evicted'|'minority')
+  gateClose: 30,     // a=reason ('stale-epoch'|'rejoining'|'evicted'|'joining'|'minority') — joining: not in the view and never was (a newcomer before its JOIN ballot)
   gateOpen: 31,
   gateAlarm: 32,     // a=wantedEpoch — pull retries exhausted; gate RELEASED with this alarm (named, never silent)
   writeBuffered: 33, // a=queueDepth — a gated write parked in the bounded pending buffer
