@@ -135,7 +135,9 @@ export const stateAt = (capture, uuid, t) => {
 // mirror matches the kernel's — the drift guard for the whole debug stack.
 export const verifyReplay = (capture) => {
   return capture.nodes.map((node) => {
-    if (node.dropped > 0) return { uuid: node.uuid, ok: false, reason: `journal truncated (${node.dropped} dropped)` }
+    //! truncated: the replay is UNCHECKED, not failed — the reason string is the honesty-gate template, the flag
+    // lets the viewer say "unchecked" in amber instead of painting a lost diary page as a replay fault
+    if (node.dropped > 0) return { uuid: node.uuid, ok: false, truncated: true, reason: `journal truncated (${node.dropped} dropped)` }
     const replayed = stateAt(capture, node.uuid, Infinity)
     const actual = new Map(node.state)
     if (replayed.size !== actual.size)
@@ -243,7 +245,7 @@ export const topologyAt = (capture, uuid, t) => {
 export const verifyTopology = (capture) => {
   const LINK_FIELDS = ['uuid', 'dialed', 'admitted', 'synced', 'paused', 'queued', 'diag']
   return capture.nodes.map((node) => {
-    if (node.dropped > 0) return { uuid: node.uuid, ok: false, reason: `journal truncated (${node.dropped} dropped)` }
+    if (node.dropped > 0) return { uuid: node.uuid, ok: false, truncated: true, reason: `journal truncated (${node.dropped} dropped)` }
     const bad = (reason) => ({ uuid: node.uuid, ok: false, reason })
     const { links, streams } = topologyAt(capture, node.uuid, Infinity)
     const end = node.links || []

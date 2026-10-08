@@ -506,7 +506,7 @@ const buildForest = (capture, T) => {
     const sev = diverged ? 'crit' : off || n.dropped > 0 ? 'warn' : '';
     const pill = diverged ? { cls:'crit', lab:'diverged', key:'node:diverged' }
       : off ? { cls:'warn', lab:'differs', key:'node:differs' }
-      : n.dropped > 0 ? { cls:'warn', lab:'truncated', key:'node:truncated', fact: `${n.dropped} oldest events dropped` } : null;
+      : n.dropped > 0 ? { cls:'warn', lab:'truncated +' + klog(n.dropped), key:'node:truncated', fact: `${n.dropped} oldest events dropped` } : null;
     const kinds = new Set();
     for (const e of n.journal) kinds.add((d.names[e.kind] || ('kind' + e.kind)).toLowerCase());
     const links = lks.map(l => {
@@ -926,8 +926,12 @@ function headerFacts(){
     // pull, so its state is a later instant than its journal — a replay mismatch there is the read, not a fault.
     // Say so, and judge replay over the nodes whose slices are one instant
     const torn = CAP.nodes.filter(n => n.torn).map(n => n.uuid);
-    const bad = REPLAY.find(r => !r.ok && !torn.includes(r.uuid));
-    if (torn.length < CAP.nodes.length) bits.push(!bad ? fact('replay ✓', 'replay-ok') : sst('crit', `replay ✗ ${esc(bad.uuid)}: ${esc(bad.reason)}`, 'replay-bad'));
+    //! a TRUNCATED journal (the fold's `truncated` flag): the oldest rows are gone, so the replay cannot be
+    // checked — unchecked, not failed. Amber, with each node's count; replay is judged over the rest
+    const cut = REPLAY.filter(r => r.truncated && !torn.includes(r.uuid)).map(r => r.uuid);
+    const bad = REPLAY.find(r => !r.ok && !torn.includes(r.uuid) && !r.truncated);
+    if (torn.length + cut.length < CAP.nodes.length) bits.push(!bad ? fact('replay ✓', 'replay-ok') : sst('crit', `replay ✗ ${esc(bad.uuid)}: ${esc(bad.reason)}`, 'replay-bad'));
+    if (cut.length) bits.push(sst('warn', `replay unchecked — journal truncated (${cut.map(u => `${esc(u)}: ${CAP.nodes.find(n => n.uuid === u).dropped} dropped`).join(', ')})`, 'replay-truncated'));
     if (torn.length) bits.push(sst('warn', `torn read ${esc(torn.join(','))} — replay unchecked`, 'torn-read'));
   }
   if (s.violations.length) bits.push(sst('crit', s.violations.length + ' violation' + (s.violations.length === 1 ? '' : 's'), 'violations'));
@@ -983,7 +987,12 @@ function renderScrub(){
   r.dataset.tip = D && D.truncated ? 'time-travel-off' : 'time-travel';   // the ELI5 says why it is off (./eli5.mjs)
   const cur = T != null ? Math.min(T, maxT) : maxT;
   if (document.activeElement !== r) r.value = cur;
-  $('tread').textContent = CAP ? `@ ${cur}/${maxT}` : '';
+  //! a truncated journal says why the rewind is off IN WORDS on the bar — the range's hover alone hid it.
+  // Kept short: the bar's left end is ~150 px of range plus this word, and the centred crumb must not run
+  // into it on a narrow window (driven at 820 px with a node selected); the header names the journal
+  const cut = !!(CAP && D && D.truncated);
+  $('tread').textContent = !CAP ? '' : cut ? 'rewind off — truncated' : `@ ${cur}/${maxT}`;
+  $('tread').dataset.tip = cut ? 'time-travel-off' : 'tread';
   $('tread').classList.toggle('on', T != null);
   $('treset').style.display = T != null ? '' : 'none';
 }
