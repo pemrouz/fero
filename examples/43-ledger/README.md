@@ -63,4 +63,4 @@ node notifier.ts               # a second one replays the log and delivers every
 ```
 
 `node check.ts` runs this story on its own and ends with `ok 43-ledger`, in about ten seconds.
-That is the series.
+Next: [44 · open, then a door](../44-sell/).
