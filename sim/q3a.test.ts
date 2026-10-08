@@ -61,7 +61,18 @@ const oracle = (sim: Sim): Set<string> => {
     }
   }
   const out = new Set<string>()
-  for (const [cell, w] of win) if (!w.dead) out.add((JSON.parse(cell) as string[])[0] ?? '')
+  const above = (a: [number, number, string], b: [number, number, string]): boolean => a[0] !== b[0] ? a[0] > b[0] : a[1] !== b[1] ? a[1] > b[1] : a[2] > b[2]
+  for (const [cell, w] of win) {
+    if (w.dead) continue
+    //! across depth (V4-18): a live field at or below an ancestor's winning stamp is hidden by it
+    const path = JSON.parse(cell) as string[]
+    let hidden = false
+    for (let d = 1; d < path.length && !hidden; d++) {
+      const a = win.get(JSON.stringify(path.slice(0, d)))
+      if (a !== undefined && !above(w.st, a.st)) hidden = true
+    }
+    if (!hidden) out.add(path[0] ?? '')
+  }
   return out
 }
 

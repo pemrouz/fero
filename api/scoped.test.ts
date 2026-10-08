@@ -190,6 +190,47 @@ test('COVERAGE ATTESTATION [0/28/53] — an answerer that does not ATTEST a part
   g.destroy()
 })
 
+test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the kernel\'s stamp rule: a field remove newer than its row takes the field out, a field at or below an ancestor\'s stamp is hidden, a parked field never tears into a live row', async () => {
+  const { Gather } = await import('./fold.ts')
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2,
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['h1', 'h2'] } },
+    scope: { entries: new Map() },
+    versions: new Map(), state: new Map(),
+  }
+  const g = JSON.stringify(['g']), ga = JSON.stringify(['g', 'a']), gc = JSON.stringify(['g', 'c'])
+  const row = { v: { a: 1, b: 2 }, st: [1, 5, 'bb'] as [number, number, string] }
+  let phase = 0
+  const answers: Record<number, Record<string, { c: Record<string, unknown>; att: string[] }>> = {
+    //! gen 0: h1 holds the row, h2 the field remove stamped ABOVE it, both in both orders of answering
+    0: { h1: { c: { [g]: row }, att: ['g'] }, h2: { c: { [ga]: { st: [1, 7, 'cc'], t: 1 } }, att: ['g'] } },
+    1: { h1: { c: { [ga]: { st: [1, 7, 'cc'], t: 1 } }, att: ['g'] }, h2: { c: { [g]: row }, att: ['g'] } },
+    //! gen 2: a field write BELOW the row's stamp (an older fact the row carried) and a field write ABOVE it
+    2: { h1: { c: { [g]: row, [ga]: { v: 0, st: [1, 3, 'cc'] } }, att: ['g'] }, h2: { c: { [gc]: { v: 9, st: [1, 9, 'cc'] } }, att: ['g'] } },
+    //! gen 3: a row REMOVE above an older field hides it; a field above the row's remove re-makes the row
+    3: { h1: { c: { [g]: { st: [1, 8, 'bb'], t: 1 }, [ga]: { v: 0, st: [1, 3, 'cc'] } }, att: ['g'] }, h2: { c: {}, att: ['g'] } },
+    4: { h1: { c: { [g]: { st: [1, 8, 'bb'], t: 1 } }, att: ['g'] }, h2: { c: { [gc]: { v: 9, st: [1, 9, 'cc'] } }, att: ['g'] } },
+    //! gen 5: the row is back whole; gen 6: nobody claims ['g','c'] any more (attested absence) — the
+    // coverage drop of the FIELD cell must not tear `c` out of the row's own value
+    5: { h1: { c: { [g]: { v: { a: 1, c: 3 }, st: [1, 11, 'bb'] } }, att: ['g'] }, h2: { c: { [gc]: { v: 9, st: [1, 12, 'cc'] } }, att: ['g'] } },
+    6: { h1: { c: { [g]: { v: { a: 1, c: 3 }, st: [1, 11, 'bb'] } }, att: ['g'] }, h2: { c: {}, att: ['g'] } },
+  }
+  const gather = new Gather({ node: fake } as never, async (uuid: string) => answers[phase][uuid] as never)
+  const expect = async (want: unknown, why: string) => {
+    await gather.refresh({ node: fake } as never, { throwOnPartial: false })
+    assert.deepEqual(snapshot(gather.proxy), want, why)
+  }
+  await expect({ g: { b: 2 } }, 'gen 0: the field remove above the row takes `a` out of it')
+  phase = 1; await expect({ g: { b: 2 } }, 'gen 1: the same with the answers the other way round')
+  phase = 2; await expect({ g: { a: 1, b: 2, c: 9 } }, 'gen 2: the older field is hidden by the row, the newer one shows on top')
+  phase = 3; await expect({}, 'gen 3: a row remove above the field hides it — the row does not come back as {a:0}')
+  phase = 4; await expect({ g: { c: 9 } }, 'gen 4: a field above the row remove re-makes the row with that field')
+  phase = 5; await expect({ g: { a: 1, c: 9 } }, 'gen 5: the row is back, the newer field on top')
+  phase = 6; await expect({ g: { a: 1, c: 3 } }, 'gen 6: the field cell dropped by coverage — the row\'s own `c` stands')
+  gather.destroy()
+})
+
 test('SYSTEM PLANE [5] — a user method named `read` owns the public name but never intercepts the internal keyed hop', async () => {
   const nodes = await spawn(3, 2, { methods: { read: () => 'USER-READ-SENTINEL' } })
   try {
