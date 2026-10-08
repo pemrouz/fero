@@ -660,7 +660,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         //! a lost linkDown: reap every stream whose link is gone
         host!.reapGone((id) => { const l = node.links.get(id); return l !== undefined && !l.dead })
         //! a lost shed: a row this node still shows whose partition the kernel no longer has at all —
-        // no scope entry and no cell — left lawfully; mirror it out (a lost acquire only undercounts)
+        // no scope entry and no cell — left lawfully; mirror it out (a lost acquire only undercounts).
+        // The kernel mints an entry for every armed cell (verdict, mintHeld, rescope) and drops both
+        // together (#shed), so the cell half is a guard: if that ever breaks, a row stays, never goes.
         if (node.armed) {
           const kept = new Set<string>(node.scope!.entries.keys())
           for (const k of node.state.keys()) kept.add((JSON.parse(k) as string[])[0] ?? '')
