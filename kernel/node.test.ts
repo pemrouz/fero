@@ -289,6 +289,44 @@ test('revival: only a FAILED final attempt revives; the pending window and a pee
   assert.equal(of('connect').length, c0)
 })
 
+test('a view install during a running redial chain dials nobody that chain is already dialing: one timer line, the full member chain', () => {
+  //! the install loop dials every member it holds no link to (the joiner's side of a join, a healed evictee's
+  // peers). It used to dial bb too while bb's chain was mid-backoff: that dial failed, its linkDown armed a
+  // SECOND timer on the same chain entry, and the two timer lines shared the tries, so the chain (and the
+  // eviction hold it carries) gave up after 4 timer fires instead of 5, about half the time. The chain owns
+  // the target until it ends; a member with no chain (dd, new in this view) is still dialed at once.
+  const { node, of } = harness('aa', { redialMs: 10, hosts: ['sim:bb', 'sim:cc'], boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] } })
+  node.step({ kind: 'start' })
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: hello('bb') })
+  node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:cc' })
+  node.step({ kind: 'bytesIn', link: 2, bytes: hello('cc') })
+  node.step({ kind: 'linkDown', link: 1, reason: 'cut' }) // bb crashed: the member chain starts, one timer armed
+  const redialTimers = () => of('timer').filter((x) => x[2] === TAG.redial)
+  assert.equal(redialTimers().length, 1)
+  assert.ok(node.dialing('sim:bb'))
+  const connects = (to: string) => of('connect').filter((x) => x[1] === to).length
+  const c0 = connects('sim:bb')
+  //! cc floods view 2 (dd joined); bb is still a member of it, and aa holds no link to bb
+  node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc'], ['dd', 'sim:dd']] }) })
+  assert.equal(node.epoch, 2, 'the view installed')
+  assert.equal(connects('sim:dd'), 1, 'a member with no chain is dialed at once')
+  assert.equal(connects('sim:bb'), c0, 'no dial over the running chain')
+  //! (a forked dial would fail here, while bb is down, and arm a second timer line)
+  if (connects('sim:bb') > c0) node.step({ kind: 'linkDown', link: 800, reason: 'refused', to: 'sim:bb' })
+  assert.equal(redialTimers().length, 1, 'still one timer line')
+  //! run the chain out: fire bb's timers in arming order and fail each dial; give-up after exactly five
+  let fired = 0
+  const gaveUp = () => node.journal.read().some((e) => e.kind === JK.giveUp && e.a === 'sim:bb')
+  while (!gaveUp() && fired < redialTimers().length) {
+    const t = redialTimers()[fired++]
+    node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    node.step({ kind: 'linkDown', link: 900 + fired, reason: 'refused', to: 'sim:bb' })
+  }
+  assert.ok(gaveUp())
+  assert.equal(fired, 5, 'the member chain gave up after its five tries, not after four')
+})
+
 test('the floor is silent on a paused link; a digest arriving mid-pause defers its suffix to drain', () => {
   //! adversarial-review regression: control frames queued into a drop-oldest queue are doomed work,
   // and serialising the missing suffix per inbound digest during a pause is O(suffix) discarded per
