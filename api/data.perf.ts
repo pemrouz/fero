@@ -69,19 +69,22 @@ test('absolute: 5k inbound records/rep through onApply→join→proxy under the 
 // index is keyed by ancestor, so the lookup under a depth-2 cell finds nothing and walks nothing.
 // Keyed by row alone it copied and scanned the row's whole set on every apply — about 8x. Both sides
 // are inbound frames with advancing seqs on their own node (the fresh-record path, never dupDrop).
+//! formed — a node at view e1 with `cart` owned by bb and `inflight` of our ['cart','fN'] writes
+// forwarded there, no answer yet (the kernel still holds every one)
+const formed = (inflight: number) => {
+  const { rt, bind } = harness()
+  const node = rt.node
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  node.writes.ring.place('cart', 'bb')
+  for (let i = 0; i < inflight; i++) bind.issue([{ type: REC.update, key: ['cart', 'f' + i], value: i }])
+  assert.equal(node.writes.pending.size, inflight)
+  return { rt, bind, node }
+}
+
 test('ratio: a foreign field apply with 1k of our field writes in flight on that row costs the same as with none', async () => {
-  const formed = (inflight: number) => {
-    const { rt, bind } = harness()
-    const node = rt.node
-    node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
-    node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
-    node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
-    node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
-    node.writes.ring.place('cart', 'bb')
-    for (let i = 0; i < inflight; i++) bind.issue([{ type: REC.update, key: ['cart', 'f' + i], value: i }])
-    assert.equal(node.writes.pending.size, inflight)
-    return { rt, bind, node }
-  }
   const none = formed(0), many = formed(1000)
   //! 8 rounds (warmup + 7) of 500 foreign field applies each, the same bytes to both nodes
   const BATCH = 500
@@ -98,6 +101,32 @@ test('ratio: a foreign field apply with 1k of our field writes in flight on that
   )
   assert.equal(many.node.writes.pending.size, 1000, 'ours are still in flight — none settled, none dropped')
   assert.ok(r < 1.6, `foreign field apply with 1k of ours in flight / with none = ${r.toFixed(2)}x — the probe is walking the row's whole set (budget 1.6x; keyed by row it read 2.3-2.5x here, keyed by ancestor 1.0x)`)
+  none.bind.destroy(); many.bind.destroy()
+  await none.rt.destroy(); await many.rt.destroy()
+})
+
+//! RATIO (V4-18): a foreign WHOLE-ROW apply is the parent of every field write of ours in that row, so
+// the probe must ask about them — but only about the ones the kernel no longer holds (a held attempt
+// settles through its own echo, or the `lost` effect when the echo is refused). With 1k of ours in
+// flight and none answered, a row apply must cost what it costs with none: walking all 1k on every row
+// apply read about 30x here (0.2 µs per in-flight field).
+test('ratio: a foreign ROW apply with 1k of our field writes in flight in that row costs the same as with none', async () => {
+  const none = formed(0), many = formed(1000)
+  const BATCH = 500
+  const frames: Uint8Array[] = []
+  for (let r = 0; r < 8; r++) {
+    const recs: { rec: Rec; origin: string; seq: number; epoch: number }[] = []
+    for (let k = 0; k < BATCH; k++) recs.push({ rec: { type: REC.update, key: ['cart'], value: { theirs: r * BATCH + k } }, origin: 'bb', seq: 1 + r * BATCH + k, epoch: 1 })
+    frames.push(encodeRuns(recs)[0])
+  }
+  let i = 0, j = 0
+  const r = ratio.interleaved(
+    () => { none.node.step({ kind: 'bytesIn', link: 1, bytes: frames[i++] }) },
+    () => { many.node.step({ kind: 'bytesIn', link: 1, bytes: frames[j++] }) },
+  )
+  assert.equal(many.node.writes.pending.size, 1000, 'ours are still in flight — none settled, none dropped')
+  assert.deepEqual(many.node.state.get(JSON.stringify(['cart'])), { theirs: 8 * BATCH - 1 }, 'every row applied for real')
+  assert.ok(r < 1.6, `foreign row apply with 1k of ours in flight / with none = ${r.toFixed(2)}x — the probe walks every field of ours in the row (budget 1.6x)`)
   none.bind.destroy(); many.bind.destroy()
   await none.rt.destroy(); await many.rt.destroy()
 })

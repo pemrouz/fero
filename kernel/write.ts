@@ -146,6 +146,11 @@ export class Writes {
   // not grow it forever. A RELAY records nothing here — it hops the refusal onward to its client.
   rejected = new Map<string, string>()
   rejectedPending = 0
+  //! released — how many attempts have ever LEFT the queue (WACKed, committed here, dropped, refused): a
+  // monotonic counter the api reads to skip work while nothing moved. While it stands still, every
+  // attempt the embedder saw queued is still queued (api/data.ts Bind: a foreign row apply asks about
+  // our in-flight field writes in that row only when the kernel let one of ours go since it last asked).
+  released = 0
   #cid = 0
   //! cid — the attempt counter, read-only (M5a): the embedder samples it around a synchronous write()
   // to learn which cids its batch minted (issue() assigns one per record, contiguous, in record order;
@@ -231,6 +236,7 @@ export class Writes {
       this.pending.delete(oldest)
       if (dropped.sent < 0) this.#queued--
       this.droppedPending++
+      this.released++
       node.journal.armed && node.journal.emit(JK.writeBufferDrop, this.droppedPending)
     }
   }
@@ -352,7 +358,7 @@ export class Writes {
 
   //! #remove — drop an attempt from the queue with counter bookkeeping (no-op for never-queued attempts).
   #remove(a: Attempt) {
-    if (this.pending.delete(a.issuer + '|' + a.cid) && a.sent < 0) this.#queued--
+    if (this.pending.delete(a.issuer + '|' + a.cid)) { this.released++; if (a.sent < 0) this.#queued-- }
   }
 
   //! #remember — record a committed cid in the issuer's exact dedup window (oldest-first eviction), with
@@ -528,6 +534,7 @@ export class Writes {
       }
       if (a.sent < 0) this.#queued--
       this.pending.delete(key)
+      this.released++
       if (cleared++ === 0) first = v.c + i
       //! the WACK's coordinates feed the dedup window too (M5b): they ARE the original commit
       // coordinates, from the owner of record. This closes the WACK-before-replication window where a

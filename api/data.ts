@@ -16,7 +16,7 @@
 // layered over the fold, revert on refusal, foreign commits hidden under an in-flight
 // cell) is DELETED, not ported.
 //
-// What survives of it is a settlement INDEX (#inflight: cell → the newest pending cid on
+// What survives of it is a settlement INDEX (#inflight: cell → the newest pending write on
 // it), which the write-route join needs for one race: the kernel no longer holds our
 // attempt (it was WACK'd) but its commit never surfaces on our apply stream because a
 // foreign record out-stamped it (the cross-epoch LWW-loss race). A foreign apply on that
@@ -77,6 +77,7 @@ export const lostAssignment = (p: Promise<Coords>, why: unknown): { key: string;
 // coordinate promise's settlers.
 interface Pending {
   cell: string
+  key: string // 'iss|cid' — the #pending key and the kernel's attempt key, built once
   above?: string[] // a FIELD cell's ancestor keys, shallowest first (depth ≥ 2) — the #fields entries it sits in
   cid: number
   resolve: (c: Coords) => void
@@ -106,16 +107,20 @@ export class Bind {
   #handle: any // the raw data v4 source handle beneath the lens
   #rt: Runtime
   #iss: string
-  //! pending — 'iss|cid' → the unsettled write; inflight — cell → the NEWEST pending cid on it (the
+  //! pending — 'iss|cid' → the unsettled write; inflight — cell → the NEWEST pending write on it (the
   // settlement index, see the banner: it decides promises, never what the proxy shows)
   #pending = new Map<string, Pending>()
-  #inflight = new Map<string, number>()
+  #inflight = new Map<string, Pending>()
   //! fields — ancestor key → our in-flight FIELD cells under it (V4-18), keyed by EVERY ancestor like the
   // kernel's deep index: a foreign apply at any depth finds exactly the cells of ours under its own
   // path in one lookup — a row write finds every field of ours in that row, a field write finds only
   // what is deeper than itself (nothing, usually). Keyed by row alone, every foreign field apply on a
   // row copied and scanned the row's whole set: about 8x per apply with 1k of ours in flight.
-  #fields = new Map<string, Set<string>>()
+  //! `at` is the kernel's `released` count when the set was last walked (or made): while the count stands
+  // still, every write in the set is still held by the kernel and the probe would settle none of them —
+  // so a foreign row apply with 1k of ours in flight and none answered walks nothing (it walked all 1k,
+  // about 30x the apply). After the kernel lets any attempt go, the next apply walks the set once.
+  #fields = new Map<string, { cells: Set<string>; at: number }>()
   //! frames — a STACK of in-flight fast-path collectors, one per active issue() call (M5-review #0/#1/#4).
   // The epoch-0 fast path mints no kernel cid and applies synchronously inside rt.write(); a user tap
   // reacting to one of those applies drains a RE-ENTRANT issue() INSIDE the outer one (substrate
@@ -228,8 +233,9 @@ export class Bind {
       //! the ring row settles IN the settle call, before the promise's own reactions run: a solo write's
       // row reads `committed` in the tick its value applied. The first settle wins, as for the promise.
       const pr = new Promise<Coords>((resolve, reject) => {
+        const key = this.#iss + '|' + cid
         entry = {
-          cell, cid,
+          cell, key, cid,
           ...(rec.key.length > 1 ? { above: ancestorKeys(rec.key) } : {}),
           resolve: (c) => {
             if (row.state === 'pending') { row.state = 'committed'; row.origin = c.origin; row.seq = c.seq; row.epoch = c.epoch; this.#onOutcome?.(id) }
@@ -240,19 +246,19 @@ export class Bind {
             reject(e)
           },
         }
-        this.#pending.set(this.#iss + '|' + cid, entry)
+        this.#pending.set(key, entry)
       })
       //! the ring row used to settle in a .then with both arms, which also marked the promise handled; keep
       // that: a caller that drops the promise (the data seed, a swallowed assignment) never surfaces a reject
       pr.catch(NOOP)
       promises.set(rec, pr)
       pend.push(entry)
-      this.#inflight.set(cell, cid)
+      this.#inflight.set(cell, entry)
       if (entry.above !== undefined)
         for (const ak of entry.above) {
           let under = this.#fields.get(ak)
-          if (under === undefined) this.#fields.set(ak, under = new Set())
-          under.add(cell)
+          if (under === undefined) this.#fields.set(ak, under = { cells: new Set(), at: node.writes.released })
+          under.cells.add(cell)
         }
     }
     //! push THIS call's fast-path collector; a nested re-entrant issue pushes its own on top, and node.commit
@@ -284,16 +290,15 @@ export class Bind {
   //! forget — drop one pending entry from both maps, guarded by identity so a nested clobber (same
   // predicted cid, another call's entry under the same key/cell) is never cross-deleted.
   #forget(p: Pending) {
-    const key = this.#iss + '|' + p.cid
-    if (this.#pending.get(key) === p) this.#pending.delete(key)
-    if (this.#inflight.get(p.cell) === p.cid) { this.#inflight.delete(p.cell); if (p.above !== undefined) this.#unfield(p.above, p.cell) }
+    if (this.#pending.get(p.key) === p) this.#pending.delete(p.key)
+    if (this.#inflight.get(p.cell) === p) { this.#inflight.delete(p.cell); if (p.above !== undefined) this.#unfield(p.above, p.cell) }
   }
 
   //! #unfield — drop a field cell from the in-flight index under each of its ancestors (an emptied set leaves the map).
   #unfield(above: string[], cell: string) {
     for (const ak of above) {
       const under = this.#fields.get(ak)
-      if (under !== undefined && under.delete(cell) && under.size === 0) this.#fields.delete(ak)
+      if (under !== undefined && under.cells.delete(cell) && under.cells.size === 0) this.#fields.delete(ak)
     }
   }
 
@@ -340,11 +345,20 @@ export class Bind {
     // field write of ours stamped at or below it is swept (or refused) in the kernel — its apply never
     // comes. The #fields index keys by ancestor, so one lookup finds exactly the cells of ours in
     // flight under THIS cell (a field apply finds only what is deeper than itself); with no field
-    // write of ours in flight anywhere this is one size check. #probe settles, which deletes from the
-    // set being walked — a Set tolerates that, so nothing is copied.
+    // write of ours in flight anywhere this is one size check. The set is walked only when the kernel
+    // let an attempt go since its last walk (`at`, see #fields): a write the kernel still holds settles
+    // through its own echo (the join, or #lost when the echo is refused), so the probe is for the ones
+    // WACKed with no echo yet. #probe settles, which deletes from the set being walked — a Set
+    // tolerates that, so nothing is copied.
     if (this.#fields.size > 0) {
       const under = this.#fields.get(cell)
-      if (under !== undefined) for (const c of under) this.#probe(c)
+      if (under !== undefined) {
+        const released = this.#rt.node.writes.released
+        if (under.at !== released) {
+          under.at = released
+          for (const c of under.cells) this.#probe(c)
+        }
+      }
     }
     //! 4) the ONE projection: kernel record → proxy
     this.#apply(a)
@@ -355,17 +369,16 @@ export class Bind {
   // the kernel no longer holds its attempt — from the dedup window's coordinates, or 'superseded'.
   #probe(cell: string) {
     const holder = this.#inflight.get(cell)
-    if (holder !== undefined && !this.#rt.node.writes.pending.has(this.#iss + '|' + holder)) {
-      const p = this.#pending.get(this.#iss + '|' + holder)
+    if (holder !== undefined && !this.#rt.node.writes.pending.has(holder.key)) {
+      const p = this.#pending.get(holder.key)
       if (p) {
         this.#forget(p)
-        const c = this.#rt.node.writes.committed(this.#iss, holder)
-        if (c) p.resolve({ origin: c.o ?? this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: holder })
+        const c = this.#rt.node.writes.committed(this.#iss, holder.cid)
+        if (c) p.resolve({ origin: c.o ?? this.#rt.node.uuid, seq: c.s, epoch: c.e, cid: holder.cid })
         else p.reject('superseded')
       } else {
         this.#inflight.delete(cell)
-        const path = JSON.parse(cell) as string[]
-        if (path.length > 1) this.#unfield(ancestorKeys(path), cell)
+        if (holder.above !== undefined) this.#unfield(holder.above, cell)
       }
     }
   }
