@@ -1,9 +1,9 @@
 {
- "syncedAt": "2026-10-03T04:22:27.258Z",
- "head": "f196de0",
+ "syncedAt": "2026-10-08T17:24:14.998Z",
+ "head": "ca8e077",
  "path": "examples/README.md",
- "count": 26,
- "checks": 26,
+ "count": 27,
+ "checks": 27,
  "rungs": [
   {
    "no": "01",
@@ -105,7 +105,7 @@
    "no": "13",
    "name": "cluster-of-three",
    "dir": "13-cluster-of-three",
-   "lesson": "three members on fixed addresses with disks: kill one, the two left vote it out in six seconds and still prove `persisted` on two disks, and the same command brings the dead one back as itself from its disk",
+   "lesson": "three members on fixed addresses with disks: kill one, the two left vote it out in about a second and still prove `persisted` on two disks, and the same command brings the dead one back as itself from its disk",
    "terminals": "`node server.ts 4801` · `node server.ts 4802` · `node server.ts 4803` · `node client.ts`",
    "check": true
   },
@@ -212,9 +212,17 @@
    "lesson": "money is facts: transfers are rows on three durable members, the rule thrown from a method, the intent cleared through the door, every id on a member that comes back",
    "terminals": "`node member.ts 4901` ×3 (4902, 4903) · `node notifier.ts` · `node teller.ts mint alice 100`",
    "check": true
+  },
+  {
+   "no": "44",
+   "name": "sell",
+   "dir": "44-sell",
+   "lesson": "an open server lets every client change every row, the price included; declaring `methods:` is the door: the same write is refused `methods-only`, and `sell` writes the sale at the server's price",
+   "terminals": "`node open.ts`, then `node door.ts` · `node customer.ts` ×2",
+   "check": true
   }
  ],
- "tiers": "Four tiers: 01-17 climb one feature at a time, 20-23 open the debugger, 30 is everything at once on one box, and 40-43 are apps.",
+ "tiers": "Four tiers: 01-17 climb one feature at a time, 20-23 open the debugger, 30 is everything at once on one box, and 40-44 are apps, the last of them the story the website tells: an open shop anyone can change, then the same shop behind a door.",
  "runs": "No build, no flags — Node 22.18+ or 23.6+ runs the `.ts` files as they are, after one `npm install` at the repo root (fero's one dependency).",
  "node": {
   "floor": "22.18",
@@ -224,6 +232,6 @@
  "vote": {
   "no": "13",
   "path": "examples/13-cluster-of-three/README.md",
-  "text": "The link drops at once; the vote waits for the dead member's redials to give up — six seconds at 30 ms, twenty at the default 100."
+  "text": "The link drops at once; the vote waits for the dead member's redials to give up — five tries, about a second at 30 ms, about four at the default 100."
  }
 }
