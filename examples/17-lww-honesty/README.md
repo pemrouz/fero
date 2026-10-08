@@ -6,7 +6,7 @@ One terminal, one run:
 $ cd examples/17-lww-honesty
 $ node race.ts
 two increments of 0, stamped a:2 and a:3 → count is 1 on a, 1 on b
-two facts { n: 1 }, stamped a:4 and a:5 → sum is 2 on a, 2 on b
+two facts { n: 1 }, stamped a:4 and b:4 → sum is 2 on a, 2 on b
 ```
 
 - `a` and `b` are two members in one process, so every read and write happens in a known order. Both read
