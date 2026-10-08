@@ -545,3 +545,113 @@ test('graceful leave (V4-6), rebase: a newer view that still holds the leaver dr
   h.tick()
   assert.deepEqual(proposed(h, 1, 3), [['bb', 'cc'], ['bb', 'cc', 'dd']], 're-proposed at 3 from the NEW base: dd stays')
 })
+
+//! ── the proposer-side double vote (I-20 salvage, 2026-10-08). votedFor remembers only the LATEST ballot. A node
+// that granted another proposer at 2, then opened a ballot of its own at 3 (past that vote) and lost it, had
+// votedFor = {3, me}: #nextEpoch saw "my own ballot" and started again at view+1 = 2 — spending at 2 a vote it
+// had already given away there. Two ballots at one epoch with its vote in both; with two old-set majorities that
+// share only this voter, two views commit at one epoch. The fix: a fresh ballot of mine never opens BELOW my own
+// last ballot (the same epoch again is the idempotent same-proposer case). ──
+test('#nextEpoch never goes back below my own ballot: granted at 2, proposed at 3, re-proposing lands at 3 again — never at 2', () => {
+  const h = formedView1() // {aa,bb,cc} at 1
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc'], ['dd', 'sim:dd']], p: 'bb' }) })
+  assert.deepEqual(h.node.membership.votedFor, { e: 2, p: 'bb', h: 'aa,bb,cc,dd' }, 'granted bb at 2')
+  //! cc is gone for good: aa evicts it — at 3, past the vote it gave bb
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  for (let i = 0; i < 11; i++) {
+    const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
+    if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:cc' })
+  }
+  for (let i = 0; i < 4; i++) h.tick()
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [3, 2]], 'the eviction ballot opened at 3')
+  //! the ballot ages out unanswered (bb never votes); the next one must open at 3 again, not at 2
+  for (let i = 0; i < 12; i++) h.tick()
+  const later = h.jk(JK.propose).slice(2).map((e) => [e.a, e.b])
+  assert.ok(later.length >= 1, 'proposed again after the ballot aged out')
+  assert.ok(later.every(([e]) => e >= 3), `every later ballot is at 3 or above: ${JSON.stringify(later)}`)
+  assert.ok(h.node.membership.votedFor.e >= 3)
+})
+
+//! ── real Nodes in a mesh, driven by hand: the test below only chooses the order their frames arrive in ──
+const meshIds = { aa: 1, bb: 2, cc: 3, ee: 5 } as const
+type MeshId = keyof typeof meshIds
+const meshNode = (uuid: MeshId) => {
+  const h = harness(uuid, { hosts: [] })
+  h.node.step({ kind: 'start' })
+  //! the raw bytes of every control frame of `verb` sent to peer `to`, in order
+  const sent = (to: MeshId, verb: number) =>
+    h.of('send').filter((e) => e[1] === meshIds[to]).map((e) => e[2] as Uint8Array)
+      .filter((b) => new Framer().push(b.slice())[0]?.verb === verb)
+  //! exhaust the redial chain to `to`: the dial is refused until the node gives up (membership holds eviction while dialing)
+  const giveUp = (to: MeshId) => {
+    for (let i = 0; i < 11; i++) {
+      const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
+      if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+      h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: `sim:${to}` })
+    }
+  }
+  return { uuid, ...h, sent, giveUp, admitPeer: (u: MeshId) => h.admit(meshIds[u], u), down: (u: MeshId) => h.node.step({ kind: 'linkDown', link: meshIds[u], reason: 'close' }) }
+}
+type Mesh = ReturnType<typeof meshNode>
+//! deliver the LAST frame of `verb` that `from` sent to `to`
+const deliver = (from: Mesh, to: Mesh, verb: number) => {
+  const all = from.sent(to.uuid, verb)
+  assert.ok(all.length, `${from.uuid} sent no ${verb} to ${to.uuid}`)
+  to.node.step({ kind: 'bytesIn', link: meshIds[from.uuid], bytes: all[all.length - 1] })
+}
+const viewOf = (h: Mesh) => `${h.node.epoch}:${h.node.membership.view.members.map((m) => m[0]).join(',')}`
+
+//! the double vote committing TWO VIEWS AT ONE EPOCH, on three real nodes whose frames arrive in a chosen order.
+// {aa,bb,cc} at 1. bb, cut from aa, proposes ee's join at 2 (ee grants); the cut heals and aa grants bb at 2 too.
+// cc then drops out: aa evicts it at 3 (past the vote it gave bb) — cc returns and the ballot is abandoned. aa's
+// VOTE reaches bb: bb commits {aa,bb,cc,ee}@2 on bb + ee + aa. Now bb drops out of aa's sight for good, and aa
+// evicts it: before the fix at 2 again — cc, who never saw bb's ballot, grants, and aa commits {aa,cc}@2 on aa + cc.
+// Two old-set majorities of {aa,bb,cc}, sharing exactly the voter that voted twice; both proposers writable.
+test('the double vote splits the cluster: aa granted bb at 2, lost its own ballot at 3, and re-proposed at 2 — two views commit at epoch 2 (base); the fix keeps aa at 3', () => {
+  const aa = meshNode('aa'), bb = meshNode('bb'), cc = meshNode('cc')
+  aa.admitPeer('bb'); aa.admitPeer('cc'); bb.admitPeer('aa'); bb.admitPeer('cc'); cc.admitPeer('aa'); cc.admitPeer('bb')
+  aa.tick() // genesis: aa is the lowest over the formed mesh
+  deliver(aa, bb, VERB.PROPOSE); deliver(aa, cc, VERB.PROPOSE)
+  deliver(bb, aa, VERB.VOTE); deliver(cc, aa, VERB.VOTE)
+  deliver(aa, bb, VERB.VIEW); deliver(aa, cc, VERB.VIEW)
+  for (const h of [aa, bb, cc]) assert.equal(viewOf(h), '1:aa,bb,cc')
+  //! 1. aa and bb lose each other (both keep dialing, so neither evicts); ee joins through bb, who is the lowest
+  // live member in its own eyes — bb opens {aa,bb,cc,ee}@2 and ee grants it. cc never sees this ballot.
+  aa.down('bb'); bb.down('aa')
+  for (let i = 0; i < 3; i++) { aa.tick(); bb.tick() }
+  bb.admitPeer('ee')
+  bb.node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.JOIN, { u: 'ee', i: 1, l: 'sim:ee' }) })
+  assert.deepEqual(bb.jk(JK.propose).map((e) => [e.a, e.b]), [[2, 4]], 'bb proposed the join at 2')
+  bb.node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 0, h: 'aa,bb,cc,ee' }) })
+  //! 2. the cut heals; bb's re-offer reaches aa, and aa grants bb at 2 (its VOTE is slow)
+  aa.admitPeer('bb'); bb.admitPeer('aa')
+  aa.tick(); bb.tick(); bb.tick()
+  deliver(bb, aa, VERB.PROPOSE)
+  assert.deepEqual(aa.node.membership.votedFor, { e: 2, p: 'bb', h: 'aa,bb,cc,ee' }, 'aa granted bb at 2')
+  //! 3. cc drops out of aa's sight and the dial gives up: aa evicts cc — at 3, past the vote it gave bb.
+  // Then cc is back, and the eviction ballot is abandoned (nobody voted on it).
+  aa.down('cc'); cc.down('aa')
+  aa.giveUp('cc')
+  for (let i = 0; i < 4; i++) aa.tick()
+  assert.deepEqual(aa.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [3, 2]], 'aa evicted cc at 3')
+  aa.admitPeer('cc'); cc.admitPeer('aa')
+  aa.tick()
+  //! 4. aa's slow VOTE lands: bb commits {aa,bb,cc,ee}@2 on bb + ee + aa (2 of 3 old, 3 of 4 new)
+  deliver(aa, bb, VERB.VOTE)
+  assert.equal(viewOf(bb), '2:aa,bb,cc,ee')
+  //! 5. bb drops out of aa's sight for good (its VIEW@2 dies with the link): aa evicts bb
+  aa.down('bb'); bb.down('aa')
+  aa.giveUp('bb')
+  for (let i = 0; i < 4; i++) aa.tick()
+  const evictBb = aa.jk(JK.propose).slice(2).map((e) => [e.a, e.b])
+  assert.equal(evictBb.length, 1, 'aa proposed the view without bb')
+  //! cc never saw bb's ballot: its vote at this epoch is free, so it grants aa — and aa's ballot commits
+  deliver(aa, cc, VERB.PROPOSE); deliver(cc, aa, VERB.VOTE)
+  assert.deepEqual(aa.node.membership.view.members.map((m) => m[0]), ['aa', 'cc'], 'aa committed the view without bb')
+  assert.deepEqual(aa.node.membership.gate(aa.node), { open: true, reason: '' })
+  assert.deepEqual(bb.node.membership.gate(bb.node), { open: true, reason: '' })
+  //! THE PIN: never two views at one epoch. Before the fix aa re-proposed at 2 and this read '2:aa,cc' beside bb's '2:aa,bb,cc,ee'.
+  assert.notEqual(aa.node.epoch, bb.node.epoch, `two views at one epoch: aa ${viewOf(aa)} vs bb ${viewOf(bb)}`)
+  assert.deepEqual(evictBb, [[3, 2]], 'the eviction of bb opened at 3, never below aa\'s own last ballot')
+})

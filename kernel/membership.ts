@@ -556,9 +556,14 @@ export class Membership {
   }
 
   //! #nextEpoch — the epoch a fresh proposal must target: past the committed view, past every KNOWN
-  // burn, and past this node's own vote if it is spent on someone else (see #burned).
+  // burn, past this node's own vote if it is spent on someone else (see #burned) — and never BELOW a
+  // ballot of its own (the same epoch again is the idempotent same-proposer case). votedFor remembers
+  // only the LATEST ballot: a node that granted another proposer at 2, then opened its own ballot at 3
+  // and lost it, once started again at view+1 = 2 — spending at 2 a vote it had already given away
+  // there, which nothing remembered any more. That is a double vote, and with two old-set majorities
+  // sharing only that voter it committed two views at one epoch (pinned in membership.test.ts, 2026-10-08).
   #nextEpoch(node: Node): number {
-    return Math.max(this.view.epoch, this.#burned, this.votedFor.p === node.uuid ? 0 : this.votedFor.e) + 1
+    return Math.max(this.view.epoch, this.#burned, this.votedFor.p === node.uuid ? this.votedFor.e - 1 : this.votedFor.e) + 1
   }
 
   #propose(node: Node, view: View) {
