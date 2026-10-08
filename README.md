@@ -130,7 +130,7 @@ Scope: *instance* = this node only. *cluster* = must be the same on every member
 
 | Key | Default | Scope | Set via | What it does |
 |---|---|---|---|---|
-| `journal.cap` | `4096` | instance | call, flag, env, file | The size of the diagnostics ring. Older events are dropped and counted. Raise it for captures that want full time travel. An integer of 1 or more. |
+| `journal.cap` | `4096` | instance | call, flag, env, file | The size of the diagnostics ring. Older events are dropped and counted. Raise it for captures that want full time travel. A tiny cap is a bad idea: one step can emit more events than it holds, so the debugger loses its diary and `cluster.partitions.acquired` can undercount. It never costs correctness: when the ring overflows past what the cluster view has read, the view is rebuilt from live state. An integer of 1 or more. |
 
 **Method plane**
 
