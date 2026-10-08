@@ -152,6 +152,22 @@ export class Bind {
     this.#handle = proxy({})
     this.data = lens(this.#handle, [], (recs) => this.#fromLens(recs), (key) => this.#inflight.has(JSON.stringify(key)))
     rt.onApply = (a) => { if (!this.#destroyed) this.#onApply(a) }
+    rt.onLost = (iss, cid, origin, seq, epoch) => { if (!this.#destroyed) this.#lost(iss, cid, origin, seq, epoch) }
+  }
+
+  //! #lost — the kernel refused a record carrying an attempt identity (V4-18, env.ts lost): it
+  // committed at these coordinates and lost its election — to a newer stamp on its own cell, or on an
+  // ancestor (our field write under a newer whole-row write). No apply will ever carry it, so the join
+  // (#onApply step 1) never fires, and the settlement probe (step 3b) only runs when a LATER foreign
+  // write lands on that row — which may be never: before this hook our write stayed `pending` for ever
+  // when the newer row reached us before our WACK. The refused record IS our commit: settle committed,
+  // on the owner's lane, from its own stamp (the same coordinates the WACK carried).
+  #lost(iss: string, cid: number, origin: string, seq: number, epoch: number) {
+    if (iss !== this.#iss) return
+    const p = this.#pending.get(iss + '|' + cid)
+    if (p === undefined) return
+    this.#forget(p)
+    p.resolve({ origin, seq, epoch, cid })
   }
 
   #validate?: (rec: Rec) => true | string

@@ -175,6 +175,46 @@ test('V4-18 overlapping cells — our in-flight FIELD write loses to a newer who
   await h.destroy()
 })
 
+test('V4-18 overlapping cells — our in-flight write settles when the kernel REFUSES its echo: a newer foreign row (or a newer same-cell write) lands before our WACK, then the WACK, then the echo — committed from the echo\'s own coordinates, never pending for ever', async () => {
+  //! the reviewer's sequence: view e1 {aa,bb} with cart at bb; our field write forwarded to bb; the view
+  // moves on (e2 adds cc and cart moves to cc) and cc's newer row reaches us FIRST — at that moment the
+  // kernel still holds our attempt, so the row's apply decides nothing; then bb's WACK clears it (a step
+  // that applies nothing); then bb's echo arrives and is refused across depth — before this it never
+  // reached the api, and the write sat 'pending' for ever (the base tree resolved it committed).
+  const run = async (label: string, cross: boolean, field: boolean) => {
+    const h = harness()
+    h.admit(1, 'bb'); h.admit(2, 'cc')
+    h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+    h.node.writes.ring.place('cart', 'bb')
+    const key = field ? ['cart', 'items'] : ['cart']
+    const [p] = h.bind.issue([{ type: REC.update, key, value: 1 }]) as Promise<unknown>[]
+    let settled: unknown = 'pending'
+    p.then((v) => { settled = v }, (e) => { settled = `rejected ${e}` })
+    if (cross) {
+      h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+      h.node.writes.ring.place('cart', 'cc')
+      h.node.step({ kind: 'bytesIn', link: 2, bytes: records('cc', 1, 2, [{ type: REC.update, key: ['cart'], value: { items: 7 } }]) })
+    } else h.node.step({ kind: 'bytesIn', link: 2, bytes: records('cc', 9, 1, [{ type: REC.update, key: ['cart'], value: { items: 7 } }]) })
+    await new Promise((r) => setTimeout(r, 5))
+    assert.equal(settled, 'pending', `${label}: the kernel still holds the attempt when the newer row lands — nothing is decided`)
+    h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 1, s: 2, e: 1 }) })
+    await new Promise((r) => setTimeout(r, 5))
+    assert.equal(h.node.writes.pending.size, 0, `${label}: WACKed`)
+    //! the echo: our commit on bb's lane, refused by the election (subsumed under the row, or lwwSkip on the cell)
+    h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 2, 1, [{ type: REC.update, key, value: 1 }], 'aa~1', 1) })
+    await new Promise((r) => setTimeout(r, 5))
+    assert.deepEqual(settled, { origin: 'bb', seq: 2, epoch: 1, cid: 1 }, `${label}: settled committed from the refused echo's own coordinates`)
+    assert.equal(h.jk(field ? JK.subsumed : JK.lwwSkip).length, 1, `${label}: the echo was refused`)
+    assert.deepEqual(snapshot(h.bind.data), { cart: { items: 7 } }, `${label}: the newer row stands`)
+    assert.ok([...h.bind.outcomes.rows.values()].every((r) => r.state === 'committed'), `${label}: no pending row of cluster.writes`)
+    await h.destroy()
+  }
+  await run('field, two epochs', true, true)
+  await run('field, one epoch', false, true)
+  await run('same cell, two epochs', true, false)
+  await run('same cell, one epoch', false, false)
+})
+
 test('V4-18 overlapping cells — on the epoch-0 fast path, removing the last field of a row that only fields made up settles committed: the kernel\'s seq-0 repair of the row is never mistaken for a foreign commit', async () => {
   const h = harness()
   const seqs = async (ps: unknown[]) => Promise.all(ps.map((p) => (p as Promise<{ seq: number }>).then((c) => c.seq, (e) => `rejected ${e}`)))
