@@ -1336,3 +1336,199 @@ history is the archive); a per-bug file or an issue tracker (no remote).
 Consequences: three files at the root a reader meets (README, STATUS,
 CLAUDE) and a docs/ folder. Battery after the pass: 495 + 18 contract,
 perf 43.
+
+## V4-14 — the ring hash is fnv-1a finished with fmix32, and it is part of the wire contract (2026-10-08)
+Context: STATUS carried "the ring is skewed" (I-24). Plain fnv-1a ends with
+`(h ^ c) * P`, so a member's 32 vnode points (`uuid#0` to `uuid#31`) differ
+only in their last characters and land in about four narrow bands. Measured
+over 300 random 4-member sets of 8-hex ids (the ids api/index.ts mints), by
+exact arc length: the biggest member owned 2.85× its fair share and 160 of
+300 sets had a member outside [0.5×, 2×]; over 3000 sets the smallest member
+owned 1/39 of fair. The old ledger's "5-7×" described the starved side.
+Sequential keys k1..k24 changed owner 4 times (fair is about 18), and one
+owner held 17.6 of 24: example 16 showed exactly that. Sim ids n01..n04 spread
+fine under plain fnv, which is why no sim test ever caught it.
+Decision: kernel/ring.ts `fnv` keeps fnv-1a's loop, then mixes the result
+with murmur3's fmix32 (`h ^= h >>> 16; h *= 0x85ebca6b; h ^= h >>> 13;
+h *= 0xc2b2ae35; h ^= h >>> 16`). With it: worst member 1.57× (1.79× over
+3000 sets), 0 of 300 sets outside [0.5×, 2×], 18.3 owner changes over
+k1..k24. Every member must compute the same owner for every key, so this
+exact function, VNODES 32 and the `#` separator are part of the wire contract
+from this commit; members on different ring hashes in one cluster are
+unsupported before 1.0, and nothing polices it yet (the HELLO contract hash,
+when it lands, should carry `ring=fmix32`). The state hash in kernel/node.ts
+is a separate plain fnv and does not change. Two pins in kernel/ring.test.ts:
+a spread pin with hex-shaped ids (50 seeded 4-member sets, 5k keys each, every
+member within [0.5×, 2×], no owner holding more than 16 of k1..k24; red on
+the old hash, 28 of 200 members outside) and a golden that pins the exact
+function (five known values, 2000 inputs against a BigInt reference, the
+owners of k1..k12 over four fixed ids), because a weaker mix keeps the spread
+pin green while moving every owner. `fnv` is exported only for that test.
+Cost: ownerOf is about 50-110 ns slower per 8-char key, flat for 36-char
+keys, under 1% of a write; it still allocates nothing; no threshold moved.
+REJECTED: more vnodes under plain fnv (the bands come from the hash, not from
+too few points); a different whole hash such as xxhash or full murmur3
+(fmix32 alone fixes the spread and keeps the integer math); moving the ring
+onto the state hash (they were already separate); running both hashes behind
+a version switch (there is no 1.0 contract to keep); a golden of owners only
+(a weak mix moved 1 owner in 5000).
+Consequences: every key's owner moved. Example 16's blocks are re-recorded;
+17's second line changed; 20 now waits until both members hold every cell's
+last write; 22 renamed its keys to `spot` and `missed`, which hash to the
+owners its story needs; sim/exec.test.ts's AE-floor test reads its key's
+owner off the real ring. docs/DESIGN-CONFIG.md's frozen row names fmix32.
+The advisory baseline row `ring.ownerof-1m` drifts until re-recorded on a
+quiet box. site/lib is regenerated.
+
+## V4-15 — the lower uuid opens the admit digest exchange; the formation count re-pins 69,400 → 59,500 (2026-10-08)
+Context: STATUS "Next" carried "every admit ships each missing suffix twice".
+Both ends opened a digest (r=1) on admit. Each end shipped its missing suffix
+when the peer's r=1 arrived, then shipped the same suffix again when the
+peer's r=0 reply arrived, because that reply's tails were built before the
+first suffix had landed on the FIFO; the receiver dropped the second copy.
+Measured: heal probe aeShip 2+2 and dupDrop 1+7; cold formation four digest
+frames per pair.
+Decision: when two members admit each other, only the one whose uuid sorts
+lower sends the opening digest. The higher side ships what the opener's tails
+show missing and answers r=0; that answer's tails pull what the higher side
+lacks. One exchange heals both ways. The rule asks who sorts lowest, never who
+dialed, so it is direction-independent (v2's dialer-gated catch-up trap stays
+the counterexample), and it is the rule the heartbeat floor already uses for
+PINGs and floor digests, so admit, drain and floor are all single-opener now.
+A client still opens to its primary (the single-feeder rule). A server no
+longer opens toward a client: the client's own r=1 syncs that link, and no
+guarantee a client gives read the dropped frame. View-on-admit still goes
+from both ends. After: heal probe aeShip 1+1, dupDrop 0+0; two digest frames
+per pair. Accepted trade: under backpressure or a cut between the r=1 and the
+r=0, the single opener heals one round trip later than the redundant second
+digest sometimes did; every such case still converges on drain or relink, and
+one lower-side floor tick heals a lost suffix in either direction. Unchanged:
+the dial race (both members dial at once, both raced links admitted before
+dupLink hangs one up) makes one side's diary show aeShip twice, about 1 run in
+10 in a 200-seed probe; the second ship goes down a dead link and nothing
+arrives twice. The count re-pin: sim/scale.perf.ts "100-node formation" moves
+69,400 → 59,500 events at seed 0, exactly 2 digest frames × 4,950 pairs;
+the pairs ratio, the idle floor 4·25·24, kernel/node.perf.ts's digest-build
+pin and the tests/baseline.perf.ts count tier do not move. This is the
+deliberate wire change tools/perf/BASELINE.md asks to land with a record and
+the re-pin in one change. sim/membership.test.ts "a burned epoch cannot wedge
+membership" was re-derived, not weakened: it stepped 200 ms at a time and only
+by luck partitioned n01 before its re-proposal landed; it now steps 1 ms to
+the grant, asserts both members are still at epoch 1 there, keeps every old
+assert, is green on the old kernel, and still fails when the escalation fix
+it guards is removed.
+REJECTED: remembering the tail already shipped per link (new per-link state
+to invalidate on every drop, and it would wrongly skip a re-ship after a
+backpressure drop, which the drain path relies on).
+Consequences: a join costs its bytes once. examples/21-journal is
+re-recorded (each side logs aeShip once, applyInbound once, no dupDrop) and
+its bullet names the dial-race shape. Three new kernel tests. The website's
+wire card still tells the two-opener story (STATUS, the website).
+
+## V4-16 — the method plane: a live scalar arrives as `{ value }`; a subscription has a `ready` per attempt and an `onError`; a kernel outcome on an assignment fails the call; a plain-value handler keeps its views (2026-10-08)
+Context: four holes. (1) A method that returns a live number
+(`count: (_, ctx) => ctx.data.count`), or a plain number on the subscribe
+leg, streamed root records carrying the bare number; the client's mirror is
+a source born an object, data has no source born a number, and the refusal
+was swallowed, so `.open()` stayed `{}` for good (I-27). (2) A handler that
+threw on the subscribe leg, or whose write was refused, replied ok:false for
+the sub's id; the caller looked that id up among its calls only, so the reply
+was dropped and every failover re-subscribed into the same failure. (3)
+Flush-on-return failed a call only when a validator refused a write; a write
+the node itself lost (dropped at queue overflow, superseded, destroyed) or an
+owner refused still let the call resolve as if it had happened. (4) A handler
+that made a view and returned a plain value leaked that view (the I-29
+residue).
+Decision 1: on the client, a root record (key [] and no `at`) whose value is
+a number, string or boolean becomes a whole-value update of `{ value: v }`
+(whole-value, so stale keys drop if a value flips from an object to a
+number); a root remove empties the mirror; `at` is the guard, because an
+object source's keyed insert is also key [] and carries its key in `at`. The
+one-shot call still gives the bare number. REJECTED: building the mirror
+from the first record's type (open() hands the mirror out before any record
+exists, and data has no scalar-born source); wrapping on the host (two sites
+and a wire change for the same result).
+Decision 2: a subscription has an eager `ready` promise per ATTEMPT (made
+when the sub opens, and again when a primary change re-subscribes a sub that
+already had a frame) and an `onError` option. `ready` resolves on that
+attempt's first frame, with nothing (the mirror is thenable; resolving with
+it would turn it into a snapshot). It rejects with `methods.<m>: <reason>`
+when the host fails the sub or the mirror refuses a record (then the client
+also unsubscribes). Because it is eager, a failure nobody handles is an
+unhandled rejection and stops the process with the handler's message, as
+loud as an uncaught call, after a failover too. `methods.feed(arg, {
+onError })` hears every failure of a long-lived sub (called in a microtask,
+never inside a kernel step) and with it set no failure stops the process;
+the directory's own lookup uses it and puts the error on
+`cluster.me.rendezvous.error`. A failed sub is dropped and never
+re-subscribed; `mode` reads 'failed', `open()` and every read throw the
+reason, `close()` does nothing. A ScopedError passes through. A LOCAL
+failure (no primary yet, the frame never left) is not a failure: that sub is
+held and replayed (I-28), and the local bit decides it. A sub that ends
+before its first frame rejects `ready` with `closed` or `destroyed`, marked
+handled, so an awaiting caller learns it and a shutdown never stops the
+process. Reading `ready` on a closed handle never opens a new sub. `open()`
+still returns the raw mirror. REJECTED: a lazy `ready` (the bug itself); one
+`ready` for the sub's whole life (a failure after the first frame landed on a
+settled promise and was silent); failing reads only (no way to await the
+first frame); a second lifetime promise beside `ready`.
+Decision 3: an ASSIGNMENT inside a handler that the node did not commit fails
+the call with `write dropped|superseded|destroyed (<cell>)`, and one an owner
+refused with `write refused (<cell>): <reason>` (semantics A of V4-5: the
+reply is true). Only assignments: a write made through methods.* already gave
+the handler its own typed reject, and a handler that caught it and recovered
+keeps its reply. api/data.ts marks an assignment's promise in a WeakMap, only
+inside a handler. REJECTED: the plan's two-line change in settle (every
+write's promise sat in the collector, so it overrode a handler's recovery;
+the test showed it); keeping kernel outcomes silent.
+Decision 4: a handler that returns a plain value KEEPS the views it made; the
+I-29 residue stays on the page. Releasing every unhooked view made in the
+handler's synchronous window also killed a view it kept on purpose (a lazily
+cached module-level `cached ??= ctx.data.filter(…)` built on the first call):
+later calls read the frozen first answer, silent stale data, worse than the
+leak. In the data graph a dropped view and a kept one look the same, so there
+is no safe rule without JS reachability. A returned sum() is now released on
+close, like a returned operator. REJECTED: releasing every unhooked view of
+the synchronous window; making "keep it by hooking a sink" the user's job;
+releasing everything newer than the mark (kills views of calls running at the
+same time). The way forward, if wanted: a FinalizationRegistry over the
+handles minted inside a handler, its own decision.
+Consequences: examples/09's README says a live scalar arrives as `{ value }`;
+Directory.start() checks that its client composed as a client and names the
+role if not (I-19 stays on the page with a race test); seven new api tests.
+
+## V4-17 — the shell's `start()` always settles; a store whose boot record failed mid-life is condemned on restart (I-36) (2026-10-08)
+Context: two shell residues. `Runtime.start()` awaited a promise settled only
+by 'listening' or a listen error, so a `destroy()` before the socket was up
+left it pending for ever (the composer raced it against the stop and masked
+it). And after a boot record (boot.json) failed to land (EIO, EACCES, ENOSPC,
+a boot.json.tmp that is a directory) the shell latched the store dead and
+voted from memory, but nothing marked the dir: a restart replayed an honest
+prefix under a stale votedFor and could vote twice in one epoch. STATUS's
+"the existing policy already condemns such a dir on restart" was not backed by
+code.
+Decision: `start()` always settles. A stop before the listen socket is up, or
+a `start()` after `destroy()`, rejects typed `code: 'stopped'` and binds
+nothing; a second `start()` rejects typed `code: 'started'` and binds nothing
+(it used to leak the first server); whichever of 'listening', 'error' and
+'close' fires first settles it and the other listeners are removed. A caller
+must await `start()` or attach a handler. The composer treats a 'stopped'
+reject during a running stop as the stop path, so `fero()` resolves stopped;
+once Ctrl-C has started a stop, a listen error that lands meanwhile also takes
+the stop path. For I-36: `boot()`'s catch marks the dir in two best-effort
+steps, a `condemned` marker naming the reason, then the unlink of boot.json;
+`restoreOpts` refuses a dir holding the marker, and the older rule (a non-
+empty wal.log with no boot.json) catches the unlink alone, its message naming
+both cases. To start the node again the operator moves the dir aside. The sim
+mirrors it: `StoreFault.bootFailP` fails a boot record, the store is marked
+condemned and takes no later record, `Sim.restart()` refuses it before
+touching anything.
+REJECTED: the plan's silent `return` for a `start()` after `destroy()` (every
+early-stop case should settle the same way); the unlink alone (a member whose
+wal.log is still empty would read as a pristine boot and forget its votedFor);
+trusting the stale record.
+Consequences: a dir deleted under a running member (the case that found I-36)
+can carry no mark, so its next life starts fresh like any wiped dir; neither
+mark is fsynced, so a power loss right after the failure can lose both. README
+and docs/DESIGN-CONFIG.md name the `condemned` marker. Five new tests
+(tests/tcp.test.ts, tests/wal.test.ts, sim/durability.test.ts).
