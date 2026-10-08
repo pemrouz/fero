@@ -75,9 +75,18 @@ test('diag.allow: from the call, a variable (FERO_DIAG_ALLOW_<NAME>) or a file �
       return true
     }, argv.join(' '))
   }
-  //! a variable can only carry text: an all-digits token lost its leading zeros, a longer name is not a token
-  assert.throws(() => r('shop', {}, { env: { FERO_DIAG_ALLOW_OPS: '0123' } }), (e: Error) => /the diag token for 'ops' is all digits \(from FERO_DIAG_ALLOW\) — a variable or a flag loses its leading zeros; give it a letter/.test(e.message) && !e.message.includes('123'))
-  assert.throws(() => r('shop', {}, { env: { FERO_DIAG_ALLOW_OPS_X: 'Tok' } }), /diag\.allow\.ops must be a token string \(from FERO_DIAG_ALLOW\)/)
+  //! a variable can only carry text: a token envdeep reads as a number or a boolean lost its text, and an
+  // `_` in the name nests it — each refused in words that say what was typed, naming the variable, never the value
+  const lost = /the diag token in FERO_DIAG_ALLOW_OPS reads as a number or a boolean, so its text is lost \(a leading zero, 1e5, true\) — give it a letter/
+  for (const tok of ['0123', '12.5', '2e7', 'Infinity', 'false'])
+    assert.throws(() => r('shop', {}, { env: { FERO_DIAG_ALLOW_OPS: tok } }), (e: Error) => lost.test(e.message) && !e.message.includes(tok), tok)
+  assert.throws(() => r('shop', {}, { env: { FERO_DIAG_ALLOW_OPS: 'true' } }), lost)
+  assert.throws(() => r('shop', {}, { env: { FERO_DIAG_ALLOW_OPS_TEAM: 'Tok-6' } }), (e: Error) => /FERO_DIAG_ALLOW_OPS_TEAM is not a diag name — a name in a variable is one word of letters and digits \(an _ nests it\); set FERO_DIAG_ALLOW_OPSTEAM=<token>, or diag: \{ allow: \{ ops_team: … \} \} in the call or a fero\.opt\.ts file/.test(e.message) && !e.message.includes('Tok-6'))
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_DIAG_ALLOW_OPS2: 'Tok-7' } }), { diag: { allow: { ops2: 'Tok-7' } } }, 'digits in a name are fine')
+  //! a file is typed: a wrong shape there is plainly wrong
+  const home2 = scratch()
+  fs.writeFileSync(path.join(home2, 'fero.opt.js'), 'export default { diag: { allow: { ops: 123 } } }')
+  assert.throws(() => r('shop', {}, { home: home2 }), /diag\.allow\.ops must be a token string \(from a fero\.opt\.ts file \(diag\.allow\)\)/)
   //! an empty token is unset, like an empty value anywhere
   assert.deepEqual(cfg('shop', {}, { env: { FERO_DIAG_ALLOW_OPS: '' } }), {})
   //! a typo inside the group gets the leaf as its hint
