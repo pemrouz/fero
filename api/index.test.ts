@@ -700,10 +700,11 @@ test('the door: the role rule holds WITH a secret — a client that holds the se
       assert.ok('bb' in view(a).peers && 'aa' in view(b).peers, 'the member\'s link is alive on both ends')
       assert.deepEqual(snapshot(c.data), {}, 'the refused client never received the seed: it was refused before any digest')
       //! the client's own side: the role rule ran BEFORE the server's proof, so the client was still proving when
-      // the notice (or the close) reached it — its row keeps the notice's word, uuid-taken, naming the dial target
-      // (or reads refused when the best-effort frame was lost); it never admitted aa
+      // the notice reached it — its row keeps the notice's word, uuid-taken, naming the dial target. A LOST notice
+      // (the frame is best-effort under socket.destroy()) writes NO row: the bare close that follows is a link loss,
+      // re-dialed on the chain (the third review) — so every row the client holds is the notice's; it never admitted aa
       assert.ok(await until(() => doorRows(c!).some(([r]) => r === 'uuid-taken'), 8000), `the client has its own row with the reason: ${JSON.stringify(doorRows(c!))}`)
-      assert.ok(doorRows(c!).every(([r, to]) => (r === 'uuid-taken' || r === 'refused') && to === `127.0.0.1:${p}`), `the dial target on every row: ${JSON.stringify(doorRows(c!))}`)
+      assert.ok(doorRows(c!).every(([r, to]) => r === 'uuid-taken' && to === `127.0.0.1:${p}`), `the notice's word and the dial target on every row — a lost notice writes none: ${JSON.stringify(doorRows(c!))}`)
       assert.equal(view(c!).me.primary, null, 'never admitted the server on its own side')
       a.data.k = 1
       assert.ok(await until(() => (snapshot(b.data) as { k?: number }).k === 1, 8000), 'replication between the members is intact')

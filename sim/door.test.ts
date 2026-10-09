@@ -303,7 +303,9 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
           const d = live[n - 1]
           if (!rows(intruder, JK.doorReject).some((e) => e.b === 'bad-proof' && e.c === addrs[n - 1])) problems.push(`the intruder never refused the member's own dial: ${reasons(intruder).join(',')}`)
           if (!rows(d, JK.doorReject).every((e) => e.c === 'sim:zz')) problems.push(`${d.uuid}: a door row names someone but the intruder: ${JSON.stringify(rows(d, JK.doorReject).map((e) => [e.b, e.c]))}`)
-          if (!rows(d, JK.dial).some((e) => e.a === 'sim:zz')) problems.push(`${d.uuid} never re-dialed the intruder after the bare close`)
+          //! a REDIAL row, not a dial row: the discover itself writes JK.dial at the moment of discovery, so a dial row
+          // toward sim:zz is there under a park too; only the chain writes JK.redial (a park writes none)
+          if (!rows(d, JK.redial).some((e) => e.b === 'sim:zz')) problems.push(`${d.uuid} never re-dialed the intruder on the chain after the bare close — no redial row toward sim:zz (a park?): ${rows(d, JK.dial).filter((e) => e.a === 'sim:zz').length} dial(s), ${rows(d, JK.redial).filter((e) => e.b === 'sim:zz').length} redial(s)`)
         }
         if (kind === 1 && !mr.includes('no-secret')) problems.push(`members never refused the missing secret: ${mr.join(',')}`)
       }
@@ -357,7 +359,7 @@ test('the forwarder: a relay behind a DISCOVERED address is refused by the addre
     assert.deepEqual(rows(a, JK.doorReject).filter((e) => e.b === 'address'), [], 'the address rule cannot see the rewrite')
     assert.ok(rows(b, JK.doorReject).some((e) => e.b === 'bad-proof' && e.c === 'sim:n01'), `n02 refused the relayed proof: ${JSON.stringify(rows(b, JK.doorReject).slice(0, 3))}`)
     assert.ok(rows(a, JK.doorReject).every((e) => e.b === 'refused' && e.c === 'sim:x'), `n01 holds no door row but a refusal of sim:x: ${JSON.stringify(rows(a, JK.doorReject).slice(0, 3))}`)
-    assert.ok(rows(a, JK.dial).some((e) => e.a === 'sim:x'), 'n01 re-dialed the relay on the chain after the bare close')
+    assert.ok(rows(a, JK.redial).some((e) => e.b === 'sim:x'), `n01 re-dialed the relay on the chain after the bare close — a redial row toward sim:x (the discover's own dial row is there under a park too; a park writes no redial): ${JSON.stringify(rows(a, JK.redial).slice(0, 3))}`)
     assert.deepEqual(a.admitted(), [], 'never admitted through the relay'); assert.deepEqual(b.admitted(), [])
     assert.equal(b.byUuid.has('n01'), false); assert.deepEqual(rows(b, JK.identified), [])
     assert.ok(rows(a, JK.revive).length >= 1, 'bounded chatter, no admission') }
