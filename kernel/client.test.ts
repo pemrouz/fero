@@ -87,8 +87,16 @@ test('feederContract: a client keeps its primary\'s HELLO contract as sent; abse
   h.admit(2, 'bb') // an old server: no `c`
   assert.equal(h.node.links.get(2)!.contract, undefined)
   assert.equal(h.node.feederContract, c, 'a non-primary admit does not move it')
+  //! an OUTAGE: every server link down, no primary — the last primary's contract still answers (the fold is
+  // still that feeder's shard; a delete queued for the reconnect is judged by it, api/data.ts #local)
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'test' })
   h.node.step({ kind: 'linkDown', link: 1, reason: 'test' })
-  assert.equal(h.node.feederContract, undefined, 'the primary is gone, or moved to a server that sent none')
+  assert.equal(h.node.primary, null)
+  assert.equal(h.node.feederContract, c, 'no primary: the last primary\'s contract is remembered')
+  //! a failover to a server that sent none reads live again: undefined
+  h.admit(3, 'bb')
+  assert.equal(h.node.primary, 3)
+  assert.equal(h.node.feederContract, undefined, 'moved to a server that sent none')
 })
 
 test('the single-feeder rule: a client digests ONLY its primary; non-primary digests are consumed for evidence but never answered', () => {

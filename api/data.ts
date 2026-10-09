@@ -192,9 +192,13 @@ export class Bind {
   // well exist, at its owner, and a delete there is a real remove to forward. (Until the `acked` effect, a
   // non-holder's own write stayed "in flight" for ever, which hid this; the stage-1 skeptic's A1 found the
   // client case: a client's delete of a row it had just written through a non-holder primary went nowhere.)
+  // The rule fails TOWARD sending: with no contract known at all (a client before its first HELLO) the fold
+  // is empty and says nothing about the server, so a delete is forwarded — at worst a tombstone for a row
+  // that was never there, the cost `methods.remove` of an absent key pays today. In an outage the kernel
+  // keeps the last primary's contract, so the judgment does not change while the links are down.
   #local(p: string): boolean {
     const n = this.#rt.node
-    if (n.client) return !SCOPED_FEEDER.test(n.feederContract ?? '')
+    if (n.client) { const c = n.feederContract; return c !== undefined && !SCOPED_FEEDER.test(c) }
     return !n.armed || n.scope!.held(p)
   }
 

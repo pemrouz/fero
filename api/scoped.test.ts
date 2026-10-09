@@ -12,6 +12,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { fero, WriteRejectError, type Fero, type ScopedError } from './index.ts'
 import { snapshot } from './substrate.ts'
+import { diag } from './diagnostics.ts'
 import { Ring } from '../kernel/ring.ts'
 import { ports, until } from '#utils'
 
@@ -207,6 +208,87 @@ test('ACKED [DESIGN-SCALE stage 1] — methods.update from a member that does no
   } finally {
     await client.destroy()
     await Promise.all(nodes.map((n) => n.destroy()))
+  }
+})
+
+//! the stage-1 review's second pass: the client rule above was read LIVE off the primary link, so with no primary
+// (every server link down — an outage, not only the first milliseconds) a client of a scoped cluster looked
+// unscoped, and a delete issued in the gap was swallowed instead of queued for the reconnect. Now the kernel keeps
+// the last primary's contract and the rule fails toward sending. Red without #feederLast: no remove row is issued
+// in the gap and the row is still at n02 after the reconnect.
+test('OUTAGE DELETE [DESIGN-SCALE stage 1] — a client of a scoped cluster with every server link down still forwards a delete of a row it cannot see; the row is gone at the owner after the reconnect', async () => {
+  const ps = [await ports.free(), await ports.free()]
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const nodes = await Promise.all(addrs.map((listen, i) =>
+    fero('scoped', { uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1 })))
+  const client = await fero('scoped', { hosts: [addrs[0]], heartbeat: { ms: 50 }, redial: { ms: 300 } })
+  const rows = (f: Fero) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string; origin?: string }>)
+  const primary = () => (snapshot(client.cluster) as { me: { primary: string | null } }).me.primary
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    const ring = new Ring()
+    ring.build(1, [['n01', addrs[0]], ['n02', addrs[1]]])
+    let k = 'g0'
+    for (let i = 0; ring.holders(k, 1)[0] !== 'n02'; i++) k = 'g' + i
+    assert.ok(await until(() => primary() !== null, 5000), 'the client has a primary')
+    client.data[k] = { k }
+    assert.ok(await until(async () => ((await nodes[1].methods.read()) as Record<string, { k?: string }>)[k]?.k === k, 5000), 'the client write reached the owner')
+    assert.ok(await until(() => rows(client).some((x) => x.key === JSON.stringify([k]) && x.state === 'committed'), 5000), 'and settled')
+    //! the outage: both server links drop; the client has no primary until the redial lands
+    const d = diag(client)!
+    for (const u of ['n01', 'n02']) d.drop!(u)
+    assert.ok(await until(() => primary() === null, 5000), 'no primary')
+    delete client.data[k]
+    assert.ok(await until(() => rows(client).some((x) => x.key === JSON.stringify([k]) && x.state === 'pending'), 2000), 'the delete is issued in the gap, not swallowed')
+    assert.ok(await until(() => primary() !== null, 10_000), 'reconnected')
+    assert.ok(await until(async () => ((await nodes[1].methods.read()) as Record<string, unknown>)[k] === undefined, 10_000), 'the delete issued in the gap reached the owner')
+  } finally {
+    await client.destroy()
+    await Promise.all(nodes.map((n) => n.destroy()))
+  }
+})
+
+//! the UNSCOPED control of the outage: the kernel remembers the last primary's contract, so a client of an
+// unscoped server keeps its whole fold's judgment while the links are down — a delete of an absent row is still
+// a no-op there, and only a real row's delete is queued. Red without #feederLast: the absent delete is issued too.
+test('OUTAGE DELETE, unscoped control — a client of an unscoped server with its link down still swallows a delete of an absent row and queues the delete of a real one', async () => {
+  const port = await ports.free()
+  const server = await fero('scoped', { uuid: 'solo', listen: `127.0.0.1:${port}`, heartbeat: { ms: 50 } })
+  const client = await fero('scoped', { hosts: [`127.0.0.1:${port}`], heartbeat: { ms: 50 }, redial: { ms: 300 } })
+  const rows = (f: Fero) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string }>)
+  const primary = () => (snapshot(client.cluster) as { me: { primary: string | null } }).me.primary
+  try {
+    client.data.real = { v: 1 }
+    assert.ok(await until(() => rows(client).some((x) => x.key === JSON.stringify(['real']) && x.state === 'committed'), 5000), 'settled')
+    assert.ok(diag(client)!.drop!('solo'), 'the link drops')
+    assert.ok(await until(() => primary() === null, 5000), 'no primary')
+    delete client.data.absent
+    delete client.data.real
+    assert.ok(await until(() => rows(client).some((x) => x.key === JSON.stringify(['real']) && x.state === 'pending'), 2000), 'the real row\'s delete is queued')
+    assert.equal(rows(client).filter((x) => x.key === JSON.stringify(['absent'])).length, 0, 'the absent row\'s delete is a no-op: the fold is whole')
+    assert.ok(await until(() => (server.snapshot as Record<string, unknown>).real === undefined, 10_000), 'the queued delete lands after the reconnect')
+  } finally {
+    await client.destroy()
+    await server.destroy()
+  }
+})
+
+//! the other half of the rule: with NO contract known (a client that has never had a primary) the fold is empty and
+// says nothing about what the server holds, so a delete is forwarded, never swallowed. Red with the old
+// `!SCOPED_FEEDER.test(contract ?? '')`: no row is issued.
+test('PRE-HELLO DELETE [DESIGN-SCALE stage 1] — a client that has never reached a server forwards a delete of a row it cannot see; it rides out with the first connection', async () => {
+  const port = await ports.free()
+  const client = await fero('scoped', { hosts: [`127.0.0.1:${port}`], heartbeat: { ms: 50 }, redial: { ms: 100 } })
+  const rows = (f: Fero) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string }>)
+  let server: Fero | undefined
+  try {
+    delete client.data.nothing
+    assert.ok(await until(() => rows(client).some((x) => x.key === JSON.stringify(['nothing']) && x.state === 'pending'), 2000), 'issued, not swallowed')
+    server = await fero('scoped', { uuid: 'solo', listen: `127.0.0.1:${port}`, heartbeat: { ms: 50 } })
+    assert.ok(await until(() => rows(client).some((x) => x.key === JSON.stringify(['nothing']) && x.state === 'committed'), 5000), 'committed once the server is up')
+  } finally {
+    await client.destroy()
+    await server?.destroy()
   }
 })
 
