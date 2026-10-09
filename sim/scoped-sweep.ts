@@ -23,7 +23,7 @@ import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, f
 import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
-import { REC, type Rec } from '../kernel/env.ts'
+import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import type { Node, NodeOpts } from '../kernel/node.ts'
 import type { Tune } from '../kernel/tune.ts'
 
@@ -246,7 +246,9 @@ export const FAMILIES: readonly Family[] = [
     // minting until it installs: one member D has every pair it is in slowed (the joiner's included), so the rest
     // commit and install the join's view while D still stamps at the old epoch. A burst of 30 writes, each posted AT
     // D for a partition D owns at epoch 1, lands from 100 ms to 1.5 s after the join starts. `stale` counts commits
-    // stamped at an epoch below the newest one any node had installed at that event: the engagement key.
+    // stamped at an epoch below the newest one any node had installed at that event, on a partition whose owner at
+    // that newest view is ANOTHER node: a demoted owner minting for a partition that already moved. That is the
+    // engagement key. (A commit that is merely stamped late, on a partition the node still owns, does not count.)
     name: 'A2-slow-owner-join', ns: [2, 3, 5], Rs: [1, 2, 3], mutateAt: 500,
     chaos: (c) => {
       const slow = 400 + Math.floor(c.r() * 100)
@@ -271,8 +273,8 @@ export const FAMILIES: readonly Family[] = [
       c.sim.monitors.push({
         name: 'a2-stale-probe',
         check: (sim) => {
-          let max = 0
-          for (const n of sim.nodes.values()) if (n.epoch > max) max = n.epoch
+          let max = 0, top: Node | null = null
+          for (const n of sim.nodes.values()) if (n.armed && n.epoch > max) { max = n.epoch; top = n }
           for (const id of sim.stepped) {
             const n = sim.nodes.get(id)
             if (!n || !n.armed) continue
@@ -280,7 +282,15 @@ export const FAMILIES: readonly Family[] = [
             const len = lane?.length ?? 0
             const from = seen.get(n) ?? len
             seen.set(n, len)
-            if (lane) for (let i = from; i < len; i++) if (lane[i].epoch < max) c.eng.stale = (c.eng.stale ?? 0) + 1
+            if (!lane || !top) continue
+            for (let i = from; i < len; i++) {
+              if (lane[i].epoch >= max) continue
+              //! the owner at the newest installed view (the same ring ownerOf reads, built at top's own epoch)
+              const ring = top.writes.ring
+              if (ring.epoch !== top.epoch) ring.build(top.epoch, top.membership.view.members)
+              const owner = ring.holders(partitionOf(lane[i].rec), top.replicas)[0]
+              if (owner !== undefined && owner !== n.origin) c.eng.stale = (c.eng.stale ?? 0) + 1
+            }
           }
           return null
         },
