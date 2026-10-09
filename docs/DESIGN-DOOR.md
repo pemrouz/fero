@@ -697,7 +697,7 @@ One new key: `secret`. It follows V4-10 (one lowercase word, declared in
 
 | Key | Layers | Default | Scope |
 |---|---|---|---|
-| `secret` | the call · `FERO_SECRET` (per resource `FERO_SHOP_SECRET`) · a `fero.opt.ts` file (`secret:` or `shop: { secret }`) | unset = the open door | cluster: the same value on every member AND every client |
+| `secret` | the call · `FERO_SECRET` (per resource `FERO_SHOP_SECRET`) · a `fero.opt.ts` file (`secret:` or `shop: { secret }`) | unset = the open door | cluster: the same value on every member AND every client (since 2026-10-09, §15: every member; a client holds it or `secret.client`) |
 
 - **LEAVES row:** `secret: { layers: 'cep', why: 'a secret never rides argv:
   ps, /proc/<pid>/cmdline and shell history show every flag' }`. The
