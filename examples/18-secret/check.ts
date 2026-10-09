@@ -31,7 +31,7 @@ const refusals = (err: () => string) => err().split('\n').filter((l) => l.starts
 
 // two members started with the secret form a cluster of two, and each holds the other's row
 const m1 = start([a, b], SECRET), m2 = start([b, a], SECRET), err1 = errs(m1), err2 = errs(m2)
-assert.ok(await until(() => [m1, m2].every((r) => header(r).includes('— secret set — members 2')), 30_000), 'two members with the secret: members 2 on both screens (is this example open in another terminal?)')
+assert.ok(await until(() => [m1, m2].every((r) => header(r).includes('— members 2')), 30_000), 'two members with the secret: members 2 on both screens (is this example open in another terminal?)')
 assert.ok(await until(() => [m1, m2].every((r) => r.out.includes(`'${m1.pid}': 'member'`) && r.out.includes(`'${m2.pid}': 'member'`))), 'both rows on both screens')
 
 // a third server started without the secret: refused at the door by both, and its own screen says why, once per member
@@ -43,7 +43,7 @@ assert.ok(await until(() => refusals(err1).includes(inbound) && refusals(err2).i
 await sleep(2000) // the third keeps redialing: one line per peer and reason, never one per attempt
 assert.deepEqual(refusals(err3).sort(), [line(a), line(b)].sort(), 'exactly one line per member on the third')
 assert.deepEqual([refusals(err1), refusals(err2)], [[inbound], [inbound]], 'exactly one line on each member')
-assert.ok(header(m3).includes('— secret none — members 0') && !m3.out.includes(`'${m1.pid}'`), 'the third is in no cluster and holds no row of theirs')
+assert.ok(header(m3).includes('— members 0') && !m3.out.includes(`'${m1.pid}'`), 'the third is in no cluster and holds no row of theirs')
 assert.ok([m1, m2].every((r) => header(r).includes('members 2') && !r.out.includes(`'${m3.pid}'`)), 'and the members never saw its row')
 const screens = [[m1, err1], [m2, err2], [m3, err3]] as const
 assert.ok(!screens.some(([r, err]) => r.out.includes(SECRET) || err().includes(SECRET)), 'no screen ever shows the secret')
@@ -51,7 +51,7 @@ assert.ok(!screens.some(([r, err]) => r.out.includes(SECRET) || err().includes(S
 // Ctrl-C, and the same command with the secret: the third is admitted, members 3 on every screen, its row on all of them
 assert.equal(await m3.stop(), 0, 'the refused server still stops cleanly on Ctrl-C')
 const m3b = start([c, a, b], SECRET)
-assert.ok(await until(() => [m1, m2, m3b].every((r) => header(r).includes('— secret set — members 3') && r.out.includes(`'${m3b.pid}': 'member'`)), 30_000), 'with the secret the same command joins: members 3 and its row on every screen')
+assert.ok(await until(() => [m1, m2, m3b].every((r) => header(r).includes('— members 3') && r.out.includes(`'${m3b.pid}': 'member'`)), 30_000), 'with the secret the same command joins: members 3 and its row on every screen')
 assert.deepEqual([refusals(err1), refusals(err2)], [[inbound], [inbound]], 'the members print nothing new for a peer that proves itself')
 
 for (const r of [m3b, m1, m2]) assert.equal(await r.stop(), 0, 'stopped cleanly on Ctrl-C')
