@@ -1435,3 +1435,27 @@ tripwire; the ceiling stays).
   names `FERO_SECRET`; a wrong client key reads `refused` with the
   client-only line; neither the secret nor the client key appears in a
   journal, a capture, the config door or a line.
+
+*Built (2026-10-09, four commits after this note): everything above landed
+as designed. kernel/door.ts: `Door.clientMac?` and one `sign` helper that
+`prove` and `verify` call; kernel/node.ts did not change beyond its comment
+on `NodeOpts.door`; sim/door.ts: `toyClientKey`, `toyDoor` with `clientMac`,
+`toyClientDoor`. api/config.ts: the `secret.client` row, the `secret`-as-group
+visit, `clientKeyHint`, the post-fold both-set refusal and the raw-env guard
+(`secretEnv`), the layer-off note; api/index.ts: three doors from one secret,
+the server-with-only-a-client-key refusal, `fero.clientKey` (also a named
+export, `clientKey`), the three client-only lines, the `secret.client`
+redaction and the skipped `secret` row when only the key is set. Tests as
+listed, each red without its change; the `sign` rule mutation-checked (always
+`mac`): the kernel case went red at "no refusal on either side". Measured:
+59,500 and 104,050 did not move; `api/config.perf.ts` A/B on this box 83/95/100
+µs (base) against 97/91/94 µs (this branch) per resolve, the gap flipping sign
+— neutral. Two small things to know, neither a deviation: the sim's positive
+test does not use `formed()` (a member that holds the client admits n peers,
+not n − 1); and the client-only stderr line prints once per process, name and
+dial target, so two client instances of one resource in one process share it
+(the printer's existing dedupe). site/lib is NOT regenerated here (the lane
+was told not to run strip.mjs): the integrator reruns `node site/strip.mjs`
+after the merge, since kernel/door.ts and sim/door.ts changed. No example
+prints a changed line (the three new lines print only on a client-only
+process, which no example composes).*
