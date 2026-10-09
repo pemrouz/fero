@@ -376,7 +376,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     //! the contract and the methods-only hint ride HELLO (DESIGN-DOOR §4) — servers only; absent keys keep
     // every other node's HELLO byte-identical with v4.0
     ...(clusterContract !== undefined ? { contract: clusterContract } : {}),
-    ...(methodsOnly ? { methodsOnly: true } : {}),
+    //! never the #directory: it is composed WITH methods (its register/lookup door), but it is the system
+    // plane and its bytes stay v4.0 — no c, no m, no k (DESIGN-DOOR §6, §8)
+    ...(methodsOnly && !isSystem ? { methodsOnly: true } : {}),
     //! the door (DESIGN-DOOR §3): the secret as two functions, the `validate` idiom — the kernel never holds
     // the string. mac = HMAC-SHA256 as base64url (43 characters, kernel/door.ts PROOF_LEN); nonce = 16
     // random bytes as base64url (22 characters), from node:crypto, never the shell's Math.random. Servers

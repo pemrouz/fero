@@ -357,6 +357,40 @@ test('the door through the directory (DESIGN-DOOR §6): a secured server is foun
   }
 })
 
+test('the system plane\'s bytes (DESIGN-DOOR §6, §8): with nothing set, the #directory HOST\'s HELLO has exactly the keys u, i, l, n and the directory CLIENT\'s exactly u, i, l, r, n — no c, no m, no k, though the host is composed with methods', async () => {
+  const firstHello = (sock: net.Socket, ms = 3000): Promise<Record<string, unknown>> => new Promise((resolve, reject) => {
+    const framer = new Framer()
+    sock.on('data', (d) => { for (const f of framer.push(new Uint8Array(d))) if (f.verb === VERB.HELLO) { resolve(f.value as Record<string, unknown>); sock.destroy() } })
+    sock.on('error', () => {})
+    setTimeout(() => reject(new Error('no HELLO')), ms).unref()
+  })
+  //! the host: a server at a private rendezvous hosts the directory; a raw socket reads what the host greets with
+  { const o = await fast()
+    let a: Fero | undefined
+    try {
+      a = await fero(`sysbytes-${process.pid}`, { server: true, ...o })
+      assert.ok(await until(() => rz(a!).hosting, 8000))
+      const [host, port] = [o.rendezvous.slice(0, o.rendezvous.lastIndexOf(':')), Number(o.rendezvous.slice(o.rendezvous.lastIndexOf(':') + 1))]
+      const h = await firstHello(net.connect(port, host))
+      assert.deepEqual(Object.keys(h), ['u', 'i', 'l', 'n'], `the host's HELLO: ${JSON.stringify(h)}`)
+      assert.equal(h.n, '#directory'); assert.equal(h.l, o.rendezvous)
+    } finally { await settle([a]) }
+  }
+  //! the client: a raw listener holds the rendezvous port; the resource's directory client dials it and greets
+  { const port = await ports.free()
+    const srv = net.createServer()
+    const got = new Promise<Record<string, unknown>>((resolve) => { srv.once('connection', (sock) => { firstHello(sock).then(resolve, () => {}) }) })
+    await new Promise<void>((res) => srv.listen(port, '127.0.0.1', res))
+    let a: Fero | undefined
+    try {
+      a = await fero(`sysbytes-${process.pid}`, { server: true, heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous: `127.0.0.1:${port}` })
+      const h = await got
+      assert.deepEqual(Object.keys(h), ['u', 'i', 'l', 'r', 'n'], `the client's HELLO: ${JSON.stringify(h)}`)
+      assert.equal(h.r, 1); assert.equal(h.n, '#directory'); assert.equal(h.l, '')
+    } finally { await settle([a]); await new Promise<void>((r) => srv.close(() => r())) }
+  }
+})
+
 test("Context.peer: a wire call carries the caller uuid, a local invoke carries the server's own", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
   let s: Fero | undefined, c: Fero | undefined
