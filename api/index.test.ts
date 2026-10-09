@@ -625,6 +625,19 @@ test("the door: a secured server and a client with NO secret — the server jour
   assert.ok(!lines.join('\n').includes(S))
 })
 
+test('the call\'s secret is trimmed like the text layers trim theirs: a client whose call pads the secret with spaces is fed by a server with the bare value; sixteen spaces are refused as a short value without echoing them', async () => {
+  const S = 'index-test-secret-LIMA-12'
+  const p = await ports.free()
+  const s = await fero('doortrim', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S, data: { stock: 3 } })
+  let c: Fero | null = null
+  try {
+    c = await fero('doortrim', { uuid: 'zz', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: `  ${S}\t` })
+    assert.ok(await until(() => (snapshot(c!.data) as { stock?: number }).stock === 3, 8000), `fed: ${JSON.stringify(doorRows(s))}`)
+    assert.deepEqual(doorRows(s), [], 'no refusal: the two secrets are one')
+    await assert.rejects(fero('doortrim', { listen: false, secret: ' '.repeat(16) }), (e: Error) => /at least 16 characters/.test(e.message) && !e.message.includes('    '))
+  } finally { await c?.destroy(); await s.destroy() }
+})
+
 //! rawHello — a hand-written peer: connect, write one HELLO, wait for the server to close (or `ms`)
 const rawHello = (addr: string, hello: Record<string, unknown>, ms = 1500): Promise<void> => new Promise((resolve) => {
   const [host, port] = [addr.slice(0, addr.lastIndexOf(':')), Number(addr.slice(addr.lastIndexOf(':') + 1))]

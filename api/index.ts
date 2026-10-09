@@ -205,7 +205,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // or non-text value refused there); the call is checked HERE with the same words — text of SECRET_MIN
   // characters, or false (open on purpose). The value never enters a message. A system resource (the
   // #directory) never carries one: loopback is its trust boundary (api/directory.ts).
-  const secret = config.secret as string | false | undefined
+  //! trimmed like the text layers trim theirs (api/config.ts coerce), so one member's padded call does not
+  // refuse its peers as bad-proof; 16 spaces trim to nothing and are refused below like any short value
+  const secret = (typeof config.secret === 'string' ? config.secret.trim() : config.secret) as string | false | undefined
   if (secret !== undefined && secret !== false && (typeof secret !== 'string' || secret.length < SECRET_MIN))
     throw new Error(`${secretHint(name, at('secret'))}; or secret: false to run open on purpose`)
 
