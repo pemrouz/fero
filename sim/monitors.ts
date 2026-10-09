@@ -546,6 +546,7 @@ import { Framer, Frame, VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { compact as _compact } from '../kernel/log.ts'
 import type { Rec } from '../kernel/env.ts'
+import type { LogEntry } from '../kernel/node.ts'
 void _compact // the planted M2 test calls kernel/log.ts compact() by hand; named here so the dependency reads in one place
 
 type Stamp = { epoch: number; seq: number; origin: string }
@@ -774,15 +775,50 @@ export const scaleMonitors = () => [
     },
   },
   {
-    //! M4 index-oracle (stage 1): for every armed node and partition, the per-partition entry index equals the
-    // filter of every lane by partition. INERT until kernel/node.ts gains `byPart` (DESIGN-SCALE §7 stage 1);
-    // then this stub becomes the comparison and the stage-1 mutation (one index site dropped) must turn it red.
+    //! M4 index-oracle (stage 1, built 2026-10-09): for every scoped node that stepped, the per-partition entry
+    // index (node.byPart) equals the filter of every lane by partition — the same objects, in lane order — and
+    // the tombstone index (node.tombs) equals the set of versions with no live value, per partition. Walks only
+    // the stepped nodes' lanes and versions. A site that forgets the index makes a teach ship an incomplete base
+    // or a shed destroy data on attested-but-wrong tails; this is what catches it (scale-probes.test.ts plants
+    // one missed site each way).
     name: 'index-oracle',
     check: (sim: Sim): string | null => {
       for (const id of sim.stepped) {
-        const n = sim.nodes.get(id) as (Node & { byPart?: unknown }) | undefined
-        if (!n || !n.armed || n.byPart === undefined) continue
-        return `${id} has node.byPart — stage 1 landed the index; fill in sim/monitors.ts index-oracle before trusting it`
+        const n = sim.nodes.get(id)
+        if (!n || n.byPart === null || n.tombs === null || sim.restoring.has(id)) continue
+        const want = new Map<string, Map<string, LogEntry[]>>()
+        for (const [origin, lane] of n.logs)
+          for (const e of lane) {
+            const p = partitionOf(e.rec)
+            let per = want.get(p); if (!per) { per = new Map(); want.set(p, per) }
+            let arr = per.get(origin); if (!arr) { arr = []; per.set(origin, arr) }
+            arr.push(e)
+          }
+        for (const [p, per] of want) {
+          const got = n.byPart.get(p)
+          if (!got) return `${id} byPart lacks '${p}', which ${per.size} lane(s) hold entries of — an index site was missed`
+          for (const [o, arr] of per) {
+            const g = got.get(o)
+            if (!g) return `${id} byPart['${p}'] lacks lane ${o}, which holds ${arr.length} entries of it`
+            if (g.length !== arr.length) return `${id} byPart['${p}'][${o}] holds ${g.length} entries, the lane holds ${arr.length} of '${p}'`
+            for (let i = 0; i < arr.length; i++) if (g[i] !== arr[i]) return `${id} byPart['${p}'][${o}] entry ${i} is seq ${g[i].seq}, the lane's is seq ${arr[i].seq}`
+          }
+        }
+        for (const [p, got] of n.byPart) {
+          const per = want.get(p)
+          if (!per) return `${id} byPart names '${p}', of which no lane holds an entry`
+          for (const o of got.keys()) if (!per.has(o)) return `${id} byPart['${p}'] names lane ${o}, which holds no entry of it`
+        }
+        for (const [k, v] of n.versions) {
+          if (n.state.has(k)) continue
+          const path = JSON.parse(k) as string[]
+          if (!n.tombs.get(path.length ? path[0] : '')?.has(k)) return `${id} tombs lacks ${k} @${stampOf(v)}, a version with no live value`
+        }
+        for (const [p, s] of n.tombs)
+          for (const k of s) {
+            if (!n.versions.has(k)) return `${id} tombs['${p}'] names ${k}, which has no version`
+            if (n.state.has(k)) return `${id} tombs['${p}'] names ${k}, which is live`
+          }
       }
       return null
     },

@@ -42,6 +42,11 @@ import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 // would be an import cycle); re-exported under their old names for the tests and tools that import them
 export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.ts'
 
+//! LogEntry: one lane entry — the record with its stamp, the attempt identity it committed from (iss/cid,
+// when it did) and its (origin, partition) predecessor pp (armed senders only). The lanes and the
+// per-partition index (byPart) hold the SAME objects.
+export type LogEntry = { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }
+
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
 export interface NodeOpts {
   uuid: string
@@ -207,7 +212,20 @@ export class Node {
   // Entries retain the ATTEMPT identity (iss/cid) of committed forwarded writes
   // so anti-entropy re-ships it — a healed or future owner rebuilds its dedup
   // window from the log stream itself (M3's ownership-move exactly-once story).
-  logs = new Map<string, { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }[]>()
+  logs = new Map<string, LogEntry[]>()
+  //! byPart (DESIGN-SCALE stage 1, M4): partition → lane → that lane's (lane, p) entries, seq-ascending, the
+  // SAME objects the lanes hold. Scoped nodes only (null at R=∞: every site pays one null check, nothing
+  // else — unscoped bytes and trajectories are untouched). Every site that puts an entry in a lane, takes one
+  // out, or replaces a lane keeps it in step: commit (below), inbound/splice/replay (write.ts), the ACQDONE
+  // fold and the shed (scope.ts), compact (log.ts), #resetFold. The hand-over paths read it instead of
+  // walking every lane: #teach, #tailsOf, #abort, #shed and rescope's partition census are O(entries of p),
+  // not O(entries of the node). The sim's M4 index-oracle re-derives it from the lanes after every event.
+  byPart: Map<string, Map<string, LogEntry[]>> | null = null
+  //! tombs (the same stage): partition → the cells whose version is a TOMBSTONE (a stamp with no live value:
+  // a remove's, or a field a parent write swept). Scoped nodes only. Kept by apply (the remove arm, the sweep,
+  // a cell written live again), tombstone GC, the shed and #resetFold; the shed drops a partition's versions
+  // through it instead of parsing every key the node holds.
+  tombs: Map<string, Set<string>> | null = null
   //! M6 pp (the floor law): the last seq this life stamped per partition — the sub-stream
   // predecessor the NEXT own-lane stamp carries. Fed on every scoped commit (epoch 0 included) and
   // NEVER cleared by shed (a shed-then-reassigned same-life owner must not re-stamp pp=0 over its
@@ -330,7 +348,7 @@ export class Node {
           pe.s = Math.min(sd[0], sd[1])
           pe.d = sd[1]
         }
-    if ((opts.replicas ?? 0) > 0) this.scope = new Scope() // (this.#opts assigns below — read opts directly)
+    if ((opts.replicas ?? 0) > 0) { this.scope = new Scope(); this.byPart = new Map(); this.tombs = new Map() } // (this.#opts assigns below — read opts directly)
     //! the Lamport floor from the boot record: even if the WAL tail was torn, the clock never restarts
     // below the last durably-recorded stamp (seq reuse under one origin would collide provenance)
     this.seq = opts.boot?.lamport ?? 0
@@ -914,6 +932,7 @@ export class Node {
         if (this.armed) entry.pp = pp
       }
       this.logFor(this.origin).push(entry) // the record is OWNED from here (embedder hands it over)
+      this.indexAppend(this.origin, entry)
       this.apply(rec, this.origin, seq, this.epoch, entry.iss, entry.cid)
       j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
       //! the own lane's ladder advances at the stamp site: applied+shippable together (logged and
@@ -1064,6 +1083,8 @@ export class Node {
   // (a wiped fold has no splices left to protect). Emits NOTHING downstream — the callers decide.
   #resetFold() {
     this.logs.clear()
+    this.byPart?.clear()
+    this.tombs?.clear()
     this.state.clear()
     this.versions.clear()
     this.deep.clear()
@@ -1797,10 +1818,75 @@ export class Node {
 
   //! logFor — per-origin log accessor (get-or-create). Kernel-internal: called by commit above and by
   // the write module's inbound ingest (source=inbound lives in kernel/write.ts with the other sources).
-  logFor(origin: string): { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number }[] {
+  logFor(origin: string): LogEntry[] {
     let l = this.logs.get(origin)
     if (!l) { l = []; this.logs.set(origin, l) }
     return l
+  }
+
+  //! ── the per-partition index (byPart, scoped only — each call is one null check unscoped) ──
+  //! indexAppend — an entry that went on a lane's TAIL: its seq is above every entry of that lane, so it
+  // goes on the tail of its (lane, p) array too (ascending by construction).
+  indexAppend(origin: string, e: LogEntry) {
+    const idx = this.byPart
+    if (idx === null) return
+    const p = partitionOf(e.rec)
+    let per = idx.get(p)
+    if (per === undefined) idx.set(p, per = new Map())
+    const arr = per.get(origin)
+    if (arr === undefined) per.set(origin, [e])
+    else arr.push(e)
+  }
+
+  //! indexInsert — an entry spliced into a lane's INTERIOR (the dual fence, a fold, a replayed interior
+  // row): binary search by seq in its (lane, p) array keeps that array ascending like the lane.
+  indexInsert(origin: string, e: LogEntry) {
+    const idx = this.byPart
+    if (idx === null) return
+    const p = partitionOf(e.rec)
+    let per = idx.get(p)
+    if (per === undefined) idx.set(p, per = new Map())
+    const arr = per.get(origin)
+    if (arr === undefined) { per.set(origin, [e]); return }
+    let lo = 0, hi = arr.length
+    while (lo < hi) { const mid = (lo + hi) >>> 1; if (arr[mid].seq < e.seq) lo = mid + 1; else hi = mid }
+    arr.splice(lo, 0, e)
+  }
+
+  //! indexDrop — entries that LEFT a lane (compaction, a shed's filter, a test's injected drop): removed by
+  // identity from their (lane, p) arrays; an emptied array leaves the map, an emptied partition too.
+  indexDrop(origin: string, dropped: LogEntry[]) {
+    const idx = this.byPart
+    if (idx === null || dropped.length === 0) return
+    const gone = new Set(dropped)
+    const parts = new Set<string>()
+    for (const e of dropped) parts.add(partitionOf(e.rec))
+    for (const p of parts) {
+      const per = idx.get(p)
+      const arr = per?.get(origin)
+      if (per === undefined || arr === undefined) continue
+      const kept = arr.filter((e) => !gone.has(e))
+      if (kept.length) per.set(origin, kept)
+      else { per.delete(origin); if (per.size === 0) idx.delete(p) }
+    }
+  }
+
+  //! tombAdd / tombDrop — the tombstone index (tombs, scoped only). tombDrop parses the key: a cold path
+  // (tombstone GC, the sim's injected drop); apply's sites pass the partition they already hold.
+  tombAdd(p: string, k: string) {
+    const t = this.tombs
+    if (t === null) return
+    let s = t.get(p)
+    if (s === undefined) t.set(p, s = new Set())
+    s.add(k)
+  }
+  tombDrop(k: string) {
+    const t = this.tombs
+    if (t === null) return
+    const path = JSON.parse(k) as string[]
+    const p = path.length ? path[0] : ''
+    const s = t.get(p)
+    if (s !== undefined && s.delete(k) && s.size === 0) t.delete(p)
   }
 
   //! #sendDigest — announce {origin: highestHeldSeq} (the log tails: exactly what this node can serve).
@@ -1872,11 +1958,13 @@ export class Node {
     if (rec.type === REC.remove) {
       this.state.delete(k)
       this.#entryHash.delete(k)
+      if (this.tombs !== null) this.tombAdd(path[0], k) // the tombstone index (scoped only)
     } else {
       this.state.set(k, rec.value)
       const h = fnv(k + '' + stable(rec.value))
       this.#entryHash.set(k, h)
       this.#hash = (this.#hash + h) | 0
+      if (this.tombs !== null) { const s = this.tombs.get(path[0]); if (s !== undefined && s.delete(k) && s.size === 0) this.tombs.delete(path[0]) } // live again
     }
     //! the index: a field cell — live, or the tombstone a field remove leaves — goes under each ancestor
     if (above !== null)
@@ -1905,6 +1993,7 @@ export class Node {
           this.journal.armed && this.journal.emit(JK.subsumed, vc.origin, vc.seq, 1)
         }
         this.versions.set(c, stamp)
+        if (this.tombs !== null) this.tombAdd(path[0], c) // swept: a stamp with no value is a tombstone
         this.unlink(c)
       }
     }

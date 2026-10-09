@@ -93,15 +93,17 @@ export const compact = (node: Node, o: string, upTo: number): number => {
   if (!entries || entries.length === 0) return 0
   const kept: typeof entries = []
   let dropped = 0
+  let gone: typeof entries | null = null // the dropped entries, for the per-partition index (scoped only)
   for (const e of entries) {
     if (e.seq > upTo) { kept.push(e); continue }
     const k = JSON.stringify(e.rec.key.length ? e.rec.key : [e.rec.at ?? ''])
     const v = node.versions.get(k)
     if (v && v.origin === o && v.seq === e.seq && v.epoch === e.epoch) kept.push(e)
-    else dropped++
+    else { dropped++; if (node.byPart !== null) (gone ??= []).push(e) }
   }
   if (dropped) {
     node.logs.set(o, kept)
+    if (gone !== null) node.indexDrop(o, gone)
     node.journal.armed && node.journal.emit(JK.compacted, o, dropped)
   }
   return dropped
@@ -142,6 +144,7 @@ export const gcTombstones = (node: Node): number => {
     if (node.fenced(k)) continue
     node.versions.delete(k)
     node.unlink(k)
+    node.tombDrop(k) // the tombstone index follows (scoped only; unreachable while armed, kept exact anyway)
     dropped++
   }
   if (dropped) node.journal.armed && node.journal.emit(JK.tombstoneGC, dropped)

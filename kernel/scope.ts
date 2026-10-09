@@ -173,7 +173,7 @@ export class Scope {
     if (node.epoch > 0 && ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
     for (const k of node.state.keys()) this.#ensure(node, keyPartition(k))
     for (const k of node.versions.keys()) this.#ensure(node, keyPartition(k))
-    for (const entries of node.logs.values()) for (const e of entries) this.#ensure(node, partitionOf(e.rec))
+    for (const p of node.byPart!.keys()) this.#ensure(node, p) // the partition census through the index (stage 1): O(partitions), not O(entries)
     const j = node.journal
     for (const [p, e] of this.entries) {
       const assigned = ring.holdsAny(node.uuid, p, node.replicas)
@@ -288,13 +288,17 @@ export class Scope {
   }
 
   //! tailsOf — per-lane CONTENT tails for p (max seq actually present): the shed evidence. Captured
-  // once at each orphan transition (orphan lanes are frozen — the gate drops, the stamp parks).
+  // once at each orphan transition (orphan lanes are frozen — the gate drops, the stamp parks). Through
+  // the per-partition index (DESIGN-SCALE stage 1): each (lane, p) array is ascending, so the tail is
+  // its last entry — O(lanes), never a walk of every entry the node holds. Lanes are visited in
+  // node.logs order, as before, so the record's key order is unchanged.
   #tailsOf(node: Node, p: string): Record<string, number> {
     const out: Record<string, number> = {}
-    for (const [origin, entries] of node.logs) {
-      let tail = 0
-      for (const x of entries) if (x.seq > tail && partitionOf(x.rec) === p) tail = x.seq
-      if (tail > 0) out[origin] = tail
+    const per = node.byPart!.get(p)
+    if (per === undefined) return out
+    for (const origin of node.logs.keys()) {
+      const arr = per.get(origin)
+      if (arr !== undefined && arr.length) out[origin] = arr[arr.length - 1].seq
     }
     return out
   }
@@ -494,10 +498,18 @@ export class Scope {
     const e = this.entries.get(p)
     if (!e || e.state === SCOPE.acquiring) return // nothing to teach / mid-latch ourselves
     let n = 0
-    for (const [origin, entries] of node.logs) {
+    //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p, only its
+    // entries — the ship is O(entries of p), not O(entries of the node). Lane order is node.logs order,
+    // as before, so the frames leave in the same order they always did.
+    const per = node.byPart!.get(p)
+    for (const origin of node.logs.keys()) {
+      const entries = per?.get(origin)
+      if (entries === undefined) continue
       const above = marks[origin] ?? 0
-      const ship = entries.filter((x) => x.seq > above && partitionOf(x.rec) === p)
-      if (!ship.length) continue
+      let lo = 0, hi = entries.length
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (entries[mid].seq <= above) lo = mid + 1; else hi = mid }
+      if (lo === entries.length) continue
+      const ship = lo === 0 ? entries : entries.slice(lo)
       //! stored pp rides the teach (the floor law): the learner's post-fold lane re-ships to OTHERS
       // with intact chain evidence. The fold itself trusts the CUT, not the chain.
       const runs = ship.map((x) => ({ rec: x.rec, origin, seq: x.seq, epoch: x.epoch, iss: x.iss, cid: x.cid, pp: x.pp }))
@@ -560,6 +572,7 @@ export class Scope {
       if (s.iss) { entry.iss = s.iss; entry.cid = s.cid }
       if (s.pp !== undefined && s.pp >= 0) entry.pp = s.pp
       lane.splice(lo, 0, entry)
+      node.indexInsert(s.origin, entry)
       node.apply(s.rec, s.origin, s.seq, s.epoch, s.iss, s.cid)
       if (s.iss) node.writes.remember(node, s.iss, s.cid!, s.seq, s.epoch)
     }
@@ -624,8 +637,7 @@ export class Scope {
     const e = this.entries.get(p)
     if (!e || e.state !== SCOPE.acquiring) return
     node.journal.armed && node.journal.emit(JK.acquireAbort, p, reason)
-    let residue = false
-    for (const entries of node.logs.values()) if (entries.some((x) => partitionOf(x.rec) === p)) { residue = true; break }
+    const residue = node.byPart!.has(p) // the index holds p iff some lane holds an entry of p
     this.n++
     if (residue) {
       e.state = SCOPE.orphan
@@ -684,16 +696,31 @@ export class Scope {
     this.entries.delete(p)
     this.n++
     if (node.durable) node.persistBoot()
-    for (const [origin, entries] of node.logs) {
-      const kept = entries.filter((x) => partitionOf(x.rec) !== p)
-      if (kept.length !== entries.length) { dropped += entries.length - kept.length; node.logs.set(origin, kept) }
-      node.streams.get(origin)?.parts?.delete(p)
+    //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p are filtered
+    // (a filtered subsequence of an ascending lane stays ascending); p's floors leave every stream (the
+    // old walk visited lanes with entries only — a floor for a lane with no entry of p outlived the shed)
+    const per = node.byPart!.get(p)
+    if (per !== undefined) {
+      for (const [origin, gone] of per) {
+        const entries = node.logs.get(origin)
+        if (entries === undefined) continue
+        dropped += gone.length
+        node.logs.set(origin, gone.length === entries.length ? [] : entries.filter((x) => partitionOf(x.rec) !== p))
+      }
+      node.byPart!.delete(p)
     }
+    for (const [, d] of node.streams) d.parts?.delete(p)
     //! the cells of p are its row cell plus the deep index's field cells (V4-18: live fields and the
-    // tombstones a live row fences — dropCell unlinks each) — no full scan
-    node.dropCell(JSON.stringify([p]))
-    for (const k of node.fields(p)) node.dropCell(k)
-    for (const k of [...node.versions.keys()]) if (keyPartition(k) === p) node.versions.delete(k)
+    // tombstones a live row fences — dropCell unlinks each) — no full scan. Its versions are those cells'
+    // plus the tombstone index's (every stamp of p with no live value) — never a parse of every key.
+    const fields = node.fields(p)
+    const row = JSON.stringify([p])
+    node.dropCell(row)
+    for (const k of fields) node.dropCell(k)
+    node.versions.delete(row)
+    for (const k of fields) node.versions.delete(k)
+    const tombs = node.tombs!.get(p)
+    if (tombs !== undefined) { for (const k of tombs) node.versions.delete(k); node.tombs!.delete(p) }
     node.journal.armed && node.journal.emit(JK.shed, p, dropped)
     if (node.durable) node.snapshot()
   }
