@@ -114,7 +114,7 @@ export const JK = {
   subsumed: 76,      // a=origin, b=seq, c=swept(0|1) — a field cell lost to a whole-row write (or row remove) stamped at or above it: refused on arrival (c=0) or swept out of state by the row write arriving later (c=1)
   //! ── the door (2026-10-09, docs/DESIGN-DOOR.md §3-§4) ──
   contractReject: 77, // a=link, b=the first contract key that differs (or missing:<key>), c=THEIR value as a string, never ours — two servers' HELLOs carried different cluster contracts (heartbeat.ms, replicas, methods, validation, ring): refused at the door, parked, re-dialed at heartbeat cadence
-  doorReject: 78,    // a=link (the one that closes), b=reason ('uuid-taken'; the secret's reasons follow in the door commit), c=the uuid claimed (for uuid-taken) — a HELLO the door refused: a CLIENT may not take a member's uuid, and a member evicts a client squatting on its uuid. Never a secret, nonce or proof.
+  doorReject: 78,    // a=link (the one that closes), b=reason, c=the dial target or the claimed listen (for 'uuid-taken' the uuid) — the door refused a link. Reasons: 'no-secret' (I have a door, the peer sent no k) · 'peer-secret' (the peer has one, I do not) · 'bad-proof' (its DOOR did not verify) · 'uuid-taken' (a CLIENT may not take a member's uuid; a member evicts a client squatting on its uuid) · 'address' (a discovered or view-learned target answered as another listen: a relay) · 'timeout' (no DOOR within tune.proveMs) · 'refused' (the peer closed, or sent {e}, after I proved — a guess: a crash mid-handshake looks the same). Never a secret, nonce or proof.
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

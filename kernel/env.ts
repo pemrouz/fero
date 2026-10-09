@@ -216,4 +216,6 @@ export interface Applied extends Rec {
 export const partitionOf = (r: Rec): string => r.key.length ? r.key[0] : (r.at ?? '')
 
 //! TAG: timer discriminants. A closed set so step()'s timer dispatch is a flat switch that fails closed.
-export const TAG = { redial: 1, heartbeat: 2 } as const
+// prove (DESIGN-DOOR §3): the one-shot proving deadline a secured node arms per link at `tune.proveMs` —
+// a timer, not a heartbeat sweep, because heartbeat.ms 0 is a documented opt-out. Append-only.
+export const TAG = { redial: 1, heartbeat: 2, prove: 3 } as const

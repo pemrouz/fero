@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node, MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './node.ts'
-import { TUNE, tuneOf, type Tune } from './tune.ts'
+import { TUNE, tuneOf, PROVE_MS, type Tune } from './tune.ts'
 import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS } from './membership.ts'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.ts'
 import { MAX_PROBES } from './confirm.ts'
@@ -28,11 +28,12 @@ test('TUNE is the old constants by name, and a node with no tune reads exactly t
     retryTicks: RETRY_TICKS, pending: MAX_PENDING, dedupKeep: DEDUP_KEEP, issuers: MAX_ISSUERS,
     probes: MAX_PROBES, queued: MAX_QUEUED, compactAt: COMPACT_AT, snapshotAt: SNAPSHOT_AT, lamportLease: LAMPORT_LEASE,
     shedTicks: SHED_TICKS, stageTicks: STAGE_TICKS, acqLiveMax: ACQ_LIVE_MAX, stallAt: STALL_AT,
+    proveMs: PROVE_MS,
   })
   //! the values the plan's table lists — a changed default is a DECISIONS line, not a drift
   assert.deepEqual(
-    [TUNE.redials, TUNE.memberRedials, TUNE.suspectTicks, TUNE.leaveTicks, TUNE.pulls, TUNE.proposalAge, TUNE.rejoinTicks, TUNE.retryTicks, TUNE.pending, TUNE.dedupKeep, TUNE.issuers, TUNE.probes, TUNE.queued, TUNE.compactAt, TUNE.snapshotAt, TUNE.lamportLease, TUNE.shedTicks, TUNE.stageTicks, TUNE.acqLiveMax, TUNE.stallAt],
-    [10, 5, 3, 4, 5, 10, 10, 2, 1024, 1024, 1024, 1024, 256, 4096, 4096, 4096, 2, 8, 8192, 8],
+    [TUNE.redials, TUNE.memberRedials, TUNE.suspectTicks, TUNE.leaveTicks, TUNE.pulls, TUNE.proposalAge, TUNE.rejoinTicks, TUNE.retryTicks, TUNE.pending, TUNE.dedupKeep, TUNE.issuers, TUNE.probes, TUNE.queued, TUNE.compactAt, TUNE.snapshotAt, TUNE.lamportLease, TUNE.shedTicks, TUNE.stageTicks, TUNE.acqLiveMax, TUNE.stallAt, TUNE.proveMs],
+    [10, 5, 3, 4, 5, 10, 10, 2, 1024, 1024, 1024, 1024, 256, 4096, 4096, 4096, 2, 8, 8192, 8, 5000],
   )
   const node = new Node({ uuid: 'aa' }, env())
   assert.strictEqual(node.tune, TUNE, 'no overrides ⇒ the shared frozen table itself, nothing allocated')
@@ -60,6 +61,13 @@ test('a bad override fails closed in the constructor: unknown row, a fraction, a
   assert.throws(() => tuneOf({ constructor: 1 } as never), /unknown row 'constructor'/)
   //! an explicit undefined is "not given", like an absent key
   assert.strictEqual(tuneOf({ redials: undefined }).redials, MAX_REDIALS)
+})
+
+test('proveMs (DESIGN-DOOR §3): the proving deadline is a tune row — default 5000, floor 1, no config key', () => {
+  assert.equal(TUNE.proveMs, 5000)
+  assert.equal(tuneOf({ proveMs: 1 }).proveMs, 1)
+  assert.equal(new Node({ uuid: 'aa', tune: { proveMs: 250 } }, env()).tune.proveMs, 250)
+  assert.throws(() => tuneOf({ proveMs: 0 }), /proveMs must be an integer ≥ 1, got 0/)
 })
 
 test('zero: allowed for the two redial counts (no redial at all), refused for every other row — a 0 there would switch a guarantee off, not tune it', () => {

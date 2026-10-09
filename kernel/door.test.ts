@@ -6,13 +6,20 @@
 //   r:1 against a committed-view member · r:1 against an admitted member link · a member against a
 //   client squatting on its uuid · client against client (today's duplicate-link rule, untouched).
 // The member's link is never touched and no dupLink row is written where the design says so.
+// Commit 2 — the contract and the methods-only hint. Commit 3 — the handshake itself (the bottom half):
+//   k on HELLO, DOOR {p} / {e}, LS.proving, the matrix, the address rule, the deadline, replay and
+//   reflection, the role rule under a door, the crossing dial. Every guard mutation-checked.
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { Node } from './node.ts'
-import { VERB, Framer, encodeControl } from './codec.ts'
+import { Node, type NodeOpts } from './node.ts'
+import { VERB, Framer, encodeControl, encodeFrame } from './codec.ts'
 import { JK } from './journal.ts'
+import { LS } from './link.ts'
+import { PROOF_LEN } from './door.ts'
 import { TAG, type EffectSink, type Env } from './env.ts'
+import { toyDoor } from '../sim/door.ts'
+import { mulberry32 } from '../sim/exec.ts'
 
 const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
   const effects: unknown[][] = []
@@ -250,4 +257,439 @@ test('the hint: m: 1 sets link.methodsOnly at admit; a client\'s feederMethodsOn
   node.step({ kind: 'linkDown', link: 1, reason: 'crash' })
   assert.equal(node.primary, 2, 'failover to the second link')
   assert.equal(node.feederMethodsOnly, false, 'read live: the new feeder sent no hint, so the write takes the round trip')
+})
+
+// ── Commit 3 — the handshake (§2, §3, §9): the secret as two injected functions, `k` on HELLO, DOOR {p} ──
+// Two nodes stepped by hand with every frame relayed by `pump` (a FIFO link, delivered a round at a time), so
+// every frame's ORDER is read off the recording sink, never inferred. Doors are the sim's toy (sim/door.ts).
+
+const SECRET = 'the-cluster-secret-0001'
+const doorFor = (seed: number, secret = SECRET) => toyDoor(secret, mulberry32(seed))
+const dec = (b: Uint8Array) => new Framer().push(b)[0]
+const verbs = (bs: Uint8Array[]) => bs.map((b) => dec(b).verb)
+
+//! rec — one node over the recording sink, with the readers the door tests need
+const rec = (uuid: string, opts: Partial<NodeOpts> = {}) => {
+  const effects: unknown[][] = []
+  const sink: EffectSink = {
+    connect: (to) => effects.push(['connect', to]),
+    send: (link, bytes) => effects.push(['send', link, bytes]),
+    close: (link, reason) => effects.push(['close', link, reason]),
+    timer: (id, tag, ms) => effects.push(['timer', id, tag, ms]),
+    cancel: (id) => effects.push(['cancel', id]),
+    apply: (r) => effects.push(['apply', r]),
+    persist: (batch, bytes) => effects.push(['persist', batch, bytes]),
+    boot: (record) => effects.push(['boot', record]),
+    confirm: (id, ok, count) => effects.push(['confirm', id, ok, count]),
+    snapshot: (batch, rows) => effects.push(['snapshot', batch, rows]),
+    invoke: (link, id, mode, m, a) => effects.push(['invoke', link, id, mode, m, a]),
+    result: (id, ok, value, local) => effects.push(['result', id, ok, value, local]),
+    subRecs: (id, recs) => effects.push(['subRecs', id, recs]),
+  }
+  const node = new Node({ uuid, listen: `sim:${uuid}`, redialMs: 10, ...opts }, { now: () => 0, rng: () => 0, sink })
+  node.step({ kind: 'start' })
+  const sends = (link: number) => effects.filter((e) => e[0] === 'send' && e[1] === link).map((e) => e[2] as Uint8Array)
+  const closes = () => effects.filter((e) => e[0] === 'close').map((e) => [e[1], e[2]])
+  const connects = () => effects.filter((e) => e[0] === 'connect').map((e) => e[1])
+  const rows = (kind: number) => node.journal.read().filter((e) => e.kind === kind).map((e) => [e.a, e.b, e.c])
+  const timers = (tag: number) => effects.filter((e) => e[0] === 'timer' && e[2] === tag).map((e) => ({ id: e[1] as number, ms: e[3] as number }))
+  const cancels = () => effects.filter((e) => e[0] === 'cancel').map((e) => e[1] as number)
+  const fire = (id: number, tag: number) => node.step({ kind: 'timer', id, tag })
+  const up = (link: number, dialed = false, to?: string) => node.step({ kind: 'linkUp', link, dialed, to })
+  const feed = (link: number, bytes: Uint8Array) => node.step({ kind: 'bytesIn', link, bytes })
+  const down = (link: number, reason = 'closed') => node.step({ kind: 'linkDown', link, reason })
+  return { node, effects, sends, closes, connects, rows, timers, cancels, fire, up, feed, down }
+}
+type Rec2 = ReturnType<typeof rec>
+
+//! pump — relay every new frame between a's link al and b's link bl, a round at a time, until quiet;
+// ai/bi skip frames a test has already delivered by hand
+const pump = (a: Rec2, al: number, b: Rec2, bl: number, rounds = 20, ai = 0, bi = 0) => {
+  for (let r = 0; r < rounds; r++) {
+    const fa = a.sends(al), fb = b.sends(bl)
+    if (ai >= fa.length && bi >= fb.length) break
+    const fromA = fa.slice(ai); ai = fa.length
+    const fromB = fb.slice(bi); bi = fb.length
+    for (const f of fromA) b.feed(bl, f)
+    for (const f of fromB) a.feed(al, f)
+  }
+}
+const VIEW1: NodeOpts['boot'] = { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }
+
+test('k: a node with a door mints a fresh nonce per link and sends it as HELLO.k (last key); without a door no k, no timer, no stash', () => {
+  const a = rec('aa', { door: doorFor(1) })
+  a.up(1, true, 'sim:bb'); a.up(2, true, 'sim:cc')
+  const h1 = dec(a.sends(1)[0]).value as Record<string, unknown>, h2 = dec(a.sends(2)[0]).value as Record<string, unknown>
+  assert.deepEqual(Object.keys(h1), ['u', 'i', 'l', 'k'])
+  assert.equal(typeof h1.k, 'string'); assert.equal((h1.k as string).length, 32, 'the toy: 16 bytes as hex')
+  assert.notEqual(h1.k, h2.k, 'never reused across links')
+  assert.equal(a.node.links.get(1)!.nonce, h1.k, 'kept on the Link')
+  assert.deepEqual(a.node.links.get(1)!.said, h1, 'the sent HELLO is kept: my proof signs exactly these keys')
+  const o = rec('aa')
+  o.up(1, true, 'sim:bb')
+  assert.equal('k' in (dec(o.sends(1)[0]).value as object), false)
+  assert.equal(o.node.links.get(1)!.said, null)
+})
+
+test('malformed k is a malformed HELLO (not a string, empty, 15 or 65 chars); 16 and 64 are accepted', () => {
+  for (const k of [7, '', 'x'.repeat(15), 'x'.repeat(65), null, ['x'.repeat(20)]]) {
+    const a = rec('aa', { door: doorFor(2) })
+    a.up(1)
+    a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k }))
+    assert.deepEqual(a.closes(), [[1, 'malformed-hello']], JSON.stringify(k))
+    assert.deepEqual(a.rows(JK.frameDrop), [[1, 'malformed hello', null]])
+  }
+  for (const k of ['x'.repeat(16), 'x'.repeat(64)]) {
+    const a = rec('aa', { door: doorFor(2) })
+    a.up(1)
+    a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k }))
+    assert.deepEqual(a.closes(), [])
+    assert.equal(a.node.links.get(1)!.state, LS.proving, `${k.length} chars: proving`)
+  }
+})
+
+test('the handshake: admission only after DOOR; the dialer proves first; the acceptor\'s DOOR precedes its VIEW and DIGEST; 4 handshake frames per link; the deadline is armed and cancelled', () => {
+  const a = rec('aa', { door: doorFor(3), boot: VIEW1 }), b = rec('bb', { door: doorFor(4), boot: VIEW1 })
+  a.up(1, true, 'sim:bb'); b.up(1)
+  //! the HELLOs cross: both proving, nobody admitted, the DIALER has already sent its proof, the acceptor nothing more
+  b.feed(1, a.sends(1)[0]); a.feed(1, b.sends(1)[0])
+  assert.deepEqual([a.node.links.get(1)!.state, b.node.links.get(1)!.state], [LS.proving, LS.proving])
+  assert.deepEqual([a.node.admitted(), b.node.admitted()], [[], []], 'nothing is admitted on a HELLO alone')
+  assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO, VERB.DOOR], 'the dialer proves at once')
+  assert.deepEqual(verbs(b.sends(1)), [VERB.HELLO], 'the acceptor waits: it never proves first')
+  assert.deepEqual([a.rows(JK.identified), b.rows(JK.identified)], [[], []])
+  assert.equal(a.node.byUuid.size + b.node.byUuid.size, 0, 'a proving link is outside byUuid')
+  assert.deepEqual(a.timers(TAG.prove).map((t) => t.ms), [5000], 'the proving deadline, tune.proveMs')
+  assert.deepEqual(b.timers(TAG.prove).map((t) => t.ms), [5000])
+  //! the dialer's proof lands: the acceptor proves back FIRST, then admits (VIEW, then the digest answer later)
+  b.feed(1, a.sends(1)[1])
+  assert.deepEqual(verbs(b.sends(1)), [VERB.HELLO, VERB.DOOR, VERB.VIEW], 'DOOR before anything admission ships')
+  assert.deepEqual(b.node.admitted(), ['aa'])
+  assert.deepEqual(b.rows(JK.identified), [[1, 'aa', 1]])
+  assert.deepEqual(b.cancels(), [b.timers(TAG.prove)[0].id], 'the deadline is cancelled at admit')
+  assert.equal(b.node.links.get(1)!.hello, null, 'the stash is cleared (step 13)')
+  //! the rest of the exchange
+  pump(a, 1, b, 1)
+  assert.deepEqual([a.node.admitted(), b.node.admitted()], [['bb'], ['aa']])
+  assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO, VERB.DOOR, VERB.DIGEST, VERB.VIEW], 'the lower uuid opens the digest at admit, then announces its view — today\'s admit order, after its proof')
+  assert.deepEqual(verbs(b.sends(1)), [VERB.HELLO, VERB.DOOR, VERB.VIEW, VERB.DIGEST], 'the acceptor: proof, then the view, then the digest answer')
+  assert.equal(verbs([...a.sends(1), ...b.sends(1)]).filter((v) => v === VERB.HELLO || v === VERB.DOOR).length, 4, '4 handshake frames per link: two HELLOs, two DOORs')
+  assert.deepEqual(a.cancels(), [a.timers(TAG.prove)[0].id])
+  //! a late fire of the cancelled deadline is ignored
+  a.fire(a.timers(TAG.prove)[0].id, TAG.prove)
+  assert.deepEqual(a.rows(JK.doorReject), [])
+  assert.deepEqual(a.closes(), [])
+})
+
+test('a proving link carries nothing but DOOR: RECORDS, DIGEST, WRITE and a membership frame each close it before-hello', () => {
+  const cases: [number, Uint8Array, string][] = [
+    [VERB.DIGEST, encodeControl(VERB.DIGEST, { d: {}, r: 1 }), 'digest-before-hello'],
+    [VERB.RECORDS, encodeFrame([{ type: 0, key: ['x'], value: 1 }], { origin: 'bb', baseSeq: 1, epoch: 0 }), 'records-before-hello'],
+    [VERB.WRITE, encodeControl(VERB.WRITE, {}), 'write-before-hello'],
+    [VERB.VIEW, encodeControl(VERB.VIEW, { e: 1, m: [] }), 'membership-before-hello'],
+  ]
+  for (const [verb, frame, reason] of cases) {
+    const a = rec('aa', { door: doorFor(5) }), b = rec('bb', { door: doorFor(6) })
+    a.up(1, true, 'sim:bb'); b.up(1)
+    b.feed(1, a.sends(1)[0]) // b is proving
+    assert.equal(b.node.links.get(1)!.state, LS.proving)
+    b.feed(1, frame)
+    assert.deepEqual(b.closes(), [[1, reason]], `verb ${verb}`)
+    assert.deepEqual(b.node.admitted(), [])
+  }
+})
+
+test('wrong secret: the acceptor journals bad-proof, sends DOOR {e: denied} and closes; the dialer journals refused and parks — heartbeat revival re-dials once per tick', () => {
+  const a = rec('aa', { door: doorFor(7), hosts: ['sim:bb'], heartbeatMs: 100 }), b = rec('bb', { door: doorFor(8, 'another-secret-value') })
+  a.up(1, true, 'sim:bb'); b.up(1)
+  pump(a, 1, b, 1)
+  assert.deepEqual(b.rows(JK.doorReject), [[1, 'bad-proof', 'sim:aa']], 'c = the claimed listen (b accepted this link)')
+  assert.deepEqual(verbs(b.sends(1)), [VERB.HELLO, VERB.DOOR], 'HELLO then the notice — never a proof to a bad dialer')
+  assert.deepEqual(dec(b.sends(1)[1]).value, { e: 'denied' })
+  assert.deepEqual(b.closes(), [[1, 'door']])
+  assert.deepEqual(a.rows(JK.doorReject), [[1, 'refused', 'sim:bb']], 'the dialer: refused, c = the dial target')
+  assert.deepEqual(a.closes(), [[1, 'door']])
+  const l = a.node.links.get(1)!
+  assert.ok(l.dead && l.noRedial)
+  assert.deepEqual([a.node.admitted(), b.node.admitted()], [[], []])
+  a.down(1, 'door')
+  assert.equal(a.timers(TAG.redial).length, 0, 'no redial chain: parked')
+  assert.equal(a.node.dialing('sim:bb'), false)
+  a.fire(a.timers(TAG.heartbeat)[0].id, TAG.heartbeat)
+  assert.deepEqual(a.connects(), ['sim:bb', 'sim:bb'], 'revived once by the heartbeat — a fixed secret heals at heartbeat cadence')
+  assert.deepEqual(a.rows(JK.revive), [['sim:bb', null, null]])
+})
+
+test('one side only: no-secret on the secured end, peer-secret on the open end; both refuse, a dialed target parks on either side', () => {
+  //! the secured node dialed the open one
+  { const a = rec('aa', { door: doorFor(9), hosts: ['sim:bb'] }), b = rec('bb')
+    a.up(1, true, 'sim:bb'); b.up(1)
+    pump(a, 1, b, 1)
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'no-secret', 'sim:bb']])
+    assert.deepEqual(b.rows(JK.doorReject), [[1, 'peer-secret', 'sim:aa']], 'the open end sees k and names the claimed listen')
+    assert.deepEqual([a.closes(), b.closes()], [[[1, 'door']], [[1, 'door']]])
+    assert.deepEqual([a.node.admitted(), b.node.admitted()], [[], []])
+    a.down(1, 'door'); assert.equal(a.node.dialing('sim:bb'), false); assert.equal(a.timers(TAG.redial).length, 0, 'parked, no chain')
+    assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO], 'no proof was spent on a peer without a door') }
+  //! the open node dialed the secured one: it parks too
+  { const a = rec('aa', { door: doorFor(10) }), b = rec('bb', { hosts: ['sim:aa'] })
+    b.up(1, true, 'sim:aa'); a.up(1)
+    pump(b, 1, a, 1)
+    assert.deepEqual(b.rows(JK.doorReject), [[1, 'peer-secret', 'sim:aa']])
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'no-secret', 'sim:bb']])
+    b.down(1, 'door'); assert.equal(b.node.dialing('sim:aa'), false); assert.equal(b.timers(TAG.redial).length, 0) }
+})
+
+test('REPLAY (the STATUS.md:54 regression): a captured HELLO + DOOR on a fresh link is bad-proof — the real member\'s link stays admitted, byUuid untouched, no dupLink row; a forged HELLO with a random k times out the same way; confirm marks untouched', () => {
+  const a = rec('aa', { door: doorFor(11) }), b = rec('bb', { door: doorFor(12) })
+  a.up(1, true, 'sim:bb'); b.up(1)
+  pump(a, 1, b, 1)
+  assert.deepEqual(b.node.admitted(), ['aa'])
+  //! evidence on b about aa's lane: a digest from the real aa
+  b.feed(1, encodeControl(VERB.DIGEST, { d: { aa: 5 }, r: 0 }))
+  assert.equal(b.node.confirm.mark('aa', 'aa'), 5)
+  const [helloA, doorA] = a.sends(1)
+  assert.deepEqual(verbs([helloA, doorA]), [VERB.HELLO, VERB.DOOR])
+  //! the replay: the same two frames on a NEW connection to b
+  b.up(2)
+  b.feed(2, helloA)
+  assert.equal(b.node.links.get(2)!.state, LS.proving, 'the forged HELLO sits in proving — byUuid is not consulted')
+  assert.equal(b.node.byUuid.get('aa'), 1)
+  b.feed(2, doorA)
+  assert.deepEqual(b.rows(JK.doorReject), [[2, 'bad-proof', 'sim:aa']], 'the fresh nonce: the old proof signs the old one')
+  assert.deepEqual(b.closes(), [[2, 'door']], 'only the replayed link closes')
+  assert.deepEqual(b.rows(JK.dupLink), [], 'the duplicate-link rule never ran')
+  assert.equal(b.node.byUuid.get('aa'), 1, 'the real member\'s link holds the uuid')
+  assert.equal(b.node.links.get(1)!.dead, false)
+  assert.deepEqual(b.node.admitted(), ['aa'])
+  //! a forged HELLO claiming aa with a HIGHER incarnation and a random k, then silence: the deadline
+  b.up(3)
+  b.feed(3, encodeControl(VERB.HELLO, { u: 'aa', i: 7, l: 'sim:aa', k: 'f'.repeat(32) }))
+  assert.equal(b.node.links.get(3)!.state, LS.proving)
+  const t = b.timers(TAG.prove).find((x) => b.cancels().indexOf(x.id) < 0 && x.id !== b.timers(TAG.prove)[0].id)!
+  b.fire(b.timers(TAG.prove)[b.timers(TAG.prove).length - 1].id, TAG.prove)
+  assert.ok(t)
+  assert.deepEqual(b.rows(JK.doorReject).slice(1), [[3, 'timeout', '']])
+  assert.deepEqual(b.closes().slice(1), [[3, 'door-timeout']])
+  assert.equal(b.node.confirm.mark('aa', 'aa'), 5, 'the reincarnation fence never ran: confirm marks untouched by an intruder')
+  assert.equal(b.node.byUuid.get('aa'), 1)
+  assert.deepEqual(b.node.admitted(), ['aa'])
+  //! the real link still works
+  b.feed(1, encodeControl(VERB.DIGEST, { d: { aa: 6 }, r: 0 }))
+  assert.equal(b.node.confirm.mark('aa', 'aa'), 6)
+})
+
+test('reflection: an acceptor that hands the dialer\'s own proof back (with its own k, or echoing the dialer\'s k) is bad-proof — the side label and the nonces stop it', () => {
+  for (const echo of [false, true]) {
+    const a = rec('aa', { door: doorFor(13), hosts: ['sim:xx'] })
+    a.up(1, true, 'sim:xx')
+    const kA = (dec(a.sends(1)[0]).value as { k: string }).k
+    const kX = echo ? kA : 'e'.repeat(32)
+    a.feed(1, encodeControl(VERB.HELLO, { u: 'xx', i: 1, l: 'sim:xx', k: kX }))
+    const pA = (dec(a.sends(1)[1]).value as { p: string }).p
+    assert.equal(pA.length, PROOF_LEN)
+    a.feed(1, encodeControl(VERB.DOOR, { p: pA }))
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'bad-proof', 'sim:xx']], `echo=${echo}`)
+    assert.deepEqual(dec(a.sends(1)[2]).value, { e: 'denied' })
+    assert.deepEqual(a.closes(), [[1, 'door']])
+    assert.deepEqual(a.node.admitted(), [])
+    a.down(1, 'door'); assert.equal(a.node.dialing('sim:xx'), false, 'parked')
+  }
+})
+
+test('malformed p is a malformed DOOR: not a string, empty, 42 or 44 chars, or neither p nor e — frameDrop + close, never bad-proof', () => {
+  for (const body of [{ p: 7 }, { p: '' }, { p: 'x'.repeat(42) }, { p: 'x'.repeat(44) }, {}, { p: null }]) {
+    const a = rec('aa', { door: doorFor(14) }), b = rec('bb', { door: doorFor(15) })
+    a.up(1, true, 'sim:bb'); b.up(1)
+    b.feed(1, a.sends(1)[0])
+    b.feed(1, encodeControl(VERB.DOOR, body))
+    assert.deepEqual(b.closes(), [[1, 'malformed-door']], JSON.stringify(body))
+    assert.deepEqual(b.rows(JK.frameDrop), [[1, 'malformed door', null]])
+    assert.deepEqual(b.rows(JK.doorReject), [])
+  }
+})
+
+test('DOOR out of order: on an admitted link it is dropped and the link lives (secured and open nodes); before any HELLO it closes', () => {
+  //! secured, admitted
+  { const a = rec('aa', { door: doorFor(16) }), b = rec('bb', { door: doorFor(17) })
+    a.up(1, true, 'sim:bb'); b.up(1); pump(a, 1, b, 1)
+    b.feed(1, a.sends(1)[1]) // the dialer's DOOR again (the dup fault)
+    assert.deepEqual(b.rows(JK.frameDrop), [[1, 'door out of order', null]])
+    assert.deepEqual(b.closes(), []); assert.deepEqual(b.node.admitted(), ['aa']) }
+  //! open, admitted
+  { const o = rec('aa'); o.up(1); o.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }))
+    o.feed(1, encodeControl(VERB.DOOR, { p: 'x'.repeat(43) }))
+    assert.deepEqual(o.rows(JK.frameDrop), [[1, 'door out of order', null]]); assert.deepEqual(o.closes(), []) }
+  //! before HELLO: the write-before-hello idiom
+  for (const opts of [{ door: doorFor(18) }, {}]) {
+    const n = rec('aa', opts); n.up(1)
+    n.feed(1, encodeControl(VERB.DOOR, { p: 'x'.repeat(43) }))
+    assert.deepEqual(n.closes(), [[1, 'door-before-hello']]); assert.deepEqual(n.rows(JK.frameDrop), [[1, 'door before hello', null]])
+  }
+})
+
+test('a second HELLO: dropped on a secured node (the stash keeps the first nonce, the proof over it still verifies; after admit the link lives); re-admits on an open node as today', () => {
+  //! secured, proving: the dup fault re-delivers HELLO (here with a different k, the worst case)
+  { const a = rec('aa', { door: doorFor(19) }), b = rec('bb', { door: doorFor(20) })
+    a.up(1, true, 'sim:bb'); b.up(1)
+    b.feed(1, a.sends(1)[0])
+    const first = b.node.links.get(1)!.hello
+    b.feed(1, encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', k: 'd'.repeat(32) }))
+    assert.deepEqual(b.rows(JK.frameDrop), [[1, 'hello twice', null]])
+    assert.equal(b.node.links.get(1)!.state, LS.proving)
+    assert.equal(b.node.links.get(1)!.hello, first, 'the stash is the FIRST HELLO')
+    pump(a, 1, b, 1, 20, 1, 0) // a's HELLO was delivered by hand above
+    assert.deepEqual([a.node.admitted(), b.node.admitted()], [['bb'], ['aa']], 'the proof over the first nonce verifies')
+    //! secured, admitted: dropped, the link lives
+    b.feed(1, a.sends(1)[0])
+    assert.deepEqual(b.rows(JK.frameDrop), [[1, 'hello twice', null], [1, 'hello twice', null]])
+    assert.deepEqual(b.closes(), []); assert.deepEqual(b.rows(JK.identified).length, 1) }
+  //! open: today's path, the golden's 14 of 20 seeds re-admit through the dup fault
+  { const o = rec('aa'); o.up(1)
+    const h = encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' })
+    o.feed(1, h); o.feed(1, h)
+    assert.equal(o.rows(JK.identified).length, 2, 're-admitted'); assert.deepEqual(o.rows(JK.frameDrop), []); assert.deepEqual(o.closes(), []) }
+})
+
+test('the notice and the close mid-handshake: DOOR {e} while proving reads refused and parks; a linkDown after my proof reads refused and parks; neither starts a redial chain', () => {
+  //! the notice
+  { const a = rec('aa', { door: doorFor(21), hosts: ['sim:bb'] })
+    a.up(1, true, 'sim:bb')
+    a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
+    assert.equal(a.node.links.get(1)!.proved, true)
+    a.feed(1, encodeControl(VERB.DOOR, { e: 'uuid-taken' }))
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'refused', 'sim:bb']])
+    assert.deepEqual(a.closes(), [[1, 'door']])
+    a.down(1, 'door')
+    assert.deepEqual(a.rows(JK.doorReject).length, 1, 'journaled once, not again at linkDown')
+    assert.equal(a.timers(TAG.redial).length, 0); assert.equal(a.node.dialing('sim:bb'), false) }
+  //! the silent close
+  { const a = rec('aa', { door: doorFor(22), hosts: ['sim:bb'] })
+    a.up(1, true, 'sim:bb')
+    a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
+    a.down(1, 'reset')
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'refused', 'sim:bb']])
+    assert.equal(a.timers(TAG.redial).length, 0, 'parked, no chain'); assert.equal(a.node.dialing('sim:bb'), false)
+    assert.deepEqual(a.cancels(), [a.timers(TAG.prove)[0].id], 'the deadline is cancelled with the link') }
+  //! an acceptor that never proved: a close while proving is just a lost link (no row)
+  { const b = rec('bb', { door: doorFor(23) })
+    b.up(1)
+    b.feed(1, encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', k: 'a'.repeat(32) }))
+    b.down(1, 'reset')
+    assert.deepEqual(b.rows(JK.doorReject), []) }
+})
+
+test('the deadline: a proving link with no DOOR is refused timeout at tune.proveMs (heartbeats off), dead + noRedial, parked, closed door-timeout', () => {
+  const a = rec('aa', { door: doorFor(24), hosts: ['sim:bb'], tune: { proveMs: 7 } })
+  a.up(1, true, 'sim:bb')
+  a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
+  assert.deepEqual(a.timers(TAG.prove).map((t) => t.ms), [7], 'the tune row, not a heartbeat sweep')
+  assert.equal(a.timers(TAG.heartbeat).length, 0, 'heartbeats are off')
+  a.fire(a.timers(TAG.prove)[0].id, TAG.prove)
+  assert.deepEqual(a.rows(JK.doorReject), [[1, 'timeout', 'sim:bb']])
+  assert.deepEqual(a.closes(), [[1, 'door-timeout']])
+  const l = a.node.links.get(1)!
+  assert.ok(l.dead && l.noRedial)
+  a.down(1, 'door-timeout')
+  assert.equal(a.timers(TAG.redial).length, 0); assert.equal(a.node.dialing('sim:bb'), false, 'parked')
+  //! the same on an accepted link: nothing to park
+  const b = rec('bb', { door: doorFor(25) })
+  b.up(1); b.feed(1, encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', k: 'a'.repeat(32) }))
+  b.fire(b.timers(TAG.prove)[0].id, TAG.prove)
+  assert.deepEqual(b.rows(JK.doorReject), [[1, 'timeout', '']])
+  assert.deepEqual(b.closes(), [[1, 'door-timeout']])
+})
+
+test('the address rule: a DISCOVERED or VIEW-LEARNED target must answer as the address I dialed (else address, parked, no proof spent); a STATIC host is exempt; an accepted link is never checked', () => {
+  const peer = (k = 'b'.repeat(32)) => encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k })
+  //! discovered: the directory said sim:x, the peer says it is sim:bb — someone in between
+  { const a = rec('aa', { door: doorFor(26) })
+    a.node.step({ kind: 'discover', hosts: ['sim:x'] })
+    assert.deepEqual(a.connects(), ['sim:x'])
+    a.up(1, true, 'sim:x'); a.feed(1, peer())
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'address', 'sim:bb']], 'c = the claimed listen')
+    assert.deepEqual(a.closes(), [[1, 'door']])
+    assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO], 'refused BEFORE any proof left')
+    a.down(1, 'door'); assert.equal(a.node.dialing('sim:x'), false, 'parked') }
+  //! view-learned: the committed view names bb at sim:x (a stale or forged entry); the dial is not a static host
+  { const a = rec('aa', { door: doorFor(27), boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:x']] } })
+    a.up(1, true, 'sim:x'); a.feed(1, peer())
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'address', 'sim:bb']])
+    assert.deepEqual(a.closes(), [[1, 'door']]) }
+  //! static: the operator typed sim:x; spelling is theirs — exempt, the handshake proceeds
+  { const a = rec('aa', { door: doorFor(28), hosts: ['sim:x'] })
+    a.up(1, true, 'sim:x'); a.feed(1, peer())
+    assert.deepEqual(a.rows(JK.doorReject), [])
+    assert.equal(a.node.links.get(1)!.state, LS.proving)
+    assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO, VERB.DOOR]) }
+  //! accepted: whatever the peer claims, I did not dial it
+  { const a = rec('aa', { door: doorFor(29) })
+    a.up(1); a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:elsewhere', k: 'b'.repeat(32) }))
+    assert.deepEqual(a.rows(JK.doorReject), []); assert.equal(a.node.links.get(1)!.state, LS.proving) }
+  //! the matching claim passes
+  { const a = rec('aa', { door: doorFor(30) })
+    a.node.step({ kind: 'discover', hosts: ['sim:bb'] })
+    a.up(1, true, 'sim:bb'); a.feed(1, peer())
+    assert.deepEqual(a.rows(JK.doorReject), []); assert.equal(a.node.links.get(1)!.state, LS.proving) }
+})
+
+test('the role rule with a door, four ways: the proof runs first, then uuid-taken (with the notice {e: uuid-taken}); a member evicts a squatting client; client vs client keeps dup-link', () => {
+  const clientOf = (uuid: string, seed: number) => rec(uuid, { client: true, hosts: ['sim:aa'], listen: '', door: doorFor(seed) })
+  //! 1/4 r:1 against a committed-view member
+  { const a = rec('aa', { door: doorFor(31), boot: VIEW1 }), c = clientOf('bb', 32)
+    c.up(1, true, 'sim:aa'); a.up(1)
+    pump(c, 1, a, 1)
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'uuid-taken', 'bb']])
+    assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO, VERB.DOOR, VERB.DOOR], 'the acceptor proved back to a verified dialer, then the notice')
+    assert.deepEqual(dec(a.sends(1)[2]).value, { e: 'uuid-taken' })
+    assert.deepEqual(a.closes(), [[1, 'uuid-taken']])
+    assert.deepEqual(a.rows(JK.dupLink), []); assert.equal(a.node.byUuid.has('bb'), false); assert.equal(a.node.clientLinks.size, 0) }
+  //! 2/4 r:1 against an admitted member link: the member's link is untouched
+  { const a = rec('aa', { door: doorFor(33) }), b = rec('bb', { door: doorFor(34) }), c = clientOf('bb', 35)
+    a.up(1, true, 'sim:bb'); b.up(1); pump(a, 1, b, 1)
+    assert.deepEqual(a.node.admitted(), ['bb'])
+    c.up(1, true, 'sim:aa'); a.up(2); pump(c, 1, a, 2)
+    assert.deepEqual(a.rows(JK.doorReject), [[2, 'uuid-taken', 'bb']])
+    assert.deepEqual(a.closes(), [[2, 'uuid-taken']], 'only the client link closes')
+    assert.equal(a.node.byUuid.get('bb'), 1); assert.equal(a.node.links.get(1)!.dead, false); assert.deepEqual(a.node.admitted(), ['bb']) }
+  //! 3/4 a member whose uuid a client link squats on: the client link closes, the member is admitted
+  { const a = rec('aa', { door: doorFor(36) }), b = rec('bb', { door: doorFor(37) }), c = clientOf('bb', 38)
+    c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
+    assert.equal(a.node.clientLinks.size, 1); assert.equal(a.node.byUuid.get('bb'), 1)
+    a.up(2); b.up(1, true, 'sim:aa'); pump(b, 1, a, 2)
+    assert.deepEqual(a.closes(), [[1, 'uuid-taken']]); assert.deepEqual(a.rows(JK.doorReject), [[1, 'uuid-taken', 'bb']])
+    assert.equal(a.node.byUuid.get('bb'), 2); assert.deepEqual(a.node.admitted(), ['bb']); assert.equal(a.node.links.get(2)!.client, false) }
+  //! 4/4 two clients, one uuid: today's duplicate-link rule
+  { const a = rec('aa', { door: doorFor(39) }), c1 = clientOf('cc', 40), c2 = clientOf('cc', 41)
+    c1.up(1, true, 'sim:aa'); a.up(1); pump(c1, 1, a, 1)
+    c2.up(1, true, 'sim:aa'); a.up(2); pump(c2, 1, a, 2)
+    assert.equal(a.rows(JK.dupLink).length, 1); assert.deepEqual(a.rows(JK.doorReject), []); assert.equal(a.closes()[0][1], 'dup-link') }
+})
+
+test('the crossing dial, secured: both dial each other, both links prove, the keeper rule picks the link dialed by the lower uuid — as today', () => {
+  const a = rec('aa', { door: doorFor(42), hosts: ['sim:bb'] }), b = rec('bb', { door: doorFor(43), hosts: ['sim:aa'] })
+  a.up(1, true, 'sim:bb'); b.up(2) // a's dial lands on b's link 2
+  b.up(1, true, 'sim:aa'); a.up(2) // b's dial lands on a's link 2
+  for (let r = 0; r < 6; r++) { pump(a, 1, b, 2, 1); pump(b, 1, a, 2, 1) }
+  assert.deepEqual([a.node.admitted(), b.node.admitted()], [['bb'], ['aa']])
+  assert.equal(a.rows(JK.dupLink).length, 1); assert.equal(b.rows(JK.dupLink).length, 1)
+  assert.equal(a.node.byUuid.get('bb'), 1, 'aa dialed: its dialed link survives')
+  assert.equal(b.node.byUuid.get('aa'), 2, 'bb keeps the link aa dialed')
+  assert.deepEqual(a.closes(), [[2, 'dup-link']]); assert.deepEqual(b.closes(), [[1, 'dup-link']])
+  assert.equal(a.node.links.get(1)!.state, LS.admitted); assert.equal(b.node.links.get(2)!.state, LS.admitted)
+})
+
+test('hygiene: no journal row ever carries a nonce or a proof — on either end, admitted or refused', () => {
+  const a = rec('aa', { door: doorFor(44) }), b = rec('bb', { door: doorFor(45) }), x = rec('xx', { door: doorFor(46, 'wrong-secret-abc') })
+  a.up(1, true, 'sim:bb'); b.up(1); pump(a, 1, b, 1)
+  x.up(1, true, 'sim:bb'); b.up(2); pump(x, 1, b, 2)
+  const secrets = new Set<string>()
+  for (const n of [a, b, x]) for (const l of [1, 2]) for (const f of n.sends(l)) {
+    const v = dec(f).value as { k?: string; p?: string }
+    if (typeof v?.k === 'string') secrets.add(v.k)
+    if (typeof v?.p === 'string') secrets.add(v.p)
+  }
+  assert.ok(secrets.size >= 5, `the handshakes minted nonces and proofs (${secrets.size})`)
+  for (const n of [a, b, x]) for (const e of n.node.journal.read()) for (const f of [e.a, e.b, e.c]) if (typeof f === 'string') assert.ok(!secrets.has(f), `${n.node.uuid}: row ${e.kind} carries a secret value`)
+  assert.deepEqual(b.rows(JK.doorReject), [[2, 'bad-proof', 'sim:xx']])
 })
