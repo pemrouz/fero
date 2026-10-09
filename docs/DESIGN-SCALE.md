@@ -132,6 +132,31 @@ remove and a mixed forwarded batch; R1 times the two nodes interleaved
 and reads 0.88 (0.95 ms vs 1.07 ms). Still open from §14: Q8 (the
 drain) and the yes on stages 2-5.
 
+**Note, 2026-10-09 (stage 1, second review).** Two holes were left,
+both closed. (1) The `acked` decision was made once, at the WACK: a
+co-holder whose record was expected to fold here (acquiring, or
+assigned with no entry yet — the review's K2/K3) was WACKed silently,
+and if a view change then moved the partition off it before the record
+landed, nothing ever settled the write. The write pipeline now keeps
+such cleared attempts (`#awaiting`) and the install's rescope settles
+every one whose partition no longer folds here: `acked` for an own
+attempt, a second WACK with the lane for a relayed one, which its
+spoke reads as the settlement (kernel/scoped.test.ts 'ACKED after a
+view change'). The STATUS line about `methods.update` from a
+non-holder is closed for every shape the review named. (2) The client
+delete rule read the feeder's contract live off the primary link, so
+with no primary (an outage, not only the first milliseconds) a scoped
+client looked unscoped and swallowed a delete. The kernel now
+remembers the last primary's contract, and with no contract known at
+all (before the first HELLO) the api forwards the delete: the rule
+fails toward sending (api/scoped.test.ts 'OUTAGE DELETE', its unscoped
+control, and 'PRE-HELLO DELETE'). What is still not settled: a spoke
+whose feeder DIES between the WACK and the tap (a link loss, not a
+scope change) — the relay's bookkeeping dies with the link, and the
+spoke's write waits for a value that reaches it only if its next
+feeder holds the partition. That is the one residual of the `acked`
+effect.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
