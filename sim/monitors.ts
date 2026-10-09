@@ -677,6 +677,10 @@ export const scaleMonitors = () => [
       const L = ledgerOf(sim)
       L.scan(sim); L.walk(sim)
       for (const { id, node: n, cell, v } of L.changed) {
+        //! a spoke mid-resync is re-folding its feeder's truth from an empty fold (node.ts #resyncBegin), like a
+        // restarted node mid-replay: its fence and its cells catch up record by record. Read it once the
+        // feeder's reply ends the resync
+        if (n.resync !== null) continue
         L.counts.cells++
         const path = JSON.parse(cell) as string[]
         for (let d = path.length; d >= 1; d--) {

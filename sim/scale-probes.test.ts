@@ -189,7 +189,7 @@ test('M3 release-safety: a tombstone released with its record at every holder, t
   assert.ok(!ns[0].state.has(P) && ns[0].versions.has(P) && ns[1].versions.has(P), 'both holders keep the tombstone')
   //! the plant: the release step with no census and no lane accounting (the mutation runner's `release-all`)
   const d = inject(sim, () => 0, 'release-all')
-  assert.match(d ?? '', /release-all .* @n01,n02/)
+  assert.match(d ?? '', /release-all 2 tombstone\(s\): .*@n01 .*@n02/)
   join(sim, 'n04', o)
   sim.run({ until: sim.now + 8000 })
   assert.equal(sim.nodes.get('n04')!.state.get(P), 'old', 'the learner was taught the dead write')
@@ -308,3 +308,4 @@ test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scope
   assert.equal(t.since(m, VERB.DIGEST), 52110, 'and 52,110 DIGEST frames to t=20 s')
   assert.deepEqual(perTick(sim, t, 200, 2, VERB.DIGEST), [930, 930], 'idle after the join: 31·30')
 })
+
