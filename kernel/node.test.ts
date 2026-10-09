@@ -327,6 +327,40 @@ test('a view install during a running redial chain dials nobody that chain is al
   assert.equal(fired, 5, 'the member chain gave up after its five tries, not after four')
 })
 
+test('two linkDowns toward one target arm ONE redial chain: a timer already pending owns the target, and the tries are neither shared nor forked', () => {
+  //! the double-arm (STATUS, 2026-10-09): #redial never looked for a timer already pending toward its
+  // target, so a second linkDown toward the same listen (a crossing dial cut while both links were up —
+  // the dialed link's `to` and the accepted link's gossiped listen name one address) armed a second
+  // timer line on the same entry; the two lines shared the tries, so the chain gave up in about half
+  // its time. Now a pending timer owns the target: the second linkDown is a no-op, exactly as the view
+  // install's own guard (membership.ts) already treats a dialing target.
+  const { node, of } = harness('aa', { redialMs: 10 })
+  const redialTimers = () => of('timer').filter((x) => x[2] === TAG.redial)
+  node.step({ kind: 'linkDown', link: 900, reason: 'refused', to: 'sim:bb' })
+  node.step({ kind: 'linkDown', link: 901, reason: 'refused', to: 'sim:bb' }) // a second failed dial, same target
+  assert.equal(redialTimers().length, 1, 'one chain: the pending timer owns the target')
+  assert.equal(node.journal.read().filter((e) => e.kind === JK.redial).length, 1, 'one redial row — the second linkDown armed nothing')
+  //! run the chain out, with a stray linkDown toward the target after EVERY fire (the other link line of a
+  // crossing pair dying late, a late refused dial): the chain still takes its full ten tries
+  let fired = 0
+  const gaveUp = () => node.journal.read().some((e) => e.kind === JK.giveUp && e.a === 'sim:bb')
+  while (!gaveUp() && fired < redialTimers().length) {
+    const t = redialTimers()[fired++]
+    node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    node.step({ kind: 'linkDown', link: 910 + fired, reason: 'refused', to: 'sim:bb' })
+    if (!gaveUp()) {
+      assert.ok(node.dialing('sim:bb'), `after fire ${fired} the chain is still dialing`)
+      node.step({ kind: 'linkDown', link: 950 + fired, reason: 'refused', to: 'sim:bb' }) // the stray one
+      assert.equal(redialTimers().length, fired + 1, `after fire ${fired}: one timer line, no fork`)
+      assert.ok(node.dialing('sim:bb'), `after the stray linkDown ${fired} the chain is still dialing — no early give-up`)
+    }
+  }
+  assert.ok(gaveUp())
+  assert.equal(fired, 10, 'the generic chain gave up after its ten tries, not sooner')
+  assert.equal(node.journal.read().filter((e) => e.kind === JK.giveUp).length, 1, 'give-up journaled once')
+  assert.deepEqual(redialTimers().map((t) => t[3]), [10, 20, 40, 80, 160, 320, 320, 320, 320, 320], 'the one chain\'s own curve: ×2 per try, capped at 32 × base (rng pinned to 0)')
+})
+
 test('the floor is silent on a paused link; a digest arriving mid-pause defers its suffix to drain', () => {
   //! adversarial-review regression: control frames queued into a drop-oldest queue are doomed work,
   // and serialising the missing suffix per inbound digest during a pause is O(suffix) discarded per
