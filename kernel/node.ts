@@ -1218,6 +1218,13 @@ export class Node {
     // the entry goes with it — no timer, no revival, nothing left to grow (#backoff stays bounded by
     // the live link set, not by every address a port-0 server ever had)
     if (b.parked) { this.#backoff.delete(to); return }
+    //! a timer already pending toward this target OWNS it (the view install's rule, membership.ts): a
+    // second linkDown naming the same address — the dialed link's `to` and the accepted link's gossiped
+    // listen when a crossing pair is cut, a late refused dial — arms nothing. It used to arm a second
+    // timer line on the same entry, and the two lines shared the tries, so the chain (and the eviction
+    // hold it carries) gave up in about half its time; at the cap it marked the target given up while
+    // the final attempt was still pending, and the revival dialed over it. One chain, its own tries.
+    for (const m of this.#timers.values()) if (m.tag === TAG.redial && m.to === to) return
     if (b.tries >= (b.member ? Math.min(t.memberRedials, t.redials) : t.redials)) {
       //! the final ARMED attempt has now FAILED — only here does the target become truly parked
       if (!b.gaveUp) {

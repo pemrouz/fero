@@ -7,7 +7,9 @@ import { cluster, formed, writes } from './harness.ts'
 import { converged, drained } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
 import { Ring } from '../kernel/ring.ts'
+import type { Node } from '../kernel/node.ts'
 import { sweepBuild } from './shrink.ts'
+import { toyDoor } from './door.ts'
 
 //! the determinism canary (plan §3.1): the same seed twice must produce byte-identical trajectories.
 // This catches unrecorded nondeterminism (Map-iteration dependence, ambient time,
@@ -34,6 +36,9 @@ test('same seed ⇒ identical trajectory (event count + per-event state-hash tra
 // moved, because the state hash over a mixed history now follows the across-depth election.
 // The canary above proves a run equals itself; this proves a run equals the kernel of that day. A
 // deliberate trajectory change (a wire law, a new default) re-records these rows with a DECISIONS line.
+// Re-recorded 2026-10-09 for the one-chain-per-target rule (#redial skips a target with a timer already
+// pending): seeds 11 (270 → 252 events) and 17 (224 → 219) moved, the two of the twenty whose cut
+// landed on a crossing pair and armed a second timer line; the other eighteen are byte-identical.
 test('golden: 20 sweep seeds match the recorded event counts and trace hashes', () => {
   const fnv = (xs: number[]): string => {
     let h = 0x811c9dc5
@@ -48,8 +53,8 @@ test('golden: 20 sweep seeds match the recorded event counts and trace hashes', 
   const golden: [seed: number, events: number, trace: string][] = [
     [0, 185, '41066e03'], [1, 213, '8f707e3c'], [2, 222, '7d73d321'], [3, 215, '11309116'], [4, 178, 'dceb35f8'],
     [5, 220, 'ced4fcaf'], [6, 162, '2406f5c8'], [7, 219, 'f9b53da4'], [8, 202, 'fbbd3c54'], [9, 237, 'bfbfdbb0'],
-    [10, 247, '101df47e'], [11, 270, 'cbca5fb3'], [12, 182, '73d7603e'], [13, 187, 'f46dd08c'], [14, 168, '5cd4dfa4'],
-    [15, 241, '183d893a'], [16, 193, 'f20c4cec'], [17, 224, '8871eab1'], [18, 204, 'e2aa438b'], [19, 197, 'db4d38a3'],
+    [10, 247, '101df47e'], [11, 252, 'c4277d30'], [12, 182, '73d7603e'], [13, 187, 'f46dd08c'], [14, 168, '5cd4dfa4'],
+    [15, 241, '183d893a'], [16, 193, 'f20c4cec'], [17, 219, '72387971'], [18, 204, 'e2aa438b'], [19, 197, 'db4d38a3'],
   ]
   const got = golden.map(([seed]) => {
     const b = sweepBuild(seed)(null)
@@ -275,6 +280,63 @@ test('40-seed mini-sweep WITH heartbeats: the floor + revival machinery under du
     assert.deepEqual(sim.violations, [], `seed ${seed}`)
     assert.ok(formed(nodes), `seed ${seed}: formed`)
     assert.equal(converged(sim), null, `seed ${seed}`)
+  }
+})
+
+//! one redial chain per target, replayed from the journal (the double-arm, STATUS 2026-10-09): a
+// JK.redial row arms a timer toward b=to; the chain's fire writes JK.dial (a=to) just before it dials.
+// Every other dial site skips a target whose chain is still dialing (start runs before any chain;
+// discover and a view install test `dialing`; the heartbeat revival moves only on a give-up), so while
+// a timer is pending the only dial row toward its target is that timer's own fire — and a second
+// redial row before it is a second timer line on the same entry. Holds for runs without `discover`
+// (a forgotten target cancels its timer with no row).
+const pendingRedials = (node: Node): string | null => {
+  const pending = new Map<string, number>()
+  for (const e of node.journal.read()) {
+    if (e.kind === JK.redial) {
+      const n = (pending.get(e.b as string) ?? 0) + 1
+      if (n > 1) return `${node.uuid}: ${n} redial timers pending toward ${e.b}`
+      pending.set(e.b as string, n)
+    } else if (e.kind === JK.dial) {
+      const n = pending.get(e.a as string) ?? 0
+      if (n > 0) pending.set(e.a as string, n - 1)
+    }
+  }
+  return null
+}
+
+test('one redial chain per target: pairs and triples cut while forming and cut again later, open and secured, 80 seeds each — the journal replay never shows two timers pending toward one target', () => {
+  //! a cut while both crossing dials are up gives one node TWO linkDowns naming one address: the dialed
+  // link's `to` and the accepted link's gossiped listen. Before the guard about a quarter of the pair
+  // schedules armed a second chain there; it shared the first one's tries and gave up early.
+  for (const secured of [false, true]) {
+    const failures: string[] = []
+    for (let seed = 0; seed < 80; seed++) {
+      const sim = new Sim(seed)
+      const n = 2 + (seed % 2)
+      const door = secured ? toyDoor('one-chain-secret-0001', sim.rng) : undefined
+      const nodes = cluster(sim, n, { heartbeatMs: 50, ...(door ? { door } : {}) })
+      for (let i = 0; i < n; i++)
+        for (let j = i + 1; j < n; j++)
+          sim.fault(nodes[i].uuid, nodes[j].uuid, { delay: [1, 1 + sim.rng() * 20], dupP: sim.rng() * 0.3 })
+      writes(sim, nodes, 10, 300)
+      //! the first cut lands inside the formation window, the second one much later; both heal
+      const a = nodes[0].uuid, b = nodes[n - 1].uuid
+      const cut1 = 2 + sim.rng() * 40
+      sim.at(cut1, () => sim.partition(a, b))
+      sim.at(cut1 + 30 + sim.rng() * 300, () => sim.heal(a, b))
+      const cut2 = 1200 + sim.rng() * 400
+      sim.at(cut2, () => sim.partition(a, b))
+      sim.at(cut2 + 30 + sim.rng() * 300, () => sim.heal(a, b))
+      sim.run({ until: 4000 })
+      const problems: string[] = []
+      if (sim.violations.length) problems.push(`monitor ${sim.violations[0].monitor}: ${sim.violations[0].detail}`)
+      if (!formed(nodes)) problems.push('never re-formed')
+      const c = converged(sim); if (c) problems.push(`not converged: ${c}`)
+      for (const nd of nodes) { const p = pendingRedials(nd); if (p) problems.push(p) }
+      if (problems.length) failures.push(`seed ${seed} (n=${n}${secured ? ', secured' : ''}): ${problems.join('; ')}`)
+    }
+    assert.deepEqual(failures, [], secured ? 'secured' : 'open')
   }
 })
 
