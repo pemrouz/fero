@@ -538,11 +538,12 @@ member's uuid is re-dialed like any lost link.
     B's HELLO with `l: X`, so the address rule is satisfied, and A proves.
     But A's proof signs `verifierListen = X`, the listen it was shown, and
     B rebuilds the message over the listen it SENT (`B`): `bad-proof`, no
-    admission, B's own proof never leaves, and A reads the notice and parks
-    X. The earlier text claimed A "sees B's signed `l` inside B's proof";
-    it does not — the dialer checks `l` before any proof exists, and B's
-    proof arrives only after A has already proved. The dialer's proof is
-    what has to bind the claim.
+    admission, B's own proof never leaves, and A parks X when it reads the
+    notice — or, when the notice is withheld or lost, re-dials X on one
+    bounded chain per revival cycle. The earlier text claimed A "sees B's
+    signed `l` inside B's proof"; it does not — the dialer checks `l`
+    before any proof exists, and B's proof arrives only after A has already
+    proved. The dialer's proof is what has to bind the claim.
   What neither closes: a relay sitting at a STATIC `hosts` address that
   forwards verbatim (A signs B's real listen, which B verifies), or in a
   network position. That is TLS's job later and it is in the NOT PROTECTED
@@ -776,8 +777,10 @@ now REFUSED at the door. A local process registers a fake address for
 `shop`; a member dials it; the squatter cannot prove (`no-secret` or
 `bad-proof`), or it relays and fails the address rule (§3 step 9), or it
 relays with a rewritten listen and the real member refuses the proof
-(§3 "the relay"); the target is parked and re-dialed once per heartbeat
-while it stays listed.
+(§3 "the relay"); the target is parked — on this node's own refusal, or
+when the real member's notice is read — and when that notice is withheld or
+lost it costs one bounded redial chain per revival cycle, for as long as it
+stays listed.
 Bounded chatter, no admission. The operator proposal said a squatter "only
 fails auth"; its skeptic showed the relay; the address rule is the answer.
 
@@ -853,8 +856,9 @@ target is checked wherever it came from.
 - The diag token still crosses cleartext (kernel/diag.ts:14-15), unchanged.
 - Denial of service: a socket that connects and never proves holds a link
   for `proveMs`; a flood of DOOR frames costs one HMAC each before the link
-  closes; a parked bad address is re-dialed once per heartbeat. Bounded,
-  not prevented.
+  closes; a bad address is parked when this node refused it or read its
+  notice, and costs one bounded redial chain per revival cycle when the
+  notice is withheld or lost. Bounded, not prevented.
 - The default: no secret on loopback means the open door, today's wire
   (V4-3's boundary). Off loopback the composer refuses, or the operator
   says `secret: false` and owns it.
