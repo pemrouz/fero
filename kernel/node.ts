@@ -442,6 +442,15 @@ export class Node {
     return targets
   }
 
+  //! #held — a live link already reaches `to`: one I dialed there, or one whose peer PROVED (or, on the open
+  // path, claimed at admit) that listen. Facts this node owns, never a closing peer's unproven claim. The
+  // revive loop's rule (a held target is not re-dialed into a dup race), shared with linkDown's
+  // close-while-proving case.
+  #held(to: string): boolean {
+    for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) return true
+    return false
+  }
+
   //! step — the single dispatch site. Unknown event kinds fail closed (throw): an unrecognised stimulus is a harness bug, never something to guess at.
   step(e: Event) {
     if (this.destroyed) return
@@ -700,28 +709,21 @@ export class Node {
           return
         }
         this.links.delete(e.link)
-        //! the uuid the peer CLAIMED on a proving link, read before #unprove drops the stash: it tells a
-        // keeper-rule close from a refusal below
-        const claimed = link.state === LS.proving ? link.hello?.u : undefined
         if (link.proveTimer !== -1) this.#unprove(link)
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
-        //! closed while PROVING, after I sent my proof (DESIGN-DOOR §3): the peer refused me, or crashed
-        // mid-handshake — the two look the same from here, so the row is `refused` and the api's line
-        // says so. Parked given-up like every door refusal: heartbeat revival re-dials it once per tick,
-        // and a deliberate close of my own (noRedial already set) was journaled where it happened.
-        // EXCEPT the crossing dial (the second review's major): when I already hold the claimed uuid over
-        // another admitted link, this close is the peer's keeper rule — it admitted me there and closed
-        // this one as the duplicate, and its proof (shipped just before) may still be in flight behind
-        // the close. An honest peer: no row, no park, and no redial either (the pair is linked).
-        if (link.state === LS.proving && link.proved && !link.noRedial) {
-          const keeper = claimed !== undefined ? this.byUuid.get(claimed) : undefined
-          if (keeper === undefined || this.links.get(keeper)?.dead !== false) {
-            j.armed && j.emit(JK.doorReject, link.id, 'refused', link.to ?? '')
-            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
-          }
-          link.noRedial = true
-        }
+        //! a bare close while PROVING — before or after my proof — is a LINK LOSS, not a refusal (DESIGN-DOOR
+        // §3, settled at the third review): the door speaks only through DOOR {e}, and a peer that refused
+        // me sent one. A crash, a cut or a reset mid-handshake looks exactly like this close, and with
+        // heartbeats off a park here stranded honest pairs and clients for good (41 of 480 cut-while-forming
+        // pairs, 68 of 210 clients). So: no row, no park, and the ordinary bounded redial chain below — the
+        // same one a link that died before HELLO gets. EXCEPT when the target is already HELD over another
+        // live link (the keeper rule of a crossing dial: the peer admitted me there and closed this one as
+        // the duplicate; its proof may still be in flight behind the close): then there is nothing to
+        // redial. Held is judged on facts this node owns — a live link's proven listen or my own dial
+        // target — never on the uuid the closing peer CLAIMED, which it never proved (the third review's
+        // nit: a stranger at a typed host claiming a held member's uuid was never dialed again).
+        const held = link.state === LS.proving && link.dialed && link.to !== undefined && this.#held(link.to)
         //! M6: a dying teacher aborts every latch it was feeding (window 6 — the buffer drops whole,
         // nothing folded, the next handshake round re-offers from a surviving holder)
         if (this.armed && link.uuid) this.scope!.linkDown(this, link.uuid)
@@ -747,7 +749,7 @@ export class Node {
         // eviction is held while this chain runs — see MEMBER_REDIALS. A link that died before HELLO is not.
         // Nor is anything a CLIENT dials: a client evicts nobody, so its chain is no clock, and with
         // heartbeats off a short chain would strand it from a restarting server (review finding).
-        const redialTo = link.noRedial ? '' : link.dialed ? link.to ?? '' : link.listen
+        const redialTo = link.noRedial || held ? '' : link.dialed ? link.to ?? '' : link.listen
         if (redialTo) this.#redial(redialTo, !this.client && link.state === LS.admitted && this.membership.isMember(link.uuid))
         //! a lost member link can flip the write-gate to minority — journal the transition NOW, not at the next tick
         if (link.state === LS.admitted) this.membership.settle(this)
@@ -835,8 +837,7 @@ export class Node {
           for (const [to, member] of this.#revivable()) {
             if (to === this.listen) continue
             if (!this.#backoff.get(to)?.gaveUp) continue // never failed, or the redial chain still owns it
-            let held = false
-            for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) { held = true; break }
+            const held = this.#held(to)
             this.#backoff.delete(to)
             if (held) continue
             if (member && !this.client) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: 0, member: true }) // the dial in flight — visible to a park, like discover's
@@ -1441,14 +1442,14 @@ export class Node {
         }
         if (link.state !== LS.proving) { j.armed && j.emit(JK.frameDrop, link.id, 'door out of order'); return }
         const v = f.value as { p?: unknown; e?: unknown }
-        //! the peer's notice: it refused my proof, or my uuid. 'denied' and anything else read `refused`, like
-        // a close mid-handshake — the notice is best-effort, so the row must read the same with or without
-        // it. 'uuid-taken' is the one notice that carries a reason this side cannot guess (the uuid this
-        // process runs as belongs to a member there — a shared FERO_UUID), so it keeps its word, with c =
-        // the dial target; lost, it reads `refused` like any close (the second review's minor). Only a link
-        // I have PROVED on can be refused: a notice before my proof (an acceptor that is still waiting for
-        // the dialer's proof) is out of order — a stranger's frame, not a refusal — dropped and closed like
-        // a malformed DOOR, with no `refused` row.
+        //! the peer's notice: it refused my proof, or my uuid. 'denied' and any unknown word read `refused`;
+        // 'uuid-taken' carries a reason this side cannot guess (the uuid this process runs as belongs to a
+        // member there — a shared FERO_UUID), so it keeps its word; c = the dial target either way. The
+        // notice is the ONLY refusal a dialer can read: it is best-effort, and when it is lost the close
+        // that follows is a link loss like any other (the ordinary redial chain, no row — linkDown; the
+        // third review). Only a link I have PROVED on can be refused: a notice before my proof (an
+        // acceptor that is still waiting for the dialer's proof) is out of order — a stranger's frame,
+        // not a refusal — dropped and closed like a malformed DOOR, with no `refused` row.
         if (typeof v?.e === 'string') {
           if (!link.proved) {
             j.armed && j.emit(JK.frameDrop, link.id, 'notice before proof')

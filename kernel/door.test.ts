@@ -551,7 +551,7 @@ test('a second HELLO: dropped on a secured node (the stash keeps the first nonce
     assert.equal(o.rows(JK.identified).length, 2, 're-admitted'); assert.deepEqual(o.rows(JK.frameDrop), []); assert.deepEqual(o.closes(), []) }
 })
 
-test('the notice and the close mid-handshake: DOOR {e: denied} while proving reads refused and parks; {e: uuid-taken} keeps its word (c = the dial target) and parks; a linkDown after my proof reads refused and parks; none starts a redial chain', () => {
+test('the notice and the close mid-handshake: DOOR {e: denied} while proving reads refused and parks; {e: uuid-taken} keeps its word (c = the dial target) and parks; neither starts a chain. A BARE close after my proof is a link loss: no row, no park, the ordinary redial chain (the third review: with heartbeats off a park here stranded honest pairs cut during the handshake)', () => {
   //! the notice: denied
   { const a = rec('aa', { door: doorFor(21), hosts: ['sim:bb'] })
     a.up(1, true, 'sim:bb')
@@ -577,14 +577,27 @@ test('the notice and the close mid-handshake: DOOR {e: denied} while proving rea
     x.up(1, true, 'sim:bb'); x.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
     x.feed(1, encodeControl(VERB.DOOR, { e: 'some-future-word' }))
     assert.deepEqual(x.rows(JK.doorReject), [[1, 'refused', 'sim:bb']]) }
-  //! the silent close
+  //! the bare close after my proof: a cut, a crash or a reset mid-handshake — or a refusal whose best-effort
+  // notice was lost. From here they look the same, so it is a LINK LOSS: no doorReject row, no park, and the
+  // same bounded redial chain a link that died before HELLO gets (never noRedial). Before the third review this
+  // wrote `refused` against an honest peer and parked it; with heartbeats off nothing clears a park.
   { const a = rec('aa', { door: doorFor(22), hosts: ['sim:bb'] })
     a.up(1, true, 'sim:bb')
     a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
+    assert.equal(a.node.links.get(1)!.proved, true)
     a.down(1, 'reset')
-    assert.deepEqual(a.rows(JK.doorReject), [[1, 'refused', 'sim:bb']])
-    assert.equal(a.timers(TAG.redial).length, 0, 'parked, no chain'); assert.equal(a.node.dialing('sim:bb'), false)
-    assert.deepEqual(a.cancels(), [a.timers(TAG.prove)[0].id], 'the deadline is cancelled with the link') }
+    assert.deepEqual(a.rows(JK.doorReject), [], 'no row: the door did not speak')
+    assert.equal(a.timers(TAG.redial).length, 1, 'the ordinary redial chain toward the target'); assert.equal(a.node.dialing('sim:bb'), true, 'not parked')
+    assert.deepEqual(a.cancels(), [a.timers(TAG.prove)[0].id], 'the deadline is cancelled with the link')
+    //! the chain is the ordinary bounded one and it ENDS: fire each redial, fail each dial, until no timer is left
+    let fired = 0
+    for (let i = 0; i < 40 && a.timers(TAG.redial).length > fired; i++) {
+      a.fire(a.timers(TAG.redial)[fired++].id, TAG.redial)
+      a.node.step({ kind: 'linkDown', link: 900 + i, reason: 'refused', to: 'sim:bb' })
+    }
+    assert.ok(fired > 1 && fired <= 10, `a bounded chain (${fired} dials)`)
+    assert.deepEqual(a.rows(JK.giveUp), [['sim:bb', null, null]], 'the chain gave up: nothing hangs, nothing re-arms with heartbeats off')
+    assert.equal(a.node.dialing('sim:bb'), false) }
   //! an acceptor that never proved: a close while proving is just a lost link (no row)
   { const b = rec('bb', { door: doorFor(23) })
     b.up(1)
@@ -820,11 +833,36 @@ test('the crossing dial, secured, the LOSER\'s close overtakes the acceptor\'s p
   a.down(2, 'reset')
   assert.equal(a.timers(TAG.redial).length, 1, 'a redial chain toward bb — the target was never parked given-up')
   assert.equal(a.node.dialing('sim:bb'), true)
-  //! the control: the same close with NO other link to the peer is still a refusal (a crash or a wrong secret)
+  //! the control: the same close with NO other link to the peer is a link loss — no row, and the chain runs
   { const c = rec('cc', { door: doorFor(55), hosts: ['sim:bb'] })
     c.up(1, true, 'sim:bb'); c.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
     c.down(1, 'reset')
-    assert.deepEqual(c.rows(JK.doorReject), [[1, 'refused', 'sim:bb']]) }
+    assert.deepEqual(c.rows(JK.doorReject), [])
+    assert.equal(c.timers(TAG.redial).length, 1); assert.equal(c.node.dialing('sim:bb'), true) }
+})
+
+test('held is judged on the PROVEN listen, not the closing peer\'s claim (the third review\'s nit): aa holds bb; a typed host sim:x answers aa\'s dial as bb with a nonce, aa proves, sim:x closes — no row, and sim:x IS dialed again on the chain; the same close from bb\'s own proven address is the keeper rule and starts nothing', () => {
+  const a = rec('aa', { door: doorFor(56), hosts: ['sim:bb', 'sim:x'] }), b = rec('bb', { door: doorFor(57) })
+  a.up(1, true, 'sim:bb'); b.up(1); pump(a, 1, b, 1)
+  assert.deepEqual(a.node.admitted(), ['bb'])
+  assert.equal(a.node.links.get(1)!.listen, 'sim:bb', 'the proven listen of the held link')
+  //! the stranger at the typed host claims a uuid aa holds — unproven, and it closes after aa's proof
+  a.up(3, true, 'sim:x')
+  a.feed(3, encodeControl(VERB.HELLO, { u: 'bb', i: 9, l: 'sim:x', k: 'x'.repeat(32) }))
+  assert.equal(a.node.links.get(3)!.proved, true)
+  a.down(3, 'reset')
+  assert.deepEqual(a.rows(JK.doorReject), [], 'no row: a bare close')
+  assert.deepEqual(a.timers(TAG.redial).length, 1, 'sim:x is dialed again: the claim it made bought it no silence')
+  assert.equal(a.node.dialing('sim:x'), true)
+  assert.deepEqual(a.node.admitted(), ['bb'], 'the real link is untouched')
+  //! the control: a second dial to bb's OWN proven address that closes while proving is the crossing dial's keeper
+  // close — held by listen, so no chain (the pair is linked over link 1)
+  a.up(4, true, 'sim:bb')
+  a.feed(4, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
+  a.down(4, 'dup-link')
+  assert.deepEqual(a.rows(JK.doorReject), [])
+  assert.deepEqual(a.timers(TAG.redial).length, 1, 'no new chain: bb is held over link 1')
+  assert.equal(a.node.dialing('sim:bb'), false)
 })
 
 test('hygiene: no journal row ever carries a nonce or a proof — on either end, admitted or refused', () => {

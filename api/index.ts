@@ -102,7 +102,9 @@ const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node
     case 'no-secret': return `${f} ${who} — it has no secret and this node has one; every member and client must share FERO_SECRET`
     case 'peer-secret': return `${f} by ${who} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`
     case 'bad-proof': return `${f} ${who} — its secret differs from this node's`
-    case 'refused': return `${f} ${who} — closed during the handshake; if this repeats every heartbeat the secrets probably differ`
+    //! `refused` is the peer's NOTICE (DOOR {e: 'denied'}, or a word this version does not know): it read this node's proof
+    // and turned it away. A bare close mid-handshake writes no row and prints nothing — it is a link loss (the third review)
+    case 'refused': return `${f} ${who} — it refused this node's proof (the secrets probably differ)`
     case 'address': return `${f} ${to ?? 'a dialed peer'} — it answered as ${shown(c)}, not the address the directory or the view gave (a stale or forged entry)`
     case 'timeout': return `${f} ${who} — no proof came within the handshake deadline`
     //! uuid-taken has two sides: the refusing node's row names the client's uuid (an accepted link); the refused
@@ -114,8 +116,8 @@ const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node
   }
 }
 //! the dial target of the row's link: off the link table, or — for the two reasons whose c IS link.to, a fact this
-// node owns — off the row itself, because `refused` written at linkDown comes after the link left the table (the
-// second review's minor: that line printed as an inbound peer and deduped across every dial target)
+// node owns — off the row itself, should the link have left the table by fold time (the second review's minor:
+// a row read after its linkDown printed as an inbound peer and deduped across every dial target)
 const dialTarget = (node: Node, e: JEvent): string | undefined => {
   const to = node.links.get(e.a as number)?.to
   if (to !== undefined) return to

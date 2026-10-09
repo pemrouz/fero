@@ -148,23 +148,31 @@ const stderrOf = async (fn: () => Promise<void>): Promise<string[]> => {
   return out.join('').split('\n').filter((l) => l.startsWith("fero('"))
 }
 
-test('the refusal lines name a DIALED target that hung up mid-handshake: two static hosts that greet with a nonce, read the member\'s proof and close — a `refused` row per target, written after the link left the table, prints one line PER TARGET naming its address, never as "a peer that connected"', async () => {
+test('a DIALED target that hangs up mid-handshake WITHOUT a notice is a link loss, not a refusal (the third review): two static hosts greet with a nonce, read the member\'s proof and destroy the socket — no doorReject row, no stderr line, and the member keeps re-dialing both (the bounded chain, then heartbeat revival), never parked; a host that sends DOOR {e: denied} before it hangs up IS refused, once, with its line', async () => {
   const S = 'tcp-test-secret-KILO-11'
-  //! each raw host answers with its own HELLO (a nonce, so the member proves) and hangs up on the proof
-  const hangup = (u: string) => rawServer((_, addr) => ({ u, i: 1, l: addr, k: randomBytes(16).toString('base64url') }), (f, sock) => { if (f.verb === VERB.DOOR) sock.destroy() })
-  const x = await hangup('xx'), y = await hangup('yy')
+  //! each raw host answers with its own HELLO (a nonce, so the member proves) and hangs up on the proof — a crash, a
+  // cut or a lost notice look exactly like this from the dialer's side, so it is a link loss: the door did not speak
+  const dials = new Map<string, number>()
+  const hangup = (u: string, notice = false) => rawServer((_, addr) => { dials.set(u, (dials.get(u) ?? 0) + 1); return { u, i: 1, l: addr, k: randomBytes(16).toString('base64url') } }, (f, sock) => {
+    if (f.verb !== VERB.DOOR) return
+    if (notice) sock.write(encodeControl(VERB.DOOR, { e: 'denied' }))
+    sock.destroy()
+  })
+  const x = await hangup('xx'), y = await hangup('yy'), z = await hangup('zz', true)
   let m: Fero | null = null
   const lines = await stderrOf(async () => {
     try {
-      m = await fero('tcphangup', { uuid: 'aa', server: true, hosts: [x.addr, y.addr], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S })
-      //! heartbeat revival re-dials each parked target once per tick: the rows repeat, the lines must not
-      assert.ok(await until(() => doorRows(m!).filter(([r, c]) => r === 'refused' && c === x.addr).length >= 3 && doorRows(m!).filter(([r, c]) => r === 'refused' && c === y.addr).length >= 3, 8000), `refused at both targets, re-dialed: ${JSON.stringify(doorRows(m!))}`)
-      assert.ok(doorRows(m!).every(([r, c]) => r === 'refused' && (c === x.addr || c === y.addr)), JSON.stringify(doorRows(m!)))
+      m = await fero('tcphangup', { uuid: 'aa', server: true, hosts: [x.addr, y.addr, z.addr], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S })
+      //! the silent hosts are dialed again and again: the ordinary chain re-dials a lost link, and revival re-arms it
+      assert.ok(await until(() => (dials.get('xx') ?? 0) >= 4 && (dials.get('yy') ?? 0) >= 4 && (dials.get('zz') ?? 0) >= 2, 8000), `re-dialed after every hang-up: ${JSON.stringify([...dials])}`)
+      //! the one host that SAID so is refused — the notice, read on a real socket before the close — and parked, so its rows repeat at heartbeat cadence
+      assert.ok(await until(() => doorRows(m!).filter(([r, c]) => r === 'refused' && c === z.addr).length >= 2, 8000), `the notice is read and the target revived: ${JSON.stringify(doorRows(m!))}`)
+      assert.ok(doorRows(m!).every(([r, c]) => r === 'refused' && c === z.addr), `no row for a bare hang-up — every row is the notice-sender's: ${JSON.stringify(doorRows(m!))}`)
+      assert.ok(rows(m!, JK.giveUp).some((e) => e.a === x.addr) || rows(m!, JK.redial).filter((e) => e.b === x.addr).length >= 3, 'the silent host runs the redial chain, not a park')
     } finally { await m?.destroy() }
   })
-  x.close(); y.close()
-  for (const t of [x.addr, y.addr]) assert.equal(lines.filter((l) => l === `fero('tcphangup'): refused ${t} — closed during the handshake; if this repeats every heartbeat the secrets probably differ`).length, 1, `one line naming ${t}: ${JSON.stringify(lines)}`)
-  assert.equal(lines.length, 2, `nothing else — no "a peer that connected" line for a target this node dialed: ${JSON.stringify(lines)}`)
+  x.close(); y.close(); z.close()
+  assert.deepEqual(lines, [`fero('tcphangup'): refused ${z.addr} — it refused this node's proof (the secrets probably differ)`], `one line, for the one host that refused; none for a hang-up: ${JSON.stringify(lines)}`)
   assert.ok(!lines.join('\n').includes(S))
 })
 

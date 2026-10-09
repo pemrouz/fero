@@ -76,7 +76,8 @@ export class Link {
   //! the door (DESIGN-DOOR §3, secured nodes only — every field stays at its zero on the open path):
   // nonce = MY `k` for this link, minted by door.nonce() at linkUp and never reused; said = the HELLO I
   // sent, the exact object (my proof signs its keys); hello = the peer's HELLO, stashed while proving
-  // and cleared at admit; proved = I shipped my DOOR {p} (a close after that is journaled `refused`);
+  // and cleared at admit; proved = I shipped my DOOR {p} (only then can a DOOR {e} refuse me; a bare
+  // close while proving is a link loss, never a refusal);
   // proveTimer = the one-shot TAG.prove timer's id, -1 when none.
   nonce = ''
   said: HelloKeys | null = null
