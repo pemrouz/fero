@@ -236,10 +236,27 @@ test('OWNER RE-CHECK [DESIGN-SCALE §11 Q12] — a non-holder\'s forwarded remov
     assert.ok(await until(() => rows(nodes[0]).some((r) => r.key === JSON.stringify([g, '0']) && r.state === 'rejected' && r.reason === 'sparse-hole'), 2000), 'cluster.writes names the reason')
     //! nothing was stamped: the array is whole at the holder
     assert.deepEqual(((await nodes[1].methods.read()) as Record<string, unknown>)[g], [1, 2, 3])
-    //! the same spelling under an OBJECT row is a lawful field remove: it commits at the owner (the acked path)
-    const r = await nodes[0].methods.remove({ key: [o, 'x'] }, { timeout: 3000 })
-    assert.equal(r.origin, 'n02')
-    assert.ok(await until(async () => { const v = ((await nodes[1].methods.read()) as Record<string, { x?: number; y?: number }>)[o]; return v?.x === undefined && v?.y === 2 }, 5000), 'the field is gone at the holder')
+    //! a CLIENT's relayed remove through the non-holder (the stage-1 skeptic's A2): n01 relays it unseen (its
+    // admit cannot see the row either), the owner refuses it, and the spoke sees the same typed reject
+    const client = await fero('scoped', { hosts: [addrs[0]], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    try {
+      const ce = await client.methods.remove({ key: [g, '0'] }, { timeout: 3000 }).then(() => null, (err: unknown) => err) as WriteRejectError | null
+      assert.ok(ce instanceof WriteRejectError, `the spoke's remove refused typed, got ${String(ce)}`)
+      assert.equal(ce.reason, 'sparse-hole')
+      assert.equal(ce.reached, 'issued')
+      assert.deepEqual(((await nodes[1].methods.read()) as Record<string, unknown>)[g], [1, 2, 3], 'still whole')
+    } finally { await client.destroy() }
+    //! a MIXED batch (A3): four removes/updates issued together from the non-holder travel in one forwarded
+    // frame; the owner judges each — the two holes refused, the field remove and the update committed
+    const mixed = await Promise.allSettled([
+      nodes[0].methods.remove({ key: [g, '0'] }, { timeout: 3000 }),
+      nodes[0].methods.remove({ key: [o, 'x'] }, { timeout: 3000 }),
+      nodes[0].methods.remove({ key: [g, '1'] }, { timeout: 3000 }),
+      nodes[0].methods.update({ key: [o, 'z'], value: 3 }, { timeout: 3000 }),
+    ])
+    assert.deepEqual(mixed.map((m) => m.status === 'rejected' ? (m.reason as WriteRejectError).reason : (m.value as { origin: string }).origin), ['sparse-hole', 'n02', 'sparse-hole', 'n02'], 'each record judged on its own')
+    assert.ok(await until(async () => { const v = ((await nodes[1].methods.read()) as Record<string, { x?: number; y?: number; z?: number }>)[o]; return v?.x === undefined && v?.y === 2 && v?.z === 3 }, 5000), 'the field remove and the update landed at the holder')
+    assert.deepEqual(((await nodes[1].methods.read()) as Record<string, unknown>)[g], [1, 2, 3], 'the array is still whole')
   } finally { await Promise.all(nodes.map((n) => n.destroy())) }
 })
 
