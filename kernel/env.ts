@@ -121,6 +121,14 @@ export interface EffectSink {
   // that write: committed, at exactly these coordinates (the WACK's). Never fires for a record without
   // an attempt identity (a fast-path commit, a repair).
   lost?(iss: string, cid: number, origin: string, seq: number, epoch: number): void
+  //! acked(iss, cid, origin, seq, epoch) (DESIGN-SCALE stage 1, OPTIONAL — the same embedder as `lost`): the
+  // owner's WACK cleared an attempt THIS node issued, and the committed record will never reach this node's
+  // apply — a scoped member that does not hold (or acquire) the partition, or a spoke whose feeder does not.
+  // The WACK carries the coordinates (the lane `o`, named with its incarnation, from the owner), and they are
+  // the settlement: committed, exactly there. Never fires where the record will fold here (the apply join
+  // settles those, after the value shows — V4-7), never on an unscoped member (its WACK carries no lane),
+  // never for a relayed attempt (the relay hops the WACK onward instead).
+  acked?(iss: string, cid: number, origin: string, seq: number, epoch: number): void
   //! snapshot(batch, rows) (M4e): ATOMICALLY REPLACE the whole WAL with `rows` — the disk counterpart
   // of compaction (a swap is not an append; it gets its own verb). Rows are [frame + fresh chain link]
   // in replay order; the store must make the swap all-or-nothing (write-tmp + fsync + rename in the

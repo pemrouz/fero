@@ -123,6 +123,9 @@ export class Runtime {
   //! onLost — a write of ours the kernel refused at the election (V4-18): it committed at these
   // coordinates and lost, and no apply will ever carry it (env.ts lost). The api settles the promise here.
   onLost: (iss: string, cid: number, origin: string, seq: number, epoch: number) => void = () => {}
+  //! onAcked — a write of ours the owner committed, whose record will never fold here (a scoped non-holder,
+  // a spoke of one): the WACK's coordinates are the settlement (env.ts acked). The api settles the promise here.
+  onAcked: (iss: string, cid: number, origin: string, seq: number, epoch: number) => void = () => {}
   //! onConfirm — the guarantee ladder's answers surface here (M5's confirm option resolves off it)
   onConfirm: (id: number, ok: boolean, count: number) => void = () => {}
   //! the M5c method plane surfaces here — the api layer is the HOST (it runs handlers) and the CALLER
@@ -174,6 +177,7 @@ export class Runtime {
         },
         apply(rec) { runtime.onApply(rec) },
         lost(iss, cid, origin, seq, epoch) { runtime.onLost(iss, cid, origin, seq, epoch) },
+        acked(iss, cid, origin, seq, epoch) { runtime.onAcked(iss, cid, origin, seq, epoch) },
         //! persist: append [varint prev][frame] + fsync, then echo — batch-per-call today (each call IS
         // a run frame; the group-many-appends-per-fsync batching is an M8 measured optimization, not a
         // semantic). The prev prefix is the chain link replay's interior-hole detector reads back.

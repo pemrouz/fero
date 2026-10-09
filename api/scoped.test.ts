@@ -12,6 +12,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { fero, type Fero, type ScopedError } from './index.ts'
 import { snapshot } from './substrate.ts'
+import { Ring } from '../kernel/ring.ts'
 import { ports, until } from '#utils'
 
 const spawn = async (n: number, replicas: number, extra: Record<string, unknown> = {}): Promise<Fero[]> => {
@@ -146,6 +147,54 @@ test('SCOPED spoke: a client reads the WHOLE resource through its primary\'s gat
       assert.equal(se.scoped, true, 'rehydrated typed — not an Error-string wrap')
       assert.equal(se.hint, 'wire-rehydration pin')
     }
+  } finally {
+    await client.destroy()
+    await Promise.all(nodes.map((n) => n.destroy()))
+  }
+})
+
+//! the STATUS probe as a test (DESIGN-SCALE §11, stage 1): two members, `replicas: 1`, six `methods.update` from
+// the member that does not hold the partition. Before the `acked` effect every one timed out: the owner committed
+// and WACKed, but a non-holder never folds the record, so the apply join never fired. Red without kernel/write.ts
+// onAck's `acked` emit: `timeout after 3000ms` on the first key.
+test('ACKED [DESIGN-SCALE stage 1] — methods.update from a member that does not hold the partition resolves committed, named on the owner\'s lane; so does a spoke relayed through it; the holder shows every write', async () => {
+  const ps = [await ports.free(), await ports.free()]
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const nodes = await Promise.all(addrs.map((listen, i) =>
+    fero('scoped', { uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1 })))
+  const client = await fero('scoped', { hosts: [addrs[0]], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const rows = (f: Fero) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string; origin?: string }>)
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    //! six keys whose one holder is n02 (the same ring every member builds)
+    const ring = new Ring()
+    ring.build(1, [['n01', addrs[0]], ['n02', addrs[1]]])
+    const keys: string[] = []
+    for (let i = 0; keys.length < 6; i++) if (ring.holders('q' + i, 1)[0] === 'n02') keys.push('q' + i)
+    for (const k of keys) {
+      const r = await nodes[0].methods.update({ key: k, value: { k } }, { timeout: 3000 })
+      assert.equal(r.origin, 'n02', `${k}: committed on the owner's lane`)
+      assert.equal(r.epoch, 1)
+    }
+    assert.equal(rows(nodes[0]).filter((r) => r.state === 'committed' && r.origin === 'n02').length, 6, 'cluster.writes names the owner on every row')
+    //! a spoke relayed through the non-holder: the relay hops the lane, the spoke settles the same way
+    const r = await client.methods.update({ key: keys[0], value: { k: keys[0], via: 'spoke' } }, { timeout: 3000 })
+    assert.equal(r.origin, 'n02', 'the spoke\'s write names the owner too')
+    assert.equal(rows(client).filter((x) => x.state === 'committed' && x.origin === 'n02').length, 1)
+    //! the holder shows every write (the gather from either member reads the same)
+    const seen = await until(async () => {
+      const all = await (nodes[1].methods.read() as Promise<Record<string, { k: string; via?: string }>>).catch(() => ({}))
+      return keys.every((k) => all[k]?.k === k) && all[keys[0]]?.via === 'spoke'
+    }, 10_000)
+    assert.ok(seen, 'n02 holds all six writes and the spoke\'s')
+    //! a plain assignment from the non-holder lands the same way (it always did; the await was the gap)
+    nodes[0].data[keys[1]] = { k: keys[1], via: 'assign' }
+    assert.ok(await until(async () => ((await nodes[1].methods.read()) as Record<string, { via?: string }>)[keys[1]]?.via === 'assign', 5000))
+    //! and a plain DELETE from the non-holder is a real remove, never swallowed as a no-op: its lens shows nothing
+    // for the row, but the row lives at the owner (before `acked`, the write above stayed "in flight" for ever,
+    // which happened to keep the delete alive; the rule is now explicit — api/data.ts #local)
+    delete nodes[0].data[keys[1]]
+    assert.ok(await until(async () => ((await nodes[1].methods.read()) as Record<string, unknown>)[keys[1]] === undefined, 5000), 'the delete reached the owner')
   } finally {
     await client.destroy()
     await Promise.all(nodes.map((n) => n.destroy()))
