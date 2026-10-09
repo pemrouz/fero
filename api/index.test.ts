@@ -719,6 +719,44 @@ test('the door: the role rule holds WITH a secret — a client that holds the se
   assert.equal(lines.filter((l) => l.startsWith("fero('doorrole'): refused by")).length, 1, `one line for the dial target across every revival: ${JSON.stringify(lines)}`)
 })
 
+//! rawListener — a hand-written peer that LISTENS, so a member dials it as a typed host; it reads the member's HELLO and,
+// once `release` resolves, answers with `reply` (a HELLO of its own). Resolves with its address.
+const rawListener = (reply: Record<string, unknown>, release: Promise<void>) => new Promise<{ addr: string; close: () => void }>((resolve) => {
+  const socks = new Set<net.Socket>()
+  const srv = net.createServer((sock) => {
+    socks.add(sock); sock.on('error', () => {}); sock.on('close', () => socks.delete(sock))
+    sock.once('data', () => { release.then(() => { if (!sock.destroyed) sock.write(encodeControl(VERB.HELLO, reply)) }) })
+  })
+  srv.listen(0, '127.0.0.1', () => {
+    const a = srv.address() as net.AddressInfo
+    resolve({ addr: `127.0.0.1:${a.port}`, close: () => { for (const s of socks) s.destroy(); srv.close() } })
+  })
+})
+
+test('the printer says the SIDE, not the link table (the third review\'s minor): a member that DIALED a host which answers as a client claiming another member\'s uuid prints the refusing-side line — the host\'s address and the uuid it claimed — never "the uuid this process runs as"; the row is the refusing side\'s (c = the claimed uuid) and the member\'s link is untouched', async () => {
+  const p = await ports.free()
+  let release!: () => void
+  const gate = new Promise<void>((r) => { release = r })
+  const x = await rawListener({ u: 'aa', i: 1, l: '', r: 1 }, gate)
+  const a = await fero('doorside', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  let b: Fero | null = null
+  const lines = await stderrOf(async () => {
+    try {
+      //! bb dials aa and the raw host; the host holds its answer until aa is admitted at bb, then claims aa's uuid as a client
+      b = await fero('doorside', { uuid: 'bb', server: true, hosts: [`127.0.0.1:${p}`, x.addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+      assert.ok(await until(() => 'aa' in view(b!).peers, 8000), 'bb admitted aa over its dialed link')
+      release()
+      assert.ok(await until(() => doorRows(b!).length >= 1, 8000), 'bb refused the host')
+      assert.deepEqual(doorRows(b!)[0], ['uuid-taken', 'aa'], 'the refusing side\'s row on a DIALED link: c is the uuid the host claimed')
+      assert.ok('aa' in view(b!).peers, 'the member\'s link is untouched')
+      await sleep(100)
+    } finally { await b?.destroy(); await a.destroy(); x.close() }
+  })
+  const mine = lines.filter((l) => l.startsWith("fero('doorside')"))
+  assert.deepEqual(mine, [`fero('doorside'): refused ${x.addr} — it answered as a client claiming uuid aa; that uuid belongs to a member (a shared FERO_UUID?)`], JSON.stringify(lines))
+  assert.ok(!lines.some((l) => l.includes('the uuid this process runs as')), `the client wording belongs to the refused client alone: ${JSON.stringify(lines)}`)
+})
+
 test('the off-loopback rule (DESIGN-DOOR §14 Q1): a server listening off loopback with no secret is refused at fero() time; secret: false runs it open on purpose; a secret runs it; the directory-socket refusal still wins for 0.0.0.0:3376; a client is never refused; secret: 123 and a short secret are refused without echoing them', async () => {
   const p = await ports.free()
   await assert.rejects(fero('r', { listen: `0.0.0.0:${p}` }), new RegExp(`^Error: fero\\('r'\\): listen 0\\.0\\.0\\.0:${p} is reachable from other machines and no secret is set — set FERO_SECRET \\(the same value on every member and client\\), or pass secret: false \\(FERO_SECRET=off\\) to run open on purpose$`))
