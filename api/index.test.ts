@@ -677,7 +677,7 @@ test('the refusal lines print nothing a peer chose unfiltered: a connecting sock
   assert.ok(!theirs[0].includes('\u001b'))
 })
 
-test('the door: the role rule holds WITH a secret — a client that holds the secret and a member\'s uuid is refused uuid-taken after its proof, the member stays linked; its line names the uuid', async () => {
+test('the door: the role rule holds WITH a secret — a client that holds the secret and a member\'s uuid is refused uuid-taken after its proof, the member stays linked; the server\'s line names the uuid, the client\'s line names the dial target and its own uuid', async () => {
   const S = 'index-test-secret-FOXTROT-06'
   const p = await ports.free()
   const a = await fero('doorrole', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S, data: { seed: 1 } })
@@ -686,7 +686,9 @@ test('the door: the role rule holds WITH a secret — a client that holds the se
   const lines = await stderrOf(async () => {
     try {
       assert.ok(await until(() => view(a).epoch >= 1 && Object.keys(view(a).members).length === 2, 8000), 'two members formed')
-      c = await fero('doorrole', { uuid: 'bb', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 0 }, redial: { ms: 30 }, secret: S })
+      //! heartbeats ON for the client: a refused target is parked, and revival re-dials it once per tick, so the
+      // best-effort notice (lost under socket.destroy() now and then) is read on some attempt
+      c = await fero('doorrole', { uuid: 'bb', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S })
       //! the client's proof verifies (it holds the secret), and THEN the role rule refuses it — a stranger without
       // the secret never gets this far. The client re-dials on its chain, so the row repeats; every one is this.
       assert.ok(await until(() => doorRows(a).length > 0, 8000), 'refused')
@@ -697,9 +699,10 @@ test('the door: the role rule holds WITH a secret — a client that holds the se
       assert.ok('bb' in view(a).peers && 'aa' in view(b).peers, 'the member\'s link is alive on both ends')
       assert.deepEqual(snapshot(c.data), {}, 'the refused client never received the seed: it was refused before any digest')
       //! the client's own side: the role rule ran BEFORE the server's proof, so the client was still proving when
-      // the notice (or the close) reached it — its row reads refused, naming the dial target; it never admitted aa
-      assert.ok(await until(() => doorRows(c!).length > 0, 8000), 'the client has its own row')
-      assert.ok(doorRows(c!).every(([r, to]) => r === 'refused' && to === `127.0.0.1:${p}`), `refused, the dial target: ${JSON.stringify(doorRows(c!))}`)
+      // the notice (or the close) reached it — its row keeps the notice's word, uuid-taken, naming the dial target
+      // (or reads refused when the best-effort frame was lost); it never admitted aa
+      assert.ok(await until(() => doorRows(c!).some(([r]) => r === 'uuid-taken'), 8000), `the client has its own row with the reason: ${JSON.stringify(doorRows(c!))}`)
+      assert.ok(doorRows(c!).every(([r, to]) => (r === 'uuid-taken' || r === 'refused') && to === `127.0.0.1:${p}`), `the dial target on every row: ${JSON.stringify(doorRows(c!))}`)
       assert.equal(view(c!).me.primary, null, 'never admitted the server on its own side')
       a.data.k = 1
       assert.ok(await until(() => (snapshot(b.data) as { k?: number }).k === 1, 8000), 'replication between the members is intact')
@@ -710,6 +713,9 @@ test('the door: the role rule holds WITH a secret — a client that holds the se
     }
   })
   assert.ok(lines.includes("fero('doorrole'): refused a client claiming uuid bb — that uuid belongs to a member (a shared FERO_UUID?)"), JSON.stringify(lines))
+  //! the client's line says what the kernel was told — the uuid clash — not a guess about the secret
+  assert.ok(lines.includes(`fero('doorrole'): refused by 127.0.0.1:${p} — the uuid this process runs as, bb, belongs to a member there (a shared FERO_UUID?)`), JSON.stringify(lines))
+  assert.equal(lines.filter((l) => l.startsWith("fero('doorrole'): refused by")).length, 1, `one line for the dial target across every revival: ${JSON.stringify(lines)}`)
 })
 
 test('the off-loopback rule (DESIGN-DOOR §14 Q1): a server listening off loopback with no secret is refused at fero() time; secret: false runs it open on purpose; a secret runs it; the directory-socket refusal still wins for 0.0.0.0:3376; a client is never refused; secret: 123 and a short secret are refused without echoing them', async () => {

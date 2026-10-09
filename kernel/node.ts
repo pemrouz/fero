@@ -1441,18 +1441,21 @@ export class Node {
         }
         if (link.state !== LS.proving) { j.armed && j.emit(JK.frameDrop, link.id, 'door out of order'); return }
         const v = f.value as { p?: unknown; e?: unknown }
-        //! the peer's notice: it refused my proof (or my uuid). The row is `refused`, like a close mid-
-        // handshake — the notice is best-effort and the journal must read the same with or without it.
-        // Only a link I have PROVED on can be refused: a notice before my proof (an acceptor that is still
-        // waiting for the dialer's proof) is out of order — a stranger's frame, not a refusal — dropped
-        // and closed like a malformed DOOR, with no `refused` row.
+        //! the peer's notice: it refused my proof, or my uuid. 'denied' and anything else read `refused`, like
+        // a close mid-handshake — the notice is best-effort, so the row must read the same with or without
+        // it. 'uuid-taken' is the one notice that carries a reason this side cannot guess (the uuid this
+        // process runs as belongs to a member there — a shared FERO_UUID), so it keeps its word, with c =
+        // the dial target; lost, it reads `refused` like any close (the second review's minor). Only a link
+        // I have PROVED on can be refused: a notice before my proof (an acceptor that is still waiting for
+        // the dialer's proof) is out of order — a stranger's frame, not a refusal — dropped and closed like
+        // a malformed DOOR, with no `refused` row.
         if (typeof v?.e === 'string') {
           if (!link.proved) {
             j.armed && j.emit(JK.frameDrop, link.id, 'notice before proof')
             link.dead = true
             return this.env.sink.close(link.id, 'malformed-door')
           }
-          j.armed && j.emit(JK.doorReject, link.id, 'refused', link.to ?? '')
+          j.armed && j.emit(JK.doorReject, link.id, v.e === 'uuid-taken' ? 'uuid-taken' : 'refused', link.to ?? '')
           return this.#refuse(link, 'door')
         }
         if (typeof v?.p !== 'string' || v.p.length !== PROOF_LEN) {
