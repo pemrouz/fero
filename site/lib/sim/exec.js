@@ -104,6 +104,19 @@ export class Sim {
   stores = new Map                  ()
   #storeFaults = new Map                    ()
   #nodeOpts = new Map                  ()
+  //! #life — the life number per uuid: add() bumps it, the sink add() makes captures it, and an echo the
+  // sink scheduled for an EARLIER life is dropped when it falls due (2026-10-09). A reborn node numbers
+  // its timers and its WAL batches from 1 again, and the sim's cancel is a no-op, so the old life's fires
+  // stayed queued and a reborn node read one as its own: a TAG.prove deadline at 12 ms instead of 5000
+  // refused an honest peer `timeout`; a stale `persisted` would resolve a fresh batch before its fsync.
+  // A real shell cancels its timers and drops its io-queue on destroy; this is that, for the queue.
+  // Link events are NOT dropped, and here the sim is looser than a shell: link ids are sim-global, so an
+  // old life's linkDown names no link of the new life (the kernel ignores it), but a dial the old life left
+  // in flight still lands in the new one: a linkUp for a dial it never made (or, had the dial been refused,
+  // a linkDown naming that address). A shell tears such a dial down at destroy (shell/runtime.ts #dial).
+  // The review's probe (80 seeds, two restarts each) saw 58 such linkUps in 21 seeds, none arming a
+  // redial, and no harm: the new life HELLOs on the link like on any dial, and it admits or dedups.
+  #life = new Map                ()
   //! per-store FIFO fsync clock (the disk twin of #lastAt): a real WAL resolves batches IN APPEND ORDER
   // (the shell's io-queue serializes write+fsync per row), so resolution times are clamped monotone per
   // store — without this the sim manufactures resolved-rows-past-an-unresolved-row, an "interior hole"
@@ -126,6 +139,28 @@ export class Sim {
   // owner, peer, this end's link id, the peer's, whether this end dialed, the bytes. Null by default,
   // zero cost on every other run.
   tap                                                                                                                  = null
+  //! watch (DESIGN-SCALE §6, stage 0): the scale monitors are installed (sim/monitors.ts armScale) — only then are
+  // `stepped` and `inflight` kept. False on every other run: one boolean read per event and per frame, so every
+  // golden, sweep and counted pin runs exactly the code it ran before.
+  watch = false
+  //! stepped (stage 0): the uuids of the nodes that stepped since the last monitor pass. A
+  // per-event monitor that walks STATE (cells, versions, floors) walks only these — state changes only inside
+  // step(), so the walk is complete and costs one node per event instead of every node (STATUS: "every new
+  // per-event monitor walks only the node that stepped"). Under checkEvery sampling it holds every node that
+  // stepped in the window. Cleared by the monitor pass itself.
+  stepped = new Set        ()
+  //! inflight (stage 0, monitor M6): every frame between a send and its bytesIn delivery, by task id — the
+  // wire as the sim can see it and no shell can. M6 reads it at a tombstone release to prove nothing
+  // older than the released stamp is still on its way to a holder. One Map set/delete per delivered frame.
+  inflight = new Map                                                         ()
+  //! g5 (stage 0, monitor M5): uuids whose restart dropped rows the disk had LIED about (StoreFault lieP, a
+  // lied swap). Their durable floors overclaim by those rows — the DESIGN-SCALE §5 G5 residual, documented and
+  // not a monitor's finding. M5 skips a life restored from such a disk.
+  g5 = new Set        ()
+  //! restoring (stage 0): uuids between restart() and their `start` event — the replay rows fold one event at a
+  // time, so a state monitor (M1, M3, M5) that read the node mid-replay would see a half-folded fold and a seed
+  // floor the rows have not caught up with yet. They wait for `start`, then read the whole restored fold at once.
+  restoring = new Set        ()
   seed        
 
   constructor(seed        , defaults        = {}) {
@@ -136,6 +171,7 @@ export class Sim {
 
   //! add — create a node whose Env is this executive. The kernel cannot tell it isn't on a real network; that is the design.
   add(opts          )       {
+    this.#life.set(opts.uuid, (this.#life.get(opts.uuid) ?? 0) + 1) // before the sink: it captures this life
     const sink = this.#sinkFor(opts.uuid)
     const node = new Node(opts, { now: () => this.now, rng: this.rng, sink })
     this.nodes.set(opts.uuid, node)
@@ -170,6 +206,7 @@ export class Sim {
     const old = this.nodes.get(uuid) 
     const opts = this.#nodeOpts.get(uuid) 
     old.destroy()
+    if (store.wal.some((r) => r.resolved && r.lied)) this.g5.add(uuid) // the disk lied: its durable floors may overclaim (G5)
     store.wal = store.wal.filter((r) => r.resolved && !r.lied)
     store.swapLied = false // the new life reopens the REAL file; the phantom died with the crash
     const b = store.boot
@@ -188,7 +225,8 @@ export class Sim {
       } : opts.boot,
     })
     for (const row of store.wal) this.post(uuid, { kind: 'replay', bytes: row.bytes, prev: row.prev }, 0)
-    this.post(uuid, { kind: 'start' }, 0)
+    this.restoring.add(uuid)
+    this.#schedule(0, () => { this.restoring.delete(uuid); this.#step(uuid, { kind: 'start' }) })
     return reborn
   }
 
@@ -247,6 +285,7 @@ export class Sim {
         const bad = m.check(this)
         if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
       }
+      this.stepped.clear()
     }
     while (this.#queue.length) {
       if (opts.until !== undefined && this.#queue[0].at > opts.until) break
@@ -271,6 +310,7 @@ export class Sim {
     const node = this.nodes.get(uuid)
     if (!node) return
     node.step(ev)
+    if (this.watch) this.stepped.add(uuid)
     this.trace.push(node.stateHash)
   }
 
@@ -324,6 +364,11 @@ export class Sim {
 
   #sinkFor(me        )             {
     const sim = this
+    //! this sink's life (see #life; a raw endpoint has none and never restarts, so 0 = 0 holds for it).
+    // Every per-node-numbered echo the sink schedules — a timer fire, a WAL batch's persisted/persistFail
+    // — is stepped only while this life is still the live one; a later life drops it at the queue.
+    const life = sim.#life.get(me) ?? 0
+    const alive = ()          => (sim.#life.get(me) ?? 0) === life
     return {
       connect(to        ) {
         const target = sim.#byListen.get(to)
@@ -370,14 +415,19 @@ export class Sim {
         const deliver = () => {
           const at = Math.max(sim.now + dMin + sim.rng() * (dMax - dMin), sim.#lastAt.get(link) ?? 0)
           sim.#lastAt.set(link, at)
-          sim.post(l.peer, { kind: 'bytesIn', link: l.peerLink, bytes }, at - sim.now)
+          //! watched runs: the frame is on the wire until its bytesIn fires (M6 reads sim.inflight). The same one
+          // task either way, so the event count and the seq order are identical with or without the watch
+          if (!sim.watch) return sim.post(l.peer, { kind: 'bytesIn', link: l.peerLink, bytes }, at - sim.now)
+          const id = sim.#seq
+          sim.inflight.set(id, { from: l.owner, to: l.peer, bytes })
+          sim.#schedule(at - sim.now, () => { sim.inflight.delete(id); sim.#step(l.peer, { kind: 'bytesIn', link: l.peerLink, bytes }) })
         }
         deliver()
         //! duplication: the same frame delivered again, still FIFO (a dup can never leapfrog its original)
         if (f.dupP && sim.rng() < f.dupP) deliver()
       },
       close(link        , reason        ) { sim.#sever(link, reason) },
-      timer(id        , tag        , ms        ) { sim.post(me, { kind: 'timer', id, tag }, ms) },
+      timer(id        , tag        , ms        ) { sim.#schedule(ms, () => { if (alive()) sim.#step(me, { kind: 'timer', id, tag }) }) },
       cancel() { /* fires are ignored by the kernel's live-id check; leaving them queued costs one no-op event */ },
       apply(rec) { foldInto(sim.folds.get(me) , rec) }, // the downstream object (V4-18); the api layer binds its proxy here
       //! M4b storage: append the row, then resolve (or fail) on the fsync clock with the node's store
@@ -395,13 +445,13 @@ export class Sim {
         sim.#storeAt.set(me, at)
         if (f.failP && sim.rng() < f.failP) {
           store.wal.pop() // a failed batch never reached the disk
-          sim.post(me, { kind: 'persistFail', batch, reason: 'io' }, at - sim.now)
+          sim.#schedule(at - sim.now, () => { if (alive()) sim.#step(me, { kind: 'persistFail', batch, reason: 'io' }) })
           return
         }
         if (f.lieP && sim.rng() < f.lieP) row.lied = true
         sim.#schedule(at - sim.now, () => {
           row.resolved = true
-          sim.#step(me, { kind: 'persisted', batch })
+          if (alive()) sim.#step(me, { kind: 'persisted', batch })
         })
       },
       //! M4e snapshot+swap: the store contract is SYNCHRONOUS-durable (the shell writes tmp + fsync +
@@ -419,7 +469,7 @@ export class Sim {
         const at = Math.max(sim.now + dMin + sim.rng() * (dMax - dMin), sim.#storeAt.get(me) ?? 0) // same FIFO clock as appends
         sim.#storeAt.set(me, at)
         if (f.failP && sim.rng() < f.failP) {
-          sim.post(me, { kind: 'persistFail', batch, reason: 'io' }, at - sim.now)
+          sim.#schedule(at - sim.now, () => { if (alive()) sim.#step(me, { kind: 'persistFail', batch, reason: 'io' }) })
           return
         }
         if (f.lieP && sim.rng() < f.lieP) store.swapLied = true
@@ -427,7 +477,7 @@ export class Sim {
           store.wal = rows.map((r) => ({ batch, bytes: r.bytes, prev: r.prev, resolved: true, lied: false }))
           store.swapLied = false
         }
-        sim.#schedule(at - sim.now, () => sim.#step(me, { kind: 'persisted', batch }))
+        sim.#schedule(at - sim.now, () => { if (alive()) sim.#step(me, { kind: 'persisted', batch }) })
       },
       //! boot: synchronous-durable like the shell's. bootFailP (I-36) fails it: the record never lands, the
       // store is condemned and takes no later record (the shell's #bootFailed latch), and persistFail is
@@ -439,7 +489,7 @@ export class Sim {
         const f = sim.#storeFaults.get(me)
         if (f?.bootFailP && sim.rng() < f.bootFailP) {
           store.condemned = true
-          sim.post(me, { kind: 'persistFail', batch: 0, reason: 'io' }, 0)
+          sim.#schedule(0, () => { if (alive()) sim.#step(me, { kind: 'persistFail', batch: 0, reason: 'io' }) })
           return
         }
         store.boot = record

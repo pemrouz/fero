@@ -486,3 +486,620 @@ export const drained = (sim     )                => {
     for (const l of n.links.values()) if (l.queued.length) return `${id} link ${l.id} has ${l.queued.length} undelivered frames`
   return null
 }
+
+//! ── DESIGN-SCALE stage 0: the scale harness monitors M1-M10 (2026-10-09) ───────────────────────
+// The record's §6 names nine invariants and the monitor that checks each. Stage 0 builds the monitors
+// on TODAY's kernel so every later rule (anti-entropy, compaction, GC, the drain) must turn one of them
+// red when it is switched off before it lands — the I-20 lesson (docs/DESIGN-LEAVE.md §9). Everything
+// below is sim-only and reads the kernel; nothing here moves a trajectory.
+//
+// The LEDGER is the oracle the tree lacked (§6, M1): every record ever appended to any node's log, keyed
+// (origin, seq), gathered by the same node-and-array-keyed cursors the log monitors above use, plus every
+// tombstone RELEASE a node performed (a version that vanished while the cell stayed absent and the
+// partition stayed on the node — tombstone GC today, the stage-4 release step tomorrow, or an injected
+// drop in a mutation run). The per-event monitors walk only the nodes that stepped (sim.stepped) and
+// diff each node's versions by stamp-object identity, so a quiet event costs one Map lookup per cell of
+// one node. A life between restart() and its `start` is skipped (sim.restoring) and read whole at start.
+//
+//   M1 stamp-oracle    (per event, every node)  a cell shown with stamp s while a remove of it, or of an
+//                      ancestor, stamped r > s is BELOW this node's coverage of r's lane (an armed node's
+//                      possession floor for (lane, partition); an unscoped node's or a client's applied
+//                      watermark). Fires at the exact event a resurrection lands. Red today on the two
+//                      unscoped probes (sim/scale-probes.test.ts).
+//   M2 frontier-sound  (per event, armed)       an entry compaction dropped at an armed node was not its
+//                      cell's winner and sits at or below every CURRENT holder's REAL floor for its
+//                      (lane, partition) — the sim reads the holders' floors, not their marks. Today an
+//                      armed node never compacts (kernel/log.ts:160), so the counter stays 0 and the
+//                      planted test calls compact() by hand; stage 3 makes it live.
+//   M3 release-safety  (per event, every node)  after any node released tombstone t for cell k, no node
+//                      shows k or a cell under k with a stamp below t. Red today on both probes.
+//   M4 index-oracle    (stage 1)                inert until node.byPart exists; see the stub.
+//   M5 floor-truth     (per event, armed)       when a possession floor (lane, p) advances from a to b,
+//                      every ledger record of (lane, p) in (a, b] is in this node's log, or a version it
+//                      holds (the cell's, or an ancestor's) dominates it, or it was released. A restored
+//                      life checks its whole seed at start — the DESIGN-SCALE §2 seed probe (A4). A life
+//                      restored from a disk that LIED (sim.g5) is the G5 residual and is skipped.
+//   M6 census-truth    (at each release)        ground truth only the sim can see: at the moment node N
+//                      releases t for k in p, no node anywhere (member or not), no frame on the wire
+//                      (sim.inflight) and no row on a DOWN node's stored WAL holds a record of k, or of
+//                      a cell under k, stamped below t that N neither contains nor covers. Red today on
+//                      the zombie probe AT THE RELEASE, before the heal shows it. M3 and M6 both find the
+//                      releases through Ledger.classify, so each stands alone when the other is off.
+//   M7 floors-agree    (horizon, armed)         at a quiet point every partition's holders report equal
+//                      floors on every lane (I6's horizon form; the cadence bound is the sweep's tail).
+//   M8 bounded-logs    (horizon, armed)         every lane holds at most winners + compactAt entries and
+//                      every tombstone is fenced or pinned by a named uuid. RED TODAY by design (logs are
+//                      unbounded under scoping; no gcWaitingOn surface exists): the sweep pins the count.
+//   M9 leave-drain     (per event, armed)       a leaver that reports left(true) holds nothing some other
+//                      live node does not contain-or-cover. RED TODAY at R=1 (the leave does not drain).
+//   M10 resync-end     (per event, spokes)      a spoke's resync (node.ts #resyncBegin) ends only on the r=0
+//                      that answers an r=1 the spoke sent on that link AFTER the resync began — the
+//                      reply that follows the re-download on the FIFO link. Ending on an older reply runs
+//                      the ghost sweep before the re-download, and the re-download then lands record run by
+//                      record run: the spoke shows older values of live rows, and rows whose removes are on
+//                      the way. Not one of the record's nine; added when the sweep found it (A11).
+//
+// Non-vacuity: ledgerOf(sim).counts says how many cells, drops, releases, floor advances, releases
+// examined by M6 and leaves each family saw — a sweep whose counters read 0 proved nothing.
+
+import { Framer, Frame, VERB } from '../kernel/codec.js'
+import { JK } from '../kernel/journal.js'
+import { compact as _compact } from '../kernel/log.js'
+                                           
+                                                 
+void _compact // the planted M2 test calls kernel/log.ts compact() by hand; named here so the dependency reads in one place
+
+                                                           
+                                                                                    
+const stampOf = (s       ) => `${s.epoch}/${s.seq}/${s.origin}`
+const pathOf = (rec     )           => rec.key.length ? rec.key : [rec.at ?? '']
+const ancestorKeys = (path          )           => { const out           = []; for (let d = 1; d < path.length; d++) out.push(JSON.stringify(path.slice(0, d))); return out }
+//! inLane — does this node's log for `origin` hold seq? Lanes are seq-ascending: binary search.
+const inLane = (n      , origin        , seq        )          => {
+  const lane = n.logs.get(origin)
+  if (!lane) return false
+  let lo = 0, hi = lane.length - 1
+  while (lo <= hi) { const mid = (lo + hi) >>> 1; const s = lane[mid].seq; if (s === seq) return true; if (s < seq) lo = mid + 1; else hi = mid - 1 }
+  return false
+}
+//! covers — how far this node's coverage of (lane, partition) reaches: an armed node's possession floor
+// (the SOLE scoped possession claim, kernel/streams.ts), an unscoped node's or a client's applied watermark
+// (the dedup fence: everything at or below it was folded, skipped or fenced here).
+const covers = (n      , origin        , p        )         =>
+  n.armed ? (n.streams.get(origin)?.parts?.get(p)?.s ?? 0) : (n.streams.get(origin)?.applied ?? 0)
+const isRemove = (rec     ) => rec.type === REC.remove
+
+export class Ledger {
+  recs = new Map                ()
+  removes = new Map                  ()
+  lanes = new Map                               ()
+  //! released — cell → the newest tombstone stamp any node ever released for it (M3's memory, M6's trigger)
+  released = new Map               ()
+  pending                                                                  = []
+  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0, resyncs: 0 }
+  #cursors = new Map                                                   ()
+  #snap = new Map                          ()
+  #floors = new Map                           ()
+  #left = new Map                 ()
+  #scanned = -1
+  #walked = -1
+  #classified = -1
+  changed                                                       = []
+  vanished                                                       = []
+
+  add(origin        , seq        , epoch        , rec     ) {
+    const key = origin + '|' + seq
+    if (this.recs.has(key)) return
+    const path = pathOf(rec)
+    const e         = { origin, seq, epoch, rec, cell: JSON.stringify(path), path, p: path[0] }
+    this.recs.set(key, e)
+    if (isRemove(rec)) { let rs = this.removes.get(e.cell); if (!rs) { rs = []; this.removes.set(e.cell, rs) } rs.push(e) }
+    let per = this.lanes.get(origin); if (!per) { per = new Map(); this.lanes.set(origin, per) }
+    let lane = per.get(e.p); if (!lane) { lane = []; per.set(e.p, lane) }
+    //! sorted by seq (entries arrive from many nodes in any order; a splice may land below a seen tail)
+    let i = lane.length
+    while (i > 0 && lane[i - 1].seq > seq) i--
+    lane.splice(i, 0, e)
+  }
+
+  //! scan — gather every entry appended to any log since the last scan (once per event count). The cursor keys
+  // on the node object and the lane array like log-monotone's: a compaction replaces the array (rescan,
+  // idempotent — add() dedups), a restart replaces the node. An entry a latch SPLICES into a lane's interior
+  // was in its teacher's log and was gathered there.
+  scan(sim     ) {
+    if (this.#scanned === sim.events) return
+    this.#scanned = sim.events
+    for (const [id, n] of sim.nodes)
+      for (const [origin, entries] of n.logs) {
+        const k = id + '|' + origin
+        let prev = this.#cursors.get(k)
+        if (!prev || prev.node !== n || prev.arr !== entries) prev = { node: n, arr: entries, len: 0 }
+        if (entries.length > prev.len) {
+          for (let i = prev.len; i < entries.length; i++) { const e = entries[i]; this.add(origin, e.seq, e.epoch, e.rec) }
+          prev.len = entries.length
+        }
+        this.#cursors.set(k, prev)
+      }
+  }
+
+  //! walk — once per pass: diff every stepped node's versions against its snapshot. `changed` = cells whose
+  // stamp object changed and that are PRESENT (M1 and M3 read them); `vanished` = tombstones whose version is
+  // gone with the cell still absent (classify() sorts them: shed, wipe, or a release).
+  walk(sim     ) {
+    if (this.#walked === sim.events) return
+    this.#walked = sim.events
+    this.changed.length = 0
+    this.vanished.length = 0
+    for (const id of sim.stepped) {
+      const n = sim.nodes.get(id)
+      if (!n || sim.restoring.has(id)) continue
+      let snap = this.#snap.get(n)
+      if (!snap) { snap = new Map(); this.#snap.set(n, snap) }
+      for (const [k, v] of n.versions) {
+        if (snap.get(k) === v) continue
+        snap.set(k, v)
+        if (n.state.has(k)) this.changed.push({ id, node: n, cell: k, v })
+      }
+      if (snap.size !== n.versions.size)
+        for (const [k, t] of snap) if (!n.versions.has(k)) { snap.delete(k); if (!n.state.has(k)) this.vanished.push({ id, node: n, cell: k, t }) }
+    }
+  }
+
+  //! classify — once per pass, after scan and walk: sort every vanished tombstone into a shed (the scope entry left
+  // with it), a wiped fold (condemn, a spoke's resync), or a RELEASE (tombstone GC, the stage-4 release step, or an
+  // injected drop). A release raises `released` (M3 reads it) and queues on `pending` (M6 reads it). Both
+  // monitors call this, so switching either one off leaves the other whole.
+  classify(sim     ) {
+    if (this.#classified === sim.events) return
+    this.#classified = sim.events
+    this.scan(sim); this.walk(sim)
+    for (const { id, node: n, cell, t } of this.vanished) {
+      if (n.tainted || n.client) continue
+      const p = (JSON.parse(cell)            )[0] ?? ''
+      if (n.scope && !n.scope.entries.has(p)) continue
+      if (n.logs.size === 0 && n.state.size === 0) continue
+      const was = this.released.get(cell)
+      if (was === undefined || newer(t.epoch, t.seq, t.origin, was)) this.released.set(cell, t)
+      this.counts.releases++
+      this.pending.push({ node: n, id, cell, p, t })
+    }
+  }
+
+  floorsOf(n      )                      { let m = this.#floors.get(n); if (!m) { m = new Map(); this.#floors.set(n, m) } return m }
+  leftBefore(uuid        )                      { return this.#left.get(uuid) }
+  sawLeft(uuid        , clean         ) { this.#left.set(uuid, clean) }
+  forgetLeft(uuid        ) { this.#left.delete(uuid) }
+}
+
+const ledgers = new WeakMap             ()
+//! ledgerOf — the one Ledger per Sim (the monitors fill it; the horizon oracles and the tests read it).
+export const ledgerOf = (sim     )         => { let l = ledgers.get(sim); if (!l) { l = new Ledger(); ledgers.set(sim, l) } return l }
+
+//! containsOrCovers — I3's right-hand side for one ledger record at one node: in my log, or a version I hold
+// (the cell's or an ancestor's) at or above its stamp, or released under a tombstone at or above it.
+const containsOrCovers = (L        , n      , e        )          => {
+  if (inLane(n, e.origin, e.seq)) return true
+  const v = n.versions.get(e.cell)
+  if (v !== undefined && !newer(e.epoch, e.seq, e.origin, v)) return true
+  for (const a of ancestorKeys(e.path)) { const va = n.versions.get(a); if (va !== undefined && !newer(e.epoch, e.seq, e.origin, va)) return true }
+  const t = L.released.get(e.cell)
+  if (t !== undefined && !newer(e.epoch, e.seq, e.origin, t)) return true
+  for (const a of ancestorKeys(e.path)) { const ta = L.released.get(a); if (ta !== undefined && !newer(e.epoch, e.seq, e.origin, ta)) return true }
+  return false
+}
+
+//! holdersNow — the live armed nodes the ring assigns p to at `n`'s epoch (M2's frontier reads their REAL floors).
+const holdersNow = (sim     , n      , p        )                   => {
+  const ring = n.writes.ring
+  if (ring.epoch !== n.epoch) ring.build(n.epoch, n.membership.view.members)
+  const out                   = []
+  for (const u of ring.holders(p, n.replicas)) { const h = sim.nodes.get(u); if (h && h.armed) out.push([u, h]) }
+  return out
+}
+
+//! framesIn — every frame in one wire chunk or WAL row (a send carries one frame; a row is one frame).
+const framesIn = (bytes            ) => { try { return new Framer().push(bytes) } catch { return [] } }
+
+export const scaleMonitors = () => [
+  {
+    name: 'stamp-oracle',
+    check: (sim     )                => {
+      const L = ledgerOf(sim)
+      L.scan(sim); L.walk(sim)
+      for (const { id, node: n, cell, v } of L.changed) {
+        L.counts.cells++
+        const path = JSON.parse(cell)            
+        for (let d = path.length; d >= 1; d--) {
+          const c = d === path.length ? cell : JSON.stringify(path.slice(0, d))
+          const rs = L.removes.get(c)
+          if (!rs) continue
+          for (const r of rs)
+            if (newer(r.epoch, r.seq, r.origin, v) && covers(n, r.origin, r.p) >= r.seq)
+              return `${id} shows ${cell} @${stampOf(v)} while the ${c === cell ? 'remove' : 'ancestor remove ' + c} @${stampOf(r)} is at or below its ${n.armed ? 'floor' : 'applied'} for lane ${r.origin} — resurrected`
+        }
+      }
+      return null
+    },
+  },
+  {
+    name: 'frontier-sound',
+    check: (() => {
+      const seen = new Map                                                                         ()
+      return (sim     )                => {
+        const L = ledgerOf(sim)
+        for (const id of sim.stepped) {
+          const n = sim.nodes.get(id)
+          if (!n || !n.armed || !n.scope) continue
+          for (const [o, entries] of n.logs) {
+            const k = id + '|' + o
+            const prev = seen.get(k)
+            seen.set(k, { node: n, arr: entries })
+            if (!prev || prev.node !== n || prev.arr === entries || n.tainted) continue
+            //! the lane array was REPLACED in this life: compaction (kernel/log.ts compact) or a shed. Every old entry
+            // missing from the new array was dropped; a shed's drops left with their scope entry and are lawful.
+            for (const e of prev.arr) {
+              if (inLane(n, o, e.seq)) continue
+              const p = pathOf(e.rec)[0]
+              if (!n.scope.entries.has(p)) continue
+              L.counts.drops++
+              const cell = JSON.stringify(pathOf(e.rec))
+              const v = n.versions.get(cell)
+              if (v !== undefined && v.origin === o && v.seq === e.seq && v.epoch === e.epoch)
+                return `${id} compacted lane ${o} and dropped seq ${e.seq}, which is still the WINNER of ${cell}`
+              for (const [hu, h] of holdersNow(sim, n, p)) {
+                const f = h.streams.get(o)?.parts?.get(p)?.s ?? 0
+                if (f < e.seq) return `${id} compacted (${o}, ${e.seq}) of '${p}' while holder ${hu}'s real floor for that lane is ${f} — below the frontier`
+              }
+            }
+          }
+        }
+        return null
+      }
+    })(),
+  },
+  {
+    name: 'release-safety',
+    check: (sim     )                => {
+      const L = ledgerOf(sim)
+      L.classify(sim)
+      for (const { id, cell, v } of L.changed) {
+        const path = JSON.parse(cell)            
+        for (let d = path.length; d >= 1; d--) {
+          const c = d === path.length ? cell : JSON.stringify(path.slice(0, d))
+          const t = L.released.get(c)
+          if (t !== undefined && newer(t.epoch, t.seq, t.origin, v))
+            return `${id} shows ${cell} @${stampOf(v)} below the RELEASED tombstone of ${c} @${stampOf(t)} — a record older than a released remove was applied`
+        }
+      }
+      return null
+    },
+  },
+  {
+    //! M4 index-oracle (stage 1, built 2026-10-09): for every scoped node that stepped, the per-partition entry
+    // index (node.byPart) equals the filter of every lane by partition — the same objects, in lane order — and
+    // the tombstone index (node.tombs) equals the set of versions with no live value, per partition. Walks only
+    // the stepped nodes' lanes and versions. A site that forgets the index makes a teach ship an incomplete base
+    // or a shed destroy data on attested-but-wrong tails; this is what catches it (scale-probes.test.ts plants
+    // one missed site each way).
+    name: 'index-oracle',
+    check: (sim     )                => {
+      for (const id of sim.stepped) {
+        const n = sim.nodes.get(id)
+        if (!n || n.byPart === null || n.tombs === null || sim.restoring.has(id)) continue
+        const want = new Map                                 ()
+        for (const [origin, lane] of n.logs)
+          for (const e of lane) {
+            const p = partitionOf(e.rec)
+            let per = want.get(p); if (!per) { per = new Map(); want.set(p, per) }
+            let arr = per.get(origin); if (!arr) { arr = []; per.set(origin, arr) }
+            arr.push(e)
+          }
+        for (const [p, per] of want) {
+          const got = n.byPart.get(p)
+          if (!got) return `${id} byPart lacks '${p}', which ${per.size} lane(s) hold entries of — an index site was missed`
+          for (const [o, arr] of per) {
+            const g = got.get(o)
+            if (!g) return `${id} byPart['${p}'] lacks lane ${o}, which holds ${arr.length} entries of it`
+            if (g.length !== arr.length) return `${id} byPart['${p}'][${o}] holds ${g.length} entries, the lane holds ${arr.length} of '${p}'`
+            for (let i = 0; i < arr.length; i++) if (g[i] !== arr[i]) return `${id} byPart['${p}'][${o}] entry ${i} is seq ${g[i].seq}, the lane's is seq ${arr[i].seq}`
+          }
+        }
+        for (const [p, got] of n.byPart) {
+          const per = want.get(p)
+          if (!per) return `${id} byPart names '${p}', of which no lane holds an entry`
+          for (const o of got.keys()) if (!per.has(o)) return `${id} byPart['${p}'] names lane ${o}, which holds no entry of it`
+        }
+        for (const [k, v] of n.versions) {
+          if (n.state.has(k)) continue
+          const path = JSON.parse(k)            
+          if (!n.tombs.get(path.length ? path[0] : '')?.has(k)) return `${id} tombs lacks ${k} @${stampOf(v)}, a version with no live value`
+        }
+        for (const [p, s] of n.tombs)
+          for (const k of s) {
+            if (!n.versions.has(k)) return `${id} tombs['${p}'] names ${k}, which has no version`
+            if (n.state.has(k)) return `${id} tombs['${p}'] names ${k}, which is live`
+          }
+      }
+      return null
+    },
+  },
+  {
+    name: 'floor-truth',
+    check: (sim     )                => {
+      const L = ledgerOf(sim)
+      L.scan(sim)
+      for (const id of sim.stepped) {
+        const n = sim.nodes.get(id)
+        if (!n || !n.armed || sim.restoring.has(id) || sim.g5.has(id)) continue
+        const fl = L.floorsOf(n)
+        for (const [o, d] of n.streams) {
+          if (!d.parts) continue
+          for (const [p, pe] of d.parts) {
+            const key = o + '|' + p
+            let prev = fl.get(key) ?? 0
+            if (pe.s < prev) prev = 0 // a shed-then-reacquired floor restarts from zero: re-check its whole claim
+            if (pe.s <= prev) { if (pe.s !== prev) fl.set(key, pe.s); continue }
+            const lane = L.lanes.get(o)?.get(p)
+            if (lane)
+              for (const e of lane) {
+                if (e.seq <= prev) continue
+                if (e.seq > pe.s) break
+                L.counts.advances++
+                //! reported once per claim: the floor is recorded before the return, so the next event does not re-report it
+                if (!containsOrCovers(L, n, e)) {
+                  fl.set(key, pe.s)
+                  return `${id} floor for (${o}, '${p}') is ${pe.s} but it neither holds nor covers (${o}, ${e.seq}) ${e.cell} @${stampOf(e)} — the floor overclaims`
+                }
+              }
+            fl.set(key, pe.s)
+          }
+        }
+      }
+      return null
+    },
+  },
+  {
+    name: 'census-truth',
+    check: (sim     )                => {
+      const L = ledgerOf(sim)
+      //! M6 finds the releases itself: it does not lean on M3 having run first, so each monitor stands alone
+      L.classify(sim)
+      if (!L.pending.length) return null
+      const rels = L.pending.splice(0)
+      for (const { node: N, id, cell, p, t } of rels) {
+        L.counts.census++
+        const under = (c        ) => c === cell || c.startsWith(cell.slice(0, -1) + ',')
+        const lacks = (origin        , seq        , part        ) => !inLane(N, origin, seq) && covers(N, origin, part) < seq
+        const bad = (origin        , seq        , epoch        , rec     , where        )                => {
+          if (!newer(t.epoch, t.seq, t.origin, { epoch, seq, origin })) return null
+          const path = pathOf(rec)
+          const c = JSON.stringify(path)
+          if (!under(c)) return null
+          if (!lacks(origin, seq, path[0])) return null
+          return `${id} released the tombstone of ${cell} @${stampOf(t)} while ${where} holds ${c} @${epoch}/${seq}/${origin}, older, which ${id} neither holds nor covers`
+        }
+        for (const [mid, m] of sim.nodes) {
+          if (m === N) continue
+          for (const [o, entries] of m.logs) for (const e of entries) { const r = bad(o, e.seq, e.epoch, e.rec, `node ${mid}`); if (r) return r }
+        }
+        for (const f of sim.inflight.values())
+          for (const fr of framesIn(f.bytes)) {
+            if (fr.verb !== VERB.RECORDS && fr.verb !== VERB.ACQ) continue
+            for (const rv of fr.records()) { const r = bad(rv.origin, rv.seq, rv.epoch, rv.rec(), `a frame on the wire ${f.from} → ${f.to}`); if (r) return r }
+          }
+        for (const [uuid, store] of sim.stores) {
+          if (sim.nodes.has(uuid)) continue
+          for (const row of store.wal) {
+            if (!row.resolved || row.lied) continue
+            for (const fr of framesIn(row.bytes)) for (const rv of fr.records()) { const r = bad(rv.origin, rv.seq, rv.epoch, rv.rec(), `the stored WAL of ${uuid} (down)`); if (r) return r }
+          }
+        }
+      }
+      return null
+    },
+  },
+  {
+    name: 'leave-drain',
+    check: (sim     )                => {
+      const L = ledgerOf(sim)
+      for (const [uuid, clean] of sim.left) {
+        if (L.leftBefore(uuid) === clean) continue
+        L.sawLeft(uuid, clean)
+        if (!clean) continue
+        const n = sim.nodes.get(uuid)
+        if (!n || !n.armed || !n.scope) continue
+        L.counts.leaves++
+        for (const [p, e] of n.scope.entries) {
+          if (e.state === SCOPE.acquiring) continue
+          for (const [o, entries] of n.logs) {
+            let tail = 0
+            for (const x of entries) if (x.seq > tail && pathOf(x.rec)[0] === p) tail = x.seq
+            if (!tail) continue
+            let kept = false
+            for (const [, m] of sim.nodes) { if (m === n || m.client) continue; if (inLane(m, o, tail) || covers(m, o, p) >= tail) { kept = true; break } }
+            if (!kept) return `${uuid} left clean (R=${n.replicas}) while it alone held ('${p}', lane ${o}) up to seq ${tail} — the leave did not drain, that data goes with it`
+          }
+        }
+      }
+      //! a uuid that restarts and leaves again re-enters sim.left fresh (the scenario deletes its row): forget it too
+      for (const uuid of sim.nodes.keys()) if (!sim.left.has(uuid) && L.leftBefore(uuid) !== undefined) L.forgetLeft(uuid)
+      return null
+    },
+  },
+]
+
+//! SpokeWire (M10) — the digest exchange on every link that has a spoke at one end, as the sim sees it at the
+// sink: what r each digest the spoke sent carried (by its own link id), which of those each feeder reply
+// answers, and per node the digestIn rows read so far from its journal. Filled by the tap armScale chains.
+class SpokeWire {
+  //! spoke-side link id → r of each DIGEST the spoke sent on it, in order
+  sent = new Map                  ()
+  //! spoke-side link id → per DIGEST the feeder sent on it, in order: the index into `sent` of the spoke digest an
+  // r=0 answers (the feeder replies inside the step that handled it, so its digestIn count names it), -1 for r=1
+  answers = new Map                  ()
+  //! spoke → the resync it is in (the kernel's object) and, per link, the index of the first r=1 sent since it began
+  began = new Map                                                   ()
+  last = new Map                     ()
+  #din = new Map                                                ()
+  //! digestIns — how many digests node n has taken in on `link` (its journal's digestIn rows, read by cursor)
+  digestIns(n      , link        )         {
+    let c = this.#din.get(n)
+    if (!c) { c = { at: 0, per: new Map() }; this.#din.set(n, c) }
+    if (n.journal.n !== c.at) {
+      for (const e of n.journal.read(c.at)) if (e.kind === JK.digestIn) c.per.set(e.a          , (c.per.get(e.a          ) ?? 0) + 1)
+      c.at = n.journal.n
+    }
+    return c.per.get(link) ?? 0
+  }
+  push(m                       , link        , x        ) { let a = m.get(link); if (!a) { a = []; m.set(link, a) } a.push(x) }
+}
+const wires = new WeakMap                ()
+const wireOf = (sim     )            => { let w = wires.get(sim); if (!w) { w = new SpokeWire(); wires.set(sim, w) } return w }
+const digestR = (b            )         => { try { return ((new Frame(b).value                  ).r ?? 0) } catch { return -1 } }
+
+//! the M10 tap: one byte compare per frame; digests touching a spoke are decoded
+const spokeTap = (sim     , w           ) => (from        , to        , link        , peerLink        , _dialed         , b            ) => {
+  if (b[2] !== VERB.DIGEST) return
+  const fn = sim.nodes.get(from), tn = sim.nodes.get(to)
+  if (!fn || !tn) return
+  if (fn.client) {
+    const r = digestR(b)
+    w.push(w.sent, link, r)
+    if (r === 1 && fn.resync !== null) {
+      let st = w.began.get(fn)
+      if (!st || st.obj !== fn.resync) { st = { obj: fn.resync, first: new Map() }; w.began.set(fn, st) }
+      if (!st.first.has(link)) st.first.set(link, w.sent.get(link) .length - 1)
+    }
+  } else if (tn.client) w.push(w.answers, peerLink, digestR(b) === 0 ? w.digestIns(fn, link) - 1 : -1)
+}
+
+const resyncEnd = {
+  name: 'resync-end',
+  check: (sim     )                => {
+    const w = wires.get(sim)
+    if (!w) return null
+    for (const id of sim.stepped) {
+      const n = sim.nodes.get(id)
+      if (!n || !n.client) continue
+      const was = w.last.get(n) ?? null
+      w.last.set(n, n.resync)
+      if (was === null || n.resync !== null) continue
+      //! the resync ended in this step, on the primary's r=0 (node.ts: `else if (v.r === 0) this.#resyncEnd()`)
+      ledgerOf(sim).counts.resyncs++
+      const link = n.primary
+      if (link === null) continue
+      const j = w.digestIns(n, link)
+      const ans = w.answers.get(link)?.[j - 1]
+      if (ans === undefined || ans < 0) continue
+      const st = w.began.get(n)
+      const first = st && st.obj === was ? st.first.get(link) : undefined
+      if (first === undefined || ans < first)
+        return `${id}'s resync ended on link ${link} on the reply to its digest #${ans}, sent ${first === undefined ? 'before it asked this feeder for the re-download at all' : 'before the resync asked for the re-download (#' + first + ')'} — a stale reply: the re-download is still on its way`
+    }
+    return null
+  },
+}
+
+//! armScale — install the stage-0 monitors on a Sim (after cluster(), before the first run): turns the exec's watch on
+// (sim.stepped, sim.inflight), appends M1-M10 once and chains M10's tap onto sim.tap. Idempotent.
+export const armScale = (sim     )         => {
+  sim.watch = true
+  if (!sim.monitors.some((m) => m.name === 'stamp-oracle')) {
+    sim.monitors.push(...scaleMonitors(), resyncEnd)
+    const w = wireOf(sim), tap = spokeTap(sim, w), prev = sim.tap
+    sim.tap = prev === null ? tap : (f, t, l, pl, d, b) => { tap(f, t, l, pl, d, b); prev(f, t, l, pl, d, b) }
+  }
+  return ledgerOf(sim)
+}
+
+//! stampOracle — M1's HORIZON form (§6): each lawful holder's value or absence equals the V4-18 fold, by stamp,
+// of every committed record some LIVE node still contains-or-covers (a write that died with its only node is
+// a lost unconfirmed write, not a resurrection). Unscoped nodes and clients answer for every cell; an armed
+// node for the partitions it HOLDS (an orphan's copy is lawfully frozen); a spoke of a scoped cluster is skipped
+// (it sees its feeder's held subset only). converged() compares nodes to each
+// other and passes a UNIFORM resurrection; this does not.
+export const stampOracle = (sim     )                => {
+  const L = ledgerOf(sim)
+  L.scan(sim)
+  const live = [...sim.nodes.values()]
+  const counted = (e        )          => live.some((m) => inLane(m, e.origin, e.seq) || covers(m, e.origin, e.p) >= e.seq)
+  const win = new Map                ()
+  for (const e of L.recs.values()) {
+    if (!counted(e)) continue
+    const w = win.get(e.cell)
+    if (!w || newer(e.epoch, e.seq, e.origin, w)) win.set(e.cell, e)
+  }
+  const expect = new Map                ()
+  for (const [cell, w] of win) {
+    if (isRemove(w.rec)) continue
+    let swept = false
+    for (const a of ancestorKeys(w.path)) { const wa = win.get(a); if (wa && newer(wa.epoch, wa.seq, wa.origin, w)) { swept = true; break } }
+    if (!swept) expect.set(cell, w)
+  }
+  //! a spoke of a SCOPED cluster sees its feeder's held subset only (write.ts: the tap carries the feeder's held
+  // partitions; STATUS "spokes subscribe to what they watch" is the idea that changes it), so it owes no whole
+  // fold here; the per-event form (stamp-oracle) still checks every cell it shows against its applied fence
+  const scoped = [...sim.nodes.values()].some((n) => n.armed)
+  for (const [id, n] of sim.nodes) {
+    if (scoped && n.client) continue
+    const mine = (cell        )          => !n.armed || n.scope .held((JSON.parse(cell)            )[0] ?? '')
+    for (const [cell, w] of expect) {
+      if (!mine(cell)) continue
+      if (!n.state.has(cell)) return `${id} lacks ${cell}, which the fold of every committed record by stamp sets to ${clip(stable(w.rec.value))} (@${stampOf(w)})`
+      if (stable(n.state.get(cell)) !== stable(w.rec.value)) return `${id} shows ${cell} = ${clip(stable(n.state.get(cell)))}; the fold by stamp says ${clip(stable(w.rec.value))} (@${stampOf(w)})`
+    }
+    for (const cell of n.state.keys()) {
+      if (expect.has(cell) || !mine(cell)) continue
+      const w = win.get(cell)
+      return `${id} shows ${cell} = ${clip(stable(n.state.get(cell)))}, which the fold by stamp ${w ? 'removes (@' + stampOf(w) + ')' : 'never wrote'} — resurrected`
+    }
+  }
+  return null
+}
+
+//! floorsAgree — M7's horizon form: at a quiet point every partition's holders report equal floors on every lane.
+export const floorsAgree = (sim     )                => {
+  const nodes = [...sim.nodes.entries()].filter(([, n]) => n.scope && n.armed)
+  if (nodes.length < 2) return null
+  const epochs = new Set(nodes.map(([, n]) => n.epoch))
+  if (epochs.size > 1) return `floorsAgree: armed nodes disagree on the epoch (${[...epochs].join(',')}) — not quiescent`
+  const [, first] = nodes[0]
+  const ring = first.writes.ring
+  if (ring.epoch !== first.epoch) ring.build(first.epoch, first.membership.view.members)
+  const parts = new Set        ()
+  for (const [, n] of nodes) for (const [p, e] of n.scope .entries) if (e.state === SCOPE.held) parts.add(p)
+  for (const p of parts) {
+    const holders = nodes.filter(([, n]) => n.scope .held(p) && ring.holdsAny(n.uuid, p, n.replicas))
+    if (holders.length < 2) continue
+    const lanes = new Set        ()
+    for (const [, h] of holders) for (const [o, d] of h.streams) if ((d.parts?.get(p)?.s ?? 0) > 0) lanes.add(o)
+    for (const o of lanes) {
+      const fl = holders.map(([id, h]) => `${id}=${h.streams.get(o)?.parts?.get(p)?.s ?? 0}`)
+      if (new Set(fl.map((x) => x.split('=')[1])).size > 1) return `holders of '${p}' disagree on the floor for lane ${o}: ${fl.join(' ')}`
+    }
+  }
+  return null
+}
+
+//! boundedLogs — M8's horizon form (I12): at every armed node every lane holds at most winners + compactAt
+// entries, and every tombstone is fenced (a live row still needs it) or pinned by a named uuid. No pin surface
+// exists today, so an unfenced tombstone reads as unbounded: RED TODAY wherever a scoped run removed a cell or
+// a lane outgrew compactAt. The sweep pins the count of red seeds; stage 3 and stage 4 flip them.
+export const boundedLogs = (sim     )                => {
+  let worst                = null, worstBy = 0
+  for (const [id, n] of sim.nodes) {
+    if (!n.armed) continue
+    for (const [o, entries] of n.logs) {
+      let winners = 0
+      for (const e of entries) { const v = n.versions.get(JSON.stringify(pathOf(e.rec))); if (v && v.origin === o && v.seq === e.seq && v.epoch === e.epoch) winners++ }
+      const over = entries.length - (winners + n.tune.compactAt)
+      if (over > worstBy) { worstBy = over; worst = `${id} lane ${o} holds ${entries.length} entries: ${winners} winners + compactAt ${n.tune.compactAt}, ${over} over — unbounded` }
+    }
+  }
+  if (worst) return worst
+  for (const [id, n] of sim.nodes) {
+    if (!n.armed) continue
+    for (const [k, v] of n.versions) if (!n.state.has(k) && !n.fenced(k)) return `${id} holds the tombstone of ${k} @${stampOf(v)}, neither fenced nor pinned by a named uuid`
+  }
+  return null
+}

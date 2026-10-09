@@ -129,6 +129,18 @@ export class Scope {
     return 1
   }
 
+  //! expects — will a live record for p FOLD here (now or after an open latch)? verdict() without the mint
+  // and without a side effect: held or acquiring, or absent and assigned (the arrival would mint held).
+  // An orphan, or a partition the ring gives to others, never folds here — the write pipeline reads this
+  // to know when an attempt's commit can only be learned from its WACK (the `acked` effect, env.ts).
+  expects(node      , p        )          {
+    const e = this.entries.get(p)
+    if (e !== undefined) return e.state !== SCOPE.orphan
+    const ring = node.writes.ring
+    if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    return ring.holdsAny(node.uuid, p, node.replicas)
+  }
+
   //! stage — buffer one live record for a latched partition (verdict 2). Overflow aborts the latch —
   // safe because nothing has folded; the next offer re-ships everything above the learner's marks.
   // The bound reads the O(1) liveN counter (M6-review findings 17/24 — the full-buffer filter per
@@ -161,7 +173,7 @@ export class Scope {
     if (node.epoch > 0 && ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
     for (const k of node.state.keys()) this.#ensure(node, keyPartition(k))
     for (const k of node.versions.keys()) this.#ensure(node, keyPartition(k))
-    for (const entries of node.logs.values()) for (const e of entries) this.#ensure(node, partitionOf(e.rec))
+    for (const p of node.byPart .keys()) this.#ensure(node, p) // the partition census through the index (stage 1): O(partitions), not O(entries)
     const j = node.journal
     for (const [p, e] of this.entries) {
       const assigned = ring.holdsAny(node.uuid, p, node.replicas)
@@ -182,6 +194,9 @@ export class Scope {
       //! orphan re-assigned (H2's A leg): stays FROZEN — the lawful re-entry is an acquiring latch
       // (delta above the frozen tails) opened by the next handshake round, never a silent un-freeze
     }
+    //! a cleared write whose record was expected here but whose partition just left this node (an
+    // aborted latch, a new orphan, an unassigned partition) settles from its WACK now (write.ts #awaiting)
+    node.writes.rescoped(node)
     //! THE ARMING TRUING (pre-arm inheritance, the no-bypass rule's door 3): the FIRST armed rescope
     // of a life BORN AT EPOCH 0 trues every entry's floors to its lane tails — epoch-0 replication
     // is full-broadcast, so tails are complete-by-construction and the claim is sound. Without it
@@ -276,13 +291,17 @@ export class Scope {
   }
 
   //! tailsOf — per-lane CONTENT tails for p (max seq actually present): the shed evidence. Captured
-  // once at each orphan transition (orphan lanes are frozen — the gate drops, the stamp parks).
+  // once at each orphan transition (orphan lanes are frozen — the gate drops, the stamp parks). Through
+  // the per-partition index (DESIGN-SCALE stage 1): each (lane, p) array is ascending, so the tail is
+  // its last entry — O(lanes), never a walk of every entry the node holds. Lanes are visited in
+  // node.logs order, as before, so the record's key order is unchanged.
   #tailsOf(node      , p        )                         {
     const out                         = {}
-    for (const [origin, entries] of node.logs) {
-      let tail = 0
-      for (const x of entries) if (x.seq > tail && partitionOf(x.rec) === p) tail = x.seq
-      if (tail > 0) out[origin] = tail
+    const per = node.byPart .get(p)
+    if (per === undefined) return out
+    for (const origin of node.logs.keys()) {
+      const arr = per.get(origin)
+      if (arr !== undefined && arr.length) out[origin] = arr[arr.length - 1].seq
     }
     return out
   }
@@ -482,10 +501,18 @@ export class Scope {
     const e = this.entries.get(p)
     if (!e || e.state === SCOPE.acquiring) return // nothing to teach / mid-latch ourselves
     let n = 0
-    for (const [origin, entries] of node.logs) {
+    //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p, only its
+    // entries — the ship is O(entries of p), not O(entries of the node). Lane order is node.logs order,
+    // as before, so the frames leave in the same order they always did.
+    const per = node.byPart .get(p)
+    for (const origin of node.logs.keys()) {
+      const entries = per?.get(origin)
+      if (entries === undefined) continue
       const above = marks[origin] ?? 0
-      const ship = entries.filter((x) => x.seq > above && partitionOf(x.rec) === p)
-      if (!ship.length) continue
+      let lo = 0, hi = entries.length
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (entries[mid].seq <= above) lo = mid + 1; else hi = mid }
+      if (lo === entries.length) continue
+      const ship = lo === 0 ? entries : entries.slice(lo)
       //! stored pp rides the teach (the floor law): the learner's post-fold lane re-ships to OTHERS
       // with intact chain evidence. The fold itself trusts the CUT, not the chain.
       const runs = ship.map((x) => ({ rec: x.rec, origin, seq: x.seq, epoch: x.epoch, iss: x.iss, cid: x.cid, pp: x.pp }))
@@ -548,8 +575,9 @@ export class Scope {
       if (s.iss) { entry.iss = s.iss; entry.cid = s.cid }
       if (s.pp !== undefined && s.pp >= 0) entry.pp = s.pp
       lane.splice(lo, 0, entry)
+      node.indexInsert(s.origin, entry)
       node.apply(s.rec, s.origin, s.seq, s.epoch, s.iss, s.cid)
-      if (s.iss) node.writes.remember(node, s.iss, s.cid , s.seq, s.epoch)
+      if (s.iss) node.writes.remember(node, s.iss, s.cid , s.seq, s.epoch, s.origin) // the lane too: a dup WACK from here must name it
     }
     //! floors and fences advance to the CUT (the teacher's attestation), never past it on the
     // teacher's word; the scalar fence merges up so replayed-live below the cut dedups
@@ -612,8 +640,7 @@ export class Scope {
     const e = this.entries.get(p)
     if (!e || e.state !== SCOPE.acquiring) return
     node.journal.armed && node.journal.emit(JK.acquireAbort, p, reason)
-    let residue = false
-    for (const entries of node.logs.values()) if (entries.some((x) => partitionOf(x.rec) === p)) { residue = true; break }
+    const residue = node.byPart .has(p) // the index holds p iff some lane holds an entry of p
     this.n++
     if (residue) {
       e.state = SCOPE.orphan
@@ -632,6 +659,9 @@ export class Scope {
     //! either leg changes the boot record's lists (an abort-to-orphan joins orphanParts; a clean
     // drop leaves both) — persist so a crash in the window classifies correctly (finding 31's class)
     if (node.durable) node.persistBoot()
+    //! no write settlement here (write.ts rescoped): a clean drop keeps the duty and the next latch brings
+    // the record; an abort to orphan only befalls an acquiring OWNER (the residue is its own commits), whose
+    // attempts never wait on a WACK. The install's rescope above is the one place the scope leaves a writer.
   }
 
   //! evaluateSheds — THE STATELESS SHED DECISION (C3, D1's graft), re-based onto CONTENT TAILS by
@@ -672,16 +702,34 @@ export class Scope {
     this.entries.delete(p)
     this.n++
     if (node.durable) node.persistBoot()
-    for (const [origin, entries] of node.logs) {
-      const kept = entries.filter((x) => partitionOf(x.rec) !== p)
-      if (kept.length !== entries.length) { dropped += entries.length - kept.length; node.logs.set(origin, kept) }
-      node.streams.get(origin)?.parts?.delete(p)
+    //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p are touched, and
+    // each of those is filtered whole (a lane is an array, so taking entries out of it is O(that lane)
+    // whatever the index says — the index saves the lanes with nothing of p and the version-key parse,
+    // not the filter; the stage-1 skeptic's reading). A filtered subsequence of an ascending lane stays
+    // ascending. p's floors leave EVERY stream, lane or no lane: the old walk ran over node.logs, so a
+    // stream with no lane at all (a floor learned from a cut, with no record of that origin) kept it.
+    const per = node.byPart .get(p)
+    if (per !== undefined) {
+      for (const [origin, gone] of per) {
+        const entries = node.logs.get(origin)
+        if (entries === undefined) continue
+        dropped += gone.length
+        node.logs.set(origin, gone.length === entries.length ? [] : entries.filter((x) => partitionOf(x.rec) !== p))
+      }
+      node.byPart .delete(p)
     }
+    for (const [, d] of node.streams) d.parts?.delete(p)
     //! the cells of p are its row cell plus the deep index's field cells (V4-18: live fields and the
-    // tombstones a live row fences — dropCell unlinks each) — no full scan
-    node.dropCell(JSON.stringify([p]))
-    for (const k of node.fields(p)) node.dropCell(k)
-    for (const k of [...node.versions.keys()]) if (keyPartition(k) === p) node.versions.delete(k)
+    // tombstones a live row fences — dropCell unlinks each) — no full scan. Its versions are those cells'
+    // plus the tombstone index's (every stamp of p with no live value) — never a parse of every key.
+    const fields = node.fields(p)
+    const row = JSON.stringify([p])
+    node.dropCell(row)
+    for (const k of fields) node.dropCell(k)
+    node.versions.delete(row)
+    for (const k of fields) node.versions.delete(k)
+    const tombs = node.tombs .get(p)
+    if (tombs !== undefined) { for (const k of tombs) node.versions.delete(k); node.tombs .delete(p) }
     node.journal.armed && node.journal.emit(JK.shed, p, dropped)
     if (node.durable) node.snapshot()
   }

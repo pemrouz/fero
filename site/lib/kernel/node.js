@@ -42,6 +42,11 @@ import { REC, TAG, partitionOf,                                } from './env.js'
 // would be an import cycle); re-exported under their old names for the tests and tools that import them
 export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.js'
 
+//! LogEntry: one lane entry — the record with its stamp, the attempt identity it committed from (iss/cid,
+// when it did) and its (origin, partition) predecessor pp (armed senders only). The lanes and the
+// per-partition index (byPart) hold the SAME objects.
+                                                                                                        
+
 //! NodeOpts: explicit boot facts — no config-shape sniffing (v2's hasPeers heuristic is banned by plan §9).
                            
               
@@ -96,6 +101,17 @@ export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.
                                                                                                    
                                                                                                        
                                         
+                                                                                                            
+                                                                                                            
+                                                                                                          
+                                                                                                            
+                                                                                                        
+                                                                                                         
+                                                                                                          
+                                                                                                      
+                                                                                                           
+                                                                                                          
+                                     
                                                                                                      
                                                                                              
                                                                                                         
@@ -106,7 +122,10 @@ export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.
                                                                                                      
                                                                                                    
                        
-                                                                                                   
+                                                                                                         
+                                                                                                        
+                                                                                                      
+                             
                                                                                                       
                                                                                                        
                                                                                                   
@@ -196,7 +215,20 @@ export class Node {
   // Entries retain the ATTEMPT identity (iss/cid) of committed forwarded writes
   // so anti-entropy re-ships it — a healed or future owner rebuilds its dedup
   // window from the log stream itself (M3's ownership-move exactly-once story).
-  logs = new Map                                                                                             ()
+  logs = new Map                    ()
+  //! byPart (DESIGN-SCALE stage 1, M4): partition → lane → that lane's (lane, p) entries, seq-ascending, the
+  // SAME objects the lanes hold. Scoped nodes only (null at R=∞: every site pays one null check, nothing
+  // else — unscoped bytes and trajectories are untouched). Every site that puts an entry in a lane, takes one
+  // out, or replaces a lane keeps it in step: commit (below), inbound/splice/replay (write.ts), the ACQDONE
+  // fold and the shed (scope.ts), compact (log.ts), #resetFold. The hand-over paths read it instead of
+  // walking every lane: #teach, #tailsOf, #abort, #shed and rescope's partition census are O(entries of p),
+  // not O(entries of the node). The sim's M4 index-oracle re-derives it from the lanes after every event.
+  byPart                                              = null
+  //! tombs (the same stage): partition → the cells whose version is a TOMBSTONE (a stamp with no live value:
+  // a remove's, or a field a parent write swept). Scoped nodes only. Kept by apply (the remove arm, the sweep,
+  // a cell written live again), tombstone GC, the shed and #resetFold; the shed drops a partition's versions
+  // through it instead of parsing every key the node holds.
+  tombs                                  = null
   //! M6 pp (the floor law): the last seq this life stamped per partition — the sub-stream
   // predecessor the NEXT own-lane stamp carries. Fed on every scoped commit (epoch 0 included) and
   // NEVER cleared by shed (a shed-then-reassigned same-life owner must not re-stamp pp=0 over its
@@ -232,7 +264,8 @@ export class Node {
   // revives, or counts a parked target, and #redial drops the entry the moment it is consulted
   //! member (2026-10-08): the chain started by the death of an ADMITTED MEMBER link — a crashed member.
   // It is capped at tune.memberRedials (never more than tune.redials); every other chain at tune.redials.
-  // Set on a FRESH chain only: a chain already running when the member link dies keeps its cap.
+  // A member link's death always leaves the member chain: a generic chain or an orphaned timer already
+  // pointed at the target is cancelled and the member chain starts fresh (#redial); a member chain keeps going.
   #backoff = new Map                                                                                             ()
   //! highest incarnation ever identified per peer uuid — a HELLO above it means the peer was REBORN,
   // and every evidence mark its previous life announced is void (confirm.forget; see that banner).
@@ -313,10 +346,13 @@ export class Node {
         for (const [p, sd] of Object.entries(parts)) {
           if (this.bootDirty.has(p)) continue
           const pe = this.streams.for(origin).part(p)
-          pe.s = sd[0]
+          //! capped at the durable floor (DESIGN-SCALE §2, the A4 seed probe): the boot record is written
+          // synchronously while WAL rows are fsynced later, so its possession half can claim rows a crash
+          // tore off. Only `d` is backed by rows the disk restored; replay advances `s` from there.
+          pe.s = Math.min(sd[0], sd[1])
           pe.d = sd[1]
         }
-    if ((opts.replicas ?? 0) > 0) this.scope = new Scope() // (this.#opts assigns below — read opts directly)
+    if ((opts.replicas ?? 0) > 0) { this.scope = new Scope(); this.byPart = new Map(); this.tombs = new Map() } // (this.#opts assigns below — read opts directly)
     //! the Lamport floor from the boot record: even if the WAL tail was torn, the clock never restarts
     // below the last durably-recorded stamp (seq reuse under one origin would collide provenance)
     this.seq = opts.boot?.lamport ?? 0
@@ -341,6 +377,10 @@ export class Node {
   //! validate — the relay-ingress admission predicate (see NodeOpts.validate). Absent ⇒ every relayed
   // record is admitted; onWrite's relay branch pays one undefined-check per FRAME, nothing per record.
   get validate()                                            { return this.#opts.validate }
+
+  //! admit — the owner's re-check of a forwarded remove under a row (see NodeOpts.admit). Read on the
+  // forwarded leg of onWrite, armed only; absent ⇒ no re-check.
+  get admit()                                            { return this.#opts.admit }
 
   //! door — the secret's two functions (see NodeOpts.door). Absent ⇒ the open door: the HELLO path pays
   // one undefined-check per HELLO and per linkUp, nothing per record.
@@ -394,6 +434,16 @@ export class Node {
   // (the feederOpen shape above) could never be refilled. False with no primary, or an old server that
   // sends no `m`: the write then takes the round trip and the relay's door refuses it as before.
   get feederMethodsOnly()          { return this.primary !== null && (this.links.get(this.primary)?.methodsOnly ?? false) }
+  //! feederContract (DESIGN-SCALE stage 1) — the PRIMARY's HELLO contract (`c`), read live off the primary
+  // link for the same reason as feederMethodsOnly. The api reads `replicas=` out of it: a client of a
+  // SCOPED feeder sees only the partitions its feeder holds, so a row absent from its fold may well live
+  // at an owner, and a delete of it is a real remove to send. With NO primary (every server link down —
+  // an outage, a redial in progress) it is the LAST primary's contract (#feederLast, set at each election):
+  // the fold is still that feeder's shard, and a delete queued for the reconnect must still be judged by
+  // it (the stage-1 review's second pass: the live read alone said "no contract ⇒ local" and the lens
+  // swallowed the delete). Undefined before the first primary, or from an old server that sends none.
+  get feederContract()                     { return this.primary !== null ? this.links.get(this.primary)?.contract : this.#feederLast }
+  #feederLast         
 
   //! clientLinks — the admitted CLIENT links this node serves (maintained at HELLO/linkDown). The
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
@@ -734,7 +784,7 @@ export class Node {
           this.primary = null
           this.feederOpen = null
           for (const l of this.links.values())
-            if (l.state === LS.admitted && !l.dead) { this.primary = l.id; break }
+            if (l.state === LS.admitted && !l.dead) { this.primary = l.id; this.#feederLast = l.contract; break }
           if (this.primary !== null) {
             this.#sendDigest(this.links.get(this.primary) , 1)
             this.writes.repark(this)
@@ -896,6 +946,7 @@ export class Node {
         if (this.armed) entry.pp = pp
       }
       this.logFor(this.origin).push(entry) // the record is OWNED from here (embedder hands it over)
+      this.indexAppend(this.origin, entry)
       this.apply(rec, this.origin, seq, this.epoch, entry.iss, entry.cid)
       j.armed && j.emit(JK.writeLocal, seq, rec.key[0] ?? rec.at ?? '')
       //! the own lane's ladder advances at the stamp site: applied+shippable together (logged and
@@ -1046,6 +1097,8 @@ export class Node {
   // (a wiped fold has no splices left to protect). Emits NOTHING downstream — the callers decide.
   #resetFold() {
     this.logs.clear()
+    this.byPart?.clear()
+    this.tombs?.clear()
     this.state.clear()
     this.versions.clear()
     this.deep.clear()
@@ -1158,17 +1211,44 @@ export class Node {
   // sim's event queue (and a real process's timer wheel) alive forever; it is
   // journal-visible, and the heartbeat tick revives a given-up target (so with
   // heartbeats on, one exhausted chain re-arms per heartbeat interval, bounded).
-  // A successful identify resets the counter. `member` marks a FRESH chain as a crashed member's
-  // (the short cap, tune.memberRedials); an existing chain keeps whatever it was.
+  // A successful identify resets the counter. `member` asks for a crashed member's chain (the short
+  // cap, tune.memberRedials): anything else pointed at the target gives way to it; a member chain keeps going.
   #redial(to        , member = false) {
     if (this.destroyed) return
     const base = this.#opts.redialMs ?? 100
     const t = this.tune
-    const b = this.#backoff.get(to) ?? { ms: base, tries: 0, member }
+    const cur = this.#backoff.get(to)
+    let b = cur ?? { ms: base, tries: 0, member }
     //! a PARKED target (discover forgot it while a link/dial still named it): the chain ends here and
     // the entry goes with it — no timer, no revival, nothing left to grow (#backoff stays bounded by
     // the live link set, not by every address a port-0 server ever had)
     if (b.parked) { this.#backoff.delete(to); return }
+    //! a dead MEMBER's chain is ALWAYS the member chain (V4-20's clock). Whatever else is pointed at the
+    // target when the member link dies is not that chain: a timer an identify orphaned (the identify
+    // deletes the entry, not the timer — up to 32 × base away), or a GENERIC chain a stray dial started
+    // while the member link was still up (on the open path the peer closes my duplicate dial before I
+    // identify it). Letting that one own the target delayed the eviction by up to 3.2 s, or brought back
+    // the 10-try chain and the 20 s eviction (review, 2026-10-09). So: cancel it and start the member
+    // chain fresh, at the base delay. A chain that is ALREADY the member chain is never restarted (the
+    // rule below: a second linkDown arms nothing) — restarting it would lengthen it.
+    if (member && !cur?.member) {
+      for (const [id, m] of this.#timers) if (m.tag === TAG.redial && m.to === to) { this.#timers.delete(id); this.env.sink.cancel(id) }
+      b = { ms: base, tries: 0, member: true }
+    }
+    //! a timer already pending toward this target OWNS it (the view install's rule, membership.ts): a
+    // second linkDown naming the same address — the dialed link's `to` and the accepted link's gossiped
+    // listen when a crossing pair is cut, a late refused dial — arms nothing. It used to arm a second
+    // timer line on the same entry, and the two lines shared the tries, so the chain (and the eviction
+    // hold it carries) gave up in about half its time; at the cap it marked the target given up while
+    // the final attempt was still pending, and the revival dialed over it. One chain, its own tries.
+    //! a call that finds an orphaned timer (no entry: an identify reset the chain) writes the entry, so
+    // dialing() holds while that timer is out; when its dial fails, the chain's tries arm from tries 0.
+    // Since the member rule above, only a NON-member linkDown gets here: the entry keeps the view install
+    // (membership.ts) from dialing over the orphan, a crossing dial on a live peer.
+    else for (const m of this.#timers.values()) if (m.tag === TAG.redial && m.to === to) {
+      if (!cur) this.#backoff.set(to, b)
+      return
+    }
     if (b.tries >= (b.member ? Math.min(t.memberRedials, t.redials) : t.redials)) {
       //! the final ARMED attempt has now FAILED — only here does the target become truly parked
       if (!b.gaveUp) {
@@ -1231,6 +1311,7 @@ export class Node {
     link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
     if (r === 1) { link.client = true; this.clientLinks.add(link) }
     link.methodsOnly = m === 1 // the hint (§4): a client reads it live off its primary (feederMethodsOnly)
+    if (typeof v.c === 'string') link.contract = v.c // the contract as sent: a client reads it live off its primary (feederContract)
     link.state = LS.admitted
     if (link.proveTimer !== -1) this.#unprove(link) // the door is behind us: the deadline and the stash go (step 13)
     this.byUuid.set(v.u, link.id)
@@ -1264,7 +1345,7 @@ export class Node {
     // synced never rises there and this client has ONE feeder: per-origin ordering by construction.
     // A server never opens toward a client: the client's own r=1 is what syncs that link.
     if (this.client) {
-      if (this.primary === null) { this.primary = link.id; this.#sendDigest(link, 1) }
+      if (this.primary === null) { this.primary = link.id; this.#feederLast = link.contract; this.#sendDigest(link, 1) }
     } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
     //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
     // membership converges even when no epoch-stamped records flow; then settle — an admitted member
@@ -1779,10 +1860,75 @@ export class Node {
 
   //! logFor — per-origin log accessor (get-or-create). Kernel-internal: called by commit above and by
   // the write module's inbound ingest (source=inbound lives in kernel/write.ts with the other sources).
-  logFor(origin        )                                                                         {
+  logFor(origin        )             {
     let l = this.logs.get(origin)
     if (!l) { l = []; this.logs.set(origin, l) }
     return l
+  }
+
+  //! ── the per-partition index (byPart, scoped only — each call is one null check unscoped) ──
+  //! indexAppend — an entry that went on a lane's TAIL: its seq is above every entry of that lane, so it
+  // goes on the tail of its (lane, p) array too (ascending by construction).
+  indexAppend(origin        , e          ) {
+    const idx = this.byPart
+    if (idx === null) return
+    const p = partitionOf(e.rec)
+    let per = idx.get(p)
+    if (per === undefined) idx.set(p, per = new Map())
+    const arr = per.get(origin)
+    if (arr === undefined) per.set(origin, [e])
+    else arr.push(e)
+  }
+
+  //! indexInsert — an entry spliced into a lane's INTERIOR (the dual fence, a fold, a replayed interior
+  // row): binary search by seq in its (lane, p) array keeps that array ascending like the lane.
+  indexInsert(origin        , e          ) {
+    const idx = this.byPart
+    if (idx === null) return
+    const p = partitionOf(e.rec)
+    let per = idx.get(p)
+    if (per === undefined) idx.set(p, per = new Map())
+    const arr = per.get(origin)
+    if (arr === undefined) { per.set(origin, [e]); return }
+    let lo = 0, hi = arr.length
+    while (lo < hi) { const mid = (lo + hi) >>> 1; if (arr[mid].seq < e.seq) lo = mid + 1; else hi = mid }
+    arr.splice(lo, 0, e)
+  }
+
+  //! indexDrop — entries that LEFT a lane (compaction, a shed's filter, a test's injected drop): removed by
+  // identity from their (lane, p) arrays; an emptied array leaves the map, an emptied partition too.
+  indexDrop(origin        , dropped            ) {
+    const idx = this.byPart
+    if (idx === null || dropped.length === 0) return
+    const gone = new Set(dropped)
+    const parts = new Set        ()
+    for (const e of dropped) parts.add(partitionOf(e.rec))
+    for (const p of parts) {
+      const per = idx.get(p)
+      const arr = per?.get(origin)
+      if (per === undefined || arr === undefined) continue
+      const kept = arr.filter((e) => !gone.has(e))
+      if (kept.length) per.set(origin, kept)
+      else { per.delete(origin); if (per.size === 0) idx.delete(p) }
+    }
+  }
+
+  //! tombAdd / tombDrop — the tombstone index (tombs, scoped only). tombDrop parses the key: a cold path
+  // (tombstone GC, the sim's injected drop); apply's sites pass the partition they already hold.
+  tombAdd(p        , k        ) {
+    const t = this.tombs
+    if (t === null) return
+    let s = t.get(p)
+    if (s === undefined) t.set(p, s = new Set())
+    s.add(k)
+  }
+  tombDrop(k        ) {
+    const t = this.tombs
+    if (t === null) return
+    const path = JSON.parse(k)            
+    const p = path.length ? path[0] : ''
+    const s = t.get(p)
+    if (s !== undefined && s.delete(k) && s.size === 0) t.delete(p)
   }
 
   //! #sendDigest — announce {origin: highestHeldSeq} (the log tails: exactly what this node can serve).
@@ -1854,11 +2000,13 @@ export class Node {
     if (rec.type === REC.remove) {
       this.state.delete(k)
       this.#entryHash.delete(k)
+      if (this.tombs !== null) this.tombAdd(path[0], k) // the tombstone index (scoped only)
     } else {
       this.state.set(k, rec.value)
       const h = fnv(k + '' + stable(rec.value))
       this.#entryHash.set(k, h)
       this.#hash = (this.#hash + h) | 0
+      if (this.tombs !== null) { const s = this.tombs.get(path[0]); if (s !== undefined && s.delete(k) && s.size === 0) this.tombs.delete(path[0]) } // live again
     }
     //! the index: a field cell — live, or the tombstone a field remove leaves — goes under each ancestor
     if (above !== null)
@@ -1887,6 +2035,7 @@ export class Node {
           this.journal.armed && this.journal.emit(JK.subsumed, vc.origin, vc.seq, 1)
         }
         this.versions.set(c, stamp)
+        if (this.tombs !== null) this.tombAdd(path[0], c) // swept: a stamp with no value is a tombstone
         this.unlink(c)
       }
     }
