@@ -160,6 +160,8 @@ test('a DIALED target that hangs up mid-handshake WITHOUT a notice is a link los
   })
   const x = await hangup('xx'), y = await hangup('yy'), z = await hangup('zz', true)
   let m: Fero | null = null
+  //! the raw hosts close on EVERY path (the `.finally` below): left open after a failed assertion they keep the event
+  // loop alive and the file never exits — a hang in the battery instead of a red line
   const lines = await stderrOf(async () => {
     try {
       m = await fero('tcphangup', { uuid: 'aa', server: true, hosts: [x.addr, y.addr, z.addr], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S })
@@ -170,8 +172,7 @@ test('a DIALED target that hangs up mid-handshake WITHOUT a notice is a link los
       assert.ok(doorRows(m!).every(([r, c]) => r === 'refused' && c === z.addr), `no row for a bare hang-up — every row is the notice-sender's: ${JSON.stringify(doorRows(m!))}`)
       assert.ok(rows(m!, JK.giveUp).some((e) => e.a === x.addr) || rows(m!, JK.redial).filter((e) => e.b === x.addr).length >= 3, 'the silent host runs the redial chain, not a park')
     } finally { await m?.destroy() }
-  })
-  x.close(); y.close(); z.close()
+  }).finally(() => { x.close(); y.close(); z.close() })
   assert.deepEqual(lines, [`fero('tcphangup'): refused ${z.addr} — it refused this node's proof (the secrets probably differ)`], `one line, for the one host that refused; none for a hang-up: ${JSON.stringify(lines)}`)
   assert.ok(!lines.join('\n').includes(S))
 })
