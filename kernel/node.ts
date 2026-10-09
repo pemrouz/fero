@@ -1224,7 +1224,16 @@ export class Node {
     // timer line on the same entry, and the two lines shared the tries, so the chain (and the eviction
     // hold it carries) gave up in about half its time; at the cap it marked the target given up while
     // the final attempt was still pending, and the revival dialed over it. One chain, its own tries.
-    for (const m of this.#timers.values()) if (m.tag === TAG.redial && m.to === to) return
+    //! but a call that finds NO entry still starts a fresh chain, and the entry is written here: a
+    // successful identify deletes the entry and leaves an older chain's timer pending, so a member link
+    // that dies right after a reconnect lands here. Without the entry its `member` mark was lost (the old
+    // timer's failed dial then started the 10-try chain, eviction in about 20 s, not 3.4 — V4-20) and
+    // dialing() was false, so eviction was not held while that timer was out. The pending timer is one
+    // extra try; when its dial fails, the chain's own tries arm from this entry (tries 0).
+    for (const m of this.#timers.values()) if (m.tag === TAG.redial && m.to === to) {
+      if (!this.#backoff.has(to)) this.#backoff.set(to, b)
+      return
+    }
     if (b.tries >= (b.member ? Math.min(t.memberRedials, t.redials) : t.redials)) {
       //! the final ARMED attempt has now FAILED — only here does the target become truly parked
       if (!b.gaveUp) {

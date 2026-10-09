@@ -361,6 +361,40 @@ test('two linkDowns toward one target arm ONE redial chain: a timer already pend
   assert.deepEqual(redialTimers().map((t) => t[3]), [10, 20, 40, 80, 160, 320, 320, 320, 320, 320], 'the one chain\'s own curve: ×2 per try, capped at 32 × base (rng pinned to 0)')
 })
 
+test('a member that dies right after a reconnect, while an older chain\'s timer is still pending, gets the short member chain and holds eviction', () => {
+  //! the review race (2026-10-09): a successful identify deletes the backoff entry but leaves the old
+  // chain's timer pending. When the member link then died, the one-chain guard returned before writing
+  // any entry, so the `member` mark was lost and dialing() was false; the old timer's failed dial then
+  // started the generic 10-try chain, and eviction took about 20 s instead of about 3.4 s (V4-20).
+  const { node, of } = harness('aa', { redialMs: 10, hosts: ['sim:bb'], boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb']] } })
+  node.step({ kind: 'start' })
+  node.step({ kind: 'linkDown', link: 900, reason: 'refused', to: 'sim:bb' }) // bb unreachable: a generic chain, one timer out
+  const redialTimers = () => of('timer').filter((x) => x[2] === TAG.redial)
+  assert.equal(redialTimers().length, 1)
+  //! bb comes back and dials US first: admitted, and the identify resets the entry — the old timer stays out
+  node.step({ kind: 'linkUp', link: 60, dialed: false })
+  node.step({ kind: 'bytesIn', link: 60, bytes: hello('bb') })
+  assert.equal(node.links.get(60)!.state, LS.admitted)
+  assert.ok(!node.dialing('sim:bb'), 'the identify reset the chain')
+  //! bb crashes now: a dead MEMBER link, while the old timer is still pending
+  const rows0 = node.journal.read().filter((e) => e.kind === JK.redial).length
+  node.step({ kind: 'linkDown', link: 60, reason: 'cut' })
+  assert.equal(redialTimers().length, 1, 'still one timer line — the pending timer owns the target')
+  assert.ok(node.dialing('sim:bb'), 'eviction is held while the pending timer is out')
+  //! run it out: the old timer fires and fails, then the chain's own tries
+  let fired = 0
+  const gaveUp = () => node.journal.read().some((e) => e.kind === JK.giveUp && e.a === 'sim:bb')
+  while (!gaveUp() && fired < redialTimers().length) {
+    const t = redialTimers()[fired++]
+    node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    node.step({ kind: 'linkDown', link: 910 + fired, reason: 'refused', to: 'sim:bb' })
+  }
+  assert.ok(gaveUp())
+  assert.equal(node.journal.read().filter((e) => e.kind === JK.redial).length - rows0, 5, 'the member chain: memberRedials tries after the crash, not the generic ten')
+  assert.equal(fired, 6, 'the old pending timer, then the member chain\'s five')
+  assert.ok(!node.dialing('sim:bb'), 'the chain ended — the eviction hold is released')
+})
+
 test('the floor is silent on a paused link; a digest arriving mid-pause defers its suffix to drain', () => {
   //! adversarial-review regression: control frames queued into a drop-oldest queue are doomed work,
   // and serialising the missing suffix per inbound digest during a pause is O(suffix) discarded per
