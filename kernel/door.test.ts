@@ -767,6 +767,36 @@ test('the crossing dial, secured: both dial each other, both links prove, the ke
   assert.equal(a.node.links.get(1)!.state, LS.admitted); assert.equal(b.node.links.get(2)!.state, LS.admitted)
 })
 
+test('the crossing dial, secured, the LOSER\'s close overtakes the acceptor\'s proof: a dialer that already holds the peer over the winning link reads the close as the duplicate-link resolution — no refused row, no park, no redial; its later loss of the winner still starts a chain', () => {
+  //! the sim posts a close after the minimum delay and bytes after a random one, so the acceptor's DOOR {p}
+  // (shipped right before it closed the link as the dup-link loser) can arrive AFTER the close. The dialer is
+  // still proving with its proof sent — exactly the shape of a refusal — but it already holds the peer over the
+  // other link, so this close is the keeper rule's, not a refusal (the second review's major).
+  const a = rec('aa', { door: doorFor(53), hosts: ['sim:bb'] }), b = rec('bb', { door: doorFor(54), hosts: ['sim:aa'] })
+  a.up(1, true, 'sim:bb'); b.up(2) // a's dial lands on b's link 2
+  b.up(1, true, 'sim:aa'); a.up(2) // b's dial lands on a's link 2
+  //! link 2 (bb dialed) completes first: bb's HELLO + proof reach aa, aa proves back and admits
+  a.feed(2, b.sends(1)[0]); b.feed(1, a.sends(2)[0]); a.feed(2, b.sends(1)[1])
+  assert.deepEqual(a.node.admitted(), ['bb']); assert.equal(a.node.byUuid.get('bb'), 2)
+  //! link 1 (aa dialed): aa read bb's HELLO and proved; bb has not answered yet
+  a.feed(1, b.sends(2)[0])
+  assert.equal(a.node.links.get(1)!.state, LS.proving); assert.equal(a.node.links.get(1)!.proved, true)
+  //! bb closes link 1 (the keeper rule at bb: it holds aa over link 2 already) and the close overtakes its proof
+  a.down(1, 'dup-link')
+  assert.deepEqual(a.rows(JK.doorReject), [], 'an honest peer is never journaled refused')
+  assert.deepEqual(a.timers(TAG.redial), [], 'no redial: the pair is linked')
+  assert.deepEqual(a.node.admitted(), ['bb'], 'the winner is untouched')
+  //! sim:bb is NOT parked: when the winner later dies, the redial chain starts (a parked target returns at once)
+  a.down(2, 'reset')
+  assert.equal(a.timers(TAG.redial).length, 1, 'a redial chain toward bb — the target was never parked given-up')
+  assert.equal(a.node.dialing('sim:bb'), true)
+  //! the control: the same close with NO other link to the peer is still a refusal (a crash or a wrong secret)
+  { const c = rec('cc', { door: doorFor(55), hosts: ['sim:bb'] })
+    c.up(1, true, 'sim:bb'); c.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
+    c.down(1, 'reset')
+    assert.deepEqual(c.rows(JK.doorReject), [[1, 'refused', 'sim:bb']]) }
+})
+
 test('hygiene: no journal row ever carries a nonce or a proof — on either end, admitted or refused', () => {
   const a = rec('aa', { door: doorFor(44) }), b = rec('bb', { door: doorFor(45) }), x = rec('xx', { door: doorFor(46, 'wrong-secret-abc') })
   a.up(1, true, 'sim:bb'); b.up(1); pump(a, 1, b, 1)
