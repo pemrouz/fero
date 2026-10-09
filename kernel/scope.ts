@@ -574,7 +574,7 @@ export class Scope {
       lane.splice(lo, 0, entry)
       node.indexInsert(s.origin, entry)
       node.apply(s.rec, s.origin, s.seq, s.epoch, s.iss, s.cid)
-      if (s.iss) node.writes.remember(node, s.iss, s.cid!, s.seq, s.epoch)
+      if (s.iss) node.writes.remember(node, s.iss, s.cid!, s.seq, s.epoch, s.origin) // the lane too: a dup WACK from here must name it
     }
     //! floors and fences advance to the CUT (the teacher's attestation), never past it on the
     // teacher's word; the scalar fence merges up so replayed-live below the cut dedups

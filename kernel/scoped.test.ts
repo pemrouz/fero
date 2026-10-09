@@ -326,6 +326,38 @@ test('ACKED (DESIGN-SCALE stage 1) — an armed owner names its lane in the WACK
   assert.equal(h.of('acked').length, 1, 'a relayed attempt never settles here')
 })
 
+//! a commit can enter the owner's dedup window WITHOUT passing #commit: through an ACQ fold (the partition
+// moved to this node after the commit) or through WAL replay (the owner restarted). A write re-sent to such
+// an owner after a lost WACK is answered from that window, and the answer must still name the lane, or a
+// non-holder issuer clears its attempt and never hears `acked` (the stage-1 skeptic's K1: the STATUS bug
+// stayed open on exactly the recovery path it was about). Red without the lane at those sites: the dup
+// WACK reads `{u, c, n, s, e}` with no `o`.
+test('ACKED after a lost WACK — a commit learned by an ACQ fold or by WAL replay answers a re-sent write WITH the lane', () => {
+  //! the FOLD leg: aa is assigned px from zero; bb teaches it one record that carries cc~1's attempt identity
+  const h = armedView1()
+  h.node.writes.ring.place('px', 'bb', 'aa')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['px', 'a'], 1), origin: 'bb', seq: 5, epoch: 1, iss: 'cc~1', cid: 7, pp: 0 }], VERB.ACQ, true)[0] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 5 }, n: 1 }) })
+  assert.equal(h.node.scope!.held('px'), true, 'the fold committed')
+  assert.deepEqual(h.node.writes.committed('cc~1', 7), { s: 5, e: 1, o: 'bb' }, 'the window names the lane the fold put the record on')
+  //! cc re-sends cid 7 (its first WACK was lost): answered from the window, with the lane
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: writeFrame('cc~1', 7, 1, [rec(['px', 'a'], 1)]) })
+  assert.deepEqual(framesOn(h, 2, VERB.WACK).map((f) => f.value), [{ u: 'cc~1', c: 7, n: 1, s: 5, e: 1, o: 'bb' }], 'the dup answer after a fold carries the lane')
+  //! the REPLAY leg, armed: a restored owner replays a held row with attempt identity, then meets the re-send
+  const r = harness('aa', { replicas: 2, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']], heldPartitions: ['p1'] } })
+  r.node.step({ kind: 'replay', bytes: encodeRuns([{ rec: rec(['p1', 'a'], 1), origin: 'bb', seq: 10, epoch: 1, iss: 'cc~1', cid: 3, pp: 0 }], VERB.RECORDS, true)[0], prev: 0 })
+  assert.deepEqual(r.node.writes.committed('cc~1', 3), { s: 10, e: 1, o: 'bb' }, 'replay names the lane')
+  r.node.step({ kind: 'start' }); r.admit(1, 'bb'); r.admit(2, 'cc')
+  r.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  r.node.step({ kind: 'bytesIn', link: 2, bytes: writeFrame('cc~1', 3, 1, [rec(['p1', 'a'], 1)]) })
+  assert.deepEqual(framesOn(r, 2, VERB.WACK).map((f) => f.value), [{ u: 'cc~1', c: 3, n: 1, s: 10, e: 1, o: 'bb' }], 'the dup answer after a restart carries the lane')
+  //! the REPLAY leg, epoch 0 (a scoped life restored before any view): the window names the lane too
+  const z = harness('aa', { replicas: 2 })
+  z.node.step({ kind: 'replay', bytes: encodeRuns([{ rec: rec(['p1', 'a'], 1), origin: 'aa', seq: 1, epoch: 0, iss: 'cc~1', cid: 4 }], VERB.RECORDS)[0], prev: 0 })
+  assert.deepEqual(z.node.writes.committed('cc~1', 4), { s: 1, e: 0, o: 'aa' })
+})
+
 test('OWNER RE-CHECK (DESIGN-SCALE §11 Q12) — an armed owner asks NodeOpts.admit about a forwarded remove under a row: refused ⇒ WNACK invalid with the reason; admitted, an update or a row remove ⇒ commits unasked; staged ⇒ withheld; unscoped ⇒ never asked', () => {
   let asked: string[][] = []
   const admit = (r: Rec) => { asked.push(r.key); return r.key[1] === '0' ? 'sparse-hole' : true }
