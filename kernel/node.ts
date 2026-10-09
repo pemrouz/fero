@@ -122,7 +122,10 @@ export interface NodeOpts {
   //! methodsOnly (DESIGN-DOOR §4): this server takes client changes only through its methods — HELLO
   // carries `m: 1` so a client refuses its own plain writes locally instead of after a round trip.
   methodsOnly?: boolean
-  //! door (DESIGN-DOOR §3): the secret, as two functions — mac(msg) and nonce() — injected the way
+  //! door (DESIGN-DOOR §3, §15): the secret, as two functions — mac(msg) and nonce() — and, when clients
+  // hold only the derived client key, a third, clientMac(msg), which signs every link whose dialer said
+  // `r: 1` on both sides (kernel/door.ts `sign`): a client-key holder can follow but never prove as a
+  // member. Injected the way
   // `validate` is; the kernel never sees a secret string. Set ⇒ every HELLO this node sends carries a
   // fresh nonce `k`, every peer must prove it holds the same secret (DOOR {p}) before admission, and a
   // peer without a door is refused. Absent ⇒ the open door: no `k`, no DOOR, no proving state, no

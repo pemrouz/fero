@@ -9,6 +9,7 @@
 // Commit 2 — the contract and the methods-only hint. Commit 3 — the handshake itself (the bottom half):
 //   k on HELLO, DOOR {p} / {e}, LS.proving, the matrix, the address rule, the deadline, replay and
 //   reflection, the role rule under a door, the crossing dial. Every guard mutation-checked.
+// §15 — the derived client key: a second function on the door, picked by the dialer's r:1 on both sides.
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -18,7 +19,7 @@ import { JK } from './journal.ts'
 import { LS } from './link.ts'
 import { PROOF_LEN } from './door.ts'
 import { TAG, type EffectSink, type Env } from './env.ts'
-import { toyDoor } from '../sim/door.ts'
+import { toyDoor, toyClientDoor, toyClientKey } from '../sim/door.ts'
 import { mulberry32 } from '../sim/exec.ts'
 
 const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
@@ -878,4 +879,58 @@ test('hygiene: no journal row ever carries a nonce or a proof — on either end,
   assert.ok(secrets.size >= 5, `the handshakes minted nonces and proofs (${secrets.size})`)
   for (const n of [a, b, x]) for (const e of n.node.journal.read()) for (const f of [e.a, e.b, e.c]) if (typeof f === 'string') assert.ok(!secrets.has(f), `${n.node.uuid}: row ${e.kind} carries a secret value`)
   assert.deepEqual(b.rows(JK.doorReject), [[2, 'bad-proof', 'sim:xx']])
+})
+
+// ── §15 — the derived client key: clientMac on the door, picked by the DIALER's r:1 on both sides ──────
+// A process that holds only the client key can follow but never prove as a member; a member answers a
+// client with a client-key proof (the client holds nothing else). The toy derives its client key the way
+// the api does (a MAC of the secret over 'fero/client/1'); real crypto is the api tier's.
+
+const CLIENT_KEY = toyClientKey(SECRET)
+const clientDoor = (seed: number, key = CLIENT_KEY) => toyClientDoor(key, mulberry32(seed))
+
+test('the client key (§15): a client-key dialer is admitted r:1 and verifies the member\'s client-key answer; the same door without r:1 is bad-proof at the member; a member\'s uuid claim is uuid-taken; a holder that ACCEPTS a member\'s dial refuses its secret-proof; a secret-holding client still follows; a door without clientMac keeps the one-key rule', () => {
+  assert.notEqual(CLIENT_KEY, SECRET); assert.equal(CLIENT_KEY.length, PROOF_LEN, 'the toy key is one MAC long')
+  assert.equal(toyDoor(SECRET, () => 0).clientMac!('m'), clientDoor(0).mac('m'), 'the member derives the key the client-only door is keyed with')
+  assert.notEqual(toyDoor(SECRET, () => 0).mac('m'), toyDoor(SECRET, () => 0).clientMac!('m'), 'two keys, two proofs')
+  //! 1/6 a client that holds ONLY the client key follows: admitted r:1 at the member; the member's answer is a
+  // client-key proof, which the client verifies — it elects the member as its primary
+  { const a = rec('aa', { door: doorFor(60) }), c = rec('cc', { client: true, hosts: ['sim:aa'], listen: '', door: clientDoor(61) })
+    c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
+    assert.deepEqual([a.rows(JK.doorReject), c.rows(JK.doorReject)], [[], []], 'no refusal on either side')
+    assert.deepEqual(a.node.admitted(), ['cc']); assert.equal(a.node.clientLinks.size, 1); assert.equal(a.node.links.get(1)!.client, true)
+    assert.deepEqual(c.node.admitted(), ['aa']); assert.equal(c.node.primary, 1, 'the client verified the member\'s client-key answer and elected it')
+    assert.deepEqual(verbs(a.sends(1)).slice(0, 2), [VERB.HELLO, VERB.DOOR], 'the member answered with a proof, not a notice') }
+  //! 2/6 the same door on a node that omits r:1 (it poses as a member): the member checks the proof with the SECRET —
+  // bad-proof, the notice, nothing admitted; the poser reads refused and parks the target
+  { const a = rec('aa', { door: doorFor(62) }), x = rec('xx', { hosts: ['sim:aa'], door: clientDoor(63) })
+    x.up(1, true, 'sim:aa'); a.up(1); pump(x, 1, a, 1)
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'bad-proof', 'sim:xx']]); assert.deepEqual(a.closes(), [[1, 'door']])
+    assert.deepEqual(dec(a.sends(1)[1]).value, { e: 'denied' }); assert.deepEqual(a.node.admitted(), []); assert.equal(a.node.byUuid.has('xx'), false)
+    assert.deepEqual(x.rows(JK.doorReject), [[1, 'refused', 'sim:aa']]); assert.deepEqual(x.node.admitted(), [])
+    x.down(1, 'door'); assert.equal(x.node.dialing('sim:aa'), false, 'parked') }
+  //! 3/6 a client-key dialer claiming a member's uuid: its client-key proof verifies, THEN the role rule refuses it
+  // uuid-taken — exactly as a secret-holding client is refused; the member's link is never touched
+  { const a = rec('aa', { door: doorFor(64), boot: VIEW1 }), c = rec('bb', { client: true, hosts: ['sim:aa'], listen: '', door: clientDoor(65) })
+    c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'uuid-taken', 'bb']]); assert.deepEqual(a.rows(JK.dupLink), []); assert.equal(a.node.byUuid.has('bb'), false)
+    assert.deepEqual(c.rows(JK.doorReject), [[1, 'uuid-taken', 'sim:aa']]); assert.deepEqual(c.node.admitted(), []) }
+  //! 4/6 a client-key holder that ACCEPTS a member's dial (it listens where a member would): the member proves with the
+  // secret, the holder can only check with the client key — bad-proof on the holder, a notice, never a proof of its own;
+  // the member reads refused and admits nothing
+  { const a = rec('aa', { door: doorFor(66), hosts: ['sim:xx'] }), x = rec('xx', { door: clientDoor(67) })
+    a.up(1, true, 'sim:xx'); x.up(1); pump(a, 1, x, 1)
+    assert.deepEqual(x.rows(JK.doorReject), [[1, 'bad-proof', 'sim:aa']]); assert.deepEqual(x.node.admitted(), [])
+    assert.deepEqual(verbs(x.sends(1)), [VERB.HELLO, VERB.DOOR]); assert.deepEqual(dec(x.sends(1)[1]).value, { e: 'denied' }, 'the notice, never a proof')
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'refused', 'sim:xx']]); assert.deepEqual(a.node.admitted(), []) }
+  //! 5/6 a client that holds the SECRET follows as before: it signs with the derived client key (its HELLO says r:1)
+  // and the member checks with the same derivation
+  { const a = rec('aa', { door: doorFor(68) }), c = rec('cc', { client: true, hosts: ['sim:aa'], listen: '', door: doorFor(69) })
+    c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
+    assert.deepEqual([a.rows(JK.doorReject), c.rows(JK.doorReject)], [[], []]); assert.deepEqual(a.node.admitted(), ['cc']); assert.equal(c.node.primary, 1) }
+  //! 6/6 an embedder's door with no clientMac keeps the one-key rule: a client and a member that both sign with mac link
+  { const one = (seed: number) => { const d = doorFor(seed); return { mac: d.mac, nonce: d.nonce } }
+    const a = rec('aa', { door: one(70) }), c = rec('cc', { client: true, hosts: ['sim:aa'], listen: '', door: one(71) })
+    c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
+    assert.deepEqual([a.rows(JK.doorReject), c.rows(JK.doorReject)], [[], []]); assert.deepEqual(a.node.admitted(), ['cc']); assert.equal(c.node.primary, 1) }
 })
