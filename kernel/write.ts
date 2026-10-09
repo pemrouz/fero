@@ -93,9 +93,12 @@ import { SCOPE } from './scope.ts'
 import { Ring } from './ring.ts'
 import { JK } from './journal.ts'
 import { LS, type Link } from './link.ts'
-import { partitionOf, type Rec } from './env.ts'
+import { REC, partitionOf, type Rec } from './env.ts'
 import type { StreamDescriptor } from './streams.ts'
 import type { Node } from './node.ts'
+
+//! holeOf — the owner's re-check answer as a WNACK reason: undefined when admitted, else the reason text, bounded like the validator's.
+const holeOf = (v: true | string): string | undefined => v === true ? undefined : String(v).slice(0, REASON_MAX)
 
 //! The four bounds below are the DEFAULTS of their tune-table rows (kernel/tune.ts); the read sites
 // consult `node.tune.<row>`. MAX_RUN is NOT a row: it is a wire bound, fixed on purpose.
@@ -477,13 +480,16 @@ export class Writes {
     // coordinates even when the CURRENT epoch/ring/gate would reject it as fresh work.
     let i = 0
     let commits: Attempt[] | null = null
-    let nack: { r: string; c: number; n: number } | null = null
+    let nack: { r: string; c: number; n: number; m?: string } | null = null
     const flushNack = () => {
       if (!nack) return
       j.armed && j.emit(JK.writeNack, nack.r, node.epoch, nack.c)
-      link.ship(encodeControl(VERB.WNACK, { u: issuer, c: nack.c, n: nack.n, r: nack.r, ce: node.epoch }), node.env.sink, j)
+      const out: { u: string; c: number; n: number; r: string; m?: string; ce: number } = { u: issuer, c: nack.c, n: nack.n, r: nack.r, ce: node.epoch }
+      if (nack.m !== undefined) out.m = nack.m
+      link.ship(encodeControl(VERB.WNACK, out), node.env.sink, j)
       nack = null
     }
+    const admit = node.admit
     for (const rv of f.records()) {
       const cid = c0 + i++
       const dup = this.#seen.get(issuer)?.get(cid)
@@ -495,6 +501,8 @@ export class Writes {
         this.#ack(node, link.id, ack)
         continue
       }
+      let rec: Rec | null = null
+      let m: string | undefined
       const reason =
         ae !== node.epoch || epoch === 0 ? NACK.staleEpoch
         : !this.ring.holds(node.uuid, partitionOf(rv)) ? NACK.notOwner
@@ -503,14 +511,21 @@ export class Writes {
         // latch) — withheld is the honest retryable answer; the issuer's retry clock re-forwards
         // after the latch completes. Acquiring commits stay lawful (mid-latch owner writes).
         : node.armed && node.scope!.entries.get(partitionOf(rv))?.state === SCOPE.orphan ? NACK.withheld
+        //! the OWNER's re-check of a forwarded remove under a row (NodeOpts.admit, DESIGN-SCALE §11 Q12):
+        // the issuer could not see the row's shape; this node holds it. Staged (an open latch) ⇒ the
+        // shape cannot be read yet ⇒ withheld, retried after the fold. Refused ⇒ invalid with the reason.
+        : node.armed && admit !== undefined && rv.type === REC.remove && rv.key.length > 1
+          ? (node.scope!.entries.get(partitionOf(rv))?.state === SCOPE.acquiring ? NACK.withheld
+            : (m = holeOf(admit(rec = rv.rec()))) !== undefined ? NACK.invalid : '')
         : ''
       if (reason) {
-        if (nack && (nack.r !== reason || nack.c + nack.n !== cid)) flushNack()
-        nack ? nack.n++ : (nack = { r: reason, c: cid, n: 1 })
+        if (nack && (nack.r !== reason || nack.c + nack.n !== cid || nack.m !== m)) flushNack()
+        if (nack) nack.n++
+        else { nack = { r: reason, c: cid, n: 1 }; if (m !== undefined) nack.m = m }
         continue
       }
       flushNack()
-      ;(commits ??= []).push({ cid, ae, issuer, rec: rv.rec(), via: link.id, sent: -1, to: '', parked: false })
+      ;(commits ??= []).push({ cid, ae, issuer, rec: rec ?? rv.rec(), via: link.id, sent: -1, to: '', parked: false })
     }
     flushNack()
     if (commits) this.#commit(node, commits)

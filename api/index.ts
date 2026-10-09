@@ -433,6 +433,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // it is what the composer puts INTO the one hook. Inert on a client (nobody relays through a spoke).
     // `bind` is created below, before the runtime can step.
     validate: methodsOnly ? METHODS_ONLY_ADMIT : (rec: Rec) => bind.admit(rec),
+    //! the owner's re-check of a forwarded remove under a row (DESIGN-SCALE §11 Q12): a scoped member that
+    // does not hold the row forwards a remove it cannot judge; the owner, which holds it, asks the sparse-hole
+    // half of the same rule again. Armed nodes only (the kernel gates it); never the directory's concern.
+    admit: (rec: Rec) => bind.hole(rec),
     //! the DIAG allowlist (M7): present = `npm run debug -- --attach` may read this node with one of its tokens
     ...(diagAllow !== undefined ? { diag: { allow: { ...(diagAllow as Record<string, string>) } } } : {}),
     ...(restored.boot !== undefined ? { boot: restored.boot } : {}),

@@ -326,6 +326,40 @@ test('ACKED (DESIGN-SCALE stage 1) — an armed owner names its lane in the WACK
   assert.equal(h.of('acked').length, 1, 'a relayed attempt never settles here')
 })
 
+test('OWNER RE-CHECK (DESIGN-SCALE §11 Q12) — an armed owner asks NodeOpts.admit about a forwarded remove under a row: refused ⇒ WNACK invalid with the reason; admitted, an update or a row remove ⇒ commits unasked; staged ⇒ withheld; unscoped ⇒ never asked', () => {
+  let asked: string[][] = []
+  const admit = (r: Rec) => { asked.push(r.key); return r.key[1] === '0' ? 'sparse-hole' : true }
+  const h = armedView1({ admit })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('mine', 'aa', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('bb~1', 5, 1, [
+    { type: REC.remove, key: ['mine', '0'] }, { type: REC.remove, key: ['mine', '1'] },
+    { type: REC.update, key: ['mine', '0'], value: 1 }, { type: REC.remove, key: ['mine'] }]) })
+  assert.deepEqual(asked, [['mine', '0'], ['mine', '1']], 'only removes below the row are asked')
+  const nacks = framesOn(h, 1, VERB.WNACK).map((f) => f.value)
+  assert.deepEqual(nacks, [{ u: 'bb~1', c: 5, n: 1, r: 'invalid', m: 'sparse-hole', ce: 1 }], 'the refused one: invalid, with the reason, never stamped')
+  assert.deepEqual(framesOn(h, 1, VERB.WACK).map((f) => (f.value as { c: number; n: number }).c), [6], 'the other three committed as one run')
+  assert.equal(h.node.logs.get('aa')!.length, 3, 'no tombstone for the hole')
+  //! a STAGED partition (an open latch) cannot read its shape: withheld, not refused
+  h.node.writes.ring.place('px', 'aa', 'bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  assert.equal(h.jk(JK.acquireStart).length, 1, 'the latch opened')
+  asked = []
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('bb~1', 9, 1, [{ type: REC.remove, key: ['px', '0'] }]) })
+  assert.deepEqual(asked, [], 'not asked while staged')
+  assert.deepEqual(framesOn(h, 1, VERB.WNACK).map((f) => f.value).at(-1), { u: 'bb~1', c: 9, n: 1, r: 'withheld', ce: 1 })
+  //! the UNSCOPED control: the hook is never consulted; the forwarded remove commits as before
+  const u = harness('aa', { admit, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] } })
+  u.node.step({ kind: 'start' }); u.admit(1, 'bb'); u.admit(2, 'cc')
+  u.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  u.node.membership.rejoinFloor = 0
+  u.node.writes.ring.place('mine', 'aa')
+  asked = []
+  u.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('bb~1', 5, 1, [{ type: REC.remove, key: ['mine', '0'] }]) })
+  assert.deepEqual(asked, [])
+  assert.equal(framesOn(u, 1, VERB.WACK).length, 1, 'committed unasked')
+})
+
 test('AE FILTER — a digest answer ships a member only the partitions ITS R-set covers', () => {
   const h = armedView1()
   h.node.membership.rejoinFloor = 0

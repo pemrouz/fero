@@ -227,6 +227,13 @@ export class Bind {
     if (v === true && rec.type === REC.remove && rec.key.length > 1 && holeAt(this.#handle, rec.key)) return SPARSE_HOLE
     return v
   }
+
+  //! hole — the sparse-hole half of admit alone, for the OWNER's re-check of a remove a scoped member
+  // forwarded because it could not see the row (kernel NodeOpts.admit, DESIGN-SCALE §11 Q12). The issuer
+  // ran the validator already; only the shape question is asked again, here, where the row is held.
+  hole(rec: Rec): true | string {
+    return rec.type === REC.remove && rec.key.length > 1 && holeAt(this.#handle, rec.key) ? SPARSE_HOLE : true
+  }
   //! issue — THE one local ingest (assignment sugar, the lens's write builtins, methods.* and the
   // data: seed all land here; the validation: hook therefore covers every spelling by
   // construction — v2's OQ6). Admit, register the pending entries, hand the records to the kernel;
