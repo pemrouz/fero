@@ -18,6 +18,8 @@ import { Directory, GRACE, MAX_PER_CALLER, boxDirectory, fromBox, hostMethods, i
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { MEMBER_REDIALS } from '../kernel/node.ts'
+import { JK } from '../kernel/journal.ts'
+import { VERB, Framer, encodeControl } from '../kernel/codec.ts'
 import { ports, sleep, until } from '#utils'
 import type { Fero } from './types.ts'
 import type { Context } from './methods.ts'
@@ -310,6 +312,51 @@ test('a user resource misdialing the rendezvous is refused by the name echo and 
   } finally { await settle([mis, s]) }
 })
 
+test('the door through the directory (DESIGN-DOOR §6): a secured server is found by a secured client at a private rendezvous; a raw socket registered under the name is refused at the door (no-secret) at heartbeat cadence, and the real members keep their view and keep replicating', async () => {
+  const o = await fast()
+  const S = 'directory-test-secret-HOTEL-08'
+  const name = `door-${process.pid}`
+  let a: Fero | undefined, b: Fero | undefined, c: Fero | undefined
+  //! the squatter: a raw socket that greets every connection with a HELLO carrying the name and no `k` — any local
+  // process can register any address for a name (api/directory.ts: loopback is the trust boundary)
+  const seenK: string[] = []
+  const squat = net.createServer((sock) => {
+    sock.on('error', () => {})
+    sock.on('data', (d) => { for (const f of new Framer().push(new Uint8Array(d))) if (f.verb === VERB.HELLO) seenK.push(String((f.value as { k?: unknown }).k)) })
+    sock.write(encodeControl(VERB.HELLO, { u: 'squat', i: 1, l: squatAddr, n: name }))
+  })
+  await new Promise<void>((res) => squat.listen(0, '127.0.0.1', res))
+  const squatAddr = `127.0.0.1:${(squat.address() as net.AddressInfo).port}`
+  try {
+    a = await fero(name, { server: true, secret: S, ...o })
+    b = await fero(name, { server: true, secret: S, ...o })
+    c = await fero(name, { secret: S, ...o })
+    assert.ok(await until(() => members(a!) === 2 && members(b!) === 2, 8000), 'two secured members found each other through the directory and formed')
+    assert.ok(await until(() => (snapshot(c!.cluster) as { me: { primary: string | null } }).me.primary !== null, 8000), 'the secured client is fed')
+    a.data.x = 1
+    assert.ok(await until(() => data(c!).x === 1 && data(b!).x === 1, 8000))
+    //! registered through a directory client — the owning instance's own, here; any local process could do the same
+    const dc = diag(c)!.rendezvous()!.client!
+    assert.equal(await dc.methods.register({ name, uuid: 'squat', listen: squatAddr }), true)
+    assert.ok(await until(() => me(a!).hosts.includes(squatAddr) && me(b!).hosts.includes(squatAddr), 8000), 'both members learn the address')
+    const rows = (f: Fero) => diag(f)!.journal().events.filter((e) => e.kind === JK.doorReject)
+    assert.ok(await until(() => rows(a!).length >= 2 && rows(b!).length >= 2, 8000), 're-dialed and refused again at heartbeat cadence — bounded chatter, no admission')
+    for (const f of [a, b]) assert.ok(rows(f).every((e) => e.b === 'no-secret' && e.c === squatAddr), `no-secret, naming the dial target: ${JSON.stringify(rows(f))}`)
+    assert.equal(members(a), 2); assert.equal(members(b), 2)
+    assert.ok(!('squat' in (snapshot(a.cluster) as { peers: Record<string, unknown> }).peers), 'never a peer')
+    b.data.y = 2
+    assert.ok(await until(() => data(a!).y === 2 && data(c!).y === 2, 8000), 'the real members keep replicating')
+    //! the squatter read the members' HELLOs: each carried a fresh nonce, and none of them is in any journal or capture
+    assert.ok(seenK.length >= 2 && new Set(seenK).size === seenK.length, `every link had its own nonce (${seenK.length} seen)`)
+    const everything = JSON.stringify([a, b, c].map((f) => [diag(f!)!.journal().events, diag(f!)!.capture()]))
+    for (const k of seenK) assert.ok(!everything.includes(k), 'a nonce never lands in a journal or a capture')
+    assert.ok(!everything.includes(S), 'nor does the secret')
+  } finally {
+    await settle([c, b, a])
+    await new Promise<void>((r) => squat.close(() => r()))
+  }
+})
+
 test("Context.peer: a wire call carries the caller uuid, a local invoke carries the server's own", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
   let s: Fero | undefined, c: Fero | undefined
@@ -362,7 +409,9 @@ test('a rendezvous this box cannot bind at all (an interface that is not here) s
   if (ip === undefined) return t.skip('no non-loopback IPv4 address on this machine')
   let s: Fero | undefined
   try {
-    s = await fero(`nobind-${process.pid}`, { listen: `${ip}:0`, heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous })
+    //! a routable listen with no secret is refused since the door (DESIGN-DOOR §14 Q1): this test is about the
+    // errno, so it runs the open door on purpose
+    s = await fero(`nobind-${process.pid}`, { listen: `${ip}:0`, heartbeat: { ms: 50 }, redial: { ms: 30 }, rendezvous, secret: false })
     assert.ok(await until(() => typeof rz(s!).error === 'string' && rz(s!).error!.startsWith('bind '), 5000), `the errno is on me.rendezvous: ${JSON.stringify(rz(s).error)}`)
     assert.equal(rz(s).hosting, false)
     assert.ok(me(s).listen.startsWith(`${ip}:`) && !me(s).listen.endsWith(':0'), 'the resource itself serves')
