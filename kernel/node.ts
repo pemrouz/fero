@@ -433,8 +433,13 @@ export class Node {
   //! feederContract (DESIGN-SCALE stage 1) — the PRIMARY's HELLO contract (`c`), read live off the primary
   // link for the same reason as feederMethodsOnly. The api reads `replicas=` out of it: a client of a
   // SCOPED feeder sees only the partitions its feeder holds, so a row absent from its fold may well live
-  // at an owner, and a delete of it is a real remove to send. Undefined with no primary or an old server.
-  get feederContract(): string | undefined { return this.primary !== null ? this.links.get(this.primary)?.contract : undefined }
+  // at an owner, and a delete of it is a real remove to send. With NO primary (every server link down —
+  // an outage, a redial in progress) it is the LAST primary's contract (#feederLast, set at each election):
+  // the fold is still that feeder's shard, and a delete queued for the reconnect must still be judged by
+  // it (the stage-1 review's second pass: the live read alone said "no contract ⇒ local" and the lens
+  // swallowed the delete). Undefined before the first primary, or from an old server that sends none.
+  get feederContract(): string | undefined { return this.primary !== null ? this.links.get(this.primary)?.contract : this.#feederLast }
+  #feederLast?: string
 
   //! clientLinks — the admitted CLIENT links this node serves (maintained at HELLO/linkDown). The
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
@@ -775,7 +780,7 @@ export class Node {
           this.primary = null
           this.feederOpen = null
           for (const l of this.links.values())
-            if (l.state === LS.admitted && !l.dead) { this.primary = l.id; break }
+            if (l.state === LS.admitted && !l.dead) { this.primary = l.id; this.#feederLast = l.contract; break }
           if (this.primary !== null) {
             this.#sendDigest(this.links.get(this.primary)!, 1)
             this.writes.repark(this)
@@ -1309,7 +1314,7 @@ export class Node {
     // synced never rises there and this client has ONE feeder: per-origin ordering by construction.
     // A server never opens toward a client: the client's own r=1 is what syncs that link.
     if (this.client) {
-      if (this.primary === null) { this.primary = link.id; this.#sendDigest(link, 1) }
+      if (this.primary === null) { this.primary = link.id; this.#feederLast = link.contract; this.#sendDigest(link, 1) }
     } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
     //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
     // membership converges even when no epoch-stamped records flow; then settle — an admitted member
