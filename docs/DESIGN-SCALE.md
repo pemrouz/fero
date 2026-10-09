@@ -60,7 +60,7 @@ known-unsafe seeds. One attempt committed twice across an ownership move
 fan-out or its WACK left, the issuer retried at the next owner, and the
 heal delivered both. It is the zombie's class, not missing dedup tuples
 (the latch already feeds the window). And a spoke's resync ending on a
-stale digest reply (A11 seeds 2, 5, 6, M10): on every A11 failover onto
+stale digest reply (A11 seeds 2, 5, 6 and 10, M10): on every A11 failover onto
 a feeder behind the spoke, the reply to the spoke's first digest ends
 the resync before the re-download, so the spoke shows older values of
 live rows for a few events. (6) The G1 mutation (release the stamp, keep

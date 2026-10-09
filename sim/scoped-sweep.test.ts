@@ -19,7 +19,9 @@
 // Cost: about 50 s at low priority on this box (2 seeds per family plus the pinned unsafe seeds, then five
 // pinned mutation schedules, each run clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about
 // 70 s on 2026-10-09, before the pinned seeds were added). The known-unsafe seeds below run in every battery on top
-// of that range, each pinned to the monitor line it fails on, and the set is exact in both directions.
+// of that range, each pinned to the monitor line it fails on, and the set is exact in both directions over the
+// seeds that were checked: 1-8 for every family, and 1-12 for A11. Above that, a new red is a finding to read,
+// not a broken test.
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -28,7 +30,7 @@ import { FAMILIES, runFamily, familyByName, CATCHERS, type Mutation } from './sc
 const SEEDS = Number(process.env.FERO_SCOPED_SEEDS ?? 2)
 
 //! KNOWN_UNSAFE — schedules today's kernel is not safe on, each with its finding and the monitor that names it.
-// A11 seeds 2, 5 and 6: a spoke's resync ends on a STALE digest reply (M10 resync-end), on every A11 seed that
+// A11 seeds 2, 5, 6 and 10: a spoke's resync ends on a STALE digest reply (M10 resync-end), on every A11 seed that
 // fails over to a feeder behind it (2, 5, 6 and 10 of seeds 1-12). At the failover the spoke sends its new feeder
 // a digest (r=1, #0). The feeder's own r=1 crosses it and shows a lane tail below the spoke's, so the spoke
 // resyncs: fold wiped, an empty r=1 (#1) sent to ask for the re-download. The feeder's r=0 reply to #0 then
@@ -47,13 +49,13 @@ const SEEDS = Number(process.env.FERO_SCOPED_SEEDS ?? 2)
 // not with the latch's dedup tuples. A re-committed remove can erase a newer write. Found by this sweep.
 const KNOWN_UNSAFE: Record<string, Record<number, RegExp>> = {
   'A3-orphan-cut': { 6: /attempt-exactly-once .*committed TWICE/ },
-  'A11-spoke': { 2: /resync-end .*stale reply/, 5: /resync-end .*stale reply/, 6: /resync-end .*stale reply/ },
+  'A11-spoke': { 2: /resync-end .*stale reply/, 5: /resync-end .*stale reply/, 6: /resync-end .*stale reply/, 10: /resync-end .*stale reply/ },
 }
 
 //! the engagement key each family must hit on at least one seed: a family whose chaos never bit proves nothing
 const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
   'A1-zombie': (e) => e.stranded === 1 && e.epoch >= 3, // stranded, evicted, healed back in
-  'A2-slow-owner-join': (e) => e.stale > 0, // a demoted owner committed at the old epoch after a newer one was installed
+  'A2-slow-owner-join': (e) => e.stale > 0, // a demoted owner committed at the old epoch for a partition that already moved
   'A3-orphan-cut': (e) => e.orphanCut === 1,
   'A4-restarts': (e) => e.restarts === 2,
   'A5-view-severed': (e) => e.epoch >= 2 && e.sheds > 0,
