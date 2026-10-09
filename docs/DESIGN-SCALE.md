@@ -98,9 +98,16 @@ splice, both replay branches, the ACQDONE fold, the shed, compact,
 the mutation "drop the inbound indexAppend" turns it red in five
 scale-probes tests. R1 (kernel/scope.perf.ts) measured 0.98 (2.69 ms
 vs 2.73 ms, tmpfs, low priority) against 9.40 with the old lane walk.
-Found while building: the old shed dropped a partition's floors only
-from lanes that held entries of it, so a floor from a cut with no
-entries outlived the shed; it now drops from every stream.
+Found while building: the old shed walked `node.logs`, so a stream with
+no lane at all (a floor learned from a cut, with no record of that
+origin) kept its floor past the shed; it now drops from every stream
+(the first version of this note said "lanes with no entries of p" —
+those the old walk did visit; the skeptic's reading). One claim
+narrowed by the same review: `#shed` is O(the lanes that hold p), not
+O(entries of p) — a lane is an array and each lane that holds p is
+filtered whole; the index saves the lanes with nothing of p and the
+version-key parse. `#teach`, `#tailsOf`, `#abort` and the census are
+O(entries of p) as stated.
 
 ## §0 The decision, in ten lines
 
@@ -772,8 +779,9 @@ announcement build O(dirty × R) and the sweep slice O(aeFan × shared). Com-
 paction: the same size-armed trigger plus the memo; F memoized per
 partition per pass; one extra `Map.get` per entry. GC: per partition with
 pending tombstones, O(its tombstones + its entries), never a walk of every
-version. Hand-over: `#teach`, `#tailsOf`, `#abort`, `#shed` O(entries of
-p) through the index. Install: O(moved) after stage 5. Wire: at n=100 idle
+version. Hand-over: `#teach`, `#tailsOf`, `#abort` O(entries of p)
+through the index; `#shed` O(the lanes that hold p), each filtered whole
+(a lane is an array — the stage-1 note). Install: O(moved) after stage 5. Wire: at n=100 idle
 3 MB → about 100 KB per tick; writes 2.28 MB → about 60 KB per tick.
 
 **Pins that must not move** (unscoped, structural): 59,500 (scale.perf.ts:
