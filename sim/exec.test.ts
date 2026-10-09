@@ -340,6 +340,72 @@ test('one redial chain per target: pairs and triples cut while forming and cut a
   }
 })
 
+//! the restart's WAL echoes (the review of 802b3fe, 2026-10-09): a reborn node numbers its WAL batches from
+// 1 again, so the first life's `persisted` and `persistFail` echoes, still queued behind a slow fsync, named
+// the new life's batches. A stale `persisted` told the new life a batch was durable before its own fsync
+// landed; a stale `persistFail` would kill the new life's WAL. The exec drops an earlier life's echoes at
+// the queue (sim/exec.ts #life). Here the victim's old life has a slow, failing disk; the new life's disk
+// is slow but sound, so a `persistFail` that reaches it can only be stale.
+test('a restart with batches still in flight on a slow, failing disk: no echo of the old life reaches the new one — every `persisted` the new life sees names a row of its own that has landed, and no `persistFail` kills its WAL', () => {
+  const failures: string[] = []
+  let checked = 0, torn = 0
+  for (let seed = 0; seed < 30; seed++) {
+    const sim = new Sim(seed)
+    const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true })
+    const victim = nodes[Math.floor(sim.rng() * 3)].uuid
+    sim.storeFault(victim, { delay: [300, 400], failP: 0.3 })
+    writes(sim, nodes, 120, 1500)
+    let early = 0, stale = 0, reborn: Node | undefined
+    sim.at(700 + sim.rng() * 100, () => {
+      const store = sim.stores.get(victim)!
+      torn += store.wal.filter((r) => !r.resolved).length // batches in flight: their echoes are still queued
+      sim.storeFault(victim, { delay: [300, 400] }) // the new life's disk is slow but sound
+      //! the new life's rows, by batch, registered the moment they are appended or swapped in: a snapshot
+      // swap replaces store.wal, so a row may be gone from it when its own echo lands. The old rows are the
+      // ones the harvest keeps (restart()'s rule); store.wal is watched across the swaps.
+      type Row = (typeof store.wal)[number]
+      const seen = new Set<Row>(store.wal.filter((r) => r.resolved && !r.lied))
+      const mine = new Map<number, Row[]>()
+      const note = (r: Row) => { if (!seen.has(r)) { seen.add(r); mine.set(r.batch, [...(mine.get(r.batch) ?? []), r]) } }
+      const watch = (a: Row[]): Row[] => {
+        const push = a.push
+        a.push = (...rs: Row[]) => { rs.forEach(note); return push.apply(a, rs) }
+        a.forEach(note)
+        return a
+      }
+      let wal = store.wal // the old life's array: restart() replaces it with the harvest, through the setter
+      Object.defineProperty(store, 'wal', { get: () => wal, set: (a: Row[]) => { wal = watch(a) }, configurable: true })
+      reborn = sim.restart(victim)
+      const life = reborn
+      //! a snapshot swap lands resolved when it is issued (the store contract is synchronous-durable), and it
+      // may hold no rows at all: the old life's failed batches leave holes, so the new life condemns its disk
+      // at replay and swaps in an EMPTY snapshot. Its echo is honest once the new life has issued it.
+      const swapped = (b: number) => life.journal.read().some((e) => e.kind === JK.snapshot && e.a === b)
+      const step = life.step.bind(life)
+      life.step = (ev) => {
+        if (ev.kind === 'persisted') {
+          const rows = mine.get(ev.batch)
+          if (rows === undefined ? !swapped(ev.batch) : rows.some((r) => !r.resolved)) early++
+          else checked++
+        }
+        if (ev.kind === 'persistFail') stale++
+        step(ev)
+      }
+    })
+    sim.run({ until: 4000 })
+    const problems: string[] = []
+    if (early) problems.push(`${early} \`persisted\` resolved a new-life batch before its own fsync`)
+    if (stale) problems.push(`${stale} \`persistFail\` reached the new life`)
+    if (reborn && reborn.journal.read().some((e) => e.kind === JK.persistFail)) problems.push('the new life journaled a persistFail')
+    if (sim.violations.length) problems.push(`monitor ${sim.violations[0].monitor}: ${sim.violations[0].detail}`)
+    const c = converged(sim); if (c) problems.push(`not converged: ${c}`)
+    if (problems.length) failures.push(`seed ${seed} (${victim}): ${problems.join('; ')}`)
+  }
+  assert.deepEqual(failures, [])
+  assert.ok(torn > 30, `the schedule really restarts with batches in flight (${torn} torn rows)`)
+  assert.ok(checked > 300, `the new lives really persisted (${checked} echoes checked)`)
+})
+
 test('checkEvery: 1 (and default) are byte-identical — the throttle at K=1 IS the per-event contract', () => {
   const runWith = (opts?: { checkEvery?: number }) => {
     const sim = new Sim(1234)
