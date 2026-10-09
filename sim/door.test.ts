@@ -387,3 +387,50 @@ test('determinism canary, secured: the same seed twice — a secret, an intruder
   assert.equal(a.events, b.events)
   assert.equal(a.trace, b.trace)
 })
+
+//! the sim's restart and the old life's queue (STATUS 2026-10-09, the third review's probe): a reborn node
+// numbers its timers from 1 again, and the sim's cancel is a no-op, so the first life's fires stayed
+// queued. Its proving deadlines (armed at formation, due at tune.proveMs) were the loud case: a member
+// restarted just before they fell due read each stale fire as one of its OWN deadlines — a TAG.prove at
+// 12 ms instead of 5000 — and refused the honest peer it was proving `timeout`. Every member here holds
+// the secret, so a `timeout` row at any member is a false refusal. Heartbeats OFF: nothing revives a
+// falsely parked peer, so a false refusal here is also a pair that never re-forms. The exec drops an
+// earlier life's echoes at the queue now (sim/exec.ts #life).
+test('restarts under chaos with a secret and heartbeats OFF: a member reborn as its first life\'s proving deadlines fall due, and one reborn mid-formation, 60 seeds each — no `timeout` row at any honest member, the members re-form and agree, and the same seed twice gives the same trace', () => {
+  const failures: string[] = []
+  const once = (seed: number, when: 'deadline' | 'forming') => {
+    const sim = new Sim(seed)
+    const n = 3 + (seed % 3)
+    const door = toyDoor(SECRET, sim.rng)
+    const nodes = cluster(sim, n, { heartbeatMs: 0, door, durable: true })
+    const ids = nodes.map((x) => x.uuid)
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) sim.fault(ids[i], ids[j], { delay: [1, 1 + sim.rng() * 25], dupP: sim.rng() * 0.25 })
+    writes(sim, nodes, 10, 300)
+    const victim = ids[Math.floor(sim.rng() * n)]
+    //! deadline: the crash lands in the 20 ms before the first life's proving deadlines (5000 after its
+    // HELLOs) fall due. forming: the crash lands while the first life is still proving its peers.
+    sim.at(when === 'deadline' ? 4985 + sim.rng() * 20 : 2 + sim.rng() * 40, () => { sim.restart(victim) })
+    sim.run({ until: 12000, maxEvents: 3_000_000 })
+    return { sim, live: ids.map((u) => sim.nodes.get(u)!) }
+  }
+  for (const when of ['deadline', 'forming'] as const) {
+    for (let seed = 0; seed < 60; seed++) {
+      const { sim, live } = once(seed, when)
+      const problems: string[] = []
+      if (sim.violations.length) problems.push(`monitor ${sim.violations[0].monitor}: ${sim.violations[0].detail}`)
+      for (const m of live) {
+        const t = rows(m, JK.doorReject).filter((e) => e.b === 'timeout')
+        if (t.length) problems.push(`${m.uuid} refused an honest peer timeout ${t.length}× (${t.map((e) => e.c).join(',')})`)
+      }
+      if (!formed(live)) problems.push('the members never re-formed')
+      const dis = agree(live); if (dis) problems.push(`members disagree: ${dis}`)
+      if (problems.length) failures.push(`seed ${seed} (n=${live.length}, ${when}): ${problems.join('; ')}`)
+    }
+  }
+  assert.deepEqual(failures, [])
+  //! the determinism canary over a restart: the dropped echoes are part of the seeded trajectory
+  const a = once(7, 'deadline'), b = once(7, 'deadline')
+  assert.equal(a.sim.events, b.sim.events)
+  assert.equal(a.sim.trace.join(','), b.sim.trace.join(','))
+})
