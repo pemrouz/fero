@@ -388,8 +388,10 @@ export class Writes {
 
   //! remember — the ACQ-fold's doorway into the dedup window (M6): acquired records carry attempt
   // identity exactly like AE re-ships, so a healed-or-future owner rebuilds exactly-once from the
-  // transfer itself (the M3 ownership-move story, kept across acquisition).
-  remember(node: Node, issuer: string, cid: number, s: number, e: number) { this.#remember(node, issuer, cid, s, e) }
+  // transfer itself (the M3 ownership-move story, kept across acquisition). `o` is the lane the record
+  // sits on: a re-sent write answered from this entry must carry it, or a non-holder issuer that lost
+  // the first WACK never hears `acked` (the stage-1 skeptic's K1).
+  remember(node: Node, issuer: string, cid: number, s: number, e: number, o?: string) { this.#remember(node, issuer, cid, s, e, o) }
 
   //! #ack — WACK on the reply route (`via` link) for relayed/forwarded attempts; via -1 = locally issued, no frame.
   // `o` (DESIGN-SCALE stage 1): the lane the commit was stamped on, named with its incarnation — set by an
@@ -891,7 +893,7 @@ export class Writes {
         }
         node.apply(rec, prov.origin, rv.seq, rv.epoch, rv.issuer || undefined, rv.issuer ? rv.cid : undefined)
         j.armed && j.emit(JK.applyInbound, prov.origin, rv.seq)
-        if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch)
+        if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch, prov.origin) // with the lane: a dup WACK after a restart names it
         count++
         continue
       }
@@ -909,7 +911,7 @@ export class Writes {
       // applyInbound keeps the debugger's time-travel fold (tools/debug/model.mjs stateAt) truthful
       // across a restore — without it a reborn node's fold looks empty to every journal consumer.
       j.armed && j.emit(JK.applyInbound, prov.origin, rv.seq)
-      if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch)
+      if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch, prov.origin)
       count++
     }
     //! the accepted row extends the chain: future persists AND the next row's check link from here
