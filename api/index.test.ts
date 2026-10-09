@@ -400,6 +400,36 @@ test('v4.1 name echo: a dial onto a DIFFERENT resource refuses loudly — never 
   }
 })
 
+test('the role rule (DESIGN-DOOR §3 step 12): a CLIENT composed with a MEMBER\'s uuid is refused at the door — the member stays linked and `cluster` keeps both members', async () => {
+  const p = await ports.free()
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', server: true, hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  type View = { epoch: number; members: Record<string, string>; peers: Record<string, unknown> }
+  const view = (f: typeof a) => snapshot(f.cluster) as View
+  let c: Awaited<ReturnType<typeof fero>> | null = null
+  try {
+    assert.ok(await until(() => view(a).epoch >= 1 && Object.keys(view(a).members).length === 2, 8000), `two members formed (${JSON.stringify(view(a))})`)
+    //! the STATUS case: a stray FERO_UUID (or a copied line) gives a client a member's uuid. Before the rule
+    // the duplicate-link check ran against the REAL member and could close its link.
+    c = await fero('r', { uuid: 'bb', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 0 }, redial: { ms: 30 } })
+    const rows = () => diag(a)!.journal().events.filter((e) => e.kind === JK.doorReject)
+    assert.ok(await until(() => rows().length > 0, 8000), 'the refusal is journal-visible (JK.doorReject)')
+    assert.deepEqual(rows().map((e) => [e.b, e.c]), [['uuid-taken', 'bb']], 'the reason and the uuid claimed; never anything else')
+    assert.equal(diag(a)!.journal().events.some((e) => e.kind === JK.dupLink), false, 'no duplicate-link row against the member')
+    assert.deepEqual(Object.keys(view(a).members).sort(), ['aa', 'bb'], 'the view keeps both members')
+    assert.ok('bb' in view(a).peers, 'the member\'s link is alive on aa')
+    assert.ok('aa' in view(b).peers, 'and on bb')
+    assert.equal((snapshot(c.cluster) as { me: { primary: string | null } }).me.primary, null, 'the client never got a feeder')
+    //! the members still work: a write on one lands on the other
+    a.data.k = 1
+    assert.ok(await until(() => (snapshot(b.data) as { k?: number }).k === 1, 8000), 'replication between the members is intact')
+  } finally {
+    await c?.destroy()
+    await b.destroy()
+    await a.destroy()
+  }
+})
+
 test('v4.1 uuid discipline: empty and lane-separator uuids refuse at fero() time', async () => {
   await assert.rejects(fero('r', { uuid: '' }), /uuid must be a non-empty string/)
   await assert.rejects(fero('r', { uuid: 'a~1' }), /without '~'/)

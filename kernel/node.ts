@@ -1158,7 +1158,30 @@ export class Node {
           link.dead = link.noRedial = true
           return this.env.sink.close(link.id, 'self')
         }
-        const existingId = this.byUuid.get(v.u)
+        //! the role rule (DESIGN-DOOR §3 step 12; with or without a secret). A CLIENT HELLO (r:1) may not
+        // take a MEMBER's uuid: the uuid is a committed-view member's (isMember) or an admitted non-client
+        // link holds it. Refuse THIS link (doorReject 'uuid-taken', dead + noRedial, close) and touch
+        // nothing else — the member's link stays up and no dupLink row is written, so a stray FERO_UUID
+        // in a client's shell can no longer knock a member off its peer (the STATUS case). The reverse:
+        // a non-client HELLO whose uuid an admitted CLIENT link holds evicts that client link (the row
+        // names the client's link) and continues into admit — a client was never entitled to the uuid.
+        // Two client links with one uuid fall through to the duplicate-link rule as before.
+        let existingId = this.byUuid.get(v.u)
+        {
+          const squatter = existingId !== undefined && existingId !== link.id ? this.links.get(existingId)! : undefined
+          if ((v as { r?: unknown }).r === 1) {
+            if (this.membership.isMember(v.u) || (squatter !== undefined && !squatter.client)) {
+              j.armed && j.emit(JK.doorReject, link.id, 'uuid-taken', v.u)
+              link.dead = link.noRedial = true
+              return this.env.sink.close(link.id, 'uuid-taken')
+            }
+          } else if (squatter !== undefined && squatter.client) {
+            j.armed && j.emit(JK.doorReject, existingId!, 'uuid-taken', v.u)
+            squatter.dead = squatter.noRedial = true
+            this.env.sink.close(existingId!, 'uuid-taken')
+            existingId = undefined // admit below; the evicted link's linkDown echo sees byUuid pointing at the new link and leaves it
+          }
+        }
         if (existingId !== undefined && existingId !== link.id) {
           const existing = this.links.get(existingId)!
           //! one-logical-link-per-pair: keep the link dialed by the lower uuid; both ends compute the same winner.

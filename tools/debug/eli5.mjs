@@ -271,6 +271,7 @@ export const ELI5 = {
   'jk:diagDeny':     { t: 'diagDeny', d: "A debugging tool tried to open an inspection window and was refused: no debug passwords configured, a malformed request, or a wrong password. The tool is only told denied." },
   'jk:diagPull':     { t: 'diagPull', d: "A connected debugging tool read a chunk of this computer's data — its summary, part of a record book, or its current state. Reads of the diary itself are deliberately not recorded." },
   'jk:nameReject':   { t: 'nameReject', d: "Another computer connected but said it shares a different named dataset, so this one refused to link with it — otherwise two unrelated datasets would silently merge." },
+  'jk:doorReject':   { t: 'doorReject', d: "A computer knocked and was turned away at the door. The common case: a client used a name that belongs to a member, so the client was refused and the member kept its line. The row says which line closed and why." },
   'jk:resync':       { t: 'resync', d: "A client (a computer not on the member list) noticed it holds changes its server no longer has — the cluster lost them, or the client moved to a server that is behind. A client never teaches a server, so it starts over: it forgets its copy and asks the server for everything." },
   'jk:resynced':     { t: 'resynced', d: "The client's fresh download finished (the server's answer arrives after the data, in order). Anything the client held before that did not come back is removed from its screen — the client now shows exactly what the cluster has." },
 
