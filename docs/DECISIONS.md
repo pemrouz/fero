@@ -2115,3 +2115,123 @@ option if drift bites).
 Consequences: the pinned quiet box still waits for hardware; after it comes
 the v2-vs-v4 socket A/B with p99s. The example time limits leave about 3×
 headroom on a runner.
+
+## V4-30 — The door: the cluster contract, the methods-only hint and peer authentication as one HELLO change (2026-10-09)
+Context: three STATUS items changed the same frame. One box's shell could
+set `heartbeat.ms` or `replicas` alone and the mismatch showed only as
+behaviour; a client learned that a resource is methods-only only after a
+round trip; and a client's HELLO that presented a member's uuid tripped the
+duplicate-link rule against the real member, so any process that could
+connect could knock a member off. The owner chose BUILD for peer
+authentication on 2026-10-05, and on 2026-10-09 took every default of the
+design record docs/DESIGN-DOOR.md §14 (a three-proposal panel: kernel HMAC,
+shell TLS, operator-first). Built the same day in three stages and settled
+in three review rounds by the other model; 32 commits.
+Decision: HELLO grows once, by three optional keys. `c` is the cluster
+contract, a readable string, not a hash:
+`v1;heartbeat.ms=<effective>;replicas=<n|0>;methods=<1|0>;validation=<8 hex
+fnv of the rule's source|none>;ring=fmix32` — the api writes the front, the
+kernel appends the ring label from `RING` in kernel/ring.ts so it cannot
+drift from the ring code. `m: 1` is the methods-only hint. `k` is a fresh
+nonce per link, 16 to 64 characters, sent only when a secret is set. Only
+user-resource servers send `c` and `m`; clients, the `#directory` and every
+embedder send nothing, so a node with nothing set sends the v4.0 bytes
+(pinned as a literal and as a journal golden) and the system plane's bytes
+do not move. Two servers whose contracts differ refuse at the door:
+`contractReject: 77` names the first key that differs (or `missing:<key>`)
+and the other side's value, the dialed target is parked and heartbeat
+revival re-dials it. A client reads the hint live off its primary
+(`feederMethodsOnly`, never copied, so a failover refreshes it) and
+`Bind.issue` refuses a plain write locally as `methods-only`, the same
+WriteRejectError the relay throws, before any record ships. The role rule,
+with or without a secret: a client HELLO (`r: 1`) whose uuid is a committed
+member's, or an admitted member link's, is refused `doorReject: 78`
+`uuid-taken`; the member's link is never touched and no dupLink row is
+written; a member HELLO evicts a client squatting on its uuid; two clients
+keep the duplicate-link rule. The door itself: `NodeOpts.door = { mac,
+nonce }` is injected like `validate`, so the kernel holds no crypto and no
+secret (the api builds HMAC-SHA256 as base64url and 16 random bytes from
+node:crypto; the sim injects a seeded toy, so the schedules prove the
+protocol and real sockets prove the cryptography). One new verb, `DOOR` 26,
+carries a proof `{ p }` (exactly 43 characters) or a best-effort notice
+`{ e: 'denied' | 'uuid-taken' }`. The proof is
+`mac(JSON.stringify(['fero-door/1', side, verifierNonce, proverNonce,
+verifierUuid, verifierListen, u, i, l, r ?? 0, n ?? '', c ?? '', m ?? 0]))`.
+The dialer proves first; the acceptor proves back only to a verified dialer
+that has passed the role rule, and before anything admission ships.
+`verifierListen` is the listen the prover was SHOWN and the verifier
+rebuilds it over the one it SENT, so a relay that rewrites the address is
+`bad-proof`; the address rule (a discovered or view-learned target must
+answer as the address it was dialed at; typed `hosts` are exempt) catches a
+relay that forwards verbatim. A proving link (`LS.proving`) is outside
+`byUuid`, `clientLinks` and `admitted()`, carries nothing but DOOR, and
+dies `timeout` at `tune.proveMs` (5000, floor 1, no config key). The
+reasons: `no-secret` · `peer-secret` · `bad-proof` · `uuid-taken` ·
+`address` · `timeout` · `refused`; `c` carries the dial target or the
+claimed listen (for `uuid-taken` the uuid on the refusing side, the dial
+target on the refused client). A second HELLO on a secured node is dropped
+and the link lives (the golden's dup fault re-delivers HELLO in 14 of 20
+seeds); a notice on a link I never proved on is dropped and closed. THE
+CLOSE RULE, settled at the third review: the door speaks only through a
+DOOR notice. A notice read while proving parks the dialed target as
+`refused` (or `uuid-taken`, the one word kept, so the line can name
+`FERO_UUID`) and heartbeat revival re-dials it once per tick. A bare close
+while proving, before or after my proof, is a LINK LOSS: no row, no park,
+the ordinary bounded redial chain a link that died before HELLO gets, then
+the ordinary give-up. The one silent close: when a live link already
+reaches the target (one I dialed there, or one whose peer PROVED that
+listen: `#held`, the revive loop's rule) the close is a crossing dial's
+keeper close and starts no chain; `held` is judged on facts this node owns,
+never on the closing peer's unproven claimed uuid. The `secret` key: the
+call, `FERO_SECRET` (per resource `FERO_<NAME>_SECRET`), a `fero.opt.ts`
+file; never a flag (ps and shell history show every flag); a 16-character
+floor; trimmed in every layer; the OFF set means `false` = open on purpose;
+`diag(f).config()` shows `<set>`, never the value; nothing a secret touches
+prints (no secret, nonce or proof in a row, a capture, an error, a line or a
+log). A server that listens off loopback must set a secret or say
+`secret: false`; a client is never refused for having none;
+`FERO_CONFIG=off` with `FERO_SECRET` set prints one line saying the process
+runs open. The stderr lines: one per dialed target and reason; inbound
+refusals once per reason per process as "a peer that connected as
+<claim>", claims cleaned and cut at 64 characters, a 1024-entry cap;
+`nameReject` stays silent. Not protected, said plainly in §7: everything
+after the handshake is cleartext (TLS is a later layer and this handshake
+runs unchanged under it); a relay at a typed static host; a dishonest
+client that holds the one shared secret is a member on the wire; a leaked
+secret; the loopback `#directory`.
+REJECTED: TLS with a pre-shared key at the shell (the kernel never sees the
+door, so the sim cannot prove it, and a plain client gets no message at
+all); mTLS (a CA, certs, rotation, files in every example); hand-rolled
+crypto in kernel/; both sides proving at once (every member would sign any
+nonce for anyone who can connect); an HMAC in HELLO alone (a captured
+HELLO replays); the incarnation as the replay bound (a reconnect looks the
+same); an 8-hex contract hash (the operator cannot see which key differs);
+one `door=` field (hides validation drift under `methods:`); "the first
+holder keeps the uuid" (a client that connects first locks a member out);
+binding the dialed address for every target (typed hosts differ in
+spelling); two secrets now (the derived client key is the follow-up); a
+secret required on loopback (breaks the 27 examples for a boundary loopback
+already gives); a park on a bare close (the design's "refused is a guess":
+it stranded 41 of 480 secured pairs and 71 of 210 secured clients cut
+during the handshake with heartbeats off, where the open path healed every
+one); keying the keeper close on the claimed uuid (unproven); a `refused`
+row at the end of a notice-less chain (one row, two meanings); a new
+example rung in this change.
+Consequences: the open path did not move: the 20-seed golden, the sweep,
+the v4.0 byte literal, the journal golden and the 100-node formation at
+exactly 59,500 events; a secured 100-node formation is pinned at exactly
+104,050 events (4 handshake frames per link against 2). Pre-1.0 breaking:
+an off-loopback listen with no secret refuses to start, and a rolling
+change of a contract key or of the secret splits the cluster until every
+member runs the new value (STATUS). Still open and on STATUS: a discovered
+target that never admits holds genesis at the lowest-uuid member (a V4-3
+property the door family found); a secured crossing dial costs one extra
+dial; a lost notice costs one bounded chain; the journal ring fills in about
+34 minutes under two mis-keyed members re-dialing every 500 ms; the refusal
+printer reads the composer's journal cursor and can skip a line on a ring
+overflow; the sim's restart leaves the old life's timers in the queue, so
+a reborn node can time out an honest peer on a stale fire (sim-only; a
+real shell cancels its timers); redial chains can double-arm toward one
+target on both paths. Follow-ups the owner deferred: the derived client
+key, a rotation window `secret: [new, old]`, TLS at the shell, a secret
+example rung.

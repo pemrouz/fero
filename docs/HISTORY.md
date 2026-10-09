@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600 on 2026-10-09 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600 then 662 on 2026-10-09 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -696,6 +696,16 @@ working as designed.
   tombstone-GC holes (a short lane resurrects a removed row; an evicted member's
   write beats a newer remove after a heal), filed in STATUS. Nothing built; the
   owner answers its §14 first.
+
+- 2026-10-09 — the door (V4-30): the cluster contract and the methods-only hint
+  ride HELLO, a shared `secret` makes a peer prove it holds the secret before it
+  is admitted (HMAC over fresh nonces, the dialer first, the acceptor only after the
+  role rule), a client HELLO never takes a member's uuid. Built in three stages
+  from docs/DESIGN-DOOR.md with every §14 default, settled in three Opus review
+  rounds (the relay hole was real: the proof now signs the verifier's listen; the
+  #directory's bytes were restored; a bare close during the handshake runs the
+  redial chain instead of parking). 32 commits. Open formation 59,500 unchanged,
+  secured formation pinned at 104,050. 662/662 + 18/18, perf 47/47, sim:scale green.
 
 ## The debug tool
 

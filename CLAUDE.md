@@ -23,7 +23,7 @@ This root IS the v4 tree (branch `v4`, package `fero` 4.0.0, promoted 2026-08-16
 | Dir | What lives there |
 |---|---|
 | [api/](api) | The public surface. [index.ts](api/index.ts) is the composer: roles by declared act (bare `fero(name)` = a client; `server: true`, `listen`, `dir`, `replicas`, a `data:` seed or `methods:` = a server; `listen: false` = a socketless solo); `methods:` is the door (V4-5: clients change data only through the methods, a relayed plain write is refused `methods-only`); a write shows when it commits (V4-7: no optimistic copy, a refused write never shows, an in-flight write is a `pending` row of `cluster.writes`); Ctrl-C is a clean stop (V4-8, [signals.ts](api/signals.ts)); `fero.spawn(file, args, { stdin })` runs a role as a child process and returns `{ pid, out, exited, stop, write, child }` (V4-9, [spawn.ts](api/spawn.ts)). [substrate.ts](api/substrate.ts) is the ONE seam onto `../../data/api/index.ts`. [config.ts](api/config.ts) is the ONE seam onto `optcascade` (V4-10). [directory.ts](api/directory.ts) is the `#directory` system resource at the per-box rendezvous `127.0.0.1:3376` (V4-3; `FERO_RENDEZVOUS`; the battery runs it `off`). [fold.ts](api/fold.ts) is the gather for scoped reads, [methods.ts](api/methods.ts) the method plane, [diagnostics.ts](api/diagnostics.ts) the Symbol-keyed internals door. |
-| [kernel/](kernel) | The deterministic kernel: node, write pipeline, ring, membership (joint-consensus views; a clean `destroy()` LEAVES by ballot, V4-6), journal, codec, confirm, streams, scope (scoped replication), log (compaction), diag. No I/O; everything replayable. |
+| [kernel/](kernel) | The deterministic kernel: node, write pipeline, ring, membership (joint-consensus views; a clean `destroy()` LEAVES by ballot, V4-6), journal, codec, confirm, streams, scope (scoped replication), log (compaction), diag, door (the handshake, V4-30: a peer proves it holds the `secret` before it is admitted; the kernel holds no crypto, `NodeOpts.door` is injected). No I/O; everything replayable. |
 | [shell/](shell) | The thin I/O runtime: real sockets, timers and the fsync WAL around the kernel. |
 | [sim/](sim) | The simulation executive: exec, harness, monitors, shrink, sweep, the n≈100 scale tier. Chaos schedules against the SAME kernel bytes the shell runs. |
 | [tests/](tests) | Cross-layer scenarios, the real-TCP and real-WAL tiers, the config tier, the baseline gate, and [examples.test.ts](tests/examples.test.ts), which runs every example check under a private rendezvous port with a per-rung budget. |
@@ -39,8 +39,8 @@ Entries: `.` → [api/index.ts](api/index.ts), `./internals` → [internals.ts](
 
 | Command | What it does |
 |---|---|
-| `npm test` | 600 unit/sim/scenario tests (the 27 example checks, the n=100 scale tier, the config tiers, the debugger's DOM and ELI5 gates), then `test:contract`: data's 18-clause SCHEDULE suite from `../data/conformance/schedule.test.ts`. Runs with `--import ./utils/battery.ts`: directory OFF, config layer OFF. |
-| `npm run perf` | The 46 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
+| `npm test` | 662 unit/sim/scenario tests (the 27 example checks, the n=100 scale tier, the config tiers, the debugger's DOM and ELI5 gates), then `test:contract`: data's 18-clause SCHEDULE suite from `../data/conformance/schedule.test.ts`. Runs with `--import ./utils/battery.ts`: directory OFF, config layer OFF. |
+| `npm run perf` | The 47 perf pins (kernel/api/sim/tests tiers). `perf:absolute` / `perf:pin` / `perf:alloc` for the probe machinery. |
 | `npm run sim` / `shrink` / `scenarios` / `debug` / `demo` / `demo:watch` | Sim executive, shrinker, scenario server, debug viewer, the two-terminal demo (= examples/02). |
 | `npm run sim:scale` | The n≈100 deep-sweep registry (11 chaos scenarios, 30-200 s each). Script-tier: run it on scale-relevant kernel changes, not per commit. |
 
