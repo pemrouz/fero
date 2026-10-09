@@ -221,7 +221,7 @@ export const FAMILIES: readonly Family[] = [
     //! A1 the zombie lane, without poking link.synced: the owner of a live row commits a re-write whose RECORDS frame
     // dies in the kernel buffer as each link severs (severOnFrame, tail loss), and the owner is cut off and evicted
     // with that stranded commit in its log only. A survivor removes the row at the new epoch. Then the owner heals.
-    name: 'A1-zombie', ns: [3, 5], Rs: [2, 3], mutateAt: 2600,
+    name: 'A1-zombie', ns: [3, 5], Rs: [2, 3], mutateAt: 3100,
     chaos: (c) => {
       c.sim.at(700, () => {
         const k = liveCell(c)
@@ -250,20 +250,26 @@ export const FAMILIES: readonly Family[] = [
     },
   },
   {
-    //! A3 an orphan frozen before the remove reaches it: a join makes orphans, the oldest orphan holder is cut off
-    // while a remove lands, then a second join re-assigns; the second joiner's links to the cut node are fast
+    //! A3 an orphan frozen before the remove reaches it: a join makes orphans; the first node seen holding one is cut
+    // off at once and a live cell of that orphaned partition is removed at a current holder; then a second join
+    // re-assigns, with the second joiner's links to the cut node fast and the rest slow; then the cut heals
     name: 'A3-orphan-cut', ns: [3, 5], Rs: [1, 2], mutateAt: 1400,
     chaos: (c) => {
       c.sim.at(300, () => join(c.sim, 'n90', c.o))
       let cut: string | null = null
       c.polls.push(() => {
-        if (cut || c.sim.now < c.t0 + 500) return
-        for (const n of c.nodes) if (c.sim.nodes.has(n.uuid) && n.scope && [...n.scope.entries.values()].some((e) => e.state === SCOPE.orphan)) { cut = n.uuid; break }
-        if (!cut) return
+        if (cut || c.sim.now < c.t0 + 300) return
+        let part: string | null = null
+        for (const n of c.nodes) {
+          if (!c.sim.nodes.has(n.uuid) || !n.scope) continue
+          for (const [p, e] of n.scope.entries) if (e.state === SCOPE.orphan && n.state.has(JSON.stringify([p]))) { cut = n.uuid; part = p; break }
+          if (cut) break
+        }
+        if (!cut || !part) return
         cutFromAll(c, cut)
         c.eng.orphanCut = 1
-        const k = liveCell(c)
-        if (k) { const a = others(c, cut).find((x) => c.sim.nodes.get(x)?.armed); if (a) c.sim.post(a, { kind: 'write', recs: [{ type: REC.remove, key: JSON.parse(k) }] }, 0) }
+        const holder = ownerOf(c, part)
+        if (holder && c.sim.nodes.has(holder) && holder !== cut) c.sim.post(holder, { kind: 'write', recs: [{ type: REC.remove, key: [part] }] }, 0)
         const x = cut
         c.mutAt = c.sim.now + 400
         c.sim.at(900, () => { join(c.sim, 'n91', c.o); c.sim.fault(x, 'n91', { delay: [1, 1] }); for (const o of others(c, 'n91')) if (o !== x) c.sim.fault(o, 'n91', { delay: [60, 80] }) })
