@@ -166,7 +166,12 @@ export interface FeroConfig {
   // a capture, a message or `diag(f).config()` (which shows '<set>'). Changing it is a full stop and
   // start of every member and client. Every frame after the handshake is cleartext: use a private
   // network, WireGuard or SSH.
-  secret?: string | false
+  //! secret: { client } (DESIGN-DOOR §15) — the derived CLIENT KEY instead of the secret, for a process that
+  // may only follow: `fero.clientKey(secret)` prints it. A client with it is admitted as a client and can
+  // never prove as a member; a server with only it is refused at fero(). A process holds one of the two,
+  // never both. The same layers as secret (`FERO_SECRET_CLIENT`, a file as secret: { client: '…' }), never a
+  // flag. What it does NOT close: a client-key holder can pose as a server to another client that dials it.
+  secret?: string | false | { client: string }
   //! signals (V4-8) — the clean stop on Ctrl-C. By default every live instance destroy()s on SIGINT or
   // SIGTERM (the graceful leave, then teardown) and, if nothing else in the process listens for that
   // signal, the process exits 0. false keeps this instance out of it: stop it yourself.

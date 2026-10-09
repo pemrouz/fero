@@ -208,6 +208,36 @@ test('secret (DESIGN-DOOR §5) in a real process: FERO_SECRET arms the door and 
   assert.ok(!ignored.stderr.includes(S))
 })
 
+test('secret.client (DESIGN-DOOR §15) in a real process: FERO_SECRET_CLIENT arms a client and the diag door shows <set> under secret.client, never the value and no secret row; a server with only the client key is refused in plain words; a flag is refused; FERO_SECRET beside FERO_SECRET_CLIENT is refused naming both; FERO_CONFIG=off names it', async () => {
+  const S = 'e2e-test-secret-BRAVO-02'
+  const K = 'e2e-test-client-key-CHARLIE-03-43chars-xxxx'
+  const follow = { hosts: ['127.0.0.1:1'], heartbeat: { ms: 0 } }
+  const c = await run('shop', { env: { FERO_SECRET_CLIENT: K }, call: follow })
+  assert.equal(c.err, null, c.err ?? '')
+  assert.equal(c.lines[0].me.role, 'client')
+  assert.deepEqual(c.lines[0].config['secret.client'], { value: '<set>', from: 'FERO_SECRET_CLIENT' })
+  assert.equal(c.lines[0].config.secret, undefined, 'secret itself is unset: the leaf and the group share a name')
+  assert.ok(!JSON.stringify(c.lines).includes(K) && !c.stderr.includes(K), 'the key appears in no line the process printed')
+  const scoped = await run('shop,users', { env: { FERO_SHOP_SECRET_CLIENT: K, FERO_SECRET: S }, call: follow })
+  assert.match(scoped.err ?? '', /^fero\('shop'\): secret \(from FERO_SECRET\) and secret\.client \(from FERO_SHOP_SECRET_CLIENT\) are both set/, 'a cross-rung pair is both set for shop')
+  const server = await run('shop', { env: { FERO_SECRET_CLIENT: K }, call: { server: true } })
+  assert.match(server.err ?? '', /^fero\('shop'\): secret\.client is the client key \(from FERO_SECRET_CLIENT\) — it lets a process follow, never serve; a server needs the secret \(secret: '…' or FERO_SECRET\)$/)
+  assert.ok(!(server.err ?? '').includes(K))
+  const flag = await run('shop', { argv: ['--fero.secret.client', K], call: follow })
+  assert.match(flag.err ?? '', /'secret\.client' cannot come from --fero\.secret\.client — it is set in the call, the environment or a fero\.opt\.ts file only \(a secret never rides argv/)
+  assert.ok(!(flag.err ?? '').includes(K), 'the refusal never echoes the key')
+  const pair = await run('shop', { env: { FERO_SECRET: S, FERO_SECRET_CLIENT: K }, call: { server: true } })
+  assert.match(pair.err ?? '', /^fero\('shop'\): FERO_SECRET and FERO_SECRET_CLIENT are both set — a process holds one/)
+  assert.ok(!(pair.err ?? '').includes(S) && !(pair.err ?? '').includes(K))
+  const h = await run('shop', { home: home(`{ secret: { client: '${K}-home' } }`), call: follow })
+  assert.equal(h.err, null, h.err ?? '')
+  assert.deepEqual(h.lines[0].config['secret.client'], { value: '<set>', from: 'a fero.opt.ts file (secret.client)' })
+  const ignored = await run('shop', { env: { FERO_CONFIG: 'off', FERO_SECRET_CLIENT: K }, call: follow })
+  assert.equal(ignored.err, null, ignored.err ?? '')
+  assert.equal(ignored.lines[0].config['secret.client'], undefined)
+  assert.ok(ignored.stderr.split('\n').includes('FERO_CONFIG=off: FERO_SECRET_CLIENT is ignored, this process runs open'), ignored.stderr)
+})
+
 test('diag.allow from FERO_DIAG_ALLOW_<NAME> arms a real process; the door shows the name, never the token; a flag is refused without echoing it; FERO_DIAG_TOKEN stays the viewer\'s', async () => {
   const r = await run('shop', { env: { FERO_DIAG_ALLOW_OPS: 'Tok-77', FERO_DIAG_TOKEN: 'viewer-only' }, call: { server: true } })
   assert.equal(r.err, null, r.err ?? '')

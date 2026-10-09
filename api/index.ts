@@ -26,7 +26,7 @@ import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, batch, snapshot as snapshotOf, SPARSE_HOLE, holeMessage } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
-import { resolveConfig, src, secretHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
+import { resolveConfig, src, secretHint, clientKeyHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
 import type { Door } from '../kernel/door.ts'
 import type { JEvent } from '../kernel/journal.ts'
 import type { Node } from '../kernel/node.ts'
@@ -88,7 +88,7 @@ const shown = (s: string): string => {
   return t.length > SHOWN_MAX ? t.slice(0, SHOWN_MAX) + '…' : t
 }
 const said = new Set<string>()
-const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node): string | null => {
+const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node, clientOnly: boolean): string | null => {
   const c = e.c === undefined ? '' : String(e.c)
   const who = to ?? (c !== '' ? `a peer that connected as ${shown(c)}` : 'a peer that connected')
   const f = `fero('${name}'): refused`
@@ -98,13 +98,21 @@ const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node
     const mine = new Map((node.contract ?? '').split(';').map((t): [string, string] => { const i = t.indexOf('='); return i < 0 ? ['version', t] : [t.slice(0, i), t.slice(i + 1)] }))
     return `${f} ${to ?? 'a peer that connected'} — the cluster contract differs: ${shown(key)} is ${mine.get(key) ?? 'not set'} here, ${c === '' ? 'not set' : shown(c)} there (every member must agree on heartbeat.ms, replicas, methods, validation and ring)`
   }
+  //! a CLIENT-ONLY process (DESIGN-DOOR §15: it holds the client key, not the secret) reads the same rows; three of its
+  // lines say what it holds, so the operator reaches for the right variable. A member's lines do not change.
   switch (e.b) {
-    case 'no-secret': return `${f} ${who} — it has no secret and this node has one; every member and client must share FERO_SECRET`
+    case 'no-secret': return clientOnly
+      ? `${f} ${who} — it has no secret and this process holds the client key; every member must set FERO_SECRET`
+      : `${f} ${who} — it has no secret and this node has one; every member and client must share FERO_SECRET`
     case 'peer-secret': return `${f} by ${who} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`
-    case 'bad-proof': return `${f} ${who} — its secret differs from this node's`
+    case 'bad-proof': return clientOnly
+      ? `${f} ${who} — its secret does not match this process's client key (FERO_SECRET_CLIENT)`
+      : `${f} ${who} — its secret differs from this node's`
     //! `refused` is the peer's NOTICE (DOOR {e: 'denied'}, or a word this version does not know): it read this node's proof
     // and turned it away. A bare close mid-handshake writes no row and prints nothing — it is a link loss (the third review)
-    case 'refused': return `${f} ${who} — it refused this node's proof (the secrets probably differ)`
+    case 'refused': return clientOnly
+      ? `${f} ${who} — it refused this process's client key (is FERO_SECRET_CLIENT fero.clientKey of that cluster's secret?)`
+      : `${f} ${who} — it refused this node's proof (the secrets probably differ)`
     case 'address': return `${f} ${to ?? 'a dialed peer'} — it answered as ${shown(c)}, not the address the directory or the view gave (a stale or forged entry)`
     case 'timeout': return `${f} ${who} — no proof came within the handshake deadline`
     //! uuid-taken has two sides, told apart by the ROW, not the link table (the third review's minor): the refused
@@ -127,7 +135,7 @@ const dialTarget = (node: Node, e: JEvent): string | undefined => {
   if (to !== undefined) return to
   return e.kind === JK.doorReject && (e.b === 'refused' || e.b === 'timeout') && typeof e.c === 'string' && e.c !== '' ? e.c : undefined
 }
-const sayRefusal = (name: string, node: Node, e: JEvent): void => {
+const sayRefusal = (name: string, node: Node, e: JEvent, clientOnly: boolean): void => {
   const to = dialTarget(node, e)
   //! the key: owned facts only — a dialed target keys per reason and address; an accepted peer keys on the
   // reason alone. A contract mismatch keys on the KIND either way: the key name is the peer's choice too
@@ -137,7 +145,7 @@ const sayRefusal = (name: string, node: Node, e: JEvent): void => {
     ? `${name}\0${e.kind}\0${e.kind === JK.contractReject ? '' : String(e.b)}\0${to}`
     : `${name}\0${e.kind}\0${e.kind === JK.contractReject ? '' : String(e.b)}`
   if (said.has(key)) return
-  const line = refusalLine(name, to, e, node)
+  const line = refusalLine(name, to, e, node, clientOnly)
   if (line === null) return
   if (said.size >= SAID_MAX) said.clear()
   said.add(key)
@@ -154,9 +162,28 @@ export { RENDEZVOUS, DIRECTORY } from './directory.ts'
 const keyPath = (k: string | string[] | undefined): string[] =>
   k === undefined ? [] : Array.isArray(k) ? k.map(String) : [String(k)]
 
+//! hmac — HMAC-SHA256 as base64url (43 characters, kernel/door.ts PROOF_LEN) over `key`, from node:crypto
+const hmac = (key: string) => (msg: string): string => createHmac('sha256', key).update(msg).digest('base64url')
+//! CLIENT_KEY_LABEL — what the client key is the HMAC of (§15); versioned like the proof's label
+const CLIENT_KEY_LABEL = 'fero/client/1'
+//! clientKeyOf — the derived client key: HMAC-SHA256(secret, 'fero/client/1') as base64url. The secret is trimmed
+// as every layer trims it, so the key a member derives and the key this prints are one string. A short secret is
+// refused in the config's words. The same string from a shell (the secret shows in `ps` while openssl runs):
+//   printf 'fero/client/1' | openssl dgst -sha256 -hmac "$FERO_SECRET" -binary | openssl base64 -A | tr '+/' '-_' | tr -d '='
+export const clientKeyOf = (secret: string): string => {
+  const s = typeof secret === 'string' ? secret.trim() : secret
+  if (typeof s !== 'string' || s.length < SECRET_MIN) throw new Error(`fero.clientKey(secret): the secret must be text of at least ${SECRET_MIN} characters — openssl rand -base64 24 prints a good one`)
+  return hmac(s)(CLIENT_KEY_LABEL)
+}
+export { clientKeyOf as clientKey }
+
 export const fero = (name: string, opts: FeroOpts = {}): Promise<Fero> => compose(name, opts, false)
 //! fero.spawn(file, args?, opts?) (V4-9): `node <file> …` as a separate process — the reader's other terminal, from code (api/spawn.ts)
 fero.spawn = spawn
+//! fero.clientKey(secret) (DESIGN-DOOR §15): the derived client key, printed once by an operator and handed to
+// processes that may only follow (`secret: { client }`, FERO_SECRET_CLIENT)
+fero.clientKey = clientKeyOf
+
 
 //! compose — the composer proper. `system` admits a `#`-prefixed name (the directory) and skips the
 // directory for the instance itself (a directory never meets a directory); the public fero() always
@@ -226,9 +253,16 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // #directory) never carries one: loopback is its trust boundary (api/directory.ts).
   //! trimmed like the text layers trim theirs (api/config.ts coerce), so one member's padded call does not
   // refuse its peers as bad-proof; 16 spaces trim to nothing and are refused below like any short value
-  const secret = (typeof config.secret === 'string' ? config.secret.trim() : config.secret) as string | false | undefined
+  //! secret: { client } (DESIGN-DOOR §15) is the derived CLIENT KEY instead: the layers folded it under `secret`
+  // (a leaf and a group), and refused both at once. The call's shape is checked here in the config's words.
+  const secretRaw: unknown = config.secret
+  const ckeyRaw = plainObject(secretRaw) ? (secretRaw as { client?: unknown }).client : undefined
+  const clientKey = typeof ckeyRaw === 'string' ? ckeyRaw.trim() : ckeyRaw
+  if (clientKey !== undefined && (typeof clientKey !== 'string' || clientKey.length < SECRET_MIN)) throw new Error(clientKeyHint(name, at('secret.client')))
+  const secret = (plainObject(secretRaw) ? undefined : typeof secretRaw === 'string' ? secretRaw.trim() : secretRaw) as string | false | undefined
   if (secret !== undefined && secret !== false && (typeof secret !== 'string' || secret.length < SECRET_MIN))
     throw new Error(`${secretHint(name, at('secret'))}; or secret: false to run open on purpose`)
+  const clientOnly = typeof clientKey === 'string'
 
   //! role by DECLARED ACT (v4.1 — supersedes the v2 hosts-without-listen rule): following is the
   // ambient case, serving is a declared act. Any server MARKER makes a server — server: true, listen
@@ -269,6 +303,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const isServer = config.server === true || config.listen !== undefined || config.dir !== undefined
     || config.replicas !== undefined || config.data !== undefined || methodsOnly
   const isClient = !isServer
+  //! the client key lets a process FOLLOW, never serve (DESIGN-DOOR §15): a server with only secret.client is
+  // refused here in plain words — a member must hold the secret, which is what every other member checks
+  if (clientOnly && isServer && !isSystem)
+    throw new Error(`fero('${name}'): secret.client is the client key${at('secret.client')} — it lets a process follow, never serve; a server needs the secret (secret: '…' or FERO_SECRET)`)
   //! an undialable member is refused loudly: a socketless node cannot be dialed back, heartbeated,
   // or counted by genesis — the v2 rule ("a spoke that can never be dialed can never be a member")
   // survives as a validation instead of a role inference
@@ -391,8 +429,13 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const clusterContract = isServer && !isSystem
     ? `v1;heartbeat.ms=${heartbeatMs ?? 500};replicas=${(config.replicas as number | undefined) ?? 0};methods=${methodsOnly ? 1 : 0};validation=${validate !== undefined ? fnv(Function.prototype.toString.call(validate)).toString(16).padStart(8, '0') : 'none'}`
     : undefined
-  const door: Door | undefined = typeof secret === 'string' && !isSystem
-    ? { mac: (msg) => createHmac('sha256', secret).update(msg).digest('base64url'), nonce: () => randomBytes(16).toString('base64url') }
+  //! three doors from one secret (DESIGN-DOOR §15): a member (or a client trusted with the secret) signs member
+  // links with the secret and client links with the derived client key; a CLIENT-ONLY process holds the client
+  // key under both names — every proof it can make is a client-key proof. Never the #directory.
+  const nonce = () => randomBytes(16).toString('base64url')
+  const door: Door | undefined = isSystem ? undefined
+    : typeof secret === 'string' ? { mac: hmac(secret), clientMac: hmac(clientKeyOf(secret)), nonce }
+    : typeof clientKey === 'string' ? { mac: hmac(clientKey), clientMac: hmac(clientKey), nonce }
     : undefined
   const rtOpts: RuntimeOpts = {
     uuid: (config.uuid as string) ?? restored.uuid ?? randomUUID().slice(0, 8),
@@ -814,7 +857,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         else if (e.kind === JK.shed) { shedEver++; bind.shedPartition(String(e.a)) }
         else if (e.kind === JK.acquire) acquiredEver++
         //! the door refused a peer (DESIGN-DOOR §3): one stderr line per peer and reason, deduped per process
-        else if (e.kind === JK.doorReject || e.kind === JK.contractReject) sayRefusal(name, node, e)
+        else if (e.kind === JK.doorReject || e.kind === JK.contractReject) sayRefusal(name, node, e, clientOnly)
         //! M6: a view install re-gathers the LIVE union against the new ring (the Q3a leg) — but
         // ONLY when the gather was ever consumed (M6-review finding 41): `gather` stays null until
         // read()/`await data` materializes it, so an idle scoped cluster pays nothing on churn
@@ -1035,14 +1078,17 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'redial.tries': redialTries ?? TUNE.redials, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
       for (const k of CONFIG_LEAVES) {
         const v = k.split('.').reduce<unknown>((o, p) => (o !== null && typeof o === 'object' ? (o as Record<string, unknown>)[p] : undefined), config)
+        //! secret is a leaf and a group (§15): with only the client key set, `secret` itself is unset
+        if (k === 'secret' && plainObject(v)) continue
         const shown = v !== undefined ? v : effective[k]
         if (shown === undefined) continue
         out[k] = {
           //! a diag token is a secret: the door shows WHO may attach, never the token
           value: typeof shown === 'function' ? '[function]' : k === 'methods' || k === 'data' ? Object.keys(shown as object)
             : k === 'diag.allow' ? Object.fromEntries(Object.keys(shown as object).map((who) => [who, '[redacted]']))
-            //! the secret is a secret: the door says that one is set (and where from), or that the door is open on purpose
-            : k === 'secret' ? (shown === false ? false : '<set>') : shown,
+            //! the secret is a secret, and so is the client key: the door says that one is set (and where from), or that
+            // the door is open on purpose
+            : k === 'secret' || k === 'secret.client' ? (shown === false ? false : '<set>') : shown,
           from: v !== undefined ? from(k) : k === 'rendezvous' && envDefault !== false ? 'FERO_RENDEZVOUS' : 'the default',
         }
       }
