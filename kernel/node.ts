@@ -1240,6 +1240,8 @@ export class Node {
     // the final attempt was still pending, and the revival dialed over it. One chain, its own tries.
     //! a call that finds an orphaned timer (no entry: an identify reset the chain) writes the entry, so
     // dialing() holds while that timer is out; when its dial fails, the chain's tries arm from tries 0.
+    // Since the member rule above, only a NON-member linkDown gets here: the entry keeps the view install
+    // (membership.ts) from dialing over the orphan, a crossing dial on a live peer.
     else for (const m of this.#timers.values()) if (m.tag === TAG.redial && m.to === to) {
       if (!cur) this.#backoff.set(to, b)
       return

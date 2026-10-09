@@ -455,6 +455,44 @@ test('a member that dies while a GENERIC chain toward it is running gets the mem
   assert.deepEqual(of('timer').filter((x) => x[2] === TAG.redial).slice(-5).map((t) => t[3]), [10, 20, 40, 80, 160], 'the member chain\'s own curve')
 })
 
+test('a NON-member link that dies while an orphaned redial timer is pending marks the target dialing, so a view install does not dial over that timer', () => {
+  //! the orphan's other door (2026-10-09 review): an identify deletes the backoff entry and leaves an older
+  // chain's timer pending. A dead MEMBER link cancels that timer (the member rule); a dead NON-member link
+  // does not, and its linkDown writes the fresh entry, so dialing() reads true while the orphan is out. The
+  // view install then leaves the target to that timer (V4-28's rule) instead of dialing it a second time,
+  // which on a live peer is a crossing dial and a dup-link close.
+  const { node, of } = harness('aa', { redialMs: 10, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['cc', 'sim:cc']] } })
+  node.step({ kind: 'start' })
+  node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:cc' })
+  node.step({ kind: 'bytesIn', link: 2, bytes: hello('cc') })
+  const fired = new Set<unknown>()
+  const live = () => { const gone = new Set(of('cancel').map((c) => c[1])); return of('timer').filter((x) => x[2] === TAG.redial && !gone.has(x[1]) && !fired.has(x[1])) }
+  //! dd (not a member) is unreachable: a generic chain, one timer out
+  node.step({ kind: 'linkDown', link: 900, reason: 'refused', to: 'sim:dd' })
+  const orphan = live()[0]
+  assert.ok(orphan && live().length === 1)
+  //! dd dials US: admitted outside the view, and the identify resets the entry — the old timer stays out
+  node.step({ kind: 'linkUp', link: 60, dialed: false })
+  node.step({ kind: 'bytesIn', link: 60, bytes: hello('dd') })
+  assert.equal(node.links.get(60)!.state, LS.admitted)
+  assert.ok(!node.membership.isMember('dd'))
+  assert.ok(!node.dialing('sim:dd'), 'the identify reset the chain')
+  //! dd's link dies: a NON-member linkDown toward its gossiped listen, while the orphan is pending
+  node.step({ kind: 'linkDown', link: 60, reason: 'cut' })
+  assert.deepEqual(live().map((t) => t[1]), [orphan[1]], 'the orphan still owns the target: nothing cancelled, nothing armed')
+  assert.ok(node.dialing('sim:dd'), 'the target reads dialing while the orphan is out')
+  //! cc floods view 2 with dd in it; aa holds no link to dd
+  const connects = () => of('connect').filter((x) => x[1] === 'sim:dd').length
+  const c0 = connects()
+  node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['cc', 'sim:cc'], ['dd', 'sim:dd']] }) })
+  assert.equal(node.epoch, 2, 'the view installed')
+  assert.equal(connects(), c0, 'no install dial over the pending orphan')
+  //! the orphan fires: that is the one dial
+  fired.add(orphan[1])
+  node.step({ kind: 'timer', id: orphan[1] as number, tag: TAG.redial })
+  assert.equal(connects(), c0 + 1)
+})
+
 test('the floor is silent on a paused link; a digest arriving mid-pause defers its suffix to drain', () => {
   //! adversarial-review regression: control frames queued into a drop-oldest queue are doomed work,
   // and serialising the missing suffix per inbound digest during a pause is O(suffix) discarded per
