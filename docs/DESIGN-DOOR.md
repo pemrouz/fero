@@ -1,7 +1,8 @@
 # DESIGN-DOOR — the door, designed once (wave 3)
 
-*Status: the design record (2026-10-08). Nothing is built. The owner reads
-this first; the build waits for the yes in §14. Three proposals and three
+*Status: the design record (2026-10-08), BUILT in three stages on 2026-10-09
+(the three dated notes below say what landed and where it deviated). The owner
+took every default of §14 on 2026-10-09. Three proposals and three
 skeptic critiques went into it (a kernel angle, a shell angle, an operator
 angle). Where a skeptic disagreed with a proposal, this record sides with the
 evidence and says so. Every file:line below was read on the tree at
@@ -63,6 +64,43 @@ not the door's: a discovered target that never admits — a squatter — holds
 GENESIS at the lowest-uuid member for good, because genesis waits there for
 `links ≥ hosts` and `hosts` counts the discovered set (kernel/membership.ts
 tick). A V4-3 property, with or without a door; stated for STATUS.*
+
+*Built, stage 3 of 3 (2026-10-09): the api half of §13 commit 3, and the docs. The
+door is built. What landed as designed: the `secret` leaf (`cep`; the carriers refusal
+names the flag; trimmed, `''` unset, the OFF set → `false`, a number, a boolean or
+fewer than 16 characters refused with one message that never prints the value and
+names `openssl rand -base64 24`); `FeroOpts.secret`; the composer's call check in the
+same words; the door closure from node:crypto (HMAC-SHA256 as base64url, 43; 16 random
+bytes as base64url, 22) for servers and clients, never the `#directory`; the
+off-loopback rule after the directory-socket check (example 15's line unchanged, its
+check run on a private port); the `FERO_CONFIG=off` note once per process;
+`diag(f).config()` showing `<set>` or `false`, in the same commit as the leaf; one
+stderr line per peer address and reason per process, deduped across revivals,
+`nameReject` silent; the README rows and limits, the DESIGN-CONFIG row; the tests of
+§11 that are the api's (config unit and e2e, api/index real TCP, the directory squatter,
+the raw-socket tier three ways plus a silent one on the real 5 s timer, fero.spawn with
+`FERO_SECRET`); the glossary and the wire card's `k` and DOOR. Deviations, each small:
+(1) the refusal lines are fed from the composer's post-step journal cursor (the read
+`cluster` already folds from), not a separate emit hook — the journal has none, and the
+cursor sees every row the step wrote. (2) The lines are adapted to the rows: an
+accepted link that sent no listen reads "a peer that connected" (the row carries no
+uuid), the address line takes the dial target from the link table (still there at fold
+time) and the claimed listen from the row, and the contract line reads our value off
+`node.contract`. (3) The carriers message now names the layers a refused key MAY come
+from, for every leaf — it said "the call only" for `uuid`, which rides a flag and a
+variable; one assertion moved with it. (4) The call's shape message is the config hint
+plus "; or secret: false to run open on purpose". (5) The layer-off note names the
+variable it found (`FERO_SHOP_SECRET` too). (6) A FINDING for the kernel, not fixed
+here: the acceptor sends its proof (step 11) before the role rule (step 12), so a
+secret-holding client with a member's uuid is ADMITTED on its own side when
+`{e: 'uuid-taken'}` arrives, drops the notice as `door out of order`, and sees only a
+close — no `doorReject` row on the client; the server's row and line say it all. The
+one-line fix is to run the role rule before the acceptor's proof. (7) The directory
+squatter registers after the members form (deviation 6 of stage 2: a discovered target
+that never admits holds genesis at the lowest member). (8) The glossary keeps one
+`doorReject` entry naming every reason (the gate wants one entry per journal kind, not
+per reason). (9) The `nobind` directory test says `secret: false`: a routable listen
+with no secret is refused now, as §8 says.*
 
 ## §0 The decision, in ten lines
 
