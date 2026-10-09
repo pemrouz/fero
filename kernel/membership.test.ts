@@ -664,13 +664,21 @@ const meshNode = (uuid: MeshId) => {
   const sent = (to: MeshId, verb: number) =>
     h.of('send').filter((e) => e[1] === meshIds[to]).map((e) => e[2] as Uint8Array)
       .filter((b) => new Framer().push(b.slice())[0]?.verb === verb)
-  //! exhaust the redial chain to `to`: the dial is refused until the node gives up (membership holds eviction while dialing)
+  //! exhaust the redial chain to `to`: the dial is refused until the node gives up (membership holds eviction while dialing).
+  // Each round fires every redial timer armed toward `to` (the i-th redial timer and the i-th JK.redial row are one
+  // arm, so the row names the target), then fails the dial. That includes a timer an OLDER chain left pending
+  // across a reconnect: under the one-chain rule (kernel/node.ts #redial) it owns the target, and the chain cannot
+  // end until it fires.
+  // (Firing only the newest timer of any target used to look like exhaustion only because that rule dropped the
+  // dead member's chain entry, so nothing held eviction — the bug the review found.)
   const giveUp = (to: MeshId) => {
     for (let i = 0; i < 11; i++) {
-      const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
-      if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+      const timers = h.of('timer').filter((x) => x[2] === TAG.redial), rows = h.jk(JK.redial)
+      assert.equal(timers.length, rows.length, 'one JK.redial row per redial timer')
+      timers.forEach((t, k) => { if (rows[k].b === `sim:${to}`) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial }) })
       h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: `sim:${to}` })
     }
+    assert.ok(!h.node.dialing(`sim:${to}`), `the chain to ${to} ended`)
   }
   return { uuid, ...h, sent, giveUp, admitPeer: (u: MeshId) => h.admit(meshIds[u], u), down: (u: MeshId) => h.node.step({ kind: 'linkDown', link: meshIds[u], reason: 'close' }) }
 }
