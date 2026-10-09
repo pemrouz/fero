@@ -59,7 +59,7 @@ const KEYS = {
   WACK: { u: 'who issued the write (name~life)', c: 'the issuer’s counter for this write', n: 'how many records', s: 'the stamp counter the owner gave', e: 'the view it was stamped in' },
   WNACK: { u: 'who issued the write', c: 'the issuer’s counter for this write', n: 'how many records', r: 'the reason', ce: 'the owner’s view' },
   HELLO: { u: 'its name', i: 'its life', l: 'its address', r: '1 means a client', n: 'the resource', c: 'the cluster contract: the settings every server must share, as one readable string', m: '1 means this server takes client changes only through its methods', k: 'a fresh random value for this link, sent only when a secret is set; the other side’s proof must cover it' },
-  DOOR: { p: 'the proof: a keyed hash over both sides’ random values, both names, the side and the HELLO keys sent', e: 'a refusal notice: denied, or the name belongs to a member' },
+  DOOR: { p: 'the proof: a keyed hash over both sides’ random values, both names, the address the other side claimed, the side and the HELLO keys sent', e: 'a refusal notice: denied, or the name belongs to a member' },
   JOIN: { u: 'its name', i: 'its life', l: 'its address' },
   PROPOSE: { e: 'the new view’s number', m: 'its members', p: 'who proposes it' },
   VOTE: { e: 'the view voted on', g: '1 is yes, 0 is no', ce: 'the voter’s view now', h: 'the member list it voted on', ve: 'the newest view it has voted for' },
