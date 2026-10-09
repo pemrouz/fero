@@ -700,6 +700,9 @@ export class Node {
           return
         }
         this.links.delete(e.link)
+        //! the uuid the peer CLAIMED on a proving link, read before #unprove drops the stash: it tells a
+        // keeper-rule close from a refusal below
+        const claimed = link.state === LS.proving ? link.hello?.u : undefined
         if (link.proveTimer !== -1) this.#unprove(link)
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
@@ -707,10 +710,17 @@ export class Node {
         // mid-handshake — the two look the same from here, so the row is `refused` and the api's line
         // says so. Parked given-up like every door refusal: heartbeat revival re-dials it once per tick,
         // and a deliberate close of my own (noRedial already set) was journaled where it happened.
+        // EXCEPT the crossing dial (the second review's major): when I already hold the claimed uuid over
+        // another admitted link, this close is the peer's keeper rule — it admitted me there and closed
+        // this one as the duplicate, and its proof (shipped just before) may still be in flight behind
+        // the close. An honest peer: no row, no park, and no redial either (the pair is linked).
         if (link.state === LS.proving && link.proved && !link.noRedial) {
-          j.armed && j.emit(JK.doorReject, link.id, 'refused', link.to ?? '')
+          const keeper = claimed !== undefined ? this.byUuid.get(claimed) : undefined
+          if (keeper === undefined || this.links.get(keeper)?.dead !== false) {
+            j.armed && j.emit(JK.doorReject, link.id, 'refused', link.to ?? '')
+            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
+          }
           link.noRedial = true
-          if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
         }
         //! M6: a dying teacher aborts every latch it was feeding (window 6 — the buffer drops whole,
         // nothing folded, the next handshake round re-offers from a surviving holder)
