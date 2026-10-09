@@ -102,6 +102,40 @@ that never admits holds genesis at the lowest member). (8) The glossary keeps on
 per reason). (9) The `nobind` directory test says `secret: false`: a routable listen
 with no secret is refused now, as §8 says.*
 
+*Settled at review (2026-10-09): a skeptic read the built door against this record
+and found two blockers, one major, two minors and two nits; every one was checked,
+confirmed and fixed, each with a test that is red without its change. (1) THE RELAY
+WAS OPEN: the address rule reads the peer's claimed `l` before any proof exists, so a
+relay listed in the directory could hand the dialer a copy of the member's HELLO with
+`l` rewritten to the relay's own address, pass the rule, forward the dialer's proof
+and be admitted at the real member as the dialer (a member victim; a secured client
+victim fed RECORDS). §3's argument that "A sees B's signed `l` inside B's proof" was
+wrong — B's proof arrives after A has proved. The proof message now carries
+`verifierListen`, the `l` the prover read in the verifier's HELLO, and the verifier
+rebuilds over the `l` it SENT (`link.said.l`): a rewritten listen is `bad-proof`.
+§3 "what is signed", "the relay", §6, §7 and §0 are rewritten above; no frame is
+added, so the 104,050 pin did not move; the label stays `fero-door/1` because no
+door ever shipped. (2) The `#directory` host sent `m: 1` with nothing set (it is
+composed with `methods`; the hint lacked the `!isSystem` gate the contract has); a
+real-socket test now pins the host's HELLO keys to u, i, l, n and the client's to
+u, i, l, r, n. (3) The stderr printer wrote peer-chosen text verbatim — a claimed
+listen (type-checked only), a claimed uuid, a contract value — so a newline forged
+a line, an escape drove the terminal, and a module Set grew without bound; on an
+OPEN server this needed no secret. Now a peer's field prints only through `shown`
+(control characters dropped, cut at 64) and the dedupe keys on facts this node owns:
+the resource, the kind, the reason and the dial target. A DEVIATION from "one line
+per peer address and reason": an ACCEPTED peer has no address we trust, so inbound
+refusals print once per reason per process, and the line reads "a peer that
+connected as <claim>" so the operator reads it as a claim; the set is capped at
+1024 entries. (4) The role rule now runs before the acceptor's proof (stage 3's
+finding 6, fixed): the refused client is still proving, reads the notice as
+`refused`, and never admits the server on its side. (5) A `DOOR { e }` on a link I
+never proved on is `frameDrop 'notice before proof'` and a close, not a `refused`
+row. (6) The call's secret is trimmed like the text layers trim theirs. (7) The
+debug attach (r:2) on a secured node — with the token, a wrong token, on a proving
+link — is now pinned by tests (the behaviour was right). Nothing printed by an
+example changed.*
+
 ## §0 The decision, in ten lines
 
 1. HELLO grows once, by three optional keys: `c` (the cluster contract, a
@@ -320,9 +354,15 @@ membership. Today those are all in the admit tail (kernel/node.ts:1178-1218).
     (kernel/diag.ts:31-36, moved to kernel/door.ts and shared). Mismatch →
     `doorReject 'bad-proof'`, best-effort `DOOR { e: 'denied' }`, dead +
     noRedial, park if dialed, close `'door'`. Match and I am the ACCEPTOR →
-    send my `DOOR { p }` first, THEN continue to step 12. On a FIFO link the
-    dialer sees the proof before the digest and VIEW that admission ships.
-    Match and I am the DIALER → continue to step 12.
+    run the REFUSING half of the role rule (step 12) first — a verified
+    client that claims a member's uuid is refused now, while it is still
+    proving, so it reads the notice as `refused` and never admits me on its
+    own side (settled at review, 2026-10-09) — then send my `DOOR { p }`,
+    THEN continue to step 12. On a FIFO link the dialer sees the proof
+    before the digest and VIEW that admission ships. Match and I am the
+    DIALER → continue to step 12. A `DOOR { e }` on a link I have NOT proved
+    on (an acceptor still waiting) is a stranger's frame, not a refusal:
+    `frameDrop 'notice before proof'` and a close, no `refused` row.
 12. **The role rule**, with or without a door. If `r === 1` and the claimed
     uuid is a member of the committed view (kernel/membership.ts:186
     `isMember`) or is held by an admitted NON-client link in `byUuid`: refuse
