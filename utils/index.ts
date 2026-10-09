@@ -149,9 +149,11 @@ export const alloc = {
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 //! Poll `check` every 5ms until pass or timeout — returns false on timeout so the test fails loudly, not hangs.
-export const until = async (check: () => boolean, ms = 5000): Promise<boolean> => {
+// The check may be async: its promise is AWAITED (a promise is truthy, so `until(async () => …)` used to
+// return true at once and the test it sat in could never fail — the stage-1 skeptic's finding).
+export const until = async (check: () => boolean | Promise<boolean>, ms = 5000): Promise<boolean> => {
   const deadline = Date.now() + ms
-  while (!check()) {
+  while (!(await check())) {
     if (Date.now() > deadline) return false
     await sleep(5)
   }
