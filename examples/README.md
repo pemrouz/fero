@@ -66,7 +66,8 @@ next to the nearest `package.json` or in your home directory. The README's "Conf
 the table. The role files here stay bare on purpose. The files that read their ports from the command
 line — 13's and 18's `server.ts`, 15's and 16's `server.ts` and `client.ts`, 30's and 43's `member.ts` — take
 every argument as a port, so give those the variable form: `FERO_HEARTBEAT_MS=50 node client.ts 4801`, not a
-flag. A secret is the variable form only, everywhere: `FERO_SECRET=… node server.ts` (18); `--fero.secret` is refused.
+flag. A secret is never a flag: use the variable form (`FERO_SECRET=… node server.ts`, 18) or a `fero.opt.ts`
+in your home directory; `--fero.secret` is refused.
 
 How a check works: `check.ts` starts the role files with `fero.spawn` (each a separate `node <file>`, its
 output echoed here), reads what they print, asserts, stops them with Ctrl-C (`stop()`), and ends with
