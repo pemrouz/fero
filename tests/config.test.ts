@@ -178,6 +178,36 @@ test('validation: and its old spelling seams.validation both guard writes in a r
   assert.equal(notes[0], "fero('shop'): seams: { validation } is now spelled validation: — the old spelling still works in this release and goes in the next")
 })
 
+test('secret (DESIGN-DOOR §5) in a real process: FERO_SECRET arms the door and the diag door shows <set>, never the value; FERO_SHOP_SECRET wins its rung; a $HOME file carries it; off is the open door; a flag or a short value is refused without echoing it; FERO_CONFIG=off with FERO_SECRET prints its one line', async () => {
+  const S = 'e2e-test-secret-BRAVO-02'
+  const env = await run('shop', { env: { FERO_SECRET: S }, call: { server: true } })
+  assert.equal(env.err, null, env.err ?? '')
+  assert.deepEqual(env.lines[0].config.secret, { value: '<set>', from: 'FERO_SECRET' })
+  assert.ok(!JSON.stringify(env.lines).includes(S) && !env.stderr.includes(S), 'the secret appears in no line the process printed')
+  const scoped = await run('shop,users', { env: { FERO_SECRET: S, FERO_SHOP_SECRET: `${S}-shop` }, call: { server: true } })
+  assert.equal(scoped.err, null, scoped.err ?? '')
+  assert.deepEqual(scoped.lines.map((l) => [l.name, l.config.secret]), [['shop', { value: '<set>', from: 'FERO_SHOP_SECRET' }], ['users', { value: '<set>', from: 'FERO_SECRET' }]])
+  const h = await run('shop', { home: home(`{ secret: '${S}-home' }`), call: { server: true } })
+  assert.equal(h.err, null, h.err ?? '')
+  assert.deepEqual(h.lines[0].config.secret, { value: '<set>', from: 'a fero.opt.ts file (secret)' })
+  const off = await run('shop', { env: { FERO_SECRET: 'off' }, call: { server: true } })
+  assert.equal(off.err, null, off.err ?? '')
+  assert.deepEqual(off.lines[0].config.secret, { value: false, from: 'FERO_SECRET' })
+  const flag = await run('shop', { argv: ['--fero.secret', S], call: { server: true } })
+  assert.match(flag.err ?? '', /'secret' cannot come from --fero\.secret — it is set in the call, the environment or a fero\.opt\.ts file only \(a secret never rides argv/)
+  assert.ok(!(flag.err ?? '').includes(S), 'the refusal never echoes the secret')
+  const short = await run('shop', { env: { FERO_SECRET: 'too-short-value' }, call: { server: true } })
+  assert.match(short.err ?? '', /secret must be text of at least 16 characters \(from FERO_SECRET\) — a value that is all digits is read as a number; openssl rand -base64 24 prints a good one/)
+  assert.ok(!(short.err ?? '').includes('too-short-value'))
+  //! the layer off: the variable is ignored, the process runs open, and it says so once for two resources
+  const ignored = await run('shop,users', { env: { FERO_CONFIG: 'off', FERO_SECRET: S }, call: { server: true } })
+  assert.equal(ignored.err, null, ignored.err ?? '')
+  assert.equal(ignored.lines[0].config.secret, undefined, 'the door is open')
+  const notes = ignored.stderr.split('\n').filter((l) => l === 'FERO_CONFIG=off: FERO_SECRET is ignored, this process runs open')
+  assert.equal(notes.length, 1, `one note for two resources:\n${ignored.stderr}`)
+  assert.ok(!ignored.stderr.includes(S))
+})
+
 test('diag.allow from FERO_DIAG_ALLOW_<NAME> arms a real process; the door shows the name, never the token; a flag is refused without echoing it; FERO_DIAG_TOKEN stays the viewer\'s', async () => {
   const r = await run('shop', { env: { FERO_DIAG_ALLOW_OPS: 'Tok-77', FERO_DIAG_TOKEN: 'viewer-only' }, call: { server: true } })
   assert.equal(r.err, null, r.err ?? '')

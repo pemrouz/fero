@@ -157,6 +157,16 @@ export interface FeroConfig {
   // readable by every user on the box). `diag(f).config()` shows the names, never the tokens. The token
   // crosses the wire in cleartext: attach on a trusted network or through a tunnel.
   diag?: { allow?: Record<string, string> }
+  //! secret (DESIGN-DOOR §5) — the cluster's shared secret: text of at least 16 characters, the SAME value
+  // on every member AND every client. With it set, a peer must prove it holds the secret before it is
+  // admitted (an HMAC over fresh nonces, kernel/door.ts); a process without it cannot join, read, write,
+  // call a method or vote. Unset = the open door (today's loopback wire); `false` = open ON PURPOSE, which
+  // a server listening off loopback must say (otherwise fero() refuses). From the call, `FERO_SECRET`
+  // (per resource `FERO_SHOP_SECRET`) or a fero.opt.ts file; never a flag. It never reaches a journal row,
+  // a capture, a message or `diag(f).config()` (which shows '<set>'). Changing it is a full stop and
+  // start of every member and client. Every frame after the handshake is cleartext: use a private
+  // network, WireGuard or SSH.
+  secret?: string | false
   //! signals (V4-8) — the clean stop on Ctrl-C. By default every live instance destroy()s on SIGINT or
   // SIGTERM (the graceful leave, then teardown) and, if nothing else in the process listens for that
   // signal, the process exits 0. false keeps this instance out of it: stop it yourself.
