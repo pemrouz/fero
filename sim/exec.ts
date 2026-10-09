@@ -110,7 +110,12 @@ export class Sim {
   // stayed queued and a reborn node read one as its own: a TAG.prove deadline at 12 ms instead of 5000
   // refused an honest peer `timeout`; a stale `persisted` would resolve a fresh batch before its fsync.
   // A real shell cancels its timers and drops its io-queue on destroy; this is that, for the queue.
-  // Link events need nothing: link ids are sim-global, so an old life's linkDown names no new link.
+  // Link events are NOT dropped, and here the sim is looser than a shell: link ids are sim-global, so an
+  // old life's linkDown names no link of the new life (the kernel ignores it), but a dial the old life left
+  // in flight still lands in the new one: a linkUp for a dial it never made (or, had the dial been refused,
+  // a linkDown naming that address). A shell tears such a dial down at destroy (shell/runtime.ts #dial).
+  // The review's probe (80 seeds, two restarts each) saw 58 such linkUps in 21 seeds, none arming a
+  // redial, and no harm: the new life HELLOs on the link like on any dial, and it admits or dedups.
   #life = new Map<string, number>()
   //! per-store FIFO fsync clock (the disk twin of #lastAt): a real WAL resolves batches IN APPEND ORDER
   // (the shell's io-queue serializes write+fsync per row), so resolution times are clamped monotone per
