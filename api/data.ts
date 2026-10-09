@@ -174,9 +174,19 @@ export class Bind {
     // writes in flight is absent from the fold but NOT absent — `data.k = v; delete data.k`
     // must issue the remove (substrate.ts deleteProperty/remove).
     this.#handle = proxy({})
-    this.data = lens(this.#handle, [], (recs) => this.#fromLens(recs), (key) => this.#inflight.has(JSON.stringify(key)))
+    this.data = lens(this.#handle, [], (recs) => this.#fromLens(recs), (key) => this.#inflight.has(JSON.stringify(key)) || !this.#local(key[0]))
     rt.onApply = (a) => { if (!this.#destroyed) this.#onApply(a) }
     rt.onLost = (iss, cid, origin, seq, epoch) => { if (!this.#destroyed) this.#lost(iss, cid, origin, seq, epoch) }
+    rt.onAcked = (iss, cid, origin, seq, epoch) => { if (!this.#destroyed) this.#lost(iss, cid, origin, seq, epoch) }
+  }
+
+  //! #local — does this node's fold speak for partition p? Unscoped: always (every row is here). Armed: only
+  // for a partition it HOLDS. The lens asks before swallowing a delete of an absent cell as a no-op: on a
+  // scoped member the row may well exist, at its owner, and a delete there is a real remove to forward.
+  // (Until the `acked` effect, a non-holder's own write stayed "in flight" for ever, which hid this.)
+  #local(p: string): boolean {
+    const n = this.#rt.node
+    return !n.armed || n.scope!.held(p)
   }
 
   //! #lost — the kernel refused a record carrying an attempt identity (V4-18, env.ts lost): it
@@ -186,6 +196,10 @@ export class Bind {
   // write lands on that row — which may be never: before this hook our write stayed `pending` for ever
   // when the newer row reached us before our WACK. The refused record IS our commit: settle committed,
   // on the owner's lane, from its own stamp (the same coordinates the WACK carried).
+  //! The same settlement serves `acked` (env.ts, DESIGN-SCALE stage 1): the owner's WACK for a write whose
+  // record will never fold here — this node does not hold the partition, or its feeder does not. The WACK's
+  // coordinates are the commit's. Idempotent with the join and with each other: whichever lands first
+  // settles, the rest find no pending entry.
   #lost(iss: string, cid: number, origin: string, seq: number, epoch: number) {
     if (iss !== this.#iss) return
     const p = this.#pending.get(iss + '|' + cid)
@@ -213,7 +227,6 @@ export class Bind {
     if (v === true && rec.type === REC.remove && rec.key.length > 1 && holeAt(this.#handle, rec.key)) return SPARSE_HOLE
     return v
   }
-
   //! issue — THE one local ingest (assignment sugar, the lens's write builtins, methods.* and the
   // data: seed all land here; the validation: hook therefore covers every spelling by
   // construction — v2's OQ6). Admit, register the pending entries, hand the records to the kernel;

@@ -28,6 +28,7 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     invoke: (link, id, mode, m, a) => effects.push(['invoke', link, id, mode, m, a]),
     result: (id, ok, value, local) => effects.push(['result', id, ok, value, local]),
     subRecs: (id, recs) => effects.push(['subRecs', id, recs]),
+    acked: (iss, cid, origin, seq, epoch) => effects.push(['acked', iss, cid, origin, seq, epoch]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }
   const node = new Node({ uuid, listen: `sim:${uuid}`, heartbeatMs: 50, ...opts }, env)
@@ -272,6 +273,57 @@ test('FAN-OUT FILTER — an armed owner ships a commit only to the partition\'s 
     .filter((f) => f && f.verb === VERB.RECORDS)
   assert.equal(records(2).length, 1, 'the co-holder heard the commit live')
   assert.equal(records(1).length, 0, 'the non-holder heard NOTHING — the R-set is the wire scope')
+})
+
+//! a forwarded-attempt frame as a peer or a client builds it: prov = [issuer, baseCid, attemptEpoch]
+const writeFrame = (issuer: string, c0: number, ae: number, recs: Rec[]): Uint8Array =>
+  encodeRuns(recs.map((r, i) => ({ rec: r, origin: issuer, seq: c0 + i, epoch: ae })), VERB.WRITE)[0]
+const framesOn = (h: ReturnType<typeof harness>, link: number, verb: number) => h.of('send').filter((e) => e[1] === link)
+  .map((e) => new Framer().push((e[2] as Uint8Array).slice())[0]).filter((f) => f && f.verb === verb)
+
+test('ACKED (DESIGN-SCALE stage 1) — an armed owner names its lane in the WACK; an issuer that will never fold the record hears `acked`; a holder issuer waits for the join; a relay hops the lane only for a partition it will not tap', () => {
+  //! the OWNER side: aa (armed, incarnation 2 — the lane is aa~2) commits bb's forwarded attempt and answers with `o`
+  const o = armedView1({ incarnation: 2 })
+  o.node.membership.rejoinFloor = 0
+  o.node.writes.ring.place('mine', 'aa', 'cc')
+  o.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('bb~1', 5, 1, [rec(['mine'], 1)]) })
+  const owned = framesOn(o, 1, VERB.WACK)
+  assert.equal(owned.length, 1)
+  assert.deepEqual(owned[0].value, { u: 'bb~1', c: 5, n: 1, s: o.node.logs.get('aa~2')![0].seq, e: 1, o: 'aa~2' }, 'the WACK names the lane, with its incarnation')
+  //! a retransmit of the same cid dup-ACKs with the lane too (the window kept it)
+  o.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('bb~1', 5, 1, [rec(['mine'], 1)]) })
+  assert.equal((framesOn(o, 1, VERB.WACK)[1].value as { o?: string }).o, 'aa~2', 'the dup answer carries the lane')
+  //! the ISSUER side: aa does not hold 'theirs' (bb, cc) — the record will never fold here: `acked` settles
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('theirs', 'bb', 'cc')
+  h.node.step({ kind: 'write', recs: [rec(['theirs'], 7)] })
+  assert.equal(h.node.writes.pending.size, 1, 'forwarded to bb, pending')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 1, s: 9, e: 1, o: 'bb~3' }) })
+  assert.deepEqual(h.of('acked'), [['acked', 'aa~1', 1, 'bb~3', 9, 1]], 'the WACK is the settlement: committed on the owner lane')
+  assert.deepEqual(h.node.writes.committed('aa~1', 1), { s: 9, e: 1, o: 'bb~3' }, 'the window names the lane, not the link')
+  //! a partition aa HOLDS as a co-holder: the record follows the WACK on the same link — the join settles, never `acked`
+  h.node.writes.ring.place('ours', 'bb', 'aa')
+  h.node.step({ kind: 'write', recs: [rec(['ours'], 8)] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 2, n: 1, s: 10, e: 1, o: 'bb' }) })
+  assert.equal(h.of('acked').length, 1, 'no acked for a partition this node will fold')
+  assert.equal(h.node.writes.pending.size, 0, 'cleared all the same')
+  //! a WACK without a lane (an unscoped owner would send one) clears but never settles through `acked`
+  h.node.step({ kind: 'write', recs: [rec(['theirs'], 9)] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 3, n: 1, s: 11, e: 1 }) })
+  assert.equal(h.of('acked').length, 1)
+  assert.equal(h.node.writes.pending.size, 0)
+  //! the RELAY side: a spoke zz on link 3 writes 'theirs' (aa will not tap it) and 'ours' (aa will): the hop
+  // to the spoke carries the lane only for 'theirs'
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: '', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: writeFrame('zz~1', 1, 0, [rec(['theirs'], 1), rec(['ours'], 2)]) })
+  assert.equal(framesOn(h, 1, VERB.WRITE).length, 4, 'both relayed to bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'zz~1', c: 1, n: 2, s: 20, e: 1, o: 'bb' }) })
+  const hops = framesOn(h, 3, VERB.WACK).map((f) => f.value)
+  assert.deepEqual(hops, [{ u: 'zz~1', c: 1, n: 1, s: 20, e: 1, o: 'bb' }, { u: 'zz~1', c: 2, n: 1, s: 21, e: 1 }], 'the lane hops only where the tap will stay silent')
+  assert.equal(h.of('acked').length, 1, 'a relayed attempt never settles here')
 })
 
 test('AE FILTER — a digest answer ships a member only the partitions ITS R-set covers', () => {

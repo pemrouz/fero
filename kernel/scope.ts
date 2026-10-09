@@ -129,6 +129,18 @@ export class Scope {
     return 1
   }
 
+  //! expects — will a live record for p FOLD here (now or after an open latch)? verdict() without the mint
+  // and without a side effect: held or acquiring, or absent and assigned (the arrival would mint held).
+  // An orphan, or a partition the ring gives to others, never folds here — the write pipeline reads this
+  // to know when an attempt's commit can only be learned from its WACK (the `acked` effect, env.ts).
+  expects(node: Node, p: string): boolean {
+    const e = this.entries.get(p)
+    if (e !== undefined) return e.state !== SCOPE.orphan
+    const ring = node.writes.ring
+    if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    return ring.holdsAny(node.uuid, p, node.replicas)
+  }
+
   //! stage — buffer one live record for a latched partition (verdict 2). Overflow aborts the latch —
   // safe because nothing has folded; the next offer re-ships everything above the learner's marks.
   // The bound reads the O(1) liveN counter (M6-review findings 17/24 — the full-buffer filter per

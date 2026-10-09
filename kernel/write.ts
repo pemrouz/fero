@@ -333,7 +333,9 @@ export class Writes {
         const hit = this.#seen.get(a.issuer)?.get(a.cid)
         if (hit) {
           j.armed && j.emit(JK.writeDup, a.issuer, a.cid)
-          this.#ack(node, a.via, { u: a.issuer, c: a.cid, n: 1, s: hit.s, e: hit.e })
+          const dup: { u: string; c: number; n: number; s: number; e: number; o?: string } = { u: a.issuer, c: a.cid, n: 1, s: hit.s, e: hit.e }
+          if (node.armed && hit.o !== undefined) dup.o = hit.o
+          this.#ack(node, a.via, dup)
           this.#remove(a)
           i++
           continue
@@ -348,10 +350,13 @@ export class Writes {
       const s0 = node.commit(run.map((x) => x.rec), { issuer: a.issuer, baseCid: a.cid })
       for (let k = 0; k < run.length; k++) {
         const x = run[k]
-        this.#remember(node, x.issuer, x.cid, s0 + k, node.epoch, node.uuid)
+        this.#remember(node, x.issuer, x.cid, s0 + k, node.epoch, node.origin) // the lane, with its incarnation
         this.#remove(x)
       }
-      this.#ack(node, a.via, { u: a.issuer, c: a.cid, n: run.length, s: s0, e: node.epoch })
+      //! an ARMED owner names the lane in its WACK: the issuer may never see the record (DESIGN-SCALE §11)
+      const ack: { u: string; c: number; n: number; s: number; e: number; o?: string } = { u: a.issuer, c: a.cid, n: run.length, s: s0, e: node.epoch }
+      if (node.armed) ack.o = node.origin
+      this.#ack(node, a.via, ack)
       i = jEnd
     }
   }
@@ -384,7 +389,10 @@ export class Writes {
   remember(node: Node, issuer: string, cid: number, s: number, e: number) { this.#remember(node, issuer, cid, s, e) }
 
   //! #ack — WACK on the reply route (`via` link) for relayed/forwarded attempts; via -1 = locally issued, no frame.
-  #ack(node: Node, via: number, v: { u: string; c: number; n: number; s: number; e: number }) {
+  // `o` (DESIGN-SCALE stage 1): the lane the commit was stamped on, named with its incarnation — set by an
+  // ARMED owner answering a commit, and hopped onward by a relay only when the relay itself will not tap
+  // the record to the asker (see onAck). Unscoped nodes never set it: their WACK bytes are v4.0's.
+  #ack(node: Node, via: number, v: { u: string; c: number; n: number; s: number; e: number; o?: string }) {
     if (via < 0) return
     const link = node.links.get(via)
     if (!link || link.dead) return // the asker is gone; its retransmit will hit the dedup window instead
@@ -482,7 +490,9 @@ export class Writes {
       if (dup) {
         flushNack()
         j.armed && j.emit(JK.writeDup, issuer, cid)
-        this.#ack(node, link.id, { u: issuer, c: cid, n: 1, s: dup.s, e: dup.e })
+        const ack: { u: string; c: number; n: number; s: number; e: number; o?: string } = { u: issuer, c: cid, n: 1, s: dup.s, e: dup.e }
+        if (node.armed && dup.o !== undefined) ack.o = dup.o
+        this.#ack(node, link.id, ack)
         continue
       }
       const reason =
@@ -509,14 +519,19 @@ export class Writes {
   //! onAck — commit coordinates arrived FROM THE OWNER OF RECORD: clear the pending attempts; a RELAY
   // batches the coordinates onward per contiguous run toward the client (`via`) — one WACK in, one WACK
   // out (the review measured the previous per-cid fan-out at n frames + n allocations per batch).
-  onAck(node: Node, link: Link, v: { u?: unknown; c?: unknown; n?: unknown; s?: unknown; e?: unknown }) {
+  onAck(node: Node, link: Link, v: { u?: unknown; c?: unknown; n?: unknown; s?: unknown; e?: unknown; o?: unknown }) {
     if (typeof v?.u !== 'string' || typeof v.c !== 'number' || typeof v.n !== 'number' || v.n <= 0 || v.n > MAX_RUN) return
     if (typeof v.s !== 'number' || typeof v.e !== 'number') return // coordinates hop onward to relays — garbage must not
     const j = node.journal
-    let hop: { via: number; c: number; n: number; s: number } | null = null
+    //! `o` (DESIGN-SCALE stage 1): the lane the owner stamped on. Present only from an armed owner (or a
+    // relay hopping its answer), so an unscoped member never reads it and nothing below runs there.
+    const lane = typeof v.o === 'string' ? v.o : undefined
+    let hop: { via: number; c: number; n: number; s: number; o?: string } | null = null
     const flushHop = () => {
       if (!hop) return
-      this.#ack(node, hop.via, { u: v.u as string, c: hop.c, n: hop.n, s: hop.s, e: v.e as number })
+      const out: { u: string; c: number; n: number; s: number; e: number; o?: string } = { u: v.u as string, c: hop.c, n: hop.n, s: hop.s, e: v.e as number }
+      if (hop.o !== undefined) out.o = hop.o
+      this.#ack(node, hop.via, out)
       hop = null
     }
     //! the journal row names what this WACK actually CLEARED (first cid, count) — not what it carried. The
@@ -528,9 +543,16 @@ export class Writes {
       const key = v.u + '|' + (v.c + i)
       const a = this.pending.get(key)
       if (!a || (a.to && a.to !== link.uuid)) { flushHop(); continue } // not ours to clear / not the owner of record
+      //! the lane travels to whoever cannot learn the commit any other way: a RELAY hops it to its spoke only
+      // when the relay itself will not fold the record (so the spoke's tap never carries it); an ISSUER
+      // that will not fold it hears `acked`. Where the record will fold here it stays the settlement, after
+      // the value shows (V4-7): the WACK lands first on the same link, and the join must not be pre-empted.
+      const silent = lane !== undefined && node.armed && !node.scope!.expects(node, partitionOf(a.rec))
       if (a.via >= 0) {
-        if (hop && (hop.via !== a.via || hop.c + hop.n !== v.c + i)) flushHop()
-        hop ? (hop.n++) : (hop = { via: a.via, c: v.c + i, n: 1, s: v.s + i })
+        const o = silent ? lane : undefined
+        if (hop && (hop.via !== a.via || hop.c + hop.n !== v.c + i || hop.o !== o)) flushHop()
+        if (hop) hop.n++
+        else { hop = { via: a.via, c: v.c + i, n: 1, s: v.s + i }; if (o !== undefined) hop.o = o }
       }
       if (a.sent < 0) this.#queued--
       this.pending.delete(key)
@@ -540,7 +562,8 @@ export class Writes {
       // coordinates, from the owner of record. This closes the WACK-before-replication window where a
       // cleared attempt had no committed() evidence — the api's drop-sweep (and any dup arriving before
       // the record replicates back) reads the answer from here.
-      this.#remember(node, v.u, v.c + i, v.s + i, v.e, node.client ? undefined : link.uuid) // a member's WACK comes from the owner
+      this.#remember(node, v.u, v.c + i, v.s + i, v.e, lane ?? (node.client ? undefined : link.uuid)) // a member's WACK comes from the owner
+      if (a.via < 0 && lane !== undefined && (node.client || silent)) node.env.sink.acked?.(v.u, v.c + i, lane, v.s + i, v.e)
     }
     flushHop()
     if (cleared) j.armed && j.emit(JK.writeAck, v.u, first, cleared)
