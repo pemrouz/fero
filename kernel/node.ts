@@ -261,7 +261,8 @@ export class Node {
   // revives, or counts a parked target, and #redial drops the entry the moment it is consulted
   //! member (2026-10-08): the chain started by the death of an ADMITTED MEMBER link — a crashed member.
   // It is capped at tune.memberRedials (never more than tune.redials); every other chain at tune.redials.
-  // Set on a FRESH chain only: a chain already running when the member link dies keeps its cap.
+  // A member link's death always leaves the member chain: a generic chain or an orphaned timer already
+  // pointed at the target is cancelled and the member chain starts fresh (#redial); a member chain keeps going.
   #backoff = new Map<string, { ms: number; tries: number; gaveUp?: boolean; parked?: boolean; member?: boolean }>()
   //! highest incarnation ever identified per peer uuid — a HELLO above it means the peer was REBORN,
   // and every evidence mark its previous life announced is void (confirm.forget; see that banner).
@@ -1207,31 +1208,40 @@ export class Node {
   // sim's event queue (and a real process's timer wheel) alive forever; it is
   // journal-visible, and the heartbeat tick revives a given-up target (so with
   // heartbeats on, one exhausted chain re-arms per heartbeat interval, bounded).
-  // A successful identify resets the counter. `member` marks a FRESH chain as a crashed member's
-  // (the short cap, tune.memberRedials); an existing chain keeps whatever it was.
+  // A successful identify resets the counter. `member` asks for a crashed member's chain (the short
+  // cap, tune.memberRedials): anything else pointed at the target gives way to it; a member chain keeps going.
   #redial(to: string, member = false) {
     if (this.destroyed) return
     const base = this.#opts.redialMs ?? 100
     const t = this.tune
-    const b = this.#backoff.get(to) ?? { ms: base, tries: 0, member }
+    const cur = this.#backoff.get(to)
+    let b = cur ?? { ms: base, tries: 0, member }
     //! a PARKED target (discover forgot it while a link/dial still named it): the chain ends here and
     // the entry goes with it — no timer, no revival, nothing left to grow (#backoff stays bounded by
     // the live link set, not by every address a port-0 server ever had)
     if (b.parked) { this.#backoff.delete(to); return }
+    //! a dead MEMBER's chain is ALWAYS the member chain (V4-20's clock). Whatever else is pointed at the
+    // target when the member link dies is not that chain: a timer an identify orphaned (the identify
+    // deletes the entry, not the timer — up to 32 × base away), or a GENERIC chain a stray dial started
+    // while the member link was still up (on the open path the peer closes my duplicate dial before I
+    // identify it). Letting that one own the target delayed the eviction by up to 3.2 s, or brought back
+    // the 10-try chain and the 20 s eviction (review, 2026-10-09). So: cancel it and start the member
+    // chain fresh, at the base delay. A chain that is ALREADY the member chain is never restarted (the
+    // rule below: a second linkDown arms nothing) — restarting it would lengthen it.
+    if (member && !cur?.member) {
+      for (const [id, m] of this.#timers) if (m.tag === TAG.redial && m.to === to) { this.#timers.delete(id); this.env.sink.cancel(id) }
+      b = { ms: base, tries: 0, member: true }
+    }
     //! a timer already pending toward this target OWNS it (the view install's rule, membership.ts): a
     // second linkDown naming the same address — the dialed link's `to` and the accepted link's gossiped
     // listen when a crossing pair is cut, a late refused dial — arms nothing. It used to arm a second
     // timer line on the same entry, and the two lines shared the tries, so the chain (and the eviction
     // hold it carries) gave up in about half its time; at the cap it marked the target given up while
     // the final attempt was still pending, and the revival dialed over it. One chain, its own tries.
-    //! but a call that finds NO entry still starts a fresh chain, and the entry is written here: a
-    // successful identify deletes the entry and leaves an older chain's timer pending, so a member link
-    // that dies right after a reconnect lands here. Without the entry its `member` mark was lost (the old
-    // timer's failed dial then started the 10-try chain, eviction in about 20 s, not 3.4 — V4-20) and
-    // dialing() was false, so eviction was not held while that timer was out. The pending timer is one
-    // extra try; when its dial fails, the chain's own tries arm from this entry (tries 0).
-    for (const m of this.#timers.values()) if (m.tag === TAG.redial && m.to === to) {
-      if (!this.#backoff.has(to)) this.#backoff.set(to, b)
+    //! a call that finds an orphaned timer (no entry: an identify reset the chain) writes the entry, so
+    // dialing() holds while that timer is out; when its dial fails, the chain's tries arm from tries 0.
+    else for (const m of this.#timers.values()) if (m.tag === TAG.redial && m.to === to) {
+      if (!cur) this.#backoff.set(to, b)
       return
     }
     if (b.tries >= (b.member ? Math.min(t.memberRedials, t.redials) : t.redials)) {

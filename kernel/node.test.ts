@@ -361,38 +361,98 @@ test('two linkDowns toward one target arm ONE redial chain: a timer already pend
   assert.deepEqual(redialTimers().map((t) => t[3]), [10, 20, 40, 80, 160, 320, 320, 320, 320, 320], 'the one chain\'s own curve: ×2 per try, capped at 32 × base (rng pinned to 0)')
 })
 
-test('a member that dies right after a reconnect, while an older chain\'s timer is still pending, gets the short member chain and holds eviction', () => {
+test('a member that dies right after a reconnect, while an older chain\'s timer is still pending, gets a FRESH member chain at the base delay', () => {
   //! the review race (2026-10-09): a successful identify deletes the backoff entry but leaves the old
-  // chain's timer pending. When the member link then died, the one-chain guard returned before writing
-  // any entry, so the `member` mark was lost and dialing() was false; the old timer's failed dial then
-  // started the generic 10-try chain, and eviction took about 20 s instead of about 3.4 s (V4-20).
+  // chain's timer pending, up to 32 × base away. Letting that orphan own the target lost the `member`
+  // mark (first fix: eviction in about 20 s, not 3.4 — V4-20), and then still made the member chain
+  // wait for the orphan's long delay (second review: median eviction 4.3 s against 2.0 s on the old
+  // kernel). The dead member's linkDown now cancels the orphan and starts the member chain at once.
   const { node, of } = harness('aa', { redialMs: 10, hosts: ['sim:bb'], boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb']] } })
   node.step({ kind: 'start' })
-  node.step({ kind: 'linkDown', link: 900, reason: 'refused', to: 'sim:bb' }) // bb unreachable: a generic chain, one timer out
-  const redialTimers = () => of('timer').filter((x) => x[2] === TAG.redial)
-  assert.equal(redialTimers().length, 1)
+  //! the redial timers still pending: armed, neither cancelled nor fired
+  const fired = new Set<unknown>()
+  const live = () => { const gone = new Set(of('cancel').map((c) => c[1])); return of('timer').filter((x) => x[2] === TAG.redial && !gone.has(x[1]) && !fired.has(x[1])) }
+  const fire = (t: unknown[]) => { fired.add(t[1]); node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial }) }
+  //! bb unreachable: a generic chain that has climbed to a long delay (four tries: 10, 20, 40, 80)
+  for (let i = 0; i < 4; i++) {
+    const t = live().at(-1)
+    if (t) fire(t)
+    node.step({ kind: 'linkDown', link: 900 + i, reason: 'refused', to: 'sim:bb' })
+  }
+  const orphan = live().at(-1)!
+  assert.equal(orphan[3], 80, 'the old chain\'s pending timer is 80 ms away')
   //! bb comes back and dials US first: admitted, and the identify resets the entry — the old timer stays out
   node.step({ kind: 'linkUp', link: 60, dialed: false })
   node.step({ kind: 'bytesIn', link: 60, bytes: hello('bb') })
   assert.equal(node.links.get(60)!.state, LS.admitted)
   assert.ok(!node.dialing('sim:bb'), 'the identify reset the chain')
-  //! bb crashes now: a dead MEMBER link, while the old timer is still pending
+  //! bb crashes now: a dead MEMBER link, while the orphan is still pending
   const rows0 = node.journal.read().filter((e) => e.kind === JK.redial).length
   node.step({ kind: 'linkDown', link: 60, reason: 'cut' })
-  assert.equal(redialTimers().length, 1, 'still one timer line — the pending timer owns the target')
-  assert.ok(node.dialing('sim:bb'), 'eviction is held while the pending timer is out')
-  //! run it out: the old timer fires and fails, then the chain's own tries
-  let fired = 0
+  assert.ok(of('cancel').some((c) => c[1] === orphan[1]), 'the orphaned timer is cancelled')
+  assert.equal(live().length, 1, 'one timer line: the member chain\'s own')
+  assert.equal(live()[0][3], 10, 'the member chain starts at the base delay, not at the orphan\'s 80 ms')
+  assert.ok(node.dialing('sim:bb'), 'eviction is held while the member chain runs')
+  //! run it out
+  let tries = 0
   const gaveUp = () => node.journal.read().some((e) => e.kind === JK.giveUp && e.a === 'sim:bb')
-  while (!gaveUp() && fired < redialTimers().length) {
-    const t = redialTimers()[fired++]
-    node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
-    node.step({ kind: 'linkDown', link: 910 + fired, reason: 'refused', to: 'sim:bb' })
+  while (!gaveUp() && tries < 20) {
+    assert.equal(live().length, 1, `try ${tries + 1}: one timer line`)
+    fire(live()[0])
+    tries++
+    node.step({ kind: 'linkDown', link: 910 + tries, reason: 'refused', to: 'sim:bb' })
   }
   assert.ok(gaveUp())
   assert.equal(node.journal.read().filter((e) => e.kind === JK.redial).length - rows0, 5, 'the member chain: memberRedials tries after the crash, not the generic ten')
-  assert.equal(fired, 6, 'the old pending timer, then the member chain\'s five')
+  assert.equal(tries, 5, 'the member chain\'s five tries and nothing else')
   assert.ok(!node.dialing('sim:bb'), 'the chain ended — the eviction hold is released')
+})
+
+test('a member that dies while a GENERIC chain toward it is running gets the member chain, and a later linkDown never restarts it', () => {
+  //! the open-path half of the review race (2026-10-09, sim seed 2): the peer closed my duplicate dial
+  // before I identified it, so that hello-state link's linkDown started a GENERIC chain toward a live
+  // member. When the member then crashed, its linkDown found that chain pending and armed nothing: ten
+  // tries, eviction at about 20 s. The member linkDown now replaces it with the member chain.
+  const { node, of } = harness('aa', { redialMs: 10, hosts: ['sim:bb'], boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb']] } })
+  node.step({ kind: 'start' })
+  //! the redial timers still pending: armed, neither cancelled nor fired
+  const fired = new Set<unknown>()
+  const live = () => { const gone = new Set(of('cancel').map((c) => c[1])); return of('timer').filter((x) => x[2] === TAG.redial && !gone.has(x[1]) && !fired.has(x[1])) }
+  const fire = (t: unknown[]) => { fired.add(t[1]); node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial }) }
+  node.step({ kind: 'linkUp', link: 60, dialed: false })
+  node.step({ kind: 'bytesIn', link: 60, bytes: hello('bb') })
+  assert.equal(node.links.get(60)!.state, LS.admitted)
+  //! a dial of mine to bb links up and the peer closes it as the duplicate before its HELLO reaches me
+  node.step({ kind: 'linkUp', link: 70, dialed: true, to: 'sim:bb' })
+  node.step({ kind: 'linkDown', link: 70, reason: 'dup-link' })
+  assert.equal(live().length, 1, 'that close started a generic chain toward bb')
+  const generic = live()[0]
+  //! let the generic chain climb once, so its pending delay is no longer the base
+  fire(generic)
+  node.step({ kind: 'linkDown', link: 71, reason: 'refused', to: 'sim:bb' })
+  const stale = live().at(-1)!
+  assert.equal(stale[3], 20)
+  //! bb crashes: the member link dies
+  const rows0 = node.journal.read().filter((e) => e.kind === JK.redial).length
+  node.step({ kind: 'linkDown', link: 60, reason: 'cut' })
+  assert.ok(of('cancel').some((c) => c[1] === stale[1]), 'the generic chain\'s pending timer is cancelled')
+  assert.equal(live().length, 1, 'one timer line')
+  assert.equal(live()[0][3], 10, 'the member chain starts fresh at the base delay')
+  //! a stray linkDown toward bb (a late refused dial) leaves the member chain alone
+  node.step({ kind: 'linkDown', link: 72, reason: 'refused', to: 'sim:bb' })
+  assert.equal(live().length, 1, 'the stray linkDown armed nothing and cancelled nothing')
+  let tries = 0
+  const gaveUp = () => node.journal.read().some((e) => e.kind === JK.giveUp && e.a === 'sim:bb')
+  while (!gaveUp() && tries < 20) {
+    assert.equal(live().length, 1, `try ${tries + 1}: one timer line`)
+    fire(live()[0])
+    tries++
+    node.step({ kind: 'linkDown', link: 910 + tries, reason: 'refused', to: 'sim:bb' })
+  }
+  assert.ok(gaveUp())
+  assert.equal(tries, 5, 'the member chain\'s five tries, not what was left of the generic ten')
+  assert.equal(node.journal.read().filter((e) => e.kind === JK.redial).length - rows0, 5)
+  assert.deepEqual(of('timer').filter((x) => x[2] === TAG.redial).slice(-5).map((t) => t[3]), [10, 20, 40, 80, 160], 'the member chain\'s own curve')
 })
 
 test('the floor is silent on a paused link; a digest arriving mid-pause defers its suffix to drain', () => {
