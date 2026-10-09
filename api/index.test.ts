@@ -622,7 +622,7 @@ test("the door: a secured server and a client with NO secret — the server jour
   })
   assert.equal(lines.length, 2, `one line per end, however many revivals: ${JSON.stringify(lines)}`)
   assert.ok(lines.includes(`fero('doornone'): refused by 127.0.0.1:${p} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`), `the client's line names FERO_SECRET: ${JSON.stringify(lines)}`)
-  assert.ok(lines.includes("fero('doornone'): refused a peer that connected — it has no secret and this node has one; every member and client must share FERO_SECRET"), `the server's line: ${JSON.stringify(lines)}`)
+  assert.ok(lines.includes("fero('doornone'): refused a peer that connected — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT"), `the server's line: ${JSON.stringify(lines)}`)
   assert.ok(!lines.join('\n').includes(S))
 })
 
@@ -760,7 +760,7 @@ test('the printer says the SIDE, not the link table (the third review\'s minor):
 
 test('the off-loopback rule (DESIGN-DOOR §14 Q1): a server listening off loopback with no secret is refused at fero() time; secret: false runs it open on purpose; a secret runs it; the directory-socket refusal still wins for 0.0.0.0:3376; a client is never refused; secret: 123 and a short secret are refused without echoing them', async () => {
   const p = await ports.free()
-  await assert.rejects(fero('r', { listen: `0.0.0.0:${p}` }), new RegExp(`^Error: fero\\('r'\\): listen 0\\.0\\.0\\.0:${p} is reachable from other machines and no secret is set — set FERO_SECRET \\(the same value on every member and client\\), or pass secret: false \\(FERO_SECRET=off\\) to run open on purpose$`))
+  await assert.rejects(fero('r', { listen: `0.0.0.0:${p}` }), new RegExp(`^Error: fero\\('r'\\): listen 0\\.0\\.0\\.0:${p} is reachable from other machines and no secret is set — set FERO_SECRET \\(the same value on every member; a client holds it or FERO_SECRET_CLIENT\\), or pass secret: false \\(FERO_SECRET=off\\) to run open on purpose$`))
   await assert.rejects(fero('r', { listen: `[::]:${p}` }), /is reachable from other machines and no secret is set/)
   await assert.rejects(fero('r', { listen: '0.0.0.0:3376' }), /would take the directory's socket/, 'the directory-socket check runs first (example 15\'s line is untouched)')
   for (const host of ['127.0.0.1', 'localhost', '127.0.0.2']) {
