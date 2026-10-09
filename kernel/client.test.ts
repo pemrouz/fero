@@ -71,6 +71,26 @@ test('a client announces its role in HELLO; a server marks the link and keeps it
   assert.equal(h2.jk(JK.propose).length, 1, 'bb still proposes — the client uuid is invisible to the race')
 })
 
+//! DESIGN-SCALE stage 1: a client reads its primary's HELLO contract live off the primary link, the way it
+// reads the methods-only hint. The api reads `replicas=` out of it (a scoped feeder shows a spoke only the
+// partitions it holds, so a delete of an absent row there must still be sent). An old server, or any peer
+// that sends no `c`, reads undefined; so does a client with no primary.
+test('feederContract: a client keeps its primary\'s HELLO contract as sent; absent from a server that sends none or with no primary', () => {
+  const h = harness('cl', { client: true, hosts: ['sim:aa', 'sim:bb'] })
+  h.node.step({ kind: 'start' })
+  assert.equal(h.node.feederContract, undefined, 'no primary yet')
+  const c = 'v1;heartbeat.ms=50;replicas=1;methods=0;validation=none'
+  h.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:aa' })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', c }) })
+  assert.equal(h.node.primary, 1)
+  assert.equal(h.node.feederContract, c, 'the primary\'s contract, as sent')
+  h.admit(2, 'bb') // an old server: no `c`
+  assert.equal(h.node.links.get(2)!.contract, undefined)
+  assert.equal(h.node.feederContract, c, 'a non-primary admit does not move it')
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'test' })
+  assert.equal(h.node.feederContract, undefined, 'the primary is gone, or moved to a server that sent none')
+})
+
 test('the single-feeder rule: a client digests ONLY its primary; non-primary digests are consumed for evidence but never answered', () => {
   const h = harness('cl', { client: true, hosts: ['sim:aa', 'sim:bb'] })
   h.node.step({ kind: 'start' })
