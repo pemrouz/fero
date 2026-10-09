@@ -52,7 +52,7 @@ const KNOWN_UNSAFE: Record<string, Record<number, RegExp>> = {
 //! the engagement key each family must hit on at least one seed: a family whose chaos never bit proves nothing
 const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
   'A1-zombie': (e) => e.stranded === 1 && e.epoch >= 3, // stranded, evicted, healed back in
-  'A2-slow-owner-join': (e) => e.epoch >= 2 && e.acquires > 0,
+  'A2-slow-owner-join': (e) => e.stale > 0, // a demoted owner committed at the old epoch after a newer one was installed
   'A3-orphan-cut': (e) => e.orphanCut === 1,
   'A4-restarts': (e) => e.restarts === 2,
   'A5-view-severed': (e) => e.epoch >= 2 && e.sheds > 0,

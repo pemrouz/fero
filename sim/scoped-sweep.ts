@@ -242,13 +242,49 @@ export const FAMILIES: readonly Family[] = [
     },
   },
   {
-    //! A2 ownership moves (a join) while every old owner's fan-out is delayed 400-500 ms
+    //! A2 ownership moves (a join) while the old owner's fan-out is delayed 400-500 ms, and the demoted owner keeps
+    // minting until it installs: one member D has every pair it is in slowed (the joiner's included), so the rest
+    // commit and install the join's view while D still stamps at the old epoch. A burst of 30 writes, each posted AT
+    // D for a partition D owns at epoch 1, lands from 100 ms to 1.5 s after the join starts. `stale` counts commits
+    // stamped at an epoch below the newest one any node had installed at that event: the engagement key.
     name: 'A2-slow-owner-join', ns: [2, 3, 5], Rs: [1, 2, 3], mutateAt: 500,
     chaos: (c) => {
       const slow = 400 + Math.floor(c.r() * 100)
-      c.sim.at(550, () => { for (const a of c.nodes) for (const b of c.nodes) if (a.uuid < b.uuid) c.sim.fault(a.uuid, b.uuid, { delay: [slow, slow + 20] }) })
-      c.sim.at(600, () => join(c.sim, 'n90', c.o))
-      c.sim.at(2600, () => { for (const a of c.nodes) for (const b of c.nodes) if (a.uuid < b.uuid) c.sim.fault(a.uuid, b.uuid, { delay: [1, 5] }) })
+      const D = pick(c.r, c.nodes).uuid
+      const peers = () => [...c.nodes.map((x) => x.uuid), 'n90'].filter((x) => x !== D)
+      c.sim.at(550, () => { for (const o of peers()) c.sim.fault(D, o, { delay: [slow, slow + 20] }) })
+      c.sim.at(600, () => {
+        join(c.sim, 'n90', c.o)
+        const mine: string[] = []
+        for (let i = 0; i < 1000 && mine.length < 20; i++) if (ownerOf(c, 'p' + i) === D) mine.push('p' + i)
+        if (!mine.length) return
+        for (let i = 0; i < 30; i++) {
+          const p = pick(c.r, mine)
+          const roll = c.r()
+          const rec: Rec = roll < 0.6 ? { type: REC.update, key: [p], value: { burst: i } } : roll < 0.8 ? { type: REC.update, key: [p, 'f0'], value: i } : { type: REC.remove, key: [p] }
+          c.sim.post(D, { kind: 'write', recs: [rec] }, 100 + Math.floor(c.r() * 1400))
+        }
+      })
+      c.sim.at(2600, () => { for (const o of peers()) c.sim.fault(D, o, { delay: [1, 5] }) })
+      //! per event: each stepped node's NEW own-lane commits, against the newest installed epoch anywhere
+      const seen = new Map<Node, number>()
+      c.sim.monitors.push({
+        name: 'a2-stale-probe',
+        check: (sim) => {
+          let max = 0
+          for (const n of sim.nodes.values()) if (n.epoch > max) max = n.epoch
+          for (const id of sim.stepped) {
+            const n = sim.nodes.get(id)
+            if (!n || !n.armed) continue
+            const lane = n.logs.get(n.origin)
+            const len = lane?.length ?? 0
+            const from = seen.get(n) ?? len
+            seen.set(n, len)
+            if (lane) for (let i = from; i < len; i++) if (lane[i].epoch < max) c.eng.stale = (c.eng.stale ?? 0) + 1
+          }
+          return null
+        },
+      })
     },
   },
   {
