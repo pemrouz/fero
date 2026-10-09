@@ -33,9 +33,9 @@ const TYPE = ['update', 'insert', 'remove']
 const VT_NAME = Object.fromEntries(Object.entries(VT).map(([k, v]) => [v, k]))
 const RECORDS_SHAPED = new Set([VERB.RECORDS, VERB.WRITE, VERB.ACQ])
 // the picker, in the order a write travels, then the rest (PING and PONG are heartbeats: never offered)
-const ORDER = ['WRITE', 'RECORDS', 'WACK', 'WNACK', 'DIGEST', 'HELLO', 'JOIN', 'PROPOSE', 'VOTE', 'VIEW', 'PULL', 'LEAVE']
+const ORDER = ['WRITE', 'RECORDS', 'WACK', 'WNACK', 'DIGEST', 'HELLO', 'DOOR', 'JOIN', 'PROPOSE', 'VOTE', 'VIEW', 'PULL', 'LEAVE']
 // the rare verbs: their chip carries a dot when a frame arrives after the last cluster action, until it is seen
-const RARE = new Set(['WNACK', 'HELLO', 'JOIN', 'PROPOSE', 'VOTE', 'VIEW', 'PULL', 'LEAVE'])
+const RARE = new Set(['WNACK', 'HELLO', 'DOOR', 'JOIN', 'PROPOSE', 'VOTE', 'VIEW', 'PULL', 'LEAVE'])
 // one plain line per verb (facts.md §4, from kernel/codec.ts and kernel/node.ts)
 const SAYS = {
   WRITE: 'a write not yet stamped, on its way to the row’s owner',
@@ -44,6 +44,7 @@ const SAYS = {
   WNACK: 'the owner’s no, with a reason',
   DIGEST: 'the highest counter it holds from each writer',
   HELLO: 'the first frame on every link: who I am (name, life, address)',
+  DOOR: 'the proof that I hold the cluster’s secret (the dialer proves first), or a refusal notice; only when a secret is set',
   JOIN: 'a new server asks a member to propose it into the view',
   PROPOSE: 'a ballot for the next view: its number and its members',
   VOTE: 'a member’s answer to a ballot',
@@ -57,7 +58,8 @@ const KEYS = {
   DIGEST: { d: 'the highest counter it holds from each writer', r: '1 asks for an answer; 0 is the answer', p: 'the same, counting only what is on its disk' },
   WACK: { u: 'who issued the write (name~life)', c: 'the issuer’s counter for this write', n: 'how many records', s: 'the stamp counter the owner gave', e: 'the view it was stamped in' },
   WNACK: { u: 'who issued the write', c: 'the issuer’s counter for this write', n: 'how many records', r: 'the reason', ce: 'the owner’s view' },
-  HELLO: { u: 'its name', i: 'its life', l: 'its address', r: '1 means a client', n: 'the resource', c: 'the cluster contract: the settings every server must share, as one readable string', m: '1 means this server takes client changes only through its methods' },
+  HELLO: { u: 'its name', i: 'its life', l: 'its address', r: '1 means a client', n: 'the resource', c: 'the cluster contract: the settings every server must share, as one readable string', m: '1 means this server takes client changes only through its methods', k: 'a fresh random value for this link, sent only when a secret is set; the other side’s proof must cover it' },
+  DOOR: { p: 'the proof: a keyed hash over both sides’ random values, both names, the side and the HELLO keys sent', e: 'a refusal notice: denied, or the name belongs to a member' },
   JOIN: { u: 'its name', i: 'its life', l: 'its address' },
   PROPOSE: { e: 'the new view’s number', m: 'its members', p: 'who proposes it' },
   VOTE: { e: 'the view voted on', g: '1 is yes, 0 is no', ce: 'the voter’s view now', h: 'the member list it voted on', ve: 'the newest view it has voted for' },
