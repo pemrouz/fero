@@ -783,6 +783,103 @@ test('the off-loopback rule (DESIGN-DOOR §14 Q1): a server listening off loopba
     }, String(bad))
 })
 
+//! ── the derived client key (DESIGN-DOOR §15): node:crypto's derivation over real sockets ──
+test('the client key (§15): fero.clientKey(secret) is the openssl one-liner\'s string — 43 base64url characters, trimmed like every layer trims the secret; a short secret is refused naming the floor', async () => {
+  const { execFileSync } = await import('node:child_process')
+  const S = 'index-test-secret-MIKE-13'
+  const k = fero.clientKey(S)
+  assert.equal(k.length, 43); assert.match(k, /^[A-Za-z0-9_-]{43}$/)
+  assert.equal(fero.clientKey(`  ${S}\t`), k, 'trimmed')
+  assert.notEqual(k, fero.clientKey(S + 'x'))
+  //! the README's shell line gives the same string (a sh child; the secret rides argv there, which the README says)
+  const sh = execFileSync('sh', ['-c', `printf 'fero/client/1' | openssl dgst -sha256 -hmac "$1" -binary | openssl base64 -A | tr '+/' '-_' | tr -d '='`, 'sh', S], { encoding: 'utf8' }).trim()
+  assert.equal(sh, k, 'openssl and node:crypto agree')
+  assert.throws(() => fero.clientKey('short'), /^Error: fero\.clientKey\(secret\): the secret must be text of at least 16 characters — openssl rand -base64 24 prints a good one$/)
+  assert.throws(() => fero.clientKey(undefined as never), /at least 16 characters/)
+})
+
+test('the client key (§15) over real TCP: a client with secret: { client } follows a secured cluster — fed, its write lands, methods work; the same process composed as a server is refused at fero(); neither the secret nor the key appears in a journal, a capture, the config door or a line', async () => {
+  const S = 'index-test-secret-NOVEMBER-14'
+  const K = fero.clientKey(S)
+  const ps = [await ports.free(), await ports.free()]
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const mk = (i: number, uuid: string) => fero('ckey', { uuid, listen: addrs[i], hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S, data: { seed: 1 } })
+  const a = await mk(0, 'aa'); const b = await mk(1, 'bb')
+  let c: Fero | null = null
+  const lines = await stderrOf(async () => {
+    try {
+      assert.ok(await until(() => [a, b].every((f) => view(f).epoch >= 1 && Object.keys(view(f).members).length === 2), 10_000), 'two members formed')
+      //! the same opts as a server: refused before any socket, in plain words, never echoing the key
+      await assert.rejects(fero('ckey', { uuid: 'zz', server: true, hosts: addrs, secret: { client: K } }), (e: Error) => {
+        assert.equal(e.message, "fero('ckey'): secret.client is the client key — it lets a process follow, never serve; a server needs the secret (secret: '…' or FERO_SECRET)")
+        return true
+      })
+      c = await fero('ckey', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: { client: K } })
+      assert.ok(await until(() => view(c!).me.primary !== null && view(c!).writable, 8000), 'the client-key client proved as the dialer, verified the member\'s client-key answer, and is fed')
+      assert.ok(await until(() => (snapshot(c!.data) as { seed?: number }).seed === 1, 8000), 'it reads the seed')
+      c.data.k = 'from-client-key'
+      assert.ok(await until(() => [a, b].every((f) => (snapshot(f.data) as { k?: string }).k === 'from-client-key'), 8000), 'its write landed on both members')
+      assert.equal(await c.methods.read('k'), 'from-client-key', 'and it can call methods')
+      assert.deepEqual([a, b, c].flatMap(doorRows), [], 'no refusal anywhere')
+      assert.ok(Object.values(view(a).peers).length >= 1 && 'zz' in view(a).peers || 'zz' in view(b).peers, 'a member holds it as a peer')
+      assert.deepEqual(Object.keys(view(a).members).sort(), ['aa', 'bb'], 'never a member')
+      //! the config door: the client key is set and where from; secret itself is unset on the client, <set> on a member
+      assert.deepEqual(diag(c)!.config()['secret.client'], { value: '<set>', from: 'the call' })
+      assert.equal(diag(c)!.config().secret, undefined)
+      assert.deepEqual(diag(a)!.config().secret, { value: '<set>', from: 'the call' })
+      assert.equal(diag(a)!.config()['secret.client'], undefined)
+      const all = leaks([], a, b, c)
+      assert.ok(!all.includes(S) && !all.includes(K), 'neither the secret nor the client key appears in a journal, a capture or a config door')
+    } finally {
+      await c?.destroy()
+      await Promise.all([a, b].map((f) => f.destroy()))
+    }
+  })
+  assert.deepEqual(lines, [], 'nothing was refused, nothing was printed')
+})
+
+test("the client key (§15) over real TCP: two clients with the key and a member WITHOUT a secret — the member's line names FERO_SECRET, the clients' lines say they hold the client key; a client with a WRONG key is refused by a secured server and reads the notice with the client-only line; no key in a line", async () => {
+  const S = 'index-test-secret-OSCAR-15'
+  const K = fero.clientKey(S)
+  const p = await ports.free()
+  const open = await fero('ckeyopen', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { stock: 3 } })
+  let c1: Fero | null = null, c2: Fero | null = null
+  const lines = await stderrOf(async () => {
+    try {
+      c1 = await fero('ckeyopen', { uuid: 'c1', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: { client: K } })
+      c2 = await fero('ckeyopen', { uuid: 'c2', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: { client: K } })
+      assert.ok(await until(() => doorRows(c1!).length >= 1 && doorRows(c2!).length >= 1 && doorRows(open).length >= 2, 8000), 'both refuse at both ends')
+      assert.ok(doorRows(open).every(([r]) => r === 'peer-secret'), JSON.stringify(doorRows(open)))
+      assert.ok([c1!, c2!].every((c) => doorRows(c).every(([r, to]) => r === 'no-secret' && to === `127.0.0.1:${p}`)), JSON.stringify([doorRows(c1!), doorRows(c2!)]))
+      await sleep(200)
+      assert.equal(view(c1!).me.primary, null); assert.equal(view(c2!).me.primary, null)
+      assert.deepEqual(view(open).peers, {}, 'never admitted')
+    } finally {
+      await c1?.destroy(); await c2?.destroy(); await open.destroy()
+    }
+  })
+  assert.ok(lines.includes("fero('ckeyopen'): refused by a peer that connected — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)"), `the member's line names FERO_SECRET: ${JSON.stringify(lines)}`)
+  assert.equal(lines.filter((l) => l === `fero('ckeyopen'): refused 127.0.0.1:${p} — it has no secret and this process holds the client key; every member must set FERO_SECRET`).length, 1, `the client-only line once: both clients share this process, the name and the dial target, and the printer dedupes on those: ${JSON.stringify(lines)}`)
+  assert.ok(!lines.join('\n').includes(K))
+  //! a WRONG client key against a secured server: bad-proof at the server (its usual line), the notice read at the client
+  // as refused, with the client-only wording
+  const p2 = await ports.free()
+  const s = await fero('ckeywrong', { uuid: 'aa', listen: `127.0.0.1:${p2}`, heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S })
+  let w: Fero | null = null
+  const wrong = await stderrOf(async () => {
+    try {
+      w = await fero('ckeywrong', { uuid: 'ww', hosts: [`127.0.0.1:${p2}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: { client: fero.clientKey(S + '-other') } })
+      assert.ok(await until(() => doorRows(s).length >= 1 && doorRows(w!).some(([r]) => r === 'refused'), 8000), `refused: ${JSON.stringify([doorRows(s), doorRows(w!)])}`)
+      assert.ok(doorRows(s).every(([r]) => r === 'bad-proof'), JSON.stringify(doorRows(s)))
+      assert.ok(doorRows(w!).every(([r, to]) => r === 'refused' && to === `127.0.0.1:${p2}`), JSON.stringify(doorRows(w!)))
+      assert.equal(view(w!).me.primary, null)
+    } finally { await w?.destroy(); await s.destroy() }
+  })
+  assert.ok(wrong.includes(`fero('ckeywrong'): refused 127.0.0.1:${p2} — it refused this process's client key (is FERO_SECRET_CLIENT fero.clientKey of that cluster's secret?)`), JSON.stringify(wrong))
+  assert.ok(wrong.some((l) => /^fero\('ckeywrong'\): refused a peer that connected — its secret differs from this node's$/.test(l)), `the server's usual line: ${JSON.stringify(wrong)}`)
+  assert.ok(!wrong.join('\n').includes(S))
+})
+
 test('v4.1 uuid discipline: empty and lane-separator uuids refuse at fero() time', async () => {
   await assert.rejects(fero('r', { uuid: '' }), /uuid must be a non-empty string/)
   await assert.rejects(fero('r', { uuid: 'a~1' }), /without '~'/)
