@@ -678,17 +678,21 @@ test('the REWRITE relay (the review\'s blocker): a relay that answers for a memb
   //! the control: a relay that forwards VERBATIM is caught by the address rule before any proof (the earlier test)
 })
 
-test('the role rule with a door, four ways: the proof runs first, then uuid-taken (with the notice {e: uuid-taken}); a member evicts a squatting client; client vs client keeps dup-link', () => {
+test('the role rule with a door, four ways: the client\'s proof is checked first, then uuid-taken BEFORE this node\'s own proof (the notice {e: uuid-taken}, never a proof), so the client is still proving and journals refused; a member evicts a squatting client; client vs client keeps dup-link', () => {
   const clientOf = (uuid: string, seed: number) => rec(uuid, { client: true, hosts: ['sim:aa'], listen: '', door: doorFor(seed) })
   //! 1/4 r:1 against a committed-view member
   { const a = rec('aa', { door: doorFor(31), boot: VIEW1 }), c = clientOf('bb', 32)
     c.up(1, true, 'sim:aa'); a.up(1)
     pump(c, 1, a, 1)
     assert.deepEqual(a.rows(JK.doorReject), [[1, 'uuid-taken', 'bb']])
-    assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO, VERB.DOOR, VERB.DOOR], 'the acceptor proved back to a verified dialer, then the notice')
-    assert.deepEqual(dec(a.sends(1)[2]).value, { e: 'uuid-taken' })
+    assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO, VERB.DOOR], 'HELLO, then the notice — the role rule ran before this node\'s proof, so no proof went to the refused client')
+    assert.deepEqual(dec(a.sends(1)[1]).value, { e: 'uuid-taken' })
     assert.deepEqual(a.closes(), [[1, 'uuid-taken']])
-    assert.deepEqual(a.rows(JK.dupLink), []); assert.equal(a.node.byUuid.has('bb'), false); assert.equal(a.node.clientLinks.size, 0) }
+    assert.deepEqual(a.rows(JK.dupLink), []); assert.equal(a.node.byUuid.has('bb'), false); assert.equal(a.node.clientLinks.size, 0)
+    //! the client's side: still proving when the notice arrives, so it reads it — refused, parked, never admitted aa
+    assert.deepEqual(c.rows(JK.doorReject), [[1, 'refused', 'sim:aa']], 'the client has its own row (the review\'s minor)')
+    assert.deepEqual(c.node.admitted(), []); assert.deepEqual(c.rows(JK.identified), [])
+    assert.deepEqual(c.rows(JK.frameDrop), [], 'the notice was not dropped as out of order') }
   //! 2/4 r:1 against an admitted member link: the member's link is untouched
   { const a = rec('aa', { door: doorFor(33) }), b = rec('bb', { door: doorFor(34) }), c = clientOf('bb', 35)
     a.up(1, true, 'sim:bb'); b.up(1); pump(a, 1, b, 1)
