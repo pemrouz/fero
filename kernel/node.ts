@@ -96,6 +96,17 @@ export interface NodeOpts {
   // (ae > 0) peer attempts are NOT re-validated: the issuing server already ran its validator, and
   // peers are trusted at this layer — same code, same config (the deployer's contract, like replicas).
   validate?: (rec: Rec) => true | string
+  //! admit (DESIGN-SCALE §11, Q12 — 2026-10-09): the OWNER's re-check of a member-forwarded (ae > 0) REMOVE
+  // under a row, on ARMED nodes only. The issuing member ran its validator, but one rule reads the shape of
+  // the row (the api's sparse hole: a remove that names an array's own element), and a scoped member that
+  // does not hold the row cannot see its shape — it forwards what it cannot judge. The owner holds the row,
+  // so it asks again, with this hook: a refusal WNACKs {r:'invalid', m: reason} back to the issuer (the
+  // typed reject it would have got locally); `true` commits as before. Only removes with a key below the
+  // row are asked (one type compare on the forwarded leg, armed only); updates and row removes never are.
+  // While the owner's fold for that partition is staged (an open latch) the shape cannot be read: the
+  // remove is `withheld`, and the issuer's retry clock re-forwards it after the fold. Absent, or unscoped:
+  // nothing changes (forwarded attempts are not re-validated — the deployer's contract, as for validate).
+  admit?: (rec: Rec) => true | string
   //! contract (DESIGN-DOOR §4): the cluster contract this SERVER's HELLO carries as `c` — a readable
   // string of the config every member must share (`v1;heartbeat.ms=500;replicas=0;methods=0;
   // validation=none`), built by the api; the kernel appends `;ring=fmix32` (kernel/ring.ts RING) so the
@@ -344,6 +355,10 @@ export class Node {
   //! validate — the relay-ingress admission predicate (see NodeOpts.validate). Absent ⇒ every relayed
   // record is admitted; onWrite's relay branch pays one undefined-check per FRAME, nothing per record.
   get validate(): ((rec: Rec) => true | string) | undefined { return this.#opts.validate }
+
+  //! admit — the owner's re-check of a forwarded remove under a row (see NodeOpts.admit). Read on the
+  // forwarded leg of onWrite, armed only; absent ⇒ no re-check.
+  get admit(): ((rec: Rec) => true | string) | undefined { return this.#opts.admit }
 
   //! door — the secret's two functions (see NodeOpts.door). Absent ⇒ the open door: the HELLO path pays
   // one undefined-check per HELLO and per linkUp, nothing per record.

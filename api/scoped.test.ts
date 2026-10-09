@@ -10,7 +10,7 @@ import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { fero, type Fero, type ScopedError } from './index.ts'
+import { fero, WriteRejectError, type Fero, type ScopedError } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { Ring } from '../kernel/ring.ts'
 import { ports, until } from '#utils'
@@ -199,6 +199,39 @@ test('ACKED [DESIGN-SCALE stage 1] — methods.update from a member that does no
     await client.destroy()
     await Promise.all(nodes.map((n) => n.destroy()))
   }
+})
+
+//! the STATUS array gap (DESIGN-SCALE §11, Q12): a scoped member that does not hold an array row cannot see its
+// shape, so its remove of `g[0]` passed its own admit and was forwarded; the owner committed a tombstone that shows
+// nothing. Now the owner re-checks the shape (NodeOpts.admit → Bind.hole). Red without the kernel re-check: the
+// remove resolves committed instead of rejecting 'sparse-hole'.
+test('OWNER RE-CHECK [DESIGN-SCALE §11 Q12] — a non-holder\'s forwarded remove of an array element is refused sparse-hole AT THE OWNER, and the issuer sees the typed reject; a remove under an object row still commits', async () => {
+  const ps = [await ports.free(), await ports.free()]
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const nodes = await Promise.all(addrs.map((listen, i) =>
+    fero('scoped', { uuid: `n${String(i + 1).padStart(2, '0')}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 }, replicas: 1 })))
+  const rows = (f: Fero) => Object.values(f.cluster.writes.snapshot() as Record<string, { key: string; state: string; reason?: string }>)
+  try {
+    assert.ok(await formed(nodes), 'formed')
+    const ring = new Ring()
+    ring.build(1, [['n01', addrs[0]], ['n02', addrs[1]]])
+    const held = (prefix: string) => { for (let i = 0; ; i++) if (ring.holders(prefix + i, 1)[0] === 'n02') return prefix + i }
+    const g = held('g'), o = held('o')
+    //! the holder writes an array row and an object row; n01 holds neither, so it cannot see their shape
+    await nodes[1].methods.update({ key: g, value: [1, 2, 3] })
+    await nodes[1].methods.update({ key: o, value: { x: 1, y: 2 } })
+    const e = await nodes[0].methods.remove({ key: [g, '0'] }, { timeout: 3000 }).then(() => null, (err: unknown) => err) as WriteRejectError | null
+    assert.ok(e instanceof WriteRejectError, `refused typed, got ${String(e)}`)
+    assert.equal(e.reason, 'sparse-hole')
+    assert.equal(e.reached, 'issued')
+    assert.ok(await until(() => rows(nodes[0]).some((r) => r.key === JSON.stringify([g, '0']) && r.state === 'rejected' && r.reason === 'sparse-hole'), 2000), 'cluster.writes names the reason')
+    //! nothing was stamped: the array is whole at the holder
+    assert.deepEqual(((await nodes[1].methods.read()) as Record<string, unknown>)[g], [1, 2, 3])
+    //! the same spelling under an OBJECT row is a lawful field remove: it commits at the owner (the acked path)
+    const r = await nodes[0].methods.remove({ key: [o, 'x'] }, { timeout: 3000 })
+    assert.equal(r.origin, 'n02')
+    assert.ok(await until(async () => { const v = ((await nodes[1].methods.read()) as Record<string, { x?: number; y?: number }>)[o]; return v?.x === undefined && v?.y === 2 }, 5000), 'the field is gone at the holder')
+  } finally { await Promise.all(nodes.map((n) => n.destroy())) }
 })
 
 //! ── M6-review fix-round pins (the api slice) ─────────────────────────────────
