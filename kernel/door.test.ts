@@ -611,6 +611,34 @@ test('the deadline: a proving link with no DOOR is refused timeout at tune.prove
   assert.deepEqual(b.closes(), [[1, 'door-timeout']])
 })
 
+test('a debug attach (r:2) on a SECURED node is unchanged (§8): with the token it latches LS.diag with diagAuth, no proving state, no deadline, no door row; a wrong token is diagDeny bad-token; an r:2 HELLO on a link that is already proving closes diag-denied', () => {
+  const TOKEN = 'secret-token-for-r2-tests'
+  const attach = (b: Rec2, link: number, t: string) => b.feed(link, encodeControl(VERB.HELLO, { u: 'dbg', i: 1, l: '', r: 2, t }))
+  //! the token: a session, outside the door entirely
+  { const b = rec('bb', { door: doorFor(53), diag: { allow: { ops: TOKEN } } })
+    b.up(1); attach(b, 1, TOKEN)
+    assert.equal(b.node.links.get(1)!.state, LS.diag)
+    assert.deepEqual(b.rows(JK.diagAuth), [[1, 'ops', null]])
+    assert.deepEqual(b.timers(TAG.prove), [], 'never asked for a proof')
+    assert.deepEqual(b.rows(JK.doorReject), []); assert.deepEqual(b.rows(JK.frameDrop), [])
+    assert.equal(b.node.links.get(1)!.hello, null, 'nothing stashed') }
+  //! a wrong token: the attach's own door, not ours
+  { const b = rec('bb', { door: doorFor(54), diag: { allow: { ops: TOKEN } } })
+    b.up(1); attach(b, 1, 'wrong-token-xxxxxxxxxxx')
+    assert.deepEqual(b.rows(JK.diagDeny), [[1, 'bad-token', null]])
+    assert.deepEqual(b.closes(), [[1, 'diag-denied']])
+    assert.deepEqual(b.rows(JK.doorReject), []); assert.deepEqual(b.timers(TAG.prove), []) }
+  //! r:2 on a link already proving: the used-link guard, unchanged
+  { const b = rec('bb', { door: doorFor(55), diag: { allow: { ops: TOKEN } } })
+    b.up(1)
+    b.feed(1, encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', k: 'a'.repeat(32) }))
+    assert.equal(b.node.links.get(1)!.state, LS.proving)
+    attach(b, 1, TOKEN)
+    assert.deepEqual(b.rows(JK.frameDrop), [[1, 'diag hello on used link', null]])
+    assert.deepEqual(b.closes(), [[1, 'diag-denied']])
+    assert.deepEqual(b.rows(JK.diagAuth), [], 'never latched') }
+})
+
 test('the address rule: a DISCOVERED or VIEW-LEARNED target must answer as the address I dialed (else address, parked, no proof spent); a STATIC host is exempt; an accepted link is never checked', () => {
   const peer = (k = 'b'.repeat(32)) => encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k })
   //! discovered: the directory said sim:x, the peer says it is sim:bb — someone in between
