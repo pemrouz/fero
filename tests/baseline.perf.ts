@@ -8,6 +8,7 @@
 //   tier-3 — the socket throughput probe: validity is part of the probe (journal-tap shed guard,
 //            onApply counter, convergence); an invalid run is a PROBE-ERROR skip with the reason,
 //            never a fake number in either direction.
+// Plus the relay pin (below the counts): a counted law and a wall tripwire of its own, not baseline rows.
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -17,6 +18,11 @@ import { fileURLToPath } from 'node:url'
 import { counts, syncProbes } from '../tools/perf/probes.ts'
 import { tcpReplicate } from '../tools/perf/probes.tcp.ts'
 import { compare, fingerprint, matches, type Baseline, type Current } from '../tools/perf/compare.ts'
+import { Runtime } from '../shell/runtime.ts'
+import { Bind } from '../api/data.ts'
+import { Framer, VERB, encodeControl, encodeRuns } from '../kernel/codec.ts'
+import { REC, type Rec } from '../kernel/env.ts'
+import { bench } from '#utils'
 
 const BASELINE = join(dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'perf', 'results', 'baseline.json')
 
@@ -32,6 +38,79 @@ test('counts: the wire-structural laws match the tracked baseline exactly (any m
     assert.equal(cur[key], want, `COUNT DRIFT ${key}: baseline ${want}, current ${cur[key]} — a wire law moved (DECISIONS + re-pin, or a regression)`)
   for (const key of Object.keys(cur))
     assert.ok(key in b.counts, `unpinned count ${key} — re-pin to adopt it`)
+})
+
+//! ── the relay pin (2026-10-09): one client, N relayed updates through one open server ──────────────
+// Since V4-28 every open server hands the kernel's relay ingress (kernel/write.ts onWrite) a check:
+// `(rec) => bind.admit(rec)` — the embedder's validation:, then the sparse-hole test. Nothing pinned that
+// path. These two tests are it: a counted law (exact on ANY machine, so CI's `^counts:` run takes it)
+// and a wall tripwire with the per-file headroom the siblings use (WSL2 swings 2-3x). Both are self-
+// contained — not rows of baseline.json, which only the perf:pin CLI writes.
+// The server is a solo open server (no member link, so it stays at epoch 0 and owns everything: the
+// relay commits at once). The client is one accepted link that said HELLO r:1 and an r:1 DIGEST, so
+// it also takes the server's commit stream. The check is the composer's own closure (api/index.ts).
+const RELAY_N = 512 // one wire run, under MAX_PENDING (1024): every relayed record is queued, none dropped
+const relayServer = (onCheck?: () => void) => {
+  let bind!: Bind
+  const rt = new Runtime({
+    uuid: 'aa', heartbeatMs: 0,
+    validate: onCheck ? (rec: Rec) => { onCheck(); return bind.admit(rec) } : (rec: Rec) => bind.admit(rec),
+  })
+  bind = new Bind(rt)
+  const node = rt.node
+  node.journal.armed = false // perf posture: an unwatched journal costs nothing
+  const out: { link: number; verb: number; v: unknown }[] = []
+  node.env.sink.send = (link: number, bytes: Uint8Array) => {
+    if (onCheck) for (const f of new Framer().push(bytes.slice())) out.push({ link, verb: f.verb, v: f.verb === VERB.WACK ? f.value : null })
+  }
+  node.step({ kind: 'linkUp', link: 2, dialed: false })
+  node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: '', r: 1 }) })
+  node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+  return { rt, bind, node, out }
+}
+//! pre-encoded client WRITE runs (ae 0, the client marker), ADVANCING cids and fresh values: no rep
+// ever hits the relay's dedup skip or a no-op apply. One run per frame.
+const relayFrames = (count: number): Uint8Array[] => {
+  const frames: Uint8Array[] = []
+  let cid = 0
+  for (let f = 0; f < count; f++) {
+    const recs = Array.from({ length: RELAY_N }, (_, i) => ({
+      rec: { type: REC.update, key: ['r' + (i & 255), 'f'], value: { n: cid + 1, s: `v${i}` } } as Rec,
+      origin: 'zz~1', seq: ++cid, epoch: 0,
+    }))
+    const [frame, ...rest] = encodeRuns(recs, VERB.WRITE)
+    assert.equal(rest.length, 0, 'fixture: one run per frame')
+    frames.push(frame)
+  }
+  return frames
+}
+
+test('counts: relay — one client run of 512 updates through an open server: 512 checks, 512 commits, 1 WACK + 1 stream frame', async () => {
+  let checks = 0
+  const s = relayServer(() => { checks++ })
+  const seq0 = s.node.seq
+  s.out.length = 0
+  s.node.step({ kind: 'bytesIn', link: 2, bytes: relayFrames(1)[0] })
+  assert.equal(checks, RELAY_N, 'the relay check ran once per relayed record (V4-28: an open server always checks)')
+  assert.equal(s.node.seq - seq0, RELAY_N, 'every relayed record committed once')
+  assert.equal(s.node.writes.pending.size, 0, 'nothing left queued at the relay')
+  assert.deepEqual(s.out.map((o) => [o.link, o.verb]), [[2, VERB.RECORDS], [2, VERB.WACK]], 'one run in = one stream frame + one WACK out, both to the client')
+  const ack = s.out[1].v as { u: string; c: number; n: number }
+  assert.deepEqual([ack.u, ack.c, ack.n], ['zz~1', 1, RELAY_N], 'one WACK covers the whole run')
+  s.bind.destroy()
+  await s.rt.destroy()
+})
+
+test('wall: relay — 512 client updates per rep through an open server\'s relay, check, commit and apply under the tripwire', async () => {
+  const s = relayServer()
+  const frames = relayFrames(6)
+  let i = 0
+  const ms = bench.time(() => { s.node.step({ kind: 'bytesIn', link: 2, bytes: frames[i++] }) })
+  assert.equal(s.node.seq, RELAY_N * 6, 'all six reps (warmup + 5) relayed and committed for real')
+  console.log(`  relay on this runner: ~${Math.round(RELAY_N / (ms / 1000)).toLocaleString()} relayed records/s through one open server (${ms.toFixed(2)}ms / ${RELAY_N})`)
+  assert.ok(ms < 80, `512 relayed updates took ${ms.toFixed(1)}ms (tripwire 80ms)`)
+  s.bind.destroy()
+  await s.rt.destroy()
 })
 
 test('wall: sync-probe medians vs the baseline — advisory prints, pinned enforces, mismatch skips honestly', async (t) => {
