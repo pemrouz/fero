@@ -169,6 +169,8 @@ export interface Out {
   red: Set<string>
   //! engagement: what the chaos actually did, so a seed whose chaos never bit reads as exactly that
   eng: Record<string, number>
+  //! the run itself, for a probe that wants to look further (a trace, a node's log)
+  sim: Sim
 }
 
 interface Ctx {
@@ -306,9 +308,21 @@ export const FAMILIES: readonly Family[] = [
     chaos: (c) => {
       c.sim.at(350, () => join(c.sim, 'n90', c.o))
       let flipped = false
+      //! the first slice where some node's journal holds an acquireStart, read by cursor (journal.read(from)) so
+      // each poll looks only at the rows emitted since the last one, not at every node's whole journal
+      const cursor = new Map<Node, number>()
+      const opened = (): boolean => {
+        for (const n of c.sim.nodes.values()) {
+          const from = cursor.get(n) ?? 0
+          if (n.journal.n === from) continue
+          cursor.set(n, n.journal.n)
+          for (const e of n.journal.read(from)) if (e.kind === JK.acquireStart) return true
+        }
+        return false
+      }
       c.polls.push(() => {
         if (flipped) return
-        if (!jcount(c.sim, JK.acquireStart)) return
+        if (!opened()) return
         flipped = true
         c.eng.flip = 1
         if (c.r() < 0.5) join(c.sim, 'n91', c.o)
@@ -412,7 +426,7 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   const o: MeshOpts = { replicas: R, durable, hb: 50, tune: { compactAt: 16, snapshotAt: 16 }, fault: { delay: [1, 5] } }
   const sim = new Sim(seed)
   const eng: Record<string, number> = {}
-  const out: Out = { family: fam.name, seed, shape: `${fam.name} seed ${seed} n=${n} R=${R}${durable ? ' durable' : ''} parts=${parts} writes=${count}${mut !== 'none' ? ' mut=' + mut : ''}`, unsafe: [], notLive: [], redToday: [], red: new Set(), eng }
+  const out: Out = { family: fam.name, seed, shape: `${fam.name} seed ${seed} n=${n} R=${R}${durable ? ' durable' : ''} parts=${parts} writes=${count}${mut !== 'none' ? ' mut=' + mut : ''}`, unsafe: [], notLive: [], redToday: [], red: new Set(), eng, sim }
   const nodes = mesh(sim, n, o)
   sim.run({ until: 1500 })
   if (!nodes.every((x) => x.armed)) { out.notLive.push('never formed'); return out }
