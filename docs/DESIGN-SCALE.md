@@ -109,6 +109,29 @@ filtered whole; the index saves the lanes with nothing of p and the
 version-key parse. `#teach`, `#tailsOf`, `#abort` and the census are
 O(entries of p) as stated.
 
+**Note, 2026-10-09 (stage 1 reviewed).** The skeptic's pass found three
+holes in the build above, all fixed. (1) `acked` never fired on one
+recovery path: a commit that entered the owner's dedup window through an
+ACQ fold or a WAL replay had no lane, so a write re-sent after a lost
+WACK was answered without `o` and a non-holder issuer still timed out;
+every window site names the lane now (kernel/scoped.test.ts 'ACKED
+after a lost WACK'). (2) A client of a scoped primary lost its plain
+deletes: its fold is the feeder's held shard, so a row it wrote through
+a non-holder never showed, and once `acked` settled the write the lens
+swallowed `delete client.data.k` as a no-op. The kernel keeps the
+primary's HELLO contract on the link (`node.feederContract`, read live
+like the methods-only hint) and the api reads `replicas=` out of it: a
+client of a scoped feeder has no local partitions, so such a delete is
+forwarded. (3) `until()` in #utils did not await an async check, so the
+api pins built on `until(async …)` could never fail; it awaits now and
+the ACKED test goes red without Bind #local. Also from the review: the
+shed sentence and the `#shed` O() claim above are corrected; the
+compaction site of the index is pinned by a direct `compact()` call
+(no armed node reaches it before stage 3); Q12 gains the relayed client
+remove and a mixed forwarded batch; R1 times the two nodes interleaved
+and reads 0.88 (0.95 ms vs 1.07 ms). Still open from §14: Q8 (the
+drain) and the yes on stages 2-5.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
