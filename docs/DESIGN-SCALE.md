@@ -68,6 +68,40 @@ every lane) is caught only where an older record still arrives (A1,
 A11): today every lane keeps the remove, so a refold re-derives it;
 stage 3 is what makes G1 bite.
 
+**Note, 2026-10-09 (stage 1 built, without the drain).** Three of §7's
+stage-1 parts are in the tree; the drain (part b of the row, Q8) waits
+for the owner's answer and `#finishLeave` is untouched. (a) The `acked`
+effect: an armed owner names its lane (with its incarnation) in the WACK
+(`o`), `onAck` emits `sink.acked(iss, cid, origin, seq, epoch)` for a
+cleared attempt this node issued whose record will never fold here
+(scope.expects: not held, acquiring or assigned), a relay hops `o` to
+its spoke only in that same case, and the Bind settles it through the
+`lost` path. Where the record WILL fold here the WACK stays silent and
+the apply join settles after the value shows (V4-7): the WACK lands
+first on the same link, so settling from it would resolve a write
+before its value showed. Unscoped nodes never set or read `o`. The
+STATUS probe is now api/scoped.test.ts ACKED (six `methods.update`
+from the non-holder, six ok; a spoke through it; a delete from it).
+One rule the old hang had hidden: the lens swallowed a delete of a
+cell absent from the local fold as a no-op, which on a scoped
+non-holder is wrong (the row lives at the owner); Bind #local now says
+a scoped node's fold speaks only for the partitions it holds. (b) The
+Q12 hook: NodeOpts `admit(rec)`, Bind.hole (the sparse-hole half of
+admit), run by an armed owner on a member-forwarded remove below the
+row; refused ⇒ WNACK `invalid` + reason, staged ⇒ `withheld`. (c) The
+indexes: `node.byPart` and `node.tombs`, allocated with `scope`
+(replicas > 0), null unscoped; ten maintenance sites (commit, inbound,
+splice, both replay branches, the ACQDONE fold, the shed, compact,
+#resetFold; apply's three tomb sites, GC); #teach, #tailsOf, #abort,
+#shed and rescope read through them. M4 is live in sim/monitors.ts
+(entries by identity and order, tombs against versions-minus-state);
+the mutation "drop the inbound indexAppend" turns it red in five
+scale-probes tests. R1 (kernel/scope.perf.ts) measured 0.98 (2.69 ms
+vs 2.73 ms, tmpfs, low priority) against 9.40 with the old lane walk.
+Found while building: the old shed dropped a partition's floors only
+from lanes that held entries of it, so a floor from a cut with no
+entries outlived the shed; it now drops from every stream.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
