@@ -936,6 +936,9 @@ lesson's own estimate).
 
 ## §14 Open questions for the owner, each with a default
 
+*Answered by the owner on 2026-10-09: every default (DECISIONS V4-31). Stages 0 and 1 are built
+first; stage 1's drain (Q8) follows the rest of stage 1 in the next wave.*
+
 - **Q1.** Retire the heartbeat DIGEST between scoped members, keeping the
   admit and drain digests as link sync only? Repair then comes from
   announce-on-change, re-admit and drain rounds, and a sweep of `aeFan`

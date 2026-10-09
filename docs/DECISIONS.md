@@ -2235,3 +2235,47 @@ real shell cancels its timers); redial chains can double-arm toward one
 target on both paths. Follow-ups the owner deferred: the derived client
 key, a rotation window `secret: [new, old]`, TLS at the shell, a secret
 example rung.
+
+## V4-31 — the owner's answers on scaling out and scaling down (2026-10-09)
+Context: two design records ended in questions for the owner:
+docs/DESIGN-SCALE.md §14 (scoped replication at scale, fifteen questions)
+and docs/DESIGN-LEAVE.md §7 and §9 (the two-member crash; how to continue
+the parked I-20 fix). The owner found the records too long to read, so the
+choices that change what fero does or risks were put to them in chat as
+four plain questions, with the technical rest on its defaults. On
+2026-10-09 they answered "rest looks all fine, can record", and asked
+whether the directory could be the third view in a two-member crash.
+Decision: (1) Scoped replication at scale is built as DESIGN-SCALE records
+it, with every default of its §14. On a scoped cluster the member heartbeat
+digest is retired for announce-on-change plus a sweep of eight links per
+tick; compaction runs behind a frontier over the current holders'
+crash-stable floors; tombstone GC runs under a census, a holder quorum and
+lane accounting, released in one step. When a member crashes and is voted
+out, GC WAITS: the tombstones of the partitions it owned stay until it
+returns or an operator forgets it, shown in `gcWaitingOn`. A clean leave
+on a scoped member drains first, bounded by `drainTicks` (16), and
+`destroy()` resolves false past the bound. With `replicas: 1` a crash loses
+that member's partitions until its disk returns (for good without `dir`);
+accepted, with a one-time note. The design's ceiling is 100 members. The
+order: stage 0 (the harness) and stage 1, then stages 2 to 4 one at a
+time, each with two reviews. (2) The I-20 fix continues design first
+(DESIGN-LEAVE §9): the safety argument per vote source and the adversarial
+harness on the base before any code, and the zero-risk candidate first: a
+leaver keeps knocking while its link to a member is up, for a longer
+window the operator can set, with no new vote source. (3) A two-member
+crash keeps the majority rule (DESIGN-LEAVE §7 (a)) while the owner weighs
+a third vote. The box's `#directory` cannot be that vote as it stands: it
+runs on one of the members' boxes, so it shares that box's fate; it keeps
+nothing on disk, so "my partner is not registered" is not proof of death
+and a restarted directory forgets what it answered, which lets both
+members go on alone; and it is unauthenticated and shared by every
+resource on its box. The safe form is a witness member: a third member on
+a third machine that votes in the ordinary ballot, keeps its vote on disk,
+holds the secret and stores no rows (DESIGN-LEAVE §7, the dated note).
+REJECTED: a fence that releases tombstones sooner but can drop a write
+only the evicted member had (DESIGN-SCALE Q5); the directory as a
+tie-breaker (above); protocol stages before the harness.
+Consequences: wave 5a builds DESIGN-SCALE stages 0 and 1, the drain
+excepted; the drain and the I-20 design-first work come next; the witness
+member is on STATUS as a choice the owner is weighing. No code changed
+with this entry.
