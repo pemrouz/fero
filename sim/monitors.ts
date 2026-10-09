@@ -531,11 +531,18 @@ export const drained = (sim: Sim): string | null => {
 //                      unbounded under scoping; no gcWaitingOn surface exists): the sweep pins the count.
 //   M9 leave-drain     (per event, armed)       a leaver that reports left(true) holds nothing some other
 //                      live node does not contain-or-cover. RED TODAY at R=1 (the leave does not drain).
+//   M10 resync-end     (per event, spokes)      a spoke's resync (node.ts #resyncBegin) ends only on the r=0
+//                      that answers an r=1 the spoke sent on that link AFTER the resync began — the
+//                      reply that follows the re-download on the FIFO link. Ending on an older reply runs
+//                      the ghost sweep before the re-download, and the re-download then lands record run by
+//                      record run: the spoke shows older values of live rows, and rows whose removes are on
+//                      the way. Not one of the record's nine; added when the sweep found it (A11).
 //
 // Non-vacuity: ledgerOf(sim).counts says how many cells, drops, releases, floor advances, releases
 // examined by M6 and leaves each family saw — a sweep whose counters read 0 proved nothing.
 
-import { Framer, VERB } from '../kernel/codec.ts'
+import { Framer, Frame, VERB } from '../kernel/codec.ts'
+import { JK } from '../kernel/journal.ts'
 import { compact as _compact } from '../kernel/log.ts'
 import type { Rec } from '../kernel/env.ts'
 void _compact // the planted M2 test calls kernel/log.ts compact() by hand; named here so the dependency reads in one place
@@ -567,7 +574,7 @@ export class Ledger {
   //! released — cell → the newest tombstone stamp any node ever released for it (M3's memory, M6's trigger)
   released = new Map<string, Stamp>()
   pending: { node: Node; id: string; cell: string; p: string; t: Stamp }[] = []
-  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0 }
+  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0, resyncs: 0 }
   #cursors = new Map<string, { node: Node; arr: unknown; len: number }>()
   #snap = new Map<Node, Map<string, Stamp>>()
   #floors = new Map<Node, Map<string, number>>()
@@ -873,11 +880,87 @@ export const scaleMonitors = () => [
   },
 ]
 
+//! SpokeWire (M10) — the digest exchange on every link that has a spoke at one end, as the sim sees it at the
+// sink: what r each digest the spoke sent carried (by its own link id), which of those each feeder reply
+// answers, and per node the digestIn rows read so far from its journal. Filled by the tap armScale chains.
+class SpokeWire {
+  //! spoke-side link id → r of each DIGEST the spoke sent on it, in order
+  sent = new Map<number, number[]>()
+  //! spoke-side link id → per DIGEST the feeder sent on it, in order: the index into `sent` of the spoke digest an
+  // r=0 answers (the feeder replies inside the step that handled it, so its digestIn count names it), -1 for r=1
+  answers = new Map<number, number[]>()
+  //! spoke → the resync it is in (the kernel's object) and, per link, the index of the first r=1 sent since it began
+  began = new Map<Node, { obj: object; first: Map<number, number> }>()
+  last = new Map<Node, object | null>()
+  #din = new Map<Node, { at: number; per: Map<number, number> }>()
+  //! digestIns — how many digests node n has taken in on `link` (its journal's digestIn rows, read by cursor)
+  digestIns(n: Node, link: number): number {
+    let c = this.#din.get(n)
+    if (!c) { c = { at: 0, per: new Map() }; this.#din.set(n, c) }
+    if (n.journal.n !== c.at) {
+      for (const e of n.journal.read(c.at)) if (e.kind === JK.digestIn) c.per.set(e.a as number, (c.per.get(e.a as number) ?? 0) + 1)
+      c.at = n.journal.n
+    }
+    return c.per.get(link) ?? 0
+  }
+  push(m: Map<number, number[]>, link: number, x: number) { let a = m.get(link); if (!a) { a = []; m.set(link, a) } a.push(x) }
+}
+const wires = new WeakMap<Sim, SpokeWire>()
+const wireOf = (sim: Sim): SpokeWire => { let w = wires.get(sim); if (!w) { w = new SpokeWire(); wires.set(sim, w) } return w }
+const digestR = (b: Uint8Array): number => { try { return ((new Frame(b).value as { r?: number }).r ?? 0) } catch { return -1 } }
+
+//! the M10 tap: one byte compare per frame; digests touching a spoke are decoded
+const spokeTap = (sim: Sim, w: SpokeWire) => (from: string, to: string, link: number, peerLink: number, _dialed: boolean, b: Uint8Array) => {
+  if (b[2] !== VERB.DIGEST) return
+  const fn = sim.nodes.get(from), tn = sim.nodes.get(to)
+  if (!fn || !tn) return
+  if (fn.client) {
+    const r = digestR(b)
+    w.push(w.sent, link, r)
+    if (r === 1 && fn.resync !== null) {
+      let st = w.began.get(fn)
+      if (!st || st.obj !== fn.resync) { st = { obj: fn.resync, first: new Map() }; w.began.set(fn, st) }
+      if (!st.first.has(link)) st.first.set(link, w.sent.get(link)!.length - 1)
+    }
+  } else if (tn.client) w.push(w.answers, peerLink, digestR(b) === 0 ? w.digestIns(fn, link) - 1 : -1)
+}
+
+const resyncEnd = {
+  name: 'resync-end',
+  check: (sim: Sim): string | null => {
+    const w = wires.get(sim)
+    if (!w) return null
+    for (const id of sim.stepped) {
+      const n = sim.nodes.get(id)
+      if (!n || !n.client) continue
+      const was = w.last.get(n) ?? null
+      w.last.set(n, n.resync)
+      if (was === null || n.resync !== null) continue
+      //! the resync ended in this step, on the primary's r=0 (node.ts: `else if (v.r === 0) this.#resyncEnd()`)
+      ledgerOf(sim).counts.resyncs++
+      const link = n.primary
+      if (link === null) continue
+      const j = w.digestIns(n, link)
+      const ans = w.answers.get(link)?.[j - 1]
+      if (ans === undefined || ans < 0) continue
+      const st = w.began.get(n)
+      const first = st && st.obj === was ? st.first.get(link) : undefined
+      if (first === undefined || ans < first)
+        return `${id}'s resync ended on link ${link} on the reply to its digest #${ans}, sent ${first === undefined ? 'before it asked this feeder for the re-download at all' : 'before the resync asked for the re-download (#' + first + ')'} — a stale reply: the re-download is still on its way`
+    }
+    return null
+  },
+}
+
 //! armScale — install the stage-0 monitors on a Sim (after cluster(), before the first run): turns the exec's watch on
-// (sim.stepped, sim.inflight) and appends M1-M9 once. Idempotent.
+// (sim.stepped, sim.inflight), appends M1-M10 once and chains M10's tap onto sim.tap. Idempotent.
 export const armScale = (sim: Sim): Ledger => {
   sim.watch = true
-  if (!sim.monitors.some((m) => m.name === 'stamp-oracle')) sim.monitors.push(...scaleMonitors())
+  if (!sim.monitors.some((m) => m.name === 'stamp-oracle')) {
+    sim.monitors.push(...scaleMonitors(), resyncEnd)
+    const w = wireOf(sim), tap = spokeTap(sim, w), prev = sim.tap
+    sim.tap = prev === null ? tap : (f, t, l, pl, d, b) => { tap(f, t, l, pl, d, b); prev(f, t, l, pl, d, b) }
+  }
   return ledgerOf(sim)
 }
 

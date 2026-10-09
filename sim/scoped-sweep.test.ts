@@ -14,7 +14,7 @@
 // one holder) only in A6, and in A1/A2/A7/A10 under earlier timings: it needs that one holder to teach the
 // partition later; `version-only` (G1: the stamp goes, every lane keeps its entries) in A1 and A11 only. On today's
 // kernel the remove's entry stays in every lane, so a refold re-derives the tombstone; G1 bites only where an older
-// record still arrives above the fence (A1's zombie after the heal, A11's re-downloading spoke). Stage 3's
+// record still arrives above the fence (A1's zombie after the heal, A11's spoke). Stage 3's
 // compaction drops that entry, and its mutation must then be caught across the families.
 // Cost: about 25 s at low priority on this box (2 seeds per family, then five pinned mutation schedules, each run
 // clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about 70 s on 2026-10-09). The known-unsafe seeds below run in every battery
@@ -26,19 +26,28 @@ import { FAMILIES, runFamily, familyByName, CATCHERS, type Mutation } from './sc
 
 const SEEDS = Number(process.env.FERO_SCOPED_SEEDS ?? 2)
 
-//! KNOWN_UNSAFE — schedules today's kernel is not safe on, each with its finding. A11 seed 5: a spoke's resync ends
-// on a STALE digest reply. The spoke asked its new feeder for a digest (r=1); the reply's records and r=0 are in
-// flight when the spoke decides to resync (fold wiped, an empty r=1 sent); the old r=0 then lands and is taken as
-// the resync's completion marker (node.ts #resyncEnd), so the ghost sweep runs with almost nothing re-downloaded,
-// and the real re-download arrives afterwards one record run per frame: for a few events the spoke shows cells
-// whose removes are still in flight (M1). The end state is right; the screen flickers. Found by this sweep.
-// A3 seed 6: one attempt commits TWICE across ownership moves on a scoped cluster (the existing attempt-exactly-once
-// monitor): n05's forwarded field remove of p58.f2 (cid 19) commits at n01 (epoch 1, seq 35) and again at n04
-// (epoch 4, seq 49), after two joins and an orphan cut moved the partition. The new owner's dedup window never
-// learned the first commit: under scoping it learns cids only from records of partitions it holds, and the latch
-// carries no dedup tuples yet (DESIGN-SCALE stage 3 plans ACQDONE `w`). A re-committed remove can erase a newer
-// write. Found by this sweep.
-const KNOWN_UNSAFE: Record<string, number[]> = { 'A3-orphan-cut': [6], 'A11-spoke': [5] }
+//! KNOWN_UNSAFE — schedules today's kernel is not safe on, each with its finding and the monitor that names it.
+// A11 seeds 2, 5 and 6: a spoke's resync ends on a STALE digest reply (M10 resync-end), on every A11 seed that
+// fails over to a feeder behind it (2, 5, 6 and 10 of seeds 1-12). At the failover the spoke sends its new feeder
+// a digest (r=1, #0). The feeder's own r=1 crosses it and shows a lane tail below the spoke's, so the spoke
+// resyncs: fold wiped, an empty r=1 (#1) sent to ask for the re-download. The feeder's r=0 reply to #0 then
+// lands and is taken as the resync's end (node.ts #resyncEnd), so the ghost sweep runs before anything was
+// re-downloaded, and the real re-download lands after it, one record run per frame. For those events the spoke
+// shows older values of live rows (seed 6: p29 at seq 21 after seq 69) and, on seed 5, a row whose remove is
+// still on the way (M1). The end state is right; the screen goes back in time. Found by this sweep.
+// A3 seed 6: one attempt commits TWICE across an ownership move (the existing attempt-exactly-once monitor):
+// n05's forwarded field remove of p58.f2 (cid 19) commits at n01 (t=1858.8, epoch 1, seq 35); 1.5 ms later the
+// orphan cut takes every n01 link down, before the commit's fan-out or its WACK left n01, so no other node holds
+// n01:35 and n05 never learns it committed. n05 retries; n04, the owner by then, commits it again (epoch 4, seq
+// 49). After the heal n01:35 reaches n04 (t=3297) and both commits stand. The latch is not the gap: it feeds every
+// taught record's attempt identity into the dedup window (kernel/scope.ts, `remember` in the ACQDONE fold), but no
+// teacher ever held n01:35. This is the unscoped zombie's class (a commit stranded on a cut-off owner), seen here
+// as a double commit, so its fix belongs with the zombie's (what a cut-off owner committed but never shipped),
+// not with the latch's dedup tuples. A re-committed remove can erase a newer write. Found by this sweep.
+const KNOWN_UNSAFE: Record<string, Record<number, RegExp>> = {
+  'A3-orphan-cut': { 6: /attempt-exactly-once .*committed TWICE/ },
+  'A11-spoke': { 2: /resync-end .*stale reply/, 5: /resync-end .*stale reply/, 6: /resync-end .*stale reply/ },
+}
 
 //! the engagement key each family must hit on at least one seed: a family whose chaos never bit proves nothing
 const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
@@ -56,27 +65,32 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
 }
 
 for (const fam of FAMILIES) {
-  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ' and pinned seed ' + KNOWN_UNSAFE[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, M9 only at R=1, the chaos engaged`, () => {
+  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''} — safe and live, M8 red today on every seed, M9 only at R=1, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
-    let engaged = 0, cells = 0, advances = 0
-    const known = new Set(KNOWN_UNSAFE[fam.name] ?? [])
+    let engaged = 0, cells = 0, advances = 0, resyncs = 0
+    const pins = KNOWN_UNSAFE[fam.name] ?? {}
+    const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
     // the newly-safe check below is the flip a fix must make
     const seeds = [...new Set([...Array.from({ length: SEEDS }, (_, i) => i + 1), ...known])]
     for (const seed of seeds) {
       const o = runFamily(fam, seed)
-      if (o.unsafe.length) { if (!known.has(seed)) unsafe.push(`${o.shape}: ${o.unsafe.join(' | ')}`) }
+      if (o.unsafe.length) {
+        if (!known.has(seed)) unsafe.push(`${o.shape}: ${o.unsafe.join(' | ')}`)
+        else assert.match(o.unsafe.join(' | '), pins[seed], `${o.shape}: unsafe for the pinned reason`)
+      }
       else if (known.has(seed)) newlySafe.push(seed)
       if (o.notLive.length) notLive.push(`${o.shape}: ${o.notLive.join(' | ')}`)
       assert.ok(o.redToday.includes('M8'), `${o.shape}: M8 is red today on every scoped run with a remove (if green, stage 3/4 landed: flip the pin)`)
       if (o.redToday.includes('M9')) assert.ok(o.shape.includes(' R=1'), `${o.shape}: M9 only at R=1`)
       if (ENGAGED[fam.name](o.eng)) engaged++
-      cells += o.eng.cells; advances += o.eng.advances
+      cells += o.eng.cells; advances += o.eng.advances; resyncs += o.eng.resyncs
     }
     assert.deepEqual(unsafe, [], 'UNSAFE: a monitor fired or M1\'s horizon form disagrees')
     assert.deepEqual(newlySafe, [], 'a schedule pinned unsafe is safe now: take it off KNOWN_UNSAFE, with the why')
     assert.deepEqual(notLive, [], 'not live at the horizon')
     assert.ok(engaged > 0, `${fam.name}: the chaos never engaged on seeds ${seeds.join(',')}`)
+    if (fam.name === 'A11-spoke') assert.ok(resyncs > 0, 'non-vacuity: M10 saw a spoke\'s resync end')
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
   })
 }
@@ -87,7 +101,7 @@ const CAUGHT: [string, number, Mutation, string[]][] = [
   ['A1-zombie', 1, 'version-only', ['stamp-oracle', 'release-safety', 'census-truth']], // G1: the zombie's write lands above the fence after the heal
   ['A7-down-to-one', 2, 'release-all', ['stamp-oracle', 'release-safety']], // a re-joiner is taught the dead writes
   ['A6-flip-mid-latch', 3, 'drop-one', ['release-safety']], // the dropping holder teaches the partition after the flip
-  ['A11-spoke', 2, 'version-only', ['release-safety']], // the spoke's re-download applies an old write under a released stamp
+  ['A11-spoke', 3, 'version-only', ['release-safety']], // the spoke applies an old write under a released stamp
 ]
 
 test('mutation runner: today\'s injected-drop class — each pinned schedule is green as is and caught by the named monitors when the release rule is weakened', () => {

@@ -455,7 +455,7 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   out.notLive.push(...live)
   if (boundedLogs(sim)) out.redToday.push('M8')
   const L = ledgerOf(sim)
-  Object.assign(eng, { cells: L.counts.cells, advances: L.counts.advances, releases: L.counts.releases, census: L.counts.census, drops: L.counts.drops, leaves: L.counts.leaves })
+  Object.assign(eng, { cells: L.counts.cells, advances: L.counts.advances, releases: L.counts.releases, census: L.counts.census, drops: L.counts.drops, leaves: L.counts.leaves, resyncs: L.counts.resyncs })
   eng.sheds = jcount(sim, JK.shed); eng.acquires = jcount(sim, JK.acquire); eng.compactions = jcount(sim, JK.compacted)
   eng.stalls = jcount(sim, JK.shedStall); eng.epoch = Math.max(...[...sim.nodes.values()].map((x) => x.epoch))
   return out
