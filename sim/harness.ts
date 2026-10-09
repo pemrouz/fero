@@ -55,13 +55,14 @@ export const formed = (nodes: Node[]): boolean =>
 
 //! client — a SPOKE (M5b): dials the given members, elects one primary feeder, folds the same
 // replication stream, writes as ae=0 relayed attempts. Convergence checks range over it like any node.
-export const client = (sim: Sim, id: string, servers: Node[], opts: { heartbeatMs?: number } = {}): Node => {
+export const client = (sim: Sim, id: string, servers: Node[], opts: { heartbeatMs?: number; door?: Door } = {}): Node => {
   const c = sim.add({
     uuid: id,
     listen: `sim:${id}`,
     hosts: servers.map((s) => `sim:${s.uuid}`),
     heartbeatMs: opts.heartbeatMs ?? 0,
     client: true,
+    ...(opts.door !== undefined ? { door: opts.door } : {}), // the door (DESIGN-DOOR §9): a secured client proves like a member
     redialMs: 20,
     journalCap: 1 << 16,
   })

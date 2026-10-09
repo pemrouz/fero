@@ -9,7 +9,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
-import { cluster, formed, writes } from './harness.ts'
+import { cluster, client, formed, writes } from './harness.ts'
 import { toyDoor } from './door.ts'
 import { JK } from '../kernel/journal.ts'
 import { VERB, Framer, encodeControl } from '../kernel/codec.ts'
@@ -163,6 +163,42 @@ test('the honest crossing dial, secured, heartbeats OFF: a formation of members 
   assert.equal(formations, 240)
 })
 
+test('a cut DURING the handshake, secured, heartbeats OFF (the third review\'s major): a pair of members (n=2 and n=3) and a server + client, partitioned at t = 0..9 ms for 3 ms while they are still proving — every schedule heals, and no doorReject row ever names an honest peer; 30 seeds × 8 cut times each', () => {
+  //! a bare close while proving used to be journaled `refused` and the target parked given-up; with heartbeats
+  // off nothing clears a park, so 41 of these 480 pairs never formed (260 rows against honest members) and 68
+  // of 210 clients never got a primary. A bare close is a link loss now: the ordinary bounded chain re-dials.
+  // The open door is the control: it healed every schedule before and after.
+  for (const secured of [false, true]) {
+    let pairs = 0, clients = 0
+    for (const n of [2, 3]) for (let seed = 1; seed <= 30; seed++) for (const t of [0, 1, 2, 3, 4, 5, 7, 9]) {
+      const sim = new Sim(seed)
+      const nodes = cluster(sim, n, secured ? { door: toyDoor(SECRET, sim.rng) } : {})
+      sim.at(t, () => sim.partition('n01', 'n02'))
+      sim.at(t + 3, () => sim.heal('n01', 'n02'))
+      sim.run()
+      const tag = `${secured ? 'secured' : 'open'} n=${n} seed ${seed} cut at ${t}`
+      assert.ok(formed(nodes), `${tag}: formed after the cut`)
+      for (const x of nodes) assert.deepEqual(rows(x, JK.doorReject).map((e) => [e.b, e.c]), [], `${tag}: ${x.uuid} refused an honest member`)
+      pairs++
+    }
+    for (let seed = 1; seed <= 30; seed++) for (const t of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const sim = new Sim(seed)
+      const door = secured ? toyDoor(SECRET, sim.rng) : undefined
+      const [s] = cluster(sim, 1, door ? { door } : {})
+      const c = client(sim, 'c01', [s], door ? { door } : {})
+      sim.at(t, () => sim.partition('n01', 'c01'))
+      sim.at(t + 3, () => sim.heal('n01', 'c01'))
+      sim.run()
+      const tag = `${secured ? 'secured' : 'open'} client seed ${seed} cut at ${t}`
+      assert.ok(c.primary !== null && c.admitted().includes('n01'), `${tag}: the client has its feeder`)
+      assert.ok(s.admitted().includes('c01'), `${tag}: the server holds the client`)
+      for (const x of [s, c]) assert.deepEqual(rows(x, JK.doorReject).map((e) => [e.b, e.c]), [], `${tag}: ${x.uuid} wrote a refusal`)
+      clients++
+    }
+    assert.equal(pairs, 480); assert.equal(clients, 240)
+  }
+})
+
 test('the door family: ~200 seeds, a secret on every member and one intruder per seed under the chaos defaults — never admitted, never in a view or a lane, the members form, converge and agree', () => {
   const failures: string[] = []
   const seen = { kinds: new Set<number>(), chaos: new Set<number>() }
@@ -258,7 +294,17 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
         if (kind === 1 && !r.includes('peer-secret')) problems.push(`no-secret intruder saw ${r.join(',')}`)
         const mr = live.flatMap(reasons)
         if (kind === 0 && !mr.includes('bad-proof')) problems.push(`members never refused the wrong secret's own dials: ${mr.join(',')}`)
-        if (kind === 0 && !reasons(live[n - 1]).includes('refused')) problems.push(`the member that dialed the wrong secret never read its refusal: ${reasons(live[n - 1]).join(',')}`)
+        //! the member that DIALED the wrong secret: the intruder refused its proof (bad-proof, naming the member's
+        // listen) and the notice it shipped rides BEHIND its close in the sim (a close lands at the pair's minimum
+        // delay, a frame at a random one), so the member reads a bare close — a link loss, not a refusal: no row
+        // (the third review), the ordinary chain re-dials, every door row it holds names the intruder, and it never
+        // admits it. Real TCP delivers the notice (the api tier reads `refused`); the sim proves the lost-notice path.
+        if (kind === 0) {
+          const d = live[n - 1]
+          if (!rows(intruder, JK.doorReject).some((e) => e.b === 'bad-proof' && e.c === addrs[n - 1])) problems.push(`the intruder never refused the member's own dial: ${reasons(intruder).join(',')}`)
+          if (!rows(d, JK.doorReject).every((e) => e.c === 'sim:zz')) problems.push(`${d.uuid}: a door row names someone but the intruder: ${JSON.stringify(rows(d, JK.doorReject).map((e) => [e.b, e.c]))}`)
+          if (!rows(d, JK.dial).some((e) => e.a === 'sim:zz')) problems.push(`${d.uuid} never re-dialed the intruder after the bare close`)
+        }
         if (kind === 1 && !mr.includes('no-secret')) problems.push(`members never refused the missing secret: ${mr.join(',')}`)
       }
       if (kind === 2) {
@@ -302,11 +348,16 @@ test('the forwarder: a relay behind a DISCOVERED address is refused by the addre
     assert.ok(reasons(b).includes('timeout'), `n02 never got a dialer proof and timed out: ${reasons(b).join(',')}`)
     assert.ok(rows(a, JK.revive).length >= 1, 'the parked target is re-dialed once per heartbeat — bounded chatter, no admission') }
   //! discovered, rewritten: x answers as sim:x, so the address rule passes and n01 proves — over the listen it was
-  // shown. n02 rebuilds over the listen it SENT (sim:n02): bad-proof, the notice rides back, n01 parks sim:x.
+  // shown. n02 rebuilds over the listen it SENT (sim:n02): bad-proof, and its notice rides back — BEHIND its close
+  // in the sim (a close lands at the pair's minimum delay, a frame at a random one), so the relay sees the far link
+  // die first and closes the near one: n01 reads a bare close, a link loss (no row; the third review), re-dials on
+  // the ordinary chain, then at heartbeat revival — bounded chatter, never an admission. A read notice would park
+  // sim:x with a `refused` row naming it (the kernel test); either way no row names anyone but sim:x.
   { const { a, b } = build(false, true)
     assert.deepEqual(rows(a, JK.doorReject).filter((e) => e.b === 'address'), [], 'the address rule cannot see the rewrite')
     assert.ok(rows(b, JK.doorReject).some((e) => e.b === 'bad-proof' && e.c === 'sim:n01'), `n02 refused the relayed proof: ${JSON.stringify(rows(b, JK.doorReject).slice(0, 3))}`)
-    assert.ok(reasons(a).includes('refused'), `n01 read the notice through the relay: ${reasons(a).join(',')}`)
+    assert.ok(rows(a, JK.doorReject).every((e) => e.b === 'refused' && e.c === 'sim:x'), `n01 holds no door row but a refusal of sim:x: ${JSON.stringify(rows(a, JK.doorReject).slice(0, 3))}`)
+    assert.ok(rows(a, JK.dial).some((e) => e.a === 'sim:x'), 'n01 re-dialed the relay on the chain after the bare close')
     assert.deepEqual(a.admitted(), [], 'never admitted through the relay'); assert.deepEqual(b.admitted(), [])
     assert.equal(b.byUuid.has('n01'), false); assert.deepEqual(rows(b, JK.identified), [])
     assert.ok(rows(a, JK.revive).length >= 1, 'bounded chatter, no admission') }
