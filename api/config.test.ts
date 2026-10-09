@@ -151,6 +151,72 @@ test('secret (DESIGN-DOOR §5): the call, FERO_SECRET, FERO_SHOP_SECRET over it,
   assert.equal(nameKey('secret'), null, 'a declared key is never a resource rung')
 })
 
+test('secret.client (DESIGN-DOOR §15): the call, FERO_SECRET_CLIENT, FERO_SHOP_SECRET_CLIENT over it, a file — never a flag; a number, a boolean or a short value refused without echoing it; trimmed, \'\' unset; secret and secret.client together refused naming both sources, from any two layers; the same-rung env pair refused before envdeep eats the secret, and an EMPTY FERO_SECRET_CLIENT= does not eat it; the layer-off note names it', () => {
+  const K = 'unit-test-client-key-KILO-11-43chars-long-xx'
+  const S = 'unit-test-secret-ALPHA-01'
+  //! the call folds through as the nested object (the composer checks its shape)
+  assert.deepEqual(cfg('shop', { secret: { client: K } }), { secret: { client: K } })
+  //! the environment, and the per-resource rung over it
+  const env = r('shop', {}, { env: { FERO_SECRET_CLIENT: K } })
+  assert.deepEqual(env.config, { secret: { client: K } })
+  assert.equal(env.from('secret.client'), 'FERO_SECRET_CLIENT')
+  const scoped = r('shop', {}, { env: { FERO_SECRET_CLIENT: K, FERO_SHOP_SECRET_CLIENT: `${K}-shop` } })
+  assert.deepEqual(scoped.config, { secret: { client: `${K}-shop` } })
+  assert.equal(scoped.from('secret.client'), 'FERO_SHOP_SECRET_CLIENT')
+  //! a $HOME file
+  const home = scratch()
+  fs.writeFileSync(path.join(home, 'fero.opt.js'), `export default { secret: { client: '${K}-file' } }`)
+  const file = r('shop', {}, { home })
+  assert.deepEqual(file.config, { secret: { client: `${K}-file` } })
+  assert.equal(file.from('secret.client'), 'a fero.opt.ts file (secret.client)')
+  //! never a flag, under either rung: the refusal names the flag and the three carriers, never the value
+  for (const argv of [['--fero.secret.client', K], ['--fero.shop.secret.client', K], [`--fero.secret.client=${K}`]])
+    assert.throws(() => r('shop', {}, { argv }), (e: Error) => {
+      assert.match(e.message, /^fero\('shop'\): 'secret\.client' cannot come from --fero\.(shop\.)?secret\.client — it is set in the call, the environment or a fero\.opt\.ts file only \(a secret never rides argv: ps, \/proc\/<pid>\/cmdline and shell history show every flag\)$/)
+      assert.ok(!e.message.includes(K), `the key is not in the message: ${e.message}`)
+      return true
+    }, argv.join(' '))
+  //! the shape rule for the text layers: one refusal naming fero.clientKey, never the value; no off word
+  const hint = /^fero\('shop'\): secret\.client must be the client key, text of at least 16 characters \(from FERO_SECRET_CLIENT\) — fero\.clientKey\(secret\) prints it from the cluster's secret$/
+  for (const v of ['1234567890123456', 'true', 'fifteen-chars!!', 'off', 'false', '0', 'short-one'])
+    assert.throws(() => r('shop', {}, { env: { FERO_SECRET_CLIENT: v } }), (e: Error) => hint.test(e.message) && !e.message.includes(v), v)
+  const bad = scratch()
+  fs.writeFileSync(path.join(bad, 'fero.opt.js'), 'export default { secret: { client: 12345678901234567890 } }')
+  assert.throws(() => r('shop', {}, { home: bad }), /secret\.client must be the client key, text of at least 16 characters \(from a fero\.opt\.ts file \(secret\.client\)\)/)
+  //! '' is unset (the next rung answers); a value is trimmed
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SECRET_CLIENT: '' } }), {})
+  assert.deepEqual(cfg('shop', { secret: { client: K } }, { env: { FERO_SHOP_SECRET_CLIENT: '' } }), { secret: { client: K } })
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SECRET_CLIENT: ` ${K} ` } }), { secret: { client: K } }, 'trimmed')
+  //! a typo under the group points at the one leaf; a dotted spelling is refused like every nested key
+  assert.throws(() => r('shop', { secret: { clint: K } }), /unknown option 'secret\.clint' from the call — did you mean secret: \{ client: … \}/)
+  assert.throws(() => r('shop', {}, { env: { FERO_SECRET_CLINT: K } }), /unknown option 'secret\.clint' from FERO_SECRET_CLINT — did you mean FERO_SECRET_CLIENT/)
+  assert.throws(() => r('shop', { 'secret.client': K } as never), /unknown option 'secret\.client' from the call — nested keys are objects: secret: \{ client: … \}/)
+  //! both set, from any two layers: refused naming both sources, never a silent pick (the leaf and the group share a name)
+  const both = /are both set — a process holds one: the secret \(a member, or a client trusted with it\) or the client key \(a client that may only follow\); drop one$/
+  assert.throws(() => r('shop', { secret: S }, { env: { FERO_SECRET_CLIENT: K } }), (e: Error) => /^fero\('shop'\): secret and secret\.client \(from FERO_SECRET_CLIENT\) are both set/.test(e.message) && both.test(e.message) && !e.message.includes(S) && !e.message.includes(K))
+  assert.throws(() => r('shop', { secret: { client: K } }, { env: { FERO_SECRET: S } }), /fero\('shop'\): secret \(from FERO_SECRET\) and secret\.client are both set/)
+  assert.throws(() => r('shop', {}, { env: { FERO_SECRET: S, FERO_SHOP_SECRET_CLIENT: K } }), /fero\('shop'\): secret \(from FERO_SECRET\) and secret\.client \(from FERO_SHOP_SECRET_CLIENT\) are both set/)
+  assert.throws(() => r('shop', { secret: false }, { env: { FERO_SECRET_CLIENT: K } }), both, 'open on purpose and a client key is a contradiction too')
+  assert.throws(() => r('shop', {}, { home, env: { FERO_SECRET: S } }), /fero\('shop'\): secret \(from FERO_SECRET\) and secret\.client \(from a fero\.opt\.ts file \(secret\.client\)\) are both set/)
+  //! the SAME rung in the environment: envdeep nests FERO_SECRET_CLIENT under FERO_SECRET and the nested one wins, so the
+  // secret would be silently gone — refused on the raw variables, before anything is lost, naming both
+  assert.throws(() => r('shop', {}, { env: { FERO_SECRET: S, FERO_SECRET_CLIENT: K } }), (e: Error) => /^fero\('shop'\): FERO_SECRET and FERO_SECRET_CLIENT are both set/.test(e.message) && both.test(e.message) && !e.message.includes(S) && !e.message.includes(K))
+  assert.throws(() => r('shop', {}, { env: { FERO_SHOP_SECRET: S, FERO_SHOP_SECRET_CLIENT: K } }), /fero\('shop'\): FERO_SHOP_SECRET and FERO_SHOP_SECRET_CLIENT are both set/)
+  assert.throws(() => r('shop', {}, { env: { fero_secret: S, fero_secret_client: K } }), /fero\('shop'\): fero_secret and fero_secret_client are both set/, 'any case: envdeep lowercases')
+  //! another resource's same-rung pair is its own business
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_USERS_SECRET: S, FERO_USERS_SECRET_CLIENT: K } }), {})
+  //! an EMPTY FERO_SECRET_CLIENT= beside FERO_SECRET (a templated variable) would eat the secret in envdeep: dropped first
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SECRET: S, FERO_SECRET_CLIENT: '' } }), { secret: S })
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SHOP_SECRET: S, FERO_SHOP_SECRET_CLIENT: '  ' } }), { secret: S })
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SECRET: S, FERO_SHOP_SECRET_CLIENT: '' } }), { secret: S })
+  //! the layer off: the variable is ignored like every other, and the note names it
+  const notes: string[] = []
+  const note = (line: string) => { notes.push(line) }
+  assert.deepEqual(r('shop', {}, { env: { FERO_CONFIG: 'off', FERO_SECRET_CLIENT: K }, note } as never).config, {})
+  assert.deepEqual(notes, ['FERO_CONFIG=off: FERO_SECRET_CLIENT is ignored, this process runs open\n'])
+  assert.ok(CONFIG_LEAVES.includes('secret.client'))
+})
+
 test('precedence: flag > call > env > project file > home file, per key', () => {
   const cwd = scratch(); const home = scratch()
   fs.writeFileSync(path.join(cwd, 'package.json'), '{ "type": "module" }')
@@ -333,7 +399,7 @@ test('a config file that fails to load throws with its path (optcascade), and th
   const home = scratch()
   fs.writeFileSync(path.join(home, 'fero.opt.js'), 'export default {')
   assert.throws(() => r('r', {}, { home }), (e: Error) => e.message.includes(path.join(home, 'fero.opt.js')))
-  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'diag.allow', 'secret', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
+  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'diag.allow', 'secret', 'secret.client', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
 })
 
 test('I-35 — a LONGER name under a leaf is refused naming THAT name; the good variable beside it is never blamed, and `data` (an object of rows) still rides a file', () => {

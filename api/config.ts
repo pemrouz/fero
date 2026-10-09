@@ -71,6 +71,10 @@ const LEAVES = table<{ layers: string; why?: string; object?: true }>({
   //! secret — the cluster's shared secret (DESIGN-DOOR §5): the call, FERO_SECRET (per resource
   // FERO_SHOP_SECRET) or a fero.opt.ts file. The same carriers as diag.allow, for the same reason.
   secret: { layers: 'cep', why: 'a secret never rides argv: ps, /proc/<pid>/cmdline and shell history show every flag' },
+  //! secret.client — the derived client key (DESIGN-DOOR §15): what a process that may only FOLLOW holds instead
+  // of the secret. The same layers and the same why. `secret` is a leaf AND a group (secret: '…' or
+  // secret: { client: '…' }); the walk visits an object under it. A process holds one of the two, never both.
+  'secret.client': { layers: 'cep', why: 'a secret never rides argv: ps, /proc/<pid>/cmdline and shell history show every flag' },
   data: { layers: 'cp', why: 'an object of rows', object: true },
   methods: { layers: 'c', why: 'functions — and the door: it closes a resource from the source line that hosts it' },
   validation: { layers: 'c', why: 'a function' },
@@ -223,6 +227,9 @@ const walk = (resource: string, layer: Layer, name: string | null, tree: unknown
         visit(v, path)
         continue
       }
+      //! secret is a leaf AND a group (DESIGN-DOOR §15): a value is the secret, an object holds the client key
+      // (secret: { client: '…' }, FERO_SECRET_CLIENT). Every other leaf keeps the longer-name refusal below.
+      if (path === 'secret' && isPlain(v)) { visit(v, path); continue }
       const leaf = LEAVES[path]
       if (leaf !== undefined) {
         if (path === 'diag.allow' && layer === 'flag') diagFlag(resource, name, v)
@@ -318,6 +325,11 @@ const coerce = (resource: string, key: string, raw: unknown, from: string): unkn
       if (v === false || v === 0 || (typeof v === 'string' && OFF.has(v))) return false
       if (typeof v !== 'string' || v.length < SECRET_MIN) throw new Error(secretHint(resource, src(from)))
       return v
+    case 'secret.client':
+      //! the client key (DESIGN-DOOR §15): text of SECRET_MIN characters (the derived key is 43), trimmed above,
+      // '' unset above. No off word — the open door is `secret: false`. The message never carries the value.
+      if (typeof v !== 'string' || v.length < SECRET_MIN) throw new Error(clientKeyHint(resource, src(from)))
+      return v
     default:
       return v
   }
@@ -329,6 +341,34 @@ export const src = (from: string): string => (from === 'the call' ? '' : ` (from
 export const SECRET_MIN = 16
 export const secretHint = (resource: string, at: string): string =>
   `fero('${resource}'): secret must be text of at least ${SECRET_MIN} characters${at} — a value that is all digits is read as a number; openssl rand -base64 24 prints a good one`
+//! clientKeyHint — the one refusal for a client key of the wrong shape (§15), from any layer; never the value
+export const clientKeyHint = (resource: string, at: string): string =>
+  `fero('${resource}'): secret.client must be the client key, text of at least ${SECRET_MIN} characters${at} — fero.clientKey(secret) prints it from the cluster's secret`
+//! bothSet — secret and secret.client together, from any two layers: refused, never a silent pick (§15)
+const bothSet = (resource: string, a: string, b: string): Error =>
+  new Error(`fero('${resource}'): ${a} and ${b} are both set — a process holds one: the secret (a member, or a client trusted with it) or the client key (a client that may only follow); drop one`)
+//! secretEnv — the raw environment, before envdeep folds it (§15): FERO_SECRET_CLIENT nests UNDER FERO_SECRET
+// (an `_` nests), and the nested one wins, so `FERO_SECRET=a FERO_SECRET_CLIENT=b` would reach the fold as
+// { secret: { client: 'b' } } with the secret silently gone — even for an EMPTY FERO_SECRET_CLIENT= (a templated
+// variable). So: an empty *_SECRET_CLIENT is dropped here (empty means unset in every layer), and a non-empty one
+// beside its own rung's *_SECRET is refused naming both, before anything is lost. Only the global rung and this
+// resource's are judged; another resource's pair is its own business (the walk skips its subtree). A pair across
+// two rungs (FERO_SECRET and FERO_SHOP_SECRET_CLIENT) survives envdeep and is refused after the fold like every
+// both-set case.
+const secretEnv = (resource: string, env: Record<string, string | undefined>, mine: string | null): Record<string, string | undefined> => {
+  const out = { ...env }
+  const keys = Object.keys(env)
+  for (const k of keys) {
+    const m = /^fero_(?:([a-z0-9]+)_)?secret_client$/i.exec(k)
+    if (m === null) continue
+    const rung = m[1]?.toLowerCase() ?? null
+    if ((env[k] ?? '').trim() === '') { delete out[k]; continue }
+    if (rung !== null && rung !== mine) continue
+    const sibling = keys.find((s) => s.toLowerCase() === (rung === null ? 'fero_secret' : `fero_${rung}_secret`) && (env[s] ?? '').trim() !== '')
+    if (sibling !== undefined) throw bothSet(resource, sibling, k)
+  }
+  return out
+}
 
 //! ── unflatten: dotted leaves back into the FeroOpts shape the composer reads ──
 const unflatten = (flat: Flat): FeroOpts => {
@@ -371,11 +411,11 @@ export const resolveConfig = (resource: string, call: FeroOpts, sources: Sources
     rungs.push({ layer: 'call', name: null, flat: callFlat })
     //! a secret in the environment with the layer OFF is ignored like every variable — said once per process
     // (DESIGN-DOOR §5), so nobody believes a box is locked when it runs open (the battery runs this way)
-    const stray = Object.keys(env).find((k) => /^FERO_(?:[A-Z0-9]+_)?SECRET$/i.test(k) && (env[k] ?? '').trim() !== '')
+    const stray = Object.keys(env).find((k) => /^FERO_(?:[A-Z0-9]+_)?SECRET(?:_CLIENT)?$/i.test(k) && (env[k] ?? '').trim() !== '')
     if (stray !== undefined) noteOnce(sources.note ?? toStderr, `FERO_CONFIG=off: ${stray} is ignored, this process runs open\n`)
   } else {
     const argv = sources.argv ?? process.argv.slice(2)
-    const scrubbed = scrub(env)
+    const scrubbed = secretEnv(resource, scrub(env), mine)
     //! the working directory can be gone (deleted under a running process): then the project file
     // layer is $HOME's — no file, not a raw ENOENT
     let cwd: string
@@ -423,6 +463,10 @@ export const resolveConfig = (resource: string, call: FeroOpts, sources: Sources
         throw new Error(`fero('${resource}'): server: true${src(origin.get('server')!)} but server: false pins the client role${src(got.from)} — drop one`)
     }
   }
+  //! secret and secret.client together (§15), from any two layers: a process holds ONE — refused naming both
+  // sources (unflatten could not even hold both: the leaf and the group share a name)
+  if (flat.has('secret') && flat.has('secret.client'))
+    throw bothSet(resource, `secret${src(origin.get('secret')!)}`, `secret.client${src(origin.get('secret.client')!)}`)
   //! seams.validation → validation (owner question 5, 2026-10-05): the one function-valued config key is
   // a top-level key now. The old spelling is folded into the new one for one release, with a note once
   // per process; both at once is one key set twice, refused rather than silently picking one.
