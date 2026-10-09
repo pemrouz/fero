@@ -69,7 +69,7 @@ const optsOf = (id: string, hosts: string[], o: MeshOpts): NodeOpts => ({
   redialMs: 20, journalCap: 1 << 16,
 })
 
-//! mesh — n nodes, full dial mesh, the per-event monitors AND the scale monitors (M1-M9) installed.
+//! mesh — n nodes, full dial mesh, the per-event monitors AND the scale monitors (M1-M10) installed.
 export const mesh = (sim: Sim, n: number, o: MeshOpts): Node[] => {
   const ids = Array.from({ length: n }, (_, i) => idOf(i + 1))
   const nodes = ids.map((id) => sim.add(optsOf(id, ids.filter((x) => x !== id).map((x) => `sim:${x}`), o)))
