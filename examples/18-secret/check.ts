@@ -24,14 +24,16 @@ const start = (args: string[], secret?: string) => {
     if (secret) process.env.FERO_SECRET = secret
     try { return fero.spawn('server.ts', args) } finally { delete process.env.FERO_SECRET; Object.assign(process.env, saved) }
 }
-// the last MEMBER line a role printed; everything it printed on stderr (`out` is stdout only), and the refusal lines in it
-const header = (r: Spawned) => r.out.split('\n').filter((l) => l.startsWith('MEMBER ')).pop() ?? ''
+// the member count on the last MEMBER line a role printed (the whole line must have the README's shape, or -1);
+// everything it printed on stderr (`out` is stdout only), and the refusal lines in it
+const shape = /^MEMBER \d+ on 127\.0\.0\.1:\d+ — members (\d+)$/
+const members = (r: Spawned, l = r.out.split('\n').filter((l) => l.startsWith('MEMBER ')).pop() ?? '') => Number(shape.exec(l)?.[1] ?? -1)
 const errs = (r: Spawned, s = '') => (r.child.stderr!.on('data', (d: string) => { s += d }), () => s)
 const refusals = (err: () => string) => err().split('\n').filter((l) => l.startsWith("fero('vault'): refused"))
 
 // two members started with the secret form a cluster of two, and each holds the other's row
 const m1 = start([a, b], SECRET), m2 = start([b, a], SECRET), err1 = errs(m1), err2 = errs(m2)
-assert.ok(await until(() => [m1, m2].every((r) => header(r).includes('— members 2')), 30_000), 'two members with the secret: members 2 on both screens (is this example open in another terminal?)')
+assert.ok(await until(() => [m1, m2].every((r) => members(r) === 2), 30_000), 'two members with the secret: members 2 on both screens (is this example open in another terminal?)')
 assert.ok(await until(() => [m1, m2].every((r) => r.out.includes(`'${m1.pid}': 'member'`) && r.out.includes(`'${m2.pid}': 'member'`))), 'both rows on both screens')
 
 // a third server started without the secret: refused at the door by both, and its own screen says why, once per member
@@ -43,16 +45,18 @@ assert.ok(await until(() => refusals(err1).includes(inbound) && refusals(err2).i
 await sleep(2000) // the third keeps redialing: one line per peer and reason, never one per attempt
 assert.deepEqual(refusals(err3).sort(), [line(a), line(b)].sort(), 'exactly one line per member on the third')
 assert.deepEqual([refusals(err1), refusals(err2)], [[inbound], [inbound]], 'exactly one line on each member')
-assert.ok(header(m3).includes('— members 0') && !m3.out.includes(`'${m1.pid}'`), 'the third is in no cluster and holds no row of theirs')
-assert.ok([m1, m2].every((r) => header(r).includes('members 2') && !r.out.includes(`'${m3.pid}'`)), 'and the members never saw its row')
-const screens = [[m1, err1], [m2, err2], [m3, err3]] as const
-assert.ok(!screens.some(([r, err]) => r.out.includes(SECRET) || err().includes(SECRET)), 'no screen ever shows the secret')
+assert.ok(members(m3) === 0 && !m3.out.includes(`'${m1.pid}'`), 'the third is in no cluster and holds no row of theirs')
+assert.ok([m1, m2].every((r) => members(r) === 2 && !r.out.includes(`'${m3.pid}'`)), 'and the members never saw its row')
 
 // Ctrl-C, and the same command with the secret: the third is admitted, members 3 on every screen, its row on all of them
 assert.equal(await m3.stop(), 0, 'the refused server still stops cleanly on Ctrl-C')
-const m3b = start([c, a, b], SECRET)
-assert.ok(await until(() => [m1, m2, m3b].every((r) => header(r).includes('— members 3') && r.out.includes(`'${m3b.pid}': 'member'`)), 30_000), 'with the secret the same command joins: members 3 and its row on every screen')
+const m3b = start([c, a, b], SECRET), err3b = errs(m3b)
+assert.ok(await until(() => [m1, m2, m3b].every((r) => members(r) === 3 && r.out.includes(`'${m3b.pid}': 'member'`)), 30_000), 'with the secret the same command joins: members 3 and its row on every screen')
 assert.deepEqual([refusals(err1), refusals(err2)], [[inbound], [inbound]], 'the members print nothing new for a peer that proves itself')
+
+// every screen of the whole story, stdout and stderr, refused and admitted: the value itself is printed nowhere
+const screens = [[m1, err1], [m2, err2], [m3, err3], [m3b, err3b]] as const
+assert.ok(!screens.some(([r, err]) => r.out.includes(SECRET) || err().includes(SECRET)), 'no screen ever shows the secret')
 
 for (const r of [m3b, m1, m2]) assert.equal(await r.stop(), 0, 'stopped cleanly on Ctrl-C')
 console.log('ok 18-secret')
