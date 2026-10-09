@@ -10,8 +10,8 @@ This is fero v4: package `fero` 4.0.0, branch `v4`, the repo root since 2026-08-
 
 ```sh
 npm install                                    # once after a clone: the one dependency (optcascade); Node 22.18 or later
-cd examples/01-two-servers && node server.ts   # the example series, 27 rungs: examples/README.md
-npm test                                       # 515 tests + data's 18 contract clauses, the 27 example checks included
+cd examples/01-two-servers && node server.ts   # the example series, 28 rungs: examples/README.md
+npm test                                       # 515 tests + data's 18 contract clauses, the 28 example checks included
 npm run perf                                   # the 43 perf pins; perf:absolute / perf:pin for the persisted baseline (tools/perf/BASELINE.md)
 npm run sim -- --seeds 1000                    # 1000 seeded chaos trajectories; a failing seed prints itself and reruns bit for bit
 npm run shrink -- --seed 42                    # shrink a failing seed to a few steps; --replay <capture> reruns the repro
@@ -220,7 +220,7 @@ sim/       the executive: virtual time, seeded faults, per-event monitors, the s
 tests/     cross-layer scenarios, the real-socket and real-WAL tiers, the example checks, the config tier, the baseline gate
 tools/     debug/ (capture → model → viewer, the scenario dashboard, live and attach) · perf/ (the persisted absolute baseline)
 utils/     shared helpers (#utils); battery.ts pins the test battery: directory off, config layer off
-examples/  the 27-rung series: one folder per example, one file per terminal, a check.ts that proves it
+examples/  the 28-rung series: one folder per example, one file per terminal, a check.ts that proves it
 docs/      the decisions ledger, the design records, the history
 ```
 
