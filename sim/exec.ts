@@ -104,6 +104,14 @@ export class Sim {
   stores = new Map<string, SimStore>()
   #storeFaults = new Map<string, StoreFault>()
   #nodeOpts = new Map<string, NodeOpts>()
+  //! #life — the life number per uuid: add() bumps it, the sink add() makes captures it, and an echo the
+  // sink scheduled for an EARLIER life is dropped when it falls due (2026-10-09). A reborn node numbers
+  // its timers and its WAL batches from 1 again, and the sim's cancel is a no-op, so the old life's fires
+  // stayed queued and a reborn node read one as its own: a TAG.prove deadline at 12 ms instead of 5000
+  // refused an honest peer `timeout`; a stale `persisted` would resolve a fresh batch before its fsync.
+  // A real shell cancels its timers and drops its io-queue on destroy; this is that, for the queue.
+  // Link events need nothing: link ids are sim-global, so an old life's linkDown names no new link.
+  #life = new Map<string, number>()
   //! per-store FIFO fsync clock (the disk twin of #lastAt): a real WAL resolves batches IN APPEND ORDER
   // (the shell's io-queue serializes write+fsync per row), so resolution times are clamped monotone per
   // store — without this the sim manufactures resolved-rows-past-an-unresolved-row, an "interior hole"
@@ -158,6 +166,7 @@ export class Sim {
 
   //! add — create a node whose Env is this executive. The kernel cannot tell it isn't on a real network; that is the design.
   add(opts: NodeOpts): Node {
+    this.#life.set(opts.uuid, (this.#life.get(opts.uuid) ?? 0) + 1) // before the sink: it captures this life
     const sink = this.#sinkFor(opts.uuid)
     const node = new Node(opts, { now: () => this.now, rng: this.rng, sink })
     this.nodes.set(opts.uuid, node)
@@ -350,6 +359,11 @@ export class Sim {
 
   #sinkFor(me: string): EffectSink {
     const sim = this
+    //! this sink's life (see #life; a raw endpoint has none and never restarts, so 0 = 0 holds for it).
+    // Every per-node-numbered echo the sink schedules — a timer fire, a WAL batch's persisted/persistFail
+    // — is stepped only while this life is still the live one; a later life drops it at the queue.
+    const life = sim.#life.get(me) ?? 0
+    const alive = (): boolean => (sim.#life.get(me) ?? 0) === life
     return {
       connect(to: string) {
         const target = sim.#byListen.get(to)
@@ -408,7 +422,7 @@ export class Sim {
         if (f.dupP && sim.rng() < f.dupP) deliver()
       },
       close(link: number, reason: string) { sim.#sever(link, reason) },
-      timer(id: number, tag: number, ms: number) { sim.post(me, { kind: 'timer', id, tag }, ms) },
+      timer(id: number, tag: number, ms: number) { sim.#schedule(ms, () => { if (alive()) sim.#step(me, { kind: 'timer', id, tag }) }) },
       cancel() { /* fires are ignored by the kernel's live-id check; leaving them queued costs one no-op event */ },
       apply(rec) { foldInto(sim.folds.get(me)!, rec) }, // the downstream object (V4-18); the api layer binds its proxy here
       //! M4b storage: append the row, then resolve (or fail) on the fsync clock with the node's store
@@ -426,13 +440,13 @@ export class Sim {
         sim.#storeAt.set(me, at)
         if (f.failP && sim.rng() < f.failP) {
           store.wal.pop() // a failed batch never reached the disk
-          sim.post(me, { kind: 'persistFail', batch, reason: 'io' }, at - sim.now)
+          sim.#schedule(at - sim.now, () => { if (alive()) sim.#step(me, { kind: 'persistFail', batch, reason: 'io' }) })
           return
         }
         if (f.lieP && sim.rng() < f.lieP) row.lied = true
         sim.#schedule(at - sim.now, () => {
           row.resolved = true
-          sim.#step(me, { kind: 'persisted', batch })
+          if (alive()) sim.#step(me, { kind: 'persisted', batch })
         })
       },
       //! M4e snapshot+swap: the store contract is SYNCHRONOUS-durable (the shell writes tmp + fsync +
@@ -450,7 +464,7 @@ export class Sim {
         const at = Math.max(sim.now + dMin + sim.rng() * (dMax - dMin), sim.#storeAt.get(me) ?? 0) // same FIFO clock as appends
         sim.#storeAt.set(me, at)
         if (f.failP && sim.rng() < f.failP) {
-          sim.post(me, { kind: 'persistFail', batch, reason: 'io' }, at - sim.now)
+          sim.#schedule(at - sim.now, () => { if (alive()) sim.#step(me, { kind: 'persistFail', batch, reason: 'io' }) })
           return
         }
         if (f.lieP && sim.rng() < f.lieP) store.swapLied = true
@@ -458,7 +472,7 @@ export class Sim {
           store.wal = rows.map((r) => ({ batch, bytes: r.bytes, prev: r.prev, resolved: true, lied: false }))
           store.swapLied = false
         }
-        sim.#schedule(at - sim.now, () => sim.#step(me, { kind: 'persisted', batch }))
+        sim.#schedule(at - sim.now, () => { if (alive()) sim.#step(me, { kind: 'persisted', batch }) })
       },
       //! boot: synchronous-durable like the shell's. bootFailP (I-36) fails it: the record never lands, the
       // store is condemned and takes no later record (the shell's #bootFailed latch), and persistFail is
@@ -470,7 +484,7 @@ export class Sim {
         const f = sim.#storeFaults.get(me)
         if (f?.bootFailP && sim.rng() < f.bootFailP) {
           store.condemned = true
-          sim.post(me, { kind: 'persistFail', batch: 0, reason: 'io' }, 0)
+          sim.#schedule(0, () => { if (alive()) sim.#step(me, { kind: 'persistFail', batch: 0, reason: 'io' }) })
           return
         }
         store.boot = record
