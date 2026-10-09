@@ -841,10 +841,10 @@ target is checked wherever it came from.
   rule exempts typed hosts. TLS's job.
 - A dishonest client that holds the one shared secret: it can omit `r: 1`
   and is a member — it can write any lane, vote, LEAVE a member out, and
-  claim any member's uuid. Every client holds the member secret in this
-  change. Where clients are not trusted, wait for the derived client key
-  (§14 Q2). This is why the STATUS line is said to close for strangers and
-  for honest clients, not for a hostile secret holder.
+  claim any member's uuid. Where clients are not trusted, give them the
+  derived client key instead (§15, built 2026-10-09): a client-key holder
+  can only follow. What the client key does NOT close is in §15: a
+  client-key holder can pose as a server to another client that dials it.
 - A leaked secret: whoever holds it is a member. No per-node identity, no
   revocation, no rotation window; changing it is a full restart.
 - A weak secret: the 16-character floor helps; a dictionary word does not.
@@ -1247,3 +1247,191 @@ Each has a default. Silence means the default.
    only; the static-host relay goes in NOT PROTECTED until TLS.*
 7. **The secret floor.** 16 characters, with `openssl rand -base64 24` as
    the hint. *Default: 16.*
+
+## §15 The derived client key (2026-10-09, the first follow-up of §14 Q2)
+
+*Status: designed and BUILT the same day (the dated line at the end of this
+section says what landed). The owner took §14 Q2's default on 2026-10-09; this
+is the follow-up it named. Read §3 (the proof), §5 (the secret) and §7 (the
+limits) first.*
+
+### The problem
+
+With one shared secret every client holds the member secret. A client that
+omits `r: 1` is a member on the wire: it can write any lane, vote, LEAVE a
+member out and claim any member's uuid (§7, "a dishonest client"). The role
+rule cannot see it, because the thing it checks, `r`, is the client's own
+claim. Where clients are not trusted the secret cannot be handed to them at
+all, which means they cannot connect at all.
+
+### The key
+
+```
+client = HMAC-SHA256(secret, 'fero/client/1')   as base64url, 43 characters
+```
+
+One secret still. A member derives the client key from it; an operator
+prints it once (`fero.clientKey(secret)`, or the `openssl` line in README,
+both proved equal by a test) and gives it to processes that may only
+follow. The label versions the derivation, like the proof label does.
+
+### The rule, in the kernel
+
+A link is a CLIENT LINK when the DIALER's HELLO says `r: 1`. Both proofs on
+a client link — the dialer's and the member's answer — are made with the
+client key; both proofs on every other link with the secret. Nothing else in
+§3 changes: the same message, the same order of checks, the same frames.
+
+- `Door` grows one optional function: `{ mac, nonce, clientMac? }`. The
+  kernel stays crypto-free: `prove` and `verify` in kernel/door.ts pick
+  `clientMac` when the dialer's HELLO (`link.said` on the dialer, the
+  stashed `link.hello` on the acceptor) carries `r: 1` and the door has one;
+  otherwise `mac`. A door without `clientMac` (an embedder's) keeps today's
+  one-key behaviour exactly. kernel/node.ts does not change: it already
+  hands both HELLOs to `prove` and `verify`.
+- The api builds three doors from one `secret`: a MEMBER and a client that
+  holds the secret get `mac = HMAC(secret)`, `clientMac = HMAC(client)`; a
+  CLIENT-ONLY process (it has `secret.client` and no `secret`) gets `mac =
+  clientMac = HMAC(client)` — it holds nothing else, so every proof it can
+  make is a client-key proof.
+- The sim toy gets the same: `toyDoor(secret)` derives a toy client key and
+  signs client links with it; `toyClientDoor(clientKey)` is the client-only
+  door. The sim proves the protocol, real sockets prove node:crypto.
+
+Why the dialer's `r` picks the key and not the prover's: the member proves
+BACK to a client, and the client holds only the client key, so the member's
+answer on a client link must be a client-key proof too. The dialer's `r` is
+signed inside the dialer's proof (`h.r`), so a dialer cannot say `r: 1` to
+be checked with the client key and then be admitted as anything else: `r`
+is what the admit tail reads, and `r: 1` makes a client link.
+
+### What it protects, said plainly
+
+A process that holds only the client key:
+
+- is admitted only as a client (`r: 1`) and only after a client-key proof;
+- cannot become a member: a HELLO without `r: 1` is checked with the member
+  secret and fails `bad-proof` the moment it arrives;
+- cannot vote, cannot write another lane, cannot LEAVE a member out: those
+  need a member link, and it can never have one;
+- cannot claim a member's uuid: with `r: 1` the role rule refuses it
+  `uuid-taken` (as before); without `r: 1` it is `bad-proof` before the
+  role rule runs;
+- cannot learn the member secret from the client key: HMAC is one-way.
+
+So the STATUS line "a hostile secret holder is a member" closes for CLIENT
+processes: a client never needs the member secret now.
+
+### What it does NOT protect, said plainly
+
+- **A client-key holder can pose as a server to another CLIENT.** A client
+  verifies the member's answer with the client key, because that is all it
+  holds; a client-key holder can make that answer. So a client that dials a
+  client-key holder (a stale or forged directory entry on the box, a typed
+  `hosts` address) admits it as its primary and reads what it sends. The
+  address rule and the directory limit where this is reachable: on the
+  default box the directory is the per-box loopback plane (§6), and a
+  routable rendezvous or a typed host is the operator's explicit act. Members
+  are never fooled this way: a member verifies every non-client proof with
+  the secret. Closing this needs a key a client can verify but not make — a
+  server signing key (asymmetric) — which is a later change, and TLS at the
+  shell would also close it. The README names this limit beside the key.
+- **The client key is a shared key too.** Every client holds the same one;
+  a leaked client key is a client; there is no per-client identity and no
+  revocation short of changing the secret (which changes the client key with
+  it, a full stop and start of every member and client, §4).
+- Everything in §7's list that is not about clients: cleartext after the
+  handshake, the static-host relay, the loopback directory, denial of
+  service, a weak or leaked member secret.
+
+If that makes the feature smaller than its name: it is "a client that can
+only follow", not "a client a member can tell from an impostor". Both the
+README and this note say so.
+
+### The config key
+
+`secret.client`, the same layers as `secret` (`cep`: the call, `FERO_SECRET_CLIENT`
+and per resource `FERO_SHOP_SECRET_CLIENT`, a `fero.opt.ts` file as
+`secret: { client: '…' }`); never a flag (the same `why`); trimmed; text of
+at least 16 characters (the derived key is 43), with a refusal that never
+prints the value and names `fero.clientKey(secret)`; `''` is unset. There is
+no `off` word for it: the open door is `secret: false`. `diag(f).config()`
+shows `<set>` with its source, like `secret`. With `FERO_CONFIG=off` the
+layer-off note names `FERO_SECRET_CLIENT` too.
+
+A process holds ONE of the two: `secret` (a member, or a client trusted with
+the member secret) or `secret.client` (a client that may only follow). Both
+set, from any two layers, is refused naming both sources — never a silent
+pick. A SERVER with only `secret.client` is refused at `fero()` in plain
+words: the client key lets a process follow, never serve. A client with
+`secret` keeps working exactly as before (it proves with the derived key
+now, which the member checks with the same derivation).
+
+Two facts about the layers, found while building, both handled:
+
+1. `secret` is a leaf AND a group now (`secret: 'x'` and `secret: { client:
+   'y' }`). The walk visits an object under `secret` as a group; every other
+   leaf keeps the I-35 rule (a longer name under a leaf is refused).
+2. envdeep folds `FERO_SECRET` and `FERO_SECRET_CLIENT` into ONE subtree, and
+   the nested one wins: `FERO_SECRET=a FERO_SECRET_CLIENT=b` reaches fero as
+   `{ secret: { client: 'b' } }` — the secret silently gone — and even an
+   EMPTY `FERO_SECRET_CLIENT=` (a templated variable) eats a real
+   `FERO_SECRET`. So the env is read raw first: an empty `*_SECRET_CLIENT`
+   is dropped before envdeep sees it (empty means unset everywhere), and a
+   non-empty one beside a same-rung `*_SECRET` is refused naming both
+   variables, before anything is lost. Cross-rung pairs (`FERO_SECRET` and
+   `FERO_SHOP_SECRET_CLIENT`) survive envdeep and are refused after the
+   fold, naming both sources, like every both-set case.
+
+### The stderr lines
+
+A client-only process reads the same rows; three of its lines say what it
+holds, so the operator reaches for the right variable:
+
+```
+fero('shop'): refused 127.0.0.1:4100 — it has no secret and this process holds the client key; every member must set FERO_SECRET
+fero('shop'): refused 127.0.0.1:4100 — it refused this process's client key (is FERO_SECRET_CLIENT fero.clientKey of that cluster's secret?)
+fero('shop'): refused 127.0.0.1:4100 (uuid 9e1c) — its secret does not match this process's client key (FERO_SECRET_CLIENT)
+```
+
+A member's lines do not change: a member that sees a client-key holder
+with `r: 1` sees a client (the usual lines); one without `r: 1` sees
+`bad-proof` ("its secret differs from this node's"), which is true.
+
+### Perf
+
+No new frame, no new HMAC per link: the key differs, the count does not. The
+derivation is one HMAC per process at `fero()` time. The open 59,500 and
+the secured 104,050 pins do not move (a member mesh has no client link).
+The config walk gains one `LEAVES` row (noise under `api/config.perf.ts`'s
+tripwire; the ceiling stays).
+
+### Tests
+
+- kernel/door.test.ts: a client-key dialer is admitted `r: 1` and verifies
+  the member's client-key answer (its primary is set); the same door without
+  `r: 1` is `bad-proof` at the member, and the dialer reads `refused`; a
+  client-key dialer claiming a member's uuid is `uuid-taken`; a client-key
+  holder that ACCEPTS a member's dial (posing as a member) refuses the
+  member's secret-proof `bad-proof` and the member reads `refused`; a door
+  without `clientMac` keeps the one-key behaviour; a client holding the
+  member secret still follows. Each mutation-checked.
+- sim/door.test.ts: intruder kind 4, a client-key holder that joins as a
+  member — never admitted anywhere, the members form and agree, every row
+  names it; `rawClient` (kind 2) proves with the client key, as a real client
+  does; a client-only follower against a secured server is fed and the
+  per-link frame count stays 4.
+- api/config.test.ts + tests/config.test.ts: the leaf from the call, the
+  variable, the per-resource rung, a file; the flag refused naming
+  `--fero.secret.client`; a number, a boolean, a short value refused without
+  echoing; trimmed; `''` unset; both set across layers refused naming both
+  sources; the same-rung env pair refused raw; an empty `FERO_SECRET_CLIENT=`
+  does not eat `FERO_SECRET`; the layer-off note; `diag(f).config()`
+  redaction; a server with only the client key refused in a real child.
+- api/index.test.ts (real TCP): `fero.clientKey` equals the openssl line; a
+  client with `secret.client` follows a secured cluster (fed, writes land,
+  methods work); the same process as a server is refused at `fero()`; two
+  clients with the key and a member WITHOUT a secret — the member's line
+  names `FERO_SECRET`; a wrong client key reads `refused` with the
+  client-only line; neither the secret nor the client key appears in a
+  journal, a capture, the config door or a line.
