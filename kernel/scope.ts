@@ -696,9 +696,12 @@ export class Scope {
     this.entries.delete(p)
     this.n++
     if (node.durable) node.persistBoot()
-    //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p are filtered
-    // (a filtered subsequence of an ascending lane stays ascending); p's floors leave every stream (the
-    // old walk visited lanes with entries only — a floor for a lane with no entry of p outlived the shed)
+    //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p are touched, and
+    // each of those is filtered whole (a lane is an array, so taking entries out of it is O(that lane)
+    // whatever the index says — the index saves the lanes with nothing of p and the version-key parse,
+    // not the filter; the stage-1 skeptic's reading). A filtered subsequence of an ascending lane stays
+    // ascending. p's floors leave EVERY stream, lane or no lane: the old walk ran over node.logs, so a
+    // stream with no lane at all (a floor learned from a cut, with no record of that origin) kept it.
     const per = node.byPart!.get(p)
     if (per !== undefined) {
       for (const [origin, gone] of per) {

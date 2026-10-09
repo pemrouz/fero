@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
 import { JK } from './journal.ts'
-import { maybeCompact } from './log.ts'
+import { compact, maybeCompact } from './log.ts'
 import { Framer, VERB, encodeControl, encodeRuns } from './codec.ts'
 import { REC, TAG, type BootRecord, type EffectSink, type Env, type Rec } from './env.ts'
 
@@ -505,6 +505,31 @@ test('SHED — the stateless predicate: HAVEA attestations from EVERY current ho
   assert.equal(h.node.versions.has(JSON.stringify(['p', 'x'])), false, 'stamps dropped')
 })
 
+//! a floor can exist for a lane this node has NO entries of: an ACQDONE cut names every lane the teacher
+// attests, and a lane whose records were all compacted away ships no record. The old shed walked node.logs,
+// so such a stream (no lane at all) kept its floor past the shed; the lane-less stream is the shape the
+// stage-1 note had wrong (it said "lanes with no entries of p" — those the old walk did visit).
+test('SHED drops the partition\'s floor from a stream that has NO lane (a cut-learned floor with no record of that origin)', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('p', 'bb', 'aa')
+  //! bb teaches p: one record on lane bb, and a cut that attests lane dd at 3 — dd ships nothing
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { p: { bb: 5, dd: 3 } }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 5, rec: rec(['p', 'x'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'p', e: 1, t: { bb: 5, dd: 3 }, n: 1 }) })
+  assert.equal(h.node.scope!.held('p'), true)
+  assert.equal(h.node.streams.get('dd')!.parts!.get('p')!.s, 3, 'the cut gave dd a floor for p')
+  assert.equal(h.node.logs.has('dd'), false, 'and dd has no lane here')
+  //! the R-set moves off aa; both holders attest the one frozen tail (bb:5): shed
+  h.node.writes.ring.place('p', 'bb', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.jk(JK.orphaned).length, 1)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(2, { p: { ok: 1, need: 0, m: { bb: 5 } } }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: havea(2, { p: { ok: 1, need: 0, m: { bb: 5 } } }) })
+  assert.equal(h.jk(JK.shed).length, 1, 'shed')
+  assert.equal(h.node.streams.get('bb')!.parts?.get('p'), undefined, 'the lane\'s floor is gone')
+  assert.equal(h.node.streams.get('dd')!.parts?.get('p'), undefined, 'the lane-less stream\'s floor is gone too')
+})
+
 test('COMPACTION PIN — armed nodes never compact or GC on the member-ranged frontier (unsound under scoping); the unscoped control still does', () => {
   const build = (replicas?: number) => {
     const h = replicas ? armedView1() : harness('aa', { hosts: ['sim:bb', 'sim:cc'] })
@@ -534,4 +559,27 @@ test('COMPACTION PIN — armed nodes never compact or GC on the member-ranged fr
   const plain = build(undefined)
   maybeCompact(plain.node)
   assert.ok(plain.jk(JK.compacted).length > 0, 'unscoped control: the same evidence compacts')
+})
+
+//! the compaction site of the per-partition index (log.ts compact → node.indexDrop). No armed node reaches it
+// today (the pin above) and a scoped node at epoch 0 has no members to range a frontier over, so nothing
+// exercised it: dropping the indexDrop call stayed green everywhere (the stage-1 skeptic). Stage 3 will
+// compact armed nodes on the per-(o,p) frontier; this pins the site until then by calling compact directly.
+test('COMPACTION keeps byPart in step — a scoped node\'s superseded entries leave the index with the lane (the site stage 3 will reach)', () => {
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('k', 'aa', 'bb')
+  h.node.writes.ring.place('q', 'aa', 'cc')
+  //! one hot cell of k written five times, one cell of q once: four entries of k are superseded
+  for (let i = 0; i < 5; i++) h.node.step({ kind: 'write', recs: [rec(['k', 'x'], i)] })
+  h.node.step({ kind: 'write', recs: [rec(['q', 'y'], 1)] })
+  const lane = h.node.logs.get('aa')!
+  assert.equal(lane.length, 6)
+  assert.equal(h.node.byPart!.get('k')!.get('aa')!.length, 5)
+  const dropped = compact(h.node, 'aa', lane[lane.length - 1].seq)
+  assert.equal(dropped, 4, 'the four superseded entries of k')
+  const kept = h.node.logs.get('aa')!
+  assert.deepEqual(h.node.byPart!.get('k')!.get('aa'), kept.filter((e) => e.rec.key[0] === 'k'), 'byPart(k) is the lane\'s filter — same objects, same order')
+  assert.deepEqual(h.node.byPart!.get('q')!.get('aa'), kept.filter((e) => e.rec.key[0] === 'q'), 'q untouched')
+  assert.equal(h.node.byPart!.get('k')!.get('aa')!.length, 1)
 })
