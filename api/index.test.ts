@@ -420,10 +420,16 @@ test('the role rule (DESIGN-DOOR §3 step 12): a CLIENT composed with a MEMBER\'
     assert.deepEqual(Object.keys(view(a).members).sort(), ['aa', 'bb'], 'the view keeps both members')
     assert.ok('bb' in view(a).peers, 'the member\'s link is alive on aa')
     assert.ok('aa' in view(b).peers, 'and on bb')
-    assert.equal((snapshot(c.cluster) as { me: { primary: string | null } }).me.primary, null, 'the client never got a feeder')
-    //! the members still work: a write on one lands on the other
+    //! on an OPEN node a HELLO is admitted on arrival, so the client elects aa as its primary the moment aa's HELLO lands
+    // and un-elects it when aa's uuid-taken close lands a moment later; a synchronous read here raced that close
+    // (0/10 alone on a cold process, 1/2 warm in the full file, on the base tree too) — wait for it
+    const primary = () => (snapshot(c!.cluster) as { me: { primary: string | null } }).me.primary
+    assert.ok(await until(() => primary() === null, 8000), `the client has no feeder once the refusal lands (primary ${JSON.stringify(primary())})`)
+    //! the members still work: a write on one lands on the other — and never on the refused client
     a.data.k = 1
     assert.ok(await until(() => (snapshot(b.data) as { k?: number }).k === 1, 8000), 'replication between the members is intact')
+    assert.equal((snapshot(c.data) as { k?: number }).k, undefined, 'the refused client was never fed')
+    assert.equal(primary(), null, 'and still has no feeder')
   } finally {
     await c?.destroy()
     await b.destroy()
