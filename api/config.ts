@@ -395,11 +395,27 @@ const unflatten = (flat: Flat): FeroOpts => {
   return out as FeroOpts
 }
 
-//! read — one optcascade read with a fero-prefixed error naming the layer (optcascade names a bad
-// flag set `optcascade: bad flags — …`, as on `--fero.heartbeat 5 --fero.heartbeat.ms 7`; a broken
-// file already carries its path)
-const read = (resource: string, what: string, fn: () => unknown): unknown => {
-  try { return fn() } catch (e) { throw new Error(`fero('${resource}'): could not read ${what} — ${(e as Error).message}`, { cause: e }) }
+//! flagClash — two flags where one is a group of the other, the shorter one first (`--fero.secret S
+// --fero.secret.client K`, `--fero.heartbeat 5 --fero.heartbeat.ms 7`): minimist cannot nest a key under
+// a string and throws a TypeError that QUOTES the first flag's value ("Cannot create property 'client'
+// on string 'S'"), and that value is a secret when the flag is one (the V4-32 review). So the clash is
+// found from the flag NAMES alone and said in fero's words; no value reaches the message. Undefined =
+// no such pair: the error is something else and its own text is passed through.
+const flagClash = (argv: string[]): string | undefined => {
+  const names: string[] = []
+  for (const a of argv) {
+    const m = /^--(?:no-)?(fero(?:\.[^=]*)?)(?:=|$)/i.exec(a)
+    if (m !== null) names.push(m[1].toLowerCase())
+  }
+  for (const a of names) for (const b of names) if (b.startsWith(a + '.')) return `--${a} and --${b} clash: a key is a value or a group, never both — set one of them`
+  return undefined
+}
+
+//! read — one optcascade read with a fero-prefixed error naming the layer (a broken file already
+// carries its path); `own` gives fero's own words for a failure it can name — the flag clash above —
+// in place of optcascade's text (`optcascade: bad flags — …`, which can carry a value)
+const read = (resource: string, what: string, fn: () => unknown, own?: () => string | undefined): unknown => {
+  try { return fn() } catch (e) { throw new Error(`fero('${resource}'): could not read ${what} — ${own?.() ?? (e as Error).message}`, { cause: e }) }
 }
 
 //! ── resolveConfig — the entry the composer calls once per public fero() ──────
@@ -434,7 +450,7 @@ export const resolveConfig = (resource: string, call: FeroOpts, sources: Sources
     try { cwd = sources.cwd ?? process.cwd() } catch { cwd = sources.home ?? homedir() }
     //! three optcascade reads, one per layer, each with the other sources emptied — so every value
     // has exactly one origin and the fold above can name it; the name rung is that layer's [mine]
-    const flags = read(resource, 'the launch flags', () => copts('fero', undefined, { argv, env: {}, files: false })())
+    const flags = read(resource, 'the launch flags', () => copts('fero', undefined, { argv, env: {}, files: false })(), () => flagClash(argv))
     const envs = read(resource, 'the environment', () => copts('fero', undefined, { argv: [], env: scrubbed, files: false })())
     const files = read(resource, 'a fero.opt.ts file', () => filesOf(cwd, sources.home ?? homedir()))
     const sub = (tree: unknown): unknown => (mine !== null && isPlain(tree) && own(tree, mine) ? tree[mine] : undefined)
