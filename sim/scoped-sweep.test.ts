@@ -60,7 +60,7 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
   'A7-down-to-one': (e) => e.left > 0 && e.leaves > 0,
   'A8-coholder-cut': (e) => e.epoch >= 2 && e.acquires > 0,
   'A9-lost-wack': (e) => e.wackCut === 1 && e.epoch >= 2,
-  'A10-linger': (e) => e.killed === 1 && e.onWire === 1, // representable only up to the wire: see the family
+  'A10-linger': (e) => e.killed === 1 && e.late > 0, // a killed member's record applied after the survivor's install
   'A11-spoke': (e) => e.paused === 1,
 }
 

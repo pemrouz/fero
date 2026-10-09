@@ -370,29 +370,57 @@ export const FAMILIES: readonly Family[] = [
     },
   },
   {
-    //! A10 linger: a member is killed with frames still on the wire, to be delivered after the survivors install the
-    // view without it. NOT REPRESENTABLE in the sim, and the family says so: eviction needs the survivors to see
-    // the link go down (membership suspects a member with no admitted link), and a frame that lands after its
-    // link's linkDown is ignored by the kernel (node.ts bytesIn: "raced close"). The family still runs the shape
-    // (a 2.5 s delay on the dying member's frames, then the kill and the cut) and counts `onWire`: frames from the
-    // killed member still in flight when a survivor installed the view without it. They all die on closed links.
-    name: 'A10-linger', ns: [3, 5], Rs: [2, 3], mutateAt: 300,
+    //! A10 linger: a frame from a member killed after it was sent, delivered after the survivors installed the view
+    // without it. REPRESENTABLE: the sim's links are FIFO for frames, and a sever's linkDown travels at the pair's
+    // delay too, so a slow pair delivers the dead member's frames first, on a link its peer still thinks is up.
+    // z (the last member) owns a partition p whose only other holder is s (R=2); only the z–s pair is slowed to
+    // 2.5 s, everyone else stays fast. z writes p (its RECORDS to s start their 2.5 s trip), and 5 ms later z is
+    // cut from everyone and killed. The fast members see their links drop at once and evict z within a second; s
+    // installs that view from them; z's frames then land at s, after the install, and the kernel applies them.
+    // `onWire` counts z's frames to s in flight at the kill; `late` the ones s applied after its install (the
+    // engagement key: a record from the killed member taken in by a survivor whose view no longer has it). This is
+    // the residual DESIGN-SCALE §5 names, and the evidence for §14 Q15's one-epoch GC floor.
+    name: 'A10-linger', ns: [5], Rs: [2], mutateAt: 300,
     chaos: (c) => {
       const z = c.nodes[c.nodes.length - 1].uuid
       c.sim.at(350, () => {
-        for (const o of others(c, z)) c.sim.fault(z, o, { delay: [2500, 2600] })
-        c.sim.post(z, { kind: 'write', recs: [{ type: REC.update, key: ['zl'], value: 1 }] }, 0)
+        const zn = c.sim.nodes.get(z)
+        if (!zn || !zn.armed) return
+        const ring = zn.writes.ring
+        if (ring.epoch !== zn.epoch) ring.build(zn.epoch, zn.membership.view.members)
+        let p = '', s = ''
+        for (let i = 0; i < 10_000 && !p; i++) { const h = ring.holders('zl' + i, zn.replicas); if (h[0] === z && h.length === 2) { p = 'zl' + i; s = h[1] } }
+        if (!p) return
+        c.sim.fault(z, s, { delay: [2500, 2500] })
+        c.sim.post(z, { kind: 'write', recs: [{ type: REC.update, key: [p], value: { linger: true } }] }, 0)
         c.sim.at(5, () => {
-          for (const o of others(c, z)) c.sim.fault(z, o, { delay: [1, 5] }) // the linkDown the cut posts is prompt
           const n = c.sim.nodes.get(z)
           if (!n) return
+          const ids = new Set<number>()
+          for (const [id, f] of c.sim.inflight) if (f.from === z && f.to === s) ids.add(id)
+          c.eng.onWire = ids.size
           cutFromAll(c, z); n.destroy(); c.sim.nodes.delete(z); c.eng.killed = 1
+          const sn = c.sim.nodes.get(s)!
+          const tailOf = () => { const l = sn.logs.get(z); return l && l.length ? l[l.length - 1].seq : 0 }
+          let tail = tailOf()
+          //! per event, not per 5 ms slice: the delivery of one of z's frames is one event, so a tail that grows in
+          // that event grew from that frame
+          c.sim.monitors.push({
+            name: 'a10-linger-probe',
+            check: (sim) => {
+              if (!ids.size) return null
+              let landed = false
+              for (const id of ids) if (!sim.inflight.has(id)) { ids.delete(id); landed = true }
+              const t = tailOf()
+              if (landed && t > tail && !sn.membership.view.members.some((m) => m[0] === z)) {
+                c.eng.late = (c.eng.late ?? 0) + 1
+                if ([...sn.links.values()].some((l) => l.uuid === z)) c.eng.lateOnLiveLink = (c.eng.lateOnLiveLink ?? 0) + 1
+              }
+              tail = t
+              return null
+            },
+          })
         })
-      })
-      c.polls.push(() => {
-        if (c.eng.onWire || !c.eng.killed) return
-        const evicted = [...c.sim.nodes.values()].some((n) => n.epoch > 1 && !n.membership.view.members.some((m) => m[0] === z))
-        if (evicted && [...c.sim.inflight.values()].some((f) => f.from === z)) c.eng.onWire = 1
       })
     },
   },
