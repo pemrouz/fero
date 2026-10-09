@@ -138,6 +138,31 @@ test('counted: a secured 2-node formation ships exactly 4 handshake frames per l
   assert.ok(sec.events > open.events, `the secured formation costs more events (${sec.events} vs ${open.events})`)
 })
 
+test('the honest crossing dial, secured, heartbeats OFF: a formation of members that all hold the secret writes NO doorReject row (the keeper close that overtakes the acceptor\'s proof is not a refusal), and after a cut the pair heals — n=2 and n=3, 40 seeds each, plain and under the dup and wide-delay faults', () => {
+  //! the sim posts a close after the minimum delay and bytes after a random one, so the dup-link loser's close
+  // can reach the still-proving dialer before the acceptor's proof. Before the fix (the second review's major)
+  // 46 to 60 of 60 seeds wrote `refused` against an honest member and parked it given-up; with heartbeats off
+  // nothing clears a park, so that side never re-dialed the peer after a cut.
+  const faults = [undefined, { dupP: 0.3 }, { delay: [1, 9] as [number, number] }]
+  let formations = 0
+  for (const n of [2, 3]) for (const fault of faults) for (let seed = 1; seed <= 40; seed++) {
+    const sim = new Sim(seed)
+    const nodes = cluster(sim, n, { door: toyDoor(SECRET, sim.rng), ...(fault !== undefined ? { fault } : {}) })
+    sim.run()
+    const tag = `n=${n} fault=${JSON.stringify(fault)} seed ${seed}`
+    assert.ok(formed(nodes), `${tag}: formed`)
+    for (const x of nodes) assert.deepEqual(rows(x, JK.doorReject).map((e) => [e.b, e.c]), [], `${tag}: ${x.uuid} refused an honest member`)
+    formations++
+    //! a cut and a heal 3 ms later, heartbeats off: both ends re-dial on their chains (neither is parked), the pair re-forms
+    sim.partition('n01', 'n02')
+    sim.at(3, () => sim.heal('n01', 'n02'))
+    sim.run()
+    assert.ok(formed(nodes), `${tag}: healed after the cut`)
+    for (const x of nodes) assert.deepEqual(rows(x, JK.doorReject), [], `${tag}: ${x.uuid} refused an honest member while healing`)
+  }
+  assert.equal(formations, 240)
+})
+
 test('the door family: ~200 seeds, a secret on every member and one intruder per seed under the chaos defaults — never admitted, never in a view or a lane, the members form, converge and agree', () => {
   const failures: string[] = []
   const seen = { kinds: new Set<number>(), chaos: new Set<number>() }
