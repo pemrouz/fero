@@ -88,14 +88,14 @@ const shown = (s: string): string => {
   return t.length > SHOWN_MAX ? t.slice(0, SHOWN_MAX) + '…' : t
 }
 const said = new Set<string>()
-const refusalLine = (name: string, to: string | undefined, e: JEvent, contract: string | undefined): string | null => {
+const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node): string | null => {
   const c = e.c === undefined ? '' : String(e.c)
   const who = to ?? (c !== '' ? `a peer that connected as ${shown(c)}` : 'a peer that connected')
   const f = `fero('${name}'): refused`
   if (e.kind === JK.contractReject) {
     //! b = the first key that differs (or missing:<key>), c = THEIR value; ours is read off this node's contract
     const key = String(e.b).replace(/^missing:/, '')
-    const mine = new Map((contract ?? '').split(';').map((t): [string, string] => { const i = t.indexOf('='); return i < 0 ? ['version', t] : [t.slice(0, i), t.slice(i + 1)] }))
+    const mine = new Map((node.contract ?? '').split(';').map((t): [string, string] => { const i = t.indexOf('='); return i < 0 ? ['version', t] : [t.slice(0, i), t.slice(i + 1)] }))
     return `${f} ${to ?? 'a peer that connected'} — the cluster contract differs: ${shown(key)} is ${mine.get(key) ?? 'not set'} here, ${c === '' ? 'not set' : shown(c)} there (every member must agree on heartbeat.ms, replicas, methods, validation and ring)`
   }
   switch (e.b) {
@@ -105,7 +105,11 @@ const refusalLine = (name: string, to: string | undefined, e: JEvent, contract: 
     case 'refused': return `${f} ${who} — closed during the handshake; if this repeats every heartbeat the secrets probably differ`
     case 'address': return `${f} ${to ?? 'a dialed peer'} — it answered as ${shown(c)}, not the address the directory or the view gave (a stale or forged entry)`
     case 'timeout': return `${f} ${who} — no proof came within the handshake deadline`
-    case 'uuid-taken': return `${f} a client claiming uuid ${shown(c)} — that uuid belongs to a member (a shared FERO_UUID?)`
+    //! uuid-taken has two sides: the refusing node's row names the client's uuid (an accepted link); the refused
+    // client's row (it read the {e: 'uuid-taken'} notice) names the dial target, and the uuid at fault is its own
+    case 'uuid-taken': return to !== undefined
+      ? `${f} by ${to} — the uuid this process runs as, ${node.uuid}, belongs to a member there (a shared FERO_UUID?)`
+      : `${f} a client claiming uuid ${shown(c)} — that uuid belongs to a member (a shared FERO_UUID?)`
     default: return null
   }
 }
@@ -118,7 +122,7 @@ const sayRefusal = (name: string, node: Node, e: JEvent): void => {
     ? `${name}\0${e.kind}\0${e.kind === JK.contractReject ? shown(String(e.b)) : String(e.b)}\0${to}`
     : `${name}\0${e.kind}\0${e.kind === JK.contractReject ? '' : String(e.b)}`
   if (said.has(key)) return
-  const line = refusalLine(name, to, e, node.contract)
+  const line = refusalLine(name, to, e, node)
   if (line === null) return
   if (said.size >= SAID_MAX) said.clear()
   said.add(key)

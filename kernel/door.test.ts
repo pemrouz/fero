@@ -551,18 +551,32 @@ test('a second HELLO: dropped on a secured node (the stash keeps the first nonce
     assert.equal(o.rows(JK.identified).length, 2, 're-admitted'); assert.deepEqual(o.rows(JK.frameDrop), []); assert.deepEqual(o.closes(), []) }
 })
 
-test('the notice and the close mid-handshake: DOOR {e} while proving reads refused and parks; a linkDown after my proof reads refused and parks; neither starts a redial chain', () => {
-  //! the notice
+test('the notice and the close mid-handshake: DOOR {e: denied} while proving reads refused and parks; {e: uuid-taken} keeps its word (c = the dial target) and parks; a linkDown after my proof reads refused and parks; none starts a redial chain', () => {
+  //! the notice: denied
   { const a = rec('aa', { door: doorFor(21), hosts: ['sim:bb'] })
     a.up(1, true, 'sim:bb')
     a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
     assert.equal(a.node.links.get(1)!.proved, true)
-    a.feed(1, encodeControl(VERB.DOOR, { e: 'uuid-taken' }))
+    a.feed(1, encodeControl(VERB.DOOR, { e: 'denied' }))
     assert.deepEqual(a.rows(JK.doorReject), [[1, 'refused', 'sim:bb']])
     assert.deepEqual(a.closes(), [[1, 'door']])
     a.down(1, 'door')
     assert.deepEqual(a.rows(JK.doorReject).length, 1, 'journaled once, not again at linkDown')
     assert.equal(a.timers(TAG.redial).length, 0); assert.equal(a.node.dialing('sim:bb'), false) }
+  //! the notice: uuid-taken — the one reason this side cannot guess, so the row keeps it (the second review's minor);
+  // an unknown word reads refused like a bare close
+  { const a = rec('aa', { door: doorFor(21), hosts: ['sim:bb'] })
+    a.up(1, true, 'sim:bb')
+    a.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
+    a.feed(1, encodeControl(VERB.DOOR, { e: 'uuid-taken' }))
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'uuid-taken', 'sim:bb']], 'the dial target, not the uuid: the row says where')
+    assert.deepEqual(a.closes(), [[1, 'door']])
+    a.down(1, 'door')
+    assert.equal(a.rows(JK.doorReject).length, 1); assert.equal(a.timers(TAG.redial).length, 0); assert.equal(a.node.dialing('sim:bb'), false, 'parked')
+    const x = rec('aa', { door: doorFor(21), hosts: ['sim:bb'] })
+    x.up(1, true, 'sim:bb'); x.feed(1, encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', k: 'b'.repeat(32) }))
+    x.feed(1, encodeControl(VERB.DOOR, { e: 'some-future-word' }))
+    assert.deepEqual(x.rows(JK.doorReject), [[1, 'refused', 'sim:bb']]) }
   //! the silent close
   { const a = rec('aa', { door: doorFor(22), hosts: ['sim:bb'] })
     a.up(1, true, 'sim:bb')
@@ -728,8 +742,9 @@ test('the role rule with a door, four ways: the client\'s proof is checked first
     assert.deepEqual(dec(a.sends(1)[1]).value, { e: 'uuid-taken' })
     assert.deepEqual(a.closes(), [[1, 'uuid-taken']])
     assert.deepEqual(a.rows(JK.dupLink), []); assert.equal(a.node.byUuid.has('bb'), false); assert.equal(a.node.clientLinks.size, 0)
-    //! the client's side: still proving when the notice arrives, so it reads it — refused, parked, never admitted aa
-    assert.deepEqual(c.rows(JK.doorReject), [[1, 'refused', 'sim:aa']], 'the client has its own row (the review\'s minor)')
+    //! the client's side: still proving when the notice arrives, so it reads it — uuid-taken with the dial target (the
+    // notice's one word this side cannot guess), parked, never admitted aa
+    assert.deepEqual(c.rows(JK.doorReject), [[1, 'uuid-taken', 'sim:aa']], 'the client has its own row, with the reason (the reviews\' minors)')
     assert.deepEqual(c.node.admitted(), []); assert.deepEqual(c.rows(JK.identified), [])
     assert.deepEqual(c.rows(JK.frameDrop), [], 'the notice was not dropped as out of order') }
   //! 2/4 r:1 against an admitted member link: the member's link is untouched
