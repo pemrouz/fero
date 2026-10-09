@@ -926,7 +926,12 @@ fails at once).
 - **`fero.spawn` roles:** the secret arrives through `FERO_SECRET` in the
   child's environment, never argv. A check that wants it deletes
   `FERO_CONFIG` from the child env (the battery pins it off, utils/battery.
-  ts:17).
+  ts:17). *2026-10-09: and pins `HOME` to an empty folder, since lifting
+  `FERO_CONFIG` also turns the `$HOME/fero.opt.ts` layer on — the README's
+  own place for a secret — and a home file would reach the test. The recipe
+  is "FERO_CONFIG deleted and HOME pinned", as tests/config.test.ts's run()
+  and examples/18-secret/check.ts do; 18's check also drops every other
+  `FERO_*` variable from the child.*
 - **The directory host and client:** no `c`, no `m`, no `k`; bytes as today.
 - **Breaking, pre-1.0:** an off-loopback listen with no secret now refuses
   to start (§14 Q1); a rolling change of a contract key now splits the
