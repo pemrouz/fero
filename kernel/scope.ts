@@ -194,6 +194,9 @@ export class Scope {
       //! orphan re-assigned (H2's A leg): stays FROZEN — the lawful re-entry is an acquiring latch
       // (delta above the frozen tails) opened by the next handshake round, never a silent un-freeze
     }
+    //! a cleared write whose record was expected here but whose partition just left this node (an
+    // aborted latch, a new orphan, an unassigned partition) settles from its WACK now (write.ts #awaiting)
+    node.writes.rescoped(node)
     //! THE ARMING TRUING (pre-arm inheritance, the no-bypass rule's door 3): the FIRST armed rescope
     // of a life BORN AT EPOCH 0 trues every entry's floors to its lane tails — epoch-0 replication
     // is full-broadcast, so tails are complete-by-construction and the claim is sound. Without it
@@ -656,6 +659,9 @@ export class Scope {
     //! either leg changes the boot record's lists (an abort-to-orphan joins orphanParts; a clean
     // drop leaves both) — persist so a crash in the window classifies correctly (finding 31's class)
     if (node.durable) node.persistBoot()
+    //! no write settlement here (write.ts rescoped): a clean drop keeps the duty and the next latch brings
+    // the record; an abort to orphan only befalls an acquiring OWNER (the residue is its own commits), whose
+    // attempts never wait on a WACK. The install's rescope above is the one place the scope leaves a writer.
   }
 
   //! evaluateSheds — THE STATELESS SHED DECISION (C3, D1's graft), re-based onto CONTENT TAILS by

@@ -358,6 +358,75 @@ test('ACKED after a lost WACK — a commit learned by an ACQ fold or by WAL repl
   assert.deepEqual(z.node.writes.committed('cc~1', 4), { s: 1, e: 0, o: 'aa' })
 })
 
+//! the `acked` decision is made once, at the WACK (scope.expects). The stage-1 skeptic's K2/K3: a co-holder
+// (acquiring, or assigned with no entry yet) is WACKed silently because the record is expected to fold here —
+// then a view change moves the partition off this node before it does. Nothing would ever settle the write:
+// no join, no `acked`, and the api's sweep runs only on drops. Now the kernel keeps such cleared attempts
+// (write.ts #awaiting) and settles them at the rescope from the WACK's coordinates. Red without rescoped():
+// `acked` stays [] after the VIEW; red without the spoke leg: the second WACK clears nothing on the client.
+const VIEW2 = encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] })
+test('ACKED after a view change — a cleared attempt whose record was expected here settles when the partition moves off before it folds (acquiring, and assigned with no entry); the control folds through the join; a relay re-answers its spoke with the lane', () => {
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  //! K3: aa is ACQUIRING px from bb (the owner) when its own write to px is WACKed with the lane
+  h.node.writes.ring.place('px', 'bb', 'aa')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  assert.equal(h.jk(JK.acquireStart).length, 1, 'the latch opened')
+  h.node.step({ kind: 'write', recs: [rec(['px', 'mine'], 1)] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 1, s: 6, e: 1, o: 'bb' }) })
+  //! K2: aa is ASSIGNED py (a co-holder) but holds no entry yet; the same WACK shape
+  h.node.writes.ring.place('py', 'bb', 'aa')
+  h.node.step({ kind: 'write', recs: [rec(['py', 'mine'], 2)] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 2, n: 1, s: 7, e: 1, o: 'bb' }) })
+  //! a spoke zz relayed through aa writes px too: aa expects the record, so the hop carries no lane
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: '', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: writeFrame('zz~1', 1, 0, [rec(['px', 'theirs'], 3)]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'zz~1', c: 1, n: 1, s: 8, e: 1, o: 'bb' }) })
+  assert.equal(h.node.writes.pending.size, 0, 'all three cleared')
+  assert.deepEqual(h.of('acked'), [], 'expected to fold here: every WACK stays silent')
+  assert.deepEqual(framesOn(h, 3, VERB.WACK).map((f) => f.value), [{ u: 'zz~1', c: 1, n: 1, s: 8, e: 1 }], 'the hop carries no lane')
+  //! the live record for px arrives mid-latch and is STAGED; then the view moves px and py to bb, cc: the
+  // latch aborts (epoch), the staged record drops, py is no longer assigned — neither record will ever fold here
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['px', 'mine'], 1), origin: 'bb', seq: 6, epoch: 1, iss: 'aa~1', cid: 1, pp: 5 }], VERB.RECORDS, true)[0] })
+  h.node.writes.ring.place('px', 'bb', 'cc')
+  h.node.writes.ring.place('py', 'bb', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: VIEW2 })
+  assert.equal(h.jk(JK.acquireAbort).filter((e) => e.b === 'epoch').length, 1, 'the machine is epoch-scoped')
+  assert.equal(h.node.state.size, 0, 'nothing folded')
+  assert.deepEqual(h.of('acked'), [['acked', 'aa~1', 1, 'bb', 6, 1], ['acked', 'aa~1', 2, 'bb', 7, 1]], 'both own attempts settle from their WACKs at the view change')
+  assert.deepEqual(framesOn(h, 3, VERB.WACK).map((f) => f.value)[1], { u: 'zz~1', c: 1, n: 1, s: 8, e: 1, o: 'bb' }, 'the spoke is answered again, with the lane')
+  //! the CONTROL: the same K3 shape where the latch completes instead — the staged record replays and folds,
+  // the join is the settlement and `acked` never fires
+  const c = armedView1()
+  c.node.membership.rejoinFloor = 0
+  c.node.writes.ring.place('px', 'bb', 'aa')
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  c.node.step({ kind: 'write', recs: [rec(['px', 'mine'], 1)] })
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 1, s: 6, e: 1, o: 'bb' }) })
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['px', 'mine'], 1), origin: 'bb', seq: 6, epoch: 1, iss: 'aa~1', cid: 1, pp: 5 }], VERB.RECORDS, true)[0] })
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 5, rec: rec(['px', 'a'], 1), pp: 0 }]) })
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 5 }, n: 1 }) })
+  assert.equal(c.node.state.get(JSON.stringify(['px', 'mine'])), 1, 'the staged record folded after the latch')
+  assert.deepEqual(c.of('acked'), [], 'the join settles the control, never acked')
+  c.node.writes.ring.place('px', 'bb', 'cc')
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: VIEW2 })
+  assert.deepEqual(c.of('acked'), [], 'and a later view change has nothing left to settle')
+  //! the SPOKE side: a client whose first WACK cleared the attempt reads the second one, with the lane, as `acked`
+  const s = harness('cl', { client: true, hosts: ['sim:aa'] })
+  s.node.step({ kind: 'start' })
+  s.admit(1, 'aa')
+  s.node.step({ kind: 'write', recs: [rec(['px', 'theirs'], 3)] })
+  s.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 1, n: 1, s: 8, e: 1 }) })
+  assert.equal(s.node.writes.pending.size, 0)
+  assert.deepEqual(s.of('acked'), [], 'the first WACK: cleared, waiting on the tap')
+  s.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 1, n: 1, s: 8, e: 1, o: 'bb' }) })
+  assert.deepEqual(s.of('acked'), [['acked', 'cl~1', 1, 'bb', 8, 1]], 'the second WACK, with the lane, is the settlement')
+  s.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'xx~1', c: 1, n: 1, s: 8, e: 1, o: 'bb' }) })
+  assert.equal(s.of('acked').length, 1, 'another issuer\'s cid is not ours to settle')
+})
+
 test('OWNER RE-CHECK (DESIGN-SCALE §11 Q12) — an armed owner asks NodeOpts.admit about a forwarded remove under a row: refused ⇒ WNACK invalid with the reason; admitted, an update or a row remove ⇒ commits unasked; staged ⇒ withheld; unscoped ⇒ never asked', () => {
   let asked: string[][] = []
   const admit = (r: Rec) => { asked.push(r.key); return r.key[1] === '0' ? 'sparse-hole' : true }
