@@ -7,10 +7,10 @@ const f = await fero('vault', { listen: mine, hosts: peers, rendezvous: false })
 // one row, keyed by my pid: it reaches every member of my cluster, and nobody else
 f.data[process.pid] = 'member'
 
-// one line per change: the object, and who I am — whether I hold a secret, and how many members the vote admitted
+// one line per change: the object, and who I am — my address, and how many members the vote admitted
 f.data.tap(() => console.log(f.snapshot))
 let last = ''
 f.cluster.tap(() => {
-    const line = `MEMBER ${process.pid} on ${mine} — secret ${process.env.FERO_SECRET ? 'set' : 'none'} — members ${Object.keys(f.cluster.snapshot().members).length}`
+    const line = `MEMBER ${process.pid} on ${mine} — members ${Object.keys(f.cluster.snapshot().members).length}`
     if (line !== last) console.log(last = line)
 })
