@@ -122,6 +122,69 @@ test('the open door: the same crafted HELLO with r: 1 at an OPEN server is refus
   }
 })
 
+//! rawServer — a hand-written peer that LISTENS, so a member dials it as a typed static host: it answers the member's
+// HELLO with `reply(hello)` (a HELLO of its own) and hands every later frame to `onFrame`. Resolves with its address.
+const rawServer = (reply: (h: Record<string, unknown>, addr: string) => Record<string, unknown>, onFrame: (f: Frame, sock: net.Socket) => void) =>
+  new Promise<{ addr: string; close: () => void }>((resolve) => {
+    let addr = ''
+    const srv = net.createServer((sock) => {
+      const framer = new Framer()
+      sock.on('data', (d) => {
+        for (const f of framer.push(new Uint8Array(d))) {
+          if (f.verb === VERB.HELLO) sock.write(encodeControl(VERB.HELLO, reply(f.value as Record<string, unknown>, addr)))
+          else onFrame(f, sock)
+        }
+      })
+      sock.on('error', () => {})
+    })
+    srv.listen(0, '127.0.0.1', () => { addr = `127.0.0.1:${(srv.address() as net.AddressInfo).port}`; resolve({ addr, close: () => srv.close() }) })
+  })
+//! stderrOf — the composer's refusal lines printed while `fn` runs (api/index.test.ts's idiom; one test at a time)
+const stderrOf = async (fn: () => Promise<void>): Promise<string[]> => {
+  const out: string[] = []
+  const orig = process.stderr.write
+  process.stderr.write = ((chunk: string | Uint8Array) => { out.push(String(chunk)); return true }) as typeof process.stderr.write
+  try { await fn() } finally { process.stderr.write = orig }
+  return out.join('').split('\n').filter((l) => l.startsWith("fero('"))
+}
+
+test('the refusal lines name a DIALED target that hung up mid-handshake: two static hosts that greet with a nonce, read the member\'s proof and close — a `refused` row per target, written after the link left the table, prints one line PER TARGET naming its address, never as "a peer that connected"', async () => {
+  const S = 'tcp-test-secret-KILO-11'
+  //! each raw host answers with its own HELLO (a nonce, so the member proves) and hangs up on the proof
+  const hangup = (u: string) => rawServer((_, addr) => ({ u, i: 1, l: addr, k: randomBytes(16).toString('base64url') }), (f, sock) => { if (f.verb === VERB.DOOR) sock.destroy() })
+  const x = await hangup('xx'), y = await hangup('yy')
+  let m: Fero | null = null
+  const lines = await stderrOf(async () => {
+    try {
+      m = await fero('tcphangup', { uuid: 'aa', server: true, hosts: [x.addr, y.addr], heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S })
+      //! heartbeat revival re-dials each parked target once per tick: the rows repeat, the lines must not
+      assert.ok(await until(() => doorRows(m!).filter(([r, c]) => r === 'refused' && c === x.addr).length >= 3 && doorRows(m!).filter(([r, c]) => r === 'refused' && c === y.addr).length >= 3, 8000), `refused at both targets, re-dialed: ${JSON.stringify(doorRows(m!))}`)
+      assert.ok(doorRows(m!).every(([r, c]) => r === 'refused' && (c === x.addr || c === y.addr)), JSON.stringify(doorRows(m!)))
+    } finally { await m?.destroy() }
+  })
+  x.close(); y.close()
+  for (const t of [x.addr, y.addr]) assert.equal(lines.filter((l) => l === `fero('tcphangup'): refused ${t} — closed during the handshake; if this repeats every heartbeat the secrets probably differ`).length, 1, `one line naming ${t}: ${JSON.stringify(lines)}`)
+  assert.equal(lines.length, 2, `nothing else — no "a peer that connected" line for a target this node dialed: ${JSON.stringify(lines)}`)
+  assert.ok(!lines.join('\n').includes(S))
+})
+
+test('the refusal lines dedupe a contract mismatch on the dial target alone: a static host that answers every redial with the member\'s own contract plus a fresh key earns ONE line, not one per heartbeat', async () => {
+  let n = 0
+  const z = await rawServer((h, addr) => ({ u: 'zz', i: 1, l: addr, c: `${h.c};z${++n}=1` }), () => {})
+  let m: Fero | null = null
+  const lines = await stderrOf(async () => {
+    try {
+      m = await fero('tcpctr', { uuid: 'aa', server: true, hosts: [z.addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+      assert.ok(await until(() => rows(m!, JK.contractReject).length >= 6, 8000), `refused and re-dialed at heartbeat cadence: ${rows(m!, JK.contractReject).length}`)
+      const keys = rows(m!, JK.contractReject).map((e) => e.b as string)
+      assert.ok(keys.every((k) => /^missing:z\d+$/.test(k)) && new Set(keys).size === keys.length, `a fresh key, chosen by the peer, on every row: ${JSON.stringify(keys)}`)
+    } finally { await m?.destroy() }
+  })
+  z.close()
+  assert.equal(lines.length, 1, `one line for the target, whatever key it names: ${JSON.stringify(lines)}`)
+  assert.match(lines[0], new RegExp(`^fero\\('tcpctr'\\): refused ${z.addr.replace(/\./g, '\\.')} — the cluster contract differs: z1 is not set here, 1 there `))
+})
+
 test('fero.spawn (V4-9) and the door: a child role with FERO_SECRET in its environment (FERO_CONFIG deleted) joins a secured parent; one without it is refused no-secret', async () => {
   const S = 'spawn-test-secret-JULIET-10'
   const p = await ports.free()

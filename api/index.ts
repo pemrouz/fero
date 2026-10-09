@@ -113,13 +113,22 @@ const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node
     default: return null
   }
 }
-const sayRefusal = (name: string, node: Node, e: JEvent): void => {
+//! the dial target of the row's link: off the link table, or — for the two reasons whose c IS link.to, a fact this
+// node owns — off the row itself, because `refused` written at linkDown comes after the link left the table (the
+// second review's minor: that line printed as an inbound peer and deduped across every dial target)
+const dialTarget = (node: Node, e: JEvent): string | undefined => {
   const to = node.links.get(e.a as number)?.to
-  //! the key: owned facts only — a dialed target keys per reason and address (for a contract mismatch, per
-  // differing key, cut like the line is); an accepted peer keys on the reason alone (for a contract
-  // mismatch, on the kind: the key name is theirs too). Never the row's `c`: a claim.
+  if (to !== undefined) return to
+  return e.kind === JK.doorReject && (e.b === 'refused' || e.b === 'timeout') && typeof e.c === 'string' && e.c !== '' ? e.c : undefined
+}
+const sayRefusal = (name: string, node: Node, e: JEvent): void => {
+  const to = dialTarget(node, e)
+  //! the key: owned facts only — a dialed target keys per reason and address; an accepted peer keys on the
+  // reason alone. A contract mismatch keys on the KIND either way: the key name is the peer's choice too
+  // (a squatter that adds a fresh key per redial would otherwise earn a fresh line per heartbeat — the
+  // second review's minor). Never the row's `c`: a claim.
   const key = to !== undefined
-    ? `${name}\0${e.kind}\0${e.kind === JK.contractReject ? shown(String(e.b)) : String(e.b)}\0${to}`
+    ? `${name}\0${e.kind}\0${e.kind === JK.contractReject ? '' : String(e.b)}\0${to}`
     : `${name}\0${e.kind}\0${e.kind === JK.contractReject ? '' : String(e.b)}`
   if (said.has(key)) return
   const line = refusalLine(name, to, e, node)
