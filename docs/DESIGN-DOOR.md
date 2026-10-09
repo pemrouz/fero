@@ -573,7 +573,7 @@ Stated, not fixed here.
 
 ```
 fero('shop'): refused by 127.0.0.1:4100 — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)
-fero('shop'): refused 127.0.0.1:51234 (uuid 7c3e) — it has no secret and this node has one; every member and client must share FERO_SECRET
+fero('shop'): refused 127.0.0.1:51234 (uuid 7c3e) — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT
 fero('shop'): refused 127.0.0.1:4100 (uuid 9e1c) — its secret differs from this node's
 fero('shop'): refused 127.0.0.1:4100 — it refused this node's proof (the secrets probably differ)
 fero('shop'): refused 127.0.0.1:4100 — it answered as a client claiming uuid 7c3e; that uuid belongs to a member (a shared FERO_UUID?)
@@ -742,8 +742,9 @@ One new key: `secret`. It follows V4-10 (one lowercase word, declared in
   `loopback()` helper at api/index.ts:216, NOT `localish` at api/directory.
   ts:70-71, which counts `0.0.0.0` as local), with `secret` unset, throws:
   *listen 0.0.0.0:4100 is reachable from other machines and no secret is
-  set — set FERO_SECRET (the same value on every member and client), or pass
-  secret: false (FERO_SECRET=off) to run open on purpose*. It runs AFTER the
+  set — set FERO_SECRET (the same value on every member; a client holds it or
+  FERO_SECRET_CLIENT), or pass secret: false (FERO_SECRET=off) to run open on
+  purpose* (the client-key clause since §15). It runs AFTER the
   directory-socket check (api/index.ts:208-212), so examples/15-static-
   topology/refusals.ts:9 (`listen: '0.0.0.0:3376'`) keeps printing *would
   take the directory's socket* and 15's README block is untouched. A client
@@ -1303,7 +1304,19 @@ BACK to a client, and the client holds only the client key, so the member's
 answer on a client link must be a client-key proof too. The dialer's `r` is
 signed inside the dialer's proof (`h.r`), so a dialer cannot say `r: 1` to
 be checked with the client key and then be admitted as anything else: `r`
-is what the admit tail reads, and `r: 1` makes a client link.
+is what the admit tail reads, and `r: 1` makes a client link. Both tests
+are EXACTLY `r === 1`, and a kernel test pins them against each other: a
+client-key proof under `r: true`, `'1'`, `2.5` or `-1` is `bad-proof`
+(a loosened truthy check on the sign side would admit such a dialer as a
+member link).
+
+The proof's label stays `fero-door/1`, but what signs a CLIENT LINK changed:
+a V4-30 build signs `r: 1` links with the secret, a V4-32 build with the
+client key. So a V4-30 client and a V4-32 member (or the reverse) do not link
+on a client link — each reads `bad-proof` ("its secret differs"), which is
+misleading there — while member links between the two still link, since
+those use the secret on both. V4-30 was never released (it is not on
+origin/main), so nothing deployed is caught; a kernel test records the fact.
 
 ### What it protects, said plainly
 
@@ -1381,7 +1394,12 @@ Two facts about the layers, found while building, both handled:
    non-empty one beside a same-rung `*_SECRET` is refused naming both
    variables, before anything is lost. Cross-rung pairs (`FERO_SECRET` and
    `FERO_SHOP_SECRET_CLIENT`) survive envdeep and are refused after the
-   fold, naming both sources, like every both-set case.
+   fold, naming both sources, like every both-set case. The guard reads a
+   name the way envdeep does — lowercased, split on `_`, empty parts
+   dropped — so `FERO_SECRET__CLIENT`, `FERO__SECRET_CLIENT` and
+   `FERO_SECRET_CLIENT_` are the same key to both (the first build matched
+   the exact spelling, and each of those ate the secret; the skeptic's
+   finding, fixed the same day with a regression test).
 
 ### The stderr lines
 
@@ -1394,9 +1412,14 @@ fero('shop'): refused 127.0.0.1:4100 — it refused this process's client key (i
 fero('shop'): refused 127.0.0.1:4100 (uuid 9e1c) — its secret does not match this process's client key (FERO_SECRET_CLIENT)
 ```
 
-A member's lines do not change: a member that sees a client-key holder
+A member's lines keep their shape: a member that sees a client-key holder
 with `r: 1` sees a client (the usual lines); one without `r: 1` sees
-`bad-proof` ("its secret differs from this node's"), which is true.
+`bad-proof` ("its secret differs from this node's"), which is true. Two
+member lines changed their last clause, since they told a client to share
+`FERO_SECRET`: the `no-secret` line ends "every member must share
+FERO_SECRET, a client holds it or FERO_SECRET_CLIENT", and the off-loopback
+refusal at `fero()` says "the same value on every member; a client holds it
+or FERO_SECRET_CLIENT" (the skeptic's finding; no example prints either).
 
 ### Perf
 
@@ -1415,7 +1438,11 @@ tripwire; the ceiling stays).
   holder that ACCEPTS a member's dial (posing as a member) refuses the
   member's secret-proof `bad-proof` and the member reads `refused`; a door
   without `clientMac` keeps the one-key behaviour; a client holding the
-  member secret still follows. Each mutation-checked.
+  member secret still follows; a client-key proof under `r: true`, `'1'`,
+  `2.5` or `-1` is `bad-proof` with nothing admitted (red when `sign`'s
+  `r === 1` is loosened to truthy); a one-key V4-30 door and a two-key door
+  do not link on a client link in either direction, and still do on a
+  member link. Each mutation-checked.
 - sim/door.test.ts: intruder kind 4, a client-key holder that joins as a
   member — never admitted anywhere, the members form and agree, every row
   names it; `rawClient` (kind 2) proves with the client key, as a real client
@@ -1426,8 +1453,11 @@ tripwire; the ceiling stays).
   `--fero.secret.client`; a number, a boolean, a short value refused without
   echoing; trimmed; `''` unset; both set across layers refused naming both
   sources; the same-rung env pair refused raw; an empty `FERO_SECRET_CLIENT=`
-  does not eat `FERO_SECRET`; the layer-off note; `diag(f).config()`
-  redaction; a server with only the client key refused in a real child.
+  does not eat `FERO_SECRET`, nor does an empty `FERO_SECRET__CLIENT=`,
+  `FERO__SECRET_CLIENT=` or `FERO_SECRET_CLIENT_=` (the guard reads names as
+  envdeep does; a set one under those spellings is refused naming both
+  variables as typed); the layer-off note; `diag(f).config()` redaction; a
+  server with only the client key refused in a real child.
 - api/index.test.ts (real TCP): `fero.clientKey` equals the openssl line; a
   client with `secret.client` follows a secured cluster (fed, writes land,
   methods work); the same process as a server is refused at `fero()`; two
@@ -1459,3 +1489,18 @@ was told not to run strip.mjs): the integrator reruns `node site/strip.mjs`
 after the merge, since kernel/door.ts and sim/door.ts changed. No example
 prints a changed line (the three new lines print only on a client-only
 process, which no example composes).*
+
+*Reviewed (2026-10-09, the same day, three commits after the build): the
+skeptic found one real bug and three gaps, all settled above. The raw-env
+guard matched the exact spelling `FERO_[RUNG_]SECRET_CLIENT`, while envdeep
+drops empty name parts, so an empty `FERO_SECRET__CLIENT=`,
+`FERO__SECRET_CLIENT=` or `FERO_SECRET_CLIENT_=` beside `FERO_SECRET` ate
+the secret and a loopback server ran open where the base tree had refused
+it — fixed by reading names as envdeep does, with a regression test (red:
+"FERO_SECRET__CLIENT: actual {} expected { secret }"). No test pinned
+`sign`'s `r === 1` against the admit tail's — pinned now, red under the
+truthy mutation. README's `secret` row still said every client shares the
+secret and that a process without it cannot read or write — reworded, with
+the two member lines that said the same. The version mix on client links
+(a V4-30 build against this one) is stated in "The rule" and pinned by a
+kernel test. Nothing in kernel/door.ts, kernel/node.ts or sim/ changed.*

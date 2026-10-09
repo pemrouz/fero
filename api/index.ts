@@ -103,7 +103,7 @@ const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node
   switch (e.b) {
     case 'no-secret': return clientOnly
       ? `${f} ${who} — it has no secret and this process holds the client key; every member must set FERO_SECRET`
-      : `${f} ${who} — it has no secret and this node has one; every member and client must share FERO_SECRET`
+      : `${f} ${who} — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT`
     case 'peer-secret': return `${f} by ${who} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`
     case 'bad-proof': return clientOnly
       ? `${f} ${who} — its secret does not match this process's client key (FERO_SECRET_CLIENT)`
@@ -385,7 +385,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // loopbackHost, NOT localish (a wildcard reaches other machines). After the directory-socket check, so
   // `0.0.0.0:3376` keeps its own refusal. A client is never refused for having no secret.
   if (!isSystem && listen !== undefined && secret === undefined && !loopbackHost(hostOf(listen)))
-    throw new Error(`fero('${name}'): listen ${listen} is reachable from other machines and no secret is set — set FERO_SECRET (the same value on every member and client), or pass secret: false (FERO_SECRET=off) to run open on purpose`)
+    throw new Error(`fero('${name}'): listen ${listen} is reachable from other machines and no secret is set — set FERO_SECRET (the same value on every member; a client holds it or FERO_SECRET_CLIENT), or pass secret: false (FERO_SECRET=off) to run open on purpose`)
   //! uuid discipline (v4.1): the string is validated (an empty uuid, or one containing '~' — the
   // incarnation-lane separator — could alias another node's lane in origin-string space), and a
   // durable dir's RESTORED identity beats the random default: fero(name, {dir}) with uuid omitted
