@@ -728,6 +728,21 @@ test('the REWRITE relay (the review\'s blocker): a relay that answers for a memb
     assert.deepEqual(b.rows(JK.doorReject), [[1, 'bad-proof', '']], 'c = the claimed listen, \'\' for a client')
     assert.equal(b.node.clientLinks.size, 0, 'never a client link: bb ships it no RECORDS')
     assert.deepEqual(b.node.admitted(), []); assert.equal(b.node.byUuid.has('cc'), false) }
+  //! 4/4 the REVERSE order (the second review's nit): the relay dials the victim FIRST and holds its HELLO (and nonce)
+  // before any member dials the relay; the member is one the victim's committed view already lists, so a proof that
+  // verified would admit it as a known member. The member's dialer proof, made over the listen it was shown (sim:x),
+  // is replayed at the victim: bad-proof, no identified row, nothing in byUuid
+  { const m = rec('mm', { door: doorFor(56) }), a = rec('aa', { door: doorFor(57), boot: { epoch: 1, members: [['aa', 'sim:aa'], ['mm', 'sim:mm']] } })
+    a.up(1) // x → aa, before mm knows anything: aa's HELLO (with its nonce) is in x's hands
+    const aaHello = dec(a.sends(1)[0]).value as Record<string, unknown>
+    m.node.step({ kind: 'discover', hosts: ['sim:x'] })
+    m.up(1, true, 'sim:x') // mm → x; x answers with aa's HELLO under its own address
+    m.feed(1, viaX(aaHello))
+    assert.deepEqual(verbs(m.sends(1)), [VERB.HELLO, VERB.DOOR], 'mm proves to what it thinks is aa at sim:x')
+    a.feed(1, m.sends(1)[0]); a.feed(1, m.sends(1)[1]) // x replays mm's HELLO and proof at aa
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'bad-proof', 'sim:mm']], 'aa rebuilt over the listen it sent (sim:aa): bad-proof, though mm is a member of its view')
+    assert.deepEqual(a.rows(JK.identified), []); assert.equal(a.node.byUuid.has('mm'), false); assert.deepEqual(a.node.admitted(), [])
+    assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO, VERB.DOOR]); assert.deepEqual(dec(a.sends(1)[1]).value, { e: 'denied' }, 'the notice, never aa\'s own proof') }
   //! the control: a relay that forwards VERBATIM is caught by the address rule before any proof (the earlier test)
 })
 
