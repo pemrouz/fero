@@ -17,8 +17,8 @@
 // record still arrives above the fence (A1's zombie after the heal, A11's re-downloading spoke). Stage 3's
 // compaction drops that entry, and its mutation must then be caught across the families.
 // Cost: about 25 s at low priority on this box (2 seeds per family, then five pinned mutation schedules, each run
-// clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about 70 s on 2026-10-09). The known-unsafe set below is exact in both directions
-// for whatever range runs.
+// clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about 70 s on 2026-10-09). The known-unsafe seeds below run in every battery
+// on top of that range, and the set is exact in both directions.
 
 import { test } from 'node:test'
 import assert from 'node:assert'
@@ -56,11 +56,14 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
 }
 
 for (const fam of FAMILIES) {
-  test(`scoped sweep ${fam.name}: ${SEEDS} seeds — safe and live, M8 red today on every seed, M9 only at R=1, the chaos engaged`, () => {
+  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ' and pinned seed ' + KNOWN_UNSAFE[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, M9 only at R=1, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
     let engaged = 0, cells = 0, advances = 0
     const known = new Set(KNOWN_UNSAFE[fam.name] ?? [])
-    for (let seed = 1; seed <= SEEDS; seed++) {
+    //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
+    // the newly-safe check below is the flip a fix must make
+    const seeds = [...new Set([...Array.from({ length: SEEDS }, (_, i) => i + 1), ...known])]
+    for (const seed of seeds) {
       const o = runFamily(fam, seed)
       if (o.unsafe.length) { if (!known.has(seed)) unsafe.push(`${o.shape}: ${o.unsafe.join(' | ')}`) }
       else if (known.has(seed)) newlySafe.push(seed)
@@ -73,7 +76,7 @@ for (const fam of FAMILIES) {
     assert.deepEqual(unsafe, [], 'UNSAFE: a monitor fired or M1\'s horizon form disagrees')
     assert.deepEqual(newlySafe, [], 'a schedule pinned unsafe is safe now: take it off KNOWN_UNSAFE, with the why')
     assert.deepEqual(notLive, [], 'not live at the horizon')
-    assert.ok(engaged > 0, `${fam.name}: the chaos never engaged on ${SEEDS} seeds`)
+    assert.ok(engaged > 0, `${fam.name}: the chaos never engaged on seeds ${seeds.join(',')}`)
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
   })
 }
