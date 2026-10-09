@@ -126,6 +126,28 @@ export class Sim {
   // owner, peer, this end's link id, the peer's, whether this end dialed, the bytes. Null by default,
   // zero cost on every other run.
   tap: ((from: string, to: string, link: number, peerLink: number, dialed: boolean, bytes: Uint8Array) => void) | null = null
+  //! watch (DESIGN-SCALE §6, stage 0): the scale monitors are installed (sim/monitors.ts armScale) — only then are
+  // `stepped` and `inflight` kept. False on every other run: one boolean read per event and per frame, so every
+  // golden, sweep and counted pin runs exactly the code it ran before.
+  watch = false
+  //! stepped (stage 0): the uuids of the nodes that stepped since the last monitor pass. A
+  // per-event monitor that walks STATE (cells, versions, floors) walks only these — state changes only inside
+  // step(), so the walk is complete and costs one node per event instead of every node (STATUS: "every new
+  // per-event monitor walks only the node that stepped"). Under checkEvery sampling it holds every node that
+  // stepped in the window. Cleared by the monitor pass itself.
+  stepped = new Set<string>()
+  //! inflight (stage 0, monitor M6): every frame between a send and its bytesIn delivery, by task id — the
+  // wire as the sim can see it and no shell can. M6 reads it at a tombstone release to prove nothing
+  // older than the released stamp is still on its way to a holder. One Map set/delete per delivered frame.
+  inflight = new Map<number, { from: string; to: string; bytes: Uint8Array }>()
+  //! g5 (stage 0, monitor M5): uuids whose restart dropped rows the disk had LIED about (StoreFault lieP, a
+  // lied swap). Their durable floors overclaim by those rows — the DESIGN-SCALE §5 G5 residual, documented and
+  // not a monitor's finding. M5 skips a life restored from such a disk.
+  g5 = new Set<string>()
+  //! restoring (stage 0): uuids between restart() and their `start` event — the replay rows fold one event at a
+  // time, so a state monitor (M1, M3, M5) that read the node mid-replay would see a half-folded fold and a seed
+  // floor the rows have not caught up with yet. They wait for `start`, then read the whole restored fold at once.
+  restoring = new Set<string>()
   seed: number
 
   constructor(seed: number, defaults: Fault = {}) {
@@ -170,6 +192,7 @@ export class Sim {
     const old = this.nodes.get(uuid)!
     const opts = this.#nodeOpts.get(uuid)!
     old.destroy()
+    if (store.wal.some((r) => r.resolved && r.lied)) this.g5.add(uuid) // the disk lied: its durable floors may overclaim (G5)
     store.wal = store.wal.filter((r) => r.resolved && !r.lied)
     store.swapLied = false // the new life reopens the REAL file; the phantom died with the crash
     const b = store.boot
@@ -188,7 +211,8 @@ export class Sim {
       } : opts.boot,
     })
     for (const row of store.wal) this.post(uuid, { kind: 'replay', bytes: row.bytes, prev: row.prev }, 0)
-    this.post(uuid, { kind: 'start' }, 0)
+    this.restoring.add(uuid)
+    this.#schedule(0, () => { this.restoring.delete(uuid); this.#step(uuid, { kind: 'start' }) })
     return reborn
   }
 
@@ -247,6 +271,7 @@ export class Sim {
         const bad = m.check(this)
         if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
       }
+      this.stepped.clear()
     }
     while (this.#queue.length) {
       if (opts.until !== undefined && this.#queue[0].at > opts.until) break
@@ -271,6 +296,7 @@ export class Sim {
     const node = this.nodes.get(uuid)
     if (!node) return
     node.step(ev)
+    if (this.watch) this.stepped.add(uuid)
     this.trace.push(node.stateHash)
   }
 
@@ -370,7 +396,12 @@ export class Sim {
         const deliver = () => {
           const at = Math.max(sim.now + dMin + sim.rng() * (dMax - dMin), sim.#lastAt.get(link) ?? 0)
           sim.#lastAt.set(link, at)
-          sim.post(l.peer, { kind: 'bytesIn', link: l.peerLink, bytes }, at - sim.now)
+          //! watched runs: the frame is on the wire until its bytesIn fires (M6 reads sim.inflight). The same one
+          // task either way, so the event count and the seq order are identical with or without the watch
+          if (!sim.watch) return sim.post(l.peer, { kind: 'bytesIn', link: l.peerLink, bytes }, at - sim.now)
+          const id = sim.#seq
+          sim.inflight.set(id, { from: l.owner, to: l.peer, bytes })
+          sim.#schedule(at - sim.now, () => { sim.inflight.delete(id); sim.#step(l.peer, { kind: 'bytesIn', link: l.peerLink, bytes }) })
         }
         deliver()
         //! duplication: the same frame delivered again, still FIFO (a dup can never leapfrog its original)
