@@ -76,7 +76,7 @@ const rawClient = (sim: Sim, id: string, claim: string, door: Door, got: string[
       for (const f of framers.get(ev.link)!.push(ev.bytes)) {
         if (f.verb === VERB.HELLO) {
           const h = f.value as HelloKeys
-          sink.send(ev.link, encodeControl(VERB.DOOR, { p: door.mac(proofMsg('dialer', h.k as string, myK, h.u, { u: claim, i: 1, l: '', r: 1 })) }))
+          sink.send(ev.link, encodeControl(VERB.DOOR, { p: door.mac(proofMsg('dialer', h.k as string, myK, h.u, h.l, { u: claim, i: 1, l: '', r: 1 })) }))
         } else if (f.verb === VERB.DOOR) {
           const v = f.value as { e?: unknown }
           if (typeof v.e === 'string') got.push(v.e)
@@ -88,17 +88,21 @@ const rawClient = (sim: Sim, id: string, claim: string, door: Door, got: string[
 
 //! relay — the forwarder: a raw endpoint at `listen` that, when dialed, dials `target` and forwards every
 // frame both ways. One session at a time; frames that arrive before the far side is up are held; the far
-// link outlives the near one (a relay that keeps its victim waiting).
-const relay = (sim: Sim, id: string, listen: string, target: string) => {
+// link outlives the near one (a relay that keeps its victim waiting). With `rewrite`, the far side's HELLO
+// is re-encoded with `l` = this relay's own address, so the address rule sees the claim it expects.
+const relay = (sim: Sim, id: string, listen: string, target: string, rewrite = false) => {
   let acc: number | null = null, out: number | null = null
   const held: Uint8Array[] = []
+  const back = new Framer()
+  const toNear = (bytes: Uint8Array): Uint8Array[] =>
+    !rewrite ? [bytes] : back.push(bytes).map((f) => f.verb === VERB.HELLO ? encodeControl(VERB.HELLO, { ...(f.value as Record<string, unknown>), l: listen }) : bytes)
   sim.raw(id, listen, (ev, sink) => {
     if (ev.kind === 'linkUp') {
       if (!ev.dialed) { acc = ev.link; sink.connect(target) }
       else { out = ev.link; for (const b of held) sink.send(out, b); held.length = 0 }
     } else if (ev.kind === 'bytesIn') {
       if (ev.link === acc) { if (out !== null) sink.send(out, ev.bytes); else held.push(ev.bytes) }
-      else if (ev.link === out && acc !== null) sink.send(acc, ev.bytes)
+      else if (ev.link === out && acc !== null) for (const b of toNear(ev.bytes)) sink.send(acc, b)
     } else if (ev.kind === 'linkDown') {
       //! a sticky relay: the far link is kept open when the near one dies (the far member sits in proving
       // with no dialer proof — its deadline is what ends it); a dead far link closes the near one
@@ -253,13 +257,13 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
   assert.deepEqual(failures, [])
 })
 
-test('the forwarder: a relay behind a DISCOVERED address is refused by the address rule before any proof (the far member times out); behind a STATIC host it is admitted — the documented limit until TLS', () => {
-  const build = (viaStatic: boolean) => {
+test('the forwarder: a relay behind a DISCOVERED address is refused by the address rule before any proof (the far member times out); one that REWRITES the far HELLO to its own address gets the dialer\'s proof, which the far member reads as bad-proof; behind a STATIC host it is admitted — the documented limit until TLS', () => {
+  const build = (viaStatic: boolean, rewrite = false) => {
     const sim = new Sim(7)
     const door = toyDoor(SECRET, sim.rng)
     const a = sim.add({ uuid: 'n01', listen: 'sim:n01', hosts: viaStatic ? ['sim:x'] : [], heartbeatMs: 50, door, redialMs: 20, journalCap: 1 << 16 })
     const b = sim.add({ uuid: 'n02', listen: 'sim:n02', hosts: [], heartbeatMs: 50, door, redialMs: 20, journalCap: 1 << 16 })
-    relay(sim, 'x', 'sim:x', 'sim:n02')
+    relay(sim, 'x', 'sim:x', 'sim:n02', rewrite)
     sim.post('n01', { kind: 'start' }); sim.post('n02', { kind: 'start' })
     if (!viaStatic) sim.at(5, () => sim.post('n01', { kind: 'discover', hosts: ['sim:x'] }))
     sim.run({ until: 7000, maxEvents: 1_000_000 })
@@ -272,6 +276,15 @@ test('the forwarder: a relay behind a DISCOVERED address is refused by the addre
     assert.deepEqual(b.admitted(), [])
     assert.ok(reasons(b).includes('timeout'), `n02 never got a dialer proof and timed out: ${reasons(b).join(',')}`)
     assert.ok(rows(a, JK.revive).length >= 1, 'the parked target is re-dialed once per heartbeat — bounded chatter, no admission') }
+  //! discovered, rewritten: x answers as sim:x, so the address rule passes and n01 proves — over the listen it was
+  // shown. n02 rebuilds over the listen it SENT (sim:n02): bad-proof, the notice rides back, n01 parks sim:x.
+  { const { a, b } = build(false, true)
+    assert.deepEqual(rows(a, JK.doorReject).filter((e) => e.b === 'address'), [], 'the address rule cannot see the rewrite')
+    assert.ok(rows(b, JK.doorReject).some((e) => e.b === 'bad-proof' && e.c === 'sim:n01'), `n02 refused the relayed proof: ${JSON.stringify(rows(b, JK.doorReject).slice(0, 3))}`)
+    assert.ok(reasons(a).includes('refused'), `n01 read the notice through the relay: ${reasons(a).join(',')}`)
+    assert.deepEqual(a.admitted(), [], 'never admitted through the relay'); assert.deepEqual(b.admitted(), [])
+    assert.equal(b.byUuid.has('n01'), false); assert.deepEqual(rows(b, JK.identified), [])
+    assert.ok(rows(a, JK.revive).length >= 1, 'bounded chatter, no admission') }
   //! static: the operator typed sim:x — exempt, the handshake completes THROUGH the relay (TLS's job later)
   { const { a, b } = build(true)
     assert.deepEqual(a.admitted(), ['n02'], 'admitted: a relay at a static host is NOT PROTECTED (DESIGN-DOOR §7)')

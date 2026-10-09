@@ -633,6 +633,51 @@ test('the address rule: a DISCOVERED or VIEW-LEARNED target must answer as the a
     assert.deepEqual(a.rows(JK.doorReject), []); assert.equal(a.node.links.get(1)!.state, LS.proving) }
 })
 
+test('the REWRITE relay (the review\'s blocker): a relay that answers for a member under its OWN address passes the address rule — so the dialer\'s proof signs the listen it was shown, and the real member, rebuilding over the listen it sent, reads bad-proof; member victim, the real link untouched, client victim', () => {
+  //! x — the relay: aa was told (discover) that the resource is at sim:x; x dials bb and forwards every frame,
+  // but rewrites bb's HELLO so that `l` reads sim:x, the address aa dialed. addressOk cannot tell.
+  const viaX = (hb: Record<string, unknown>) => encodeControl(VERB.HELLO, { ...hb, l: 'sim:x' })
+  //! 1/3 the member victim: bb must never admit aa over x's link
+  { const a = rec('aa', { door: doorFor(47) }), b = rec('bb', { door: doorFor(48) })
+    a.node.step({ kind: 'discover', hosts: ['sim:x'] })
+    a.up(1, true, 'sim:x'); b.up(1) // aa → x, and x → bb
+    a.feed(1, viaX(dec(b.sends(1)[0]).value as Record<string, unknown>))
+    assert.deepEqual(a.rows(JK.doorReject), [], 'the address rule is blind to the rewrite: the claim equals the dial target')
+    assert.deepEqual(verbs(a.sends(1)), [VERB.HELLO, VERB.DOOR], 'so aa, the dialer, proves — over the listen it was SHOWN')
+    b.feed(1, a.sends(1)[0]); b.feed(1, a.sends(1)[1]) // x forwards aa's HELLO and proof verbatim
+    assert.deepEqual(b.rows(JK.doorReject), [[1, 'bad-proof', 'sim:aa']], 'bb rebuilt the message over the listen it SENT (sim:bb): the proof does not verify')
+    assert.deepEqual(verbs(b.sends(1)), [VERB.HELLO, VERB.DOOR], 'HELLO, then the notice — bb never proved to the relay')
+    assert.deepEqual(dec(b.sends(1)[1]).value, { e: 'denied' })
+    assert.deepEqual([a.node.admitted(), b.node.admitted()], [[], []])
+    assert.equal(b.node.byUuid.has('aa'), false)
+    assert.deepEqual(b.rows(JK.identified), [])
+    a.feed(1, b.sends(1)[1]) // the notice comes back through x
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'refused', 'sim:x']], 'aa parks the relay\'s address') }
+  //! 2/3 the real link: bb (the higher uuid) already holds aa over a link bb dialed; the relay must not evict it
+  { const a = rec('aa', { door: doorFor(49) }), b = rec('bb', { door: doorFor(50), hosts: ['sim:aa'] })
+    b.up(1, true, 'sim:aa'); a.up(1); pump(b, 1, a, 1)
+    assert.deepEqual([a.node.admitted(), b.node.admitted()], [['bb'], ['aa']])
+    a.node.step({ kind: 'discover', hosts: ['sim:x'] })
+    a.up(2, true, 'sim:x'); b.up(2)
+    a.feed(2, viaX(dec(b.sends(2)[0]).value as Record<string, unknown>))
+    b.feed(2, a.sends(2)[0]); b.feed(2, a.sends(2)[1])
+    assert.deepEqual(b.rows(JK.doorReject), [[2, 'bad-proof', 'sim:aa']])
+    assert.equal(b.node.byUuid.get('aa'), 1, 'the real link still holds aa'); assert.equal(b.node.links.get(1)!.dead, false)
+    assert.deepEqual(b.rows(JK.dupLink), [], 'no duplicate-link row: the duplicate-link rule never ran')
+    assert.deepEqual(b.closes(), [[2, 'door']], 'only the relay\'s link closes') }
+  //! 3/3 the client victim: a secured client told about sim:x by the directory; bb must not admit it as the client
+  { const c = rec('cc', { client: true, listen: '', door: doorFor(51) }), b = rec('bb', { door: doorFor(52) })
+    c.node.step({ kind: 'discover', hosts: ['sim:x'] })
+    c.up(1, true, 'sim:x'); b.up(1)
+    c.feed(1, viaX(dec(b.sends(1)[0]).value as Record<string, unknown>))
+    assert.deepEqual(verbs(c.sends(1)), [VERB.HELLO, VERB.DOOR])
+    b.feed(1, c.sends(1)[0]); b.feed(1, c.sends(1)[1])
+    assert.deepEqual(b.rows(JK.doorReject), [[1, 'bad-proof', '']], 'c = the claimed listen, \'\' for a client')
+    assert.equal(b.node.clientLinks.size, 0, 'never a client link: bb ships it no RECORDS')
+    assert.deepEqual(b.node.admitted(), []); assert.equal(b.node.byUuid.has('cc'), false) }
+  //! the control: a relay that forwards VERBATIM is caught by the address rule before any proof (the earlier test)
+})
+
 test('the role rule with a door, four ways: the proof runs first, then uuid-taken (with the notice {e: uuid-taken}); a member evicts a squatting client; client vs client keeps dup-link', () => {
   const clientOf = (uuid: string, seed: number) => rec(uuid, { client: true, hosts: ['sim:aa'], listen: '', door: doorFor(seed) })
   //! 1/4 r:1 against a committed-view member

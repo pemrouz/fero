@@ -49,21 +49,26 @@ export const doorMatrix = (mine: boolean, theirs: boolean): 'open' | 'secured' |
 
 //! proofMsg (§3 "what is signed") — `side` is the PROVER's side on this link, so a proof cannot be turned
 // around; verifierNonce is the `k` the verifier minted for this link, proverNonce the prover's own;
-// verifierUuid the uuid the verifier claimed; then every HELLO key the prover sent (absent keys read as
-// 0 / '' so the array has one shape). JSON over an array of strings and numbers has one encoding, so
-// there is no separator ambiguity. The label versions the message.
-export const proofMsg = (side: 'dialer' | 'acceptor', verifierNonce: string, proverNonce: string, verifierUuid: string, h: HelloKeys): string =>
-  JSON.stringify(['fero-door/1', side, verifierNonce, proverNonce, verifierUuid, h.u, h.i, h.l, h.r ?? 0, h.n ?? '', h.c ?? '', h.m ?? 0])
+// verifierUuid and verifierListen are the `u` and `l` the verifier's HELLO CLAIMED, as the prover read
+// them; then every HELLO key the prover sent (absent keys read as 0 / '' so the array has one shape).
+// The verifier rebuilds the message with its OWN uuid and the `l` it actually sent, so a HELLO whose
+// `l` was rewritten in flight — the relay that answers for a member under its own address, so the
+// address rule cannot see it — yields a proof the real member cannot verify: `bad-proof`, never
+// admitted. JSON over an array of strings and numbers has one encoding, so there is no separator
+// ambiguity. The label versions the message.
+export const proofMsg = (side: 'dialer' | 'acceptor', verifierNonce: string, proverNonce: string, verifierUuid: string, verifierListen: string, h: HelloKeys): string =>
+  JSON.stringify(['fero-door/1', side, verifierNonce, proverNonce, verifierUuid, verifierListen, h.u, h.i, h.l, h.r ?? 0, h.n ?? '', h.c ?? '', h.m ?? 0])
 
-//! prove — MY proof on this link: over the peer's nonce (their `k`), my nonce, the uuid they claimed, and
-// the HELLO I sent (link.said, the exact object that went out at linkUp).
+//! prove — MY proof on this link: over the peer's nonce (their `k`), my nonce, the uuid and listen they
+// claimed, and the HELLO I sent (link.said, the exact object that went out at linkUp).
 export const prove = (door: Door, link: Link, mine: HelloKeys, theirs: HelloKeys): string =>
-  door.mac(proofMsg(link.dialed ? 'dialer' : 'acceptor', theirs.k as string, link.nonce, theirs.u, mine))
+  door.mac(proofMsg(link.dialed ? 'dialer' : 'acceptor', theirs.k as string, link.nonce, theirs.u, theirs.l, mine))
 
 //! verify — the PEER's proof: rebuilt from the stashed HELLO with the peer's side, my nonce as the
-// verifier's and my uuid as the verifier's; compared in constant time.
+// verifier's, my uuid and the listen I SENT on this link (link.said.l — what a prover that read my
+// HELLO unaltered signed); compared in constant time.
 export const verify = (door: Door, link: Link, myUuid: string, theirs: HelloKeys, p: string): boolean =>
-  ctEq(door.mac(proofMsg(link.dialed ? 'acceptor' : 'dialer', link.nonce, theirs.k as string, myUuid, theirs)), p)
+  ctEq(door.mac(proofMsg(link.dialed ? 'acceptor' : 'dialer', link.nonce, theirs.k as string, myUuid, link.said!.l, theirs)), p)
 
 //! addressOk (§3 step 9, the relay) — a link I DIALED whose target is not one of my STATIC hosts came
 // from the directory's discover set or a committed view's member listen: both carry the peer's own

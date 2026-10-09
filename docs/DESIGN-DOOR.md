@@ -129,8 +129,10 @@ with no secret is refused now, as §8 says.*
    `doorReject: 78` carries a typed reason. One stderr line per peer and
    reason per process (§14 Q4).
 9. The `#directory` stays open on loopback and gets no secret; a dialer
-   refuses a discovered or view-learned peer whose signed listen is not the
-   address it dialed, which closes the directory-squatter relay.
+   refuses a discovered or view-learned peer whose claimed listen is not the
+   address it dialed, and its proof signs the listen it was shown, so a
+   relay that rewrites the claim fails at the real node. Together they close
+   the directory-squatter relay.
 10. Not protected, said out loud: eavesdropping and tampering after the
     handshake (TLS later), a leaked secret, a dishonest client that holds
     the one shared secret, and the per-box loopback plane.
@@ -239,16 +241,21 @@ at :1482-1486), so a proving link can carry nothing but DOOR.
 
 ```
 msg = JSON.stringify(['fero-door/1', side, verifierNonce, proverNonce,
-                      verifierUuid, u, i, l, r ?? 0, n ?? '', c ?? '', m ?? 0])
+                      verifierUuid, verifierListen,
+                      u, i, l, r ?? 0, n ?? '', c ?? '', m ?? 0])
 p   = door.mac(msg)
 ```
 
 `side` is `'dialer'` or `'acceptor'`: the prover's side on this link, so a
 proof cannot be turned around. `verifierNonce` is the `k` from the peer's
-HELLO; `proverNonce` is my own `k`; `verifierUuid` is the `u` the peer
-claimed; `u … m` are MY HELLO keys exactly as sent. JSON over an array of
-strings and numbers has one encoding, so there is no separator ambiguity.
-The label versions the message.
+HELLO; `proverNonce` is my own `k`; `verifierUuid` and `verifierListen` are
+the `u` and `l` the peer's HELLO claimed, AS I READ THEM; `u … m` are MY
+HELLO keys exactly as sent. The verifier rebuilds the message with its own
+uuid and the `l` it actually sent on this link (`link.said.l`), so a HELLO
+whose `l` was rewritten between us yields a proof the real node cannot
+verify (the relay, below; added at review, 2026-10-09). JSON over an array
+of strings and numbers has one encoding, so there is no separator
+ambiguity. The label versions the message.
 
 ### The order of checks on an inbound HELLO
 
@@ -372,11 +379,26 @@ repeats every heartbeat the secrets probably differ*.
   found, and it matters on the default box: any local process can register
   a fake address for a name (api/directory.ts:24-27), and a parked target
   listed by the directory is re-dialed every heartbeat (kernel/node.ts:761-
-  771). Step 9 closes it: A sees B's signed `l` (B's own listen, inside B's
-  proof) and it is not X, so A refuses before sending any proof; B never
-  gets a dialer proof and its link times out. What step 9 does not close: a
-  relay sitting at a STATIC `hosts` address, or in a network position. That
-  is TLS's job later and it is in the NOT PROTECTED list.
+  771). Two rules close it, and it takes both (the review of 2026-10-09
+  showed that step 9 alone does not):
+  - Step 9, the address rule, catches a relay that forwards VERBATIM: B's
+    HELLO says `l: B`, A dialed X, they differ, A refuses before sending any
+    proof; B never gets a dialer proof and its link times out.
+  - The proof message catches a relay that REWRITES: X hands A a copy of
+    B's HELLO with `l: X`, so the address rule is satisfied, and A proves.
+    But A's proof signs `verifierListen = X`, the listen it was shown, and
+    B rebuilds the message over the listen it SENT (`B`): `bad-proof`, no
+    admission, B's own proof never leaves, and A reads the notice and parks
+    X. The earlier text claimed A "sees B's signed `l` inside B's proof";
+    it does not — the dialer checks `l` before any proof exists, and B's
+    proof arrives only after A has already proved. The dialer's proof is
+    what has to bind the claim.
+  What neither closes: a relay sitting at a STATIC `hosts` address that
+  forwards verbatim (A signs B's real listen, which B verifies), or in a
+  network position. That is TLS's job later and it is in the NOT PROTECTED
+  list. Note the asymmetry is deliberate: the dialer signs the string it was
+  SHOWN, never the one it TYPED, so a typed `0.0.0.0` or hostname never
+  breaks an honest handshake.
 - **A dishonest client that holds the shared secret** can omit `r: 1` and is
   a member. The role rule cannot see it. Said plainly in §7; the derived
   client key is the follow-up (§14 Q2).
@@ -597,8 +619,10 @@ protects addresses when the dial itself now authenticates.
 What a secret changes about what the directory hands out: a wrong address is
 now REFUSED at the door. A local process registers a fake address for
 `shop`; a member dials it; the squatter cannot prove (`no-secret` or
-`bad-proof`), or it relays and fails the address rule (§3 step 9); the
-target is parked and re-dialed once per heartbeat while it stays listed.
+`bad-proof`), or it relays and fails the address rule (§3 step 9), or it
+relays with a rewritten listen and the real member refuses the proof
+(§3 "the relay"); the target is parked and re-dialed once per heartbeat
+while it stays listed.
 Bounded chatter, no admission. The operator proposal said a squatter "only
 fails auth"; its skeptic showed the relay; the address rule is the answer.
 
@@ -626,10 +650,13 @@ target is checked wherever it came from.
   uuids, both nonces, the side, and every HELLO key of the prover.
 - A process that can only connect never gets a proof to relay: the dialer
   proves first.
-- A relay behind a directory entry or a view-learned address is refused by
-  the address rule.
+- A relay behind a directory entry or a view-learned address is refused:
+  one that forwards verbatim by the address rule, one that rewrites the
+  listen by the proof (the dialer signs the listen it was shown; the real
+  node rebuilds over the one it sent).
 - The identity keys (`u, i, l, r, n, c, m`) cannot be changed in flight
-  before admission: they are signed.
+  before admission: they are signed by their sender, and `u` and `l` are
+  signed again by the side that read them.
 - A debug attach cannot be used as a peer: the r:2 branch latches outside
   membership on its own token, unchanged.
 
