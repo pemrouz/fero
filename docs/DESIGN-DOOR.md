@@ -895,6 +895,14 @@ fails at once).
   contract now refuses that server at the door, so the bullet and the `sh`
   comment are reworded to *refused at the door: the contract differs
   (validation)*. The check runs the files the README names and is unchanged.
+  *2026-10-09: the series is 28 rungs. examples/18-secret is the door's own
+  rung: two members with `FERO_SECRET` in their environment form a cluster, a
+  third without it is refused `no-secret` (the members' line) and sees
+  `peer-secret` (its own two lines, one per dialed member), nothing of it
+  lands, and the same command with the secret joins. Its check gives the
+  roles the secret through the env with `FERO_CONFIG` lifted, exactly as the
+  `fero.spawn` bullet below says, and reads the lines off the children's
+  stderr.*
 - **The website demo:** site/strip.mjs copies kernel + sim/exec, monitors
   and harness (:23-27); the demo runs with no secret and no contract, so the
   tab runs today's trajectories. kernel/door.ts has no `node:` import, so
