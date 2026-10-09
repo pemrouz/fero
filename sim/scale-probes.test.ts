@@ -198,12 +198,36 @@ test('M3 release-safety: a tombstone released with its record at every holder, t
   assert.ok(ledgerOf(sim).counts.releases >= 2, 'non-vacuity: M3 classified both releases')
 })
 
-test('M4 index-oracle is a named stub: inert today, red the moment node.byPart exists (stage 1 must fill it in)', () => {
-  const { sim, ns } = scoped3(24)
-  assert.equal(named(sim, 'index-oracle').length, 0)
-  ;(ns[0] as Node & { byPart?: unknown }).byPart = new Map()
+//! M4 (stage 1): a lawful run keeps both indexes exact at every step; one missed site of either kind goes red at
+// the node's next step. The plants are what a forgotten `indexAppend` or `tombAdd` would leave behind.
+test('M4 index-oracle: exact on a lawful scoped run (non-vacuity counted); one entry missing from byPart, or one tombstone missing from tombs, goes red at the next step', () => {
+  const { sim, ns, p } = scoped3(24)
+  for (let i = 0; i < 6; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [p, 'f' + i], value: i }] }, i * 5)
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.remove, key: [p, 'f2'] }] }, 40)
+  sim.run({ until: sim.now + 500 })
+  assert.deepEqual(named(sim, 'index-oracle'), [])
+  const holder = ns.find((n) => n.armed && n.byPart!.has(p))!
+  const lanes = holder.byPart!.get(p)!
+  assert.ok([...lanes.values()].reduce((s, a) => s + a.length, 0) >= 7, `non-vacuity: the index holds the 7 entries of ${p} at ${holder.uuid}`)
+  const k = JSON.stringify([p, 'f2'])
+  assert.ok(holder.tombs!.get(p)?.has(k) && !holder.state.has(k) && holder.versions.has(k), 'the remove left a tombstone in the index')
+  //! plant 1: one entry falls out of byPart (a missed indexAppend) — the lane still holds it
+  const arr = [...lanes.values()][0]
+  arr.pop()
+  sim.stepped.add(holder.uuid)
   sim.run({ until: sim.now + 100 })
-  assert.match(named(sim, 'index-oracle')[0]?.detail ?? '', /stage 1 landed the index/)
+  assert.match(named(sim, 'index-oracle')[0]?.detail ?? '', new RegExp(`${holder.uuid} byPart\\['${p}'\\]\\[.*\\] holds \\d+ entries, the lane holds \\d+`))
+  //! plant 2 (a fresh run): one tombstone falls out of tombs (a missed tombAdd) — the version is still there
+  const r2 = scoped3(24)
+  for (let i = 0; i < 3; i++) r2.sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [r2.p, 'f' + i], value: i }] }, i * 5)
+  r2.sim.post('n01', { kind: 'write', recs: [{ type: REC.remove, key: [r2.p, 'f1'] }] }, 20)
+  r2.sim.run({ until: r2.sim.now + 500 })
+  assert.deepEqual(named(r2.sim, 'index-oracle'), [])
+  const h2 = r2.ns.find((n) => n.armed && n.tombs!.has(r2.p))!
+  h2.tombs!.get(r2.p)!.delete(JSON.stringify([r2.p, 'f1']))
+  r2.sim.stepped.add(h2.uuid)
+  r2.sim.run({ until: r2.sim.now + 100 })
+  assert.match(named(r2.sim, 'index-oracle')[0]?.detail ?? '', new RegExp(`${h2.uuid} tombs lacks \\["${r2.p}","f1"\\]`))
 })
 
 test('M5 floor-truth: a floor raised past what the node holds goes red at its next step; a lawful run checks every advance', () => {

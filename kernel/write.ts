@@ -699,6 +699,7 @@ export class Writes {
     if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
     if (node.armed && rv.pp !== undefined && rv.pp >= 0) entry.pp = rv.pp
     node.logFor(origin).push(entry)
+    node.indexAppend(origin, entry)
     //! the SHIPPABLE watermark advances at the log append — the sole evidence confirm:'replicated'
     // may ever read (M4c); synchronous with applied today, a distinct site by design
     d.shippable = seq
@@ -777,6 +778,7 @@ export class Writes {
     if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
     if (node.armed && rv.pp !== undefined && rv.pp >= 0) entry.pp = rv.pp
     lane.splice(lo, 0, entry) // ascending preserved: inserted at its seq position
+    node.indexInsert(origin, entry)
     if (node.armed) {
       const pe = d.part(p)
       //! the chain rule at the splice site, PLUS the forward walk: a gap-fill can make later
@@ -867,12 +869,14 @@ export class Writes {
           if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
           if (rv.pp >= 0) entry.pp = rv.pp
           lane.splice(lo, 0, entry)
+          node.indexInsert(prov.origin, entry)
         } else {
           d.applied = rv.seq
           const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number; pp?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
           if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
           if (rv.pp >= 0) entry.pp = rv.pp
           node.logFor(prov.origin).push(entry)
+          node.indexAppend(prov.origin, entry)
           if (rv.seq > d.shippable) d.shippable = rv.seq
           if (rv.seq > d.durable) d.durable = rv.seq
         }
@@ -897,6 +901,7 @@ export class Writes {
       const entry: { rec: Rec; seq: number; epoch: number; iss?: string; cid?: number } = { rec, seq: rv.seq, epoch: rv.epoch }
       if (rv.issuer) { entry.iss = rv.issuer; entry.cid = rv.cid }
       node.logFor(prov.origin).push(entry)
+      node.indexAppend(prov.origin, entry) // a scoped life restored at epoch 0 replays here: its index fills too
       d.shippable = rv.seq
       d.durable = rv.seq
       node.apply(rec, prov.origin, rv.seq, rv.epoch, entry.iss, entry.cid)

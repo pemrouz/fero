@@ -146,9 +146,14 @@ export const inject = (sim: Sim, r: () => number, m: Mutation): string | null =>
     const t = n.versions.get(k)!
     n.versions.delete(k)
     n.unlink(k)
+    n.tombDrop(k) // a broken RELEASE rule, not a broken index: the indexes follow the drop (M4 stays green here)
     if (m !== 'version-only') {
       const lane = n.logs.get(t.origin)
-      if (lane) n.logs.set(t.origin, lane.filter((e) => !(e.seq === t.seq && e.epoch === t.epoch)))
+      if (lane) {
+        const gone = lane.filter((e) => e.seq === t.seq && e.epoch === t.epoch)
+        n.logs.set(t.origin, lane.filter((e) => !(e.seq === t.seq && e.epoch === t.epoch)))
+        n.indexDrop(t.origin, gone)
+      }
     }
     sim.stepped.add(n.uuid) // the walk diffs only stepped nodes: this step happened outside a node event
   }
