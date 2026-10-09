@@ -208,7 +208,7 @@ export const verifyReplay = (capture) => {
 // below is a kernel emit site (cited so drift is auditable), the way stateAt mirrors the LWW election:
 //   links    linkUp(a=id, b=dialed) opens · identified(a=id, b=uuid) admits (kernel/node.ts HELLO: LS.admitted
 //            is set in the same synchronous block as the emit — identified ⇔ admitted) · dupLink(a=closed) /
-//            selfReject(a) / nameReject(a) mark the LOSER closing: dead, still in the table until its linkDown
+//            selfReject(a) / nameReject(a) / doorReject(a) / contractReject(a) mark the LOSER closing: dead, still in the table until its linkDown
 //            echo (the kernel deletes only on the echo — deleting early would read as a failed dial and redial
 //            the race) · linkDown(a) removes · pause(a)/drain(a) flip paused · dropOldest(a) de-syncs (the
 //            whole queue was cleared) · digestIn(a) syncs UNLESS the link is paused (the DIGEST handler marks
@@ -257,7 +257,7 @@ export const topologyAt = (capture, uuid, t) => {
     } else if (k === K.identified) {
       const l = links.get(e.a)
       if (l) { l.uuid = e.b; l.admitted = true; if (isClient && primary === null) primary = l.id }
-    } else if (k === K.dupLink || k === K.selfReject || k === K.nameReject) {
+    } else if (k === K.dupLink || k === K.selfReject || k === K.nameReject || k === K.doorReject || k === K.contractReject) {
       const l = links.get(e.a)
       if (l) l.closing = true
     } else if (k === K.linkDown) {

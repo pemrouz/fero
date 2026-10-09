@@ -45,6 +45,10 @@ export const LAMPORT_LEASE = 4096
 // rows) bounds RELATIVE growth: even when the log itself is large (frontier pinned), at most
 // SNAPSHOT_AT appended rows separate swaps, so the file is O(log entries + SNAPSHOT_AT) always.
 export const SNAPSHOT_AT = 4096
+//! PROVE_MS (DESIGN-DOOR §3): how long a secured link may sit in LS.proving — from the HELLO that carried
+// `k` to the DOOR that proves it — before the node gives up on it (doorReject 'timeout'). A timer per
+// proving link, never a heartbeat sweep (heartbeat.ms 0 is an opt-out). Draws nothing on the open path.
+export const PROVE_MS = 5000
 
                        
                                                                                                     
@@ -88,6 +92,8 @@ export const SNAPSHOT_AT = 4096
                     
                     
                  
+                                                                                                             
+                 
  
 
 //! TUNE — the defaults: today's constants, by name. Frozen; a node copies it, never mutates it.
@@ -114,6 +120,7 @@ export const TUNE                 = Object.freeze({
   stageTicks: STAGE_TICKS,
   acqLiveMax: ACQ_LIVE_MAX,
   stallAt: STALL_AT,
+  proveMs: PROVE_MS,
 })
 
 //! ZERO_OK — the rows where 0 means something: no redial at all (the config key redial.tries allows

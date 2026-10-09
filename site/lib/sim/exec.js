@@ -116,6 +116,16 @@ export class Sim {
   rpcInbox = new Map                                                                             ()
   rpcResults = new Map                                                                       ()
   rpcSubRecs = new Map                                           ()
+  //! raw endpoints (the door family, DESIGN-DOOR §9): a hand-written relay, a replayer, a stranger with a
+  // socket — an endpoint that is NOT a kernel node. Dialable at its listen, able to dial, fed the same
+  // Events a node would see (linkUp / bytesIn / linkDown) and answering through the same sink. Never in
+  // sim.nodes (the monitors see kernel nodes only), never traced. Empty on every other run: one size
+  // check per step.
+  #raws = new Map                             ()
+  //! tap (the door family's frame oracle): sees every frame the moment a node ships it onto a live link —
+  // owner, peer, this end's link id, the peer's, whether this end dialed, the bytes. Null by default,
+  // zero cost on every other run.
+  tap                                                                                                                  = null
   seed        
 
   constructor(seed        , defaults        = {}) {
@@ -138,6 +148,15 @@ export class Sim {
 
   //! storeFault — install a storage personality for a node (fsync delay, lie probability, fail probability).
   storeFault(uuid        , f            ) { this.#storeFaults.set(uuid, f) }
+
+  //! raw — register a raw endpoint (see #raws): `id` names it in the queue, `listen` makes it dialable (null
+  // = it only dials), `handler` gets every Event addressed to it and the sink to answer with. Returns the sink.
+  raw(id        , listen               , handler                                       )             {
+    const sink = this.#sinkFor(id)
+    this.#raws.set(id, (ev) => handler(ev, sink))
+    if (listen) this.#byListen.set(listen, id)
+    return sink
+  }
 
   //! restart — crash + recover a node FROM ITS DISK (M4b): destroy it mid-flight, harvest the store the
   // way a real recovery would (unresolved batches are the torn tail — gone; fsync-lied batches are gone
@@ -248,6 +267,7 @@ export class Sim {
   get quiesced()          { return this.#queue.length === 0 }
 
   #step(uuid        , ev       ) {
+    if (this.#raws.size !== 0) { const raw = this.#raws.get(uuid); if (raw !== undefined) return raw(ev) }
     const node = this.nodes.get(uuid)
     if (!node) return
     node.step(ev)
@@ -335,6 +355,7 @@ export class Sim {
       send(link        , bytes            ) {
         const l = sim.#links.get(link)
         if (!l || !l.up) return // send into a dead link goes nowhere — exactly like a closed socket
+        if (sim.tap !== null) sim.tap(l.owner, l.peer, link, l.peerLink, l.to !== undefined, bytes)
         if (sim.#partitioned.has(pairKey(l.owner, l.peer))) return
         //! frame trap (severOnFrame): the nth matching frame dies IN the kernel buffer as the link severs —
         // byte [2] of a framed message is the verb (MAGIC | flags | verb), so the peek costs nothing

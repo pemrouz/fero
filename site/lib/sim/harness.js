@@ -10,10 +10,11 @@ import { Sim,            } from './exec.js'
 import { perEvent } from './monitors.js'
 import { REC,          } from '../kernel/env.js'
                                              
+                                             
                                         // type-only: no runtime cycle (shrink imports harness at runtime)
 
 //! cluster — n nodes, full dial mesh (everyone dials everyone: deliberately redundant so the one-link-per-pair dedup is exercised on every formation).
-export const cluster = (sim     , n        , opts                                                                                                                        = {})         => {
+export const cluster = (sim     , n        , opts                                                                                                                                     = {})         => {
   //! id width follows n: lexicographic order IS uuid order (the lowest uuid is the genesis proposer,
   // membership.ts gate) — at n=100 a 2-wide pad would sort n100 between n10 and n11. n≤99 keeps the
   // historical 2-wide ids so every seeded golden stays byte-identical.
@@ -29,6 +30,7 @@ export const cluster = (sim     , n        , opts                               
       durable: opts.durable ?? false, // explicit protocol mode — storage OFF by default (zero persist effects)
       ...(opts.replicas !== undefined ? { replicas: opts.replicas } : {}), // explicit protocol mode — scoping OFF by default (M6)
       ...(opts.validate !== undefined ? { validate: opts.validate } : {}), // the relay's admission predicate — absent by default (every relayed record admitted)
+      ...(opts.door !== undefined ? { door: opts.door } : {}), // the door (DESIGN-DOOR §9) — absent by default: the open wire, every golden byte-identical
       redialMs: 20,
       journalCap: 1 << 16, // capture-grade history: time-travel replay needs the journal un-truncated
     }),
@@ -53,13 +55,14 @@ export const formed = (nodes        )          =>
 
 //! client — a SPOKE (M5b): dials the given members, elects one primary feeder, folds the same
 // replication stream, writes as ae=0 relayed attempts. Convergence checks range over it like any node.
-export const client = (sim     , id        , servers        , opts                           = {})       => {
+export const client = (sim     , id        , servers        , opts                                        = {})       => {
   const c = sim.add({
     uuid: id,
     listen: `sim:${id}`,
     hosts: servers.map((s) => `sim:${s.uuid}`),
     heartbeatMs: opts.heartbeatMs ?? 0,
     client: true,
+    ...(opts.door !== undefined ? { door: opts.door } : {}), // the door (DESIGN-DOOR §9): a secured client proves like a member
     redialMs: 20,
     journalCap: 1 << 16,
   })

@@ -23,6 +23,7 @@
 import { Framer, Outbox, VERB,                            } from './codec.js'
 import { JK,              } from './journal.js'
                                           
+                                          
 
 //! MAX_QUEUED: frames a paused link may hold before drop-oldest kicks in. M0 policy — M1 replaces the drop with spill-to-log (the log IS the retransmit buffer).
 // The default of the tune row `queued` (kernel/tune.ts): a Link has no node, so the node hands its row in at construction (Link.maxQueued).
@@ -32,7 +33,11 @@ export const MAX_QUEUED = 256
 //! LS.diag (M7): the authenticated diagnostics latch — a state, not a field. An LS.diag link is
 // structurally outside membership: never in byUuid/clientLinks, never counted by admitted(), and every
 // admitted-only verb closes it (kernel/diag.ts holds the whole machine). Appended, never renumbered.
-export const LS = { hello: 0, admitted: 1, diag: 2 }         
+//! LS.proving (DESIGN-DOOR §3): the link has read a HELLO that carries `k` and waits for the proof — the
+// peer's HELLO is stashed on the Link, and the link is NOT in byUuid, NOT in clientLinks, NOT counted by
+// admitted(); every admitted-only verb closes it, so it can carry nothing but DOOR. Only a node WITH a
+// door ever puts a link here.
+export const LS = { hello: 0, admitted: 1, diag: 2, proving: 3 }         
 
 export class Link {
   state         = LS.hello
@@ -64,6 +69,21 @@ export class Link {
   // from genesis sweeps, fed by tap-forward when synced (it digests exactly ONE server, its primary, so
   // synced here means "this node is that primary" — the single-feeder ordering guarantee)
   client = false
+  //! methodsOnly (DESIGN-DOOR §4): the peer's HELLO carried `m: 1` — it is a server that takes client
+  // changes only through its methods. Set at admit; a CLIENT reads it live off its primary
+  // (node.feederMethodsOnly) to refuse its own plain writes without the round trip.
+  methodsOnly = false
+  //! the door (DESIGN-DOOR §3, secured nodes only — every field stays at its zero on the open path):
+  // nonce = MY `k` for this link, minted by door.nonce() at linkUp and never reused; said = the HELLO I
+  // sent, the exact object (my proof signs its keys); hello = the peer's HELLO, stashed while proving
+  // and cleared at admit; proved = I shipped my DOOR {p} (only then can a DOOR {e} refuse me; a bare
+  // close while proving is a link loss, never a refusal);
+  // proveTimer = the one-shot TAG.prove timer's id, -1 when none.
+  nonce = ''
+  said                   = null
+  hello                   = null
+  proved = false
+  proveTimer = -1
 
   id        
   dialed         

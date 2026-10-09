@@ -34,6 +34,8 @@ import { Scope, SCOPE } from './scope.js'
 import { diagHello, onDiagQ } from './diag.js'
 import { maybeCompact } from './log.js'
 import { tuneOf,           } from './tune.js'
+import { RING } from './ring.js'
+import { NONCE_MIN, NONCE_MAX, PROOF_LEN, addressOk, contractDiff, prove, verify,                           } from './door.js'
 import { REC, TAG, partitionOf,                                } from './env.js'
 
 //! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
@@ -94,6 +96,22 @@ export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.
                                                                                                    
                                                                                                        
                                         
+                                                                                                     
+                                                                                             
+                                                                                                        
+                                                                                                       
+                                                                                                        
+                                                                                                      
+                   
+                                                                                                     
+                                                                                                   
+                       
+                                                                                                   
+                                                                                                      
+                                                                                                       
+                                                                                                  
+                                                                                                         
+             
                                                                                                        
                                                                                                        
                                                                                                   
@@ -109,6 +127,9 @@ export class Node {
   // resource's port refuses instead of silently merging logs (see NodeOpts.name). Optional: absent
   // (sim harness, embedders) disables the check and keeps the HELLO body byte-identical with v4.0.
            name         
+  //! contract — the full string HELLO carries (NodeOpts.contract + the kernel's `;ring=` part); undefined = no claim
+           contract         
+           methodsOnly         
   //! listen — my dialable address, gossiped in HELLO. Assignable (V4-3): a shell that binds port 0 writes
   // the OS-chosen address here inside its listen callback — before the start stimulus and before any
   // accepted socket can HELLO — and the kernel reads it only at send/propose time. Assignment invalidates
@@ -198,9 +219,10 @@ export class Node {
   // on apply, unlink on sweep), dropCell, tombstone GC and #resetFold; shed walks it instead of
   // scanning every key. No set is ever left empty.
   deep = new Map                     ()
-  //! timers — kernel-minted ids; fired ids not in #timers are stale (cancel raced the fire) and ignored
+  //! timers — kernel-minted ids; fired ids not in #timers are stale (cancel raced the fire) and ignored.
+  // `to` rides a redial, `link` a proving deadline (TAG.prove).
   #timerSeq = 0
-  #timers = new Map                                      ()
+  #timers = new Map                                                     ()
   //! gaveUp distinguishes "parked after the final attempt FAILED" from "the final attempt is still
   // pending" — tries increments at ARM time, so tries alone cannot tell them apart, and a revival
   // during the pending window would orphan the live timer into a second concurrent dial chain
@@ -265,6 +287,8 @@ export class Node {
     this.journal = new Journal(opts.journalCap)
     this.uuid = opts.uuid
     this.name = opts.name
+    this.contract = opts.contract !== undefined ? `${opts.contract};ring=${RING}` : undefined
+    this.methodsOnly = opts.methodsOnly === true
     this.listen = opts.listen ?? ''
     this.incarnation = opts.incarnation ?? 1
     this.origin = this.incarnation > 1 ? `${this.uuid}~${this.incarnation}` : this.uuid
@@ -318,6 +342,10 @@ export class Node {
   // record is admitted; onWrite's relay branch pays one undefined-check per FRAME, nothing per record.
   get validate()                                            { return this.#opts.validate }
 
+  //! door — the secret's two functions (see NodeOpts.door). Absent ⇒ the open door: the HELLO path pays
+  // one undefined-check per HELLO and per linkUp, nothing per record.
+  get door()                   { return this.#opts.door }
+
   //! armed — scoping is LIVE: scoped ∧ a committed view exists. Open genesis (epoch 0) is always
   // unscoped — there is no committed ring to scope against, every node owns its own writes, and the
   // epoch-0 fast path must stay byte-identical (DESIGN-M6 rule 3). Every scoped branch in the
@@ -361,6 +389,11 @@ export class Node {
   // null while unknown (no feeder, a fresh feeder that has not digested yet, or an older server that
   // sends no `w`). One heartbeat behind the feeder at worst; the api's `cluster.writable` on a client.
   feederOpen                 = null
+  //! feederMethodsOnly (DESIGN-DOOR §4) — did the PRIMARY's HELLO say methods-only (`m: 1`)? Read LIVE off
+  // the primary link, never copied at admit: HELLO is sent once per link, so a copy reset on failover
+  // (the feederOpen shape above) could never be refilled. False with no primary, or an old server that
+  // sends no `m`: the write then takes the round trip and the relay's door refuses it as before.
+  get feederMethodsOnly()          { return this.primary !== null && (this.links.get(this.primary)?.methodsOnly ?? false) }
 
   //! clientLinks — the admitted CLIENT links this node serves (maintained at HELLO/linkDown). The
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
@@ -407,6 +440,15 @@ export class Node {
     for (const h of this.hosts) targets.set(h, false)
     for (const [u, listen] of this.membership.view.members) if (u !== this.uuid && listen) targets.set(listen, true)
     return targets
+  }
+
+  //! #held — a live link already reaches `to`: one I dialed there, or one whose peer PROVED (or, on the open
+  // path, claimed at admit) that listen. Facts this node owns, never a closing peer's unproven claim. The
+  // revive loop's rule (a held target is not re-dialed into a dup race), shared with linkDown's
+  // close-while-proving case.
+  #held(to        )          {
+    for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) return true
+    return false
   }
 
   //! step — the single dispatch site. Unknown event kinds fail closed (throw): an unrecognised stimulus is a harness bug, never something to guess at.
@@ -617,12 +659,23 @@ export class Node {
         //! both sides open with HELLO — identity first, before anything routes. Clients declare the
         // role (r:1) so the peer excludes them from genesis and feeds them by tap-forward (M5b).
         // `n` (v4.1) declares the RESOURCE, only when configured — absent keys keep the frame
-        // byte-identical with v4.0 (the sim's byte-identical sweep contract rides on that).
-        link.ship(encodeControl(VERB.HELLO, {
+        // byte-identical with v4.0 (the sim's byte-identical sweep contract rides on that). `c` is the
+        // cluster contract and `m: 1` the methods-only hint (DESIGN-DOOR §2): user-resource servers
+        // only. `k` (§3) is my nonce for this link, minted by the door and kept on the Link — only when
+        // this node has a door. Keys spread in only when present, in the order u, i, l, r, n, c, m, k.
+        // With a door the sent object is kept (link.said): my proof signs exactly these keys.
+        const door = this.door
+        if (door !== undefined) link.nonce = door.nonce()
+        const body            = {
           u: this.uuid, i: this.incarnation, l: this.listen,
           ...(this.client ? { r: 1 } : {}),
           ...(this.name !== undefined ? { n: this.name } : {}),
-        }), this.env.sink, j)
+          ...(this.contract !== undefined ? { c: this.contract } : {}),
+          ...(this.methodsOnly ? { m: 1 } : {}),
+          ...(door !== undefined ? { k: link.nonce } : {}),
+        }
+        if (door !== undefined) link.said = body
+        link.ship(encodeControl(VERB.HELLO, body), this.env.sink, j)
         return
       }
       case 'bytesIn': {
@@ -656,8 +709,21 @@ export class Node {
           return
         }
         this.links.delete(e.link)
+        if (link.proveTimer !== -1) this.#unprove(link)
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
+        //! a bare close while PROVING — before or after my proof — is a LINK LOSS, not a refusal (DESIGN-DOOR
+        // §3, settled at the third review): the door speaks only through DOOR {e}, and a peer that refused
+        // me sent one. A crash, a cut or a reset mid-handshake looks exactly like this close, and with
+        // heartbeats off a park here stranded honest pairs and clients for good (41 of 480 cut-while-forming
+        // pairs, 68 of 210 clients). So: no row, no park, and the ordinary bounded redial chain below — the
+        // same one a link that died before HELLO gets. EXCEPT when the target is already HELD over another
+        // live link (the keeper rule of a crossing dial: the peer admitted me there and closed this one as
+        // the duplicate; its proof may still be in flight behind the close): then there is nothing to
+        // redial. Held is judged on facts this node owns — a live link's proven listen or my own dial
+        // target — never on the uuid the closing peer CLAIMED, which it never proved (the third review's
+        // nit: a stranger at a typed host claiming a held member's uuid was never dialed again).
+        const held = link.state === LS.proving && link.dialed && link.to !== undefined && this.#held(link.to)
         //! M6: a dying teacher aborts every latch it was feeding (window 6 — the buffer drops whole,
         // nothing folded, the next handshake round re-offers from a surviving holder)
         if (this.armed && link.uuid) this.scope .linkDown(this, link.uuid)
@@ -683,7 +749,7 @@ export class Node {
         // eviction is held while this chain runs — see MEMBER_REDIALS. A link that died before HELLO is not.
         // Nor is anything a CLIENT dials: a client evicts nobody, so its chain is no clock, and with
         // heartbeats off a short chain would strand it from a restarting server (review finding).
-        const redialTo = link.noRedial ? '' : link.dialed ? link.to ?? '' : link.listen
+        const redialTo = link.noRedial || held ? '' : link.dialed ? link.to ?? '' : link.listen
         if (redialTo) this.#redial(redialTo, !this.client && link.state === LS.admitted && this.membership.isMember(link.uuid))
         //! a lost member link can flip the write-gate to minority — journal the transition NOW, not at the next tick
         if (link.state === LS.admitted) this.membership.settle(this)
@@ -711,6 +777,16 @@ export class Node {
         if (!meta) return // cancelled — the raced fire is ignored by id, per the Env contract
         this.#timers.delete(e.id)
         if (meta.tag === TAG.redial && meta.to) { j.armed && j.emit(JK.dial, meta.to); this.env.sink.connect(meta.to) }
+        //! the proving deadline (DESIGN-DOOR §3): the peer's HELLO carried `k` and its DOOR never came —
+        // a stranger with a socket, a wrong-secret dialer that went quiet, a lost frame. A link that has
+        // moved on (admitted, dead, gone) is left alone: the fire is stale by then.
+        else if (meta.tag === TAG.prove) {
+          const link = meta.link !== undefined ? this.links.get(meta.link) : undefined
+          if (link === undefined || link.dead || link.state !== LS.proving) return
+          link.proveTimer = -1
+          j.armed && j.emit(JK.doorReject, link.id, 'timeout', link.to ?? '')
+          this.#refuse(link, 'door-timeout')
+        }
         else if (meta.tag === TAG.heartbeat) {
           for (const link of this.links.values())
             //! lower-uuid side originates PINGs (halves N² probe traffic — v2's rule, kept). Paused links
@@ -761,8 +837,7 @@ export class Node {
           for (const [to, member] of this.#revivable()) {
             if (to === this.listen) continue
             if (!this.#backoff.get(to)?.gaveUp) continue // never failed, or the redial chain still owns it
-            let held = false
-            for (const l of this.links.values()) if (!l.dead && (l.to === to || l.listen === to)) { held = true; break }
+            const held = this.#held(to)
             this.#backoff.delete(to)
             if (held) continue
             if (member && !this.client) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: 0, member: true }) // the dial in flight — visible to a park, like discover's
@@ -1111,6 +1186,138 @@ export class Node {
     this.journal.armed && this.journal.emit(JK.redial, delay, to)
   }
 
+  //! #admit — the admit tail (DESIGN-DOOR §3 steps 12-13): the role rule, the duplicate-link rule, admit.
+  // Reached by a HELLO on an OPEN node (nothing to prove) and by a verified DOOR on a secured one, with
+  // the HELLO the link stashed. From here on the HELLO is trusted: with a door it has proved itself;
+  // without one, loopback is the trust boundary (V4-3).
+  #admit(link      , v           ) {
+    const j = this.journal
+    const { r, m } = v
+    //! the role rule (DESIGN-DOOR §3 step 12; with or without a secret). A CLIENT HELLO (r:1) may not
+    // take a MEMBER's uuid: #uuidTaken refuses THIS link and touches nothing else — the member's link
+    // stays up and no dupLink row is written, so a stray FERO_UUID in a client's shell can no longer
+    // knock a member off its peer (the STATUS case). On a secured node that check already ran BEFORE
+    // this node's proof left (the DOOR handler), so here it is a no-op there. The reverse: a non-client
+    // HELLO whose uuid an admitted CLIENT link holds evicts that client link (the row names the
+    // client's link) and continues into admit — a client was never entitled to the uuid. Two client
+    // links with one uuid fall through to the duplicate-link rule as before.
+    if (this.#uuidTaken(link, v)) return
+    let existingId = this.byUuid.get(v.u)
+    {
+      const squatter = existingId !== undefined && existingId !== link.id ? this.links.get(existingId)  : undefined
+      if (r !== 1 && squatter !== undefined && squatter.client) {
+        j.armed && j.emit(JK.doorReject, existingId , 'uuid-taken', v.u)
+        squatter.dead = squatter.noRedial = true
+        this.env.sink.close(existingId , 'uuid-taken')
+        existingId = undefined // admit below; the evicted link's linkDown echo sees byUuid pointing at the new link and leaves it
+      }
+    }
+    if (existingId !== undefined && existingId !== link.id) {
+      const existing = this.links.get(existingId) 
+      //! one-logical-link-per-pair: keep the link dialed by the lower uuid; both ends compute the same winner.
+      // The loser is marked dead+noRedial and closed — its linkDown echo cleans the map; deleting it here
+      // would make the echo look like a failed dial and re-dial the pair back into the race.
+      if (dialedByLower(link, this.uuid, v.u) && !dialedByLower(existing, this.uuid, v.u)) {
+        existing.dead = existing.noRedial = true
+        this.env.sink.close(existingId, 'dup-link')
+        j.armed && j.emit(JK.dupLink, existingId, link.id)
+      } else {
+        link.dead = link.noRedial = true
+        this.env.sink.close(link.id, 'dup-link')
+        j.armed && j.emit(JK.dupLink, link.id, existingId)
+        return
+      }
+    }
+    link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
+    if (r === 1) { link.client = true; this.clientLinks.add(link) }
+    link.methodsOnly = m === 1 // the hint (§4): a client reads it live off its primary (feederMethodsOnly)
+    link.state = LS.admitted
+    if (link.proveTimer !== -1) this.#unprove(link) // the door is behind us: the deadline and the stash go (step 13)
+    this.byUuid.set(v.u, link.id)
+    //! reincarnation fences dead evidence: a peer identifying with a HIGHER incarnation crashed —
+    // its previous life's confirm marks (shippable AND durable tails) may all have regressed, so
+    // they are forgotten before anything recounts over them (M4-review: a replicated probe counted
+    // a peer that provably held nothing; the compaction frontier trusted marks no disk backs).
+    const prevInc = this.#peerInc.get(v.u) ?? 0
+    if (v.i > prevInc) {
+      if (prevInc > 0) { this.confirm.forget(v.u); this.scope?.forget(v.u) }
+      this.#peerInc.set(v.u, v.i)
+    }
+    //! successful identify resets the redial backoff — by OUR dial target AND by the peer's gossiped
+    // listen: when the peer dialed us while our own chain to it was mid-backoff (or a dup-race left
+    // our dialed link the loser), the listen-keyed entry would otherwise orphan with gaveUp unset,
+    // reporting dialing() forever and permanently holding eviction (review finding)
+    if (link.to) this.#backoff.delete(link.to)
+    if (v.l) this.#backoff.delete(v.l)
+    j.armed && j.emit(JK.identified, link.id, v.u, v.i)
+    //! digest-on-admit, ONE opener: the LOWER uuid sends the r=1 digest, the higher answers r=0
+    // (2026-10-06). The rule is direction-independent — it asks who sorts lowest, never who dialed
+    // (v2's dialer-gated catch-up trap is the counterexample) — and it is the PING/floor rule the
+    // heartbeat already uses, so admit, drain and floor are all single-opener exchanges. One r=1
+    // heals BOTH ways: the higher side ships what the opener's tails lack and then replies; that
+    // reply's tails pull what the higher side lacks. Every admit heals — first link,
+    // keeper-after-dup-race, reconnect-after-heal — and each missing suffix ships ONCE. (Both ends
+    // used to open: each r=0 reply was built before the peer's first suffix had landed, so every
+    // suffix shipped twice and the second copy dup-dropped.)
+    // CLIENT exception (M5b): a client digests exactly ONE server — its primary. The first admit
+    // elects it; every other link stays un-digested (and un-answered — see the DIGEST handler), so
+    // synced never rises there and this client has ONE feeder: per-origin ordering by construction.
+    // A server never opens toward a client: the client's own r=1 is what syncs that link.
+    if (this.client) {
+      if (this.primary === null) { this.primary = link.id; this.#sendDigest(link, 1) }
+    } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
+    //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
+    // membership converges even when no epoch-stamped records flow; then settle — an admitted member
+    // can flip the gate back to majority, flushing any parked writes
+    this.membership.onAdmit(this, link)
+    this.membership.settle(this)
+    //! round-on-admit (M6-review findings 13/23/33/40/49 — DESIGN-M6 C3's mandated trigger): the
+    // post-reconnect multi-source window creates interior holes suffix AE cannot fill (they sit
+    // below the scalar lane tail), and a lost install-round offer otherwise re-heals only at the
+    // next install. One batched HAVEQ round per admit re-announces + re-probes; it rides AFTER
+    // the VIEW frame on this same FIFO link (finding 39's ordering rule), so a healed peer
+    // installs the epoch before judging the round's epoch stamp.
+    if (this.armed && !link.client) this.scope .round(this)
+  }
+
+  //! #uuidTaken — the refusing half of the role rule (DESIGN-DOOR §3 step 12): a CLIENT HELLO (r:1) whose
+  // uuid is a committed-view member's (isMember) or is held by an admitted NON-client link. Refuse this
+  // link: doorReject 'uuid-taken', with a door the best-effort notice {e: 'uuid-taken'} (the peer is
+  // proving and can read it; an open node ships nothing — zero new frames on the open path), dead +
+  // noRedial, close. On a secured node it runs BEFORE this node's own proof leaves (the DOOR handler), so
+  // the refused client is still proving when the notice or the close reaches it and journals `refused`
+  // — it is never admitted on its own side first (the review's finding). True = refused, nothing else moved.
+  #uuidTaken(link      , v           )          {
+    if (v.r !== 1) return false
+    const existingId = this.byUuid.get(v.u)
+    const squatter = existingId !== undefined && existingId !== link.id ? this.links.get(existingId)  : undefined
+    if (!this.membership.isMember(v.u) && (squatter === undefined || squatter.client)) return false
+    const j = this.journal
+    j.armed && j.emit(JK.doorReject, link.id, 'uuid-taken', v.u)
+    if (this.door !== undefined) link.ship(encodeControl(VERB.DOOR, { e: 'uuid-taken' }), this.env.sink, j)
+    link.dead = link.noRedial = true
+    this.env.sink.close(link.id, 'uuid-taken')
+    return true
+  }
+
+  //! #refuse — the door's refusal idiom (nameReject's, V4-3): dead + noRedial, and a DIALED target is parked
+  // GIVEN-UP — never a redial chain (that would hammer a misconfigured or hostile port) — so the heartbeat's
+  // give-up revival re-dials it once per heartbeat while it stays in hosts ∪ view: a fixed secret, a fixed
+  // config or a resource that moves onto the right port heals at heartbeat cadence. The caller journals.
+  #refuse(link      , reason        ) {
+    link.dead = link.noRedial = true
+    if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
+    this.env.sink.close(link.id, reason)
+  }
+
+  //! #unprove — the proving deadline is over (admitted, or the link is gone): cancel its timer and drop the stash.
+  #unprove(link      ) {
+    this.#timers.delete(link.proveTimer)
+    this.env.sink.cancel(link.proveTimer)
+    link.proveTimer = -1
+    link.hello = null
+  }
+
   //! #dispatch — per-frame verb routing; fails closed (journal + drop) on unknown verbs so control can never fall into the data path.
   #dispatch(link      , f       ) {
     const j = this.journal
@@ -1127,30 +1334,56 @@ export class Node {
         // BEFORE self-reject/dup-link so a diag client can never perturb byUuid or evict a member by
         // presenting a spoofed uuid; the LS.diag leg catches a re-HELLO on an already-latched session.
         if (link.state === LS.diag || (v                   ).r === 2) return diagHello(this, link, v                           )
+        //! ── the pre-door checks (DESIGN-DOOR §3): shape → diag (above) → a second HELLO → name →
+        // contract → self-reject → the secret matrix → the address rule. None of them touches shared
+        // state (byUuid, #peerInc, clientLinks, membership); only a dialed target may be parked. Then
+        // the proof (stash + DOOR, below), and only a proven HELLO — or any HELLO on an open node —
+        // reaches #admit, the admit tail.
+        //! a second HELLO (§3 step 3), secured nodes only: on a link already proving or admitted it would
+        // replace the stashed nonce and break the proof, so it is dropped and the link lives (the dup
+        // fault re-delivers HELLO; a close here would kill a healthy link). An OPEN node keeps today's
+        // path — a duplicated HELLO re-runs the admit tail — because 14 of the 20 golden seeds re-admit
+        // through the dup fault, and the golden must not move.
+        const door = this.door
+        if (door !== undefined && link.state !== LS.hello) { j.armed && j.emit(JK.frameDrop, link.id, 'hello twice'); return }
         //! resource-name refusal (v4.1): when BOTH ends declare a name and they differ, this link
         // reaches for a DIFFERENT resource — admit it and digest-on-admit would silently cross-
         // replicate two unrelated logs (a durable merge). Refuse loudly instead: dead + noRedial,
         // the same idiom as the self-reject below. One side declaring and the other not is the
         // legacy/embedder case — no check (absent means "no claim", never "any resource").
-        {
-          const n = (v                   ).n
-          if (n !== undefined && typeof n !== 'string') {
-            j.armed && j.emit(JK.frameDrop, link.id, 'malformed hello')
-            link.dead = true
-            return this.env.sink.close(link.id, 'malformed-hello')
-          }
-          if (typeof n === 'string' && this.name !== undefined && n !== this.name) {
-            j.armed && j.emit(JK.nameReject, link.id, n)
-            link.dead = link.noRedial = true
-            //! a DIALED target answering for another resource is parked GIVEN-UP (never a redial chain —
-            // that would hammer a misconfigured port), so the heartbeat's give-up revival re-dials it
-            // once per heartbeat while it stays in hosts ∪ view: a squatter on the rendezvous, or a
-            // resource that moves onto the right port later, heals at heartbeat cadence instead of
-            // stranding this node forever (V4-3 panel: noRedial alone never started a chain, so
-            // revival — which keys on gaveUp — could never reach the target)
-            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
-            return this.env.sink.close(link.id, 'name-mismatch')
-          }
+        const { n, c, m, r, k } = v                                                                       
+        //! the optional keys' shape (§2): `n` a string, `c` a string of 1..256 chars, `m` exactly 1, `k` a
+        // string of 16..64 chars — anything else is a malformed HELLO. An r:2 HELLO never reaches here.
+        if ((n !== undefined && typeof n !== 'string')
+          || (c !== undefined && (typeof c !== 'string' || c.length === 0 || c.length > 256))
+          || (m !== undefined && m !== 1)
+          || (k !== undefined && (typeof k !== 'string' || k.length < NONCE_MIN || k.length > NONCE_MAX))) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'malformed hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'malformed-hello')
+        }
+        if (typeof n === 'string' && this.name !== undefined && n !== this.name) {
+          j.armed && j.emit(JK.nameReject, link.id, n)
+          //! a DIALED target answering for another resource is parked GIVEN-UP (never a redial chain —
+          // that would hammer a misconfigured port), so the heartbeat's give-up revival re-dials it
+          // once per heartbeat while it stays in hosts ∪ view: a squatter on the rendezvous, or a
+          // resource that moves onto the right port later, heals at heartbeat cadence instead of
+          // stranding this node forever (V4-3 panel: noRedial alone never started a chain, so
+          // revival — which keys on gaveUp — could never reach the target). #refuse is that idiom.
+          return this.#refuse(link, 'name-mismatch')
+        }
+        //! the cluster contract (DESIGN-DOOR §4): when BOTH ends carry `c` and the link is not a client
+        // link and the strings differ, the two servers run different cluster config (heartbeat.ms,
+        // replicas, methods, the validation text, the ring) — a mismatch that used to show only as
+        // behaviour. Refuse at the door and name the first key that differs (b) and THEIR value (c),
+        // never ours; the nameReject idiom (dead + noRedial, a dialed target parked gaveUp so heartbeat
+        // revival re-dials it once per heartbeat; a fixed value heals). One side absent → no check (a
+        // client, the sim, an embedder). Runs AFTER the name check (a misdial reads nameReject) and
+        // BEFORE the self-reject and the proof, so a config mistake never reads as a bad secret.
+        if (typeof c === 'string' && this.contract !== undefined && r !== 1 && c !== this.contract) {
+          const [key, theirs] = contractDiff(this.contract, c)
+          j.armed && j.emit(JK.contractReject, link.id, key, theirs)
+          return this.#refuse(link, 'contract-mismatch')
         }
         if (v.u === this.uuid) {
           //! self-reject by uuid — a gossip loop or misconfig dialled ourselves; never redial a self-loop
@@ -1158,72 +1391,94 @@ export class Node {
           link.dead = link.noRedial = true
           return this.env.sink.close(link.id, 'self')
         }
-        const existingId = this.byUuid.get(v.u)
-        if (existingId !== undefined && existingId !== link.id) {
-          const existing = this.links.get(existingId) 
-          //! one-logical-link-per-pair: keep the link dialed by the lower uuid; both ends compute the same winner.
-          // The loser is marked dead+noRedial and closed — its linkDown echo cleans the map; deleting it here
-          // would make the echo look like a failed dial and re-dial the pair back into the race.
-          if (dialedByLower(link, this.uuid, v.u) && !dialedByLower(existing, this.uuid, v.u)) {
-            existing.dead = existing.noRedial = true
-            this.env.sink.close(existingId, 'dup-link')
-            j.armed && j.emit(JK.dupLink, existingId, link.id)
-          } else {
-            link.dead = link.noRedial = true
-            this.env.sink.close(link.id, 'dup-link')
-            j.armed && j.emit(JK.dupLink, link.id, existingId)
-            return
+        const hello = v             
+        //! the secret matrix (§3 step 7): I have a door and the peer sent no `k` → 'no-secret'; I have no
+        // door and the peer sent `k` → 'peer-secret'. Both ends see the mismatch, so both refuse and
+        // both print. The row's c is the dial target, or the listen the peer claimed.
+        if ((door !== undefined) !== (k !== undefined)) {
+          j.armed && j.emit(JK.doorReject, link.id, door !== undefined ? 'no-secret' : 'peer-secret', link.to ?? hello.l)
+          return this.#refuse(link, 'door')
+        }
+        if (door !== undefined) {
+          //! the address rule (§3 step 9, the relay): a DIALED target that is not one of my static hosts
+          // came from the directory or a committed view — both carry the peer's own listen — so the
+          // acceptor must claim exactly the address I dialed, or someone between us is answering for it.
+          if (!addressOk(link, this.#opts.hosts, hello.l)) {
+            j.armed && j.emit(JK.doorReject, link.id, 'address', hello.l)
+            return this.#refuse(link, 'door')
           }
+          //! stash and prove (§3 step 10): the HELLO waits on the Link, the link sits in `proving`
+          // (outside byUuid, clientLinks and admitted(); every admitted-only verb closes it), and a
+          // one-shot deadline is armed. The DIALER proves now; the acceptor proves back only once the
+          // dialer's proof checked out (the DOOR handler) — a stranger that can only connect never
+          // gets a proof to relay.
+          link.hello = hello
+          link.state = LS.proving
+          const id = ++this.#timerSeq
+          link.proveTimer = id
+          this.#timers.set(id, { tag: TAG.prove, link: link.id })
+          this.env.sink.timer(id, TAG.prove, this.tune.proveMs)
+          if (link.dialed) {
+            link.ship(encodeControl(VERB.DOOR, { p: prove(door, link, link.said , hello) }), this.env.sink, j)
+            link.proved = true
+          }
+          return
         }
-        link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
-        if ((v                   ).r === 1) { link.client = true; this.clientLinks.add(link) }
-        link.state = LS.admitted
-        this.byUuid.set(v.u, link.id)
-        //! reincarnation fences dead evidence: a peer identifying with a HIGHER incarnation crashed —
-        // its previous life's confirm marks (shippable AND durable tails) may all have regressed, so
-        // they are forgotten before anything recounts over them (M4-review: a replicated probe counted
-        // a peer that provably held nothing; the compaction frontier trusted marks no disk backs).
-        const prevInc = this.#peerInc.get(v.u) ?? 0
-        if (v.i > prevInc) {
-          if (prevInc > 0) { this.confirm.forget(v.u); this.scope?.forget(v.u) }
-          this.#peerInc.set(v.u, v.i)
+        //! neither side has a door (§3 step 8): the admit tail, as today, plus the role rule
+        return this.#admit(link, hello)
+      }
+      //! DOOR (DESIGN-DOOR §3 step 11): the proof, or a refusal notice. Only a PROVING link may carry one:
+      // before HELLO it is the write-before-hello shape (close); on an admitted link it is a DROP, not a
+      // close, so the dup fault cannot kill a live link. A right-shaped proof that does not verify is
+      // `bad-proof`: a best-effort {e:'denied'} goes out and the link closes, parked if I dialed it. A
+      // proof that verifies ends the wait: the ACCEPTOR sends its own proof FIRST and then admits, so on
+      // this FIFO link the dialer reads the proof before the digest and VIEW that admission ships; the
+      // DIALER (which proved at HELLO time) just admits.
+      case VERB.DOOR: {
+        if (link.state === LS.hello) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'door before hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'door-before-hello')
         }
-        //! successful identify resets the redial backoff — by OUR dial target AND by the peer's gossiped
-        // listen: when the peer dialed us while our own chain to it was mid-backoff (or a dup-race left
-        // our dialed link the loser), the listen-keyed entry would otherwise orphan with gaveUp unset,
-        // reporting dialing() forever and permanently holding eviction (review finding)
-        if (link.to) this.#backoff.delete(link.to)
-        if (v.l) this.#backoff.delete(v.l)
-        j.armed && j.emit(JK.identified, link.id, v.u, v.i)
-        //! digest-on-admit, ONE opener: the LOWER uuid sends the r=1 digest, the higher answers r=0
-        // (2026-10-06). The rule is direction-independent — it asks who sorts lowest, never who dialed
-        // (v2's dialer-gated catch-up trap is the counterexample) — and it is the PING/floor rule the
-        // heartbeat already uses, so admit, drain and floor are all single-opener exchanges. One r=1
-        // heals BOTH ways: the higher side ships what the opener's tails lack and then replies; that
-        // reply's tails pull what the higher side lacks. Every admit heals — first link,
-        // keeper-after-dup-race, reconnect-after-heal — and each missing suffix ships ONCE. (Both ends
-        // used to open: each r=0 reply was built before the peer's first suffix had landed, so every
-        // suffix shipped twice and the second copy dup-dropped.)
-        // CLIENT exception (M5b): a client digests exactly ONE server — its primary. The first admit
-        // elects it; every other link stays un-digested (and un-answered — see the DIGEST handler), so
-        // synced never rises there and this client has ONE feeder: per-origin ordering by construction.
-        // A server never opens toward a client: the client's own r=1 is what syncs that link.
-        if (this.client) {
-          if (this.primary === null) { this.primary = link.id; this.#sendDigest(link, 1) }
-        } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
-        //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
-        // membership converges even when no epoch-stamped records flow; then settle — an admitted member
-        // can flip the gate back to majority, flushing any parked writes
-        this.membership.onAdmit(this, link)
-        this.membership.settle(this)
-        //! round-on-admit (M6-review findings 13/23/33/40/49 — DESIGN-M6 C3's mandated trigger): the
-        // post-reconnect multi-source window creates interior holes suffix AE cannot fill (they sit
-        // below the scalar lane tail), and a lost install-round offer otherwise re-heals only at the
-        // next install. One batched HAVEQ round per admit re-announces + re-probes; it rides AFTER
-        // the VIEW frame on this same FIFO link (finding 39's ordering rule), so a healed peer
-        // installs the epoch before judging the round's epoch stamp.
-        if (this.armed && !link.client) this.scope .round(this)
-        return
+        if (link.state !== LS.proving) { j.armed && j.emit(JK.frameDrop, link.id, 'door out of order'); return }
+        const v = f.value                                
+        //! the peer's notice: it refused my proof, or my uuid. 'denied' and any unknown word read `refused`;
+        // 'uuid-taken' carries a reason this side cannot guess (the uuid this process runs as belongs to a
+        // member there — a shared FERO_UUID), so it keeps its word; c = the dial target either way. The
+        // notice is the ONLY refusal a dialer can read: it is best-effort, and when it is lost the close
+        // that follows is a link loss like any other (the ordinary redial chain, no row — linkDown; the
+        // third review). Only a link I have PROVED on can be refused: a notice before my proof (an
+        // acceptor that is still waiting for the dialer's proof) is out of order — a stranger's frame,
+        // not a refusal — dropped and closed like a malformed DOOR, with no `refused` row.
+        if (typeof v?.e === 'string') {
+          if (!link.proved) {
+            j.armed && j.emit(JK.frameDrop, link.id, 'notice before proof')
+            link.dead = true
+            return this.env.sink.close(link.id, 'malformed-door')
+          }
+          j.armed && j.emit(JK.doorReject, link.id, v.e === 'uuid-taken' ? 'uuid-taken' : 'refused', link.to ?? '')
+          return this.#refuse(link, 'door')
+        }
+        if (typeof v?.p !== 'string' || v.p.length !== PROOF_LEN) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'malformed door')
+          link.dead = true
+          return this.env.sink.close(link.id, 'malformed-door')
+        }
+        const door = this.door , hello = link.hello 
+        if (!verify(door, link, this.uuid, hello, v.p)) {
+          j.armed && j.emit(JK.doorReject, link.id, 'bad-proof', link.to ?? hello.l)
+          link.ship(encodeControl(VERB.DOOR, { e: 'denied' }), this.env.sink, j)
+          return this.#refuse(link, 'door')
+        }
+        if (!link.dialed) {
+          //! the role rule BEFORE my proof (step 12 ahead of step 11's second half): a verified client that
+          // claims a member's uuid is refused while it is still proving, so it reads the notice as `refused`
+          // and never admits this node on its own side first
+          if (this.#uuidTaken(link, hello)) return
+          link.ship(encodeControl(VERB.DOOR, { p: prove(door, link, link.said , hello) }), this.env.sink, j)
+          link.proved = true
+        }
+        return this.#admit(link, hello)
       }
       case VERB.RECORDS: {
         //! identity before admission, ENFORCED (link.ts's claim, adversarial review caught it unguarded):
