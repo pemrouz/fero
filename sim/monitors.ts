@@ -523,7 +523,8 @@ export const drained = (sim: Sim): string | null => {
 //                      releases t for k in p, no node anywhere (member or not), no frame on the wire
 //                      (sim.inflight) and no row on a DOWN node's stored WAL holds a record of k, or of
 //                      a cell under k, stamped below t that N neither contains nor covers. Red today on
-//                      the zombie probe AT THE RELEASE, before the heal shows it.
+//                      the zombie probe AT THE RELEASE, before the heal shows it. M3 and M6 both find the
+//                      releases through Ledger.classify, so each stands alone when the other is off.
 //   M7 floors-agree    (horizon, armed)         at a quiet point every partition's holders report equal
 //                      floors on every lane (I6's horizon form; the cadence bound is the sweep's tail).
 //   M8 bounded-logs    (horizon, armed)         every lane holds at most winners + compactAt entries and
@@ -581,6 +582,7 @@ export class Ledger {
   #left = new Map<string, boolean>()
   #scanned = -1
   #walked = -1
+  #classified = -1
   changed: { id: string; node: Node; cell: string; v: Stamp }[] = []
   vanished: { id: string; node: Node; cell: string; t: Stamp }[] = []
 
@@ -621,7 +623,7 @@ export class Ledger {
 
   //! walk — once per pass: diff every stepped node's versions against its snapshot. `changed` = cells whose
   // stamp object changed and that are PRESENT (M1 and M3 read them); `vanished` = tombstones whose version is
-  // gone with the cell still absent (M3 classifies them: shed, wipe, or a release).
+  // gone with the cell still absent (classify() sorts them: shed, wipe, or a release).
   walk(sim: Sim) {
     if (this.#walked === sim.events) return
     this.#walked = sim.events
@@ -639,6 +641,26 @@ export class Ledger {
       }
       if (snap.size !== n.versions.size)
         for (const [k, t] of snap) if (!n.versions.has(k)) { snap.delete(k); if (!n.state.has(k)) this.vanished.push({ id, node: n, cell: k, t }) }
+    }
+  }
+
+  //! classify — once per pass, after scan and walk: sort every vanished tombstone into a shed (the scope entry left
+  // with it), a wiped fold (condemn, a spoke's resync), or a RELEASE (tombstone GC, the stage-4 release step, or an
+  // injected drop). A release raises `released` (M3 reads it) and queues on `pending` (M6 reads it). Both
+  // monitors call this, so switching either one off leaves the other whole.
+  classify(sim: Sim) {
+    if (this.#classified === sim.events) return
+    this.#classified = sim.events
+    this.scan(sim); this.walk(sim)
+    for (const { id, node: n, cell, t } of this.vanished) {
+      if (n.tainted || n.client) continue
+      const p = (JSON.parse(cell) as string[])[0] ?? ''
+      if (n.scope && !n.scope.entries.has(p)) continue
+      if (n.logs.size === 0 && n.state.size === 0) continue
+      const was = this.released.get(cell)
+      if (was === undefined || newer(t.epoch, t.seq, t.origin, was)) this.released.set(cell, t)
+      this.counts.releases++
+      this.pending.push({ node: n, id, cell, p, t })
     }
   }
 
@@ -738,19 +760,7 @@ export const scaleMonitors = () => [
     name: 'release-safety',
     check: (sim: Sim): string | null => {
       const L = ledgerOf(sim)
-      L.scan(sim); L.walk(sim)
-      //! classify every vanished tombstone: a shed (the scope entry left with it), a wiped fold (condemn, a spoke's
-      // resync), or a RELEASE — tombstone GC, the stage-4 release step, or an injected drop
-      for (const { id, node: n, cell, t } of L.vanished) {
-        if (n.tainted || n.client) continue
-        const p = (JSON.parse(cell) as string[])[0] ?? ''
-        if (n.scope && !n.scope.entries.has(p)) continue
-        if (n.logs.size === 0 && n.state.size === 0) continue
-        const was = L.released.get(cell)
-        if (was === undefined || newer(t.epoch, t.seq, t.origin, was)) L.released.set(cell, t)
-        L.counts.releases++
-        L.pending.push({ node: n, id, cell, p, t })
-      }
+      L.classify(sim)
       for (const { id, cell, v } of L.changed) {
         const path = JSON.parse(cell) as string[]
         for (let d = path.length; d >= 1; d--) {
@@ -816,6 +826,8 @@ export const scaleMonitors = () => [
     name: 'census-truth',
     check: (sim: Sim): string | null => {
       const L = ledgerOf(sim)
+      //! M6 finds the releases itself: it does not lean on M3 having run first, so each monitor stands alone
+      L.classify(sim)
       if (!L.pending.length) return null
       const rels = L.pending.splice(0)
       for (const { node: N, id, cell, p, t } of rels) {
