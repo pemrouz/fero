@@ -430,6 +430,90 @@ test('the role rule (DESIGN-DOOR §3 step 12): a CLIENT composed with a MEMBER\'
   }
 })
 
+test('the cluster contract (DESIGN-DOOR §4): heartbeat.ms 500 against 250 → contractReject on BOTH ends naming heartbeat.ms and the other side\'s value; never linked; a fixed value heals', async () => {
+  const p = await ports.free()
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 500 }, redial: { ms: 30 } })
+  const b = await fero('r', { uuid: 'bb', server: true, hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 250 }, redial: { ms: 30 } })
+  const rows = (f: typeof a) => diag(f)!.journal().events.filter((e) => e.kind === JK.contractReject).map((e) => [e.b, e.c])
+  let b2: Awaited<ReturnType<typeof fero>> | null = null
+  try {
+    assert.ok(await until(() => rows(a).length > 0 && rows(b).length > 0, 8000), 'both journals carry the refusal')
+    assert.deepEqual(rows(a)[0], ['heartbeat.ms', '250'], 'aa names the key and bb\'s value')
+    assert.deepEqual(rows(b)[0], ['heartbeat.ms', '500'], 'bb names the key and aa\'s value')
+    assert.deepEqual((snapshot(a.cluster) as { peers: object }).peers, {}, 'never admitted on aa')
+    assert.deepEqual((snapshot(b.cluster) as { peers: object }).peers, {}, 'never admitted on bb')
+    assert.equal(diag(a)!.journal().events.some((e) => e.kind === JK.identified), false, 'no identified row: the check runs before admit')
+    //! bb restarts with the right value: the two form at the next heartbeat (aa's parked target is revived)
+    await b.destroy()
+    b2 = await fero('r', { uuid: 'bb', server: true, hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 500 }, redial: { ms: 30 } })
+    assert.ok(await until(() => Object.keys((snapshot(a.cluster) as { members: object }).members).length === 2, 8000), 'the fixed member joins')
+  } finally {
+    await b2?.destroy()
+    await b.destroy()
+    await a.destroy()
+  }
+})
+
+test('the cluster contract: a different validation rule names `validation` — under methods: too (the V4-5 pair) — and a bound or native validator is refused at fero() time', async () => {
+  const p = await ports.free()
+  const rule1 = (r: { value?: { stock?: number } }) => (r.value?.stock ?? 0) >= 0 || 'negative stock'
+  const rule2 = (r: { value?: { stock?: number } }) => (r.value?.stock ?? 0) >= 1 || 'no stock'
+  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 }, validation: rule1, methods: { sell: () => 1 } })
+  const b = await fero('r', { uuid: 'bb', server: true, hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, validation: rule2, methods: { sell: () => 1 } })
+  const rows = (f: typeof a) => diag(f)!.journal().events.filter((e) => e.kind === JK.contractReject).map((e) => e.b)
+  try {
+    assert.ok(await until(() => rows(a).length > 0 && rows(b).length > 0, 8000), 'both refuse')
+    assert.deepEqual([rows(a)[0], rows(b)[0]], ['validation', 'validation'], 'the validator text differs, even with the door on')
+    assert.deepEqual((snapshot(a.cluster) as { peers: object }).peers, {})
+  } finally {
+    await b.destroy()
+    await a.destroy()
+  }
+  //! a validator whose source is [native code] would hash alike for two different rules: refused in plain words
+  await assert.rejects(fero('r', { listen: false, validation: rule1.bind(null) as never }), /validation must be a plain function whose source is visible/)
+})
+
+test('the methods-only hint (DESIGN-DOOR §4): a client whose feeder said m: 1 refuses its own plain writes LOCALLY — a rejected row, no pending row, no round trip; methods.update rejects at once with the same WriteRejectError; a write before the first admit is still refused remotely', async () => {
+  const p = await ports.free()
+  const s = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { stock: 3 }, methods: { sell: () => 1 } })
+  const c = await fero('r', { uuid: 'zz', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  type Row = { key: string; state: string; reason?: string }
+  const rows = (f: typeof c) => Object.values(f.cluster.writes.snapshot() as Record<string, Row>)
+  const nacks = (f: typeof c) => diag(f)!.journal().events.filter((e) => e.kind === JK.writeNack).length
+  let early: Awaited<ReturnType<typeof fero>> | null = null
+  try {
+    assert.ok(await until(() => (snapshot(c.cluster) as { me: { primary: string | null } }).me.primary !== null, 8000), 'the client is fed')
+    const states: string[] = []
+    c.cluster.writes.tap(() => { states.push(rows(c).map((r) => r.state).join()) })
+    states.length = 0
+    c.data.x = 1
+    await Promise.resolve()
+    assert.deepEqual(rows(c).map((r) => [r.state, r.reason]), [['rejected', 'methods-only']], 'refused in the same tick — the hint, not the round trip')
+    await sleep(200)
+    assert.ok(states.every((s) => !s.includes('pending')), `no pending row was ever shown (${JSON.stringify(states)})`)
+    assert.equal(nacks(c), 0, 'nothing went to the relay: no WNACK came back')
+    assert.equal((snapshot(s.data) as { x?: number }).x, undefined, 'and nothing landed')
+    //! the write methods: the SAME WriteRejectError the relay's refusal throws today
+    const t0 = Date.now()
+    await assert.rejects(c.methods.update({ key: 'stock', value: 1 }, { timeout: 8000 }),
+      (e: WriteRejectError) => e instanceof WriteRejectError && e.reached === 'issued' && e.reason === 'methods-only' && /the server takes changes only through its methods/.test(e.message))
+    assert.ok(Date.now() - t0 < 1000, 'at once')
+    assert.equal(nacks(c), 0)
+    //! the door is still the guard: a write issued BEFORE the first admit knows nothing, goes to the relay,
+    // and comes back refused the old way (one WNACK)
+    early = await fero('r', { uuid: 'yy', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, signals: false })
+    if ((snapshot(early.cluster) as { me: { primary: string | null } }).me.primary === null) {
+      early.data.y = 1
+      assert.ok(await until(() => rows(early!).some((r) => r.state === 'rejected' && r.reason === 'methods-only'), 8000), 'refused at the relay')
+      assert.equal(nacks(early), 1, 'this one took the round trip')
+    }
+  } finally {
+    await early?.destroy()
+    await c.destroy()
+    await s.destroy()
+  }
+})
+
 test('v4.1 uuid discipline: empty and lane-separator uuids refuse at fero() time', async () => {
   await assert.rejects(fero('r', { uuid: '' }), /uuid must be a non-empty string/)
   await assert.rejects(fero('r', { uuid: 'a~1' }), /without '~'/)

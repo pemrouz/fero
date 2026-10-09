@@ -58,6 +58,12 @@ test('control frames carry one value; HELLO shape round-trips', () => {
   const f = new Framer().push(encodeControl(VERB.HELLO, { u: 'abc', i: 3, l: 'h:1' }))[0]
   assert.equal(f.verb, VERB.HELLO)
   assert.deepEqual(f.value, { u: 'abc', i: 3, l: 'h:1' })
+  //! the door's optional keys (DESIGN-DOOR §2): `c` the cluster contract (a string), `m: 1` the
+  // methods-only hint — generic object keys, so an old decoder keeps and ignores them
+  const full = { u: 'abc', i: 3, l: 'h:1', r: 1, n: 'shop', c: 'v1;heartbeat.ms=500;replicas=0;methods=1;validation=none;ring=fmix32', m: 1 }
+  const g = new Framer().push(encodeControl(VERB.HELLO, full))[0]
+  assert.deepEqual(g.value, full)
+  assert.deepEqual(Object.keys(g.value as object), ['u', 'i', 'l', 'r', 'n', 'c', 'm'], 'key order is the send site\'s insertion order')
 })
 
 test('framer reassembles frames split at EVERY byte boundary', () => {
