@@ -313,7 +313,10 @@ export class Node {
         for (const [p, sd] of Object.entries(parts)) {
           if (this.bootDirty.has(p)) continue
           const pe = this.streams.for(origin).part(p)
-          pe.s = sd[0]
+          //! capped at the durable floor (DESIGN-SCALE §2, the A4 seed probe): the boot record is written
+          // synchronously while WAL rows are fsynced later, so its possession half can claim rows a crash
+          // tore off. Only `d` is backed by rows the disk restored; replay advances `s` from there.
+          pe.s = Math.min(sd[0], sd[1])
           pe.d = sd[1]
         }
     if ((opts.replicas ?? 0) > 0) this.scope = new Scope() // (this.#opts assigns below — read opts directly)
