@@ -683,6 +683,11 @@ test('the door: the role rule holds WITH a secret — a client that holds the se
       assert.deepEqual(Object.keys(view(a).members).sort(), ['aa', 'bb'])
       assert.ok('bb' in view(a).peers && 'aa' in view(b).peers, 'the member\'s link is alive on both ends')
       assert.deepEqual(snapshot(c.data), {}, 'the refused client never received the seed: it was refused before any digest')
+      //! the client's own side: the role rule ran BEFORE the server's proof, so the client was still proving when
+      // the notice (or the close) reached it — its row reads refused, naming the dial target; it never admitted aa
+      assert.ok(await until(() => doorRows(c!).length > 0, 8000), 'the client has its own row')
+      assert.ok(doorRows(c!).every(([r, to]) => r === 'refused' && to === `127.0.0.1:${p}`), `refused, the dial target: ${JSON.stringify(doorRows(c!))}`)
+      assert.equal(view(c!).me.primary, null, 'never admitted the server on its own side')
       a.data.k = 1
       assert.ok(await until(() => (snapshot(b.data) as { k?: number }).k === 1, 8000), 'replication between the members is intact')
     } finally {
