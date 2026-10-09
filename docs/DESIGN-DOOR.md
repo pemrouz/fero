@@ -136,6 +136,44 @@ debug attach (r:2) on a secured node — with the token, a wrong token, on a pro
 link — is now pinned by tests (the behaviour was right). Nothing printed by an
 example changed.*
 
+*Settled at the second review (2026-10-09): a second skeptic read the fixed door
+and found one major, three minors and three nits; each was checked and
+confirmed, and each fix is red without its change. (1) THE HONEST CROSSING DIAL
+WROTE A REFUSAL: when two secured members dial each other at once, the acceptor
+on the losing link ships its proof and closes that link as the duplicate in one
+step; the sim posts a close after the minimum delay and bytes after a random one,
+so the close can reach the dialer first. The dialer was still proving with its
+proof sent — the shape of a refusal — so it journaled `refused` against an honest
+member and parked it given-up (7 of 8 seeds of a two-node formation; with
+heartbeats off nothing clears a park, so that side never re-dialed the peer after
+a cut). Now linkDown reads the uuid the stashed HELLO claimed: when `byUuid`
+already holds a live admitted link to it, the close is the peer's keeper rule —
+no row, no park, no redial. A close with no other link to the peer is still
+`refused`, as "close-while-proving" below says. A kernel test feeds the loser's
+linkDown while proving; a sim test runs 240 honest formations and a cut with
+heartbeats off. The 104,050 pin did not move (the row and the park were never
+events, and the loser never re-dialed either way). (2) A `refused` row written at
+linkDown came after the link left the table, so its line printed a dialed target
+as "a peer that connected" and deduped across every target: for `refused` and
+`timeout` the row's `c` IS the dial target, a fact this node owns, so the printer
+reads it off the row when the table misses. (3) A dialed contract mismatch deduped
+on the differing key's name, which the peer chooses; it keys on the kind and the
+target now, as the inbound branch did. (4) A client with the right secret and a
+member's uuid printed "the secrets probably differ" — the kernel had read
+`{e: 'uuid-taken'}` and dropped the word. A DEVIATION from stage 2's note 2 ("the
+dialer journals `refused`, not the notice's word"): that ONE word is kept —
+`doorReject 'uuid-taken'` with `c` = the dial target — because it is a reason this
+side cannot guess and the line can name the fix (`FERO_UUID`); `denied`, any other
+word and a bare close still read `refused`, so a lost notice reads as before. (5) A
+reverse-order relay test (the relay holds the victim's HELLO before the member
+dials it) sits beside the rewrite relay. (6) README's limits name the static-host
+relay. (7) The wire card's proof gloss names the claimed address. Not fixed, stated
+for STATUS: on the secured path a crossing dial costs one extra dial — the dialer
+whose accepted link the peer closed as the duplicate starts a member redial chain
+before its own dialed link's proof lands (the open path marks that loser itself at
+admit); the extra link is closed as a duplicate at once. It is inside the 104,050
+count. Nothing printed by an example changed.*
+
 ## §0 The decision, in ten lines
 
 1. HELLO grows once, by three optional keys: `c` (the cluster contract, a
@@ -390,7 +428,13 @@ only on secured links, so it draws nothing on the open path.
 A link that closes while proving, AFTER I sent my proof: the dialer journals
 `doorReject 'refused'` and parks. It is a guess (a crash mid-handshake looks
 the same), so the stderr line says so: *closed during the handshake; if this
-repeats every heartbeat the secrets probably differ*.
+repeats every heartbeat the secrets probably differ*. One close is not a
+guess: when the stashed HELLO's uuid is already held by a live admitted link
+in `byUuid`, the peer closed this link as the duplicate of a crossing dial
+(its proof may still be in flight behind the close) — no row, no park, no
+redial (settled at the second review, 2026-10-09). A `DOOR { e: 'uuid-taken' }`
+read while proving keeps its word: `doorReject 'uuid-taken'` with `c` = the
+dial target; `{ e: 'denied' }` reads `refused` like a close.
 
 ### Replay and forgery, step by step
 
@@ -448,7 +492,7 @@ repeats every heartbeat the secrets probably differ*.
 | kind | a | b | c |
 |---|---|---|---|
 | `contractReject: 77` | link | the first key that differs, or `missing:<key>` | their value for it (a string, never ours) |
-| `doorReject: 78` | link | `'no-secret'` · `'peer-secret'` · `'bad-proof'` · `'uuid-taken'` · `'address'` · `'timeout'` · `'refused'` | the dial target or the claimed listen; for `uuid-taken` the uuid |
+| `doorReject: 78` | link | `'no-secret'` · `'peer-secret'` · `'bad-proof'` · `'uuid-taken'` · `'address'` · `'timeout'` · `'refused'` | the dial target or the claimed listen; for `uuid-taken` the uuid on the refusing side, the dial target on the refused client |
 
 Never in a row: the secret, a nonce, a proof. The journal's 4096 ring
 (kernel/journal.ts:127) fills in about 34 minutes if two mis-keyed members
@@ -464,6 +508,7 @@ fero('shop'): refused 127.0.0.1:4100 (uuid 9e1c) — its secret differs from thi
 fero('shop'): refused 127.0.0.1:4100 — closed during the handshake; if this repeats every heartbeat the secrets probably differ
 fero('shop'): refused 127.0.0.1:4100 — it answered as 127.0.0.1:4200, not the address the directory gave (a stale or forged entry)
 fero('shop'): refused a client claiming uuid 7c3e — that uuid belongs to a member (a shared FERO_UUID?)
+fero('shop'): refused by 127.0.0.1:4100 — the uuid this process runs as, 7c3e, belongs to a member there (a shared FERO_UUID?)
 fero('shop'): refused 127.0.0.1:4101 (uuid 9e1c) — the cluster contract differs: heartbeat.ms is 500 here, 250 there (every member must agree on heartbeat.ms, replicas, methods, validation and ring)
 ```
 
