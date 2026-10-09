@@ -64,6 +64,10 @@ export class Link {
   // from genesis sweeps, fed by tap-forward when synced (it digests exactly ONE server, its primary, so
   // synced here means "this node is that primary" — the single-feeder ordering guarantee)
   client = false
+  //! methodsOnly (DESIGN-DOOR §4): the peer's HELLO carried `m: 1` — it is a server that takes client
+  // changes only through its methods. Set at admit; a CLIENT reads it live off its primary
+  // (node.feederMethodsOnly) to refuse its own plain writes without the round trip.
+  methodsOnly = false
 
   id: number
   dialed: boolean

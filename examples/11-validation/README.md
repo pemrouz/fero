@@ -31,11 +31,12 @@ CLIENT 1623681
 - The rule says what a record may look like, never who may write it. Any client may write any row:
   `methods:` (08) is the door for that, and behind it a handler's own write the rule refuses fails the call
   with `write refused (["axe"]): negative stock`. Servers trust each other's writes, so every server must
-  carry the rule — the last line below is one that does not.
+  carry the same rule — a server without it is refused at the door, because the cluster contract differs
+  (`validation`); the last line below is one that does not.
 
 ```sh
 node client.ts                     # again: another saw on every screen, another hammer refused
-node client.ts --fero.server=true  # the same file as a server: it carries no rule, so its hammer lands
+node client.ts --fero.server=true  # the same file as a server: it carries no rule, so the shop refuses to link with it (contractReject: validation)
 ```
 
 `node check.ts` runs this story on its own and ends with `ok 11-validation`, in about five seconds.

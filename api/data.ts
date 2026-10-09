@@ -33,6 +33,13 @@ import { proxy, applyRec, lens, holeAt, SPARSE_HOLE } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
+//! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
+// the relay's WNACK as the validator's "reason" and so lands in the same outcome row and the same
+// WriteRejectError as any refused write. Since DESIGN-DOOR §4 a client whose feeder's HELLO carried the
+// methods-only hint gives the same reason LOCALLY in issue(), before the round trip. Defined here (the
+// composer re-exports it) because issue() is the one place that speaks it on a client.
+export const METHODS_ONLY = 'methods-only'
+
 //! cellOf — the version-key normalization, byte-identical to the kernel's (node.apply): a record's
 // LWW cell is its key path, or [at] for a root insert.
 export const cellOf = (r: Rec): string => JSON.stringify(r.key.length ? r.key : [r.at ?? ''])
@@ -214,6 +221,18 @@ export class Bind {
   issue(recs: Rec[]): Issued {
     const node = this.#rt.node
     const out: Issued = new Array(recs.length)
+    //! the door, read ONCE per batch (DESIGN-DOOR §4): a CLIENT whose primary said methods-only (`m: 1`
+    // in its HELLO) refuses every record of the batch here, before the validator runs — an outcome row
+    // `rejected` with the door's reason, nothing shipped, no `pending` row: the same refusal the relay
+    // would send back a round trip later (V4-5), so a program cannot tell the two apart except by time.
+    // One boolean on servers (node.client), one property read on clients; nothing per record.
+    if (node.client && node.feederMethodsOnly) {
+      for (let i = 0; i < recs.length; i++) {
+        out[i] = METHODS_ONLY
+        this.#outcome({ key: cellOf(recs[i]), state: 'rejected', reason: METHODS_ONLY })
+      }
+      return out
+    }
     const valid: Rec[] = []
     const t = this.#tracked?.()
     for (let i = 0; i < recs.length; i++) {

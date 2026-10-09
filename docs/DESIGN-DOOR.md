@@ -7,6 +7,26 @@ angle). Where a skeptic disagreed with a proposal, this record sides with the
 evidence and says so. Every file:line below was read on the tree at
 `364e5ee`. The DECISIONS number is assigned at landing.*
 
+*Built, stage 1 of 3 (2026-10-09): commits 1 and 2 of §13 — the role rule, then
+the contract and the methods-only hint. No secret, no nonce, no DOOR verb yet.
+What landed as designed: `doorReject: 78` ('uuid-taken'), `contractReject: 77`,
+`RING`, `NodeOpts.contract` / `methodsOnly`, `link.methodsOnly`,
+`node.feederMethodsOnly` read live, the per-batch door read in `Bind.issue`, the
+composer's contract string for user-resource servers, the `[native code]`
+refusal, the handler split (pre-door checks → the admit tail) with the seam
+commented, 11's prose, the README drift rule, the wire card's `c` and `m`.
+Deviations, each small: (1) `contractReject` and its glossary entry land in
+commit 2, not 1 — the glossary gate refuses an entry for a kind the kernel does
+not emit yet; the fold model learned both kinds in commit 1. (2) The shape
+check for `c` and `m` sits with `n`'s, AFTER the diag branch, not before it as
+step 1 lists — so an r:2 HELLO's `c` is never read, as §4 asks, and `n` keeps
+its v4.1 position. (3) `missing:<key>` carries THEIR value when we lack the key
+and `''` when they lack it. (4) The wire card gains `c` and `m` only; `k` and the
+DOOR row wait for stage 3, since the site must not describe a frame the kernel
+does not send yet; `site/index.html` did not change (it links the section
+script). (5) `METHODS_ONLY` moved to api/data.ts (re-exported from api/index.ts
+unchanged) because `issue()` now speaks it and data.ts cannot import index.ts.*
+
 ## §0 The decision, in ten lines
 
 1. HELLO grows once, by three optional keys: `c` (the cluster contract, a

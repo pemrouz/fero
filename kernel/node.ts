@@ -34,6 +34,7 @@ import { Scope, SCOPE } from './scope.ts'
 import { diagHello, onDiagQ } from './diag.ts'
 import { maybeCompact } from './log.ts'
 import { tuneOf, type Tune } from './tune.ts'
+import { RING } from './ring.ts'
 import { REC, TAG, partitionOf, type Env, type Event, type Rec } from './env.ts'
 
 //! the three node-level defaults live in kernel/tune.ts (it is imported here, so defining them here
@@ -94,6 +95,16 @@ export interface NodeOpts {
   // (ae > 0) peer attempts are NOT re-validated: the issuing server already ran its validator, and
   // peers are trusted at this layer — same code, same config (the deployer's contract, like replicas).
   validate?: (rec: Rec) => true | string
+  //! contract (DESIGN-DOOR §4): the cluster contract this SERVER's HELLO carries as `c` — a readable
+  // string of the config every member must share (`v1;heartbeat.ms=500;replicas=0;methods=0;
+  // validation=none`), built by the api; the kernel appends `;ring=fmix32` (kernel/ring.ts RING) so the
+  // ring label cannot drift from the ring code. When BOTH ends of a non-client link carry one and they
+  // differ, the link refuses at the door (JK.contractReject names the first key that differs). Absent =
+  // no claim, no check (clients, the #directory, the sim, embedders: the HELLO stays the v4.0 bytes).
+  contract?: string
+  //! methodsOnly (DESIGN-DOOR §4): this server takes client changes only through its methods — HELLO
+  // carries `m: 1` so a client refuses its own plain writes locally instead of after a round trip.
+  methodsOnly?: boolean
   //! tune (the tune table, kernel/tune.ts): per-node overrides of the kernel's bounds and tick counts.
   // Absent = the defaults, which equal the old constants (trajectories stay byte-identical). Validated
   // once in the constructor and frozen: an unknown row or a non-integer or negative value throws.
@@ -109,6 +120,9 @@ export class Node {
   // resource's port refuses instead of silently merging logs (see NodeOpts.name). Optional: absent
   // (sim harness, embedders) disables the check and keeps the HELLO body byte-identical with v4.0.
   readonly name?: string
+  //! contract — the full string HELLO carries (NodeOpts.contract + the kernel's `;ring=` part); undefined = no claim
+  readonly contract?: string
+  readonly methodsOnly: boolean
   //! listen — my dialable address, gossiped in HELLO. Assignable (V4-3): a shell that binds port 0 writes
   // the OS-chosen address here inside its listen callback — before the start stimulus and before any
   // accepted socket can HELLO — and the kernel reads it only at send/propose time. Assignment invalidates
@@ -265,6 +279,8 @@ export class Node {
     this.journal = new Journal(opts.journalCap)
     this.uuid = opts.uuid
     this.name = opts.name
+    this.contract = opts.contract !== undefined ? `${opts.contract};ring=${RING}` : undefined
+    this.methodsOnly = opts.methodsOnly === true
     this.listen = opts.listen ?? ''
     this.incarnation = opts.incarnation ?? 1
     this.origin = this.incarnation > 1 ? `${this.uuid}~${this.incarnation}` : this.uuid
@@ -361,6 +377,11 @@ export class Node {
   // null while unknown (no feeder, a fresh feeder that has not digested yet, or an older server that
   // sends no `w`). One heartbeat behind the feeder at worst; the api's `cluster.writable` on a client.
   feederOpen: boolean | null = null
+  //! feederMethodsOnly (DESIGN-DOOR §4) — did the PRIMARY's HELLO say methods-only (`m: 1`)? Read LIVE off
+  // the primary link, never copied at admit: HELLO is sent once per link, so a copy reset on failover
+  // (the feederOpen shape above) could never be refilled. False with no primary, or an old server that
+  // sends no `m`: the write then takes the round trip and the relay's door refuses it as before.
+  get feederMethodsOnly(): boolean { return this.primary !== null && (this.links.get(this.primary)?.methodsOnly ?? false) }
 
   //! clientLinks — the admitted CLIENT links this node serves (maintained at HELLO/linkDown). The
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
@@ -617,11 +638,15 @@ export class Node {
         //! both sides open with HELLO — identity first, before anything routes. Clients declare the
         // role (r:1) so the peer excludes them from genesis and feeds them by tap-forward (M5b).
         // `n` (v4.1) declares the RESOURCE, only when configured — absent keys keep the frame
-        // byte-identical with v4.0 (the sim's byte-identical sweep contract rides on that).
+        // byte-identical with v4.0 (the sim's byte-identical sweep contract rides on that). `c` is the
+        // cluster contract and `m: 1` the methods-only hint (DESIGN-DOOR §2): user-resource servers
+        // only, keys spread in only when present, in the order u, i, l, r, n, c, m.
         link.ship(encodeControl(VERB.HELLO, {
           u: this.uuid, i: this.incarnation, l: this.listen,
           ...(this.client ? { r: 1 } : {}),
           ...(this.name !== undefined ? { n: this.name } : {}),
+          ...(this.contract !== undefined ? { c: this.contract } : {}),
+          ...(this.methodsOnly ? { m: 1 } : {}),
         }), this.env.sink, j)
         return
       }
@@ -1127,30 +1152,51 @@ export class Node {
         // BEFORE self-reject/dup-link so a diag client can never perturb byUuid or evict a member by
         // presenting a spoofed uuid; the LS.diag leg catches a re-HELLO on an already-latched session.
         if (link.state === LS.diag || (v as { r?: unknown }).r === 2) return diagHello(this, link, v as Record<string, unknown>)
+        //! ── the pre-door checks (DESIGN-DOOR §3): shape → diag (above) → name → contract → self-reject.
+        // None of them touches shared state (byUuid, #peerInc, clientLinks, membership); only a dialed
+        // target may be parked. The door commit inserts the proof BETWEEN this block and the admit tail
+        // below, so keep the seam: everything up to the self-reject runs on an unproven HELLO.
         //! resource-name refusal (v4.1): when BOTH ends declare a name and they differ, this link
         // reaches for a DIFFERENT resource — admit it and digest-on-admit would silently cross-
         // replicate two unrelated logs (a durable merge). Refuse loudly instead: dead + noRedial,
         // the same idiom as the self-reject below. One side declaring and the other not is the
         // legacy/embedder case — no check (absent means "no claim", never "any resource").
-        {
-          const n = (v as { n?: unknown }).n
-          if (n !== undefined && typeof n !== 'string') {
-            j.armed && j.emit(JK.frameDrop, link.id, 'malformed hello')
-            link.dead = true
-            return this.env.sink.close(link.id, 'malformed-hello')
-          }
-          if (typeof n === 'string' && this.name !== undefined && n !== this.name) {
-            j.armed && j.emit(JK.nameReject, link.id, n)
-            link.dead = link.noRedial = true
-            //! a DIALED target answering for another resource is parked GIVEN-UP (never a redial chain —
-            // that would hammer a misconfigured port), so the heartbeat's give-up revival re-dials it
-            // once per heartbeat while it stays in hosts ∪ view: a squatter on the rendezvous, or a
-            // resource that moves onto the right port later, heals at heartbeat cadence instead of
-            // stranding this node forever (V4-3 panel: noRedial alone never started a chain, so
-            // revival — which keys on gaveUp — could never reach the target)
-            if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
-            return this.env.sink.close(link.id, 'name-mismatch')
-          }
+        const { n, c, m, r } = v as { n?: unknown; c?: unknown; m?: unknown; r?: unknown }
+        //! the optional keys' shape (§2): `n` a string, `c` a string of 1..256 chars, `m` exactly 1 —
+        // anything else is a malformed HELLO. An r:2 HELLO never reaches here (the diag branch ran).
+        if ((n !== undefined && typeof n !== 'string')
+          || (c !== undefined && (typeof c !== 'string' || c.length === 0 || c.length > 256))
+          || (m !== undefined && m !== 1)) {
+          j.armed && j.emit(JK.frameDrop, link.id, 'malformed hello')
+          link.dead = true
+          return this.env.sink.close(link.id, 'malformed-hello')
+        }
+        if (typeof n === 'string' && this.name !== undefined && n !== this.name) {
+          j.armed && j.emit(JK.nameReject, link.id, n)
+          link.dead = link.noRedial = true
+          //! a DIALED target answering for another resource is parked GIVEN-UP (never a redial chain —
+          // that would hammer a misconfigured port), so the heartbeat's give-up revival re-dials it
+          // once per heartbeat while it stays in hosts ∪ view: a squatter on the rendezvous, or a
+          // resource that moves onto the right port later, heals at heartbeat cadence instead of
+          // stranding this node forever (V4-3 panel: noRedial alone never started a chain, so
+          // revival — which keys on gaveUp — could never reach the target)
+          if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
+          return this.env.sink.close(link.id, 'name-mismatch')
+        }
+        //! the cluster contract (DESIGN-DOOR §4): when BOTH ends carry `c` and the link is not a client
+        // link and the strings differ, the two servers run different cluster config (heartbeat.ms,
+        // replicas, methods, the validation text, the ring) — a mismatch that used to show only as
+        // behaviour. Refuse at the door and name the first key that differs (b) and THEIR value (c),
+        // never ours; the nameReject idiom (dead + noRedial, a dialed target parked gaveUp so heartbeat
+        // revival re-dials it once per heartbeat; a fixed value heals). One side absent → no check (a
+        // client, the sim, an embedder). Runs AFTER the name check (a misdial reads nameReject) and
+        // BEFORE the self-reject and the proof, so a config mistake never reads as a bad secret.
+        if (typeof c === 'string' && this.contract !== undefined && r !== 1 && c !== this.contract) {
+          const [key, theirs] = contractDiff(this.contract, c)
+          j.armed && j.emit(JK.contractReject, link.id, key, theirs)
+          link.dead = link.noRedial = true
+          if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
+          return this.env.sink.close(link.id, 'contract-mismatch')
         }
         if (v.u === this.uuid) {
           //! self-reject by uuid — a gossip loop or misconfig dialled ourselves; never redial a self-loop
@@ -1158,6 +1204,8 @@ export class Node {
           link.dead = link.noRedial = true
           return this.env.sink.close(link.id, 'self')
         }
+        //! ── the admit tail: the role rule, the duplicate-link rule, admit. From here on the HELLO is
+        // trusted (with a door it has proved itself; without one, loopback is the trust boundary, V4-3).
         //! the role rule (DESIGN-DOOR §3 step 12; with or without a secret). A CLIENT HELLO (r:1) may not
         // take a MEMBER's uuid: the uuid is a committed-view member's (isMember) or an admitted non-client
         // link holds it. Refuse THIS link (doorReject 'uuid-taken', dead + noRedial, close) and touch
@@ -1169,7 +1217,7 @@ export class Node {
         let existingId = this.byUuid.get(v.u)
         {
           const squatter = existingId !== undefined && existingId !== link.id ? this.links.get(existingId)! : undefined
-          if ((v as { r?: unknown }).r === 1) {
+          if (r === 1) {
             if (this.membership.isMember(v.u) || (squatter !== undefined && !squatter.client)) {
               j.armed && j.emit(JK.doorReject, link.id, 'uuid-taken', v.u)
               link.dead = link.noRedial = true
@@ -1199,7 +1247,8 @@ export class Node {
           }
         }
         link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
-        if ((v as { r?: unknown }).r === 1) { link.client = true; this.clientLinks.add(link) }
+        if (r === 1) { link.client = true; this.clientLinks.add(link) }
+        link.methodsOnly = m === 1 // the hint (§4): a client reads it live off its primary (feederMethodsOnly)
         link.state = LS.admitted
         this.byUuid.set(v.u, link.id)
         //! reincarnation fences dead evidence: a peer identifying with a HIGHER incarnation crashed —
@@ -1855,6 +1904,17 @@ export const newer = (epoch: number, seq: number, origin: string, cur: { epoch: 
 
 //! isPlain — a plain object: a value the kernel's repairs walk INTO. Arrays and bytes are not — data does
 // write into an array (see #unvivify's banner), but the kernel treats one as a whole value: the array limit.
+//! contractDiff — the first key whose value differs between two contract strings (`v1;k=v;k=v` — the
+// leading bare token is the version). Returns [key, THEIR value]; a key one side lacks reads
+// `missing:<key>` (their value, or '' when they lack it). Called only when the strings differ.
+const contractDiff = (mine: string, theirs: string): [string, string] => {
+  const parse = (s: string): [string, string][] => s.split(';').map((t) => { const i = t.indexOf('='); return i < 0 ? ['version', t] : [t.slice(0, i), t.slice(i + 1)] })
+  const ours = parse(mine), b = new Map(parse(theirs))
+  for (const [k, v] of ours) { const t = b.get(k); if (t === undefined) return [`missing:${k}`, '']; if (t !== v) return [k, t] }
+  for (const [k, v] of b) if (!ours.some(([ok]) => ok === k)) return [`missing:${k}`, v]
+  return ['version', theirs] // same keys, same values, a different spelling: name the whole string
+}
+
 const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array)
 
 //! ancestorsOf — the keys of a path's proper prefixes, shallowest first (the cold-path twin of apply's loop).

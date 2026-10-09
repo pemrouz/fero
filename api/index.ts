@@ -19,7 +19,8 @@ import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { TUNE } from '../kernel/tune.ts'
-import { Bind, type Coords } from './data.ts'
+import { Bind, METHODS_ONLY, type Coords } from './data.ts'
+import { fnv } from '../kernel/ring.ts'
 import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, batch, snapshot as snapshotOf, SPARSE_HOLE, holeMessage } from './substrate.ts'
@@ -39,8 +40,9 @@ const SEAM_KEYS = new Set(['validation'])
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
 // V4-4's `invalid` WNACK as `m`, surfaces as WriteReject.reason and cluster.writes.reason, and is what a
 // plain client assignment is refused with (nothing ever showed — V4-7). A degenerate admission predicate
-// folded into the ONE kernel hook.
-export const METHODS_ONLY = 'methods-only'
+// folded into the ONE kernel hook. Defined in api/data.ts since DESIGN-DOOR §4 (a client speaks it
+// locally when its feeder's HELLO carried the hint); re-exported here unchanged.
+export { METHODS_ONLY }
 const METHODS_ONLY_ADMIT = (_: Rec): true | string => METHODS_ONLY
 
 //! WriteRejectError — what methods.update/insert/remove REJECT with: the typed WriteReject fields riding
@@ -125,6 +127,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const validate = (config.validation ?? seams.validation) as ((rec: Rec) => true | string) | undefined
   if (validate !== undefined && typeof validate !== 'function')
     throw new Error(`fero('${name}'): validation must be a function (record) => true | 'the reason' — it runs on every write that enters`)
+  //! the cluster contract hashes the validator's SOURCE TEXT (DESIGN-DOOR §4): a bound or native function
+  // prints `[native code]`, so two different rules would hash alike and drift would hide — refused here.
+  if (validate !== undefined && /\[native code\]/.test(Function.prototype.toString.call(validate)))
+    throw new Error(`fero('${name}'): validation must be a plain function whose source is visible — a bound or native function prints [native code], so two different rules would look the same to the cluster contract; write the rule as (record) => … instead`)
   //! diag: { allow: { name: token } } — the DIAG channel's allowlist (kernel NodeOpts.diag): absent, the
   // channel is dead and every debugger attach is denied. The string layers were checked in api/config.ts;
   // the call is checked here. The tokens never reach a message or the diagnostics door.
@@ -282,6 +288,16 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // never follow anything: no directory (rendezvous: false / FERO_RENDEZVOUS=off) AND no hosts
   if (isClient && rendezvous === false && (hosts === undefined || hosts.length === 0))
     throw new Error(`fero('${name}'): a client needs something to dial — the directory is off (rendezvous: false) and hosts is ${hosts === undefined ? 'omitted' : 'empty'}`)
+  //! the cluster contract (DESIGN-DOOR §4): what every MEMBER must agree on, as one readable string the
+  // server's HELLO carries (`c`). The kernel appends `;ring=fmix32`. heartbeat.ms is the EFFECTIVE value
+  // (after the 500 default below); replicas 0 = full replication; methods 1 = the door is on; validation =
+  // 8 hex of fnv over the rule's source text, or `none` — hashed even under `methods:` (V4-5's supported
+  // pair: the server's own Bind runs the rule under the door). User-resource servers only: a client, the
+  // #directory and every embedder pass nothing, so their HELLO stays the v4.0 bytes. A readable string,
+  // not a hash: the refusal row can then say WHICH key differs and what the other side runs.
+  const clusterContract = isServer && !isSystem
+    ? `v1;heartbeat.ms=${heartbeatMs ?? 500};replicas=${(config.replicas as number | undefined) ?? 0};methods=${methodsOnly ? 1 : 0};validation=${validate !== undefined ? fnv(Function.prototype.toString.call(validate)).toString(16).padStart(8, '0') : 'none'}`
+    : undefined
   const rtOpts: RuntimeOpts = {
     uuid: (config.uuid as string) ?? restored.uuid ?? randomUUID().slice(0, 8),
     //! the resource name rides HELLO (v4.1): a misdial onto another resource's port refuses loudly
@@ -301,6 +317,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // the member chain (memberRedials) keeps its own default and never exceeds it (the kernel caps it)
     ...(redialTries !== undefined ? { tune: { redials: redialTries } } : {}),
     ...(config.replicas !== undefined ? { replicas: config.replicas as number } : {}),
+    //! the contract and the methods-only hint ride HELLO (DESIGN-DOOR §4) — servers only; absent keys keep
+    // every other node's HELLO byte-identical with v4.0
+    ...(clusterContract !== undefined ? { contract: clusterContract } : {}),
+    ...(methodsOnly ? { methodsOnly: true } : {}),
     //! the relay's admission predicate (V4-4, V4-5): a client's plain write relayed through this server
     // meets the kernel's relay ingress (kernel/write.ts onWrite) with THIS predicate — under `methods:`
     // the door itself (every relayed record refused 'methods-only', before any user code runs);

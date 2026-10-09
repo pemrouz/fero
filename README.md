@@ -90,7 +90,7 @@ Examples for a resource named `shop`. The per-resource form is shown for the fla
 
 ### The table
 
-Scope: *instance* = this node only. *cluster* = must be the same on every member (the deployer's contract; the kernel does not police drift). *process* = one value for the whole process. Every default is the code's.
+Scope: *instance* = this node only. *cluster* = must be the same on every member. Every server says its cluster values (`heartbeat.ms`, `replicas`, `methods`, the `validation` rule's text, the ring) in the first frame it sends, and two servers whose values differ refuse to link, naming the key that differs in both journals (`contractReject`). So a rolling change of a cluster key splits the cluster until every member runs the new value: stop every member and client, change the value, start them again. *process* = one value for the whole process. Every default is the code's.
 
 **Identity and role**
 
