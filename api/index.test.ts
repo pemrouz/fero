@@ -18,6 +18,7 @@ import { fero, WriteRejectError } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { JK } from '../kernel/journal.ts'
+import { VERB, encodeControl } from '../kernel/codec.ts'
 import { ports, until, sleep } from '#utils'
 import type { Fero, WriteReject, WriteResolve } from './types.ts'
 
@@ -591,7 +592,7 @@ test('the door: two members with DIFFERENT secrets never link — the acceptor j
     }
   })
   //! one line per peer and reason, however many revivals wrote the row again
-  assert.equal(lines.filter((l) => /^fero\('doorkeys'\): refused 127\.0\.0\.1:\d+ — its secret differs from this node's$/.test(l)).length, 1, `aa printed once, naming bb's listen: ${JSON.stringify(lines)}`)
+  assert.equal(lines.filter((l) => /^fero\('doorkeys'\): refused a peer that connected as 127\.0\.0\.1:\d+ — its secret differs from this node's$/.test(l)).length, 1, `aa printed once, naming the listen bb CLAIMED (aa accepted this link): ${JSON.stringify(lines)}`)
   assert.equal(lines.filter((l) => l === `fero('doorkeys'): refused 127.0.0.1:${p} — closed during the handshake; if this repeats every heartbeat the secrets probably differ`).length, 1, `bb printed once: ${JSON.stringify(lines)}`)
   assert.equal(lines.length, 2, `nothing else: ${JSON.stringify(lines)}`)
   assert.ok(!lines.join('\n').includes(S1) && !lines.join('\n').includes(S2), 'no secret in a line')
@@ -622,6 +623,45 @@ test("the door: a secured server and a client with NO secret — the server jour
   assert.ok(lines.includes(`fero('doornone'): refused by 127.0.0.1:${p} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`), `the client's line names FERO_SECRET: ${JSON.stringify(lines)}`)
   assert.ok(lines.includes("fero('doornone'): refused a peer that connected — it has no secret and this node has one; every member and client must share FERO_SECRET"), `the server's line: ${JSON.stringify(lines)}`)
   assert.ok(!lines.join('\n').includes(S))
+})
+
+//! rawHello — a hand-written peer: connect, write one HELLO, wait for the server to close (or `ms`)
+const rawHello = (addr: string, hello: Record<string, unknown>, ms = 1500): Promise<void> => new Promise((resolve) => {
+  const [host, port] = [addr.slice(0, addr.lastIndexOf(':')), Number(addr.slice(addr.lastIndexOf(':') + 1))]
+  let done = false
+  const finish = () => { if (done) return; done = true; sock.destroy(); resolve() }
+  const sock = net.connect(port, host, () => { sock.write(encodeControl(VERB.HELLO, hello)) })
+  sock.on('close', finish); sock.on('error', () => {})
+  setTimeout(finish, ms).unref()
+})
+
+test('the refusal lines print nothing a peer chose unfiltered: a connecting socket\'s claimed listen with a newline, an escape and 100k characters gives ONE line, cut and clean; another socket with another claim prints nothing new (inbound refusals print once per reason); an open server\'s forged contract value is cut and clean too', async () => {
+  const S = 'index-test-secret-KILO-11'
+  const p = await ports.free(), p2 = await ports.free()
+  const s = await fero('doorsafe', { uuid: 'aa', listen: `127.0.0.1:${p}`, heartbeat: { ms: 50 }, redial: { ms: 30 }, secret: S })
+  const o = await fero('doorsafe2', { uuid: 'ab', listen: `127.0.0.1:${p2}`, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const evil = `x\nfero('doorsafe'): a fake line\u001b[2J` + 'y'.repeat(100_000)
+  const lines = await stderrOf(async () => {
+    try {
+      await rawHello(`127.0.0.1:${p}`, { u: 'zz', i: 1, l: evil, n: 'doorsafe' })
+      assert.ok(await until(() => doorRows(s).length >= 1, 5000), 'refused no-secret')
+      assert.equal(doorRows(s)[0][1].length, evil.length, 'the row carries the claim as made — the row is the record, the line is the print')
+      await rawHello(`127.0.0.1:${p}`, { u: 'zy', i: 1, l: 'z\rother' + 'q'.repeat(500), n: 'doorsafe' })
+      assert.ok(await until(() => doorRows(s).length >= 2, 5000), 'refused again')
+      await rawHello(`127.0.0.1:${p2}`, { u: 'zx', i: 1, l: '127.0.0.1:1', n: 'doorsafe2', c: 'v1;heartbeat.ms=\nanything\u001b[2J' })
+      assert.ok(await until(() => diag(o)!.journal().events.some((e) => e.kind === JK.contractReject), 5000), 'contractReject')
+      await sleep(100)
+    } finally { await o.destroy(); await s.destroy() }
+  })
+  const mine = lines.filter((l) => l.startsWith("fero('doorsafe')"))
+  assert.equal(mine.length, 1, `one line for two inbound no-secret refusals, and the injected newline forged none: ${JSON.stringify(lines)}`)
+  assert.ok(mine[0].startsWith("fero('doorsafe'): refused a peer that connected as xfero('doorsafe'): a fake line[2Jyyyy"), mine[0])
+  assert.ok(mine[0].includes('…') && mine[0].length < 260, `cut at 64 characters of claim: ${mine[0].length} chars in all`)
+  assert.ok(!/[\u0000-\u001f\u007f-\u009f]/.test(mine[0]), 'no control character')
+  const theirs = lines.filter((l) => l.startsWith("fero('doorsafe2')"))
+  assert.equal(theirs.length, 1, JSON.stringify(lines))
+  assert.ok(theirs[0].includes('heartbeat.ms is 50 here, anything[2J there'), theirs[0])
+  assert.ok(!theirs[0].includes('\u001b'))
 })
 
 test('the door: the role rule holds WITH a secret — a client that holds the secret and a member\'s uuid is refused uuid-taken after its proof, the member stays linked; its line names the uuid', async () => {

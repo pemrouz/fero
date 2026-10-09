@@ -71,38 +71,57 @@ const VERB_NAMES = ['update', 'insert', 'remove'] as const
 
 //! ── the refusal lines (DESIGN-DOOR §3, §14 Q4): one stderr line per peer address and reason, per process ──
 // Fed from the journal rows the composer's cursor reads after every step (the same read `cluster` folds
-// from): every `doorReject` reason and `contractReject`; `nameReject` stays silent as today. Deduped on
-// the line itself, so heartbeat revival — which re-dials a parked target once per tick and writes the
-// same row again — prints nothing new. The rows carry no secret, nonce or proof, and the lines are built
-// from the rows and the link's dial target alone. The peer's address is the row's `c` (the dial target,
-// or the listen the peer claimed), else the link's `to` (still in the table: linkDown lands a step later).
+// from): every `doorReject` reason and `contractReject`; `nameReject` stays silent as today. The rows
+// carry no secret, nonce or proof. What a line PRINTS and what it is DEDUPED on are kept apart on purpose
+// (the review of 2026-10-09): a peer that can connect chooses its claimed listen, uuid and contract text,
+// so those fields are shown only through `shown` — control characters dropped (a newline would forge a
+// line, an escape would drive the terminal), cut at SHOWN_MAX — and never key the dedupe. The key is built
+// from facts this node owns: the resource, the kind, the reason and the dial target (`to`, still in the
+// link table: linkDown lands a step later). A DIALED peer's address is ours (hosts, the directory, the
+// view), so each dialed target gets its lines; an ACCEPTED peer has no address we trust, so inbound
+// refusals print once per reason per process, however many sockets connect or what they claim. The set
+// is capped: past SAID_MAX entries it is cleared and may repeat a line, never grow without bound.
+const SHOWN_MAX = 64
+const SAID_MAX = 1024
+const shown = (s: string): string => {
+  const t = s.replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+  return t.length > SHOWN_MAX ? t.slice(0, SHOWN_MAX) + '…' : t
+}
 const said = new Set<string>()
-const refusalLine = (name: string, node: Node, e: JEvent): string | null => {
-  const to = node.links.get(e.a as number)?.to
+const refusalLine = (name: string, to: string | undefined, e: JEvent, contract: string | undefined): string | null => {
   const c = e.c === undefined ? '' : String(e.c)
-  const who = c !== '' ? c : to ?? 'a peer that connected'
+  const who = to ?? (c !== '' ? `a peer that connected as ${shown(c)}` : 'a peer that connected')
   const f = `fero('${name}'): refused`
   if (e.kind === JK.contractReject) {
     //! b = the first key that differs (or missing:<key>), c = THEIR value; ours is read off this node's contract
     const key = String(e.b).replace(/^missing:/, '')
-    const mine = new Map((node.contract ?? '').split(';').map((t): [string, string] => { const i = t.indexOf('='); return i < 0 ? ['version', t] : [t.slice(0, i), t.slice(i + 1)] }))
-    return `${f} ${to ?? 'a peer that connected'} — the cluster contract differs: ${key} is ${mine.get(key) ?? 'not set'} here, ${c === '' ? 'not set' : c} there (every member must agree on heartbeat.ms, replicas, methods, validation and ring)`
+    const mine = new Map((contract ?? '').split(';').map((t): [string, string] => { const i = t.indexOf('='); return i < 0 ? ['version', t] : [t.slice(0, i), t.slice(i + 1)] }))
+    return `${f} ${to ?? 'a peer that connected'} — the cluster contract differs: ${shown(key)} is ${mine.get(key) ?? 'not set'} here, ${c === '' ? 'not set' : shown(c)} there (every member must agree on heartbeat.ms, replicas, methods, validation and ring)`
   }
   switch (e.b) {
     case 'no-secret': return `${f} ${who} — it has no secret and this node has one; every member and client must share FERO_SECRET`
     case 'peer-secret': return `${f} by ${who} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`
     case 'bad-proof': return `${f} ${who} — its secret differs from this node's`
     case 'refused': return `${f} ${who} — closed during the handshake; if this repeats every heartbeat the secrets probably differ`
-    case 'address': return `${f} ${to ?? 'a dialed peer'} — it answered as ${c}, not the address the directory or the view gave (a stale or forged entry)`
+    case 'address': return `${f} ${to ?? 'a dialed peer'} — it answered as ${shown(c)}, not the address the directory or the view gave (a stale or forged entry)`
     case 'timeout': return `${f} ${who} — no proof came within the handshake deadline`
-    case 'uuid-taken': return `${f} a client claiming uuid ${c} — that uuid belongs to a member (a shared FERO_UUID?)`
+    case 'uuid-taken': return `${f} a client claiming uuid ${shown(c)} — that uuid belongs to a member (a shared FERO_UUID?)`
     default: return null
   }
 }
 const sayRefusal = (name: string, node: Node, e: JEvent): void => {
-  const line = refusalLine(name, node, e)
-  if (line === null || said.has(line)) return
-  said.add(line)
+  const to = node.links.get(e.a as number)?.to
+  //! the key: owned facts only — a dialed target keys per reason and address (for a contract mismatch, per
+  // differing key, cut like the line is); an accepted peer keys on the reason alone (for a contract
+  // mismatch, on the kind: the key name is theirs too). Never the row's `c`: a claim.
+  const key = to !== undefined
+    ? `${name}\0${e.kind}\0${e.kind === JK.contractReject ? shown(String(e.b)) : String(e.b)}\0${to}`
+    : `${name}\0${e.kind}\0${e.kind === JK.contractReject ? '' : String(e.b)}`
+  if (said.has(key)) return
+  const line = refusalLine(name, to, e, node.contract)
+  if (line === null) return
+  if (said.size >= SAID_MAX) said.clear()
+  said.add(key)
   process.stderr.write(line + '\n')
 }
 
