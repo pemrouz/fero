@@ -10,7 +10,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, client, formed, writes } from './harness.ts'
-import { toyDoor } from './door.ts'
+import { toyDoor, toyClientDoor, toyClientKey } from './door.ts'
 import { JK } from '../kernel/journal.ts'
 import { VERB, Framer, encodeControl } from '../kernel/codec.ts'
 import { LS } from '../kernel/link.ts'
@@ -63,10 +63,12 @@ const oracle = (sim: Sim, secured: Set<string>) => {
 }
 
 //! rawClient — a hand-written CLIENT with the secret that claims `claim` as its uuid (the stray FERO_UUID):
-// HELLO r:1 with a nonce, the dialer's proof over the server's HELLO, then whatever comes back.
+// HELLO r:1 with a nonce, the dialer's proof over the server's HELLO — a CLIENT-KEY proof, as every r:1
+// dialer's is (§15; the door derives it from the secret) — then whatever comes back.
 const rawClient = (sim: Sim, id: string, claim: string, door: Door, got: string[]) => {
   const framers = new Map<number, Framer>()
   let myK = ''
+  const mac = (m: string) => (door.clientMac !== undefined ? door.clientMac(m) : door.mac(m))
   return sim.raw(id, null, (ev, sink) => {
     if (ev.kind === 'linkUp') {
       myK = door.nonce()
@@ -76,7 +78,7 @@ const rawClient = (sim: Sim, id: string, claim: string, door: Door, got: string[
       for (const f of framers.get(ev.link)!.push(ev.bytes)) {
         if (f.verb === VERB.HELLO) {
           const h = f.value as HelloKeys
-          sink.send(ev.link, encodeControl(VERB.DOOR, { p: door.mac(proofMsg('dialer', h.k as string, myK, h.u, h.l, { u: claim, i: 1, l: '', r: 1 })) }))
+          sink.send(ev.link, encodeControl(VERB.DOOR, { p: mac(proofMsg('dialer', h.k as string, myK, h.u, h.l, { u: claim, i: 1, l: '', r: 1 })) }))
         } else if (f.verb === VERB.DOOR) {
           const v = f.value as { e?: unknown }
           if (typeof v.e === 'string') got.push(v.e)
@@ -228,16 +230,18 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
         },
       })
       //! the intruder: 0 wrong secret · 1 no secret · 2 a client WITH the secret claiming a member's uuid ·
-      // 3 a replay of a captured HELLO + DOOR on a fresh connection
-      const kind = seed % 4
+      // 3 a replay of a captured HELLO + DOOR on a fresh connection · 4 a holder of the CLIENT KEY alone that
+      // joins as a member (§15: no r:1, so every member checks its proof with the secret)
+      const kind = seed % 5
       seen.kinds.add(kind)
       let intruder: Node | null = null
       const got: string[] = []
       let captured: Uint8Array[] = []
       let before: unknown = null, dupBefore = -1
-      if (kind === 0 || kind === 1) {
-        intruder = sim.add({ uuid: 'zz', listen: 'sim:zz', hosts: addrs, heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16, ...(kind === 0 ? { door: toyDoor('wrong-' + SECRET, sim.rng) } : {}) })
-        if (kind === 0) secured.add('zz')
+      if (kind === 0 || kind === 1 || kind === 4) {
+        const bad = kind === 0 ? toyDoor('wrong-' + SECRET, sim.rng) : kind === 4 ? toyClientDoor(toyClientKey(SECRET), sim.rng) : undefined
+        intruder = sim.add({ uuid: 'zz', listen: 'sim:zz', hosts: addrs, heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16, ...(bad !== undefined ? { door: bad } : {}) })
+        if (bad !== undefined) secured.add('zz')
         sim.post('zz', { kind: 'start' })
         //! and a member is told about it (the directory's squatter): it dials, is refused, re-dials once per heartbeat.
         // Not the lowest-uuid member: genesis waits there for links ≥ hosts, discovered hosts included, so a
@@ -290,16 +294,18 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
         if (intruder.admitted().length) problems.push('the intruder admitted someone')
         if (intruder.epoch !== 0 || intruder.byUuid.size) problems.push('the intruder learned a view or a peer')
         const r = reasons(intruder)
-        if (kind === 0 && !r.some((x) => x === 'refused' || x === 'bad-proof')) problems.push(`wrong-secret intruder saw ${r.join(',')}`)
+        //! a wrong secret and a client key posing as a member look the same to every member: bad-proof
+        const wrongKey = kind === 0 || kind === 4
+        if (wrongKey && !r.some((x) => x === 'refused' || x === 'bad-proof')) problems.push(`wrong-key intruder saw ${r.join(',')}`)
         if (kind === 1 && !r.includes('peer-secret')) problems.push(`no-secret intruder saw ${r.join(',')}`)
         const mr = live.flatMap(reasons)
-        if (kind === 0 && !mr.includes('bad-proof')) problems.push(`members never refused the wrong secret's own dials: ${mr.join(',')}`)
+        if (wrongKey && !mr.includes('bad-proof')) problems.push(`members never refused the wrong key's own dials: ${mr.join(',')}`)
         //! the member that DIALED the wrong secret: the intruder refused its proof (bad-proof, naming the member's
         // listen) and the notice it shipped rides BEHIND its close in the sim (a close lands at the pair's minimum
         // delay, a frame at a random one), so the member reads a bare close — a link loss, not a refusal: no row
         // (the third review), the ordinary chain re-dials, every door row it holds names the intruder, and it never
         // admits it. Real TCP delivers the notice (the api tier reads `refused`); the sim proves the lost-notice path.
-        if (kind === 0) {
+        if (wrongKey) {
           const d = live[n - 1]
           if (!rows(intruder, JK.doorReject).some((e) => e.b === 'bad-proof' && e.c === addrs[n - 1])) problems.push(`the intruder never refused the member's own dial: ${reasons(intruder).join(',')}`)
           if (!rows(d, JK.doorReject).every((e) => e.c === 'sim:zz')) problems.push(`${d.uuid}: a door row names someone but the intruder: ${JSON.stringify(rows(d, JK.doorReject).map((e) => [e.b, e.c]))}`)
@@ -326,8 +332,41 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
       failures.push(`seed ${seed}: threw ${e}`)
     }
   }
-  assert.deepEqual(seen, { kinds: new Set([0, 1, 2, 3]), chaos: new Set([0, 1, 2]) }, 'every intruder and every chaos ran')
+  assert.deepEqual(seen, { kinds: new Set([0, 1, 2, 3, 4]), chaos: new Set([0, 1, 2]) }, 'every intruder and every chaos ran')
   assert.deepEqual(failures, [])
+})
+
+test('the client key (§15): a process that holds ONLY the client key follows a secured server — admitted r:1, fed, its write lands, the handshake stays 4 frames per link — and the same door on a node that joins as a member is bad-proof at every member and admits nobody; 20 seeds under the chaos defaults', () => {
+  for (let seed = 0; seed < 20; seed++) {
+    const sim = new Sim(seed)
+    const door = toyDoor(SECRET, sim.rng)
+    const nodes = cluster(sim, 2, { heartbeatMs: 50, door, fault: { delay: [1, 1 + sim.rng() * 10], dupP: sim.rng() * 0.2 } })
+    const perLink = new Map<string, number>()
+    sim.tap = (_from, _to, link, peerLink, _dialed, bytes) => {
+      if (bytes[2] === VERB.HELLO || bytes[2] === VERB.DOOR) { const key = Math.min(link, peerLink) + '-' + Math.max(link, peerLink); perLink.set(key, (perLink.get(key) ?? 0) + 1) }
+    }
+    const c = client(sim, 'c01', nodes, { heartbeatMs: 50, door: toyClientDoor(toyClientKey(SECRET), sim.rng) })
+    const poser = sim.add({ uuid: 'zz', listen: 'sim:zz', hosts: ['sim:n01', 'sim:n02'], heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16, door: toyClientDoor(toyClientKey(SECRET), sim.rng) })
+    sim.post('zz', { kind: 'start' })
+    sim.at(400, () => sim.post('c01', { kind: 'write', recs: [{ type: 0, key: ['from-client'], value: seed }] }))
+    sim.run({ until: 3000 })
+    const tag = `seed ${seed}`
+    //! not formed(): a member that holds the client admits n peers, not n - 1
+    assert.ok(nodes.every((m) => nodes.every((o) => o === m || m.admitted().includes(o.uuid))), `${tag}: the members formed`)
+    assert.ok(c.primary !== null && c.admitted().length >= 1, `${tag}: the client-key client has a feeder`)
+    for (const m of nodes) {
+      assert.ok(m.admitted().includes('c01') && m.links.get(m.byUuid.get('c01')!)?.client === true, `${tag}: ${m.uuid} holds the client as a CLIENT link`)
+      assert.deepEqual(rows(m, JK.doorReject).map((e) => [e.b, e.c]).filter(([, c]) => c !== 'sim:zz'), [], `${tag}: ${m.uuid} refused someone but the poser`)
+      assert.ok(rows(m, JK.doorReject).some((e) => e.b === 'bad-proof' && e.c === 'sim:zz'), `${tag}: ${m.uuid} never refused the poser's own dial bad-proof: ${JSON.stringify(reasons(m))}`)
+      assert.equal(m.byUuid.has('zz'), false, `${tag}: ${m.uuid} holds the poser`)
+      assert.ok(m.state.has(JSON.stringify(['from-client'])), `${tag}: the client's write landed at ${m.uuid}`)
+    }
+    assert.deepEqual(rows(c, JK.doorReject), [], `${tag}: the client was never refused`)
+    assert.deepEqual(poser.admitted(), [], `${tag}: the poser admitted someone`)
+    assert.equal(poser.epoch, 0, `${tag}: the poser learned a view`)
+    //! the per-link count: every handshake that completed (admitted on both ends) cost exactly 2 HELLO + 2 DOOR
+    assert.ok([...perLink.values()].every((v) => v <= 4), `${tag}: a link carried more than 4 handshake frames: ${JSON.stringify([...perLink])}`)
+  }
 })
 
 test('the forwarder: a relay behind a DISCOVERED address is refused by the address rule before any proof (the far member times out); one that REWRITES the far HELLO to its own address gets the dialer\'s proof, which the far member reads as bad-proof; behind a STATIC host it is admitted — the documented limit until TLS', () => {

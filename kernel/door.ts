@@ -2,10 +2,11 @@
 // The rules that run on an inbound HELLO before a link is admitted, as pure functions over the HELLO's
 // keys and the link's facts: the presence matrix, the proof message, verify, the address rule, the
 // contract compare. The kernel holds NO crypto and NO secret: `NodeOpts.door` hands it two functions —
-// mac(msg) and nonce() — which the api builds from node:crypto and the sim from a seeded toy
-// (sim/door.ts). So the sim proves the PROTOCOL (replay, forgery, the relay, the order of frames) on
-// seeded schedules, and the real-TCP tier proves the cryptography. Nothing here reaches outside the
-// kernel (kernel/purity.test.ts), and nothing here journals: node.ts owns every row.
+// mac(msg) and nonce() — and, with the derived client key (§15), a third, clientMac(msg) — which the api
+// builds from node:crypto and the sim from a seeded toy (sim/door.ts). So the sim proves the PROTOCOL
+// (replay, forgery, the relay, the order of frames) on seeded schedules, and the real-TCP tier proves the
+// cryptography. Nothing here reaches outside the kernel (kernel/purity.test.ts), and nothing here
+// journals: node.ts owns every row.
 //
 // The handshake, in one breath: both ends send HELLO at linkUp; with a door the HELLO carries `k`, a
 // fresh nonce for this link. The DIALER proves first — DOOR {p}, an HMAC over both nonces, both uuids,
@@ -18,7 +19,11 @@ import type { Link } from './link.ts'
 
 //! Door — what the embedder injects (the `validate` idiom): never a secret string. mac(msg) must return a
 // string of exactly PROOF_LEN characters (the api: HMAC-SHA256 as base64url; the sim's toy pads to it).
-export interface Door { mac(msg: string): string; nonce(): string }
+// clientMac (§15, the derived client key) signs CLIENT LINKS — every link whose dialer said `r: 1` — on
+// both sides, so a process that holds only the client key can follow but never prove as a member. A
+// member's door carries both (the api derives clientMac from the secret); a client-only door carries the
+// client key under both names (it holds nothing else); a door without clientMac keeps the one-key rule.
+export interface Door { mac(msg: string): string; nonce(): string; clientMac?(msg: string): string }
 
 //! HelloKeys — a HELLO's identity keys as a peer sent them (and as this node sent its own): what a proof
 // signs, so none of them can change in flight before admission. `u, i, l` are checked for shape before
@@ -59,16 +64,23 @@ export const doorMatrix = (mine: boolean, theirs: boolean): 'open' | 'secured' |
 export const proofMsg = (side: 'dialer' | 'acceptor', verifierNonce: string, proverNonce: string, verifierUuid: string, verifierListen: string, h: HelloKeys): string =>
   JSON.stringify(['fero-door/1', side, verifierNonce, proverNonce, verifierUuid, verifierListen, h.u, h.i, h.l, h.r ?? 0, h.n ?? '', h.c ?? '', h.m ?? 0])
 
+//! sign (§15) — which key signs this link: the DIALER's HELLO says. `r: 1` from the dialer makes a client
+// link, signed with the client key on both sides (the member's answer too: a client holds nothing else);
+// any other link is signed with the secret. The dialer's `r` is inside its own proof, so it cannot be
+// checked as a client and admitted as anything else. A door without clientMac signs everything with mac.
+const sign = (door: Door, dialer: HelloKeys, msg: string): string =>
+  dialer.r === 1 && door.clientMac !== undefined ? door.clientMac(msg) : door.mac(msg)
+
 //! prove — MY proof on this link: over the peer's nonce (their `k`), my nonce, the uuid and listen they
 // claimed, and the HELLO I sent (link.said, the exact object that went out at linkUp).
 export const prove = (door: Door, link: Link, mine: HelloKeys, theirs: HelloKeys): string =>
-  door.mac(proofMsg(link.dialed ? 'dialer' : 'acceptor', theirs.k as string, link.nonce, theirs.u, theirs.l, mine))
+  sign(door, link.dialed ? mine : theirs, proofMsg(link.dialed ? 'dialer' : 'acceptor', theirs.k as string, link.nonce, theirs.u, theirs.l, mine))
 
 //! verify — the PEER's proof: rebuilt from the stashed HELLO with the peer's side, my nonce as the
 // verifier's, my uuid and the listen I SENT on this link (link.said.l — what a prover that read my
 // HELLO unaltered signed); compared in constant time.
 export const verify = (door: Door, link: Link, myUuid: string, theirs: HelloKeys, p: string): boolean =>
-  ctEq(door.mac(proofMsg(link.dialed ? 'acceptor' : 'dialer', link.nonce, theirs.k as string, myUuid, link.said!.l, theirs)), p)
+  ctEq(sign(door, link.dialed ? link.said! : theirs, proofMsg(link.dialed ? 'acceptor' : 'dialer', link.nonce, theirs.k as string, myUuid, link.said!.l, theirs)), p)
 
 //! addressOk (§3 step 9, the relay) — a link I DIALED whose target is not one of my STATIC hosts came
 // from the directory's discover set or a committed view's member listen: both carry the peer's own
