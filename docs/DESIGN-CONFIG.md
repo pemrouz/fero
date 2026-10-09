@@ -400,6 +400,19 @@ for two reasons: it is the one NEW key, and its natural env shorthand
 (§2, problem 2). Land it after, with `FERO_DIAG_TOKEN` stated as the viewer's
 only, and with token values redacted from the `from` trace (Q4).
 
+### The door's key: `secret` (landed 2026-10-09, docs/DESIGN-DOOR.md §5)
+
+| Key | Default | Scope | Set via | What it does |
+|---|---|---|---|---|
+| `secret` | unset (the open door) | cluster: the same value on every member AND every client | call `secret: '…'` or `false` · env `FERO_SECRET=…` / `off` (per resource `FERO_SHOP_SECRET`) · file `secret: '…'` · CLI: refused, a secret never rides argv | The cluster's shared secret, text of at least 16 characters; the text layers coerce `off` / `false` / `0` to `false` (open on purpose) and refuse a number, a boolean or a short value without echoing it. The kernel gets two functions (an HMAC and a nonce mint), never the string. `diag(f).config()` shows `<set>` with its source, or `false`. With the layer off (`FERO_CONFIG=off`) a `FERO_SECRET` in the environment is ignored like every variable, and the process says so once on stderr. |
+
+The shape §4 gave the deferred `diag` key — the call, the environment or a
+file, never a flag, the value redacted from the diagnostics door — is now used
+twice: `diag.allow` (landed with M7's config) and `secret`. The carriers
+message names the layers a key may come from (`it is set in the call, the
+environment or a fero.opt.ts file only`), and so corrects `uuid`'s, which read
+"the call only" while the key rode a flag and a variable.
+
 ## §5 Kept fixed
 
 | Parameter | Where | Reason |

@@ -13,7 +13,7 @@
 // `dir` holds a previous life, and a minimal reactive cluster surface. The client
 // role (M5b) and user-method dispatch (M5c) land next.
 
-import { randomUUID } from 'node:crypto'
+import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { Runtime, restoreOpts, type RuntimeOpts } from '../shell/runtime.ts'
 import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
@@ -26,7 +26,10 @@ import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, batch, snapshot as snapshotOf, SPARSE_HOLE, holeMessage } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
-import { resolveConfig, src, CONFIG_LEAVES } from './config.ts'
+import { resolveConfig, src, secretHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
+import type { Door } from '../kernel/door.ts'
+import type { JEvent } from '../kernel/journal.ts'
+import type { Node } from '../kernel/node.ts'
 import { compact, frontier, gcTombstones } from '../kernel/log.ts'
 import { captureNode } from '../tools/debug/capture.ts'
 import { track, untrack } from './signals.ts'
@@ -34,7 +37,7 @@ import { spawn } from './spawn.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'journal', 'replicas', 'data', 'methods', 'validation', 'seams', 'rendezvous', 'diag', 'signals'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'journal', 'replicas', 'data', 'methods', 'validation', 'seams', 'rendezvous', 'diag', 'secret', 'signals'])
 const SEAM_KEYS = new Set(['validation'])
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -65,6 +68,43 @@ export class WriteRejectError extends Error implements WriteReject {
 Object.defineProperty(WriteRejectError.prototype, 'name', { value: 'WriteRejectError', configurable: true, writable: true })
 //! VERB_NAMES — REC type → the methods.* verb a message names
 const VERB_NAMES = ['update', 'insert', 'remove'] as const
+
+//! ── the refusal lines (DESIGN-DOOR §3, §14 Q4): one stderr line per peer address and reason, per process ──
+// Fed from the journal rows the composer's cursor reads after every step (the same read `cluster` folds
+// from): every `doorReject` reason and `contractReject`; `nameReject` stays silent as today. Deduped on
+// the line itself, so heartbeat revival — which re-dials a parked target once per tick and writes the
+// same row again — prints nothing new. The rows carry no secret, nonce or proof, and the lines are built
+// from the rows and the link's dial target alone. The peer's address is the row's `c` (the dial target,
+// or the listen the peer claimed), else the link's `to` (still in the table: linkDown lands a step later).
+const said = new Set<string>()
+const refusalLine = (name: string, node: Node, e: JEvent): string | null => {
+  const to = node.links.get(e.a as number)?.to
+  const c = e.c === undefined ? '' : String(e.c)
+  const who = c !== '' ? c : to ?? 'a peer that connected'
+  const f = `fero('${name}'): refused`
+  if (e.kind === JK.contractReject) {
+    //! b = the first key that differs (or missing:<key>), c = THEIR value; ours is read off this node's contract
+    const key = String(e.b).replace(/^missing:/, '')
+    const mine = new Map((node.contract ?? '').split(';').map((t): [string, string] => { const i = t.indexOf('='); return i < 0 ? ['version', t] : [t.slice(0, i), t.slice(i + 1)] }))
+    return `${f} ${to ?? 'a peer that connected'} — the cluster contract differs: ${key} is ${mine.get(key) ?? 'not set'} here, ${c === '' ? 'not set' : c} there (every member must agree on heartbeat.ms, replicas, methods, validation and ring)`
+  }
+  switch (e.b) {
+    case 'no-secret': return `${f} ${who} — it has no secret and this node has one; every member and client must share FERO_SECRET`
+    case 'peer-secret': return `${f} by ${who} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`
+    case 'bad-proof': return `${f} ${who} — its secret differs from this node's`
+    case 'refused': return `${f} ${who} — closed during the handshake; if this repeats every heartbeat the secrets probably differ`
+    case 'address': return `${f} ${to ?? 'a dialed peer'} — it answered as ${c}, not the address the directory or the view gave (a stale or forged entry)`
+    case 'timeout': return `${f} ${who} — no proof came within the handshake deadline`
+    case 'uuid-taken': return `${f} a client claiming uuid ${c} — that uuid belongs to a member (a shared FERO_UUID?)`
+    default: return null
+  }
+}
+const sayRefusal = (name: string, node: Node, e: JEvent): void => {
+  const line = refusalLine(name, node, e)
+  if (line === null || said.has(line)) return
+  said.add(line)
+  process.stderr.write(line + '\n')
+}
 
 //! discovery (V4-3, docs/DESIGN-DIRECTORY.md): no name hashing — a server binds a FREE loopback port and
 // registers {name, uuid, listen} with the per-box directory (api/directory.ts, the `#directory`
@@ -142,6 +182,13 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     for (const [who, tok] of Object.entries(diagAllow as Record<string, unknown>))
       if (typeof tok !== 'string' || tok === '') throw new Error(`fero('${name}'): diag.allow.${who} must be a non-empty token string${at('diag.allow')}`)
   }
+  //! secret (DESIGN-DOOR §5): the string layers were coerced in api/config.ts (the OFF set → false, a short
+  // or non-text value refused there); the call is checked HERE with the same words — text of SECRET_MIN
+  // characters, or false (open on purpose). The value never enters a message. A system resource (the
+  // #directory) never carries one: loopback is its trust boundary (api/directory.ts).
+  const secret = config.secret as string | false | undefined
+  if (secret !== undefined && secret !== false && (typeof secret !== 'string' || secret.length < SECRET_MIN))
+    throw new Error(`${secretHint(name, at('secret'))}; or secret: false to run open on purpose`)
 
   //! role by DECLARED ACT (v4.1 — supersedes the v2 hosts-without-listen rule): following is the
   // ambient case, serving is a declared act. Any server MARKER makes a server — server: true, listen
@@ -255,6 +302,12 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     if (why !== null)
       throw new Error(`fero('${name}'): to be reachable from another box, listen on a routable address — ${why}, but listen ${listen}${config.listen === undefined ? ' (the default, a free loopback port)' : at('listen')} ${loopbackHost(hostOf(listen)) ? 'only reaches this box' : 'is a wildcard, not an address another box can dial'}`)
   }
+  //! the off-loopback rule (DESIGN-DOOR §5, §14 Q1): a server whose listen other machines can reach must have
+  // a secret, or say `secret: false` and own the open door. Loopback is `127.*`, `localhost`, `[::1]` —
+  // loopbackHost, NOT localish (a wildcard reaches other machines). After the directory-socket check, so
+  // `0.0.0.0:3376` keeps its own refusal. A client is never refused for having no secret.
+  if (!isSystem && listen !== undefined && secret === undefined && !loopbackHost(hostOf(listen)))
+    throw new Error(`fero('${name}'): listen ${listen} is reachable from other machines and no secret is set — set FERO_SECRET (the same value on every member and client), or pass secret: false (FERO_SECRET=off) to run open on purpose`)
   //! uuid discipline (v4.1): the string is validated (an empty uuid, or one containing '~' — the
   // incarnation-lane separator — could alias another node's lane in origin-string space), and a
   // durable dir's RESTORED identity beats the random default: fero(name, {dir}) with uuid omitted
@@ -298,6 +351,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const clusterContract = isServer && !isSystem
     ? `v1;heartbeat.ms=${heartbeatMs ?? 500};replicas=${(config.replicas as number | undefined) ?? 0};methods=${methodsOnly ? 1 : 0};validation=${validate !== undefined ? fnv(Function.prototype.toString.call(validate)).toString(16).padStart(8, '0') : 'none'}`
     : undefined
+  const door: Door | undefined = typeof secret === 'string' && !isSystem
+    ? { mac: (msg) => createHmac('sha256', secret).update(msg).digest('base64url'), nonce: () => randomBytes(16).toString('base64url') }
+    : undefined
   const rtOpts: RuntimeOpts = {
     uuid: (config.uuid as string) ?? restored.uuid ?? randomUUID().slice(0, 8),
     //! the resource name rides HELLO (v4.1): a misdial onto another resource's port refuses loudly
@@ -321,6 +377,11 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // every other node's HELLO byte-identical with v4.0
     ...(clusterContract !== undefined ? { contract: clusterContract } : {}),
     ...(methodsOnly ? { methodsOnly: true } : {}),
+    //! the door (DESIGN-DOOR §3): the secret as two functions, the `validate` idiom — the kernel never holds
+    // the string. mac = HMAC-SHA256 as base64url (43 characters, kernel/door.ts PROOF_LEN); nonce = 16
+    // random bytes as base64url (22 characters), from node:crypto, never the shell's Math.random. Servers
+    // AND clients (a client proves as the dialer); never the #directory. Absent = the v4.0 wire.
+    ...(door !== undefined ? { door } : {}),
     //! the relay's admission predicate (V4-4, V4-5): a client's plain write relayed through this server
     // meets the kernel's relay ingress (kernel/write.ts onWrite) with THIS predicate — under `methods:`
     // the door itself (every relayed record refused 'methods-only', before any user code runs);
@@ -706,6 +767,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         // remove, echo pre-consumed: nothing re-issues) and count the lifetime tallies
         else if (e.kind === JK.shed) { shedEver++; bind.shedPartition(String(e.a)) }
         else if (e.kind === JK.acquire) acquiredEver++
+        //! the door refused a peer (DESIGN-DOOR §3): one stderr line per peer and reason, deduped per process
+        else if (e.kind === JK.doorReject || e.kind === JK.contractReject) sayRefusal(name, node, e)
         //! M6: a view install re-gathers the LIVE union against the new ring (the Q3a leg) — but
         // ONLY when the gather was ever consumed (M6-review finding 41): `gather` stays null until
         // read()/`await data` materializes it, so an idle scoped cluster pays nothing on churn
@@ -931,7 +994,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         out[k] = {
           //! a diag token is a secret: the door shows WHO may attach, never the token
           value: typeof shown === 'function' ? '[function]' : k === 'methods' || k === 'data' ? Object.keys(shown as object)
-            : k === 'diag.allow' ? Object.fromEntries(Object.keys(shown as object).map((who) => [who, '[redacted]'])) : shown,
+            : k === 'diag.allow' ? Object.fromEntries(Object.keys(shown as object).map((who) => [who, '[redacted]']))
+            //! the secret is a secret: the door says that one is set (and where from), or that the door is open on purpose
+            : k === 'secret' ? (shown === false ? false : '<set>') : shown,
           from: v !== undefined ? from(k) : k === 'rendezvous' && envDefault !== false ? 'FERO_RENDEZVOUS' : 'the default',
         }
       }

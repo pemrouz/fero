@@ -68,6 +68,9 @@ const LEAVES = table<{ layers: string; why?: string; object?: true }>({
   // value: `FERO_DIAG_ALLOW_OPS=tok` nests to { ops: 'tok' }. Never a flag: a secret on the command line
   // is readable by every user on the box (`ps`), so the flag layer refuses it with its own message.
   'diag.allow': { layers: 'cep', why: 'a secret never rides the command line', object: true },
+  //! secret — the cluster's shared secret (DESIGN-DOOR §5): the call, FERO_SECRET (per resource
+  // FERO_SHOP_SECRET) or a fero.opt.ts file. The same carriers as diag.allow, for the same reason.
+  secret: { layers: 'cep', why: 'a secret never rides argv: ps, /proc/<pid>/cmdline and shell history show every flag' },
   data: { layers: 'cp', why: 'an object of rows', object: true },
   methods: { layers: 'c', why: 'functions — and the door: it closes a resource from the source line that hosts it' },
   validation: { layers: 'c', why: 'a function' },
@@ -183,6 +186,15 @@ const diagFlag = (resource: string, name: string | null, allow: unknown): never 
   throw new Error(`fero('${resource}'): a diag token cannot come from a launch flag (${spell('flag', name, 'diag.allow' + (who !== undefined ? '.' + who : ''))}) — every user on this box can read a command line; set ${spell('env', name, 'diag.allow.' + n)}=<token>, or diag: { allow: { ${n}: … } } in the call or a fero.opt.ts file`)
 }
 
+//! carriers — the layers a refused key MAY come from, as a phrase: "the call", "the call or a fero.opt.ts
+// file", "the call, the environment or a fero.opt.ts file" (a `cep` leaf: diag.allow, secret), "a flag, the
+// call or the environment" (uuid). The template used to say "the call only" for every leaf without a file
+// layer, which was false for uuid; it names the real carriers now.
+const carriers = (layers: string): string => {
+  const parts = [...(layers.includes('f') ? ['a flag'] : []), 'the call', ...(layers.includes('e') ? ['the environment'] : []), ...(layers.includes('p') ? ['a fero.opt.ts file'] : [])]
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} or ${parts[parts.length - 1]}`
+}
+
 //! walk — validate `tree` as one layer's contribution and flatten it. `name` is the rung (null =
 // global). In the GLOBAL rung of a flag, env or file layer an undeclared OBJECT at the top level is
 // another resource's subtree (this resource's own, `mine`, included — its rung was folded already)
@@ -215,7 +227,7 @@ const walk = (resource: string, layer: Layer, name: string | null, tree: unknown
       if (leaf !== undefined) {
         if (path === 'diag.allow' && layer === 'flag') diagFlag(resource, name, v)
         if (!leaf.layers.includes(LAYER_CODE[layer]))
-          throw new Error(`fero('${resource}'): '${path}' cannot come from ${spell(layer, name, path)} — it is set in the call${leaf.layers.includes('p') ? ' or a fero.opt.ts file' : ''} only (${leaf.why})`)
+          throw new Error(`fero('${resource}'): '${path}' cannot come from ${spell(layer, name, path)} — it is set in ${carriers(leaf.layers)} only (${leaf.why})`)
         //! a LONGER name under a leaf — FERO_RENDEZVOUS_UNUSED beside FERO_RENDEZVOUS, --fero.dir.old — arrives
         // as an OBJECT at the leaf (envdeep nests on `_`, flags on `.`). Folded, it won the merge over the good
         // value and the composer's refusal blamed the variable that was right (I-35): refused here instead,
@@ -298,12 +310,25 @@ const coerce = (resource: string, key: string, raw: unknown, from: string): unkn
       if (typeof v === 'number')
         throw new Error(`fero('${resource}'): ${key} looks like a number (${v})${src(from)} — a flag or an env value that is all digits loses its leading zeros; give it a letter, or set it in the call`)
       return v
+    case 'secret':
+      //! the OFF set (and the 0 / false envdeep makes of it) means `false`: open on purpose. Everything else
+      // must be text of SECRET_MIN characters — a number or a boolean lost its text on the way in (a value
+      // that is all digits is read as a number), a short one is too weak. The message never carries the
+      // value: it is the secret.
+      if (v === false || v === 0 || (typeof v === 'string' && OFF.has(v))) return false
+      if (typeof v !== 'string' || v.length < SECRET_MIN) throw new Error(secretHint(resource, src(from)))
+      return v
     default:
       return v
   }
 }
 //! src — the provenance suffix for a message: nothing for the call, ` (from FERO_X)` otherwise
 export const src = (from: string): string => (from === 'the call' ? '' : ` (from ${from})`)
+//! SECRET_MIN — the secret's floor (DESIGN-DOOR §14 Q7): 16 characters. secretHint is the one refusal for a
+// secret of the wrong shape, from any layer (the composer uses it for the call); it never prints the value.
+export const SECRET_MIN = 16
+export const secretHint = (resource: string, at: string): string =>
+  `fero('${resource}'): secret must be text of at least ${SECRET_MIN} characters${at} — a value that is all digits is read as a number; openssl rand -base64 24 prints a good one`
 
 //! ── unflatten: dotted leaves back into the FeroOpts shape the composer reads ──
 const unflatten = (flat: Flat): FeroOpts => {
@@ -344,6 +369,10 @@ export const resolveConfig = (resource: string, call: FeroOpts, sources: Sources
   }
   if (mode === 'off') {
     rungs.push({ layer: 'call', name: null, flat: callFlat })
+    //! a secret in the environment with the layer OFF is ignored like every variable — said once per process
+    // (DESIGN-DOOR §5), so nobody believes a box is locked when it runs open (the battery runs this way)
+    const stray = Object.keys(env).find((k) => /^FERO_(?:[A-Z0-9]+_)?SECRET$/i.test(k) && (env[k] ?? '').trim() !== '')
+    if (stray !== undefined) noteOnce(sources.note ?? toStderr, `FERO_CONFIG=off: ${stray} is ignored, this process runs open\n`)
   } else {
     const argv = sources.argv ?? process.argv.slice(2)
     const scrubbed = scrub(env)

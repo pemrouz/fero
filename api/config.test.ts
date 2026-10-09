@@ -94,6 +94,63 @@ test('diag.allow: from the call, a variable (FERO_DIAG_ALLOW_<NAME>) or a file �
   assert.equal(nameKey('diag'), null, 'a declared group is never a resource rung')
 })
 
+test('secret (DESIGN-DOOR §5): the call, FERO_SECRET, FERO_SHOP_SECRET over it, a file — never a flag; a number, a boolean or a short value is refused without echoing it; \'\' is unset, off is false; the layer-off note once per process', () => {
+  const S = 'unit-test-secret-ALPHA-01'
+  //! the call folds through as written (the composer checks its shape); false is the open door on purpose
+  assert.deepEqual(cfg('shop', { secret: S }), { secret: S })
+  assert.deepEqual(cfg('shop', { secret: false }), { secret: false })
+  //! the environment, and the per-resource rung over it
+  const env = r('shop', {}, { env: { FERO_SECRET: S } })
+  assert.deepEqual(env.config, { secret: S })
+  assert.equal(env.from('secret'), 'FERO_SECRET')
+  const scoped = r('shop', {}, { env: { FERO_SECRET: S, FERO_SHOP_SECRET: `${S}-shop` } })
+  assert.equal(scoped.config.secret, `${S}-shop`)
+  assert.equal(scoped.from('secret'), 'FERO_SHOP_SECRET')
+  assert.equal(cfg('users', {}, { env: { FERO_SECRET: S, FERO_SHOP_SECRET: `${S}-shop` } }).secret, S, 'another resource reads the global rung')
+  //! a $HOME file
+  const home = scratch()
+  fs.writeFileSync(path.join(home, 'fero.opt.js'), `export default { secret: '${S}-file' }`)
+  const file = r('shop', {}, { home })
+  assert.equal(file.config.secret, `${S}-file`)
+  assert.equal(file.from('secret'), 'a fero.opt.ts file (secret)')
+  //! never a flag, under either rung: the refusal names the flag and the three carriers, never the value
+  for (const argv of [['--fero.secret', S], ['--fero.shop.secret', S], [`--fero.secret=${S}`]])
+    assert.throws(() => r('shop', {}, { argv }), (e: Error) => {
+      assert.match(e.message, /^fero\('shop'\): 'secret' cannot come from --fero\.(shop\.)?secret — it is set in the call, the environment or a fero\.opt\.ts file only \(a secret never rides argv: ps, \/proc\/<pid>\/cmdline and shell history show every flag\)$/)
+      assert.ok(!e.message.includes(S), `the secret is not in the message: ${e.message}`)
+      return true
+    }, argv.join(' '))
+  //! the shape rule for the text layers: envdeep turns an all-digit or boolean-looking value into a number or a
+  // boolean (its text is lost), and a short value is too weak — one refusal, with the hint, never the value
+  const hint = /^fero\('shop'\): secret must be text of at least 16 characters \(from FERO_SECRET\) — a value that is all digits is read as a number; openssl rand -base64 24 prints a good one$/
+  for (const v of ['1234567890123456', 'true', 'fifteen-chars!!', '12.5e3', 'Infinity', 'short-one'])
+    assert.throws(() => r('shop', {}, { env: { FERO_SECRET: v } }), (e: Error) => hint.test(e.message) && !e.message.includes(v), v)
+  //! a file is typed, and gets the same words naming the file
+  const bad = scratch()
+  fs.writeFileSync(path.join(bad, 'fero.opt.js'), 'export default { secret: 12345678901234567890 }')
+  assert.throws(() => r('shop', {}, { home: bad }), /secret must be text of at least 16 characters \(from a fero\.opt\.ts file \(secret\)\)/)
+  //! '' is unset (the next rung answers); the OFF set is false — open on purpose; a value is trimmed
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SECRET: '' } }), {})
+  assert.equal(cfg('shop', { secret: S }, { env: { FERO_SHOP_SECRET: '' } }).secret, S)
+  for (const off of ['off', 'false', '0', ' off ']) assert.equal(cfg('shop', {}, { env: { FERO_SECRET: off } }).secret, false, off)
+  assert.equal(cfg('shop', {}, { env: { FERO_SECRET: ` ${S} ` } }).secret, S, 'trimmed')
+  //! FERO_CONFIG=off ignores the variable like every other, and says so ONCE per process (per sink), naming it;
+  // nothing is said for an empty or absent one
+  const notes: string[] = []
+  const note = (line: string) => { notes.push(line) }
+  assert.deepEqual(r('shop', {}, { env: { FERO_CONFIG: 'off', FERO_SECRET: S }, note } as never).config, {})
+  r('users', {}, { env: { FERO_CONFIG: 'off', FERO_SECRET: S }, note } as never)
+  assert.deepEqual(notes, ['FERO_CONFIG=off: FERO_SECRET is ignored, this process runs open\n'])
+  r('shop', {}, { env: { FERO_CONFIG: 'off', FERO_SHOP_SECRET: S }, note } as never)
+  assert.deepEqual(notes[1], 'FERO_CONFIG=off: FERO_SHOP_SECRET is ignored, this process runs open\n')
+  assert.ok(!notes.join('').includes(S), 'the note never carries the value')
+  const quiet: string[] = []
+  r('shop', {}, { env: { FERO_CONFIG: 'off', FERO_SECRET: ' ' }, note: (l: string) => { quiet.push(l) } } as never)
+  r('shop', {}, { env: { FERO_CONFIG: 'off' }, note: (l: string) => { quiet.push(l) } } as never)
+  assert.deepEqual(quiet, [])
+  assert.equal(nameKey('secret'), null, 'a declared key is never a resource rung')
+})
+
 test('precedence: flag > call > env > project file > home file, per key', () => {
   const cwd = scratch(); const home = scratch()
   fs.writeFileSync(path.join(cwd, 'package.json'), '{ "type": "module" }')
@@ -168,7 +225,8 @@ test('call-only keys: a function or a per-instance switch cannot come from a fla
   assert.throws(() => r('r', {}, { argv: ['--fero.data.k', '1'] }), /'data' cannot come from --fero\.data — it is set in the call or a fero\.opt\.ts file only/)
   const home = scratch()
   fs.writeFileSync(path.join(home, 'fero.opt.js'), "export default { uuid: 'shared' }")
-  assert.throws(() => r('r', {}, { home }), /'uuid' cannot come from a fero\.opt\.ts file \(uuid\) — it is set in the call only \(one shared file would give every process the same identity\)/)
+  //! the refusal names the layers the key MAY come from (it said "the call only" for uuid, which rides a flag and a variable)
+  assert.throws(() => r('r', {}, { home }), /'uuid' cannot come from a fero\.opt\.ts file \(uuid\) — it is set in a flag, the call or the environment only \(one shared file would give every process the same identity\)/)
   //! data DOES ride a file (rows are data, not code)
   const home2 = scratch()
   fs.writeFileSync(path.join(home2, 'fero.opt.js'), "export default { data: { widgets: { stock: 1 } } }")
@@ -275,7 +333,7 @@ test('a config file that fails to load throws with its path (optcascade), and th
   const home = scratch()
   fs.writeFileSync(path.join(home, 'fero.opt.js'), 'export default {')
   assert.throws(() => r('r', {}, { home }), (e: Error) => e.message.includes(path.join(home, 'fero.opt.js')))
-  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'diag.allow', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
+  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'diag.allow', 'secret', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
 })
 
 test('I-35 — a LONGER name under a leaf is refused naming THAT name; the good variable beside it is never blamed, and `data` (an object of rows) still rides a file', () => {
