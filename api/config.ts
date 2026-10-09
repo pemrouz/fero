@@ -354,17 +354,29 @@ const bothSet = (resource: string, a: string, b: string): Error =>
 // beside its own rung's *_SECRET is refused naming both, before anything is lost. Only the global rung and this
 // resource's are judged; another resource's pair is its own business (the walk skips its subtree). A pair across
 // two rungs (FERO_SECRET and FERO_SHOP_SECRET_CLIENT) survives envdeep and is refused after the fold like every
-// both-set case.
+// both-set case. A name is read here the way envdeep reads it — lowercased, split on `_`, empty parts dropped — so
+// FERO_SECRET__CLIENT, FERO__SECRET_CLIENT and FERO_SECRET_CLIENT_ (a templated name with an empty part) are the
+// same key to the guard that they are to envdeep; an exact-spelling match let each of them past it, and the secret
+// was silently gone (the skeptic's finding on the §15 build).
+const envKey = (k: string): string[] => k.toLowerCase().split('_').filter(Boolean)
+//! rungOf — the rung of a variable whose segments are ['fero', rung?, ...want]: null = the global rung, a string =
+// that resource's rung, undefined = not this key at all
+const rungOf = (k: string, want: readonly string[]): string | null | undefined => {
+  const s = envKey(k)
+  const rung = s.length === want.length + 1 ? null : s.length === want.length + 2 ? s[1] : undefined
+  if (rung === undefined || s[0] !== 'fero') return undefined
+  const rest = rung === null ? s.slice(1) : s.slice(2)
+  return rest.every((x, i) => x === want[i]) ? rung : undefined
+}
 const secretEnv = (resource: string, env: Record<string, string | undefined>, mine: string | null): Record<string, string | undefined> => {
   const out = { ...env }
   const keys = Object.keys(env)
   for (const k of keys) {
-    const m = /^fero_(?:([a-z0-9]+)_)?secret_client$/i.exec(k)
-    if (m === null) continue
-    const rung = m[1]?.toLowerCase() ?? null
+    const rung = rungOf(k, ['secret', 'client'])
+    if (rung === undefined) continue
     if ((env[k] ?? '').trim() === '') { delete out[k]; continue }
     if (rung !== null && rung !== mine) continue
-    const sibling = keys.find((s) => s.toLowerCase() === (rung === null ? 'fero_secret' : `fero_${rung}_secret`) && (env[s] ?? '').trim() !== '')
+    const sibling = keys.find((s) => rungOf(s, ['secret']) === rung && (env[s] ?? '').trim() !== '')
     if (sibling !== undefined) throw bothSet(resource, sibling, k)
   }
   return out

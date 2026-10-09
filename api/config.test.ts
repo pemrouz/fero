@@ -217,6 +217,24 @@ test('secret.client (DESIGN-DOOR §15): the call, FERO_SECRET_CLIENT, FERO_SHOP_
   assert.ok(CONFIG_LEAVES.includes('secret.client'))
 })
 
+test('the raw-env guard (§15) reads a variable\'s name the way envdeep does — lowercased, split on _, empty parts dropped — so FERO_SECRET__CLIENT, FERO__SECRET_CLIENT and FERO_SECRET_CLIENT_ are FERO_SECRET_CLIENT to it too: an EMPTY one is dropped and FERO_SECRET survives, a set one beside its rung\'s secret is refused naming both variables as typed (the skeptic\'s finding: an exact-spelling match let each one eat the secret, and a loopback server ran open)', () => {
+  const K = 'unit-test-client-key-KILO-11-43chars-long-xx'
+  const S = 'unit-test-secret-ALPHA-01'
+  //! an empty client key under an odd spelling beside the secret: dropped, the secret survives
+  for (const odd of ['FERO_SECRET__CLIENT', 'FERO__SECRET_CLIENT', 'FERO_SECRET_CLIENT_', '_FERO_SECRET_CLIENT', 'fero_Secret__Client'])
+    assert.deepEqual(cfg('shop', {}, { env: { FERO_SECRET: S, [odd]: '' } }), { secret: S }, odd)
+  //! the templated name with an EMPTY resource part on both variables (FERO_${NAME}_SECRET with NAME unset)
+  assert.deepEqual(cfg('shop', {}, { env: { FERO__SECRET: S, FERO__SECRET_CLIENT: '' } }), { secret: S })
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SHOP_SECRET: S, FERO_SHOP_SECRET__CLIENT: '' } }), { secret: S })
+  //! a SET one beside its rung's secret: refused naming both variables as the user typed them, never a silent swap
+  assert.throws(() => r('shop', {}, { env: { FERO_SECRET: S, FERO_SECRET__CLIENT: K } }), /fero\('shop'\): FERO_SECRET and FERO_SECRET__CLIENT are both set/)
+  assert.throws(() => r('shop', {}, { env: { FERO__SECRET: S, FERO__SECRET_CLIENT: K } }), /fero\('shop'\): FERO__SECRET and FERO__SECRET_CLIENT are both set/)
+  assert.throws(() => r('shop', {}, { env: { FERO_SHOP_SECRET: S, FERO_SHOP_SECRET_CLIENT_: K } }), /fero\('shop'\): FERO_SHOP_SECRET and FERO_SHOP_SECRET_CLIENT_ are both set/)
+  //! alone, an odd spelling still reaches the leaf (envdeep's law, unchanged); another resource's odd pair is its own business
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_SECRET__CLIENT: K } }), { secret: { client: K } })
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_USERS_SECRET: S, FERO_USERS_SECRET__CLIENT: '' } }), {})
+})
+
 test('precedence: flag > call > env > project file > home file, per key', () => {
   const cwd = scratch(); const home = scratch()
   fs.writeFileSync(path.join(cwd, 'package.json'), '{ "type": "module" }')
