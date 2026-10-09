@@ -107,11 +107,15 @@ const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node
     case 'refused': return `${f} ${who} — it refused this node's proof (the secrets probably differ)`
     case 'address': return `${f} ${to ?? 'a dialed peer'} — it answered as ${shown(c)}, not the address the directory or the view gave (a stale or forged entry)`
     case 'timeout': return `${f} ${who} — no proof came within the handshake deadline`
-    //! uuid-taken has two sides: the refusing node's row names the client's uuid (an accepted link); the refused
-    // client's row (it read the {e: 'uuid-taken'} notice) names the dial target, and the uuid at fault is its own
-    case 'uuid-taken': return to !== undefined
+    //! uuid-taken has two sides, told apart by the ROW, not the link table (the third review's minor): the refused
+    // client's row (it read the {e: 'uuid-taken'} notice) carries c = its dial target, and the uuid at fault is its
+    // own; the refusing node's row carries c = the uuid the client claimed — on an accepted link, or on a DIALED
+    // one when a host it dialed answered as a client (or a client it had admitted was evicted by the real member)
+    case 'uuid-taken': return to !== undefined && c === to
       ? `${f} by ${to} — the uuid this process runs as, ${node.uuid}, belongs to a member there (a shared FERO_UUID?)`
-      : `${f} a client claiming uuid ${shown(c)} — that uuid belongs to a member (a shared FERO_UUID?)`
+      : to !== undefined
+        ? `${f} ${to} — it answered as a client claiming uuid ${shown(c)}; that uuid belongs to a member (a shared FERO_UUID?)`
+        : `${f} a client claiming uuid ${shown(c)} — that uuid belongs to a member (a shared FERO_UUID?)`
     default: return null
   }
 }
