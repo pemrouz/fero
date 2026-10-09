@@ -27,6 +27,43 @@ does not send yet; `site/index.html` did not change (it links the section
 script). (5) `METHODS_ONLY` moved to api/data.ts (re-exported from api/index.ts
 unchanged) because `issue()` now speaks it and data.ts cannot import index.ts.*
 
+*Built, stage 2 of 3 (2026-10-09): commit 3 of §13, the kernel half — the handshake
+itself, in the kernel and the sim. No api yet: the `secret` key, the composer's
+door closure, the off-loopback rule, the stderr lines and the redaction are stage
+3. What landed as designed: kernel/door.ts (the matrix, the proof message exactly
+as §3, `prove`/`verify` over `ctEq`, the address rule, `contractDiff` and `ctEq`
+moved here); `NodeOpts.door = { mac, nonce }`; HELLO `k` (16..64 accepted, minted
+at linkUp, kept on the Link, the sent HELLO kept as `link.said` so the proof signs
+exactly those keys); `DOOR: 26` with `{p}` (exactly 43 chars) and `{e}`;
+`LS.proving: 3`, `link.hello`, `TAG.prove: 3`, `tune.proveMs` (5000, floor 1);
+the order of checks of §3, with the proof between the pre-door checks and the
+admit tail (`#admit`, one method, reached by an open HELLO or a verified DOOR);
+the dialer proves first and the acceptor's DOOR precedes its VIEW and digest;
+`bad-proof` with the `{e: 'denied'}` notice, `uuid-taken` with `{e: 'uuid-taken'}`
+(secured nodes only — zero new frames on the open path); `timeout`; `refused` on a
+close or a notice after my proof, parked; the toy door (sim/door.ts: a chained
+keyed fnv padded to 43, 16 rng bytes as hex); the door family (200 seeds, n=3..5,
+one intruder per seed, the chaos defaults, the monitors and the frame oracle);
+the forwarder; the canary; the counted 4 frames per link; the 100-node secured
+formation pinned at 104,050 events beside the open 59,500, which did not move.
+Deviations, each small: (1) a second HELLO on a SECURED node is dropped and the
+link LIVES (step 3 said "and a close"; §9 and §11 say dropped, and under the dup
+fault a close would kill a healthy link — the stash keeps the first nonce, so
+nothing is lost). (2) On a received `{e}` the dialer journals `refused` with c =
+the dial target, not the notice's word, so the journal reads the same with or
+without the best-effort frame. (3) The address rule's view-learned case is proved
+in the kernel test (a dial whose `to` is a committed member's listen and not a
+static host); the sim's forwarder covers discovered and static — the sim has no
+way to make a member dial a view-learned address without a static host. (4) The
+refusal idiom (dead + noRedial, park a dialed target) is one method, `#refuse`,
+shared by name, contract and the door — no behaviour change. (5) sim/exec.ts grew
+two seams for the family: `raw()` endpoints (a relay, a replayer, a hand-written
+client) and `tap` (the frame oracle); both are inert unless used. (6) A finding,
+not the door's: a discovered target that never admits — a squatter — holds
+GENESIS at the lowest-uuid member for good, because genesis waits there for
+`links ≥ hosts` and `hosts` counts the discovered set (kernel/membership.ts
+tick). A V4-3 property, with or without a door; stated for STATUS.*
+
 ## §0 The decision, in ten lines
 
 1. HELLO grows once, by three optional keys: `c` (the cluster contract, a

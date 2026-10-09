@@ -14,12 +14,14 @@ import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed, writes } from './harness.ts'
 import { converged } from './monitors.ts'
+import { toyDoor } from './door.ts'
 import { JK } from '../kernel/journal.ts'
 import type { Node } from '../kernel/node.ts'
 
-const formOnly = (n: number): { sim: Sim; nodes: Node[] } => {
+const formOnly = (n: number, secured = false): { sim: Sim; nodes: Node[] } => {
   const sim = new Sim(0)
-  const nodes = cluster(sim, n, { fault: { delay: [1, 1] } })
+  const door = secured ? toyDoor('scale-pin-secret-000001', sim.rng) : undefined
+  const nodes = cluster(sim, n, { fault: { delay: [1, 1] }, ...(door ? { door } : {}) })
   sim.monitors.length = 0 // measurements, not laws — the monitors have their own suites
   sim.run({ maxEvents: 3_000_000 })
   assert.ok(formed(nodes), `n=${n}: a cheap-but-broken formation must not pin a number`)
@@ -39,6 +41,21 @@ test('counted: 100-node formation is EXACTLY 59,500 events at seed 0 — the who
   assert.equal(
     sim.events, 59_500,
     `100-node formation cost ${sim.events} events (pinned 59,500) — the formation protocol changed: ` +
+    're-pin deliberately with a DECISIONS entry, never to green a drifted count',
+  )
+})
+
+test('counted: 100-node formation WITH a secret is EXACTLY 104,050 events at seed 0 — the handshake\'s whole cost over the same mesh, pinned', () => {
+  //! PINNED 2026-10-09 (DESIGN-DOOR §10): the same 9,900-dial mesh with a door on every node. The
+  // 44,550 over the open 59,500 is the handshake: two DOOR frames per link (the dialer's proof, then
+  // the acceptor's) and one proving deadline armed per link end (its fire is a no-op event in the sim,
+  // whose cancel is a no-op — the open path arms none), over the 9,900 links the mesh opens. The frames
+  // after admission are the open mesh's own: this pin is what catches a frame added to the handshake
+  // unnoticed. Re-pin deliberately with a DECISIONS entry, never to green a drifted count.
+  const { sim } = formOnly(100, true)
+  assert.equal(
+    sim.events, 104_050,
+    `secured 100-node formation cost ${sim.events} events (pinned 104,050) — the handshake changed: ` +
     're-pin deliberately with a DECISIONS entry, never to green a drifted count',
   )
 })
