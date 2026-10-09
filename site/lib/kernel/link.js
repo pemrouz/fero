@@ -73,6 +73,11 @@ export class Link {
   // changes only through its methods. Set at admit; a CLIENT reads it live off its primary
   // (node.feederMethodsOnly) to refuse its own plain writes without the round trip.
   methodsOnly = false
+  //! contract (DESIGN-DOOR §4, DESIGN-SCALE stage 1): the peer's HELLO `c` as it came, kept at admit. A
+  // member checks it at the door and is done; a CLIENT reads it live off its primary (node.feederContract)
+  // to learn whether its feeder is scoped — a scoped feeder shows the spoke only the partitions it holds,
+  // so an absent row there says nothing about the resource. Undefined from a client, the sim, an old server.
+  contract         
   //! the door (DESIGN-DOOR §3, secured nodes only — every field stays at its zero on the open path):
   // nonce = MY `k` for this link, minted by door.nonce() at linkUp and never reused; said = the HELLO I
   // sent, the exact object (my proof signs its keys); hello = the peer's HELLO, stashed while proving
