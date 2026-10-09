@@ -31,6 +31,11 @@ export const VNODES = 32
 // 4-member sets of 8-hex ids). fmix32 spreads every input bit over the word: worst 1.57x (I-24).
 // This exact function is part of the wire contract: every member must compute the same ownership.
 // Exported only so ring.test.ts can pin its exact values.
+//! RING — the ring's wire label (DESIGN-DOOR §4, V4-14): the kernel appends `;ring=fmix32` to the cluster
+// contract a server's HELLO carries, so two members whose ring code differs refuse at the door instead
+// of computing two ownerships. It lives beside the hash so the label cannot drift from the code.
+export const RING = 'fmix32'
+
 export const fnv = (s        )         => {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) }

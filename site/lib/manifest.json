@@ -1,5 +1,5 @@
 {
- "head": "b62e054",
+ "head": "47c3717",
  "entries": [
   "sim/exec.ts",
   "sim/monitors.ts",
@@ -13,6 +13,7 @@
   "kernel/codec.js",
   "kernel/confirm.js",
   "kernel/diag.js",
+  "kernel/door.js",
   "kernel/env.js",
   "kernel/journal.js",
   "kernel/link.js",
@@ -33,5 +34,5 @@
   "tools/debug/eli5.mjs",
   "tools/debug/model.mjs"
  ],
- "bytes": 585184
+ "bytes": 617548
 }
