@@ -52,11 +52,17 @@ test('R1 teach cost: shipping a 1,000-entry partition from a 200,000-entry node 
   const small = armed()
   fill(small, 1, 1000)
   assert.equal(small.logs.get('aa')!.length, 1000)
-  //! bb asks to be taught p0 from zero: HAVEA need=1 with empty marks — the teacher ships p0's 1,000 entries
+  //! bb asks to be taught p0 from zero: HAVEA need=1 with empty marks — the teacher ships p0's 1,000 entries.
+  // The two nodes are timed INTERLEAVED (big, small, big, small, …, median of five each, one untimed warmup
+  // each — bench.time's discipline), so a GC pause or a neighbour's load lands on both alike instead of on
+  // whichever ran second (the stage-1 skeptic measured 1.64 with the runs back to back, 0.98 when alone).
   const need = encodeControl(VERB.HAVEA, { e: 1, a: { p0: { ok: 0, need: 1, m: {} } } })
-  const teach = (n: Node) => () => { n.step({ kind: 'bytesIn', link: 1, bytes: need }) }
-  const tBig = bench.time(teach(big))
-  const tSmall = bench.time(teach(small))
+  const teach = (n: Node) => { n.step({ kind: 'bytesIn', link: 1, bytes: need }) }
+  const once = (n: Node) => { const t0 = performance.now(); teach(n); return performance.now() - t0 }
+  teach(big); teach(small)
+  const bigs: number[] = [], smalls: number[] = []
+  for (let i = 0; i < 5; i++) { bigs.push(once(big)); smalls.push(once(small)) }
+  const tBig = bench.median(bigs), tSmall = bench.median(smalls)
   const r = tBig / Math.max(tSmall, 1e-3)
   console.log(`  R1 teach p0 (1,000 entries): big node ${tBig.toFixed(2)} ms, small node ${tSmall.toFixed(2)} ms, ratio ${r.toFixed(2)}`)
   assert.ok(r <= 2, `teach cost ratio ${r.toFixed(2)} > 2x — the hand-over walks the whole node again`)
