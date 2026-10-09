@@ -61,6 +61,10 @@ Only `be78891` (a client follows its feeder) has landed on `v4`, as `688aea6`.
 What the owner has to decide is in §9 (how to continue) and §7 (the crash-at-two question). The
 rest of this record is the evidence.
 
+**2026-10-09, the owner's answers (DECISIONS V4-31).** §9: go design first, the zero-risk candidate
+first. §7: (a) stays while the owner weighs a third vote; the directory as that vote is ruled out
+and the witness member is the open option (the dated note at the end of §7).
+
 ## §1 The problem
 
 When one of two members presses Ctrl-C, it asks the other to vote it out and waits about four
@@ -702,6 +706,29 @@ My view, in two sentences: keep (a) until the clean-stop design is settled, beca
 pledge both make a node act on a vote it cannot confirm, and settling one before the other means
 arguing safety twice. Of the rest, (d) is the only one that adds no automatic rule to the kernel,
 and it already exists in an unguarded form.
+
+**2026-10-09: could the directory be the third view? (the owner's question.)** A third vote is what
+breaks a tie at two, but the box's `#directory` cannot cast it as it stands. One: it runs on one of
+the members' boxes (`127.0.0.1:3376`, or a routable rendezvous on one of them since V4-27), so it
+shares that box's fate and sides with it in a cut; it is a third failure domain only on a third
+machine. Two: it keeps nothing on disk. An entry lives as long as its registrant's link, so "B is
+not registered" is not proof that B is dead (a directory restart drops every entry until the
+registrants come back), and a restarted directory forgets any answer it gave. Two members that
+each read "my partner is gone" would both go on alone: the split this rule exists to prevent.
+Three: it is unauthenticated and shared by every resource on its box, which may run different
+secrets (DESIGN-DOOR §6), so a stranger could ask it or pose as it.
+
+Fixing all three turns it into a member. The safe form of (c) is a **witness member**: a third
+member of the resource, on a third machine, that votes in the ordinary ballot, keeps its vote on
+disk (`dir`), holds the secret and stores no rows. With the view {A, B, W}, A and W are a
+majority, so A stays writable when B crashes and votes B out by the ordinary rule; a cut goes to
+whichever side reaches W. No lease, no clock and no new vote source: the lease is what made (c)
+expensive above, and a new vote source is what sank the pledge. What it needs: a member role
+that is never a holder (outside the ring, sent no records, never a client's feeder), its `dir`,
+the door's secret, and a sim family for crashes and cuts at two plus a witness. V4-6 weighed a
+witness against a third full member ("a third bare copy already is one that also holds data");
+the owner's ask, scale down to one rather than three to be crash safe, makes a data-less third
+vote on a small machine worth its own design. Not built; (a) holds until the owner decides.
 
 ## §8 What to salvage now, whatever is decided
 
