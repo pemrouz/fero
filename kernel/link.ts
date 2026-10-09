@@ -23,6 +23,7 @@
 import { Framer, Outbox, VERB, type AttemptRun, type Prov } from './codec.ts'
 import { JK, type Journal } from './journal.ts'
 import type { EffectSink } from './env.ts'
+import type { HelloKeys } from './door.ts'
 
 //! MAX_QUEUED: frames a paused link may hold before drop-oldest kicks in. M0 policy — M1 replaces the drop with spill-to-log (the log IS the retransmit buffer).
 // The default of the tune row `queued` (kernel/tune.ts): a Link has no node, so the node hands its row in at construction (Link.maxQueued).
@@ -32,7 +33,11 @@ export const MAX_QUEUED = 256
 //! LS.diag (M7): the authenticated diagnostics latch — a state, not a field. An LS.diag link is
 // structurally outside membership: never in byUuid/clientLinks, never counted by admitted(), and every
 // admitted-only verb closes it (kernel/diag.ts holds the whole machine). Appended, never renumbered.
-export const LS = { hello: 0, admitted: 1, diag: 2 } as const
+//! LS.proving (DESIGN-DOOR §3): the link has read a HELLO that carries `k` and waits for the proof — the
+// peer's HELLO is stashed on the Link, and the link is NOT in byUuid, NOT in clientLinks, NOT counted by
+// admitted(); every admitted-only verb closes it, so it can carry nothing but DOOR. Only a node WITH a
+// door ever puts a link here.
+export const LS = { hello: 0, admitted: 1, diag: 2, proving: 3 } as const
 
 export class Link {
   state: number = LS.hello
@@ -68,6 +73,16 @@ export class Link {
   // changes only through its methods. Set at admit; a CLIENT reads it live off its primary
   // (node.feederMethodsOnly) to refuse its own plain writes without the round trip.
   methodsOnly = false
+  //! the door (DESIGN-DOOR §3, secured nodes only — every field stays at its zero on the open path):
+  // nonce = MY `k` for this link, minted by door.nonce() at linkUp and never reused; said = the HELLO I
+  // sent, the exact object (my proof signs its keys); hello = the peer's HELLO, stashed while proving
+  // and cleared at admit; proved = I shipped my DOOR {p} (a close after that is journaled `refused`);
+  // proveTimer = the one-shot TAG.prove timer's id, -1 when none.
+  nonce = ''
+  said: HelloKeys | null = null
+  hello: HelloKeys | null = null
+  proved = false
+  proveTimer = -1
 
   id: number
   dialed: boolean

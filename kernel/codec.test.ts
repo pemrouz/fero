@@ -60,10 +60,22 @@ test('control frames carry one value; HELLO shape round-trips', () => {
   assert.deepEqual(f.value, { u: 'abc', i: 3, l: 'h:1' })
   //! the door's optional keys (DESIGN-DOOR §2): `c` the cluster contract (a string), `m: 1` the
   // methods-only hint — generic object keys, so an old decoder keeps and ignores them
-  const full = { u: 'abc', i: 3, l: 'h:1', r: 1, n: 'shop', c: 'v1;heartbeat.ms=500;replicas=0;methods=1;validation=none;ring=fmix32', m: 1 }
+  const full = { u: 'abc', i: 3, l: 'h:1', r: 1, n: 'shop', c: 'v1;heartbeat.ms=500;replicas=0;methods=1;validation=none;ring=fmix32', m: 1, k: 'Zm9vYmFyYmF6cXV4cXV1eA' }
   const g = new Framer().push(encodeControl(VERB.HELLO, full))[0]
   assert.deepEqual(g.value, full)
-  assert.deepEqual(Object.keys(g.value as object), ['u', 'i', 'l', 'r', 'n', 'c', 'm'], 'key order is the send site\'s insertion order')
+  assert.deepEqual(Object.keys(g.value as object), ['u', 'i', 'l', 'r', 'n', 'c', 'm', 'k'], 'key order is the send site\'s insertion order')
+})
+
+test('DOOR (26) round-trips its two shapes: {p} the proof and {e} the refusal notice', () => {
+  assert.equal(VERB.DOOR, 26, 'appended after LEAVE: 25, never renumbered')
+  const p = 'A'.repeat(43)
+  const proof = new Framer().push(encodeControl(VERB.DOOR, { p }))[0]
+  assert.equal(proof.verb, VERB.DOOR)
+  assert.deepEqual(proof.value, { p })
+  for (const e of ['denied', 'uuid-taken']) {
+    const notice = new Framer().push(encodeControl(VERB.DOOR, { e }))[0]
+    assert.deepEqual(notice.value, { e })
+  }
 })
 
 test('framer reassembles frames split at EVERY byte boundary', () => {

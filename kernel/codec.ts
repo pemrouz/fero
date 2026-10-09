@@ -72,6 +72,12 @@ export const VERB = {
   // of the same node never could (a two-member view). The frame carries no identity on purpose: the
   // leaver IS the link's authenticated uuid. Value {} — a control frame carries exactly one value.
   LEAVE: 25,
+  //! the door (2026-10-09, DESIGN-DOOR §2-§3): DOOR {p} carries a proof — a 43-character HMAC over both
+  // nonces, both uuids, the prover's side and every HELLO key it sent; the DIALER proves first, the
+  // acceptor proves back only to a verified dialer. DOOR {e: 'denied' | 'uuid-taken'} is a best-effort
+  // refusal notice sent just before a close (the shell's socket.destroy can lose it; the journal row is
+  // the contract). Sent only by nodes with a door; an open node never ships it and drops it on arrival.
+  DOOR: 26,
 } as const
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.

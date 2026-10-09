@@ -18,6 +18,7 @@ import { VERB, encodeControl, FrameError } from './codec.ts'
 import { LS, type Link } from './link.ts'
 import { JK } from './journal.ts'
 import { partitionOf } from './env.ts'
+import { ctEq } from './door.ts'
 import type { Node } from './node.ts'
 
 //! DIAG_MAX: rows per journal/logs chunk — chunked cursor pulls are what keep a big node servable
@@ -27,13 +28,8 @@ export const DIAG_MAX = 4096
 //! DIAG_P: the DIAG payload protocol version — reported in meta/ACCEPT; version skew degrades typed ('bad-op'), never fatally.
 export const DIAG_P = 1
 
-//! ctEq — length + constant-time XOR compare: token checks must not leak match-prefix length via timing.
-const ctEq = (a: string, b: string): boolean => {
-  if (a.length !== b.length) return false
-  let x = 0
-  for (let i = 0; i < a.length; i++) x |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return x === 0
-}
+//! ctEq (the constant-time token compare) lives in kernel/door.ts now: the door's proof check and this
+// token check are the same comparison, so there is one copy.
 
 //! reply — every DIAGA leaves through this gate: the encode is guarded (a FrameError from an oversized
 // body becomes a TYPED {ok:0, e:'too-large'} answer, never an escape into the bytesIn net where it
