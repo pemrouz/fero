@@ -129,33 +129,30 @@ export const MUTATIONS: readonly Mutation[] = ['drop-one', 'release-all', 'versi
 //! the monitors a mutation must turn red (any one of them counts as caught)
 export const CATCHERS = new Set(['stamp-oracle', 'release-safety', 'census-truth'])
 
-//! inject — perform the mutation now. Picks (seeded) a removed cell k of a partition p held by a live armed node;
-// returns a short description, or null when no tombstone was there to release (the seed did not engage).
+//! inject — perform the mutation now and return a short description, or null when no tombstone was there to release
+// (the seed did not engage). `drop-one` picks (seeded) one removed cell of a partition a live armed node holds and
+// drops it at that node; the other two act like a broken release rule would: on EVERY tombstone of every held
+// partition, at every armed node holding it.
 export const inject = (sim: Sim, r: () => number, m: Mutation): string | null => {
   if (m === 'none') return null
-  const cands: { n: Node; k: string; p: string }[] = []
+  const cands: { n: Node; k: string }[] = []
   for (const n of sim.nodes.values()) {
     if (!n.armed || !n.scope) continue
-    for (const [k] of n.versions) {
-      if (n.state.has(k)) continue
-      const p = (JSON.parse(k) as string[])[0]
-      if (n.scope.entries.get(p)?.state === SCOPE.held) cands.push({ n, k, p })
-    }
+    for (const [k] of n.versions) if (!n.state.has(k) && n.scope.entries.get((JSON.parse(k) as string[])[0])?.state === SCOPE.held) cands.push({ n, k })
   }
   if (!cands.length) return null
-  const c = pick(r, cands)
-  const at = m === 'drop-one' ? [c.n] : [...sim.nodes.values()].filter((n) => n.armed && n.scope?.held(c.p) && n.versions.has(c.k) && !n.state.has(c.k))
-  for (const n of at) {
-    const t = n.versions.get(c.k)!
-    n.versions.delete(c.k)
-    n.unlink(c.k)
+  const chosen = m === 'drop-one' ? [pick(r, cands)] : cands
+  for (const { n, k } of chosen) {
+    const t = n.versions.get(k)!
+    n.versions.delete(k)
+    n.unlink(k)
     if (m !== 'version-only') {
       const lane = n.logs.get(t.origin)
       if (lane) n.logs.set(t.origin, lane.filter((e) => !(e.seq === t.seq && e.epoch === t.epoch)))
     }
     sim.stepped.add(n.uuid) // the walk diffs only stepped nodes: this step happened outside a node event
   }
-  return `${m} ${c.k} @${at.map((n) => n.uuid).join(',')}`
+  return `${m} ${chosen.length} tombstone(s): ${chosen.slice(0, 3).map((c) => c.k + '@' + c.n.uuid).join(' ')}`
 }
 
 // ── the family runner ────────────────────────────────────────────────────────────────────────────
@@ -177,6 +174,8 @@ export interface Out {
 interface Ctx {
   sim: Sim; r: () => number; n: number; R: number; durable: boolean; o: MeshOpts; nodes: Node[]
   eng: Record<string, number>; t0: number
+  //! when the mutation runner injects (absolute virtual ms); a family may move it from inside its chaos
+  mutAt: number
   //! every 5 ms of virtual time, these run (the leave sweep's slice loop): reactive chaos
   polls: (() => void)[]
 }
@@ -266,6 +265,7 @@ export const FAMILIES: readonly Family[] = [
         const k = liveCell(c)
         if (k) { const a = others(c, cut).find((x) => c.sim.nodes.get(x)?.armed); if (a) c.sim.post(a, { kind: 'write', recs: [{ type: REC.remove, key: JSON.parse(k) }] }, 0) }
         const x = cut
+        c.mutAt = c.sim.now + 400
         c.sim.at(900, () => { join(c.sim, 'n91', c.o); c.sim.fault(x, 'n91', { delay: [1, 1] }); for (const o of others(c, 'n91')) if (o !== x) c.sim.fault(o, 'n91', { delay: [60, 80] }) })
         c.sim.at(1400, () => { if (c.sim.nodes.has(x)) healAll(c, x) })
       })
@@ -275,12 +275,12 @@ export const FAMILIES: readonly Family[] = [
     //! A4 durable holders restarted from disk at seeded moments; one disk lies about fsync (G5); a slow fsync clock
     // with a lamport lease of 1, so the boot record (with its floor seed) is written ahead of the WAL rows it
     // claims and a restart lands between the two (the DESIGN-SCALE §2 seed question)
-    name: 'A4-restarts', ns: [2, 3, 5], Rs: [2, 3], durable: true, mutateAt: 700,
+    name: 'A4-restarts', ns: [2, 3, 5], Rs: [2, 3], durable: true, mutateAt: 250,
     chaos: (c) => {
       const victims = [...c.nodes].sort(() => c.r() - 0.5).slice(0, 2)
       if (c.r() < 0.4) c.sim.storeFault(victims[1].uuid, { lieP: 0.3 })
       c.sim.storeFault(victims[0].uuid, { delay: [40, 80] })
-      const at = [300 + Math.floor(c.r() * 400), 900 + Math.floor(c.r() * 600)]
+      const at = [300 + Math.floor(c.r() * 400), 1200 + Math.floor(c.r() * 600)]
       c.sim.at(at[0], () => { if (c.sim.nodes.has(victims[0].uuid)) { c.sim.restart(victims[0].uuid); c.eng.restarts = (c.eng.restarts ?? 0) + 1 } })
       c.sim.at(at[1], () => { if (c.sim.nodes.has(victims[1].uuid)) { c.sim.restart(victims[1].uuid); c.eng.restarts = (c.eng.restarts ?? 0) + 1 } })
     },
@@ -411,13 +411,17 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   sim.run({ until: 1500 })
   if (!nodes.every((x) => x.armed)) { out.notLive.push('never formed'); return out }
   const t0 = sim.now
-  const c: Ctx = { sim, r, n, R, durable, o, nodes, eng, t0, polls: [] }
+  const c: Ctx = { sim, r, n, R, durable, o, nodes, eng, t0, polls: [], mutAt: t0 + fam.mutateAt }
   post(sim, plan(r, nodes.map((x) => x.uuid), count, parts, 600), t0)
   fam.chaos(c)
-  if (mut !== 'none') sim.at(fam.mutateAt, () => { const d = inject(sim, r, mut); if (d) eng.mutated = 1 })
+  //! the mutation fires at the first 5 ms slice at or past c.mutAt; its draws come from a separate stream so the
+  // schedule itself is the same with and without it
+  const mr = mul(seed * 31 + 7)
+  let mutated = mut === 'none'
   for (let t = sim.now; t <= t0 + horizon; t += 5) {
     sim.run({ until: t })
     for (const f of c.polls) f()
+    if (!mutated && sim.now >= c.mutAt) { mutated = true; if (inject(sim, mr, mut)) eng.mutated = 1 }
   }
   //! the verdict
   for (const v of sim.violations) {
