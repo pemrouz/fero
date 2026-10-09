@@ -195,6 +195,15 @@ test('ACKED [DESIGN-SCALE stage 1] — methods.update from a member that does no
     // which happened to keep the delete alive; the rule is now explicit — api/data.ts #local)
     delete nodes[0].data[keys[1]]
     assert.ok(await until(async () => ((await nodes[1].methods.read()) as Record<string, unknown>)[keys[1]] === undefined, 5000), 'the delete reached the owner')
+    //! a CLIENT of the non-holder (the stage-1 skeptic's A1): its fold is n01's held shard, so a row it writes
+    // through n01 that n02 holds never shows in it. Once `acked` settles that write, the lens no longer sees
+    // it as in flight, and a plain delete of it was swallowed as a no-op — the row stayed at n02 for ever.
+    // Now a client whose feeder is scoped (its HELLO contract says replicas=1) forwards every such delete.
+    client.data[keys[2]] = { k: keys[2], via: 'client' }
+    assert.ok(await until(async () => ((await nodes[1].methods.read()) as Record<string, { via?: string }>)[keys[2]]?.via === 'client', 5000), 'the client write reached the owner')
+    assert.ok(await until(() => rows(client).some((x) => x.key === JSON.stringify([keys[2]]) && x.state === 'committed'), 5000), 'and settled through acked')
+    delete client.data[keys[2]]
+    assert.ok(await until(async () => ((await nodes[1].methods.read()) as Record<string, unknown>)[keys[2]] === undefined, 5000), 'the client delete reached the owner')
   } finally {
     await client.destroy()
     await Promise.all(nodes.map((n) => n.destroy()))

@@ -430,6 +430,11 @@ export class Node {
   // (the feederOpen shape above) could never be refilled. False with no primary, or an old server that
   // sends no `m`: the write then takes the round trip and the relay's door refuses it as before.
   get feederMethodsOnly(): boolean { return this.primary !== null && (this.links.get(this.primary)?.methodsOnly ?? false) }
+  //! feederContract (DESIGN-SCALE stage 1) — the PRIMARY's HELLO contract (`c`), read live off the primary
+  // link for the same reason as feederMethodsOnly. The api reads `replicas=` out of it: a client of a
+  // SCOPED feeder sees only the partitions its feeder holds, so a row absent from its fold may well live
+  // at an owner, and a delete of it is a real remove to send. Undefined with no primary or an old server.
+  get feederContract(): string | undefined { return this.primary !== null ? this.links.get(this.primary)?.contract : undefined }
 
   //! clientLinks — the admitted CLIENT links this node serves (maintained at HELLO/linkDown). The
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
@@ -1270,6 +1275,7 @@ export class Node {
     link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
     if (r === 1) { link.client = true; this.clientLinks.add(link) }
     link.methodsOnly = m === 1 // the hint (§4): a client reads it live off its primary (feederMethodsOnly)
+    if (typeof v.c === 'string') link.contract = v.c // the contract as sent: a client reads it live off its primary (feederContract)
     link.state = LS.admitted
     if (link.proveTimer !== -1) this.#unprove(link) // the door is behind us: the deadline and the stash go (step 13)
     this.byUuid.set(v.u, link.id)

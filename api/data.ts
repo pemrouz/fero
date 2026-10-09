@@ -40,6 +40,10 @@ import type { Runtime } from '../shell/runtime.ts'
 // composer re-exports it) because issue() is the one place that speaks it on a client.
 export const METHODS_ONLY = 'methods-only'
 
+//! SCOPED_FEEDER — does a server's HELLO contract (api/index.ts clusterContract: `v1;heartbeat.ms=…;
+// replicas=N;…`) say it is scoped? `replicas=0` is full replication. Read by #local on a client.
+const SCOPED_FEEDER = /(?:^|;)replicas=(?:[1-9]\d*)(?:;|$)/
+
 //! cellOf — the version-key normalization, byte-identical to the kernel's (node.apply): a record's
 // LWW cell is its key path, or [at] for a root insert.
 export const cellOf = (r: Rec): string => JSON.stringify(r.key.length ? r.key : [r.at ?? ''])
@@ -181,11 +185,16 @@ export class Bind {
   }
 
   //! #local — does this node's fold speak for partition p? Unscoped: always (every row is here). Armed: only
-  // for a partition it HOLDS. The lens asks before swallowing a delete of an absent cell as a no-op: on a
-  // scoped member the row may well exist, at its owner, and a delete there is a real remove to forward.
-  // (Until the `acked` effect, a non-holder's own write stayed "in flight" for ever, which hid this.)
+  // for a partition it HOLDS. A CLIENT of a scoped feeder: never — its fold is the feeder's held shard (the
+  // tap filters by the feeder's held set), and it cannot know which partitions those are; the feeder's HELLO
+  // contract carries `replicas=N` (api/index.ts clusterContract, read live off the primary link). The lens
+  // asks before swallowing a delete of an absent cell as a no-op: on a scoped member or spoke the row may
+  // well exist, at its owner, and a delete there is a real remove to forward. (Until the `acked` effect, a
+  // non-holder's own write stayed "in flight" for ever, which hid this; the stage-1 skeptic's A1 found the
+  // client case: a client's delete of a row it had just written through a non-holder primary went nowhere.)
   #local(p: string): boolean {
     const n = this.#rt.node
+    if (n.client) return !SCOPED_FEEDER.test(n.feederContract ?? '')
     return !n.armed || n.scope!.held(p)
   }
 
