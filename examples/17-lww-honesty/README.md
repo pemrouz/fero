@@ -28,4 +28,4 @@ for i in 1 2 3; do node race.ts; done  # the same numbers every run: the loss is
 ```
 
 `node check.ts` runs this story on its own and ends with `ok 17-lww-honesty`, in about ten seconds.
-Next: [20 · looking inside](../20-inside/).
+Next: [18 · the shared secret](../18-secret/).

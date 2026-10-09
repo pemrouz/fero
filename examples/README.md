@@ -24,6 +24,7 @@ dependency).
 | 15 | [static-topology](15-static-topology/) | with the directory off every address is in the call — a member is `listen` + `hosts`, a client is `hosts` — and a shape that cannot work is refused at `fero()` | `node server.ts 4801 4802 4803` ×3, rotated · `node client.ts 4801 4802 4803` · `node refusals.ts` |
 | 16 | [scoped](16-scoped/) | `replicas: 2` puts every row on exactly two members: a shard is never shown as the resource — a sync read or an operator throws typed, `await f.data` gathers the whole, a row not held is one hop away, and a client reads the union | `node server.ts 4811 5811 6811` ×3 rotated · `node client.ts 4811 5811 6811` |
 | 17 | [lww-honesty](17-lww-honesty/) | two members read a cell and write it back plus one, and one increment is lost — a cell keeps its last writer; write one row per event and fold them instead | `node race.ts` |
+| 18 | [secret](18-secret/) | `FERO_SECRET` in the environment is the cluster's shared secret, never a flag or the call: two members that hold it form a cluster; a third started without it is refused at the door, both screens say why once per peer, and nothing of it lands; the same command with the secret joins | `FERO_SECRET=… node server.ts 4801 4802` ×2, rotated · `node server.ts 4803 4801 4802`, then with the secret |
 | 20 | [inside](20-inside/) | every instance carries a diagnostics handle off the typed surface: the journal, the log, compaction on demand, and a capture file the debugger opens | `node inside.ts` · `npm run debug -- …` |
 | 21 | [journal](21-journal/) | `diag(f).journal(from)` is a cursor over the kernel's one diagnostics ring: tail it and watch a peer arrive and be voted in, leave by vote, and its link close | `node server.ts` ×2 |
 | 22 | [time-travel](22-time-travel/) | a capture with a story: two writes before the first view are an election (`lww-lost` in the viewer), the same two after it are plain history, a cut heals by anti-entropy, and the scrubber replays any step | `node story.ts` · `npm run debug -- examples/22-time-travel/story.capture.json` |
@@ -35,7 +36,7 @@ dependency).
 | 43 | [ledger](43-ledger/) | money is facts: transfers are rows on three durable members, the rule thrown from a method, the intent cleared through the door, every id on a member that comes back | `node member.ts 4901` ×3 (4902, 4903) · `node notifier.ts` · `node teller.ts mint alice 100` |
 | 44 | [sell](44-sell/) | an open server lets every client change every row, the price included; declaring `methods:` is the door: the same write is refused `methods-only`, and `sell` writes the sale at the server's price | `node open.ts`, then `node door.ts` · `node customer.ts` ×2 |
 
-Four tiers: 01-17 climb one feature at a time, 20-23 open the debugger, 30 is everything at once on one
+Four tiers: 01-18 climb one feature at a time, 20-23 open the debugger, 30 is everything at once on one
 box, and 40-44 are apps, the last of them the story the website tells: an open shop anyone can change,
 then the same shop behind a door.
 
@@ -63,8 +64,9 @@ Every option a role file could pass in the call can also come from outside the f
 (`node server.ts --fero.dir ./shop`), a variable (`FERO_DIR=./shop node server.ts`), or a `fero.opt.ts`
 next to the nearest `package.json` or in your home directory. The README's "Configuration" section has
 the table. The role files here stay bare on purpose. The files that read their ports from the command
-line — 13's `server.ts`, 15's and 16's `server.ts` and `client.ts`, 30's and 43's `member.ts` — take every
-argument as a port, so give those the variable form: `FERO_HEARTBEAT_MS=50 node client.ts 4801`, not a flag.
+line — 13's and 18's `server.ts`, 15's and 16's `server.ts` and `client.ts`, 30's and 43's `member.ts` — take
+every argument as a port, so give those the variable form: `FERO_HEARTBEAT_MS=50 node client.ts 4801`, not a
+flag. A secret is the variable form only, everywhere: `FERO_SECRET=… node server.ts` (18); `--fero.secret` is refused.
 
 How a check works: `check.ts` starts the role files with `fero.spawn` (each a separate `node <file>`, its
 output echoed here), reads what they print, asserts, stops them with Ctrl-C (`stop()`), and ends with
