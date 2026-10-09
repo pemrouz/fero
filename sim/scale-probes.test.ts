@@ -222,8 +222,15 @@ test('M5 floor-truth: a floor raised past what the node holds goes red at its ne
   assert.match(named(sim, 'floor-truth')[0]?.detail ?? '', /n02 floor for \(n01, 'p\d+'\) is \d+ but it neither holds nor covers .* the floor overclaims/)
 })
 
-test('M6 census-truth: a release while a cut-off holder still has an older record goes red at the release (scoped form of the zombie)', () => {
+//! m6Plant — `alone` takes M3 (release-safety) off the sim first: M6 must find the release by itself, not lean on
+// M3 having sorted it (the stage-0 review: M6 read the releases M3 queued, so M3 off silenced M6)
+const m6Plant = (alone: boolean) => {
   const { sim, ns, p, P } = scoped3(26)
+  if (alone) {
+    const i = sim.monitors.findIndex((m) => m.name === 'release-safety')
+    assert.ok(i >= 0, 'release-safety was armed')
+    sim.monitors.splice(i, 1)
+  }
   sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [p], value: 1 }] }, 0)
   sim.run({ until: sim.now + 200 })
   //! n01 writes again with n02 unreachable (the record reaches n01's log only), then a remove is stamped and n02 learns it
@@ -242,7 +249,11 @@ test('M6 census-truth: a release while a cut-off holder still has an older recor
   sim.run({ until: sim.now + 50 })
   assert.match(named(sim, 'census-truth')[0]?.detail ?? '', /n02 released the tombstone of .* while node n01 holds .* older, which n02 neither holds nor covers/)
   assert.ok(ledgerOf(sim).counts.census >= 1)
-})
+}
+
+test('M6 census-truth: a release while a cut-off holder still has an older record goes red at the release (scoped form of the zombie)', () => m6Plant(false))
+
+test('M6 census-truth stands alone: with M3 off, the same release still goes red', () => m6Plant(true))
 
 test('M7 floors-agree: holders with unequal floors at a quiet point are red; equal after a lawful run', () => {
   const { sim, ns: [a, b], p } = scoped3(27)
