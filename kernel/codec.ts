@@ -45,7 +45,9 @@ export const HEADER = 11
 // M3 write pipeline: WRITE is a RECORDS-shaped frame (FLAG_PROV + record runs) whose provenance triple is
 // REINTERPRETED as the ATTEMPT triple [issuer, baseCid, attemptEpoch] — un-sequenced attempts forwarded to
 // the partition owner reuse the whole hot record-encode/decode path. WACK {u,c,n,s,e} answers a committed
-// run with its stamp coordinates; WNACK {u,c,n,r,ce} rejects one with a typed reason + the owner's epoch.
+// run with its stamp coordinates — plus `o`, the lane it was stamped on, from an ARMED owner only (DESIGN-SCALE
+// stage 1: the issuer may never see the record; unscoped WACKs stay the v4.0 bytes); WNACK {u,c,n,r,ce} rejects
+// one with a typed reason + the owner's epoch (`m`, the reason text, rides an `invalid`).
 export const VERB = {
   HELLO: 1, RECORDS: 2, PING: 3, PONG: 4, DIGEST: 5,
   JOIN: 6, PROPOSE: 7, VOTE: 8, VIEW: 9, PULL: 10,
