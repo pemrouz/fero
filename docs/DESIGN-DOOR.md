@@ -174,6 +174,62 @@ before its own dialed link's proof lands (the open path marks that loser itself 
 admit); the extra link is closed as a duplicate at once. It is inside the 104,050
 count. Nothing printed by an example changed.*
 
+*Settled at the third review (2026-10-09): a third skeptic re-checked the fixed
+door with probes and left one major, one minor and one nit; each was checked
+and confirmed, and each fix is red without its change. (1) THE PARK ON A BARE
+CLOSE STRANDED HONEST PEERS: a dialer whose secured link closed mid-handshake
+after its proof journaled `refused` and parked the target given-up — a guess,
+as the old "close-while-proving" text admitted. With heartbeats off (the sim's
+sweep mode, a documented opt-out) nothing clears a park: a 3 ms cut during
+formation left 41 of 480 pairs (n=2 and n=3, 30 seeds × 8 cut times) never
+formed, with 260 `refused` rows naming honest members, and 68 of 210
+server + client schedules without a feeder — a server never dials a client, so
+the client's own park was final. The round-2 keeper exception covered only the
+crossing dial. THE RULE NOW (option 1, the integrator's call under the owner's
+"every default"): the door speaks only through `DOOR { e }`. A notice parks, as
+before (`refused`, or `uuid-taken` with its word). A bare close while proving —
+before or after my proof — is a LINK LOSS: no row, no park, no `noRedial`; the
+ordinary bounded redial chain a link that died before HELLO gets (the generic
+chain, `tune.redials`, not the member chain — the link was never admitted),
+then the ordinary give-up and heartbeat revival. A lost notice costs one chain.
+On loopback the notice arrived on 70 of 70 real-TCP attempts, so a refusal
+still reads as one. The row: NO row for a bare close, and no `refused` at the
+end of a notice-less chain either — telling that apart would need a flag on
+the backoff entry and would make `refused` mean two things (a word the peer
+said, and a guess); the chain's `giveUp` row is the record, as on the open
+path, and the acceptor's `bad-proof` row and line say what happened on the
+side that knows. The `refused` line reads "it refused this node's proof (the
+secrets probably differ)" — the notice's line. (2) HELD, NOT CLAIMED: the
+keeper exception stays as the one close while proving that starts no chain,
+but it keys on facts this node owns — a live link whose PROVEN listen, or my
+own dial target, equals this link's `to` (`#held`, the revive loop's rule) —
+never on the uuid the closing peer claimed and never proved: a stranger at a
+typed host answering as a held member's uuid got silence for the life of the
+process. It is re-dialed on the chain now. (3) THE PRINTER SAID THE WRONG SIDE:
+a `uuid-taken` row on a link with a dial target printed the refused-client
+wording, naming this node's own uuid — but the refusing side writes that row
+on a dialed link too (a host that answers as a client claiming a member's
+uuid; a squatting client on a dialed link evicted by the real member). The
+side is in the row: the refused client's `c` is its dial target, so the client
+wording prints only when `c` equals the target; a dialed link with another `c`
+reads "refused <host> — it answered as a client claiming uuid <c>; that uuid
+belongs to a member", and an accepted link keeps its line. A FINDING about the
+sim, stated: its close model posts a close at the pair's minimum delay and a
+frame at a random one, so a dialer in the sim never reads a notice shipped in
+the step that closes (unless the pair's delay is fixed); two sim assertions
+that said "read its refusal" had passed only through the old row and now pin
+the lost-notice path (no admission, re-dials, every row names the stranger).
+The read-notice path is the kernel test's and real TCP's. A sweep of 480 pair
+and 240 server + client schedules cut during the handshake, open and secured,
+asserts every one heals and no row names an honest peer; the real-socket
+hang-up tier asserts a silent host is re-dialed with no row and no line while
+one that sends `{ e: 'denied' }` is refused once. The 59,500 and 104,050 pins
+did not move: a keeper close never started a chain, and nothing else closes a
+proving link in a clean formation. §3's close-while-proving paragraph, the
+note under its row table, the `refused` line, §9 and §11 are rewritten below;
+the earlier dated notes stand as the record of what each stage landed.
+Nothing printed by an example changed.*
+
 ## §0 The decision, in ten lines
 
 1. HELLO grows once, by three optional keys: `c` (the cluster contract, a
@@ -425,16 +481,26 @@ operator skeptic noted `heartbeat: { ms: 0 }` is a documented opt-out
 (api/index.ts:261-263), so a sweep would never run there. The timer is set
 only on secured links, so it draws nothing on the open path.
 
-A link that closes while proving, AFTER I sent my proof: the dialer journals
-`doorReject 'refused'` and parks. It is a guess (a crash mid-handshake looks
-the same), so the stderr line says so: *closed during the handshake; if this
-repeats every heartbeat the secrets probably differ*. One close is not a
-guess: when the stashed HELLO's uuid is already held by a live admitted link
-in `byUuid`, the peer closed this link as the duplicate of a crossing dial
-(its proof may still be in flight behind the close) — no row, no park, no
-redial (settled at the second review, 2026-10-09). A `DOOR { e: 'uuid-taken' }`
-read while proving keeps its word: `doorReject 'uuid-taken'` with `c` = the
-dial target; `{ e: 'denied' }` reads `refused` like a close.
+A link that closes while proving — before or after I sent my proof — is a
+LINK LOSS, not a refusal (settled at the third review, 2026-10-09): no
+`doorReject` row, no park, no `noRedial`. The dialer runs the ordinary
+bounded redial chain a link that died before HELLO gets (the generic chain),
+then the ordinary give-up and heartbeat revival. The door speaks only through
+`DOOR { e }`: a notice read while proving parks the target with `doorReject
+'refused'` (or `'uuid-taken'`, the one word that is kept; `c` = the dial
+target either way). A crash, a cut, a reset and a lost notice all look like a
+bare close from the dialer's side and are treated as one, so an honest peer is
+never journaled refused and, with heartbeats off, never stranded — the earlier
+text parked here on a guess, and a 3 ms cut during formation then left 41 of
+480 pairs unformed for good. A lost notice costs one chain; on loopback the
+notice arrives (70 of 70 real-TCP attempts). The ONE close that starts no
+chain: when a live link already reaches the target — one I dialed there, or
+one whose peer PROVED that listen (`#held`, the revive loop's rule) — the peer
+closed this link as the duplicate of a crossing dial (its proof may still be
+in flight behind the close); the pair is linked, so nothing is dialed. Held is
+judged on facts this node owns, never on the uuid the closing peer claimed:
+that claim is unproven, and a stranger at a typed host claiming a held
+member's uuid is re-dialed like any lost link.
 
 ### Replay and forgery, step by step
 
@@ -494,7 +560,10 @@ dial target; `{ e: 'denied' }` reads `refused` like a close.
 | `contractReject: 77` | link | the first key that differs, or `missing:<key>` | their value for it (a string, never ours) |
 | `doorReject: 78` | link | `'no-secret'` · `'peer-secret'` · `'bad-proof'` · `'uuid-taken'` · `'address'` · `'timeout'` · `'refused'` | the dial target or the claimed listen; for `uuid-taken` the uuid on the refusing side, the dial target on the refused client |
 
-Never in a row: the secret, a nonce, a proof. The journal's 4096 ring
+`refused` is written only when a `DOOR { e }` notice was read; a bare close
+while proving writes no door row at all — it is a `linkDown`, a `redial`
+chain and, if every attempt fails, a `giveUp`, like any link loss (the third
+review). Never in a row: the secret, a nonce, a proof. The journal's 4096 ring
 (kernel/journal.ts:127) fills in about 34 minutes if two mis-keyed members
 re-dial each other every 500 ms, the same cadence `nameReject` has today.
 Stated, not fixed here.
@@ -505,7 +574,8 @@ Stated, not fixed here.
 fero('shop'): refused by 127.0.0.1:4100 — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)
 fero('shop'): refused 127.0.0.1:51234 (uuid 7c3e) — it has no secret and this node has one; every member and client must share FERO_SECRET
 fero('shop'): refused 127.0.0.1:4100 (uuid 9e1c) — its secret differs from this node's
-fero('shop'): refused 127.0.0.1:4100 — closed during the handshake; if this repeats every heartbeat the secrets probably differ
+fero('shop'): refused 127.0.0.1:4100 — it refused this node's proof (the secrets probably differ)
+fero('shop'): refused 127.0.0.1:4100 — it answered as a client claiming uuid 7c3e; that uuid belongs to a member (a shared FERO_UUID?)
 fero('shop'): refused 127.0.0.1:4100 — it answered as 127.0.0.1:4200, not the address the directory gave (a stale or forged entry)
 fero('shop'): refused a client claiming uuid 7c3e — that uuid belongs to a member (a shared FERO_UUID?)
 fero('shop'): refused by 127.0.0.1:4100 — the uuid this process runs as, 7c3e, belongs to a member there (a shared FERO_UUID?)
@@ -887,6 +957,16 @@ same-seed runs, equal `trace`) both hold.
   today (the golden).
 - The timer: a proving link with no DOOR dies at `proveMs` and parks, with
   heartbeats off.
+- A cut DURING the handshake with heartbeats off heals: 480 pair schedules
+  (n=2 and n=3, 30 seeds × 8 cut times) and 240 server + client schedules,
+  open and secured, every one formed afterwards with no `doorReject` row
+  against an honest peer (the third review's sweep).
+- The LOST-notice path, and only that: the sim posts a close at the pair's
+  minimum delay and a frame at a random one, so a dialer here never reads a
+  `DOOR { e }` shipped in the step that closes (unless the pair's delay is
+  fixed, as in the counted test). What it proves is that a bare close after
+  the proof is a link loss — the dialer re-dials on the chain, is never
+  admitted, writes no row, and every row it does hold names the stranger.
 - `m: 1` sets `link.methodsOnly`; `feederMethodsOnly` follows the primary
   across a failover.
 - Byte identity: with nothing set the goldens, the sweep and the 59,500 pin
@@ -900,8 +980,10 @@ ts):
 - The config layers deliver the secret and the flag is refused; the
   per-resource rung; the redaction; no message contains the value.
 - The stderr lines, deduped across revivals.
-- The best-effort `DOOR { e }` under `socket.destroy()`, and the close-
-  while-proving inference.
+- The best-effort `DOOR { e }` under `socket.destroy()` is READ on loopback:
+  the dialer's row is the notice's (`refused` with its line), while a host
+  that hangs up on the proof without a notice earns no row and no line and
+  is re-dialed — the chain, then revival (the hang-up tier).
 - The directory squatter on a real box: a raw socket registered as `shop`
   is refused and the real members form.
 - The STATUS bug end to end: a raw `net.Socket` writes a crafted HELLO
@@ -958,14 +1040,20 @@ write/codec/node pins run with no secret and the same frames as today.
   one-sided / malformed / r:2; `m: 1` → `link.methodsOnly`,
   `feederMethodsOnly` follows the primary across failover; the crossing-dial
   case (both dial each other) proves both links and the keeper picks one as
-  today. Each test mutation-checked: drop the guard, watch it go red.
+  today; a bare close after my proof writes no row and starts the ordinary
+  chain, which ends in `giveUp`; the keeper close starts no chain, judged on
+  the held link's proven listen — a typed host claiming a held uuid is
+  re-dialed (the third review). Each test mutation-checked: drop the guard,
+  watch it go red.
 - **kernel/codec.test.ts:** HELLO round-trips with `c`, `m`, `k`; DOOR with
   `{ p }` and `{ e }`.
 - **kernel/tune.test.ts:** the `proveMs` row and its floor.
 - **sim:** a `door` family of about 200 seeds, a secret on every member plus
   one intruder per seed (wrong secret, no secret, a member's uuid as r:1, a
   replay); the new monitors; the 4-per-link frame count; the forwarder case;
-  the existing golden unchanged.
+  the honest crossing dial (240 formations, a cut with heartbeats off); the
+  cut-during-handshake sweep (480 pairs + 240 server + client, open and
+  secured); the existing golden unchanged.
 - **api/config.test.ts and tests/config.test.ts:** `secret` from the call,
   `FERO_SECRET`, `FERO_SHOP_SECRET` over `FERO_SECRET`, a `$HOME` file;
   `--fero.secret` refused naming the flag; a number, a boolean, a 15-
@@ -992,7 +1080,12 @@ write/codec/node pins run with no secret and the same frames as today.
 - **api/directory.test.ts:** a secured server is found through a private-
   port directory; a raw socket registered as the name is refused at the door
   and the real members form.
-- **tests/ real-TCP tier:** the raw-socket STATUS scenario in §9, three ways.
+- **tests/ real-TCP tier:** the raw-socket STATUS scenario in §9, three ways;
+  the hang-up hosts (silent → re-dialed, no row, no line; with the notice →
+  refused once); the contract dedupe on the dial target; `fero.spawn` with
+  `FERO_SECRET`.
+- **api/index.test.ts, the printer:** a dialed host that answers as a client
+  claiming a member's uuid prints the refusing side's line (the third review).
 - **tools/debug:** eli5 entries for `contractReject` and `doorReject` (the
   glossary gate in tools/debug/eli5.test.ts fails without them); model.mjs
   treats both like `nameReject` (tools/debug/model.mjs:260); the honesty
