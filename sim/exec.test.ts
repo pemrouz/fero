@@ -406,6 +406,56 @@ test('a restart with batches still in flight on a slow, failing disk: no echo of
   assert.ok(checked > 300, `the new lives really persisted (${checked} echoes checked)`)
 })
 
+//! the snapshot site's two echo guards (the second review, 2026-10-09): the test above reaches only the
+// persist() site, so the snapshot swap's `persisted` and `persistFail` guards could be removed with every
+// test green. Here the victim's first snapshot swap after 300 ms is the last thing its old life does: the
+// node restarts 1 ms after the swap is issued, with the swap's echo (80-160 ms away) still queued, and in
+// the `fail` round the swap itself fails. The new life's disk answers no sooner than 400 ms, so ANY
+// `persisted` or `persistFail` the new life steps in its first 400 ms is the old life's.
+// (The boot site's persistFail guard cannot be reached: restart() refuses a condemned store, and a failed
+// boot record is what condemns it.)
+test('a restart while a snapshot swap\'s echo is in flight: neither its `persisted` nor its `persistFail` reaches the new life', () => {
+  for (const fail of [false, true]) {
+    let restarts = 0, stale = 0
+    const failures: string[] = []
+    for (let seed = 0; seed < 12; seed++) {
+      const sim = new Sim(seed)
+      const ids = ['n01', 'n02', 'n03']
+      const nodes = ids.map((id, i) => sim.add({ uuid: id, listen: `sim:${id}`, hosts: ids.filter((_, j) => j !== i).map((x) => `sim:${x}`), heartbeatMs: 40, durable: true, tune: { snapshotAt: 6 } }))
+      for (const id of ids) sim.post(id, { kind: 'start' })
+      const victim = ids[seed % 3]
+      sim.storeFault(victim, { delay: [80, 160] })
+      writes(sim, nodes, 150, 1500)
+      const sink = sim.nodes.get(victim)!.env.sink
+      const snapshot = sink.snapshot.bind(sink)
+      let armed = true
+      sink.snapshot = (batch, rows) => {
+        if (!armed || sim.now < 300) return snapshot(batch, rows)
+        armed = false
+        if (fail) sim.storeFault(victim, { delay: [80, 160], failP: 1 }) // this one swap fails
+        snapshot(batch, rows)
+        sim.storeFault(victim, { delay: [400, 500] }) // the new life's disk: slow and sound
+        const at = sim.now + 1
+        sim.at(1, () => { // a delay: Sim.at schedules relative to now
+          const life = sim.restart(victim)
+          restarts++
+          const step = life.step.bind(life)
+          life.step = (ev) => {
+            if ((ev.kind === 'persisted' || ev.kind === 'persistFail') && sim.now < at + 400) stale++
+            step(ev)
+          }
+        })
+      }
+      sim.run({ until: 4000 })
+      if (sim.violations.length) failures.push(`seed ${seed}: monitor ${sim.violations[0].monitor}: ${sim.violations[0].detail}`)
+      const c = converged(sim); if (c) failures.push(`seed ${seed}: not converged: ${c}`)
+    }
+    assert.equal(stale, 0, `${fail ? 'a failed' : 'a sound'} swap: no old-life echo reaches the new life`)
+    assert.deepEqual(failures, [])
+    assert.equal(restarts, 12, 'every seed restarted with a swap echo in flight')
+  }
+})
+
 test('checkEvery: 1 (and default) are byte-identical — the throttle at K=1 IS the per-event contract', () => {
   const runWith = (opts?: { checkEvery?: number }) => {
     const sim = new Sim(1234)
