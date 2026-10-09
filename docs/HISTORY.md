@@ -688,6 +688,15 @@ working as designed.
   nothing built until the owner answers its §14. 600/600 + 18/18, perf 46/46,
   sim:scale green.
 
+- 2026-10-09 — scoped replication at scale is a design record, docs/DESIGN-SCALE.md,
+  from a three-proposal panel (protocol, storage, operator) with a skeptic each:
+  announce-on-change anti-entropy instead of the member digest, compaction behind
+  a holders' frontier, tombstone GC under census + quorum + lane accounting, a
+  draining leave; six stages, the harness first. Its probes found two unscoped
+  tombstone-GC holes (a short lane resurrects a removed row; an evicted member's
+  write beats a newer remove after a heal), filed in STATUS. Nothing built; the
+  owner answers its §14 first.
+
 ## The debug tool
 
 One journal, one model, replay for free (plan §8) — every piece exists because the
