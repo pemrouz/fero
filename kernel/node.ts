@@ -1433,7 +1433,15 @@ export class Node {
         const v = f.value as { p?: unknown; e?: unknown }
         //! the peer's notice: it refused my proof (or my uuid). The row is `refused`, like a close mid-
         // handshake — the notice is best-effort and the journal must read the same with or without it.
+        // Only a link I have PROVED on can be refused: a notice before my proof (an acceptor that is still
+        // waiting for the dialer's proof) is out of order — a stranger's frame, not a refusal — dropped
+        // and closed like a malformed DOOR, with no `refused` row.
         if (typeof v?.e === 'string') {
+          if (!link.proved) {
+            j.armed && j.emit(JK.frameDrop, link.id, 'notice before proof')
+            link.dead = true
+            return this.env.sink.close(link.id, 'malformed-door')
+          }
           j.armed && j.emit(JK.doorReject, link.id, 'refused', link.to ?? '')
           return this.#refuse(link, 'door')
         }

@@ -577,7 +577,18 @@ test('the notice and the close mid-handshake: DOOR {e} while proving reads refus
     b.feed(1, encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', k: 'a'.repeat(32) }))
     b.down(1, 'reset')
     assert.deepEqual(b.rows(JK.doorReject), []) }
+  //! an acceptor that never proved reads a NOTICE: a stranger's frame, not a refusal — dropped and closed like a
+  // malformed DOOR, no `refused` row (the review's nit: only a link I proved on can be refused)
+  { const b = rec('bb', { door: doorFor(23) })
+    b.up(1)
+    b.feed(1, encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', k: 'a'.repeat(32) }))
+    assert.equal(b.node.links.get(1)!.proved, false)
+    b.feed(1, encodeControl(VERB.DOOR, { e: 'denied' }))
+    assert.deepEqual(b.rows(JK.doorReject), [], 'no refused row: this node never sent a proof to be refused')
+    assert.deepEqual(b.rows(JK.frameDrop), [[1, 'notice before proof', null]])
+    assert.deepEqual(b.closes(), [[1, 'malformed-door']]) }
 })
+
 
 test('the deadline: a proving link with no DOOR is refused timeout at tune.proveMs (heartbeats off), dead + noRedial, parked, closed door-timeout', () => {
   const a = rec('aa', { door: doorFor(24), hosts: ['sim:bb'], tune: { proveMs: 7 } })
