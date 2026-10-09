@@ -1974,3 +1974,144 @@ and trace hash) is re-recorded: every event count stayed, every trace hash
 moved, because the state hash over a mixed history now follows the
 across-depth election (a swept field leaves the rolling hash, a tombstone
 takes its parent's stamp).
+
+## V4-26 — `validation:` is a top-level key; the `diag` key arms the debugger's attach (2026-10-09)
+Context: the owner asked (question 5) whether `seams.validation` is needed
+at all. It is: it is the only guard on an open resource (one with no
+`methods:`), and it also covers the server's own writes, its handlers'
+writes and the `data:` seed. So it gets a plain name instead of living alone
+under `seams`. And `NodeOpts.diag { allow }` existed in the kernel (M7) but
+was not a config key, so `npm run debug -- --attach` was denied by every real
+`fero()`.
+Decision: `validation: rule` in the call is the schema check every write
+meets as it enters. It comes from the call only and must be a function at
+`fero()` time. `seams: { validation }` works for one release: api/config.ts
+folds it into `validation`, so the composer reads one key, and prints one
+note to stderr per process; setting both is refused. The seed error says
+"rejected by validation". Examples 11 and 41 use the new spelling; no
+printed line changed. The `diag` key, as docs/DESIGN-CONFIG.md §4 planned:
+`diag: { allow: { <name>: <token> } }` from the call, `FERO_DIAG_ALLOW_<NAME>`
+or a `fero.opt.ts` file, with the per-resource rung like every key; never a
+launch flag, because every user on the box can read a command line, and a
+flag is refused in plain words that name the variable to use instead; no
+message ever repeats a token. A name in a variable is one word of letters
+and digits (an `_` would nest it); a token that reads as a number or a
+boolean is refused because its text is lost; an empty token is unset; the
+allow that wins replaces the others whole. `FERO_DIAG_TOKEN` stays the
+viewer's variable and is still stripped before the layer looks.
+`diag(f).config()` shows the names and `[redacted]` for each token. Without
+the key the channel stays dead, as before. The node's resource name now
+rides the capture and the DIAG wire (additive), and the viewer marks a `#`
+name as a system resource with a quiet tag beside the label, never in the
+pill slot, so a problem pill cannot hide it. A client holds its process open
+while it follows, so a script that reads and is done ends with `await
+f.destroy()` (README, examples/02).
+REJECTED: refusing object inits of `seams` silently (both spellings set is
+an error, not a pick); a token from a flag; a token that could nest or lose
+its text; the badge in the pill slot.
+Consequences: the token still crosses the wire in clear text, so attach on
+a trusted network or through a tunnel. A `#directory` node cannot be
+attached: the system compose takes no `diag.allow` (STATUS). A capture that
+mixes resources paints every node `differs` (STATUS, the debugger).
+
+## V4-27 — cross-box discovery: a host with no port asks that box's directory, under the explicit-listen rule (2026-10-09)
+Context: a box knew only its own directory; a server on another box could
+be reached only by its full `host:port` in `hosts`.
+Decision: a `hosts` entry with no port names another box: `hosts:
+['10.0.0.5']` means "ask that box's directory", at this instance's
+rendezvous port (`rendezvous:`, else `FERO_RENDEZVOUS`'s port, else 3376;
+every box runs its directory on one port). The instance opens one more
+`#directory` client per named box and looks its own name up there; the
+addresses from every directory are joined and go to the kernel as one
+`discover` event, the union of all sources (a test pins it). It only asks:
+it never registers or hosts on another box, so a box's directory still
+lists exactly that box's servers, and an entry lives as long as its
+registrant's link to its own box's directory. The asked box must make its
+directory reachable (`FERO_RENDEZVOUS=10.0.0.5:3376` there); the default is
+still loopback. A misdial (the far port holds a user resource) is refused
+by the HELLO name echo and dialed again at heartbeat cadence. A loopback or
+wildcard address another box hands out is dropped unless it sits on the
+host that answered. Spellings that dial this box's own directory are not
+asked twice (`LOCALHOST`, `0.0.0.0`); `[::1]` is a different socket and is
+asked like another box. `cluster.me.rendezvous.boxes` shows each asked box
+as `{ up, error? }`; a failed lookup is never asked again, so `error` stays
+set (clearing it would make a dead lookup look healthy). A bare host with
+the directory off is refused. The explicit-listen rule replaces V4-2's
+loopback guard: a server is refused at `fero()` with "to be reachable from
+another box, listen on a routable address" when its listen is loopback or a
+wildcard (127.*, localhost, ::1, 0.0.0.0, ::; the default counts) AND the
+listen would leave the box (a routable rendezvous, or `hosts` naming
+another box). Clients are never refused; with nothing set the rule never
+applies. On a box whose `FERO_RENDEZVOUS` is routable, every server must
+name a routable listen, even one meant to stay local: that directory hands
+every listen it holds to other boxes.
+REJECTED: registering on every asked box (it copies what the view gossips,
+and an entry's life would hang on a link between boxes); picking 3376 in
+silence when the directory is off; clearing a box's lookup error on relink.
+Consequences: two boxes on one machine are tested as 127.0.0.1 and
+127.0.0.2 with one rendezvous port; example 15's refusal line is
+re-recorded; docs/DESIGN-DIRECTORY.md §11 is the record. An askable
+directory is as unauthenticated as the peer plane: the door
+(docs/DESIGN-DOOR.md) is what makes it safe off a trusted network.
+
+## V4-28 — a remove of an array's own element is refused `sparse-hole`; a view install leaves a member to its running redial chain (2026-10-09)
+Context: two leftovers from V4-18 and V4-20. data will not delete an
+array's own key (a sparse hole); the lens refused `delete data.g[0]` but
+`methods.remove({ key: ['g', 0] })` skipped the lens and committed a
+tombstone that showed nothing. And membership's install loop dialed every
+member it held no link to, even one whose redial chain was mid-backoff; the
+failed dial armed a second timer line that shared the chain's tries, so a
+member cut while another view installed gave up in about half its chain.
+Decision: (1) the binding has one admission rule, `Bind.admit`: the
+embedder's `validation`, then the hole check (a remove at depth 2 or more
+whose parent, in this node's view, is an array that owns that index).
+`issue()` uses it, so every local spelling is covered; when there is no
+`methods:` door the composer gives the same rule to the kernel's relay
+check, so a client's relayed remove is refused at the server too. One
+WriteRejectError: reason `sparse-hole`, reached `issued`, data's own words;
+the reason rides the WNACK like `methods-only` and shows as a rejected row
+in `cluster.writes`. The check reads the shape the node shows when the
+remove is issued (V4-7's rule). Any key an array owns is refused, `length`
+included. (2) The install loop skips a member the node is still dialing
+(`node.dialing(listen)`, the check the eviction hold reads); a chain that
+gave up is not dialing, so a parked member is still dialed on install.
+REJECTED: refusing only inside methods.remove's own code (a relayed record
+would slip past a server); judging the remove against writes still in
+flight (a second, guessed view, which V4-7 rules out); re-checking forwarded
+owner-leg writes on scoped nodes (peers are trusted at that layer; the
+door's question); cancelling the chain's timer and letting the install dial
+take over (the lengthening V4-20 rejected for revivals).
+Consequences: an open server with no `validation` now always hands the
+relay a check, about 7.5 ns per relayed update against about 110 µs per
+relayed record; no pin covers relayed client writes yet (STATUS). Two gaps
+still commit a tombstone that shows nothing: a remove from a scoped node
+that does not hold the row, and a remove in the same batch as a pending
+write that turns the row into an array (STATUS, the array line). A dead
+member's chain gives up after its full five tries even when a view install
+lands meanwhile; this supersedes V4-20's "known and not changed" sentence.
+Only sim/write.test.ts AA#2's give-up moved (1420 → about 1855); the sweep
+golden and the 59,500-event formation count are unchanged.
+
+## V4-29 — CI runs the tiers whose results do not depend on timing (2026-10-09)
+Context: the remote `pemrouz/fero` exists and runs nothing; the owner has
+no quiet box yet.
+Decision: `.github/workflows/test.yml` runs on pushes to `main` and on pull
+requests (a push to a PR branch runs once, not twice), on ubuntu-latest with
+Node '26'. fero reaches data by path, so the workflow checks out fero and
+`pemrouz/data`'s v4 branch side by side, the same rule as `test:contract`
+(data HEAD): data's v4 must be pushed before a fero commit that needs it,
+and a red run right after a data push points at data. It runs `npm ci` in
+fero only, checks that python3 has the pty module (so the tty example tier
+cannot skip unnoticed), then `npm test` and the count tier of
+tests/baseline.perf.ts alone (`--test-name-pattern="^counts:"`). It does
+not run `npm run perf`: on a shared runner the wall-time pins measure the
+neighbours, and tools/perf/BASELINE.md keeps them for a pinned quiet box. A
+new push to the same ref cancels the run still going. Proved locally in the
+CI layout against the data commit GitHub has today (63fea66): 584 + 18
+green, about 6 minutes. The file is written, not pushed.
+REJECTED: running the wall-time perf tier in CI; pinning data to a fixed
+commit (stricter, but then every data fix needs a fero bump; left as the
+option if drift bites).
+Consequences: the pinned quiet box still waits for hardware; after it comes
+the v2-vs-v4 socket A/B with p99s. The example time limits leave about 3×
+headroom on a runner.
