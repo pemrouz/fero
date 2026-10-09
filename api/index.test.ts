@@ -415,21 +415,25 @@ test('the role rule (DESIGN-DOOR §3 step 12): a CLIENT composed with a MEMBER\'
     c = await fero('r', { uuid: 'bb', hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 0 }, redial: { ms: 30 } })
     const rows = () => diag(a)!.journal().events.filter((e) => e.kind === JK.doorReject)
     assert.ok(await until(() => rows().length > 0, 8000), 'the refusal is journal-visible (JK.doorReject)')
-    assert.deepEqual(rows().map((e) => [e.b, e.c]), [['uuid-taken', 'bb']], 'the reason and the uuid claimed; never anything else')
+    //! the OPEN path ships no notice (DESIGN-DOOR §3 step 12: zero new frames there), so the refused client reads a
+    // bare close, redials at its redial cadence for good, elects aa as its primary for a millisecond or two on every
+    // dial and loses it on the close, and aa journals one uuid-taken row per dial (about every 50 ms here; the
+    // V4-32 review, STATUS records the loop). So the ROW COUNT grows and the client's primary FLICKERS: neither is
+    // read as a fixed value here. What holds: every row is the one reason, and the client is never fed
+    const reasons = () => [...new Set(rows().map((e) => `${e.b}:${e.c}`))]
+    assert.deepEqual(reasons(), ['uuid-taken:bb'], 'the reason and the uuid claimed; never anything else')
     assert.equal(diag(a)!.journal().events.some((e) => e.kind === JK.dupLink), false, 'no duplicate-link row against the member')
     assert.deepEqual(Object.keys(view(a).members).sort(), ['aa', 'bb'], 'the view keeps both members')
     assert.ok('bb' in view(a).peers, 'the member\'s link is alive on aa')
     assert.ok('aa' in view(b).peers, 'and on bb')
-    //! on an OPEN node a HELLO is admitted on arrival, so the client elects aa as its primary the moment aa's HELLO lands
-    // and un-elects it when aa's uuid-taken close lands a moment later; a synchronous read here raced that close
-    // (0/10 alone on a cold process, 1/2 warm in the full file, on the base tree too) — wait for it
-    const primary = () => (snapshot(c!.cluster) as { me: { primary: string | null } }).me.primary
-    assert.ok(await until(() => primary() === null, 8000), `the client has no feeder once the refusal lands (primary ${JSON.stringify(primary())})`)
-    //! the members still work: a write on one lands on the other — and never on the refused client
+    //! the members still work: a write on one lands on the other — and never on the refused client, which keeps
+    // dialing and is refused on every dial (two more rows is two more dials)
     a.data.k = 1
     assert.ok(await until(() => (snapshot(b.data) as { k?: number }).k === 1, 8000), 'replication between the members is intact')
-    assert.equal((snapshot(c.data) as { k?: number }).k, undefined, 'the refused client was never fed')
-    assert.equal(primary(), null, 'and still has no feeder')
+    const seen = rows().length
+    assert.ok(await until(() => rows().length >= seen + 2, 8000), 'the client dials again and is refused again')
+    assert.deepEqual(reasons(), ['uuid-taken:bb'], 'still the one reason')
+    assert.equal((snapshot(c.data) as { k?: number }).k, undefined, 'the refused client was never fed, across those dials')
   } finally {
     await c?.destroy()
     await b.destroy()

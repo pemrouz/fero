@@ -502,6 +502,22 @@ judged on facts this node owns, never on the uuid the closing peer claimed:
 that claim is unproven, and a stranger at a typed host claiming a held
 member's uuid is re-dialed like any lost link.
 
+A client refused `uuid-taken` on the OPEN path (noted 2026-10-09, the V4-32
+review). An open node ships no notice (step 12: zero new frames on the open
+path) and admits a HELLO on arrival, so the refused client never learns why:
+it reads a bare close, and the close of an admitted link is an ordinary link
+loss. So it redials at its redial cadence for good (about every 50 ms at
+`redial: { ms: 30 }` on this box; each dial admits the member's HELLO on the
+client's side, which resets the chain's counter), elects the member as its
+primary for a millisecond or two on every dial and loses it on the close, and
+the member journals one `doorReject 'uuid-taken'` row per dial. Nothing is
+ever fed: the member closes before any record ships. With a secret the client
+reads the notice and parks (above), so only the open path loops. The
+api/index.test.ts role-rule case therefore never reads the client's primary
+as a fixed value; STATUS records the loop as a bug. A fix needs a word the
+open path does not have today, or a park on the dialer's side keyed on a
+repeated close of an admitted link; not taken here.
+
 ### Replay and forgery, step by step
 
 - **A forged HELLO without `k` to a secured node** is refused at step 7.
