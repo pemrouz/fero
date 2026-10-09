@@ -46,6 +46,11 @@ test('counts: the wire-structural laws match the tracked baseline exactly (any m
 // path. These two tests are it: a counted law (exact on ANY machine, so CI's `^counts:` run takes it)
 // and a wall tripwire with the per-file headroom the siblings use (WSL2 swings 2-3x). Both are self-
 // contained — not rows of baseline.json, which only the perf:pin CLI writes.
+//! what each one sees: the COUNTED law pins the check itself (exactly one call per relayed record; a
+// doubled check goes red at 1024). The WALL tripwire times the whole relay path (relay, check, commit,
+// apply), not the check: the check costs a few ns of a record's ~15-40 µs here, so a slower check trips
+// the wall only once it adds about 100 µs a record (the review made bind.admit busy-wait 50 µs per call:
+// 39.9 ms / 512, still green). The wall guards the path from a gross regression, nothing finer.
 // The server is a solo open server (no member link, so it stays at epoch 0 and owns everything: the
 // relay commits at once). The client is one accepted link that said HELLO r:1 and an r:1 DIGEST, so
 // it also takes the server's commit stream. The check is the composer's own closure (api/index.ts).
