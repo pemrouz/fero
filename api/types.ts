@@ -158,9 +158,10 @@ export interface FeroConfig {
   // crosses the wire in cleartext: attach on a trusted network or through a tunnel.
   diag?: { allow?: Record<string, string> }
   //! secret (DESIGN-DOOR §5) — the cluster's shared secret: text of at least 16 characters, the SAME value
-  // on every member AND every client. With it set, a peer must prove it holds the secret before it is
-  // admitted (an HMAC over fresh nonces, kernel/door.ts); a process without it cannot join, read, write,
-  // call a method or vote. Unset = the open door (today's loopback wire); `false` = open ON PURPOSE, which
+  // on every member; a client holds it or the client key (`secret: { client }`, below). With it set, a peer
+  // must prove it holds the secret before it is admitted (an HMAC over fresh nonces, kernel/door.ts); a
+  // process with neither it nor the client key cannot join, read, write, call a method or vote. Unset = the
+  // open door (today's loopback wire); `false` = open ON PURPOSE, which
   // a server listening off loopback must say (otherwise fero() refuses). From the call, `FERO_SECRET`
   // (per resource `FERO_SHOP_SECRET`) or a fero.opt.ts file; never a flag. It never reaches a journal row,
   // a capture, a message or `diag(f).config()` (which shows '<set>'). Changing it is a full stop and
