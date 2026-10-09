@@ -176,6 +176,15 @@ test('secret.client (DESIGN-DOOR §15): the call, FERO_SECRET_CLIENT, FERO_SHOP_
       assert.ok(!e.message.includes(K), `the key is not in the message: ${e.message}`)
       return true
     }, argv.join(' '))
+  //! both flags, the secret first: minimist cannot nest `.client` under a string and throws a TypeError that
+  // QUOTES the first flag's value — the clash is named from the flag NAMES alone (the V4-32 review), so neither
+  // value reaches the message; the fix for either is the same refusal the flag gets alone
+  for (const argv of [['--fero.secret', S, '--fero.secret.client', K], [`--fero.secret=${S}`, `--fero.secret.client=${K}`], ['--fero.shop.secret', S, '--fero.shop.secret.client', K]])
+    assert.throws(() => r('shop', {}, { argv }), (e: Error) => {
+      assert.match(e.message, /^fero\('shop'\): could not read the launch flags — --fero\.(shop\.)?secret and --fero\.(shop\.)?secret\.client clash: a key is a value or a group, never both — set one of them$/)
+      assert.ok(!e.message.includes(S) && !e.message.includes(K), `no value in the message: ${e.message}`)
+      return true
+    }, argv.join(' '))
   //! the shape rule for the text layers: one refusal naming fero.clientKey, never the value; no off word
   const hint = /^fero\('shop'\): secret\.client must be the client key, text of at least 16 characters \(from FERO_SECRET_CLIENT\) — fero\.clientKey\(secret\) prints it from the cluster's secret$/
   for (const v of ['1234567890123456', 'true', 'fifteen-chars!!', 'off', 'false', '0', 'short-one'])
@@ -284,8 +293,9 @@ test('unknown keys throw naming their source, with the nearest declared spelling
   assert.throws(() => r('r', { toString: 1 } as never), /unknown option 'toString' from the call/)
   assert.deepEqual(cfg('constructor', {}, { env: { FERO_DIR: './g', FERO_CONSTRUCTOR_DIR: './c' } }), { dir: './c' })
   assert.deepEqual(cfg('r', {}, { env: { FERO_CONSTRUCTOR_DIR: './c' } }), {})
-  //! a bad flag set is named twice: fero says which layer it was reading, optcascade says what
-  assert.throws(() => r('r', {}, { argv: ['--fero.heartbeat', '5', '--fero.heartbeat.ms', '7'] }), /fero\('r'\): could not read the launch flags — optcascade: bad flags — Cannot create property 'ms'/)
+  //! a bad flag set is named twice: fero says which layer it was reading, and which two flags clash — from their
+  // names, never from optcascade's TypeError, which quotes the first flag's value (a secret, when it is one)
+  assert.throws(() => r('r', {}, { argv: ['--fero.heartbeat', '5', '--fero.heartbeat.ms', '7'] }), /fero\('r'\): could not read the launch flags — --fero\.heartbeat and --fero\.heartbeat\.ms clash: a key is a value or a group, never both — set one of them$/)
   //! a flag's key is read lowercased at every depth, as a variable's is (optcascade >= 1.1.0):
   // `--fero.Dir`, `--FERO.dir` and `FERO_DIR` are one key — nothing is parsed under another name
   assert.deepEqual(cfg('r', {}, { argv: ['--FERO.dir', 'x'] }), { dir: 'x' })
