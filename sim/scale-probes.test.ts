@@ -1,7 +1,8 @@
 //! Stage 0 of DESIGN-SCALE (2026-10-09): the scale monitors' planted violations, the two unscoped probes pinned
 // RED TODAY, and the three counted floors recorded from today's kernel.
 //
-// Planted violations: every monitor M1-M9 of sim/monitors.ts gets a schedule or an injected fault that MUST turn
+// Planted violations: every monitor M1-M9 of sim/monitors.ts (M10, the spoke's resync end, is proven by the
+// sweep's pinned A11 seeds in sim/scoped-sweep.test.ts) gets a schedule or an injected fault that MUST turn
 // it red, and a non-vacuity count (the monitor saw at least N checks in the family it guards). A monitor that
 // cannot be turned red proves nothing when it stays green. M4 (the per-partition index oracle) is stage 1's: its
 // stub goes red the moment `node.byPart` exists, so stage 1 cannot land the index without filling it in.

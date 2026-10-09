@@ -487,7 +487,7 @@ export const drained = (sim: Sim): string | null => {
   return null
 }
 
-//! ── DESIGN-SCALE stage 0: the scale harness monitors M1-M9 (2026-10-09) ────────────────────────
+//! ── DESIGN-SCALE stage 0: the scale harness monitors M1-M10 (2026-10-09) ───────────────────────
 // The record's §6 names nine invariants and the monitor that checks each. Stage 0 builds the monitors
 // on TODAY's kernel so every later rule (anti-entropy, compaction, GC, the drain) must turn one of them
 // red when it is switched off before it lands — the I-20 lesson (docs/DESIGN-LEAVE.md §9). Everything

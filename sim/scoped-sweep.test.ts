@@ -1,6 +1,6 @@
 //! The scoped adversarial sweep (DESIGN-SCALE stage 0, §6): the adversaries A1-A11 of sim/scoped-sweep.ts, each run
 // on seeded scoped clusters (n from the family's list, R 1-3, memory or durable, 50-500 partitions, row and field
-// writes, removes, re-writes of removed cells; compactAt and snapshotAt at 16) with M1-M9 armed, and the mutation
+// writes, removes, re-writes of removed cells; compactAt and snapshotAt at 16) with M1-M10 armed, and the mutation
 // runner's pinned catches.
 //
 // Lawful runs, per seed: no monitor fires and M1's horizon form agrees (SAFE); holders converge, exactly-R holds and
@@ -16,9 +16,10 @@
 // kernel the remove's entry stays in every lane, so a refold re-derives the tombstone; G1 bites only where an older
 // record still arrives above the fence (A1's zombie after the heal, A11's spoke). Stage 3's
 // compaction drops that entry, and its mutation must then be caught across the families.
-// Cost: about 25 s at low priority on this box (2 seeds per family, then five pinned mutation schedules, each run
-// clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about 70 s on 2026-10-09). The known-unsafe seeds below run in every battery
-// on top of that range, and the set is exact in both directions.
+// Cost: about 50 s at low priority on this box (2 seeds per family plus the pinned unsafe seeds, then five
+// pinned mutation schedules, each run clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about
+// 70 s on 2026-10-09, before the pinned seeds were added). The known-unsafe seeds below run in every battery on top
+// of that range, each pinned to the monitor line it fails on, and the set is exact in both directions.
 
 import { test } from 'node:test'
 import assert from 'node:assert'

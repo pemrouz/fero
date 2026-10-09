@@ -33,27 +33,40 @@ let drift.
 row is in the tree, sim only plus the one kernel line §2 names. Monitors
 M1-M9 live in sim/monitors.ts (M4 is a stub that goes red once
 `node.byPart` exists); each has a planted-violation test and was
-mutation-checked (sim/scale-probes.test.ts). The adversaries A1-A11, the
-frame tally and the mutation runner live in sim/scoped-sweep.ts; the sweep
-runs 2 seeds per family in the battery, more with `FERO_SCOPED_SEEDS`.
-What the build found against this record: (1) the §2 seed probe holds:
-a boot record written ahead of its WAL rows restored a floor the disk did
-not back; the restored `s` is now capped at `d` (kernel/node.ts), which
-moved 4 of 12 A4 sweep trajectories and none of the 25 CHURN seeds.
-(2) The join floor re-measures at 2,585 HAVEQ, not 2,555: the panel's
-probe fired its 300 writes at 8.1-8.4 s, inside the window it called
-idle; 1,067 for the writes and 52,110 DIGEST for the join stand. (3) A10
-is not representable in the sim: eviction needs the link down, and a
-frame landing after its link's linkDown is dropped. (4) Both unscoped
-probes reproduce without the test seams (a clean leave moves ownership;
-`severOnFrame` strands the zombie's write), pinned red today; M6 is red
-on the zombie at the release itself. (5) Two new findings from the
-sweep, pinned as known-unsafe seeds: an attempt committed twice across
-ownership moves on a scoped cluster (A3 seed 6), and a spoke's resync
-ending on a stale digest reply (A11 seed 5). (6) The G1 mutation
-(release the stamp, keep every lane) is caught only where an older
-record still arrives (A1, A11): today every lane keeps the remove, so a
-refold re-derives it; stage 3 is what makes G1 bite.
+mutation-checked (sim/scale-probes.test.ts). A tenth, M10 resync-end,
+was added for a finding below. The adversaries A1-A11, the frame tally
+and the mutation runner live in sim/scoped-sweep.ts; the sweep runs 2
+seeds per family in the battery plus every pinned unsafe seed, more with
+`FERO_SCOPED_SEEDS`. What the build found against this record: (1) the
+§2 seed probe holds: a boot record written ahead of its WAL rows restored
+a floor the disk did not back; the restored `s` is now capped at `d`
+(kernel/node.ts), which moved 4 of 12 A4 sweep trajectories and none of
+the 25 CHURN seeds. (2) The join floor re-measures at 2,446 HAVEQ, not
+2,555, for two reasons: the panel's probe fired its 300 writes at
+8.1-8.4 s, inside the window it called idle, and the sim pairs a joiner
+at its default delay [1,5] unless told otherwise (with the joiner at
+[1,5] the join costs 2,585); 1,067 for the writes and 52,110 DIGEST for
+the join stand. (3) A10 IS representable: a sever's linkDown travels at
+the pair's delay, like a FIN behind data in a slow buffer, so with only
+the dying member's pair to one co-holder slowed, its frames land after
+that survivor installed the view without it, on a link still up, and the
+kernel applies them (8 of 8 seeds). That is §5's shared residual, so §14
+Q15's one-epoch GC floor is warranted. (4) Both unscoped probes reproduce
+without the test seams (a clean leave moves ownership; `severOnFrame`
+strands the zombie's write), pinned red today; M6 is red on the zombie
+at the release itself. (5) Two new findings from the sweep, pinned as
+known-unsafe seeds. One attempt committed twice across an ownership move
+(A3 seed 6): the owner was cut off 1.5 ms after committing, before its
+fan-out or its WACK left, the issuer retried at the next owner, and the
+heal delivered both. It is the zombie's class, not missing dedup tuples
+(the latch already feeds the window). And a spoke's resync ending on a
+stale digest reply (A11 seeds 2, 5, 6, M10): on every A11 failover onto
+a feeder behind the spoke, the reply to the spoke's first digest ends
+the resync before the re-download, so the spoke shows older values of
+live rows for a few events. (6) The G1 mutation (release the stamp, keep
+every lane) is caught only where an older record still arrives (A1,
+A11): today every lane keeps the remove, so a refold re-derives it;
+stage 3 is what makes G1 bite.
 
 ## §0 The decision, in ten lines
 
