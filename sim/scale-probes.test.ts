@@ -279,12 +279,14 @@ test('M9 leave-drain is RED TODAY at R=1: a clean leaver takes the only copy of 
 
 // ── the counted floors, recorded from today ─────────────────────────────────────────────────────
 
-//! RE-MEASURED 2026-10-09: the record's 2,555 is 2,585 here, for a stated reason. The panel's probe posted its writes
-// with an absolute delay (4,100 + i ms from t ≈ 4 s), so they fired at 8.1-8.4 s: inside the window it labelled
-// idle, not the one it labelled writes (re-run with its timing: 0 HAVEQ in the writes window, 1,067 in the "idle"
-// one, and its join then costs 2,555). Here the writes fire at 4.1-4.4 s, where the setup says, and the join starts
-// from a settled mesh: 1,067 for the writes either way, 2,585 for the join, 52,110 DIGEST frames to t = 20 s.
-test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scoped = n(n−1) DIGEST per tick; 300 writes = 1,067 HAVEQ; one join at n=30 R=3 P=300 = 2,585 HAVEQ', () => {
+//! RE-MEASURED 2026-10-09: the record's 2,555 is 2,446 here, for two stated reasons. (1) The panel's probe posted
+// its writes with an absolute delay (4,100 + i ms from t ≈ 4 s), so they fired at 8.1-8.4 s: inside the window it
+// labelled idle, not the one it labelled writes (re-run with its timing: 0 HAVEQ in the writes window, 1,067 in the
+// "idle" one, and its join then costs 2,555). Here the writes fire at 4.1-4.4 s, where the setup says, and the join
+// starts from a settled mesh. (2) The joiner's own 30 pairs are at the stated [1,1] too; sim.add pairs a new node at
+// the sim's default [1,5]; the re-run of the panel's timing and this test's first version (2,585) both ran with the
+// joiner there. 1,067 for the writes and 52,110 DIGEST frames to t = 20 s are the same either way.
+test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scoped = n(n−1) DIGEST per tick; 300 writes = 1,067 HAVEQ; one join at n=30 R=3 P=300 = 2,446 HAVEQ', () => {
   const sim = new Sim(13)
   const t = frameTally(sim)
   const nodes = cluster(sim, 30, { heartbeatMs: 200, fault: { delay: [1, 1] }, replicas: 3 })
@@ -299,12 +301,14 @@ test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scope
   assert.equal(t.since(m, VERB.HAVEA), 1067)
   assert.deepEqual(perTick(sim, t, 200, 4, VERB.DIGEST), [870, 870, 870, 870], 'idle: n(n−1) = 30·29 member DIGEST frames per tick')
   m = t.mark()
+  //! the joiner's 30 pairs at the stated [1,1] too (sim.add pairs a new node at the sim's DEFAULT [1,5] otherwise)
+  for (const x of nodes) sim.fault('n31', x.uuid, { delay: [1, 1] })
   sim.add({ uuid: 'n31', listen: 'sim:n31', hosts: nodes.map((x) => `sim:${x.uuid}`), heartbeatMs: 200, redialMs: 20, journalCap: 1 << 16, replicas: 3 })
   sim.post('n31', { kind: 'start' }, 0)
   sim.run({ until: 20_000, maxEvents: 8_000_000 })
   assert.equal(exactlyR(sim), null)
-  assert.equal(t.since(m, VERB.HAVEQ), 2585, 'one join costs 2,585 HAVEQ (about 2.8 full co-holder rounds)')
-  assert.equal(t.since(m, VERB.HAVEA), 2585)
+  assert.equal(t.since(m, VERB.HAVEQ), 2446, 'one join costs 2,446 HAVEQ (about 2.6 full co-holder rounds)')
+  assert.equal(t.since(m, VERB.HAVEA), 2446)
   assert.equal(t.since(m, VERB.DIGEST), 52110, 'and 52,110 DIGEST frames to t=20 s')
   assert.deepEqual(perTick(sim, t, 200, 2, VERB.DIGEST), [930, 930], 'idle after the join: 31·30')
 })
