@@ -309,3 +309,35 @@ test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scope
   assert.deepEqual(perTick(sim, t, 200, 2, VERB.DIGEST), [930, 930], 'idle after the join: 31·30')
 })
 
+// ── the §2 seed probe (A4): a restored floor may not claim what the disk did not keep ───────────
+
+test('seed probe (DESIGN-SCALE §2, A4): a holder whose boot record was written ahead of its WAL rows restarts with floors no higher than its disk restores — M5 stays green', () => {
+  //! three durable members, R=3 (every member holds every row). n02's fsync is slow (300 ms) and its lamport lease
+  // is 1, so each commit of its own re-writes the boot record (synchronously, with the floor seed) while the rows
+  // it just folded from n01 are still queued for the disk. n02 crashes 30 ms later: the torn tail takes the rows,
+  // the boot record keeps the floors. Before the fix the restored floor claimed every lost row (M5: "the floor
+  // overclaims", once per lost record); the fix caps the restored possession floor at the durable one.
+  const ids = ['n01', 'n02', 'n03']
+  const sim = new Sim(5)
+  const ns = mesh(sim, 3, { hb: 50, durable: true, replicas: 3, tune: { lamportLease: 1 } })
+  sim.run({ until: 1500 })
+  assert.ok(formed(ns) && ns.every((n) => n.armed))
+  sim.storeFault('n02', { delay: [300, 300] })
+  const a: string[] = [], b: string[] = []
+  for (let i = 0; a.length < 5 || b.length < 2; i++) { const k = 'k' + i; const o = holdersAt(ids, k, 1)[0]; if (o === 'n01' && a.length < 5) a.push(k); if (o === 'n02' && b.length < 2) b.push(k) }
+  a.forEach((k, i) => sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [k], value: i }] }, 1))
+  b.forEach((k, i) => sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: [k], value: i }] }, 20 + i))
+  sim.run({ until: sim.now + 30 })
+  const store = sim.stores.get('n02')!
+  assert.deepEqual(Object.values(store.boot!.floors!.n01).map((sd) => sd[0] > sd[1]), [true, true, true, true, true], 'the boot record claims possession ahead of durability')
+  assert.ok(store.wal.every((r) => !r.resolved), 'and none of the rows behind it reached the disk')
+  const reborn = sim.restart('n02')
+  sim.run({ until: sim.now + 5 })
+  assert.equal(reborn.logs.size, 0, 'the torn tail took every row')
+  assert.deepEqual(named(sim, 'floor-truth').map((v) => v.detail), [], 'no restored floor claims a row the disk lost')
+  for (const [, d] of reborn.streams) for (const [, pe] of d.parts ?? []) assert.ok(pe.s <= pe.d, 'restored possession never exceeds the durable floor')
+  sim.run({ until: sim.now + 3000 })
+  assert.deepEqual(sim.violations, [])
+  assert.equal(scopedConverged(sim), null, 'the holder heals the lost rows')
+  assert.equal(reborn.logs.get('n01')?.length, 5)
+})
