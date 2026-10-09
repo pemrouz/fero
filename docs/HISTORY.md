@@ -1,6 +1,6 @@
 # fero — the record
 
-This file is the history: the v4 status log (2026-08-01 to 2026-10-08), then the v3 milestone record that the old README carried (M0 to M8, the adversarial reviews, the comparison with v2). Nothing here is a to-do. The live one-page view is [../STATUS.md](../STATUS.md); the settled decisions are [DECISIONS.md](DECISIONS.md).
+This file is the history: the v4 status log (2026-08-01 to 2026-10-09), then the v3 milestone record that the old README carried (M0 to M8, the adversarial reviews, the comparison with v2). Nothing here is a to-do. The live one-page view is [../STATUS.md](../STATUS.md); the settled decisions are [DECISIONS.md](DECISIONS.md).
 
 ---
 
@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600 on 2026-10-09 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -679,6 +679,14 @@ working as designed.
   depth; a per-ancestor cell index; the `lost` settlement effect; the gather
   folds by depth; a sim object oracle), after four review rounds: 584/584 + 18/18,
   perf 46/46, sim:scale green.
+
+- 2026-10-09 — wave 3 of the STATUS plan: V4-26 `validation:` top-level + the
+  `diag` key + the `#` badge, V4-27 cross-box discovery under the explicit-listen
+  rule, V4-28 the `sparse-hole` reject + the install-dial fork, V4-29 the CI file
+  (unpushed). The door (contract hash + methods-only hint + peer auth, one HELLO
+  change) is a design record, docs/DESIGN-DOOR.md, from a three-proposal panel;
+  nothing built until the owner answers its §14. 600/600 + 18/18, perf 46/46,
+  sim:scale green.
 
 ## The debug tool
 
