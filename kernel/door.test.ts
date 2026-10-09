@@ -17,7 +17,7 @@ import { Node, type NodeOpts } from './node.ts'
 import { VERB, Framer, encodeControl, encodeFrame } from './codec.ts'
 import { JK } from './journal.ts'
 import { LS } from './link.ts'
-import { PROOF_LEN } from './door.ts'
+import { PROOF_LEN, proofMsg } from './door.ts'
 import { TAG, type EffectSink, type Env } from './env.ts'
 import { toyDoor, toyClientDoor, toyClientKey } from '../sim/door.ts'
 import { mulberry32 } from '../sim/exec.ts'
@@ -889,7 +889,7 @@ test('hygiene: no journal row ever carries a nonce or a proof — on either end,
 const CLIENT_KEY = toyClientKey(SECRET)
 const clientDoor = (seed: number, key = CLIENT_KEY) => toyClientDoor(key, mulberry32(seed))
 
-test('the client key (§15): a client-key dialer is admitted r:1 and verifies the member\'s client-key answer; the same door without r:1 is bad-proof at the member; a member\'s uuid claim is uuid-taken; a holder that ACCEPTS a member\'s dial refuses its secret-proof; a secret-holding client still follows; a door without clientMac keeps the one-key rule', () => {
+test('the client key (§15): a client-key dialer is admitted r:1 and verifies the member\'s client-key answer; the same door without r:1 is bad-proof at the member; a member\'s uuid claim is uuid-taken; a holder that ACCEPTS a member\'s dial refuses its secret-proof; a secret-holding client still follows; a door without clientMac keeps the one-key rule; a client-key proof under r:true, \'1\', 2.5 or -1 is bad-proof (sign and the admit tail agree on exactly r === 1); a one-key V4-30 door and a two-key door do not link on a client link', () => {
   assert.notEqual(CLIENT_KEY, SECRET); assert.equal(CLIENT_KEY.length, PROOF_LEN, 'the toy key is one MAC long')
   assert.equal(toyDoor(SECRET, () => 0).clientMac!('m'), clientDoor(0).mac('m'), 'the member derives the key the client-only door is keyed with')
   assert.notEqual(toyDoor(SECRET, () => 0).mac('m'), toyDoor(SECRET, () => 0).clientMac!('m'), 'two keys, two proofs')
@@ -928,9 +928,41 @@ test('the client key (§15): a client-key dialer is admitted r:1 and verifies th
   { const a = rec('aa', { door: doorFor(68) }), c = rec('cc', { client: true, hosts: ['sim:aa'], listen: '', door: doorFor(69) })
     c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
     assert.deepEqual([a.rows(JK.doorReject), c.rows(JK.doorReject)], [[], []]); assert.deepEqual(a.node.admitted(), ['cc']); assert.equal(c.node.primary, 1) }
-  //! 6/6 an embedder's door with no clientMac keeps the one-key rule: a client and a member that both sign with mac link
-  { const one = (seed: number) => { const d = doorFor(seed); return { mac: d.mac, nonce: d.nonce } }
-    const a = rec('aa', { door: one(70) }), c = rec('cc', { client: true, hosts: ['sim:aa'], listen: '', door: one(71) })
+  //! 6/8 an embedder's door with no clientMac keeps the one-key rule: a client and a member that both sign with mac link
+  const one = (seed: number) => { const d = doorFor(seed); return { mac: d.mac, nonce: d.nonce } }
+  { const a = rec('aa', { door: one(70) }), c = rec('cc', { client: true, hosts: ['sim:aa'], listen: '', door: one(71) })
     c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
     assert.deepEqual([a.rows(JK.doorReject), c.rows(JK.doorReject)], [[], []]); assert.deepEqual(a.node.admitted(), ['cc']); assert.equal(c.node.primary, 1) }
+  //! 7/8 the one rule the key rests on: `sign` picks the client key on EXACTLY r === 1, the same test the admit tail
+  // makes a client link on. A raw dialer that holds only the client key and says r: true, '1', 2.5 or -1 (every
+  // value a loosened truthy check would take) sends a client-key proof: the member checks it with the SECRET, so it
+  // is bad-proof and nothing is admitted. Were the two tests to differ, such a dialer would be verified with the
+  // client key and admitted as a MEMBER link (the skeptic's mutation M3). r: 2 is a DIAG attach, another path.
+  for (const r of [true, '1', 2.5, -1]) {
+    const a = rec('aa', { door: doorFor(72) })
+    a.up(1)
+    const k = 'x'.repeat(32), h = { u: 'xx', i: 1, l: '', r, k }
+    a.feed(1, encodeControl(VERB.HELLO, h))
+    const ah = dec(a.sends(1)[0]).value as { k: string; u: string; l: string }
+    a.feed(1, encodeControl(VERB.DOOR, { p: clientDoor(73).mac(proofMsg('dialer', ah.k, k, ah.u, ah.l, h as never)) }))
+    assert.deepEqual(a.rows(JK.doorReject), [[1, 'bad-proof', '']], `r=${JSON.stringify(r)}: ${JSON.stringify(a.rows(JK.doorReject))}`)
+    assert.deepEqual(a.node.admitted(), [], `r=${JSON.stringify(r)}: admitted ${JSON.stringify(a.node.admitted())}`)
+    assert.equal(a.node.byUuid.has('xx'), false); assert.deepEqual(a.closes(), [[1, 'door']])
+  }
+  //! 8/8 the version mix, stated so nobody is surprised: a V4-30 door (one key, the secret on every link) and a
+  // two-key door do not link on a CLIENT link in either direction — the old client signs r:1 with the secret and the
+  // new member checks with the client key, and the reverse — each reads bad-proof ("secrets differ"). Member links
+  // (no r:1) still use the secret on both and are unaffected. V4-30 is unreleased, so nothing deployed is caught.
+  { const a = rec('aa', { door: doorFor(74) }), c = rec('cc', { client: true, hosts: ['sim:aa'], listen: '', door: one(75) })
+    c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
+    assert.deepEqual([a.rows(JK.doorReject), c.rows(JK.doorReject)], [[[1, 'bad-proof', '']], [[1, 'refused', 'sim:aa']]], 'old client, new member')
+    assert.deepEqual([a.node.admitted(), c.node.admitted()], [[], []]) }
+  { const a = rec('aa', { door: one(76) }), c = rec('cc', { client: true, hosts: ['sim:aa'], listen: '', door: doorFor(77) })
+    c.up(1, true, 'sim:aa'); a.up(1); pump(c, 1, a, 1)
+    assert.deepEqual([a.rows(JK.doorReject), c.rows(JK.doorReject)], [[[1, 'bad-proof', '']], [[1, 'refused', 'sim:aa']]], 'new client, old member')
+    assert.deepEqual([a.node.admitted(), c.node.admitted()], [[], []]) }
+  { const a = rec('aa', { door: doorFor(78) }), b = rec('bb', { hosts: ['sim:aa'], door: one(79) })
+    b.up(1, true, 'sim:aa'); a.up(1); pump(b, 1, a, 1)
+    assert.deepEqual([a.rows(JK.doorReject), b.rows(JK.doorReject)], [[], []], 'two members, one old: a member link is signed with the secret on both')
+    assert.deepEqual([a.node.admitted(), b.node.admitted()], [['bb'], ['aa']]) }
 })
