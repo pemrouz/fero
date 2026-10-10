@@ -221,7 +221,7 @@ drain window only (kernel/drain.test.ts pins it). Two more facts from the
 review: the sweep's battery seed count (2) gives A7 only R=2 shapes, so
 A7 always runs its seed 4 (n=2 R=1), the shape on which M9 can bite; and a
 lawful scoped stop can outlast `fero.spawn`'s 5 s stop grace (up to
-leaveTicks + drainTicks + 3 heartbeats, 11.5 s at the default cadence, when
+max(leaveWindow, leaveTicks) + drainTicks + 3 heartbeats, 17.5 s at the default cadence since the knock window of V4-39, when
 a new holder cannot attest) — the README says so rather than the grace
 being raised, since spawn cannot know the child's cadence.
 
