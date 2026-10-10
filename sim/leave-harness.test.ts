@@ -105,11 +105,15 @@ test('leave harness, pledgeTwo: two leavers knock to n01, then n01 keeps one sta
   pinExact('pledgeTwo', notSettled, KNOWN_NOT_SETTLED_PLEDGE_TWO, shapes)
 })
 
-//! rebirth on today's kernel: the seeds it is NOT live on inside 1..100 (22 of 100): pairs cut apart inside the leave
+//! rebirth on today's kernel: the seeds it is NOT live on inside 1..100 (20 of 100): pairs cut apart inside the leave
 // window, a leaver's knock that dies with a cut and is never answered, three leavers at n=4 with the lowest among them
 // under a cut. Pinned exactly. Above the range, H9_SEEDS are the three the base heals and the parked branch wedges:
-// pinned live.
-const KNOWN_NOT_LIVE_R = new Set<number>([8, 9, 19, 25, 26, 31, 32, 33, 40, 41, 46, 47, 49, 50, 60, 61, 63, 64, 72, 82, 84, 98])
+// pinned live. The knock window (DESIGN-LEAVE §10.7, 2026-10-10) took 61 and 72 off this pin, 22 → 20: in both a
+// leaver cut from the proposer for 300 ms kept an admitted link to another member and knocked on, where before it
+// gave up at the fifth tick; the cut healed inside the 16-tick window and the knock reached the lowest live member
+// (61: n=5, n02, n04 and n05 stop, n03-n01 and n04-n01 cut; 72: n=4, n01, n02 and n04 stop, n01-n04 cut 300 ms and
+// n02-n01 600 ms). No other seed moved.
+const KNOWN_NOT_LIVE_R = new Set<number>([8, 9, 19, 25, 26, 31, 32, 33, 40, 41, 46, 47, 49, 50, 60, 63, 64, 82, 84, 98])
 
 test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pairs with leavers reborn as fresh identities (the round-2 report\'s sweep2) — SAFE on every one; the not-live set is exactly the pinned one; the H9 seeds 306, 744 and 804 heal; the named shapes heal (seed 157 under 10 sim seeds, the n=3 two-stop pair once each)', () => {
   const unsafeOnes: string[] = [], notLive: number[] = [], shapes = new Map<number, string>()
