@@ -28,12 +28,17 @@
 // clock counts it again — red today as the quiet-point witness is), keptBallotReversed (the kept ballot granted one
 // apart and two apart after the install — red today), and three liveness shapes pinned as end states: allHeld (every
 // live member holds the dead proposer's view), genesisProposerDies (the first proposer dies at epoch 0), and
-// proposerAndGranterDie (the rule's cost with no cut among the living). Bounded: about 30 s at low priority on the loaded WSL2
+// proposerAndGranterDie (the rule's cost with no cut among the living). The third review added four (2026-10-10):
+// clientAsk (a client's HELLO and PULL naming a hold teach nothing — live today, I-23), freshLink (a held member's
+// link flaps: the stayer must not count the fresh link before it knows the holds — red today as the witness is),
+// genesisProposerAndGranterDie (the genesis hold's cost: one survivor with memory beside a newcomer or a reborn pair —
+// live today) and genesisSplit (today's kernel commits two views at one epoch at genesis, hostless — red today).
+// Bounded: about 30 s at low priority on the loaded WSL2
 // box, half that idle; FERO_LEAVE_FULL=1 runs the full crash grid (576 cases, three restart delays, two seeds) and
 // 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
@@ -432,6 +437,50 @@ test('leave harness, the second review\'s shapes: the held member\'s heartbeat l
   //! liveness, one list: the end state of every live shape
   const teeth: string[] = []
   for (const [name, o, end] of live) if (o.end !== end) teeth.push(`${name}: the end state moved — a rule that holds a vote above the view must say who leads and what it costs; re-record with the why: ${o.end}`)
+  assert.deepEqual(teeth, [])
+})
+
+//! the third review's shapes (DESIGN-LEAVE §10.10, 2026-10-10), pinned on today's kernel. Two are LIVE today, pinned
+// as end states: clientAsk — a client's HELLO and PULL name a hold that does not exist, and aa's one-member eviction
+// commits on the first ballot all the same (I-23: a client's word teaches nothing; the first fixed scratch kernel
+// read the hold and never committed); genesisProposerAndGranterDie — one survivor with memory at epoch 0 beside a
+// newcomer, or beside the two others reborn memory-only, forms a view today (the rule's cost at epoch 0: the CP
+// answer, pinned so the move carries its why; the reborn pair is drawn `open` only, because in the `committed`
+// variant today's kernel installs a second view at epoch 1 beside aa's — the genesis class below, the rebirth rule).
+// Two are RED today, pinned as the exact states: freshLink — the held member's link to a stayer flaps, and today's
+// kernel counts the fresh link at once (dd writable at 1 beside aa and bb at 2 at both points: a rule that holds cc
+// must show dd read-only from the instant of the admit, not one round trip later); genesisSplit — two granters cut
+// from the proposer before the VIEW form a view of their own at the SAME epoch the proposer's side reaches next,
+// both writable (hostless genesis; the Sim's cluster() gives every node hosts, so no Sim family draws it).
+const CLIENT_ASK_END = 'aa@2{aa,bb,cc,dd}W bb@2{aa,bb,cc,dd}W cc@2{aa,bb,cc,dd}W dd@2{aa,bb,cc,dd}W ee@2{aa,bb,cc,dd}r:evicted'
+const FRESH_LINK_MIDS = ['admitted', 'landed'].map((at) => `${at}: aa@2{aa,bb,cc}W bb@2{aa,bb,cc}W cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}W ee@1{aa,bb,cc,dd,ee}W | writable views 2`)
+const GENESIS_GRANTER_DIE_END: Record<'fresh' | 'reborn', string> = { fresh: 'bb@2{bb,dd}W dd@2{bb,dd}W', reborn: 'bb@1{a2,bb,c2}W a2@1{a2,bb,c2}W c2@1{a2,bb,c2}W' }
+const GENESIS_SPLIT_QUIET = 'writable in different views: aa@2{aa,bb,cc} bb@2{aa,bb,cc} cc@2{aa,bb,cc} dd@2{dd,ee} ee@2{dd,ee}'
+const GENESIS_SPLIT_SPLITS = ['aa', 'bb', 'cc'].map((u) => `epoch 2: {dd,ee} vs {aa,bb,cc} (at ${u})`)
+const GENESIS_SPLIT_END = 'aa@2{aa,bb,cc}W bb@2{aa,bb,cc}W cc@2{aa,bb,cc}W dd@2{dd,ee}W ee@2{dd,ee}W'
+
+test('leave harness, the third review\'s shapes: a client\'s word names a hold (clientAsk) and the one survivor of a genesis ballot meets a newcomer or a reborn pair (genesisProposerAndGranterDie) — SAFE, and today\'s kernel commits on every one, pinned as the exact end states; a held member\'s link flaps (freshLink) and two granters cut before the VIEW at genesis (genesisSplit) — today\'s kernel is writable in two views, pinned exactly', () => {
+  const ca = clientAsk(), fl = freshLink(), gs = genesisSplit()
+  const live: [string, ReturnType<typeof clientAsk>, string][] = [
+    ['clientAsk', ca, CLIENT_ASK_END],
+    ...(['open', 'committed'] as const).map((v) => [`genesisProposerAndGranterDie ${v} fresh`, genesisProposerAndGranterDie(v, 'fresh'), GENESIS_GRANTER_DIE_END.fresh] as [string, ReturnType<typeof clientAsk>, string]),
+    ['genesisProposerAndGranterDie open reborn', genesisProposerAndGranterDie('open', 'reborn'), GENESIS_GRANTER_DIE_END.reborn],
+  ]
+  //! safety first, one list: the shape of every run, and no split anywhere on the live shapes
+  const unsafeOnes = [...fl.shape.map((p) => `freshLink: ${p}`), ...gs.shape.map((p) => `genesisSplit: ${p}`), ...live.flatMap(([name, o]) => [...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])].map((p) => `${name}: ${p}`))]
+  assert.deepEqual(unsafeOnes, [], 'not the shape, or UNSAFE')
+  //! the red-today witnesses, one list
+  const red: string[] = []
+  if (fl.mid!.join('\n') !== FRESH_LINK_MIDS.join('\n')) red.push(`freshLink: a mid point moved — a kernel that holds cc must show dd read-only from the instant the fresh link is admitted; re-record with the why:\n${fl.mid!.join('\n')}`)
+  if (fl.quiet !== LATE_ASK_QUIET) red.push(`freshLink: the quiet point moved: ${fl.quiet}`)
+  if (gs.quiet !== GENESIS_SPLIT_QUIET) red.push(`genesisSplit: the quiet point moved: ${gs.quiet}`)
+  if (gs.splits.join('|') !== GENESIS_SPLIT_SPLITS.join('|')) red.push(`genesisSplit: the epoch-2 split moved: ${gs.splits.join('; ') || 'none'}`)
+  if (gs.end !== GENESIS_SPLIT_END) red.push(`genesisSplit: the end state moved: ${gs.end}`)
+  assert.deepEqual(red, [], 'a kernel change closed (or widened) a hole of today\'s kernel; re-record with the why')
+  //! liveness, one list: the end state of every live shape, and the one ballot clientAsk's eviction took
+  const teeth: string[] = []
+  for (const [name, o, end] of live) if (o.end !== end) teeth.push(`${name}: the end state moved — a rule that reads a hold must say whose word it reads and what the genesis hold costs; re-record with the why: ${o.end}`)
+  if (ca.mid![0] !== 'aa proposed: P(2,4)') teeth.push(`clientAsk: aa did not commit the eviction on its first ballot — a client's word made it joint over members that do not exist (I-23): ${ca.mid![0]}`)
   assert.deepEqual(teeth, [])
 })
 
