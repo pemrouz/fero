@@ -13,15 +13,19 @@
 // the seed-157 shape (0 of 10, H7); rounds 1 and 3 fail `evictsplit`, `joinsplit`, the isolate grid (11 and 9 of
 // 108 split) and the seeded isolate family (12 and 8 of 100) — H11; round 3 wedges the three H9_SEEDS the base heals
 // (H9), and four more crash schedules than the base in the default grid (#9, #11, #25, #27) and 24 more in the full
-// one, all of them the n=3 crash twin (H12); the round-3 kernel also splits `pledgeTwo` (its gate counts a read-only
-// leaver's link, the 2026-10-10 review's blocker). Bounded: about 30 s at low priority on the loaded WSL2 box, half
+// one, all of them the n=3 crash twin (H12); the round-3 kernel also splits `pledgeTwo` on 5 of 5 (its gate counts a
+// read-only leaver's link, the 2026-10-10 review's blocker — with the cut at 0 ms; the first version's 3 ms cut let
+// the VOTEs land and was green there, the second review). The base's own hole is `evictTwo` and `evictTwoB`, pinned
+// red as the seeds they split on. Bounded: about 30 s at low priority on the loaded WSL2 box, half
 // that idle; FERO_LEAVE_FULL=1 runs the full crash grid (576 cases, three restart delays, two seeds) and 100 seeded
 // isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
-import { unsafe } from './leave-sweep.ts'
+import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
+import { Sim } from './exec.ts'
+import { cluster } from './harness.ts'
 import { JK } from '../kernel/journal.ts'
 
 const FULL = process.env.FERO_LEAVE_FULL === '1'
@@ -49,20 +53,30 @@ test('leave harness, pins: evictsplit and joinsplit (the round-3 report\'s two s
   assert.deepEqual(bad, [])
 })
 
-//! pledgeTwo on today's kernel: no knock is a vote, so n01 (one stayer beside it, three members cut off) commits
-// nothing and is read-only; the three on the far side re-form without n01 and n02. A kernel that commits "the view
-// minus the two leavers" on the knocks (the restricted pledge of DESIGN-LEAVE §10.3) splits here: n01@2{n01,n02,n03}
-// beside n03@1 with the leavers' links — the review's blocker, and the family the isolate grid cannot draw (it cuts
-// n01 from everyone).
-test('leave harness, pledgeTwo: two leavers knock to n01, then n01 keeps one stayer and the other stayer keeps both leavers (the 2026-10-10 review\'s probe) — safe on seeds 1..5, n01 never writable, the far side settles without n01', () => {
-  const bad: string[] = []
+//! pledgeTwo on today's kernel: no knock is a vote, so n01 (one stayer beside it, three members cut off the instant it
+// has read both knocks) commits nothing and is read-only; the three on the far side re-form without n01 and n02. A
+// kernel that commits "the view minus the two leavers" on the knocks (the restricted pledge of DESIGN-LEAVE §10.3)
+// splits here: n01@2{n01,n02,n03} beside n03@1 with the leavers' links, then two views at epoch 3 — the review's
+// blocker, and the family the isolate grid cannot draw (it cuts n01 from everyone). Measured on the round-3 kernel
+// (6de8eee) with the cut at 0 ms: 5 of 5 split (46 to 3,553 one-view-per-epoch violations, `n01@3{n01,n02}` beside
+// `n03@3{n03,n04,n05}` or @4 at the horizon); with the first version's 3 ms cut, 0 of 5 — the VOTEs in flight landed.
+// SAFETY is asserted. The far side SETTLING is liveness and is pinned as a counted set, like every other family: on
+// today's kernel it settles on all five, but only because n03 leads while holding a vote at 2 above its view 1 — the
+// rule of §10.9 step 2 would close that gate (and the restored leavers' too, both hold votes at 2), so under it this
+// pin is EXPECTED to move to all five not settled, with the why in the commit.
+const KNOWN_NOT_SETTLED_PLEDGE_TWO = new Set<number>([])
+
+test('leave harness, pledgeTwo: two leavers knock to n01, then n01 keeps one stayer and the other stayer keeps both leavers (the 2026-10-10 review\'s probe, the cut at 0 ms) — SAFE on seeds 1..5, n01 never writable; the not-settled set is exactly the pinned one', () => {
+  const bad: string[] = [], notSettled: number[] = [], shapes = new Map<number, string>()
   for (let seed = 1; seed <= 5; seed++) {
     const o = pledgeTwo(seed)
-    if (o.problems.length) bad.push(`pledgeTwo ${seed}: ${o.problems.join('; ')}`)
-    if (!o.settled) bad.push(`pledgeTwo ${seed}: the far side did not settle`)
+    shapes.set(seed, `pledgeTwo ${seed}: ${o.problems.join('; ')}`)
+    if (o.problems.length) bad.push(shapes.get(seed)!)
     if (o.proposerWritable) bad.push(`pledgeTwo ${seed}: n01 writable on two knocks and one stayer`)
+    if (!o.settled) notSettled.push(seed)
   }
-  assert.deepEqual(bad, [])
+  assert.deepEqual(bad, [], 'UNSAFE, or n01 committed on votes it never received live')
+  pinExact('pledgeTwo', notSettled, KNOWN_NOT_SETTLED_PLEDGE_TWO, shapes)
 })
 
 //! rebirth on today's kernel: the seeds it is NOT live on inside 1..100 (22 of 100): pairs cut apart inside the leave
@@ -80,10 +94,12 @@ test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pai
     else if (ps.length) notLive.push(seed)
   }
   assert.deepEqual(unsafeOnes, [], 'UNSAFE: a monitor fired, or two nodes ended writable in different views')
-  pinExact('rebirth', notLive, KNOWN_NOT_LIVE_R, shapes)
+  //! the H9 seeds BEFORE the exact pin: on the round-3 kernel the pin fails first (it heals ten seeds the base does
+  // not, "known to wedge is live now"), and that message would hide the one this line is for
   const h9: string[] = []
   for (const seed of H9_SEEDS) { const s = scheduleR(seed); const ps = runR(s); if (ps.length) h9.push(`${shapeR(s)}: ${ps.join('; ')}`) }
   assert.deepEqual(h9, [], 'an H9 seed the base heals did not heal (the parked branch wedges these)')
+  pinExact('rebirth', notLive, KNOWN_NOT_LIVE_R, shapes)
   const named: string[] = []
   for (const name of Object.keys(NAMED_R)) for (let seed = 1; seed <= (name === 'r2-157' ? 10 : 1); seed++) { const ps = runR(namedR(name, seed)); if (ps.length) named.push(`${name} under sim seed ${seed}: ${ps.join('; ')}`) }
   assert.deepEqual(named, [], 'a named shape the base heals did not heal')
@@ -171,6 +187,16 @@ test('leave harness, the quiet-point check: two nodes writable in different view
   five.cut('aa', 'cc'); five.cut('bb', 'cc') // the VIEW to cc dies on the cut; cc keeps view 1 and a vote at 2
   assert.deepEqual(five.splits, [], 'one view per epoch holds: the recorder sees nothing')
   assert.match(quietSplit(five) ?? '', /aa@2\{aa,bb,cc\} bb@2\{aa,bb,cc\} cc@1\{aa,bb,cc,dd,ee\} dd@1\{aa,bb,cc,dd,ee\} ee@1\{aa,bb,cc,dd,ee\}/)
+  //! the sweep's split() by hand, the same rule on Sim nodes: a node at epoch 0 is open genesis — writable, but IN no
+  // view — so it is not one side of a split; a second solo view at epoch 1 is (the mutation "drop `x.epoch > 0`"
+  // names n02@0{} beside n01@1{n01} and turns this red)
+  const sim = new Sim(1)
+  const [n01, n02] = cluster(sim, 2, { heartbeatMs: 50 })
+  n01.membership.install(n01, { epoch: 1, members: [['n01', 'sim:n01']] })
+  assert.equal(n02.membership.gate(n02).open, true, 'open genesis is writable')
+  assert.equal(split(sim), null, 'an epoch-0 writable node beside a writable view is not a split')
+  n02.membership.install(n02, { epoch: 1, members: [['n02', 'sim:n02']] })
+  assert.match(split(sim) ?? '', /SPLIT: writable in different views: n01@1\{n01\} n02@1\{n02\}/)
 })
 
 //! evictTwo on today's kernel: a hole, counted (DESIGN-LEAVE §10.2). A ballot that evicts TWO suspects at once at n=5
@@ -180,9 +206,15 @@ test('leave harness, the quiet-point check: two nodes writable in different view
 // monitor fires, and both sides are writable. Seeds 1, 2, 4 and 5 of 5 in both variants (seed 3 misses the timing);
 // the one-evictee control never splits (the arithmetic forbids it). A kernel that closes the hole empties these
 // lists: re-record them with the why, and move the STATUS line.
+// evictTwoB is the same hole with the stale voter NOT the far side's lowest member: a node that never voted leads the
+// far side and the stale voter GRANTS its higher ballot (seed 3 misses the timing, as in evictTwo). It is the schedule
+// that a rule of "a vote above my view closes my gate and I lead nothing" does NOT close (measured on a scratch
+// kernel: evictTwo 0 of 10, evictTwoB still 1, 2, 4, 5), and that one grant clause does (0 of 5) — DESIGN-LEAVE
+// §10.2. A kernel that turns evictTwo green and leaves this red has closed half the hole.
 const SPLITS_EVICT_TWO = { cut: [1, 2, 4, 5], crash: [1, 2, 4, 5] }
+const SPLITS_EVICT_TWO_B = [1, 2, 4, 5]
 
-test('leave harness, evictTwo: two suspects evicted at once at n=5 with the third voter cut or crashed on its grant — today\'s kernel commits two views at one epoch and ends writable on both sides on exactly the pinned seeds; one evictee never splits', () => {
+test('leave harness, evictTwo: two suspects evicted at once at n=5 with the third voter cut or crashed on its grant — today\'s kernel commits two views at one epoch and ends writable on both sides on exactly the pinned seeds; one evictee never splits; evictTwoB (the stale voter is not the far side\'s lowest, so it GRANTS a never-voted member\'s higher ballot) splits on exactly the pinned seeds too', () => {
   for (const how of ['cut', 'crash'] as const) {
     const bad: number[] = [], detail: string[] = []
     for (let seed = 1; seed <= 5; seed++) { const ps = evictTwo(seed, how, 2); if (ps.length) { bad.push(seed); detail.push(`${seed}: ${ps.join('; ')}`) } }
@@ -191,6 +223,9 @@ test('leave harness, evictTwo: two suspects evicted at once at n=5 with the thir
     for (let seed = 1; seed <= 5; seed++) { const ps = evictTwo(seed, how, 1); if (ps.length) control.push(`${seed}: ${ps.join('; ')}`) }
     assert.deepEqual(control, [], `${how}, one evictee: the new view's majority and the old view's must share a voter`)
   }
+  const badB: number[] = [], detailB: string[] = []
+  for (let seed = 1; seed <= 5; seed++) { const ps = evictTwoB(seed); if (ps.length) { badB.push(seed); detailB.push(`${seed}: ${ps.join('; ')}`) } }
+  assert.deepEqual(badB, SPLITS_EVICT_TWO_B, `evictTwoB: the split set moved — a kernel change closed (or widened) the hole's grant half; re-record with the why\n${detailB.join('\n')}`)
 })
 
 //! the explorer's range here starts ABOVE the 1..2000 sim/explore.test.ts pins, so every seed adds coverage (the
