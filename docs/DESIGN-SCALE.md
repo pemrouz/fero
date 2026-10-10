@@ -260,6 +260,134 @@ Reading (3) above narrows to its real case: a leaver STILL IN its own
 view (the vote never came back) has nothing frozen, goes like a crash
 and counts nothing (kernel/drain.test.ts pins both).
 
+**Note, 2026-10-10 (stage 2 built: announce-on-change anti-entropy).** The
+§7 stage-2 row is in the tree in four commits (the keys; the announcement
+plan and the targeted rounds; the member digest's retirement; the spoke
+path). What landed, where it differs from §3, and why — each difference
+settled at the build with its reason, for the two reviews to weigh.
+
+*What landed.* On an armed node the heartbeat sends no DIGEST on a member
+link, and the DIGEST handler ships no suffix to a member (the frame still
+syncs the link and answers r=0: an admit, a drain). A client link is
+unchanged. Repair is the holder handshake: the owner's announcement of what
+it stamped (one batched HAVEQ per co-holder at the next tick), the
+never-answered leg (a co-holder that never attested a held partition is
+asked every tick until it does), the orphan poll, the probe-driven round,
+and the sweep (`aeFan` 8, a tune row: the next aeFan co-holder links in
+uuid order behind a cursor that survives installs, each told every held
+partition it shares). `round(node, only?, parts?)`: the post-fold and
+sealed rounds go to the partition's holders only, the admit and drain
+rounds to that one peer for what the two share, the install's round is the
+full one. HAVEQ carries `d` (a durable node's durable floors), `g` (the
+partitions the sender is gapless for: content tail = floor on every lane)
+and `x` (released, sent by the shed to the current holders, batched per
+link per step); a HAVEA partition answers `g: 1` and `x: 1` (none, where the
+old code was silent). No MAGIC bump (V4-14). Paused links are skipped by
+every leg.
+
+*The numbers.* The counted floors of §2 re-recorded (sim/scale-probes):
+idle member DIGEST per tick 870 → 0 (and 930 → 0 after the join); the join
+window's DIGEST 52,110 → 60 (the joiner's 30 admit exchanges, two legs);
+the 300-writes window 1,067 → 5,337 HAVEQ (the sweep: 20 ticks × 30 × 8 =
+4,800 frames, plus the owners' announcements merged per link) and its
+RECORDS exactly 300 × (R−1) = 600; the join 2,446 → 14,791 HAVEQ (about
+13,500 sweep frames + the install round + 38 targeted post-fold rounds + 81
+release frames). The pins of §8 (sim/announce.test.ts): **P1** idle n=25
+R=3: member DIGEST 0, HAVEQ = HAVEA = Σᵢ min(aeFan, cᵢ) = 200 per tick
+exactly, nothing shipped to a member; **P2** n=100 R=3 3,000 rows idle:
+non-PING frames per tick exactly Σᵢ 2·min(aeFan, cᵢ) = 1,600 and 249,878
+bytes (today 9,900 frames, 2.93 MB); **P3** one write on a settled n=100 R=3
+mesh with aeFan 0: exactly 2 RECORDS deliveries, then 2 HAVEQ + 2 HAVEA at
+the next tick, then silence. The unscoped pins did not move: the golden,
+the 300-seed sweep, 59,500, 104,050, the idle law — no line of stage 2 is
+reached on an unscoped node.
+
+*Where it differs from §3, and why.*
+
+1. **The dirty set marks at the stamp site only**, not at the fast path,
+   the splice, the fold or the truing. On a scoped cluster a holder's floor
+   moves at an inbound site only as the echo of the owner's stamp (the live
+   fan-out, or that fan-out replayed from a latch buffer) — and the owner
+   announces it; the fold, the seal, the arming truing and a boot each run
+   their own round at once; a durable echo is carried by the next answer
+   (`md`) or sweep (`d`). Announcing the echoes too would cost R(R−1)
+   entries per write where (R−1) do the work, and §3's own frames
+   arithmetic and §8's P3 count (R−1): the owner's. So the hot path is one
+   `Set.add` per committed record on an armed OWNER and nothing on the
+   inbound path (§8 budgeted both). Co-holder↔co-holder marks refresh at
+   the sweep (a lap at most); the owner↔co-holder pair converges in one
+   round trip.
+2. **The drain round runs on every drain of an armed member link**, not
+   only after a drop: every announcement skipped the link while it was
+   paused, so the one round to that peer is what catches it up; the
+   re-sync digest still follows a drop.
+3. **P2's frame bound is the law, not 1,000.** With aeFan 8 at n=100 and
+   c ≥ 8 everywhere the sweep is 800 HAVEQ + 800 HAVEA = 1,600 frames (§3
+   says so itself); and a sweep frame is about 156 bytes (the epoch, the
+   ~1.8 partitions a pair shares with their lane floors, the `g` list, the
+   echoed `m`), so the idle tick is 250 KB, not 100 KB: 11.7× less than
+   today. Stage 5's "lanes changed since the last answer" is the next cut.
+4. **`aeFan` 0 is allowed** (ZERO_OK): the sweep off, announce-on-change
+   alone — the measurement posture P3 needs ("then silence" is unmeasurable
+   under a sweep); every real cluster keeps the default.
+5. **The sweep's walk is O(held × R) per tick**, not O(aeFan × shared): one
+   walk over the held entries builds the per-peer shared list the slice
+   reads (and serves the dirty and never-answered legs). A per-link index
+   makes it O(slice); that is stage 5's install work.
+6. **A node teaches whatever it holds, mid-latch too** (kernel/scope.ts
+   `#teach`; a change to C8's teacher side). The digest's suffixes had been
+   masking a deadlock: two holders of one partition each ahead on a
+   DIFFERENT lane (an owner change leaves exactly this shape — A2's demoted
+   owner and the joiner that re-committed its attempt) each found
+   themselves behind the other's announcement, latched each other, and an
+   acquiring node refused to teach, so both timed out, aborted to orphan on
+   their residue, re-latched at the next round and cycled for ever (A2 seed
+   9 went not-live the moment the digest retired; live on the base tree
+   only through the admit digest's suffixes). Now a node teaches its held
+   base, its frozen orphan content or its PRE-LATCH base with its current
+   floors as the cut — sound whatever the latch state, since floors never
+   regress inside a life and a latch stages new records outside the lanes.
+   I6's "h latches x and folds the gap" needed this to be true.
+7. **The spoke path** (STATUS's three parked lines; the parked branch
+   w5b/a11's probes rebuilt as tests, kernel/client.test.ts and sim/scale-
+   probes). Every r=1 a client sends carries `q`, a server's r=0 toward a
+   client echoes it, and a resync ends only on a reply whose q ≥ its own;
+   what a stale reply shipped stays in the fold; in resync a client
+   announces d = {} on every digest; a client whose resync ask is a tick old
+   answers a feeder's r=1 with an r=1 of its own (the paused-feeder late
+   end: one tick late at most, no re-ship at every heartbeat); and a client
+   of a SCOPED feeder (`replicas=` in the feeder's HELLO contract,
+   `node.feederScoped`) resyncs at every failover, unioning the sweep set
+   when begun mid-resync. The sim's scoped clusters now carry the api's
+   contract so a sim spoke reads it as a real one does (unscoped sim
+   clusters send none). Member bytes are unchanged; an unscoped CLIENT's
+   r=1 digest gains the one key `q` — the one place stage 2 touches a
+   client's bytes, and no golden carries a client.
+8. **The monitors** M11 resync-behind and the per-spoke screen check
+   (`screenMatches`) came in from the parked branch as its reviews left
+   them; the sweep's verdict names a screen-only row UNSAFE.
+
+*The harness.* Every family safe and live; A8 heals; floors agree at the
+horizon on every seed, and at `FERO_SCOPED_SEEDS=8` (the knob; the M7 run
+the row asks for — see the battery of the day). KNOWN_UNSAFE: A11's four
+resync seeds leave (fixed; they stay in every battery as RESYNC_SEEDS, M10
+and M11 green, a resync end on each); A3 seed 6 leaves — safe now, but
+because its 1.5 ms window between the commit and the cut does not open on
+the new trajectory, not because the class is fixed; A2 seed 9 enters so the
+class (the zombie's: a commit stranded on a cut-off owner) stays pinned in
+every battery. The scan of A2/A3 seeds 1-12 reads exactly as stage 0 did
+(A2 seeds 9, 10, 12 unsafe; A3 seed 10's partition not held where the ring
+assigns it). The mutation pins follow the trajectory: `drop-one` on A6 seed
+3, A7 seed 4 and A1 seed 8, `version-only` on A11 seed 7, each scanned over
+the family's seeds. Two debugger fixtures (tools/debug) followed the
+trajectory; no kernel law they check changed.
+
+*What stage 2 does not close.* The double commit across an ownership move
+(the zombie's class; §14 Q7's decision); A3 seed 10's not-held partition
+(pre-existing, unchanged). The record's I6 cadence bound now reads: within
+one tick of the owner's stamp, at the next (re)admit or drain, or within
+⌈c / aeFan⌉ ticks for a pair whose announcement was lost.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
