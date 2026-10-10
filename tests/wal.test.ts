@@ -252,3 +252,59 @@ test('I-36 — a store whose boot record failed mid-life refuses to restart: boo
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
+
+//! DRAIN past the bound (DESIGN-SCALE §7 stage 1 (b), 2026-10-10) over real sockets and a real WAL: the new holder
+// folds the leaver's partitions in memory but can never ATTEST them — its store died (the dir under it is gone, I-36),
+// so the acquired bases never seal (the snapshot echo never comes) and it announces nothing for them. The leaver
+// waits exactly tune.drainTicks heartbeats, then goes: leave() false, an `undrained` row naming every partition.
+test('DRAIN past the bound — a scoped leaver whose new holder cannot attest (its WAL dir is gone: the acquired base never seals) resolves leave() false after drainTicks with an `undrained` row; the holder still folded the rows in memory', async () => {
+  const da = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-drain-a-'))
+  const db = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-drain-b-'))
+  const live: Runtime[] = []
+  const uncaught: unknown[] = []
+  const trap = (e: unknown) => { uncaught.push(e) }
+  process.on('uncaughtException', trap)
+  try {
+    const pa = await ports.free()
+    const pb = await ports.free()
+    const a = new Runtime({ uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], dir: da, heartbeatMs: 50, redialMs: 30, replicas: 1 })
+    const b = new Runtime({ uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], dir: db, heartbeatMs: 50, redialMs: 30, replicas: 1, tune: { drainTicks: 3 } })
+    live.push(a, b)
+    await a.start()
+    await b.start()
+    assert.ok(await until(() => a.node.armed && b.node.armed && a.node.membership.view.members.length === 2), 'a two-member scoped view committed')
+    //! three partitions bb holds alone (R=1): the only copies
+    const ring = new Ring()
+    ring.build(b.node.membership.view.epoch, b.node.membership.view.members)
+    const mine: string[] = []
+    for (let n = 0; n < 256 && mine.length < 3; n++) { const k = `k${n}`; if (ring.holders(k, 1)[0] === 'bb') mine.push(k) }
+    assert.equal(mine.length, 3)
+    b.write(mine.map((k, i) => ({ type: REC.update, key: [k], value: i })))
+    assert.ok(await until(() => mine.every((k) => b.node.scope!.held(k))), 'bb holds them')
+    assert.equal(mine.filter((k) => a.node.state.has(JSON.stringify([k]))).length, 0, 'aa has none of them yet')
+    //! aa's store dies under it: every later boot record and snapshot swap is skipped, so a base aa acquires from
+    // now on stays memory-only (scope.sealed false) and aa attests NOTHING for it (kernel/scope.ts announceFloors)
+    fs.rmSync(da, { recursive: true, force: true })
+    a.node.persistBoot()
+    assert.ok(await until(() => a.node.journal.read().some((e) => e.kind === JK.persistFail)), 'the store is condemned')
+    const t0 = performance.now()
+    const clean = await b.leave()
+    const took = performance.now() - t0
+    assert.equal(clean, false, 'past the bound: not a clean stop')
+    const und = b.node.journal.read().filter((e) => e.kind === JK.undrained).map((e) => e.a)
+    assert.deepEqual(und, [3], 'every one of its three partitions is named undrained')
+    assert.equal(b.node.journal.read().filter((e) => e.kind === JK.left).at(-1)?.b, 0)
+    assert.equal(b.node.membership.isMember('bb'), false, 'the view half did complete: bb is out')
+    assert.ok(took < 50 * (4 + 3 + 2), `the kernel answered inside the shell cap (${took.toFixed(0)} ms)`)
+    assert.ok(await until(() => mine.every((k) => a.node.state.has(JSON.stringify([k])))), 'aa folded the rows in memory all the same')
+    assert.ok(mine.every((k) => a.node.scope!.entries.get(k)?.sealed === false), 'but none of them sealed: that is what the leaver could not count')
+    await b.destroy()
+    live.splice(live.indexOf(b), 1)
+    assert.deepEqual(uncaught, [], 'nothing escaped')
+  } finally {
+    process.off('uncaughtException', trap)
+    for (const r of live) await r.destroy()
+    fs.rmSync(da, { recursive: true, force: true })
+    fs.rmSync(db, { recursive: true, force: true })
+  }
+})

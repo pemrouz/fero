@@ -540,3 +540,41 @@ test('SNAPSHOT CLONE [8] — mutating an awaited whole-resource read never corru
     assert.equal((second as Record<string, unknown>).injected, undefined, 'no injected key leaked into the shared state')
   } finally { await Promise.all(nodes.map((n) => n.destroy())) }
 })
+
+//! DRAIN-THEN-GO (DESIGN-SCALE §7 stage 1 (b), 2026-10-10) through the public surface: destroy() on a scoped member
+// waits for the new holders to copy what it held, and resolves the verdict — true for a stop that was clean all the
+// way, false when there was nobody left to copy to (the last member), with cluster.me.undrained naming the count.
+test('DRAIN [DESIGN-SCALE stage 1 (b)] — scaling 2→1 at replicas 1 by destroy(): the leaver\'s rows are all at the survivor when destroy() resolves true; the last member\'s destroy() resolves false and cluster.me.undrained counts its partitions', async () => {
+  const nodes = await spawn(2, 1)
+  try {
+    assert.ok(await formed(nodes))
+    for (let i = 0; i < 12; i++) nodes[i % 2].data['row' + i] = { v: i }
+    const whole = () => nodes[0].data as PromiseLike<Record<string, { v: number }>>
+    assert.ok(await until(async () => Object.keys(await whole()).length === 12), 'every row committed somewhere')
+    const me = (f: Fero) => (snapshot(f.cluster) as { me: { undrained: number } }).me
+    assert.equal(me(nodes[1]).undrained, 0, 'nothing undrained before the stop')
+    //! the leaver: the view shrinks by its ballot, then it holds `left` until n01 has attested every partition it held
+    assert.equal(await nodes[1].destroy(), true, 'a clean stop all the way: the vote came back AND the rows were copied')
+    const after = await whole()
+    assert.deepEqual(Object.keys(after).sort(), Array.from({ length: 12 }, (_, i) => 'row' + i).sort(), 'the survivor alone holds every row')
+    assert.deepEqual(Array.from({ length: 12 }, (_, i) => after['row' + i].v), Array.from({ length: 12 }, (_, i) => i), 'with the right values')
+    assert.equal(me(nodes[0]).undrained, 0)
+    //! the last member: nobody to copy to — it goes at once and says so (its rows have no other home without a dir)
+    assert.equal(await nodes[0].destroy(), false, 'the last member\'s stop is not a clean one')
+    assert.equal(me(nodes[0]).undrained, 12, 'all twelve partitions went with it — folded into cluster.me before the teardown')
+  } finally { await Promise.all(nodes.map((n) => n.destroy())) }
+})
+
+test('DRAIN, the verdict rides destroy(): an UNSCOPED pair resolves true on both stops (the last member simply goes, as V4-6 says) and cluster.me.undrained stays 0', async () => {
+  const ps = [await ports.free(), await ports.free()]
+  const addrs = ps.map((p) => `127.0.0.1:${p}`)
+  const nodes = await Promise.all(addrs.map((listen, i) => fero('plain', { uuid: `u${i}`, listen, hosts: addrs.filter((_, j) => j !== i), heartbeat: { ms: 50 }, redial: { ms: 30 } })))
+  try {
+    assert.ok(await formed(nodes))
+    nodes[1].data.k = 1
+    assert.ok(await until(() => (snapshot(nodes[0].data) as { k?: number }).k === 1))
+    assert.equal(await nodes[1].destroy(), true)
+    assert.equal(await nodes[0].destroy(), true)
+    assert.equal((snapshot(nodes[0].cluster) as { me: { undrained: number } }).me.undrained, 0)
+  } finally { await Promise.all(nodes.map((n) => n.destroy())) }
+})
