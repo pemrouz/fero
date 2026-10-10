@@ -220,6 +220,27 @@ leaveTicks + drainTicks + 2 heartbeats, 11 s at the default cadence, when
 a new holder cannot attest) — the README says so rather than the grace
 being raised, since spawn cannot know the child's cadence.
 
+Two more notes from the second review of the same day. (1) §9 lists
+`undrained` among the scalars `cluster.partitions` gains; it landed on
+`cluster.me.undrained` instead, because a stopping node paints no
+partitions frame (api/index.ts fold: the shrunk view installs on the
+leaver too, and a screen must not end on the survivors' picture), while
+the `me` row is still written before the teardown. (2) A cost the §7 row
+chose, named here so nobody reads it as a bug: at R=1 a new holder that
+crashes mid-drain takes with it the rows it was about to receive. The
+leaver sees the link die, finds that partition with no reachable holder,
+and goes at the next tick (about two heartbeats after the crash in the
+sim, the link death included) with `left(false)` and `undrained` counted —
+honest, and the rows are lost unless the leaver kept a `dir`. The
+survivors evict the crashed holder afterwards and re-range the
+partition, but the leaver did not wait for that: waiting "while any
+other member is reachable" instead was tried at review (n=4, R=1, five
+seeds) and kept every row, but ended only just inside the 16-tick
+bound, because the eviction waits out the redial chain first. Whether a
+holderless partition should wait for a re-range while other members are
+still reachable is the owner's call (a Q for §14 if wanted); today the
+rule is the row's: stopped at once when nobody can be drained to.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
