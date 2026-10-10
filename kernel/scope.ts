@@ -56,6 +56,15 @@ export const ACQ_LIVE_MAX = 8192
 //! STALL_AT: polls without shed progress before the FIRST shedStall alarm (then doubling cadence).
 export const STALL_AT = 8
 
+//! covers — THE shed bar as one predicate: do a holder's attested marks (`per`: HAVEA ok `m` / HAVEQ feed) reach
+// every frozen content tail (`lanes`)? evaluateSheds (the shed) and undrained (the leave drain) both read it, so
+// the two cannot drift apart: an ok answer whose floors sit BELOW the tail is not cover — under the pp law floors
+// lawfully under-claim (M6 findings 12/21), and the drain must wait for the right event, not any ok answer.
+const covers = (per: Map<string, number> | undefined, lanes: [string, number][]): boolean => {
+  for (const [o, s] of lanes) if ((per?.get(o) ?? 0) < s) return false
+  return true
+}
+
 //! one staged record — teacher transfer and live records share the buffer, discriminated by `live`.
 interface Staged { origin: string; seq: number; epoch: number; iss?: string; cid?: number; rec: Rec; live: boolean; pp?: number }
 
@@ -685,9 +694,7 @@ export class Scope {
       let covered = true
       for (const holder of ring.holders(p, node.replicas)) {
         if (holder === node.uuid) { covered = false; break } // still assigned?! never shed our own duty
-        const per = e.marks.get(holder)
-        for (const [o, s] of lanes) if ((per?.get(o) ?? 0) < s) { covered = false; break }
-        if (!covered) break
+        if (!covers(e.marks.get(holder), lanes)) { covered = false; break }
       }
       if (covered) this.#shed(node, p, e)
     }
@@ -720,9 +727,7 @@ export class Scope {
         const link = id === undefined ? undefined : node.links.get(id)
         if (!link || link.state !== LS.admitted || link.dead) continue
         reachable = true
-        const per = e.marks.get(holder)
-        for (const [o, s] of lanes) if ((per?.get(o) ?? 0) < s) { behind = true; break }
-        if (behind) break
+        if (!covers(e.marks.get(holder), lanes)) { behind = true; break }
       }
       if (behind) waiting++
       else if (!reachable) stranded++
