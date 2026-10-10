@@ -6,7 +6,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node, MAX_REDIALS, MEMBER_REDIALS } from './node.ts'
-import { LEAVE_TICKS, MAX_PULLS } from './membership.ts'
+import { LEAVE_TICKS, LEAVE_WINDOW, MAX_PULLS } from './membership.ts'
+import { Mesh } from '../sim/mesh.ts'
 import { MAX_PENDING } from './write.ts'
 import { JK } from './journal.ts'
 import { Framer, VERB, encodeControl, encodeFrame } from './codec.ts'
@@ -444,8 +445,8 @@ test('membership frames before HELLO are a protocol violation: the link closes',
 
 //! drive a 2-node genesis to a committed view 1 on 'aa' (lowest, proposer): the smallest view that can vote —
 // and the one suspicion + eviction can never shrink (a dead half is a missing old-majority vote)
-const formedPair = () => {
-  const h = harness('aa', { hosts: ['sim:bb'] })
+const formedPair = (opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
+  const h = harness('aa', { hosts: ['sim:bb'], ...opts })
   h.node.step({ kind: 'start' })
   h.admit(1, 'bb')
   h.tick()
@@ -554,18 +555,187 @@ test('graceful leave (V4-6): a LEAVE is ignored at open genesis, from a non-memb
   assert.equal(k.jk(JK.propose).length, 2, 'no second ballot while one is in flight (genesis + the join)')
 })
 
-test('graceful leave (V4-6), the bound: no vote ever comes → after LEAVE_TICKS the leaver goes anyway (`left` b=0) — from there it is a crash, and eviction follows the old way', () => {
+//! ── the knock window (DESIGN-LEAVE §10.7, 2026-10-10). A tick counts toward the LEAVE_TICKS bound only while the
+// leaver has no admitted link to a member that could answer — one that has neither knocked LEAVE at it nor proposed
+// its own exit to it. With such a link up it keeps knocking, up to LEAVE_WINDOW ticks in all. On the kernel before
+// the window every test below that says "past LEAVE_TICKS" goes red at tick 5 with `left` b=0. ──
+
+//! a non-lowest leaver at view {aa,bb}: it knocks, aa proposes
+const knockingPair = (opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
+  const h = harness('bb', { hosts: ['sim:aa'], ...opts })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'aa')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  assert.equal(h.node.epoch, 1)
+  return h
+}
+
+test('the knock window: a leaver whose member link is up knocks every tick PAST the old bound until the vote lands — the lowest re-offers its ballot, a non-lowest re-knocks LEAVE — and goes clean on the echo', () => {
+  //! the lowest live member: its ballot is re-offered every other tick while bb (linked, a member, not leaving) says nothing
   const h = formedPair()
   h.node.step({ kind: 'leave' })
-  for (let i = 0; i < LEAVE_TICKS; i++) {
+  for (let i = 0; i < LEAVE_TICKS + 3; i++) {
     h.tick()
-    assert.equal(h.of('left').length, 0, `tick ${i + 1}: still waiting`)
+    assert.equal(h.of('left').length, 0, `tick ${i + 1}: still knocking — bb is linked and could answer`)
+  }
+  assert.ok(h.sentOn(1, VERB.PROPOSE).length >= 4, `the ballot was re-offered while waiting (${h.sentOn(1, VERB.PROPOSE).length} PROPOSEs): a lost PROPOSE heals`)
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_TICKS + 3, done: false }, 'no tick counted toward the bound')
+  //! bb wakes: its vote commits the shrunk view, its echo is the exit proof — a clean stop, where the old bound gave up at tick 5
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb' }) })
+  assert.equal(h.node.epoch, 2)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['bb', 'sim:bb']] }) })
+  assert.deepEqual(h.of('left'), [['left', true]])
+  assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b]), [[2, 1]])
+  //! the non-lowest: one LEAVE per tick on the member link, past the bound
+  const k = knockingPair()
+  k.node.step({ kind: 'leave' })
+  for (let i = 0; i < LEAVE_TICKS + 3; i++) k.tick()
+  assert.equal(k.sentOn(1, VERB.LEAVE).length, LEAVE_TICKS + 4, 'knocked at leave() and on every tick since')
+  assert.equal(k.of('left').length, 0, 'past LEAVE_TICKS and still waiting: aa is linked')
+  k.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: [['aa', 'sim:aa']], p: 'aa' }) })
+  assert.equal((k.sentOn(1, VERB.VOTE).find((f) => (f.value as { e: number }).e === 2)!.value as { g: number }).g, 1, 'granted — voting is not writing')
+  k.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa']] }) })
+  assert.deepEqual(k.of('left'), [['left', true]])
+})
+
+test('the knock window\'s end: a linked member that never answers → `left` b=0 at LEAVE_WINDOW + 1, not before; the tune row moves it; a row at or below the bound is the bound alone', () => {
+  const h = formedPair()
+  h.node.step({ kind: 'leave' })
+  for (let i = 0; i < LEAVE_WINDOW; i++) {
+    h.tick()
+    assert.equal(h.of('left').length, 0, `tick ${i + 1}: inside the window`)
   }
   h.tick()
-  assert.deepEqual(h.of('left'), [['left', false]])
-  assert.equal(h.jk(JK.left)[0].b, 0)
+  assert.deepEqual(h.of('left'), [['left', false]], 'the window ran out: it goes like a crash')
+  assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b]), [[1, 0]])
   assert.equal(h.node.epoch, 1, 'nothing committed: the view is unchanged')
-  assert.ok(h.sentOn(1, VERB.PROPOSE).length >= 2, 'the ballot was re-offered while waiting (a lost PROPOSE heals)')
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, drain: undefined })
+  assert.equal(LEAVE_WINDOW, 16, 'the record\'s default: 16 ticks, 8 s at the default cadence (DESIGN-LEAVE §10.7)')
+  //! the row: leaveWindow 6 ends it at 7
+  const w = formedPair({ tune: { leaveWindow: 6 } })
+  w.node.step({ kind: 'leave' })
+  for (let i = 0; i < 6; i++) w.tick()
+  assert.equal(w.of('left').length, 0)
+  w.tick()
+  assert.deepEqual(w.of('left'), [['left', false]])
+  //! a row BELOW the bound never cuts the bound short: leaveWindow 2 is "the bound alone", so it ends at LEAVE_TICKS + 1
+  const b = formedPair({ tune: { leaveWindow: 2 } })
+  b.node.step({ kind: 'leave' })
+  for (let i = 0; i < LEAVE_TICKS; i++) b.tick()
+  assert.equal(b.of('left').length, 0, 'the bound still has a tick to go')
+  b.tick()
+  assert.deepEqual(b.of('left'), [['left', false]], 'leaveTicks + 1: today\'s behaviour, by choice (leave.ms 0)')
+})
+
+test('the knock window counts only links to members that could ANSWER: a fellow leaver — one that knocked LEAVE at me, or proposed its own exit to me — keeps no window open, so a leaver among leavers stops at the old bound; a fresh admit forgets it until it knocks again', () => {
+  //! bb at {aa,bb,cc}: it knocks at aa and cc. cc knocks back (a fellow leaver); aa still could answer
+  const h = harness('bb', { hosts: ['sim:aa', 'sim:cc'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'aa')
+  h.admit(2, 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  h.node.step({ kind: 'leave' })
+  assert.equal(h.sentOn(1, VERB.LEAVE).length + h.sentOn(2, VERB.LEAVE).length, 2, 'knocked on both member links')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.LEAVE, {}) })
+  for (let i = 0; i < LEAVE_TICKS + 2; i++) h.tick()
+  assert.equal(h.of('left').length, 0, 'past the bound: aa is linked and has not said it is leaving')
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_TICKS + 2, done: false })
+  //! aa proposes ITS OWN exit (a ballot that leaves its proposer out is a leave): now every member link is a fellow leaver's
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: [['bb', 'sim:bb'], ['cc', 'sim:cc']], p: 'aa' }) })
+  assert.equal((h.sentOn(1, VERB.VOTE).find((f) => (f.value as { e: number }).e === 2)!.value as { g: number }).g, 1, 'bb grants aa\'s exit all the same (a knocking leaver may vote)')
+  assert.deepEqual(h.jk(JK.leave).map((e) => e.a), ['bb', 'cc', 'aa'], 'the diary: my own knock, cc\'s knock, aa\'s exit ballot')
+  for (let i = 0; i < LEAVE_TICKS; i++) {
+    h.tick()
+    assert.equal(h.of('left').length, 0, `bound tick ${i + 1}`)
+  }
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS, total: LEAVE_TICKS * 2 + 2, done: false }, 'every tick since aa\'s ballot counted toward the bound')
+  //! a fresh admit of cc (a redial, or a new life) forgets what the old link heard: cc could be answering again
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'close', to: 'sim:cc' })
+  h.admit(3, 'cc')
+  h.tick()
+  assert.equal(h.node.membership.leaving!.ticks, LEAVE_TICKS, 'not counted: cc, re-admitted, has not knocked yet on this link')
+  assert.equal(h.of('left').length, 0)
+  //! cc knocks again on the new link: back to the bound, which now runs out
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.LEAVE, {}) })
+  h.tick()
+  assert.deepEqual(h.of('left'), [['left', false]], 'the bound ran out among leavers: nobody linked could commit anything')
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 4, done: true, drain: undefined })
+  assert.ok(h.node.membership.leaving!.total < LEAVE_WINDOW, 'well inside the window: the bound ended it, not the window')
+})
+
+test('the knock window closes with the link: a link loss is not a tick, but from then on the old bound counts — a leaver whose last member link dies goes LEAVE_TICKS ticks later, not at the window\'s end', () => {
+  const h = formedPair()
+  h.node.step({ kind: 'leave' })
+  for (let i = 0; i < LEAVE_TICKS + 2; i++) h.tick()
+  assert.equal(h.of('left').length, 0, 'past the bound, bb linked: knocking on')
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'close', to: 'sim:bb' })
+  assert.equal(h.of('left').length, 0, 'the loss itself is not a tick')
+  for (let i = 0; i < LEAVE_TICKS; i++) {
+    h.tick()
+    assert.equal(h.of('left').length, 0, `unlinked tick ${i + 1}: inside the bound`)
+  }
+  h.tick()
+  assert.deepEqual(h.of('left'), [['left', false]], 'LEAVE_TICKS + 1 unlinked ticks: it goes like a crash, as before')
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 3, done: true, drain: undefined })
+  assert.ok(h.node.membership.leaving!.total < LEAVE_WINDOW, 'the bound ended it, not the window')
+})
+
+test('the knock window needs the clock: with heartbeats off a leaver knocks once and waits, as before — no tick is counted either way, and the answer still ends it', () => {
+  const h = knockingPair({ heartbeatMs: 0 })
+  h.node.step({ kind: 'leave' })
+  assert.equal(h.sentOn(1, VERB.LEAVE).length, 1)
+  assert.equal(h.of('timer').filter((x) => x[2] === TAG.heartbeat).length, 0, 'no heartbeat timer exists')
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: 0, done: false })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: [['aa', 'sim:aa']], p: 'aa' }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa']] }) })
+  assert.deepEqual(h.of('left'), [['left', true]])
+})
+
+test('the knock window covers the echo too: the lowest member leaves, the vote comes late and the survivor\'s echo later still — both inside the window — and the stop is clean where the old bound called it a crash', () => {
+  const h = formedPair()
+  h.node.step({ kind: 'leave' })
+  for (let i = 0; i < LEAVE_TICKS + 2; i++) h.tick()
+  assert.equal(h.of('left').length, 0, 'bb is slow to vote')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb' }) })
+  assert.equal(h.node.epoch, 2, 'the proposer commits from the vote')
+  assert.equal(h.node.membership.isMember('aa'), false)
+  assert.ok(h.sentOn(1, VERB.VIEW).some((f) => (f.value as { e: number }).e === 2), 'the view floods to bb')
+  //! not a member of its own view any more — but bb IS, and its link is up: the window stays open for the echo
+  for (let i = 0; i < LEAVE_TICKS + 2; i++) {
+    h.tick()
+    assert.equal(h.of('left').length, 0, `echo tick ${i + 1}: still waiting for a survivor to echo`)
+  }
+  assert.equal(h.sentOn(1, VERB.LEAVE).length, 0, 'nothing to knock for: only the echo is awaited')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['bb', 'sim:bb']] }) })
+  assert.deepEqual(h.of('left'), [['left', true]])
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_TICKS * 2 + 4, done: true, drain: undefined })
+})
+
+//! the round-1 shapes (DESIGN-LEAVE §3, §10.8 H1 and H3) on real Nodes, with the window on: two members stop at once
+// at n=3 (the lowest among them or not) and at n=4. A stayer is linked throughout, so the window is open — and the
+// fellow-leaver memory must not stop a leaver from granting the other's exit. Every frame lands, everyone ticks.
+const settled = (m: Mesh, rounds: number) => {
+  const drain = () => { for (let g = 0; g < 2000; g++) { const qs = [...m.q.entries()].filter(([, f]) => f.length); if (!qs.length) break; for (const [k] of qs) { const [a, b] = k.split('>'); m.deliver(a, b) } } }
+  for (let r = 0; r < rounds; r++) { drain(); for (const u of [...m.nodes.keys()]) m.tick(u) }
+  drain()
+}
+test('two leavers at once with the window on — n=3 (bb, cc), n=3 with the lowest among them (aa, bb), n=4 (cc, dd): both go clean within a few ticks, the stayers end writable in one view, no split', () => {
+  for (const [ids, leavers] of [[['aa', 'bb', 'cc'], ['bb', 'cc']], [['aa', 'bb', 'cc'], ['aa', 'bb']], [['aa', 'bb', 'cc', 'dd'], ['cc', 'dd']]] as [string[], string[]][]) {
+    const m = Mesh.formed(ids)
+    for (const u of leavers) m.nodes.get(u)!.step({ kind: 'leave' })
+    settled(m, 6)
+    const label = `${ids.join(',')} minus ${leavers.join(',')}`
+    assert.deepEqual(leavers.map((u) => m.left.get(u)), leavers.map(() => true), `${label}: both leavers went clean (${m.log.filter((l) => l.includes(' left ')).join('; ')})`)
+    assert.deepEqual(m.splits, [], `${label}: one view per epoch`)
+    const stayers = ids.filter((u) => !leavers.includes(u))
+    for (const u of stayers) {
+      const x = m.nodes.get(u)!
+      assert.deepEqual(x.membership.view.members.map((v) => v[0]), stayers, `${label}: ${u} holds the view of the stayers`)
+      assert.equal(x.epoch, 3, `${label}: two shrinks, epoch 3`)
+      assert.equal(x.membership.gate(x).open, true, `${label}: ${u} is writable`)
+    }
+    for (const u of leavers) assert.ok(m.nodes.get(u)!.membership.leaving!.total <= 6, `${label}: ${u} went inside a few ticks, not at the window`)
+  }
 })
 
 test('graceful leave (V4-6): nothing to leave answers at once — open genesis, a rejoiner, a solo view — with no LEAVE, no ballot, no journal; a second leave() is a no-op', () => {

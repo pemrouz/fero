@@ -19,7 +19,7 @@
 // The three node-level constants are DEFINED here and re-exported by kernel/node.ts under their
 // old names: node.ts imports this file, so defining them there would make an import cycle.
 
-import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, DRAIN_TICKS } from './membership.ts'
+import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, LEAVE_WINDOW, DRAIN_TICKS } from './membership.ts'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.ts'
 import { MAX_PROBES } from './confirm.ts'
 import { MAX_QUEUED } from './link.ts'
@@ -61,8 +61,12 @@ export interface Tune {
   redialCap: number
   //! suspectTicks — heartbeat ticks a member is unreachable before it is suspect
   suspectTicks: number
-  //! leaveTicks — ticks a leaver waits for the view without it to commit and echo before it goes like a crash
+  //! leaveTicks — ticks a leaver waits with NO member link that could answer its knock before it goes like a crash
   leaveTicks: number
+  //! leaveWindow — the most ticks the view half of a leave may run in all while a member that could answer is linked
+  // (DESIGN-LEAVE §10.7, the knock window): a stalled survivor wakes inside it with the leaver still there to grant.
+  // Never less than leaveTicks in effect; the config key leave.ms sets it (ms ÷ heartbeat.ms, rounded up)
+  leaveWindow: number
   //! drainTicks — ticks a SCOPED leaver, out of the view, waits for the new holders to prove they hold what it held
   // before it goes anyway (`undrained`); the shell's destroy cap adds it on a scoped node (DESIGN-SCALE stage 1 (b))
   drainTicks: number
@@ -107,6 +111,7 @@ export const TUNE: Readonly<Tune> = Object.freeze({
   redialCap: 32,
   suspectTicks: SUSPECT_TICKS,
   leaveTicks: LEAVE_TICKS,
+  leaveWindow: LEAVE_WINDOW,
   drainTicks: DRAIN_TICKS,
   pulls: MAX_PULLS,
   proposalAge: PROPOSAL_AGE,
