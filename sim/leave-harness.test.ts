@@ -33,12 +33,18 @@
 // link flaps: the stayer must not count the fresh link before it knows the holds — red today as the witness is),
 // genesisProposerAndGranterDie (the genesis hold's cost: one survivor with memory beside a newcomer or a reborn pair —
 // live today) and genesisSplit (today's kernel commits two views at one epoch at genesis, hostless — red today).
+// The fourth review added four and a record (2026-10-10), one pin per kernel line of the rule's wire: clientGenesis
+// (a client's word at epoch 0 — live today) and serverAsk (a non-member server's word — live today), the two halves
+// of I-23's fix that clientAsk catches only together; helloHold (a hold a stayer learned from a HELLO alone must be
+// taken back when it ends — live today, the rule's own liveness gap at epoch 0); freshLinkSim (freshLink on REAL
+// HELLOs in the Sim, since the mesh writes its own — red today as evictTwo is); and genesisProposerAndGranterDie now
+// records every node's proposal list and bb's vote, so a rule that re-proposes while frozen is pinned to the SAME epoch.
 // Bounded: about 30 s at low priority on the loaded WSL2
 // box, half that idle; FERO_LEAVE_FULL=1 runs the full crash grid (576 cases, three restart delays, two seeds) and
 // 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
@@ -455,6 +461,11 @@ test('leave harness, the second review\'s shapes: the held member\'s heartbeat l
 const CLIENT_ASK_END = 'aa@2{aa,bb,cc,dd}W bb@2{aa,bb,cc,dd}W cc@2{aa,bb,cc,dd}W dd@2{aa,bb,cc,dd}W ee@2{aa,bb,cc,dd}r:evicted'
 const FRESH_LINK_MIDS = ['admitted', 'landed'].map((at) => `${at}: aa@2{aa,bb,cc}W bb@2{aa,bb,cc}W cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}W ee@1{aa,bb,cc,dd,ee}W | writable views 2`)
 const GENESIS_GRANTER_DIE_END: Record<'fresh' | 'reborn', string> = { fresh: 'bb@2{bb,dd}W dd@2{bb,dd}W', reborn: 'bb@1{a2,bb,c2}W a2@1{a2,bb,c2}W c2@1{a2,bb,c2}W' }
+//! the proposals and bb's vote (the fourth review): today one ballot forms the view, and bb's vote carries nothing.
+// A rule that freezes these shapes re-proposes at every age-out, and must do so at the SAME epoch with ONE earlier
+// vote behind bb's: without the same-members clause (§10.10.2) every re-offer is refused, the epoch burns, the list
+// climbs (`P(3,3) P(4,3)`) and bb's vote climbs with it, one earlier vote per burn.
+const GENESIS_GRANTER_DIE_MIDS: Record<'fresh' | 'reborn', string[]> = { fresh: ['proposals: bb=P(2,2) dd=-', 'bb vote: e=2 p=bb prior=0'], reborn: ['proposals: bb=- a2=P(1,3) c2=-', 'bb vote: e=1 p=aa prior=0'] }
 const GENESIS_SPLIT_QUIET = 'writable in different views: aa@2{aa,bb,cc} bb@2{aa,bb,cc} cc@2{aa,bb,cc} dd@2{dd,ee} ee@2{dd,ee}'
 const GENESIS_SPLIT_SPLITS = ['aa', 'bb', 'cc'].map((u) => `epoch 2: {dd,ee} vs {aa,bb,cc} (at ${u})`)
 const GENESIS_SPLIT_END = 'aa@2{aa,bb,cc}W bb@2{aa,bb,cc}W cc@2{aa,bb,cc}W dd@2{dd,ee}W ee@2{dd,ee}W'
@@ -481,6 +492,66 @@ test('leave harness, the third review\'s shapes: a client\'s word names a hold (
   const teeth: string[] = []
   for (const [name, o, end] of live) if (o.end !== end) teeth.push(`${name}: the end state moved — a rule that reads a hold must say whose word it reads and what the genesis hold costs; re-record with the why: ${o.end}`)
   if (ca.mid![0] !== 'aa proposed: P(2,4)') teeth.push(`clientAsk: aa did not commit the eviction on its first ballot — a client's word made it joint over members that do not exist (I-23): ${ca.mid![0]}`)
+  //! the proposals and bb's vote of every genesisProposerAndGranterDie run: a rule that freezes it re-proposes at the
+  // same epoch, or it is burning epochs (the same-members clause, §10.10.2)
+  for (const [name, o] of live.slice(1)) { const want = GENESIS_GRANTER_DIE_MIDS[name.endsWith('reborn') ? 'reborn' : 'fresh']; if (o.mid!.join('\n') !== want.join('\n')) teeth.push(`${name}: the proposals or bb's vote moved — a frozen cluster must re-propose at the same epoch; re-record with the why:\n${o.mid!.join('\n')}`) }
+  assert.deepEqual(teeth, [])
+})
+
+//! the fourth review's shapes (DESIGN-LEAVE §10.10, 2026-10-10), pinned on today's kernel: one pin per kernel line of
+// the rule's wire, so a scratch kernel missing that one line goes red on its own pin. Three are LIVE today and pinned
+// as exact states: clientGenesis — a client linked into aa before genesis names a hold by its HELLO or by a PULL at
+// epoch 0, and genesis forms all the same (`P(1,3)` once; a proposer that reads every linked uuid's holds at epoch 0
+// and takes a client's word never forms: one client stops genesis); serverAsk — a server in no view names a hold by
+// its HELLO and a PULL, and aa's one-member eviction commits on the first ballot (`P(2,4)` once; a proposer that
+// widens its ballot with ANY linked server's word, member or not, never commits: `P(2,4)` three times); helloHold —
+// a stayer learns a hold from a fresh link's HELLO alone (at epoch 0 no ask goes out), the hold ends at the member's
+// next install, and the stayer must count it again: aa is writable with cc and dd linked, three of five, at both mid
+// points (a rule that never takes a HELLO's word back leaves aa `minority` there, with a reachable majority, until
+// its own ballot — joint over the phantom hold — ages out and is disowned). One is RED today, pinned exactly per seed
+// and link delay: freshLinkSim — freshLink on REAL HELLOs in the Sim (the mesh writes its own HELLO for every link,
+// so freshLink never tests the node's), evictTwo's cut shape with the n03-n04 and n03-n05 links flapped 1.5 s after
+// the cut; today's kernel is split before the flap and through the window on the seeds evictTwo splits on (4000 of
+// 4000 ms), and on none of the others. A rule that holds n03 shows 0 everywhere ONLY when n03's own HELLO carries
+// its hold; without it, the stayer counts the fresh link for one round trip and the window shows 15 to 160 ms.
+const CLIENT_GENESIS_END = 'aa@1{aa,bb,cc}W bb@1{aa,bb,cc}W cc@1{aa,bb,cc}W'
+const HELLO_HOLD_MIDS = [
+  'aa with cc and dd: aa@1{aa,bb,cc,dd,ee}W bb@0{}W cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}W ee@0{}W',
+  'three rounds: aa@1{aa,bb,cc,dd,ee}W bb@1{aa,bb,cc,dd,ee}r:minority cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}W ee@1{aa,bb,cc,dd,ee}W',
+]
+const HELLO_HOLD_END = 'aa@3{aa,cc,dd}W bb@3{aa,cc,dd}r:evicted cc@3{aa,cc,dd}W dd@3{aa,cc,dd}W ee@3{aa,cc,dd}r:evicted'
+const FRESH_LINK_SIM: string[] = [
+  'seed 1 delay 3-3: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 2 delay 3-3: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 3 delay 3-3: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors quiet',
+  'seed 4 delay 3-3: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 5 delay 3-3: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 1 delay 3-40: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 2 delay 3-40: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors quiet',
+  'seed 3 delay 3-40: before [n03:W n04:W n05:W] split-ms 31 of 4000; n04 gateOpen rows 1; monitors quiet',
+  'seed 4 delay 3-40: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 5 delay 3-40: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors quiet',
+]
+
+test('leave harness, the fourth review\'s shapes: a client\'s word at epoch 0 (clientGenesis) and a non-member server\'s word (serverAsk) teach nothing, and a hold learned from a HELLO alone is counted again when it ends (helloHold) — SAFE, and today\'s kernel is live on every one, pinned as the exact states; a held member\'s links flap on real HELLOs in the Sim (freshLinkSim) — today\'s kernel is split through the window on evictTwo\'s seeds, pinned exactly', () => {
+  const live: [string, ReturnType<typeof clientAsk>, string, string[]][] = [
+    ...(['hello', 'pull'] as const).map((via) => [`clientGenesis ${via}`, clientGenesis(via), CLIENT_GENESIS_END, ['aa proposed: P(1,3)']] as [string, ReturnType<typeof clientAsk>, string, string[]]),
+    ['serverAsk', serverAsk(), CLIENT_ASK_END, ['aa proposed: P(2,4)']],
+    ['helloHold', helloHold(), HELLO_HOLD_END, HELLO_HOLD_MIDS],
+  ]
+  //! safety first, one list: the shape, one view per epoch and the quiet point of every live shape
+  const unsafeOnes = live.flatMap(([name, o]) => [...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])].map((p) => `${name}: ${p}`))
+  assert.deepEqual(unsafeOnes, [], 'not the shape, or UNSAFE')
+  //! the red-today witness: the Sim's window, exactly as today's kernel shows it per seed and delay
+  const sim: string[] = []
+  for (const d of [[3, 3], [3, 40]] as [number, number][]) for (let seed = 1; seed <= 5; seed++) sim.push(freshLinkSim(seed, d))
+  assert.deepEqual(sim, FRESH_LINK_SIM, 'freshLinkSim: the window moved — a kernel that holds n03 must show 0 split-ms everywhere, and only its own HELLO carrying the hold makes it so; re-record with the why')
+  //! liveness, one list: the end state and every mid point of the live shapes
+  const teeth: string[] = []
+  for (const [name, o, end, mids] of live) {
+    if (o.end !== end) teeth.push(`${name}: the end state moved — a rule that reads a word must say whose, and take it back when it ends; re-record with the why: ${o.end}`)
+    if (o.mid!.join('\n') !== mids.join('\n')) teeth.push(`${name}: a mid point moved — ${name === 'helloHold' ? 'a stayer that read a hold from a HELLO must count the member again when the hold ends' : 'a stranger\'s word widened the ballot'}; re-record with the why:\n${o.mid!.join('\n')}`)
+  }
   assert.deepEqual(teeth, [])
 })
 
