@@ -20,7 +20,16 @@
 //               restart on the stale side. A stayer's gate counts any admitted member link (kernel/membership.ts
 //               gate), a read-only leaver's included — so two pledges plus one stayer's grant commit the view
 //               minus the leavers at n01 while n03 is writable at the old view with the leavers' links: a split.
-//               Today's kernel counts no knock as a vote and commits nothing there.
+//               Today's kernel counts no knock as a vote: its ballot (the view minus the FIRST leaver it read, the
+//               second knock is ignored while a ballot is in flight) has its own vote and n02's, two of the five it
+//               needs, and commits nothing. The cut must come the instant n01 has read both knocks: 3 ms later the
+//               VOTEs already in flight land, both kernels commit a four-member view at 2, and the family has no
+//               teeth (the second review).
+//   evictTwo,
+//   evictTwoB — the base's own hole (DESIGN-LEAVE §10.2): a ballot that evicts two suspects at once at n=5, with the
+//               third voter cut or crashed on its grant. In evictTwoB the voter that keeps the old view and a vote
+//               above it is NOT the far side's lowest member, so the far side is led by a node that never voted, and
+//               the stale voter GRANTS that higher ballot: "lead nothing" never fires, the vote is spent again.
 //   crash     — the round-3 re-check's `crash2`: one stayer CRASHES at an offset from one or two clean stops (before,
 //               at, just after), comes back from its dir after 2 s or never; the leavers time out and are restarted
 //               from their dirs after 0.4, 3 or 25 s. The 24 n=3 "crash twin" cases live here (H12).
@@ -324,14 +333,21 @@ export const twoLeavers = (seed: number, inspect?: (sim: Sim) => void): string[]
 }
 
 //! pledgeTwo — the shape the restricted pledge cannot answer (DESIGN-LEAVE §10.3; the 2026-10-10 review's probe): n=5;
-// n04 and n05 stop at once and knock to n01; 3 ms after n01 has read both knocks, {n03,n04,n05} are cut from
+// n04 and n05 stop at once and knock to n01; the instant n01 has read both knocks, {n03,n04,n05} are cut from
 // {n01,n02}. So n01 keeps ONE stayer (n02), and the stale stayer n03 keeps admitted links to BOTH leavers. The
 // leavers time out, are torn down and restart from their dirs 500 ms later linked to n03 and each other only.
-// Checked at the 12 s horizon. Today's kernel: n01's ballot needs three of the old five and has two (no knock is a
-// vote), so it commits nothing; the far side re-forms without n01 and n02. A kernel that counts the two knocks as
-// votes commits `{n01,n02,n03}`@2 on n01 + n02 + two pledges — exactly "the view minus the leavers" — while n03's
-// gate counts 1 + n04 + n05 = 3 of 5 at view 1 (a leaver's own read-only gate does not stop it being COUNTED):
-// two writable views for the whole leave window, and for good once the leavers restart beside n03.
+// Checked at the 12 s horizon. Today's kernel: n01 opened `{n01,n02,n03,n05}`@2 on the first knock (the second is
+// ignored while a ballot is in flight, kernel/membership.ts onLeave); its PROPOSE reaches n03 and n05 across the
+// cut (frames in flight land, sim/exec.ts partition) but their VOTEs leave after it and die, so n01 has its own vote
+// and n02's, two of the five it needs, and commits nothing; the far side re-forms without n01 and n02, because n03
+// leads it — holding a vote at 2 above its view 1 (the §10.9 step-2 rule would close that, so `settled` is a counted
+// pin, not an assertion). A kernel that counts the two knocks as votes commits `{n01,n02,n03}`@2 on n01 + n02 + two
+// pledges — exactly "the view minus the leavers" — while n03's gate counts 1 + n04 + n05 = 3 of 5 at view 1 (a
+// leaver's own read-only gate does not stop it being COUNTED): two writable views from the commit on, one view per
+// epoch broken once both sides reach 3, and `n01@3{n01,n02}` beside `n03@3{n03,n04,n05}` at the horizon.
+// THE CUT IS AT 0 MS: the first version cut 3 ms after the knocks, the VOTEs already in flight landed, and BOTH
+// kernels committed a four-member view at 2 (the base `{n01,n02,n03,n05}`, read-only at 2 of 4; round 3 the same) —
+// no split anywhere, no teeth (the second review).
 export const pledgeTwo = (seed: number, inspect?: (sim: Sim) => void): OutcomeI => {
   const sim = new Sim(seed)
   const nodes = cluster(sim, 5, { heartbeatMs: 50, durable: true, fault: { delay: [3, 3] } })
@@ -347,7 +363,8 @@ export const pledgeTwo = (seed: number, inspect?: (sim: Sim) => void): OutcomeI 
     sim.run({ until: t })
     if (read < 0 && leavers.every((u) => has(nodes[0], JK.leave, u))) {
       read = sim.now
-      sim.at(3, () => { cutAt = sim.now; for (const a of ['n01', 'n02']) for (const b of ['n03', ...leavers]) sim.partition(a, b) })
+      //! the cut comes NOW, before any VOTE answering n01's ballot has left n03 or the leavers
+      cutAt = sim.now; for (const a of ['n01', 'n02']) for (const b of ['n03', ...leavers]) sim.partition(a, b)
     }
     for (const u of leavers) {
       if (!gone.has(u) && sim.left.has(u) && sim.nodes.has(u)) { tearDown(sim, u, true); gone.set(u, sim.now); last = sim.now }
@@ -403,6 +420,40 @@ export const evictTwo = (seed: number, how: 'cut' | 'crash', k: 1 | 2 = 2, inspe
   inspect?.(sim)
   const problems: string[] = []
   if (voted < 0) problems.push('not the shape: n03 never granted the eviction')
+  if (sim.violations.length) problems.push('VIOLATION ' + JSON.stringify(sim.violations.slice(0, 2)))
+  const sp = split(sim)
+  if (sp) problems.push(sp)
+  return problems
+}
+
+//! evictTwoB — evictTwo with the stale voter NOT the far side's lowest member (the second 2026-10-10 review's probe,
+// DESIGN-LEAVE §10.2): n=5; {n02,n03} are cut from n01, n04 and n05, so neither can open a ballot (two of five live).
+// n01 evicts both on n04's and n05's grants: `{n01,n04,n05}`@2. n04 CRASHES on its grant (every link dies) and comes
+// back from its dir 500 ms later linked to n02 and n03 ONLY: view 1, a vote at 2 for n01 above it. The far side's
+// lowest live member is n02, which never voted at 2: it evicts n01 and n05 at 2, n04 refuses (its vote at 2 is
+// spent on n01, `ve` teaches the burn), n02 escalates to 3 — and n04 GRANTS at 3 while it still holds view 1: the
+// vote above its view is spent again, on a ballot over the view it should not trust. n01 meanwhile evicts n04 at 3.
+// Two views at epoch 3, `n01@3{n01,n05}` beside `n02@4{n02,n03,n04}` (or @3), both writable. So a rule that only
+// closes the stale voter's gate and stops IT leading changes nothing here: the hole is the GRANT (a candidate rule
+// with gate + lead-nothing only turns evictTwo green and leaves this red; one grant clause closes it, and costs
+// the far side its liveness — DESIGN-LEAVE §10.2, §10.9 step 2).
+export const evictTwoB = (seed: number, inspect?: (sim: Sim) => void): string[] => {
+  const sim = new Sim(seed)
+  const nodes = cluster(sim, 5, { heartbeatMs: 50, durable: true, fault: { delay: [3, 3] } })
+  sim.run({ until: 800 })
+  if (!nodes.every((x) => x.epoch === 1)) return ['never formed']
+  for (const a of ['n02', 'n03']) for (const b of ['n01', 'n04', 'n05']) sim.partition(a, b)
+  const t0 = sim.now
+  let voted = -1, backAt = -1
+  for (let t = sim.now; t <= t0 + 15000; t += 1) {
+    sim.run({ until: t })
+    if (voted < 0 && nodes[3].journal.read().some((e) => e.kind === JK.vote && e.a === 2 && e.b === 1 && e.c === 'n01')) { voted = sim.now; tearDown(sim, 'n04', true) }
+    if (voted >= 0 && backAt < 0 && sim.now >= voted + 500) { backAt = sim.now; sim.heal('n04', 'n02'); sim.heal('n04', 'n03'); sim.restart('n04') }
+    if (backAt >= 0 && sim.now > backAt + 8000) break
+  }
+  inspect?.(sim)
+  const problems: string[] = []
+  if (voted < 0) problems.push('not the shape: n04 never granted the eviction')
   if (sim.violations.length) problems.push('VIOLATION ' + JSON.stringify(sim.violations.slice(0, 2)))
   const sp = split(sim)
   if (sp) problems.push(sp)
