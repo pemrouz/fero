@@ -55,6 +55,11 @@
 //               hold's cost (one survivor with memory beside a newcomer or a reborn pair, the epoch-0 form of
 //               proposerAndGranterDie); and today's genesis split (two views at one epoch when two granters are cut
 //               before the VIEW, hostless), red today.
+//   clientGenesis, serverAsk, helloHold, freshLinkSim — the FOURTH review's shapes (§10.10, 2026-10-10): one pin per
+//               kernel line of the rule's wire. A client's word at epoch 0 and a non-member server's word teach
+//               nothing (the two halves of I-23's fix); a hold a stayer learned from a HELLO alone is counted again
+//               when it ends; and freshLink on REAL HELLOs in the Sim, because this mesh writes its own HELLO for
+//               every link and so never tests the node's. genesisProposerAndGranterDie also records its proposals.
 //   explorer  — sim/mesh.ts's random explorer over real Nodes with the quiet-point writable-split check on (the
 //               round-2 re-check's "end-state check" variant), over its own seed range.
 // What every family checks (sim/leave-sweep.ts): SAFETY — no monitor fired and no two nodes end WRITABLE in
