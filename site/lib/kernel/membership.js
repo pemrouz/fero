@@ -44,9 +44,23 @@
 // get — so a two-member view loses one member cleanly, where suspicion +
 // eviction wedge it forever. The leaver goes once a survivor's VIEW echo
 // proves the commit reached someone who stays; LEAVE_TICKS without that echo
-// and it goes anyway (journal `left` b=0) — from there it looks like a crash
-// and the pre-V4-6 path (suspicion, eviction) takes over. Nothing else moved:
-// ballots, majorities, and vote-once are exactly as above.
+// and with no member linked that could answer — LEAVE_WINDOW with one (the
+// knock window below) — and it goes anyway (journal `left` b=0) — from there
+// it looks like a crash and the pre-V4-6 path (suspicion, eviction) takes
+// over. Nothing else moved: ballots, majorities, and vote-once are exactly
+// as above.
+//
+// THE KNOCK WINDOW (DESIGN-LEAVE §10.7, 2026-10-10) is how long the leaver keeps asking. A tick counts
+// toward the LEAVE_TICKS bound only while the leaver has NO admitted link to a member that could answer
+// the knock: a member of its view that has neither knocked LEAVE at it nor proposed its own exit to it
+// (#leavers — a fellow leaver can commit nothing). While such a link is up the leaver keeps knocking,
+// up to LEAVE_WINDOW ticks in all (tune row leaveWindow; the config key leave.ms), so a survivor that is
+// stalled for a few seconds still reads the knock with the leaver there to grant — TCP delivers the
+// buffered knocks before the FIN. No new vote source: the leaver still votes only in onPropose over a
+// live link or proposes its own exit; nothing is counted without a link, nothing is seeded, nothing is
+// remembered across a restart (#leavers is in-memory and pruned on every install). The ballot rules
+// above are untouched. What it does not cover: a survivor stalled past the window, or whose link is
+// DOWN (a tick is spent, so the old bound applies, as before).
 //
 // DRAIN-THEN-GO (DESIGN-SCALE §7 stage 1 (b), 2026-10-10) is the scoped leaver's second wait. Once the
 // view without it has committed and echoed, every partition it held is an orphan (kernel/scope.ts: the
@@ -128,7 +142,12 @@ export const SUSPECT_TICKS = 3    // member unreachable this many consecutive ti
 export const MAX_PULLS = 5        // targeted view-pull retries before the alarmed gate release
 export const PROPOSAL_AGE = 10    // ticks before an uncommitted proposal is abandoned (unblocks JOINs; re-grants make retry safe)
 export const REJOIN_TICKS = 10    // rejoining ticks without live confirmation before the self-ballot
-export const LEAVE_TICKS = 4      // ticks a leaver waits for the view without it to commit AND echo before it goes like a crash
+export const LEAVE_TICKS = 4      // ticks a leaver waits WITHOUT a member link that could answer before it goes like a crash
+//! LEAVE_WINDOW (DESIGN-LEAVE §10.7, 2026-10-10): the most ticks the view half of a leave may run in all while a member
+// that could answer the knock is linked — a stalled survivor wakes inside it with the leaver still there to grant. Never
+// less than LEAVE_TICKS in effect (a row at or below it means the bound alone). 16 = drainTicks: 8 s at the default
+// cadence, inside docker stop's 10 s grace with the shell's two slack ticks (9 s). The config key leave.ms sets it.
+export const LEAVE_WINDOW = 16
 //! DRAIN_TICKS (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): ticks a SCOPED leaver, already out of the view, waits for
 // the new holders of what it held to prove they hold it (the shed bar) before it goes anyway (`undrained`, `left` b=0)
 export const DRAIN_TICKS = 16
@@ -178,13 +197,25 @@ export class Membership {
   //! rejoin floor: a restored node is read-only until a committed view ≥ this is CONFIRMED live (plan boot modes)
   rejoinFloor = 0
   #rejoinTicks = 0
-  //! leaving — the graceful exit in progress (V4-6): ticks spent waiting, and whether the VIEW half is over
-  // (`done`: the view without me committed and echoed, or the bound ran out — nothing more to knock for, and
-  // no ballot may vote me back in). `drain` (DESIGN-SCALE stage 1 (b)) is the scoped leaver's second wait:
-  // defined while `left` is held for the new holders, counting its own ticks against tune.drainTicks; `clean`
-  // is the view half's verdict it carries (the echo came: true; bounded out: false), so the final `left` is
-  // clean only when BOTH halves were — set with `drain`, read when the drain ends.
-  leaving                                                                           = null
+  //! leaving — the graceful exit in progress (V4-6): `ticks` spent waiting with no member link that could answer
+  // (the leaveTicks bound), `total` ticks since the leave began (the leaveWindow; DESIGN-LEAVE §10.7), and
+  // whether the VIEW half is over (`done`: the view without me committed and echoed, or a bound ran out —
+  // nothing more to knock for, and no ballot may vote me back in). `drain` (DESIGN-SCALE stage 1 (b)) is the
+  // scoped leaver's second wait: defined while `left` is held for the new holders, counting its own ticks
+  // against tune.drainTicks; `clean` is the view half's verdict it carries (the echo came: true; bounded out:
+  // false), so the final `left` is clean only when BOTH halves were — set with `drain`, read when the drain ends.
+  leaving                                                                                          = null
+  //! #leavers — members this node has heard are LEAVING: they knocked LEAVE at it (onLeave) or proposed their own
+  // exit to it (onPropose: a ballot that leaves its proposer out). A fellow leaver can commit nothing, so its link
+  // does not keep a knock window open (DESIGN-LEAVE §10.7). In-memory only: pruned of non-members on every install
+  // (hygiene — #answerable checks membership first, so the prune changes no answer; it keeps the set from growing
+  // across many leaves), and forgotten for a uuid on a fresh admit (a new life, or a redial). The cost of forgetting:
+  // a non-lowest fellow leaver knocks LEAVE again next tick, so the error is one tick; the LOWEST fellow leaver
+  // re-offers its exit ballot only to members that have not voted (#proposalTargets), so a voter that re-admitted it
+  // hears nothing more until that ballot ages out and is re-proposed (tune.proposalAge, 10 ticks) or the window
+  // ends — in the shell the leaver's own teardown closes the link first. Read by #answerable alone; no ballot rule
+  // reads it.
+  #leavers = new Set        ()
   #wasOpen = true // last journaled gate state, for transition events
   //! wasMember — has any view this node held ever named it? Set in install() (the boot view counts: it is
   // the view install() replaces). It splits the not-a-member gate word: a node that was in a view and is
@@ -295,8 +326,14 @@ export class Membership {
     }
     //! leaving (V4-6): re-knock every tick until a survivor's echo, bounded — then go like a crash.
     // Once my shrunk view is installed here there is nothing left to knock for: only the echo is awaited.
+    //! The knock window (DESIGN-LEAVE §10.7): a tick counts toward the leaveTicks bound only while no member that
+    // could answer is linked (#answerable); with one linked the leaver keeps knocking, up to leaveWindow ticks in
+    // all (never fewer than leaveTicks: a window at or below the bound is the bound alone). A link that dies is
+    // not a tick: from then on the bound counts, as it always did.
     if (this.leaving && !this.leaving.done) {
-      if (++this.leaving.ticks > node.tune.leaveTicks) this.#finishLeave(node, false)
+      if (!this.#answerable(node)) this.leaving.ticks++
+      this.leaving.total++
+      if (this.leaving.ticks > node.tune.leaveTicks || this.leaving.total > Math.max(node.tune.leaveWindow, node.tune.leaveTicks)) this.#finishLeave(node, false)
       //! epoch 0 = no view has reached me yet: keep knocking (a peer that HAS one answers). Past that,
       // only a member knocks — once my shrunk view is installed here there is nothing left to ask for.
       else if (this.isMember(node.uuid) || this.view.epoch === 0) this.#knockLeave(node)
@@ -341,6 +378,7 @@ export class Membership {
   // view, so a healed partition re-converges its VIEWS even when no epoch-stamped records flow (the
   // plan's split-brain-heal re-announce). A rejoiner/evictee learns its status in one round-trip.
   onAdmit(node      , link      ) {
+    this.#leavers.delete(link.uuid) // a fresh admit forgets what an earlier link heard: a non-lowest leaver still leaving knocks again next tick; the lowest re-proposes only after its ballot ages out (§10.7, the #leavers note)
     if (!node.client && this.view.epoch > 0) // a spoke announces nothing: its view is its feeder's, and a reborn feeder must not inherit it
       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
   }
@@ -392,6 +430,7 @@ export class Membership {
   onLeave(node      , link      ) {
     const leaver = link.uuid
     node.journal.armed && node.journal.emit(JK.leave, leaver)
+    this.#leavers.add(leaver) // this peer is leaving: its link no longer keeps my own knock window open (§10.7)
     if (node.client || this.view.epoch === 0 || !this.isMember(node.uuid) || !this.isMember(leaver) || this.epochStale || this.rejoining()) return
     if (this.#lowestLive() !== node.uuid || this.#proposal || this.view.members.length < 2) return
     this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => u !== leaver) })
@@ -404,8 +443,9 @@ export class Membership {
     const h = hashOf(v.m)
     //! one spelling for a clean leave: a ballot that leaves its OWN proposer out is a leave (the lowest live
     // leaver proposes its exit itself, see #knockLeave). Journal it as leave(proposer) — the row a knocked
-    // leave writes in onLeave — so a survivor's diary reads the same either way. Journal only.
-    if (!v.m.some((m) => m[0] === proposer)) j.armed && j.emit(JK.leave, proposer)
+    // leave writes in onLeave — so a survivor's diary reads the same either way — and remember the proposer
+    // as a leaver for my own knock window (#leavers, §10.7). Nothing else: no ballot rule reads it.
+    if (!v.m.some((m) => m[0] === proposer)) { j.armed && j.emit(JK.leave, proposer); this.#leavers.add(proposer) }
     //! the vote-once rule with same-proposer idempotency (see banner): unspent epoch, or re-grant to the
     // same proposer (his abandoned/re-offered ballots — at most one of HIS can commit; a rejoining node
     // may vote: voting is not writing). ANY epoch above the committed view is grantable — a ballot
@@ -506,6 +546,7 @@ export class Membership {
     if (this.leaving && !this.leaving.done && this.#proposal && this.isMember(node.uuid)) this.#proposal = null
     for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u) }
     if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear() } // an evictee's grudges expire with its membership
+    for (const u of [...this.#leavers]) if (!this.isMember(u)) this.#leavers.delete(u) // hygiene: a leaver out of the view is no longer "leaving" (§10.7); #answerable checks membership first, so this changes no answer
     //! dial any member this node holds no link to (the joiner's side of a join, a healed evictee's peers),
     // unless a redial chain is still trying it: that chain owns the target until it ends. A dial over it
     // failed into the same chain entry and armed a second timer line that shared the tries, so the chain
@@ -547,7 +588,8 @@ export class Membership {
   //! leave — the GRACEFUL exit (V4-6; see the banner). Starts the leave and returns; the outcome
   // arrives on sink.left exactly once: at once with clean=true when there is nothing to leave (open
   // genesis, a client, a non-member, a solo view, a rejoiner, a stale gate — the caller tears down
-  // now), later with clean=true on a survivor's echo, or clean=false when LEAVE_TICKS ran out.
+  // now), later with clean=true on a survivor's echo, or clean=false when the bound ran out (LEAVE_TICKS
+  // with no member linked that could answer, the knock window LEAVE_WINDOW with one).
   leave(node      ) {
     if (this.leaving) return
     //! "nothing to leave" is a claim about OTHER nodes, so it needs EVIDENCE, not a local mood. A client
@@ -563,7 +605,7 @@ export class Membership {
     if (node.client || !held) {
       //! answered at once — but LATCHED as going, so the microtask hop before the shell's teardown
       // cannot vote this node INTO a view it has already said it left (see onPropose).
-      this.leaving = { ticks: 0, done: true }
+      this.leaving = { ticks: 0, total: 0, done: true }
       //! nothing to LEAVE, but maybe something to LOSE (DESIGN-SCALE stage 1 (b)): a scoped node that is in no
       // view with anyone else — the last member, or one already voted out — asks the same last question as a
       // leaver past its exit proof (#finishLeave): drain to a reachable holder, or go saying what goes with it.
@@ -571,9 +613,21 @@ export class Membership {
       node.env.sink.left?.(true)
       return
     }
-    this.leaving = { ticks: 0, done: false }
+    this.leaving = { ticks: 0, total: 0, done: false }
     node.journal.armed && node.journal.emit(JK.leave, node.uuid)
     this.#knockLeave(node)
+  }
+
+  //! #answerable — is a member that could answer my knock linked? (DESIGN-LEAVE §10.7) A member of my committed
+  // view, on an admitted live non-client link, that has neither knocked LEAVE at me nor proposed its own exit to
+  // me (#leavers). At epoch 0 there are no members, so nothing counts and the leaveTicks bound alone applies, as
+  // before. Once my shrunk view is installed here the survivors are still members of it and I am not: their
+  // links keep the window open for the echo I am waiting for.
+  #answerable(node      )          {
+    if (this.view.epoch === 0) return false
+    for (const l of node.links.values())
+      if (l.state === LS.admitted && !l.dead && !l.client && this.isMember(l.uuid) && !this.#leavers.has(l.uuid)) return true
+    return false
   }
 
   //! #knockLeave — one round of the leave: propose the shrunk view myself when I am the lowest live
@@ -608,8 +662,8 @@ export class Membership {
   // bound (tune.drainTicks), or when nobody can be drained to. What was not drained is counted in an
   // `undrained` row and makes the exit `left` b=0: the rows went with the leaver.
   //! Bounded out (clean=false) the leaver still drains when its OWN view no longer holds it: as the proposer
-  // it commits the shrunk view from the votes alone, and when every survivor's echo is lost inside leaveTicks
-  // its partitions are orphans with reachable new holders all the same (third review, 2026-10-10 — before, at
+  // it commits the shrunk view from the votes alone, and when every survivor's echo is lost inside the bound
+  // (leaveTicks unlinked, leaveWindow with a survivor linked) its partitions are orphans with reachable new holders all the same (third review, 2026-10-10 — before, at
   // R=1 the only copy went with it, uncounted). The drain then carries the view half's verdict: the final
   // `left` is b=0 even when every row was handed over, since the commit was never proved to have reached a
   // survivor. Still in its own view (the vote never came back), nothing froze: it goes like a crash, drains

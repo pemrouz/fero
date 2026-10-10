@@ -9,12 +9,12 @@
 import { Sim,            } from './exec.js'
 import { perEvent } from './monitors.js'
 import { REC,          } from '../kernel/env.js'
-                                             
+                                                       
                                              
                                         // type-only: no runtime cycle (shrink imports harness at runtime)
 
 //! cluster — n nodes, full dial mesh (everyone dials everyone: deliberately redundant so the one-link-per-pair dedup is exercised on every formation).
-export const cluster = (sim     , n        , opts                                                                                                                                     = {})         => {
+export const cluster = (sim     , n        , opts                                                                                                                                                              = {})         => {
   //! id width follows n: lexicographic order IS uuid order (the lowest uuid is the genesis proposer,
   // membership.ts gate) — at n=100 a 2-wide pad would sort n100 between n10 and n11. n≤99 keeps the
   // historical 2-wide ids so every seeded golden stays byte-identical.
@@ -29,8 +29,13 @@ export const cluster = (sim     , n        , opts                               
       heartbeatMs: opts.heartbeatMs ?? 0, // explicit protocol mode — heartbeats OFF by default so quiescence is reachable
       durable: opts.durable ?? false, // explicit protocol mode — storage OFF by default (zero persist effects)
       ...(opts.replicas !== undefined ? { replicas: opts.replicas } : {}), // explicit protocol mode — scoping OFF by default (M6)
+      //! a SCOPED sim cluster carries the cluster contract the api would build (DESIGN-DOOR §4; the kernel appends
+      // `;ring=`), so a spoke of it reads `replicas=` off its feeder's HELLO (node.feederScoped, DESIGN-SCALE stage 2)
+      // exactly as a real client does. Unscoped clusters send none: their HELLO stays the v4.0 bytes, every golden intact.
+      ...(opts.replicas ? { contract: `v1;heartbeat.ms=${opts.heartbeatMs ?? 0};replicas=${opts.replicas};methods=0;validation=none` } : {}),
       ...(opts.validate !== undefined ? { validate: opts.validate } : {}), // the relay's admission predicate — absent by default (every relayed record admitted)
       ...(opts.door !== undefined ? { door: opts.door } : {}), // the door (DESIGN-DOOR §9) — absent by default: the open wire, every golden byte-identical
+      ...(opts.tune !== undefined ? { tune: opts.tune } : {}), // tune rows under test (the leave sweep's window) — absent by default: the shared frozen TUNE
       redialMs: 20,
       journalCap: 1 << 16, // capture-grade history: time-travel replay needs the journal un-truncated
     }),

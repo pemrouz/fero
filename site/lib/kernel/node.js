@@ -458,7 +458,50 @@ export class Node {
   // digest asks the feeder for everything, and the feeder's r=0 reply (FIFO: after the suffix) completes
   // it: every cell held before that did not come back is removed downstream. `old` = the cells held at
   // the reset. Null when not resyncing. Survives a failover (the new primary's reply completes it).
-  resync                              = null
+  //! `q` (DESIGN-SCALE stage 2, 2026-10-10 — the A11 stale-reply finding, M10): the correlation id of the r=1 the
+  // resync sent. Every r=1 a CLIENT sends carries a fresh `q` (#dq, monotone per node) and a server's r=0 toward a
+  // client echoes the `q` of the r=1 it answers. The resync may end ONLY on a reply whose q ≥ this one — the reply
+  // to a digest sent AFTER the resync began (the failover's own r=1 counts, so a feeder that dies mid-resync is no
+  // hang). A reply to an older digest — the failover's r=1 that the feeder's own digest crossed — is NOT the end:
+  // before, it ran the ghost sweep before the re-download, and the re-download then landed one record run per
+  // frame, so the screen went back in time. What that older reply's ship brought STAYS in the fold: it is the
+  // feeder's committed log, the re-download re-sends it and the lane drops the duplicates (the client leg of the
+  // dual fence, write.ts #splice); a second wipe would drop cells the screen still shows and the sweep does not
+  // know. But kept, those records RAISE the lane tails this node holds, and on a wiped fold a raised tail has
+  // nothing under it — so while in resync every digest this node sends announces d = {} (#sendDigest): "send me
+  // everything", the lane drops what it has. A reply with no `q` is an older server's (V4-14): it ends as before.
+  //! One ask per resync (the second review of stage 2, 2026-10-10; its premise corrected at the third re-check). In
+  // resync every digest this node sends says d = {}, so every ask costs the feeder a ship of its whole held subset —
+  // and the ask's reply is the end. On this FIFO link the feeder answers the ask in the step that handles it, and an
+  // answer whose ship TEARS (the feeder's queue overflowing partway through it) is resumed at the feeder's drain
+  // with its reply after the whole ship (#answer): a torn ship is a late reply, never a missing one. So the ONLY way
+  // a live feeder leaves an ask unanswered is the ask arriving while its link is paused (swallowed: the paused branch
+  // of the DIGEST handler marks the debt and ships nothing). The feeder knows that, and says so on its drain digest
+  // (`h: 1`, #sendDigest; a torn ship sets the same debt, and that digest follows the resumed reply, when this node
+  // is out of resync and answers it with its real tails). So in resync this node (1)
+  // sends no heartbeat floor to its primary (the ask IS the floor), (2) answers a feeder's r=1 that carries `h: 1`
+  // with an r=1 of its own (a fresh q): that exchange ships everything and its reply ends the resync, one exchange
+  // after the drain, and (3) answers any other r=1 from the feeder with NOTHING — it was sent before the feeder
+  // handled the ask (its heartbeat floor crossing the ask at a failover), the reply is behind it, and an r=0 of ours
+  // would say d = {} and buy a second ship. A feeder that dies instead is a failover, and that asks afresh. Before
+  // this rule the spoke re-asked on a tick-age proxy (its own floor every tick; a feeder's r=1 once the ask was a tick
+  // old): one ship on a normal link, but ceil(RTT / heartbeat) + 1 ships on a link slower than one heartbeat (the
+  // review measured 5 and 9 at 200 ms each way with a 50 ms heartbeat, one ordering each); now one on any link.
+  resync                                         = null
+  #dq = 0
+
+  //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
+  // contract (`replicas=N`, N > 0; the api spells it, kernel/node.ts appends `;ring=`), the last primary's when none
+  // is up (feederContract). A scoped feeder shows a spoke only the partitions it holds and each holder's copy of a
+  // lane is sparse, so at a failover the spoke's lane tails say nothing about what the NEXT feeder holds below them:
+  // it resyncs onto the new feeder instead of asking for the suffixes above its tails. False with no contract (an
+  // unscoped cluster, an old server, the sim's unscoped clusters): the failover digest carries the real tails.
+  get feederScoped()          {
+    const c = this.feederContract
+    if (c === undefined) return false
+    const m = /(?:^|;)replicas=(\d+)(?:;|$)/.exec(c)
+    return m !== null && Number(m[1]) > 0
+  }
 
   //! hosts — the discovery targets: static NodeOpts.hosts ∪ the dynamic set the `discover` event
   // installs (V4-3), deduplicated, minus this node's own listen. Genesis (links ≥ hosts) and the
@@ -789,7 +832,13 @@ export class Node {
           for (const l of this.links.values())
             if (l.state === LS.admitted && !l.dead) { this.primary = l.id; this.#feederLast = l.contract; break }
           if (this.primary !== null) {
-            this.#sendDigest(this.links.get(this.primary) , 1)
+            //! a SCOPED feeder (feederScoped, DESIGN-SCALE stage 2): the new feeder holds a different subset, and its
+            // copy of a lane this spoke learnt from the old one may run BELOW the spoke's tail (another partition's
+            // rows), so an ask for the suffixes above the tails would miss them, and rows the new feeder does not
+            // hold would stay on the screen. The spoke resyncs onto it: wipe, ask for everything, sweep the ghosts
+            // at the end. An unscoped feeder holds every lane in full: the tails ask for exactly what is missing.
+            if (this.feederScoped) this.#resyncBegin(this.links.get(this.primary) )
+            else this.#sendDigest(this.links.get(this.primary) , 1)
             this.writes.repark(this)
           }
         }
@@ -817,12 +866,33 @@ export class Node {
         const link = this.links.get(e.link)
         if (!link) return
         link.drain(this.env.sink, j)
+        //! a TORN answer resumes FIRST (the third re-check of DESIGN-SCALE stage 2): the suffix ship this link was
+        // sending when its queue overflowed goes on from the first frame the socket did not take, and its reply
+        // follows the whole ship — so the peer's tails never rise above the hole, and a spoke in resync ends on the
+        // reply with every row (see #answer). The flush above may have filled the socket again (the shell steps
+        // `pause` inside a send): then the resume, the exchange and the round all wait for the next drain. A resume
+        // that tears again likewise leaves the exchange for the drain that completes it — the ask it carries would
+        // otherwise go out AHEAD of the rest of the ship and buy a spoke in resync a whole second download.
+        if (link.torn !== null) {
+          if (link.paused) return
+          const t = link.torn
+          link.torn = null
+          this.#answer(link, t.d, t.r, t.q, t)
+          if (link.torn !== null) return
+        }
         //! drop-under-backpressure left the peer with a tail hole in our stream — follow the drain with a
         // digest exchange so the loss heals within two round-trips instead of lingering until the next admit
         if (link.droppedWhilePaused && link.state === LS.admitted) {
           link.droppedWhilePaused = false
-          this.#sendDigest(link, 1)
+          //! toward a member (armed): it re-syncs the link and ships nothing — the round below repairs. Toward a CLIENT it
+          // says `h: 1`: this link dropped frames, so a spoke whose resync ask got no reply asks again (see `resync`)
+          this.#sendDigest(link, 1, undefined, true)
         }
+        //! the DRAIN ROUND (DESIGN-SCALE stage 2, §3 trigger 2): every announcement skipped this link while it was
+        // paused (kernel/scope.ts #link), so the one scoped round to this peer, for the partitions the two share,
+        // is what catches it up — whether or not its queue dropped (a deviation from the row's "whose queue
+        // dropped", with that reason). The peer that finds itself behind latches us; a lost record re-ships once.
+        if (this.armed && !link.client && link.state === LS.admitted) this.scope .round(this, new Set([link]))
         return
       }
       case 'timer': {
@@ -855,8 +925,14 @@ export class Node {
               // any loss mode WITHOUT a reconnect/drain signal (transport bugs, future non-TCP shells).
               // One r=1 digest from the PING side covers both directions: the reply ships our gaps, and
               // receiving their digest ships theirs. Nothing missing ⇒ nothing shipped (idempotent).
-              // A client floors only its PRIMARY (the single-feeder rule — see the DIGEST handler).
-              if (!this.client || link.id === this.primary) this.#sendDigest(link, 1)
+              // A client floors only its PRIMARY (the single-feeder rule — see the DIGEST handler), and not
+              // while in RESYNC: the resync's ask is the floor, every digest sent in resync asks for everything,
+              // and only the feeder's drain digest can mean the ask needs re-sending (see `resync`).
+              //! On a SCOPED cluster the member floor does not run (DESIGN-SCALE stage 2, §3; the owner's yes,
+              // §14 Q1): a member learns history only through the one-teacher latch, and the holder handshake
+              // — announce on change, the admit and drain rounds, the aeFan sweep (kernel/scope.ts tick) — is
+              // what re-proves every pair. The digest to a CLIENT link is unchanged: a spoke floors on it.
+              if ((!this.client || (link.id === this.primary && this.resync === null)) && !(this.armed && !link.client)) this.#sendDigest(link, 1)
             }
           //! membership acts on the heartbeat clock too (explicit protocol mode): genesis, suspicion,
           // eviction/join ballots, stale pulls, rejoin nudges — all only when heartbeats are on.
@@ -965,7 +1041,9 @@ export class Node {
       if (this.armed) {
         const p = partitionOf(rec)
         const pe = d.part(p)
-        if (pp  <= pe.s && seq > pe.s) pe.s = seq
+        //! the floor advanced at the stamp site: the ONE dirty mark of the hot path (DESIGN-SCALE stage 2) — the next
+        // tick announces the new floor to p's co-holders in one batched HAVEQ per link (kernel/scope.ts `dirty`)
+        if (pp  <= pe.s && seq > pe.s) { pe.s = seq; this.scope .dirty.add(p) }
         this.scope .mintHeld(this, p) // the owner holds what it stamps — the entry exists from the first commit
         const ring = this.writes.ring
         if (ring.epoch !== this.epoch) ring.build(this.epoch, this.membership.view.members)
@@ -1119,12 +1197,17 @@ export class Node {
   // which it sends AFTER the ship on the same FIFO link, is the completion marker (#resyncEnd). The
   // projection downstream is left as it is until then — no remove-everything flicker; cells that come
   // back identical re-apply in place. The dedup window stays: WACKed coordinates were true when learned.
+  //! Begun MID-RESYNC (a scoped failover onto a third feeder while the second's re-download was landing): the cells
+  // held at the FIRST reset stay in `old` — the screen still shows them, and only this set is swept at the end — and
+  // the partial re-download's cells join it; the fold is wiped again (the new feeder's held subset is the truth).
   #resyncBegin(link      ) {
-    const old = new Set(this.state.keys())
+    const old = this.resync !== null ? this.resync.old : new Set        ()
+    for (const k of this.state.keys()) old.add(k)
     this.journal.armed && this.journal.emit(JK.resync, old.size)
     this.#resetFold()
-    this.resync = { old }
-    this.#sendDigest(link, 1)
+    const q = ++this.#dq
+    this.resync = { old, q }
+    this.#sendDigest(link, 1, q)
   }
 
   //! #resyncEnd — the feeder's reply arrived: every cell held at the reset that the re-download did not
@@ -1348,7 +1431,17 @@ export class Node {
     // synced never rises there and this client has ONE feeder: per-origin ordering by construction.
     // A server never opens toward a client: the client's own r=1 is what syncs that link.
     if (this.client) {
-      if (this.primary === null) { this.primary = link.id; this.#feederLast = link.contract; this.#sendDigest(link, 1) }
+      if (this.primary === null) {
+        this.primary = link.id; this.#feederLast = link.contract
+        //! a SCOPED feeder elected HERE (the last one died with no other link up, so the linkDown arm found nobody) is
+        // the failover's second path, and the same shape (DESIGN-SCALE stage 2; the review's test found it): this
+        // spoke's lane tails came from a feeder that held a different subset, so an ask with them would miss what this
+        // one holds below them and leave what it does not hold on the screen. It resyncs onto this feeder too —
+        // whenever it holds anything, or a resync is already open (a mid-resync death: the sweep set must union, as in
+        // the linkDown arm). A spoke that holds nothing yet asks its first feeder as before: bytes unchanged.
+        if (this.feederScoped && (this.resync !== null || this.logs.size > 0)) this.#resyncBegin(link)
+        else this.#sendDigest(link, 1)
+      }
     } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
     //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
     // membership converges even when no epoch-stamped records flow; then settle — an admitted member
@@ -1358,10 +1451,11 @@ export class Node {
     //! round-on-admit (M6-review findings 13/23/33/40/49 — DESIGN-M6 C3's mandated trigger): the
     // post-reconnect multi-source window creates interior holes suffix AE cannot fill (they sit
     // below the scalar lane tail), and a lost install-round offer otherwise re-heals only at the
-    // next install. One batched HAVEQ round per admit re-announces + re-probes; it rides AFTER
-    // the VIEW frame on this same FIFO link (finding 39's ordering rule), so a healed peer
-    // installs the epoch before judging the round's epoch stamp.
-    if (this.armed && !link.client) this.scope .round(this)
+    // next install. One batched HAVEQ per admit re-announces + re-probes, to the ADMITTED PEER only
+    // for the partitions the two share (DESIGN-SCALE stage 2 §3 trigger 2; it used to be a full round
+    // to every co-holder); it rides AFTER the VIEW frame on this same FIFO link (finding 39's ordering
+    // rule), so a healed peer installs the epoch before judging the round's epoch stamp.
+    if (this.armed && !link.client) this.scope .round(this, new Set([link]))
   }
 
   //! #uuidTaken — the refusing half of the role rule (DESIGN-DOOR §3 step 12): a CLIENT HELLO (r:1) whose
@@ -1692,7 +1786,7 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'digest-before-hello')
         }
-        const v = f.value                                                                                        
+        const v = f.value                                                                                                                
         if (typeof v?.d !== 'object' || v.d === null) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed digest')
           return
@@ -1736,9 +1830,27 @@ export class Node {
           if (this.resync === null) {
             for (const [origin, d] of this.streams)
               if (d.applied > (typeof v.d[origin] === 'number' ? (v.d[origin]          ) : 0)) return this.#resyncBegin(link)
-          } else if (v.r === 0) this.#resyncEnd()
+          }
+          //! the end is the reply to a digest sent AFTER the resync began (q ≥ the resync's own; the failover's fresh
+          // r=1 counts); a reply to an older digest is NOT the end — the re-download is still on its way behind it,
+          // and what that older reply's ship brought stays in the fold (see `resync`). No q: an old server's reply.
+          else if (v.r === 0 && (typeof v.q !== 'number' || v.q >= this.resync.q)) this.#resyncEnd()
           link.synced = true
-          if (v.r === 1) this.#sendDigest(link, 0)
+          //! a feeder's r=1 is answered r=0 with our tails — unless we are in a resync. In resync the ask is out on THIS
+          // link (the single-feeder rule above: only the primary reaches here, and every ask goes to the primary) and
+          // its reply is the end. An r=1 that lands before that reply was sent before the feeder handled the ask — its
+          // heartbeat floor crossing the ask at a failover — and an r=0 of ours would carry d = {} and make the feeder
+          // ship its held subset a SECOND time (the review of stage 2 measured the double ship on 30 of 30 tick-aligned
+          // seeds; the lane dropped the duplicates, the cost was a second download). So it gets no answer; the gate it
+          // carried was read above. The one r=1 that means the ask needs re-sending is the feeder's DRAIN digest
+          // (`h: 1`: its queue overflowed while paused — an ask that arrived then was swallowed; an answer whose ship
+          // tore the feeder resumes itself, #answer, and its reply lands BEFORE this digest): that one is answered
+          // with an r=1 of our own, so the exchange ships everything and its reply ends the resync, one exchange
+          // after the drain (see `resync`).
+          if (v.r === 1) {
+            if (this.resync === null) this.#sendDigest(link, 0)
+            else if (v.h === 1) this.#sendDigest(link, 1)
+          }
           return
         }
         //! a PAUSED link cannot deliver: serialising the missing suffix into its drop-oldest queue is
@@ -1750,42 +1862,9 @@ export class Node {
           link.droppedWhilePaused = true
           return
         }
-        //! ship every suffix the peer's digest shows missing: for each origin I hold, everything past their
-        // high-water. encodeRuns splits Lamport gaps into valid contiguous frames (attempt identity rides
-        // along, so a healed peer rebuilds its cid-dedup window too); ship() honours backpressure.
-        //! M6 (armed): the answer ships only partitions the REQUESTER may fold — a member link gets
-        // its R-set's subset (ring-derived; slice 3b tightens to possession-announced), a client link
-        // gets this node's HELD subset (an orphan's frozen copy is a teacher for holders, never a
-        // spoke feed). Skipped entries gate-drop at the receiver anyway (§0 law row 1) — the filter
-        // keeps the wire honest and the promiscuous-stage hole (3b) closed at the never-sent leg.
-        const scopedTo = this.armed
-          ? (p        ) => link.client ? this.scope .held(p) : this.writes.ring.holdsAny(link.uuid, p, this.replicas)
-          : null
-        if (scopedTo !== null && this.writes.ring.epoch !== this.epoch)
-          this.writes.ring.build(this.epoch, this.membership.view.members)
-        let shipped = 0
-        for (const [origin, entries] of this.logs) {
-          const theirs = typeof v.d[origin] === 'number' ? (v.d[origin]          ) : 0
-          let lo = entries.length
-          while (lo > 0 && entries[lo - 1].seq > theirs) lo-- // entries are seq-ascending; find the missing suffix
-          if (lo === entries.length) continue
-          let tail = entries.slice(lo)
-          if (scopedTo !== null) tail = tail.filter((e) => scopedTo(partitionOf(e.rec)))
-          if (!tail.length) continue
-          //! armed AE answers carry each entry's STORED pp (the floor law): the receiver's floors
-          // advance only through chain-verified spans, so a suffix landing above a gap folds without
-          // forging coverage of the still-missing interior (finding 10's AE leg / the multi-source
-          // interleave). Unscoped answers stay flag-free — bytes unchanged.
-          const missing = tail.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp }))
-          for (const bytes of encodeRuns(missing, undefined, this.armed)) link.ship(bytes, this.env.sink, j)
-          shipped += missing.length
-        }
-        if (shipped) j.armed && j.emit(JK.aeShip, link.uuid, shipped)
-        //! the peer's digest is what SYNCS the link: the suffix just shipped covers everything up to this
-        // instant, and every record from here on has a higher seq — per-origin monotonicity holds on the wire
-        link.synced = true
-        //! r=1 means "answer with yours" — the reply carries r=0, so the exchange is two-legged, never a loop
-        if (v.r === 1) this.#sendDigest(link, 0)
+        //! the answer: the suffix ship, the link sync and the r=0 reply (#answer — resumable at the drain when
+        // the ship tears). A client's r=1 carries `q`; the reply echoes it (only clients send one).
+        this.#answer(link, v.d, v.r, typeof v.q === 'number' ? v.q : undefined, null)
         return
       }
       //! M6 scoped-replication plane (DESIGN-M6 C3/C8): HAVEQ/HAVEA carry the possession handshake,
@@ -1934,13 +2013,92 @@ export class Node {
     if (s !== undefined && s.delete(k) && s.size === 0) t.delete(p)
   }
 
+  //! #answer — what a peer's digest gets: the suffix ship, the link sync, and the r=0 reply to an r=1. For each
+  // origin I hold, everything past the peer's high-water (`d`): encodeRuns splits Lamport gaps into valid contiguous
+  // frames (attempt identity rides along, so a healed peer rebuilds its cid-dedup window too); ship() honours
+  // backpressure. The peer's digest is what SYNCS the link: the suffix shipped covers everything up to this instant,
+  // and every record from here on has a higher seq — per-origin monotonicity holds on the wire. r=1 means "answer
+  // with yours": the reply carries r=0, so the exchange is two-legged, never a loop.
+  //! M6 (armed): a MEMBER link gets NOTHING (DESIGN-SCALE stage 2, §3): on a scoped cluster a member receives history
+  // only through the one-teacher latch with its attested cut — the digest only syncs the link (an admit, a drain), and
+  // the round that follows it is the repair. A suffix shipped from a ring-filtered walk was the second teacher the H3
+  // resurrection needs once compaction runs (stage 3 requires this). A CLIENT link is unchanged: it gets this node's
+  // HELD subset (an orphan's frozen copy is a teacher for holders, never a spoke feed), with each entry's STORED pp.
+  //! A TORN ship (the third re-check of stage 2, 2026-10-10). The shell steps `pause` inside a send, so this link can
+  // pause partway through the ship and its bounded queue overflow before the ship ends — ship() then clears the whole
+  // queue: every frame queued since the pause is gone, and the socket took only the frames before it. The ship STOPS
+  // at that first clear: a frame shipped past it would leapfrog the hole, and the peer's tails would rise above it —
+  // a hole no digest can see, and the fold of a spoke in resync would sweep the hole's rows as ghosts. The link stays
+  // unsynced, no reply goes out, and the rest is kept on the link (`torn`: the peer's tails, its r and q, and the
+  // first frame the socket did not take). The drain handler calls back here with `from`, and the ship goes on from
+  // that frame: every drain round delivers at least what the socket takes, so a ship larger than the socket plus the
+  // queue still completes (a re-ask from zero would tear at the same frame for ever), and the reply follows the whole
+  // ship, so a spoke in resync ends on it with every row. Before: the loop ran on past the clear, the reply went out
+  // with the ship's last frames, and a spoke lost 5 of 10 rows with a queue of 4, 257 of 600 at the default bound.
+  #answer(link      , d                         , r                    , q                    , from                                        ) {
+    const j = this.journal
+    let shipped = 0
+    let tear                                         = null
+    let taken = -1 // the records the socket took before the first queued frame — the honest aeShip count of a torn ship
+    const drops = link.drops // a clear DURING this answer is a tear; the debt flag may still be set from an earlier one
+    if (!this.armed || link.client) {
+      const scopedTo = this.armed ? (p        ) => this.scope .held(p) : null
+      let skip = from !== null && this.logs.has(from.origin) // the origins before the torn one went out whole
+      for (const [origin, entries] of this.logs) {
+        if (skip) { if (origin !== from .origin) continue; skip = false }
+        let theirs = typeof d[origin] === 'number' ? (d[origin]          ) : 0
+        if (from !== null && origin === from.origin && from.seq - 1 > theirs) theirs = from.seq - 1
+        let lo = entries.length
+        while (lo > 0 && entries[lo - 1].seq > theirs) lo-- // entries are seq-ascending; find the missing suffix
+        if (lo === entries.length) continue
+        let tail = entries.slice(lo)
+        if (scopedTo !== null) tail = tail.filter((e) => scopedTo(partitionOf(e.rec)))
+        if (!tail.length) continue
+        //! armed AE answers carry each entry's STORED pp (the floor law): the receiver's floors
+        // advance only through chain-verified spans, so a suffix landing above a gap folds without
+        // forging coverage of the still-missing interior (finding 10's AE leg / the multi-source
+        // interleave). Unscoped answers stay flag-free — bytes unchanged.
+        const missing = tail.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp }))
+        const starts           = []
+        const frames = encodeRuns(missing, undefined, this.armed, starts)
+        for (let k = 0; k < frames.length; k++) {
+          if (tear === null && link.paused) { tear = { origin, seq: missing[starts[k]].seq }; taken = shipped + starts[k] }
+          link.ship(frames[k], this.env.sink, j)
+          if (link.drops !== drops) break
+        }
+        if (link.drops !== drops) break
+        shipped += missing.length
+      }
+    }
+    if (link.drops === drops) {
+      if (shipped) j.armed && j.emit(JK.aeShip, link.uuid, shipped)
+      link.synced = true
+      if (r === 1) this.#sendDigest(link, 0, q)
+      if (link.drops === drops) return
+      //! the reply itself overflowed: the queue held the ship's frames since the pause, and they went with it — the
+      // count above stands (its clear is the journal's own row) and the resume re-sends them
+    } else if (taken > 0) j.armed && j.emit(JK.aeShip, link.uuid, taken)
+    //! the cold path: keep the peer's tails as numbers (the decoded frame's map is not ours to hold)
+    const tails                         = {}
+    for (const origin in d) if (typeof d[origin] === 'number') tails[origin] = d[origin]          
+    link.torn = { d: tails, r, q, origin: tear !== null ? tear.origin : '', seq: tear !== null ? tear.seq : 0 }
+  }
+
   //! #sendDigest — announce {origin: highestHeldSeq} (the log tails: exactly what this node can serve).
   // Durable mode adds the p map (durable tails) — the persisted-confirm evidence; non-durable digests
   // are byte-identical with M0-M3.
-  #sendDigest(link      , r       ) {
+  //! `q` (DESIGN-SCALE stage 2, see `resync`): a CLIENT's r=1 mints a correlation id (or carries the one its caller
+  // minted); a server's r=0 toward a client echoes the asker's. Members never send one: member bytes are unchanged.
+  //! A CLIENT in resync announces NO tails: what it holds mid-resync is whatever ship landed first, and a tail raised
+  // by a stale ship would hide the rows under it from a feeder that holds the lane in full. "Send me everything";
+  // the lane drops what it already has (write.ts #splice, dupDrop).
+  //! `h` (the drain digest, see `resync`): toward a CLIENT, `h: 1` says this link dropped frames while paused — the one
+  // event after which an ask of the spoke's may have no reply coming. Member digests never carry it: bytes unchanged.
+  #sendDigest(link      , r       , q         , h          ) {
     const d                         = {}
-    for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
-    let body                                                                                  
+    if (!(this.client && this.resync !== null))
+      for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
+    let body                                                                                                          
     if (this.durable) {
       const p                         = {}
       for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
@@ -1949,6 +2107,9 @@ export class Node {
     //! toward a CLIENT, the digest also carries this node's write-gate (I-33): the client has no gate of
     // its own, and a closed gate here parks its relayed writes. Member-to-member digests are unchanged.
     if (link.client) body.w = this.membership.gate(this).open ? 1 : 0
+    if (this.client && r === 1) body.q = q ?? ++this.#dq
+    else if (q !== undefined) body.q = q
+    if (h === true && link.client) body.h = 1
     link.ship(encodeControl(VERB.DIGEST, body), this.env.sink, this.journal)
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }

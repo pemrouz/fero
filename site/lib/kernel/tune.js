@@ -19,12 +19,12 @@
 // The three node-level constants are DEFINED here and re-exported by kernel/node.ts under their
 // old names: node.ts imports this file, so defining them there would make an import cycle.
 
-import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, DRAIN_TICKS } from './membership.js'
+import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, LEAVE_WINDOW, DRAIN_TICKS } from './membership.js'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.js'
 import { MAX_PROBES } from './confirm.js'
 import { MAX_QUEUED } from './link.js'
 import { COMPACT_AT } from './log.js'
-import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT } from './scope.js'
+import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT, AE_FAN } from './scope.js'
 
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
 // heartbeats on, the heartbeat tick revives given-up targets (JK.revive) — give-up is a cool-down.
@@ -61,8 +61,12 @@ export const PROVE_MS = 5000
                    
                                                                                  
                       
-                                                                                                              
+                                                                                                                   
                     
+                                                                                                                     
+                                                                                                                     
+                                                                                                          
+                     
                                                                                                                     
                                                                                                                      
                     
@@ -95,6 +99,10 @@ export const PROVE_MS = 5000
                     
                     
                  
+                                                                                                                    
+                                                                                                                   
+                                                                                                
+               
                                                                                                              
                  
  
@@ -107,6 +115,7 @@ export const TUNE                 = Object.freeze({
   redialCap: 32,
   suspectTicks: SUSPECT_TICKS,
   leaveTicks: LEAVE_TICKS,
+  leaveWindow: LEAVE_WINDOW,
   drainTicks: DRAIN_TICKS,
   pulls: MAX_PULLS,
   proposalAge: PROPOSAL_AGE,
@@ -124,15 +133,18 @@ export const TUNE                 = Object.freeze({
   stageTicks: STAGE_TICKS,
   acqLiveMax: ACQ_LIVE_MAX,
   stallAt: STALL_AT,
+  aeFan: AE_FAN,
   proveMs: PROVE_MS,
 })
 
 //! ZERO_OK — the rows where 0 means something: no redial at all (the config key redial.tries allows
-// it). Every other row is a tick count, a bound, a growth or a cap, and 0 would switch a guarantee
-// off instead of tuning it: shedTicks 0 makes `% shedTicks` NaN so no orphan ever polls, dedupKeep
+// it), and no anti-entropy sweep (aeFan 0: a scoped node announces on change only — the posture the
+// counted pins of DESIGN-SCALE §8 measure; repair then comes from the dirty announcements, the admit and
+// drain rounds alone). Every other row is a tick count, a bound, a growth or a cap, and 0 would switch a
+// guarantee off instead of tuning it: shedTicks 0 makes `% shedTicks` NaN so no orphan ever polls, dedupKeep
 // or issuers 0 turns exactly-once dedup off, pending 0 drops every attempt, redialGrowth 0 makes
 // every later wait pure jitter (review finding). Those start at 1.
-const ZERO_OK                      = new Set(['redials', 'memberRedials'])
+const ZERO_OK                      = new Set(['redials', 'memberRedials', 'aeFan'])
 
 //! tuneOf — the validated, frozen table for one node: TUNE under the embedder's overrides. Fails
 // closed: a row that is not in TUNE, or a value that is not an integer at or above the row's floor

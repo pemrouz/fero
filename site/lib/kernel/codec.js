@@ -38,7 +38,9 @@ export const HEADER = 11
 
 //! VERB: dense 1-byte frame verbs, append-only. The codec fails closed on unknowns at dispatch, not here.
 // DIGEST carries {d: {origin: highestHeldSeq}, r: 0|1} — "here is what I hold; r=1 means please answer with yours".
-// Toward a client link it also carries w: 0|1, the sender's write-gate (I-33: the client's cluster.writable).
+// Toward a client link it also carries w: 0|1, the sender's write-gate (I-33: the client's cluster.writable), and
+// at a drain h: 1 (this link dropped frames while paused). A client's r=1 carries q (a correlation id) and the
+// server's r=0 that answers it echoes q (DESIGN-SCALE stage 2: the spoke's resync ends on the reply to its own ask).
 // M2 membership control plane: JOIN {u,i,l} asks a member to propose the sender in; PROPOSE {e,m,p} /
 // VOTE {e,g,ce} are the joint-consensus ballot legs; VIEW {e,m} announces (or answers a PULL {e} with)
 // a committed view. LEAVE {} (V4-6) asks for the view WITHOUT the sender — the graceful exit.
@@ -61,7 +63,11 @@ export const VERB = {
   // wire shape is untouched in both modes): HAVEQ {e, q:{p:{o:seq}}} announces possession floors and
   // asks for coverage; HAVEA {e, a:{p:{ok,need,m?,md?}}} attests-or-requests per partition; ACQ is a
   // RECORDS-shaped one-teacher transfer (provenance + attempt identity ride exactly like AE);
-  // ACQDONE {p, e, t:{o:cut}, n} closes the atomic fold.
+  // ACQDONE {p, e, t:{o:cut}, n} closes the atomic fold. DESIGN-SCALE stage 2 (no MAGIC bump, V4-14):
+  // HAVEQ gains three optional top-level keys — d:{p:{o:durable floor}} from durable nodes, g:[p…] the
+  // partitions the sender is gapless for, x:[p…] the partitions it has just released — and a HAVEA
+  // partition gains g:1 (gapless) and x:1 ("none": neither held nor assigned, where it used to be silent).
+  // On a scoped cluster HAVEQ/HAVEA are the anti-entropy: the member heartbeat DIGEST does not run there.
   HAVEQ: 19, HAVEA: 20, ACQ: 21, ACQDONE: 22,
   //! M7 DIAG plane (DESIGN-M7 §1 — the authenticated diagnostics channel, structurally OUTSIDE
   // membership): DIAGQ {id≥1, q, ...} is a client pull (journal/logs cursors, node fold, state);
@@ -496,12 +502,17 @@ export const encodeRuns = (
   // run-split condition — pp is per-record data, so the split shape is identical either way (the
   // snapshot chunker's one-frame assert depends on this).
   withPp = false,
+  //! starts (optional): receives the index in `records` of each frame's first record, one push per frame —
+  // the one caller that resumes a torn ship (node.ts #answer) reads the seq it tears at from it. The split
+  // is unchanged; a caller that passes nothing pays one undefined check per frame.
+  starts           ,
 )               => {
   const frames               = []
   const o = runsScratch
   let i = 0
   while (i < records.length) {
     const head = records[i]
+    if (starts !== undefined) starts.push(i)
     o.begin(verb, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch },
       head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid  } : undefined, withPp)
     o.add(head.rec, head.pp)
