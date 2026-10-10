@@ -1,6 +1,6 @@
 {
- "builtAt": "2026-10-10T00:22:08.383Z",
- "head": "2c98d42",
+ "builtAt": "2026-10-10T07:10:16.350Z",
+ "head": "dec4ecc",
  "branch": "v4",
  "version": "4.0.0",
  "dependencies": [
@@ -45,18 +45,18 @@
  "checks": 28,
  "kernel": {
   "modules": 23,
-  "bytes": 681370,
-  "head": "c02f5ff"
+  "bytes": 692605,
+  "head": "c4338f1"
  },
  "npm": {
   "fero": "1.7.1",
   "data": "4.0.0"
  },
  "test": {
-  "at": "2026-10-10T01:22:08+01:00",
+  "at": "2026-10-10T08:10:16+01:00",
   "fero": {
-   "tests": 718,
-   "pass": 718,
+   "tests": 747,
+   "pass": 747,
    "fail": 0
   },
   "contract": {
@@ -67,7 +67,7 @@
   "exit": 0
  },
  "perf": {
-  "at": "2026-10-10T01:22:08+01:00",
+  "at": "2026-10-10T08:10:16+01:00",
   "tests": 50,
   "pass": 50,
   "fail": 0
