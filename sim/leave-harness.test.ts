@@ -289,21 +289,29 @@ test('leave harness, keptBallot: at n=4 the loser of a duel escalates over view 
 // `stale-vote`; aa and ee `minority`, because a stayer's gate skips the three) and all four after the crash (bb and
 // cc `stale-vote`, dd and ee `minority`), with no proposer left to release the vote. So the release is needed by the
 // gate and lead parts, not only by the grant. Liveness, pinned as the exact read-only set (empty today): a rule
-// that moves it must say how the vote is released, and re-record with the why.
+// that moves it must say how the vote is released, and re-record with the why. The three shapes' liveness teeth
+// are gathered in ONE list, as the rebirth and keptBallot tests do: asserted one after another, the flap's message
+// hid the crash's on both scratch kernels, where all three are red together (the third re-check).
 const KNOWN_READ_ONLY_FLAP: string[] = []
 const KNOWN_READ_ONLY_CRASH: Record<'open' | 'committed', string[]> = { open: [], committed: [] }
+const CRASH_END = 'bb@3{bb,cc,dd,ee}W cc@3{bb,cc,dd,ee}W dd@3{bb,cc,dd,ee}W ee@3{bb,cc,dd,ee}W'
 
 test('leave harness, a failed ballot in a healthy cluster: one member flaps during an eviction ballot and the proposer abandons it; the proposer crashes for good mid-ballot (open, or committed with its VIEW unsent) — SAFE, and on today\'s kernel every live member is writable again (the read-only set is exactly the pinned one, empty)', () => {
-  const f = flapDuringBallot()
-  assert.deepEqual([...f.shape, ...f.splits, ...(f.quiet ? [f.quiet] : [])], [], 'flapDuringBallot: not the shape, or UNSAFE')
-  assert.deepEqual(f.readOnly, KNOWN_READ_ONLY_FLAP, `flapDuringBallot: the read-only set moved — a gate rule on a vote above the view needs its release; re-record with the why\n${f.end}`)
-  assert.match(f.end, /^aa@1\{aa,bb,cc,dd,ee\}W /, 'the abandoned ballot committed nothing: view 1 stands')
+  const runs = [['flapDuringBallot', flapDuringBallot()] as const, ...(['open', 'committed'] as const).map((v) => [`proposerCrash ${v}`, proposerCrash(v)] as const)]
+  //! safety first, all three shapes in one list, apart from the liveness teeth below
+  const unsafeOnes = runs.flatMap(([name, o]) => [...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])].map((p) => `${name}: ${p}`))
+  assert.deepEqual(unsafeOnes, [], 'not the shape, or UNSAFE')
+  //! the liveness teeth, one list: the read-only set and the end state of every shape
+  const teeth: string[] = []
+  const [, f] = runs[0]
+  if (f.readOnly.join(' ') !== KNOWN_READ_ONLY_FLAP.join(' ')) teeth.push(`flapDuringBallot: the read-only set moved — a gate rule on a vote above the view needs its release; re-record with the why: ${f.end}`)
+  if (!/^aa@1\{aa,bb,cc,dd,ee\}W /.test(f.end)) teeth.push(`flapDuringBallot: the abandoned ballot committed something — view 1 should stand: ${f.end}`)
   for (const variant of ['open', 'committed'] as const) {
-    const c = proposerCrash(variant)
-    assert.deepEqual([...c.shape, ...c.splits, ...(c.quiet ? [c.quiet] : [])], [], `proposerCrash ${variant}: not the shape, or UNSAFE`)
-    assert.deepEqual(c.readOnly, KNOWN_READ_ONLY_CRASH[variant], `proposerCrash ${variant}: the read-only set moved — a gate rule on a vote above the view needs a release that works with the proposer dead; re-record with the why\n${c.end}`)
-    assert.equal(c.end, 'bb@3{bb,cc,dd,ee}W cc@3{bb,cc,dd,ee}W dd@3{bb,cc,dd,ee}W ee@3{bb,cc,dd,ee}W', `proposerCrash ${variant}: the four re-form without aa at 3`)
+    const [, c] = runs[variant === 'open' ? 1 : 2]
+    if (c.readOnly.join(' ') !== KNOWN_READ_ONLY_CRASH[variant].join(' ')) teeth.push(`proposerCrash ${variant}: the read-only set moved — a gate rule on a vote above the view needs a release that works with the proposer dead; re-record with the why: ${c.end}`)
+    if (c.end !== CRASH_END) teeth.push(`proposerCrash ${variant}: the four did not re-form without aa at 3: ${c.end}`)
   }
+  assert.deepEqual(teeth, [])
 })
 
 //! the explorer's range here starts ABOVE the 1..2000 sim/explore.test.ts pins, so every seed adds coverage (the
