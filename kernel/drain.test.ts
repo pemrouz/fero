@@ -126,6 +126,37 @@ test('DRAIN — the exit proof no longer ends a scoped leave: `left` is held whi
   assert.equal(h.of('left').length, 1)
 })
 
+test('DRAIN waits for the RIGHT event: a holder\'s ok answer whose floors sit BELOW the frozen tail is not cover — the leaver keeps waiting (no shed, no left) until an answer reaches the tail; with two lanes, one covered lane does not drain the partition', () => {
+  //! the bar is the content tail, not "any ok answer": under the pp law a holder's floors lawfully under-claim
+  // (M6 findings 12/21), so an ok at bb:4 against a frozen tail of bb:5 proves bb holds LESS than aa did.
+  // Mutation: make `covers` (kernel/scope.ts) return true for any non-empty mark set and this test goes red.
+  const h = holderAtView1()
+  leaveToEcho(h)
+  h.bytes(1, havea(2, { p: { ok: 1, need: 0, m: { bb: 4 } } }))
+  assert.equal(h.jk(JK.shed).length, 0, 'bb:4 < the frozen tail bb:5: not covered, not shed')
+  assert.equal(h.of('left').length, 0, 'an ok answer below the tail does not end the drain')
+  assert.deepEqual(h.node.scope!.undrained(h.node), { waiting: 1, stranded: 0 }, 'still waiting on bb')
+  h.tick()
+  assert.equal(h.of('left').length, 0, 'the tick re-checks the same bar: still waiting')
+  h.bytes(1, havea(2, { p: { ok: 1, need: 0, m: { bb: 5 } } }))
+  assert.equal(h.jk(JK.shed).length, 1, 'bb:5 reaches the tail: covered, shed')
+  assert.deepEqual(h.of('left'), [['left', true]], 'and the drain ends on that answer')
+  assert.equal(h.jk(JK.undrained).length, 0)
+  //! two lanes: aa's frozen tails are bb:5 AND cc:3; bb covering one lane is not cover
+  const t = holderAtView1()
+  t.bytes(2, frame('cc', [{ seq: 3, rec: rec(['p', 'y'], 2), pp: 0 }]))
+  leaveToEcho(t)
+  assert.deepEqual(t.node.scope!.entries.get('p')?.tails, { bb: 5, cc: 3 }, 'two lanes frozen at the install')
+  t.bytes(1, havea(2, { p: { ok: 1, need: 0, m: { bb: 5 } } }))
+  assert.equal(t.of('left').length, 0, 'lane bb covered, lane cc not: the partition is not drained')
+  assert.deepEqual(t.node.scope!.undrained(t.node), { waiting: 1, stranded: 0 })
+  t.bytes(1, havea(2, { p: { ok: 1, need: 0, m: { bb: 5, cc: 2 } } }))
+  assert.equal(t.of('left').length, 0, 'cc:2 < cc:3: still not drained')
+  t.bytes(1, havea(2, { p: { ok: 1, need: 0, m: { cc: 3 } } }))
+  assert.deepEqual(t.of('left'), [['left', true]], 'marks are per lane and monotone: bb:5 from before + cc:3 now cover both lanes')
+  assert.equal(t.jk(JK.shed).length, 1)
+})
+
 test('DRAIN, the bound: a holder that never attests holds the leaver for exactly drainTicks ticks, then it goes with `undrained` 1 and left(false) — the leave\'s own bound (leaveTicks) never fires during the drain', () => {
   const h = holderAtView1({ tune: { drainTicks: 6 } })
   leaveToEcho(h)
