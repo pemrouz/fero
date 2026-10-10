@@ -1622,7 +1622,7 @@ test("a client's `cluster.writable` is its feeder's gate (I-33): false before a 
     // and the next digest tells the client (one heartbeat behind)
     const feeder = view(c).me.primary!
     const [fed, other] = feeder === 'aa' ? [a, b] : [b, a]
-    await diag(other!)!.crash!()
+    assert.strictEqual(await diag(other!)!.crash!(), false, 'a crash resolves the teardown verdict, and a crash is never clean')
     assert.ok(await until(() => view(fed!).writable === false, 4000), "the feeder's gate closed")
     assert.ok(await until(() => view(c).writable === false, 500), `the client follows within a few heartbeats (${JSON.stringify(view(c))})`)
     assert.equal(view(c).me.primary, feeder, 'still fed by the same member — only its gate moved')

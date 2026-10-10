@@ -1077,7 +1077,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       return d
     },
     drop: (uuid: string) => rt.drop(uuid),
-    crash: () => { untrack(inst); return teardown() },
+    //! a crash is never a clean stop: no leave, no drain — the teardown's verdict is false
+    crash: () => { untrack(inst); return teardown(false) },
     rendezvous: () => (directory ? { client: directory.client, host: directory.host, boxes: Object.fromEntries(directory.boxClients) } : null),
     //! config (V4-10): every resolved leaf with the layer it came from — the coerced value the composer
     // read, or the effective default ('the default') where one exists; a function shows as '[function]',

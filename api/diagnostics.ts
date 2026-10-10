@@ -38,8 +38,9 @@ export interface Diagnostics {
   drop?(uuid: string): boolean
   //! crash (V4-6): tear the instance down WITHOUT the graceful leave — a process death, as the cluster
   // sees it (no ballot; the survivors suspect, then evict). destroy() leaves first; this is drop()'s
-  // fault-injection twin for tests and failure stories. OPTIONAL like drop().
-  crash?(): Promise<void>
+  // fault-injection twin for tests and failure stories. OPTIONAL like drop(). Resolves the teardown's verdict,
+  // which for a crash is always false: no leave ran, nothing was drained (destroy() is the one that can say true).
+  crash?(): Promise<boolean>
   //! the directory nodes this instance runs (V4-3): its `#directory` client and, when it won the bind,
   // the hosted `#directory` server — real Fero instances, so a tool can capture/diag them like any node.
   // null when the instance meets no directory (rendezvous: false, listen: false, a system resource).
