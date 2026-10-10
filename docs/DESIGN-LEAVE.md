@@ -1467,9 +1467,17 @@ because no ballot rule moves.
 - *Which links count.* `#leavers` is fed by `onLeave` (the link's authenticated uuid knocked LEAVE at
   me) and by `onPropose` when a ballot leaves its own proposer out (the lowest live leaver's exit
   ballot; the line sits beside the `leave(proposer)` journal row V4-25's fix already wrote). It is
-  pruned of non-members on every install and forgotten for a uuid on a fresh admit (a redial or a new
-  life: a leaver still leaving knocks again next tick, so the error is one tick). In-memory only;
-  nothing rides the boot record.
+  pruned of non-members on every install (hygiene: `#answerable` checks membership first, so the
+  prune changes no answer) and forgotten for a uuid on a fresh admit (a redial or a new life). The
+  cost of forgetting is not always one tick (the review's probe P-b, 2026-10-10): a NON-lowest fellow
+  leaver knocks LEAVE again next tick, so for it the error is one tick; the LOWEST fellow leaver
+  re-offers its exit ballot only to members that have not voted (`#proposalTargets`), so a voter that
+  re-admitted it hears nothing more until that ballot ages out and is re-proposed (`proposalAge`, 10
+  ticks) or the window ends — measured: bb at {aa,bb,cc} linked to aa alone, aa proposing its own
+  exit and holding bb's vote, the aa link flapping once: bb goes at tick 17 (the window), where
+  without the flap it goes at tick 5 (the bound). In the shell aa's own teardown closes the link
+  first, so the extra wait is about the bound; in the sim a lingering aa holds bb to the window.
+  Liveness only: no ballot rule is involved. In-memory only; nothing rides the boot record.
 - *What did not move.* The grant expression in `onPropose`, `onVote`, `#propose`, `#nextEpoch`,
   `gate()` and `majority()` are byte-identical (the diff of the kernel's code lines, comments
   stripped, is the two counters, the set, `#answerable`, the constant and the three `#leavers`
@@ -1486,28 +1494,53 @@ because no ballot rule moves.
   18 ticks (9 s) unscoped, 35 ticks (17.5 s) scoped when the survivor was stalled AND a holder is slow
   to attest; the usual stop is one or two heartbeats. `fero.spawn`'s 5 s grace is not raised (the
   README's Process bullet says a stop cut short reads `null`).
-- *The numbers.* The sweep's stall became a pause (`Sim.pause`: every event bound for the node held
-  in order and replayed at the wake; `cluster()` takes `tune`; `run`/`run2` take the window and a
-  stall factor), because the delay model charged every answer the stall again — four stalls per
-  round trip — and, with the leaver knocking on, its lift never came while the leaver lived, so no
-  stalled schedule could ever go live under it. Re-derived on the base kernel under the pause first:
-  family 1 36 → 25 not live (the eleven that differ, 2, 20, 31, 34, 35, 50, 60, 65, 74, 78, 87, had
-  the stalled node not the proposer; its vote landed inside the proposal's age once it woke). With the
-  window: family 1 live on 100 of 100 at the default; with the stalls tripled (750/900/1350/2100 ms
+- *The numbers.* The sweep draws the stalled survivor two ways now (`RunOpts.model`). The new
+  default is a PAUSE (`Sim.pause`: every event bound for the node held in order and replayed at the
+  wake; `cluster()` takes `tune`; `run`/`run2` take the window and a stall factor): the survivor
+  wakes inside the window and reads everything at once, the shape the window exists for. The old
+  model stays beside it as `'delay'`: the survivor keeps running and every frame to and from it is
+  held for the stall (a survivor alive but SLOW, each knock and each answer paying the stall in
+  turn), lifted once the leavers are gone. The build first claimed the delay model could never let
+  a stalled schedule go live under the window; the review measured it and that was false — under the
+  window the delay model goes live on sixteen more seeds (36 → 20 at the default, 1 at 64 ticks),
+  because a slow survivor's late answers still land while the leaver knocks on. Both models are run
+  and both are pinned, so the second shape of I-20, repeated knocks at a slow survivor, stays
+  measured. Re-derived on the base kernel (a 4-tick window) under both first: pause 25 not live,
+  delay 36 (the eleven that differ, 2, 20, 31, 34, 35, 50, 60, 65, 74, 78, 87, had the stalled node
+  not the proposer; under the pause its vote landed inside the proposal's age once it woke). With the
+  window: pause 25 → 0 of 100 at the default — the like-for-like before-and-after; 36 → 0 compares
+  the delay model's base to the pause's window — and with the stalls tripled (750/900/1350/2100 ms
   against the 800 ms window) 22 not live — exactly the 300/450/700 ms stalls tripled, the survivor
-  waking to a leaver that is gone — and 0 at a 64-tick window; family 2 13 → 10 (4, 44 and 89 live: a
-  leaver cut from the proposer but linked to another member knocked on until the cut healed inside
-  the window), the same 10 at 64 ticks, since a longer window heals no cut. The harness (§10.8):
-  rebirth 78 → 80 of 100 live (61 and 72, the same cut-then-heal shape under a 300 ms cut); every other
-  pin unchanged — the isolate grid's 24, the seeded family's 8, the crash grid's 10, pledgeTwo's,
-  evictsplit's and joinsplit's settled sets, `evictTwo`, `evictTwoB` and `keptBallot` red exactly as
-  pinned, `flapDuringBallot` and `proposerCrash` writable everywhere, the explorer's 300 clean. Kernel
-  tests: seven for the window in `kernel/membership.test.ts` (red on the base kernel at the fifth
-  tick), the two round-1 two-leaver shapes on real Nodes; two `kernel/drain.test.ts` cases that
-  assumed the bound fires with both member links up now wait for the window (the links could still
-  echo). Shell: `tests/knock.test.ts` stops the survivor's process with SIGSTOP for 1.2 s — the real
-  stall — and the leave is clean with the window open, `left` b=0 at the fifth tick with it shut.
-  The counted pins 59,500 and 104,050, the 20-seed golden and the 300-seed sweep are unchanged.
+  waking to a leaver that is gone — and 0 at a 64-tick window; delay 36 → 20 at the default
+  (8, 9, 15, 20, 21, 26, 27, 38, 40, 42, 44, 57, 66, 67, 71, 75, 81, 88, 92, 95) and 1 at 64 ticks
+  (seed 42, which stays wedged even when the hold is never lifted); family 2 13 → 10 (4, 44 and 89
+  live: a leaver cut from the proposer but linked to another member knocked on until the cut healed
+  inside the window), the same 10 at 64 ticks, since a longer window heals no cut. The harness
+  (§10.8): the paragraph above predicted the rebirth and crash floors would not move; the prediction
+  was wrong for rebirth, and the reason is the one it gave for the sweep — rebirth 78 → 80 of 100
+  live, seeds 61 and 72, the cut-then-heal shape under a 300 ms cut: a leaver cut from the proposer
+  kept an admitted link to another member and knocked on where it used to give up at the fifth tick,
+  the cut healed inside the window, and the knock reached the lowest live member. A liveness gain, no
+  ballot rule moved; the floor table in §10.8 reads 80 now, and §10.9 step 1's "must not move" is
+  read as "must not move for a ballot-rule reason". Every other pin unchanged — the isolate grid's
+  24, the seeded family's 8, the crash grid's 10, pledgeTwo's, evictsplit's and joinsplit's settled
+  sets, `evictTwo`, `evictTwoB` and `keptBallot` red exactly as pinned, `flapDuringBallot` and
+  `proposerCrash` writable everywhere, the explorer's 300 clean. Kernel tests: eight for the window
+  in `kernel/membership.test.ts` (seven red on the base kernel at the fifth tick; the eighth, a
+  member link dead on a wire fault before the shell's linkDown, pins the `!dead` check of
+  `#answerable`), the two round-1 two-leaver shapes on real Nodes; two `kernel/drain.test.ts` cases
+  that assumed the bound fires with both member links up now wait for the window (the links could
+  still echo). Shell: `tests/knock.test.ts` stops the survivor's process with SIGSTOP for 1.2 s — the
+  real stall — and the leave is clean with the window open, `left` b=0 at the fifth tick with it
+  shut. The api test reads the kernel row through `diag(f).tune()`, so a composer that stopped
+  passing `leave.ms` to the table goes red. The counted pins 59,500 and 104,050, the 20-seed golden
+  and the 300-seed sweep are unchanged.
+- *The config layer's collateral (the review).* The `leave` group is five letters, and the config
+  layer's near-miss rule (a top-level object within two edits of a declared group is a typo) pulled
+  in live, lease, level, league, save, wave and lane: a sibling resource so named refused to start.
+  The base had the same hole for teams (`seams`) and dial (`diag`). Fixed in `api/config.ts`: the
+  object is read too — one that holds a declared top-level option is a resource's rung and is left
+  alone; one that holds none (`heartbeats: { ms }`, `lease: { ms }`) is still the typo.
 - *What remains.* A survivor stalled longer than the window (the I-20 line narrows to it); a survivor
   whose link is down (the bound alone, as before); the three splits of §10.2, untouched by design.
 
@@ -1519,7 +1552,7 @@ counted and pinned as exact seed sets; about 30 s at low priority on the loaded 
 
 | Family | The reviewer's generator | Today's kernel, the floor |
 |---|---|---|
-| `rebirth` | R2 `sweep2`: cuts and heals between pairs, leavers reborn fresh (here as NEW identities: fero never restarts a uuid without its dir; the epoch monitor would fire on epoch 0 under a known id) | live 78 of 100 (944 of 1200); 0 splits; the not-live set pinned exactly. Named shapes: the reviewer's seed 157 heals under 10 sim seeds (seven distinct runs), the n=3 two-stop pair heals (one deterministic schedule each: the seed moves nothing in it). The three seeds of this generator the base heals and round 3 wedges, 306, 744 and 804 (`H9_SEEDS`), pinned live |
+| `rebirth` | R2 `sweep2`: cuts and heals between pairs, leavers reborn fresh (here as NEW identities: fero never restarts a uuid without its dir; the epoch monitor would fire on epoch 0 under a known id) | live 80 of 100 since the knock window (78 before it: seeds 61 and 72 went live, §10.7's note; 944 of 1200 on the base); 0 splits; the not-live set pinned exactly. Named shapes: the reviewer's seed 157 heals under 10 sim seeds (seven distinct runs), the n=3 two-stop pair heals (one deterministic schedule each: the seed moves nothing in it). The three seeds of this generator the base heals and round 3 wedges, 306, 744 and 804 (`H9_SEEDS`), pinned live |
 | `isolate` grid | R3 `isolate`: the proposer cut off 5/10/30 ms after one or two stops at n 3..5, the leavers back from their dirs 0.3/1.5/5 s later, 2 seeds: 108 | 0 splits; the proposer writable on 0; the far side settles on 84, the 24 not-settled pinned as an exact index set (every n=3 schedule cut 10 or 30 ms after the stops) |
 | `isolate` seeded | the family the round-3 reviewer asked for: slow links, a joiner on the proposer's side one time in three | 0 splits in 100; settles on 79 (42 of the first 50); pinned exactly |
 | `evictsplit`, `joinsplit` | R3's two pins, time-triggered as described | 0 splits, 5 of 5 settle, n01 never writable |
@@ -1564,6 +1597,9 @@ branch's breadth and sees none of its holes, which is what §8.1 said.
 
 1. The knock window first (§10.7): no vote source, no ballot rule, the operator's choice of window;
    measured against the sweep's family 1 and the harness's floor, which must not move.
+   *Built 2026-10-10 (V4-39):* the sweep's pins moved as planned, and of the harness only `rebirth`
+   moved, 78 → 80 live — a liveness gain from the window itself, no ballot rule involved (§10.7's
+   note says how), so "must not move" reads as "must not move for a ballot-rule reason".
 2. Before any pledge: the base holes of §10.2 need their own page and rule, in THREE parts — a vote
    above my view closes my gate, I lead nothing, and I GRANT no new ballot that keeps me in (or, by
    the wire, no ballot over a view below my vote: §10.2 (α) and (β)) — together with what a stale
