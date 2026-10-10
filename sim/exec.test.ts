@@ -505,6 +505,27 @@ test('checkEvery: a violation in the final sub-K tail is caught by the exit chec
   assert.ok(sim.quiesced, 'the trajectory ran to quiescence despite the pending violation')
 })
 
+test('pause: every event held for a paused node is replayed as its OWN event at the wake, in order — the monitors run between them, as after every other event (a wake that stepped the whole batch in one task gave them one pass, so a view installed and replaced inside the batch was never sampled: the wave 5c review)', () => {
+  const sim = new Sim(5)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+  sim.run({ until: 800 })
+  assert.ok(nodes.every((x) => x.epoch === 1), 'formed')
+  //! 311 ms: not a multiple of the heartbeat, so no tick of another node lands on the wake instant by alignment
+  const wake = sim.now + 311
+  sim.pause('n02', 311)
+  sim.run({ until: wake - 1 })
+  //! a planted monitor that counts the passes AT the wake instant; the trace grows by one per step, so the steps at that
+  // instant are the replayed events (nothing else of n02's runs then: it was asleep until this very moment)
+  const trace0 = sim.trace.length
+  let passes = 0
+  sim.monitors.push({ name: 'passes-at-the-wake', check: (s: Sim) => { if (s.now === wake) passes++; return null } })
+  sim.run({ until: wake })
+  const steps = sim.trace.length - trace0
+  assert.ok(steps >= 2, `events piled up for the sleeper: ${steps} steps replayed at the wake`)
+  assert.ok(passes >= steps, `one monitor pass per replayed event: ${passes} passes for ${steps} steps (one pass for the whole batch hides what happened inside it)`)
+  assert.equal(sim.violations.length, 0, 'the replay itself trips nothing')
+})
+
 test('backpressure overflow heals: the queue clears to a tail hole, the drain-time digest exchange re-ships it all', () => {
   const sim = new Sim(9)
   const nodes = cluster(sim, 2)
