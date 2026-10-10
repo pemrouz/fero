@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -717,6 +717,16 @@ working as designed.
   718/718 + 18/18, perf 50/50, sim:scale green. Open: two scoped-kernel bugs the
   harness found (a forwarded write committed twice across a move; a resync ending on
   a stale reply), the feeder-death residual, the open-path uuid-taken loop.
+
+- 2026-10-10 — wave 5b: the drain (V4-38; a scoped clean leave hands its rows over
+  before it goes, stage 1 of the scale design complete) and the leave fix's design-first
+  step (V4-37: the safety argument per vote source as DESIGN-LEAVE §10, the adversarial
+  harness sim/leave-harness.ts pinned on today's kernel, reviewed four times; it found
+  three splits in today's kernel — two suspects evicted at once at n=5, twice, and a
+  ballot kept across an install at n=4 — all pinned red; the knock window skipped until
+  the argument settles). The stale-reply resync fix was parked after three reviews each
+  found a deeper hole; its findings are STATUS bugs for the scale design's stage 2.
+  747/747 + 18/18, perf 50/50, sim:scale green.
 
 ## The debug tool
 
