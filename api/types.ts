@@ -255,6 +255,11 @@ export interface ClusterShape {
     incarnation: number
     listen: string
     role: 'server' | 'client'
+    //! undrained (DESIGN-SCALE stage 1 (b)): on a scoped member's clean stop, how many partitions it went with
+    // because no reachable new holder proved it holds them inside the drain window; 0 until then, 0 forever on
+    // an unscoped member or a client. Set in the fold just before the teardown, so a screen closing on the stop
+    // can show it; the kernel's `undrained` journal row is the same number.
+    undrained: number
     //! primary: on a CLIENT, the uuid of the ONE server feeding it (a spoke digests exactly one) — null
     // until a link is admitted, and re-set to the survivor on failover; always null on a server
     primary: string | null
@@ -292,7 +297,13 @@ export interface Fero {
   // footgun — methods.read() is the cloning path). On an armed scoped node it throws ScopedError:
   // a sync local read would be the shard, and a silent partial is never an answer (plan §9).
   readonly snapshot: unknown
-  destroy(): Promise<void>
+  //! destroy — the clean stop (V4-6): leave the view by ballot, then tear down. Resolves `true` when the stop was
+  // clean all the way: the view without this node committed and a survivor echoed it, and on a scoped member
+  // (DESIGN-SCALE stage 1 (b)) the new holders proved they hold every partition this node held before it went.
+  // `false` past the window: the vote did not come back in time (the survivors will vote this node out the slow
+  // way), or the copy did not finish in `drainTicks` heartbeats, or there was nobody left to copy to (the last
+  // member) — then the rows a scoped member alone held went with it (back from its `dir` on the next life).
+  destroy(): Promise<boolean>
 }
 
 //! Spawned (V4-9) — what fero.spawn(file, args?, opts?) returns: a separate `node <file> …` process, the

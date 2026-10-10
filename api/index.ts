@@ -781,6 +781,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // differently; none of it needs the diagnostics seam). `listen` re-folds after start — port 0 resolves there.
   let discovered: string[] = []
   let directory: Directory | null = null
+  let undrained = 0
   //! meets — the ONE predicate for "this instance meets a directory": a rendezvous is set AND the
   // instance is dialable (a client) or dialed (a listening server) — a socketless solo meets none and
   // says `false`, never "down" (the panel's observability finding)
@@ -791,6 +792,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // life; `incarnation` is the life counter for screens that want one
     uuid: node.uuid, origin: node.origin, incarnation: node.incarnation, listen: node.listen,
     role: isClient ? 'client' : 'server',
+    //! undrained (DESIGN-SCALE stage 1 (b)): on a scoped member's clean stop, the partitions it went with because no
+    // reachable new holder proved it holds them inside the drain window (the kernel's `undrained` row); 0 until then
+    undrained,
     //! primary: the ONE server this client digests (kernel/node.ts `primary`, a link id there) — its uuid,
     // null while unconnected and always on a server. Re-folded below on every primary change.
     primary: node.primary !== null ? node.links.get(node.primary)?.uuid ?? null : null,
@@ -832,7 +836,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   //! stopping — the ONE stop, whoever starts it (V4-8): the owner's destroy(), the signal handler, or a
   // signal that lands BEFORE fero() resolves. A second caller joins the first. Declared before the fold:
   // the fold reads it (a stopping node paints no more cluster frames).
-  let stopping: Promise<void> | null = null
+  let stopping: Promise<boolean> | null = null
   const fold = () => {
     //! settle kernel-side outcomes FIRST (two integer compares when nothing moved): a relay's `invalid`
     // WNACK removes our attempt inside a step that applies nothing, so the write's promise
@@ -856,6 +860,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         // remove, echo pre-consumed: nothing re-issues) and count the lifetime tallies
         else if (e.kind === JK.shed) { shedEver++; bind.shedPartition(String(e.a)) }
         else if (e.kind === JK.acquire) acquiredEver++
+        //! the drain gave up on this many partitions (DESIGN-SCALE stage 1 (b)): cluster.me says so before the teardown
+        else if (e.kind === JK.undrained) { undrained = e.a as number; cluster.set('me', meRow()) }
         //! the door refused a peer (DESIGN-DOOR §3): one stderr line per peer and reason, deduped per process
         else if (e.kind === JK.doorReject || e.kind === JK.contractReject) sayRefusal(name, node, e, clientOnly)
         //! M6: a view install re-gathers the LIVE union against the new ring (the Q3a leg) — but
@@ -939,7 +945,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // directory client (its link drops ⇒ the host forgets this instance's entries), then the hosted
   // directory if this instance holds it (⇒ the other servers race for the port), then the runtime.
   // The diagnostics crash() door runs THIS alone: a process death, as the cluster would see it.
-  const teardown = async () => {
+  //! `clean` is the leave's verdict (Runtime.leave): it rides through the teardown and is what destroy() resolves —
+  // true for a stop that was clean all the way, false past the leave or (scoped) the drain window
+  const teardown = async (clean: boolean): Promise<boolean> => {
     bind.destroy()
     host!.destroy()
     caller?.destroy()
@@ -949,6 +957,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     probes.clear()
     await directory?.destroy()
     await rt.destroy()
+    return clean
   }
   //! the clean stop is armed HERE, not when compose completes: a SIGINT during a slow start — the listen
   // bind, a durable server's directory round — used to be Node's default (killed by signal: the port
@@ -968,7 +977,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // is an ordinary start rejection, not an operator typo). Joins a stop a signal already started.
   const abort = async (err: unknown): Promise<never> => {
     if (signals) untrack(provisional)
-    await (stopping ??= teardown()).catch(() => {})
+    await (stopping ??= teardown(false)).catch(() => {})
     throw err
   }
   //! the data seed (v4.1): applied ONLY when the local fold is empty at boot — a durable restore or
