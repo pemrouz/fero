@@ -2519,10 +2519,10 @@ lies on the file and call routes); a fourth-member scale-it line (four rows
 print over six lines and break the one-line screen rule); a check that
 reads only stdout.
 Consequences: 28 rungs; +1 test (663 before the other lanes); the check runs
-in about 7 s against the default 40 s budget. The members' refusal line is
-150 characters and wraps on an 80-column terminal, and the wrong-secret
-line differs from the no-secret line by the word "by" only; neither was
-changed.
+in about 7 s against the default 40 s budget. The members' refusal line is about 170 characters (V4-36 reworded it the
+same day, and the README was re-recorded at the merge) and wraps on an
+80-column terminal; the wrong-secret line differs from the no-secret line
+by the word "by" only; neither was changed.
 
 ## V4-36 — the derived client key: a client follows without holding the member secret (2026-10-09)
 Context: V4-30 landed the door with one shared secret, so every client held
