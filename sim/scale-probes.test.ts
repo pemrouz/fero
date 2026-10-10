@@ -467,8 +467,11 @@ test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scope
   sim.post('n31', { kind: 'start' }, 0)
   sim.run({ until: 20_000, maxEvents: 8_000_000 })
   assert.equal(exactlyR(sim), null)
-  assert.equal(t.since(m, VERB.HAVEQ), 2446, 'one join costs 2,446 HAVEQ (about 2.6 full co-holder rounds)')
-  assert.equal(t.since(m, VERB.HAVEA), 2446)
+  //! RE-RECORDED 2026-10-10 (DESIGN-SCALE stage 2, the keys): 2,446 → 2,527 HAVEQ. A shed now tells the partition's
+  // current holders it released it (HAVEQ `x`, one frame per holder link, batched across the sheds of one step): the
+  // 38 sheds cost 81 release frames, which get no answer, so HAVEA stays at 2,446.
+  assert.equal(t.since(m, VERB.HAVEQ), 2527, 'one join costs 2,527 HAVEQ (about 2.6 full co-holder rounds, plus 81 release frames)')
+  assert.equal(t.since(m, VERB.HAVEA), 2446, 'the release frames get no answer')
   assert.equal(t.since(m, VERB.DIGEST), 52110, 'and 52,110 DIGEST frames to t=20 s')
   assert.deepEqual(perTick(sim, t, 200, 2, VERB.DIGEST), [930, 930], 'idle after the join: 31·30')
 })

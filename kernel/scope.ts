@@ -68,13 +68,21 @@ const covers = (per: Map<string, number> | undefined, lanes: [string, number][])
 //! one staged record — teacher transfer and live records share the buffer, discriminated by `live`.
 interface Staged { origin: string; seq: number; epoch: number; iss?: string; cid?: number; rec: Rec; live: boolean; pp?: number }
 
+//! one partition's HAVEA answer: ok/need as always; m the echoed floors, md the durable ones; `g: 1` gapless (stage 2);
+// `x: 1` none — the answerer neither holds nor is assigned p (stage 2, where the old code was silent)
+interface Answer { ok: number; need: number; m?: Record<string, number>; md?: Record<string, number>; g?: number; x?: number }
+
 //! ScopeEntry: one partition's machine state.
 export interface ScopeEntry {
   state: number
   //! attested per-lane possession marks per peer uuid (HAVEQ-in declares, HAVEA-ok-in echoes)
   marks: Map<string, Map<string, number>>
-  //! the durable mirror (HAVEA md) — scoped persisted-level confirm evidence reads THESE
+  //! the durable mirror (HAVEQ `d` declares, HAVEA `md` echoes) — scoped persisted-level confirm evidence reads THESE
   marksD: Map<string, Map<string, number>>
+  //! gapless (DESIGN-SCALE stage 2): the peers whose LAST announcement or answer for p said `g` — their content
+  // tail equals their floor on every lane of p, so their floors speak for their content (G4). A last-value bit per
+  // peer, not monotone: an announcement without `g` clears it. Stage 4's holder quorum (R2) reads it.
+  gl: Set<string>
   //! latch state (acquiring only)
   teacher?: string
   buf?: Staged[]
@@ -108,7 +116,7 @@ export class Scope {
   // journal nothing scope-specific).
   n = 0
 
-  #entry(state: number): ScopeEntry { return { state, marks: new Map(), marksD: new Map() } }
+  #entry(state: number): ScopeEntry { return { state, marks: new Map(), marksD: new Map(), gl: new Set() } }
 
   //! held — the api/monitor view: is p live here (folds records, serves reads, attests possession)?
   held(p: string): boolean { return this.entries.get(p)?.state === SCOPE.held }
@@ -247,7 +255,33 @@ export class Scope {
 
   //! forget — a peer was reborn: every mark its previous life attested is void.
   forget(uuid: string) {
-    for (const e of this.entries.values()) { e.marks.delete(uuid); e.marksD.delete(uuid) }
+    for (const e of this.entries.values()) this.#void(e, uuid)
+  }
+
+  //! #void — one peer's attestations for one partition are gone: its marks, its durable marks, its gapless bit.
+  // Three callers: a rebirth (forget), a release the peer announced (HAVEQ `x`), a `none` answer (HAVEA `x: 1`).
+  #void(e: ScopeEntry, uuid: string) { e.marks.delete(uuid); e.marksD.delete(uuid); e.gl.delete(uuid) }
+
+  //! #gapless — does this node's CONTENT for p reach its floor on every lane that holds p? (The `g` bit, DESIGN-
+  // SCALE stage 2.) Through the per-partition index: each (lane, p) array is ascending, so its tail is its last
+  // entry. Floors may lawfully trail content (a gapped record folds and waits for the chain); a floor never
+  // exceeds content before stage 3's compaction. So: gapless iff tail === floor on every lane with entries of p.
+  // O(lanes of p), once per announced partition per frame.
+  #gapless(node: Node, p: string): boolean {
+    const per = node.byPart!.get(p)
+    if (per === undefined) return true // nothing held: nothing can be missing
+    for (const [origin, arr] of per) {
+      if (!arr.length) continue
+      if (arr[arr.length - 1].seq !== (node.streams.get(origin)?.parts?.get(p)?.s ?? 0)) return false
+    }
+    return true
+  }
+
+  //! #durableFloors — this node's per-lane DURABLE floors for p (the HAVEQ `d` body / the HAVEA `md` echo).
+  #durableFloors(node: Node, p: string): Record<string, number> {
+    const md: Record<string, number> = {}
+    for (const [origin, d] of node.streams) { const pd = d.parts?.get(p)?.d ?? 0; if (pd > 0) md[origin] = pd }
+    return md
   }
 
   //! linkDown — a peer died: abort every latch it was teaching (window 6; the buffer drops whole).
@@ -278,6 +312,16 @@ export class Scope {
     for (const [p, e] of this.entries)
       if (e.state === SCOPE.orphan || (e.state === SCOPE.acquiring && e.preState === SCOPE.orphan)) out.push(p)
     return out
+  }
+
+  //! #link — the one link a HAVEQ to peer `uuid` may ride: admitted, alive and FLOWING. byUuid maps to the link ID
+  // (the keeper rule) and is resolved here. A paused link is skipped like the heartbeat skips it (DESIGN-SCALE §3):
+  // a control frame queued into a drop-oldest queue is doomed work, and the drain round re-announces on a flowing
+  // link. Undefined ⇒ nothing is sent to that peer now.
+  #link(node: Node, uuid: string): Link | undefined {
+    const id = node.byUuid.get(uuid)
+    const link = id === undefined ? undefined : node.links.get(id)
+    return link !== undefined && link.state === LS.admitted && !link.dead && !link.paused ? link : undefined
   }
 
   //! myFloors — this node's per-lane possession floors for p (the HAVEQ q-body / the ACQDONE cut).
@@ -364,7 +408,13 @@ export class Scope {
   // declared floors ARE possession attestations (feed marks), then answer HAVEA per partition:
   // ok=1 (+ echoed floors m) when we cover; need=1 (+ our marks) latches THEM as our teacher when
   // we are behind or absent-and-assigned; busy (ok:0, need:0) while our own latch is open.
-  onHaveQ(node: Node, link: Link, v: { e?: number; q?: Record<string, Record<string, number>> }) {
+  //! The three optional top-level keys (DESIGN-SCALE stage 2, §3; no MAGIC bump under V4-14): `d` {p: {o: durable
+  // floor}} from a durable asker feeds marksD; `g` [p…] names the partitions the asker is gapless for (a last-value
+  // bit per peer: an attestation without it clears the bit); `x` [p…] names the partitions the asker has RELEASED
+  // (sent by #shed) — every mark it ever attested for them is void here. Per partition the answer gains `g: 1` on
+  // an ok we are gapless for, and `x: 1` ("none": we neither hold nor are assigned p) where the old code was silent,
+  // so a stale pin at the asker clears the next time it asks us about p.
+  onHaveQ(node: Node, link: Link, v: { e?: number; q?: Record<string, Record<string, number>>; d?: Record<string, Record<string, number>>; g?: string[]; x?: string[] }) {
     const j = node.journal
     if (v.e !== node.epoch || typeof v.q !== 'object' || v.q === null) {
       j.armed && j.emit(JK.frameDrop, link.id, 'haveq epoch skew')
@@ -372,22 +422,34 @@ export class Scope {
     }
     const ring = node.writes.ring
     if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
-    const a: Record<string, { ok: number; need: number; m?: Record<string, number>; md?: Record<string, number> }> = {}
+    if (Array.isArray(v.x)) for (const p of v.x) { const e = typeof p === 'string' ? this.entries.get(p) : undefined; if (e) this.#void(e, link.uuid) }
+    const gset = Array.isArray(v.g) ? new Set(v.g) : null
+    const dmap = typeof v.d === 'object' && v.d !== null ? v.d : null
+    const a: Record<string, Answer> = {}
     for (const [p, asked] of Object.entries(v.q)) {
       const e = this.entries.get(p)
       //! feed marks: the asker possesses what it declares (frozen or live, floors are sound claims)
       if (e) {
         let per = e.marks.get(link.uuid)
         if (!per) { per = new Map(); e.marks.set(link.uuid, per) }
-        for (const [o, s] of Object.entries(asked)) if (typeof s === 'number' && s > (per.get(o) ?? 0)) per.set(o, s)
+        let attested = false
+        for (const [o, s] of Object.entries(asked)) if (typeof s === 'number') { attested = true; if (s > (per.get(o) ?? 0)) per.set(o, s) }
+        const dd = dmap?.[p]
+        if (typeof dd === 'object' && dd !== null) {
+          let perD = e.marksD.get(link.uuid)
+          if (!perD) { perD = new Map(); e.marksD.set(link.uuid, perD) }
+          for (const [o, s] of Object.entries(dd)) if (typeof s === 'number' && s > (perD.get(o) ?? 0)) perD.set(o, s)
+        }
+        //! the gapless bit is last-value, judged only on an attestation (a pure probe `{}` says nothing about content)
+        if (attested) { if (gset?.has(p)) e.gl.add(link.uuid); else e.gl.delete(link.uuid) }
       }
       if (e === undefined) {
         if (ring.holdsAny(node.uuid, p, node.replicas)) {
           //! absent + assigned: acquire from the announcer — the from-zero latch (empty marks)
           this.#latch(node, p, link.uuid)
           a[p] = { ok: 0, need: 1, m: {} }
-        }
-        continue // not ours, not assigned: silence (the asker's ring knows who its holders are)
+        } else a[p] = { ok: 0, need: 0, x: 1 } // none: not ours, not assigned — the asker's pin on us for p is stale
+        continue
       }
       if (e.state === SCOPE.acquiring) { a[p] = { ok: 0, need: 0 }; continue } // busy: one teacher per attempt
       const mine = this.#myFloors(node, p)
@@ -406,11 +468,10 @@ export class Scope {
       //! we cover (or we are a frozen orphan answering the shed poll of ANOTHER orphan — still a
       // sound claim; the shed predicate ranges over CURRENT holders regardless of who answers).
       // The ANSWERED floors go through the attestation gate (a sealed-pending base announces {}).
-      const ans: { ok: number; need: number; m?: Record<string, number>; md?: Record<string, number> } = behind ? { ok: 0, need: 0 } : { ok: 1, need: 0, m: this.#announceFloors(node, p, e) }
-      if (!behind && node.durable && e.sealed !== false) {
-        const md: Record<string, number> = {}
-        for (const [origin, d] of node.streams) { const pd = d.parts?.get(p)?.d ?? 0; if (pd > 0) md[origin] = pd }
-        ans.md = md
+      const ans: Answer = behind ? { ok: 0, need: 0 } : { ok: 1, need: 0, m: this.#announceFloors(node, p, e) }
+      if (!behind && !(node.durable && e.sealed === false)) {
+        if (node.durable) ans.md = this.#durableFloors(node, p)
+        if (this.#gapless(node, p)) ans.g = 1
       }
       a[p] = ans
     }
@@ -424,7 +485,7 @@ export class Scope {
   //! onHaveA — answers to our HAVEQ round (or an unprompted teach-me request). ok answers feed marks
   // (the answerer's echoed floors are its self-attested possession claim); need answers make US the
   // teacher — ship the one-teacher delta.
-  onHaveA(node: Node, link: Link, v: { e?: number; a?: Record<string, { ok?: number; need?: number; m?: Record<string, number>; md?: Record<string, number> }> }) {
+  onHaveA(node: Node, link: Link, v: { e?: number; a?: Record<string, { ok?: number; need?: number; m?: Record<string, number>; md?: Record<string, number>; g?: number; x?: number }> }) {
     const j = node.journal
     if (v.e !== node.epoch || typeof v.a !== 'object' || v.a === null) {
       j.armed && j.emit(JK.frameDrop, link.id, 'havea epoch skew')
@@ -434,6 +495,8 @@ export class Scope {
     if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
     for (const [p, ans] of Object.entries(v.a)) {
       const e = this.entries.get(p)
+      //! `x: 1` — none: the answerer neither holds nor is assigned p; whatever it attested for p here is a stale pin
+      if (ans.x === 1) { if (e) this.#void(e, link.uuid); continue }
       if (ans.need === 1) { this.#teach(node, link, p, ans.m ?? {}); continue }
       if (ans.ok === 1 && e) {
         let per = e.marks.get(link.uuid)
@@ -444,6 +507,7 @@ export class Scope {
           if (!perD) { perD = new Map(); e.marksD.set(link.uuid, perD) }
           for (const [o, s] of Object.entries(ans.md)) if (typeof s === 'number' && s > (perD.get(o) ?? 0)) perD.set(o, s)
         }
+        if (ans.g === 1) e.gl.add(link.uuid); else e.gl.delete(link.uuid)
         //! the ASKER-BEHIND leg: the answerer's echoed floors exceed ours on a partition that is OURS
         // to hold (held-found-lagging, or the orphan re-entry) — the behind party always requests:
         // latch them and send the unprompted need (one extra round-trip, no new verbs, symmetric).
@@ -686,18 +750,35 @@ export class Scope {
     if (!node.armed) return
     const ring = node.writes.ring
     if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    let released: Map<Link, string[]> | null = null
     for (const [p, e] of this.entries) {
       if (e.state !== SCOPE.orphan) continue
       const tails = e.tails ??= this.#tailsOf(node, p) // captured at the freeze; rebuilt here only for legacy entries
       const lanes = Object.entries(tails)
-      if (!lanes.length) { this.#shed(node, p, e); continue } // no content anywhere: a true husk
       let covered = true
-      for (const holder of ring.holders(p, node.replicas)) {
-        if (holder === node.uuid) { covered = false; break } // still assigned?! never shed our own duty
-        if (!covers(e.marks.get(holder), lanes)) { covered = false; break }
+      if (lanes.length) // no content anywhere: a true husk sheds at once
+        for (const holder of ring.holders(p, node.replicas)) {
+          if (holder === node.uuid) { covered = false; break } // still assigned?! never shed our own duty
+          if (!covers(e.marks.get(holder), lanes)) { covered = false; break }
+        }
+      if (!covered) continue
+      //! the release rides to p's CURRENT holders as HAVEQ `x` (DESIGN-SCALE stage 2): the marks this orphan's
+      // polls fed there are void from here. Gathered per link across the loop, one frame per link after it.
+      for (const uuid of ring.holders(p, node.replicas)) {
+        const link = this.#link(node, uuid)
+        if (link === undefined) continue
+        released ??= new Map()
+        let xs = released.get(link)
+        if (!xs) released.set(link, xs = [])
+        xs.push(p)
       }
-      if (covered) this.#shed(node, p, e)
+      this.#shed(node, p, e)
     }
+    if (released !== null)
+      for (const [link, x] of released) {
+        link.ship(encodeControl(VERB.HAVEQ, { e: node.epoch, q: {}, x }), node.env.sink, node.journal)
+        link.flush(node.env.sink, node.journal)
+      }
     //! a DRAINING leaver (membership.ts, DESIGN-SCALE stage 1 (b)) re-reads its bar the instant marks moved or a
     // shed landed — one field read on every other armed node
     if (node.membership.leaving?.drain !== undefined) node.membership.drain(node)
