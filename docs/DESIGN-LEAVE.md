@@ -993,7 +993,9 @@ one, before it reads the PROPOSE; and a view never goes down: a restart keeps th
 (`:178`) and comes back at it or above (read-only until confirmed, never lower). The ballot for e+2
 is over view e+1's members and needs a majority of them, ⌊(n−1)/2⌋+1 nodes that hold e+1 or above
 for good. That leaves at most n − ⌊(n−1)/2⌋ − 1 < ⌊n/2⌋+1 nodes at view e: no majority of view e can
-still be there. The same for every later view. So a chain of one-member changes reduces to its
+still be there. (When e+1 was a join the majority is ⌊(n+1)/2⌋+1, at most one of them the joiner,
+which is never a member of view e and never counts toward its majority, `:198`: ⌊n/2⌋ old members
+are left at e, again short of one.) The same for every later view. So a chain of one-member changes reduces to its
 adjacent pairs, and each pair is closed by the count above. This step is what a ballot over an
 OLDER view breaks (the kept ballot, below): its granters hold only that older view or above.
 
@@ -1026,8 +1028,10 @@ n03, over view 1 at epoch 3, while n01 is over view 2. (ii) A KEPT BALLOT: `inst
 proposal whose epoch is above the view it installs (`:477`); `#proposal.old` was fixed when the
 ballot opened (`:601`), and a PROPOSE carries no base epoch (`:614`), so a voter cannot tell. The
 proposer then counts a majority of a set it no longer holds. That is STATUS's "a ballot built on an
-older view still commits" line and the double-vote mesh scenario (`kernel/membership.test.ts`,
-2026-10-08): aa's `{aa,cc}`@3 over view 1 commits after view 2 (`{aa,bb,cc,ee}`) has landed at aa.
+older view still commits" line, the variant of the double-vote mesh scenario
+(`kernel/membership.test.ts`, 2026-10-08) it describes: aa's `{aa,cc}`@3 over view 1 commits after
+view 2 (`{aa,bb,cc,ee}`) has landed at aa, with 2 of view 2's four members, dropping ee, which its
+old set never held.
 The two are different mechanisms: in (i) no node keeps a ballot across an install (n03's journal reads
 `vote(2,1,n01) PROPOSE(3,4) INSTALL(3,4)`; its ballot is over the view it holds); in (ii) the
 proposer's own view has moved under its ballot. The count is the same for both. Let the old sets be
