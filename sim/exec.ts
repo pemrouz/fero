@@ -246,21 +246,30 @@ export class Sim {
 
   //! pause — a STALLED process (the I-20 shape, DESIGN-LEAVE §10.7: a long GC pause, a swap-in, SIGSTOP): for `ms`
   // every event bound for the node — frames, timer fires, link events — is held in order and replayed at the wake,
-  // in one task. That is what a paused process sees: its socket buffers the frames, the one heartbeat it had armed
-  // fires once, late (the kernel re-arms only on a fire, so no backlog of ticks), and its links stay up — TCP has no
-  // liveness clock of its own at this scale. Its peers see a member that answers nothing and whose link is up. Not
-  // a delay: a delay on every link (the sweep's stall model before this) kept the node RUNNING and late, so a knock
-  // and its answer each paid the stall, four stalls per round trip, which no real pause costs. Empty in every run
-  // that never pauses: one size check per step. A paused node must not be restarted while paused.
+  // each as its OWN event. That is what a paused process sees: its socket buffers the frames, the one heartbeat it
+  // had armed fires once, late (the kernel re-arms only on a fire, so no backlog of ticks), and its links stay up —
+  // TCP has no liveness clock of its own at this scale. Its peers see a member that answers nothing and whose link
+  // is up. Not a delay: a delay on every link (the sweep's stall model before this) kept the node RUNNING and late,
+  // so a knock and its answer each paid the stall, four stalls per round trip, which no real pause costs. Empty in
+  // every run that never pauses: one size check per step. A paused node must not be restarted while paused.
+  //! The wake DRAINS the hold one event per task (delay 0, so same-instant tasks keep insertion order): the monitors
+  // run between the replayed events as they do after every other event. The first build stepped the whole batch in
+  // one task, so one-view-per-epoch sampled the node once per batch and a view installed and replaced INSIDE it was
+  // never seen (the wave 5c review; sim/exec.test.ts pins one pass per replayed event). The hold stays in place
+  // until the list is empty, so a frame that lands at the very wake instant queues BEHIND the buffered ones, as a
+  // socket delivers them, instead of overtaking them.
   #paused = new Map<string, Event[]>()
   pause(uuid: string, ms: number) {
     if (!this.#paused.has(uuid)) this.#paused.set(uuid, [])
-    this.#schedule(ms, () => {
+    const drain = () => {
       const held = this.#paused.get(uuid)
       if (held === undefined) return
-      this.#paused.delete(uuid)
-      for (const ev of held) this.#step(uuid, ev)
-    })
+      const ev = held.shift()
+      if (ev === undefined) { this.#paused.delete(uuid); return }
+      this.#deliver(uuid, ev)
+      this.#schedule(0, drain)
+    }
+    this.#schedule(ms, drain)
   }
 
   //! fault / partition / heal — install network personality between a pair (both directions; unordered key).
@@ -327,6 +336,16 @@ export class Sim {
   #step(uuid: string, ev: Event) {
     if (this.#raws.size !== 0) { const raw = this.#raws.get(uuid); if (raw !== undefined) return raw(ev) }
     if (this.#paused.size !== 0) { const held = this.#paused.get(uuid); if (held !== undefined) { held.push(ev); return } }
+    const node = this.nodes.get(uuid)
+    if (!node) return
+    node.step(ev)
+    if (this.watch) this.stepped.add(uuid)
+    this.trace.push(node.stateHash)
+  }
+
+  //! #deliver — #step's tail, past the hold: the wake's drain steps a held event through here (a #step would hold it
+  // again, the entry being kept until the list is empty). Kept apart so #step's hot path is unchanged.
+  #deliver(uuid: string, ev: Event) {
     const node = this.nodes.get(uuid)
     if (!node) return
     node.step(ev)
