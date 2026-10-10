@@ -77,8 +77,10 @@ const KNOWN_NOT_LIVE_1 = new Set<number>([])
 // every frame held for the stall and the hold lifted once the leavers are gone), at the default window: 20 not live,
 // down from the 36 the base kernel wedged under it. The sixteen that went live are schedules where the late answers
 // still landed while the leaver knocked on; the twenty left are the stall paid too many times over for 800 ms — four
-// stalls per round trip — so the leaver gave up first. At 64 ticks (3.2 s) one is left, seed 42, which does not go
-// live even when the hold is never lifted (a slow survivor beside a leaver that lingers). Pinned exactly, both runs.
+// stalls per round trip — so the leaver gave up first. At 64 ticks (3.2 s) one is left, seed 42: n=4, three leavers,
+// the one survivor slow by 700 ms each way, so three leaves in turn at four stalls a round trip outlast 3.2 s and the
+// last leaver goes with the survivor sitting in a two-member view it cannot shrink; it wedges the same with the hold
+// never lifted (the lift comes only once every leaver is gone), and is live at a 200-tick window. Pinned exactly, both.
 const KNOWN_NOT_LIVE_1_DELAY = new Set<number>([8, 9, 15, 20, 21, 26, 27, 38, 40, 42, 44, 57, 66, 67, 71, 75, 81, 88, 92, 95])
 const KNOWN_NOT_LIVE_1_DELAY_64 = new Set<number>([42])
 //! the same 100 schedules with the stalls TRIPLED (750/900/1350/2100 ms) against the default 800 ms window: the

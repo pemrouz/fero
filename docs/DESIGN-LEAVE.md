@@ -1513,7 +1513,8 @@ because no ballot rule moves.
   against the 800 ms window) 22 not live — exactly the 300/450/700 ms stalls tripled, the survivor
   waking to a leaver that is gone — and 0 at a 64-tick window; delay 36 → 20 at the default
   (8, 9, 15, 20, 21, 26, 27, 38, 40, 42, 44, 57, 66, 67, 71, 75, 81, 88, 92, 95) and 1 at 64 ticks
-  (seed 42, which stays wedged even when the hold is never lifted); family 2 13 → 10 (4, 44 and 89
+  (seed 42: n=4, three leavers in turn at four 700 ms stalls a round trip outlast 3.2 s; it wedges
+  the same with the hold never lifted, and is live at a 200-tick window); family 2 13 → 10 (4, 44 and 89
   live: a leaver cut from the proposer but linked to another member knocked on until the cut healed
   inside the window), the same 10 at 64 ticks, since a longer window heals no cut. The harness
   (§10.8): the paragraph above predicted the rebirth and crash floors would not move; the prediction
