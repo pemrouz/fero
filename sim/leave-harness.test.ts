@@ -4,22 +4,25 @@
 //             WRITABLE in different views at a quiet point. The base is safe on every family here but one: evictTwo
 //             (two suspects evicted at once, the third voter cut on its grant) is a hole of today's kernel and is
 //             pinned as the exact seeds it splits on, so a fix shows as a moved pin.
-//   LIVENESS — COUNTED, pinned exactly in both directions (a schedule the kernel used to heal that wedges now is a
-//             regression; one that heals where it used to wedge means the pin is stale: update it on purpose, with
-//             the why). Today's kernel is not live on every schedule (I-20), so the exact sets are the FLOOR.
+//   LIVENESS — COUNTED, pinned as exact sets in both directions (a schedule the kernel used to heal that wedges now
+//             is a regression; one that heals where it used to wedge means the pin is stale: update it on purpose,
+//             with the why). Today's kernel is not live on every schedule (I-20), so the exact sets are the FLOOR.
 // Teeth, measured on 2026-10-10 by putting the parked branch's kernel/membership.ts over a scratch copy of this tree
 // (docs/DESIGN-LEAVE.md §10.8): the round-0 kernel (851796b) fails `twoLeavers` (two views at epoch 2, H1); the
-// review-fix kernel (915d027) fails the two n=3 named shapes (0 of 10 live, H3); the round-1 kernel (02f65ed) fails
+// review-fix kernel (915d027) fails the two n=3 named shapes (not live, H3); the round-1 kernel (02f65ed) fails
 // the seed-157 shape (0 of 10, H7); rounds 1 and 3 fail `evictsplit`, `joinsplit`, the isolate grid (11 and 9 of
-// 108 split) and the seeded isolate family (12 and 8 of 100) — H11; round 3 wedges eight more crash schedules than the
-// base in the default grid and 24 more in the full one, all of them the n=3 crash twin (H12). Bounded: about 30 s at low priority on the loaded WSL2 box, half that idle;
-// FERO_LEAVE_FULL=1 runs the full crash grid (576 cases, three restart delays, two seeds) and 100 seeded isolate
-// schedules instead of 50.
+// 108 split) and the seeded isolate family (12 and 8 of 100) — H11; round 3 wedges the three H9_SEEDS the base heals
+// (H9), and four more crash schedules than the base in the default grid (#9, #11, #25, #27) and 24 more in the full
+// one, all of them the n=3 crash twin (H12); the round-3 kernel also splits `pledgeTwo` (its gate counts a read-only
+// leaver's link, the 2026-10-10 review's blocker). Bounded: about 30 s at low priority on the loaded WSL2 box, half
+// that idle; FERO_LEAVE_FULL=1 runs the full crash grid (576 cases, three restart delays, two seeds) and 100 seeded
+// isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { evictsplit, joinsplit, twoLeavers, evictTwo, scheduleR, runR, shapeR, NAMED_R, namedR, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import { unsafe } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
+import { JK } from '../kernel/journal.ts'
 
 const FULL = process.env.FERO_LEAVE_FULL === '1'
 
@@ -46,12 +49,29 @@ test('leave harness, pins: evictsplit and joinsplit (the round-3 report\'s two s
   assert.deepEqual(bad, [])
 })
 
+//! pledgeTwo on today's kernel: no knock is a vote, so n01 (one stayer beside it, three members cut off) commits
+// nothing and is read-only; the three on the far side re-form without n01 and n02. A kernel that commits "the view
+// minus the two leavers" on the knocks (the restricted pledge of DESIGN-LEAVE §10.3) splits here: n01@2{n01,n02,n03}
+// beside n03@1 with the leavers' links — the review's blocker, and the family the isolate grid cannot draw (it cuts
+// n01 from everyone).
+test('leave harness, pledgeTwo: two leavers knock to n01, then n01 keeps one stayer and the other stayer keeps both leavers (the 2026-10-10 review\'s probe) — safe on seeds 1..5, n01 never writable, the far side settles without n01', () => {
+  const bad: string[] = []
+  for (let seed = 1; seed <= 5; seed++) {
+    const o = pledgeTwo(seed)
+    if (o.problems.length) bad.push(`pledgeTwo ${seed}: ${o.problems.join('; ')}`)
+    if (!o.settled) bad.push(`pledgeTwo ${seed}: the far side did not settle`)
+    if (o.proposerWritable) bad.push(`pledgeTwo ${seed}: n01 writable on two knocks and one stayer`)
+  }
+  assert.deepEqual(bad, [])
+})
+
 //! rebirth on today's kernel: the seeds it is NOT live on inside 1..100 (22 of 100): pairs cut apart inside the leave
 // window, a leaver's knock that dies with a cut and is never answered, three leavers at n=4 with the lowest among them
-// under a cut. Pinned exactly.
+// under a cut. Pinned exactly. Above the range, H9_SEEDS are the three the base heals and the parked branch wedges:
+// pinned live.
 const KNOWN_NOT_LIVE_R = new Set<number>([8, 9, 19, 25, 26, 31, 32, 33, 40, 41, 46, 47, 49, 50, 60, 61, 63, 64, 72, 82, 84, 98])
 
-test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pairs with leavers reborn as fresh identities (the round-2 report\'s sweep2) — SAFE on every one; the not-live set is exactly the pinned one; the named shapes (the reviewer\'s seed 157, the n=3 two-stop pair) heal on 10 of 10 sim seeds', () => {
+test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pairs with leavers reborn as fresh identities (the round-2 report\'s sweep2) — SAFE on every one; the not-live set is exactly the pinned one; the H9 seeds 306, 744 and 804 heal; the named shapes heal (seed 157 under 10 sim seeds, the n=3 two-stop pair once each)', () => {
   const unsafeOnes: string[] = [], notLive: number[] = [], shapes = new Map<number, string>()
   for (let seed = 1; seed <= 100; seed++) {
     const s = scheduleR(seed); const ps = runR(s)
@@ -61,29 +81,34 @@ test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pai
   }
   assert.deepEqual(unsafeOnes, [], 'UNSAFE: a monitor fired, or two nodes ended writable in different views')
   pinExact('rebirth', notLive, KNOWN_NOT_LIVE_R, shapes)
+  const h9: string[] = []
+  for (const seed of H9_SEEDS) { const s = scheduleR(seed); const ps = runR(s); if (ps.length) h9.push(`${shapeR(s)}: ${ps.join('; ')}`) }
+  assert.deepEqual(h9, [], 'an H9 seed the base heals did not heal (the parked branch wedges these)')
   const named: string[] = []
-  for (const name of Object.keys(NAMED_R)) for (let seed = 1; seed <= 10; seed++) { const ps = runR(namedR(name, seed)); if (ps.length) named.push(`${name} under sim seed ${seed}: ${ps.join('; ')}`) }
+  for (const name of Object.keys(NAMED_R)) for (let seed = 1; seed <= (name === 'r2-157' ? 10 : 1); seed++) { const ps = runR(namedR(name, seed)); if (ps.length) named.push(`${name} under sim seed ${seed}: ${ps.join('; ')}`) }
   assert.deepEqual(named, [], 'a named shape the base heals did not heal')
 })
 
 //! isolate on today's kernel: the grid's far side settles (one view without n01, writable) on 84 of 108; on the other
-// 24 the far side is a two-member pair cut from a leaver whose vote it needs, or a stayer alone — the I-20 class. n01
-// is writable on none (a proposer cut from every member can commit nothing). The seeded family settles on 42 of 50.
-const SETTLED_GRID_I = 84
+// 24 — every n=3 schedule whose cut comes 10 or 30 ms after the stops (#6-#17 one leaver, #24-#35 two) — the far side
+// is a stayer alone or a pair cut from a leaver whose vote it needs: the I-20 class. n01 is writable on none (a
+// proposer cut from every member can commit nothing). Pinned as an exact index set. The seeded family settles on 42
+// of 50.
+const KNOWN_NOT_SETTLED_GRID_I = new Set<number>([6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35])
 const KNOWN_NOT_SETTLED_I = new Set<number>([4, 11, 13, 21, 29, 35, 36, 39, ...(FULL ? [56, 59, 60, 61, 68, 69, 74, 79, 80, 90, 93, 97, 99] : [])])
 
-test('leave harness, isolate grid: the 108 schedules the round-3 report counted — the proposer cut off 5/10/30 ms after one or two stops, the leavers back from their dirs 0.3/1.5/5 s later beside a stale stayer — SAFE on every one, n01 writable on none, the far side settles on exactly 84', () => {
-  const unsafeOnes: string[] = [], writable: string[] = []
-  let settled = 0
-  GRID_I.forEach((s) => {
+test('leave harness, isolate grid: the 108 schedules the round-3 report counted — the proposer cut off 5/10/30 ms after one or two stops, the leavers back from their dirs 0.3/1.5/5 s later beside a stale stayer — SAFE on every one, n01 writable on none, the not-settled set is exactly the pinned 24', () => {
+  const unsafeOnes: string[] = [], writable: string[] = [], notSettled: number[] = [], shapes = new Map<number, string>()
+  GRID_I.forEach((s, i) => {
     const o = runI(s)
-    if (unsafe(o.problems)) unsafeOnes.push(`${shapeI(s)}: ${o.problems.join('; ')}`)
-    if (o.proposerWritable) writable.push(shapeI(s))
-    if (o.settled) settled++
+    shapes.set(i, `#${i} ${shapeI(s)}: ${o.problems.join('; ')}`)
+    if (unsafe(o.problems)) unsafeOnes.push(shapes.get(i)!)
+    if (o.proposerWritable) writable.push(shapes.get(i)!)
+    if (!o.settled) notSettled.push(i)
   })
   assert.deepEqual(unsafeOnes, [], 'UNSAFE: a monitor fired, or two nodes ended writable in different views')
   assert.deepEqual(writable, [], 'n01 writable while cut off from every member: a commit on votes it never received live')
-  assert.equal(settled, SETTLED_GRID_I, 'the far side settled on a different number of schedules: a liveness change to look at')
+  pinExact('isolate grid', notSettled, KNOWN_NOT_SETTLED_GRID_I, shapes)
 })
 
 test('leave harness, isolate seeded: 50 schedules (100 with FERO_LEAVE_FULL) — n 3..5, one to n-2 non-lowest leavers, slow links, a joiner on the proposer\'s side one time in three — SAFE on every one; the not-settled set is exactly the pinned one', () => {
@@ -102,8 +127,10 @@ test('leave harness, isolate seeded: 50 schedules (100 with FERO_LEAVE_FULL) —
 //! crash on today's kernel: the default grid (96: the leavers back after 0.4 s, sim seed 1) wedges on 10 — every one
 // a stayer that crashes AFTER the leaves (+20 or +100 ms) and never comes back: at n=3 the one stayer left (or the two
 // restored leavers) sits in a minority of the old view; at n=4 the same with two leavers. The crash-at-two class
-// (DESIGN-LEAVE §7). The full grid (576) wedges on 60, the same class. Pinned exactly.
-const KNOWN_NOT_LIVE_C = new Set<number>(FULL ? [] : [5, 7, 13, 15, 21, 23, 29, 31, 47, 63])
+// (DESIGN-LEAVE §7). The full grid (576) wedges on 60, the same class. Both pinned exactly, as index sets.
+const KNOWN_NOT_LIVE_C = new Set<number>(FULL
+  ? [30, 31, 32, 33, 34, 35, 42, 43, 44, 45, 46, 47, 78, 79, 80, 81, 82, 83, 90, 91, 92, 93, 94, 95, 126, 127, 128, 129, 130, 131, 138, 139, 140, 141, 142, 143, 174, 175, 176, 177, 178, 179, 186, 187, 188, 189, 190, 191, 282, 283, 284, 285, 286, 287, 378, 379, 380, 381, 382, 383]
+  : [5, 7, 13, 15, 21, 23, 29, 31, 47, 63])
 
 test('leave harness, crash: a stayer crashes 200 ms before, at, 20 or 100 ms after one or two clean stops, comes back from its dir after 2 s or never, the leavers restarted from their dirs (the round-3 report\'s crash2) — SAFE on every one; the not-live set is exactly the pinned one', () => {
   const grid = FULL ? gridC() : gridC([400], [1])
@@ -115,20 +142,35 @@ test('leave harness, crash: a stayer crashes 200 ms before, at, 20 or 100 ms aft
     else if (ps.length) notLive.push(i)
   })
   assert.deepEqual(unsafeOnes, [], 'UNSAFE: a monitor fired, or two nodes ended writable in different views')
-  if (!FULL) pinExact('crash', notLive, KNOWN_NOT_LIVE_C, shapes)
-  else assert.equal(notLive.length, 60, `the full crash grid wedged on ${notLive.length}, not 60: ${notLive.map((i) => shapes.get(i)).join('\n')}`)
+  pinExact('crash', notLive, KNOWN_NOT_LIVE_C, shapes)
 })
 
-//! the check itself, pinned by hand: two members each writable alone in a solo view of its own is the split the
-// one-view-per-epoch recorder cannot see (the epochs are equal, the members differ, nothing was installed twice at one
-// epoch); one solo view is not. No family above ever made it fire on today's kernel, so this is its proof of teeth.
-test('leave harness, the quiet-point check: two nodes writable in different views are named; one writable node is not', () => {
+//! the check itself, pinned twice. By hand: two members each writable alone in a solo view of its own is the split
+// the one-view-per-epoch recorder cannot see (the epochs are equal, the members differ, nothing was installed twice at
+// one epoch); one solo view is not. And from a RUN on real Nodes (the 2026-10-10 review's probe): evictTwo's shape
+// built move by move — five formed, {aa,bb} cut from {dd,ee} and the chains given up, aa evicts both at 2 on bb's
+// and cc's grants, and cc is cut before the VIEW reaches it — ends with aa and bb writable at 2 beside cc, dd and ee
+// writable at 1, one view per epoch intact. No random family ever made it fire on today's kernel; this is its teeth.
+test('leave harness, the quiet-point check: two nodes writable in different views are named; one writable node is not; a two-evictee ballot with the third voter cut before its VIEW is named with no second view at any epoch', () => {
   const m = new Mesh()
   const aa = m.add('aa'), bb = m.add('bb')
   aa.membership.install(aa, { epoch: 1, members: [['aa', 'sim:aa']] })
   assert.equal(quietSplit(m, 0), null)
   bb.membership.install(bb, { epoch: 1, members: [['bb', 'sim:bb']] })
   assert.match(quietSplit(m, 0) ?? '', /aa@1\{aa\} bb@1\{bb\}/)
+  //! the run: evictTwo on the mesh
+  const five = Mesh.formed(['aa', 'bb', 'cc', 'dd', 'ee'])
+  for (const a of ['aa', 'bb']) for (const b of ['dd', 'ee']) five.cut(a, b)
+  for (let i = 0; i < 3; i++) five.tick('aa') // suspect first, then exhaust the chains (V4-20)
+  for (const b of ['dd', 'ee']) five.giveUp('aa', b)
+  five.tick('aa')
+  const proposed = five.nodes.get('aa')!.journal.read().filter((e) => e.kind === JK.propose).map((e) => [e.a, e.b])
+  assert.deepEqual(proposed, [[2, 3]], 'aa evicted dd and ee in one ballot at 2')
+  for (const x of ['bb', 'cc']) { assert.equal(five.deliver('aa', x), 'PROPOSE'); assert.equal(five.deliver(x, 'aa'), 'VOTE') }
+  assert.equal(five.nodes.get('aa')!.epoch, 2, 'aa committed {aa,bb,cc}@2 on its own vote, bb and cc')
+  five.cut('aa', 'cc'); five.cut('bb', 'cc') // the VIEW to cc dies on the cut; cc keeps view 1 and a vote at 2
+  assert.deepEqual(five.splits, [], 'one view per epoch holds: the recorder sees nothing')
+  assert.match(quietSplit(five) ?? '', /aa@2\{aa,bb,cc\} bb@2\{aa,bb,cc\} cc@1\{aa,bb,cc,dd,ee\} dd@1\{aa,bb,cc,dd,ee\} ee@1\{aa,bb,cc,dd,ee\}/)
 })
 
 //! evictTwo on today's kernel: a hole, counted (DESIGN-LEAVE §10.2). A ballot that evicts TWO suspects at once at n=5
@@ -151,8 +193,10 @@ test('leave harness, evictTwo: two suspects evicted at once at n=5 with the thir
   }
 })
 
-test('leave harness, explorer: 300 seeded random schedules over real Nodes with the quiet-point split check — never two views at one epoch, never two nodes writable in different views once every frame has landed', () => {
+//! the explorer's range here starts ABOVE the 1..2000 sim/explore.test.ts pins, so every seed adds coverage (the
+// one-view-per-epoch recorder on new schedules, and the quiet check on all of them) instead of re-running a pinned one
+test('leave harness, explorer: 300 seeded random schedules (2001..2300) over real Nodes with the quiet-point split check — never two views at one epoch, never two nodes writable in different views once every frame has landed', () => {
   const bad: string[] = []
-  for (let seed = 1; seed <= 300; seed++) { const o = exploreQuiet(seed); if (o.bad) bad.push(`seed ${seed} n=${o.n}: ${o.bad}`) }
+  for (let seed = 2001; seed <= 2300; seed++) { const o = exploreQuiet(seed); if (o.bad) bad.push(`seed ${seed} n=${o.n}: ${o.bad}`) }
   assert.deepEqual(bad, [])
 })

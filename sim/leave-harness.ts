@@ -5,15 +5,22 @@
 //
 // The families, each named after the reviewer's generator (DESIGN-LEAVE §8.1 names them):
 //   rebirth   — the round-2 re-check's `sweep2`: random cuts and heals between pairs during the leave window, and
-//               leavers reborn FRESH under the same uuid (a new process, no dir), on a memory-only cluster. Plus
-//               the four shapes the reports name by that generator's seed (157, 469, 740, 1077), replayed under
-//               sim seeds: the base healed every one, the parked branch lost three (H7, H9).
+//               leavers reborn FRESH as NEW identities (`n0Xr`: a new process without a dir is a new uuid, V4-2/V4-3),
+//               on a memory-only cluster. Plus, as fixed schedules: the reviewer's seed 157 (H7) and the round-1
+//               re-check's n=3 two-stop pair (H3), and the three seeds of THIS generator that today's kernel heals
+//               and the parked branch wedges (306, 744, 804: H9's class, measured on both kernels).
 //   isolate   — the round-3 re-check's `isolate`: the proposer (n01, the lowest member) cut from everyone a few ms
 //               after one or two non-lowest members stop; the leavers time out, are torn down and restarted FROM
 //               THEIR DIRS on the other side of the cut, next to a stayer that never saw a commit. The fixed 108-
 //               schedule grid the report counted (n 3..5 × one or two leavers × 5/10/30 ms × 0.3/1.5/5 s × 2 seeds),
 //               the two pins `evictsplit` (n=3) and `joinsplit` (n=3 plus a joiner through n01), and a seeded
 //               variant with slow links and a joiner drawn by the seed — the family the reviewer asked for (H11).
+//   pledgeTwo — the shape the RESTRICTED pledge cannot answer (DESIGN-LEAVE §10.3, the 2026-10-10 review): the
+//               proposer keeps ONE stayer, the other stayer is cut off holding links to TWO leavers, and the leavers
+//               restart on the stale side. A stayer's gate counts any admitted member link (kernel/membership.ts
+//               gate), a read-only leaver's included — so two pledges plus one stayer's grant commit the view
+//               minus the leavers at n01 while n03 is writable at the old view with the leavers' links: a split.
+//               Today's kernel counts no knock as a vote and commits nothing there.
 //   crash     — the round-3 re-check's `crash2`: one stayer CRASHES at an offset from one or two clean stops (before,
 //               at, just after), comes back from its dir after 2 s or never; the leavers time out and are restarted
 //               from their dirs after 0.4, 3 or 25 s. The 24 n=3 "crash twin" cases live here (H12).
@@ -49,7 +56,7 @@ const tearDown = (sim: Sim, u: string, keep: boolean) => {
 //! has — a journal row of that kind, optionally matching `a`
 const has = (x: Node, kind: number, a?: unknown) => x.journal.read().some((e) => e.kind === kind && (a === undefined || e.a === a))
 
-// ── rebirth: cuts and heals between pairs, leavers reborn fresh under the same uuid (the round-2 `sweep2`) ──
+// ── rebirth: cuts and heals between pairs, leavers reborn fresh as new identities (the round-2 `sweep2`) ──
 export interface ScheduleR { seed: number; n: number; ids: string[]; leavers: string[]; delay: [string, string, number][]; cuts: [string, string, number, number][]; offsets: number[]; reborn: number[] }
 
 export const scheduleR = (seed: number): ScheduleR => {
@@ -68,11 +75,12 @@ export const scheduleR = (seed: number): ScheduleR => {
   return { seed, n, ids, leavers, delay, cuts, offsets, reborn }
 }
 
-//! the shapes the reports name, as fixed schedules replayed under sim seeds (the seed drives the redial jitter only).
+//! the shapes the reports name, as fixed schedules. The sim seed drives the redial jitter only: seed 157's shape has
+// slow links and a cut, so ten sim seeds give seven distinct runs; the two n=3 shapes have neither, so each is ONE
+// deterministic schedule whatever the seed (612 events on every seed), and the test runs each once.
 // Seed 157 of the reviewer's generator (H7) is here; its seeds 469, 740 and 1077 (H9) are not: the reports do not say
 // which links were slow or how long one cut lasted, and the three rebuilds wedged on the base for the known pair-cut
-// reason, so they would pin nothing the reviewer measured. Their class (n=4, three leavers with the lowest among
-// them, cuts inside the window) is what scheduleR draws.
+// reason, so they would pin nothing the reviewer measured. H9's class is pinned by H9_SEEDS below instead.
 export const NAMED_R: Record<string, Omit<ScheduleR, 'seed'>> = {
   //! seed 157: n=5; n05 stops, 120 ms later n01 (the lowest) and n04 stop; a 60 ms n01-n02 link; n01-n05 cut for 600 ms
   'r2-157': { n: 5, ids: ['n01', 'n02', 'n03', 'n04', 'n05'], leavers: ['n01', 'n04', 'n05'], delay: [['n01', 'n02', 60]], cuts: [['n01', 'n05', 0, 600]], offsets: [120, 120, 0], reborn: [-1, -1, -1] },
@@ -81,6 +89,12 @@ export const NAMED_R: Record<string, Omit<ScheduleR, 'seed'>> = {
   'r1-n3-lowest-too': { n: 3, ids: ['n01', 'n02', 'n03'], leavers: ['n01', 'n02'], delay: [], cuts: [], offsets: [0, 0], reborn: [-1, -1] },
 }
 export const namedR = (name: string, seed: number): ScheduleR => ({ seed, ...NAMED_R[name] })
+//! H9_SEEDS — the three seeds of scheduleR, outside the pinned 1..100, that today's kernel heals and the round-3
+// kernel (6de8eee) wedges, measured on both (the 2026-10-10 review): 306 is n=4 with two leavers (n01, n02); 744 and
+// 804 are n=5 with leavers n02, n04, n05. The reports' 469/740/1077 class (n=4, three leavers, the lowest among them)
+// is a different shape; these are the branch-only losses THIS generator draws. Pinned LIVE, so the branch's kernel
+// turns them red.
+export const H9_SEEDS = [306, 744, 804]
 
 //! runR — one rebirth schedule to its horizon. A leaver is torn down the moment its leave is answered (cut from
 // everyone, destroyed) and, when asked to, comes back `reborn` ms later as a FRESH node (a new identity, rebornId):
@@ -309,6 +323,56 @@ export const twoLeavers = (seed: number, inspect?: (sim: Sim) => void): string[]
   return problems
 }
 
+//! pledgeTwo — the shape the restricted pledge cannot answer (DESIGN-LEAVE §10.3; the 2026-10-10 review's probe): n=5;
+// n04 and n05 stop at once and knock to n01; 3 ms after n01 has read both knocks, {n03,n04,n05} are cut from
+// {n01,n02}. So n01 keeps ONE stayer (n02), and the stale stayer n03 keeps admitted links to BOTH leavers. The
+// leavers time out, are torn down and restart from their dirs 500 ms later linked to n03 and each other only.
+// Checked at the 12 s horizon. Today's kernel: n01's ballot needs three of the old five and has two (no knock is a
+// vote), so it commits nothing; the far side re-forms without n01 and n02. A kernel that counts the two knocks as
+// votes commits `{n01,n02,n03}`@2 on n01 + n02 + two pledges — exactly "the view minus the leavers" — while n03's
+// gate counts 1 + n04 + n05 = 3 of 5 at view 1 (a leaver's own read-only gate does not stop it being COUNTED):
+// two writable views for the whole leave window, and for good once the leavers restart beside n03.
+export const pledgeTwo = (seed: number, inspect?: (sim: Sim) => void): OutcomeI => {
+  const sim = new Sim(seed)
+  const nodes = cluster(sim, 5, { heartbeatMs: 50, durable: true, fault: { delay: [3, 3] } })
+  sim.run({ until: 800 })
+  if (!nodes.every((x) => x.epoch === 1)) return { problems: ['never formed'], settled: false, proposerWritable: false }
+  const leavers = ['n04', 'n05']
+  for (const u of leavers) sim.post(u, { kind: 'leave' })
+  const t0 = sim.now
+  let read = -1, cutAt = -1
+  const gone = new Map<string, number>(), back = new Set<string>()
+  let last = t0
+  for (let t = sim.now; t <= t0 + 12000; t += 1) {
+    sim.run({ until: t })
+    if (read < 0 && leavers.every((u) => has(nodes[0], JK.leave, u))) {
+      read = sim.now
+      sim.at(3, () => { cutAt = sim.now; for (const a of ['n01', 'n02']) for (const b of ['n03', ...leavers]) sim.partition(a, b) })
+    }
+    for (const u of leavers) {
+      if (!gone.has(u) && sim.left.has(u) && sim.nodes.has(u)) { tearDown(sim, u, true); gone.set(u, sim.now); last = sim.now }
+      if (gone.has(u) && !back.has(u) && sim.now >= gone.get(u)! + 500) {
+        back.add(u)
+        sim.heal(u, 'n03'); for (const o of leavers) if (o !== u && back.has(o)) sim.heal(u, o)
+        sim.left.delete(u); sim.restart(u); last = sim.now
+      }
+    }
+    if (back.size === leavers.length && sim.now > last + 8000) break
+  }
+  inspect?.(sim)
+  const problems: string[] = []
+  if (read < 0) problems.push('not the shape: n01 never read both knocks')
+  if (cutAt < 0) problems.push('not the shape: the cut never came')
+  if (gone.size !== leavers.length) problems.push('leaver never answered: ' + leavers.filter((u) => !gone.has(u)))
+  if (sim.violations.length) problems.push('VIOLATION ' + JSON.stringify(sim.violations.slice(0, 2)))
+  const sp = split(sim)
+  if (sp) problems.push(sp)
+  const far = [...sim.nodes.values()].filter((x) => x.uuid !== 'n01' && x.uuid !== 'n02')
+  const settled = new Set(far.map((x) => `${x.epoch}:${members(x)}`)).size === 1 && far.every((x) => x.membership.gate(x).open && !members(x).includes('n01'))
+  const p = sim.nodes.get('n01')!
+  return { problems, settled, proposerWritable: p.membership.gate(p).open }
+}
+
 //! evictTwo — the stale-majority shape the base's own arithmetic allows (DESIGN-LEAVE §10.2): a ballot that evicts TWO
 // suspects at once at n=5 shrinks the view to three, whose writable majority is two, while a majority of the old view
 // is three — and 2 + 3 = 5 voters exist. n04 and n05 are cut from n01 and n02 but stay linked to n03; n01 evicts both
@@ -351,7 +415,7 @@ export interface ScheduleC { seed: number; n: number; crashed: string; leavers: 
 //! GRID_C — n 3..5; the crashed member the lowest (n01) or the highest; one leaver (the highest member left) or two
 // (the two highest left); the crash 200 ms before the stops, at them, 20 or 100 ms after; the crashed member back
 // from its dir after 2 s or never (-1); the leavers restarted after 0.4, 3 or 25 s; sim seeds 1 and 2. 576 cases.
-// `restarts` and `seeds` trim it (the test runs 0.4 and 3 s under seed 1 by default: 192 cases).
+// `restarts` and `seeds` trim it (the test runs 0.4 s under seed 1 by default: 96 cases, 4 of them the n=3 crash twin).
 export const gridC = (restarts = [400, 3000, 25000], seeds = [1, 2]): ScheduleC[] => {
   const out: ScheduleC[] = []
   for (const n of [3, 4, 5]) for (const low of [true, false]) for (const two of [false, true]) for (const offset of [-200, 0, 20, 100]) for (const back of [2000, -1]) for (const restart of restarts) for (const seed of seeds) {
