@@ -1089,6 +1089,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     //! a crash is never a clean stop: no leave, no drain — the teardown's verdict is false
     crash: () => { untrack(inst); return teardown(false) },
     rendezvous: () => (directory ? { client: directory.client, host: directory.host, boxes: Object.fromEntries(directory.boxClients) } : null),
+    //! tune: the table the node runs with — how a test sees that redial.tries or leave.ms reached the kernel
+    tune: () => node.tune,
     //! config (V4-10): every resolved leaf with the layer it came from — the coerced value the composer
     // read, or the effective default ('the default') where one exists; a function shows as '[function]',
     // the hosted methods and the data seed as their names (rows are data, not config)

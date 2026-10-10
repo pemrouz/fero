@@ -18,6 +18,7 @@ import { fero, WriteRejectError } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { JK } from '../kernel/journal.ts'
+import { TUNE } from '../kernel/tune.ts'
 import { VERB, encodeControl } from '../kernel/codec.ts'
 import { ports, until, sleep } from '#utils'
 import type { Fero, WriteReject, WriteResolve } from './types.ts'
@@ -167,15 +168,38 @@ test('redial.tries reaches the kernel: a client dialing a dead port gives up aft
   await assert.rejects(fero('r', { redial: { tries: -1 } } as never), /redial\.tries must be an integer ≥ 0/)
 })
 
-test('leave.ms (the knock window, DESIGN-LEAVE §10.7) is read in milliseconds and shown with its source; its default is 16 heartbeats at this node\'s cadence; a bad value is refused naming the key', async () => {
+test('leave.ms (the knock window, DESIGN-LEAVE §10.7) reaches the kernel as the tune row leaveWindow — ms ÷ heartbeat.ms, rounded up; 0 is the bound alone; heartbeats off leave the row at its default — and is shown with its source; its default is 16 heartbeats at this node\'s cadence; a bad value is refused naming the key', async () => {
   //! the tune table's second config key (kernel/tune.ts row `leaveWindow`, in heartbeat ticks): the composer divides
-  // by the effective cadence and rounds up. The door shows the value the operator set, or the effective default.
+  // by the effective cadence and rounds up. The door shows the value the operator set, or the effective default —
+  // and diag(f).tune() shows the row itself, so a composer that stopped passing the row to the node goes red here
+  // (the review's finding: config() alone displays what was READ, not what the kernel RUNS with).
   const f = await fero(`knock-${process.pid}`, { listen: false, heartbeat: { ms: 100 }, leave: { ms: 1250 } })
-  try { assert.deepEqual(diag(f)!.config()['leave.ms'], { value: 1250, from: 'the call' }) } finally { await f.destroy() }
+  try {
+    assert.deepEqual(diag(f)!.config()['leave.ms'], { value: 1250, from: 'the call' })
+    assert.equal(diag(f)!.tune().leaveWindow, 13, '1250 ms at 100 ms a tick, rounded UP: 13 ticks (12.5 would cut the window short)')
+    assert.equal(diag(f)!.tune().leaveTicks, TUNE.leaveTicks, 'the bound is untouched')
+  } finally { await f.destroy() }
+  const z = await fero(`knock-z-${process.pid}`, { listen: false, heartbeat: { ms: 100 }, leave: { ms: 0 } })
+  try {
+    assert.equal(diag(z)!.tune().leaveWindow, 1, 'leave.ms 0: a row at 1, below the four-tick bound — the kernel reads max(window, bound), so this is the bound alone')
+    assert.deepEqual(diag(z)!.config()['leave.ms'], { value: 0, from: 'the call' }, '0 is a value, shown as set')
+  } finally { await z.destroy() }
   const d = await fero(`knock-d-${process.pid}`, { listen: false })
-  try { assert.deepEqual(diag(d)!.config()['leave.ms'], { value: 8000, from: 'the default' }, '16 heartbeats × 500 ms') } finally { await d.destroy() }
+  try {
+    assert.deepEqual(diag(d)!.config()['leave.ms'], { value: 8000, from: 'the default' }, '16 heartbeats × 500 ms')
+    assert.equal(diag(d)!.tune().leaveWindow, TUNE.leaveWindow, 'no key: the frozen default row')
+  } finally { await d.destroy() }
   const q = await fero(`knock-q-${process.pid}`, { listen: false, heartbeat: { ms: 100 } })
   try { assert.deepEqual(diag(q)!.config()['leave.ms'], { value: 1600, from: 'the default' }, '16 heartbeats × 100 ms') } finally { await q.destroy() }
+  //! heartbeats off: no clock, so no window — the row stays at its default whatever leave.ms says, and the door shows
+  // no effective value (16 × 0 = 0 would read as "the bound alone", which is not what no clock means)
+  const o = await fero(`knock-o-${process.pid}`, { listen: false, heartbeat: { ms: 0 }, leave: { ms: 1250 } })
+  try {
+    assert.equal(diag(o)!.tune().leaveWindow, TUNE.leaveWindow, 'heartbeats off: the row is left at its default')
+    assert.deepEqual(diag(o)!.config()['leave.ms'], { value: 1250, from: 'the call' }, 'what was set is still shown')
+  } finally { await o.destroy() }
+  const n = await fero(`knock-n-${process.pid}`, { listen: false, heartbeat: { ms: 0 } })
+  try { assert.equal(diag(n)!.config()['leave.ms'], undefined, 'heartbeats off and nothing set: no effective window to show') } finally { await n.destroy() }
   await assert.rejects(fero('r', { leave: { ms: -1 } } as never), /leave\.ms must be a finite number of milliseconds ≥ 0/)
   await assert.rejects(fero('r', { leave: { ms: 'soon' } } as never), /leave\.ms must be a finite number of milliseconds ≥ 0/)
   await assert.rejects(fero('r', { leave: 5 } as never), /'leave' from the call is a group, not a value/)
