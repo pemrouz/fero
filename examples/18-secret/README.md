@@ -10,7 +10,7 @@ $ FERO_SECRET=wnxH+ZDVQyfo9xZAS/1cwBu0caZpkD+t node server.ts 4801 4802
 MEMBER 3114061 on 127.0.0.1:4801 — members 0
 { '3114061': 'member', '3114062': 'member' }
 MEMBER 3114061 on 127.0.0.1:4801 — members 2
-fero('vault'): refused a peer that connected as 127.0.0.1:4803 — it has no secret and this node has one; every member and client must share FERO_SECRET
+fero('vault'): refused a peer that connected as 127.0.0.1:4803 — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT
 { '3114061': 'member', '3114062': 'member', '3114180': 'member' }
 MEMBER 3114061 on 127.0.0.1:4801 — members 3
 ```
@@ -21,7 +21,7 @@ $ FERO_SECRET=wnxH+ZDVQyfo9xZAS/1cwBu0caZpkD+t node server.ts 4802 4801
 MEMBER 3114062 on 127.0.0.1:4802 — members 0
 { '3114061': 'member', '3114062': 'member' }
 MEMBER 3114062 on 127.0.0.1:4802 — members 2
-fero('vault'): refused a peer that connected as 127.0.0.1:4803 — it has no secret and this node has one; every member and client must share FERO_SECRET
+fero('vault'): refused a peer that connected as 127.0.0.1:4803 — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT
 { '3114061': 'member', '3114062': 'member', '3114180': 'member' }
 MEMBER 3114062 on 127.0.0.1:4802 — members 3
 ```

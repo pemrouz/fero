@@ -40,7 +40,7 @@ assert.ok(await until(() => [m1, m2].every((r) => r.out.includes(`'${m1.pid}': '
 const m3 = start([c, a, b]), err3 = errs(m3)
 const line = (p: string) => `fero('vault'): refused by 127.0.0.1:${p} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`
 assert.ok(await until(() => refusals(err3).includes(line(a)) && refusals(err3).includes(line(b)), 15_000), `the third's screen names both members and FERO_SECRET: ${JSON.stringify(refusals(err3))}`)
-const inbound = `fero('vault'): refused a peer that connected as 127.0.0.1:${c} — it has no secret and this node has one; every member and client must share FERO_SECRET`
+const inbound = `fero('vault'): refused a peer that connected as 127.0.0.1:${c} — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT`
 assert.ok(await until(() => refusals(err1).includes(inbound) && refusals(err2).includes(inbound)), `each member's screen shows the refusal too: ${JSON.stringify([refusals(err1), refusals(err2)])}`)
 await sleep(2000) // the third keeps redialing: one line per peer and reason, never one per attempt
 assert.deepEqual(refusals(err3).sort(), [line(a), line(b)].sort(), 'exactly one line per member on the third')
