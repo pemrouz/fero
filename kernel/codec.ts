@@ -502,12 +502,17 @@ export const encodeRuns = (
   // run-split condition — pp is per-record data, so the split shape is identical either way (the
   // snapshot chunker's one-frame assert depends on this).
   withPp = false,
+  //! starts (optional): receives the index in `records` of each frame's first record, one push per frame —
+  // the one caller that resumes a torn ship (node.ts #answer) reads the seq it tears at from it. The split
+  // is unchanged; a caller that passes nothing pays one undefined check per frame.
+  starts?: number[],
 ): Uint8Array[] => {
   const frames: Uint8Array[] = []
   const o = runsScratch
   let i = 0
   while (i < records.length) {
     const head = records[i]
+    if (starts !== undefined) starts.push(i)
     o.begin(verb, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch },
       head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid! } : undefined, withPp)
     o.add(head.rec, head.pp)
