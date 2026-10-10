@@ -1143,7 +1143,10 @@ THREE parts, and the third is about the grant:
   lets H8's and H12's shapes heal below). The probe also kept a ballot that takes a LEAVER out
   grantable (`leavingOut`, `:397-398`: only a node that is itself leaving; a non-leaver holding a
   vote above its view refuses a ballot that takes it out, too); that exception is not argued here.
-  With (α) the scratch kernel closes `evictTwoB`: 0 of 5.
+  And a vote that is my OWN — an open or aged-out ballot of mine — is exempt too, as for the gate
+  and lead parts (the probe's clause reads `votedFor.p !== node.uuid`): a proposer holding its own
+  ballot above its view still grants other proposers. Not argued here either. With (α) the scratch
+  kernel closes `evictTwoB`: 0 of 5.
 - (β) at the voter, by the ballot: a PROPOSE carries the epoch of the view it is over
   (`#proposal.old` is fixed at `:601`; the frame has no field for it, `:614`), and a voter refuses
   any ballot whose base is below its vote's epoch. For a stale proposer (β) says what (α) says; it
