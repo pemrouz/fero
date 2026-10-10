@@ -1094,8 +1094,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // the hosted methods and the data seed as their names (rows are data, not config)
     config: () => {
       const out: Record<string, { value: unknown; from: string }> = {}
-      //! leave.ms's effective default is the tune row in milliseconds at this node's cadence (16 heartbeats: 8000 at 500)
-      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'redial.tries': redialTries ?? TUNE.redials, 'leave.ms': leaveMs ?? TUNE.leaveWindow * rtOpts.heartbeatMs!, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
+      //! leave.ms's effective default is the tune row in milliseconds at this node's cadence (16 heartbeats: 8000 at 500);
+      // with heartbeats off there is no clock and so no window — the row is shown only when the operator set it
+      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'redial.tries': redialTries ?? TUNE.redials, 'leave.ms': leaveMs ?? (rtOpts.heartbeatMs! > 0 ? TUNE.leaveWindow * rtOpts.heartbeatMs! : undefined), 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
       for (const k of CONFIG_LEAVES) {
         const v = k.split('.').reduce<unknown>((o, p) => (o !== null && typeof o === 'object' ? (o as Record<string, unknown>)[p] : undefined), config)
         //! secret is a leaf and a group (§15): with only the client key set, `secret` itself is unset
