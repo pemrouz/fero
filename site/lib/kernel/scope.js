@@ -56,6 +56,15 @@ export const ACQ_LIVE_MAX = 8192
 //! STALL_AT: polls without shed progress before the FIRST shedStall alarm (then doubling cadence).
 export const STALL_AT = 8
 
+//! covers — THE shed bar as one predicate: do a holder's attested marks (`per`: HAVEA ok `m` / HAVEQ feed) reach
+// every frozen content tail (`lanes`)? evaluateSheds (the shed), undrained (the leave drain) and shedWaitingOn
+// (the stall surface) all read it, so the three cannot drift apart: an ok answer whose floors sit BELOW the tail is not cover — under the pp law floors
+// lawfully under-claim (M6 findings 12/21), and the drain must wait for the right event, not any ok answer.
+const covers = (per                                 , lanes                    )          => {
+  for (const [o, s] of lanes) if ((per?.get(o) ?? 0) < s) return false
+  return true
+}
+
 //! one staged record — teacher transfer and live records share the buffer, discriminated by `live`.
                                                                                                                                  
 
@@ -685,12 +694,45 @@ export class Scope {
       let covered = true
       for (const holder of ring.holders(p, node.replicas)) {
         if (holder === node.uuid) { covered = false; break } // still assigned?! never shed our own duty
-        const per = e.marks.get(holder)
-        for (const [o, s] of lanes) if ((per?.get(o) ?? 0) < s) { covered = false; break }
-        if (!covered) break
+        if (!covers(e.marks.get(holder), lanes)) { covered = false; break }
       }
       if (covered) this.#shed(node, p, e)
     }
+    //! a DRAINING leaver (membership.ts, DESIGN-SCALE stage 1 (b)) re-reads its bar the instant marks moved or a
+    // shed landed — one field read on every other armed node
+    if (node.membership.leaving?.drain !== undefined) node.membership.drain(node)
+  }
+
+  //! undrained — the leave drain's evidence (DESIGN-SCALE §7 stage 1 (b)): what this node still holds that no
+  // survivor has proved it holds. For every entry with content — an orphan's frozen tails; a held entry's live
+  // tails (the solo view's case: no install ever froze them) — over the CURRENT holders other than this node:
+  // `waiting` counts the partitions some REACHABLE holder (an admitted, live link) has not yet attested covering,
+  // lane by lane — the shed bar of evaluateSheds with its quantifier narrowed to the holders that can still
+  // answer, so the drain can still progress; `stranded` the partitions with content and no reachable holder at
+  // all — nobody to drain to. A partition every holder covers has shed already and is in neither count.
+  undrained(node      )                                        {
+    let waiting = 0, stranded = 0
+    if (!node.armed) return { waiting, stranded }
+    const ring = node.writes.ring
+    if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    for (const [p, e] of this.entries) {
+      if (e.state === SCOPE.acquiring) continue // a staged buffer is the teacher's data, not this node's
+      const tails = e.state === SCOPE.orphan ? (e.tails ??= this.#tailsOf(node, p)) : this.#tailsOf(node, p)
+      const lanes = Object.entries(tails)
+      if (!lanes.length) continue // a husk: nothing to hand over
+      let reachable = false, behind = false
+      for (const holder of ring.holders(p, node.replicas)) {
+        if (holder === node.uuid) continue
+        const id = node.byUuid.get(holder)
+        const link = id === undefined ? undefined : node.links.get(id)
+        if (!link || link.state !== LS.admitted || link.dead) continue
+        reachable = true
+        if (!covers(e.marks.get(holder), lanes)) { behind = true; break }
+      }
+      if (behind) waiting++
+      else if (!reachable) stranded++
+    }
+    return { waiting, stranded }
   }
 
   //! #shed — the crash-safe execution order (C10/H1): (1) boot record WITHOUT p (a crash after this
@@ -793,7 +835,8 @@ export class Scope {
   }
 
   //! shedWaitingOn — the H7 surface: uuids currently pinning any orphan's shed (≤ view size).
-  // Reads the SAME tails bar as evaluateSheds — the surface must name who actually pins the shed.
+  // Reads the SAME bar as evaluateSheds and undrained — `covers`, the one predicate — so the surface
+  // names exactly who pins the shed and cannot drift from it (the third review found it re-inlined).
   shedWaitingOn(node      )           {
     if (!node.armed) return []
     const ring = node.writes.ring
@@ -801,11 +844,9 @@ export class Scope {
     const waiting = new Set        ()
     for (const [p, e] of this.entries) {
       if (e.state !== SCOPE.orphan) continue
-      const tails = e.tails ??= this.#tailsOf(node, p)
+      const lanes = Object.entries(e.tails ??= this.#tailsOf(node, p))
       for (const holder of ring.holders(p, node.replicas)) {
-        if (holder === node.uuid) continue
-        const per = e.marks.get(holder)
-        for (const [o, s] of Object.entries(tails)) if ((per?.get(o) ?? 0) < s) { waiting.add(holder); break }
+        if (holder !== node.uuid && !covers(e.marks.get(holder), lanes)) waiting.add(holder)
       }
     }
     return [...waiting]

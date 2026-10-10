@@ -19,7 +19,7 @@
 // The three node-level constants are DEFINED here and re-exported by kernel/node.ts under their
 // old names: node.ts imports this file, so defining them there would make an import cycle.
 
-import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS } from './membership.js'
+import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, DRAIN_TICKS } from './membership.js'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.js'
 import { MAX_PROBES } from './confirm.js'
 import { MAX_QUEUED } from './link.js'
@@ -63,6 +63,9 @@ export const PROVE_MS = 5000
                       
                                                                                                               
                     
+                                                                                                                    
+                                                                                                                     
+                    
                                                                         
                
                                                                      
@@ -104,6 +107,7 @@ export const TUNE                 = Object.freeze({
   redialCap: 32,
   suspectTicks: SUSPECT_TICKS,
   leaveTicks: LEAVE_TICKS,
+  drainTicks: DRAIN_TICKS,
   pulls: MAX_PULLS,
   proposalAge: PROPOSAL_AGE,
   rejoinTicks: REJOIN_TICKS,
