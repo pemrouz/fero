@@ -1,7 +1,9 @@
 //! The adversarial leave harness, pinned on today's kernel (DESIGN-LEAVE §9 step 2 and §10, 2026-10-10). The
 // generators are in sim/leave-harness.ts; this file runs each family over its range and pins two things apart:
 //   SAFETY  — ASSERTED on every schedule: no monitor fired (one-view-per-epoch above all) and no two nodes ended
-//             WRITABLE in different views at a quiet point. The base is safe on every family here.
+//             WRITABLE in different views at a quiet point. The base is safe on every family here but one: evictTwo
+//             (two suspects evicted at once, the third voter cut on its grant) is a hole of today's kernel and is
+//             pinned as the exact seeds it splits on, so a fix shows as a moved pin.
 //   LIVENESS — COUNTED, pinned exactly in both directions (a schedule the kernel used to heal that wedges now is a
 //             regression; one that heals where it used to wedge means the pin is stale: update it on purpose, with
 //             the why). Today's kernel is not live on every schedule (I-20), so the exact sets are the FLOOR.
@@ -15,7 +17,7 @@
 // schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { evictsplit, joinsplit, twoLeavers, scheduleR, runR, shapeR, NAMED_R, namedR, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { evictsplit, joinsplit, twoLeavers, evictTwo, scheduleR, runR, shapeR, NAMED_R, namedR, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import { unsafe } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
 
@@ -127,6 +129,26 @@ test('leave harness, the quiet-point check: two nodes writable in different view
   assert.equal(quietSplit(m, 0), null)
   bb.membership.install(bb, { epoch: 1, members: [['bb', 'sim:bb']] })
   assert.match(quietSplit(m, 0) ?? '', /aa@1\{aa\} bb@1\{bb\}/)
+})
+
+//! evictTwo on today's kernel: a hole, counted (DESIGN-LEAVE §10.2). A ballot that evicts TWO suspects at once at n=5
+// shrinks the view to three; a voter cut (or crashed) right after its grant never learns the view it consented to,
+// stays at the old view with the two "suspects" as a reachable majority of it, and as their lowest live member leads
+// them into a view of its own — at the SAME epoch the proposer's side reaches next, so the sim's one-view-per-epoch
+// monitor fires, and both sides are writable. Seeds 1, 2, 4 and 5 of 5 in both variants (seed 3 misses the timing);
+// the one-evictee control never splits (the arithmetic forbids it). A kernel that closes the hole empties these
+// lists: re-record them with the why, and move the STATUS line.
+const SPLITS_EVICT_TWO = { cut: [1, 2, 4, 5], crash: [1, 2, 4, 5] }
+
+test('leave harness, evictTwo: two suspects evicted at once at n=5 with the third voter cut or crashed on its grant — today\'s kernel commits two views at one epoch and ends writable on both sides on exactly the pinned seeds; one evictee never splits', () => {
+  for (const how of ['cut', 'crash'] as const) {
+    const bad: number[] = [], detail: string[] = []
+    for (let seed = 1; seed <= 5; seed++) { const ps = evictTwo(seed, how, 2); if (ps.length) { bad.push(seed); detail.push(`${seed}: ${ps.join('; ')}`) } }
+    assert.deepEqual(bad, SPLITS_EVICT_TWO[how], `${how}, two evictees: the split set moved — a kernel change closed (or widened) the hole; re-record with the why\n${detail.join('\n')}`)
+    const control: string[] = []
+    for (let seed = 1; seed <= 5; seed++) { const ps = evictTwo(seed, how, 1); if (ps.length) control.push(`${seed}: ${ps.join('; ')}`) }
+    assert.deepEqual(control, [], `${how}, one evictee: the new view's majority and the old view's must share a voter`)
+  }
 })
 
 test('leave harness, explorer: 300 seeded random schedules over real Nodes with the quiet-point split check — never two views at one epoch, never two nodes writable in different views once every frame has landed', () => {
