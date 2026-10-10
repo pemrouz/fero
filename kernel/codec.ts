@@ -61,7 +61,11 @@ export const VERB = {
   // wire shape is untouched in both modes): HAVEQ {e, q:{p:{o:seq}}} announces possession floors and
   // asks for coverage; HAVEA {e, a:{p:{ok,need,m?,md?}}} attests-or-requests per partition; ACQ is a
   // RECORDS-shaped one-teacher transfer (provenance + attempt identity ride exactly like AE);
-  // ACQDONE {p, e, t:{o:cut}, n} closes the atomic fold.
+  // ACQDONE {p, e, t:{o:cut}, n} closes the atomic fold. DESIGN-SCALE stage 2 (no MAGIC bump, V4-14):
+  // HAVEQ gains three optional top-level keys — d:{p:{o:durable floor}} from durable nodes, g:[p…] the
+  // partitions the sender is gapless for, x:[p…] the partitions it has just released — and a HAVEA
+  // partition gains g:1 (gapless) and x:1 ("none": neither held nor assigned, where it used to be silent).
+  // On a scoped cluster HAVEQ/HAVEA are the anti-entropy: the member heartbeat DIGEST does not run there.
   HAVEQ: 19, HAVEA: 20, ACQ: 21, ACQDONE: 22,
   //! M7 DIAG plane (DESIGN-M7 §1 — the authenticated diagnostics channel, structurally OUTSIDE
   // membership): DIAGQ {id≥1, q, ...} is a client pull (journal/logs cursors, node fold, state);

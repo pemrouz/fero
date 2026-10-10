@@ -572,6 +572,85 @@ test('SHED — the stateless predicate: HAVEA attestations from EVERY current ho
   assert.equal(h.node.logs.get('bb')!.some((e) => e.rec.key[0] === 'p'), false, 'the lane filtered')
   assert.equal(h.node.streams.get('bb')!.parts?.get('p'), undefined, 'floors dropped')
   assert.equal(h.node.versions.has(JSON.stringify(['p', 'x'])), false, 'stamps dropped')
+  //! DESIGN-SCALE stage 2: the release rides to p's CURRENT holders as HAVEQ `x`, in the shed step — one frame per holder
+  for (const link of [1, 2]) {
+    const xs = sentOn(h, link, VERB.HAVEQ).map((f) => f.value as { e: number; q: Record<string, unknown>; x?: string[] }).filter((v) => v.x !== undefined)
+    assert.deepEqual(xs, [{ e: 2, q: {}, x: ['p'] }], `link ${link}: the holder is told p was released here`)
+  }
+})
+
+//! sentOn — every frame of one verb this node shipped on `link`, decoded, in order
+const sentOn = (h: ReturnType<typeof harness>, link: number, verb: number) =>
+  h.of('send').filter((e) => e[1] === link).map((e) => new Framer().push((e[2] as Uint8Array).slice())[0]).filter((f) => f && f.verb === verb)
+
+//! ── DESIGN-SCALE stage 2: the optional HAVEQ keys d/g/x and the HAVEA keys g/x (no MAGIC bump, V4-14) ──
+
+test('STAGE 2 KEYS — HAVEQ `x` voids the sender\'s marks for p; a HAVEA `x: 1` (none) voids a stale pin; a HAVEQ about a partition aa neither holds nor is assigned answers `x: 1` where it used to be silent', () => {
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('p', 'aa', 'bb')
+  h.node.step({ kind: 'write', recs: [rec(['p', 'x'], 1)] })
+  //! bb attests p (its HAVEQ feeds marks and marksD here), then announces it RELEASED p: every mark it fed is void
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { p: { aa: 1 } }, d: { p: { aa: 1 } }, g: ['p'] }) })
+  const e = h.node.scope!.entries.get('p')!
+  assert.deepEqual([...e.marks.get('bb')!], [['aa', 1]], 'bb\'s marks fed')
+  assert.deepEqual([...e.marksD.get('bb')!], [['aa', 1]], 'bb\'s durable marks fed from the HAVEQ `d` map (not only from a HAVEA md)')
+  assert.equal(e.gl.has('bb'), true, 'bb said it is gapless for p')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: {}, x: ['p'] }) })
+  assert.equal(e.marks.has('bb'), false, 'released: bb\'s marks are void')
+  assert.equal(e.marksD.has('bb'), false)
+  assert.equal(e.gl.has('bb'), false)
+  assert.equal(sentOn(h, 1, VERB.HAVEA).length, 1, 'a release frame with an empty q gets no answer (the attestation did)')
+  //! cc's ok answer feeds a mark, then cc answers `none` for p: a stale pin, cleared
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: havea(1, { p: { ok: 1, need: 0, m: { aa: 1 }, g: 1 } }) })
+  assert.deepEqual([...e.marks.get('cc')!], [['aa', 1]])
+  assert.equal(e.gl.has('cc'), true)
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEA, { e: 1, a: { p: { ok: 0, need: 0, x: 1 } } }) })
+  assert.equal(e.marks.has('cc'), false, 'none: cc neither holds nor is assigned p — its pin here was stale')
+  assert.equal(e.gl.has('cc'), false)
+  //! asked about a partition this node neither holds nor is assigned: `x: 1`, not silence
+  h.node.writes.ring.place('zz', 'bb', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { zz: { bb: 3 } }) })
+  const last = sentOn(h, 1, VERB.HAVEA).pop()!.value as { a: Record<string, unknown> }
+  assert.deepEqual(last.a.zz, { ok: 0, need: 0, x: 1 }, 'none: the asker learns its pin on aa for zz is stale')
+  assert.equal(h.node.scope!.entries.has('zz'), false, 'and nothing was minted or latched')
+})
+
+test('STAGE 2 KEYS — an ok answer carries `g: 1` exactly when the content tail equals the floor on every lane of p; `d` rides a durable node\'s answers and announcements; a skewed frame with d/g/x is dropped whole', () => {
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('p', 'bb', 'aa')
+  //! lane bb: seq 1 chained (floor 1), then seq 3 with an unknown predecessor — folds, the floor waits: NOT gapless
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 1, rec: rec(['p', 'a'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 3, rec: rec(['p', 'c'], 3), pp: 2 }]) })
+  assert.equal(h.node.streams.get('bb')!.parts!.get('p')!.s, 1, 'the floor stopped at the gap')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(1, { p: { bb: 1 } }) })
+  let ans = (sentOn(h, 2, VERB.HAVEA).pop()!.value as { a: Record<string, { ok: number; g?: number }> }).a.p
+  assert.equal(ans.ok, 1)
+  assert.equal(ans.g, undefined, 'content (3) runs past the floor (1): not gapless')
+  //! the gap fills: the chain walk trues the floor to 3 — gapless now
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 2, rec: rec(['p', 'b'], 2), pp: 1 }]) })
+  assert.equal(h.node.streams.get('bb')!.parts!.get('p')!.s, 3)
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(1, { p: { bb: 3 } }) })
+  ans = (sentOn(h, 2, VERB.HAVEA).pop()!.value as { a: Record<string, { ok: number; g?: number }> }).a.p
+  assert.deepEqual(ans, { ok: 1, need: 0, m: { bb: 3 }, g: 1 }, 'gapless: tail 3 = floor 3 on the one lane of p')
+  //! a skewed frame (another epoch) is dropped whole: no mark fed, no pin voided, no answer
+  const e = h.node.scope!.entries.get('p')!
+  const before = sentOn(h, 2, VERB.HAVEA).length
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 2, q: { p: { bb: 9 } }, d: { p: { bb: 9 } }, g: ['p'], x: ['p'] }) })
+  assert.deepEqual([...e.marks.get('cc')!], [['bb', 3]], 'the skewed frame fed nothing (cc\'s mark is still its lawful 3)')
+  assert.equal(e.marksD.has('cc'), false)
+  assert.equal(sentOn(h, 2, VERB.HAVEA).length, before, 'and got no answer')
+  assert.equal(h.jk(JK.frameDrop).filter((x) => x.b === 'haveq epoch skew').length, 1)
+  //! a DURABLE node's ok answer carries md as before (the `d` map on its own announcements is pinned where announcements are)
+  const d = armedView1({ durable: true })
+  d.node.membership.rejoinFloor = 0
+  d.node.writes.ring.place('p', 'aa', 'bb')
+  d.node.step({ kind: 'write', recs: [rec(['p', 'x'], 1)] })
+  d.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { p: { aa: 1 } }) })
+  const dans = (sentOn(d, 1, VERB.HAVEA).pop()!.value as { a: Record<string, { ok: number; md?: Record<string, number>; g?: number }> }).a.p
+  assert.deepEqual(dans.md, {}, 'durable: the md map rides (nothing fsynced yet)')
+  assert.equal(dans.g, 1)
 })
 
 //! a floor can exist for a lane this node has NO entries of: an ACQDONE cut names every lane the teacher
