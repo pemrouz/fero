@@ -457,8 +457,13 @@ test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scope
   for (let i = 0; i < 300; i++) sim.post(nodes[i % 30].uuid, { kind: 'write', recs: [{ type: REC.update, key: [`row${i}`], value: { v: i } }] }, 4100 - sim.now + i)
   sim.run({ until: 8000, maxEvents: 5_000_000 })
   assert.equal(exactlyR(sim), null); assert.equal(scopedConverged(sim), null)
-  assert.equal(t.since(m, VERB.HAVEQ), 1067, '300 writes cost 1,067 HAVEQ (the lag round: 3.7 pairs per write)')
-  assert.equal(t.since(m, VERB.HAVEA), 1067)
+  //! RE-RECORDED 2026-10-10 (DESIGN-SCALE stage 2, announce on change + the sweep): 1,067 → 5,337 HAVEQ. The lag
+  // round is gone; what the window holds now is the sweep (20 ticks × 30 nodes × min(aeFan 8, c) = 4,800 frames)
+  // plus the owners' announcements of the 300 written partitions (one entry each, merged into a link's sweep frame
+  // where the tick already had one). HAVEA trails by one tick's answers (the tick at t = 8000 is inside the window,
+  // its 240 answers land at 8001). The exact per-write and per-tick laws are P1 and P3 in sim/announce.test.ts.
+  assert.equal(t.since(m, VERB.HAVEQ), 5337, '300 writes under the sweep: 4,800 sweep frames + the owner announcements, merged per link')
+  assert.equal(t.since(m, VERB.HAVEA), 5097)
   assert.deepEqual(perTick(sim, t, 200, 4, VERB.DIGEST), [870, 870, 870, 870], 'idle: n(n−1) = 30·29 member DIGEST frames per tick')
   m = t.mark()
   //! the joiner's 30 pairs at the stated [1,1] too (sim.add pairs a new node at the sim's DEFAULT [1,5] otherwise)
@@ -469,11 +474,16 @@ test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scope
   assert.equal(exactlyR(sim), null)
   //! RE-RECORDED 2026-10-10 (DESIGN-SCALE stage 2, the keys): 2,446 → 2,527 HAVEQ. A shed now tells the partition's
   // current holders it released it (HAVEQ `x`, one frame per holder link, batched across the sheds of one step): the
-  // 38 sheds cost 81 release frames, which get no answer, so HAVEA stays at 2,446.
-  assert.equal(t.since(m, VERB.HAVEQ), 2527, 'one join costs 2,527 HAVEQ (about 2.6 full co-holder rounds, plus 81 release frames)')
-  assert.equal(t.since(m, VERB.HAVEA), 2446, 'the release frames get no answer')
+  // 38 sheds cost 81 release frames, which get no answer, so HAVEA stayed at 2,446.
+  //! RE-RECORDED again the same day (announce on change + the sweep): 2,527 → 14,791 HAVEQ. The window is 56 ticks
+  // of sweep at 30 then 31 nodes × min(aeFan 8, c) ≈ 13,500 frames, plus the install's full round, the targeted
+  // post-fold rounds of the 38 acquisitions (to the partition's holders only — each used to be a full round) and
+  // the 81 release frames. The 38 ACQ transfers and ACQDONEs are unchanged.
+  assert.equal(t.since(m, VERB.HAVEQ), 14791, 'one join under the sweep: about 13,500 sweep frames + the install round, 38 targeted post-fold rounds and 81 release frames')
+  assert.equal(t.since(m, VERB.HAVEA), 14702, 'the release frames get no answer; the last tick\'s answers land past the window')
   assert.equal(t.since(m, VERB.DIGEST), 52110, 'and 52,110 DIGEST frames to t=20 s')
   assert.deepEqual(perTick(sim, t, 200, 2, VERB.DIGEST), [930, 930], 'idle after the join: 31·30')
+  assert.deepEqual(perTick(sim, t, 200, 2, VERB.HAVEQ), [248, 248], 'idle after the join: 31 × min(aeFan 8, c) sweep frames per tick')
 })
 
 // ── the §2 seed probe (A4): a restored floor may not claim what the disk did not keep ───────────

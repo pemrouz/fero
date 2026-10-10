@@ -114,7 +114,13 @@ const CAUGHT: [string, number, Mutation, string[]][] = [
   ['A1-zombie', 1, 'release-all', ['stamp-oracle', 'release-safety', 'census-truth']], // M6 at the release: the zombie still holds an older record
   ['A1-zombie', 1, 'version-only', ['stamp-oracle', 'release-safety', 'census-truth']], // G1: the zombie's write lands above the fence after the heal
   ['A7-down-to-one', 2, 'release-all', ['stamp-oracle', 'release-safety']], // a re-joiner is taught the dead writes
-  ['A6-flip-mid-latch', 3, 'drop-one', ['release-safety']], // the dropping holder teaches the partition after the flip
+  //! RE-PINNED 2026-10-10 (DESIGN-SCALE stage 2): `drop-one` was pinned on A6 seed 3 (the dropping holder taught the
+  // partition after the flip). Stage 2's targeted post-fold rounds and announce-on-change change that trajectory: on
+  // A6 seeds 1-8 the dropping holder no longer teaches that partition to anyone, so nothing refolds it there. The same
+  // mutation is caught on A7 seed 4 (n=2 R=1: the leaver's drain teaches every partition it held to the one new
+  // holder, the dropped tombstone's among them — the stage-1 drain made that teach certain) and on A1 seeds 4 and 8.
+  ['A7-down-to-one', 4, 'drop-one', ['release-safety', 'stamp-oracle']], // the drain teaches the dropped tombstone's partition to the new holder
+  ['A1-zombie', 4, 'drop-one', ['release-safety', 'stamp-oracle']], // the healed zombie is re-taught the partition without the remove
   ['A11-spoke', 3, 'version-only', ['release-safety']], // the spoke applies an old write under a released stamp
 ]
 

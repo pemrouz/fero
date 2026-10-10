@@ -55,6 +55,11 @@ export const STAGE_TICKS = 8
 export const ACQ_LIVE_MAX = 8192
 //! STALL_AT: polls without shed progress before the FIRST shedStall alarm (then doubling cadence).
 export const STALL_AT = 8
+//! AE_FAN (DESIGN-SCALE stage 2, §3 trigger 4; the owner's yes, §14 Q1): co-holder links the sweep re-announces to
+// per tick, in uuid order behind a cursor, so every held partition is re-proved with each co-holder within
+// ⌈co-holders / aeFan⌉ ticks (about 9 at n=100). A tune row, not a config key (V4-19). 0 = no sweep (a measurement
+// posture for the counted pins: announce-on-change alone); every real cluster keeps the default.
+export const AE_FAN = 8
 
 //! covers — THE shed bar as one predicate: do a holder's attested marks (`per`: HAVEA ok `m` / HAVEQ feed) reach
 // every frozen content tail (`lanes`)? evaluateSheds (the shed), undrained (the leave drain) and shedWaitingOn
@@ -359,26 +364,39 @@ export class Scope {
     return out
   }
 
-  //! round — one batched handshake round: for every entry, HAVEQ the peers who matter (co-holders of
-  // held/acquiring partitions — announce + probe; CURRENT holders of orphaned partitions — the shed
-  // poll doubles as the teaching offer). One frame per admitted member link per round.
-  round(node: Node) {
+  //! dirty (DESIGN-SCALE stage 2, §3 "on change") — the partitions whose floors this node ADVANCED AT ITS STAMP SITE
+  // since its last announcement: one Set.add per committed record on an armed owner (node.ts commit), nothing on the
+  // inbound path. At the next tick every dirty partition goes to each co-holder in one batched HAVEQ per link, and
+  // the ok answers carry the co-holders' floors back: marks converge in one round trip. Why the stamp site alone
+  // (a deviation from §3's list, settled at the build — the record's own arithmetic in §3 and §8 counts (R−1)
+  // announcement entries per write, which is the owner's): on a scoped cluster a holder's floor moves at an
+  // inbound site only as the echo of the owner's stamp (the live fan-out, or that fan-out replayed from a latch
+  // buffer), and the owner announces it; a fold, a seal, the arming truing and a boot each run their own round
+  // right away; a durable echo is carried by the next sweep or answer (`d`/`md`). Announcing those again would
+  // cost R(R−1) entries per write where (R−1) do the work. Cleared by a FULL round (every entry to every
+  // co-holder covers it) and by the tick's own announcement; never by a targeted round.
+  dirty = new Set<string>()
+
+  //! round — one batched handshake round, FILTERED (DESIGN-SCALE stage 2): HAVEQ the peers who matter for the
+  // partitions that matter — co-holders of held partitions (announce + probe), CURRENT holders of orphaned
+  // partitions (the shed poll doubles as the teaching offer), the holders of a non-holder's probe partitions (a
+  // pure probe, {}). `only` restricts the links (the admit round, the drain round: that one peer); `parts` the
+  // partitions (the post-fold and sealed rounds: that one partition; the probe-driven round: the probe
+  // partitions). Neither ⇒ the FULL round of an install. One frame per link per round; a paused link is skipped
+  // (#link) and caught up by the drain round.
+  round(node: Node, only?: ReadonlySet<Link>, parts?: ReadonlySet<string>) {
     if (!node.armed) return
     const ring = node.writes.ring
     if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
-    const perLink = new Map<Link, Record<string, Record<string, number>>>()
+    const plan = new Map<Link, Set<string>>()
     for (const [p, e] of this.entries) {
       if (e.state === SCOPE.acquiring) continue // the latch is the active protocol for this partition
-      //! floors computed ONCE per partition, not per (partition × link) — finding 44
-      let mine: Record<string, number> | null = null
+      if (parts !== undefined && !parts.has(p)) continue
       for (const uuid of ring.holders(p, node.replicas)) {
         if (uuid === node.uuid) continue
-        const id = node.byUuid.get(uuid) // byUuid maps to the link ID (the keeper rule) — resolve it
-        const link = id === undefined ? undefined : node.links.get(id)
-        if (!link || link.state !== LS.admitted || link.dead) continue
-        let q = perLink.get(link)
-        if (!q) { q = {}; perLink.set(link, q) }
-        q[p] = (mine ??= this.#announceFloors(node, p, e))
+        const link = this.#link(node, uuid)
+        if (link === undefined || (only !== undefined && !only.has(link))) continue
+        this.#plan(plan, link, p)
       }
     }
     //! the PROBE-driven leg (finding 38): partitions with open scoped confirms this node does NOT
@@ -387,19 +405,56 @@ export class Scope {
     const probeParts = new Set<string>()
     node.confirm.scopedParts(probeParts)
     for (const p of probeParts) {
-      if (this.entries.has(p)) continue // a holder's entry already announces above
+      if (this.entries.has(p) || (parts !== undefined && !parts.has(p))) continue // a holder's entry already announces above
       for (const uuid of ring.holders(p, node.replicas)) {
         if (uuid === node.uuid) continue
-        const id = node.byUuid.get(uuid)
-        const link = id === undefined ? undefined : node.links.get(id)
-        if (!link || link.state !== LS.admitted || link.dead) continue
-        let q = perLink.get(link)
-        if (!q) { q = {}; perLink.set(link, q) }
-        q[p] = {}
+        const link = this.#link(node, uuid)
+        if (link === undefined || (only !== undefined && !only.has(link))) continue
+        this.#plan(plan, link, p)
       }
     }
-    for (const [link, q] of perLink) {
-      link.ship(encodeControl(VERB.HAVEQ, { e: node.epoch, q }), node.env.sink, node.journal)
+    this.#ship(node, plan)
+    if (only === undefined && parts === undefined) this.dirty.clear()
+  }
+
+  #plan(plan: Map<Link, Set<string>>, link: Link, p: string) {
+    let ps = plan.get(link)
+    if (ps === undefined) plan.set(link, ps = new Set())
+    ps.add(p)
+  }
+
+  //! #ship — one HAVEQ per planned link: q = this node's attested floors per partition (computed ONCE per partition,
+  // not per partition × link — finding 44; {} for a partition it has no entry for, a pure probe), plus the stage-2
+  // keys where it attests: `d` (durable nodes), `g` (gapless). An acquiring entry is never planned; an unsealed
+  // durable base announces {} and claims nothing.
+  #ship(node: Node, plan: Map<Link, Set<string>>) {
+    if (plan.size === 0) return
+    const floors = new Map<string, Record<string, number>>()
+    const durs = node.durable ? new Map<string, Record<string, number>>() : null
+    const gap = new Map<string, boolean>()
+    for (const [link, ps] of plan) {
+      const q: Record<string, Record<string, number>> = {}
+      let d: Record<string, Record<string, number>> | undefined
+      let g: string[] | undefined
+      for (const p of ps) {
+        const e = this.entries.get(p)
+        let f = floors.get(p)
+        if (f === undefined) floors.set(p, f = this.#announceFloors(node, p, e))
+        q[p] = f
+        if (e === undefined || e.state === SCOPE.acquiring || (node.durable && e.sealed === false)) continue // no attestation
+        if (durs !== null) {
+          let dd = durs.get(p)
+          if (dd === undefined) durs.set(p, dd = this.#durableFloors(node, p))
+          ;(d ??= {})[p] = dd
+        }
+        let gl = gap.get(p)
+        if (gl === undefined) gap.set(p, gl = this.#gapless(node, p))
+        if (gl) (g ??= []).push(p)
+      }
+      const body: { e: number; q: typeof q; d?: typeof d; g?: string[] } = { e: node.epoch, q }
+      if (d !== undefined) body.d = d
+      if (g !== undefined) body.g = g
+      link.ship(encodeControl(VERB.HAVEQ, body), node.env.sink, node.journal)
       link.flush(node.env.sink, node.journal)
     }
   }
@@ -690,7 +745,7 @@ export class Scope {
     // (never persistRun: interior rows condemn the chain), and dirty until the echo
     if (node.durable) node.spliced(p)
     node.persistBoot()
-    this.round(node) // the post-fold round: announce possession (sealed-gated), true the floor up, seed confirm
+    this.round(node, undefined, new Set([p])) // the post-fold round, to p's holders only: announce possession (sealed-gated), true the floor up, seed confirm
     node.confirm.recount(node)
   }
 
@@ -702,7 +757,7 @@ export class Scope {
     if (!e || e.sealed !== false) return
     e.sealed = true
     if (node.durable) node.persistBoot()
-    this.round(node)
+    this.round(node, undefined, new Set([p])) // the sealed round, to p's holders only (DESIGN-SCALE stage 2)
     node.confirm.recount(node)
   }
 
@@ -857,18 +912,27 @@ export class Scope {
     if (node.durable) node.snapshot()
   }
 
-  //! tick — the heartbeat hook: orphan shed polls (every SHED_TICKS, with the escalating shedStall
-  // alarm), latch timeouts, the probe-driven re-round for pending scoped confirms, and the
-  // MARKS-LAG round (M6-review findings 13/23): a stable cluster whose co-holder evidence is
-  // missing or behind keeps announcing at the poll cadence until it converges — a lost install
-  // offer, a clean latch abort, or a skew-dropped round self-heals within SHED_TICKS instead of
-  // waiting for the next membership change. Converged marks go silent (zero steady-state chatter).
+  //! tick — the heartbeat hook (DESIGN-SCALE stage 2 reshaped it): latch timeouts and the shedStall alarm as before,
+  // then ONE announcement plan, one HAVEQ per link, built from four legs —
+  //   dirty      every partition whose floor this owner advanced since the last tick, to each co-holder (§3 trigger 1);
+  //   never-answered  every held partition to each co-holder that has never attested it (the `!per` leg of the old
+  //              #lagging, kept: a lost install offer still heals within a tick). Its "trails" clause is GONE — after
+  //              a write the owner's announcement carries the new floor and the answer carries the co-holder's, so
+  //              marks converge in one round trip instead of a full round every two ticks;
+  //   orphan poll  every orphan whose poll is due (every shedTicks), its frozen floors to the CURRENT holders;
+  //   probe      the partitions of open scoped confirms, to their holders (held: our floors; else a pure probe);
+  //   sweep      the next aeFan co-holder links in uuid order get every held partition they share (§3 trigger 4): a
+  //              cursor over the sorted co-holders, surviving installs, so every held partition is re-proved with
+  //              each co-holder within ⌈c / aeFan⌉ ticks. This replaces the member heartbeat DIGEST's belt and
+  //              braces with a bounded cost; aeFan 0 switches the sweep off (a measurement posture).
+  // Converged marks and an idle cluster cost exactly the sweep: Σ min(aeFan, cᵢ) HAVEQ frames per node per tick.
   #ticks = 0
+  #cursor = 0
   tick(node: Node) {
     if (!node.armed) return
-    const { shedTicks, stageTicks, stallAt } = node.tune
+    const { shedTicks, stageTicks, stallAt, aeFan } = node.tune
     this.#ticks++
-    let pollDue = false
+    const due = new Set<string>()
     for (const [p, e] of this.entries) {
       if (e.state === SCOPE.acquiring) {
         if (++e.ticks! >= stageTicks) this.#abort(node, p, 'timeout')
@@ -876,32 +940,61 @@ export class Scope {
       }
       if (e.state !== SCOPE.orphan) continue
       e.polls = (e.polls ?? 0) + 1
-      if (e.polls % shedTicks === 0) pollDue = true
+      if (e.polls % shedTicks === 0) due.add(p)
       if (e.polls >= (e.nextStall ?? stallAt)) {
         e.nextStall = (e.nextStall ?? stallAt) * 2
         node.journal.armed && node.journal.emit(JK.shedStall, p, e.polls)
       }
     }
     this.evaluateSheds(node)
-    if (pollDue || node.confirm.pendingScoped() ||
-        (this.#ticks % shedTicks === 0 && this.#lagging(node))) this.round(node)
-  }
-
-  //! #lagging — is any co-holder's attested evidence missing or behind our announceable floors?
-  // (Sealed-pending entries skip — they announce nothing yet, so peers cannot be "behind" them.)
-  #lagging(node: Node): boolean {
     const ring = node.writes.ring
+    if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    const plan = new Map<Link, Set<string>>()
+    //! shared — co-holder uuid → the held partitions it shares with us, the sweep's list (one walk serves every leg)
+    const shared = new Map<string, string[]>()
     for (const [p, e] of this.entries) {
-      if (e.state !== SCOPE.held || (node.durable && e.sealed === false)) continue
-      const mine = this.#myFloors(node, p)
-      for (const holder of ring.holders(p, node.replicas)) {
-        if (holder === node.uuid) continue
-        const per = e.marks.get(holder)
-        if (!per) return true // never exchanged — the (re)offer leg
-        for (const o in mine) if ((per.get(o) ?? 0) < mine[o]) return true
+      if (e.state === SCOPE.acquiring) continue
+      const orphan = e.state === SCOPE.orphan
+      if (orphan && !due.has(p)) continue
+      if (!orphan && node.durable && e.sealed === false) continue // announces nothing yet: no leg applies
+      const dirty = this.dirty.has(p)
+      for (const uuid of ring.holders(p, node.replicas)) {
+        if (uuid === node.uuid) continue
+        const link = this.#link(node, uuid)
+        if (link === undefined) continue
+        if (orphan) { this.#plan(plan, link, p); continue }
+        let list = shared.get(uuid)
+        if (list === undefined) shared.set(uuid, list = [])
+        list.push(p)
+        if (dirty || !e.marks.has(uuid)) this.#plan(plan, link, p)
       }
     }
-    return false
+    if (node.confirm.pendingScoped()) {
+      const probeParts = new Set<string>()
+      node.confirm.scopedParts(probeParts)
+      for (const p of probeParts) {
+        const e = this.entries.get(p)
+        if (e !== undefined && e.state === SCOPE.acquiring) continue
+        for (const uuid of ring.holders(p, node.replicas)) {
+          if (uuid === node.uuid) continue
+          const link = this.#link(node, uuid)
+          if (link !== undefined) this.#plan(plan, link, p)
+        }
+      }
+    }
+    if (aeFan > 0 && shared.size) {
+      const peers = [...shared.keys()].sort()
+      const n = Math.min(aeFan, peers.length)
+      if (this.#cursor >= peers.length) this.#cursor = 0
+      for (let i = 0; i < n; i++) {
+        const uuid = peers[(this.#cursor + i) % peers.length]
+        const link = this.#link(node, uuid)!
+        for (const p of shared.get(uuid)!) this.#plan(plan, link, p)
+      }
+      this.#cursor = (this.#cursor + n) % peers.length
+    }
+    this.#ship(node, plan)
+    this.dirty.clear()
   }
 
   //! tallies — the cluster.partitions projection (api slice 4): bounded scalars, one walk.

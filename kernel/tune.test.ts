@@ -10,7 +10,7 @@ import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.ts'
 import { MAX_PROBES } from './confirm.ts'
 import { MAX_QUEUED } from './link.ts'
 import { COMPACT_AT } from './log.ts'
-import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT } from './scope.ts'
+import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT, AE_FAN } from './scope.ts'
 import type { EffectSink, Env } from './env.ts'
 
 const env = (): Env => {
@@ -27,13 +27,13 @@ test('TUNE is the old constants by name, and a node with no tune reads exactly t
     suspectTicks: SUSPECT_TICKS, leaveTicks: LEAVE_TICKS, leaveWindow: LEAVE_WINDOW, drainTicks: DRAIN_TICKS, pulls: MAX_PULLS, proposalAge: PROPOSAL_AGE, rejoinTicks: REJOIN_TICKS,
     retryTicks: RETRY_TICKS, pending: MAX_PENDING, dedupKeep: DEDUP_KEEP, issuers: MAX_ISSUERS,
     probes: MAX_PROBES, queued: MAX_QUEUED, compactAt: COMPACT_AT, snapshotAt: SNAPSHOT_AT, lamportLease: LAMPORT_LEASE,
-    shedTicks: SHED_TICKS, stageTicks: STAGE_TICKS, acqLiveMax: ACQ_LIVE_MAX, stallAt: STALL_AT,
+    shedTicks: SHED_TICKS, stageTicks: STAGE_TICKS, acqLiveMax: ACQ_LIVE_MAX, stallAt: STALL_AT, aeFan: AE_FAN,
     proveMs: PROVE_MS,
   })
   //! the values the plan's table lists — a changed default is a DECISIONS line, not a drift
   assert.deepEqual(
-    [TUNE.redials, TUNE.memberRedials, TUNE.suspectTicks, TUNE.leaveTicks, TUNE.leaveWindow, TUNE.drainTicks, TUNE.pulls, TUNE.proposalAge, TUNE.rejoinTicks, TUNE.retryTicks, TUNE.pending, TUNE.dedupKeep, TUNE.issuers, TUNE.probes, TUNE.queued, TUNE.compactAt, TUNE.snapshotAt, TUNE.lamportLease, TUNE.shedTicks, TUNE.stageTicks, TUNE.acqLiveMax, TUNE.stallAt, TUNE.proveMs],
-    [10, 5, 3, 4, 16, 16, 5, 10, 10, 2, 1024, 1024, 1024, 1024, 256, 4096, 4096, 4096, 2, 8, 8192, 8, 5000],
+    [TUNE.redials, TUNE.memberRedials, TUNE.suspectTicks, TUNE.leaveTicks, TUNE.leaveWindow, TUNE.drainTicks, TUNE.pulls, TUNE.proposalAge, TUNE.rejoinTicks, TUNE.retryTicks, TUNE.pending, TUNE.dedupKeep, TUNE.issuers, TUNE.probes, TUNE.queued, TUNE.compactAt, TUNE.snapshotAt, TUNE.lamportLease, TUNE.shedTicks, TUNE.stageTicks, TUNE.acqLiveMax, TUNE.stallAt, TUNE.aeFan, TUNE.proveMs],
+    [10, 5, 3, 4, 16, 16, 5, 10, 10, 2, 1024, 1024, 1024, 1024, 256, 4096, 4096, 4096, 2, 8, 8192, 8, 8, 5000],
   )
   const node = new Node({ uuid: 'aa' }, env())
   assert.strictEqual(node.tune, TUNE, 'no overrides ⇒ the shared frozen table itself, nothing allocated')
@@ -70,11 +70,12 @@ test('proveMs (DESIGN-DOOR §3): the proving deadline is a tune row — default 
   assert.throws(() => tuneOf({ proveMs: 0 }), /proveMs must be an integer ≥ 1, got 0/)
 })
 
-test('zero: allowed for the two redial counts (no redial at all), refused for every other row — a 0 there would switch a guarantee off, not tune it', () => {
+test('zero: allowed for the two redial counts (no redial at all) and for aeFan (no anti-entropy sweep), refused for every other row — a 0 there would switch a guarantee off, not tune it', () => {
   assert.equal(tuneOf({ redials: 0 }).redials, 0)
   assert.equal(tuneOf({ memberRedials: 0 }).memberRedials, 0)
+  assert.equal(tuneOf({ aeFan: 0 }).aeFan, 0, 'aeFan 0: announce-on-change alone (the counted pins\' posture, DESIGN-SCALE stage 2)')
   for (const k of Object.keys(TUNE) as (keyof Tune)[]) {
-    if (k === 'redials' || k === 'memberRedials') continue
+    if (k === 'redials' || k === 'memberRedials' || k === 'aeFan') continue
     assert.throws(() => tuneOf({ [k]: 0 }), new RegExp(`${k} must be an integer ≥ 1, got 0`), k)
     assert.equal(tuneOf({ [k]: 1 })[k], 1, `${k}: 1 is the floor`)
   }
