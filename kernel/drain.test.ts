@@ -104,7 +104,7 @@ test('DRAIN — the exit proof no longer ends a scoped leave: `left` is held whi
   //! the proof arrived, but p is undrained: the leave is in its second wait
   assert.equal(h.of('left').length, 0, 'the echo alone does not let a scoped leaver go')
   assert.equal(h.jk(JK.left).length, 0)
-  assert.deepEqual(h.node.membership.leaving, { ticks: 0, done: true, drain: 0 }, 'the view half is done; the drain counts from 0')
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, done: true, drain: 0, clean: true }, 'the view half is done (and was clean); the drain counts from 0')
   assert.deepEqual(h.node.scope!.undrained(h.node), { waiting: 1, stranded: 0 })
   //! the install's round asked bb; bb (absent and assigned) answers need — aa teaches p exactly as any orphan would
   assert.equal(h.sentOn(1, VERB.HAVEQ).length, 1, 'the install round announced p to its new holder')
@@ -205,6 +205,55 @@ test('DRAIN never follows a vote that did not come back: a scoped leaver whose s
   h.bytes(2, vote(2, 'bb', 'cc'))
   h.tick()
   assert.equal(h.of('left').length, 1)
+})
+
+test('DRAIN after a timed-out view half: the votes came back and the leaver installed its own shrunk view, but no survivor echo arrived inside leaveTicks — p is an orphan with a reachable new holder all the same, so it drains; the verdict stays false (the view half was never proved) and `undrained` counts what was not copied', () => {
+  //! the shape (third review, 2026-10-10): aa is the proposer; bb and cc vote; aa commits epoch 2 itself (p
+  // freezes into an orphan whose holder is bb); the VIEW echo is lost. Before the fix #finishLeave(false) skipped
+  // the drain: at R=1 the only copy of p went with aa, uncounted, while bb had a live link. Mutation: make
+  // #finishLeave ask #exit only when clean and this leaver goes at leaveTicks + 1 with left(false) and no row.
+  const timedOut = (opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
+    const h = holderAtView1(opts)
+    h.node.step({ kind: 'leave' })
+    h.bytes(1, vote(2, 'bb', 'cc'))
+    h.bytes(2, vote(2, 'bb', 'cc'))
+    assert.equal(h.node.epoch, 2, 'the proposer commits from the votes alone')
+    assert.equal(h.node.membership.isMember('aa'), false, 'its own view no longer holds it')
+    assert.equal(h.node.scope!.entries.get('p')?.state, SCOPE.orphan, 'p froze into an orphan at the install')
+    for (let i = 0; i < LEAVE_TICKS; i++) { h.tick(); assert.equal(h.of('left').length, 0, `tick ${i + 1}: waiting for the echo`) }
+    h.tick() // leaveTicks + 1: the view half times out
+    assert.equal(h.of('left').length, 0, 'not gone: bb is reachable and has not proved it holds p — the drain begins')
+    assert.deepEqual(h.node.scope!.undrained(h.node), { waiting: 1, stranded: 0 })
+    assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, done: true, drain: 0, clean: false }, 'the drain carries the view half\'s verdict')
+    return h
+  }
+  //! (a) bb attests at the frozen tail: shed, then left(false) — copied, but the stop was not clean all the way
+  const h = timedOut()
+  h.bytes(1, view(2, 'bb', 'cc'))
+  assert.equal(h.of('left').length, 0, 'a late echo neither ends the drain nor re-opens the view half')
+  h.bytes(1, havea(2, { p: { ok: 1, need: 0, m: { bb: 5 } } }))
+  assert.equal(h.jk(JK.shed).length, 1, 'bb covers ⇒ shed')
+  assert.deepEqual(h.of('left'), [['left', false]], 'the rows were handed over, but the view half was never proved: not clean')
+  assert.equal(h.jk(JK.undrained).length, 0, 'nothing went with it: no undrained row')
+  assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b]), [[2, 0]])
+  h.tick(); h.tick()
+  assert.equal(h.of('left').length, 1, 'once')
+  //! (b) nobody attests: the drain bound, then `undrained` 1 and left(false) — the count now names the lost copy
+  const d = timedOut({ tune: { drainTicks: 6 } })
+  for (let i = 0; i < 6; i++) { d.tick(); assert.equal(d.of('left').length, 0, `drain tick ${i + 1}`) }
+  d.tick()
+  assert.deepEqual(d.of('left'), [['left', false]])
+  assert.deepEqual(d.jk(JK.undrained).map((e) => [e.a, e.b]), [[1, 2]], 'one partition went with it, at epoch 2')
+  //! (c) nobody to drain to: bb's link is down when the view half times out ⇒ at once, `undrained` 1
+  const s = holderAtView1()
+  s.node.step({ kind: 'leave' })
+  s.bytes(1, vote(2, 'bb', 'cc'))
+  s.bytes(2, vote(2, 'bb', 'cc'))
+  s.node.step({ kind: 'linkDown', link: 1, reason: 'test' })
+  for (let i = 0; i <= LEAVE_TICKS; i++) s.tick()
+  assert.deepEqual(s.of('left'), [['left', false]])
+  assert.deepEqual(s.jk(JK.undrained).map((e) => [e.a, e.b]), [[1, 2]], 'stranded: counted at once, no hold')
+  assert.equal(s.node.membership.leaving!.drain, undefined)
 })
 
 test('DRAIN, nobody to drain to: the new holder\'s link is down at the proof ⇒ left(false) at once with `undrained` 1; a holder that dies DURING the drain ends it at the next tick the same way', () => {
