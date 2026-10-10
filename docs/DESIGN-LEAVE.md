@@ -1751,6 +1751,18 @@ holds); the genesis hold's liveness cost was unnamed (§10.10.1, §10.10.4, §10
 undrawn (§10.10.1, `genesisSplit`). The re-measurement also taught that a ballot whose member set is
 the held view's members is joint over it by construction (§10.10.2).*
 
+*The fourth review (2026-10-10, the same day) checked the argument under its own probes — no safety
+hole at a quiet point, the acceptance numbers reproduced on a scratch kernel it built itself — and
+left four minors and a nit, each closed below where it lives. Three of the third review's kernel
+lines had no pin that goes red without them, because the mesh harness writes its own HELLO for every
+link and so never tests the node's (§10.10.8: `freshLinkSim`, the fresh link on REAL HELLOs in the
+Sim; `clientGenesis` and `serverAsk`, one per half of the client fix, which `clientAsk` catches only
+together; and `genesisProposerAndGranterDie` now pins its proposal list, which is what the
+same-members clause changes). One liveness gap in the diff: a hold announced only by an epoch-0 HELLO
+was never taken back, so a stayer stayed `minority` with a reachable majority (§10.10.6, `helloHold`;
+fixed in the diff: a HELLO that names holds is an announcement). And two build notes (§10.10.9: how
+`v` is signed, and the gate's per-call `holds()` on the write path, which now has its fast path).*
+
 **The summary, in ten lines.**
 
 1. A vote above my view warns only when it is for a view TWO or more members apart from the one I
@@ -1813,18 +1825,38 @@ the held view's members is joint over it by construction (§10.10.2).*
    fresh link included) — NEVER a clock (the first draft's two-tick memory: with the held member's
    heartbeat late the far side wrote beside the new view with every link up, `lateAsk`, the second
    review's blocker) and NEVER a window (the second draft forgot the word at admit and read the new
-   one from an ask one round trip later, `freshLink`, the third review). A client's word is not read
-   (I-23, `clientAsk`), and only a member's widens a ballot. The gate needs `e`, the next proposer
-   needs `h` to be joint, and the disown needs `p` (§10.10.6).
+   one from an ask one round trip later, `freshLink`, the third review). A HELLO that names holds is
+   itself a word, so the first change after it goes out as the ask — at epoch 0 the HELLO is the
+   only word there is, and a hold it announced must still be taken back (`helloHold`, the fourth
+   review). A client's word is not read (I-23, `clientAsk`), and only a member's widens a ballot. The
+   gate needs `e`, the next proposer needs `h` to be joint, and the disown needs `p` (§10.10.6).
 10. The acceptance of §10.9 step 2 holds on the scratch kernel: `evictTwo`, `evictTwoB`, `keptBallot`
-    and `releasedEarly` green, and `keptBallotReversed`, `lateAsk`, `freshLink` and `genesisSplit`
-    with them; every family safe; `flapDuringBallot` and `proposerCrash` writable everywhere;
-    `pledgeTwo` safe AND still settled; `allHeld`, `genesisProposerDies` and `clientAsk` as today; and
-    NOT ONE liveness pin of the existing families moves — rebirth, both isolate families, the crash
-    grid, evictsplit, joinsplit and the in-tree sweep are exactly as on the base. The pins that move
-    are the red ones, the quiet-point witness, the mid states of three release shapes, and TWO
-    liveness pins frozen on purpose, `proposerAndGranterDie` and `genesisProposerAndGranterDie`, each
-    with its why (§10.10.8). The build is step 3 (§10.10.9); the kernel is unchanged.
+    and `releasedEarly` green, and `keptBallotReversed`, `lateAsk`, `freshLink`, `freshLinkSim` and
+    `genesisSplit` with them; every family safe; `flapDuringBallot` and `proposerCrash` writable
+    everywhere; `pledgeTwo` safe AND still settled; `allHeld`, `genesisProposerDies`, `clientAsk`,
+    `clientGenesis`, `serverAsk` and `helloHold` as today; and NOT ONE liveness pin of the existing
+    families moves — rebirth, both isolate families, the crash grid, evictsplit, joinsplit and the
+    in-tree sweep are exactly as on the base. The pins that move are the red ones, the quiet-point
+    witness, the mid states of three release shapes, and TWO liveness pins frozen on purpose,
+    `proposerAndGranterDie` and `genesisProposerAndGranterDie`, each with its why (§10.10.8). Every
+    kernel line of the wire has ONE pin that goes red without it (§10.10.8, the one-line mutants).
+    The build is step 3 (§10.10.9); the kernel is unchanged.
+
+**What is proven, and what is open — in plain words.** PROVEN means: measured on the scratch kernel
+that `docs/leave-release.diff` builds (apply it to `v4` at `145a70b` plus this branch's harness
+commits), by the harness in `sim/leave-harness.ts`, whose test file pins today's kernel and whose
+numbers on the scratch kernel are the table of §10.10.8 — every number there is a run of that file
+or of the three in-tree suites on that tree. Proven that way: the three red pins of today's kernel
+and the genesis split close; the fresh-link window closes on real HELLOs; every family of the harness
+is safe; no liveness pin of any existing family moves; the two costs are exactly the two named
+freezes; each rejected variant reopens exactly the holes its row names; and each kernel line of the
+wire has a pin that goes red without it. ARGUED, not measured: the safety argument itself (§10.10.2,
+reviewed four times; a fifth look before the build is §10.9 step 4); the pledge under the rule; the
+ask and the HELLO key under real TCP. OPEN, by design or for the owner: a hold that arises after a
+HELLO left at genesis (a hosts question, §10.10.1); epoch-0 nodes that hold a vote and stay writable
+in no view (§10.1 excludes epoch 0 from the check); the growth of `prior` and of `#heldPeers`, bounded
+by proposers and by server uuids and never pruned here; the scratch kernel's own performance (the
+common case of `holds()` is a fast path; the build's pins measure it); and the build itself.
 
 #### §10.10.1 When a vote above my view warns: two members apart, against my own view
 
@@ -2148,7 +2180,24 @@ them — so that no quiet point sees a stayer counting a member that is already 
 an empty list, when its last hold ends — the release is this frame, never silence; and at admit, on
 the fresh link, ONLY when the holds are not what the HELLO on that link said (they changed while it
 was in flight; *scratch* `onAdmit` reads the key `helloHolds` left on the Link). Nothing at epoch 0
-but the HELLO (§10.10.1).
+but the HELLO (§10.10.1). And a HELLO that names holds is itself an ANNOUNCEMENT (the fourth
+review): what it said becomes the last word the sender gave (*scratch* `helloHolds` sets `#lastAsk`),
+so the first change after it goes out as the ask on every member link. At epoch 0 that is the only
+way a word can be taken back, because no ask goes out there: before this line the install that ended
+a hold compared nothing with nothing and sent nothing, and a stayer that had read the hold from the
+HELLO kept not counting a member that held nothing. `helloHold` is the pin (n=5, hostless): aa
+installs view 1 and is cut off; bb at epoch 0 proposes `{bb,cc,dd,ee}`@2 and dd grants it; aa
+re-links to dd — dd's HELLO names the hold at 2 — and aa's VIEW 1 lands at dd, whose vote at 2 is
+now one apart from view 1, no hold; aa re-links to cc. With cc and dd linked, three of its five, aa
+must be writable, and today it is. On the scratch kernel before the fix aa was `minority` at that
+point and after three quiet rounds, and stayed so until its own eviction ballot — joint over the
+phantom `{bb,cc,dd,ee}`, which needs three of them — aged out and was disowned, and dd's next word
+(the empty ask after the disown) replaced the phantom: one proposal age of a stayer frozen with a
+reachable majority, and a ballot burnt. What the line costs: one empty ask per member link, once,
+at the first install of a node whose HELLO carried a hold — a link that formed AFTER its genesis
+grant, which the genesis condition (a fully-formed mesh) makes rare. In the Sim that one frame
+shifts the timing of exactly one `freshLinkSim` seed (3 at 3-40 ms) into the held shape, and moves
+no pin of the in-tree sweep, the explorer or the harness families (§10.10.8).
 
 **What the receiver keeps, and whose word it is.** What each SERVER last said, until that server's
 NEXT word replaces it: its ask (an empty one included), or the HELLO of a fresh link to it, which
@@ -2238,13 +2287,15 @@ hold, and a dropped hold is this hole. With the list the scratch kernel closes `
 
 #### §10.10.8 The measurement
 
-The scratch kernel (`docs/leave-release.diff`, applied with `git apply`; 228 lines added and 23
+The scratch kernel (`docs/leave-release.diff`, applied with `git apply`; 242 lines added and 23
 removed over `kernel/membership.ts`, a verb in `kernel/codec.ts`, its dispatch and the HELLO's `v`
 in `kernel/node.ts`, the `v` key in `kernel/door.ts`, a journal row, and the mesh's verb list and
 fabricated HELLO), run against the whole harness, the in-tree sweep, the explorer and the kernel's
 own membership pins, under `t1` on the loaded box. The base column is the committed pin. This is the
-measurement AFTER the third review; the earlier drafts' numbers that changed are named in the last
-column.
+measurement AFTER the fourth review (the fix of `helloHolds` and the fast path of `holds()` in the
+diff; the seven in-tree pins that move are byte-for-byte the moves of the third review's kernel,
+and the three suites are 35 of 35 again); the earlier drafts' numbers that changed are named in the
+last column.
 
 | What | Today's kernel (the floor) | The scratch kernel | Why it moved |
 |---|---|---|---|
@@ -2263,7 +2314,12 @@ column.
 | `genesisProposerAndGranterDie` fresh open, committed; reborn open (third review) | `{bb,dd}`@2 writable; `{a2,bb,c2}`@1 writable | **everyone at epoch 0, for good** (`bb@0{}`, `dd@0{}`; `a2@0{} bb@0{} c2@0{}`); bb re-proposes `{bb,dd}`@2 and a2 `{a2,bb,c2}`@2 every age-out, at the SAME epoch | the CP answer at epoch 0: bb's hold needs two of `{aa,bb,cc}`; a2 reads it from bb's HELLO, so its ballot is joint from the first; the other liveness pin the rule moves (§10.10.1) |
 | `genesisSplit` (third review) | two views at epoch 2 (`{aa,bb,cc}` beside `{dd,ee}`), both writable at the quiet point, the recorder firing three times | **safe**: `aa@2{aa,bb,cc}W bb@2 W cc@2 W dd@0{}W ee@0{}W`, no split | dd's and ee's genesis votes are holds five apart from the empty view; dd's `{dd,ee}`@2 is joint over the five and needs three |
 | `clientAsk` (third review) | `{aa,bb,cc,dd}`@2 in one ballot, `P(2,4)` | **the same** (the second draft: `P(2,4) P(2,4) P(2,4)` and no commit — every ballot joint over `{q1,q2,q3}`) | a client's HELLO `v` and PULL `vs` are not read (I-23) |
-| `freshLink` (third review) | dd writable at 1 beside aa and bb at 2 at both points (`admitted`, `landed`): two writable views | **one writable view at both points**: dd `minority` the instant the fresh link is admitted (the second draft: dd W at `admitted`, two writable views, `minority` only at `landed`) | the HELLO carries cc's holds, so dd admits the link knowing them |
+| `freshLink` (third review) | dd writable at 1 beside aa and bb at 2 at both points (`admitted`, `landed`): two writable views | **one writable view at both points**: dd `minority` the instant the fresh link is admitted (the second draft: dd W at `admitted`, two writable views, `minority` only at `landed`) | the HELLO carries cc's holds, so dd admits the link knowing them — the MESH's copy of the HELLO: this pin never reads `node.ts` (the fourth review), `freshLinkSim` does |
+| `freshLinkSim` (fourth review: the Sim, real HELLOs; `evictTwo`'s cut shape, the n03-n04 and n03-n05 links flapped 1.5 s after the cut, the writable split sampled every ms for 4 s) | split through the window on the seeds `evictTwo` splits on — 4000 of 4000 ms on seeds 1, 2, 4, 5 at 3 ms and 1, 4 at 3-40 ms (n03 writable at 1 with n04 and n05 beside n01 and n02 at 2, later `{n03,n04,n05}`@3); 31 ms and one n04 `gateOpen` on seed 3 at 3-40 ms (a transient); 0 on the rest | **0 of 4000 on every seed and delay**; before the flap n03 `held` and n04, n05 `held` or `minority` on every seed that reaches the shape (seeds 3 at 3 ms, 2 and 5 at 3-40 ms never reach it: n03 learns view 2 before the cut, as on the base) | n03's OWN HELLO carries its hold; minus that one line (mC below) the window shows 15 to 160 ms per flap |
+| `clientGenesis` hello, pull (fourth review) | view 1 forms, `P(1,3)` once | **the same** | a client's word is not read at epoch 0 either; minus the client guards alone (mA) nothing ever forms: `aa@0{}W bb@0{}W cc@0{}W`, `P(1,3) P(1,3) P(1,3)` — a proposer at epoch 0 reads every linked uuid's word |
+| `serverAsk` (fourth review) | `{aa,bb,cc,dd}`@2, `P(2,4)` once | **the same** | only a MEMBER's word widens a ballot; minus the member filter alone (mB) `P(2,4)` three times and ee is never evicted |
+| `helloHold` (fourth review) | aa writable with cc and dd linked at both points; end `aa@3{aa,cc,dd}W …` with bb and ee evicted | **the same** (the diff before the fix, mE: aa `minority` at both points, until its ballot joint over the phantom hold aged out and was disowned) | a HELLO that names holds is an announcement, so its release follows (§10.10.6) |
+| `genesisProposerAndGranterDie` proposals and bb's vote (fourth review) | bb `P(2,2)` once; a2 `P(1,3)` once; bb's vote carries nothing | bb **`P(2,2)` six times**, a2 **`P(1,3) P(2,3)` five times** — the SAME epoch at every age-out — and bb's vote at 2 with ONE earlier vote behind it | the same-members clause (§10.10.2); minus it (mD) a2 `P(1,3) P(2,3) P(2,3) P(3,3) P(3,3) P(4,3)` and bb's vote at 4 with three behind it |
 | `retrySameEpoch` one, two | writable everywhere at the mid point; ends `{aa,bb,cc,dd}`@2 and `{aa,bb,cc}`@2 | mid: **bb and cc `held`**; the ends **the same** | held after the first grant; the restarted aa re-grants at the same epoch (the disown is not what heals it, §10.10.4) |
 | `twoFailedBallots` | writable everywhere at both mid points; `{aa,bb,cc}`@2 at the end | **the same** | disowned twice within the settle rounds, held a third time until the VIEW: the disown's teeth |
 | `lateView` (24 rounds) | mid: `cc@1 … W` beside `aa@2 W` (red today); end at 2 | mid: **`cc@1 r:held`**, no two writable views; end **the same** | the ask is answered by the VIEW, behind the first VIEW on the link |
@@ -2292,9 +2348,37 @@ whole under each:
 | `noviewcheck`: the disown without its view check | 0 / 0 | 0 | 0 | one view | everything as the candidate | masked by FIFO: the VIEW is ahead of the word on the link; the check is belt-and-braces |
 | the second draft (the kernel the third review measured: the word forgotten at admit and re-asked; a hold read from any admitted link; no same-members clause) | 0 / 0 | 0 | 0 | one view | `freshLink`'s `admitted` point two writable views; `clientAsk` never commits (`P(2,4)` three times); `genesisProposerAndGranterDie reborn` climbs epochs while frozen | the third review's three findings against the kernel, each with its one pin |
 
+The fourth review's teeth: ONE PIN PER KERNEL LINE of the wire. Each mutant is the scratch kernel
+minus one line (or one pair of guards); the five new pins re-recorded to the scratch kernel's values
+are run on each (`rfix3/pins-*.log`: 5 of 5 pass on the scratch kernel), and exactly that line's pin
+goes red. Before this round `clientAsk` went red only with BOTH client guards gone, the
+same-members clause moved nothing any pin read, and the node's own HELLO `v` was tested by nothing
+— the mesh writes its own HELLO for every link (`sim/mesh.ts` `connect`), so every mesh shape ran
+the same with or without it.
+
+| Mutant | The line missing | The pin that goes red, and what it shows |
+|---|---|---|
+| mA | the client guards in `onAdmit` and `onPull` (`!link.client`) | `clientGenesis` hello AND pull: `aa@0{}W bb@0{}W cc@0{}W`, aa `P(1,3) P(1,3) P(1,3)` — one client linked in before genesis stops genesis, because `#propose` at epoch 0 reads every linked uuid's word; `clientAsk` and `serverAsk` unchanged |
+| mB | `#propose`'s member filter (`this.view.epoch === 0 \|\| this.isMember(u)`) | `serverAsk`: all five at view 1, aa `P(2,4) P(2,4) P(2,4)`, ee never evicted — a server in no view widened every ballot; `clientAsk` and `clientGenesis` unchanged |
+| mC | the node's own HELLO `v` (`node.ts`, `...(vs.length ? { v: vs } : {})`) | `freshLinkSim`: 15 and 51 split-ms (n04 `gateOpen` 2 and 1) on seeds 4 and 5 at 3 ms; 103, 144 and 160 (2, 1, 1) on seeds 1, 3, 4 at 3-40 ms; 0 where the shape is not reached — the stayer counts the fresh link for the round trip until the ask lands. The whole mesh harness and the mesh `freshLink` pin are IDENTICAL to the scratch kernel's (the mesh's copy of the rule carries the hold) |
+| mD | the same-members clause (`\|\| x.h === h`) | `genesisProposerAndGranterDie` proposals: a2 `P(1,3) P(2,3) P(2,3) P(3,3) P(3,3) P(4,3)` and bb's vote at 4 with three earlier votes behind it (the scratch kernel: `P(2,3)` five times at the same epoch, one behind) — every end state and every other pin identical |
+| mE | the announcement (`helloHolds` setting `#lastAsk`: the diff as it was before this round's fix, plus the fast path) | `helloHold`: `aa@1{…}r:minority` with cc and dd linked at both points (`aa with cc and dd`, `three rounds`) where the scratch kernel and today's kernel show aa writable; the end state the same (aa's ballot, joint over the phantom, ages out, is disowned, and dd's next word replaces the phantom). And `freshLinkSim`'s seed 3 at 3-40 ms no longer reaches the held shape (31 ms, one `gateOpen`, as on the base): the fix's one empty ask at a genesis install shifts that seed |
+
+The new shapes under the rejected variants (the harness run whole under each, `rfix3/variant-*.log`;
+every older column of the table above is unchanged): `timeout` and `nojoint` reopen `freshLinkSim`
+on the base's seeds (4000 of 4000) and on seeds 3 and 4 at 3-40 ms too (3918 and 3922: the hold
+ends on the clock, or the far side re-forms without the held view's majority); `counted` splits
+through the window on every seed that reaches the shape (1442 to 3946 ms, n04 and n05 writable
+before the flap on most of them: the stayer counts the held member); `forget` and `noviewcheck`
+show 0 everywhere, as the scratch kernel (the HELLO is not the clock, and the view check is
+belt-and-braces); `nolead` never reaches `helloHold`'s shape (bb, held at epoch 0, proposes
+nothing: the second review's major again). `clientGenesis`, `serverAsk` and `helloHold` are as
+the scratch kernel under every other variant.
+
 The acceptance of §10.9 step 2, line by line: `evictTwo`, `evictTwoB` and `keptBallot` green (and
-`releasedEarly`, `keptBallotReversed`, `lateAsk`, `freshLink` and `genesisSplit` with them); every
-family safe; `flapDuringBallot` and `proposerCrash` writable everywhere; `pledgeTwo` safe; the
+`releasedEarly`, `keptBallotReversed`, `lateAsk`, `freshLink`, `freshLinkSim` and `genesisSplit`
+with them); every family safe; `flapDuringBallot` and `proposerCrash` writable everywhere;
+`clientGenesis`, `serverAsk` and `helloHold` as today; `pledgeTwo` safe; the
 liveness pins moved only with the why — the ones that move are three release shapes' mid states (held
 members where the base had writable ones, released or superseded by the end), the witnesses §10.9
 named, and TWO end states frozen on purpose as the CP answer: `proposerAndGranterDie` (§10.10.4) and
@@ -2314,29 +2398,56 @@ forgets the dead or starts it fresh. The genesis hold is not free; it buys `gene
   `tick` field of `#heldPeers` that serve another (`forget`), which would be dead code without them.
   The frames: HELLO gains `v` (the sender's holds, absent when none — a fresh node's HELLO is
   byte-identical; the build gives it a shape check beside `n`, `c`, `m`, `k`, and SIGNS it: the
-  scratch `proofMsg` names its keys and leaves `v` outside the proof, which a relay could then
-  rewrite); PROPOSE gains `o` and `j`; VOTE gains `hm` on a refusal; PULL gains `vs` (sent on the
-  tick, on the change, once on the release, and at admit only when the holds changed since the HELLO);
-  NACK is verb 27; all append-only, and a PROPOSE without `o` reads as over the voter's own view
-  (today's behaviour). The key `helloHolds` leaves on the Link becomes a Link field (the scratch
-  hangs it on the object). The journal gains `release` (a=epoch, b=proposer) and the gate word
-  `held`; the ELI5 and the debugger's fold learn both. The boot record's `votedFor` gains `prior` and
-  `f` inside the same field; the two V4-25 kernel pins pass unchanged (no stamp rides in the vote).
-  The mesh's fabricated HELLO carries the peer's holds as the node's own does (`sim/mesh.ts`).
+  scratch `proofMsg` names its keys and leaves `v` outside the proof); PROPOSE gains `o` and `j`;
+  VOTE gains `hm` on a refusal; PULL gains `vs` (sent on the tick, on the change, once on the
+  release, and at admit only when the holds changed since the HELLO); NACK is verb 27; all
+  append-only, and a PROPOSE without `o` reads as over the voter's own view (today's behaviour). The
+  key `helloHolds` leaves on the Link becomes a Link field (the scratch hangs it on the object), and
+  `helloHolds` keeps setting `#lastAsk` from a HELLO that names holds (§10.10.6, the fourth review).
+  The journal gains `release` (a=epoch, b=proposer) and the gate word `held`; the ELI5 and the
+  debugger's fold learn both. The boot record's `votedFor` gains `prior` and `f` inside the same
+  field; the two V4-25 kernel pins pass unchanged (no stamp rides in the vote). The mesh's
+  fabricated HELLO carries the peer's holds as the node's own does (`sim/mesh.ts`).
+- How `v` is signed (the fourth review's note). `proofMsg` signs a JSON array of strings and
+  numbers, which has ONE encoding; `v` is an array of objects, whose key order is whatever the
+  decoder produced, so it must not go into the array as decoded. The build signs it as one string:
+  the canonical key `#keyOf` makes of it (`e:p:h|e:p:h` in the order the sender lists them, the
+  latest vote first as `holds()` returns them; `''` when absent), appended to the array after `m`.
+  Both ends compute it from the same list, so a rewritten `v` fails the proof like a rewritten `l`.
+  Say plainly what that buys: consistency with the other HELLO keys — the door guards the admit, and
+  the HELLO is the one word read before a link is counted — not protection of the holds afterwards:
+  the same list travels UNSIGNED in every PULL `vs` after admission (DESIGN-DOOR: no frame after
+  admission is signed), so a peer that can rewrite frames on a link can add a hold there (the
+  receiver counts less, a ballot needs more) or drop one (the receiver counts a held member: the
+  window back) exactly as it could rewrite a VOTE or a VIEW today.
 - The pins to re-record, with this section as the why: the three red pins and `releasedEarly` to
   empty sets; `keptBallot` to its refused shape (the test's `shape` list becomes the pin of the
   refusal, or the schedule is redrawn to assert the refusal); `keptBallotReversed` to its safe end
   (no splits, `cc held`); the quiet-point test's mesh witness to "cc held, no split"; `lateAsk`'s
   mids to one writable view at every point; `freshLink`'s mids to one writable view at both points;
-  `genesisSplit` to no split, dd and ee at epoch 0; `lateView`'s mid to `cc held`; `retrySameEpoch`'s
-  and `proposerDeadStale`'s mid read-only sets to bb and cc held (and dd and ee minority); and TWO
-  liveness end states, `proposerAndGranterDie` to all three held and `genesisProposerAndGranterDie`
-  to everyone at epoch 0 — the costs of §10.10.4 and §10.10.1, with those whys. Every other pin stays
-  as it is — `allHeld`, `genesisProposerDies` and `clientAsk` included — and the commit says so.
+  `freshLinkSim` to `0 of 4000` on every seed and delay, with its `before` gates as §10.10.8 lists
+  them; `genesisSplit` to no split, dd and ee at epoch 0; `lateView`'s mid to `cc held`;
+  `retrySameEpoch`'s and `proposerDeadStale`'s mid read-only sets to bb and cc held (and dd and ee
+  minority); TWO liveness end states, `proposerAndGranterDie` to all three held and
+  `genesisProposerAndGranterDie` to everyone at epoch 0 — the costs of §10.10.4 and §10.10.1, with
+  those whys — and the latter's proposal pin to `P(2,2)` six times, `P(1,3) P(2,3)` five times, bb's
+  vote with one earlier vote behind it (the same epoch at every age-out: the same-members clause).
+  Every other pin stays as it is — `allHeld`, `genesisProposerDies`, `clientAsk`, `clientGenesis`,
+  `serverAsk` and `helloHold` included — and the commit says so. One pin per kernel line of the wire,
+  so a line dropped in the build shows (§10.10.8's mutants): `freshLinkSim` is the pin for the node's
+  own HELLO `v` (no mesh pin reads it), `clientGenesis` for the client guards, `serverAsk` for the
+  member filter, `genesisProposerAndGranterDie`'s proposals for the same-members clause, `helloHold`
+  for the announcement.
 - Not measured here, to be argued or measured in the build: the ask under the real-TCP tier (a
   frame per tick per held member while held, and one per change); the growth of `prior` under the
   explorer with a hold that never ends; a held member under the knock window (the window changes no
   ballot, so nothing is expected to move); a pledge, if ever built, is a hold from the knock
-  (§10.10.6) and is argued safe by this rule, not measured.
+  (§10.10.6) and is argued safe by this rule, not measured; and the gate's per-call `holds()` on the
+  write path (the fourth review's note): `gate()` now calls `holds()` every time, and `gate()` runs on
+  every write drain and every inbound write run (`kernel/write.ts`), so the build's perf pins must
+  see it. The scratch `holds()` returns at once in the common case — no vote above the view and
+  nothing behind it, which is every member of a settled cluster — and builds and filters
+  `[votedFor, ...prior]` only while a vote above the view exists; the build keeps that fast path and
+  measures the held case, which is bounded by the length of `prior`.
 - STATUS: the I-20 line's "release" sentence and the two split lines' "the rule for it" sentences
   point here; the kernel is still unchanged.
