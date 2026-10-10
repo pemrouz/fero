@@ -384,6 +384,22 @@ test('the per-resource rung beats the global rung inside every layer, and is val
   //! a near miss of a declared GROUP is a typo, not another resource (an object can only be a group)
   assert.throws(() => r('shop', {}, { env: { FERO_HEARTBEATS_MS: '5' } }), /unknown option 'heartbeats' from FERO_HEARTBEATS — did you mean FERO_HEARTBEAT_MS/)
   assert.throws(() => r('shop', {}, { argv: ['--fero.journals.cap', '5'] }), /unknown option 'journals' from --fero\.journals — did you mean --fero\.journal\.cap/)
+  //! ... unless the object holds a declared option: then it is a resource's rung, whatever its name is near. The
+  // `leave` group (wave 5c) sits two edits from live, lease, level, league, save, wave and lane; `seams` from teams;
+  // `diag` from dial — a sibling resource so named must not stop this one from starting (every layer, both rungs)
+  for (const sibling of ['live', 'lease', 'level', 'league', 'save', 'wave', 'lane', 'teams', 'dial'])
+    assert.deepEqual(cfg('shop', {}, { env: { [`FERO_${sibling.toUpperCase()}_HEARTBEAT_MS`]: '100' } }), {}, `${sibling}'s rung is its own business`)
+  assert.deepEqual(cfg('shop', {}, { argv: ['--fero.live.dir', './live', '--fero.teams.replicas', '2'] }), {})
+  assert.deepEqual(cfg('live', {}, { env: { FERO_LIVE_HEARTBEAT_MS: '100' } }), { heartbeat: { ms: 100 } }, 'and the sibling reads it')
+  const sib = scratch()
+  fs.writeFileSync(path.join(sib, 'package.json'), '{ "type": "module" }')
+  fs.writeFileSync(path.join(sib, 'fero.opt.js'), "export default { live: { heartbeat: { ms: 100 } }, lease: { ms: 5 } }")
+  assert.throws(() => r('shop', {}, { cwd: sib }), /unknown option 'lease' from a fero\.opt\.ts file \(lease\) — did you mean a fero\.opt\.ts file \(leave\.ms\)/, 'a near miss holding only a group\'s leaf is still the typo')
+  const sib2 = scratch() // a second dir: a module file, once imported, is cached under its path
+  fs.writeFileSync(path.join(sib2, 'package.json'), '{ "type": "module" }')
+  fs.writeFileSync(path.join(sib2, 'fero.opt.js'), "export default { live: { heartbeat: { ms: 100 } } }")
+  assert.deepEqual(cfg('shop', {}, { cwd: sib2 }), {}, 'the file layer: live beside leave is a resource')
+  assert.throws(() => r('shop', {}, { env: { FERO_LEASE_MS: '5' } }), /unknown option 'lease' from FERO_LEASE — did you mean FERO_LEAVE_MS/)
   //! a scalar under an unknown name is a typo too (a resource's subtree is an object)
   assert.throws(() => r('shop', {}, { env: { FERO_WIDGETS: '5' } }), /unknown option 'widgets' from FERO_WIDGETS/)
   assert.throws(() => r('shop', {}, { argv: ['--fero.shp', 'x'] }), /unknown option 'shp' from --fero\.shp$/)
