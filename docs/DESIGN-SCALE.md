@@ -241,6 +241,20 @@ holderless partition should wait for a re-range while other members are
 still reachable is the owner's call (a Q for §14 if wanted); today the
 rule is the row's: stopped at once when nobody can be drained to.
 
+One more from the third review of the same day: a leaver bounded out of
+the view half (leaveTicks, no survivor echo) drains all the same when its
+OWN view no longer holds it. That is the proposer's shape: it commits the
+shrunk view from the votes alone, its partitions freeze into orphans with
+reachable new holders, and the echo is lost. Before, `#finishLeave(false)`
+skipped `#exit`, so at R=1 the only copy went with the leaver and
+`undrained` read 0. Now the drain runs and carries the view half's
+verdict: the rows are handed over, but `left` is b=0 even when every
+holder covers, because the commit was never proved to have reached a
+survivor; past the bound, or stranded, `undrained` counts what went.
+Reading (3) above narrows to its real case: a leaver STILL IN its own
+view (the vote never came back) has nothing frozen, goes like a crash
+and counts nothing (kernel/drain.test.ts pins both).
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder

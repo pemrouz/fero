@@ -56,9 +56,11 @@
 // shed bar itself (scope.evaluateSheds; when every holder covers, the entry sheds and leaves the count
 // by construction) — bounded by drainTicks (DRAIN_TICKS). Past the bound, or when nobody can be
 // drained to (no reachable holder; the solo view), it goes at once with `left` b=0 and an `undrained`
-// row naming how many partitions went with it. The ballot rules are untouched: the drain begins AFTER
-// the view change commits (the leaver is already out, so no survivor can suspect or evict it) and
-// BEFORE the process goes. Unscoped leavers never drain (no scope ⇒ nothing to count): byte-identical.
+// row naming how many partitions went with it. A leaver bounded out of the view half drains too when
+// its own view already dropped it (it committed as the proposer; the echo was lost): the rows are handed
+// over, the verdict stays b=0. The ballot rules are untouched: the drain begins AFTER the view change
+// commits (the leaver is already out, so no survivor can suspect or evict it) and BEFORE the process
+// goes. Unscoped leavers never drain (no scope ⇒ nothing to count): byte-identical.
 //
 // A CLIENT node is a VIEW of the control plane, never a voice in it (I-23, 2026-09-28
 // — DECISIONS V4-5 carried up from the data plane): it installs the views its
@@ -178,8 +180,10 @@ export class Membership {
   //! leaving — the graceful exit in progress (V4-6): ticks spent waiting, and whether the VIEW half is over
   // (`done`: the view without me committed and echoed, or the bound ran out — nothing more to knock for, and
   // no ballot may vote me back in). `drain` (DESIGN-SCALE stage 1 (b)) is the scoped leaver's second wait:
-  // defined while `left` is held for the new holders, counting its own ticks against tune.drainTicks.
-  leaving: { ticks: number; done: boolean; drain?: number } | null = null
+  // defined while `left` is held for the new holders, counting its own ticks against tune.drainTicks; `clean`
+  // is the view half's verdict it carries (the echo came: true; bounded out: false), so the final `left` is
+  // clean only when BOTH halves were — set with `drain`, read when the drain ends.
+  leaving: { ticks: number; done: boolean; drain?: number; clean?: boolean } | null = null
   #wasOpen = true // last journaled gate state, for transition events
   //! wasMember — has any view this node held ever named it? Set in install() (the boot view counts: it is
   // the view install() replaces). It splits the not-a-member gate word: a node that was in a view and is
@@ -602,32 +606,40 @@ export class Membership {
   // tails (scope.undrained — the shed bar over reachable holders); the hold ends at the shed, at the
   // bound (tune.drainTicks), or when nobody can be drained to. What was not drained is counted in an
   // `undrained` row and makes the exit `left` b=0: the rows went with the leaver.
+  //! Bounded out (clean=false) the leaver still drains when its OWN view no longer holds it: as the proposer
+  // it commits the shrunk view from the votes alone, and when every survivor's echo is lost inside leaveTicks
+  // its partitions are orphans with reachable new holders all the same (third review, 2026-10-10 — before, at
+  // R=1 the only copy went with it, uncounted). The drain then carries the view half's verdict: the final
+  // `left` is b=0 even when every row was handed over, since the commit was never proved to have reached a
+  // survivor. Still in its own view (the vote never came back), nothing froze: it goes like a crash, drains
+  // nothing and counts nothing — `undrained` is the drain window's count only.
   #finishLeave(node: Node, clean: boolean) {
     if (!this.leaving || this.leaving.done) return
     this.leaving.done = true
-    if (clean && node.armed && this.#exit(node)) return
+    if (node.armed && (clean || !this.isMember(node.uuid)) && this.#exit(node, clean)) return
     this.#left(node, clean, 0)
   }
 
   //! #exit — the scoped leaver's last question, once the view half is over: is anything this node holds not yet
-  // proved held by a reachable current holder? Something waiting with the clock on ⇒ hold (the drain begins);
-  // something waiting with no clock, or stranded (nobody to drain to) ⇒ go at once, `undrained`, left(false).
-  // Returns true when it answered (held or went); false when nothing is at stake — the caller's clean exit stands.
-  #exit(node: Node): boolean {
+  // proved held by a reachable current holder? Something waiting with the clock on ⇒ hold (the drain begins,
+  // carrying `clean`, the view half's verdict); something waiting with no clock, or stranded (nobody to drain
+  // to) ⇒ go at once, `undrained`, left(false). Returns true when it answered (held or went); false when
+  // nothing is at stake — the caller's own verdict stands.
+  #exit(node: Node, clean = true): boolean {
     const { waiting, stranded } = node.scope!.undrained(node)
-    if (waiting > 0 && node.heartbeats) { this.leaving!.drain = 0; return true }
+    if (waiting > 0 && node.heartbeats) { this.leaving!.drain = 0; this.leaving!.clean = clean; return true }
     if (waiting + stranded > 0) { this.#left(node, false, waiting + stranded); return true }
     return false
   }
 
   //! drain — the draining leaver's re-check: from the tick (counting against drainTicks) and from the scope
   // after marks moved (scope.evaluateSheds — a shed, or a holder's attestation, ends the wait the instant it
-  // lands, not a tick later). Nothing left waiting ⇒ over: clean iff nothing is stranded either.
+  // lands, not a tick later). Nothing left waiting ⇒ over: clean iff the view half was AND nothing is stranded.
   drain(node: Node, tick = false) {
     const l = this.leaving
     if (!l || l.drain === undefined) return
     const { waiting, stranded } = node.scope!.undrained(node)
-    if (waiting === 0) this.#left(node, stranded === 0, stranded)
+    if (waiting === 0) this.#left(node, l.clean === true && stranded === 0, stranded)
     else if (tick && ++l.drain > node.tune.drainTicks) this.#left(node, false, waiting + stranded)
   }
 
