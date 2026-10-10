@@ -27,6 +27,7 @@ import { cluster } from './harness.ts'
 import { verdict, split } from './leave-sweep.ts'
 import { explore } from './mesh.ts'
 import { JK } from '../kernel/journal.ts'
+import { VERB } from '../kernel/codec.ts'
 import type { Node } from '../kernel/node.ts'
 import type { NodeOpts } from '../kernel/node.ts'
 
@@ -305,6 +306,42 @@ export const twoLeavers = (seed: number, inspect?: (sim: Sim) => void): string[]
   sim.run({ until: 3000 })
   inspect?.(sim)
   check('3 s')
+  return problems
+}
+
+//! evictTwo — the stale-majority shape the base's own arithmetic allows (DESIGN-LEAVE §10.2): a ballot that evicts TWO
+// suspects at once at n=5 shrinks the view to three, whose writable majority is two, while a majority of the old view
+// is three — and 2 + 3 = 5 voters exist. n04 and n05 are cut from n01 and n02 but stay linked to n03; n01 evicts both
+// once its redial chains give up; n03 grants and is cut from n01 and n02 before the VIEW reaches it (`cut`: the first
+// VIEW n01→n03 dies on the sever and both pairs stay cut) or crashes on its grant and comes back from its dir 500 ms
+// later linked to n04 and n05 only (`crash`). `k = 1` (n05 alone cut, n04 kept) is the control the arithmetic
+// forbids: the new view's two-of-four majority and the old view's three-of-five need six voters of five.
+export const evictTwo = (seed: number, how: 'cut' | 'crash', k: 1 | 2 = 2, inspect?: (sim: Sim) => void): string[] => {
+  const sim = new Sim(seed)
+  const nodes = cluster(sim, 5, { heartbeatMs: 50, durable: true, fault: { delay: [3, 3] } })
+  sim.run({ until: 800 })
+  if (!nodes.every((x) => x.epoch === 1)) return ['never formed']
+  const far = k === 2 ? ['n04', 'n05'] : ['n05']
+  for (const f of far) { sim.partition('n01', f); sim.partition('n02', f) }
+  if (how === 'cut') sim.severOnFrame('n01', 'n03', VERB.VIEW)
+  const t0 = sim.now
+  let voted = -1, cutAt = -1, backAt = -1
+  for (let t = sim.now; t <= t0 + 15000; t += 1) {
+    sim.run({ until: t })
+    if (voted < 0 && nodes[2].journal.read().some((e) => e.kind === JK.vote && e.a === 2 && e.b === 1 && e.c === 'n01')) {
+      voted = sim.now
+      if (how === 'crash') { tearDown(sim, 'n03', true) }
+    }
+    if (voted >= 0 && cutAt < 0 && how === 'cut' && nodes[0].epoch >= 2) { cutAt = sim.now; sim.partition('n01', 'n03'); sim.partition('n02', 'n03') }
+    if (voted >= 0 && backAt < 0 && how === 'crash' && sim.now >= voted + 500) { backAt = sim.now; for (const f of far) sim.heal('n03', f); if (k === 1) sim.heal('n03', 'n04'); sim.restart('n03') }
+    if ((how === 'cut' ? cutAt : backAt) >= 0 && sim.now > Math.max(cutAt, backAt) + 6000) break
+  }
+  inspect?.(sim)
+  const problems: string[] = []
+  if (voted < 0) problems.push('not the shape: n03 never granted the eviction')
+  if (sim.violations.length) problems.push('VIOLATION ' + JSON.stringify(sim.violations.slice(0, 2)))
+  const sp = split(sim)
+  if (sp) problems.push(sp)
   return problems
 }
 
