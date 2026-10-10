@@ -368,8 +368,11 @@ reached on an unscoped node.
    them; the sweep's verdict names a screen-only row UNSAFE.
 
 *The harness.* Every family safe and live; A8 heals; floors agree at the
-horizon on every seed, and at `FERO_SCOPED_SEEDS=8` (the knob; the M7 run
-the row asks for — see the battery of the day). KNOWN_UNSAFE: A11's four
+horizon on every seed, and at `FERO_SCOPED_SEEDS=8` (the knob). The row
+asks for M7 over 1,000 seeds: that is the script tier's run, not this
+box's (its rules cap a lane at single files and one battery, so 8 per
+family is what was run; the reviewed note below says what the review ran
+on top). KNOWN_UNSAFE: A11's four
 resync seeds leave (fixed; they stay in every battery as RESYNC_SEEDS, M10
 and M11 green, a resync end on each); A3 seed 6 leaves — safe now, but
 because its 1.5 ms window between the commit and the cut does not open on
@@ -387,6 +390,114 @@ trajectory; no kernel law they check changed.
 (pre-existing, unchanged). The record's I6 cadence bound now reads: within
 one tick of the owner's stamp, at the next (re)admit or drain, or within
 ⌈c / aeFan⌉ ticks for a pair whose announcement was lost.
+
+**Note, 2026-10-10 (stage 2 reviewed).** One review, ten findings, no
+blocker, no hole in the protocol argument (the reviewer tried an
+announcement lost on a cut, a paused link skipped by a sweep lap, a joiner
+mid-announcement and a holder set changing between announce and answer:
+each heals through the re-admit, drain or install round or the
+never-answered leg). The one major finding was a hole in the HARNESS
+argument, fixed in §6 first, then in the harness, with no kernel change.
+
+*The harness could not see either repair leg.* The §7 gate says "harness
+green with the stage-2 mutations caught" and §6 lists "a dropped dirty site
+(M7)". The reviewer dropped the dirty mark at the stamp site and the sweep
+went 13/13 green; switched the sweep off (`AE_FAN` 0) and every family
+stayed safe and live. Why: M7's floor form checks floors, and the sim loses
+no frame on a live link — every loss it can make (a cut, a pause, an
+install) is followed by a round of its own, so floors agree whether or not
+the owner announces and whether or not the sweep runs. What the two legs
+repair is KNOWLEDGE: what each holder knows of its co-holders (its marks),
+which compaction and GC will wait on. So M7 gained its knowledge form
+(`marksAgree`, §6 I6 as amended): at the horizon every holder's marks of
+each co-holder equal that co-holder's floors (durable marks the durable
+floors). It runs in every family's verdict (`notLive`) and is green on
+every family at 2 and 8 seeds per family. The two stage-2 mutations in the
+runner: `no-sweep` (aeFan 0, the dirty leg intact) is red on A8 seed 3
+(n=5 R=3) — "n02 knows n90's floor for 'p9' lane n01 as 4; n90 is at 30 —
+never heard": a co-holder↔co-holder pair has no owner to announce for it;
+`drop-dirty` (a per-event monitor empties every stepped armed node's dirty
+set, with the sweep off so it cannot heal what the dirty leg should have)
+is red on A8 seed 1 (n=3 R=2) — "n01 knows n02's floor for 'p319' lane n01
+as 7; n02 is at 27", where `no-sweep` alone on that seed is green (the
+control: at R=2 every pair has its owner). Neither is a safety hole:
+`unsafe` stays empty, floors still agree. Mutation-checked against the
+kernel once each: the dirty mark removed from node.ts's stamp site turns
+the control red; `AE_FAN` 0 turns the seed-3 clean run red. Both M7 forms
+now count what they compared (`eng.floorLanes`, `eng.markPairs`) and the
+family test asserts both non-zero wherever a seed drew R ≥ 2 — the
+reviewer noted the floor form had no counter (it compared 29-89 lanes on
+18 of 22 runs, nothing at R=1, lawfully).
+
+*The crossing double ship.* The new `resync` comment said a feeder's r=1
+crossing the ask "costs no duplicate ship". The reviewer measured the
+opposite: at a tick-aligned scoped failover the new feeder shipped its
+whole held subset twice on 30 of 30 seeds (the spoke answered the crossing
+r=1 with r=0, and in resync it says d = {}). The lane dropped the
+duplicates; the cost was a second download per crossing (about
+RTT/heartbeat of failovers). Now a feeder's r=1 that arrives inside the
+ask's first tick gets no answer at all: the ask is on its way on this very
+link (the single-feeder rule: only the primary reaches that arm) and its
+reply is the end; the gate the crossing digest carried is still read. Out
+of resync, and once the ask is a tick old (kernel probe B's rule), nothing
+changes. Pinned in kernel/client.test.ts and, at the sim level, by the
+four-seed scoped failover in sim/scale-probes.test.ts, which now cuts at
+the feeder's tick boundary and asserts exactly one `aeShip` toward the
+spoke (two before).
+
+*The failover bug's second path.* The new kernel test's first run found
+it: when the feeder dies with NO other link up, the linkDown arm finds
+nobody, and the feeder admitted later is elected at the admit site — which
+sent the spoke's REAL tails. The same shape as the bug stage 2 fixed (the
+tails came from a feeder that held a different subset). A scoped spoke that
+holds anything, or has a resync open, now resyncs onto a feeder elected at
+the admit too (the open-resync case unions the sweep set, as the linkDown
+arm does). A spoke that holds nothing yet asks its first feeder as before:
+no byte of a fresh spoke's start changes, no journal row; unscoped is
+unchanged. Pinned in the same kernel test with the first-feeder and the
+unscoped controls.
+
+*The smaller findings.* The gapless bit's last-value clearing on the HAVEQ
+leg had no test (reversing it left everything green): now asserted on both
+legs, with a pure probe leaving the bit alone. The §7 row's "skewed frames
+dropped at a mid-announcement install" is now tested as an INSTALL between
+the owner's announcement and the co-holder's answer (the answer is dropped
+whole, the install's round re-asks at the new epoch, an answer at the new
+epoch converges the marks). The RESYNC_SEEDS comment overstated what the
+A11 sweep pins: as a sweep those seeds catch the two spoke fixes together
+(each alone leaves them green); each alone is pinned in
+kernel/client.test.ts. `#gapless` walks the lanes with entries of p, not
+every lane with a floor for p: §3 now says so, with the stage-4 note that
+the bit must be redefined once compaction drops entries below the floor
+(the §3 "tail = floor" definition reads false at every compacted holder).
+
+*What the reviewer ran that the lane could not.* The row's gate names the
+sim:scale scoped scenarios; this box's rules keep a lane off sim:scale.
+The review ran them alone at nice 15 on the built tree: exactly-3-of-100
+5/5, rescope-storm-100 2/2, spokes-20-on-50 2/2 (unscoped, twenty clients
+failing over at once: the new client `q`), all green. The row's "M7 over
+1,000 seeds" is the script tier's; what ran is 8 per family, twice (the
+build and the review).
+
+*Left as questions and records, not code.* **P2** is pinned at the law's
+1,600 frames and 249,878 bytes per idle tick, 2.5× above §1's and §8's
+"under 100 KB" target: §3's own arithmetic gives 1,600 frames and a sweep
+frame is about 156 bytes, so the record's target missed its own per-frame
+body. 11.7× under today, but a design target missed, not a moved number —
+the owner should accept it, or not, in the V4-39 text (stage 5's "lanes
+changed since the last answer" is the next cut). **R2** (§8: armed commit
+with the dirty mark ≤ 1.05× without, back-to-back) has no `*.perf.ts` pin:
+a with/without ratio needs a kernel switch for the mark, and no measurement
+deserves one. It is judged structurally — one `Set.add` of an already-held
+string per committed record on an armed owner, nothing on the inbound
+path, nothing unscoped — and by the build's scratch A/B (20,000 armed
+commits, medians of 7, interleaved base/stage2/base/stage2: 173.2 / 195.2
+/ 203.1 / 158.8 ms, 7.9-10.2 µs per commit: the two trees differ less than
+two runs of one tree). P3 is the pin that would move if the mark cost a
+frame. The parked branch's two scoped second-cut sim probes were not
+carried over: the kernel-level mid-resync test pins the shape, and on the
+new kernel a scoped failover is itself a resync, so the one assertion
+those probes would add is "one resync end where there were two".
 
 ## §0 The decision, in ten lines
 
@@ -609,8 +720,13 @@ as a rule break; it is a cadence change on the same bytes.
 floor}}}` (scope.ts:329-330). Three optional top-level maps join it, all
 armed-only: `d: {p: {o: durable floor}}` from durable nodes (today `md`
 rides only on a HAVEA ok answer, :382-386; GC and shed need it on both
-legs); `g: [p…]`, the partitions for which this node is **gapless** (its
-content tail equals its floor on every lane of p); `x: [p…]`, the
+legs); `g: [p…]`, the partitions for which this node is **gapless** (on
+every lane that holds entries of p, the content tail equals the floor —
+the code's definition since stage 2, narrower than "every lane of p": a
+lane with a floor and no entries of p cannot arise before stage 3, and once
+compaction drops entries below the floor, "tail = floor" reads false at
+every compacted holder, so stage 4's R2 must redefine the bit before it
+reads it; noted at the stage-2 review); `x: [p…]`, the
 partitions this node has just released (sent by `#shed`, :670-687, in the
 same step as the boot write). They are top-level because `onHaveQ`
 iterates a partition's object as lanes (:354). HAVEA's per-partition object
@@ -914,7 +1030,20 @@ that stepped (STATUS.md:66).
   tick of x's floor moving, or at the next (re)admit, or within ⌈c/aeFan⌉
   ticks at worst, latches x and folds the gap. Monitor **M7
   repairLiveness**: once writes stop, every partition's holders have equal
-  floors within ⌈c/aeFan⌉ + `stageTicks` ticks.
+  floors within ⌈c/aeFan⌉ + `stageTicks` ticks. *Amended at the stage-2
+  review (2026-10-10):* M7 has two forms. The floor form (`floorsAgree`)
+  cannot see either repair leg in the sim — a sim link loses no frame, and
+  every loss the sim can make (a cut, a pause, an install) is healed by a
+  round of its own (the re-admit, drain or install round) — so it stays
+  green with the owner's dirty mark dropped and with the sweep off. The
+  KNOWLEDGE form (`marksAgree`) is what the two legs repair: once writes
+  stop, every holder's marks of each co-holder equal that co-holder's floors
+  (h HEARD x; durable marks the durable floors). It sees both legs: with the
+  sweep off, a co-holder↔co-holder pair of an R=3 partition (neither is the
+  owner, so neither announces for it) never hears the other's floor again
+  after a write; with the dirty mark dropped too, an owner↔co-holder pair
+  does not either. Stale knowledge is a liveness hole (compaction and GC
+  wait on marks), never a safety one; both forms are `notLive` in the sweep.
 - **I7 Release safety** (the goal). After a release of tombstone t for
   cell k in p at any node, no record stamped below t, for k or any cell
   under k, is ever applied at any node that holds p. Holds by R1 + R2 + R3
@@ -1025,7 +1154,10 @@ budget: no census (A3, A5); lane accounting off (A1, A7); R2 without the
 gapless bit (A2, G4); volatile instead of durable floors (A4); release of
 the version only, lanes untouched (G1, every family); teach without the
 `keep` filter (A3); compaction over orphans or over an acquiring holder's
-zero (M2); a dropped dirty site (M7); a dropped index site (M4). Note the
+zero (M2); a dropped dirty site (M7's knowledge form, measured with the
+sweep off on an R=2 shape where the sweep-off run alone is green — A8 seed
+1) and the sweep switched off (M7's knowledge form on an R=3 shape — A8
+seed 3); a dropped index site (M4). Note the
 operator critique's point: deleting log.ts:160 alone does NOT make GC fire
 under scoping (today's rule needs every member at every lane's tail, log.
 ts:124-135, which a scoped member never is), so the stage 0 proof that the
