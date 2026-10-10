@@ -355,7 +355,11 @@ reached on an unscoped node.
    what a stale reply shipped stays in the fold; in resync a client
    announces d = {} on every digest; a client whose resync ask is a tick old
    answers a feeder's r=1 with an r=1 of its own (the paused-feeder late
-   end: one tick late at most, no re-ship at every heartbeat); and a client
+   end: one tick late at most, no re-ship at every heartbeat) — *amended at
+   the second review (2026-10-10): that tick-age rule bought a ship per
+   heartbeat on a link slower than one heartbeat; now the spoke re-asks only
+   on the feeder's drain digest (`h: 1`) and sends no floor in resync, see
+   the note below*; and a client
    of a SCOPED feeder (`replicas=` in the feeder's HELLO contract,
    `node.feederScoped`) resyncs at every failover, unioning the sweep set
    when begun mid-resync. The sim's scoped clusters now carry the api's
@@ -498,6 +502,91 @@ frame. The parked branch's two scoped second-cut sim probes were not
 carried over: the kernel-level mid-resync test pins the shape, and on the
 new kernel a scoped failover is itself a resync, so the one assertion
 those probes would add is "one resync end where there were two".
+
+**Note, 2026-10-10 (stage 2, the second review: one ask per resync).**
+The second review shipped the tree (772 tests, 50 pins, both run by the
+reviewer) with one minor finding and three nits. The minor was real and
+is fixed; the fix is one key on the wire and a simpler spoke.
+
+*The finding.* In resync every digest a spoke sends says d = {}, so every
+ask makes the feeder ship its whole held subset — and the ask's reply is
+the end. The spoke re-asked on a tick-age proxy: its own heartbeat floor
+every tick when its uuid sorted below the feeder's, and an answer to the
+feeder's heartbeat r=1 once the ask was a tick old when the feeder's
+sorted below. On a normal link that was one ship (50 of 50 runs, both
+orderings, every cut phase). On a link slower than one heartbeat it was
+one ship per tick until the reply landed: at 60 ms each way with a 50 ms
+heartbeat, 2 and 3 ships; at 200 ms each way, 5 (feeder floors) and 9
+(spoke floors), on every seed and phase, re-measured here. Every run
+ended correct (B arrived, A swept, screen = kernel, one resync end): the
+cost was downloads, not rows. The built note's item 7 said the late end
+"never re-ships at every heartbeat"; that was true of a paused feeder, not
+a slow one. Stage 2 widened the exposure (d = {} stays after records
+land, and every scoped failover is now a resync); the api's default
+heartbeat is 500 ms, so a real link pays this above half a second of RTT.
+
+*Why the proxy, and what replaces it.* The spoke could not tell a
+feeder's heartbeat r=1 from its drain r=1 — both are `{d, r: 1}` — and
+the tick age stood in for "the reply should have come by now". The fact
+it lacked: on this FIFO link the feeder answers an ask in the very step
+that handles it, so an r=1 that lands before the reply was SENT before
+the feeder handled the ask (the heartbeat floor crossing it), whatever
+its age; and the only way a live feeder leaves an ask unanswered is its
+queue overflowing while paused — the ask swallowed on arrival
+(kernel/node.ts, the paused branch of the DIGEST handler) or its reply
+dropped with the ship (kernel/link.ts `ship`: an overflow drops the whole
+queue, and the shell steps `pause` inside a send, so a reply queued
+behind a big ship can go with it). The feeder knows both: that is
+`droppedWhilePaused`, and its drain digest is the one r=1 it sends
+because of it. So now that digest, toward a CLIENT, carries `h: 1`
+(`#sendDigest`; member digests never carry it — member bytes unchanged),
+and a spoke in resync (1) sends no heartbeat floor to its primary (the
+ask is the floor), (2) answers a feeder's r=1 that carries `h: 1` with an
+r=1 of its own (a fresh q) — the exchange ships everything and its reply
+ends the resync, one exchange after the drain, at any age of the ask —
+and (3) answers any other r=1 from its feeder with nothing. A feeder that
+dies is a failover, which asks afresh (`#resyncBegin`). The `ticks`
+counter is gone. One ship per resync on any link, both orderings, every
+phase (the four-seed and the new slow-link tests in sim/scale-probes;
+2 seeds × 2 phases × 2 orderings at 200 ms each way: exactly one ship,
+where 5 and 9 stood). The one extra ship left: a drain whose drop
+happened before the ask arrived re-asks once more than needed — one per
+drop event, never per tick.
+
+*The wire.* DIGEST gains the optional key `h` on a server's drain digest
+toward a client; no MAGIC bump (V4-14), the codec comment names it with
+`q`. An unscoped spoke's digest bytes across a failover, a full outage
+and a re-admit are identical to base once q is stripped (the reviewer's
+probe re-run on this kernel: 223/225/224 digests on three seeds, 675
+lines, no difference); inside a resync window an unscoped spoke now sends
+fewer digests (no floor) — the one place its bytes change.
+
+*The tests.* kernel/client.test.ts: probe B is rebuilt around the drain
+digest — the drain r=1 INSIDE the ask's first tick is answered at once
+(the case the review found untested: before, it was swallowed and the
+end came one tick late), a heartbeat r=1 gets no answer, the tick sends
+no floor, the floor is back after the end, a drain digest out of resync
+is answered with the tails like any r=1; the crossing test's tail follows
+the new rule; a feeder-side test pins `h: 1` toward a client and no `h`
+toward a member. sim/scale-probes.test.ts: the slow-link failover. Red
+on the previous kernel: client 19/22 (probe B at "the drain digest is
+answered with a request", actual []; "the client's drain digest says
+h: 1", actual undefined; the crossing test at "no floor in resync", two
+digests for one) and the sim test at "O shipped its held subset to the
+spoke exactly once", actual 5. Mutation-checked once each: `h` sent on
+member digests too turns the member-bytes assertions red (client and
+node tests, 3 reds); every feeder r=1 answered in resync turns probe B,
+the crossing test and the slow-link sim test red (actual 6 ships). No
+perf pin moved (sim/scale, kernel/node, kernel/scope, kernel/alloc,
+tests/baseline, api/data run alone: all pass; 59,500, 104,050, the idle
+law, fan-out 99, R1 ratio 0.91).
+
+*The nits.* The counted-floors test is named after the floors it now
+asserts (its name still printed the pre-stage-2 numbers). The bundled
+commit (5ef923e: two kernel fixes and two unrelated test additions) stays
+as it is — no rewrite of commits already on the branch — and is noted for
+the integrator. The crossing comment's premise ("its reply is the end"
+for any ask less than a tick old) is gone with the rule it described.
 
 ## §0 The decision, in ten lines
 
