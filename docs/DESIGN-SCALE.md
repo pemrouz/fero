@@ -359,7 +359,11 @@ reached on an unscoped node.
    the second review (2026-10-10): that tick-age rule bought a ship per
    heartbeat on a link slower than one heartbeat; now the spoke re-asks only
    on the feeder's drain digest (`h: 1`) and sends no floor in resync, see
-   the note below*; and a client
+   the note below; and at the third re-check (2026-10-10): a feeder whose
+   answer tears — its queue overflowing partway through the ship — resumes
+   it at the drain, so a torn ship is a late reply, never a missing one,
+   and the drain digest's `h: 1` is for an ask that arrived while the link
+   was paused, see that note*; and a client
    of a SCOPED feeder (`replicas=` in the feeder's HELLO contract,
    `node.feederScoped`) resyncs at every failover, unioning the sweep set
    when begun mid-resync. The sim's scoped clusters now carry the api's
@@ -538,7 +542,14 @@ dropped with the ship (kernel/link.ts `ship`: an overflow drops the whole
 queue, and the shell steps `pause` inside a send, so a reply queued
 behind a big ship can go with it). The feeder knows both: that is
 `droppedWhilePaused`, and its drain digest is the one r=1 it sends
-because of it. So now that digest, toward a CLIENT, carries `h: 1`
+because of it. *Corrected at the third re-check (2026-10-10): that
+premise was false. The likelier case is the SHIP torn and the reply
+surviving behind its last frames — the ship loop ran on past the clear,
+so the spoke's tails rose above the hole and its resync ended over it.
+The feeder now resumes a torn answer at the drain and the reply follows
+the whole ship, so the one ask a live feeder leaves unanswered is the
+swallowed one; see the third re-check's note below.* So now that
+digest, toward a CLIENT, carries `h: 1`
 (`#sendDigest`; member digests never carry it — member bytes unchanged),
 and a spoke in resync (1) sends no heartbeat floor to its primary (the
 ask is the floor), (2) answers a feeder's r=1 that carries `h: 1` with an
@@ -587,6 +598,86 @@ commit (5ef923e: two kernel fixes and two unrelated test additions) stays
 as it is — no rewrite of commits already on the branch — and is noted for
 the integrator. The crossing comment's premise ("its reply is the end"
 for any ask less than a tick old) is gone with the rule it described.
+
+**Note, 2026-10-10 (stage 2, the third re-check: a torn answer).** The
+third re-check ran the tree (774 tests, 50 pins) and found one major,
+with a probe: a scoped spoke could lose rows for good when it failed
+over or re-admitted and the new feeder's link backed up during the
+re-download.
+
+*The finding.* kernel/link.ts `ship` clears the WHOLE queue when a
+paused link's bounded queue overflows, and the shell steps `pause` from
+inside a send (shell/runtime.ts). The DIGEST handler's suffix ship
+checked `paused` only on entry, so it could pause partway, have its
+queue cleared, and keep going: the ship's last frames and the r=0 reply
+went out at the drain, the spoke's lane tails rose above the hole, the
+resync ended on the reply (its q matched), and the ghost sweep removed
+the hole's rows from the screen. The drain digest (`h: 1`) was then
+answered with those raised tails, so the feeder shipped nothing. The
+probe — a real feeder Node against a client Node, pausing re-entrantly
+after the second frame of the ship, queue bound 4 — lost 5 of 10 rows;
+with 600 rows at the default bound of 256, 257. The second review's
+premise ("the only way a live feeder leaves an ask unanswered is … the
+ask swallowed, or its reply dropped with the ship") was false: the
+likelier case was the ship torn and the reply surviving. Stage 2 put
+this on every scoped failover and re-admit (each is a resync, and a
+resync's ship is the whole held subset) and added the sweep that takes
+rows off a screen that showed them; the class itself is older — a
+spoke's FIRST connect (d = {}) and an unscoped member's digest exchange
+lost rows the same way on the base tree. No sim test could see any of
+it: the sim posts pause and drain between steps, never inside a send.
+
+*The fix (kernel/node.ts `#answer`).* The ship stops at the first
+clear; the link stays unsynced; no reply goes out; the rest of the
+answer is kept on the link (`torn`: the peer's tails, the digest's r
+and q, and the first frame the socket did not take — encodeRuns reports
+each frame's first record through an optional `starts` out-param). The
+drain handler resumes it from that frame BEFORE the drain digest and
+the drain round, and the reply follows the whole ship. A resume that
+tears again leaves the drain digest for the drain that completes it, so
+the re-ask never goes out ahead of the rest of the ship; a flush that
+fills the socket again waits for the next drain. The link counts its
+clears (`drops`); `droppedWhilePaused` stays the sticky debt the drain
+settles. The reviewer's trial — stop the ship, send no reply, let the
+drain's `h: 1` re-ask — was not taken as it stood: a spoke in resync
+asks with d = {}, so it would download from zero again, and a ship
+bigger than the socket plus the queue that tears at the same frame each
+round would never end (a livelock where the loss was). The resume
+delivers at least what the socket takes per drain, so it always ends.
+The spoke is unchanged: a torn ship is a late reply, never a missing
+one; the `h: 1` re-ask is for an ask that arrived while the link was
+paused. The first-connect case and the unscoped member case are fixed
+by the same rule, with tests; the journal's aeShip row on a torn ship
+counts what the socket took.
+
+*What it changes for the UNSCOPED member path.* In an unscoped cluster
+a member's digest answer ships suffixes too, so a torn one now stops at
+the tear, leaves the link unsynced (live records withheld until the
+exchange; before, they flowed over the hole) and resumes at the drain.
+This can only happen under a real socket: the sim never pauses inside a
+send, so the golden (59,500 and 104,050 events), the 300-seed sweep,
+the idle law, fan-out 99 and every sim test are byte-identical (all
+re-run; no pin moved; kernel/node, kernel/scope, kernel/alloc,
+sim/scale, tests/baseline and api/data perf files pass alone).
+
+*The tests.* kernel/client.test.ts: four tests on a real feeder Node
+and a client Node, with a `send` hook that steps `pause` from inside a
+send as the shell does — the scoped failover resync (the finding: two
+frames reach the socket, nothing is queued past the tear, `torn` holds
+seq 5 for q 2, no reply; the drain ships eight frames, then the reply,
+then `h: 1`; the resync ends with every row and sweeps nothing; the
+drain digest is answered with whole tails and ships nothing more), a
+resume that tears again (torn at 9 after 5; the drain digest waits; the
+second drain finishes; aeShip 2, 2, 6), a spoke's first connect (no
+resync; the tails sit at the tear), and an unscoped member link (member
+bytes: no q, no h). Red on the previous kernel at: "nothing queued past
+the tear" (actual 4), `torn` undefined, "the link stays unsynced over
+the tear" (actual true); the reviewer's probe went 5 of 10 → 10 of 10,
+first connect included. Four mutations, each caught: no stop at the
+tear (4 red: queued 3), no resume at the drain (4 red), no wait on a
+second tear (1 red: the drain digest went out ahead), resume from the
+origin's start instead of the tear (4 red: ten frames re-shipped where
+eight).
 
 ## §0 The decision, in ten lines
 
