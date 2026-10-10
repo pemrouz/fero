@@ -189,8 +189,10 @@ is not reported clean. Heartbeats off: no drain clock (the shed poll
 never runs either), so the leaver decides at once from the evidence. A
 leaver cut off while draining is already out of the view: the survivors
 never suspect or evict it (suspicion ranges over view members), so V4-20
-cannot race the drain; the leaver goes at the bound, or at once once
-every holder is unreachable. Two leavers at once: the first drains to
+cannot race the drain; the leaver goes at the bound, or at the next tick
+once every holder is unreachable (a link loss is not a tick: `linkDown`
+only aborts latches, and the bar is re-read on the heartbeat). Two
+leavers at once: the first drains to
 the second (a live holder, leaving or not), which drains on. M9 flipped
 from red-today to green in the scoped sweep (a leave-drain violation is
 now unsafe) and in sim/scale-probes.test.ts (3→2→1 at R=1, two leavers,
