@@ -7,6 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node, MAX_REDIALS, MEMBER_REDIALS } from './node.ts'
 import { LEAVE_TICKS, LEAVE_WINDOW, MAX_PULLS } from './membership.ts'
+import { LS } from './link.ts'
 import { Mesh } from '../sim/mesh.ts'
 import { MAX_PENDING } from './write.ts'
 import { JK } from './journal.ts'
@@ -678,6 +679,27 @@ test('the knock window closes with the link: a link loss is not a tick, but from
   assert.deepEqual(h.of('left'), [['left', false]], 'LEAVE_TICKS + 1 unlinked ticks: it goes like a crash, as before')
   assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 3, done: true, drain: undefined })
   assert.ok(h.node.membership.leaving!.total < LEAVE_WINDOW, 'the bound ended it, not the window')
+})
+
+test('the knock window counts no link that is DEAD on a wire fault: the kernel marks the link dead and asks the shell to close it, but the link stays admitted until linkDown arrives — the bound counts from the fault, not from the close', () => {
+  const h = formedPair()
+  h.node.step({ kind: 'leave' })
+  for (let i = 0; i < LEAVE_TICKS + 2; i++) h.tick()
+  assert.equal(h.of('left').length, 0, 'past the bound, bb linked: knocking on')
+  //! a frame whose body length exceeds MAX_FRAME is a wire fault: the link is dead at once (no more frames dispatch on
+  // it), the shell is asked to close it, and the linkDown that follows is a LATER event — until then the link is still
+  // in node.links as admitted. A dead link keeps no window open: bb cannot read a knock on it.
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: new Uint8Array([0xf3, 0, VERB.LEAVE, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0]) })
+  assert.deepEqual(h.of('close').map((e) => [e[1], e[2]]), [[1, 'wire-fault']], 'the kernel asked the shell to close the link')
+  assert.equal(h.node.links.get(1)!.dead, true)
+  assert.equal(h.node.links.get(1)!.state, LS.admitted, 'still admitted: linkDown has not arrived')
+  for (let i = 0; i < LEAVE_TICKS; i++) {
+    h.tick()
+    assert.equal(h.of('left').length, 0, `dead-link tick ${i + 1}: inside the bound`)
+  }
+  h.tick()
+  assert.deepEqual(h.of('left'), [['left', false]], 'LEAVE_TICKS + 1 ticks after the fault: it goes like a crash')
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 3, done: true, drain: undefined }, 'every tick since the fault counted toward the bound')
 })
 
 test('the knock window needs the clock: with heartbeats off a leaver knocks once and waits, as before — no tick is counted either way, and the answer still ends it', () => {
