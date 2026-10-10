@@ -1444,7 +1444,11 @@ fellow leaver it has not heard from yet counts for a tick or two, no longer.
 
 What it costs: a slow Ctrl-C while the survivor stalls, up to the window (an operator who sets 30 s
 waits up to 30 s for a stalled peer, by choice), and the same wait when every member it can reach is
-leaving too and the rule above has not yet heard their knocks; the shell cap grows with it, so
+leaving too and the rule above has not yet heard their knocks; the same wait, ending unclean, when the
+survivor is healthy but the ballot cannot complete — at three members with one crashed and not yet
+voted out, the leave ballot's new set is {stayer, dead} and needs the dead member's vote, so the leaver
+knocks for the whole window and goes `left` b=0 all the same, where before the window it went at the
+fifth tick (the wave 5c review; the built note below has the numbers); the shell cap grows with it, so
 `destroy()` still never hangs; one config key for the window (the tune row has none today: `api/index.ts:455-457` maps
 only `redial.tries` to the table), a README row, a `config.test.ts` case, and the sim's stall model
 (a constant delay on every link of one node, `sim/leave-sweep.ts:78-85`) gains a knob to prove the
@@ -1482,6 +1486,24 @@ because no ballot rule moves.
   `gate()` and `majority()` are byte-identical (the diff of the kernel's code lines, comments
   stripped, is the two counters, the set, `#answerable`, the constant and the three `#leavers`
   lines). No new frame, no new journal kind. `#leavers` is read by `#answerable` alone.
+- *A cost the paragraphs above did not name (the review, 2026-10-10).* A healthy survivor whose
+  ballot cannot complete: three members, one crashed and not yet evicted, and a second one stops. The
+  lowest stayer's leave ballot leaves the leaver out, so its NEW set is {stayer, dead}, whose majority
+  needs the dead member's vote: it can never commit. The leaver knocks for the whole window and goes
+  unclean all the same, where before the window it went at the fifth tick. Measured on the sim at
+  heartbeat 50 with the third member cut 200 ms before the stop: `left` b=0 at 250 ms with a 4-tick
+  window, 850 ms at 16, 3250 ms at 64; at the default cadence Ctrl-C takes about 8.5 s, and
+  `fero.spawn`'s 5 s grace turns the verdict into `null`. The knocks also starve the eviction that
+  would make the stop live: the eviction branch of the tick runs only with no ballot in flight, the
+  leave ballot ages out inside a tick (`proposalAge`), and the next knock, landing between ticks,
+  re-proposes it through `onLeave` before the branch runs again — in the 64-tick run the stayer
+  proposed the stuck epoch-2 ballot six times over and never evicted the dead member, though its
+  redial chain had long given up. The outcome is no worse than the base (the stayer sits `minority` in
+  the old view either way, and with the eviction run first — the member cut 800 ms before the stop —
+  the stop is clean in a tick under every window), but the wait is new and a longer `leave.ms` cannot
+  help this shape. A fix is proposer logic (a knock must not reopen an aged-out leave ballot ahead of
+  an evictable suspect), outside this candidate's zero-risk scope: recorded in STATUS as an idea for
+  the leave chain. The README's Membership and Process bullets name the shape.
 - *The window and its key.* The tune row `leaveWindow`, default `LEAVE_WINDOW` = 16 ticks: the
   drain's number, so the README says 16 heartbeats for both halves of a scoped stop; 8 s at the
   default cadence, which covers the stalls a process meets (a long GC pause, a swap-in) and keeps an
@@ -1493,11 +1515,19 @@ because no ballot rule moves.
   shell's destroy cap is `max(leaveWindow, leaveTicks) + (scoped ? drainTicks + 1 : 0) + 2` ticks:
   18 ticks (9 s) unscoped, 35 ticks (17.5 s) scoped when the survivor was stalled AND a holder is slow
   to attest; the usual stop is one or two heartbeats. `fero.spawn`'s 5 s grace is not raised (the
-  README's Process bullet says a stop cut short reads `null`).
+  README's Process bullet says a stop cut short reads `null`). The cap is clamped to Node's timer
+  ceiling (2^31 − 1 ms, about 24.8 days): `setTimeout` fires a longer delay after 1 ms, so a huge
+  `leave.ms` — an operator meaning "wait as long as it takes" — made every stop with a slow survivor a
+  crash within milliseconds, before the kernel ticked once (the review; `tests/knock.test.ts` pins the
+  3e9 ms case: clean after the wake with the clamp, `took 0 ms` without it).
 - *The numbers.* The sweep draws the stalled survivor two ways now (`RunOpts.model`). The new
   default is a PAUSE (`Sim.pause`: every event bound for the node held in order and replayed at the
-  wake; `cluster()` takes `tune`; `run`/`run2` take the window and a stall factor): the survivor
-  wakes inside the window and reads everything at once, the shape the window exists for. The old
+  wake, each as its own event, so the monitors run between them as after every other event — the
+  first build replayed the batch in one task, and one-view-per-epoch sampled the woken node once per
+  batch: on 12 of 64 wakes in family 1 it passed through two to four views unsampled (the review);
+  fixed, `sim/exec.test.ts` pins one pass per replayed event, and no sweep pin moved; `cluster()`
+  takes `tune`; `run`/`run2` take the window and a stall factor): the survivor wakes inside the window
+  and reads everything at once, the shape the window exists for. The old
   model stays beside it as `'delay'`: the survivor keeps running and every frame to and from it is
   held for the stall (a survivor alive but SLOW, each knock and each answer paying the stall in
   turn), lifted once the leavers are gone. The build first claimed the delay model could never let
@@ -1527,9 +1557,12 @@ because no ballot rule moves.
   24, the seeded family's 8, the crash grid's 10, pledgeTwo's, evictsplit's and joinsplit's settled
   sets, `evictTwo`, `evictTwoB` and `keptBallot` red exactly as pinned, `flapDuringBallot` and
   `proposerCrash` writable everywhere, the explorer's 300 clean. Kernel tests: eight for the window
-  in `kernel/membership.test.ts` (seven red on the base kernel at the fifth tick; the eighth, a
-  member link dead on a wire fault before the shell's linkDown, pins the `!dead` check of
-  `#answerable`), the two round-1 two-leaver shapes on real Nodes; two `kernel/drain.test.ts` cases
+  in `kernel/membership.test.ts` — six red under the base rule (every leaving tick counts) at the
+  fifth tick, among them the one for a member link dead on a wire fault before the shell's linkDown,
+  which also pins the `!dead` check of `#answerable`; the heartbeats-off and two-leaver tests are
+  guards, green under the base rule and red on the base kernel only by the `total` field's shape (the
+  review counted; the build's "seven" counted the shape) — and the two round-1 two-leaver shapes on
+  real Nodes; two `kernel/drain.test.ts` cases
   that assumed the bound fires with both member links up now wait for the window (the links could
   still echo). Shell: `tests/knock.test.ts` stops the survivor's process with SIGSTOP for 1.2 s — the
   real stall — and the leave is clean with the window open, `left` b=0 at the fifth tick with it
@@ -1540,8 +1573,17 @@ because no ballot rule moves.
   layer's near-miss rule (a top-level object within two edits of a declared group is a typo) pulled
   in live, lease, level, league, save, wave and lane: a sibling resource so named refused to start.
   The base had the same hole for teams (`seams`) and dial (`diag`). Fixed in `api/config.ts`: the
-  object is read too — one that holds a declared top-level option is a resource's rung and is left
-  alone; one that holds none (`heartbeats: { ms }`, `lease: { ms }`) is still the typo.
+  object is read too, for the group's OWN options — a near miss that holds one of them
+  (`heartbeats: { ms }`, `lease: { ms }`, `seam: { validation }`) is the typo and the hint names that
+  leaf; one that holds none (`live: { heartbeat: … }`, `teams: { dir: … }`, `live: { heartbeats: … }`)
+  is a resource's rung, whatever its name is near, and a typo inside it is that resource's to catch
+  when it composes. (The first fix asked for ANY declared top-level name in the object, which let
+  `seam: { validation }` pass silently where the base refused it and blamed `leave.ms` for a typo
+  inside `live`'s rung: the review's second look, the same day.) And `leave` is a reserved resource
+  name now, as every declared top-level name is (V4-10: a resource may not be named after a group): a
+  resource named exactly `leave` and configured through its own rung (`FERO_LEAVE_HEARTBEAT_MS`,
+  `--fero.leave.dir`) stops itself and every sibling from starting with `unknown option
+  'leave.heartbeat'`. The README lists the reserved names; the call layer is not affected.
 - *What remains.* A survivor stalled longer than the window (the I-20 line narrows to it); a survivor
   whose link is down (the bound alone, as before); the three splits of §10.2, untouched by design.
 
