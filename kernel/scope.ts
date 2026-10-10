@@ -835,7 +835,8 @@ export class Scope {
   }
 
   //! shedWaitingOn — the H7 surface: uuids currently pinning any orphan's shed (≤ view size).
-  // Reads the SAME tails bar as evaluateSheds — the surface must name who actually pins the shed.
+  // Reads the SAME bar as evaluateSheds and undrained — `covers`, the one predicate — so the surface
+  // names exactly who pins the shed and cannot drift from it (the third review found it re-inlined).
   shedWaitingOn(node: Node): string[] {
     if (!node.armed) return []
     const ring = node.writes.ring
@@ -843,11 +844,9 @@ export class Scope {
     const waiting = new Set<string>()
     for (const [p, e] of this.entries) {
       if (e.state !== SCOPE.orphan) continue
-      const tails = e.tails ??= this.#tailsOf(node, p)
+      const lanes = Object.entries(e.tails ??= this.#tailsOf(node, p))
       for (const holder of ring.holders(p, node.replicas)) {
-        if (holder === node.uuid) continue
-        const per = e.marks.get(holder)
-        for (const [o, s] of Object.entries(tails)) if ((per?.get(o) ?? 0) < s) { waiting.add(holder); break }
+        if (holder !== node.uuid && !covers(e.marks.get(holder), lanes)) waiting.add(holder)
       }
     }
     return [...waiting]
