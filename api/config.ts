@@ -61,6 +61,10 @@ const LEAVES = table<{ layers: string; why?: string; object?: true }>({
   'heartbeat.ms': { layers: 'fcep' },
   'redial.ms': { layers: 'fcep' },
   'redial.tries': { layers: 'fcep' },
+  //! leave.ms — the knock window (DESIGN-LEAVE §10.7): how long a clean stop keeps asking a connected member to
+  // vote it out, in milliseconds; the composer turns it into the kernel tune row leaveWindow (÷ heartbeat.ms,
+  // rounded up). 0 means the four-heartbeat bound alone (today's behaviour before the window).
+  'leave.ms': { layers: 'fcep' },
   'journal.cap': { layers: 'fcep' },
   replicas: { layers: 'fcep' },
   rendezvous: { layers: 'fcep' },
@@ -85,7 +89,7 @@ const LEAVES = table<{ layers: string; why?: string; object?: true }>({
 })
 const LEAF_KEYS = Object.keys(LEAVES)
 //! GROUPS — the object-valued declared keys (a group holds leaves; a resource may not be named after one).
-const GROUPS = new Set(['heartbeat', 'redial', 'journal', 'diag', 'seams'])
+const GROUPS = new Set(['heartbeat', 'redial', 'leave', 'journal', 'diag', 'seams'])
 //! TOP — every declared top-level name; a name subtree in the global layer must not collide with one.
 const TOP = new Set([...GROUPS, ...LEAF_KEYS.filter((k) => !k.includes('.'))])
 //! RENAMED — the pre-V4-10 spellings, refused with the pointer (lowercased: env arrives that way).

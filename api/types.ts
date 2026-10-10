@@ -127,6 +127,11 @@ export interface FeroConfig {
   // (heartbeats revive it); 10 by default, the kernel tune row `redials`. A dead MEMBER is dialed 5
   // times (the eviction clock, tune row `memberRedials`), or `tries` if that is lower.
   redial?: { ms?: number; tries?: number }
+  //! leave.ms — the knock window (DESIGN-LEAVE §10.7): how long a clean stop keeps asking a connected member to vote
+  // it out, so a survivor stalled for a few seconds still gets the vote. 8000 by default (16 heartbeats at the
+  // default cadence; the kernel tune row `leaveWindow`, in heartbeat ticks, rounded up). 0 = the four-heartbeat
+  // bound alone. With no member connected the bound alone applies whatever this says.
+  leave?: { ms?: number }
   //! journal.cap (was journalCap) — the diagnostics ring size; older events are dropped and counted.
   // 4096 by default; captures that want full-history time travel raise it.
   journal?: { cap?: number }

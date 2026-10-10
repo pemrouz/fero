@@ -427,7 +427,27 @@ test('a config file that fails to load throws with its path (optcascade), and th
   const home = scratch()
   fs.writeFileSync(path.join(home, 'fero.opt.js'), 'export default {')
   assert.throws(() => r('r', {}, { home }), (e: Error) => e.message.includes(path.join(home, 'fero.opt.js')))
-  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'journal.cap', 'replicas', 'rendezvous', 'diag.allow', 'secret', 'secret.client', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
+  assert.deepEqual([...CONFIG_LEAVES], ['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat.ms', 'redial.ms', 'redial.tries', 'leave.ms', 'journal.cap', 'replicas', 'rendezvous', 'diag.allow', 'secret', 'secret.client', 'data', 'methods', 'validation', 'seams.validation', 'signals'])
+})
+
+test('leave.ms (the knock window, DESIGN-LEAVE §10.7) rides every layer under the nested spelling, scoped by name, with its provenance', () => {
+  assert.deepEqual(cfg('shop', { leave: { ms: 30000 } }), { leave: { ms: 30000 } })
+  assert.deepEqual(cfg('shop', {}, { argv: ['--fero.leave.ms', '30000'] }), { leave: { ms: 30000 } })
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_LEAVE_MS: '30000' } }), { leave: { ms: 30000 } })
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_LEAVE_MS: '0' } }), { leave: { ms: 0 } }, '0 is a value (the bound alone), not unset')
+  const cwd = scratch()
+  fs.writeFileSync(path.join(cwd, 'package.json'), '{ "type": "module" }')
+  fs.writeFileSync(path.join(cwd, 'fero.opt.js'), "export default { leave: { ms: 5000 }, shop: { leave: { ms: 9000 } } }")
+  const shop = r('shop', {}, { cwd })
+  assert.deepEqual(shop.config, { leave: { ms: 9000 } }, 'the name rung beats the global one inside the file layer')
+  assert.equal(shop.from('leave.ms'), 'a fero.opt.ts file (shop.leave.ms)')
+  assert.equal(r('users', {}, { cwd }).from('leave.ms'), 'a fero.opt.ts file (leave.ms)')
+  assert.equal(r('users', { leave: { ms: 1 } }, { cwd }).from('leave.ms'), 'the call')
+  //! the group's shape is checked like heartbeat's: a bare value, a flat key and a stray leaf are refused with the hint
+  assert.throws(() => r('r', { leave: 5 } as never), /'leave' from the call is a group, not a value — did you mean leave: \{ ms: … \}/)
+  assert.throws(() => r('r', { 'leave.ms': 5 } as never), /unknown option 'leave\.ms' from the call — nested keys are objects: leave: \{ ms: … \}/)
+  assert.throws(() => r('r', {}, { argv: ['--fero.leave.sec', '5'] }), /unknown option 'leave\.sec' from --fero\.leave\.sec — did you mean --fero\.leave\.ms/)
+  assert.throws(() => r('r', {}, { env: { FERO_LEAVE_MS_OLD: '5' } }), /unknown option 'leave\.ms\.old' from FERO_LEAVE_MS_OLD — leave\.ms takes a value, not a group$/)
 })
 
 test('I-35 — a LONGER name under a leaf is refused naming THAT name; the good variable beside it is never blamed, and `data` (an object of rows) still rides a file', () => {
