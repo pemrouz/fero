@@ -183,13 +183,20 @@ const nearest = (path: string): string | null => {
 // beside `heartbeat` is a typo, `orders` beside `order` is a sibling resource. The name alone does not
 // decide it: a short group pulls in common words (`leave` is two edits from live, lease, level, league,
 // save, wave, lane; `seams` from teams, `diag` from dial), and a multi-resource app with a resource so
-// named refused to start (wave 5c's review, 2026-10-10). So the OBJECT is read too: one that holds a
-// declared top-level option (`live: { heartbeat: … }`, `teams: { dir: … }`) is a resource's rung —
-// no group has an option under it — and is left alone; one that holds none (`heartbeats: { ms }`,
-// `lease: { ms }`) is the typo the rule was written for.
+// named refused to start (wave 5c's review, 2026-10-10). So the OBJECT is read too, for the group's OWN
+// options: a near miss that holds one of them (`heartbeats: { ms }`, `lease: { ms }`, `seam: { validation }`,
+// `redials: { tries, dir }`) is the typo the rule was written for, and the hint names that leaf; one that
+// holds none (`live: { heartbeat: … }`, `teams: { dir: … }`, `live: { heartbeats: … }`) is a resource's
+// rung, whatever its name is near, and is left alone — a typo inside it is that resource's to catch when
+// it composes. (The first fix asked whether the object held ANY declared top-level name, which let
+// `seam: { validation }` pass as a resource and blamed `leave.ms` for a typo inside `live`'s rung: the
+// review's second look, the same day.)
 const groupMiss = (k: string, v: Record<string, unknown>): string | null => {
-  if (Object.keys(v).some((o) => TOP.has(o.toLowerCase()))) return null
-  for (const g of GROUPS) if (distance(k.toLowerCase(), g) <= 2) return firstLeaf(g)!
+  for (const g of GROUPS) {
+    if (distance(k.toLowerCase(), g) > 2) continue
+    const leaf = Object.keys(v).map((o) => `${g}.${o.toLowerCase()}`).find((p) => own(LEAVES, p))
+    if (leaf !== undefined) return leaf
+  }
   return null
 }
 

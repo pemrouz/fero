@@ -400,6 +400,12 @@ test('the per-resource rung beats the global rung inside every layer, and is val
   fs.writeFileSync(path.join(sib2, 'fero.opt.js'), "export default { live: { heartbeat: { ms: 100 } } }")
   assert.deepEqual(cfg('shop', {}, { cwd: sib2 }), {}, 'the file layer: live beside leave is a resource')
   assert.throws(() => r('shop', {}, { env: { FERO_LEASE_MS: '5' } }), /unknown option 'lease' from FERO_LEASE — did you mean FERO_LEAVE_MS/)
+  //! the rule reads the group's OWN options, not any declared name (the review's escapes, 2026-10-10): a near miss that
+  // holds the group's leaf is the typo even beside a declared option, the hint names THAT leaf, and a typo INSIDE a
+  // sibling's rung is the sibling's to catch when it composes — not a near miss of a group this resource never named
+  assert.throws(() => r('shop', {}, { env: { FERO_SEAM_VALIDATION: 'x' } }), /unknown option 'seam' from FERO_SEAM — did you mean FERO_SEAMS_VALIDATION/, 'seam beside seams holds its leaf: a typo')
+  assert.throws(() => r('shop', {}, { env: { FERO_REDIALS_TRIES: '3', FERO_REDIALS_DIR: 'x' } }), /unknown option 'redials' from FERO_REDIALS — did you mean FERO_REDIAL_TRIES/, 'redials holds a redial leaf: a typo, whatever else it holds')
+  assert.deepEqual(cfg('shop', {}, { env: { FERO_LIVE_HEARTBEATS_MS: '100' } }), {}, "a typo inside live's rung is live's business, not a near miss of leave")
   //! a scalar under an unknown name is a typo too (a resource's subtree is an object)
   assert.throws(() => r('shop', {}, { env: { FERO_WIDGETS: '5' } }), /unknown option 'widgets' from FERO_WIDGETS/)
   assert.throws(() => r('shop', {}, { argv: ['--fero.shp', 'x'] }), /unknown option 'shp' from --fero\.shp$/)
