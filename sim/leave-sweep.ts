@@ -25,7 +25,7 @@ export const split = (sim: Sim): string | null => {
 //! verdict — what went wrong at the end of a schedule (empty = safe AND live). The SAFETY problems come first and
 // start with VIOLATION or SPLIT; everything after is liveness: every node left holds the one wanted view, writable,
 // and the data converged.
-const verdict = (sim: Sim, want: string[]): string[] => {
+export const verdict = (sim: Sim, want: string[]): string[] => {
   const live = [...sim.nodes.values()]
   const problems: string[] = []
   if (sim.violations.length) problems.push('VIOLATION ' + JSON.stringify(sim.violations.slice(0, 2)))
