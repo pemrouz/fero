@@ -187,9 +187,12 @@ row and Q8 say nobody-to-drain-to is `left(false)` with `undrained`
 counted, and that is what landed — a stop that could not copy its rows
 is not reported clean. Heartbeats off: no drain clock (the shed poll
 never runs either), so the leaver decides at once from the evidence. A
-leaver cut off while draining is already out of the view: the survivors
-never suspect or evict it (suspicion ranges over view members), so V4-20
-cannot race the drain; the leaver goes at the bound, or at the next tick
+leaver cut off while draining has left its own view; when the survivors
+installed that view too they never suspect or evict it (suspicion ranges
+over view members). A leaver bounded out of the view half drains on its
+own install alone: the survivors may still hold it and may evict it under
+V4-20 while it drains, at no cost — cut off, it is stranded and goes at
+the next tick. Either way the leaver goes at the bound, or at the next tick
 once every holder is unreachable (a link loss is not a tick: `linkDown`
 only aborts latches, and the bar is re-read on the heartbeat). Two
 leavers at once: the first drains to
@@ -218,7 +221,7 @@ drain window only (kernel/drain.test.ts pins it). Two more facts from the
 review: the sweep's battery seed count (2) gives A7 only R=2 shapes, so
 A7 always runs its seed 4 (n=2 R=1), the shape on which M9 can bite; and a
 lawful scoped stop can outlast `fero.spawn`'s 5 s stop grace (up to
-leaveTicks + drainTicks + 2 heartbeats, 11 s at the default cadence, when
+leaveTicks + drainTicks + 3 heartbeats, 11.5 s at the default cadence, when
 a new holder cannot attest) — the README says so rather than the grace
 being raised, since spawn cannot know the child's cadence.
 
