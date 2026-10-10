@@ -76,8 +76,15 @@ day found the hole in that rule itself: "a vote above my view closes my gate and
 `evictTwo` green and leaves a schedule of the same class, `evictTwoB`, splitting, because the stale voter
 GRANTS a never-voted member's higher ballot (§10.2: the rule needs a third part, the grant, and with
 it a release question nobody has answered). It also found `pledgeTwo` had no teeth (its cut came 3 ms
-late; now 0 ms, red on round 3). The knock window (§10.7) is next; the rule of §10.9 step 2 is back
-in design.
+late; now 0 ms, red on round 3). The third review of the day found two more things. The kept
+ballot's two-member shape at n=4, which the page called undrawn, splits today's kernel: two writable
+views at the quiet point, then two views at epoch 4 (`keptBallot`, pinned red; §10.2) — so today's
+kernel has THREE known splits, `evictTwo`, `evictTwoB` and `keptBallot`. And the cost of the candidate
+rule was put in the wrong place: the release is needed by the gate and lead parts as much as by the
+grant, because a ballot that fails in a HEALTHY cluster — one member flaps, or the proposer crashes —
+leaves every live member read-only for good under the rule, two parts or three, while the base heals
+both (`flapDuringBallot`, `proposerCrash`, pinned writable; §10.2). The knock window (§10.7) is next;
+the rule of §10.9 step 2 is back in design, with the release as its first question.
 
 ## §1 The problem
 
@@ -904,21 +911,28 @@ corrected by H11 and H12 (R3 `recheck3` finding #3).
 2. Today's kernel keeps it for every ballot that changes ONE member, by arithmetic: the new view's
    writable majority and a stale majority of the old view must share a voter, and that voter is
    linked to the proposer and learns the view (§10.2).
-3. Today's kernel BREAKS it for the one ballot that changes two members at once: the eviction of
-   two suspects at n=5 (two or three at n=7, three at n=8; n=6 has no such shape, §10.2). A voter
-   cut or crashed right after its grant keeps the old view, and the two "suspects" are a majority
-   of it with him. Two views commit at one epoch and both sides write. Measured: 4 of 5 seeds, cut
-   and crash, pinned (`evictTwo`, §10.2, §10.8), and the same 4 of 5 when the stale voter is not
-   the far side's lowest member and only GRANTS (`evictTwoB`). A ballot KEPT across an install
-   (STATUS's "built on an older view" line, `:477`) has the same two-member shape against the view
-   it was kept across, by the same count; no run has drawn it writable on both sides (§10.2).
+3. Today's kernel BREAKS it, and the argument has found THREE splits in it. Two are the one ballot
+   that changes two members at once: the eviction of two suspects at n=5 (two or three at n=7,
+   three at n=8; n=6 has no such shape, §10.2). A voter cut or crashed right after its grant keeps
+   the old view, and the two "suspects" are a majority of it with him. Two views commit at one
+   epoch and both sides write. Measured: 4 of 5 seeds, cut and crash, pinned (`evictTwo`, §10.2,
+   §10.8), and the same 4 of 5 when the stale voter is not the far side's lowest member and only
+   GRANTS (`evictTwoB`). The third is a ballot KEPT across an install (STATUS's "built on an older
+   view" line, `:477`): the view it commits is two members apart from the view it was kept across,
+   and at n=4 the loser of a duel commits `{aa,cc,dd}`@3 over view 1 after installing
+   `{bb,cc,dd}`@2 — two writable views at the quiet point, then two views at epoch 4 (`keptBallot`,
+   one fixed schedule, pinned red; §10.2). The second draft of this page called that shape
+   undrawn; the third review drew it.
 4. The root of 3 and of every hole the three rounds found is the same: a node acts on a view BELOW
    a vote it has spent. The gate (`kernel/membership.ts:191-202`) and the proposer rule (`:205`)
    never read `votedFor`; the grant rule (`:400`) reads it only to refuse a second proposer at the
    SAME epoch, so the vote is spent again one epoch up, on a ballot over the older view
-   (`evictTwoB`). The pledge makes this the normal case (§10.3, §10.6); a restart makes it durable
-   (§10.5). The rule that closes it has three parts — gate, lead, GRANT — and the third costs a
-   release nobody has designed (§10.2).
+   (`evictTwoB`, `keptBallot`). The pledge makes this the normal case (§10.3, §10.6); a restart
+   makes it durable (§10.5). The rule that closes it has three parts — gate, lead, GRANT — and
+   EVERY part needs a release nobody has designed: a vote for a ballot that failed, with nothing
+   coming to supersede it, is a closed gate for good, and a ballot fails in a healthy cluster
+   whenever a member flaps or the proposer crashes mid-ballot. Under the rule as drafted, two parts
+   or three, that leaves every live member read-only for good; the base heals both (§10.2).
 5. A pledge may complete at most one change: the pledger's own view minus the leavers, nothing
    else. Any wider use counts a vote for a change the voter never consented to (§10.3; H11). Even
    so restricted it is UNSAFE with two or more pledgers at n ≥ 5 until a stale stayer's gate stops
@@ -935,13 +949,18 @@ corrected by H11 and H12 (R3 `recheck3` finding #3).
 8. The harness exists (`sim/leave-harness.ts`, its test): the reviewers' generators rebuilt
    in-tree, pinned on today's kernel as the floor; every hole H1, H3, H7, H9, H11 and H12 goes red
    on the kernel that had it, and `pledgeTwo` goes red on round 3, the family a restricted pledge
-   fails (§10.8). Today's kernel's own hole is red on the base: `evictTwo` and `evictTwoB`.
-9. The kernel has not changed in this step. STATUS keeps its "ballot built on an older view" line
-   (a different mechanism, `:477`) and gains one for the two-evictee split (§10.2).
+   fails (§10.8). Today's kernel's three holes are red on the base: `evictTwo`, `evictTwoB` and
+   `keptBallot`. What the candidate rule costs is pinned too: `flapDuringBallot` and
+   `proposerCrash` are writable everywhere on the base and read-only everywhere under the rule.
+9. The kernel has not changed in this step. STATUS gains one line for the two-evictee split, and
+   its "ballot built on an older view" line becomes a bug line of today's kernel: the kept ballot
+   breaks one view per epoch at n=4 (§10.2).
 10. Step 3 is now: the knock window; then, before any pledge, the page for "a vote above my view"
-    — gate, lead and GRANT, what a stale stayer's gate may count, and the release for a vote whose
-    ballot failed — which closes §10.2's hole on the base and is what the restricted pledge needs
-    to be safe at all (§10.9). The rule is not finished (§10.2).
+    — gate, lead and GRANT, what a stale stayer's gate may count, and the RELEASE for a vote whose
+    ballot failed, which must work with the proposer dead — which closes §10.2's three holes on the
+    base and is what the restricted pledge needs to be safe at all (§10.9). The rule is not
+    finished: without the release it trades three splits for a cluster that freezes on one flap
+    (§10.2).
 
 ### §10.1 The invariant, and what a restart forgets
 
@@ -1053,21 +1072,37 @@ evicted between them) they cannot be: ⌊n/2⌋+1 + ⌊(n−1)/2⌋+1 = n+1 > n,
 they can: `evictTwo`'s view 1 (five) against view 2 (three), 3 + 2 = 5. So one view per epoch holds
 for a stale proposer and for a kept ballot on every one-member path, and fails on a two-member one.
 The mesh scenario is a one-member path (view 1 to 2 added ee) and settles to one view, as the STATUS
-line says; `evictTwo` is a two-member path and does not. STATUS keeps the kept-ballot line and gains
-one for the two-evictee split.
+line says; `evictTwo` is a two-member path and does not. STATUS gains one line for the two-evictee
+split, and its kept-ballot line becomes a bug line: the kept ballot has a two-member path of its
+own, below.
 
-The kept ballot has a second shape of its own, by the same count. The view it commits is its old
-view changed by one member; the view it was kept across is that same old view changed by another.
-Against each other they can be TWO members apart, so the writable split of (a) is not forbidden by
-the count between them: at n=4, after a duel in which b evicts a at 2 (`{b,c,d}`) while a, refused at
-2, escalates to `{a,c,d}`@3 over view 1 before view 2 reaches it (`:587`, `:477`), c and d may grant
-a at 3 (`:400`: any epoch above their view), and a granter cut from a after its VOTE and from the
-other granter is 2 of 3 at view 2 beside a's 2 of 3 at view 3. The mesh scenario itself is safe (3
-of 4 at view 2 and 2 of 2 at view 3 need five of four). No run has drawn the n=4 shape (the
-explorer, 1..2000 and the quiet 2001..2300, and every family of §10.8): it needs the escalation to
-open before the VIEW lands and two cuts inside one round trip. It stays on the kept-ballot STATUS
-line as the reason the line stays open, and the rule for it is §10.9 step 2's: no ballot outlives
-an install (a leaver's already does not, `:480`).
+The kept ballot has a second shape of its own, by the same count, and today's kernel SPLITS on it
+(the third 2026-10-10 review's probe; `keptBallot` in the harness, one fixed schedule on real
+Nodes, pinned red). The view it commits is its old view changed by one member; the view it was kept
+across is that same old view changed by another. Against each other they can be TWO members apart,
+so the writable split of (a) is not forbidden by the count between them. At n=4: aa and bb lose
+each other and duel at 2; bb wins `{bb,cc,dd}`@2 on cc's and dd's grants; aa, refused at 2, ages
+its ballot out (`:264-267`) and escalates past the burn to `{aa,cc,dd}`@3 (`:587`) over view 1,
+because bb's VIEW has not reached it. bb's VIEW lands at cc and dd first; they install view 2 and
+then read aa's PROPOSE@3 — above their view, so they grant it (`:400`; the frame carries no base
+epoch). aa reads cc's VIEW 2, installs it evicted and KEEPS the ballot (`:477` drops only a ballot
+at or below the view), then cc's VOTE. cc is cut from aa and dd, bb from dd; dd's VOTE lands, aa
+counts 2 of view 1's four (its old set, `:601`) and 2 of 3 new, and installs `{aa,cc,dd}`@3. The
+quiet point: `aa@3{aa,cc,dd} dd@3{aa,cc,dd}` writable beside `bb@2{bb,cc,dd} cc@2{bb,cc,dd}`
+writable — one view per epoch intact, so the recorder sees nothing. Once the chains give up, bb
+evicts dd (`{bb,cc}`@4) and aa evicts cc (`{aa,dd}`@4): two views at epoch 4, both writable. So
+the kept-ballot STATUS line is a bug line of today's kernel, not a "settles to one view" note: the
+mesh scenario it describes is the one-member path and is safe (3 of 4 at view 2 and 2 of 2 at view
+3 need five of four); the two-member path is not. No random family had drawn it (the explorer,
+1..2000 and the quiet 2001..2300, and every family of §10.8): it needs the escalation to open
+before the VIEW lands and two cuts inside one round trip. Which parts of the candidate rule close
+it, measured on the scratch kernels: gate and lead-nothing alone clear the quiet point (cc's gate
+shuts on its vote at 3 above view 2, so bb is 1 of 3 and read-only) but NOT the end state — cc,
+still holding that vote, grants bb's `{bb,cc}`@4 and the epoch-4 split stands; with the grant
+clause (α) it ends safe, `aa@4{aa,dd}` writable, bb and cc read-only for good (`minority`,
+`stale-vote`). Form (β) would close it at the voter without (α): cc and dd refuse a ballot whose
+base epoch is 1 while they hold view 2. Either way the rule for it is §10.9 step 2's, and no
+ballot should outlive an install (a leaver's already does not, `:480`).
 
 Where the argument stops, in one sentence: **a voter that has spent a vote above its view may be
 acting on a view that no longer holds, and nothing in the base reads that vote as a warning**: not
@@ -1101,8 +1136,10 @@ THREE parts, and the third is about the grant:
 - (α) at the voter, by its own vote: while my vote sits above my view I grant no NEW ballot that
   keeps me in — not another proposer's, not the same proposer's at another epoch. The re-grant to
   the same proposer at the same epoch stays (it heals a lost VOTE, banner `:19-23`, and it is what
-  lets H8's and H12's shapes heal below). The probe also kept a ballot that takes me OUT grantable;
-  that exception is not argued here. With (α) the scratch kernel closes `evictTwoB`: 0 of 5.
+  lets H8's and H12's shapes heal below). The probe also kept a ballot that takes a LEAVER out
+  grantable (`leavingOut`, `:397-398`: only a node that is itself leaving; a non-leaver holding a
+  vote above its view refuses a ballot that takes it out, too); that exception is not argued here.
+  With (α) the scratch kernel closes `evictTwoB`: 0 of 5.
 - (β) at the voter, by the ballot: a PROPOSE carries the epoch of the view it is over
   (`#proposal.old` is fixed at `:601`; the frame has no field for it, `:614`), and a voter refuses
   any ballot whose base is below its vote's epoch. For a stale proposer (β) says what (α) says; it
@@ -1110,36 +1147,78 @@ THREE parts, and the third is about the grant:
   install" needs no rule at the proposer. It is a wire change, the same class as what a stale
   stayer's gate needs (§10.5).
 
-What the three parts cost, measured on the scratch kernel with (α), every family of §10.8 and the
-in-tree sweep run unchanged. Safety: 0 splits, 0 violations everywhere, `evictTwo` and `evictTwoB`
-included. Liveness: `pledgeTwo`'s far side settles on 0 of 5 (the base 5 of 5 — n03, n04 and n05
-all hold a vote at 2 above view 1, so nobody may lead); `evictsplit` and `joinsplit` the same, 0 of
-10 (the base 10 of 10); the isolate grid loses 36 of 108, every `isolate = 5 ms` case (the VOTEs
-leave and die on the cut; the far side, the old view's majority, holds votes above its view and
-nobody leads it), the seeded isolate family 11 of 50; `rebirth` 6 of 100 (seeds 7, 51, 59, 69, 83,
-96); the sweep's family 1 three (17, 52, 83) and family 2 four (46, 47, 65, 90); the crash grid 4
-of 96 — and they are NOT H12's. #8, #10, #24 and #26 are the n=3 two-leaver cases with the stayer
-crashed at −200 or 0 ms and BACK after 2 s: the lowest leaver's exit ballot at 2 failed (one of two
-new-set votes), both leavers restart, the stayer returns, all three are linked at view 1 again, and
-nothing ever proposes a view at 2 or above — the other leaver holds its vote at 2 for good, `gate
-stale-vote`, read-only beside two writable members. H12's four (#9, #11, #25, #27, the stayer never
-back) still heal: the lowest leaver, now the lowest live, re-proposes at 2 and the same-proposer
-re-grant is allowed. H8's shape heals the same way. So neither H8 nor H12 comes back; what comes is
-a new class.
+What the rule costs, measured on two scratch kernels — the three parts with (α), and the two parts
+alone (gate and lead-nothing, the grant line deleted) — every family of §10.8 and the in-tree sweep
+run unchanged. Safety with three parts: 0 splits, 0 violations everywhere, `evictTwo`, `evictTwoB`
+and `keptBallot` included. Liveness, on the families that were already there: `pledgeTwo`'s far
+side settles on 0 of 5 (the base 5 of 5 — n03, n04 and n05 all hold a vote at 2 above view 1, so
+nobody may lead); `evictsplit` and `joinsplit` 0 of 10 with three parts (the base 10 of 10; with
+two parts they still settle: n02 never voted and leads, and n03 grants); the isolate grid loses 36
+of 108, every `isolate = 5 ms` case (the VOTEs leave and die on the cut; the far side, the old
+view's majority, holds votes above its view and nobody leads it), the seeded isolate family 11 of
+50; `rebirth` 6 of 100 (seeds 7, 51, 59, 69, 83, 96); the sweep's family 1 three (17, 52, 83) and
+family 2 four (46, 47, 65, 90); the crash grid 4 of 96 — and they are NOT H12's. #8, #10, #24 and
+#26 are the n=3 two-leaver cases with the stayer crashed at −200 or 0 ms and BACK after 2 s: the
+lowest leaver's exit ballot at 2 failed (one of two new-set votes), both leavers restart, the stayer
+returns, all three are linked at view 1 again, and nothing ever proposes a view at 2 or above — the
+other leaver holds its vote at 2 for good, `gate stale-vote`, read-only beside two writable
+members. H12's four (#9, #11, #25, #27, the stayer never back) still heal: the lowest leaver, now
+the lowest live, re-proposes at 2 and the same-proposer re-grant is allowed. H8's shape heals the
+same way. So neither H8 nor H12 comes back; what comes is a new class.
+
+**The second draft of this section put that class in the wrong place and made it too small** (the
+third 2026-10-10 review). It said the GRANT part costs the release, and counted the cost as "a
+read-only member in the four crash cases, the 36 isolate cases, and the far side of every cut
+inside one round trip". Both are wrong. The gate and lead parts need the release just as much, and
+the cost is not one member on the far side of a cut: it is EVERY live member of a healthy cluster,
+for good, with no cut anywhere. Two shapes, now in the harness (§10.8), each one fixed schedule on
+real Nodes, measured on the base and on both scratch kernels:
+
+- `flapDuringBallot`: five members, all linked but aa–ee. aa suspects ee, its chain gives up, it
+  proposes `{aa,bb,cc,dd}`@2; bb's VOTE lands (2 of the 3 it needs). ee comes back, and aa
+  ABANDONS the ballot (`:240`: the suspect returned). Every frame lands, everyone ticks, forty
+  rounds. The base: all five writable at view 1; bb, cc and dd each hold a vote at 2 for aa above
+  their view, and nothing reads it. Both candidate kernels: all five read-only for good — bb, cc
+  and dd `stale-vote`; aa and ee `minority`, because the stayer's-gate skip of §10.5 drops the
+  three granters from every count. aa holds its own vote and may lead, but there is nothing to
+  propose: no member is suspect, and a ballot opens only on a suspect, a knock or a join (`:259`,
+  `:371`, `:358`); nothing will ever propose a view at 2 or above.
+- `proposerCrash`: the same ballot; bb and cc grant, and aa dies for good — with the ballot open
+  (the VOTEs never reach it), or after it installed `{aa,bb,cc,dd}`@2 and before its VIEW left.
+  The base: the four re-form, `{bb,cc,dd,ee}`@3, writable. Both candidate kernels: all four
+  read-only for good — bb and cc `stale-vote`, dd and ee `minority` — with every link up.
+
+So the release is needed by parts 1 and 2, not only by the grant: the two-part rule freezes exactly
+as the three-part one does. The class covers a flap and a proposer crash, the two most ordinary
+failures a ballot can meet, not only cuts inside one round trip. And the one release the second
+draft named — the vote's proposer, linked, reporting a committed epoch below the vote — can never
+fire in the proposer-crash case: there is no proposer. The committed variant adds one more fact: the
+base's re-form there is SAFE, because the dead proposer's ballot changed ONE member and (a)'s count
+protects a one-member change. That suggests the hold may need to bind only for ballots that change
+two or more members, the ones the count does not protect — a design question for §10.9 step 2, not
+a rule argued here.
 
 That class is the open question of the rule, and the page for step 2 must answer it before the rule
 is built: **a vote above my view, for a ballot that did not commit, with nothing coming to supersede
-it, is a closed gate for good.** The base's alarmed release (`:285-288`: pull five ticks, then reopen
-with a journal alarm, the liveness-over-safety choice on record, banner `:85-89`) is the wrong
-answer here — it would reopen `evictTwoB`'s far side at view 1 with 3 of 5 links and bring the split
-back. The one candidate release is a proof the ballot committed nowhere: only its proposer installs
-a ballot (`:424-427`), so the vote's proposer, linked, reporting a committed epoch below the vote
-voids the vote's hold on the gate (vote-once at that epoch stands). It is not argued: the proposer
-may still be collecting the ballot it reports as uncommitted, and a cut between its answer and its
-commit is the §10.1 window again. Until the release exists, the rule trades the base's 4-of-5 split
-for a read-only member in the four crash cases, the 36 isolate cases, and the far side of every cut
-inside one round trip. (b) is closed by the rule only with its third part, and the rule is not
-finished.
+it, is a closed gate for good — and under the rule as drafted it closes every gate in a healthy
+cluster on one flap.** The base's alarmed release (`:285-288`: pull five ticks, then reopen with a
+journal alarm, the liveness-over-safety choice on record, banner `:85-89`) is the wrong answer here
+— it would reopen `evictTwoB`'s far side at view 1 with 3 of 5 links and bring the split back. The
+step-2 page has to find a release that (1) fires with the proposer dead, (2) fires when the
+proposer abandoned the ballot, and (3) never fires while a majority of the old view may still
+commit the vote it holds. The candidates it should weigh, none of them argued here: the proposer
+reporting the ballot uncommitted (only its proposer installs a ballot, `:424-427`, so the report is
+a proof — but it fails (1), and the proposer may still be collecting the ballot it reports, the
+§10.1 window again); a hold that ages out at the voter after the ballot itself would have
+(`PROPOSAL_AGE`, `:114`, `:264-267`, is the proposer's bound — but the proposer may commit on its
+last tick with the VIEW still in flight); a hold that binds only to ballots that change two or more
+members (every one-member change is safe by (a)'s count, so the freeze would narrow to the
+multi-evict case and the kept ballot and leave the flap, the crash, H8 and H12 untouched — but it is
+a per-ballot fact the voter must learn from the PROPOSE, a wire change of (β)'s class). Until a
+release exists, the rule trades the base's three splits for a read-only member in the four crash
+cases, the 36 isolate cases, the far side of every cut inside one round trip — and a whole cluster
+frozen by one flap or one crashed proposer. (b) and the kept ballot are closed by the rule only with
+its third part, and the rule is not finished.
 
 ### §10.3 Source 2: a pledge (H11's page)
 
@@ -1255,8 +1334,8 @@ of a member whose view is current; a member whose vote is above its view may be 
 majority of a view it never saw, and its next grant lets a second majority of the OLD view form at a
 higher epoch. What such a node may grant is §10.2's third part: the same proposer at the same epoch,
 yes (that is H8's heal, and the crash grid confirms it: #9, #11, #25 and #27 heal under the clause);
-a new ballot that keeps it in, no. What the four cost is H12 (§10.6), and with the grant clause the
-release question of §10.2.
+a new ballot that keeps it in, no. What the four cost is H12 (§10.6) and the release question of
+§10.2, which every part of the rule raises, the grant clause included.
 
 **What a stale stayer's gate may count** (H11's other half). A link to a member proves reachability,
 not that the member holds my view or is willing to write at it. The gate counts the link (`:196-199`).
@@ -1369,6 +1448,8 @@ counted and pinned as exact seed sets; about 30 s at low priority on the loaded 
 | `pledgeTwo` | the 2026-10-10 review's probe (§10.3): n=5, two leavers knock to n01, then — the instant n01 has read both knocks — n01 keeps one stayer and the other stayer keeps both leavers; the leavers restart beside it | 0 splits, n01 never writable; the far side settles on 5 of 5, pinned as a counted set (it settles because n03 leads holding a vote above its view, so the rule of §10.9 step 2 moves this pin to 0 of 5). The family a restricted pledge fails |
 | `crash` | R3 `crash2`: a stayer crashes at −200/0/20/100 ms from one or two stops, back after 2 s or never, leavers restarted after 0.4/3/25 s, n 3..5 | default grid (0.4 s, seed 1): 86 of 96 live; full grid: 516 of 576. Every wedge: the stayer crashes AFTER the leaves and never returns, the crash-at-two class (§7). 0 splits. Both not-live sets pinned exactly |
 | `evictTwo`, `evictTwoB` | new (§10.2); B is the second review's probe: the stale voter is not the far side's lowest, so a never-voted member leads and the voter GRANTS | SPLITS on 4 of 5 seeds, cut and crash; B on 4 of 5; the one-evictee control 0 of 5. Pinned as the seeds, red until a kernel closes BOTH: gate + lead-nothing alone close `evictTwo` and leave B red |
+| `keptBallot` | the third review's probe (§10.2 (ii)): the kept ballot's two-member shape at n=4, one fixed schedule on real Nodes — a duel at 2, the loser escalates over view 1, installs view 2 evicted, keeps the ballot and commits it on two granters at view 2 | SPLITS: `aa@3{aa,cc,dd} dd@3` writable beside `bb@2{bb,cc,dd} cc@2` at the quiet point, then two views at epoch 4 once the chains give up. Pinned red as the exact end state; gate + lead-nothing clear only the quiet point, the grant clause clears it all |
+| `flapDuringBallot`, `proposerCrash` | the third review's probes (§10.2, the release): a FAILED ballot in a healthy cluster — one member flaps during an eviction ballot and the proposer abandons it; the proposer dies mid-ballot, open or committed with its VIEW unsent | writable everywhere, 0 splits; pinned as the exact read-only set (empty). Both scratch kernels: every live member read-only for good |
 | explorer, quiet | R2's explorer with the end-state check (`sim/mesh.ts`, `quietSplit`, opt-in) | seeds 2001..2300, above the 1..2000 `sim/explore.test.ts` pins, so every seed adds coverage: 0. The check's own teeth: a hand pin, and `evictTwo`'s shape built move by move on real Nodes, which it names while one view per epoch holds; the sweep's `split()` has the same hand pin (an epoch-0 node is in no view and is no side of a split) |
 
 The seeds 469, 740 and 1077 of the reviewer's generator (H9) are not rebuilt: the reports omit which
@@ -1392,6 +1473,8 @@ git tree, and running the same harness:
 | the restricted pledge with two pledgers (§10.3) | round 3 (any kernel that counts two knocks as votes) | `pledgeTwo` | 5 of 5 UNSAFE on round 3 with the cut at 0 ms: two writable views from +56 ms, 46 to 3,553 one-view-per-epoch violations, `n01@3{n01,n02}` beside `n03@3{n03,n04,n05}` or @4 at the horizon, n01 writable throughout; the base 0 of 5. The first version's 3 ms cut: 0 of 5 on BOTH kernels (the VOTEs in flight landed and each committed a four-member view) — no teeth, caught by the second review |
 | H12 the n=3 crash twin | round 3 | `crash` | 4 more wedges in the default grid (#9, #11, #25, #27), 24 more in the full one, all n=3 with two leavers and the stayer crashed at −200 or 0 ms and never back (the report: 24) |
 | §10.2 two evictees at once | the base AND every round | `evictTwo`, `evictTwoB` | 4 of 5 each (cut and crash; B crash). On the scratch kernel with gate + lead-nothing only: `evictTwo` 0, `evictTwoB` still 4 of 5; with the grant clause 0 and 0, and every liveness pin above moves (§10.2) |
+| §10.2 the kept ballot at n=4 | the base AND every round | `keptBallot` | the base: two writable views at the quiet point, two views at epoch 4. The two-part scratch kernel: the quiet point clean, the epoch-4 split still there (cc grants bb at 4 holding a vote at 3 above view 2); the three-part kernel: safe, bb and cc read-only for good |
+| the candidate rule's cost (§10.2, the release) | the two-part AND the three-part scratch kernels | `flapDuringBallot`, `proposerCrash` | the base: writable everywhere; both scratch kernels: all five after the flap and all four after the crash read-only for good (`stale-vote`, `minority`), with no proposer left to release the vote |
 | H4 (n=2 lingering leaver) | — | not drawn: the harness has no linger; the branch's kernel pin carries it | — |
 
 The in-tree sweep's three families run unchanged on every kernel; on round 3 family 1 is live on 100
@@ -1402,20 +1485,27 @@ branch's breadth and sees none of its holes, which is what §8.1 said.
 
 1. The knock window first (§10.7): no vote source, no ballot rule, the operator's choice of window;
    measured against the sweep's family 1 and the harness's floor, which must not move.
-2. Before any pledge: the base hole of §10.2 needs its own page and rule, in THREE parts — a vote
+2. Before any pledge: the base holes of §10.2 need their own page and rule, in THREE parts — a vote
    above my view closes my gate, I lead nothing, and I GRANT no new ballot that keeps me in (or, by
    the wire, no ballot over a view below my vote: §10.2 (α) and (β)) — together with what a stale
    stayer's gate may count (§10.5: not a member sitting on a vote above my view) and the RELEASE for
-   a vote whose ballot failed and that nothing supersedes (§10.2: the alarmed release is unsafe for
-   it, and the one candidate release is not argued). The pledge is that hole made the normal case and
-   is unsafe without the gate half (§10.3, `pledgeTwo`). The same page settles the kept ballot (§10.2;
-   form (β) settles it at the voter, as a leaver's own ballot already does not outlive an install,
-   `:480`). Acceptance: `evictTwo` AND `evictTwoB` green — gate and lead-nothing alone turn only the
-   first; every family SAFE; the liveness pins moved only with the why in the commit. The pins the
-   rule moves today are known (§10.2): `pledgeTwo`'s settled set to all five, `evictsplit`'s and
-   `joinsplit`'s, the isolate grid's 5 ms cases, the crash grid's #8, #10, #24, #26, six rebirth and
-   seven sweep seeds — and the release decides which of them stay moved. `pledgeTwo` must stay SAFE;
-   it is not expected to stay settled.
+   a vote whose ballot failed and that nothing supersedes (§10.2: needed by EVERY part, not only the
+   grant; the alarmed release is unsafe for it; the one candidate the second draft named cannot fire
+   with the proposer dead; the three candidates to weigh are listed there). The pledge is that hole
+   made the normal case and is unsafe without the gate half (§10.3, `pledgeTwo`). The same page
+   settles the kept ballot (§10.2 (ii), `keptBallot`: the grant clause (α) or form (β) closes it;
+   gate and lead-nothing alone leave its epoch-4 split; a leaver's own ballot already does not
+   outlive an install, `:480`). Acceptance: `evictTwo`, `evictTwoB` AND `keptBallot` green — gate
+   and lead-nothing alone turn only the first; every family SAFE; `flapDuringBallot` and
+   `proposerCrash` WRITABLE everywhere, as on the base — a rule that leaves them read-only has no
+   release and is not done; the liveness pins moved only with the why in the commit. The pins the
+   rule as drafted moves are known (§10.2): `pledgeTwo`'s settled set to all five, `evictsplit`'s
+   and `joinsplit`'s (with three parts), the isolate grid's 5 ms cases, the crash grid's #8, #10,
+   #24, #26, six rebirth and seven sweep seeds; and the red-today witnesses turn green and are
+   re-recorded with the why — the three red pins, and the quiet-point test's `evictTwo` run on the
+   mesh (cc's gate shuts on its vote and nothing splits, so its named split string goes away). The
+   release decides which of the liveness pins stay moved. `pledgeTwo` must stay SAFE; it is not
+   expected to stay settled.
 3. Then, and only on top of step 2's gate rule, the pledge restricted to one change (§10.3): the
    leaver read-only from the knock is necessary and not sufficient (a read-only leaver is still
    counted), and the owner's yes or no on H12 (§10.6) comes in writing before a line is written.
