@@ -454,13 +454,15 @@ export class Runtime {
   // scoped member, DESIGN-SCALE stage 1 (b)) that the view change did commit but the new holders did not
   // prove inside tune.drainTicks that they hold every partition this node held: those rows went with it.
   // The cap covers the tick bounds at this node's heartbeat cadence plus slack — the leave's, plus the
-  // drain's on a scoped node (heartbeats OFF ⇒ no view ⇒ the kernel answers at once). Idempotent: a
-  // second call joins the first wait.
+  // drain's on a scoped node, plus one tick for a drain that starts at leaveTicks + 1 when the view half
+  // timed out: its last tick is the 22nd after leave(), and a cap of 22 periods could win the race and tear
+  // the node down before it writes its `undrained` row (heartbeats OFF ⇒ no view ⇒ the kernel answers at
+  // once). Idempotent: a second call joins the first wait.
   leave(): Promise<boolean> {
     if (this.#leaving) return this.#leaving
     if (this.node.destroyed) return Promise.resolve(false)
     this.#leaving = new Promise<boolean>((resolve) => {
-      const ticks = this.node.tune.leaveTicks + (this.node.scoped ? this.node.tune.drainTicks : 0) + 2
+      const ticks = this.node.tune.leaveTicks + (this.node.scoped ? this.node.tune.drainTicks + 1 : 0) + 2
       const capMs = Math.max(250, (this.#opts.heartbeatMs ?? 0) * ticks)
       const cap = setTimeout(() => { this.#onLeft = null; resolve(false) }, capMs)
       this.#onLeft = (clean) => { clearTimeout(cap); this.#onLeft = null; resolve(clean) }

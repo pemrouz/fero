@@ -8,7 +8,7 @@ import type { Spawned, SpawnOpts } from './types.ts'
 // IS the reader's Ctrl-C (SIGINT: a fero process leaves by ballot and exits 0, V4-8) but gives up after
 // GRACE ms (SIGKILL, null), so a broken clean stop FAILS the caller instead of hanging it. One LAWFUL stop
 // can outlast GRACE: a scoped member (`replicas`) draining to a new holder that cannot prove it holds the
-// rows waits up to leaveTicks + drainTicks + 2 heartbeats — the shell's destroy cap, 22 ticks, 11 s at the
+// rows waits up to leaveTicks + drainTicks + 3 heartbeats — the shell's destroy cap, 23 ticks, 11.5 s at the
 // default 500 ms (DESIGN-SCALE stage 1 (b)) — and is killed mid-drain, `null`; the README's Process bullet
 // says so. The usual drain is one or two heartbeats.
 // GRACE is not raised for it: spawn cannot know the child's cadence, and every broken stop in the example
