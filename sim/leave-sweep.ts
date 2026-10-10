@@ -8,7 +8,7 @@ import { cluster } from './harness.ts'
 import { converged } from './monitors.ts'
 import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
-import type { Node } from '../kernel/node.ts'
+import type { Node, NodeOpts } from '../kernel/node.ts'
 
 const mul = (seed: number) => { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
 const pick = <T>(r: () => number, xs: readonly T[]): T => xs[Math.floor(r() * xs.length)]
@@ -58,7 +58,8 @@ export const schedule = (seed: number): Schedule => {
   //! slow links: constant delays small enough that a ballot can still complete (RTT < PROPOSAL_AGE × 50 ms)
   const stalls: [string, string, number][] = []
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (r() < 0.35) stalls.push([ids[i], ids[j], pick(r, [3, 30, 60, 100])])
-  //! a STALLED survivor: every frame to and from it is held for D ms (longer than the leave window), then it wakes
+  //! a STALLED survivor: its process is paused for D ms (longer than the four-tick bound), then it wakes and reads
+  // everything at once (sim.pause; DESIGN-LEAVE §10.7). `RunOpts.stall` scales D to put it past the knock window.
   const survivors = ids.filter((u) => !leavers.includes(u))
   const stall = r() < 0.6 ? { node: pick(r, survivors), ms: pick(r, [250, 300, 450, 700]) } : null
   const offsets = leavers.map(() => pick(r, [0, 0, 0, 10, 60, 120]))
@@ -67,23 +68,28 @@ export const schedule = (seed: number): Schedule => {
   return { seed, n, ids, leavers, stalls, stall, offsets, linger, join }
 }
 
+//! RunOpts — the knobs the knock window's tests turn (DESIGN-LEAVE §10.7): `tune` rows for every member (the window,
+// leaveWindow), and `stall`, a factor on the schedule's stall length (3 puts every stall but the shortest past the
+// default 16-tick window: 750/900/1350/2100 ms against 800). The generator is untouched, so a seed is the same shape
+// under every knob and the pinned sets stay comparable.
+export interface RunOpts { tune?: NodeOpts['tune']; stall?: number }
+
 //! run — one schedule to its horizon; returns what went wrong (empty = safe AND live)
-export const run = (s: Schedule, horizon = 12000): string[] => {
+export const run = (s: Schedule, horizon = 12000, o: RunOpts = {}): string[] => {
   const sim = new Sim(s.seed)
-  const nodes = cluster(sim, s.n, { heartbeatMs: 50, fault: { delay: [3, 3] } })
+  const nodes = cluster(sim, s.n, { heartbeatMs: 50, fault: { delay: [3, 3] }, ...(o.tune !== undefined ? { tune: o.tune } : {}) })
   sim.run({ until: 800 })
   if (!nodes.every((x) => x.epoch === 1)) return ['never formed']
   for (const [a, b, d] of s.stalls) sim.fault(a, b, { delay: [d, d] })
   const t0 = sim.now
-  //! the stall is lifted only once every leaver is destroyed: the sim's #sever posts linkDown at the pair's
-  // CURRENT delay without the FIFO clamp, so lifting earlier would let a linkDown overtake frames a socket delivers first
-  let lift: (() => void) | null = null
-  if (s.stall) {
-    const st = s.stall
-    const others = s.ids.filter((u) => u !== st.node)
-    for (const o of others) sim.fault(st.node, o, { delay: [st.ms, st.ms] })
-    lift = () => { for (const o of others) { const slow = s.stalls.find(([a, b]) => (a === o && b === st.node) || (b === o && a === st.node)); sim.fault(st.node, o, { delay: slow ? [slow[2], slow[2]] : [3, 3] }) } }
-  }
+  //! the stall is a PAUSE of the survivor's process (sim.pause): frames pile up in its socket buffers and its one
+  // armed heartbeat waits; at the wake it reads everything at once, as a process does after a long GC pause or a
+  // swap-in. It used to be a constant delay on every link of the node, lifted once the leavers were gone — but a
+  // delay keeps the node running and late, so a knock and each answer paid the stall in turn (four stalls per round
+  // trip), and with the leaver knocking on (§10.7) the lift never came while it lived. The old model wedged every
+  // stalled schedule for a reason no pause has; this one lets the survivor wake INSIDE the window, the shape the
+  // window exists for (re-derived on the base kernel under this model first: the pinned set did not move).
+  if (s.stall) sim.pause(s.stall.node, Math.round(s.stall.ms * (o.stall ?? 1)))
   s.leavers.forEach((u, i) => sim.post(u, { kind: 'leave' }, s.offsets[i]))
   let joiner: Node | null = null
   if (s.join) {
@@ -105,7 +111,6 @@ export const run = (s: Schedule, horizon = 12000): string[] => {
       sim.nodes.get(id)!.destroy(); sim.nodes.delete(id)
       gone.set(id, sim.now); lastGone = sim.now
     }
-    if (lift && gone.size === s.leavers.length && sim.now >= t0 + s.stall!.ms) { lift(); lift = null }
     if (gone.size === s.leavers.length && sim.now > lastGone + 7000) break
   }
   if (gone.size !== s.leavers.length) return ['leaver never answered: ' + s.leavers.filter((u) => !gone.has(u))]
@@ -136,10 +141,10 @@ export const schedule2 = (seed: number): Schedule2 => {
 //! run2 — one family-2 schedule: a durable cluster; a leaver is torn down the moment its leave is answered (cut from
 // everyone, like the shell), and comes back FROM ITS DIR after `restart` ms when asked to — a node that was leaving
 // and may be OUT of a view it never saw. Wanted at the end: the survivors plus every leaver that came back, in one
-// view, writable.
-export const run2 = (s: Schedule2, horizon = 30000): string[] => {
+// view, writable. `o.tune` sets the members' tune rows (the knock window's tests).
+export const run2 = (s: Schedule2, horizon = 30000, o: RunOpts = {}): string[] => {
   const sim = new Sim(s.seed)
-  const nodes = cluster(sim, s.n, { heartbeatMs: 50, durable: true, fault: { delay: [3, 3] } })
+  const nodes = cluster(sim, s.n, { heartbeatMs: 50, durable: true, fault: { delay: [3, 3] }, ...(o.tune !== undefined ? { tune: o.tune } : {}) })
   sim.run({ until: 800 })
   if (!nodes.every((x) => x.epoch === 1)) return ['never formed']
   for (const [a, b, d] of s.delay) sim.fault(a, b, { delay: [d, d] })
