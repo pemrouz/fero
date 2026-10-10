@@ -1105,7 +1105,8 @@ shuts on its vote at 3 above view 2, so bb is 1 of 3 and read-only) but NOT the 
 still holding that vote, grants bb's `{bb,cc}`@4 and the epoch-4 split stands; with the grant
 clause (α) it ends safe, `aa@4{aa,dd}` writable, bb and cc read-only for good (`minority`,
 `stale-vote`). Form (β) would close it at the voter without (α): cc and dd refuse a ballot whose
-base epoch is 1 while they hold view 2. Either way the rule for it is §10.9 step 2's, and no
+base epoch is 1 while they hold view 2 and a vote at 2, either one above it ((β) reads the higher
+of the two, below). Either way the rule for it is §10.9 step 2's, and no
 ballot should outlive an install (a leaver's already does not, `:480`).
 
 Where the argument stops, in one sentence: **a voter that has spent a vote above its view may be
@@ -1149,10 +1150,13 @@ THREE parts, and the third is about the grant:
   kernel closes `evictTwoB`: 0 of 5.
 - (β) at the voter, by the ballot: a PROPOSE carries the epoch of the view it is over
   (`#proposal.old` is fixed at `:601`; the frame has no field for it, `:614`), and a voter refuses
-  any ballot whose base is below its vote's epoch. For a stale proposer (β) says what (α) says; it
-  also refuses the KEPT ballot (ii) at every voter that has moved on, so "no ballot outlives an
-  install" needs no rule at the proposer. It is a wire change, the same class as what a stale
-  stayer's gate needs (§10.5).
+  any ballot whose base is below the HIGHER of its view and its vote. Both are needed: a voter that
+  installed a newer view from a VIEW frame without voting at it has its vote BELOW its view
+  (`install()` never touches `votedFor`, `:465-505`; `onView` installs any higher view, `:445`), and
+  by its vote alone it would grant a kept ballot over its older view. For a stale proposer (β) says
+  what (α) says; it also refuses the KEPT ballot (ii) at every voter that has moved on, by view or
+  by vote, so "no ballot outlives an install" needs no rule at the proposer. It is a wire change,
+  the same class as what a stale stayer's gate needs (§10.5).
 
 What the rule costs, measured on two scratch kernels — the three parts with (α), and the two parts
 alone (gate and lead-nothing, the grant line deleted) — every family of §10.8 and the in-tree sweep
