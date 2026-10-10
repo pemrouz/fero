@@ -180,8 +180,15 @@ const nearest = (path: string): string | null => {
 }
 //! groupMiss — an undeclared OBJECT at the top of a global rung is another resource's subtree unless
 // it is a near miss of a declared GROUP (the only declared keys that hold objects): `heartbeats`
-// beside `heartbeat` is a typo, `orders` beside `order` is a sibling resource
-const groupMiss = (k: string): string | null => {
+// beside `heartbeat` is a typo, `orders` beside `order` is a sibling resource. The name alone does not
+// decide it: a short group pulls in common words (`leave` is two edits from live, lease, level, league,
+// save, wave, lane; `seams` from teams, `diag` from dial), and a multi-resource app with a resource so
+// named refused to start (wave 5c's review, 2026-10-10). So the OBJECT is read too: one that holds a
+// declared top-level option (`live: { heartbeat: … }`, `teams: { dir: … }`) is a resource's rung —
+// no group has an option under it — and is left alone; one that holds none (`heartbeats: { ms }`,
+// `lease: { ms }`) is the typo the rule was written for.
+const groupMiss = (k: string, v: Record<string, unknown>): string | null => {
+  if (Object.keys(v).some((o) => TOP.has(o.toLowerCase()))) return null
   for (const g of GROUPS) if (distance(k.toLowerCase(), g) <= 2) return firstLeaf(g)!
   return null
 }
@@ -256,7 +263,7 @@ const walk = (resource: string, layer: Layer, name: string | null, tree: unknown
       if (prefix === 'seams') throw new Error(`fero('${resource}'): unknown seam '${k}' — M5a ships validation; hash/codec/storage land with their milestones`)
       if (layer !== 'call' && name === null && prefix === '' && isPlain(v)) {
         if (k === mine) continue
-        const miss = groupMiss(k)
+        const miss = groupMiss(k, v)
         if (miss === null) continue
         throw new Error(`fero('${resource}'): unknown option '${path}' from ${spell(layer, name, path)} — did you mean ${hint(layer, name, miss)}`)
       }
