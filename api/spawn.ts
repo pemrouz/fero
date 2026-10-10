@@ -7,9 +7,10 @@ import type { Spawned, SpawnOpts } from './types.ts'
 // The handle is what a script or a check needs: the pid, what the process printed, and a stop() that
 // IS the reader's Ctrl-C (SIGINT: a fero process leaves by ballot and exits 0, V4-8) but gives up after
 // GRACE ms (SIGKILL, null), so a broken clean stop FAILS the caller instead of hanging it. One LAWFUL stop
-// can outlast GRACE: a scoped member (`replicas`) draining to a new holder that cannot attest waits
-// leaveTicks + drainTicks heartbeats (11 s at the default 500 ms, DESIGN-SCALE stage 1 (b)) and is then
-// killed mid-drain, `null` — the README's Process bullet says so; the usual drain is one or two heartbeats.
+// can outlast GRACE: a scoped member (`replicas`) draining to a new holder that cannot prove it holds the
+// rows waits up to leaveTicks + drainTicks + 2 heartbeats — the shell's destroy cap, 22 ticks, 11 s at the
+// default 500 ms (DESIGN-SCALE stage 1 (b)) — and is killed mid-drain, `null`; the README's Process bullet
+// says so. The usual drain is one or two heartbeats.
 // GRACE is not raised for it: spawn cannot know the child's cadence, and every broken stop in the example
 // checks would wait that long to fail. A child is
 // tracked like a live instance: the parent's own Ctrl-C stops it and waits. A parent that dies on an
