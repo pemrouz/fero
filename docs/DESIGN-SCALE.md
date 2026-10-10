@@ -198,6 +198,28 @@ the cut-off leaver). The unscoped leave is byte-identical (no scope ⇒
 `#exit` is never asked): the golden, the 300-seed sweep, 59,500 and
 104,050 stand. Scoped trajectories with leaves moved (A6's leave leg, A7).
 
+Three readings that differ from the §7 row's words, settled at the
+review of the same day. (1) The row says the hold waits for a "live,
+non-leaving" holder; what landed waits for every REACHABLE holder,
+leaving or not. A holder that is itself leaving still acquires and drains
+on, and knowing who is leaving would need the ballot code (the leave
+chain's lines); two leavers at once both finish clean inside the bound
+(sim/scale-probes). (2) At R≥2 a holder that is unreachable and never
+attested does not hold the leaver: once the reachable holders cover the
+frozen tails the drain ends `left(true)`, with no `undrained` row, while
+the orphan itself stays unshed (the shed still wants every holder) for
+the teardown to take. The data is safe (a live copy exists; M9 agrees),
+and I13 above now says so. (3) A leaver whose vote never came back
+(leaveTicks) goes like a crash and never drains: no install froze its
+partitions, so there is no orphan to hand over; `undrained` counts the
+drain window only (kernel/drain.test.ts pins it). Two more facts from the
+review: the sweep's battery seed count (2) gives A7 only R=2 shapes, so
+A7 always runs its seed 4 (n=2 R=1), the shape on which M9 can bite; and a
+lawful scoped stop can outlast `fero.spawn`'s 5 s stop grace (up to
+leaveTicks + drainTicks + 2 heartbeats, 11 s at the default cadence, when
+a new holder cannot attest) — the README says so rather than the grace
+being raised, since spawn cannot know the child's cadence.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
@@ -756,10 +778,20 @@ that stepped (STATUS.md:66).
   open latch, every lane at every node holds ≤ winners + `compactAt`
   entries, and every tombstone is either fenced or pinned by a named
   uuid. Monitor **M8 boundedLogs**, per node, worst lane named.
-- **I13 Leave drain** (new). A leaver reports `left(true)` only when it
-  holds no orphan and no latch, or no reachable member is a current holder
-  of what it still holds; past the bound it reports `left(false)` and
-  counts `undrained`. Monitor **M9 leaveDrain**.
+- **I13 Leave drain** (new; amended 2026-10-10 to what landed). A leaver
+  reports `left(true)` only when the view without it committed and echoed
+  AND every partition it still holds with content is covered by the
+  attestation of every REACHABLE current holder (the shed bar, quantified
+  over the holders that can still answer). Past the bound, or when some
+  partition it holds has no reachable current holder at all (the last
+  member), it reports `left(false)` and counts `undrained`. Monitor **M9
+  leaveDrain**. The first wording said "holds no orphan" and that
+  no-reachable-holder counts as `left(true)`; the drain that landed reads
+  both the other way: a stop that could not copy its rows is not clean,
+  and at R≥2 a partition whose unreachable holder never attested is
+  drained once the reachable holders cover it (a live copy exists; the
+  orphan itself stays for the teardown, since the shed still wants every
+  holder). M9 agrees with both.
 - **I14 Unscoped identity.** No unscoped byte or trajectory changes.
   Gate: the golden, the sweep, 59,500, the idle law, the 46 pins.
 
