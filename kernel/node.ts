@@ -965,7 +965,9 @@ export class Node {
       if (this.armed) {
         const p = partitionOf(rec)
         const pe = d.part(p)
-        if (pp! <= pe.s && seq > pe.s) pe.s = seq
+        //! the floor advanced at the stamp site: the ONE dirty mark of the hot path (DESIGN-SCALE stage 2) — the next
+        // tick announces the new floor to p's co-holders in one batched HAVEQ per link (kernel/scope.ts `dirty`)
+        if (pp! <= pe.s && seq > pe.s) { pe.s = seq; this.scope!.dirty.add(p) }
         this.scope!.mintHeld(this, p) // the owner holds what it stamps — the entry exists from the first commit
         const ring = this.writes.ring
         if (ring.epoch !== this.epoch) ring.build(this.epoch, this.membership.view.members)
@@ -1358,10 +1360,11 @@ export class Node {
     //! round-on-admit (M6-review findings 13/23/33/40/49 — DESIGN-M6 C3's mandated trigger): the
     // post-reconnect multi-source window creates interior holes suffix AE cannot fill (they sit
     // below the scalar lane tail), and a lost install-round offer otherwise re-heals only at the
-    // next install. One batched HAVEQ round per admit re-announces + re-probes; it rides AFTER
-    // the VIEW frame on this same FIFO link (finding 39's ordering rule), so a healed peer
-    // installs the epoch before judging the round's epoch stamp.
-    if (this.armed && !link.client) this.scope!.round(this)
+    // next install. One batched HAVEQ per admit re-announces + re-probes, to the ADMITTED PEER only
+    // for the partitions the two share (DESIGN-SCALE stage 2 §3 trigger 2; it used to be a full round
+    // to every co-holder); it rides AFTER the VIEW frame on this same FIFO link (finding 39's ordering
+    // rule), so a healed peer installs the epoch before judging the round's epoch stamp.
+    if (this.armed && !link.client) this.scope!.round(this, new Set([link]))
   }
 
   //! #uuidTaken — the refusing half of the role rule (DESIGN-DOOR §3 step 12): a CLIENT HELLO (r:1) whose

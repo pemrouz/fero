@@ -653,6 +653,115 @@ test('STAGE 2 KEYS — an ok answer carries `g: 1` exactly when the content tail
   assert.equal(dans.g, 1)
 })
 
+//! ── DESIGN-SCALE stage 2: announce on change, the sweep, the targeted rounds ──
+
+//! haveqs — the HAVEQ bodies this node shipped on `link`, in order
+const haveqs = (h: ReturnType<typeof harness>, link: number) =>
+  sentOn(h, link, VERB.HAVEQ).map((f) => f.value as { e: number; q: Record<string, Record<string, number>>; d?: Record<string, Record<string, number>>; g?: string[]; x?: string[] })
+
+test('ANNOUNCE ON CHANGE — one commit → at the next tick one HAVEQ with one entry to each of the R−1 co-holders (never to a non-holder), then silence once they have answered; a never-answered co-holder is asked every tick until it does (aeFan 0: the sweep off)', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('p', 'aa', 'bb') // R=2: bb is the one co-holder; cc holds nothing of p
+  const n1 = () => haveqs(h, 1).length, n2 = () => haveqs(h, 2).length
+  assert.equal(n1() + n2(), 0, 'quiet before the write')
+  h.node.step({ kind: 'write', recs: [rec(['p', 'x'], 1)] })
+  assert.deepEqual([...h.node.scope!.dirty], ['p'], 'the stamp site marked p dirty')
+  assert.equal(n1(), 0, 'nothing leaves at the stamp: the announcement waits for the tick')
+  h.tick()
+  assert.deepEqual(haveqs(h, 1).map((v) => v.q), [{ p: { aa: 1 } }], 'one HAVEQ to bb carrying the new floor')
+  assert.deepEqual(haveqs(h, 1)[0].g, ['p'], 'and the gapless bit for it')
+  assert.equal(n2(), 0, 'cc is no holder of p: nothing')
+  assert.equal(h.node.scope!.dirty.size, 0, 'the tick cleared the dirty set')
+  //! bb has not answered: the never-answered leg asks again at the next tick, and the one after
+  h.tick(); h.tick()
+  assert.equal(n1(), 3, 'a co-holder that never attested p is asked every tick until it does')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(1, { p: { ok: 1, need: 0, m: { aa: 1 }, g: 1 } }) })
+  assert.deepEqual([...h.node.scope!.entries.get('p')!.marks.get('bb')!], [['aa', 1]], 'the answer carried bb\'s floor back: marks converge in one round trip')
+  h.tick(); h.tick()
+  assert.equal(n1(), 3, 'silence: nothing changed, bb has attested, no sweep')
+  //! a second commit: exactly one more entry to bb at the next tick, then silence again
+  h.node.step({ kind: 'write', recs: [rec(['p', 'y'], 2), rec(['p', 'z'], 3)] })
+  h.tick()
+  assert.equal(n1(), 4)
+  assert.deepEqual(haveqs(h, 1)[3].q, { p: { aa: 3 } }, 'a batch of two records is one entry: the floor')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(1, { p: { ok: 1, need: 0, m: { aa: 3 }, g: 1 } }) })
+  h.tick(); h.tick(); h.tick()
+  assert.equal(n1(), 4, 'silence')
+  assert.equal(n2(), 0, 'and cc never heard of p')
+  //! a DURABLE announcer carries its durable floors too (`d`), empty until the fsync echo
+  const d = armedView1({ durable: true, tune: { aeFan: 0 } })
+  d.node.membership.rejoinFloor = 0
+  d.node.writes.ring.place('p', 'aa', 'bb')
+  d.node.step({ kind: 'write', recs: [rec(['p', 'x'], 1)] })
+  d.tick()
+  assert.deepEqual(haveqs(d, 1), [{ e: 1, q: { p: { aa: 1 } }, d: { p: {} }, g: ['p'] }], 'durable: q, d and g')
+})
+
+test('THE SWEEP — with aeFan 1 and two co-holders, every held partition is re-announced to each co-holder within ⌈c / aeFan⌉ = 2 ticks, in uuid order, and an idle tick costs exactly min(aeFan, c) HAVEQ frames; aeFan 2 covers both every tick', () => {
+  const h = armedView1({ tune: { aeFan: 1 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('p1', 'aa', 'bb')
+  h.node.writes.ring.place('p2', 'aa', 'cc')
+  h.node.step({ kind: 'write', recs: [rec(['p1', 'x'], 1), rec(['p2', 'x'], 2)] })
+  //! both co-holders attest first (so the never-answered leg is quiet and what remains is the sweep)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(1, { p1: { ok: 1, need: 0, m: { aa: 1 } } }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: havea(1, { p2: { ok: 1, need: 0, m: { aa: 2 } } }) })
+  h.tick() // the dirty announcement (p1 → bb, p2 → cc) plus the first sweep slice
+  const b0 = haveqs(h, 1).length, c0 = haveqs(h, 2).length
+  const perTick: [number, number][] = []
+  for (let i = 0; i < 4; i++) {
+    const b = haveqs(h, 1).length, c = haveqs(h, 2).length
+    h.tick()
+    perTick.push([haveqs(h, 1).length - b, haveqs(h, 2).length - c])
+  }
+  assert.deepEqual(perTick, [[0, 1], [1, 0], [0, 1], [1, 0]], 'one frame per tick, alternating bb/cc in uuid order (the cursor): every pair is re-proved every 2 ticks')
+  assert.deepEqual(haveqs(h, 1).slice(b0).map((v) => v.q), [{ p1: { aa: 1 } }, { p1: { aa: 1 } }], 'bb is told exactly what it shares: p1')
+  assert.deepEqual(haveqs(h, 2).slice(c0).map((v) => v.q), [{ p2: { aa: 2 } }, { p2: { aa: 2 } }], 'cc: p2')
+  //! aeFan 2 (≥ c): both co-holders every tick — the idle cost is min(aeFan, c) = 2 frames
+  const w = armedView1({ tune: { aeFan: 2 } })
+  w.node.membership.rejoinFloor = 0
+  w.node.writes.ring.place('p1', 'aa', 'bb')
+  w.node.writes.ring.place('p2', 'aa', 'cc')
+  w.node.step({ kind: 'write', recs: [rec(['p1', 'x'], 1), rec(['p2', 'x'], 2)] })
+  w.node.step({ kind: 'bytesIn', link: 1, bytes: havea(1, { p1: { ok: 1, need: 0, m: { aa: 1 } } }) })
+  w.node.step({ kind: 'bytesIn', link: 2, bytes: havea(1, { p2: { ok: 1, need: 0, m: { aa: 2 } } }) })
+  w.tick()
+  const wb = haveqs(w, 1).length, wc = haveqs(w, 2).length
+  w.tick(); w.tick(); w.tick()
+  assert.deepEqual([haveqs(w, 1).length - wb, haveqs(w, 2).length - wc], [3, 3], 'every tick re-proves every co-holder')
+  //! a paused link is skipped by the sweep (and by every leg): nothing is queued into a drop-oldest queue
+  w.node.step({ kind: 'pause', link: 1 })
+  const pb = haveqs(w, 1).length, pc = haveqs(w, 2).length
+  w.tick(); w.tick()
+  assert.equal(haveqs(w, 1).length - pb, 0, 'paused: skipped')
+  assert.equal(haveqs(w, 2).length - pc, 2, 'the flowing link still swept')
+})
+
+test('TARGETED ROUNDS — the post-fold round announces the acquired partition to ITS holders only; the admit round announces to the admitted peer only, the partitions the two share', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('p1', 'aa', 'bb')
+  h.node.writes.ring.place('px', 'cc', 'aa')
+  h.node.step({ kind: 'write', recs: [rec(['p1', 'x'], 1)] })
+  h.tick()
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(1, { p1: { ok: 1, need: 0, m: { aa: 1 } } }) })
+  const b0 = haveqs(h, 1).length, c0 = haveqs(h, 2).length
+  //! cc announces px (lane cc at 5); aa (assigned, from zero) latches, cc teaches, aa folds
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(1, { px: { cc: 5 } }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: acqFrame('cc', [{ seq: 5, rec: rec(['px', 'a'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { cc: 5 }, n: 1 }) })
+  assert.equal(h.node.scope!.held('px'), true)
+  assert.deepEqual(haveqs(h, 2).slice(c0).map((v) => v.q), [{ px: { cc: 5 } }], 'the post-fold round: px to cc, its co-holder — nothing else')
+  assert.equal(haveqs(h, 1).length, b0, 'bb holds nothing of px: the fold told it nothing (it used to get a full round)')
+  //! bb's link dies and comes back: the admit round goes to bb alone, with p1 (shared) and not px (not shared)
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'test' })
+  const c1 = haveqs(h, 2).length
+  h.admit(3, 'bb')
+  assert.deepEqual(haveqs(h, 3).map((v) => v.q), [{ p1: { aa: 1 } }], 'the admit round: the one shared partition, to the admitted peer')
+  assert.equal(haveqs(h, 2).length, c1, 'cc heard nothing of bb\'s re-admit')
+})
+
 //! a floor can exist for a lane this node has NO entries of: an ACQDONE cut names every lane the teacher
 // attests, and a lane whose records were all compacted away ships no record. The old shed walked node.logs,
 // so such a stream (no lane at all) kept its floor past the shed; the lane-less stream is the shape the
