@@ -581,7 +581,7 @@ test('M10 resync-end and M11 resync-behind: lawful on the crossing schedule (the
 // starts from a settled mesh. (2) The joiner's own 30 pairs are at the stated [1,1] too; sim.add pairs a new node at
 // the sim's default [1,5]; the re-run of the panel's timing and this test's first version (2,585) both ran with the
 // joiner there. 1,067 for the writes and 52,110 DIGEST frames to t = 20 s are the same either way.
-test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scoped = n(n−1) DIGEST per tick; 300 writes = 1,067 HAVEQ; one join at n=30 R=3 P=300 = 2,446 HAVEQ', () => {
+test('counted floors (DESIGN-SCALE §2\'s setup, re-recorded at stage 2): idle scoped = 0 member DIGEST per tick (n(n−1) before); 300 writes = 5,337 HAVEQ and exactly 600 RECORDS (1,067 HAVEQ before); one join at n=30 R=3 P=300 = 14,791 HAVEQ and 60 DIGEST (2,446 and 52,110 before)', () => {
   const sim = new Sim(13)
   const t = frameTally(sim)
   const nodes = cluster(sim, 30, { heartbeatMs: 200, fault: { delay: [1, 1] }, replicas: 3 })
