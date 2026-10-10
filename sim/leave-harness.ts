@@ -998,7 +998,14 @@ export const genesisProposerAndGranterDie = (variant: 'open' | 'committed', who:
   if (who === 'fresh') { m.add('dd'); m.connect('bb', 'dd') }
   else { m.add('a2'); m.add('c2'); m.connect('a2', 'bb'); m.connect('c2', 'bb'); m.connect('a2', 'c2') }
   settle(m, 60, [['bb', 'aa'], ['bb', 'cc']])
-  return outcomeM(m, shape, quietSplit(m))
+  //! `mid` (the fourth review): every node's proposal list and the shape of bb's vote — the epoch it is at and how
+  // many earlier votes it carries. Today bb's vote is the one it gave aa at 1 and carries nothing. A rule that holds
+  // bb re-proposes at every age-out (the frozen cluster) and must do so at the SAME epoch: without the same-members
+  // clause of §10.10.2 the re-offer is refused, the epoch burns, and the list climbs — P(3,3), P(4,3) — while bb's
+  // vote climbs with it and carries one earlier vote per burn.
+  const vf = m.nodes.get('bb')!.membership.votedFor as { e: number; p: string; prior?: unknown[] }
+  const mid = [`proposals: ${[...m.nodes.keys()].map((u) => `${u}=${proposals(m, u) || '-'}`).join(' ')}`, `bb vote: e=${vf.e} p=${vf.p} prior=${vf.prior?.length ?? 0}`]
+  return outcomeM(m, shape, quietSplit(m), mid)
 }
 
 //! genesisSplit — today's kernel commits two views at ONE epoch at genesis (the third review's minor: §10.10.1 named
@@ -1029,6 +1036,147 @@ export const genesisSplit = (): OutcomeM => {
   for (const a of ['aa', 'bb', 'cc']) for (const b of ['dd', 'ee']) pairs.push([a, b], [b, a])
   settle(m, 40, pairs)
   return outcomeM(m, shape, quietSplit(m))
+}
+
+// ── the fourth review's shapes (DESIGN-LEAVE §10.10, 2026-10-10): one pin per kernel line of the rule's wire, and the
+// hold a HELLO alone announced — each one fixed schedule on real Nodes, or one seeded Sim run on real HELLOs ──
+//! the hold a stranger names in clientGenesis and serverAsk: three members that do not exist, nine epochs up
+const STRANGER_HOLD = [{ e: 9, h: 'q1,q2,q3', p: 'q1' }]
+//! stranger — a link into aa from a uuid outside the mesh: a HELLO (a client's with `r: 1`) that names the hold, or
+// a plain HELLO and then a PULL that names it. The mesh carries no frame on this link; aa's answers go nowhere.
+const stranger = (m: Mesh, via: 'hello' | 'pull', client: boolean, e: number): void => {
+  const aa = m.nodes.get('aa')!
+  aa.step({ kind: 'linkUp', link: 7777, dialed: false })
+  aa.step({ kind: 'bytesIn', link: 7777, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: client ? '' : 'sim:zz', ...(client ? { r: 1 } : {}), ...(via === 'hello' ? { v: STRANGER_HOLD } : {}) }) })
+  if (via === 'pull') aa.step({ kind: 'bytesIn', link: 7777, bytes: encodeControl(VERB.PULL, { e, vs: STRANGER_HOLD }) })
+}
+//! clientGenesis — a CLIENT's word at epoch 0 (the fourth review: clientAsk goes red only when BOTH halves of the
+// I-23 fix are gone, so each half needs its own shape). n=3, fully linked, no view yet; a client zz links into aa
+// before genesis with a HELLO that names the hold (`hello`), or a plain client HELLO and then a PULL at epoch 0 that
+// names it (`pull`). Then everyone ticks. Today's kernel: aa proposes view 1 over the three and it forms, `P(1,3)`
+// once. A rule whose proposer reads the holds of EVERY linked uuid at epoch 0 (the formation set) and takes a
+// client's word there makes aa's genesis ballot joint over three members that do not exist: nothing ever forms
+// (`aa@0{} bb@0{} cc@0{}`, `P(1,3) P(1,3)`) — one client stops genesis. Pinned as the end state and aa's proposals.
+export const clientGenesis = (via: 'hello' | 'pull'): OutcomeM => {
+  const shape: string[] = []
+  const ids = ['aa', 'bb', 'cc']
+  const m = new Mesh()
+  for (const u of ids) m.add(u)
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) m.connect(ids[i], ids[j])
+  for (const k of m.q.keys()) m.q.set(k, [])
+  stranger(m, via, true, 0)
+  const zl = m.nodes.get('aa')!.links.get(7777)
+  if (zl?.state !== LS.admitted || !zl.client) shape.push(`zz was not admitted as a client: state ${zl?.state}, client ${zl?.client}`)
+  settle(m, 20, [])
+  return outcomeM(m, shape, quietSplit(m), [`aa proposed: ${proposals(m, 'aa') || 'nothing'}`])
+}
+//! serverAsk — a NON-MEMBER SERVER's word (the other half of I-23's fix): a formed five-node mesh; zz, a server that
+// is in no view (a joiner that never knocked), links into aa with a HELLO and a PULL that both name the hold; then
+// aa loses ee and evicts it. Today's kernel: `{aa,bb,cc,dd}`@2 on the first ballot, `P(2,4)` once — as clientAsk. A
+// rule that widens a ballot with ANY linked server's holds, member or not, makes aa's every ballot joint over
+// `{q1,q2,q3}` and nothing commits (`P(2,4)` three times, ee never evicted). Pinned as the end state and the
+// proposals: only a MEMBER's word may widen a ballot (§10.10.6).
+export const serverAsk = (): OutcomeM => {
+  const shape: string[] = []
+  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd', 'ee'])
+  stranger(m, 'hello', false, 1)
+  m.nodes.get('aa')!.step({ kind: 'bytesIn', link: 7777, bytes: encodeControl(VERB.PULL, { e: 1, vs: STRANGER_HOLD }) })
+  const zl = m.nodes.get('aa')!.links.get(7777)
+  if (zl?.state !== LS.admitted || zl.client) shape.push(`zz was not admitted as a server: state ${zl?.state}, client ${zl?.client}`)
+  m.cut('aa', 'ee')
+  for (let i = 0; i < 3; i++) m.tick('aa')
+  m.giveUp('aa', 'ee')
+  m.tick('aa')
+  if (proposals(m, 'aa') !== 'P(2,4)') shape.push(`aa did not open the eviction of ee at 2: ${proposals(m, 'aa') || 'nothing'}`)
+  settle(m, 30, ['aa', 'bb', 'cc', 'dd'].map((u) => [u, 'ee'] as [string, string]))
+  return outcomeM(m, shape, quietSplit(m), [`aa proposed: ${proposals(m, 'aa')}`])
+}
+
+//! helloHold — a hold a stayer learned from a HELLO ALONE, and its release (the fourth review's liveness finding
+// against the scratch kernel: at epoch 0 no ask goes out, so a hold the HELLO announced was never taken back). n=5,
+// hostless genesis: aa proposes view 1 over the five, bb and cc grant, aa installs it on their two VOTEs and is cut
+// from everyone before the VIEW or the PROPOSEs to dd and ee land; the four give up on aa. bb, the lowest of the
+// rest at epoch 0, proposes `{bb,cc,dd,ee}`@2 over the empty old set; dd grants it (a vote at 2 for a view four
+// apart from its empty view); then bb is cut from cc and ee, so its PROPOSEs to them die and the ballot holds two of
+// four on either kernel — it cannot commit (at n=4 it would: two of three IS a majority of the new set over an
+// empty old one, today's genesis class). Then aa re-links to dd — a FRESH link, so dd's HELLO is where a hold would
+// ride — and aa's VIEW 1 lands at dd: dd installs it, and its vote at 2 for `{bb,cc,dd,ee}` is now ONE apart from
+// view 1, no hold; dd's answer lands at aa. aa re-links to cc the same way. Now aa holds links to cc and dd, three
+// of its five: it must be writable. Today's kernel: aa is writable there (it reads no hold), and after three quiet
+// rounds too. A rule that reads dd's hold from its HELLO must take it back when it ends, or aa stays `minority`
+// with a reachable majority until a view change — and its own next ballot, joint over the phantom hold, may never
+// commit: the release is a frame, never silence (§10.10.6), at epoch 0 too. `mid` is the exact state at the two
+// points; the end is after the chains give up and aa evicts bb and ee.
+export const helloHold = (): OutcomeM => {
+  const shape: string[] = []
+  const ids = ['aa', 'bb', 'cc', 'dd', 'ee']
+  const m = new Mesh()
+  for (const u of ids) m.add(u)
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) m.connect(ids[i], ids[j])
+  for (const k of m.q.keys()) m.q.set(k, [])
+  const node = (u: string) => m.nodes.get(u)!
+  m.tick('aa')
+  if (proposals(m, 'aa') !== 'P(1,5)') shape.push(`aa did not propose view 1 over the five: ${proposals(m, 'aa') || 'nothing'}`)
+  m.deliver('aa', 'bb'); m.deliver('aa', 'cc'); m.deliver('bb', 'aa'); m.deliver('cc', 'aa')
+  if (node('aa').epoch !== 1) shape.push(`aa did not install view 1 on bb's and cc's grants: ${meshState(m)}`)
+  for (const u of ['bb', 'cc', 'dd', 'ee']) { m.cut('aa', u); m.giveUp(u, 'aa') }
+  m.tick('bb')
+  if (proposals(m, 'bb') !== 'P(2,4)') shape.push(`bb did not propose {bb,cc,dd,ee}@2 from epoch 0: ${proposals(m, 'bb') || 'nothing'}`)
+  m.deliver('bb', 'dd'); m.deliver('dd', 'bb')
+  if (node('dd').membership.votedFor.e !== 2 || node('dd').membership.votedFor.p !== 'bb') shape.push(`dd did not grant bb at 2: ${meshState(m)}`)
+  m.cut('bb', 'cc'); m.cut('bb', 'ee')
+  if (node('bb').epoch !== 0) shape.push(`bb committed on two of four: ${meshState(m)}`)
+  const mid: string[] = []
+  for (const u of ['dd', 'cc']) {
+    m.connect('aa', u); allOf(m, 'aa', u)
+    if (node(u).epoch !== 1) shape.push(`${u} did not install view 1 from aa: ${meshState(m)}`)
+    allOf(m, u, 'aa')
+  }
+  mid.push(`aa with cc and dd: ${meshState(m)}`)
+  rounds(m, 3)
+  mid.push(`three rounds: ${meshState(m)}`)
+  settle(m, 30, [['aa', 'bb'], ['bb', 'aa'], ['aa', 'ee'], ['ee', 'aa'], ['bb', 'cc'], ['cc', 'bb'], ['bb', 'ee'], ['ee', 'bb']])
+  return outcomeM(m, shape, quietSplit(m), mid)
+}
+
+//! freshLinkSim — freshLink on REAL HELLOs (the fourth review: the mesh writes its own HELLO for every link, so
+// freshLink tests the mesh's copy of the rule and never the node's own HELLO). evictTwo's cut shape in the Sim:
+// n04 and n05 cut from n01 and n02; n01 evicts both at 2 on n03's grant; the VIEW to n03 dies on the sever and n03
+// is cut from n01 and n02 the instant n01 is at 2. 1.5 s later the n03-n04 and n03-n05 links FLAP: partitioned, healed
+// 30 ms later, re-dialed and re-admitted with a real HELLO each way. The writable split (sim/leave-sweep.ts) is
+// sampled every ms for 4 s from the flap; the line is the three far-side gates before the flap, the count of
+// split-ms, n04's gateOpen rows in the window, and the monitors' count. Today's kernel: a split before the flap and
+// through the window but for the flap itself (n03 is writable at 1 with n04 and n05, beside n01 and n02 at 2 — the
+// evictTwo split; later n03 leads `{n03,n04,n05}`@3 and the split goes on). A rule that holds n03 shows no split
+// before the flap and none in the window ONLY when n03's own HELLO carries its hold: without it n04 admits the fresh
+// link not knowing the hold, counts n03 for the round trip until n03's ask lands, and writes at 1 beside n01 at 2.
+// Pinned exactly per seed and link delay, so a kernel change moves it only with the why.
+export const freshLinkSim = (seed: number, delay: [number, number]): string => {
+  const sim = new Sim(seed)
+  const nodes = cluster(sim, 5, { heartbeatMs: 50, durable: true, fault: { delay } })
+  sim.run({ until: 800 })
+  const label = `seed ${seed} delay ${delay.join('-')}:`
+  if (!nodes.every((x) => x.epoch === 1)) return `${label} not the shape: never formed`
+  for (const f of ['n04', 'n05']) { sim.partition('n01', f); sim.partition('n02', f) }
+  sim.severOnFrame('n01', 'n03', VERB.VIEW)
+  //! the sample clock is `t` (sim.now is the last event's time and lags it): the window is the 4000 samples from the flap
+  const t0 = sim.now
+  let voted = -1, cutAt = -1, flapAt = -1, healAt = -1, hits = 0, before = ''
+  const gateOf = (u: string) => { const n = sim.nodes.get(u)!; return `${u}:${n.membership.gate(n).reason || 'W'}` }
+  for (let t = t0; t <= t0 + 12000; t += 1) {
+    sim.run({ until: t })
+    if (voted < 0 && nodes[2].journal.read().some((e) => e.kind === JK.vote && e.a === 2 && e.b === 1 && e.c === 'n01')) voted = t
+    if (voted >= 0 && cutAt < 0 && nodes[0].epoch >= 2) { cutAt = t; sim.partition('n01', 'n03'); sim.partition('n02', 'n03') }
+    if (cutAt >= 0 && flapAt < 0 && t >= cutAt + 1500) { flapAt = t; before = ['n03', 'n04', 'n05'].map(gateOf).join(' '); for (const f of ['n04', 'n05']) sim.partition('n03', f) }
+    if (flapAt >= 0 && healAt < 0 && t >= flapAt + 30) { healAt = t; for (const f of ['n04', 'n05']) sim.heal('n03', f) }
+    if (flapAt >= 0 && split(sim)) hits++
+    if (flapAt >= 0 && t >= flapAt + 3999) break
+  }
+  if (voted < 0) return `${label} not the shape: n03 never granted the eviction`
+  if (cutAt < 0) return `${label} not the shape: n01 never committed`
+  if (healAt < 0) return `${label} not the shape: the flap never came`
+  const opens = sim.nodes.get('n04')!.journal.read().filter((e) => e.kind === JK.gateOpen).length
+  return `${label} before [${before}] split-ms ${hits} of 4000; n04 gateOpen rows ${opens}; monitors ${sim.violations.length ? 'fired' : 'quiet'}`
 }
 
 // ── crash: a stayer crashes at an offset from the clean stops; everyone restarts from disk (the round-3 `crash2`) ──
