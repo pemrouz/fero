@@ -2451,3 +2451,28 @@ forgets the dead or starts it fresh. The genesis hold is not free; it buys `gene
   measures the held case, which is bounded by the length of `prior`.
 - STATUS: the I-20 line's "release" sentence and the two split lines' "the rule for it" sentences
   point here; the kernel is still unchanged.
+
+**2026-10-10, after the fourth re-check: open for the build.** The page landed as a record with
+these items open, each with the reviewer's probe under the session's scratch folder (`rsk2/`,
+`rsk3/`):
+
+1. `helloHolds` sets the node-wide `#lastAsk` from a HELLO sent on ONE link, so at the next
+   install `#ask('change')` skips the ask on member links that never carried that HELLO, and a
+   stayer that linked before the hold existed counts the held member for up to a heartbeat (two
+   writable views in that window on the candidate). Fix in the diff: a HELLO that names holds forces
+   the next change's ask onto every member link (a sentinel no key equals, or the last word per
+   link, which `saidHolds` already tracks); pin the shape.
+2. Two `onAdmit` lines of the diff have no pin: the fresh HELLO replacing a peer's old word
+   (`else this.#heldPeers.delete(link.uuid)`; without it a lost release is never learned, and a
+   node stays `minority` for good), and the ask at admit when the holds changed while the HELLO was
+   in flight. The claim that every kernel line of the wire has one pin is true for the five lines
+   §10.10.8 names, not for these two.
+3. `freshLinkSim` counts every writable split in its window, the normal propagation of a view
+   change included, and never checks that the run reached the two-evictee shape; a correct kernel
+   can read non-zero on timing alone. Return "not the shape" unless n01's view at 2 evicts both,
+   and count only the ms in which a far-side node at view 1 is writable beside a higher view.
+4. The signing note: sign `v` inside proofMsg's JSON array as `[[e, p, h], …]` (strings and
+   numbers, one encoding; a canonical string brings back the separator ambiguity the array exists
+   to avoid); say what an old peer does with the new keys and that a secured pair of mixed versions
+   fails as `bad-proof` (or bump the label to `fero-door/2`); mixed versions are unsupported before
+   1.0 (V4-14).
