@@ -454,6 +454,8 @@ const spokeOf = (sim: Sim, ids: string[], hosts: string[]) => {
 }
 const at = (sim: Sim, n: Node, k: string) => n.state.has(JSON.stringify([k])) && k in sim.folds.get(n.uuid)!
 const noneAt = (sim: Sim, n: Node, k: string) => !n.state.has(JSON.stringify([k])) && !(k in sim.folds.get(n.uuid)!)
+//! aeShipsTo — how many digest answers this node shipped records on toward `uuid` (one JK.aeShip row per answer that shipped)
+const aeShipsTo = (n: Node, uuid: string) => n.journal.read().filter((e) => e.kind === JK.aeShip && e.a === uuid).length
 
 //! STATUS: "A scoped spoke that fails over never receives the rows its new feeder holds below a lane tail it learned
 // from the old feeder." n=3 R=2. B: six rows owned by T and held by {T, O} (not P), written FIRST — lane T's LOW
@@ -486,11 +488,18 @@ test('a scoped spoke\'s failover resyncs onto the new feeder: the six rows it ho
     assert.ok(B.every((k) => On.state.has(JSON.stringify([k]))) && A.every((k) => !On.state.has(JSON.stringify([k]))), `seed ${seed}: O holds B and nothing of A`)
     assert.ok((s1.streams.get(T)?.applied ?? 0) > (On.streams.get(T)?.applied ?? 0), `seed ${seed}: the spoke's lane-T tail is above O's (A is the high rows)`)
     const resyncs0 = count(s1, JK.resynced)
+    //! the cut at O's tick boundary (a member started at t=0 ticks at multiples of hb): O's heartbeat r=1 to the spoke
+    // is in flight when the spoke's ask leaves, so the two cross. On that shape the spoke's r=0 answer — d = {} in
+    // resync — made O ship its held subset a SECOND time (the review of stage 2 measured 2 × 12 rows on 30 of 30
+    // seeds). A crossing inside the ask's first tick gets no answer now: exactly one ship.
+    sim.run({ until: Math.ceil(sim.now / 50) * 50 })
+    const ships0 = aeShipsTo(On, 's1')
     sim.partition(P, 's1')
     for (let t = sim.now + 1; t <= sim.now + 3000 && count(s1, JK.resynced) === resyncs0; t += 5) sim.run({ until: t })
     assert.equal(s1.links.get(s1.primary!)!.uuid, O, `seed ${seed}: fed by O now`)
     assert.ok(count(s1, JK.resynced) > resyncs0, `seed ${seed}: the failover was a resync`)
     sim.run({ until: sim.now + 300 })
+    assert.equal(aeShipsTo(On, 's1') - ships0, 1, `seed ${seed}: O shipped its held subset to the spoke exactly once (twice before: the crossing heartbeat was answered r=0 with d = {})`)
     assert.ok(B.every((k) => at(sim, s1, k)), `seed ${seed}: B arrived — the rows below the old tail that O holds (${B.filter((k) => at(sim, s1, k)).length} of 6)`)
     assert.ok(A.every((k) => noneAt(sim, s1, k)), `seed ${seed}: A left kernel and screen — O does not hold it`)
     assert.deepEqual(sim.violations, [], `seed ${seed}: no monitor fired (M10 resync-end and M11 resync-behind among them)`)

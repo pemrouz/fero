@@ -474,8 +474,10 @@ export class Node {
   // feeder marks the debt and asks with ITS r=1 after the drain); once the ask is a tick old, a feeder's r=1 is
   // answered with an r=1 of this node's own (a fresh q) instead of an r=0, so that exchange ships everything and
   // its reply ends the resync — the ghost sweep is at most one tick late, and never waits for the heartbeat floor
-  // this node may not own (a spoke floors its primary only when its uuid sorts below). A crossing at the instant
-  // of the resync (ticks 0) is still answered r=0: no duplicate ship for a reply that is already on its way.
+  // this node may not own (a spoke floors its primary only when its uuid sorts below). A feeder's r=1 that crosses
+  // the ask inside that first tick gets NO answer: the ask's reply is already on its way, and an r=0 of ours would
+  // say d = {} and make the feeder ship its held subset a second time (the review of stage 2 measured exactly that
+  // double ship at every tick-aligned scoped failover before this rule).
   resync: { old: Set<string>; q: number; ticks: number } | null = null
   #dq = 0
 
@@ -1403,7 +1405,17 @@ export class Node {
     // synced never rises there and this client has ONE feeder: per-origin ordering by construction.
     // A server never opens toward a client: the client's own r=1 is what syncs that link.
     if (this.client) {
-      if (this.primary === null) { this.primary = link.id; this.#feederLast = link.contract; this.#sendDigest(link, 1) }
+      if (this.primary === null) {
+        this.primary = link.id; this.#feederLast = link.contract
+        //! a SCOPED feeder elected HERE (the last one died with no other link up, so the linkDown arm found nobody) is
+        // the failover's second path, and the same shape (DESIGN-SCALE stage 2; the review's test found it): this
+        // spoke's lane tails came from a feeder that held a different subset, so an ask with them would miss what this
+        // one holds below them and leave what it does not hold on the screen. It resyncs onto this feeder too —
+        // whenever it holds anything, or a resync is already open (a mid-resync death: the sweep set must union, as in
+        // the linkDown arm). A spoke that holds nothing yet asks its first feeder as before: bytes unchanged.
+        if (this.feederScoped && (this.resync !== null || this.logs.size > 0)) this.#resyncBegin(link)
+        else this.#sendDigest(link, 1)
+      }
     } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
     //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
     // membership converges even when no epoch-stamped records flow; then settle — an admitted member
@@ -1798,10 +1810,18 @@ export class Node {
           // and what that older reply's ship brought stays in the fold (see `resync`). No q: an old server's reply.
           else if (v.r === 0 && (typeof v.q !== 'number' || v.q >= this.resync.q)) this.#resyncEnd()
           link.synced = true
-          //! a feeder's r=1 is answered r=0 with our tails — unless we are in a resync whose ask is a tick old (it
-          // reached a paused feeder, or was lost): then with an r=1 of our own, so this exchange ships everything
-          // and its reply ends the resync (see `resync.ticks`)
-          if (v.r === 1) this.#sendDigest(link, this.resync !== null && this.resync.ticks >= 1 ? 1 : 0)
+          //! a feeder's r=1 is answered r=0 with our tails — unless we are in a resync. An ask less than a tick old is
+          // still on its way on THIS link (the single-feeder rule above: only the primary reaches here, and every ask
+          // goes to the primary), its reply is the end, and an r=0 of ours would carry d = {} (in resync) and only make
+          // the feeder ship its held subset a SECOND time — the crossing at a scoped failover, where the new feeder's
+          // heartbeat r=1 is already in flight when the ask leaves (the review of stage 2 measured the double ship on
+          // 30 of 30 seeds; the lane dropped the duplicates, the cost was a second download). So it gets no answer; the
+          // gate it carried was read above. An ask a tick old (it reached a paused feeder, or was lost) is answered
+          // with an r=1 of our own, so that exchange ships everything and its reply ends the resync (see `resync.ticks`).
+          if (v.r === 1) {
+            if (this.resync === null) this.#sendDigest(link, 0)
+            else if (this.resync.ticks >= 1) this.#sendDigest(link, 1)
+          }
           return
         }
         //! a PAUSED link cannot deliver: serialising the missing suffix into its drop-oldest queue is

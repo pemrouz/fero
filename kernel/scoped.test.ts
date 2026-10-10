@@ -726,14 +726,26 @@ test('STAGE 2 KEYS — HAVEQ `x` voids the sender\'s marks for p; a HAVEA `x: 1`
   assert.deepEqual([...e.marks.get('bb')!], [['aa', 1]], 'bb\'s marks fed')
   assert.deepEqual([...e.marksD.get('bb')!], [['aa', 1]], 'bb\'s durable marks fed from the HAVEQ `d` map (not only from a HAVEA md)')
   assert.equal(e.gl.has('bb'), true, 'bb said it is gapless for p')
+  //! the bit is last-value on the HAVEQ leg too (the review of stage 2: this clearing had no test): an attestation
+  // WITHOUT g clears it, the next one with g sets it again, and a pure probe ({}: no attestation) leaves it alone
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { p: { aa: 1 } } }) })
+  assert.equal(e.gl.has('bb'), false, 'an announcement without g: bb is no longer gapless for p')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { p: { aa: 1 } }, g: ['p'] }) })
+  assert.equal(e.gl.has('bb'), true, 'and the next one with g sets it again')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { p: {} } }) })
+  assert.equal(e.gl.has('bb'), true, 'a pure probe says nothing about content: the bit stands')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: {}, x: ['p'] }) })
   assert.equal(e.marks.has('bb'), false, 'released: bb\'s marks are void')
   assert.equal(e.marksD.has('bb'), false)
   assert.equal(e.gl.has('bb'), false)
-  assert.equal(sentOn(h, 1, VERB.HAVEA).length, 1, 'a release frame with an empty q gets no answer (the attestation did)')
+  assert.equal(sentOn(h, 1, VERB.HAVEA).length, 4, 'a release frame with an empty q gets no answer (the four attestations did)')
   //! cc's ok answer feeds a mark, then cc answers `none` for p: a stale pin, cleared
   h.node.step({ kind: 'bytesIn', link: 2, bytes: havea(1, { p: { ok: 1, need: 0, m: { aa: 1 }, g: 1 } }) })
   assert.deepEqual([...e.marks.get('cc')!], [['aa', 1]])
+  assert.equal(e.gl.has('cc'), true)
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: havea(1, { p: { ok: 1, need: 0, m: { aa: 1 } } }) })
+  assert.equal(e.gl.has('cc'), false, 'last-value on the HAVEA leg too: an ok without g clears it')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: havea(1, { p: { ok: 1, need: 0, m: { aa: 1 }, g: 1 } }) })
   assert.equal(e.gl.has('cc'), true)
   h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEA, { e: 1, a: { p: { ok: 0, need: 0, x: 1 } } }) })
   assert.equal(e.marks.has('cc'), false, 'none: cc neither holds nor is assigned p — its pin here was stale')
@@ -866,6 +878,38 @@ test('THE SWEEP — with aeFan 1 and two co-holders, every held partition is re-
   w.tick(); w.tick()
   assert.equal(haveqs(w, 1).length - pb, 0, 'paused: skipped')
   assert.equal(haveqs(w, 2).length - pc, 2, 'the flowing link still swept')
+})
+
+//! the §7 stage-2 row's "skewed frames dropped at a mid-announcement install", as an INSTALL between an announcement
+// and its answer (the review of stage 2: the keys test sends a hand-built frame at the wrong epoch, which is the
+// same drop but not the same moment). The install clears the marks (rescope) and runs its own round at the new epoch;
+// the late answer to the old announcement is dropped whole; the never-answered leg asks again at the next tick.
+test('MID-ANNOUNCEMENT INSTALL — a view installed between an owner\'s announcement and the co-holder\'s answer: the answer is dropped whole, the install\'s round re-asks at the new epoch, and an answer at the new epoch converges the marks', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('p', 'aa', 'bb')
+  h.node.step({ kind: 'write', recs: [rec(['p', 'x'], 1)] })
+  h.tick()
+  assert.deepEqual(haveqs(h, 1).map((v) => [v.e, v.q]), [[1, { p: { aa: 1 } }]], 'the announcement at epoch 1')
+  const e = h.node.scope!.entries.get('p')!
+  //! the view moves under it (the same members, so p is still aa's and bb's: nothing freezes); the install clears the
+  // marks and runs the full round at epoch 2
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.node.epoch, 2)
+  assert.equal(e.state, SCOPE.held, 'p is still held: its holders did not change')
+  assert.equal(e.marks.has('bb'), false, 'the install cleared the marks')
+  assert.deepEqual(haveqs(h, 1).slice(1).map((v) => [v.e, v.q]), [[2, { p: { aa: 1 } }]], 'the install\'s own round, at epoch 2')
+  //! bb's answer to the epoch-1 announcement lands now: dropped whole
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(1, { p: { ok: 1, need: 0, m: { aa: 1 } } }) })
+  assert.equal(e.marks.has('bb'), false, 'the skewed answer fed nothing')
+  assert.equal(h.jk(JK.frameDrop).filter((x) => x.b === 'havea epoch skew').length, 1)
+  //! bb has not attested at epoch 2: the never-answered leg asks again at the next tick, at epoch 2
+  h.tick()
+  assert.deepEqual(haveqs(h, 1).slice(2).map((v) => [v.e, v.q]), [[2, { p: { aa: 1 } }]], 're-asked at the new epoch')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(2, { p: { ok: 1, need: 0, m: { aa: 1 } } }) })
+  assert.deepEqual([...e.marks.get('bb')!], [['aa', 1]], 'the answer at the right epoch converges the marks')
+  h.tick()
+  assert.equal(haveqs(h, 1).length, 3, 'then silence')
 })
 
 test('TARGETED ROUNDS — the post-fold round announces the acquired partition to ITS holders only; the admit round announces to the admitted peer only, the partitions the two share', () => {
