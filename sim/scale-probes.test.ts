@@ -442,9 +442,9 @@ test('a leaver cut off while draining (V4-20): the survivors never suspect or ev
 
 //! spokeOf — a spoke fed by one of `ids`: P its primary, O where the failover lands (the first other admitted link in
 // the spoke's link order, node.ts's linkDown arm), T the remaining member
-const spokeOf = (sim: Sim, ids: string[], hosts: string[]) => {
-  const s1 = sim.add({ uuid: 's1', listen: 'sim:s1', hosts: hosts.map((x) => 'sim:' + x), heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
-  sim.post('s1', { kind: 'start' }, 0)
+const spokeOf = (sim: Sim, ids: string[], hosts: string[], uuid = 's1') => {
+  const s1 = sim.add({ uuid, listen: 'sim:' + uuid, hosts: hosts.map((x) => 'sim:' + x), heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
+  sim.post(uuid, { kind: 'start' }, 0)
   sim.run({ until: sim.now + 300 })
   assert.notEqual(s1.primary, null, 'the spoke has a feeder')
   const P = s1.links.get(s1.primary!)!.uuid
@@ -507,6 +507,51 @@ test('a scoped spoke\'s failover resyncs onto the new feeder: the six rows it ho
     //! M11 judges the cells held at the reset that the FEEDER holds: O holds none of A, so it has 0 rows to judge here
     // (its non-vacuity is the crossing test below and the sweep's A11 seeds); M10 saw the end
     assert.ok(ledgerOf(sim).counts.resyncs >= 1, `seed ${seed}: non-vacuity — M10 saw ${ledgerOf(sim).counts.resyncs} resync end(s)`)
+  }
+})
+
+//! the second review of stage 2: a spoke link SLOWER than one heartbeat. In resync every digest says d = {}, so every ask
+// is a ship of the feeder's whole held subset — and the spoke re-asked on a tick-age proxy (its own floor every tick
+// when its uuid sorts below the feeder's; the feeder's heartbeat r=1 answered once the ask was a tick old when the
+// feeder's sorts below), one ask per tick until the reply landed: at 200 ms each way with hb 50 the feeder shipped 5
+// times (feeder floors) and 9 times (spoke floors), on every seed and cut phase. Now the spoke sends no floor in
+// resync, ignores a feeder's heartbeat r=1, and re-asks only on the feeder's drain digest (h: 1): exactly one ship on
+// any link, both orderings, every phase. The same schedule as the four-seed test above, O's pair to the spoke slowed.
+test('a scoped spoke\'s failover across a link slower than one heartbeat (200 ms each way, hb 50): the new feeder ships its held subset exactly once whichever side floors (5 and 9 ships before) — B arrives, A is swept, screen = kernel, one resync end', () => {
+  for (const sp of ['s1', 'a1']) for (const seed of [1, 2]) for (const phase of [0, 25]) {
+    const tag = `spoke ${sp} (${sp < 'n01' ? 'spoke floors' : 'feeder floors'}) seed ${seed} phase ${phase}`
+    const ids = ['n01', 'n02', 'n03']
+    const sim = new Sim(seed)
+    mesh(sim, 3, { hb: 50, replicas: 2, fault: { delay: [1, 5] } })
+    sim.run({ until: 1500 })
+    const { s1, P, O, T } = spokeOf(sim, ids, ids.slice(0, 2), sp)
+    const keys = (prefix: string, want: (h: string[]) => boolean): string[] => {
+      const out: string[] = []
+      for (let i = 0; i < 100_000 && out.length < 6; i++) { const k = prefix + i; if (want(holdersAt(ids, k, 2))) out.push(k) }
+      return out
+    }
+    const B = keys('b', (h) => h[0] === T && h.includes(O))
+    const A = keys('a', (h) => h[0] === T && h.includes(P))
+    for (const [i, k] of B.entries()) sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [k], value: i }] }, i * 3)
+    sim.run({ until: sim.now + 200 })
+    for (const [i, k] of A.entries()) sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [k], value: 100 + i }] }, i * 3)
+    sim.run({ until: sim.now + 600 })
+    const On = sim.nodes.get(O)!
+    assert.ok(A.every((k) => at(sim, s1, k)) && B.every((k) => noneAt(sim, s1, k)), `${tag}: the spoke holds A (from P) and nothing of B`)
+    sim.fault(O, sp, { delay: [200, 200] }) // the next feeder's pair to the spoke: four heartbeats per leg
+    const resyncs0 = count(s1, JK.resynced)
+    sim.run({ until: Math.ceil(sim.now / 50) * 50 + phase })
+    const ships0 = aeShipsTo(On, sp)
+    sim.partition(P, sp)
+    for (let t = sim.now + 1; t <= sim.now + 3000 && count(s1, JK.resynced) === resyncs0; t += 5) sim.run({ until: t })
+    assert.equal(count(s1, JK.resynced) - resyncs0, 1, `${tag}: the failover was a resync, and it ended`)
+    sim.run({ until: sim.now + 600 })
+    assert.equal(aeShipsTo(On, sp) - ships0, 1, `${tag}: O shipped its held subset to the spoke exactly once`)
+    assert.ok(B.every((k) => at(sim, s1, k)), `${tag}: B arrived (${B.filter((k) => at(sim, s1, k)).length} of 6)`)
+    assert.ok(A.every((k) => noneAt(sim, s1, k)), `${tag}: A left kernel and screen`)
+    assert.deepEqual(sim.violations, [], `${tag}: no monitor fired`)
+    assert.equal(screenMatches(sim, sp), null, `${tag}: the screen shows exactly what the kernel holds`)
+    assert.equal(count(s1, JK.resynced) - resyncs0, 1, `${tag}: one resync end`)
   }
 })
 

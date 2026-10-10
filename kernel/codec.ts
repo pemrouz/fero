@@ -38,7 +38,9 @@ export const HEADER = 11
 
 //! VERB: dense 1-byte frame verbs, append-only. The codec fails closed on unknowns at dispatch, not here.
 // DIGEST carries {d: {origin: highestHeldSeq}, r: 0|1} — "here is what I hold; r=1 means please answer with yours".
-// Toward a client link it also carries w: 0|1, the sender's write-gate (I-33: the client's cluster.writable).
+// Toward a client link it also carries w: 0|1, the sender's write-gate (I-33: the client's cluster.writable), and
+// at a drain h: 1 (this link dropped frames while paused). A client's r=1 carries q (a correlation id) and the
+// server's r=0 that answers it echoes q (DESIGN-SCALE stage 2: the spoke's resync ends on the reply to its own ask).
 // M2 membership control plane: JOIN {u,i,l} asks a member to propose the sender in; PROPOSE {e,m,p} /
 // VOTE {e,g,ce} are the joint-consensus ballot legs; VIEW {e,m} announces (or answers a PULL {e} with)
 // a committed view. LEAVE {} (V4-6) asks for the view WITHOUT the sender — the graceful exit.

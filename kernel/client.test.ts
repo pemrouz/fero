@@ -290,9 +290,10 @@ test('V4-18 resync — a ghost ROW whose newer field came back: the row is remov
 //! ── DESIGN-SCALE stage 2 (2026-10-10): the spoke's resync across a failover — the three STATUS lines the parked
 // branch w5b/a11 probed, rebuilt here as tests on the design that landed. (1) A resync ends only on the reply to a
 // digest sent after it began: every r=1 a client sends carries `q`, a server's r=0 toward a client echoes it, and
-// what a stale reply shipped stays in the fold. (2) A client in resync announces d = {} on every digest, and
-// answers a feeder's r=1 with an r=1 of its own once its ask is a tick old (the paused-feeder late end). (3) A client
-// of a SCOPED feeder resyncs at every failover (its tails say nothing about what the next feeder holds below them).
+// what a stale reply shipped stays in the fold. (2) A client in resync announces d = {} on every digest, sends no
+// heartbeat floor, and re-asks only on the feeder's drain digest (h: 1) — one ship per resync on any link (the
+// paused-feeder late end, and the second review's ship-per-heartbeat on a slow link). (3) A client of a SCOPED
+// feeder resyncs at every failover (its tails say nothing about what the next feeder holds below them).
 const lane = (origin: string, from: number, keys: string[]) =>
   encodeRuns(keys.map((k, i) => ({ rec: { type: REC.update, key: [k], value: k } as Rec, origin, seq: from + i, epoch: 1 })))[0]
 const digests = (h: ReturnType<typeof harness>, link: number) => h.sentOn(link, VERB.DIGEST).map((f) => f.value as { d: Record<string, number>; r: number; q?: number })
@@ -458,11 +459,15 @@ test('kernel probe A — a second failover during the re-download onto a feeder 
 })
 
 //! the paused feeder (STATUS: "A spoke in resync whose ask reached a paused feeder ends it late"): the feeder marks
-// the debt and does not reply; after the drain it asks the spoke with its own r=1. A spoke whose ask is a tick old
-// answers that r=1 with an r=1 of its own (a fresh q): the feeder ships everything and replies with that q — the end,
-// one exchange after the drain, never waiting for a heartbeat floor the spoke may not own. Inside the ask's first tick
-// a feeder's r=1 gets no answer at all (the crossing test below): an r=0 with d = {} made the feeder ship twice.
-test('kernel probe B — the resync ask reached a paused feeder: once the ask is a tick old the spoke answers the drain r=1 with an r=1 of its own, the feeder ships everything and its reply ends the resync — nothing lost, the sweep one tick late at most', () => {
+// the debt and does not reply; after the drain it asks the spoke with its own r=1, which says h: 1 (this link dropped
+// frames — the ask swallowed, or its reply dropped with the ship). A spoke in resync answers THAT r=1 with an r=1 of
+// its own (a fresh q), at any age of the ask: the feeder ships everything and replies with that q — the end, one
+// exchange after the drain. Every other r=1 from the feeder in resync (its heartbeat floor, sent before it handled
+// the ask) gets no answer, and the spoke sends no floor of its own while in resync. The second review of stage 2
+// measured the tick-age proxy that stood here (a floor every tick; a feeder's r=1 answered once the ask was a tick
+// old): one ship on a normal link, 5 and 9 ships on a link slower than one heartbeat. Red on that kernel at the first
+// assertion after the drain digest (the drain r=1 inside the first tick got no answer) and at the tick (a floor).
+test('kernel probe B — the resync ask reached a paused feeder: the spoke answers the drain digest (h: 1) with an r=1 of its own at once, the feeder ships everything and its reply ends the resync — nothing lost; a heartbeat r=1 gets no answer and the spoke sends no floor while in resync', () => {
   const h = harness('cl', { client: true, hosts: ['sim:aa', 'sim:dd'] })
   h.node.step({ kind: 'start' })
   h.admit(1, 'aa')
@@ -479,21 +484,56 @@ test('kernel probe B — the resync ask reached a paused feeder: once the ask is
   serve(h, 2, { bb: ['x'], cc: ['u', 'v', 'w1', 'w2'] }, 0)
   assert.notEqual(h.node.resync, null)
   assert.equal(h.node.streams.get('cc')!.applied, 4, 'the stale ship raised the cc tail')
-  //! the resync's r=1 (#1) reached dd on a paused link: no reply. A tick passes; after the drain dd asks with its own r=1.
-  h.tick()
-  assert.equal(h.node.resync!.ticks, 1)
+  //! the resync's r=1 (#1) reached dd on a paused link: no reply. dd drains inside the ask's first tick and asks with its
+  // drain digest (h: 1): answered at once with a request of the spoke's own
   const sent = digests(h, 2).length
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1, cc: 4 }, r: 1, w: 1, h: 1 }) })
+  assert.deepEqual(digests(h, 2).slice(sent), [{ d: {}, r: 1, q: 4 }], 'the drain digest is answered with a request: everything, with a fresh q — whatever the age of the ask')
+  //! a heartbeat passes: cl sorts below dd, so out of resync it floors dd — in resync it sends nothing
+  h.tick()
+  assert.equal(digests(h, 2).length, sent + 1, 'no heartbeat floor in resync: the ask is the floor')
+  //! dd's heartbeat r=1 (no h) lands before its reply: sent before dd handled the ask, so it gets no answer
   h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1, cc: 4 }, r: 1, w: 1 }) })
-  assert.deepEqual(digests(h, 2).slice(sent), [{ d: {}, r: 1, q: 5 }], 'an ask a tick old: the feeder\'s request is answered with a request — everything, with a fresh q')
-  //! dd ships everything and replies with that q: the end, with u and v back
+  assert.equal(digests(h, 2).length, sent + 1, 'a feeder r=1 without h in resync: no answer (an r=0 would say d = {} and buy a second ship)')
+  //! dd ships everything and replies to the answer-request (q=4): the end, with u and v back
   serve(h, 2, { bb: ['x'], cc: ['u', 'v', 'w1', 'w2'] })
   assert.equal(h.node.resync, null, 'ended on the reply to the spoke\'s answer-request')
   assert.deepEqual(cells(h), ['u', 'v', 'w1', 'w2', 'x'], 'nothing is lost: u and v arrived')
   assert.deepEqual(screenOf(h), ['u', 'v', 'w1', 'w2', 'x'], 'the screen shows the same: y and z swept, nothing else')
   assert.deepEqual(h.jk(JK.resynced).map((e) => e.a), [2])
-  //! out of resync, a feeder's r=1 is answered r=0 with the real tails again
+  //! out of resync, a feeder's r=1 is answered r=0 with the real tails again — a drain digest too
   h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1, cc: 4 }, r: 1, w: 1 }) })
   assert.deepEqual(digests(h, 2).slice(-1), [{ d: { bb: 1, cc: 4 }, r: 0 }])
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1, cc: 4 }, r: 1, w: 1, h: 1 }) })
+  assert.deepEqual(digests(h, 2).slice(-1), [{ d: { bb: 1, cc: 4 }, r: 0 }], 'a drain digest out of resync: the tails, as any r=1')
+  //! and the heartbeat floor is back once the resync is over
+  const before = digests(h, 2).length
+  h.tick()
+  assert.deepEqual(digests(h, 2).slice(before), [{ d: { bb: 1, cc: 4 }, r: 1, q: 5 }], 'out of resync the floor runs again (cl sorts below dd)')
+})
+
+//! the drain digest's `h` (the second review of stage 2): a server whose link dropped frames while paused asks after the
+// drain with r=1 — toward a CLIENT that r=1 says h: 1, the one signal a spoke in resync re-asks on. A member's drain
+// digest is unchanged (no h, no q: member bytes are the golden's).
+test('a drain digest toward a CLIENT carries h: 1; toward a member it does not (member bytes unchanged)', () => {
+  const h = harness('aa')
+  h.admit(1, 'bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  h.admit(2, 'zz', 1)
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  for (const l of [1, 2]) h.node.step({ kind: 'pause', link: l })
+  //! each peer's digest arrives mid-pause: the suffix is deferred, the debt marked
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 2 }) })
+  assert.ok(h.node.links.get(1)!.droppedWhilePaused && h.node.links.get(2)!.droppedWhilePaused, 'both debts marked')
+  const m0 = digests(h, 1).length, c0 = digests(h, 2).length
+  for (const l of [1, 2]) h.node.step({ kind: 'drain', link: l })
+  assert.deepEqual(digests(h, 1).slice(m0), [{ d: {}, r: 1 }], 'the member\'s drain digest: no h, no q')
+  const c = digests(h, 2).slice(c0) as { r: number; h?: number; q?: number }[]
+  assert.equal(c.length, 1, 'one drain digest to the client')
+  assert.equal(c[0].r, 1)
+  assert.equal(c[0].h, 1, 'the client\'s drain digest says h: 1')
+  assert.equal('q' in c[0], false, 'a server mints no q')
 })
 
 //! STATUS: "A scoped spoke that fails over never receives the rows its new feeder holds below a lane tail it learned
@@ -577,13 +617,15 @@ test('a feeder\'s r=1 that crosses the resync\'s ask inside its first tick gets 
   assert.notEqual(h.node.resync, null, 'a scoped feeder elected at the admit: the spoke resyncs onto it (it held three rows from the last one)')
   assert.deepEqual(digests(h, 3), [{ d: {}, r: 1, q: 3 }], 'the ask asks for everything, not for what is above tail 3')
   assert.deepEqual(h.jk(JK.resync).map((e) => e.a), [2, 3], 'the two resets remembered their cells (a1-a2, then b1-b3)')
-  //! a tick-old ask (kernel probe B's rule, unchanged): the feeder's r=1 is answered with an r=1 of the spoke's own.
-  // The tick itself floors the primary (cl sorts below oo): that r=1 is q=4, in resync d = {}; the answer-request is q=5
+  //! a tick passes: in resync the spoke sends NO heartbeat floor (cl sorts below oo; out of resync it floors oo), and oo's
+  // heartbeat r=1 gets no answer whatever the ask's age. oo's DRAIN digest (h: 1) is what re-asks: q=4 (kernel probe B)
+  const sent = digests(h, 3).length
   h.tick()
-  assert.equal(h.node.resync!.ticks, 1)
-  assert.deepEqual(digests(h, 3).slice(-1), [{ d: {}, r: 1, q: 4 }], 'the tick\'s own heartbeat floor, in resync: d = {}')
+  assert.equal(digests(h, 3).length, sent, 'no floor in resync')
   h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: { tt: 1 }, r: 1, w: 1 }) })
-  assert.deepEqual(digests(h, 3).slice(-1), [{ d: {}, r: 1, q: 5 }], 'a tick old: answered with a request of its own, as before')
+  assert.equal(digests(h, 3).length, sent, 'a tick old or not, a heartbeat r=1 in resync gets no answer')
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: { tt: 1 }, r: 1, w: 1, h: 1 }) })
+  assert.deepEqual(digests(h, 3).slice(sent), [{ d: {}, r: 1, q: 4 }], 'the drain digest: answered with a request of the spoke\'s own')
   serve(h, 3, { tt: ['c1'] })
   assert.equal(h.node.resync, null)
   assert.deepEqual(cells(h), ['c1'], 'the new feeder\'s subset; b1-b3 swept')

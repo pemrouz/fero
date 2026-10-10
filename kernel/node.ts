@@ -470,15 +470,20 @@ export class Node {
   // know. But kept, those records RAISE the lane tails this node holds, and on a wiped fold a raised tail has
   // nothing under it — so while in resync every digest this node sends announces d = {} (#sendDigest): "send me
   // everything", the lane drops what it has. A reply with no `q` is an older server's (V4-14): it ends as before.
-  //! `ticks`: heartbeat ticks since the resync began. A resync whose ask reached a PAUSED feeder gets no reply (the
-  // feeder marks the debt and asks with ITS r=1 after the drain); once the ask is a tick old, a feeder's r=1 is
-  // answered with an r=1 of this node's own (a fresh q) instead of an r=0, so that exchange ships everything and
-  // its reply ends the resync — the ghost sweep is at most one tick late, and never waits for the heartbeat floor
-  // this node may not own (a spoke floors its primary only when its uuid sorts below). A feeder's r=1 that crosses
-  // the ask inside that first tick gets NO answer: the ask's reply is already on its way, and an r=0 of ours would
-  // say d = {} and make the feeder ship its held subset a second time (the review of stage 2 measured exactly that
-  // double ship at every tick-aligned scoped failover before this rule).
-  resync: { old: Set<string>; q: number; ticks: number } | null = null
+  //! One ask per resync (the second review of stage 2, 2026-10-10). In resync every digest this node sends says
+  // d = {}, so every ask costs the feeder a ship of its whole held subset — and the ask's reply is the end. On this
+  // FIFO link the feeder answers the ask in the step that handles it, so the ONLY way a live feeder leaves an ask
+  // unanswered is its queue overflowing while paused (the ask swallowed on arrival, or its reply dropped with the
+  // ship): the feeder knows that, and says so on its drain digest (`h: 1`, #sendDigest). So in resync this node (1)
+  // sends no heartbeat floor to its primary (the ask IS the floor), (2) answers a feeder's r=1 that carries `h: 1`
+  // with an r=1 of its own (a fresh q): that exchange ships everything and its reply ends the resync, one exchange
+  // after the drain, and (3) answers any other r=1 from the feeder with NOTHING — it was sent before the feeder
+  // handled the ask (its heartbeat floor crossing the ask at a failover), the reply is behind it, and an r=0 of ours
+  // would say d = {} and buy a second ship. A feeder that dies instead is a failover, and that asks afresh. Before
+  // this rule the spoke re-asked on a tick-age proxy (its own floor every tick; a feeder's r=1 once the ask was a tick
+  // old): one ship on a normal link, but ceil(RTT / heartbeat) + 1 ships on a link slower than one heartbeat (the
+  // review measured 5 and 9 at 200 ms each way with a 50 ms heartbeat, one ordering each); now one on any link.
+  resync: { old: Set<string>; q: number } | null = null
   #dq = 0
 
   //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
@@ -861,7 +866,9 @@ export class Node {
         // digest exchange so the loss heals within two round-trips instead of lingering until the next admit
         if (link.droppedWhilePaused && link.state === LS.admitted) {
           link.droppedWhilePaused = false
-          this.#sendDigest(link, 1) // armed, toward a member: it re-syncs the link and ships nothing — the round below repairs
+          //! toward a member (armed): it re-syncs the link and ships nothing — the round below repairs. Toward a CLIENT it
+          // says `h: 1`: this link dropped frames, so a spoke whose resync ask got no reply asks again (see `resync`)
+          this.#sendDigest(link, 1, undefined, true)
         }
         //! the DRAIN ROUND (DESIGN-SCALE stage 2, §3 trigger 2): every announcement skipped this link while it was
         // paused (kernel/scope.ts #link), so the one scoped round to this peer, for the partitions the two share,
@@ -886,7 +893,6 @@ export class Node {
           this.#refuse(link, 'door-timeout')
         }
         else if (meta.tag === TAG.heartbeat) {
-          if (this.client && this.resync !== null) this.resync.ticks++ // the resync's age: see `resync.ticks`
           for (const link of this.links.values())
             //! lower-uuid side originates PINGs (halves N² probe traffic — v2's rule, kept). Paused links
             // are SKIPPED entirely: control frames queued into a drop-oldest queue are doomed work, and a
@@ -901,12 +907,14 @@ export class Node {
               // any loss mode WITHOUT a reconnect/drain signal (transport bugs, future non-TCP shells).
               // One r=1 digest from the PING side covers both directions: the reply ships our gaps, and
               // receiving their digest ships theirs. Nothing missing ⇒ nothing shipped (idempotent).
-              // A client floors only its PRIMARY (the single-feeder rule — see the DIGEST handler).
+              // A client floors only its PRIMARY (the single-feeder rule — see the DIGEST handler), and not
+              // while in RESYNC: the resync's ask is the floor, every digest sent in resync asks for everything,
+              // and only the feeder's drain digest can mean the ask needs re-sending (see `resync`).
               //! On a SCOPED cluster the member floor does not run (DESIGN-SCALE stage 2, §3; the owner's yes,
               // §14 Q1): a member learns history only through the one-teacher latch, and the holder handshake
               // — announce on change, the admit and drain rounds, the aeFan sweep (kernel/scope.ts tick) — is
               // what re-proves every pair. The digest to a CLIENT link is unchanged: a spoke floors on it.
-              if ((!this.client || link.id === this.primary) && !(this.armed && !link.client)) this.#sendDigest(link, 1)
+              if ((!this.client || (link.id === this.primary && this.resync === null)) && !(this.armed && !link.client)) this.#sendDigest(link, 1)
             }
           //! membership acts on the heartbeat clock too (explicit protocol mode): genesis, suspicion,
           // eviction/join ballots, stale pulls, rejoin nudges — all only when heartbeats are on.
@@ -1180,7 +1188,7 @@ export class Node {
     this.journal.armed && this.journal.emit(JK.resync, old.size)
     this.#resetFold()
     const q = ++this.#dq
-    this.resync = { old, q, ticks: 0 }
+    this.resync = { old, q }
     this.#sendDigest(link, 1, q)
   }
 
@@ -1760,7 +1768,7 @@ export class Node {
           link.dead = true
           return this.env.sink.close(link.id, 'digest-before-hello')
         }
-        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown>; w?: number }
+        const v = f.value as { d?: Record<string, unknown>; r?: number; p?: Record<string, unknown>; w?: number; q?: number; h?: number }
         if (typeof v?.d !== 'object' || v.d === null) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed digest')
           return
@@ -1810,17 +1818,19 @@ export class Node {
           // and what that older reply's ship brought stays in the fold (see `resync`). No q: an old server's reply.
           else if (v.r === 0 && (typeof v.q !== 'number' || v.q >= this.resync.q)) this.#resyncEnd()
           link.synced = true
-          //! a feeder's r=1 is answered r=0 with our tails — unless we are in a resync. An ask less than a tick old is
-          // still on its way on THIS link (the single-feeder rule above: only the primary reaches here, and every ask
-          // goes to the primary), its reply is the end, and an r=0 of ours would carry d = {} (in resync) and only make
-          // the feeder ship its held subset a SECOND time — the crossing at a scoped failover, where the new feeder's
-          // heartbeat r=1 is already in flight when the ask leaves (the review of stage 2 measured the double ship on
-          // 30 of 30 seeds; the lane dropped the duplicates, the cost was a second download). So it gets no answer; the
-          // gate it carried was read above. An ask a tick old (it reached a paused feeder, or was lost) is answered
-          // with an r=1 of our own, so that exchange ships everything and its reply ends the resync (see `resync.ticks`).
+          //! a feeder's r=1 is answered r=0 with our tails — unless we are in a resync. In resync the ask is out on THIS
+          // link (the single-feeder rule above: only the primary reaches here, and every ask goes to the primary) and
+          // its reply is the end. An r=1 that lands before that reply was sent before the feeder handled the ask — its
+          // heartbeat floor crossing the ask at a failover — and an r=0 of ours would carry d = {} and make the feeder
+          // ship its held subset a SECOND time (the review of stage 2 measured the double ship on 30 of 30 tick-aligned
+          // seeds; the lane dropped the duplicates, the cost was a second download). So it gets no answer; the gate it
+          // carried was read above. The one r=1 that means the ask needs re-sending is the feeder's DRAIN digest
+          // (`h: 1`: its queue overflowed while paused — the ask was swallowed, or its reply dropped with the ship):
+          // that one is answered with an r=1 of our own, so the exchange ships everything and its reply ends the
+          // resync, one exchange after the drain (see `resync`).
           if (v.r === 1) {
             if (this.resync === null) this.#sendDigest(link, 0)
-            else if (this.resync.ticks >= 1) this.#sendDigest(link, 1)
+            else if (v.h === 1) this.#sendDigest(link, 1)
           }
           return
         }
@@ -2025,11 +2035,13 @@ export class Node {
   //! A CLIENT in resync announces NO tails: what it holds mid-resync is whatever ship landed first, and a tail raised
   // by a stale ship would hide the rows under it from a feeder that holds the lane in full. "Send me everything";
   // the lane drops what it already has (write.ts #splice, dupDrop).
-  #sendDigest(link: Link, r: 0 | 1, q?: number) {
+  //! `h` (the drain digest, see `resync`): toward a CLIENT, `h: 1` says this link dropped frames while paused — the one
+  // event after which an ask of the spoke's may have no reply coming. Member digests never carry it: bytes unchanged.
+  #sendDigest(link: Link, r: 0 | 1, q?: number, h?: boolean) {
     const d: Record<string, number> = {}
     if (!(this.client && this.resync !== null))
       for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
-    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number; q?: number }
+    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number; q?: number; h?: number }
     if (this.durable) {
       const p: Record<string, number> = {}
       for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
@@ -2040,6 +2052,7 @@ export class Node {
     if (link.client) body.w = this.membership.gate(this).open ? 1 : 0
     if (this.client && r === 1) body.q = q ?? ++this.#dq
     else if (q !== undefined) body.q = q
+    if (h === true && link.client) body.h = 1
     link.ship(encodeControl(VERB.DIGEST, body), this.env.sink, this.journal)
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }
