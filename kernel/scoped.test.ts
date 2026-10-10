@@ -9,6 +9,7 @@ import assert from 'node:assert'
 import { Node } from './node.ts'
 import { JK } from './journal.ts'
 import { compact, maybeCompact } from './log.ts'
+import { SCOPE } from './scope.ts'
 import { Framer, VERB, encodeControl, encodeRuns } from './codec.ts'
 import { REC, TAG, type BootRecord, type EffectSink, type Env, type Rec } from './env.ts'
 
@@ -461,22 +462,117 @@ test('OWNER RE-CHECK (DESIGN-SCALE §11 Q12) — an armed owner asks NodeOpts.ad
   assert.equal(framesOn(u, 1, VERB.WACK).length, 1, 'committed unasked')
 })
 
-test('AE FILTER — a digest answer ships a member only the partitions ITS R-set covers', () => {
-  const h = armedView1()
+//! RETIRED 2026-10-10 (DESIGN-SCALE stage 2): 'AE FILTER — a digest answer ships a member only the partitions ITS
+// R-set covers'. The ring-filtered suffix to a member is gone: on a scoped cluster a member learns history only
+// through the one-teacher latch (a suffix from a ring-filtered walk was the second teacher the H3 resurrection needs
+// once compaction runs). The three tests below pin what replaced it.
+
+//! recordsOn — the partitions of every RECORDS frame this node shipped on `link` after `from` sends, in order
+const recordsOn = (h: ReturnType<typeof harness>, link: number, from = 0): string[] => {
+  const out: string[] = []
+  for (const f of h.of('send').filter((e) => e[1] === link).slice(from).map((e) => new Framer().push((e[2] as Uint8Array).slice())[0]).filter((f) => f && f.verb === VERB.RECORDS))
+    for (const rv of f.records()) out.push((rv.rec() as Rec).key[0])
+  return out
+}
+
+test('NO MEMBER DIGEST (DESIGN-SCALE stage 2) — an armed node\'s heartbeat PINGs its member links and floors none of them; a client link still gets its digest; the unscoped control floors every member', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  //! a client (HELLO r:1) with a uuid above aa's: aa is the lower side of that pair, the side that floors it
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+  const before = h.of('send').length
+  h.tick()
+  const sent = h.of('send').slice(before).map((e) => [e[1] as number, new Framer().push((e[2] as Uint8Array).slice())[0]?.verb] as [number, number])
+  assert.deepEqual(sent.filter(([, v]) => v === VERB.PING).map(([l]) => l).sort(), [1, 2, 3], 'PING to every admitted link (liveness is membership\'s)')
+  assert.deepEqual(sent.filter(([, v]) => v === VERB.DIGEST).map(([l]) => l), [3], 'a DIGEST to the client only — no member floor on a scoped cluster')
+  //! the unscoped control: the same tick floors both members (the digest law, sim/scale.perf.ts)
+  const u = harness('aa', { hosts: ['sim:bb', 'sim:cc'] })
+  u.node.step({ kind: 'start' })
+  u.admit(1, 'bb'); u.admit(2, 'cc')
+  const ub = u.of('send').length
+  u.tick()
+  const usent = u.of('send').slice(ub).map((e) => [e[1] as number, new Framer().push((e[2] as Uint8Array).slice())[0]?.verb] as [number, number])
+  assert.deepEqual(usent.filter(([, v]) => v === VERB.DIGEST).map(([l]) => l).sort(), [1, 2], 'unscoped: a DIGEST to every member — byte-identical with before')
+})
+
+test('CLIENT DIGESTS UNCHANGED (DESIGN-SCALE stage 2) — a spoke\'s r=1 digest at an armed server still ships the HELD subset (never an orphan\'s frozen copy) and gets its r=0 reply with the gate', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('held', 'aa', 'bb')
+  h.node.writes.ring.place('gone', 'aa', 'cc')
+  h.node.step({ kind: 'write', recs: [rec(['held', 'x'], 1), rec(['gone', 'x'], 2)] })
+  //! the R-set of `gone` moves off aa: a frozen orphan — a teacher for holders, never a spoke feed
+  h.node.writes.ring.place('gone', 'bb', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.jk(JK.orphaned).length, 1)
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', r: 1 }) })
+  const from = h.of('send').filter((e) => e[1] === 3).length
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+  assert.deepEqual(recordsOn(h, 3, from), ['held'], 'the held subset ships; the orphan does not')
+  assert.equal(h.jk(JK.aeShip).length, 1, 'journaled as an AE ship, as before')
+  const reply = sentOn(h, 3, VERB.DIGEST).pop()!.value as { d: Record<string, number>; r: number; w?: number }
+  assert.deepEqual(reply, { d: { aa: 2 }, r: 0, w: 1 }, 'the r=0 reply with the lane tails and the gate (I-33)')
+})
+
+test('ADMIT SHIPS NOTHING TO A MEMBER (DESIGN-SCALE stage 2) — a member\'s r=1 digest at an armed node syncs the link and gets its r=0 reply, but no RECORDS; the admit round then offers what the two share, and the peer\'s need is taught through the latch', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
   h.node.membership.rejoinFloor = 0
   h.node.writes.ring.place('shared', 'aa', 'bb')
   h.node.writes.ring.place('private', 'aa', 'cc')
   h.node.step({ kind: 'write', recs: [rec(['shared', 'x'], 1)] })
   h.node.step({ kind: 'write', recs: [rec(['private', 'x'], 2)] })
-  const sentBefore = h.of('send').filter((e) => e[1] === 1).length
-  //! bb re-announces empty tails (r=0 digest) — the suffix answer must carry ONLY bb's partitions
-  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
-  const frames = h.of('send').filter((e) => e[1] === 1).slice(sentBefore)
-    .map((e) => new Framer().push((e[2] as Uint8Array).slice())[0])
-    .filter((f) => f && f.verb === VERB.RECORDS)
-  const shipped: string[] = []
-  for (const f of frames) for (const rv of f.records()) shipped.push((rv.rec() as Rec).key[0])
-  assert.deepEqual(shipped, ['shared'], 'the suffix ships bb\'s partitions only — never private ones')
+  //! bb's link dies and comes back: HELLO (the admit round fires here), then bb's r=1 digest with empty tails
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'test' })
+  h.node.step({ kind: 'linkUp', link: 3, dialed: true, to: 'sim:bb' })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
+  const link = h.node.links.get(3)!
+  assert.equal(link.synced, false, 'not synced until bb\'s digest lands')
+  assert.deepEqual(haveqs(h, 3).map((v) => v.q), [{ shared: { aa: 1 } }], 'the admit round: the one shared partition, to bb alone')
+  const from = h.of('send').filter((e) => e[1] === 3).length
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+  assert.deepEqual(recordsOn(h, 3, from), [], 'the admit answer ships NOTHING to a member — history reaches a member only through the latch')
+  assert.equal(h.jk(JK.aeShip).length, 0)
+  assert.equal(link.synced, true, 'the digest still syncs the link: live records flow from here')
+  assert.deepEqual(sentOn(h, 3, VERB.DIGEST).map((f) => (f.value as { r: number }).r), [1, 0], 'aa\'s own admit opener (aa < bb), then the r=0 reply that answers bb\'s r=1 (one exchange, never a loop)')
+  //! the round repairs it: bb answers need for `shared` (it has nothing) — aa teaches it through the latch
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: havea(1, { shared: { ok: 0, need: 1, m: {} } }) })
+  const acq = sentOn(h, 3, VERB.ACQ)
+  assert.equal(acq.length, 1, 'one ACQ transfer')
+  assert.deepEqual([...acq[0].records()].map((rv) => (rv.rec() as Rec).key[0]), ['shared'], 'exactly the shared partition')
+  assert.deepEqual(sentOn(h, 3, VERB.ACQDONE).map((f) => (f.value as { p: string; n: number }).p), ['shared'], 'with its attested cut')
+  assert.equal(h.jk(JK.teachShip).length, 1)
+})
+
+test('DRAIN ROUND (DESIGN-SCALE stage 2) — a paused member link is skipped by every announcement; its drain brings one scoped round to that peer for what the two share (its queue dropped or not), beside the re-sync digest when it did drop', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('shared', 'aa', 'bb')
+  h.node.step({ kind: 'write', recs: [rec(['shared', 'x'], 1)] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(1, { shared: { ok: 1, need: 0, m: { aa: 1 } } }) })
+  h.tick()
+  const q0 = haveqs(h, 1).length
+  h.node.step({ kind: 'pause', link: 1 })
+  h.node.step({ kind: 'write', recs: [rec(['shared', 'y'], 2)] })
+  h.tick()
+  assert.equal(haveqs(h, 1).length, q0, 'paused: the dirty announcement for bb was skipped, not queued')
+  assert.deepEqual(h.node.links.get(1)!.queued.map((b) => new Framer().push(b.slice())[0]?.verb), [VERB.RECORDS], 'the live fan-out queues as always; no HAVEQ sits in the drop-oldest queue')
+  //! the drain (no drop): one scoped round to bb — the announcement it missed
+  const d0 = sentOn(h, 1, VERB.DIGEST).length // aa's admit opener (aa < bb) is already there
+  h.node.step({ kind: 'drain', link: 1 })
+  assert.deepEqual(haveqs(h, 1).slice(q0).map((v) => v.q), [{ shared: { aa: 2 } }], 'the drain round carries the floor bb missed')
+  assert.equal(sentOn(h, 1, VERB.DIGEST).length, d0, 'no digest: the queue never dropped')
+  //! a drain AFTER a drop: the re-sync digest (ships nothing to a member) and the round
+  h.node.step({ kind: 'pause', link: 1 })
+  const link = h.node.links.get(1)!
+  link.droppedWhilePaused = true; link.synced = false // what an overflow does (kernel/link.ts ship)
+  const q1 = haveqs(h, 1).length, d1 = sentOn(h, 1, VERB.DIGEST).length
+  h.node.step({ kind: 'drain', link: 1 })
+  assert.equal(sentOn(h, 1, VERB.DIGEST).length - d1, 1, 'the re-sync digest (r=1) follows a drop')
+  assert.equal(haveqs(h, 1).length - q1, 1, 'and the round')
+  assert.equal(h.jk(JK.aeShip).length, 0, 'no suffix was ever shipped to bb (its RECORDS are the live fan-out): a member is repaired by the latch, never by a digest')
 })
 
 //! ── slice 3b: the one-teacher latch — every leg driven deterministically ──
@@ -550,6 +646,40 @@ test('ACQUISITION aborts — torn count, foreign ACQ, teacher death, epoch flip,
   t4.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
   for (let i = 0; i < 9; i++) t4.tick()
   assert.equal(t4.jk(JK.acquireAbort).filter((e) => e.b === 'timeout').length, 1)
+})
+
+//! found by the scoped sweep when the member digest retired (DESIGN-SCALE stage 2; A2 seed 9 at FERO_SCOPED_SEEDS=12):
+// two holders of one partition, each ahead on a DIFFERENT lane (an owner change leaves exactly this shape), each
+// latch the other on the other's announcement. Before, an acquiring node refused to teach ("mid-latch ourselves"),
+// so both timed out, aborted to orphan on their residue, re-latched at the next round and cycled for ever — the
+// admit digest's lane suffixes used to paper over it. Now a node teaches its pre-latch base with its floors as the
+// cut, so both teach and both fold.
+test('MUTUAL LATCH — two holders each behind the other on a different lane of p latch each other; the acquiring node still teaches its pre-latch base, so both fold and both hold both lanes (no deadlock, no orphan cycle)', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('p', 'aa', 'bb')
+  h.node.step({ kind: 'write', recs: [rec(['p', 'x'], 1)] }) // aa's own lane: aa@1
+  //! bb announces p on ITS lane (bb:1), which aa lacks: aa is behind → latches bb, answers need with its own floors
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { p: { bb: 1 } }) })
+  assert.equal(h.node.scope!.entries.get('p')!.state, SCOPE.acquiring)
+  assert.equal(h.node.scope!.entries.get('p')!.teacher, 'bb')
+  const need = sentOn(h, 1, VERB.HAVEA).pop()!.value as { a: Record<string, { ok: number; need: number; m: Record<string, number> }> }
+  assert.deepEqual(need.a.p, { ok: 0, need: 1, m: { aa: 1 } }, 'aa asks bb to teach it lane bb, above its own marks')
+  //! bb was behind on lane aa the same way and latched aa: its need arrives while aa is mid-latch — aa teaches anyway
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(1, { p: { ok: 0, need: 1, m: { bb: 1 } } }) })
+  const acq = sentOn(h, 1, VERB.ACQ)
+  assert.equal(acq.length, 1, 'the acquiring node taught its pre-latch base (it used to refuse: the deadlock)')
+  assert.deepEqual([...acq[0].records()].map((rv) => [rv.origin, rv.seq]), [['aa', 1]])
+  assert.deepEqual(sentOn(h, 1, VERB.ACQDONE).map((f) => f.value), [{ p: 'p', e: 1, t: { aa: 1 }, n: 1 }], 'with its own floors as the cut: a sound claim whatever its latch state')
+  assert.equal(h.node.scope!.entries.get('p')!.state, SCOPE.acquiring, 'and its own latch is untouched')
+  //! bb's transfer lands: aa folds, holds both lanes, and its post-fold round announces both floors to bb
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 1, rec: rec(['p', 'y'], 2), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'p', e: 1, t: { bb: 1 }, n: 1 }) })
+  assert.equal(h.node.scope!.held('p'), true)
+  assert.equal(h.jk(JK.acquireAbort).length, 0, 'no timeout, no abort, no orphan cycle')
+  assert.deepEqual([h.node.streams.get('aa')!.parts!.get('p')!.s, h.node.streams.get('bb')!.parts!.get('p')!.s], [1, 1], 'both lanes floored')
+  assert.deepEqual([...h.node.state.keys()].sort(), [JSON.stringify(['p', 'x']), JSON.stringify(['p', 'y'])])
+  assert.deepEqual(haveqs(h, 1).pop()!.q, { p: { aa: 1, bb: 1 } }, 'the post-fold round carries both floors to bb')
 })
 
 test('SHED — the stateless predicate: HAVEA attestations from EVERY current holder over every frozen lane release the data; a partial answer does not', () => {

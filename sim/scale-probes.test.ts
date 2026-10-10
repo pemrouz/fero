@@ -464,7 +464,12 @@ test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scope
   // its 240 answers land at 8001). The exact per-write and per-tick laws are P1 and P3 in sim/announce.test.ts.
   assert.equal(t.since(m, VERB.HAVEQ), 5337, '300 writes under the sweep: 4,800 sweep frames + the owner announcements, merged per link')
   assert.equal(t.since(m, VERB.HAVEA), 5097)
-  assert.deepEqual(perTick(sim, t, 200, 4, VERB.DIGEST), [870, 870, 870, 870], 'idle: n(n−1) = 30·29 member DIGEST frames per tick')
+  //! RE-RECORDED 2026-10-10 (DESIGN-SCALE stage 2, the member digest retires): 870 → 0 member DIGEST frames per idle
+  // tick (n(n−1) = 30·29 was today's floor, §2). The holder handshake above is the whole anti-entropy on a scoped
+  // cluster; a digest flows only at an admit or a drain, to sync the link, and ships nothing to a member. The 300
+  // writes' RECORDS are exactly 300 × (R−1) = 600 fan-out deliveries: no digest suffix rides beside them any more.
+  assert.equal(t.since(m, VERB.RECORDS), 600, '300 writes: exactly (R−1) RECORDS deliveries each, nothing else')
+  assert.deepEqual(perTick(sim, t, 200, 4, VERB.DIGEST), [0, 0, 0, 0], 'idle: no member DIGEST on a scoped cluster (was n(n−1) = 870 per tick)')
   m = t.mark()
   //! the joiner's 30 pairs at the stated [1,1] too (sim.add pairs a new node at the sim's DEFAULT [1,5] otherwise)
   for (const x of nodes) sim.fault('n31', x.uuid, { delay: [1, 1] })
@@ -481,8 +486,12 @@ test('counted floors of today (DESIGN-SCALE §2, the panel\'s setup): idle scope
   // the 81 release frames. The 38 ACQ transfers and ACQDONEs are unchanged.
   assert.equal(t.since(m, VERB.HAVEQ), 14791, 'one join under the sweep: about 13,500 sweep frames + the install round, 38 targeted post-fold rounds and 81 release frames')
   assert.equal(t.since(m, VERB.HAVEA), 14702, 'the release frames get no answer; the last tick\'s answers land past the window')
-  assert.equal(t.since(m, VERB.DIGEST), 52110, 'and 52,110 DIGEST frames to t=20 s')
-  assert.deepEqual(perTick(sim, t, 200, 2, VERB.DIGEST), [930, 930], 'idle after the join: 31·30')
+  //! RE-RECORDED 2026-10-10 (the member digest retires): 52,110 → 60 DIGEST frames to t = 20 s — the joiner's 30
+  // admit exchanges, two legs each (the lower uuid's r=1 and the r=0 reply), each syncing a link and shipping
+  // nothing; the 38 ACQ transfers are the only history that moved. Idle after the join: 0 (was 31·30 = 930).
+  assert.equal(t.since(m, VERB.DIGEST), 60, 'the joiner\'s 30 admit exchanges, two legs each — and no floor after')
+  assert.equal(t.since(m, VERB.ACQ), 38, 'the 38 moved partitions, each taught once')
+  assert.deepEqual(perTick(sim, t, 200, 2, VERB.DIGEST), [0, 0], 'idle after the join: no member DIGEST (was 31·30 = 930)')
   assert.deepEqual(perTick(sim, t, 200, 2, VERB.HAVEQ), [248, 248], 'idle after the join: 31 × min(aeFan 8, c) sweep frames per tick')
 })
 

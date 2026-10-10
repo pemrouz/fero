@@ -627,7 +627,16 @@ export class Scope {
   #teach(node: Node, link: Link, p: string, marks: Record<string, number>) {
     const j = node.journal
     const e = this.entries.get(p)
-    if (!e || e.state === SCOPE.acquiring) return // nothing to teach / mid-latch ourselves
+    //! A node teaches WHATEVER IT HOLDS of p — a held base, an orphan's frozen content, or the PRE-LATCH base of an
+    // entry that is itself acquiring — with its current floors as the cut: floors never regress inside a life and a
+    // latch stages new records outside the lanes, so the cut is a sound claim whatever the latch state. Until
+    // DESIGN-SCALE stage 2 an acquiring node refused ("mid-latch ourselves"), and with no member digest to ship lane
+    // suffixes that left one repair path a deadlock: two holders each ahead on a DIFFERENT lane of p (A2's demoted
+    // owner and the joiner that re-committed its attempt; any owner change) each find themselves behind the other's
+    // announcement, latch each other, neither teaches, both time out to orphan on their residue and re-latch — for
+    // ever (A2 seed 9 at FERO_SCOPED_SEEDS=12, found by the sweep when the digest retired). Now both teach, both
+    // fold, both hold both lanes. Only an absent entry has nothing to teach.
+    if (!e) return
     let n = 0
     //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p, only its
     // entries — the ship is O(entries of p), not O(entries of the node). Lane order is node.logs order,

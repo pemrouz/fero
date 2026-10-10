@@ -41,17 +41,27 @@ const SEEDS = Number(process.env.FERO_SCOPED_SEEDS ?? 2)
 // re-downloaded, and the real re-download lands after it, one record run per frame. For those events the spoke
 // shows older values of live rows (seed 6: p29 at seq 21 after seq 69) and, on seed 5, a row whose remove is
 // still on the way (M1). The end state is right; the screen goes back in time. Found by this sweep.
-// A3 seed 6: one attempt commits TWICE across an ownership move (the existing attempt-exactly-once monitor):
-// n05's forwarded field remove of p58.f2 (cid 19) commits at n01 (t=1858.8, epoch 1, seq 35); 1.5 ms later the
-// orphan cut takes every n01 link down, before the commit's fan-out or its WACK left n01, so no other node holds
-// n01:35 and n05 never learns it committed. n05 retries; n04, the owner by then, commits it again (epoch 4, seq
-// 49). After the heal n01:35 reaches n04 (t=3297) and both commits stand. The latch is not the gap: it feeds every
-// taught record's attempt identity into the dedup window (kernel/scope.ts, `remember` in the ACQDONE fold), but no
-// teacher ever held n01:35. This is the unscoped zombie's class (a commit stranded on a cut-off owner), seen here
-// as a double commit, so its fix belongs with the zombie's (what a cut-off owner committed but never shipped),
-// not with the latch's dedup tuples. A re-committed remove can erase a newer write. Found by this sweep.
+// A3 seed 6 WAS pinned here (2026-10-09): one attempt committed TWICE across an ownership move (the existing
+// attempt-exactly-once monitor): n05's forwarded field remove of p58.f2 (cid 19) committed at n01 (t=1858.8, epoch 1,
+// seq 35); 1.5 ms later the orphan cut took every n01 link down, before the commit's fan-out or its WACK left n01, so
+// no other node held n01:35 and n05 never learnt it committed. n05 retried; n04, the owner by then, committed it
+// again (epoch 4, seq 49). After the heal n01:35 reached n04 (t=3297) and both commits stood. The latch is not the
+// gap: it feeds every taught record's attempt identity into the dedup window (kernel/scope.ts, `remember` in the
+// ACQDONE fold), but no teacher ever held n01:35. This is the unscoped zombie's class (a commit stranded on a
+// cut-off owner), seen here as a double commit, so its fix belongs with the zombie's (what a cut-off owner committed
+// but never shipped), not with the latch's dedup tuples. A re-committed remove can erase a newer write. Found by
+// this sweep. UNPINNED 2026-10-10 (DESIGN-SCALE stage 2): the seed is safe now, but NOT because the class is fixed
+// — stage 2 moved every scoped trajectory (announce on change, no member digest), and on seed 6's new one the 1.5 ms
+// window between the commit and the cut does not open (no attempt is stamped twice anywhere; every orphan sheds).
+// The class stands, and so that it stays pinned in every battery the pin moves to A2 seed 9 (below).
+// A2 seed 9: the same class on the demoted-owner shape (stage 0 saw it at FERO_SCOPED_SEEDS=12 on A2 seeds 9, 10
+// and 12; stage 2's scan of A2/A3 seeds 1-12 sees exactly the same three, and A3 seed 10's partition not held where
+// the ring assigns it): the joiner n90 commits n02's attempt 13 at epoch 1 seq 2, the demoted owner n04 commits it
+// again at its old epoch (seq 39), and after the install both stand at n04. A re-committed remove can erase a newer
+// write. Fix with the zombie's. The seed is LIVE (the two holders each ahead on their own lane teach each other —
+// kernel/scoped.test.ts MUTUAL LATCH, the deadlock the digest's retirement uncovered on exactly this seed).
 const KNOWN_UNSAFE: Record<string, Record<number, RegExp>> = {
-  'A3-orphan-cut': { 6: /attempt-exactly-once .*committed TWICE/ },
+  'A2-slow-owner-join': { 9: /attempt-exactly-once .*committed TWICE/ },
   'A11-spoke': { 2: /resync-end .*stale reply/, 5: /resync-end .*stale reply/, 6: /resync-end .*stale reply/, 10: /resync-end .*stale reply/ },
 }
 
@@ -114,14 +124,18 @@ const CAUGHT: [string, number, Mutation, string[]][] = [
   ['A1-zombie', 1, 'release-all', ['stamp-oracle', 'release-safety', 'census-truth']], // M6 at the release: the zombie still holds an older record
   ['A1-zombie', 1, 'version-only', ['stamp-oracle', 'release-safety', 'census-truth']], // G1: the zombie's write lands above the fence after the heal
   ['A7-down-to-one', 2, 'release-all', ['stamp-oracle', 'release-safety']], // a re-joiner is taught the dead writes
-  //! RE-PINNED 2026-10-10 (DESIGN-SCALE stage 2): `drop-one` was pinned on A6 seed 3 (the dropping holder taught the
-  // partition after the flip). Stage 2's targeted post-fold rounds and announce-on-change change that trajectory: on
-  // A6 seeds 1-8 the dropping holder no longer teaches that partition to anyone, so nothing refolds it there. The same
-  // mutation is caught on A7 seed 4 (n=2 R=1: the leaver's drain teaches every partition it held to the one new
-  // holder, the dropped tombstone's among them — the stage-1 drain made that teach certain) and on A1 seeds 4 and 8.
+  //! `drop-one` needs the dropping holder to TEACH the partition later, so its catch follows the trajectory. Stage 2
+  // (2026-10-10) moved it twice: with the targeted rounds alone A6 seed 3 stopped catching (the dropping holder no
+  // longer taught that partition to anyone) and A1 seed 4 caught; with the member digest retired A6 seed 3 catches
+  // again and A1 seed 4 does not. Three pins, scanned over A1/A6/A7 seeds 1-8 on the final tree: A6 seed 3, A7 seed 4
+  // (n=2 R=1: the leaver's drain teaches every partition it held to the one new holder, the dropped tombstone's
+  // among them — the stage-1 drain made that teach certain), and A1 seed 8 (the healed zombie is re-taught).
+  ['A6-flip-mid-latch', 3, 'drop-one', ['release-safety']], // the dropping holder teaches the partition after the flip
   ['A7-down-to-one', 4, 'drop-one', ['release-safety', 'stamp-oracle']], // the drain teaches the dropped tombstone's partition to the new holder
-  ['A1-zombie', 4, 'drop-one', ['release-safety', 'stamp-oracle']], // the healed zombie is re-taught the partition without the remove
-  ['A11-spoke', 3, 'version-only', ['release-safety']], // the spoke applies an old write under a released stamp
+  ['A1-zombie', 8, 'drop-one', ['stamp-oracle', 'release-safety', 'census-truth']], // the healed zombie is re-taught the partition without the remove
+  //! moved from A11 seed 3 to seed 7 with stage 2 (the members' handshake timing changed the spoke's trajectory;
+  // scanned over A11 seeds 1-12: 7 is the clean seed that catches it)
+  ['A11-spoke', 7, 'version-only', ['release-safety']], // the spoke applies an old write under a released stamp
 ]
 
 test('mutation runner: today\'s injected-drop class — each pinned schedule is green as is and caught by the named monitors when the release rule is weakened', () => {
