@@ -48,6 +48,18 @@
 // and the pre-V4-6 path (suspicion, eviction) takes over. Nothing else moved:
 // ballots, majorities, and vote-once are exactly as above.
 //
+// DRAIN-THEN-GO (DESIGN-SCALE §7 stage 1 (b), 2026-10-10) is the scoped leaver's second wait. Once the
+// view without it has committed and echoed, every partition it held is an orphan (kernel/scope.ts: the
+// install's rescope froze it) and the new holders acquire from it as from any orphan. A scoped leaver
+// holds the `left` effect until each orphan with content is DRAINED — every reachable current holder
+// has attested, in a HAVEA/HAVEQ, floors at or above the orphan's frozen content tails, which is the
+// shed bar itself (scope.evaluateSheds; when every holder covers, the entry sheds and leaves the count
+// by construction) — bounded by drainTicks (DRAIN_TICKS). Past the bound, or when nobody can be
+// drained to (no reachable holder; the solo view), it goes at once with `left` b=0 and an `undrained`
+// row naming how many partitions went with it. The ballot rules are untouched: the drain begins AFTER
+// the view change commits (the leaver is already out, so no survivor can suspect or evict it) and
+// BEFORE the process goes. Unscoped leavers never drain (no scope ⇒ nothing to count): byte-identical.
+//
 // A CLIENT node is a VIEW of the control plane, never a voice in it (I-23, 2026-09-28
 // — DECISIONS V4-5 carried up from the data plane): it installs the views its
 // servers announce, but never announces one (no view-on-admit, no flood, no PULL
@@ -114,6 +126,9 @@ export const MAX_PULLS = 5        // targeted view-pull retries before the alarm
 export const PROPOSAL_AGE = 10    // ticks before an uncommitted proposal is abandoned (unblocks JOINs; re-grants make retry safe)
 export const REJOIN_TICKS = 10    // rejoining ticks without live confirmation before the self-ballot
 export const LEAVE_TICKS = 4      // ticks a leaver waits for the view without it to commit AND echo before it goes like a crash
+//! DRAIN_TICKS (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): ticks a SCOPED leaver, already out of the view, waits for
+// the new holders of what it held to prove they hold it (the shed bar) before it goes anyway (`undrained`, `left` b=0)
+export const DRAIN_TICKS = 16
 
 const sorted = (m: [string, string][]) => [...m].sort((a, b) => (a[0] < b[0] ? -1 : 1))
 //! majority of `of`, counting ONLY voters that are in `of` (a voter in both joint sets counts in both;
@@ -160,8 +175,11 @@ export class Membership {
   //! rejoin floor: a restored node is read-only until a committed view ≥ this is CONFIRMED live (plan boot modes)
   rejoinFloor = 0
   #rejoinTicks = 0
-  //! leaving — the graceful exit in progress (V4-6): ticks spent waiting, and whether it is over
-  leaving: { ticks: number; done: boolean } | null = null
+  //! leaving — the graceful exit in progress (V4-6): ticks spent waiting, and whether the VIEW half is over
+  // (`done`: the view without me committed and echoed, or the bound ran out — nothing more to knock for, and
+  // no ballot may vote me back in). `drain` (DESIGN-SCALE stage 1 (b)) is the scoped leaver's second wait:
+  // defined while `left` is held for the new holders, counting its own ticks against tune.drainTicks.
+  leaving: { ticks: number; done: boolean; drain?: number } | null = null
   #wasOpen = true // last journaled gate state, for transition events
   //! wasMember — has any view this node held ever named it? Set in install() (the boot view counts: it is
   // the view install() replaces). It splits the not-a-member gate word: a node that was in a view and is
@@ -278,6 +296,9 @@ export class Membership {
       // only a member knocks — once my shrunk view is installed here there is nothing left to ask for.
       else if (this.isMember(node.uuid) || this.view.epoch === 0) this.#knockLeave(node)
     }
+    //! draining (DESIGN-SCALE stage 1 (b)): the view half is over; the scoped leaver counts a drain tick and
+    // re-reads the shed bar — done when every reachable holder covers, bounded by drainTicks (then `undrained`)
+    else if (this.leaving && this.leaving.drain !== undefined) this.drain(node, true)
     //! stale-epoch pulls: targeted, bounded; then the alarmed release (a wedged gate is named, never silent)
     if (this.epochStale) {
       if (this.#pullTicks++ < node.tune.pulls) {
@@ -538,6 +559,10 @@ export class Membership {
       //! answered at once — but LATCHED as going, so the microtask hop before the shell's teardown
       // cannot vote this node INTO a view it has already said it left (see onPropose).
       this.leaving = { ticks: 0, done: true }
+      //! nothing to LEAVE, but maybe something to LOSE (DESIGN-SCALE stage 1 (b)): a scoped node that is in no
+      // view with anyone else — the last member, or one already voted out — asks the same last question as a
+      // leaver past its exit proof (#finishLeave): drain to a reachable holder, or go saying what goes with it.
+      if (node.armed && this.#exit(node)) return
       node.env.sink.left?.(true)
       return
     }
@@ -568,11 +593,52 @@ export class Membership {
     this.#send(node, this.#admitted(node).filter((l) => !l.client && this.isMember(l.uuid)), encodeControl(VERB.LEAVE, {}))
   }
 
-  //! #finishLeave — the leave is over, once: journal `left` (b = clean) and tell the env.
+  //! #finishLeave — the VIEW half of the leave is over, once. Unscoped, or bounded out (clean=false), or with
+  // heartbeats off (no drain clock: the shed poll never runs either), the leave is over here: journal `left`
+  // (b = clean) and tell the env. A SCOPED leaver that left cleanly first DRAINS (DESIGN-SCALE §7 stage 1 (b)):
+  // the install that took it out of the view already froze every partition it held into an orphan
+  // (scope.rescope), and the new holders acquire from it as from any orphan. `left` is held while some
+  // orphan with content has a reachable current holder that has not yet attested covering its frozen
+  // tails (scope.undrained — the shed bar over reachable holders); the hold ends at the shed, at the
+  // bound (tune.drainTicks), or when nobody can be drained to. What was not drained is counted in an
+  // `undrained` row and makes the exit `left` b=0: the rows went with the leaver.
   #finishLeave(node: Node, clean: boolean) {
     if (!this.leaving || this.leaving.done) return
     this.leaving.done = true
-    node.journal.armed && node.journal.emit(JK.left, this.view.epoch, clean ? 1 : 0)
+    if (clean && node.armed && this.#exit(node)) return
+    this.#left(node, clean, 0)
+  }
+
+  //! #exit — the scoped leaver's last question, once the view half is over: is anything this node holds not yet
+  // proved held by a reachable current holder? Something waiting with the clock on ⇒ hold (the drain begins);
+  // something waiting with no clock, or stranded (nobody to drain to) ⇒ go at once, `undrained`, left(false).
+  // Returns true when it answered (held or went); false when nothing is at stake — the caller's clean exit stands.
+  #exit(node: Node): boolean {
+    const { waiting, stranded } = node.scope!.undrained(node)
+    if (waiting > 0 && node.heartbeats) { this.leaving!.drain = 0; return true }
+    if (waiting + stranded > 0) { this.#left(node, false, waiting + stranded); return true }
+    return false
+  }
+
+  //! drain — the draining leaver's re-check: from the tick (counting against drainTicks) and from the scope
+  // after marks moved (scope.evaluateSheds — a shed, or a holder's attestation, ends the wait the instant it
+  // lands, not a tick later). Nothing left waiting ⇒ over: clean iff nothing is stranded either.
+  drain(node: Node, tick = false) {
+    const l = this.leaving
+    if (!l || l.drain === undefined) return
+    const { waiting, stranded } = node.scope!.undrained(node)
+    if (waiting === 0) this.#left(node, stranded === 0, stranded)
+    else if (tick && ++l.drain > node.tune.drainTicks) this.#left(node, false, waiting + stranded)
+  }
+
+  //! #left — the exit itself, once per leave: the `undrained` row (when any partition goes with the leaver),
+  // then `left` (b = clean) and the env's effect. `clean` now means the whole stop was clean: the view without
+  // this node committed and echoed AND (scoped) everything it held was proved held elsewhere.
+  #left(node: Node, clean: boolean, undrained: number) {
+    this.leaving!.drain = undefined
+    const j = node.journal
+    if (undrained > 0) j.armed && j.emit(JK.undrained, undrained, this.view.epoch)
+    j.armed && j.emit(JK.left, this.view.epoch, clean ? 1 : 0)
     node.env.sink.left?.(clean)
   }
 

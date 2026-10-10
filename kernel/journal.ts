@@ -109,12 +109,14 @@ export const JK = {
   resynced: 73,      // a=ghosts — the re-download completed (the feeder's r=0 reply, FIFO after its suffix): cells held before that did not come back were removed downstream
   //! ── the graceful leave (2026-09-07, DECISIONS V4-6) ──
   leave: 74,         // a=uuid — a LEAVE sent (a=self: this node is stopping on purpose) or received (a=the leaver): "propose the view without me"
-  left: 75,          // a=epoch, b=clean(0|1) — the leaver's exit: 1 = the view without it committed and a survivor echoed it; 0 = LEAVE_TICKS ran out, it goes like a crash (suspicion + eviction follow)
+  left: 75,          // a=epoch, b=clean(0|1) — the leaver's exit: 1 = the view without it committed and a survivor echoed it (and, scoped, every partition it held was proved held elsewhere); 0 = LEAVE_TICKS ran out, it goes like a crash (suspicion + eviction follow) — or, after an `undrained` row, the view change did commit but some of its partitions went with it
   //! ── overlapping cells (2026-10-08, DECISIONS V4-18) ──
   subsumed: 76,      // a=origin, b=seq, c=swept(0|1) — a field cell lost to a whole-row write (or row remove) stamped at or above it: refused on arrival (c=0) or swept out of state by the row write arriving later (c=1)
   //! ── the door (2026-10-09, docs/DESIGN-DOOR.md §3-§4) ──
   contractReject: 77, // a=link, b=the first contract key that differs (or missing:<key>), c=THEIR value as a string, never ours — two servers' HELLOs carried different cluster contracts (heartbeat.ms, replicas, methods, validation, ring): refused at the door, parked, re-dialed at heartbeat cadence
   doorReject: 78,    // a=link (the one that closes), b=reason, c=the dial target or the claimed listen (for 'uuid-taken' on the refusing side the uuid; on the refused client the dial target) — the door refused a link. Reasons: 'no-secret' (I have a door, the peer sent no k) · 'peer-secret' (the peer has one, I do not) · 'bad-proof' (its DOOR did not verify) · 'uuid-taken' (a CLIENT may not take a member's uuid; a member evicts a client squatting on its uuid; the refused client that read the {e: 'uuid-taken'} notice writes it too) · 'address' (a discovered or view-learned target answered as another listen: a relay) · 'timeout' (no DOOR within tune.proveMs) · 'refused' (a DOOR {e} notice — 'denied', or a word this version does not know — read while proving, after I proved; ONLY then. A bare close while proving is a link loss, not a refusal: no row, no park, the ordinary bounded redial chain — a crash, a cut or a lost notice look exactly like it, and the door speaks only through DOOR {e} (the third review)). Never a secret, nonce or proof.
+  //! ── drain-then-go (2026-10-10, DESIGN-SCALE §7 stage 1 (b)) ──
+  undrained: 79,     // a=partitions, b=epoch — a scoped leaver went with partitions no reachable new holder had proved it holds (the drain hit tune.drainTicks, or nobody was there to drain to: the last member, every new holder unreachable); the `left` row that follows carries b=0
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).
