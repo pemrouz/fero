@@ -15,8 +15,9 @@
 //
 // Today's kernel never releases a tombstone on an armed node (kernel/log.ts maybeCompact returns at once), so in a
 // lawful run M3 and M6 have nothing to check: their non-vacuity comes from the mutation runner and the planted
-// tests in sim/scale-probes.test.ts. M8 (bounded logs) is red today by design and M9 (leave drain) is red today at
-// R=1: both are recorded as `redToday`, not as problems, and the test pins them.
+// tests in sim/scale-probes.test.ts. M8 (bounded logs) is red today by design and is recorded as `redToday`, not
+// as a problem; the test pins it. M9 (leave drain) was red today at R=1 until the drain landed (DESIGN-SCALE §7
+// stage 1 (b), 2026-10-10): a leave-drain violation is now UNSAFE like any other.
 
 import { Sim } from './exec.ts'
 import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, boundedLogs } from './monitors.ts'
@@ -168,7 +169,7 @@ export interface Out {
   unsafe: string[]
   //! liveness problems at the horizon: holders disagree, exactly-R not restored, floors unequal
   notLive: string[]
-  //! the rows expected red on today's kernel: M8 at the horizon, M9 at R=1
+  //! the rows expected red on today's kernel: M8 at the horizon (M9 at R=1 left this list with the drain)
   redToday: string[]
   //! every monitor that went red, by name (the mutation runner reads it)
   red: Set<string>
@@ -525,8 +526,7 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   //! the verdict
   for (const v of sim.violations) {
     out.red.add(v.monitor)
-    if (v.monitor === 'leave-drain' && R === 1) { if (!out.redToday.includes('M9')) out.redToday.push('M9') }
-    else if (out.unsafe.length < 3) out.unsafe.push(`${v.monitor} @${v.event}: ${v.detail}`)
+    if (out.unsafe.length < 3) out.unsafe.push(`${v.monitor} @${v.event}: ${v.detail}`)
   }
   const m1 = stampOracle(sim)
   if (m1) { out.red.add('stamp-oracle'); out.unsafe.push('M1 horizon: ' + m1) }

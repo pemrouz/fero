@@ -5,7 +5,9 @@
 //
 // Lawful runs, per seed: no monitor fires and M1's horizon form agrees (SAFE); holders converge, exactly-R holds and
 // the holders' floors agree at the horizon (LIVE); M8 is red (RED TODAY by design: logs are unbounded under
-// scoping) and M9 is red only at R=1 (the leave does not drain). Per family, an engagement count proves the chaos bit.
+// scoping). M9 (leave drain) was red at R=1 until the drain landed (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): a
+// clean leaver now hands what it held to the new holders before it goes, so a leave-drain violation is UNSAFE
+// like any other. Per family, an engagement count proves the chaos bit.
 //
 // Mutations: today's kernel never releases an armed tombstone, so M3 and M6 check nothing in a lawful run. The
 // mutation runner performs the releases a broken rule would (sim/scoped-sweep.ts inject), and the pinned schedules
@@ -68,7 +70,7 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
 }
 
 for (const fam of FAMILIES) {
-  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''} — safe and live, M8 red today on every seed, M9 only at R=1, the chaos engaged`, () => {
+  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
     let engaged = 0, cells = 0, advances = 0, resyncs = 0
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
@@ -85,7 +87,7 @@ for (const fam of FAMILIES) {
       else if (known.has(seed)) newlySafe.push(seed)
       if (o.notLive.length) notLive.push(`${o.shape}: ${o.notLive.join(' | ')}`)
       assert.ok(o.redToday.includes('M8'), `${o.shape}: M8 is red today on every scoped run with a remove (if green, stage 3/4 landed: flip the pin)`)
-      if (o.redToday.includes('M9')) assert.ok(o.shape.includes(' R=1'), `${o.shape}: M9 only at R=1`)
+      assert.ok(!o.red.has('leave-drain'), `${o.shape}: M9 red — a clean leaver took the only copy of a row with it (the drain, DESIGN-SCALE stage 1 (b), should have held it)`)
       if (ENGAGED[fam.name](o.eng)) engaged++
       cells += o.eng.cells; advances += o.eng.advances; resyncs += o.eng.resyncs
     }

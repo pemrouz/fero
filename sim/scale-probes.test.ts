@@ -40,14 +40,18 @@ const keyFor = (prefix: string, want: (h: (ids: string[], r: number) => string[]
 }
 const named = (sim: Sim, monitor: string) => sim.violations.filter((v) => v.monitor === monitor)
 const count = (n: Node, kind: number) => n.journal.read().filter((e) => e.kind === kind).length
-//! leave — a clean leave; the node is torn down the moment `left` is reported, like the shell
+//! leave — a clean leave; the node is torn down the moment `left` is reported, like the shell. Returns the kernel's
+// verdict and the leaver's `undrained` rows (read before the teardown — the journal goes with the node).
 const leave = (sim: Sim, id: string) => {
   sim.post(id, { kind: 'leave' }, 0)
   const until = sim.now + 5000
   for (let t = sim.now; !sim.left.has(id) && t < until; t += 5) sim.run({ until: t })
   assert.ok(sim.left.has(id), `${id} left`)
+  const n = sim.nodes.get(id)!
+  const undrained = n.journal.read().filter((e) => e.kind === JK.undrained).map((e) => e.a as number)
   for (const u of sim.nodes.keys()) if (u !== id) sim.partition(id, u)
-  sim.nodes.get(id)!.destroy(); sim.nodes.delete(id)
+  n.destroy(); sim.nodes.delete(id)
+  return { clean: sim.left.get(id)!, undrained }
 }
 
 // ── RED TODAY: the two unscoped holes ───────────────────────────────────────────────────────────
@@ -298,19 +302,136 @@ test('M8 bounded-logs is RED TODAY on any scoped run that removed a cell: the to
   assert.match(boundedLogs(sim) ?? '', /holds the tombstone of .* neither fenced nor pinned/, 'RED TODAY')
 })
 
-test('M9 leave-drain is RED TODAY at R=1: a clean leaver takes the only copy of its rows with it', () => {
+//! ── M9, GREEN since the drain (DESIGN-SCALE §7 stage 1 (b), 2026-10-10). Until then this was the RED TODAY pin:
+// "a clean leaver at R=1 takes the only copy of its rows with it" — the leave ended at the exit proof, and the
+// new holder's acquisition raced the teardown. Now a scoped leaver holds `left` until every reachable new holder
+// has attested (the shed bar) what it held, bounded by tune.drainTicks (16).
+
+test('M9 leave-drain is GREEN at R=1: a clean leaver hands the only copy of its row to the new holder before it goes (the shed precedes `left`), and M9 examined it', () => {
   const ids = ['n01', 'n02']
   const p = keyFor('p', (h) => h(ids, 1)[0] === 'n02')
   const sim = new Sim(29)
-  mesh(sim, 2, { hb: 50, replicas: 1 })
+  const [a] = mesh(sim, 2, { hb: 50, replicas: 1 })
   sim.run({ until: 1500 })
   sim.post('n02', { kind: 'write', recs: [{ type: REC.update, key: [p], value: 1 }] }, 0)
   sim.run({ until: sim.now + 300 })
+  assert.equal(a.state.has(JSON.stringify([p])), false, 'R=1: the survivor does not hold it before the leave')
   sim.post('n02', { kind: 'leave' }, 0)
+  const z = sim.nodes.get('n02')!
   for (let t = sim.now; !sim.left.has('n02') && t < sim.now + 5000; t += 5) sim.run({ until: t })
   assert.equal(sim.left.get('n02'), true, 'the leave reported clean')
-  assert.match(named(sim, 'leave-drain')[0]?.detail ?? '', /n02 left clean \(R=1\) while it alone held \('p\d+', lane n02\)/, 'RED TODAY')
+  const kinds = z.journal.read().filter((e) => e.kind === JK.shed || e.kind === JK.left || e.kind === JK.undrained).map((e) => e.kind)
+  assert.deepEqual(kinds, [JK.shed, JK.left], 'the leaver shed p (the new holder attested it) BEFORE it reported left; no undrained row')
+  assert.equal(a.state.get(JSON.stringify([p])), 1, 'the survivor holds the row')
+  assert.deepEqual(named(sim, 'leave-drain'), [], 'M9 green (when this fails, the drain broke: read the detail)')
   assert.equal(ledgerOf(sim).counts.leaves, 1, 'non-vacuity: M9 examined the leave')
+})
+
+//! rows written at every member so that every member owns some; the union of what the live armed nodes hold
+const writeRows = (sim: Sim, ns: Node[], n: number) => {
+  for (let i = 0; i < n; i++) sim.post(ns[i % ns.length].uuid, { kind: 'write', recs: [{ type: REC.update, key: ['r' + i], value: i }] }, i)
+  return Array.from({ length: n }, (_, i) => JSON.stringify(['r' + i]))
+}
+const heldAcross = (sim: Sim, keys: string[]) => keys.filter((k) => [...sim.nodes.values()].some((x) => x.armed && x.state.has(k)))
+
+test('scale down 3→2→1 at R=1 loses nothing (DESIGN-SCALE §7 stage 1 (b)): each clean leaver drains to the new holders; every row is at the last survivor; every exit is clean; M9 examined every leave; no undrained row anywhere', () => {
+  const sim = new Sim(31)
+  const ns = mesh(sim, 3, { hb: 50, replicas: 1 })
+  sim.run({ until: 1500 })
+  assert.ok(formed(ns) && ns.every((n) => n.armed))
+  const keys = writeRows(sim, ns, 30)
+  sim.run({ until: sim.now + 500 })
+  assert.equal(heldAcross(sim, keys).length, 30)
+  assert.equal(exactlyR(sim), null)
+  assert.ok(ns.every((n) => keys.some((k) => n.state.has(k))), 'every member owns some rows (R=1: the only copies)')
+  const l3 = leave(sim, 'n03')
+  sim.run({ until: sim.now + 500 })
+  assert.deepEqual(l3, { clean: true, undrained: [] }, 'n03 left clean with nothing undrained')
+  assert.equal(heldAcross(sim, keys).length, 30, '3→2: every row still held')
+  assert.equal(exactlyR(sim), null); assert.equal(scopedConverged(sim), null)
+  const l2 = leave(sim, 'n02')
+  sim.run({ until: sim.now + 500 })
+  assert.deepEqual(l2, { clean: true, undrained: [] })
+  assert.equal(keys.filter((k) => ns[0].state.has(k)).length, 30, '2→1: the last survivor holds every row')
+  assert.deepEqual(keys.map((k) => ns[0].state.get(k)), keys.map((_, i) => i), 'with the right values')
+  assert.deepEqual(named(sim, 'leave-drain'), [], 'M9 green on both leaves')
+  assert.equal(ledgerOf(sim).counts.leaves, 2, 'non-vacuity: M9 examined both')
+  assert.deepEqual(sim.violations, [])
+  //! and the last one: nobody to drain to — it goes at once saying so (false, every partition it holds undrained)
+  const l1 = leave(sim, 'n01')
+  assert.equal(l1.clean, false, 'the last member\'s stop is not a clean one: its rows go with it')
+  assert.deepEqual(l1.undrained, [30], 'all 30 partitions named undrained')
+})
+
+test('two leavers at once at R=1 (n=3): both drain and go clean inside the bound, the survivor holds every row, M9 green — a leaver whose new holder is itself leaving drains to it, and that one drains on', () => {
+  const sim = new Sim(37)
+  const ns = mesh(sim, 3, { hb: 50, replicas: 1 })
+  sim.run({ until: 1500 })
+  assert.ok(formed(ns) && ns.every((n) => n.armed))
+  const keys = writeRows(sim, ns, 30)
+  sim.run({ until: sim.now + 500 })
+  assert.equal(heldAcross(sim, keys).length, 30)
+  sim.post('n02', { kind: 'leave' }, 0)
+  sim.post('n03', { kind: 'leave' }, 0)
+  const gone: Record<string, { clean: boolean; undrained: number[]; at: number }> = {}
+  const until = sim.now + 50 * 40
+  for (let t = sim.now; Object.keys(gone).length < 2 && t < until; t += 5) {
+    sim.run({ until: t })
+    for (const id of ['n02', 'n03']) {
+      if (gone[id] || !sim.left.has(id)) continue
+      const n = sim.nodes.get(id)!
+      gone[id] = { clean: sim.left.get(id)!, undrained: n.journal.read().filter((e) => e.kind === JK.undrained).map((e) => e.a as number), at: sim.now }
+      for (const u of sim.nodes.keys()) if (u !== id) sim.partition(id, u)
+      n.destroy(); sim.nodes.delete(id)
+    }
+  }
+  assert.deepEqual(Object.keys(gone).sort(), ['n02', 'n03'], 'both left inside 40 ticks')
+  assert.deepEqual([gone.n02.clean, gone.n03.clean], [true, true], 'both clean')
+  assert.deepEqual([gone.n02.undrained, gone.n03.undrained], [[], []])
+  sim.run({ until: sim.now + 500 })
+  assert.equal(keys.filter((k) => ns[0].state.has(k)).length, 30, 'the survivor holds every row')
+  assert.deepEqual(named(sim, 'leave-drain'), [], 'M9 green')
+  assert.equal(ledgerOf(sim).counts.leaves, 2)
+  assert.deepEqual(sim.violations, [])
+  assert.deepEqual(ns[0].membership.view.members.map((m) => m[0]), ['n01'])
+})
+
+test('a leaver cut off while draining (V4-20): the survivors never suspect or evict it — it is already out of the view, so there is no race; the leaver goes at the bound (or at once, stranded) with left(false) and an undrained row', () => {
+  const sim = new Sim(41)
+  const ns = mesh(sim, 3, { hb: 50, replicas: 1 })
+  sim.run({ until: 1500 })
+  assert.ok(formed(ns) && ns.every((n) => n.armed))
+  const keys = writeRows(sim, ns, 30)
+  sim.run({ until: sim.now + 500 })
+  const z = ns[2]
+  const mine = keys.filter((k) => z.state.has(k))
+  assert.ok(mine.length > 0, 'n03 owns some rows')
+  sim.post('n03', { kind: 'leave' }, 0)
+  //! the first 5 ms slice where n03 is draining: out of the view, `left` held. Cut it from everyone there.
+  let cutAt = -1
+  for (let t = sim.now; cutAt < 0 && t < sim.now + 2000; t += 5) {
+    sim.run({ until: t })
+    if (z.membership.leaving?.drain !== undefined) { cutAt = sim.now; for (const u of ['n01', 'n02']) sim.partition('n03', u) }
+  }
+  assert.ok(cutAt > 0, 'n03 reached the drain')
+  assert.equal(z.membership.isMember('n03'), false, 'the view without it had committed before the drain began')
+  const epochAtCut = ns[0].epoch
+  for (let t = sim.now; !sim.left.has('n03') && t < sim.now + 50 * 30; t += 5) sim.run({ until: t })
+  assert.equal(sim.left.get('n03'), false, 'cut off from every new holder: not a clean stop')
+  const und = z.journal.read().filter((e) => e.kind === JK.undrained).map((e) => e.a as number)
+  assert.equal(und.length, 1, 'one undrained row')
+  assert.ok(und[0] >= 1 && und[0] <= mine.length, `undrained ${und[0]} of its ${mine.length} partitions`)
+  sim.run({ until: sim.now + 1500 })
+  //! the survivors' side: n03 left the view by the leave's ballot; nothing about it is suspected, proposed or evicted after
+  for (const s of [ns[0], ns[1]]) {
+    assert.equal(s.epoch, epochAtCut, `${s.uuid}: no view change after the leave's`)
+    assert.deepEqual(s.membership.view.members.map((m) => m[0]), ['n01', 'n02'])
+    assert.deepEqual(s.journal.read().filter((e) => e.kind === JK.suspect && e.a === 'n03'), [], `${s.uuid} never suspected the leaver`)
+    assert.equal(s.journal.read().filter((e) => e.kind === JK.evict && e.a === 'n03').length, 1, `${s.uuid}: the one evict row is the leave's install`)
+  }
+  assert.deepEqual(named(sim, 'leave-drain'), [], 'M9 has nothing to say about a leave that reported itself unclean')
+  assert.deepEqual(sim.violations, [])
+  z.destroy(); sim.nodes.delete('n03')
 })
 
 // ── the counted floors, recorded from today ─────────────────────────────────────────────────────
