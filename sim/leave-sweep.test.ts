@@ -34,8 +34,9 @@
 // never saw the first ballot — none of these families draw that shape (measured: every family stays green with the
 // fix reverted). The kernel pins in kernel/membership.test.ts and the random explorer over real Nodes in
 // sim/explore.test.ts carry that rule; this file is the breadth behind V4-6.
-// Bounded: the five sweeps and family 3 together run in about 12 s at low priority on the idle WSL2 box (100 × 5 + 40
-// schedules; measured 2.1 + 1.7 + 1.9 + 2.5 + 2.8 + 1.3 s on 2026-10-10), about 30 s when it is loaded. The tails after
+// Bounded: the seven sweeps and family 3 together run in about 15 s at low priority on the idle WSL2 box (100 × 7 + 40
+// schedules; measured 2.1 + 1.7 + 1.9 + 2.5 + 2.8 + 1.3 s for the first five and family 3 on 2026-10-10, the delay
+// model's two about 3 s more; 16.7 s in all under some load), about 35 s when the box is loaded. The tails after
 // the last leaver goes — 7 s and 9 s of virtual time — are kept, so a heal through the eviction chain still counts as
 // live. The generators and runners live in sim/leave-sweep.ts (a plain module, so a scratch script can import them to
 // run more seeds, or re-derive the known-not-live sets when the kernel's liveness changes on purpose, without running
