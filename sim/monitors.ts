@@ -380,43 +380,63 @@ export const converged = (sim: Sim): string | null => {
 export const projected = (sim: Sim): string | null => {
   let ref: string | null = null, refId = ''
   for (const [id, n] of sim.nodes) {
-    const indexed = new Set<string>()
-    for (const [a, s] of n.deep) {
-      if (s.size === 0) return `${id}: the deep index holds an empty set under ${a}`
-      for (const c of s) {
-        indexed.add(c)
-        if (!c.startsWith(a.slice(0, -1) + ',')) return `${id}: deep index of ${a} holds ${c}, which is not under it`
-        if (!n.versions.has(c)) return `${id}: deep index of ${a} holds ${c}, which has no version`
-      }
-    }
-    for (const c of n.state.keys()) if (!indexed.has(c) && (JSON.parse(c) as string[]).length > 1) return `${id}: live field ${c} is missing from the deep index`
-    const cells: [string, string[]][] = []
-    for (const c of indexed) {
-      const path = JSON.parse(c) as string[]
-      const vc = n.versions.get(c)!
-      for (let d = 1; d < path.length; d++) {
-        const a = JSON.stringify(path.slice(0, d))
-        if (!n.deep.get(a)?.has(c)) return `${id}: field ${c} is not indexed under its ancestor ${a}`
-        const va = n.versions.get(a)
-        if (va !== undefined && !newer(vc.epoch, vc.seq, vc.origin, va))
-          return `${id}: ${n.state.has(c) ? 'field' : 'field remove'} ${c} @${vc.epoch}/${vc.seq}/${vc.origin} is ${n.state.has(c) ? 'live' : 'indexed'} under ${a} @${va.epoch}/${va.seq}/${va.origin} — an older field survived a newer row`
-      }
-      cells.push([c, path])
-    }
-    for (const c of n.state.keys()) if (!indexed.has(c)) cells.push([c, JSON.parse(c) as string[]])
-    //! the fold by depth: rows first, then each deeper cell inside — a live cell set, a tombstone deleted
-    cells.sort((x, y) => x[1].length - y[1].length || (x[0] < y[0] ? -1 : 1))
-    const byDepth: Folded = {}
-    for (const [c, path] of cells) foldInto(byDepth, n.state.has(c) ? { type: REC.update, key: path, value: n.state.get(c) } : { type: REC.remove, key: path })
-    const s = stable(byDepth)
-    const sunk = sim.folds.get(id)
-    if (sunk !== undefined) {
-      const t = stable(sunk)
-      if (t !== s) return `${id}: the object that reached the sink differs from the kernel's cells folded by depth (${clip(t)} vs ${clip(s)})`
-    }
-    if (ref === null) { ref = s; refId = id } else if (s !== ref) return `${refId} vs ${id}: the projected objects differ (${clip(ref)} vs ${clip(s)})`
+    const r = projectedOf(sim, id, n)
+    if (typeof r === 'string') return r
+    if (ref === null) { ref = r.s; refId = id } else if (r.s !== ref) return `${refId} vs ${id}: the projected objects differ (${clip(ref)} vs ${clip(r.s)})`
   }
   return null
+}
+
+//! projectedOf — one node's half of projected(): steps (1)-(3) for `n`, and its fold by depth as a stable string
+// for the cross-node compare. A string is a violation.
+const projectedOf = (sim: Sim, id: string, n: Node): string | { s: string } => {
+  const indexed = new Set<string>()
+  for (const [a, s] of n.deep) {
+    if (s.size === 0) return `${id}: the deep index holds an empty set under ${a}`
+    for (const c of s) {
+      indexed.add(c)
+      if (!c.startsWith(a.slice(0, -1) + ',')) return `${id}: deep index of ${a} holds ${c}, which is not under it`
+      if (!n.versions.has(c)) return `${id}: deep index of ${a} holds ${c}, which has no version`
+    }
+  }
+  for (const c of n.state.keys()) if (!indexed.has(c) && (JSON.parse(c) as string[]).length > 1) return `${id}: live field ${c} is missing from the deep index`
+  const cells: [string, string[]][] = []
+  for (const c of indexed) {
+    const path = JSON.parse(c) as string[]
+    const vc = n.versions.get(c)!
+    for (let d = 1; d < path.length; d++) {
+      const a = JSON.stringify(path.slice(0, d))
+      if (!n.deep.get(a)?.has(c)) return `${id}: field ${c} is not indexed under its ancestor ${a}`
+      const va = n.versions.get(a)
+      if (va !== undefined && !newer(vc.epoch, vc.seq, vc.origin, va))
+        return `${id}: ${n.state.has(c) ? 'field' : 'field remove'} ${c} @${vc.epoch}/${vc.seq}/${vc.origin} is ${n.state.has(c) ? 'live' : 'indexed'} under ${a} @${va.epoch}/${va.seq}/${va.origin} — an older field survived a newer row`
+    }
+    cells.push([c, path])
+  }
+  for (const c of n.state.keys()) if (!indexed.has(c)) cells.push([c, JSON.parse(c) as string[]])
+  //! the fold by depth: rows first, then each deeper cell inside — a live cell set, a tombstone deleted
+  cells.sort((x, y) => x[1].length - y[1].length || (x[0] < y[0] ? -1 : 1))
+  const byDepth: Folded = {}
+  for (const [c, path] of cells) foldInto(byDepth, n.state.has(c) ? { type: REC.update, key: path, value: n.state.get(c) } : { type: REC.remove, key: path })
+  const s = stable(byDepth)
+  const sunk = sim.folds.get(id)
+  if (sunk !== undefined) {
+    const t = stable(sunk)
+    if (t !== s) return `${id}: the object that reached the sink differs from the kernel's cells folded by depth (${clip(t)} vs ${clip(s)})`
+  }
+  return { s }
+}
+
+//! screenMatches — the screen check for ONE node (2026-10-10, the review of the stale-reply fix): the object that
+// reached its sink equals its kernel's cells folded by depth. projected() runs this for every node and then
+// compares the nodes to each other; a SPOKE of a scoped cluster is not compared to anyone (it mirrors its feeder's
+// held subset), so the scoped sweep runs this for each spoke alone at the horizon. It is what catches a cell the
+// kernel dropped without telling the screen — a wipe whose cells the resync's ghost sweep did not know, for one.
+export const screenMatches = (sim: Sim, id: string): string | null => {
+  const n = sim.nodes.get(id)
+  if (!n) return null
+  const r = projectedOf(sim, id, n)
+  return typeof r === 'string' ? r : null
 }
 
 const clip = (s: string) => (s.length > 200 ? s.slice(0, 200) + '…' : s)
@@ -504,8 +524,8 @@ export const drained = (sim: Sim): string | null => {
 //   M1 stamp-oracle    (per event, every node)  a cell shown with stamp s while a remove of it, or of an
 //                      ancestor, stamped r > s is BELOW this node's coverage of r's lane (an armed node's
 //                      possession floor for (lane, partition); an unscoped node's or a client's applied
-//                      watermark). Fires at the exact event a resurrection lands. Red today on the two
-//                      unscoped probes (sim/scale-probes.test.ts).
+//                      watermark; nothing for a spoke in resync — see `covers`). Fires at the exact event
+//                      a resurrection lands. Red today on the two unscoped probes (sim/scale-probes.test.ts).
 //   M2 frontier-sound  (per event, armed)       an entry compaction dropped at an armed node was not its
 //                      cell's winner and sits at or below every CURRENT holder's REAL floor for its
 //                      (lane, partition) — the sim reads the holders' floors, not their marks. Today an
@@ -539,9 +559,24 @@ export const drained = (sim: Sim): string | null => {
 //                      the ghost sweep before the re-download, and the re-download then lands record run by
 //                      record run: the spoke shows older values of live rows, and rows whose removes are on
 //                      the way. Not one of the record's nine; added when the sweep found it (A11).
+//                      Fixed 2026-10-10: a client's r=1 carries `q`, the reply echoes it, the end is a
+//                      reply whose q is at or above the resync's own (kernel/node.ts `resync`).
+//   M11 resync-behind  (at each resync end, spokes) the FOLD form of M10, read from the kernel at the
+//                      end (n.state, n.versions, the log), not from the screen: when a spoke's resync
+//                      ends, every row it held at the reset that its feeder still holds (in the feeder's
+//                      log, for a partition the feeder holds, at or below the ending reply's tail for its
+//                      lane — the reply's `d` map is the feeder's tails when it built the reply) is
+//                      contained-or-covered at the spoke: in its log, or a version at the cell or an
+//                      ancestor at or above the feeder's. A record above that tail was applied after the
+//                      reply and is on the wire behind it: excused. A stale end fails this at once: the
+//                      ghost sweep removed rows the feeder holds, and the rows the re-download then
+//                      re-applies land at older stamps first. It sees nothing between the reset and the
+//                      end, and nothing the screen shows that the kernel does not: that is the horizon's
+//                      screen check (`screenMatches`, run per spoke by the scoped sweep).
 //
 // Non-vacuity: ledgerOf(sim).counts says how many cells, drops, releases, floor advances, releases
-// examined by M6 and leaves each family saw — a sweep whose counters read 0 proved nothing.
+// examined by M6, leaves and resync ends (and the rows M11 checked at them) each family saw — a sweep
+// whose counters read 0 proved nothing.
 
 import { Framer, Frame, VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
@@ -566,8 +601,15 @@ const inLane = (n: Node, origin: string, seq: number): boolean => {
 //! covers — how far this node's coverage of (lane, partition) reaches: an armed node's possession floor
 // (the SOLE scoped possession claim, kernel/streams.ts), an unscoped node's or a client's applied watermark
 // (the dedup fence: everything at or below it was folded, skipped or fenced here).
+//! A spoke IN RESYNC covers nothing (2026-10-10): it wiped its fold and asked its feeder for everything, so a
+// lane's applied watermark there is the top of whatever has landed so far, not a claim on what is below it —
+// a reply to an older digest (the one the feeder's own digest crossed at the failover) ships the lane's newest
+// entries first, and the re-download then fills the lane from its start as splices under that fence (write.ts
+// #splice, the client leg). The screen lawfully shows a row at an older stamp until its newer record lands —
+// the re-download flicker, a design property noted in STATUS — and M1 would read that as a resurrection.
+// Coverage returns with the end (#resyncEnd), where M10 and M11 judge the result.
 const covers = (n: Node, origin: string, p: string): number =>
-  n.armed ? (n.streams.get(origin)?.parts?.get(p)?.s ?? 0) : (n.streams.get(origin)?.applied ?? 0)
+  n.armed ? (n.streams.get(origin)?.parts?.get(p)?.s ?? 0) : n.client && n.resync !== null ? 0 : (n.streams.get(origin)?.applied ?? 0)
 const isRemove = (rec: Rec) => rec.type === REC.remove
 
 export class Ledger {
@@ -577,7 +619,7 @@ export class Ledger {
   //! released — cell → the newest tombstone stamp any node ever released for it (M3's memory, M6's trigger)
   released = new Map<string, Stamp>()
   pending: { node: Node; id: string; cell: string; p: string; t: Stamp }[] = []
-  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0, resyncs: 0 }
+  counts = { cells: 0, drops: 0, releases: 0, advances: 0, census: 0, leaves: 0, resyncs: 0, resyncRows: 0 }
   #cursors = new Map<string, { node: Node; arr: unknown; len: number }>()
   #snap = new Map<Node, Map<string, Stamp>>()
   #floors = new Map<Node, Map<string, number>>()
@@ -938,10 +980,32 @@ class SpokeWire {
   //! spoke-side link id → per DIGEST the feeder sent on it, in order: the index into `sent` of the spoke digest an
   // r=0 answers (the feeder replies inside the step that handled it, so its digestIn count names it), -1 for r=1
   answers = new Map<number, number[]>()
+  //! spoke-side link id → per DIGEST the feeder sent on it, in order: its `d` map (the feeder's lane tails when it
+  // built the frame) for an r=0, null for an r=1 — M11 reads the ending reply's tails
+  ds = new Map<number, (Record<string, number> | null)[]>()
   //! spoke → the resync it is in (the kernel's object) and, per link, the index of the first r=1 sent since it began
   began = new Map<Node, { obj: object; first: Map<number, number> }>()
-  last = new Map<Node, object | null>()
+  last = new Map<Node, Resync | null>()
   #din = new Map<Node, { at: number; per: Map<number, number> }>()
+  //! endings — the spokes whose resync ENDED since the last pass (resync went from an object to null), with the
+  // resync that ended; computed once per pass (M10 and M11 both read it) and counted as the non-vacuity row
+  #endedAt = -1
+  #ended: { id: string; n: Node; was: Resync }[] = []
+  endings(sim: Sim): { id: string; n: Node; was: Resync }[] {
+    if (this.#endedAt === sim.events) return this.#ended
+    this.#endedAt = sim.events
+    this.#ended.length = 0
+    for (const id of sim.stepped) {
+      const n = sim.nodes.get(id)
+      if (!n || !n.client) continue
+      const was = this.last.get(n) ?? null
+      this.last.set(n, n.resync)
+      if (was === null || n.resync !== null) continue
+      ledgerOf(sim).counts.resyncs++
+      this.#ended.push({ id, n, was })
+    }
+    return this.#ended
+  }
   //! digestIns — how many digests node n has taken in on `link` (its journal's digestIn rows, read by cursor)
   digestIns(n: Node, link: number): number {
     let c = this.#din.get(n)
@@ -952,11 +1016,15 @@ class SpokeWire {
     }
     return c.per.get(link) ?? 0
   }
-  push(m: Map<number, number[]>, link: number, x: number) { let a = m.get(link); if (!a) { a = []; m.set(link, a) } a.push(x) }
+  push<T>(m: Map<number, T[]>, link: number, x: T) { let a = m.get(link); if (!a) { a = []; m.set(link, a) } a.push(x) }
 }
+type Resync = NonNullable<Node['resync']>
 const wires = new WeakMap<Sim, SpokeWire>()
 const wireOf = (sim: Sim): SpokeWire => { let w = wires.get(sim); if (!w) { w = new SpokeWire(); wires.set(sim, w) } return w }
-const digestR = (b: Uint8Array): number => { try { return ((new Frame(b).value as { r?: number }).r ?? 0) } catch { return -1 } }
+const digestValue = (b: Uint8Array): { r: number; d: Record<string, number> } => {
+  try { const v = new Frame(b).value as { r?: number; d?: Record<string, number> }; return { r: v.r ?? 0, d: v.d ?? {} } } catch { return { r: -1, d: {} } }
+}
+const digestR = (b: Uint8Array): number => digestValue(b).r
 
 //! the M10 tap: one byte compare per frame; digests touching a spoke are decoded
 const spokeTap = (sim: Sim, w: SpokeWire) => (from: string, to: string, link: number, peerLink: number, _dialed: boolean, b: Uint8Array) => {
@@ -971,7 +1039,11 @@ const spokeTap = (sim: Sim, w: SpokeWire) => (from: string, to: string, link: nu
       if (!st || st.obj !== fn.resync) { st = { obj: fn.resync, first: new Map() }; w.began.set(fn, st) }
       if (!st.first.has(link)) st.first.set(link, w.sent.get(link)!.length - 1)
     }
-  } else if (tn.client) w.push(w.answers, peerLink, digestR(b) === 0 ? w.digestIns(fn, link) - 1 : -1)
+  } else if (tn.client) {
+    const { r, d } = digestValue(b)
+    w.push(w.answers, peerLink, r === 0 ? w.digestIns(fn, link) - 1 : -1)
+    w.push(w.ds, peerLink, r === 0 ? d : null)
+  }
 }
 
 const resyncEnd = {
@@ -979,14 +1051,8 @@ const resyncEnd = {
   check: (sim: Sim): string | null => {
     const w = wires.get(sim)
     if (!w) return null
-    for (const id of sim.stepped) {
-      const n = sim.nodes.get(id)
-      if (!n || !n.client) continue
-      const was = w.last.get(n) ?? null
-      w.last.set(n, n.resync)
-      if (was === null || n.resync !== null) continue
-      //! the resync ended in this step, on the primary's r=0 (node.ts: `else if (v.r === 0) this.#resyncEnd()`)
-      ledgerOf(sim).counts.resyncs++
+    for (const { id, n, was } of w.endings(sim)) {
+      //! the resync ended in this step, on the primary's r=0 (node.ts: the `v.r === 0` arm of the DIGEST handler)
       const link = n.primary
       if (link === null) continue
       const j = w.digestIns(n, link)
@@ -1001,12 +1067,56 @@ const resyncEnd = {
   },
 }
 
+//! M11 resync-behind — the fold form of M10 (2026-10-10): at the moment a spoke's resync ends, its fold is not
+// behind its feeder on any row it held at the reset. The reply that ends a resync was built AFTER the ship that
+// answered the same ask, and the link is FIFO, so every record the feeder held when it built the reply has landed
+// at the spoke. The reply's `d` map IS the feeder's lane tails at that build (SpokeWire.ds), so a record the
+// feeder holds at seq > d[lane] was applied after the reply and is excused (it is on the wire behind the reply);
+// one at or below d[lane] was shipped before the reply and must have landed — the one exact line, where "on the
+// wire" would excuse the re-download itself behind a stale reply. For every cell of `old` (the kernel's set of
+// cells held at the reset) whose live version at the feeder is in the feeder's log, for a partition the feeder
+// holds (an armed feeder ships a spoke only its held subset), at or below the reply's tail for its lane, the
+// spoke must contain-or-cover that record: in its log, or a version at the cell or an ancestor at or above it.
+// Fails at a stale end: the ghost sweep removed rows the feeder holds, and the rows the re-download then re-applies
+// land at older stamps first. Reads the kernel only (n.state, n.versions, the log — not the screen, and only at
+// the end); nothing here moves a trajectory. The screen against the kernel is `screenMatches` at the horizon.
+const resyncBehind = {
+  name: 'resync-behind',
+  check: (sim: Sim): string | null => {
+    const w = wires.get(sim)
+    if (!w) return null
+    for (const { id, n, was } of w.endings(sim)) {
+      const link = n.primary
+      if (link === null) continue
+      const fu = n.links.get(link)?.uuid
+      const F = fu !== undefined ? sim.nodes.get(fu) : undefined
+      if (!F) continue
+      const D = w.ds.get(link)?.[w.digestIns(n, link) - 1]
+      if (!D) continue // the ending reply was not seen by the tap: nothing to judge against
+      const L = ledgerOf(sim)
+      L.scan(sim)
+      for (const cell of was.old) {
+        const vF = F.versions.get(cell)
+        if (vF === undefined || !F.state.has(cell) || vF.seq > (D[vF.origin] ?? 0) || !inLane(F, vF.origin, vF.seq)) continue
+        const path = JSON.parse(cell) as string[]
+        if (F.armed && !F.scope!.held(path[0])) continue
+        L.counts.resyncRows++
+        const e = L.recs.get(vF.origin + '|' + vF.seq)
+        if (e === undefined || containsOrCovers(L, n, e)) continue
+        const vS = n.versions.get(cell)
+        return `${id}'s resync ended with its fold behind its feeder ${fu}: it held ${cell} at the reset, ${fu} holds it @${stampOf(vF)} (at or below the reply's tail ${D[vF.origin]} for lane ${vF.origin}), and ${id} ${vS === undefined ? 'no longer has it (a ghost that is live at the feeder)' : (n.state.has(cell) ? 'shows' : 'holds') + ' it @' + stampOf(vS) + ', older'} — the re-download had not landed when the ghost sweep ran`
+      }
+    }
+    return null
+  },
+}
+
 //! armScale — install the stage-0 monitors on a Sim (after cluster(), before the first run): turns the exec's watch on
-// (sim.stepped, sim.inflight), appends M1-M10 once and chains M10's tap onto sim.tap. Idempotent.
+// (sim.stepped, sim.inflight), appends M1-M11 once and chains M10's tap onto sim.tap. Idempotent.
 export const armScale = (sim: Sim): Ledger => {
   sim.watch = true
   if (!sim.monitors.some((m) => m.name === 'stamp-oracle')) {
-    sim.monitors.push(...scaleMonitors(), resyncEnd)
+    sim.monitors.push(...scaleMonitors(), resyncEnd, resyncBehind)
     const w = wireOf(sim), tap = spokeTap(sim, w), prev = sim.tap
     sim.tap = prev === null ? tap : (f, t, l, pl, d, b) => { tap(f, t, l, pl, d, b); prev(f, t, l, pl, d, b) }
   }

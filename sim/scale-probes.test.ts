@@ -23,8 +23,9 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed } from './harness.ts'
-import { armScale, ledgerOf, stampOracle, floorsAgree, boundedLogs, converged, scopedConverged, exactlyR } from './monitors.ts'
+import { armScale, ledgerOf, stampOracle, floorsAgree, boundedLogs, converged, scopedConverged, exactlyR, screenMatches } from './monitors.ts'
 import { mesh, join, frameTally, perTick, inject, type MeshOpts } from './scoped-sweep.ts'
+import { LS } from '../kernel/link.ts'
 import { Ring } from '../kernel/ring.ts'
 import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
@@ -435,6 +436,131 @@ test('a leaver cut off while draining (V4-20): the survivors never suspect or ev
   assert.deepEqual(named(sim, 'leave-drain'), [], 'M9 has nothing to say about a leave that reported itself unclean')
   assert.deepEqual(sim.violations, [])
   z.destroy(); sim.nodes.delete('n03')
+})
+
+// ── the spoke's resync across a failover (DESIGN-SCALE stage 2, 2026-10-10; the parked branch's probes rebuilt) ──
+
+//! spokeOf — a spoke fed by one of `ids`: P its primary, O where the failover lands (the first other admitted link in
+// the spoke's link order, node.ts's linkDown arm), T the remaining member
+const spokeOf = (sim: Sim, ids: string[], hosts: string[]) => {
+  const s1 = sim.add({ uuid: 's1', listen: 'sim:s1', hosts: hosts.map((x) => 'sim:' + x), heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('s1', { kind: 'start' }, 0)
+  sim.run({ until: sim.now + 300 })
+  assert.notEqual(s1.primary, null, 'the spoke has a feeder')
+  const P = s1.links.get(s1.primary!)!.uuid
+  const O = [...s1.links.values()].find((l) => l.uuid !== P && l.state === LS.admitted)!.uuid
+  const T = ids.find((x) => x !== P && x !== O)!
+  return { s1, P, O, T }
+}
+const at = (sim: Sim, n: Node, k: string) => n.state.has(JSON.stringify([k])) && k in sim.folds.get(n.uuid)!
+const noneAt = (sim: Sim, n: Node, k: string) => !n.state.has(JSON.stringify([k])) && !(k in sim.folds.get(n.uuid)!)
+
+//! STATUS: "A scoped spoke that fails over never receives the rows its new feeder holds below a lane tail it learned
+// from the old feeder." n=3 R=2. B: six rows owned by T and held by {T, O} (not P), written FIRST — lane T's LOW
+// seqs. A: six rows owned by T and held by {T, P} (not O), written after — lane T's HIGH seqs. The spoke, fed by P,
+// holds A and lane T's tail is high. Cut from P, it fails over to O, which holds B and nothing of A. Before stage 2
+// the failover digest asked O only for lane T above that tail: 0 of 6 B rows ever arrived (4 of 4 seeds), and A
+// stayed on the screen though O does not hold it. Now a client of a scoped feeder (its HELLO contract carries
+// `replicas=2` — sim/harness.ts gives a scoped mesh the api's contract) RESYNCS at the failover: B arrives, A is swept,
+// M10 and M11 are green and the screen equals the kernel.
+test('a scoped spoke\'s failover resyncs onto the new feeder: the six rows it holds below the old lane tail arrive (0 of 6 before), the old feeder\'s six leave the screen, M10/M11 green, screen = kernel — on four seeds', () => {
+  for (const seed of [1, 2, 3, 4]) {
+    const ids = ['n01', 'n02', 'n03']
+    const sim = new Sim(seed)
+    mesh(sim, 3, { hb: 50, replicas: 2, fault: { delay: [1, 5] } })
+    sim.run({ until: 1500 })
+    const { s1, P, O, T } = spokeOf(sim, ids, ids.slice(0, 2))
+    const keys = (prefix: string, want: (h: string[]) => boolean): string[] => {
+      const out: string[] = []
+      for (let i = 0; i < 100_000 && out.length < 6; i++) { const k = prefix + i; if (want(holdersAt(ids, k, 2))) out.push(k) }
+      return out
+    }
+    const B = keys('b', (h) => h[0] === T && h.includes(O))
+    const A = keys('a', (h) => h[0] === T && h.includes(P))
+    for (const [i, k] of B.entries()) sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [k], value: i }] }, i * 3)
+    sim.run({ until: sim.now + 200 })
+    for (const [i, k] of A.entries()) sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [k], value: 100 + i }] }, i * 3)
+    sim.run({ until: sim.now + 600 })
+    const On = sim.nodes.get(O)!
+    assert.ok(A.every((k) => at(sim, s1, k)) && B.every((k) => noneAt(sim, s1, k)), `seed ${seed}: the spoke holds A (from P) and nothing of B`)
+    assert.ok(B.every((k) => On.state.has(JSON.stringify([k]))) && A.every((k) => !On.state.has(JSON.stringify([k]))), `seed ${seed}: O holds B and nothing of A`)
+    assert.ok((s1.streams.get(T)?.applied ?? 0) > (On.streams.get(T)?.applied ?? 0), `seed ${seed}: the spoke's lane-T tail is above O's (A is the high rows)`)
+    const resyncs0 = count(s1, JK.resynced)
+    sim.partition(P, 's1')
+    for (let t = sim.now + 1; t <= sim.now + 3000 && count(s1, JK.resynced) === resyncs0; t += 5) sim.run({ until: t })
+    assert.equal(s1.links.get(s1.primary!)!.uuid, O, `seed ${seed}: fed by O now`)
+    assert.ok(count(s1, JK.resynced) > resyncs0, `seed ${seed}: the failover was a resync`)
+    sim.run({ until: sim.now + 300 })
+    assert.ok(B.every((k) => at(sim, s1, k)), `seed ${seed}: B arrived — the rows below the old tail that O holds (${B.filter((k) => at(sim, s1, k)).length} of 6)`)
+    assert.ok(A.every((k) => noneAt(sim, s1, k)), `seed ${seed}: A left kernel and screen — O does not hold it`)
+    assert.deepEqual(sim.violations, [], `seed ${seed}: no monitor fired (M10 resync-end and M11 resync-behind among them)`)
+    assert.equal(screenMatches(sim, 's1'), null, `seed ${seed}: the screen shows exactly what the kernel holds`)
+    //! M11 judges the cells held at the reset that the FEEDER holds: O holds none of A, so it has 0 rows to judge here
+    // (its non-vacuity is the crossing test below and the sweep's A11 seeds); M10 saw the end
+    assert.ok(ledgerOf(sim).counts.resyncs >= 1, `seed ${seed}: non-vacuity — M10 saw ${ledgerOf(sim).counts.resyncs} resync end(s)`)
+  }
+})
+
+//! M10/M11's plant, on an UNSCOPED cluster (a scoped failover is now itself the resync's ask, so nothing can cross it
+// there): the spoke is fed by P; O is cut from BOTH members (the third member's digest would heal it otherwise), so six
+// Y rows written at P reach the spoke but not O (six X rows written before the cut are everywhere). The spoke is cut
+// from P and fails over to O, still linked to the spoke: its failover digest
+// carries lane P's tail, O's own heartbeat r=1 crosses it and shows lane P below that tail, so the spoke resyncs; O's
+// reply to the failover digest lands FIRST — the stale reply, on every seed of this schedule. Lawful kernel: that
+// reply is not the end (its ship stays), the end is the reply to the resync's ask, X is back and Y is gone until the
+// P–O heal brings it to O and O's tap forwards it. The fault: the spoke's correlation switched off (`resync.q` poked
+// to 0 as soon as the resync begins — the kernel before stage 2 in one line), so the stale reply ends it: M10 names
+// the stale reply, M11 names an X row O holds that the ghost sweep removed.
+const spokeCrossing = (seed: number, poke = false) => {
+  const ids = ['n01', 'n02', 'n03']
+  const sim = new Sim(seed)
+  const members = cluster(sim, 3, { heartbeatMs: 50, fault: { delay: [1, 5] } })
+  armScale(sim)
+  sim.run({ until: 1500 })
+  assert.ok(formed(members))
+  const { s1, P, O, T } = spokeOf(sim, ids, ids.slice(0, 2))
+  const X = Array.from({ length: 6 }, (_, i) => 'x' + i), Y = Array.from({ length: 6 }, (_, i) => 'y' + i)
+  for (const [i, k] of X.entries()) sim.post(P, { kind: 'write', recs: [{ type: REC.update, key: [k], value: i }] }, i * 3)
+  sim.run({ until: sim.now + 300 })
+  sim.partition(P, O); sim.partition(T, O) // O alone, still linked to the spoke (short: healed below, before any eviction)
+  for (const [i, k] of Y.entries()) sim.post(P, { kind: 'write', recs: [{ type: REC.update, key: [k], value: 100 + i }] }, i * 3)
+  sim.run({ until: sim.now + 100 })
+  const On = sim.nodes.get(O)!
+  assert.ok([...X, ...Y].every((k) => at(sim, s1, k)) && X.every((k) => On.state.has(JSON.stringify([k]))) && Y.every((k) => !On.state.has(JSON.stringify([k]))), 'X everywhere; Y at P, T and the spoke only')
+  sim.partition(P, 's1')
+  const t1 = sim.now
+  for (let t = t1 + 1; t <= t1 + 3000 && count(s1, JK.resynced) === 0; t += 1) {
+    sim.run({ until: t })
+    if (poke && s1.resync !== null && s1.resync.q !== 0) s1.resync.q = 0
+  }
+  assert.equal(count(s1, JK.resynced), 1, 'the resync ended (no hang)')
+  assert.equal(s1.links.get(s1.primary!)!.uuid, O, 'fed by O now')
+  return { sim, s1, X, Y, O, P, T }
+}
+
+test('M10 resync-end and M11 resync-behind: lawful on the crossing schedule (the stale reply is not the end; X comes back, Y goes until the heal brings it), both red when the spoke\'s correlation is switched off', () => {
+  const a = spokeCrossing(1)
+  assert.deepEqual(a.sim.violations, [], 'lawful: neither M10 nor M11 fired')
+  assert.ok(a.X.every((k) => at(a.sim, a.s1, k)), 'X is back from the re-download')
+  assert.ok(a.Y.every((k) => noneAt(a.sim, a.s1, k)), 'Y is gone: the new feeder does not hold it yet')
+  assert.equal(ledgerOf(a.sim).counts.resyncs, 1, 'non-vacuity: one resync end seen')
+  assert.equal(ledgerOf(a.sim).counts.resyncRows, 6, 'non-vacuity: M11 checked the six X rows against the feeder')
+  assert.equal(screenMatches(a.sim, 's1'), null, 'the screen shows exactly what the kernel holds')
+  //! the heal: Y reaches O through the members' digest and O's tap forwards it — the spoke is whole again
+  a.sim.heal(a.P, a.O); a.sim.heal(a.T, a.O)
+  a.sim.run({ until: a.sim.now + 1500 })
+  assert.ok([...a.X, ...a.Y].every((k) => at(a.sim, a.s1, k)), 'X and Y at the spoke, kernel and screen')
+  assert.deepEqual(a.sim.violations, [])
+  assert.equal(screenMatches(a.sim, 's1'), null)
+  //! the plant: a screen-only row is named
+  a.sim.folds.get('s1')!.ghost = 1
+  assert.match(screenMatches(a.sim, 's1') ?? '', /s1: the object that reached the sink differs from the kernel's cells folded by depth/, 'planted: a row on the screen the kernel does not hold is named')
+  //! the fault: the correlation off — the stale reply ends the resync, and both monitors say so at that event
+  const b = spokeCrossing(1, true)
+  const m10 = named(b.sim, 'resync-end'), m11 = named(b.sim, 'resync-behind')
+  assert.match(m10[0]?.detail ?? '', /s1's resync ended on link \d+ on the reply to its digest #\d+, sent before the resync asked for the re-download \(#\d+\) — a stale reply/, 'M10 names the stale reply')
+  assert.match(m11[0]?.detail ?? '', /s1's resync ended with its fold behind its feeder n0[123]: it held \["x\d"\] at the reset, n0[123] holds it @\d+\/\d+\/n0[123] .* and s1 no longer has it \(a ghost that is live at the feeder\)/, 'M11 names an X row the ghost sweep removed')
+  assert.equal(m10[0].event, m11[0].event, 'both at the event the stale reply ended the resync')
 })
 
 // ── the counted floors, recorded from today ─────────────────────────────────────────────────────

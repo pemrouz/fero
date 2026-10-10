@@ -29,6 +29,10 @@ export const cluster = (sim: Sim, n: number, opts: { heartbeatMs?: number; durab
       heartbeatMs: opts.heartbeatMs ?? 0, // explicit protocol mode — heartbeats OFF by default so quiescence is reachable
       durable: opts.durable ?? false, // explicit protocol mode — storage OFF by default (zero persist effects)
       ...(opts.replicas !== undefined ? { replicas: opts.replicas } : {}), // explicit protocol mode — scoping OFF by default (M6)
+      //! a SCOPED sim cluster carries the cluster contract the api would build (DESIGN-DOOR §4; the kernel appends
+      // `;ring=`), so a spoke of it reads `replicas=` off its feeder's HELLO (node.feederScoped, DESIGN-SCALE stage 2)
+      // exactly as a real client does. Unscoped clusters send none: their HELLO stays the v4.0 bytes, every golden intact.
+      ...(opts.replicas ? { contract: `v1;heartbeat.ms=${opts.heartbeatMs ?? 0};replicas=${opts.replicas};methods=0;validation=none` } : {}),
       ...(opts.validate !== undefined ? { validate: opts.validate } : {}), // the relay's admission predicate — absent by default (every relayed record admitted)
       ...(opts.door !== undefined ? { door: opts.door } : {}), // the door (DESIGN-DOOR §9) — absent by default: the open wire, every golden byte-identical
       ...(opts.tune !== undefined ? { tune: opts.tune } : {}), // tune rows under test (the leave sweep's window) — absent by default: the shared frozen TUNE

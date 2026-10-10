@@ -33,14 +33,19 @@ import { FAMILIES, runFamily, familyByName, CATCHERS, type Mutation } from './sc
 const SEEDS = Number(process.env.FERO_SCOPED_SEEDS ?? 2)
 
 //! KNOWN_UNSAFE — schedules today's kernel is not safe on, each with its finding and the monitor that names it.
-// A11 seeds 2, 5, 6 and 10: a spoke's resync ends on a STALE digest reply (M10 resync-end), on every A11 seed that
-// fails over to a feeder behind it (2, 5, 6 and 10 of seeds 1-12). At the failover the spoke sends its new feeder
-// a digest (r=1, #0). The feeder's own r=1 crosses it and shows a lane tail below the spoke's, so the spoke
-// resyncs: fold wiped, an empty r=1 (#1) sent to ask for the re-download. The feeder's r=0 reply to #0 then
-// lands and is taken as the resync's end (node.ts #resyncEnd), so the ghost sweep runs before anything was
-// re-downloaded, and the real re-download lands after it, one record run per frame. For those events the spoke
-// shows older values of live rows (seed 6: p29 at seq 21 after seq 69) and, on seed 5, a row whose remove is
-// still on the way (M1). The end state is right; the screen goes back in time. Found by this sweep.
+// A11 seeds 2, 5, 6 and 10 WERE pinned here (2026-10-09): a spoke's resync ended on a STALE digest reply (M10
+// resync-end) on every A11 seed that fails over to a feeder behind it. At the failover the spoke sent its new feeder
+// a digest (r=1, #0); the feeder's own r=1 crossed it and showed a lane tail below the spoke's, so the spoke resynced
+// (fold wiped, an empty r=1 #1); the feeder's r=0 reply to #0 then landed and was taken as the resync's end, so the
+// ghost sweep ran before anything was re-downloaded and the re-download landed after it, one record run per frame:
+// the spoke showed older values of live rows (seed 6: p29 at seq 21 after seq 69) and, on seed 5, a row whose remove
+// was still on the way (M1). FIXED 2026-10-10 (DESIGN-SCALE stage 2, kernel/node.ts `resync`): a client's r=1
+// carries `q`, the reply echoes it, the end is a reply at or above the resync's own q, what a stale reply shipped
+// stays in the fold, a client in resync announces d = {}, and a client of a SCOPED feeder resyncs at every failover
+// (so on a scoped cluster the failover digest IS the resync's ask and nothing can cross it). Seeds 1-12 are safe,
+// M10 and M11 (resync-behind) green, a resync end seen on each of the four seeds, every spoke's screen equal to its
+// kernel at the horizon. M1 reads no coverage off a spoke in resync (sim/monitors.ts `covers`): the re-download
+// lawfully lands a lane's newest rows first. The planted violation for M10/M11 lives in sim/scale-probes.test.ts.
 // A3 seed 6 WAS pinned here (2026-10-09): one attempt committed TWICE across an ownership move (the existing
 // attempt-exactly-once monitor): n05's forwarded field remove of p58.f2 (cid 19) committed at n01 (t=1858.8, epoch 1,
 // seq 35); 1.5 ms later the orphan cut took every n01 link down, before the commit's fan-out or its WACK left n01, so
@@ -62,8 +67,12 @@ const SEEDS = Number(process.env.FERO_SCOPED_SEEDS ?? 2)
 // kernel/scoped.test.ts MUTUAL LATCH, the deadlock the digest's retirement uncovered on exactly this seed).
 const KNOWN_UNSAFE: Record<string, Record<number, RegExp>> = {
   'A2-slow-owner-join': { 9: /attempt-exactly-once .*committed TWICE/ },
-  'A11-spoke': { 2: /resync-end .*stale reply/, 5: /resync-end .*stale reply/, 6: /resync-end .*stale reply/, 10: /resync-end .*stale reply/ },
 }
+
+//! RESYNC_SEEDS — A11's four seeds of 1-12 whose failover lands on a feeder behind the spoke (the ones that were
+// pinned unsafe above). They run in every battery on top of SEEDS, like the pinned seeds, so the stale-reply fix is
+// exercised and M10/M11 see a resync end on every run (the non-vacuity row below).
+const RESYNC_SEEDS: Record<string, number[]> = { 'A11-spoke': [2, 5, 6, 10] }
 
 //! ALWAYS — shapes a family must reach in every battery, whatever SEEDS is, because a pin below is vacuous without
 // them. A7 seed 4 is n=2 R=1 (seeds 1-3 are all R=2): the one shape where the leaver alone holds rows, so the only
@@ -89,14 +98,14 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
 }
 
 for (const fam of FAMILIES) {
-  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
+  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
-    let engaged = 0, cells = 0, advances = 0, resyncs = 0
+    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
     const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
-    // the newly-safe check below is the flip a fix must make; the ALWAYS shapes run for the same reason
-    const seeds = [...new Set([...Array.from({ length: SEEDS }, (_, i) => i + 1), ...known, ...(ALWAYS[fam.name] ?? [])])]
+    // the newly-safe check below is the flip a fix must make; the ALWAYS shapes and the resync seeds run for the same reason
+    const seeds = [...new Set([...Array.from({ length: SEEDS }, (_, i) => i + 1), ...known, ...(RESYNC_SEEDS[fam.name] ?? []), ...(ALWAYS[fam.name] ?? [])])]
     for (const seed of seeds) {
       const o = runFamily(fam, seed)
       if (o.unsafe.length) {
@@ -108,16 +117,33 @@ for (const fam of FAMILIES) {
       assert.ok(o.redToday.includes('M8'), `${o.shape}: M8 is red today on every scoped run with a remove (if green, stage 3/4 landed: flip the pin)`)
       assert.ok(!o.red.has('leave-drain'), `${o.shape}: M9 red — a clean leaver took the only copy of a row with it (the drain, DESIGN-SCALE stage 1 (b), should have held it)`)
       if (ENGAGED[fam.name](o.eng)) engaged++
-      cells += o.eng.cells; advances += o.eng.advances; resyncs += o.eng.resyncs
+      cells += o.eng.cells; advances += o.eng.advances; resyncs += o.eng.resyncs; resyncRows += o.eng.resyncRows
     }
     assert.deepEqual(unsafe, [], 'UNSAFE: a monitor fired or M1\'s horizon form disagrees')
     assert.deepEqual(newlySafe, [], 'a schedule pinned unsafe is safe now: take it off KNOWN_UNSAFE, with the why')
     assert.deepEqual(notLive, [], 'not live at the horizon')
     assert.ok(engaged > 0, `${fam.name}: the chaos never engaged on seeds ${seeds.join(',')}`)
-    if (fam.name === 'A11-spoke') assert.ok(resyncs > 0, 'non-vacuity: M10 saw a spoke\'s resync end')
+    if (fam.name === 'A11-spoke') {
+      assert.ok(resyncs >= 4, `non-vacuity: M10 saw a spoke's resync end on each of the four resync seeds (${resyncs})`)
+      assert.ok(resyncRows > 0, `non-vacuity: M11 checked ${resyncRows} rows the spoke held at a reset against its feeder`)
+    }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
   })
 }
+
+//! the screen check (the review of the parked stale-reply fix, 2026-10-10) is part of runFamily's verdict, not only a
+// function the probes call by hand: a row on a spoke's screen that its kernel does not hold makes the seed UNSAFE. The
+// plant wraps A11's chaos and writes one key straight into the spoke's downstream object after the spoke exists; nothing
+// in the kernel ever removes it, so the horizon check must name it. Red with the runFamily loop over spokes removed.
+test('runFamily names a screen-only row on a spoke as UNSAFE ("screen: s1: …"): the horizon screen check is wired into the sweep\'s verdict', () => {
+  const a11 = familyByName('A11-spoke')
+  const planted = { ...a11, chaos: (c: Parameters<typeof a11.chaos>[0]) => { a11.chaos(c); c.sim.at(600, () => { c.sim.folds.get('s1')!.ghost = 1 }) } }
+  const o = runFamily(planted, 1, 'none', 3000)
+  assert.ok(o.red.has('screen'), `the screen check went red (red: ${[...o.red].join(',')})`)
+  assert.ok(o.unsafe.some((u) => /^screen: s1: the object that reached the sink differs from the kernel's cells folded by depth/.test(u)), `UNSAFE names the spoke's screen: ${o.unsafe.join(' | ')}`)
+  const clean = runFamily(a11, 1, 'none', 3000)
+  assert.equal(clean.red.has('screen'), false, 'the same seed unplanted is green on the screen check')
+})
 
 //! the mutation runner's pinned catches: each schedule is green unmutated and red (M1, M3 or M6) with the mutation
 const CAUGHT: [string, number, Mutation, string[]][] = [

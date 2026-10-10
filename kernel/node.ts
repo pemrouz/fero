@@ -458,7 +458,39 @@ export class Node {
   // digest asks the feeder for everything, and the feeder's r=0 reply (FIFO: after the suffix) completes
   // it: every cell held before that did not come back is removed downstream. `old` = the cells held at
   // the reset. Null when not resyncing. Survives a failover (the new primary's reply completes it).
-  resync: { old: Set<string> } | null = null
+  //! `q` (DESIGN-SCALE stage 2, 2026-10-10 — the A11 stale-reply finding, M10): the correlation id of the r=1 the
+  // resync sent. Every r=1 a CLIENT sends carries a fresh `q` (#dq, monotone per node) and a server's r=0 toward a
+  // client echoes the `q` of the r=1 it answers. The resync may end ONLY on a reply whose q ≥ this one — the reply
+  // to a digest sent AFTER the resync began (the failover's own r=1 counts, so a feeder that dies mid-resync is no
+  // hang). A reply to an older digest — the failover's r=1 that the feeder's own digest crossed — is NOT the end:
+  // before, it ran the ghost sweep before the re-download, and the re-download then landed one record run per
+  // frame, so the screen went back in time. What that older reply's ship brought STAYS in the fold: it is the
+  // feeder's committed log, the re-download re-sends it and the lane drops the duplicates (the client leg of the
+  // dual fence, write.ts #splice); a second wipe would drop cells the screen still shows and the sweep does not
+  // know. But kept, those records RAISE the lane tails this node holds, and on a wiped fold a raised tail has
+  // nothing under it — so while in resync every digest this node sends announces d = {} (#sendDigest): "send me
+  // everything", the lane drops what it has. A reply with no `q` is an older server's (V4-14): it ends as before.
+  //! `ticks`: heartbeat ticks since the resync began. A resync whose ask reached a PAUSED feeder gets no reply (the
+  // feeder marks the debt and asks with ITS r=1 after the drain); once the ask is a tick old, a feeder's r=1 is
+  // answered with an r=1 of this node's own (a fresh q) instead of an r=0, so that exchange ships everything and
+  // its reply ends the resync — the ghost sweep is at most one tick late, and never waits for the heartbeat floor
+  // this node may not own (a spoke floors its primary only when its uuid sorts below). A crossing at the instant
+  // of the resync (ticks 0) is still answered r=0: no duplicate ship for a reply that is already on its way.
+  resync: { old: Set<string>; q: number; ticks: number } | null = null
+  #dq = 0
+
+  //! feederScoped (DESIGN-SCALE stage 2) — is the cluster this spoke follows SCOPED? Read off the feeder's HELLO
+  // contract (`replicas=N`, N > 0; the api spells it, kernel/node.ts appends `;ring=`), the last primary's when none
+  // is up (feederContract). A scoped feeder shows a spoke only the partitions it holds and each holder's copy of a
+  // lane is sparse, so at a failover the spoke's lane tails say nothing about what the NEXT feeder holds below them:
+  // it resyncs onto the new feeder instead of asking for the suffixes above its tails. False with no contract (an
+  // unscoped cluster, an old server, the sim's unscoped clusters): the failover digest carries the real tails.
+  get feederScoped(): boolean {
+    const c = this.feederContract
+    if (c === undefined) return false
+    const m = /(?:^|;)replicas=(\d+)(?:;|$)/.exec(c)
+    return m !== null && Number(m[1]) > 0
+  }
 
   //! hosts — the discovery targets: static NodeOpts.hosts ∪ the dynamic set the `discover` event
   // installs (V4-3), deduplicated, minus this node's own listen. Genesis (links ≥ hosts) and the
@@ -789,7 +821,13 @@ export class Node {
           for (const l of this.links.values())
             if (l.state === LS.admitted && !l.dead) { this.primary = l.id; this.#feederLast = l.contract; break }
           if (this.primary !== null) {
-            this.#sendDigest(this.links.get(this.primary)!, 1)
+            //! a SCOPED feeder (feederScoped, DESIGN-SCALE stage 2): the new feeder holds a different subset, and its
+            // copy of a lane this spoke learnt from the old one may run BELOW the spoke's tail (another partition's
+            // rows), so an ask for the suffixes above the tails would miss them, and rows the new feeder does not
+            // hold would stay on the screen. The spoke resyncs onto it: wipe, ask for everything, sweep the ghosts
+            // at the end. An unscoped feeder holds every lane in full: the tails ask for exactly what is missing.
+            if (this.feederScoped) this.#resyncBegin(this.links.get(this.primary)!)
+            else this.#sendDigest(this.links.get(this.primary)!, 1)
             this.writes.repark(this)
           }
         }
@@ -846,6 +884,7 @@ export class Node {
           this.#refuse(link, 'door-timeout')
         }
         else if (meta.tag === TAG.heartbeat) {
+          if (this.client && this.resync !== null) this.resync.ticks++ // the resync's age: see `resync.ticks`
           for (const link of this.links.values())
             //! lower-uuid side originates PINGs (halves N² probe traffic — v2's rule, kept). Paused links
             // are SKIPPED entirely: control frames queued into a drop-oldest queue are doomed work, and a
@@ -1130,12 +1169,17 @@ export class Node {
   // which it sends AFTER the ship on the same FIFO link, is the completion marker (#resyncEnd). The
   // projection downstream is left as it is until then — no remove-everything flicker; cells that come
   // back identical re-apply in place. The dedup window stays: WACKed coordinates were true when learned.
+  //! Begun MID-RESYNC (a scoped failover onto a third feeder while the second's re-download was landing): the cells
+  // held at the FIRST reset stay in `old` — the screen still shows them, and only this set is swept at the end — and
+  // the partial re-download's cells join it; the fold is wiped again (the new feeder's held subset is the truth).
   #resyncBegin(link: Link) {
-    const old = new Set(this.state.keys())
+    const old = this.resync !== null ? this.resync.old : new Set<string>()
+    for (const k of this.state.keys()) old.add(k)
     this.journal.armed && this.journal.emit(JK.resync, old.size)
     this.#resetFold()
-    this.resync = { old }
-    this.#sendDigest(link, 1)
+    const q = ++this.#dq
+    this.resync = { old, q, ticks: 0 }
+    this.#sendDigest(link, 1, q)
   }
 
   //! #resyncEnd — the feeder's reply arrived: every cell held at the reset that the re-download did not
@@ -1748,9 +1792,16 @@ export class Node {
           if (this.resync === null) {
             for (const [origin, d] of this.streams)
               if (d.applied > (typeof v.d[origin] === 'number' ? (v.d[origin] as number) : 0)) return this.#resyncBegin(link)
-          } else if (v.r === 0) this.#resyncEnd()
+          }
+          //! the end is the reply to a digest sent AFTER the resync began (q ≥ the resync's own; the failover's fresh
+          // r=1 counts); a reply to an older digest is NOT the end — the re-download is still on its way behind it,
+          // and what that older reply's ship brought stays in the fold (see `resync`). No q: an old server's reply.
+          else if (v.r === 0 && (typeof v.q !== 'number' || v.q >= this.resync.q)) this.#resyncEnd()
           link.synced = true
-          if (v.r === 1) this.#sendDigest(link, 0)
+          //! a feeder's r=1 is answered r=0 with our tails — unless we are in a resync whose ask is a tick old (it
+          // reached a paused feeder, or was lost): then with an r=1 of our own, so this exchange ships everything
+          // and its reply ends the resync (see `resync.ticks`)
+          if (v.r === 1) this.#sendDigest(link, this.resync !== null && this.resync.ticks >= 1 ? 1 : 0)
           return
         }
         //! a PAUSED link cannot deliver: serialising the missing suffix into its drop-oldest queue is
@@ -1795,8 +1846,9 @@ export class Node {
         //! the peer's digest is what SYNCS the link: the suffix just shipped covers everything up to this
         // instant, and every record from here on has a higher seq — per-origin monotonicity holds on the wire
         link.synced = true
-        //! r=1 means "answer with yours" — the reply carries r=0, so the exchange is two-legged, never a loop
-        if (v.r === 1) this.#sendDigest(link, 0)
+        //! r=1 means "answer with yours" — the reply carries r=0, so the exchange is two-legged, never a loop.
+        // A client's r=1 carries `q`; the reply echoes it (only clients send one: member bytes are unchanged)
+        if (v.r === 1) this.#sendDigest(link, 0, typeof v.q === 'number' ? v.q : undefined)
         return
       }
       //! M6 scoped-replication plane (DESIGN-M6 C3/C8): HAVEQ/HAVEA carry the possession handshake,
@@ -1948,10 +2000,16 @@ export class Node {
   //! #sendDigest — announce {origin: highestHeldSeq} (the log tails: exactly what this node can serve).
   // Durable mode adds the p map (durable tails) — the persisted-confirm evidence; non-durable digests
   // are byte-identical with M0-M3.
-  #sendDigest(link: Link, r: 0 | 1) {
+  //! `q` (DESIGN-SCALE stage 2, see `resync`): a CLIENT's r=1 mints a correlation id (or carries the one its caller
+  // minted); a server's r=0 toward a client echoes the asker's. Members never send one: member bytes are unchanged.
+  //! A CLIENT in resync announces NO tails: what it holds mid-resync is whatever ship landed first, and a tail raised
+  // by a stale ship would hide the rows under it from a feeder that holds the lane in full. "Send me everything";
+  // the lane drops what it already has (write.ts #splice, dupDrop).
+  #sendDigest(link: Link, r: 0 | 1, q?: number) {
     const d: Record<string, number> = {}
-    for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
-    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number }
+    if (!(this.client && this.resync !== null))
+      for (const [origin, entries] of this.logs) if (entries.length) d[origin] = entries[entries.length - 1].seq
+    let body: { d: Record<string, number>; r: number; p?: Record<string, number>; w?: number; q?: number }
     if (this.durable) {
       const p: Record<string, number> = {}
       for (const [origin, s] of this.streams) if (s.durable > 0) p[origin] = s.durable
@@ -1960,6 +2018,8 @@ export class Node {
     //! toward a CLIENT, the digest also carries this node's write-gate (I-33): the client has no gate of
     // its own, and a closed gate here parks its relayed writes. Member-to-member digests are unchanged.
     if (link.client) body.w = this.membership.gate(this).open ? 1 : 0
+    if (this.client && r === 1) body.q = q ?? ++this.#dq
+    else if (q !== undefined) body.q = q
     link.ship(encodeControl(VERB.DIGEST, body), this.env.sink, this.journal)
     this.journal.armed && this.journal.emit(JK.digestOut, link.id, r)
   }
