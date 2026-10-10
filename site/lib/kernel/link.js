@@ -62,6 +62,12 @@ export class Link {
   //! set when overflow cleared the queue: the peer now has a TAIL hole, and the drain handler follows up
   // with a digest exchange to re-ship it (loss heals, never lingers)
   droppedWhilePaused = false
+  //! torn (the third re-check of DESIGN-SCALE stage 2, 2026-10-10): a digest ANSWER whose suffix ship overflowed
+  // this queue partway — the peer's tails `d` it answered, the `r` and `q` of that digest, and the first frame the
+  // socket did not take (`origin`, `seq`). The node resumes the answer from there at the drain (node.ts #answer),
+  // so the reply always follows the whole ship. Null when no answer is torn. Set only on a link that ships
+  // suffixes (an unscoped member's, a client's); an armed member link gets no suffix and never tears.
+  torn                                                                                                                  = null
   dead = false // set on wire fault so a half-processed chunk can't keep dispatching before linkDown arrives
   //! noRedial: set before a DELIBERATE close (dup-link, self-reject) — without it, closing the loser of a dial race would redial and re-create the race forever
   noRedial = false
@@ -127,6 +133,9 @@ export class Link {
   // not the oldest entry: partial drops manufacture interior gaps (survivors leapfrog the hole at drain time,
   // ahead of any heal), while a full clear keeps the loss a pure TAIL — exactly what the digest exchange the
   // drain handler triggers knows how to re-ship. De-syncing here stops any further records widening the hole.
+  // The same rule binds a caller that ships a WHOLE suffix in one step (node.ts #answer): the shell steps
+  // `pause` inside a send, so the clear can land partway through that ship — the caller must stop at the first
+  // clear, or the frames it ships after it leapfrog the hole and the peer's tails rise above it.
   ship(bytes            , sink            , j         ) {
     if (this.dead) return
     if (!this.paused) return sink.send(this.id, bytes)
@@ -135,9 +144,14 @@ export class Link {
       j.armed && j.emit(JK.dropOldest, this.id, this.queued.length)
       this.queued.length = 0
       this.droppedWhilePaused = true
+      this.drops++
       this.synced = false
     }
   }
+  //! drops — every clear this link ever made. droppedWhilePaused is the DEBT (sticky until the drain settles it);
+  // a caller shipping many frames in one step reads this count before and after to see whether ITS ship tore
+  // (node.ts #answer: a resume runs while the earlier tear's debt is still set).
+  drops = 0
 
   //! drain: the env's socket buffer emptied — release the parked frames in order.
   drain(sink            , j         ) {
