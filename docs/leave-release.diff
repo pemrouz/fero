@@ -1,19 +1,27 @@
-# The scratch kernel of DESIGN-LEAVE §10.10 (2026-10-10): the rule for a vote above my view, with its release.
-# Built on a copy of v4 at fc77fc1 (the tree after wave 5b plus the five release adversaries), outside any git tree;
-# measured, never committed. FERO_SCRATCH_TIMEOUT=1 is the REJECTED clock-based release, kept only for its teeth.
-# Apply with: git apply docs/leave-release.diff (then drop the SCRATCH_TIMEOUT lines and the `since` stamp).
+# The scratch kernel of DESIGN-LEAVE §10.10 (2026-10-10, after its second review): the rule for a vote above my view, with its release.
+# Built on a copy of w5c/release (v4 at 145a70b plus the harness commits fc77fc1 and d8ebc5d), outside any git tree; measured,
+# never committed. FERO_SCRATCH_VARIANT names the REJECTED variants, kept only for their teeth (§10.10.8): timeout (a clock on
+# the hold), forget (a two-tick memory of a held member's ask: the second review's blocker), counted (a stayer counts a held
+# member), nojoint (the commit ignores the joint sets), nolead (a held member leads nothing: the second review's major), noviewcheck.
+# Apply with: git apply docs/leave-release.diff (then drop the `V` line and every use of it).
 --- a/kernel/membership.ts
 +++ b/kernel/membership.ts
-@@ -121,6 +121,8 @@
+@@ -121,6 +121,14 @@
  
  //! View: the committed membership fact — epoch + [uuid, listen] pairs, sorted by uuid (deterministic everywhere).
  export interface View { epoch: number; members: [string, string][] }
 +//! SCRATCH (DESIGN-LEAVE §10.10): a vote, with the earlier votes above the view behind it (see Membership.votedFor)
-+export interface Vote { e: number; p: string; h: string; f?: 1; since?: number; prior?: Vote[] }
++export interface Vote { e: number; p: string; h: string; f?: 1; prior?: Vote[] }
++//! SCRATCH: the REJECTED variants, kept only for their teeth (DESIGN-LEAVE §10.10.8): `timeout` — the hold ends after
++// proposalAge + 2 ticks (candidate 2, a clock); `forget` — a stayer forgets a held member's ask after two ticks (the
++// first draft of §10.10.6; the second review's blocker); `counted` — a stayer counts a held member's link; `nojoint`
++// — the commit ignores the joint sets; `nolead` — a held member leads nothing (the first draft of §10.10.2; the second
++// review's major); `noviewcheck` — the disown skips its view check. The build drops this line and every use of V.
++const V = process.env.FERO_SCRATCH_VARIANT ?? ''
  
  //! protocol constants — ticks are heartbeat ticks (the membership clock). Each is the DEFAULT of its
  // tune-table row (kernel/tune.ts: suspectTicks, pulls, proposalAge, rejoinTicks, leaveTicks); tick() reads node.tune.
-@@ -157,8 +159,55 @@
+@@ -157,8 +165,89 @@
  export class Membership {
    view: View = { epoch: 0, members: [] }
    //! ballot state: one vote per epoch, identified by (epoch, proposer, membersHash) — see the banner
@@ -24,16 +32,25 @@
 +  // above the view (a grant of a ballot joint over a held view must not forget that view: evictTwo's n03 granted
 +  // n04's joint ballot, n04 dropped it and disowned it, and the hold on n01's view had been overwritten). `f` marks
 +  // a vote its proposer DISOWNED (a NACK: it holds no such ballot and no view at or above it): still spent, warns
-+  // no more. `since` is the tick the vote was given (the TIMEOUT variant only). It rides inside votedFor so every
-+  // boot path (the WAL record, the sim's and the mesh's restarts) carries it unchanged.
++  // no more. It rides inside votedFor so every boot path (the WAL record, the sim's and the mesh's restarts) carries
++  // it unchanged.
 +  votedFor: Vote = { e: 0, p: '', h: '' }
 +  //! SCRATCH: `oldEpoch` is the base the ballot is over (the PROPOSE carries it as `o`); `joint` the held views
-+  // (member hashes) this ballot must ALSO carry a majority of — learned from held voters' asks and refusals
++  // (member hashes) this ballot must ALSO carry a majority of — my own holds, and those linked members' asks and
++  // refusals named
 +  #proposal: { view: View; old: string[]; oldEpoch: number; h: string; votes: Set<string>; ticks: number; age: number; joint: Set<string> } | null = null
-+  //! SCRATCH: what linked members told me they hold (their tick-ly ask, PULL {vs}); an entry is fresh for two
-+  // ticks — a stayer's gate counts no link whose member sits on a fresh hold above my view (§10.5)
++  //! SCRATCH §10.10.6: what linked members told me they hold (their ask, PULL {vs}). An entry is kept until that
++  // member's NEXT ask replaces it (an empty one when its last hold ended) or a fresh link to it is admitted — never
++  // a clock (the second review's blocker: a two-tick memory counted a held member again when its heartbeat was late,
++  // and the far side wrote beside the new view with every link up). A stayer's gate counts no link whose member sits
++  // on a hold above my view (§10.5). `tick` is read by the rejected `forget` variant only.
 +  #heldPeers = new Map<string, { holds: { e: number; h: string; p: string }[]; tick: number }>()
 +  #tickNo = 0
++  //! SCRATCH: the holds I last announced (as a key), so the ask goes out when they CHANGE and once more when the
++  // last one ends — the release is a frame, never silence
++  #lastAsk = ''
++  //! SCRATCH: the tick each vote was given (the rejected `timeout` variant only)
++  #voteTick = new Map<string, number>()
 +  //! SCRATCH: #apart — how many members the view a vote is for differs from mine by (the symmetric difference;
 +  // `h` IS the member list, hashOf joins the uuids)
 +  #apart(h: string): number {
@@ -53,15 +70,40 @@
 +  // members apart from the one I hold (one apart, the count of §10.2 (a) protects). Re-read on every call, so an
 +  // install re-reads each against the new view by construction.
 +  holds(node: Node): Vote[] {
-+    const timeout = process.env.FERO_SCRATCH_TIMEOUT === '1' ? node.tune.proposalAge + 2 : Infinity
-+    return this.#votesAbove(node).filter((x) => !x.f && this.#apart(x.h) >= 2 && this.#tickNo - (x.since ?? this.#tickNo) <= timeout)
++    const timeout = V === 'timeout' ? node.tune.proposalAge + 2 : Infinity
++    return this.#votesAbove(node).filter((x) => !x.f && this.#apart(x.h) >= 2 && this.#tickNo - (this.#voteTick.get(`${x.e}:${x.p}:${x.h}`) ?? 0) <= timeout)
 +  }
 +  held(node: Node): boolean { return this.holds(node).length > 0 }
-+  //! SCRATCH: heldPeer — a linked member sits on a fresh hold above my view
++  //! SCRATCH: #fresh — an entry counts (the `forget` variant expires it after two ticks: the rejected clock)
++  #fresh(p: { tick: number }): boolean { return V !== 'forget' || this.#tickNo - p.tick <= 2 }
++  //! SCRATCH: heldPeer — a linked member told me it sits on a hold above my view
 +  #heldPeer(u: string): boolean {
++    if (V === 'counted') return false
 +    const p = this.#heldPeers.get(u)
-+    return p !== undefined && this.#tickNo - p.tick <= 2 && p.holds.some((x) => x.e > this.view.epoch)
++    return p !== undefined && this.#fresh(p) && p.holds.some((x) => x.e > this.view.epoch)
 +  }
++  //! SCRATCH §10.10.6, the ask: PULL {e, vs: [{e, h, p}]} with my holds, on every admitted member link. Sent on every
++  // tick while I hold anything; the moment my holds CHANGE (a grant that holds me, a disown, an install), so a quiet
++  // point never sees a stale count; once more when the last hold ends (the release is this frame); and on a fresh
++  // link, to that link, when I am held (the receiver forgot me at admit). The vote's proposer answers with a VIEW at
++  // or above it or disowns it; every other member learns not to count me and which view a ballot must be joint over.
++  // Nothing at epoch 0: a genesis grant IS a hold (n members apart from the empty view) but nobody is a member, the
++  // gate is open genesis whatever I hold, the lead reads its own holds and a rival genesis ballot is learned from the
++  // refusal (`hm`) — and the frames would perturb every forming cluster (the in-tree sweep's seed 89 moved on timing).
++  #ask(node: Node, on: 'tick' | 'change' | Link) {
++    if (node.client || this.view.epoch === 0) return
++    const hs = this.holds(node)
++    const key = hs.map((x) => `${x.e}:${x.p}:${x.h}`).join('|')
++    if (typeof on !== 'string') { if (key === '' || !this.isMember(on.uuid)) return }
++    else if (key === '' && this.#lastAsk === '') return
++    else if (on === 'change' && key === this.#lastAsk) return
++    const to = typeof on !== 'string' ? [on] : this.#admitted(node).filter((l) => !l.client && this.isMember(l.uuid))
++    this.#send(node, to, encodeControl(VERB.PULL, { e: this.view.epoch, vs: hs.map((x) => ({ e: x.e, h: x.h, p: x.p })) }))
++    if (typeof on === 'string') this.#lastAsk = key
++  }
++  //! SCRATCH: the commit rule's third majority — of every held view the ballot is joint over (the `nojoint` variant
++  // drops it: supersession without the held view's consent is the split)
++  #jointOk(p: { joint: Set<string>; votes: Set<string> }): boolean { return V === 'nojoint' || [...p.joint].every((hh) => majority(hh.split(','), p.votes)) }
 +  //! SCRATCH: #remember — a new vote to another proposer: the latest, with every other vote above my view kept
 +  // behind it (minus one at the same epoch: the same proposer's replacement ballot)
 +  #remember(v: Vote) {
@@ -71,7 +113,7 @@
    //! #burned — the highest epoch known to hold SPENT votes for a ballot that never committed (the
    // proposer vanished mid-round). Vote-once-per-epoch means a burned epoch is unwinnable by any OTHER
    // proposer, and with every proposal pinned to view.epoch+1 that was a PERMANENT liveness wedge: a
-@@ -216,23 +265,31 @@
+@@ -216,15 +305,20 @@
      if (this.rejoining()) return { open: false, reason: 'rejoining' }
      if (this.view.epoch === 0) return { open: true, reason: '' } // open genesis — the M0/M1 mode
      if (!this.isMember(node.uuid)) return { open: false, reason: this.#wasMember ? 'evicted' : 'joining' }
@@ -86,61 +128,35 @@
    }
  
    //! #lowestLive — the single-proposer rule: the lowest-uuid non-suspect member proposes; everyone else defers.
--  #lowestLive(): string {
--    return this.view.members.map((m) => m[0]).filter((u) => !this.#suspects.has(u))[0] ?? ''
-+  #lowestLive(node?: Node): string {
-+    //! SCRATCH §10.10: a HELD member leads nothing; the lowest live UNHELD member leads, jointly over every hold it knows
-+    return this.view.members.map((m) => m[0]).filter((u) => !this.#suspects.has(u) && !this.#heldPeer(u) && !(node !== undefined && u === node.uuid && this.held(node)))[0] ?? ''
++  // SCRATCH §10.10.2 (the second review): unchanged — a HELD member leads too, with its ballot JOINT over its own
++  // holds (they stay behind its own vote in `prior`). The first draft skipped held members here and left nobody to
++  // lead when every live member was held (every granter of a dead proposer's two-apart ballot; every granter at
++  // genesis, whose view is empty).
+   #lowestLive(): string {
+     return this.view.members.map((m) => m[0]).filter((u) => !this.#suspects.has(u))[0] ?? ''
    }
- 
-   //! tick — the membership clock (called from the heartbeat branch): genesis, suspicion, eviction
+@@ -233,6 +327,8 @@
    // proposals, proposal retry/abandon, stale-pull retries + alarmed release, rejoin/evictee recovery.
    tick(node: Node) {
      const j = node.journal
 +    this.#tickNo++
-+    //! SCRATCH §10.10, the ask: while my vote warns, every tick I tell every linked member what I hold (PULL {e, ve,
-+    // vh}) — the vote's proposer answers with a VIEW at or above it, or disowns it (NACK); every other member learns
-+    // not to count me and which view a ballot must be joint over.
-+    const hs = this.holds(node)
-+    if (hs.length) this.#send(node, this.#admitted(node).filter((l) => !l.client && this.isMember(l.uuid)), encodeControl(VERB.PULL, { e: this.view.epoch, vs: hs.map((x) => ({ e: x.e, h: x.h, p: x.p })) }))
++    this.#ask(node, 'tick') // SCRATCH §10.10.6: the per-tick refresh of my holds (see #ask)
      //! genesis: fully-formed open mesh + lowest uuid ⇒ propose view 1 over the admitted set.
      // CLIENT links are invisible here (M5b): a spoke never counts toward formation, never enters the
      // member sweep, and never wins the lowest-uuid race — and a client NODE runs none of the member
-@@ -277,7 +334,7 @@
-       if (this.#suspects.size && !this.#proposal && !this.epochStale) {
-         const live = this.view.members.map((m) => m[0]).filter((u) => !this.#suspects.has(u))
-         const evictable = this.view.members.filter(([u, listen]) => this.#suspects.has(u) && !node.dialing(listen))
--        if (evictable.length && live[0] === node.uuid && live.length * 2 > this.view.members.length) {
-+        if (evictable.length && this.#lowestLive(node) === node.uuid && live.length * 2 > this.view.members.length) { // SCRATCH: the lowest live UNHELD member
-           const gone = new Set(evictable.map((m) => m[0]))
-           this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => !gone.has(u)) })
-         }
-@@ -319,7 +376,7 @@
-     if (!node.client && this.rejoining() && !this.epochStale) {
-       const memberLinks = this.#admitted(node).filter((l) => this.isMember(l.uuid))
-       this.#send(node, memberLinks, encodeControl(VERB.PULL, { e: this.view.epoch }))
--      if (++this.#rejoinTicks >= node.tune.rejoinTicks && !this.#proposal && this.#lowestLive() === node.uuid)
-+      if (++this.#rejoinTicks >= node.tune.rejoinTicks && !this.#proposal && this.#lowestLive(node) === node.uuid)
-         this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members })
-     }
-     //! evicted: ask the lowest admitted MEMBER of my view to propose me back in (a fellow evictee would
-@@ -373,8 +430,8 @@
-     const jlink = jid !== undefined ? node.links.get(jid) : undefined
-     if (!jlink || jlink.state !== LS.admitted || jlink.dead) return
-     //! single-proposer discipline: a non-lowest member RELAYS the knock one hop instead of dueling ballots
--    if (this.#lowestLive() !== node.uuid) {
--      const id = node.byUuid.get(this.#lowestLive())
-+    if (this.#lowestLive(node) !== node.uuid) {
-+      const id = node.byUuid.get(this.#lowestLive(node))
-       const l = id !== undefined ? node.links.get(id) : undefined
-       if (l && l.state === LS.admitted && !l.dead)
-         l.ship(encodeControl(VERB.JOIN, { u: v.u, i: 0, l: v.l }), node.env.sink, node.journal)
-@@ -393,15 +450,23 @@
-     const leaver = link.uuid
-     node.journal.armed && node.journal.emit(JK.leave, leaver)
-     if (node.client || this.view.epoch === 0 || !this.isMember(node.uuid) || !this.isMember(leaver) || this.epochStale || this.rejoining()) return
--    if (this.#lowestLive() !== node.uuid || this.#proposal || this.view.members.length < 2) return
-+    if (this.#lowestLive(node) !== node.uuid || this.#proposal || this.view.members.length < 2) return
+@@ -343,6 +439,11 @@
+   onAdmit(node: Node, link: Link) {
+     if (!node.client && this.view.epoch > 0) // a spoke announces nothing: its view is its feeder's, and a reborn feeder must not inherit it
+       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
++    //! SCRATCH §10.10.6: a fresh link carries no memory of the peer's holds — forget what the old link said (a release
++    // announced on a dead link was lost), and tell the peer mine if I have any (its ask is in flight, so no quiet
++    // point sees it counting me before the ask lands)
++    this.#heldPeers.delete(link.uuid)
++    this.#ask(node, link)
+   }
+ 
+   //! staleObserved — the epoch-staleness contract: any epoch above the committed view closes the gate
+@@ -397,11 +498,19 @@
      this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => u !== leaver) })
    }
  
@@ -161,14 +177,15 @@
      //! one spelling for a clean leave: a ballot that leaves its OWN proposer out is a leave (the lowest live
      // leaver proposes its exit itself, see #knockLeave). Journal it as leave(proposer) — the row a knocked
      // leave writes in onLeave — so a survivor's diary reads the same either way. Journal only.
-@@ -424,17 +489,32 @@
+@@ -424,17 +533,35 @@
      const leavingOut = going && !inBallot
      const backIn = this.leaving?.done === true && inBallot
      const grant = v.e > this.view.epoch && !backIn && (leavingOut || !this.epochStale) && (this.votedFor.e < v.e || this.votedFor.p === proposer)
 +      && over >= this.view.epoch && jointOverMine // SCRATCH §10.10
      if (grant) {
 -      this.votedFor = { e: v.e, p: proposer, h }
-+      this.#remember({ e: v.e, p: proposer, h, since: this.#tickNo }) // SCRATCH: the latest vote, the earlier ones kept behind it
++      this.#remember({ e: v.e, p: proposer, h }) // SCRATCH: the latest vote, the earlier ones kept behind it
++      this.#voteTick.set(`${v.e}:${proposer}:${h}`, this.#tickNo) // SCRATCH: the `timeout` variant's stamp
        //! the vote is DURABLE before the VOTE frame leaves (sink.boot precedes the ship in this step —
        // the env contract): a crash between grant and send must not forget the spent ballot
        node.persistBoot()
@@ -177,6 +194,7 @@
 -    link.ship(encodeControl(VERB.VOTE, { e: v.e, g: grant ? 1 : 0, ce: this.view.epoch, h, ve: this.votedFor.e }), node.env.sink, j)
 +    //! SCRATCH: a refusal while held carries `hm`, the views my holds are for, so the proposer re-offers joint over them
 +    link.ship(encodeControl(VERB.VOTE, { e: v.e, g: grant ? 1 : 0, ce: this.view.epoch, h, ve: this.votedFor.e, ...(!grant && hs.length ? { hm: hs.map((x) => x.h) } : {}) }), node.env.sink, j)
++    if (grant) this.#ask(node, 'change') // SCRATCH §10.10.6: a grant that holds me is announced at once, behind the VOTE on the proposer's link
 +  }
 +
 +  //! SCRATCH §10.10, the disown: the vote's proposer says it holds no ballot of that identity and no view at or
@@ -190,6 +208,7 @@
 +    hit.f = 1
 +    node.persistBoot()
 +    node.journal.armed && node.journal.emit(JK.release, v.e, link.uuid)
++    this.#ask(node, 'change') // SCRATCH §10.10.6: the release is announced at once (an empty ask when it was my last hold)
    }
  
 -  onVote(node: Node, link: Link, v: { e?: unknown; g?: unknown; ce?: unknown; h?: unknown; ve?: unknown }) {
@@ -197,7 +216,7 @@
      if (typeof v?.e !== 'number' || typeof v?.g !== 'number') return
      if (typeof v.ce === 'number') this.staleObserved(node, v.ce, link)
      //! a REFUSAL carrying the voter's spent epoch (ve) teaches the burn in one round: this voter's
-@@ -442,12 +522,17 @@
+@@ -442,12 +569,17 @@
      if (v.g !== 1 && typeof v.ve === 'number' && Number.isFinite(v.ve) && v.ve > this.#burned && v.ve > this.view.epoch)
        this.#burned = v.ve
      const p = this.#proposal
@@ -212,11 +231,11 @@
 -    if (majority(p.old, p.votes) && majority(p.view.members.map((m) => m[0]), p.votes)) {
 +    //! SCRATCH §10.10: AND a majority of every held view the ballot is joint over — a held view can be live only
 +    // while a majority of its members may hold it; once a majority of them consent to this ballot it cannot be
-+    if (majority(p.old, p.votes) && majority(p.view.members.map((m) => m[0]), p.votes) && [...p.joint].every((hh) => majority(hh.split(','), p.votes))) {
++    if (majority(p.old, p.votes) && majority(p.view.members.map((m) => m[0]), p.votes) && this.#jointOk(p)) {
        const view = p.view
        this.#proposal = null
        this.install(node, view)
-@@ -478,10 +563,20 @@
+@@ -478,10 +610,21 @@
        this.#finishLeave(node, true)
    }
  
@@ -226,19 +245,20 @@
      if (!node.client && this.view.epoch > v.e) // a spoke's view is hearsay — only a member answers a PULL
        link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
 +    //! SCRATCH §10.10: a held member's ask. Remember what it holds (my gate stops counting it; my next ballot is
-+    // joint over it). For each hold whose proposer I am: if I hold neither that ballot nor a view at or above it,
-+    // DISOWN it — the VIEW branch above already answered when I hold a view at or above it (e > the asker's view).
++    // joint over it) — an EMPTY list replaces what it held before: that is its release. For each hold whose proposer
++    // I am: if I hold neither that ballot nor a view at or above it, DISOWN it — the VIEW branch above already
++    // answered when I hold a view at or above it (e > the asker's view).
 +    if (!node.client && Array.isArray(v.vs)) {
 +      const holds = (v.vs as unknown[]).filter((x): x is { e: number; h: string; p: string } => typeof x === 'object' && x !== null && typeof (x as { e?: unknown }).e === 'number' && typeof (x as { h?: unknown }).h === 'string' && typeof (x as { p?: unknown }).p === 'string' && (x as { e: number }).e > (v.e as number))
 +      this.#heldPeers.set(link.uuid, { holds, tick: this.#tickNo })
 +      for (const x of holds)
-+        if (x.p === node.uuid && this.view.epoch < x.e && !(this.#proposal && this.#proposal.view.epoch === x.e && this.#proposal.h === x.h))
++        if (x.p === node.uuid && (V === 'noviewcheck' || this.view.epoch < x.e) && !(this.#proposal && this.#proposal.view.epoch === x.e && this.#proposal.h === x.h))
 +          link.ship(encodeControl(VERB.NACK, { e: x.e, h: x.h }), node.env.sink, node.journal)
 +    }
    }
  
    //! install — the ONE place a view becomes committed fact: bump the node epoch, clear satisfied stale/
-@@ -500,10 +595,11 @@
+@@ -500,10 +643,11 @@
      node.confirm.recount(node) // the view-change recount: thresholds are majorities OF THE COMMITTED VIEW
      if (this.epochStale && view.epoch >= this.#staleWant) { this.epochStale = false; this.#pullTicks = 0 }
      if (this.rejoining() && view.epoch >= this.rejoinFloor) this.rejoinFloor = 0
@@ -254,24 +274,23 @@
      for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u) }
      if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear() } // an evictee's grudges expire with its membership
      //! dial any member this node holds no link to (the joiner's side of a join, a healed evictee's peers),
-@@ -590,7 +686,7 @@
-     }
-     const shrunk = this.view.members.filter(([u]) => u !== node.uuid)
-     if (shrunk.length === 0) { this.#finishLeave(node, true); return } // the last member simply goes
--    if (this.#lowestLive() === node.uuid) {
-+    if (this.#lowestLive(node) === node.uuid) {
-       if (this.#proposal && this.#proposal.h !== hashOf(shrunk)) this.#proposal = null
-       if (!this.#proposal) this.#propose(node, { epoch: this.#nextEpoch(node), members: shrunk })
-       return
-@@ -667,6 +763,7 @@
+@@ -519,6 +663,7 @@
+     // same FIFO links — a peer still on the old epoch must receive the VIEW before the round, or it
+     // deterministically drops the round for epoch skew and the offer waits a full re-round cadence.
+     if (!node.client) this.#send(node, this.#admitted(node), encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members })) // a spoke never floods (I-23)
++    this.#ask(node, 'change') // SCRATCH §10.10.6: my holds were re-read against the new view — say so, behind the VIEW on every link
+     //! M6: every install re-derives the scope machine against the new ring — held partitions that
+     // left the R-set freeze into orphans HERE, the instant the duty changes (kernel/scope.ts)
+     if (node.armed) node.scope!.rescope(node)
+@@ -667,6 +812,7 @@
    }
  
    #propose(node: Node, view: View) {
-+    if (this.held(node)) return // SCRATCH §10.10: a held member leads nothing (its vote would be replaced by its own)
++    if (V === 'nolead' && this.held(node)) return // SCRATCH: the REJECTED first draft — a held member leads nothing (nobody leads when all are held)
      //! proposing SPENDS your vote — and a vote already spent on another proposer for this epoch cannot
      // be spent again here (the review's critical: double-voting via propose committed two views/epoch).
      // The refusal records the burn so the next attempt escalates past it instead of wedging forever.
-@@ -675,12 +772,15 @@
+@@ -675,12 +821,16 @@
        return
      }
      const h = hashOf(view.members)
@@ -279,18 +298,19 @@
 +    this.#remember({ e: view.epoch, p: node.uuid, h }) // SCRATCH: my own vote, the earlier ones above my view kept behind it
      node.persistBoot() // the self-vote is spent — durable before any PROPOSE frame leaves
 -    this.#proposal = { view, old: this.view.members.map((m) => m[0]), h, votes: new Set([node.uuid]), ticks: 0, age: 0 }
-+    //! SCRATCH §10.10: joint over every fresh hold a linked member told me of (their asks); refusals add more
-+    const joint = new Set<string>()
-+    for (const [u, p] of this.#heldPeers) if (this.#tickNo - p.tick <= 2 && node.byUuid.has(u)) for (const x of p.holds) if (x.e > this.view.epoch) joint.add(x.h)
++    //! SCRATCH §10.10.2: joint over every hold of MY OWN (a held member leads too; its holds stay behind its own vote
++    // in `prior`) and every hold a linked member told me of (their asks); refusals add more
++    const joint = new Set<string>(this.holds(node).map((x) => x.h))
++    for (const [u, p] of this.#heldPeers) if (this.#fresh(p) && node.byUuid.has(u)) for (const x of p.holds) if (x.e > this.view.epoch) joint.add(x.h)
 +    this.#proposal = { view, old: this.view.members.map((m) => m[0]), oldEpoch: this.view.epoch, h, votes: new Set([node.uuid]), ticks: 0, age: 0, joint }
      node.journal.armed && node.journal.emit(JK.propose, view.epoch, view.members.length)
      //! a solo proposal (single-member old and new sets) commits immediately — solo boot mode
 -    if (majority(this.#proposal.old, this.#proposal.votes) && majority(view.members.map((m) => m[0]), this.#proposal.votes)) {
-+    if (majority(this.#proposal.old, this.#proposal.votes) && majority(view.members.map((m) => m[0]), this.#proposal.votes) && [...joint].every((hh) => majority(hh.split(','), this.#proposal!.votes))) {
++    if (majority(this.#proposal.old, this.#proposal.votes) && majority(view.members.map((m) => m[0]), this.#proposal.votes) && this.#jointOk(this.#proposal)) {
        this.#proposal = null
        this.install(node, view)
        return
-@@ -690,12 +790,12 @@
+@@ -690,12 +840,12 @@
  
    #proposeFrame(node: Node): Uint8Array {
      const p = this.#proposal!
