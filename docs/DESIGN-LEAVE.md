@@ -908,9 +908,11 @@ corrected by H11 and H12 (R3 `recheck3` finding #3).
 
 1. The rule to keep is the sweep's split check, not "one view per epoch": at no quiet point are
    two nodes writable in different views, at any epochs (§10.1).
-2. Today's kernel keeps it for every ballot that changes ONE member, by arithmetic: the new view's
-   writable majority and a stale majority of the old view must share a voter, and that voter is
-   linked to the proposer and learns the view (§10.2).
+2. Today's kernel keeps it for every ballot over the CURRENT view that changes one member, by
+   arithmetic: the new view's writable majority and a stale majority of the old view must share a
+   voter, and that voter is linked to the proposer and learns the view. A ballot over an OLDER view
+   is not covered even when it changes one member of that view: the kept ballot (line 3) does, and
+   splits (§10.2).
 3. Today's kernel BREAKS it, and the argument has found THREE splits in it. Two are the one ballot
    that changes two members at once: the eviction of two suspects at n=5 (two or three at n=7,
    three at n=8; n=6 has no such shape, §10.2). A voter cut or crashed right after its grant keeps
@@ -1199,10 +1201,10 @@ as the three-part one does. The class covers a flap and a proposer crash, the tw
 failures a ballot can meet, not only cuts inside one round trip. And the one release the second
 draft named — the vote's proposer, linked, reporting a committed epoch below the vote — can never
 fire in the proposer-crash case: there is no proposer. The committed variant adds one more fact: the
-base's re-form there is SAFE, because the dead proposer's ballot changed ONE member and (a)'s count
-protects a one-member change. That suggests the hold may need to bind only for ballots that change
-two or more members, the ones the count does not protect — a design question for §10.9 step 2, not
-a rule argued here.
+base's re-form there is SAFE, because the dead proposer's ballot changed ONE member of the view
+every voter held, and (a)'s count protects that. That suggests the hold may need to bind only for
+ballots that change two or more members, the ones the count does not protect — a design question
+for §10.9 step 2, not a rule argued here, and one with a catch, below.
 
 That class is the open question of the rule, and the page for step 2 must answer it before the rule
 is built: **a vote above my view, for a ballot that did not commit, with nothing coming to supersede
@@ -1218,9 +1220,14 @@ a proof — but it fails (1), and the proposer may still be collecting the ballo
 §10.1 window again); a hold that ages out at the voter after the ballot itself would have
 (`PROPOSAL_AGE`, `:114`, `:264-267`, is the proposer's bound — but the proposer may commit on its
 last tick with the VIEW still in flight); a hold that binds only to ballots that change two or more
-members (every one-member change is safe by (a)'s count, so the freeze would narrow to the
-multi-evict case and the kept ballot and leave the flap, the crash, H8 and H12 untouched — but it is
-a per-ballot fact the voter must learn from the PROPOSE, a wire change of (β)'s class). Until a
+members — which must say which view the change is counted AGAINST, because the two answers differ.
+Against the proposer's base (its old set, `:601`): a one-member change over the CURRENT view is safe
+by (a)'s count, so the freeze would narrow to the multi-evict case and leave the flap, the crash, H8
+and H12 untouched; but the kept ballot is a one-member change against ITS base (view 1 to
+`{aa,cc,dd}`) and splits, so this hold does NOT catch it — and the base is a per-ballot fact the
+voter must learn from the PROPOSE, a wire change of (β)'s class. Against the voter's own view: the
+kept ballot is caught (cc and dd hold view 2, two members apart from `{aa,cc,dd}`) and no wire
+change is needed. Which to count against is the step-2 page's choice. Until a
 release exists, the rule trades the base's three splits for a read-only member in the four crash
 cases, the 36 isolate cases, the far side of every cut inside one round trip — and a whole cluster
 frozen by one flap or one crashed proposer. (b) and the kept ballot are closed by the rule only with
