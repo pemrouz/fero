@@ -37,7 +37,7 @@ import { spawn } from './spawn.ts'
 import type { Change, Fero, FeroOpts, Guarantee, Methods, WriteOpts, WriteReject, WriteResolve } from './types.ts'
 
 //! the declared config schema: PICKED keys, everything else is a loud error (plan §9)
-const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'journal', 'replicas', 'data', 'methods', 'validation', 'seams', 'rendezvous', 'diag', 'secret', 'signals'])
+const CONFIG_KEYS = new Set(['uuid', 'server', 'listen', 'hosts', 'dir', 'heartbeat', 'redial', 'leave', 'journal', 'replicas', 'data', 'methods', 'validation', 'seams', 'rendezvous', 'diag', 'secret', 'signals'])
 const SEAM_KEYS = new Set(['validation'])
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -322,7 +322,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       throw new Error(`fero('${name}'): ${key} must be ${what}${at(key)}`)
     return v
   }
-  const group = (k: 'heartbeat' | 'redial' | 'journal'): Record<string, unknown> => {
+  const group = (k: 'heartbeat' | 'redial' | 'leave' | 'journal'): Record<string, unknown> => {
     const g = config[k]
     if (g === undefined) return {}
     if (typeof g !== 'object' || g === null || Array.isArray(g)) throw new Error(`fero('${name}'): ${k} is a group — ${k}: { ${k === 'journal' ? 'cap' : 'ms'}: … }${at(k)}`)
@@ -331,6 +331,12 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const heartbeatMs = num('heartbeat.ms', group('heartbeat').ms, 0, false, 'a finite number of milliseconds ≥ 0 (0 = heartbeats off)')
   const redialMs = num('redial.ms', group('redial').ms, 0, false, 'a finite number of milliseconds ≥ 0')
   const redialTries = num('redial.tries', group('redial').tries, 0, true, 'an integer ≥ 0')
+  //! leave.ms — the knock window (DESIGN-LEAVE §10.7): how long a clean stop keeps asking a connected member to vote
+  // it out. The kernel counts heartbeat ticks (the tune row leaveWindow), so the composer divides by the effective
+  // cadence and rounds up; the kernel never lets the row cut the four-tick bound short, so 0 (or anything under
+  // four heartbeats) is "the bound alone". With heartbeats off there is no clock and the row stays at its default.
+  const leaveMs = num('leave.ms', group('leave').ms, 0, false, 'a finite number of milliseconds ≥ 0 (0 = the four-heartbeat bound alone)')
+  const leaveWindow = leaveMs !== undefined && (heartbeatMs ?? 500) > 0 ? Math.max(1, Math.ceil(leaveMs / (heartbeatMs ?? 500))) : undefined
   const journalCap = num('journal.cap', group('journal').cap, 1, true, 'an integer ≥ 1')
   //! the rendezvous (V4-3): the per-box directory this instance meets at — precedence: `rendezvous:`
   // config > FERO_RENDEZVOUS (an address, or 'off') > the constant; false = no directory. A system
@@ -452,9 +458,12 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     heartbeatMs: heartbeatMs ?? 500,
     redialMs,
     journalCap,
-    //! the tune table (kernel/tune.ts): redial.tries is the one row with a config key — the generic chain;
-    // the member chain (memberRedials) keeps its own default and never exceeds it (the kernel caps it)
-    ...(redialTries !== undefined ? { tune: { redials: redialTries } } : {}),
+    //! the tune table (kernel/tune.ts): two rows have a config key — redial.tries → redials (the generic chain;
+    // the member chain, memberRedials, keeps its own default and never exceeds it: the kernel caps it) and
+    // leave.ms → leaveWindow (the knock window, in ticks). Absent keys leave the row at its default.
+    ...(redialTries !== undefined || leaveWindow !== undefined
+      ? { tune: { ...(redialTries !== undefined ? { redials: redialTries } : {}), ...(leaveWindow !== undefined ? { leaveWindow } : {}) } }
+      : {}),
     ...(config.replicas !== undefined ? { replicas: config.replicas as number } : {}),
     //! the contract and the methods-only hint ride HELLO (DESIGN-DOOR §4) — servers only; absent keys keep
     // every other node's HELLO byte-identical with v4.0
@@ -1085,7 +1094,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // the hosted methods and the data seed as their names (rows are data, not config)
     config: () => {
       const out: Record<string, { value: unknown; from: string }> = {}
-      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'redial.tries': redialTries ?? TUNE.redials, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
+      //! leave.ms's effective default is the tune row in milliseconds at this node's cadence (16 heartbeats: 8000 at 500)
+      const effective: Record<string, unknown> = { 'heartbeat.ms': rtOpts.heartbeatMs, 'redial.ms': redialMs ?? 100, 'redial.tries': redialTries ?? TUNE.redials, 'leave.ms': leaveMs ?? TUNE.leaveWindow * rtOpts.heartbeatMs!, 'journal.cap': journalCap ?? 4096, listen: listen ?? config.listen, rendezvous }
       for (const k of CONFIG_LEAVES) {
         const v = k.split('.').reduce<unknown>((o, p) => (o !== null && typeof o === 'object' ? (o as Record<string, unknown>)[p] : undefined), config)
         //! secret is a leaf and a group (§15): with only the client key set, `secret` itself is unset

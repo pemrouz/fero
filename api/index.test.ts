@@ -167,6 +167,20 @@ test('redial.tries reaches the kernel: a client dialing a dead port gives up aft
   await assert.rejects(fero('r', { redial: { tries: -1 } } as never), /redial\.tries must be an integer ≥ 0/)
 })
 
+test('leave.ms (the knock window, DESIGN-LEAVE §10.7) is read in milliseconds and shown with its source; its default is 16 heartbeats at this node\'s cadence; a bad value is refused naming the key', async () => {
+  //! the tune table's second config key (kernel/tune.ts row `leaveWindow`, in heartbeat ticks): the composer divides
+  // by the effective cadence and rounds up. The door shows the value the operator set, or the effective default.
+  const f = await fero(`knock-${process.pid}`, { listen: false, heartbeat: { ms: 100 }, leave: { ms: 1250 } })
+  try { assert.deepEqual(diag(f)!.config()['leave.ms'], { value: 1250, from: 'the call' }) } finally { await f.destroy() }
+  const d = await fero(`knock-d-${process.pid}`, { listen: false })
+  try { assert.deepEqual(diag(d)!.config()['leave.ms'], { value: 8000, from: 'the default' }, '16 heartbeats × 500 ms') } finally { await d.destroy() }
+  const q = await fero(`knock-q-${process.pid}`, { listen: false, heartbeat: { ms: 100 } })
+  try { assert.deepEqual(diag(q)!.config()['leave.ms'], { value: 1600, from: 'the default' }, '16 heartbeats × 100 ms') } finally { await q.destroy() }
+  await assert.rejects(fero('r', { leave: { ms: -1 } } as never), /leave\.ms must be a finite number of milliseconds ≥ 0/)
+  await assert.rejects(fero('r', { leave: { ms: 'soon' } } as never), /leave\.ms must be a finite number of milliseconds ≥ 0/)
+  await assert.rejects(fero('r', { leave: 5 } as never), /'leave' from the call is a group, not a value/)
+})
+
 test('solo: assignment and methods.update are ONE ingest — both commit, both visible, coordinates resolve', async () => {
   const f = await fero('inventory', { uuid: 'aa', listen: false })
   assert.equal(f.name, 'inventory')
