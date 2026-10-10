@@ -157,6 +157,47 @@ spoke's write waits for a value that reaches it only if its next
 feeder holds the partition. That is the one residual of the `acked`
 effect.
 
+**Note, 2026-10-10 (stage 1 complete: the drain, part (b)).** The owner
+said yes to Q8 (DECISIONS V4-31), and the drain-then-go is in the tree.
+What "drained" means, in the kernel's terms: the shed bar. Once the view
+without the leaver has committed and echoed, every partition it held is
+an orphan (the install's rescope froze it, kernel/scope.ts) and the new
+holders acquire from it as from any orphan. A partition is drained when
+every REACHABLE current holder (an admitted, live link) has attested, in
+a HAVEA ok or a HAVEQ announcement, floors at or above the orphan's frozen
+content tails on every lane — `evaluateSheds`' quantifier narrowed to the
+holders that can still answer (`Scope.undrained`); when every holder
+covers, the entry sheds and leaves the count by construction, so the
+journal reads orphaned → teachShip → shed → left. The acquirer's ACQDONE
+alone is not proof: its attestation comes after its fold (durable: after
+its snapshot echo, `sealed`), on the leaver's next shed poll. The hold:
+`Membership.#finishLeave` no longer ends a scoped leave at the exit
+proof; it asks `#exit`, which holds `left` (`leaving.drain` counts
+ticks) while something is waiting and the heartbeat clock is on, and
+goes at once otherwise. The bound is the new tune row `drainTicks` (16;
+not a config key). Past it, or when nobody can be drained to (every
+holder of some partition unreachable; the solo view, reached through
+`leave()`'s "nothing to leave" branch), the leaver goes at once with a
+new journal row `undrained` (a = partitions) and `left` b=0; the api
+folds it into `cluster.me.undrained`, the shell's destroy cap adds
+`drainTicks` on a scoped node, and `destroy()` resolves the verdict
+(`Promise<boolean>`). One reading of §6 I13 changed: it said "or no
+reachable member is a current holder" counts as `left(true)`; the §7
+row and Q8 say nobody-to-drain-to is `left(false)` with `undrained`
+counted, and that is what landed — a stop that could not copy its rows
+is not reported clean. Heartbeats off: no drain clock (the shed poll
+never runs either), so the leaver decides at once from the evidence. A
+leaver cut off while draining is already out of the view: the survivors
+never suspect or evict it (suspicion ranges over view members), so V4-20
+cannot race the drain; the leaver goes at the bound, or at once once
+every holder is unreachable. Two leavers at once: the first drains to
+the second (a live holder, leaving or not), which drains on. M9 flipped
+from red-today to green in the scoped sweep (a leave-drain violation is
+now unsafe) and in sim/scale-probes.test.ts (3→2→1 at R=1, two leavers,
+the cut-off leaver). The unscoped leave is byte-identical (no scope ⇒
+`#exit` is never asked): the golden, the 300-seed sweep, 59,500 and
+104,050 stand. Scoped trajectories with leaves moved (A6's leave leg, A7).
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
