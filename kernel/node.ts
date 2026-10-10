@@ -821,8 +821,13 @@ export class Node {
         // digest exchange so the loss heals within two round-trips instead of lingering until the next admit
         if (link.droppedWhilePaused && link.state === LS.admitted) {
           link.droppedWhilePaused = false
-          this.#sendDigest(link, 1)
+          this.#sendDigest(link, 1) // armed, toward a member: it re-syncs the link and ships nothing — the round below repairs
         }
+        //! the DRAIN ROUND (DESIGN-SCALE stage 2, §3 trigger 2): every announcement skipped this link while it was
+        // paused (kernel/scope.ts #link), so the one scoped round to this peer, for the partitions the two share,
+        // is what catches it up — whether or not its queue dropped (a deviation from the row's "whose queue
+        // dropped", with that reason). The peer that finds itself behind latches us; a lost record re-ships once.
+        if (this.armed && !link.client && link.state === LS.admitted) this.scope!.round(this, new Set([link]))
         return
       }
       case 'timer': {
@@ -856,7 +861,11 @@ export class Node {
               // One r=1 digest from the PING side covers both directions: the reply ships our gaps, and
               // receiving their digest ships theirs. Nothing missing ⇒ nothing shipped (idempotent).
               // A client floors only its PRIMARY (the single-feeder rule — see the DIGEST handler).
-              if (!this.client || link.id === this.primary) this.#sendDigest(link, 1)
+              //! On a SCOPED cluster the member floor does not run (DESIGN-SCALE stage 2, §3; the owner's yes,
+              // §14 Q1): a member learns history only through the one-teacher latch, and the holder handshake
+              // — announce on change, the admit and drain rounds, the aeFan sweep (kernel/scope.ts tick) — is
+              // what re-proves every pair. The digest to a CLIENT link is unchanged: a spoke floors on it.
+              if ((!this.client || link.id === this.primary) && !(this.armed && !link.client)) this.#sendDigest(link, 1)
             }
           //! membership acts on the heartbeat clock too (explicit protocol mode): genesis, suspicion,
           // eviction/join ballots, stale pulls, rejoin nudges — all only when heartbeats are on.
@@ -1756,32 +1765,31 @@ export class Node {
         //! ship every suffix the peer's digest shows missing: for each origin I hold, everything past their
         // high-water. encodeRuns splits Lamport gaps into valid contiguous frames (attempt identity rides
         // along, so a healed peer rebuilds its cid-dedup window too); ship() honours backpressure.
-        //! M6 (armed): the answer ships only partitions the REQUESTER may fold — a member link gets
-        // its R-set's subset (ring-derived; slice 3b tightens to possession-announced), a client link
-        // gets this node's HELD subset (an orphan's frozen copy is a teacher for holders, never a
-        // spoke feed). Skipped entries gate-drop at the receiver anyway (§0 law row 1) — the filter
-        // keeps the wire honest and the promiscuous-stage hole (3b) closed at the never-sent leg.
-        const scopedTo = this.armed
-          ? (p: string) => link.client ? this.scope!.held(p) : this.writes.ring.holdsAny(link.uuid, p, this.replicas)
-          : null
-        if (scopedTo !== null && this.writes.ring.epoch !== this.epoch)
-          this.writes.ring.build(this.epoch, this.membership.view.members)
+        //! M6 (armed): a MEMBER link gets NOTHING (DESIGN-SCALE stage 2, §3): on a scoped cluster a member
+        // receives history only through the one-teacher latch with its attested cut — the digest here only
+        // syncs the link (an admit, a drain), and the round that follows it is the repair. A suffix shipped
+        // from a ring-filtered walk was the second teacher the H3 resurrection needs once compaction runs
+        // (stage 3 requires this). A CLIENT link is unchanged: it gets this node's HELD subset (an orphan's
+        // frozen copy is a teacher for holders, never a spoke feed), with each entry's STORED pp.
         let shipped = 0
-        for (const [origin, entries] of this.logs) {
-          const theirs = typeof v.d[origin] === 'number' ? (v.d[origin] as number) : 0
-          let lo = entries.length
-          while (lo > 0 && entries[lo - 1].seq > theirs) lo-- // entries are seq-ascending; find the missing suffix
-          if (lo === entries.length) continue
-          let tail = entries.slice(lo)
-          if (scopedTo !== null) tail = tail.filter((e) => scopedTo(partitionOf(e.rec)))
-          if (!tail.length) continue
-          //! armed AE answers carry each entry's STORED pp (the floor law): the receiver's floors
-          // advance only through chain-verified spans, so a suffix landing above a gap folds without
-          // forging coverage of the still-missing interior (finding 10's AE leg / the multi-source
-          // interleave). Unscoped answers stay flag-free — bytes unchanged.
-          const missing = tail.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp }))
-          for (const bytes of encodeRuns(missing, undefined, this.armed)) link.ship(bytes, this.env.sink, j)
-          shipped += missing.length
+        if (!this.armed || link.client) {
+          const scopedTo = this.armed ? (p: string) => this.scope!.held(p) : null
+          for (const [origin, entries] of this.logs) {
+            const theirs = typeof v.d[origin] === 'number' ? (v.d[origin] as number) : 0
+            let lo = entries.length
+            while (lo > 0 && entries[lo - 1].seq > theirs) lo-- // entries are seq-ascending; find the missing suffix
+            if (lo === entries.length) continue
+            let tail = entries.slice(lo)
+            if (scopedTo !== null) tail = tail.filter((e) => scopedTo(partitionOf(e.rec)))
+            if (!tail.length) continue
+            //! armed AE answers carry each entry's STORED pp (the floor law): the receiver's floors
+            // advance only through chain-verified spans, so a suffix landing above a gap folds without
+            // forging coverage of the still-missing interior (finding 10's AE leg / the multi-source
+            // interleave). Unscoped answers stay flag-free — bytes unchanged.
+            const missing = tail.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp }))
+            for (const bytes of encodeRuns(missing, undefined, this.armed)) link.ship(bytes, this.env.sink, j)
+            shipped += missing.length
+          }
         }
         if (shipped) j.armed && j.emit(JK.aeShip, link.uuid, shipped)
         //! the peer's digest is what SYNCS the link: the suffix just shipped covers everything up to this
