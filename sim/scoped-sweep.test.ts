@@ -3,12 +3,19 @@
 // writes, removes, re-writes of removed cells; compactAt and snapshotAt at 16) with M1-M10 armed, and the mutation
 // runner's pinned catches.
 //
-// Lawful runs, per seed: no monitor fires and M1's horizon form agrees (SAFE); holders converge, exactly-R holds and
-// the holders' floors agree at the horizon (LIVE); M8 is red (RED TODAY by design: logs are unbounded under
+// Lawful runs, per seed: no monitor fires and M1's horizon form agrees (SAFE); holders converge, exactly-R holds,
+// the holders' floors agree at the horizon and every holder's marks of each co-holder equal that co-holder's floors
+// (M7's two forms: floors-agree and marks-agree — LIVE); M8 is red (RED TODAY by design: logs are unbounded under
 // scoping). M9 (leave drain) was red at R=1 until the drain landed (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): a
 // clean leaver now hands what it held to the new holders before it goes, so a leave-drain violation is UNSAFE
 // like any other; A7 always runs its seed 4 (n=2 R=1), the one shape at the battery's seed count where that check
 // can bite. Per family, an engagement count proves the chaos bit.
+//
+// Stage-2 mutations (announce-on-change, 2026-10-10): the sweep switched off and the dirty site dropped must each be
+// caught (DESIGN-SCALE §6, §7's stage-2 gate). M7's floor form cannot catch either — the sim loses no frame on a
+// live link, and every loss it can make is healed by a round of its own — so the catch is M7's KNOWLEDGE form
+// (sim/monitors.ts marksAgree), pinned below on A8 (the §6 family for lost announcements): seed 3 (R=3) for the
+// sweep, seed 1 (R=2) for the dirty site, with the sweep-off run on seed 1 as the control that is green.
 //
 // Mutations: today's kernel never releases an armed tombstone, so M3 and M6 check nothing in a lawful run. The
 // mutation runner performs the releases a broken rule would (sim/scoped-sweep.ts inject), and the pinned schedules
@@ -70,8 +77,11 @@ const KNOWN_UNSAFE: Record<string, Record<number, RegExp>> = {
 }
 
 //! RESYNC_SEEDS — A11's four seeds of 1-12 whose failover lands on a feeder behind the spoke (the ones that were
-// pinned unsafe above). They run in every battery on top of SEEDS, like the pinned seeds, so the stale-reply fix is
-// exercised and M10/M11 see a resync end on every run (the non-vacuity row below).
+// pinned unsafe above). They run in every battery on top of SEEDS, like the pinned seeds, so that on a scoped
+// cluster a failover resync runs on every battery and M10/M11 see a resync end on every run (the non-vacuity row
+// below). What they pin as a sweep is the two spoke fixes TOGETHER (the q end rule and the scoped-failover resync:
+// reversing either alone leaves these seeds green, reversing both turns them red — the review of 2026-10-10); each
+// fix alone is pinned in kernel/client.test.ts.
 const RESYNC_SEEDS: Record<string, number[]> = { 'A11-spoke': [2, 5, 6, 10] }
 
 //! ALWAYS — shapes a family must reach in every battery, whatever SEEDS is, because a pin below is vacuous without
@@ -100,7 +110,7 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
 for (const fam of FAMILIES) {
   test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
-    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0
+    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
     const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
@@ -118,6 +128,7 @@ for (const fam of FAMILIES) {
       assert.ok(!o.red.has('leave-drain'), `${o.shape}: M9 red — a clean leaver took the only copy of a row with it (the drain, DESIGN-SCALE stage 1 (b), should have held it)`)
       if (ENGAGED[fam.name](o.eng)) engaged++
       cells += o.eng.cells; advances += o.eng.advances; resyncs += o.eng.resyncs; resyncRows += o.eng.resyncRows
+      floorLanes += o.eng.floorLanes; markPairs += o.eng.markPairs; if (o.R >= 2) rge2++
     }
     assert.deepEqual(unsafe, [], 'UNSAFE: a monitor fired or M1\'s horizon form disagrees')
     assert.deepEqual(newlySafe, [], 'a schedule pinned unsafe is safe now: take it off KNOWN_UNSAFE, with the why')
@@ -128,8 +139,43 @@ for (const fam of FAMILIES) {
       assert.ok(resyncRows > 0, `non-vacuity: M11 checked ${resyncRows} rows the spoke held at a reset against its feeder`)
     }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
+    //! M7 compares nothing on an R=1 seed (one holder per partition): the row bites only where some seed drew R ≥ 2
+    if (rge2 > 0) assert.ok(floorLanes > 0 && markPairs > 0, `${fam.name}: non-vacuity — M7 compared ${floorLanes} (partition, lane) floors and ${markPairs} (holder, co-holder, partition) marks over ${rge2} seed(s) at R ≥ 2`)
   })
 }
+
+//! the stage-2 mutations (DESIGN-SCALE §6 "a dropped dirty site (M7)"; the §7 stage-2 gate "harness green with the
+// stage-2 mutations caught"). The review of 2026-10-10 found the harness green with the dirty mark dropped AND with the
+// sweep off: M7's floor form heals through the re-admit, drain and install rounds. M7's knowledge form (marks-agree)
+// is the catch. A8 is §6's family for this ("lost dirty announcements; the sweep must heal"); the two seeds are the
+// family's R=3 and R=2 shapes (seed 3: n=5 R=3; seed 1: n=3 R=2). Red lines kept from the first run: seed 3 no-sweep
+// "n02 knows n90's floor for 'p9' lane n01 as 4; n90 is at 30 — never heard"; seed 1 drop-dirty "n01 knows n02's
+// floor for 'p319' lane n01 as 7; n02 is at 27 — never heard"; seed 1 no-sweep green (100 pairs compared).
+test('stage-2 mutations: the sweep switched off is caught by M7\'s knowledge form on an R=3 shape (a co-holder pair has no owner to announce for it); the dirty site dropped is caught on an R=2 shape with the sweep off, where the sweep-off control alone is green — and neither is a safety hole', () => {
+  const a8 = familyByName('A8-coholder-cut')
+  const onlyM7 = (o: ReturnType<typeof runFamily>, what: string) => {
+    assert.equal(o.eng.mutated, 1, `${o.shape}: the mutation engaged`)
+    assert.deepEqual(o.unsafe, [], `${o.shape}: ${what} is a liveness hole, never a safety one`)
+    assert.ok(o.red.has('marks-agree'), `${o.shape}: caught by marks-agree (red: ${[...o.red].join(',') || 'nothing'})`)
+    assert.ok(o.notLive.length > 0 && o.notLive.every((s) => s.startsWith('M7 knowledge: ')), `${o.shape}: the only liveness red is stale knowledge — floors still agree, holders converge, exactly-R holds (${o.notLive.join(' | ')})`)
+    assert.match(o.notLive[0], /knows .*'s floor for '.*' lane .* as \d+; .* is at \d+ — never heard/)
+  }
+  //! the sweep: seed 3 (R=3) green as is, red with aeFan 0
+  const clean3 = runFamily(a8, 3)
+  assert.equal(clean3.R, 3)
+  assert.deepEqual([clean3.unsafe, clean3.notLive], [[], []], 'seed 3 is green as is')
+  onlyM7(runFamily(a8, 3, 'no-sweep'), 'the sweep off')
+  //! the dirty site: seed 1 (R=2) green as is, green with the sweep off alone (the control: every pair has its owner,
+  // whose announcement converges it), red with the dirty mark dropped too
+  const clean1 = runFamily(a8, 1)
+  assert.equal(clean1.R, 2)
+  assert.deepEqual([clean1.unsafe, clean1.notLive], [[], []], 'seed 1 is green as is')
+  const ctrl = runFamily(a8, 1, 'no-sweep')
+  assert.equal(ctrl.eng.mutated, 1)
+  assert.deepEqual([ctrl.unsafe, ctrl.notLive], [[], []], 'the control: at R=2 the owner\'s announcement alone keeps every pair\'s knowledge current')
+  assert.ok(ctrl.eng.markPairs > 0, `the control compared ${ctrl.eng.markPairs} pairs`)
+  onlyM7(runFamily(a8, 1, 'drop-dirty'), 'the dirty site dropped')
+})
 
 //! the screen check (the review of the parked stale-reply fix, 2026-10-10) is part of runFamily's verdict, not only a
 // function the probes call by hand: a row on a spoke's screen that its kernel does not hold makes the seed UNSAFE. The

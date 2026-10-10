@@ -9,6 +9,7 @@
 
 import { Node, stable, newer } from '../kernel/node.ts'
 import { SCOPE } from '../kernel/scope.ts'
+import { LS } from '../kernel/link.ts'
 import { partitionOf, REC } from '../kernel/env.ts'
 import { foldInto, type Folded } from './fold.ts'
 import type { Sim } from './exec.ts'
@@ -547,6 +548,10 @@ export const drained = (sim: Sim): string | null => {
 //                      releases through Ledger.classify, so each stands alone when the other is off.
 //   M7 floors-agree    (horizon, armed)         at a quiet point every partition's holders report equal
 //                      floors on every lane (I6's horizon form; the cadence bound is the sweep's tail).
+//      marks-agree     (horizon, armed)         M7's KNOWLEDGE form (stage 2's review): every holder's marks
+//                      of each co-holder equal that co-holder's floors — h HEARD x. The floor form cannot see
+//                      the owner's announcement or the sweep in the sim (every loss the sim can make is healed
+//                      by a round of its own); this form can, and the stage-2 mutations are pinned on it.
 //   M8 bounded-logs    (horizon, armed)         every lane holds at most winners + compactAt entries and
 //                      every tombstone is fenced or pinned by a named uuid. RED TODAY by design (logs are
 //                      unbounded under scoping; no gcWaitingOn surface exists): the sweep pins the count.
@@ -1169,7 +1174,9 @@ export const stampOracle = (sim: Sim): string | null => {
 }
 
 //! floorsAgree — M7's horizon form: at a quiet point every partition's holders report equal floors on every lane.
-export const floorsAgree = (sim: Sim): string | null => {
+// `counts.lanes` reports how many (partition, lane) floors it compared across ≥ 2 holders — the non-vacuity row (an
+// R=1 run compares nothing, lawfully).
+export const floorsAgree = (sim: Sim, counts?: { lanes: number }): string | null => {
   const nodes = [...sim.nodes.entries()].filter(([, n]) => n.scope && n.armed)
   if (nodes.length < 2) return null
   const epochs = new Set(nodes.map(([, n]) => n.epoch))
@@ -1185,8 +1192,69 @@ export const floorsAgree = (sim: Sim): string | null => {
     const lanes = new Set<string>()
     for (const [, h] of holders) for (const [o, d] of h.streams) if ((d.parts?.get(p)?.s ?? 0) > 0) lanes.add(o)
     for (const o of lanes) {
+      if (counts) counts.lanes++
       const fl = holders.map(([id, h]) => `${id}=${h.streams.get(o)?.parts?.get(p)?.s ?? 0}`)
       if (new Set(fl.map((x) => x.split('=')[1])).size > 1) return `holders of '${p}' disagree on the floor for lane ${o}: ${fl.join(' ')}`
+    }
+  }
+  return null
+}
+
+//! marksAgree — M7's KNOWLEDGE form (I6's "h hears x's floor"; DESIGN-SCALE stage 2, the review of 2026-10-10): at a
+// quiet point every holder's MARKS of each co-holder equal that co-holder's floors for the partition, lane by lane
+// (and its durable marks the co-holder's durable floors, when the co-holder is durable). Why a second form: the floor
+// form above cannot see either of stage 2's repair legs in the sim. A live sim link loses no frame, and every loss
+// the sim can make (a cut, a pause, an install) is followed by a round of its own (the re-admit, drain or install
+// round), so floors agree at the horizon whether or not the owner announces what it stamped and whether or not the
+// sweep runs. Knowledge can see them: with the sweep off, a co-holder↔co-holder pair of an R=3 partition (neither is
+// the owner, so neither announces for it) never hears the other's floor again after a write; and with the owner's
+// dirty mark dropped too, an owner↔co-holder pair does not either. The stage-2 mutations in sim/scoped-sweep.ts
+// (`no-sweep`, `drop-dirty`) pin both reds; the clean sweep must stay green here on every family and seed. Stale
+// knowledge is a repair-liveness hole, not a safety one (I6: compaction and GC wait on marks — the safe direction),
+// so a red here is `notLive`. Skipped, by design: a pair with no admitted, flowing link between them; a durable
+// entry still waiting for its seal (it attests nothing yet, by the attestation gate); a lane the co-holder has no
+// floor for. `counts.pairs` reports the (holder, co-holder, partition) triples compared — the non-vacuity row.
+export const marksAgree = (sim: Sim, counts?: { pairs: number }): string | null => {
+  const nodes = [...sim.nodes.entries()].filter(([, n]) => n.scope && n.armed)
+  if (nodes.length < 2) return null
+  const epochs = new Set(nodes.map(([, n]) => n.epoch))
+  if (epochs.size > 1) return `marksAgree: armed nodes disagree on the epoch (${[...epochs].join(',')}) — not quiescent`
+  const [, first] = nodes[0]
+  const ring = first.writes.ring
+  if (ring.epoch !== first.epoch) ring.build(first.epoch, first.membership.view.members)
+  const parts = new Set<string>()
+  for (const [, n] of nodes) for (const [p, e] of n.scope!.entries) if (e.state === SCOPE.held) parts.add(p)
+  const flowing = (h: Node, x: Node): boolean => {
+    const id = h.byUuid.get(x.uuid)
+    const l = id === undefined ? undefined : h.links.get(id)
+    return l !== undefined && l.state === LS.admitted && !l.dead && !l.paused
+  }
+  for (const p of parts) {
+    const holders = nodes.filter(([, n]) => n.scope!.held(p) && ring.holdsAny(n.uuid, p, n.replicas))
+    if (holders.length < 2) continue
+    for (const [hid, h] of holders) {
+      const e = h.scope!.entries.get(p)!
+      for (const [xid, x] of holders) {
+        if (x === h || !flowing(h, x)) continue
+        const xe = x.scope!.entries.get(p)!
+        if (x.durable && xe.sealed === false) continue // x attests nothing of p yet: nothing to have heard
+        const per = e.marks.get(x.uuid), perD = e.marksD.get(x.uuid)
+        let compared = false
+        for (const [o, d] of x.streams) {
+          const s = d.parts?.get(p)?.s ?? 0
+          if (s === 0) continue
+          compared = true
+          const m = per?.get(o) ?? 0
+          if (m < s) return `M7 knowledge: ${hid} knows ${xid}'s floor for '${p}' lane ${o} as ${m}; ${xid} is at ${s} — never heard (no announcement reached ${hid}, and no sweep re-proved the pair)`
+          if (m > s) return `M7 knowledge: ${hid} holds a mark of ${xid} for '${p}' lane ${o} at ${m} ABOVE ${xid}'s floor ${s} — an attestation ${xid} does not stand behind`
+          if (x.durable) {
+            const pd = d.parts?.get(p)?.d ?? 0
+            const md = perD?.get(o) ?? 0
+            if (pd > 0 && md < pd) return `M7 knowledge: ${hid} knows ${xid}'s DURABLE floor for '${p}' lane ${o} as ${md}; ${xid} is at ${pd} — the echo never reached ${hid}`
+          }
+        }
+        if (compared && counts) counts.pairs++
+      }
     }
   }
   return null

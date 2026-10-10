@@ -20,7 +20,7 @@
 // stage 1 (b), 2026-10-10): a leave-drain violation is now UNSAFE like any other.
 
 import { Sim } from './exec.ts'
-import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, boundedLogs, screenMatches } from './monitors.ts'
+import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLogs, screenMatches } from './monitors.ts'
 import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
@@ -128,8 +128,19 @@ const post = (sim: Sim, xs: Planned[], t0: number) => { for (const w of xs) sim.
 //                   shape) and a straggler may still hold an older record (the zombie shape).
 //   version-only  — G1: the stamp is released at every holder, every lane untouched. Red only where an older
 //                   record still arrives (a straggler, a stranded lane): the dedup fence hides it otherwise.
-export type Mutation = 'none' | 'drop-one' | 'release-all' | 'version-only'
+//! The STAGE-2 mutations (DESIGN-SCALE §6 "a dropped dirty site (M7)", §7's stage-2 gate; the review of 2026-10-10):
+// each switches off one of the two repair legs announce-on-change added, and M7's knowledge form (marks-agree) must
+// go red — its floor form cannot, since every loss the sim can make is healed by a round of its own.
+//   no-sweep      — the sweep off (the tune row aeFan 0) with the owner's announcement intact. Red on an R=3 shape:
+//                   a co-holder↔co-holder pair (neither the owner) is re-proved by the sweep alone, so after a write
+//                   neither ever hears the other's floor again. Green on an R=2 shape (every pair has its owner).
+//   drop-dirty    — the stamp site's dirty mark dropped (a per-event monitor empties every stepped armed node's
+//                   dirty set, so the tick finds nothing to announce), measured with the sweep off so the sweep
+//                   cannot heal what the dirty leg should have. Red on an R=2 shape where `no-sweep` alone is green:
+//                   that difference is the dirty leg.
+export type Mutation = 'none' | 'drop-one' | 'release-all' | 'version-only' | 'no-sweep' | 'drop-dirty'
 export const MUTATIONS: readonly Mutation[] = ['drop-one', 'release-all', 'version-only']
+export const STAGE2_MUTATIONS: readonly Mutation[] = ['no-sweep', 'drop-dirty']
 //! the monitors a mutation must turn red (any one of them counts as caught)
 export const CATCHERS = new Set(['stamp-oracle', 'release-safety', 'census-truth'])
 
@@ -168,9 +179,11 @@ export const inject = (sim: Sim, r: () => number, m: Mutation): string | null =>
 
 export interface Out {
   family: string; seed: number; shape: string
+  //! the replica count the seed drew (an R=1 seed has no co-holder pairs for M7 to compare)
+  R: number
   //! safety problems: a monitor fired (other than a red-today row), or M1's horizon form disagrees
   unsafe: string[]
-  //! liveness problems at the horizon: holders disagree, exactly-R not restored, floors unequal
+  //! liveness problems at the horizon: holders disagree, exactly-R not restored, floors unequal, marks stale (M7's two forms)
   notLive: string[]
   //! the rows expected red on today's kernel: M8 at the horizon (M9 at R=1 left this list with the drain)
   redToday: string[]
@@ -506,11 +519,24 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   const durable = fam.durable === true || (fam.durable === 'mix' && r() < 0.5)
   const parts = pick(r, [50, 120, 500])
   const count = pick(r, [60, 120])
-  const o: MeshOpts = { replicas: R, durable, hb: 50, tune: { compactAt: 16, snapshotAt: 16 }, fault: { delay: [1, 5] } }
+  //! the stage-2 mutations switch the sweep off through the tune row (drop-dirty: so the sweep cannot heal what the
+  // dirty leg should have); the injected-drop class leaves the tune alone
+  const stage2 = mut === 'no-sweep' || mut === 'drop-dirty'
+  const o: MeshOpts = { replicas: R, durable, hb: 50, tune: { compactAt: 16, snapshotAt: 16, ...(stage2 ? { aeFan: 0 } : {}) }, fault: { delay: [1, 5] } }
   const sim = new Sim(seed)
   const eng: Record<string, number> = {}
-  const out: Out = { family: fam.name, seed, shape: `${fam.name} seed ${seed} n=${n} R=${R}${durable ? ' durable' : ''} parts=${parts} writes=${count}${mut !== 'none' ? ' mut=' + mut : ''}`, unsafe: [], notLive: [], redToday: [], red: new Set(), eng, sim }
+  const out: Out = { family: fam.name, seed, shape: `${fam.name} seed ${seed} n=${n} R=${R}${durable ? ' durable' : ''} parts=${parts} writes=${count}${mut !== 'none' ? ' mut=' + mut : ''}`, R, unsafe: [], notLive: [], redToday: [], red: new Set(), eng, sim }
   const nodes = mesh(sim, n, o)
+  if (mut === 'no-sweep') eng.mutated = 1
+  //! drop-dirty: after every event, every stepped armed node's dirty set is emptied — the stamp site's one mark never
+  // reaches the tick, exactly as a dropped dirty site would read
+  if (mut === 'drop-dirty') sim.monitors.push({
+    name: 'mutation-drop-dirty',
+    check: (s) => {
+      for (const id of s.stepped) { const x = s.nodes.get(id); if (x !== undefined && x.armed && x.scope !== null && x.scope.dirty.size) { x.scope.dirty.clear(); eng.mutated = 1 } }
+      return null
+    },
+  })
   sim.run({ until: 1500 })
   if (!nodes.every((x) => x.armed)) { out.notLive.push('never formed'); return out }
   const t0 = sim.now
@@ -520,7 +546,7 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   //! the mutation fires at the first 5 ms slice at or past c.mutAt; its draws come from a separate stream so the
   // schedule itself is the same with and without it
   const mr = mul(seed * 31 + 7)
-  let mutated = mut === 'none'
+  let mutated = mut === 'none' || stage2
   for (let t = sim.now; t <= t0 + horizon; t += 5) {
     sim.run({ until: t })
     for (const f of c.polls) f()
@@ -533,8 +559,14 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   }
   const m1 = stampOracle(sim)
   if (m1) { out.red.add('stamp-oracle'); out.unsafe.push('M1 horizon: ' + m1) }
-  const live = [scopedConverged(sim), exactlyR(sim), floorsAgree(sim)].filter((x): x is string => x !== null)
+  //! M7's two forms, each with its non-vacuity count (eng.floorLanes, eng.markPairs); stale knowledge is named by
+  // monitor so the stage-2 mutation runner can read the catch off `red`
+  const fc = { lanes: 0 }, mc = { pairs: 0 }
+  const live = [scopedConverged(sim), exactlyR(sim), floorsAgree(sim, fc)].filter((x): x is string => x !== null)
+  const m7k = marksAgree(sim, mc)
+  if (m7k !== null) { out.red.add('marks-agree'); live.push(m7k) }
   out.notLive.push(...live)
+  eng.floorLanes = fc.lanes; eng.markPairs = mc.pairs
   //! every spoke's screen equals its kernel at the horizon (a spoke is compared to no other node, so projected()
   // does not cover it): a screen-only ghost is UNSAFE, whatever the kernel holds
   for (const [id, n] of sim.nodes) if (n.client) { const m = screenMatches(sim, id); if (m !== null) { out.red.add('screen'); out.unsafe.push('screen: ' + m) } }
