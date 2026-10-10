@@ -1152,15 +1152,19 @@ THREE parts, and the third is about the grant:
 What the rule costs, measured on two scratch kernels — the three parts with (α), and the two parts
 alone (gate and lead-nothing, the grant line deleted) — every family of §10.8 and the in-tree sweep
 run unchanged. Safety with three parts: 0 splits, 0 violations everywhere, `evictTwo`, `evictTwoB`
-and `keptBallot` included. Liveness, on the families that were already there: `pledgeTwo`'s far
-side settles on 0 of 5 (the base 5 of 5 — n03, n04 and n05 all hold a vote at 2 above view 1, so
-nobody may lead); `evictsplit` and `joinsplit` 0 of 10 with three parts (the base 10 of 10; with
-two parts they still settle: n02 never voted and leads, and n03 grants); the isolate grid loses 36
-of 108, every `isolate = 5 ms` case (the VOTEs leave and die on the cut; the far side, the old
-view's majority, holds votes above its view and nobody leads it), the seeded isolate family 11 of
-50; `rebirth` 6 of 100 (seeds 7, 51, 59, 69, 83, 96); the sweep's family 1 three (17, 52, 83) and
-family 2 four (46, 47, 65, 90); the crash grid 4 of 96 — and they are NOT H12's. #8, #10, #24 and
-#26 are the n=3 two-leaver cases with the stayer crashed at −200 or 0 ms and BACK after 2 s: the
+and `keptBallot` included. Liveness, on the families that were already there, kernel by kernel.
+The same on BOTH kernels: `pledgeTwo`'s far side settles on 0 of 5 (the base 5 of 5 — n03, n04 and
+n05 all hold a vote at 2 above view 1, so nobody may lead); the isolate grid loses 36 of 108, every
+`isolate = 5 ms` case (the VOTEs leave and die on the cut; the far side, the old view's majority,
+holds votes above its view and nobody leads it), the seeded isolate family 11 of 50; the sweep's
+family 1 three (17, 52, 83); the crash grid 4 of 96 (#8, #10, #24, #26). Where the grant part (α)
+costs MORE than gate and lead-nothing alone: `evictsplit` and `joinsplit` 0 of 10 with three parts
+(the base 10 of 10; with two parts they still settle: n02 never voted and leads, and n03 grants);
+`rebirth` 6 of 100 with three parts (seeds 7, 51, 59, 69, 83, 96), 4 with two (59, 69, 83, 96; 7
+and 51 heal without the grant line); the sweep's family 2 four with three parts (46, 47, 65, 90),
+three with two (46, 47, 65; 90 heals without the grant line). The crash grid's four are NOT H12's.
+#8, #10, #24 and #26 are the n=3 two-leaver cases with the stayer crashed at −200 or 0 ms and BACK
+after 2 s: the
 lowest leaver's exit ballot at 2 failed (one of two new-set votes), both leavers restart, the stayer
 returns, all three are linked at view 1 again, and nothing ever proposes a view at 2 or above — the
 other leaver holds its vote at 2 for good, `gate stale-vote`, read-only beside two writable
@@ -1503,7 +1507,8 @@ branch's breadth and sees none of its holes, which is what §8.1 said.
    release and is not done; the liveness pins moved only with the why in the commit. The pins the
    rule as drafted moves are known (§10.2): `pledgeTwo`'s settled set to all five, `evictsplit`'s
    and `joinsplit`'s (with three parts), the isolate grid's 5 ms cases, the crash grid's #8, #10,
-   #24, #26, six rebirth and seven sweep seeds; and the red-today witnesses turn green and are
+   #24, #26, six rebirth and seven sweep seeds with three parts (four and six with two); and the
+   red-today witnesses turn green and are
    re-recorded with the why — the three red pins, and the quiet-point test's `evictTwo` run on the
    mesh (cc's gate shuts on its vote and nothing splits, so its named split string goes away). The
    release decides which of the liveness pins stay moved. `pledgeTwo` must stay SAFE; it is not
