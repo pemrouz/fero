@@ -5,7 +5,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node, MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './node.ts'
 import { TUNE, tuneOf, PROVE_MS, type Tune } from './tune.ts'
-import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS } from './membership.ts'
+import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, DRAIN_TICKS } from './membership.ts'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.ts'
 import { MAX_PROBES } from './confirm.ts'
 import { MAX_QUEUED } from './link.ts'
@@ -24,7 +24,7 @@ const env = (): Env => {
 test('TUNE is the old constants by name, and a node with no tune reads exactly them', () => {
   assert.deepEqual(TUNE, {
     redials: MAX_REDIALS, memberRedials: MEMBER_REDIALS, redialGrowth: 2, redialCap: 32,
-    suspectTicks: SUSPECT_TICKS, leaveTicks: LEAVE_TICKS, pulls: MAX_PULLS, proposalAge: PROPOSAL_AGE, rejoinTicks: REJOIN_TICKS,
+    suspectTicks: SUSPECT_TICKS, leaveTicks: LEAVE_TICKS, drainTicks: DRAIN_TICKS, pulls: MAX_PULLS, proposalAge: PROPOSAL_AGE, rejoinTicks: REJOIN_TICKS,
     retryTicks: RETRY_TICKS, pending: MAX_PENDING, dedupKeep: DEDUP_KEEP, issuers: MAX_ISSUERS,
     probes: MAX_PROBES, queued: MAX_QUEUED, compactAt: COMPACT_AT, snapshotAt: SNAPSHOT_AT, lamportLease: LAMPORT_LEASE,
     shedTicks: SHED_TICKS, stageTicks: STAGE_TICKS, acqLiveMax: ACQ_LIVE_MAX, stallAt: STALL_AT,
@@ -32,8 +32,8 @@ test('TUNE is the old constants by name, and a node with no tune reads exactly t
   })
   //! the values the plan's table lists — a changed default is a DECISIONS line, not a drift
   assert.deepEqual(
-    [TUNE.redials, TUNE.memberRedials, TUNE.suspectTicks, TUNE.leaveTicks, TUNE.pulls, TUNE.proposalAge, TUNE.rejoinTicks, TUNE.retryTicks, TUNE.pending, TUNE.dedupKeep, TUNE.issuers, TUNE.probes, TUNE.queued, TUNE.compactAt, TUNE.snapshotAt, TUNE.lamportLease, TUNE.shedTicks, TUNE.stageTicks, TUNE.acqLiveMax, TUNE.stallAt, TUNE.proveMs],
-    [10, 5, 3, 4, 5, 10, 10, 2, 1024, 1024, 1024, 1024, 256, 4096, 4096, 4096, 2, 8, 8192, 8, 5000],
+    [TUNE.redials, TUNE.memberRedials, TUNE.suspectTicks, TUNE.leaveTicks, TUNE.drainTicks, TUNE.pulls, TUNE.proposalAge, TUNE.rejoinTicks, TUNE.retryTicks, TUNE.pending, TUNE.dedupKeep, TUNE.issuers, TUNE.probes, TUNE.queued, TUNE.compactAt, TUNE.snapshotAt, TUNE.lamportLease, TUNE.shedTicks, TUNE.stageTicks, TUNE.acqLiveMax, TUNE.stallAt, TUNE.proveMs],
+    [10, 5, 3, 4, 16, 5, 10, 10, 2, 1024, 1024, 1024, 1024, 256, 4096, 4096, 4096, 2, 8, 8192, 8, 5000],
   )
   const node = new Node({ uuid: 'aa' }, env())
   assert.strictEqual(node.tune, TUNE, 'no overrides ⇒ the shared frozen table itself, nothing allocated')

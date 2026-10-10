@@ -691,6 +691,43 @@ export class Scope {
       }
       if (covered) this.#shed(node, p, e)
     }
+    //! a DRAINING leaver (membership.ts, DESIGN-SCALE stage 1 (b)) re-reads its bar the instant marks moved or a
+    // shed landed — one field read on every other armed node
+    if (node.membership.leaving?.drain !== undefined) node.membership.drain(node)
+  }
+
+  //! undrained — the leave drain's evidence (DESIGN-SCALE §7 stage 1 (b)): what this node still holds that no
+  // survivor has proved it holds. For every entry with content — an orphan's frozen tails; a held entry's live
+  // tails (the solo view's case: no install ever froze them) — over the CURRENT holders other than this node:
+  // `waiting` counts the partitions some REACHABLE holder (an admitted, live link) has not yet attested covering,
+  // lane by lane — the shed bar of evaluateSheds with its quantifier narrowed to the holders that can still
+  // answer, so the drain can still progress; `stranded` the partitions with content and no reachable holder at
+  // all — nobody to drain to. A partition every holder covers has shed already and is in neither count.
+  undrained(node: Node): { waiting: number; stranded: number } {
+    let waiting = 0, stranded = 0
+    if (!node.armed) return { waiting, stranded }
+    const ring = node.writes.ring
+    if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    for (const [p, e] of this.entries) {
+      if (e.state === SCOPE.acquiring) continue // a staged buffer is the teacher's data, not this node's
+      const tails = e.state === SCOPE.orphan ? (e.tails ??= this.#tailsOf(node, p)) : this.#tailsOf(node, p)
+      const lanes = Object.entries(tails)
+      if (!lanes.length) continue // a husk: nothing to hand over
+      let reachable = false, behind = false
+      for (const holder of ring.holders(p, node.replicas)) {
+        if (holder === node.uuid) continue
+        const id = node.byUuid.get(holder)
+        const link = id === undefined ? undefined : node.links.get(id)
+        if (!link || link.state !== LS.admitted || link.dead) continue
+        reachable = true
+        const per = e.marks.get(holder)
+        for (const [o, s] of lanes) if ((per?.get(o) ?? 0) < s) { behind = true; break }
+        if (behind) break
+      }
+      if (behind) waiting++
+      else if (!reachable) stranded++
+    }
+    return { waiting, stranded }
   }
 
   //! #shed — the crash-safe execution order (C10/H1): (1) boot record WITHOUT p (a crash after this

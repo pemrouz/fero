@@ -369,6 +369,9 @@ export class Node {
   // machinery is inert; scoped() is the one branch guard every M6 code path hangs off.
   get replicas(): number { return this.#opts.replicas ?? 0 }
   get scoped(): boolean { return (this.#opts.replicas ?? 0) > 0 }
+  //! heartbeats — is the protocol clock on? (heartbeatMs 0 is the explicit sweep mode: no ticks ever fire,
+  // so a tick-bounded wait — the leave drain — must not be entered)
+  get heartbeats(): boolean { return (this.#opts.heartbeatMs ?? 0) > 0 }
 
   //! diagAllow — the M7 DIAG allowlist (see NodeOpts.diag). Absent/empty ⇒ the channel is dead: every
   // r:2 HELLO is denied (fail closed, the durable/client/replicas idiom for absent modes).
