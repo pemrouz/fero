@@ -20,7 +20,7 @@
 // stage 1 (b), 2026-10-10): a leave-drain violation is now UNSAFE like any other.
 
 import { Sim } from './exec.ts'
-import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, boundedLogs } from './monitors.ts'
+import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, boundedLogs, screenMatches } from './monitors.ts'
 import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
@@ -66,6 +66,9 @@ const idOf = (i: number) => `n${String(i).padStart(2, '0')}`
 const optsOf = (id: string, hosts: string[], o: MeshOpts): NodeOpts => ({
   uuid: id, listen: `sim:${id}`, hosts, heartbeatMs: o.hb ?? 50, durable: o.durable ?? false,
   ...(o.replicas !== undefined ? { replicas: o.replicas } : {}),
+  //! a scoped mesh carries the api's cluster contract, so a spoke reads `replicas=` off its feeder (node.feederScoped,
+  // DESIGN-SCALE stage 2) as a real client does; unscoped meshes send none (sim/harness.ts cluster says why)
+  ...(o.replicas ? { contract: `v1;heartbeat.ms=${o.hb ?? 50};replicas=${o.replicas};methods=0;validation=none` } : {}),
   ...(o.tune !== undefined ? { tune: o.tune } : {}),
   redialMs: 20, journalCap: 1 << 16,
 })
@@ -532,9 +535,12 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   if (m1) { out.red.add('stamp-oracle'); out.unsafe.push('M1 horizon: ' + m1) }
   const live = [scopedConverged(sim), exactlyR(sim), floorsAgree(sim)].filter((x): x is string => x !== null)
   out.notLive.push(...live)
+  //! every spoke's screen equals its kernel at the horizon (a spoke is compared to no other node, so projected()
+  // does not cover it): a screen-only ghost is UNSAFE, whatever the kernel holds
+  for (const [id, n] of sim.nodes) if (n.client) { const m = screenMatches(sim, id); if (m !== null) { out.red.add('screen'); out.unsafe.push('screen: ' + m) } }
   if (boundedLogs(sim)) out.redToday.push('M8')
   const L = ledgerOf(sim)
-  Object.assign(eng, { cells: L.counts.cells, advances: L.counts.advances, releases: L.counts.releases, census: L.counts.census, drops: L.counts.drops, leaves: L.counts.leaves, resyncs: L.counts.resyncs })
+  Object.assign(eng, { cells: L.counts.cells, advances: L.counts.advances, releases: L.counts.releases, census: L.counts.census, drops: L.counts.drops, leaves: L.counts.leaves, resyncs: L.counts.resyncs, resyncRows: L.counts.resyncRows })
   eng.sheds = jcount(sim, JK.shed); eng.acquires = jcount(sim, JK.acquire); eng.compactions = jcount(sim, JK.compacted)
   eng.stalls = jcount(sim, JK.shedStall); eng.epoch = Math.max(...[...sim.nodes.values()].map((x) => x.epoch))
   return out
