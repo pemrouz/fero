@@ -553,8 +553,14 @@ test('DRAIN [DESIGN-SCALE stage 1 (b)] — scaling 2→1 at replicas 1 by destro
     assert.ok(await until(async () => Object.keys(await whole()).length === 12), 'every row committed somewhere')
     const me = (f: Fero) => (snapshot(f.cluster) as { me: { undrained: number } }).me
     assert.equal(me(nodes[1]).undrained, 0, 'nothing undrained before the stop')
+    const heldBefore = (snapshot(nodes[0].cluster) as { partitions: { held: number } }).partitions.held
+    assert.ok(heldBefore > 0 && heldBefore < 12, `the survivor holds its own share before the stop (${heldBefore} of 12)`)
     //! the leaver: the view shrinks by its ballot, then it holds `left` until n01 has attested every partition it held
     assert.equal(await nodes[1].destroy(), true, 'a clean stop all the way: the vote came back AND the rows were copied')
+    //! the survivor's OWN count first: the gather below goes on showing rows of a member that has gone, so it alone
+    // cannot tell a drained stop from one that took 8 rows with it (the skeptic's probe, 2026-10-10)
+    const held = () => (snapshot(nodes[0].cluster) as { partitions: { held: number } }).partitions.held
+    assert.equal(held(), 12, 'the survivor itself holds all twelve partitions the instant destroy() resolves true')
     const after = await whole()
     assert.deepEqual(Object.keys(after).sort(), Array.from({ length: 12 }, (_, i) => 'row' + i).sort(), 'the survivor alone holds every row')
     assert.deepEqual(Array.from({ length: 12 }, (_, i) => after['row' + i].v), Array.from({ length: 12 }, (_, i) => i), 'with the right values')
