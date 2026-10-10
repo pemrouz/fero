@@ -531,7 +531,8 @@ export const drained = (sim     )                => {
 //                      every tombstone is fenced or pinned by a named uuid. RED TODAY by design (logs are
 //                      unbounded under scoping; no gcWaitingOn surface exists): the sweep pins the count.
 //   M9 leave-drain     (per event, armed)       a leaver that reports left(true) holds nothing some other
-//                      live node does not contain-or-cover. RED TODAY at R=1 (the leave does not drain).
+//                      live node does not contain-or-cover. Was red at R=1 until the drain landed; GREEN
+//                      since DESIGN-SCALE stage 1 (b), 2026-10-10 (a clean leaver hands its rows over first).
 //   M10 resync-end     (per event, spokes)      a spoke's resync (node.ts #resyncBegin) ends only on the r=0
 //                      that answers an r=1 the spoke sent on that link AFTER the resync began — the
 //                      reply that follows the re-download on the FIFO link. Ending on an older reply runs
