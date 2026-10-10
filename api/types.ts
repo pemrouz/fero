@@ -264,7 +264,8 @@ export interface ClusterShape {
     // because no reachable new holder proved it holds them inside the drain window; 0 until then, 0 forever on
     // an unscoped member or a client. Set in the fold just before the teardown, so a screen closing on the stop
     // can show it; the kernel's `undrained` journal row is the same number. It counts the DRAIN window only: a
-    // leaver still in its own view when the vote never came back (leaveTicks) goes like a crash, never drained,
+    // leaver still in its own view when the vote never came back (the bound: leaveTicks with no member linked, the
+    // knock window leaveWindow with one) goes like a crash, never drained,
     // and leaves this 0 too — at `replicas: 1` its rows go with it uncounted. A leaver whose own view already
     // dropped it (it held the votes; the survivors' echo was lost) drains and counts like any other.
     undrained: number
