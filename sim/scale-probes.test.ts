@@ -318,7 +318,8 @@ test('M9 leave-drain is GREEN at R=1: a clean leaver hands the only copy of its 
   assert.equal(a.state.has(JSON.stringify([p])), false, 'R=1: the survivor does not hold it before the leave')
   sim.post('n02', { kind: 'leave' }, 0)
   const z = sim.nodes.get('n02')!
-  for (let t = sim.now; !sim.left.has('n02') && t < sim.now + 5000; t += 5) sim.run({ until: t })
+  const deadline = sim.now + 5000 // a FIXED bound: `t < sim.now + 5000` would move with t and never end
+  for (let t = sim.now; !sim.left.has('n02') && t < deadline; t += 5) sim.run({ until: t })
   assert.equal(sim.left.get('n02'), true, 'the leave reported clean')
   const kinds = z.journal.read().filter((e) => e.kind === JK.shed || e.kind === JK.left || e.kind === JK.undrained).map((e) => e.kind)
   assert.deepEqual(kinds, [JK.shed, JK.left], 'the leaver shed p (the new holder attested it) BEFORE it reported left; no undrained row')
@@ -409,14 +410,16 @@ test('a leaver cut off while draining (V4-20): the survivors never suspect or ev
   sim.post('n03', { kind: 'leave' }, 0)
   //! the first 5 ms slice where n03 is draining: out of the view, `left` held. Cut it from everyone there.
   let cutAt = -1
-  for (let t = sim.now; cutAt < 0 && t < sim.now + 2000; t += 5) {
+  const drainBy = sim.now + 2000 // fixed bounds: a bound written against sim.now inside the loop moves with it
+  for (let t = sim.now; cutAt < 0 && t < drainBy; t += 5) {
     sim.run({ until: t })
     if (z.membership.leaving?.drain !== undefined) { cutAt = sim.now; for (const u of ['n01', 'n02']) sim.partition('n03', u) }
   }
-  assert.ok(cutAt > 0, 'n03 reached the drain')
+  assert.ok(cutAt > 0, 'n03 reached the drain (with the drain removed, it never does: the mutation check)')
   assert.equal(z.membership.isMember('n03'), false, 'the view without it had committed before the drain began')
   const epochAtCut = ns[0].epoch
-  for (let t = sim.now; !sim.left.has('n03') && t < sim.now + 50 * 30; t += 5) sim.run({ until: t })
+  const leftBy = sim.now + 50 * 30
+  for (let t = sim.now; !sim.left.has('n03') && t < leftBy; t += 5) sim.run({ until: t })
   assert.equal(sim.left.get('n03'), false, 'cut off from every new holder: not a clean stop')
   const und = z.journal.read().filter((e) => e.kind === JK.undrained).map((e) => e.a as number)
   assert.equal(und.length, 1, 'one undrained row')
