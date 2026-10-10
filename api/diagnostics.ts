@@ -9,6 +9,7 @@
 // This module imports TYPES only, so tools/tests can import the Symbol without loading the composer.
 
 import type { JEvent } from '../kernel/journal.ts'
+import type { Tune } from '../kernel/tune.ts'
 import type { captureNode } from '../tools/debug/capture.ts'
 import type { Fero } from './types.ts'
 
@@ -51,6 +52,10 @@ export interface Diagnostics {
   // Values are the coerced ones the composer read; function-valued keys show as '[function]', and a
   // diag token as '[redacted]' (the names who may attach show; the secret never does).
   config(): Record<string, { value: unknown; from: string }>
+  //! tune (V4-10, the knock window): the kernel tune table THIS node runs with — the frozen defaults with the rows a
+  // config key moved (`redial.tries` → redials, `leave.ms` → leaveWindow in heartbeat ticks). The one way a test can
+  // see that a key reached the kernel, and not only what config() displays. Read-only: the node froze it at birth.
+  tune(): Readonly<Tune>
 }
 
 //! diagnostics — the Symbol key. Not Symbol.for (a registry symbol would be forgeable); exported from
