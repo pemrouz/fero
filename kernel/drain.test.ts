@@ -151,6 +151,31 @@ test('DRAIN, the bound: a holder that never attests holds the leaver for exactly
   assert.deepEqual(d.of('left'), [['left', false]])
 })
 
+test('DRAIN never follows a vote that did not come back: a scoped leaver whose shrunk view never commits goes at leaveTicks + 1 with left(false), no drain, no `undrained` row — it still holds p (nothing froze), and the survivors evict it the slow way', () => {
+  //! the ballot is proposed but nobody votes: the leave's own bound (V4-6) ends it, clean=false. The drain is the
+  // SECOND wait of a leave whose first wait succeeded; a leaver going like a crash does not drain (there is no
+  // orphan: p is still held, no install re-ranged it) and counts nothing undrained — `undrained` counts only the
+  // drain window. Mutation: drop `clean &&` in #finishLeave and this leaver holds instead of going.
+  const h = holderAtView1()
+  h.node.step({ kind: 'leave' })
+  for (let i = 0; i < LEAVE_TICKS; i++) {
+    h.tick()
+    assert.equal(h.of('left').length, 0, `tick ${i + 1}: knocking`)
+  }
+  h.tick()
+  assert.deepEqual(h.of('left'), [['left', false]], 'leaveTicks + 1: it goes like a crash')
+  assert.equal(h.node.epoch, 1, 'the view never changed')
+  assert.equal(h.node.scope!.entries.get('p')?.state, SCOPE.held, 'p is still held: no install froze it into an orphan')
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, done: true, drain: undefined }, 'no drain was entered')
+  assert.equal(h.jk(JK.undrained).length, 0, 'nothing counted undrained: the count covers the drain window only')
+  assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b]), [[1, 0]])
+  //! a late vote changes nothing: the leave is over
+  h.bytes(1, vote(2, 'bb', 'cc'))
+  h.bytes(2, vote(2, 'bb', 'cc'))
+  h.tick()
+  assert.equal(h.of('left').length, 1)
+})
+
 test('DRAIN, nobody to drain to: the new holder\'s link is down at the proof ⇒ left(false) at once with `undrained` 1; a holder that dies DURING the drain ends it at the next tick the same way', () => {
   //! (a) dead before the echo: cc still stays, its echo is the proof — but p's only holder, bb, is unreachable
   const h = holderAtView1()
