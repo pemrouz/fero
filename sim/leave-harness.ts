@@ -42,6 +42,13 @@
 //               an eviction ballot and the proposer abandons it; the proposer crashes for good mid-ballot (open, or
 //               committed with its VIEW unsent). Today's kernel heals both, writable everywhere; a rule that closes a
 //               gate on a vote above its view freezes every live member for good (DESIGN-LEAVE §10.2, the release).
+//   releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView — the RELEASE shapes (DESIGN-LEAVE
+//               §10.10): what a rule that holds a vote above the view must stay live and safe on, pinned on today's
+//               kernel before the rule was measured. A two-evictee ballot (the only ballot today's kernel opens that
+//               changes two members at once) that commits late with the VIEW lost (the split a clock-based release
+//               allows; red today as evictTwo is); whose proposer dies for good with a stale majority alive, open or
+//               committed, and comes back from its dir; that is abandoned and retried at the same epoch after the
+//               proposer's restart; that is abandoned twice and then commits; and whose VIEW is late into one voter.
 //   explorer  — sim/mesh.ts's random explorer over real Nodes with the quiet-point writable-split check on (the
 //               round-2 re-check's "end-state check" variant), over its own seed range.
 // What every family checks (sim/leave-sweep.ts): SAFETY — no monitor fired and no two nodes end WRITABLE in
@@ -406,7 +413,9 @@ export const pledgeTwo = (seed: number, inspect?: (sim: Sim) => void): OutcomeI 
 // VIEW n01→n03 dies on the sever and both pairs stay cut) or crashes on its grant and comes back from its dir 500 ms
 // later linked to n04 and n05 only (`crash`). `k = 1` (n05 alone cut, n04 kept) is the control the arithmetic
 // forbids: the new view's two-of-four majority and the old view's three-of-five need six voters of five.
-export const evictTwo = (seed: number, how: 'cut' | 'crash', k: 1 | 2 = 2, inspect?: (sim: Sim) => void): string[] => {
+//! `slow` (releasedEarly, below): the n01-n03 link carries every frame `slow` ms each way, so n03's grant reaches n01
+// late and the ballot commits late; the commit is then required to come at least `slow` ms after the grant.
+export const evictTwo = (seed: number, how: 'cut' | 'crash', k: 1 | 2 = 2, inspect?: (sim: Sim) => void, slow = 0): string[] => {
   const sim = new Sim(seed)
   const nodes = cluster(sim, 5, { heartbeatMs: 50, durable: true, fault: { delay: [3, 3] } })
   sim.run({ until: 800 })
@@ -414,14 +423,16 @@ export const evictTwo = (seed: number, how: 'cut' | 'crash', k: 1 | 2 = 2, inspe
   const far = k === 2 ? ['n04', 'n05'] : ['n05']
   for (const f of far) { sim.partition('n01', f); sim.partition('n02', f) }
   if (how === 'cut') sim.severOnFrame('n01', 'n03', VERB.VIEW)
+  if (slow > 0) sim.fault('n01', 'n03', { delay: [slow, slow] })
   const t0 = sim.now
-  let voted = -1, cutAt = -1, backAt = -1
+  let voted = -1, cutAt = -1, backAt = -1, committedAt = -1
   for (let t = sim.now; t <= t0 + 15000; t += 1) {
     sim.run({ until: t })
     if (voted < 0 && nodes[2].journal.read().some((e) => e.kind === JK.vote && e.a === 2 && e.b === 1 && e.c === 'n01')) {
       voted = sim.now
       if (how === 'crash') { tearDown(sim, 'n03', true) }
     }
+    if (committedAt < 0 && nodes[0].epoch >= 2) committedAt = sim.now
     if (voted >= 0 && cutAt < 0 && how === 'cut' && nodes[0].epoch >= 2) { cutAt = sim.now; sim.partition('n01', 'n03'); sim.partition('n02', 'n03') }
     if (voted >= 0 && backAt < 0 && how === 'crash' && sim.now >= voted + 500) { backAt = sim.now; for (const f of far) sim.heal('n03', f); if (k === 1) sim.heal('n03', 'n04'); sim.restart('n03') }
     if ((how === 'cut' ? cutAt : backAt) >= 0 && sim.now > Math.max(cutAt, backAt) + 6000) break
@@ -429,11 +440,24 @@ export const evictTwo = (seed: number, how: 'cut' | 'crash', k: 1 | 2 = 2, inspe
   inspect?.(sim)
   const problems: string[] = []
   if (voted < 0) problems.push('not the shape: n03 never granted the eviction')
+  if (slow > 0 && (committedAt < 0 || committedAt < voted + slow)) problems.push(`not the shape: the commit did not come ${slow} ms after the grant (grant ${voted - t0}, commit ${committedAt < 0 ? 'never' : committedAt - t0})`)
   if (sim.violations.length) problems.push('VIOLATION ' + JSON.stringify(sim.violations.slice(0, 2)))
   const sp = split(sim)
   if (sp) problems.push(sp)
   return problems
 }
+
+//! releasedEarly — the split a vote RELEASED BY A CLOCK allows (DESIGN-LEAVE §10.10, the release): evictTwo's cut
+// shape with the n01-n03 link slow (200 ms each way), so n03 grants at +200 ms and n01 commits `{n01,n02,n03}`@2 on
+// that grant at +400 ms (age 8 of its 10 ticks) — then the VIEW to n03 dies on the sever and the pairs stay cut. From
+// n03's seat nothing distinguishes this from a ballot its proposer dropped: the grant is 200 ms old when the commit
+// happens, and the VIEW never comes. A voter that stops holding after any local bound (the ballot's own age, or
+// longer) is writable at view 1 with n04 and n05 beside n01 and n02 at view 2, and leads them into `{n02,n03,n04,
+// n05}`@3: the evictTwo split, made by the release. Today's kernel holds nothing, so it splits here as in evictTwo
+// (red today, the same finding); a kernel whose hold ends on a clock splits here too; one whose hold ends only on
+// the proposer's word or on a view at or above the vote is clean. The engagement count is the seeds on which the
+// commit came at least 200 ms after the grant.
+export const releasedEarly = (seed: number, inspect?: (sim: Sim) => void): string[] => evictTwo(seed, 'cut', 2, inspect, 200)
 
 //! evictTwoB — evictTwo with the stale voter NOT the far side's lowest member (the second 2026-10-10 review's probe,
 // DESIGN-LEAVE §10.2): n=5; {n02,n03} are cut from n01, n04 and n05, so neither can open a ballot (two of five live).
@@ -483,11 +507,14 @@ const settle = (m: Mesh, rounds: number, pairs: [string, string][]) => {
   for (let r = 0; r < rounds; r++) { for (const [x, y] of pairs) m.giveUp(x, y); drain(m); for (const u of m.nodes.keys()) m.tick(u) }
   drain(m)
 }
-export interface OutcomeM { shape: string[]; splits: string[]; quiet: string | null; end: string; readOnly: string[] }
-const outcomeM = (m: Mesh, shape: string[], quiet: string | null): OutcomeM => {
+//! `mid` (the release shapes below): the state at named points before the end — read-only sets a rule may move
+export interface OutcomeM { shape: string[]; splits: string[]; quiet: string | null; end: string; readOnly: string[]; mid?: string[] }
+const outcomeM = (m: Mesh, shape: string[], quiet: string | null, mid?: string[]): OutcomeM => {
   const end = meshState(m)
-  return { shape, splits: [...m.splits], quiet, end, readOnly: end.split(' ').filter((s) => s.includes('r:')) }
+  return { shape, splits: [...m.splits], quiet, end, readOnly: end.split(' ').filter((s) => s.includes('r:')), ...(mid ? { mid } : {}) }
 }
+//! readOnlyOf — the read-only entries of a meshState line
+export const readOnlyOf = (state: string) => state.split(' ').filter((s) => s.includes('r:'))
 
 //! keptBallot — the kept ballot's two-member shape at n=4 (DESIGN-LEAVE §10.2 (ii)): aa and bb lose each other and
 // each, the lowest live member in its own eyes, proposes the view without the other at 2. bb wins on cc's and dd's
@@ -534,16 +561,30 @@ export const keptBallot = (): OutcomeM => {
   return outcomeM(m, shape, quiet)
 }
 
-//! evictionBallot — a healthy five-node mesh in which aa loses ee only, suspects it, its chain gives up, and it
-// proposes `{aa,bb,cc,dd}`@2 (the eviction branch of kernel/membership.ts tick). The start of the two shapes below.
-const evictionBallot = (shape: string[]): Mesh => {
-  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd', 'ee'])
-  m.cut('aa', 'ee')
+//! evictionBallot — a healthy five-node mesh in which aa loses ee only (k = 1), or dd and ee (k = 2), suspects them,
+// its chains give up, and it proposes the view without them at 2 (the eviction branch of kernel/membership.ts tick):
+// `{aa,bb,cc,dd}`@2, one member apart from view 1, or `{aa,bb,cc}`@2, TWO apart — the shape the one-member count of
+// DESIGN-LEAVE §10.2 (a) does not protect, and the only ballot today's kernel opens that changes two members at once.
+// The start of the failed-ballot shapes below.
+const evictionBallot = (shape: string[], k: 1 | 2 = 1, durable = false): Mesh => {
+  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd', 'ee'], durable)
+  const gone = k === 2 ? ['dd', 'ee'] : ['ee']
+  for (const u of gone) m.cut('aa', u)
   for (let i = 0; i < 3; i++) m.tick('aa')
-  m.giveUp('aa', 'ee')
+  for (const u of gone) m.giveUp('aa', u)
   m.tick('aa')
-  if (proposals(m, 'aa') !== 'P(2,4)') shape.push(`aa did not open the eviction of ee at 2: ${proposals(m, 'aa')}`)
+  if (proposals(m, 'aa') !== `P(2,${5 - k})`) shape.push(`aa did not open the eviction of ${gone} at 2: ${proposals(m, 'aa')}`)
   return m
+}
+//! drainExcept — every queued frame lands, in order, except those INTO `skip` (a late link into one node)
+const drainExcept = (m: Mesh, skip: string) => { for (let g = 0; g < 2000; g++) { const qs = [...m.q.entries()].filter(([k, f]) => f.length && !k.endsWith('>' + skip)); if (!qs.length) break; for (const [k] of qs) { const [a, b] = k.split('>'); m.deliver(a, b) } } }
+//! restartFromDir — the node comes back from its boot record (a new life, the next incarnation) linked to `peers`
+const restartFromDir = (m: Mesh, u: string, peers: string[], shape: string[]) => {
+  const b = m.boots.get(u)
+  if (!b) { shape.push(`${u} has no boot record to restart from`); return }
+  if (m.nodes.has(u)) m.destroy(u)
+  m.add(u, { epoch: b.epoch, members: b.members, votedFor: b.votedFor }, 2)
+  for (const o of peers) m.connect(u, o)
 }
 
 //! flapDuringBallot — one member flaps during an eviction ballot, no cut of the cluster: bb's VOTE lands (2 of the 3
@@ -577,6 +618,126 @@ export const proposerCrash = (variant: 'open' | 'committed'): OutcomeM => {
   m.destroy('aa')
   settle(m, 40, [...m.nodes.keys()].map((u) => [u, 'aa'] as [string, string]))
   return outcomeM(m, shape, quietSplit(m))
+}
+
+// ── the release shapes (DESIGN-LEAVE §10.10): what a rule for "a vote above my view" must stay live and safe on ──
+//! proposerDeadStale — the proposer of a TWO-evictee ballot dies for good with a stale majority of the old view alive
+// and linked: aa evicts dd and ee at 2 on bb's and cc's grants and dies — with the ballot open (`open`: the VOTEs never
+// reach it) or after installing `{aa,bb,cc}`@2 and before its VIEW leaves (`committed`); in `restart` it then comes
+// back from its dir holding that view, which nobody else has, and dials everyone. bb, cc, dd and ee stay linked; their
+// chains to aa give up. Today's kernel: bb (the lowest live member, holding a vote at 2 for aa above view 1) proposes
+// `{bb,cc,dd,ee}`@3 and the four re-form, writable; the restored aa is a rejoiner at floor 2, learns view 3 on admit,
+// is evicted, knocks JOIN, and bb votes it back in at 4. SAFE on the base: the view that died with aa was never held
+// by a writable majority. Under a rule that holds bb and cc (their vote is for a view two members apart from the
+// one they hold), the four are read-only for good unless the rule lets the held view be SUPERSEDED by a ballot that
+// a majority of its members consent to — aa's death is indistinguishable, from here, from aa cut off and writable
+// with its view (releasedEarly), so no local clock may release them (§10.10, requirement 1).
+export const proposerDeadStale = (variant: 'open' | 'committed' | 'restart'): OutcomeM => {
+  const shape: string[] = []
+  const m = evictionBallot(shape, 2, true)
+  m.deliver('aa', 'bb'); m.deliver('aa', 'cc')
+  if (variant !== 'open') { m.deliver('bb', 'aa'); m.deliver('cc', 'aa'); if (m.nodes.get('aa')!.epoch !== 2) shape.push('aa did not commit {aa,bb,cc}@2 on two grants') }
+  else if (m.nodes.get('aa')!.epoch !== 1) shape.push('aa committed before it died')
+  m.destroy('aa')
+  settle(m, 40, [...m.nodes.keys()].map((u) => [u, 'aa'] as [string, string]))
+  const mid = meshState(m)
+  const quiet: string[] = []
+  const q1 = quietSplit(m); if (q1) quiet.push(q1)
+  if (variant === 'restart') {
+    //! aa comes back holding {aa,bb,cc}@2 — a committed view nobody else has — and dials everyone
+    if (m.boots.get('aa')?.epoch !== 2) shape.push(`aa's boot record does not hold {aa,bb,cc}@2: ${JSON.stringify(m.boots.get('aa'))}`)
+    restartFromDir(m, 'aa', ['bb', 'cc', 'dd', 'ee'], shape)
+    settle(m, 20, [])
+    const q2 = quietSplit(m); if (q2) quiet.push(q2)
+  }
+  return outcomeM(m, shape, quiet.length ? quiet.join(' | ') : null, [mid])
+}
+
+//! retrySameEpoch — an ABANDONED two-evictee ballot whose proposer later restarts and retries at the same epoch:
+// aa evicts dd and ee at 2; bb grants (cc's VOTE is still in flight); dd comes back and aa abandons the ballot
+// (kernel/membership.ts tick: the suspect returned); aa crashes and comes back from its dir — view 1, its own vote at
+// 2 (durable before the PROPOSE left), the ballot forgotten — linked to bb, cc and dd (`one`: ee is still gone, so it
+// retries as the ONE-member eviction `{aa,bb,cc,dd}`@2) or to bb and cc only (`two`: dd and ee are both gone again,
+// so it retries the SAME two-member ballot at 2). The epoch is the same because a node's own ballots never go down
+// (#nextEpoch, V4-25). bb and cc re-grant: the same proposer at the same epoch. Today's kernel: the retry commits and
+// every member of it is writable; ee (and dd, in `two`) learn the view from bb and sit evicted, cut from the proposer
+// they would knock to. Under a rule that holds bb and cc on the first grant, the re-grant must RE-READ the hold against
+// the ballot it is for — one member apart in `one` (no hold), two in `two` (held until the VIEW lands) — and a vote
+// the proposer's restart disowned must not stay disowned once the same proposer asks again.
+export const retrySameEpoch = (variant: 'one' | 'two'): OutcomeM => {
+  const shape: string[] = []
+  const m = evictionBallot(shape, 2, true)
+  m.deliver('aa', 'bb'); m.deliver('aa', 'cc'); m.deliver('bb', 'aa')
+  m.connect('aa', 'dd'); m.tick('aa') // dd is back: the ballot is abandoned, cc's VOTE dies with aa below
+  if (m.nodes.get('aa')!.epoch !== 1) shape.push(`aa committed before the abandon: ${meshState(m)}`)
+  for (const u of ['bb', 'cc']) if (m.nodes.get(u)!.membership.votedFor.e !== 2 || m.nodes.get(u)!.membership.votedFor.p !== 'aa') shape.push(`${u} does not hold a vote at 2 for aa: ${meshState(m)}`)
+  const mid = meshState(m)
+  if (variant === 'two') m.cut('aa', 'dd')
+  restartFromDir(m, 'aa', variant === 'one' ? ['bb', 'cc', 'dd'] : ['bb', 'cc'], shape)
+  const vf = m.nodes.get('aa')!.membership.votedFor
+  if (vf.e !== 2 || vf.p !== 'aa' || m.nodes.get('aa')!.epoch !== 1) shape.push(`the restored aa does not hold view 1 and its own vote at 2: ${meshState(m)}`)
+  //! the rejoin floor clears on a peer's VIEW 1 at admit; then aa suspects the absent again and retries at 2
+  settle(m, 40, variant === 'one' ? [['aa', 'ee']] : [['aa', 'dd'], ['aa', 'ee']])
+  if (proposals(m, 'aa') !== `P(2,${variant === 'one' ? 4 : 3})`) shape.push(`the restored aa did not retry at 2: ${proposals(m, 'aa') || 'nothing'}`)
+  return outcomeM(m, shape, quietSplit(m), [mid])
+}
+
+//! twoFailedBallots — two abandoned two-evictee ballots in a row by one proposer, then a third that commits: dd and ee
+// flap away from aa, aa proposes `{aa,bb,cc}`@2, bb grants, both come back, aa abandons; everyone ticks ten rounds
+// (`mid[0]`); the same again at the same epoch (aa's own vote is at 2, so the retry is at 2 — V4-25), `mid[1]`; then
+// they stay away and the ballot commits on bb's and cc's re-grants. Today's kernel: all five writable after each
+// abandon; `{aa,bb,cc}`@2 at the end with dd and ee evicted. A rule that holds bb and cc on each grant must release
+// them twice — the proposer is alive and linked and says the ballot is gone — and hold them a third time until the
+// VIEW lands: the release and the re-hold must compose.
+export const twoFailedBallots = (): OutcomeM => {
+  const shape: string[] = []
+  const m = evictionBallot(shape, 2)
+  const mid: string[] = []
+  const fail = (nth: number) => {
+    m.deliver('aa', 'bb'); m.deliver('aa', 'cc'); m.deliver('bb', 'aa')
+    m.connect('aa', 'dd'); m.connect('aa', 'ee'); m.tick('aa') // both back: abandoned; cc's VOTE lands on no ballot
+    if (m.nodes.get('aa')!.epoch !== 1) shape.push(`ballot ${nth} committed: ${meshState(m)}`)
+    settle(m, 10, [])
+    mid.push(meshState(m))
+  }
+  fail(1)
+  const again = () => {
+    m.cut('aa', 'dd'); m.cut('aa', 'ee')
+    for (let i = 0; i < 3; i++) m.tick('aa')
+    m.giveUp('aa', 'dd'); m.giveUp('aa', 'ee')
+    m.tick('aa')
+  }
+  again()
+  if (proposals(m, 'aa') !== 'P(2,3) P(2,3)') shape.push(`aa did not re-open {aa,bb,cc} at 2: ${proposals(m, 'aa')}`)
+  fail(2)
+  again()
+  if (proposals(m, 'aa') !== 'P(2,3) P(2,3) P(2,3)') shape.push(`aa did not open {aa,bb,cc} at 2 a third time: ${proposals(m, 'aa')}`)
+  settle(m, 20, [['aa', 'dd'], ['aa', 'ee'], ['dd', 'aa'], ['ee', 'aa']])
+  if (m.nodes.get('aa')!.epoch !== 2) shape.push(`the third ballot did not commit: ${meshState(m)}`)
+  return outcomeM(m, shape, quietSplit(m), mid)
+}
+
+//! lateView — the release racing a LATE VIEW: aa evicts dd and ee at 2 on bb's and cc's grants and installs; every
+// frame INTO cc is held back (a slow link into one node), everything else lands and everyone ticks twelve rounds —
+// bb installs 2 and floods it, dd and ee install 2 evicted — then the late frames land in order. Today's kernel at
+// the mid point: cc is WRITABLE at view 1 (every link up, a majority of view 1 reachable) beside aa and bb writable at
+// 2: two writable views, the evictTwo shape in its one-round-trip window (red today, the quiet-point test's witness).
+// Under the rule cc is held until a VIEW at or above its vote lands; a hold that ends on a clock would end here
+// before the VIEW does, and the proposer's answer to a held voter's question, once it holds a view at or above the
+// vote, is that VIEW and never a release — on one FIFO link the answer cannot overtake the view. The end: cc at 2.
+export const lateView = (): OutcomeM => {
+  const shape: string[] = []
+  const m = evictionBallot(shape, 2)
+  m.deliver('aa', 'bb'); m.deliver('aa', 'cc'); m.deliver('bb', 'aa'); m.deliver('cc', 'aa')
+  if (m.nodes.get('aa')!.epoch !== 2) shape.push(`aa did not commit {aa,bb,cc}@2: ${meshState(m)}`)
+  for (let r = 0; r < 12; r++) { drainExcept(m, 'cc'); for (const u of m.nodes.keys()) m.tick(u) }
+  drainExcept(m, 'cc')
+  const mid = meshState(m)
+  if (m.nodes.get('cc')!.epoch !== 1) shape.push(`cc learned the view before the late frames landed: ${mid}`)
+  //! the late frames land, in the order each link queued them
+  for (const k of [...m.q.keys()].filter((k) => k.endsWith('>cc'))) allOf(m, k.split('>')[0], 'cc')
+  settle(m, 10, [])
+  return outcomeM(m, shape, quietSplit(m), [mid])
 }
 
 // ── crash: a stayer crashes at an offset from the clean stops; everyone restarts from disk (the round-3 `crash2`) ──

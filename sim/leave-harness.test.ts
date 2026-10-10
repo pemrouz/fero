@@ -21,12 +21,14 @@
 // the VOTEs land and was green there, the second review). The base's own holes are `evictTwo`, `evictTwoB` and
 // `keptBallot`, pinned red. The candidate rule of §10.9 step 2 (a vote above my view: gate closed, lead nothing,
 // grant nothing new) turns `flapDuringBallot` and `proposerCrash` red — every live member read-only for good where
-// the base heals — which is the release question (§10.2). Bounded: about 30 s at low priority on the loaded WSL2
+// the base heals — which is the release question (§10.2). The five release shapes (§10.10: releasedEarly,
+// proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView) pin what that rule's release must keep: red today
+// where the base splits (releasedEarly, lateView's window), live today everywhere else. Bounded: about 30 s at low priority on the loaded WSL2
 // box, half that idle; FERO_LEAVE_FULL=1 runs the full crash grid (576 cases, three restart delays, two seeds) and
 // 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
@@ -314,6 +316,70 @@ test('leave harness, a failed ballot in a healthy cluster: one member flaps duri
     const [, c] = runs[variant === 'open' ? 1 : 2]
     if (c.readOnly.join(' ') !== KNOWN_READ_ONLY_CRASH[variant].join(' ')) teeth.push(`proposerCrash ${variant}: the read-only set moved — a gate rule on a vote above the view needs a release that works with the proposer dead; re-record with the why: ${c.end}`)
     if (c.end !== CRASH_END) teeth.push(`proposerCrash ${variant}: the four did not re-form without aa at 3: ${c.end}`)
+  }
+  assert.deepEqual(teeth, [])
+})
+
+//! the release shapes (DESIGN-LEAVE §10.10): the adversaries a rule for "a vote above my view" must stay live and
+// safe on, pinned on today's kernel as the floor BEFORE the rule is measured. releasedEarly is evictTwo's cut shape
+// with the grant 200 ms old when the ballot commits and the VIEW lost: red today on the same four seeds as evictTwo
+// (seed 5 reaches the shape and misses the split's timing), and red on any kernel whose hold ends on a clock — the
+// split a release must never allow. The engagement count (the seeds on which the commit came 200 ms after the grant)
+// is pinned at all five, so a timing drift that empties the family shows as a moved count, not a green pin.
+const SPLITS_RELEASED_EARLY = [1, 2, 3, 4]
+
+test('leave harness, releasedEarly: a two-evictee ballot that commits 200 ms after the third voter\'s grant, the VIEW lost on the cut — today\'s kernel (which holds nothing) splits on exactly the pinned seeds; the shape is reached on all five', () => {
+  const bad: number[] = [], detail: string[] = [], notTheShape: number[] = []
+  for (let seed = 1; seed <= 5; seed++) {
+    const ps = releasedEarly(seed)
+    if (ps.some((p) => p.startsWith('not the shape'))) notTheShape.push(seed)
+    else if (ps.length) { bad.push(seed); detail.push(`${seed}: ${ps.join('; ')}`) }
+  }
+  assert.deepEqual(notTheShape, [], 'the shape was not reached: the commit must come 200 ms after the grant on every seed')
+  assert.deepEqual(bad, SPLITS_RELEASED_EARLY, `releasedEarly: the split set moved — a kernel change closed (or widened) the hole; re-record with the why\n${detail.join('\n')}`)
+})
+
+//! the four failed-ballot shapes of a TWO-evictee ballot, each one fixed schedule on real Nodes (DESIGN-LEAVE §10.10):
+// the proposer dies for good with a stale majority alive (open, committed, and back from its dir); an abandoned
+// ballot whose proposer restarts and retries at the same epoch (as a one-member ballot, or the same two-member one);
+// two abandoned ballots in a row and a third that commits; the release racing a late VIEW. SAFE on today's kernel
+// except lateView's mid point, which is the evictTwo window drawn on purpose (cc writable at 1 beside aa and bb at
+// 2, the quiet-point test's witness) and is pinned RED as the exact state. LIVENESS is pinned as the exact end
+// states and the exact read-only sets at the mid points, in ONE list: a rule that holds bb and cc after their grant
+// for `{aa,bb,cc}`@2 moves these only with its release (the proposer's word: twoFailedBallots, retrySameEpoch), its
+// supersession (proposerDeadStale: the proposer is dead, only a ballot the held view's majority consents to may go on),
+// and its re-read of the hold against the ballot it is for (retrySameEpoch one) — and re-records each with the why.
+const DEAD_STALE_END = 'bb@3{bb,cc,dd,ee}W cc@3{bb,cc,dd,ee}W dd@3{bb,cc,dd,ee}W ee@3{bb,cc,dd,ee}W'
+const DEAD_STALE_RESTART_END = 'bb@4{aa,bb,cc,dd,ee}W cc@4{aa,bb,cc,dd,ee}W dd@4{aa,bb,cc,dd,ee}W ee@4{aa,bb,cc,dd,ee}W aa@4{aa,bb,cc,dd,ee}W'
+const RETRY_ONE_END = 'bb@2{aa,bb,cc,dd}W cc@2{aa,bb,cc,dd}W dd@2{aa,bb,cc,dd}W ee@2{aa,bb,cc,dd}r:evicted aa@2{aa,bb,cc,dd}W'
+const RETRY_TWO_END = 'bb@2{aa,bb,cc}W cc@2{aa,bb,cc}W dd@2{aa,bb,cc}r:evicted ee@2{aa,bb,cc}r:evicted aa@2{aa,bb,cc}W'
+const THREE_END = 'aa@2{aa,bb,cc}W bb@2{aa,bb,cc}W cc@2{aa,bb,cc}W dd@2{aa,bb,cc}r:evicted ee@2{aa,bb,cc}r:evicted'
+const LATE_VIEW_MID = 'aa@2{aa,bb,cc}W bb@2{aa,bb,cc}W cc@1{aa,bb,cc,dd,ee}W dd@2{aa,bb,cc}r:evicted ee@2{aa,bb,cc}r:evicted'
+//! the mid-point read-only sets today: nobody after a dead proposer's ballot or an abandoned one (the base reads no vote)
+const KNOWN_READ_ONLY_MID: Record<string, string[][]> = { 'proposerDeadStale open': [[]], 'proposerDeadStale committed': [[]], 'proposerDeadStale restart': [[]], 'retrySameEpoch one': [[]], 'retrySameEpoch two': [[]], twoFailedBallots: [[], []] }
+
+test('leave harness, the failed two-evictee ballot: the proposer dead with a stale majority alive (open, committed, back from its dir); an abandoned ballot retried at the same epoch after the proposer\'s restart; two abandoned ballots then a commit; a late VIEW — SAFE on today\'s kernel but lateView\'s mid point (the evictTwo window, pinned red); every end state and mid read-only set exactly as pinned', () => {
+  const runs: [string, ReturnType<typeof lateView>, string][] = [
+    ['proposerDeadStale open', proposerDeadStale('open'), DEAD_STALE_END],
+    ['proposerDeadStale committed', proposerDeadStale('committed'), DEAD_STALE_END],
+    ['proposerDeadStale restart', proposerDeadStale('restart'), DEAD_STALE_RESTART_END],
+    ['retrySameEpoch one', retrySameEpoch('one'), RETRY_ONE_END],
+    ['retrySameEpoch two', retrySameEpoch('two'), RETRY_TWO_END],
+    ['twoFailedBallots', twoFailedBallots(), THREE_END],
+    ['lateView', lateView(), THREE_END],
+  ]
+  //! safety first: the shape, one view per epoch, and the quiet point of every shape in one list
+  const unsafeOnes = runs.flatMap(([name, o]) => [...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])].map((p) => `${name}: ${p}`))
+  assert.deepEqual(unsafeOnes, [], 'not the shape, or UNSAFE')
+  //! the red-today witness: lateView's window, two writable views before the late VIEW lands
+  const [, late] = runs[6]
+  assert.equal(late.mid![0], LATE_VIEW_MID, 'lateView: the mid point moved — a kernel that holds cc on its vote closes the evictTwo window; re-record with the why')
+  //! liveness, one list: the end state of every shape and the read-only set at every mid point
+  const teeth: string[] = []
+  for (const [name, o, end] of runs) {
+    if (o.end !== end) teeth.push(`${name}: the end state moved — a rule that holds a vote above the view must say how it is released or superseded; re-record with the why: ${o.end}`)
+    const known = KNOWN_READ_ONLY_MID[name]
+    if (known) o.mid!.forEach((s, i) => { if (readOnlyOf(s).join(' ') !== known[i].join(' ')) teeth.push(`${name}: the read-only set at mid point ${i + 1} moved; re-record with the why: ${s}`) })
   }
   assert.deepEqual(teeth, [])
 })
