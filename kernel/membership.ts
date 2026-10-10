@@ -59,8 +59,9 @@
 // row naming how many partitions went with it. A leaver bounded out of the view half drains too when
 // its own view already dropped it (it committed as the proposer; the echo was lost): the rows are handed
 // over, the verdict stays b=0. The ballot rules are untouched: the drain begins AFTER the view change
-// commits (the leaver is already out, so no survivor can suspect or evict it) and BEFORE the process
-// goes. Unscoped leavers never drain (no scope ⇒ nothing to count): byte-identical.
+// commits (a leaver whose shrunk view the survivors installed is out of it, so none can suspect or evict
+// it; one bounded out of the view half may still be in theirs and may be evicted while it drains — harmless,
+// it is cut off and goes at the next tick) and BEFORE the process goes. Unscoped leavers never drain (no scope ⇒ nothing to count): byte-identical.
 //
 // A CLIENT node is a VIEW of the control plane, never a voice in it (I-23, 2026-09-28
 // — DECISIONS V4-5 carried up from the data plane): it installs the views its

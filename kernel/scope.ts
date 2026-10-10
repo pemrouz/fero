@@ -57,8 +57,8 @@ export const ACQ_LIVE_MAX = 8192
 export const STALL_AT = 8
 
 //! covers — THE shed bar as one predicate: do a holder's attested marks (`per`: HAVEA ok `m` / HAVEQ feed) reach
-// every frozen content tail (`lanes`)? evaluateSheds (the shed) and undrained (the leave drain) both read it, so
-// the two cannot drift apart: an ok answer whose floors sit BELOW the tail is not cover — under the pp law floors
+// every frozen content tail (`lanes`)? evaluateSheds (the shed), undrained (the leave drain) and shedWaitingOn
+// (the stall surface) all read it, so the three cannot drift apart: an ok answer whose floors sit BELOW the tail is not cover — under the pp law floors
 // lawfully under-claim (M6 findings 12/21), and the drain must wait for the right event, not any ok answer.
 const covers = (per: Map<string, number> | undefined, lanes: [string, number][]): boolean => {
   for (const [o, s] of lanes) if ((per?.get(o) ?? 0) < s) return false
