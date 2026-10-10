@@ -83,3 +83,13 @@ test('the window shut (leaveWindow at the bound, what leave.ms 0 means): the sam
   assert.ok(r.took < STALL, `gave up before the survivor woke (${r.took.toFixed(0)} ms < ${STALL} ms)`)
   assert.equal(r.leaving.total, 5, 'the fifth tick: the bound alone')
 })
+
+test('a huge window (leave.ms 3e9 at this cadence, about 35 days — an operator saying "wait as long as it takes") must not break the shell\'s cap: setTimeout treats a delay over 2^31 - 1 ms as 1 ms, so an unclamped cap resolved false at once and the clean stop was a crash (the wave 5c review) — the same stall, and the stop is clean after the wake', async () => {
+  //! 3e7 ticks × 100 ms = 3e9 ms, past Node's 2,147,483,647 ms timer ceiling: without the clamp in Runtime.leave() the
+  // cap fired after 1 ms, before the kernel ticked once (clean false, `left` [], leaving { ticks: 0, total: 0 })
+  const r = await stalledLeave({ leaveWindow: 3e7 })
+  assert.equal(r.clean, true, `a clean stop (took ${r.took.toFixed(0)} ms; leaving ${JSON.stringify(r.leaving)})`)
+  assert.deepEqual(r.left, [1], 'the kernel said so: `left` b=1')
+  assert.equal(r.epoch, 2, 'the view without aa committed')
+  assert.ok(r.took >= STALL - 50, `the vote could not come before the wake (${r.took.toFixed(0)} ms ≥ ${STALL})`)
+})

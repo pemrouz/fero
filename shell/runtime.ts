@@ -459,12 +459,16 @@ export class Runtime {
   // half's last tick + 1 when it timed out: with the defaults that is the 34th tick after leave(), and a cap
   // of 34 periods could win the race and tear the node down before it writes its `undrained` row
   // (heartbeats OFF ⇒ no view ⇒ the kernel answers at once). Idempotent: a second call joins the first wait.
+  //! The cap is clamped to Node's timer ceiling (2^31 - 1 ms, about 24.8 days): setTimeout treats a longer delay as
+  // 1 ms, so an operator who set leave.ms to a huge number to mean "wait as long as it takes" got the opposite — the
+  // cap won before the kernel ticked once and every stop with a slow survivor was a crash (the wave 5c review;
+  // tests/knock.test.ts pins it). The window's ticks are the kernel's bound; the clamp only keeps the timer honest.
   leave(): Promise<boolean> {
     if (this.#leaving) return this.#leaving
     if (this.node.destroyed) return Promise.resolve(false)
     this.#leaving = new Promise<boolean>((resolve) => {
       const ticks = Math.max(this.node.tune.leaveWindow, this.node.tune.leaveTicks) + (this.node.scoped ? this.node.tune.drainTicks + 1 : 0) + 2
-      const capMs = Math.max(250, (this.#opts.heartbeatMs ?? 0) * ticks)
+      const capMs = Math.min(MAX_TIMER_MS, Math.max(250, (this.#opts.heartbeatMs ?? 0) * ticks))
       const cap = setTimeout(() => { this.#onLeft = null; resolve(false) }, capMs)
       this.#onLeft = (clean) => { clearTimeout(cap); this.#onLeft = null; resolve(clean) }
       this.node.step({ kind: 'leave' })
@@ -495,6 +499,8 @@ export class Runtime {
 
 //! CONDEMNED — the marker boot() leaves in a dir whose boot record failed mid-life (I-36); restoreOpts refuses it
 const CONDEMNED = 'condemned'
+//! MAX_TIMER_MS — Node's setTimeout ceiling (2^31 - 1 ms): a longer delay fires after 1 ms. The destroy cap is clamped to it.
+const MAX_TIMER_MS = 2_147_483_647
 
 //! the typed reject start() settles with when the runtime stopped before it listened
 const stoppedError = () => Object.assign(new Error('runtime stopped before it listened'), { code: 'stopped' })
