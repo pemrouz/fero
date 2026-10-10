@@ -7,7 +7,8 @@
 // the holders' floors agree at the horizon (LIVE); M8 is red (RED TODAY by design: logs are unbounded under
 // scoping). M9 (leave drain) was red at R=1 until the drain landed (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): a
 // clean leaver now hands what it held to the new holders before it goes, so a leave-drain violation is UNSAFE
-// like any other. Per family, an engagement count proves the chaos bit.
+// like any other; A7 always runs its seed 4 (n=2 R=1), the one shape at the battery's seed count where that check
+// can bite. Per family, an engagement count proves the chaos bit.
 //
 // Mutations: today's kernel never releases an armed tombstone, so M3 and M6 check nothing in a lawful run. The
 // mutation runner performs the releases a broken rule would (sim/scoped-sweep.ts inject), and the pinned schedules
@@ -54,6 +55,14 @@ const KNOWN_UNSAFE: Record<string, Record<number, RegExp>> = {
   'A11-spoke': { 2: /resync-end .*stale reply/, 5: /resync-end .*stale reply/, 6: /resync-end .*stale reply/, 10: /resync-end .*stale reply/ },
 }
 
+//! ALWAYS — shapes a family must reach in every battery, whatever SEEDS is, because a pin below is vacuous without
+// them. A7 seed 4 is n=2 R=1 (seeds 1-3 are all R=2): the one shape where the leaver alone holds rows, so the only
+// one on which M9's leave-drain check can bite. With the drain removed it is the seed that goes red (checked
+// 2026-10-10: base tree red=[leave-drain] on seed 4 alone of seeds 1-4; the branch green).
+const ALWAYS: Record<string, number[]> = {
+  'A7-down-to-one': [4],
+}
+
 //! the engagement key each family must hit on at least one seed: a family whose chaos never bit proves nothing
 const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
   'A1-zombie': (e) => e.stranded === 1 && e.epoch >= 3, // stranded, evicted, healed back in
@@ -70,14 +79,14 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
 }
 
 for (const fam of FAMILIES) {
-  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
+  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
     let engaged = 0, cells = 0, advances = 0, resyncs = 0
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
     const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
-    // the newly-safe check below is the flip a fix must make
-    const seeds = [...new Set([...Array.from({ length: SEEDS }, (_, i) => i + 1), ...known])]
+    // the newly-safe check below is the flip a fix must make; the ALWAYS shapes run for the same reason
+    const seeds = [...new Set([...Array.from({ length: SEEDS }, (_, i) => i + 1), ...known, ...(ALWAYS[fam.name] ?? [])])]
     for (const seed of seeds) {
       const o = runFamily(fam, seed)
       if (o.unsafe.length) {
