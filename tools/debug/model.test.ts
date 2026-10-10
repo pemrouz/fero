@@ -459,7 +459,10 @@ test('the replay at a hand-off step: no cell of a row just shed, and no record a
   sim.post('n05', { kind: 'start' }); sim.run({ until: 9000 })
   writes(sim, [...nodes, n5], 6, 150); sim.run({ until: 10500 })
   sim.post('n05', { kind: 'leave' }); sim.run({ until: 16000 })
-  writes(sim, nodes, 8, 150); sim.run({ until: 20000 }) // writes after the rows came back: live arrivals after an acquire
+  //! writes after the rows came back: live arrivals after an acquire. 40 over 20 keys (was 8): DESIGN-SCALE stage 2
+  // moved every scoped trajectory, and on this seed 8 random writes no longer hit a re-acquired row at the node that
+  // re-acquired it (the fixture's `liveAfter` read 0); 40 cover every key several times over.
+  writes(sim, nodes, 40, 300); sim.run({ until: 20000 })
   assert.deepEqual(sim.violations, [])
   const cap = captureSim(sim)
   const K = cap.vocab

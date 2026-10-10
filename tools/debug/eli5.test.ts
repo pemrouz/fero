@@ -16,7 +16,7 @@ import { runAll } from './scenarios.ts'
 import { captureLive, captureSim, captureAttached } from './capture.ts'
 import { ELI5, tip, tipHTML, phaseKey } from './eli5.mjs'
 import { bootViewer, bootScenarios, bootScenariosPure, dragTo } from './dom-shim.ts'
-import { ABSENT_REASONS, verifyTopology } from './model.mjs'
+import { ABSENT_REASONS, verifyTopology, routes } from './model.mjs'
 import { REC, type EffectSink } from '../../kernel/env.ts'
 import { Node } from '../../kernel/node.ts'
 import { VERB, encodeControl } from '../../kernel/codec.ts'
@@ -124,6 +124,18 @@ const sweepViewer = async () => {
     }
   }
   for (const [id, cap] of run.captures) await drive(id, cap)
+  //! the scoped scenario's write that came in a HAND-OFF: `visit` selects the forest's first write of each severity,
+  // and which writes the join moves is the trajectory's choice (DESIGN-SCALE stage 2 moved it, and the first write
+  // no longer has an acquired stop) — so the one that did is selected by name, and its stop paints "got it in a hand-off"
+  {
+    const scoped = [...run.captures].find(([id]) => id === 'scoped')?.[1]
+    assert.ok(scoped, 'the scoped scenario is in the run')
+    const r = [...routes(scoped).values()].find((x: { nodes: Record<string, { status: string }> }) => Object.values(x.nodes).some((s) => s.status === 'acquired')) as { origin: string; seq: number } | undefined
+    assert.ok(r, 'the scoped scenario has a write that came in a hand-off — the fixture is what it claims')
+    const { el, g } = await bootViewer('scoped-handoff', scoped, {})
+    g(`navTo(${JSON.stringify('g/writes/' + r.origin + '#' + r.seq)})`)
+    sweep(el, 'scoped/handoff')
+  }
   //! a LIVE capture of real nodes frozen MID-FLIGHT (run to a horizon, not to quiescence): the poll path with
   // writes still travelling (in-flight pills, not-yet-arrived stops), then a deep-linked scrub point → paused
   // 600 writes in a burst so the Writes group overflows its 500-row paint cap (the honest '… older writes' row);
