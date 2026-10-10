@@ -1086,8 +1086,10 @@ its ballot out (`:264-267`) and escalates past the burn to `{aa,cc,dd}`@3 (`:587
 because bb's VIEW has not reached it. bb's VIEW lands at cc and dd first; they install view 2 and
 then read aa's PROPOSE@3 — above their view, so they grant it (`:400`; the frame carries no base
 epoch). aa reads cc's VIEW 2, installs it evicted and KEEPS the ballot (`:477` drops only a ballot
-at or below the view), then cc's VOTE. cc is cut from aa and dd, bb from dd; dd's VOTE lands, aa
-counts 2 of view 1's four (its old set, `:601`) and 2 of 3 new, and installs `{aa,cc,dd}`@3. The
+at or below the view), then cc's VOTE — its own vote and cc's are 2 of view 1's four, not a
+majority (`majority()`, `:121`), so nothing commits yet. cc is cut from aa and dd, bb from dd; dd's
+VOTE lands, aa counts 3 of view 1's four (itself, cc and dd; its old set, `:601`) and 3 of 3 new,
+and installs `{aa,cc,dd}`@3. The
 quiet point: `aa@3{aa,cc,dd} dd@3{aa,cc,dd}` writable beside `bb@2{bb,cc,dd} cc@2{bb,cc,dd}`
 writable — one view per epoch intact, so the recorder sees nothing. Once the chains give up, bb
 evicts dd (`{bb,cc}`@4) and aa evicts cc (`{aa,dd}`@4): two views at epoch 4, both writable. So

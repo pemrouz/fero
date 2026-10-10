@@ -495,9 +495,10 @@ const outcomeM = (m: Mesh, shape: string[], quiet: string | null): OutcomeM => {
 // burn to `{aa,cc,dd}`@3 (kernel/membership.ts #nextEpoch) — over view 1, because bb's VIEW 2 has not reached it.
 // bb's VIEW lands at cc and dd first; they install view 2 and THEN read aa's PROPOSE@3, which is above their view,
 // and grant it (the grant rule reads no base epoch: the frame carries none). aa reads cc's VIEW 2 — installs it,
-// EVICTED, and KEEPS its ballot at 3 (install drops only a ballot at or below the view) — then cc's VOTE. Now cc is
-// cut from aa and from dd, and bb from dd; dd's VOTE lands and aa counts 2 of view 1's 4 (its old set, fixed when the
-// ballot opened) and 2 of 3 new: `{aa,cc,dd}`@3 commits with view 2 and view 3 TWO members apart (bb out, aa in).
+// EVICTED, and KEEPS its ballot at 3 (install drops only a ballot at or below the view) — then cc's VOTE (its own and
+// cc's: 2 of view 1's 4, not a majority, so nothing commits yet). Now cc is cut from aa and from dd, and bb from dd;
+// dd's VOTE lands and aa counts 3 of view 1's 4 (itself, cc and dd; its old set, fixed when the ballot opened) and 3
+// of 3 new: `{aa,cc,dd}`@3 commits with view 2 and view 3 TWO members apart (bb out, aa in).
 // At the quiet point aa and dd are writable at 3 beside bb and cc at 2 (the split the recorder cannot see); once the
 // chains give up, bb evicts dd (`{bb,cc}`@4) and aa evicts cc (`{aa,dd}`@4): two views at epoch 4, both writable.
 // `shape` names the move that did not happen as described; empty on today's kernel.
