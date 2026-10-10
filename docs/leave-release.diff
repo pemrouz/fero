@@ -1,14 +1,55 @@
-# The scratch kernel of DESIGN-LEAVE §10.10 (2026-10-10, after its third review): the rule for a vote above my view, with its release.
-# Built on a copy of w5c/release (v4 at 145a70b plus the harness commits fc77fc1, d8ebc5d and d374759), outside any git tree; measured,
-# never committed. FERO_SCRATCH_VARIANT names the REJECTED variants, kept only for their teeth (§10.10.8): timeout (a clock on
-# the hold), forget (a two-tick memory of a held member's ask: the second review's blocker), counted (a stayer counts a held
-# member), nojoint (the commit ignores the joint sets), nolead (a held member leads nothing: the second review's major), noviewcheck.
-# The third review's three fixes are in the body (§10.10.6, §10.10.2): a HELLO carries the sender's holds (`v`) and a fresh link is
-# admitted knowing them; a client's word is not read and only a member's widens a ballot (I-23); a ballot whose member set is the
-# held view's is joint over it by construction. Apply with: git apply docs/leave-release.diff (then drop the `V` line and every use of it).
+# The scratch kernel of DESIGN-LEAVE §10.10 (2026-10-10, after its fourth review): the rule for a vote above my view, with its release.
+# Built on a copy of w5c/release (v4 at 145a70b plus the harness commits fc77fc1, d8ebc5d, d374759 and the fourth review's), outside
+# any git tree; measured, never committed. FERO_SCRATCH_VARIANT names the REJECTED variants, kept only for their teeth (§10.10.8):
+# timeout (a clock on the hold), forget (a two-tick memory of a held member's ask: the second review's blocker), counted (a stayer
+# counts a held member), nojoint (the commit ignores the joint sets), nolead (a held member leads nothing: the second review's
+# major), noviewcheck. The third review's three fixes are in the body (§10.10.6, §10.10.2): a HELLO carries the sender's holds (`v`)
+# and a fresh link is admitted knowing them; a client's word is not read and only a member's widens a ballot (I-23); a ballot whose
+# member set is the held view's is joint over it by construction. The fourth review's fix is in helloHolds (§10.10.6): a HELLO that
+# names holds is an announcement, so the release follows it even when it went out at epoch 0, where no ask does; and holds() has its
+# common-case fast path, since gate() calls it on the write path. Apply with: git apply docs/leave-release.diff (then drop the `V`
+# line and every use of it).
+--- a/kernel/codec.ts
++++ b/kernel/codec.ts
+@@ -80,6 +80,8 @@ export const VERB = {
+   // refusal notice sent just before a close (the shell's socket.destroy can lose it; the journal row is
+   // the contract). Sent only by nodes with a door; an open node never ships it and drops it on arrival.
+   DOOR: 26,
++  //! SCRATCH (DESIGN-LEAVE §10.10): NACK {e, h} — a vote's proposer disowns the ballot a held voter asked about
++  NACK: 27,
+ } as const
+ 
+ //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.
+--- a/kernel/door.ts
++++ b/kernel/door.ts
+@@ -28,7 +28,13 @@ export interface Door { mac(msg: string): string; nonce(): string; clientMac?(ms
+ //! HelloKeys — a HELLO's identity keys as a peer sent them (and as this node sent its own): what a proof
+ // signs, so none of them can change in flight before admission. `u, i, l` are checked for shape before
+ // anything reads them; the optional keys ride as decoded (shape-checked in node.ts).
+-export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: unknown; c?: unknown; m?: unknown; k?: unknown }
++//! SCRATCH (DESIGN-LEAVE §10.10.6): `v` — the sender's holds, [{e, h, p}], absent when it holds nothing. Outside the
++// proof here (proofMsg names its keys, and signs an array of strings and numbers — ONE encoding, which an array of
++// objects whose key order is the decoder's does not have). The build signs it as one string: the canonical key
++// Membership.#keyOf makes of it (`e:p:h|e:p:h`, '' when absent) — for consistency with the other HELLO keys, not
++// for protection: the same holds travel unsigned in every PULL `vs` after admission (DESIGN-DOOR §: no frame after
++// admission is signed), so a peer that can rewrite frames can rewrite the ask anyway.
++export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: unknown; c?: unknown; m?: unknown; k?: unknown; v?: unknown }
+ 
+ //! the nonce bounds (§2): 16 random bytes as base64url is 22 characters (the api); the sim's toy sends 32
+ // hex characters; anything outside 16..64 is a malformed HELLO.
+--- a/kernel/journal.ts
++++ b/kernel/journal.ts
+@@ -116,6 +116,7 @@ export const JK = {
+   contractReject: 77, // a=link, b=the first contract key that differs (or missing:<key>), c=THEIR value as a string, never ours — two servers' HELLOs carried different cluster contracts (heartbeat.ms, replicas, methods, validation, ring): refused at the door, parked, re-dialed at heartbeat cadence
+   doorReject: 78,    // a=link (the one that closes), b=reason, c=the dial target or the claimed listen (for 'uuid-taken' on the refusing side the uuid; on the refused client the dial target) — the door refused a link. Reasons: 'no-secret' (I have a door, the peer sent no k) · 'peer-secret' (the peer has one, I do not) · 'bad-proof' (its DOOR did not verify) · 'uuid-taken' (a CLIENT may not take a member's uuid; a member evicts a client squatting on its uuid; the refused client that read the {e: 'uuid-taken'} notice writes it too) · 'address' (a discovered or view-learned target answered as another listen: a relay) · 'timeout' (no DOOR within tune.proveMs) · 'refused' (a DOOR {e} notice — 'denied', or a word this version does not know — read while proving, after I proved; ONLY then. A bare close while proving is a link loss, not a refusal: no row, no park, the ordinary bounded redial chain — a crash, a cut or a lost notice look exactly like it, and the door speaks only through DOOR {e} (the third review)). Never a secret, nonce or proof.
+   //! ── drain-then-go (2026-10-10, DESIGN-SCALE §7 stage 1 (b)) ──
++  release: 80,       // SCRATCH §10.10: a=epoch, b=proposer — the vote's proposer disowned the ballot; the vote warns no more
+   undrained: 79,     // a=partitions, b=epoch — a scoped leaver went with partitions no reachable new holder had proved it holds (the drain hit tune.drainTicks, or nobody was there to drain to: the last member, every new holder unreachable); the `left` row that follows carries b=0
+ } as const
+ 
 --- a/kernel/membership.ts
 +++ b/kernel/membership.ts
-@@ -121,6 +121,14 @@
+@@ -121,6 +121,14 @@ import type { Node } from './node.ts'
  
  //! View: the committed membership fact — epoch + [uuid, listen] pairs, sorted by uuid (deterministic everywhere).
  export interface View { epoch: number; members: [string, string][] }
@@ -23,7 +64,7 @@
  
  //! protocol constants — ticks are heartbeat ticks (the membership clock). Each is the DEFAULT of its
  // tune-table row (kernel/tune.ts: suspectTicks, pulls, proposalAge, rejoinTicks, leaveTicks); tick() reads node.tune.
-@@ -157,8 +165,113 @@
+@@ -157,8 +165,123 @@ const viewOk = (m: unknown): m is [string, string][] => {
  export class Membership {
    view: View = { epoch: 0, members: [] }
    //! ballot state: one vote per epoch, identified by (epoch, proposer, membersHash) — see the banner
@@ -77,6 +118,9 @@
 +  // members apart from the one I hold (one apart, the count of §10.2 (a) protects). Re-read on every call, so an
 +  // install re-reads each against the new view by construction.
 +  holds(node: Node): Vote[] {
++    //! the common case first — no vote above the view and nothing behind it — allocates nothing: gate() calls this on
++    // every write drain and every inbound write run (kernel/write.ts), so the build's perf pins must see it (§10.10.9)
++    if (this.votedFor.e <= this.view.epoch && !this.votedFor.prior?.length) return []
 +    const timeout = V === 'timeout' ? node.tune.proposalAge + 2 : Infinity
 +    return this.#votesAbove(node).filter((x) => !x.f && this.#apart(x.h) >= 2 && this.#tickNo - (this.#voteTick.get(`${x.e}:${x.p}:${x.h}`) ?? 0) <= timeout)
 +  }
@@ -105,7 +149,14 @@
 +  helloHolds(node: Node, link: Link): { e: number; h: string; p: string }[] {
 +    if (node.client) return []
 +    const hs = this.#named(this.holds(node))
-+    ;(link as unknown as { saidHolds?: string }).saidHolds = this.#keyOf(hs) // the build gives Link the field
++    const key = this.#keyOf(hs)
++    ;(link as unknown as { saidHolds?: string }).saidHolds = key // the build gives Link the field
++    //! §10.10.6 (the fourth review): a HELLO that names holds is an ANNOUNCEMENT, so the release must follow it — at
++    // epoch 0 too, where no ask goes out and #lastAsk stayed empty: the install that ended the hold compared '' with ''
++    // and sent nothing, and a stayer that had read the HELLO kept not counting a member that held nothing (helloHold:
++    // aa `minority` with cc and dd linked, and its next ballot joint over the phantom hold). With the key here, the
++    // first change after the HELLO goes out as the ask on every member link — an empty one when the last hold ended.
++    if (key !== '') this.#lastAsk = key
 +    return hs
 +  }
 +  //! SCRATCH §10.10.6, the ask: PULL {e, vs: [{e, h, p}]} with my holds, on every admitted member link. Sent on every
@@ -139,7 +190,7 @@
    //! #burned — the highest epoch known to hold SPENT votes for a ballot that never committed (the
    // proposer vanished mid-round). Vote-once-per-epoch means a burned epoch is unwinnable by any OTHER
    // proposer, and with every proposal pinned to view.epoch+1 that was a PERMANENT liveness wedge: a
-@@ -216,15 +329,20 @@
+@@ -216,15 +339,20 @@ export class Membership {
      if (this.rejoining()) return { open: false, reason: 'rejoining' }
      if (this.view.epoch === 0) return { open: true, reason: '' } // open genesis — the M0/M1 mode
      if (!this.isMember(node.uuid)) return { open: false, reason: this.#wasMember ? 'evicted' : 'joining' }
@@ -161,7 +212,7 @@
    #lowestLive(): string {
      return this.view.members.map((m) => m[0]).filter((u) => !this.#suspects.has(u))[0] ?? ''
    }
-@@ -233,6 +351,8 @@
+@@ -233,6 +361,8 @@ export class Membership {
    // proposals, proposal retry/abandon, stale-pull retries + alarmed release, rejoin/evictee recovery.
    tick(node: Node) {
      const j = node.journal
@@ -170,7 +221,7 @@
      //! genesis: fully-formed open mesh + lowest uuid ⇒ propose view 1 over the admitted set.
      // CLIENT links are invisible here (M5b): a spoke never counts toward formation, never enters the
      // member sweep, and never wins the lowest-uuid race — and a client NODE runs none of the member
-@@ -340,9 +460,25 @@
+@@ -340,9 +470,25 @@ export class Membership {
    //! onAdmit — view-on-admit, symmetric with digest-on-admit: every admission announces the committed
    // view, so a healed partition re-converges its VIEWS even when no epoch-stamped records flow (the
    // plan's split-brain-heal re-announce). A rejoiner/evictee learns its status in one round-trip.
@@ -197,7 +248,7 @@
    }
  
    //! staleObserved — the epoch-staleness contract: any epoch above the committed view closes the gate
-@@ -397,11 +533,23 @@
+@@ -397,11 +543,23 @@ export class Membership {
      this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => u !== leaver) })
    }
  
@@ -222,7 +273,7 @@
      //! one spelling for a clean leave: a ballot that leaves its OWN proposer out is a leave (the lowest live
      // leaver proposes its exit itself, see #knockLeave). Journal it as leave(proposer) — the row a knocked
      // leave writes in onLeave — so a survivor's diary reads the same either way. Journal only.
-@@ -424,17 +572,35 @@
+@@ -424,17 +582,35 @@ export class Membership {
      const leavingOut = going && !inBallot
      const backIn = this.leaving?.done === true && inBallot
      const grant = v.e > this.view.epoch && !backIn && (leavingOut || !this.epochStale) && (this.votedFor.e < v.e || this.votedFor.p === proposer)
@@ -240,8 +291,9 @@
 +    //! SCRATCH: a refusal while held carries `hm`, the views my holds are for, so the proposer re-offers joint over them
 +    link.ship(encodeControl(VERB.VOTE, { e: v.e, g: grant ? 1 : 0, ce: this.view.epoch, h, ve: this.votedFor.e, ...(!grant && hs.length ? { hm: hs.map((x) => x.h) } : {}) }), node.env.sink, j)
 +    if (grant) this.#ask(node, 'change') // SCRATCH §10.10.6: a grant that holds me is announced at once, behind the VOTE on the proposer's link
-+  }
-+
+   }
+ 
+-  onVote(node: Node, link: Link, v: { e?: unknown; g?: unknown; ce?: unknown; h?: unknown; ve?: unknown }) {
 +  //! SCRATCH §10.10, the disown: the vote's proposer says it holds no ballot of that identity and no view at or
 +  // above it. Only the proposer could ever commit that ballot, and a ballot counts only VOTE frames that reach it
 +  // after it opened — so this vote can never be a committing vote unless I grant it AGAIN, which re-reads the hold.
@@ -254,14 +306,13 @@
 +    node.persistBoot()
 +    node.journal.armed && node.journal.emit(JK.release, v.e, link.uuid)
 +    this.#ask(node, 'change') // SCRATCH §10.10.6: the release is announced at once (an empty ask when it was my last hold)
-   }
- 
--  onVote(node: Node, link: Link, v: { e?: unknown; g?: unknown; ce?: unknown; h?: unknown; ve?: unknown }) {
++  }
++
 +  onVote(node: Node, link: Link, v: { e?: unknown; g?: unknown; ce?: unknown; h?: unknown; ve?: unknown; hm?: unknown }) {
      if (typeof v?.e !== 'number' || typeof v?.g !== 'number') return
      if (typeof v.ce === 'number') this.staleObserved(node, v.ce, link)
      //! a REFUSAL carrying the voter's spent epoch (ve) teaches the burn in one round: this voter's
-@@ -442,12 +608,17 @@
+@@ -442,12 +618,17 @@ export class Membership {
      if (v.g !== 1 && typeof v.ve === 'number' && Number.isFinite(v.ve) && v.ve > this.#burned && v.ve > this.view.epoch)
        this.#burned = v.ve
      const p = this.#proposal
@@ -280,7 +331,7 @@
        const view = p.view
        this.#proposal = null
        this.install(node, view)
-@@ -478,10 +649,23 @@
+@@ -478,10 +659,23 @@ export class Membership {
        this.#finishLeave(node, true)
    }
  
@@ -305,7 +356,7 @@
    }
  
    //! install — the ONE place a view becomes committed fact: bump the node epoch, clear satisfied stale/
-@@ -500,10 +684,11 @@
+@@ -500,10 +694,11 @@ export class Membership {
      node.confirm.recount(node) // the view-change recount: thresholds are majorities OF THE COMMITTED VIEW
      if (this.epochStale && view.epoch >= this.#staleWant) { this.epochStale = false; this.#pullTicks = 0 }
      if (this.rejoining() && view.epoch >= this.rejoinFloor) this.rejoinFloor = 0
@@ -321,7 +372,7 @@
      for (const u of [...this.#suspects]) if (!this.isMember(u)) { this.#suspects.delete(u); this.#suspectTicks.delete(u) }
      if (!this.isMember(node.uuid)) { this.#suspects.clear(); this.#suspectTicks.clear() } // an evictee's grudges expire with its membership
      //! dial any member this node holds no link to (the joiner's side of a join, a healed evictee's peers),
-@@ -519,6 +704,7 @@
+@@ -519,6 +714,7 @@ export class Membership {
      // same FIFO links — a peer still on the old epoch must receive the VIEW before the round, or it
      // deterministically drops the round for epoch skew and the offer waits a full re-round cadence.
      if (!node.client) this.#send(node, this.#admitted(node), encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members })) // a spoke never floods (I-23)
@@ -329,7 +380,7 @@
      //! M6: every install re-derives the scope machine against the new ring — held partitions that
      // left the R-set freeze into orphans HERE, the instant the duty changes (kernel/scope.ts)
      if (node.armed) node.scope!.rescope(node)
-@@ -667,6 +853,7 @@
+@@ -667,6 +863,7 @@ export class Membership {
    }
  
    #propose(node: Node, view: View) {
@@ -337,7 +388,7 @@
      //! proposing SPENDS your vote — and a vote already spent on another proposer for this epoch cannot
      // be spent again here (the review's critical: double-voting via propose committed two views/epoch).
      // The refusal records the burn so the next attempt escalates past it instead of wedging forever.
-@@ -675,12 +862,18 @@
+@@ -675,12 +872,18 @@ export class Membership {
        return
      }
      const h = hashOf(view.members)
@@ -359,7 +410,7 @@
        this.#proposal = null
        this.install(node, view)
        return
-@@ -690,12 +883,12 @@
+@@ -690,12 +893,12 @@ export class Membership {
  
    #proposeFrame(node: Node): Uint8Array {
      const p = this.#proposal!
@@ -374,20 +425,9 @@
      return this.#admitted(node).filter((l) => want.has(l.uuid) && !p.votes.has(l.uuid))
    }
  
---- a/kernel/codec.ts
-+++ b/kernel/codec.ts
-@@ -80,6 +80,8 @@
-   // refusal notice sent just before a close (the shell's socket.destroy can lose it; the journal row is
-   // the contract). Sent only by nodes with a door; an open node never ships it and drops it on arrival.
-   DOOR: 26,
-+  //! SCRATCH (DESIGN-LEAVE §10.10): NACK {e, h} — a vote's proposer disowns the ballot a held voter asked about
-+  NACK: 27,
- } as const
- 
- //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.
 --- a/kernel/node.ts
 +++ b/kernel/node.ts
-@@ -719,6 +719,7 @@
+@@ -719,6 +719,7 @@ export class Node {
          // With a door the sent object is kept (link.said): my proof signs exactly these keys.
          const door = this.door
          if (door !== undefined) link.nonce = door.nonce()
@@ -395,7 +435,7 @@
          const body: HelloKeys = {
            u: this.uuid, i: this.incarnation, l: this.listen,
            ...(this.client ? { r: 1 } : {}),
-@@ -726,6 +727,7 @@
+@@ -726,6 +727,7 @@ export class Node {
            ...(this.contract !== undefined ? { c: this.contract } : {}),
            ...(this.methodsOnly ? { m: 1 } : {}),
            ...(door !== undefined ? { k: link.nonce } : {}),
@@ -403,7 +443,7 @@
          }
          if (door !== undefined) link.said = body
          link.ship(encodeControl(VERB.HELLO, body), this.env.sink, j)
-@@ -1353,7 +1355,7 @@
+@@ -1353,7 +1355,7 @@ export class Node {
      //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
      // membership converges even when no epoch-stamped records flow; then settle — an admitted member
      // can flip the gate back to majority, flushing any parked writes
@@ -412,7 +452,7 @@
      this.membership.settle(this)
      //! round-on-admit (M6-review findings 13/23/33/40/49 — DESIGN-M6 C3's mandated trigger): the
      // post-reconnect multi-source window creates interior holes suffix AE cannot fill (they sit
-@@ -1817,6 +1819,7 @@
+@@ -1817,6 +1819,7 @@ export class Node {
        case VERB.VOTE:
        case VERB.VIEW:
        case VERB.PULL:
@@ -420,7 +460,7 @@
        case VERB.LEAVE: {
          if (link.state !== LS.admitted) {
            j.armed && j.emit(JK.frameDrop, link.id, 'membership before hello')
-@@ -1836,6 +1839,7 @@
+@@ -1836,6 +1839,7 @@ export class Node {
          else if (f.verb === VERB.VOTE) this.membership.onVote(this, link, v)
          else if (f.verb === VERB.VIEW) this.membership.onView(this, link, v)
          else if (f.verb === VERB.PULL) this.membership.onPull(this, link, v)
@@ -428,32 +468,9 @@
          else this.membership.onLeave(this, link)
          this.membership.settle(this)
          return
---- a/kernel/door.ts
-+++ b/kernel/door.ts
-@@ -28,7 +28,9 @@
- //! HelloKeys — a HELLO's identity keys as a peer sent them (and as this node sent its own): what a proof
- // signs, so none of them can change in flight before admission. `u, i, l` are checked for shape before
- // anything reads them; the optional keys ride as decoded (shape-checked in node.ts).
--export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: unknown; c?: unknown; m?: unknown; k?: unknown }
-+//! SCRATCH (DESIGN-LEAVE §10.10.6): `v` — the sender's holds, [{e, h, p}], absent when it holds nothing. Outside the
-+// proof here (proofMsg names its keys); the build signs it too.
-+export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: unknown; c?: unknown; m?: unknown; k?: unknown; v?: unknown }
- 
- //! the nonce bounds (§2): 16 random bytes as base64url is 22 characters (the api); the sim's toy sends 32
- // hex characters; anything outside 16..64 is a malformed HELLO.
---- a/kernel/journal.ts
-+++ b/kernel/journal.ts
-@@ -116,6 +116,7 @@
-   contractReject: 77, // a=link, b=the first contract key that differs (or missing:<key>), c=THEIR value as a string, never ours — two servers' HELLOs carried different cluster contracts (heartbeat.ms, replicas, methods, validation, ring): refused at the door, parked, re-dialed at heartbeat cadence
-   doorReject: 78,    // a=link (the one that closes), b=reason, c=the dial target or the claimed listen (for 'uuid-taken' on the refusing side the uuid; on the refused client the dial target) — the door refused a link. Reasons: 'no-secret' (I have a door, the peer sent no k) · 'peer-secret' (the peer has one, I do not) · 'bad-proof' (its DOOR did not verify) · 'uuid-taken' (a CLIENT may not take a member's uuid; a member evicts a client squatting on its uuid; the refused client that read the {e: 'uuid-taken'} notice writes it too) · 'address' (a discovered or view-learned target answered as another listen: a relay) · 'timeout' (no DOOR within tune.proveMs) · 'refused' (a DOOR {e} notice — 'denied', or a word this version does not know — read while proving, after I proved; ONLY then. A bare close while proving is a link loss, not a refusal: no row, no park, the ordinary bounded redial chain — a crash, a cut or a lost notice look exactly like it, and the door speaks only through DOOR {e} (the third review)). Never a secret, nonce or proof.
-   //! ── drain-then-go (2026-10-10, DESIGN-SCALE §7 stage 1 (b)) ──
-+  release: 80,       // SCRATCH §10.10: a=epoch, b=proposer — the vote's proposer disowned the ballot; the vote warns no more
-   undrained: 79,     // a=partitions, b=epoch — a scoped leaver went with partitions no reachable new holder had proved it holds (the drain hit tune.drainTicks, or nobody was there to drain to: the last member, every new holder unreachable); the `left` row that follows carries b=0
- } as const
- 
 --- a/sim/mesh.ts
 +++ b/sim/mesh.ts
-@@ -12,7 +12,7 @@
+@@ -12,7 +12,7 @@ import { Framer, VERB, encodeControl } from '../kernel/codec.ts'
  import { TAG, type BootRecord, type EffectSink, type Env } from '../kernel/env.ts'
  
  //! the membership verbs: the only frames the mesh carries
@@ -462,7 +479,7 @@
  const vname = (v: number) => Object.entries(VERB).find(([, x]) => x === v)?.[0] ?? String(v)
  type Frame = { verb: number; bytes: Uint8Array; value: unknown }
  type Boot = { epoch: number; members: [string, string][]; votedFor?: { e: number; p: string; h: string } }
-@@ -80,7 +80,10 @@
+@@ -80,7 +80,10 @@ export class Mesh {
      for (const [x, y] of [[a, b], [b, a]]) {
        const n = this.nodes.get(x)!, id = this.linkOf.get(x)!.get(y)!
        n.step({ kind: 'linkUp', link: id, dialed: x < y, to: x < y ? `sim:${y}` : undefined })
