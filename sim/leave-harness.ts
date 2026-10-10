@@ -33,6 +33,15 @@
 //   crash     — the round-3 re-check's `crash2`: one stayer CRASHES at an offset from one or two clean stops (before,
 //               at, just after), comes back from its dir after 2 s or never; the leavers time out and are restarted
 //               from their dirs after 0.4, 3 or 25 s. The 24 n=3 "crash twin" cases live here (H12).
+//   keptBallot — the kept ballot's two-member shape at n=4 (DESIGN-LEAVE §10.2 (ii); the third 2026-10-10 review's
+//               probe), move by move on real Nodes: a duel at 2, the loser escalates to 3 over view 1 before view 2
+//               reaches it, installs view 2 EVICTED and keeps the ballot (kernel/membership.ts install), and commits
+//               it on two granters who hold view 2. Today's kernel: two writable views at the quiet point, then two
+//               views at epoch 4 once the cut chains give up. The base's third hole.
+//   flapDuringBallot, proposerCrash — a FAILED ballot in a healthy cluster (the same review): one member flaps during
+//               an eviction ballot and the proposer abandons it; the proposer crashes for good mid-ballot (open, or
+//               committed with its VIEW unsent). Today's kernel heals both, writable everywhere; a rule that closes a
+//               gate on a vote above its view freezes every live member for good (DESIGN-LEAVE §10.2, the release).
 //   explorer  — sim/mesh.ts's random explorer over real Nodes with the quiet-point writable-split check on (the
 //               round-2 re-check's "end-state check" variant), over its own seed range.
 // What every family checks (sim/leave-sweep.ts): SAFETY — no monitor fired and no two nodes end WRITABLE in
@@ -41,7 +50,7 @@
 import { Sim } from './exec.ts'
 import { cluster } from './harness.ts'
 import { verdict, split } from './leave-sweep.ts'
-import { explore } from './mesh.ts'
+import { explore, Mesh, quietSplit } from './mesh.ts'
 import { JK } from '../kernel/journal.ts'
 import { VERB } from '../kernel/codec.ts'
 import type { Node } from '../kernel/node.ts'
@@ -458,6 +467,115 @@ export const evictTwoB = (seed: number, inspect?: (sim: Sim) => void): string[] 
   const sp = split(sim)
   if (sp) problems.push(sp)
   return problems
+}
+
+// ── the mesh shapes: fixed schedules, move by move on real Nodes (sim/mesh.ts; the third 2026-10-10 review's probes) ──
+//! meshState — every node on one line: `uuid@epoch{members}` then `W` (writable) or `r:<reason>` (read-only)
+export const meshState = (m: Mesh) => [...m.nodes.values()].map((x) => { const g = x.membership.gate(x); return `${x.uuid}@${x.epoch}{${x.membership.view.members.map((v) => v[0])}}${g.open ? 'W' : 'r:' + g.reason}` }).join(' ')
+//! drain — every queued frame lands, in order, with the cuts as they are (the mesh's quiet point, without the ticks)
+const drain = (m: Mesh) => { for (let g = 0; g < 2000; g++) { const qs = [...m.q.entries()].filter(([, f]) => f.length); if (!qs.length) break; for (const [k] of qs) { const [a, b] = k.split('>'); m.deliver(a, b) } } }
+//! allOf — every frame a→b lands, in order; the verbs it delivered
+const allOf = (m: Mesh, a: string, b: string) => { const out: string[] = []; for (let v; (v = m.deliver(a, b)); ) out.push(v); return out }
+const proposals = (m: Mesh, u: string) => m.nodes.get(u)!.journal.read().filter((e) => e.kind === JK.propose).map((e) => `P(${e.a},${e.b})`).join(' ')
+//! settle — the chains to every cut pair give up (as they do in life after the redial budget), every frame lands,
+// everyone ticks; `rounds` times over
+const settle = (m: Mesh, rounds: number, pairs: [string, string][]) => {
+  for (let r = 0; r < rounds; r++) { for (const [x, y] of pairs) m.giveUp(x, y); drain(m); for (const u of m.nodes.keys()) m.tick(u) }
+  drain(m)
+}
+export interface OutcomeM { shape: string[]; splits: string[]; quiet: string | null; end: string; readOnly: string[] }
+const outcomeM = (m: Mesh, shape: string[], quiet: string | null): OutcomeM => {
+  const end = meshState(m)
+  return { shape, splits: [...m.splits], quiet, end, readOnly: end.split(' ').filter((s) => s.includes('r:')) }
+}
+
+//! keptBallot — the kept ballot's two-member shape at n=4 (DESIGN-LEAVE §10.2 (ii)): aa and bb lose each other and
+// each, the lowest live member in its own eyes, proposes the view without the other at 2. bb wins on cc's and dd's
+// grants, `{bb,cc,dd}`@2. aa is refused at 2 (their votes are on bb), its ballot ages out, and it escalates past the
+// burn to `{aa,cc,dd}`@3 (kernel/membership.ts #nextEpoch) — over view 1, because bb's VIEW 2 has not reached it.
+// bb's VIEW lands at cc and dd first; they install view 2 and THEN read aa's PROPOSE@3, which is above their view,
+// and grant it (the grant rule reads no base epoch: the frame carries none). aa reads cc's VIEW 2 — installs it,
+// EVICTED, and KEEPS its ballot at 3 (install drops only a ballot at or below the view) — then cc's VOTE. Now cc is
+// cut from aa and from dd, and bb from dd; dd's VOTE lands and aa counts 2 of view 1's 4 (its old set, fixed when the
+// ballot opened) and 2 of 3 new: `{aa,cc,dd}`@3 commits with view 2 and view 3 TWO members apart (bb out, aa in).
+// At the quiet point aa and dd are writable at 3 beside bb and cc at 2 (the split the recorder cannot see); once the
+// chains give up, bb evicts dd (`{bb,cc}`@4) and aa evicts cc (`{aa,dd}`@4): two views at epoch 4, both writable.
+// `shape` names the move that did not happen as described; empty on today's kernel.
+export const keptBallot = (): OutcomeM => {
+  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd'])
+  const shape: string[] = []
+  const node = (u: string) => m.nodes.get(u)!
+  m.cut('aa', 'bb')
+  for (let i = 0; i < 3; i++) { m.tick('aa'); m.tick('bb') }
+  m.giveUp('aa', 'bb'); m.giveUp('bb', 'aa')
+  m.tick('aa'); m.tick('bb')
+  if (proposals(m, 'aa') !== 'P(2,3)' || proposals(m, 'bb') !== 'P(2,3)') shape.push(`the duel at 2: aa ${proposals(m, 'aa')}, bb ${proposals(m, 'bb')}`)
+  //! bb wins on cc's and dd's grants
+  allOf(m, 'bb', 'cc'); allOf(m, 'bb', 'dd'); allOf(m, 'cc', 'bb'); allOf(m, 'dd', 'bb')
+  if (node('bb').epoch !== 2) shape.push(`bb did not commit {bb,cc,dd}@2: ${meshState(m)}`)
+  //! cc and dd refuse aa at 2 (their vote at 2 is on bb); bb's VIEW 2 is still in their queues, not yet read
+  allOf(m, 'aa', 'cc'); allOf(m, 'aa', 'dd'); allOf(m, 'cc', 'aa'); allOf(m, 'dd', 'aa')
+  //! aa's ballot at 2 ages out and it escalates past the burn to 3, over view 1
+  for (let i = 0; i < 20 && !proposals(m, 'aa').includes('P(3'); i++) { m.giveUp('aa', 'bb'); m.tick('aa') }
+  if (proposals(m, 'aa') !== 'P(2,3) P(3,3)' || node('aa').epoch !== 1) shape.push(`aa did not escalate to 3 over view 1: ${proposals(m, 'aa')} at epoch ${node('aa').epoch}`)
+  //! bb's VIEW 2 lands at cc and dd FIRST (they install it and flood it to aa), then aa's queued PROPOSE@3s: both grant
+  allOf(m, 'bb', 'cc'); allOf(m, 'bb', 'dd'); allOf(m, 'aa', 'cc'); allOf(m, 'aa', 'dd')
+  for (const u of ['cc', 'dd']) if (node(u).epoch !== 2 || node(u).membership.votedFor.e !== 3 || node(u).membership.votedFor.p !== 'aa') shape.push(`${u} did not grant aa at 3 from view 2: ${meshState(m)}`)
+  //! aa reads cc's queue: VIEW 2 first (FIFO) — installed, evicted, the ballot KEPT — then cc's VOTE at 3
+  allOf(m, 'cc', 'aa')
+  if (node('aa').epoch !== 2) shape.push(`aa did not install view 2 evicted: ${meshState(m)}`)
+  //! the two cuts inside one round trip; then dd's VOTE lands and the kept ballot commits
+  m.cut('cc', 'aa'); m.cut('cc', 'dd'); m.cut('bb', 'dd')
+  allOf(m, 'dd', 'aa')
+  if (node('aa').epoch !== 3) shape.push(`aa did not commit {aa,cc,dd}@3 on the kept ballot: ${meshState(m)}`)
+  const quiet = quietSplit(m)
+  settle(m, 30, [['aa', 'bb'], ['bb', 'aa'], ['aa', 'cc'], ['cc', 'aa'], ['cc', 'dd'], ['dd', 'cc'], ['bb', 'dd'], ['dd', 'bb']])
+  return outcomeM(m, shape, quiet)
+}
+
+//! evictionBallot — a healthy five-node mesh in which aa loses ee only, suspects it, its chain gives up, and it
+// proposes `{aa,bb,cc,dd}`@2 (the eviction branch of kernel/membership.ts tick). The start of the two shapes below.
+const evictionBallot = (shape: string[]): Mesh => {
+  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd', 'ee'])
+  m.cut('aa', 'ee')
+  for (let i = 0; i < 3; i++) m.tick('aa')
+  m.giveUp('aa', 'ee')
+  m.tick('aa')
+  if (proposals(m, 'aa') !== 'P(2,4)') shape.push(`aa did not open the eviction of ee at 2: ${proposals(m, 'aa')}`)
+  return m
+}
+
+//! flapDuringBallot — one member flaps during an eviction ballot, no cut of the cluster: bb's VOTE lands (2 of the 3
+// aa needs), then ee comes back and aa ABANDONS the ballot (membership.ts tick: the suspect came back). Every frame
+// lands and everyone ticks 40 rounds. Today's kernel: all five writable at view 1, bb, cc and dd each holding a vote
+// at 2 for aa above their view, which nothing reads. A gate rule on that vote leaves all five read-only for good:
+// bb, cc, dd `stale-vote`, and aa and ee `minority` once a stayer's gate skips the three (DESIGN-LEAVE §10.2).
+export const flapDuringBallot = (): OutcomeM => {
+  const shape: string[] = []
+  const m = evictionBallot(shape)
+  if (m.deliver('aa', 'bb') !== 'PROPOSE' || m.deliver('bb', 'aa') !== 'VOTE') shape.push('bb did not grant aa at 2')
+  m.connect('aa', 'ee')
+  m.tick('aa') // ee is live again: the eviction ballot is abandoned
+  settle(m, 40, [])
+  return outcomeM(m, shape, quietSplit(m))
+}
+
+//! proposerCrash — the proposer crashes for good in the middle of a one-member eviction ballot, after bb and cc have
+// granted. `open`: the VOTEs never reach aa (it dies with the ballot open). `committed`: aa counts both, installs
+// `{aa,bb,cc,dd}`@2 and dies before its VIEW leaves. The rest stay linked; their chains to aa give up. Today's
+// kernel: the four re-form, `{bb,cc,dd,ee}`@3, writable. A gate rule on a vote above the view leaves all four
+// read-only for good, and the one candidate release (the vote's proposer reporting its ballot uncommitted) has no
+// proposer to fire from. In the committed variant the base's re-form is safe by the one-member count: a view at 2
+// that changed one member cannot be writable beside view 3 (DESIGN-LEAVE §10.2 (a)).
+export const proposerCrash = (variant: 'open' | 'committed'): OutcomeM => {
+  const shape: string[] = []
+  const m = evictionBallot(shape)
+  m.deliver('aa', 'bb'); m.deliver('aa', 'cc')
+  if (variant === 'committed') { m.deliver('bb', 'aa'); m.deliver('cc', 'aa'); if (m.nodes.get('aa')!.epoch !== 2) shape.push('aa did not commit {aa,bb,cc,dd}@2 on two grants') }
+  else if (m.nodes.get('aa')!.epoch !== 1) shape.push('aa committed before it died')
+  m.destroy('aa')
+  settle(m, 40, [...m.nodes.keys()].map((u) => [u, 'aa'] as [string, string]))
+  return outcomeM(m, shape, quietSplit(m))
 }
 
 // ── crash: a stayer crashes at an offset from the clean stops; everyone restarts from disk (the round-3 `crash2`) ──

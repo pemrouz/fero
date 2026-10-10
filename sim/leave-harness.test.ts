@@ -1,12 +1,15 @@
 //! The adversarial leave harness, pinned on today's kernel (DESIGN-LEAVE §9 step 2 and §10, 2026-10-10). The
 // generators are in sim/leave-harness.ts; this file runs each family over its range and pins two things apart:
 //   SAFETY  — ASSERTED on every schedule: no monitor fired (one-view-per-epoch above all) and no two nodes ended
-//             WRITABLE in different views at a quiet point. The base is safe on every family here but one: evictTwo
-//             (two suspects evicted at once, the third voter cut on its grant) is a hole of today's kernel and is
-//             pinned as the exact seeds it splits on, so a fix shows as a moved pin.
+//             WRITABLE in different views at a quiet point. The base is safe on every family here but three, which
+//             are holes of today's kernel and are pinned RED as the exact seeds or end state they split on, so a fix
+//             shows as a moved pin: evictTwo (two suspects evicted at once, the third voter cut on its grant),
+//             evictTwoB (the same with the stale voter granting a never-voted member's higher ballot), and keptBallot
+//             (a ballot kept across an install commits two members apart from the view it was kept across, at n=4).
 //   LIVENESS — COUNTED, pinned as exact sets in both directions (a schedule the kernel used to heal that wedges now
 //             is a regression; one that heals where it used to wedge means the pin is stale: update it on purpose,
 //             with the why). Today's kernel is not live on every schedule (I-20), so the exact sets are the FLOOR.
+//             Safety and liveness are never asserted in one list: a liveness move must read apart from a split.
 // Teeth, measured on 2026-10-10 by putting the parked branch's kernel/membership.ts over a scratch copy of this tree
 // (docs/DESIGN-LEAVE.md §10.8): the round-0 kernel (851796b) fails `twoLeavers` (two views at epoch 2, H1); the
 // review-fix kernel (915d027) fails the two n=3 named shapes (not live, H3); the round-1 kernel (02f65ed) fails
@@ -15,13 +18,16 @@
 // (H9), and four more crash schedules than the base in the default grid (#9, #11, #25, #27) and 24 more in the full
 // one, all of them the n=3 crash twin (H12); the round-3 kernel also splits `pledgeTwo` on 5 of 5 (its gate counts a
 // read-only leaver's link, the 2026-10-10 review's blocker — with the cut at 0 ms; the first version's 3 ms cut let
-// the VOTEs land and was green there, the second review). The base's own hole is `evictTwo` and `evictTwoB`, pinned
-// red as the seeds they split on. Bounded: about 30 s at low priority on the loaded WSL2 box, half
-// that idle; FERO_LEAVE_FULL=1 runs the full crash grid (576 cases, three restart delays, two seeds) and 100 seeded
-// isolate schedules instead of 50.
+// the VOTEs land and was green there, the second review). The base's own holes are `evictTwo`, `evictTwoB` and
+// `keptBallot`, pinned red. The candidate rule of §10.9 step 2 (a vote above my view: gate closed, lead nothing,
+// grant nothing new) turns `flapDuringBallot` and `proposerCrash` red — every live member read-only for good where
+// the base heals — which is the release question (§10.2). Bounded: about 30 s at low priority on the loaded WSL2
+// box, half that idle; FERO_LEAVE_FULL=1 runs the full crash grid (576 cases, three restart delays, two seeds) and
+// 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
 import { Sim } from './exec.ts'
@@ -30,27 +36,47 @@ import { JK } from '../kernel/journal.ts'
 
 const FULL = process.env.FERO_LEAVE_FULL === '1'
 
-//! pinExact — the sweep's rule (sim/leave-sweep.test.ts): safety asserted, the not-live (or not-settled) set equal to
-// the pinned one in both directions
-const pinExact = (label: string, actual: number[], known: Set<number>, shapes: Map<number, string>) => {
-  const regressed = actual.filter((s) => !known.has(s)).map((s) => `${shapes.get(s)}`)
-  const improved = [...known].filter((s) => !actual.includes(s))
-  assert.deepEqual(regressed, [], `${label}: a schedule the kernel used to heal is not live now — a liveness regression, or update the pin on purpose`)
-  assert.deepEqual(improved, [], `${label}: a schedule known to wedge is live now — take it off the pin`)
-}
+//! pinDiff — the sweep's rule (sim/leave-sweep.test.ts) as lines: the not-live (or not-settled) set against the
+// pinned one in both directions, each difference its own line, so a test can gather it with its other teeth and
+// every message prints. pinExact asserts it alone.
+const pinDiff = (label: string, actual: number[], known: Set<number>, shapes: Map<number, string>) => [
+  ...actual.filter((s) => !known.has(s)).map((s) => `${label}: a schedule the kernel used to heal is not live now — a liveness regression, or update the pin on purpose: ${shapes.get(s)}`),
+  ...[...known].filter((s) => !actual.includes(s)).map((s) => `${label}: a schedule known to wedge is live now — take it off the pin: ${s}`),
+]
+const pinExact = (label: string, actual: number[], known: Set<number>, shapes: Map<number, string>) => assert.deepEqual(pinDiff(label, actual, known, shapes), [])
 
-test('leave harness, pins: evictsplit and joinsplit (the round-3 report\'s two schedules) — safe on seeds 1..5, the far side settles without n01, n01 is never writable; twoLeavers (the first review\'s n=4 schedule) — safe on seeds 1..10', () => {
+//! the two round-3 schedules run ONCE (about 4 s together) and are read by two tests: the safety test asserts, the
+// liveness test pins
+let outcomesEJ: Record<'evictsplit' | 'joinsplit', OutcomeI[]> | null = null
+const evictAndJoin = () => (outcomesEJ ??= { evictsplit: [1, 2, 3, 4, 5].map((s) => evictsplit(s)), joinsplit: [1, 2, 3, 4, 5].map((s) => joinsplit(s)) })
+
+test('leave harness, safety pins: evictsplit and joinsplit (the round-3 report\'s two schedules) — safe on seeds 1..5, n01 is never writable while cut off from every member; twoLeavers (the first review\'s n=4 schedule) — safe on seeds 1..10', () => {
   const bad: string[] = []
-  for (const [name, go] of [['evictsplit', evictsplit], ['joinsplit', joinsplit]] as const) {
-    for (let seed = 1; seed <= 5; seed++) {
-      const o = go(seed)
-      if (o.problems.length) bad.push(`${name} ${seed}: ${o.problems.join('; ')}`)
-      if (!o.settled) bad.push(`${name} ${seed}: the far side did not settle`)
-      if (o.proposerWritable) bad.push(`${name} ${seed}: n01 writable while cut off from every member`)
-    }
-  }
+  for (const [name, outs] of Object.entries(evictAndJoin())) outs.forEach((o, i) => {
+    if (o.problems.length) bad.push(`${name} ${i + 1}: ${o.problems.join('; ')}`)
+    if (o.proposerWritable) bad.push(`${name} ${i + 1}: n01 writable while cut off from every member`)
+  })
   for (let seed = 1; seed <= 10; seed++) { const ps = twoLeavers(seed); if (ps.length) bad.push(`twoLeavers ${seed}: ${ps.join('; ')}`) }
-  assert.deepEqual(bad, [])
+  assert.deepEqual(bad, [], 'UNSAFE, or n01 committed on votes it never received live')
+})
+
+//! evictsplit and joinsplit on today's kernel: the far side settles (one view without n01, writable) on 5 of 5 each,
+// because the restored n03 leads it (evictsplit) or n02 does (joinsplit) while a vote above the old view is in play
+// — the rule of DESIGN-LEAVE §10.9 step 2 moves BOTH pins to all five not settled (measured on the scratch three-part
+// kernel: 0 of 10), and the page lists them among the pins that move. Liveness, so pinned here as counted sets,
+// apart from the safety lines above.
+const KNOWN_NOT_SETTLED_EVICTSPLIT = new Set<number>([])
+const KNOWN_NOT_SETTLED_JOINSPLIT = new Set<number>([])
+
+test('leave harness, liveness pins: evictsplit and joinsplit — the far side settles without n01 on exactly the seeds the pins say (all five today)', () => {
+  const o = evictAndJoin()
+  const teeth: string[] = []
+  for (const [name, known] of [['evictsplit', KNOWN_NOT_SETTLED_EVICTSPLIT], ['joinsplit', KNOWN_NOT_SETTLED_JOINSPLIT]] as const) {
+    const notSettled: number[] = [], shapes = new Map<number, string>()
+    o[name].forEach((x, i) => { shapes.set(i + 1, `${name} ${i + 1}: the far side did not settle`); if (!x.settled) notSettled.push(i + 1) })
+    teeth.push(...pinDiff(name, notSettled, known, shapes))
+  }
+  assert.deepEqual(teeth, [])
 })
 
 //! pledgeTwo on today's kernel: no knock is a vote, so n01 (one stayer beside it, three members cut off the instant it
@@ -94,15 +120,14 @@ test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pai
     else if (ps.length) notLive.push(seed)
   }
   assert.deepEqual(unsafeOnes, [], 'UNSAFE: a monitor fired, or two nodes ended writable in different views')
-  //! the H9 seeds BEFORE the exact pin: on the round-3 kernel the pin fails first (it heals ten seeds the base does
-  // not, "known to wedge is live now"), and that message would hide the one this line is for
-  const h9: string[] = []
-  for (const seed of H9_SEEDS) { const s = scheduleR(seed); const ps = runR(s); if (ps.length) h9.push(`${shapeR(s)}: ${ps.join('; ')}`) }
-  assert.deepEqual(h9, [], 'an H9 seed the base heals did not heal (the parked branch wedges these)')
-  pinExact('rebirth', notLive, KNOWN_NOT_LIVE_R, shapes)
-  const named: string[] = []
-  for (const name of Object.keys(NAMED_R)) for (let seed = 1; seed <= (name === 'r2-157' ? 10 : 1); seed++) { const ps = runR(namedR(name, seed)); if (ps.length) named.push(`${name} under sim seed ${seed}: ${ps.join('; ')}`) }
-  assert.deepEqual(named, [], 'a named shape the base heals did not heal')
+  //! the three liveness teeth in ONE list, so each fires on its own: the named shapes (H3 and H7), the H9 seeds, and
+  // the exact pin. Asserted one after another, the first message hid the rest — on the review-fix kernel the H9 line
+  // fired while the n=3 shapes were the hole (H3), on round 1 the pin fired while seed 157 was (H7); the third review
+  const teeth: string[] = []
+  for (const name of Object.keys(NAMED_R)) for (let seed = 1; seed <= (name === 'r2-157' ? 10 : 1); seed++) { const ps = runR(namedR(name, seed)); if (ps.length) teeth.push(`a named shape the base heals did not heal — ${name} under sim seed ${seed}: ${ps.join('; ')}`) }
+  for (const seed of H9_SEEDS) { const s = scheduleR(seed); const ps = runR(s); if (ps.length) teeth.push(`an H9 seed the base heals did not heal (the parked branch wedges these) — ${shapeR(s)}: ${ps.join('; ')}`) }
+  teeth.push(...pinDiff('rebirth', notLive, KNOWN_NOT_LIVE_R, shapes))
+  assert.deepEqual(teeth, [])
 })
 
 //! isolate on today's kernel: the grid's far side settles (one view without n01, writable) on 84 of 108; on the other
@@ -167,6 +192,9 @@ test('leave harness, crash: a stayer crashes 200 ms before, at, 20 or 100 ms aft
 // built move by move — five formed, {aa,bb} cut from {dd,ee} and the chains given up, aa evicts both at 2 on bb's
 // and cc's grants, and cc is cut before the VIEW reaches it — ends with aa and bb writable at 2 beside cc, dd and ee
 // writable at 1, one view per epoch intact. No random family ever made it fire on today's kernel; this is its teeth.
+// The run witness is the base's own hole: a kernel that closes evictTwo (cc's gate shuts on its vote at 2 above view
+// 1) turns this line red too, and the rule of DESIGN-LEAVE §10.9 step 2 re-records it with the why — the hand pins
+// above and below it do not depend on the kernel's ballot rules.
 test('leave harness, the quiet-point check: two nodes writable in different views are named; one writable node is not; a two-evictee ballot with the third voter cut before its VIEW is named with no second view at any epoch', () => {
   const m = new Mesh()
   const aa = m.add('aa'), bb = m.add('bb')
@@ -226,6 +254,56 @@ test('leave harness, evictTwo: two suspects evicted at once at n=5 with the thir
   const badB: number[] = [], detailB: string[] = []
   for (let seed = 1; seed <= 5; seed++) { const ps = evictTwoB(seed); if (ps.length) { badB.push(seed); detailB.push(`${seed}: ${ps.join('; ')}`) } }
   assert.deepEqual(badB, SPLITS_EVICT_TWO_B, `evictTwoB: the split set moved — a kernel change closed (or widened) the hole's grant half; re-record with the why\n${detailB.join('\n')}`)
+})
+
+//! keptBallot on today's kernel: a hole, pinned as the end state (DESIGN-LEAVE §10.2 (ii); the third 2026-10-10
+// review's probe). The ballot aa keeps across its install of view 2 is over view 1 and commits `{aa,cc,dd}`@3 TWO
+// members apart from view 2 (`{bb,cc,dd}`), so the count that protects a one-member change does not hold: at the
+// quiet point aa and dd write at 3 beside bb and cc at 2 (one view per epoch intact — the recorder sees nothing), and
+// once the chains give up bb evicts dd and aa evicts cc, two views at epoch 4, both writable, the recorder firing
+// twice. The page and STATUS called this shape undrawn until the third review drew it. One deterministic schedule,
+// no seed. Measured on the scratch kernels (§10.2): the two-part rule (gate closed, lead nothing) leaves the quiet
+// point clean but STILL splits at epoch 4 — cc, holding a vote at 3 above view 2, grants bb's `{bb,cc}`@4; the
+// three-part rule (the grant clause too) ends with no split anywhere and bb and cc read-only for good. A kernel that
+// closes it moves this pin: re-record with the why, and move the STATUS line.
+const KEPT_BALLOT_QUIET = 'writable in different views: aa@3{aa,cc,dd} bb@2{bb,cc,dd} cc@2{bb,cc,dd} dd@3{aa,cc,dd}'
+const KEPT_BALLOT_SPLITS = ['epoch 4: {aa,dd} vs {bb,cc} (at bb)', 'epoch 4: {aa,dd} vs {bb,cc} (at cc)']
+const KEPT_BALLOT_END = 'aa@4{aa,dd}W bb@4{bb,cc}W cc@4{bb,cc}W dd@4{aa,dd}W'
+
+test('leave harness, keptBallot: at n=4 the loser of a duel escalates over view 1, installs view 2 evicted, keeps the ballot and commits {aa,cc,dd}@3 on two granters at view 2 — today\'s kernel is writable in two views at the quiet point and commits two views at epoch 4 once the chains give up, exactly as pinned', () => {
+  const o = keptBallot()
+  assert.deepEqual(o.shape, [], 'not the shape the page describes: the kernel moved a step of it')
+  //! the three pins in ONE list, so a kernel that moves one of them shows the others too (the two-part rule keeps the
+  // epoch-4 split and clears the quiet point; the three-part rule clears both)
+  const moved: string[] = []
+  if (o.quiet !== KEPT_BALLOT_QUIET) moved.push(`the quiet point moved: ${o.quiet}`)
+  if (o.splits.join('|') !== KEPT_BALLOT_SPLITS.join('|')) moved.push(`the epoch-4 split moved: ${o.splits.join('; ') || 'none'}`)
+  if (o.end !== KEPT_BALLOT_END) moved.push(`the end state moved: ${o.end}`)
+  assert.deepEqual(moved, [], 'a kernel change closed (or widened) the kept-ballot hole; re-record with the why')
+})
+
+//! a FAILED ballot in a healthy cluster (DESIGN-LEAVE §10.2, the release): the flap and the proposer crash. Today's
+// kernel heals both — every live member writable, no split — and the vote the granters hold above their view is
+// never read. The candidate rule of §10.9 step 2 reads it: measured on the scratch kernels, the TWO-part rule (gate
+// closed, lead nothing) and the THREE-part rule alike leave all five read-only for good after the flap (bb, cc, dd
+// `stale-vote`; aa and ee `minority`, because a stayer's gate skips the three) and all four after the crash (bb and
+// cc `stale-vote`, dd and ee `minority`), with no proposer left to release the vote. So the release is needed by the
+// gate and lead parts, not only by the grant. Liveness, pinned as the exact read-only set (empty today): a rule
+// that moves it must say how the vote is released, and re-record with the why.
+const KNOWN_READ_ONLY_FLAP: string[] = []
+const KNOWN_READ_ONLY_CRASH: Record<'open' | 'committed', string[]> = { open: [], committed: [] }
+
+test('leave harness, a failed ballot in a healthy cluster: one member flaps during an eviction ballot and the proposer abandons it; the proposer crashes for good mid-ballot (open, or committed with its VIEW unsent) — SAFE, and on today\'s kernel every live member is writable again (the read-only set is exactly the pinned one, empty)', () => {
+  const f = flapDuringBallot()
+  assert.deepEqual([...f.shape, ...f.splits, ...(f.quiet ? [f.quiet] : [])], [], 'flapDuringBallot: not the shape, or UNSAFE')
+  assert.deepEqual(f.readOnly, KNOWN_READ_ONLY_FLAP, `flapDuringBallot: the read-only set moved — a gate rule on a vote above the view needs its release; re-record with the why\n${f.end}`)
+  assert.match(f.end, /^aa@1\{aa,bb,cc,dd,ee\}W /, 'the abandoned ballot committed nothing: view 1 stands')
+  for (const variant of ['open', 'committed'] as const) {
+    const c = proposerCrash(variant)
+    assert.deepEqual([...c.shape, ...c.splits, ...(c.quiet ? [c.quiet] : [])], [], `proposerCrash ${variant}: not the shape, or UNSAFE`)
+    assert.deepEqual(c.readOnly, KNOWN_READ_ONLY_CRASH[variant], `proposerCrash ${variant}: the read-only set moved — a gate rule on a vote above the view needs a release that works with the proposer dead; re-record with the why\n${c.end}`)
+    assert.equal(c.end, 'bb@3{bb,cc,dd,ee}W cc@3{bb,cc,dd,ee}W dd@3{bb,cc,dd,ee}W ee@3{bb,cc,dd,ee}W', `proposerCrash ${variant}: the four re-form without aa at 3`)
+  }
 })
 
 //! the explorer's range here starts ABOVE the 1..2000 sim/explore.test.ts pins, so every seed adds coverage (the
