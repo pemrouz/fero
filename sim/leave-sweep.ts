@@ -16,9 +16,11 @@ const members = (x: Node) => x.membership.view.members.map((m) => m[0])
 
 //! split — the end-state SAFETY check: two nodes WRITABLE in different views. The per-event monitor sees two views at
 // one epoch; this sees what it cannot — a stale majority writable at a lower epoch beside the view without it.
-// Checked at a quiet point, never mid-flood.
+// Checked at a quiet point, never mid-flood. A node at epoch 0 holds no committed view (open genesis: a newcomer
+// before any view reached it), so it is not writable IN a view and is not one side of this split — the same rule as
+// the mesh's quietSplit (sim/mesh.ts), so the two checks name one invariant.
 export const split = (sim: Sim): string | null => {
-  const open = [...sim.nodes.values()].filter((x) => x.membership.gate(x).open)
+  const open = [...sim.nodes.values()].filter((x) => x.epoch > 0 && x.membership.gate(x).open)
   const views = new Set(open.map((x) => `${x.epoch}:${members(x)}`))
   return views.size > 1 ? `SPLIT: writable in different views: ${open.map((x) => `${x.uuid}@${x.epoch}{${members(x)}}`).join(' ')}` : null
 }
