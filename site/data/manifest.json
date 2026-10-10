@@ -1,6 +1,6 @@
 {
- "builtAt": "2026-10-09T07:35:10.551Z",
- "head": "d42125e",
+ "builtAt": "2026-10-10T00:22:08.383Z",
+ "head": "2c98d42",
  "branch": "v4",
  "version": "4.0.0",
  "dependencies": [
@@ -30,6 +30,7 @@
   "15-static-topology",
   "16-scoped",
   "17-lww-honesty",
+  "18-secret",
   "20-inside",
   "21-journal",
   "22-time-travel",
@@ -41,21 +42,21 @@
   "43-ledger",
   "44-sell"
  ],
- "checks": 27,
+ "checks": 28,
  "kernel": {
   "modules": 23,
-  "bytes": 617692,
-  "head": "e549d5b"
+  "bytes": 681370,
+  "head": "c02f5ff"
  },
  "npm": {
   "fero": "1.7.1",
   "data": "4.0.0"
  },
  "test": {
-  "at": "2026-10-09T08:34:23+01:00",
+  "at": "2026-10-10T01:22:08+01:00",
   "fero": {
-   "tests": 662,
-   "pass": 662,
+   "tests": 718,
+   "pass": 718,
    "fail": 0
   },
   "contract": {
@@ -66,15 +67,15 @@
   "exit": 0
  },
  "perf": {
-  "at": "2026-10-09T08:34:23+01:00",
-  "tests": 47,
-  "pass": 47,
+  "at": "2026-10-10T01:22:08+01:00",
+  "tests": 50,
+  "pass": 50,
   "fail": 0
  },
  "sim": {
   "seeds": 1000,
   "green": 1000,
-  "events": 211160,
-  "line": "1000/1000 seeds green · 3 nodes · 40 writes/run · 211,160 events"
+  "events": 209313,
+  "line": "1000/1000 seeds green · 3 nodes · 40 writes/run · 209,313 events"
  }
 }
