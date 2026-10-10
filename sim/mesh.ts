@@ -137,14 +137,36 @@ export class Mesh {
 
 const rng = (seed: number) => { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
 
-export interface Explored { seed: number; n: number; splits: string[]; trace: string[]; threw: string | null; maxEpoch: number; installs: number; restarts: number }
+export interface Explored { seed: number; n: number; splits: string[]; trace: string[]; threw: string | null; maxEpoch: number; installs: number; restarts: number; quietSplit: string | null }
+
+//! quietSplit — the sweep's split check (sim/leave-sweep.ts) on the mesh: after the random moves, every queued frame
+// lands and everyone ticks, a few rounds over, with the cuts left as they are; then no two live nodes may be WRITABLE
+// in different views, at any epochs (DESIGN-LEAVE §9: the invariant one-view-per-epoch does not see — a stale
+// majority writable at a lower epoch beside the view without it). Null = no such pair.
+export const quietSplit = (m: Mesh, rounds = 6): string | null => {
+  for (let r = 0; r < rounds; r++) {
+    for (let guard = 0; guard < 2000; guard++) {
+      const qs = [...m.q.entries()].filter(([, f]) => f.length)
+      if (!qs.length) break
+      for (const [key] of qs) { const [a, b] = key.split('>'); m.deliver(a, b) }
+    }
+    for (const u of [...m.nodes.keys()]) if (m.timers.get(u)?.size) { try { m.tick(u) } catch { /* no heartbeat timer: a node mid-teardown */ } }
+  }
+  //! a node at epoch 0 holds no committed view (open genesis: a newcomer before any view reached it), so it is not
+  // writable IN a view and cannot be one side of this split
+  const open = [...m.nodes.values()].filter((x) => x.epoch > 0 && x.membership.gate(x).open)
+  const views = new Set(open.map((x) => `${x.epoch}:${x.membership.view.members.map((v) => v[0])}`))
+  return views.size > 1 ? `writable in different views: ${open.map((x) => `${x.uuid}@${x.epoch}{${x.membership.view.members.map((v) => v[0])}}`).join(' ')}` : null
+}
 
 //! explore — one seeded random schedule over a formed durable mesh of 2..5 nodes: one to three members leave at
 // once, then `steps` random moves — a frame lands (most often), a node ticks, a node leaves, a pair is cut (with a
 // few frames still landing first, as a socket close lets them) or healed, a dial chain gives up, a node whose leave
 // was answered is torn down, a dead or live node restarts from its boot record, a sixth node joins. Stops at the
-// first split. Safety only: one view per epoch across every life of every node.
-export const explore = (seed: number, steps = 400): Explored => {
+// first split. Safety only: one view per epoch across every life of every node — and, with `quiet`, the writable-
+// split check at a quiet point after the moves (sim/leave-harness.ts; off by default, so the pinned range above is
+// byte-identical with or without it).
+export const explore = (seed: number, steps = 400, quiet = false): Explored => {
   const r = rng(seed)
   const n = 2 + Math.floor(r() * 4)
   const ids = ['aa', 'bb', 'cc', 'dd', 'ee'].slice(0, n)
@@ -215,5 +237,7 @@ export const explore = (seed: number, steps = 400): Explored => {
   } catch (e) { threw = (e as Error).stack?.split('\n').slice(0, 4).join(' | ') ?? String(e) }
   let installs = 0
   for (const l of m.log) if (l.includes(' INSTALL ')) installs++
-  return { seed, n, splits: m.splits, trace, threw, maxEpoch: Math.max(0, ...m.views.keys()), installs, restarts }
+  let qs: string | null = null
+  if (quiet && !threw && !m.splits.length) { try { qs = quietSplit(m) } catch (e) { threw = (e as Error).stack?.split('\n').slice(0, 4).join(' | ') ?? String(e) } }
+  return { seed, n, splits: m.splits, trace, threw, maxEpoch: Math.max(0, ...m.views.keys()), installs, restarts, quietSplit: qs }
 }
