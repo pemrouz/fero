@@ -69,10 +69,14 @@ export const schedule = (seed: number): Schedule => {
 }
 
 //! RunOpts — the knobs the knock window's tests turn (DESIGN-LEAVE §10.7): `tune` rows for every member (the window,
-// leaveWindow), and `stall`, a factor on the schedule's stall length (3 puts every stall but the shortest past the
-// default 16-tick window: 750/900/1350/2100 ms against 800). The generator is untouched, so a seed is the same shape
-// under every knob and the pinned sets stay comparable.
-export interface RunOpts { tune?: NodeOpts['tune']; stall?: number }
+// leaveWindow); `stall`, a factor on the schedule's stall length (3 puts every stall but the shortest past the
+// default 16-tick window: 750/900/1350/2100 ms against 800); and `model`, how the stalled survivor is drawn —
+// 'pause' (the default): its process is paused (sim.pause), frames pile up and it reads them all at the wake;
+// 'delay': the model the sweep had before the window — the node keeps RUNNING, every frame to and from it is held
+// for the stall, and the hold is lifted once every leaver is gone: a survivor that is alive but slow, every knock
+// and every answer paying the stall in turn. Two shapes of I-20, kept apart and both pinned. The generator is
+// untouched, so a seed is the same shape under every knob and the pinned sets stay comparable.
+export interface RunOpts { tune?: NodeOpts['tune']; stall?: number; model?: 'pause' | 'delay' }
 
 //! run — one schedule to its horizon; returns what went wrong (empty = safe AND live)
 export const run = (s: Schedule, horizon = 12000, o: RunOpts = {}): string[] => {
@@ -82,14 +86,25 @@ export const run = (s: Schedule, horizon = 12000, o: RunOpts = {}): string[] => 
   if (!nodes.every((x) => x.epoch === 1)) return ['never formed']
   for (const [a, b, d] of s.stalls) sim.fault(a, b, { delay: [d, d] })
   const t0 = sim.now
-  //! the stall is a PAUSE of the survivor's process (sim.pause): frames pile up in its socket buffers and its one
-  // armed heartbeat waits; at the wake it reads everything at once, as a process does after a long GC pause or a
-  // swap-in. It used to be a constant delay on every link of the node, lifted once the leavers were gone — but a
-  // delay keeps the node running and late, so a knock and each answer paid the stall in turn (four stalls per round
-  // trip), and with the leaver knocking on (§10.7) the lift never came while it lived. The old model wedged every
-  // stalled schedule for a reason no pause has; this one lets the survivor wake INSIDE the window, the shape the
-  // window exists for (re-derived on the base kernel under this model first: the pinned set did not move).
-  if (s.stall) sim.pause(s.stall.node, Math.round(s.stall.ms * (o.stall ?? 1)))
+  //! the stall, in the default model, is a PAUSE of the survivor's process (sim.pause): frames pile up in its socket
+  // buffers and its one armed heartbeat waits; at the wake it reads everything at once, as a process does after a
+  // long GC pause or a swap-in — the shape the window exists for, a survivor that wakes INSIDE it. Re-derived on the
+  // base kernel under this model first: 25 of 100 not live, against 36 under the delay model (the eleven that differ
+  // had the stalled node not the proposer; its vote landed inside the proposal's age once it woke). The 'delay'
+  // model is the one the sweep had before the window: the node keeps running and every frame to and from it is held
+  // for the stall, so a knock and each answer pay it in turn — a survivor alive but SLOW — and the hold is lifted
+  // only once every leaver is destroyed (the sim's #sever posts linkDown at the pair's CURRENT delay without the
+  // FIFO clamp, so lifting earlier would let a linkDown overtake frames a socket delivers first). Under the window a
+  // slow survivor's late answers still land while the leaver knocks on, so the delay model goes live on more seeds
+  // too (36 → 20 at the default window, 1 at 64 ticks): both models are run, and both pinned.
+  const ms = s.stall ? Math.round(s.stall.ms * (o.stall ?? 1)) : 0
+  let lift: (() => void) | null = null
+  if (s.stall && o.model === 'delay') {
+    const st = s.stall
+    const others = s.ids.filter((u) => u !== st.node)
+    for (const o of others) sim.fault(st.node, o, { delay: [ms, ms] })
+    lift = () => { for (const o of others) { const slow = s.stalls.find(([a, b]) => (a === o && b === st.node) || (b === o && a === st.node)); sim.fault(st.node, o, { delay: slow ? [slow[2], slow[2]] : [3, 3] }) } }
+  } else if (s.stall) sim.pause(s.stall.node, ms)
   s.leavers.forEach((u, i) => sim.post(u, { kind: 'leave' }, s.offsets[i]))
   let joiner: Node | null = null
   if (s.join) {
@@ -111,6 +126,7 @@ export const run = (s: Schedule, horizon = 12000, o: RunOpts = {}): string[] => 
       sim.nodes.get(id)!.destroy(); sim.nodes.delete(id)
       gone.set(id, sim.now); lastGone = sim.now
     }
+    if (lift && gone.size === s.leavers.length && sim.now >= t0 + ms) { lift(); lift = null }
     if (gone.size === s.leavers.length && sim.now > lastGone + 7000) break
   }
   if (gone.size !== s.leavers.length) return ['leaver never answered: ' + s.leavers.filter((u) => !gone.has(u))]

@@ -16,7 +16,10 @@
 // joining a survivor in the middle of it. Run three ways: the stalls as drawn (250-700 ms) at the default 16-tick
 // window; the stalls TRIPLED (750-2100 ms) at the default window, where every stall but the shortest outlasts the
 // window and the survivor wakes to a leaver that is gone — the class the window does not cover; and the tripled stalls
-// at a 64-tick window (3.2 s), where they are inside it again.
+// at a 64-tick window (3.2 s), where they are inside it again. A fourth run keeps the sweep's OLD stall model, a
+// survivor alive but SLOW (every frame to and from it held for the stall, lifted once the leavers are gone, so each
+// knock and each answer pays the stall in turn): it wedged 36 of 100 before the window and 20 with it, 1 at 64 ticks —
+// repeated knocks at a slow survivor are the second shape of I-20, and the model stays so that shape stays measured.
 // Family 2 (`schedule2`): random CUTS and heals between any pair during the leave window, on a durable cluster, and
 // leavers that time out and are RESTARTED FROM THEIR DIRS while the view without them may hold. Run at the default
 // window and at 64 ticks: a longer window does not heal a cut.
@@ -60,14 +63,23 @@ const sweep = <S extends { seed: number }>(count: number, gen: (seed: number) =>
 }
 
 //! family 1 with the knock window (2026-10-10): live on 100 of 100 at the default window. Before the window the kernel
-// wedged 36 of 100 under the old stall model (a constant delay on every link of the stalled node: [1, 2, 8, 9, 13, 15,
-// 20, 21, 26, 27, 31, 34, 35, 38, 40, 42, 44, 46, 50, 57, 60, 61, 65, 66, 67, 71, 74, 75, 78, 81, 85, 87, 88, 90, 92,
-// 95]) and 25 under this one (a pause; the eleven that differ — 2, 20, 31, 34, 35, 50, 60, 65, 74, 78, 87 — are
-// schedules where the stalled node was not the proposer and its vote still landed inside the proposal's age once it
-// woke, which the delay model never let happen: it charged every answer the stall again). Every one of the 25 is
-// I-20's shape — a survivor stalled across the four-tick bound wakes to a leaver that is gone — and every one is live
-// now: the leaver is still there when the survivor wakes.
+// wedged 36 of 100 under the delay model (the sweep's stall model then: a constant delay on every link of the stalled
+// node: [1, 2, 8, 9, 13, 15, 20, 21, 26, 27, 31, 34, 35, 38, 40, 42, 44, 46, 50, 57, 60, 61, 65, 66, 67, 71, 74, 75,
+// 78, 81, 85, 87, 88, 90, 92, 95]) and 25 under this one (a pause: [1, 8, 9, 13, 15, 21, 26, 27, 38, 40, 42, 44, 46,
+// 57, 61, 66, 67, 71, 75, 81, 85, 88, 90, 92, 95]; the eleven that differ — 2, 20, 31, 34, 35, 50, 60, 65, 74, 78, 87 —
+// are schedules where the stalled node was not the proposer and its vote still landed inside the proposal's age once
+// it woke, where under a delay each answer paid the stall again). Every one of the 25 is I-20's shape — a survivor
+// stalled across the four-tick bound wakes to a leaver that is gone — and every one is live now: the leaver is still
+// there when the survivor wakes. The like-for-like before-and-after is 25 → 0 (the pause); 36 is the delay model's.
 const KNOWN_NOT_LIVE_1 = new Set<number>([])
+//! the same 100 schedules under the DELAY model (the sweep's stall before the window: the survivor alive but slow,
+// every frame held for the stall and the hold lifted once the leavers are gone), at the default window: 20 not live,
+// down from the 36 the base kernel wedged under it. The sixteen that went live are schedules where the late answers
+// still landed while the leaver knocked on; the twenty left are the stall paid too many times over for 800 ms — four
+// stalls per round trip — so the leaver gave up first. At 64 ticks (3.2 s) one is left, seed 42, which does not go
+// live even when the hold is never lifted (a slow survivor beside a leaver that lingers). Pinned exactly, both runs.
+const KNOWN_NOT_LIVE_1_DELAY = new Set<number>([8, 9, 15, 20, 21, 26, 27, 38, 40, 42, 44, 57, 66, 67, 71, 75, 81, 88, 92, 95])
+const KNOWN_NOT_LIVE_1_DELAY_64 = new Set<number>([42])
 //! the same 100 schedules with the stalls TRIPLED (750/900/1350/2100 ms) against the default 800 ms window: the
 // 750 ms stalls (and every schedule without a stalled survivor) are live; the 22 longer ones are not — the survivor
 // wakes after the leaver gave up, sits `minority` in the old view, and nothing can vote the leaver out. The class the
@@ -89,6 +101,11 @@ test('leave sweep, family 1: 100 seeded clean-stop schedules — n 2..5, up to t
 test('leave sweep, family 1 past the window: the same schedules with the stalls tripled — SAFE on every one; a survivor stalled longer than the 16-tick window still wedges, on exactly the pinned seeds; at a 64-tick window every one is live again', () => {
   sweep(100, schedule, (s) => run(s, 12000, { stall: 3 }), shape1, KNOWN_NOT_LIVE_1_PAST_WINDOW)
   sweep(100, schedule, (s) => run(s, 12000, { stall: 3, tune: { leaveWindow: 64 } }), shape1, new Set<number>([]))
+})
+
+test('leave sweep, family 1 under the delay model: the same schedules with the survivor alive but SLOW (every frame held for the stall) — SAFE on every one; the not-live set is exactly the pinned one at the default window (20; 36 before the window) and at 64 ticks (seed 42)', () => {
+  sweep(100, schedule, (s) => run(s, 12000, { model: 'delay' }), shape1, KNOWN_NOT_LIVE_1_DELAY)
+  sweep(100, schedule, (s) => run(s, 12000, { model: 'delay', tune: { leaveWindow: 64 } }), shape1, KNOWN_NOT_LIVE_1_DELAY_64)
 })
 
 test('leave sweep, family 2: 100 seeded clean-stop schedules with cuts between pairs and leavers restarted from their dirs — SAFE on every one; the not-live set is exactly the pinned one, at the default window and at 64 ticks alike', () => {
