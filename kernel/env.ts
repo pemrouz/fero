@@ -112,7 +112,8 @@ export interface EffectSink {
   subRecs(id: number, recs: Rec[]): void
   //! left(clean) (V4-6, OPTIONAL — only an env that waits on destroy cares): the graceful leave is over.
   // clean=true: the view without this node committed and a survivor echoed it (or there was nothing to
-  // leave); false: LEAVE_TICKS ran out — the node goes like a crash. Fires exactly once per leave.
+  // leave); false: the bound ran out (LEAVE_TICKS with no member linked, the knock window LEAVE_WINDOW with one) — the
+  // node goes like a crash. Fires exactly once per leave.
   left?(clean: boolean): void
   //! lost(iss, cid, origin, seq, epoch) (V4-18, OPTIONAL — only an env that joins its own writes cares):
   // a committed record carrying an attempt identity was REFUSED by the LWW election (its own cell holds
