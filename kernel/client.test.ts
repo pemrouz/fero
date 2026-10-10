@@ -460,8 +460,8 @@ test('kernel probe A — a second failover during the re-download onto a feeder 
 //! the paused feeder (STATUS: "A spoke in resync whose ask reached a paused feeder ends it late"): the feeder marks
 // the debt and does not reply; after the drain it asks the spoke with its own r=1. A spoke whose ask is a tick old
 // answers that r=1 with an r=1 of its own (a fresh q): the feeder ships everything and replies with that q — the end,
-// one exchange after the drain, never waiting for a heartbeat floor the spoke may not own. At the instant of the
-// resync (no tick yet) a feeder's r=1 is still answered r=0 with d = {}: a crossing costs no duplicate ship.
+// one exchange after the drain, never waiting for a heartbeat floor the spoke may not own. Inside the ask's first tick
+// a feeder's r=1 gets no answer at all (the crossing test below): an r=0 with d = {} made the feeder ship twice.
 test('kernel probe B — the resync ask reached a paused feeder: once the ask is a tick old the spoke answers the drain r=1 with an r=1 of its own, the feeder ships everything and its reply ends the resync — nothing lost, the sweep one tick late at most', () => {
   const h = harness('cl', { client: true, hosts: ['sim:aa', 'sim:dd'] })
   h.node.step({ kind: 'start' })
@@ -536,6 +536,76 @@ test('a client of a SCOPED feeder resyncs at every failover: the new feeder\'s r
   u.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
   assert.equal(u.node.resync, null, 'unscoped: no resync at a failover')
   assert.deepEqual(digests(u, 2), [{ d: { tt: 6 }, r: 1, q: 2 }], 'the real tails: the new feeder holds every lane in full and ships what is above')
+})
+
+//! the review of stage 2 (2026-10-10): at a scoped failover the new feeder's heartbeat r=1 is often already in flight
+// when the ask leaves (the feeder floors the spoke every tick when its uuid sorts below), so it crosses the ask. The
+// spoke answered it r=0 — and in resync a spoke says d = {} — so the feeder shipped its WHOLE held subset a second
+// time, on 30 of 30 tick-aligned seeds (the lane dropped the duplicates; the cost was a second download). Now a
+// crossing inside the ask's first tick gets no answer: the ask's reply is the end. Red on the old kernel at the first
+// assertion below (a second digest {d: {}, r: 0} on the link).
+test('a feeder\'s r=1 that crosses the resync\'s ask inside its first tick gets NO answer (the ask\'s reply is the end; an r=0 with d = {} made the feeder re-ship its held subset); out of resync it is answered as before; a scoped feeder elected at an ADMIT (the last one died with no other link up) is a resync too — the failover bug\'s second path', () => {
+  const h = harness('cl', { client: true, hosts: ['sim:pp', 'sim:oo'] })
+  h.node.step({ kind: 'start' })
+  admitScoped(h, 1, 'pp')
+  h.digestFrom(1)
+  admitScoped(h, 2, 'oo')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: lane('tt', 5, ['a1', 'a2']) })
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  assert.equal(h.node.primary, 2)
+  assert.deepEqual(digests(h, 2), [{ d: {}, r: 1, q: 2 }], 'the ask, at the failover')
+  //! oo's heartbeat r=1 crosses it (ticks 0): read for its gate, answered with nothing
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { tt: 3 }, r: 1, w: 1 }) })
+  assert.deepEqual(digests(h, 2), [{ d: {}, r: 1, q: 2 }], 'the crossing r=1 got no answer: the ask is on its way and its reply is the end (an r=0 with d = {} would re-ship everything)')
+  assert.notEqual(h.node.resync, null, 'still in resync')
+  assert.equal(h.node.feederOpen, true, 'the crossing digest was still read: the gate rides it')
+  //! oo serves the ask: the end, after exactly one ship
+  serve(h, 2, { tt: ['b1', 'b2', 'b3'] })
+  assert.equal(h.node.resync, null)
+  assert.deepEqual(cells(h), ['b1', 'b2', 'b3'])
+  //! out of resync, a feeder's r=1 is answered r=0 with the real tails
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { tt: 3 }, r: 1, w: 1 }) })
+  assert.deepEqual(digests(h, 2).slice(-1), [{ d: { tt: 3 }, r: 0 }])
+  //! the SECOND path of the scoped-failover bug (this test's first run found it): the feeder dies with no other link
+  // up, and a feeder is admitted later — the admit elected it and asked with the REAL tails (d = {tt: 3}), so the
+  // rows it holds below tail 3 would never have come and b1-b3 would have stayed on the screen. A scoped spoke that
+  // holds anything resyncs here too.
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  assert.equal(h.node.primary, null, 'no other link up: no primary')
+  admitScoped(h, 3, 'oo')
+  assert.equal(h.node.primary, 3)
+  assert.notEqual(h.node.resync, null, 'a scoped feeder elected at the admit: the spoke resyncs onto it (it held three rows from the last one)')
+  assert.deepEqual(digests(h, 3), [{ d: {}, r: 1, q: 3 }], 'the ask asks for everything, not for what is above tail 3')
+  assert.deepEqual(h.jk(JK.resync).map((e) => e.a), [2, 3], 'the two resets remembered their cells (a1-a2, then b1-b3)')
+  //! a tick-old ask (kernel probe B's rule, unchanged): the feeder's r=1 is answered with an r=1 of the spoke's own.
+  // The tick itself floors the primary (cl sorts below oo): that r=1 is q=4, in resync d = {}; the answer-request is q=5
+  h.tick()
+  assert.equal(h.node.resync!.ticks, 1)
+  assert.deepEqual(digests(h, 3).slice(-1), [{ d: {}, r: 1, q: 4 }], 'the tick\'s own heartbeat floor, in resync: d = {}')
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: { tt: 1 }, r: 1, w: 1 }) })
+  assert.deepEqual(digests(h, 3).slice(-1), [{ d: {}, r: 1, q: 5 }], 'a tick old: answered with a request of its own, as before')
+  serve(h, 3, { tt: ['c1'] })
+  assert.equal(h.node.resync, null)
+  assert.deepEqual(cells(h), ['c1'], 'the new feeder\'s subset; b1-b3 swept')
+  assert.deepEqual(screenOf(h), ['c1'], 'kernel and screen agree')
+  //! a spoke that holds NOTHING yet asks its first feeder as before: no wipe, no journal row, the same bytes
+  const f = harness('cl', { client: true, hosts: ['sim:pp'] })
+  f.node.step({ kind: 'start' })
+  admitScoped(f, 1, 'pp')
+  assert.equal(f.node.resync, null, 'a first feeder: nothing to resync')
+  assert.deepEqual(digests(f, 1), [{ d: {}, r: 1, q: 1 }])
+  assert.deepEqual(f.jk(JK.resync), [])
+  //! the UNSCOPED control on this path: the real tails at the re-admit, as before
+  const u = harness('cl', { client: true, hosts: ['sim:pp', 'sim:oo'] })
+  u.node.step({ kind: 'start' })
+  u.admit(1, 'pp')
+  u.digestFrom(1)
+  u.node.step({ kind: 'bytesIn', link: 1, bytes: lane('tt', 5, ['a1', 'a2']) })
+  u.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  assert.equal(u.node.primary, null)
+  u.admit(2, 'oo')
+  assert.equal(u.node.resync, null, 'unscoped: no resync at a re-admit')
+  assert.deepEqual(digests(u, 2), [{ d: { tt: 6 }, r: 1, q: 2 }], 'the real tails: an unscoped feeder holds every lane in full')
 })
 
 test('a scoped failover MID-RESYNC keeps every cell of the first reset in the sweep set (the screen still shows them) and wipes the partial re-download: the end sweeps exactly what the third feeder does not hold — no screen-only ghost', () => {
