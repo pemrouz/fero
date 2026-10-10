@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600 then 662 on 2026-10-09 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -706,6 +706,17 @@ working as designed.
   #directory's bytes were restored; a bare close during the handshake runs the
   redial chain instead of parking). 32 commits. Open formation 59,500 unchanged,
   secured formation pinned at 104,050. 662/662 + 18/18, perf 47/47, sim:scale green.
+
+- 2026-10-09 — the owner's answers (V4-31) and wave 5a (V4-32 to V4-36): the scale
+  harness (monitors M1-M10, adversaries A1-A11, the mutation runner, the two unscoped
+  GC holes pinned red today, a restored floor capped), stage 1 of the scale design
+  without the drain (the acked effect, the owner re-check, the per-partition indexes,
+  pin R1), one redial chain per target + the sim's life-tagged timers + the relay pin,
+  the 18-secret rung, the derived client key. The Fable weekly limit hit mid-wave, so
+  Opus built two lanes and Fable the other three, each reviewed by the other model.
+  718/718 + 18/18, perf 50/50, sim:scale green. Open: two scoped-kernel bugs the
+  harness found (a forwarded write committed twice across a move; a resync ending on
+  a stale reply), the feeder-death residual, the open-path uuid-taken loop.
 
 ## The debug tool
 

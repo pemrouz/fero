@@ -2279,3 +2279,312 @@ Consequences: wave 5a builds DESIGN-SCALE stages 0 and 1, the drain
 excepted; the drain and the I-20 design-first work come next; the witness
 member is on STATUS as a choice the owner is weighing. No code changed
 with this entry.
+
+## V4-32 — DESIGN-SCALE stage 0: the scale harness, and a restored floor capped at the durable floor (2026-10-09)
+Context: docs/DESIGN-SCALE.md §6 and the I-20 lesson (docs/DESIGN-LEAVE.md
+§9): every later scoped rule (announce-on-change anti-entropy, compaction,
+tombstone GC, the drain on leave) must turn a named monitor red when it is
+switched off, on a schedule the harness can build, BEFORE the rule lands.
+Built by Opus, reviewed three times by Fable; 18 commits; sim only, plus
+one kernel line.
+Decision: the sim keeps a ledger of every record ever appended to any log
+and every tombstone any node released, and ten monitors read it where
+`converged()` runs, on stepped scoped nodes. M1 stamp oracle: a cell shown
+below a remove its node already covers is a resurrection; its horizon form
+compares each holder to the fold of every committed record by stamp, so it
+also sees a resurrection every node agrees on, which `converged()` passes.
+M2: a scoped compaction keeps winners and stays below every holder's real
+floor. M3: nothing older than a released tombstone is ever applied. M4: a
+stub until stage 1's index exists (stage 1 made it live). M5: every floor
+advance, and a restored node's whole seed, is backed by records the node
+holds or covers. M6: at each release, no node, no frame on the wire and no
+down node's stored WAL holds an older record the releaser lacks. M7:
+holders' floors agree at a quiet point. M8: logs are bounded (red today by
+design). M9: a clean leaver keeps nothing only it held (red today at R=1).
+M10 resync-end, added when the sweep found a spoke's resync ending on a
+stale reply: a resync may end only on the reply to a digest the spoke sent
+after the resync began. Each monitor has a planted-violation test and a
+non-vacuity count, and each was proven by switching it off and watching a
+test go red; M3 and M6 find releases through one shared step but each
+stands alone with the other off. The adversaries A1-A11 of §6 run as seeded
+schedules over scoped clusters in `sim/scoped-sweep.ts`, each with an
+engagement count that proves its chaos bit (A2's key counts a demoted
+owner's commit on a partition that moved, nothing looser); 2 seeds per
+family in the battery plus every pinned unsafe seed, more with
+`FERO_SCOPED_SEEDS`; the pinned set was checked over seeds 1-8 for every
+family and 1-12 for A11. A10 (a killed member's frame landing after its
+eviction) is representable after all: a sever's link-down travels at the
+pair's delay, so the frame lands on a link still up and is applied — the
+shared residual of §5, so Q15's one-epoch GC floor is warranted. The
+mutation runner performs the releases a broken rule would (one tombstone
+and its record dropped at one holder; every tombstone at every holder with
+the remove's entry dropped; the stamp only, every lane kept); five pinned
+schedules must be caught by M1, M3 or M6; the stamp-only mutation is caught
+only where an older record still arrives (A1, A11), because today every
+lane keeps the remove — stage 3's compaction is what makes it bite
+everywhere. The pins: the two unscoped holes of V4-31's record are pinned
+RED TODAY in `sim/scale-probes.test.ts`, built without test seams (a short
+lane brings a removed row back after GC and compaction; a write stranded on
+an evicted owner beats a newer remove after a heal), each asserting today's
+wrong outcome so the fix flips it; three counted floors from a frame tally
+that reads each frame's verb at the sink (idle: members send n(n−1) digests
+per tick; 300 writes cost 1,067 HAVEQ; one join at n=30, R=3, 300 rows
+costs 2,446 HAVEQ — the record said 2,555 because the panel's probe fired
+its writes inside the window it called idle); and two shapes the sweep
+found unsafe on today's kernel, pinned with their findings (STATUS): one
+forwarded write committed twice across an ownership move (A3 seed 6, the
+zombie's class), and a spoke's resync ending on a stale digest reply (A11
+seeds 2, 5, 6, 10). The kernel line: the record's §2 asked whether a
+restored floor could claim rows the disk never kept. It can: the boot
+record is written synchronously and carries each floor, while WAL rows are
+fsynced later, so a crash between them restored a floor for rows that were
+gone. A restored possession floor is now capped at the durable floor; rows
+up to it are on disk, and replay advances the floor from there. Today the
+member digest re-sent the lost rows, so the node healed; stage 2 retires
+that digest, which would have made the overclaim permanent.
+REJECTED: a test seam to move ownership for the red-today pins (a clean
+leave does it); calling A10 "not representable" (a Fable review showed the
+shape with an asymmetric delay); the loose A2 engagement key; a pinned set
+that claims to be exact over seed ranges never swept.
+Consequences: 662 → 689 tests; no perf pin moved; the exec golden, the
+300-seed sweep, 59,500 and 104,050 unchanged. Only scoped durable restart
+trajectories moved for the floor cap (4 of 12 of the restart family, 0 of
+the 25 CHURN seeds). The sweep costs about 25-40 s in the battery at low
+priority. Not yet in the harness: M6's wire and WAL legs have no planted
+test; the sweep builds no n=1, n=8 or durable cluster outside A4; there is
+no oracle for spokes on a scoped cluster (M1's horizon form skips them).
+
+## V4-33 — DESIGN-SCALE stage 1 without the drain: the `acked` effect, the owner re-check of a forwarded remove, the per-partition indexes (2026-10-09)
+Context: three parts of the stage-1 row of docs/DESIGN-SCALE.md §7 were
+owner-independent and are what stages 2-4 build on; the drain-then-go
+(Q8) was held back until the owner answered (they did, V4-31; it is the
+next wave's). Built by Fable, reviewed three times by Opus.
+Decision: (1) The `acked` effect. An ARMED owner names the lane it stamped
+on, with its incarnation, in its WACK (`o`). When that WACK clears an
+attempt this node issued and the record can never fold here — a scoped
+member that does not hold, acquire or get assigned the partition — the
+kernel emits a new optional effect `sink.acked(iss, cid, origin, seq,
+epoch)`, and the api settles the write's promise from it, committed on the
+owner's lane, through the same idempotent path as `lost`. A relay hops `o`
+to its spoke only when the relay itself will not tap the record, so a
+spoke settles from `acked` only when its feeder's tap will stay silent.
+Where the record will fold here the WACK stays silent and the apply join
+settles after the value shows, as V4-7 asks. The decision is not made only
+once: the kernel keeps every cleared attempt whose record is still expected
+(write.ts `#awaiting`), the fold sites drop the entry when the record
+lands, and the install's rescope settles every entry whose partition no
+longer folds here (an aborted latch, a new orphan, an unassigned
+partition): `acked` for an own attempt, a second WACK carrying the lane for
+a relayed one, which its spoke reads as the settlement for its own cid.
+Every commit that enters the dedup window names the lane (the local
+commit, the WACK, the inbound fold, the ACQ fold, WAL replay), so a write
+re-sent after a lost WACK is answered with it. Unscoped nodes and clients
+never set, read or keep any of this. This closes the STATUS bug
+"`methods.update` from a node that does not hold the partition never
+resolves committed" for every shape the reviews named (a non-holder, a
+co-holder acquiring, a co-holder assigned with no entry, a spoke through
+either); one residual stays on STATUS: a spoke whose feeder dies between
+the WACK and the tap. Rules the old hang had hidden: the lens swallowed a
+delete of a cell absent from the local fold as a no-op, which on a scoped
+non-holder is wrong (the row lives at the owner); now a scoped node's fold
+speaks only for the partitions it holds (Bind `#local`), and a client's
+rule fails toward sending — the kernel remembers the contract of every
+primary it elects and answers with it while there is no primary (an outage
+keeps the fold's judgment), and with no contract known at all (before the
+first HELLO) the api forwards the delete. `until()` in #utils now awaits an
+async check: nine `until(async …)` pins in api/scoped.test.ts could never
+fail before. (2) The owner re-check (Q12). NodeOpts gains `admit(rec)`; the
+api passes the sparse-hole half of Bind.admit. An armed owner runs it on a
+member-forwarded remove whose key is below the row (the issuer could not
+see the row's shape): refused ⇒ WNACK invalid with the reason, so the
+issuer sees the same typed `sparse-hole` reject a local refusal gives; a
+partition whose fold is staged (an open latch) ⇒ withheld, re-forwarded
+after the fold. Updates, row removes and unscoped nodes are never asked.
+(3) The per-partition indexes. Node gains `byPart` (partition → lane →
+that lane's entries of the partition, ascending, the same objects the lanes
+hold) and `tombs` (partition → the cells whose version is a tombstone),
+allocated with `scope` and null unscoped, so an unscoped node pays one null
+check per site. Every site that adds or removes a lane entry keeps byPart
+in step (commit, inbound, splice, both replay branches, the ACQDONE fold,
+the shed, compaction, the fold reset); apply's remove arm, its sweep and
+its live-again arm, tombstone GC, the shed and the fold reset keep tombs.
+`#teach`, `#tailsOf`, `#abort`, `#shed` and rescope's partition census read
+through them, with lanes visited in node.logs order so frame order did not
+move; the shed also drops the partition's floors from every stream. M4
+index-oracle re-derives both indexes after every event of a stepped scoped
+node; dropping one site turns it red. Pin R1 (kernel/scope.perf.ts, the
+two nodes timed interleaved): teaching a 1,000-entry partition from a
+200,000-entry node costs at most 2× the same partition from a 1,000-entry
+node — 1.08 at landing, 9.40 with the old walk.
+REJECTED: deciding `acked` once at the WACK (a view change could then
+strand the write); a narrowed STATUS line instead of the rescope
+settlement; a settlement hook in `#abort` (an abort to orphan keeps the
+duty; the rescope covers every reachable case); the drain in this wave.
+Consequences: 689 → 701 tests, 47 → 48 pins; the golden, the sweep, 59,500
+and 104,050 unchanged. The wire gains an optional WACK key `o` an old node
+ignores, and a relay may send its spoke a second WACK for an already-
+cleared cid at a rescope (an old client ignores it): no MAGIC bump
+(V4-14). A behaviour change on every client before its first HELLO: a
+delete of a row the client has never seen now issues a remove (it was
+swallowed), so a forwarded delete of a row absent at the owner commits a
+tombstone for nothing, as `methods.remove` of an absent key does. Still
+open: the feeder-death residual (STATUS); M9 stays red at R=1 until the
+drain; env.ts's "never fires where the record will fold here" promise is
+now "the api absorbs a repeat".
+
+## V4-34 — one redial chain per target; the sim's restart drops the old life's echoes; the relay is pinned (2026-10-09)
+Context: three leftovers of the door's reviews (STATUS, 2026-10-09).
+`#redial` never checked for a timer already pending toward its target, so a
+crossing pair cut while both links were up armed two timer lines on one
+backoff entry that shared the tries, and the chain — with the eviction hold
+it carries — gave up in about half its time; a sweep found it in about a
+quarter of pair schedules on both paths. The sim's restart left the first
+life's timer fires and WAL echoes in the queue, and a reborn node numbered
+its timers from 1 again, so a `TAG.prove` deadline fired at 12 ms and the
+node refused an honest peer `timeout`. And since V4-28 every open server
+runs a check on each relayed client record with no pin on that path.
+Built by Opus, reviewed three times by Fable.
+Decision: (1) A redial timer already pending toward a target owns that
+target: `#redial` walks the timer map and arms nothing if it finds one (the
+rule the view install already follows, V4-28; one walk per linkDown over a
+handful of timers). The guard alone was wrong for a crashed member in two
+measured cases (an identify deletes the backoff entry but leaves an older
+chain's timer pending, up to 32× the base delay away; on the open path the
+peer closes my duplicate dial before I identified it and that close starts
+a GENERIC chain toward a live member), so a dead member's linkDown that
+finds anything other than a member chain cancels it and starts the member
+chain fresh at the base delay (V4-20's clock); a member chain already
+running is never restarted. A NON-member linkDown that finds an orphaned
+timer with no entry writes a fresh entry (tries 0), so `dialing()` reads
+true while that timer is out and a view install leaves the peer to it. (2)
+Sim only: `Sim.add` bumps a life number per uuid and the sink it makes
+captures it; a timer fire, a `persisted` or a `persistFail` scheduled by an
+earlier life is dropped when it falls due, at the persist site and the
+snapshot swap site. The queue entry still runs, so the event count is
+unchanged. A real shell already cancels its timers on destroy. (3)
+tests/baseline.perf.ts pins one client's relayed updates through a solo
+open server that uses the composer's own check: 512 updates mean 512
+checks, 512 commits, 0 pending, exactly one stream frame and one WACK out
+(exact on any machine; CI's `^counts:` run takes it), and a wall tripwire
+of 80 ms per 512.
+REJECTED: cancelling the pending timer and re-arming from every second
+linkDown (the backoff would restart, the lengthening V4-20 rejected);
+letting the one-chain guard alone decide for a dead member (eviction
+delayed by up to 3.2 s, or back at about 20 s through a generic chain);
+dropping the non-member orphan entry (it keeps the view install from a
+second dial, pinned); starting a reborn node's timer ids above the old
+life's (WAL batch numbers would need the same trick; one life tag covers
+both); the relay count as a row of baseline.json.
+Consequences: the sweep golden in sim/exec.test.ts moved for 2 of its 20
+seeds, 11 (270 → 252 events) and 17 (224 → 219), exactly the two whose cut
+armed a second line; 18 are byte-identical. On the 300-seed sweep 41 seeds
+carried a double arm before and 0 now; an independent checker finds none
+in 700. A crash soon after a reconnect is evicted within 3.96 s over 600
+trials, open and secured (the base had cases near 20 s). Unchanged: the
+plain crash eviction (3.41 / 1.41 / 7.91 s), 59,500 and 104,050, AA#2's
+1855 give-up, heartbeat revival of a given-up target. On the old exec 72 of
+120 restart-at-deadline seeds carried a false `timeout`; none do now. 662 →
+670 tests, 47 → 49 pins. Still open (STATUS): on the open path a dup-link
+close of my own dial starts a generic chain toward a live member (bounded;
+no effect on eviction). Two early commits of the lane are signed by Fable
+and the rest by Opus; both models built it.
+
+## V4-35 — 18-secret, the door's rung (2026-10-09)
+Context: DESIGN-DOOR §14 Q5 deferred the secret rung to after the door
+landed. It landed (V4-30); the rung follows. Built by Fable, reviewed three
+times by Opus.
+Decision: examples/18-secret sits between 17 and 20 on the ladder, and
+01-18 climb one feature at a time. The lesson: the secret is config, never
+code or a flag — `FERO_SECRET` in the environment, or `secret:` in a
+`fero.opt.ts` in the home directory. Two members started with it form a
+cluster; a third started without it is refused at the door, and both ends
+say so on stderr, one line per peer and reason, naming `FERO_SECRET` and
+the fix; nothing of the refused server lands and it still stops cleanly on
+Ctrl-C; the same command with the secret is admitted. The rung uses the
+static shape (listen + hosts, directory off) so the lines are exact: the
+members never dial the third, so it prints one line per member it dialed
+and each member one line for the peer that connected. The role file never
+reads the secret; its screen line is `MEMBER <pid> on <addr> — members N`.
+The check starts the roles with `fero.spawn` and gives each the environment
+its terminal would have and nothing else: `FERO_SECRET` set or not,
+`FERO_CONFIG` lifted (the battery pins it off, which silences every
+variable), every other `FERO_*` variable dropped, and `HOME` pointed at an
+empty folder, all restored afterwards — an unset `HOME` still resolves to
+the passwd home, so a `$HOME/fero.opt.ts` with a secret would otherwise
+reach the roles. The check reads the refusal lines off the children's
+stderr, matches the MEMBER line whole, and asserts over all four roles and
+both streams that the secret is printed on no screen.
+REJECTED: a role file that prints `secret set|none` from `process.env` (it
+lies on the file and call routes); a fourth-member scale-it line (four rows
+print over six lines and break the one-line screen rule); a check that
+reads only stdout.
+Consequences: 28 rungs; +1 test (663 before the other lanes); the check runs
+in about 7 s against the default 40 s budget. The members' refusal line is
+150 characters and wraps on an 80-column terminal, and the wrong-secret
+line differs from the no-secret line by the word "by" only; neither was
+changed.
+
+## V4-36 — the derived client key: a client follows without holding the member secret (2026-10-09)
+Context: V4-30 landed the door with one shared secret, so every client held
+the member secret, and a dishonest client could omit `r: 1` and be a member
+on the wire. DESIGN-DOOR §14 Q2 named the derived client key as the first
+follow-up and the owner took that default. Designed in a dated note (§15),
+built by Fable in five commits, settled in three Opus review rounds.
+Decision: one secret still. The client key is `HMAC-SHA256(secret,
+'fero/client/1')` as base64url, 43 characters; `fero.clientKey(secret)`
+prints it (also a named export), and an openssl one-liner in README gives
+the same string (a test proves they agree; the openssl form does not trim
+the secret, fero does). A link is a CLIENT LINK when the DIALER's HELLO says
+exactly `r === 1`; both proofs on it, the client's and the member's answer,
+are made with the client key, and every other proof with the secret. Why
+the dialer's `r` and not the prover's role: the member proves BACK to a
+client, and the client holds nothing but the client key; the dialer's `r`
+is inside its own proof, so it cannot be checked as a client and admitted
+as anything else (a kernel test pins that `sign` and the admit tail make
+the same `r === 1` test). The kernel stays crypto-free: `Door` grows one
+optional function, `clientMac`; a door without it keeps the one-key rule.
+The api builds the doors from one secret: a member, or a client trusted
+with the secret, gets `mac = HMAC(secret)` and `clientMac = HMAC(client
+key)`; a CLIENT-ONLY process (`secret.client` and no `secret`) holds the
+client key under both names, so every proof it can make is a client-key
+proof. The config key `secret.client`: the call as `secret: { client }`,
+`FERO_SECRET_CLIENT` (per resource `FERO_SHOP_SECRET_CLIENT`), a file;
+never a flag; trimmed; 16 characters or more; `''` unset; no off word; a
+wrong shape is refused naming `fero.clientKey(secret)`, never the value;
+`diag(f).config()` shows `<set>` with the source. A process holds ONE of
+the two: `secret` and `secret.client` from any two layers is refused naming
+both sources. envdeep nests `FERO_SECRET_CLIENT` under `FERO_SECRET` and the
+nested one wins, so the raw environment is read first, every name the way
+envdeep reads it (lowercased, split on `_`, empty parts dropped): an empty
+`*_SECRET_CLIENT` is dropped, a non-empty one beside its own rung's
+`*_SECRET` is refused naming both variables as typed. A server with only
+the client key is refused at `fero()`. A launch-flag clash where one flag
+is a group of the other (`--fero.secret S --fero.secret.client K`) is named
+from the flag names alone, because minimist's error quotes the first flag's
+value and that value may be a secret. What it protects: a client-key holder
+is admitted only as a client after a client-key proof; without `r: 1` its
+proof is checked with the secret and is `bad-proof` the moment it arrives,
+so it cannot become a member, vote, write another lane, LEAVE a member out
+or take a member's uuid; it cannot learn the secret from the key. What it
+does NOT protect, said in README and §15: a client-key holder can pose as
+a server to another CLIENT that dials it, because a client can only verify
+client-key proofs (a member is never fooled); the directory and the address
+rule limit where that is reachable; closing it needs a server signing key
+or TLS at the shell. The client key is shared by every client, a leaked one
+is a client, there is no per-client identity, and it changes with the
+secret. So the feature is "a client that can only follow", not "a client a
+member can tell from an impostor".
+REJECTED: a second independent secret typed on every member; picking the
+key by the prover's role; requiring exactly 43 characters for
+`secret.client` (one line later if wanted); an off word; a per-client
+identity or revocation (later, with a server key); a new frame, HELLO key
+or proof label; a kernel change for the open-path redial loop found on the
+way (below).
+Consequences: no new frame and no new HMAC per link; one HMAC per process
+at `fero()` time; 59,500 and 104,050 unchanged; the config walk gains one
+LEAVES row (api/config.perf.ts about 80 µs per resolve, ceiling 500). 662 →
+670 tests. A client that held the secret proves with the derived key now,
+which the member checks with the same derivation, so nothing an operator
+set changes. Found and recorded, not fixed (STATUS): on the OPEN path a
+client refused `uuid-taken` reads only a bare close, so it redials at its
+redial cadence for good and the member journals one row per dial.
