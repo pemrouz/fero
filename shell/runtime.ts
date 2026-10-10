@@ -449,20 +449,21 @@ export class Runtime {
 
   //! leave (V4-6) — the graceful exit: ask the kernel to get the view changed without this node and
   // wait for the outcome. Resolves true when the shrunk view committed and a survivor echoed it (or
-  // there was nothing to leave), false when the kernel's leaveTicks bound (node.tune) or this wall-clock cap ran
-  // out — the caller tears down either way; false means the survivors will evict us the slow way, or (a
+  // there was nothing to leave), false when the kernel's bound ran out (node.tune: leaveTicks with no member
+  // link that could answer, leaveWindow with one — the knock window, DESIGN-LEAVE §10.7) or this wall-clock cap
+  // did — the caller tears down either way; false means the survivors will evict us the slow way, or (a
   // scoped member, DESIGN-SCALE stage 1 (b)) that the view change did commit but the new holders did not
   // prove inside tune.drainTicks that they hold every partition this node held: those rows went with it.
-  // The cap covers the tick bounds at this node's heartbeat cadence plus slack — the leave's, plus the
-  // drain's on a scoped node, plus one tick for a drain that starts at leaveTicks + 1 when the view half
-  // timed out: its last tick is the 22nd after leave(), and a cap of 22 periods could win the race and tear
-  // the node down before it writes its `undrained` row (heartbeats OFF ⇒ no view ⇒ the kernel answers at
-  // once). Idempotent: a second call joins the first wait.
+  // The cap covers the tick bounds at this node's heartbeat cadence plus slack — the window (never less
+  // than the bound), plus the drain's on a scoped node, plus one tick for a drain that starts at the view
+  // half's last tick + 1 when it timed out: with the defaults that is the 34th tick after leave(), and a cap
+  // of 34 periods could win the race and tear the node down before it writes its `undrained` row
+  // (heartbeats OFF ⇒ no view ⇒ the kernel answers at once). Idempotent: a second call joins the first wait.
   leave(): Promise<boolean> {
     if (this.#leaving) return this.#leaving
     if (this.node.destroyed) return Promise.resolve(false)
     this.#leaving = new Promise<boolean>((resolve) => {
-      const ticks = this.node.tune.leaveTicks + (this.node.scoped ? this.node.tune.drainTicks + 1 : 0) + 2
+      const ticks = Math.max(this.node.tune.leaveWindow, this.node.tune.leaveTicks) + (this.node.scoped ? this.node.tune.drainTicks + 1 : 0) + 2
       const capMs = Math.max(250, (this.#opts.heartbeatMs ?? 0) * ticks)
       const cap = setTimeout(() => { this.#onLeft = null; resolve(false) }, capMs)
       this.#onLeft = (clean) => { clearTimeout(cap); this.#onLeft = null; resolve(clean) }

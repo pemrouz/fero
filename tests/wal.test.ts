@@ -259,7 +259,8 @@ test('I-36 — a store whose boot record failed mid-life refuses to restart: boo
 // waits exactly tune.drainTicks heartbeats, then goes: leave() false, an `undrained` row naming every partition.
 // The drain here is LONGER than the pre-drain shell cap (leaveTicks + 2 ticks): the verdict must come from the
 // kernel (the `undrained` row and `left` b=0 are there when leave() resolves), never from the shell's timer firing
-// first (which would resolve false with no row at all — the skeptic's reverted-cap mutation, 2026-10-10).
+// first (which would resolve false with no row at all — the skeptic's reverted-cap mutation, 2026-10-10). The cap
+// is the knock window (leaveWindow, never less than leaveTicks; DESIGN-LEAVE §10.7) plus the drain plus three ticks.
 test('DRAIN past the bound — a scoped leaver whose new holder cannot attest (its WAL dir is gone: the acquired base never seals) resolves leave() false after drainTicks with an `undrained` row, past the old leave-only cap; the holder still folded the rows in memory', async () => {
   const da = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-drain-a-'))
   const db = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-drain-b-'))
@@ -303,7 +304,7 @@ test('DRAIN past the bound — a scoped leaver whose new holder cannot attest (i
     assert.equal(b.node.journal.read().filter((e) => e.kind === JK.left).at(-1)?.b, 0, 'the kernel said so: `left` b=0 is in the journal when leave() resolves')
     assert.equal(b.node.membership.isMember('bb'), false, 'the view half did complete: bb is out')
     assert.ok(took > hb * (b.node.tune.leaveTicks + 2), `the drain outlasted the old leave-only cap (${took.toFixed(0)} ms > ${hb * (b.node.tune.leaveTicks + 2)} ms): the shell waited for the kernel`)
-    assert.ok(took < hb * (b.node.tune.leaveTicks + drainTicks + 2), `the kernel answered inside the new shell cap (${took.toFixed(0)} ms)`)
+    assert.ok(took < hb * (Math.max(b.node.tune.leaveWindow, b.node.tune.leaveTicks) + drainTicks + 1 + 2), `the kernel answered inside the shell cap (${took.toFixed(0)} ms; the window, the drain, three ticks)`)
     assert.ok(await until(() => mine.every((k) => a.node.state.has(JSON.stringify([k])))), 'aa folded the rows in memory all the same')
     assert.ok(mine.every((k) => a.node.scope!.entries.get(k)?.sealed === false), 'but none of them sealed: that is what the leaver could not count')
     await b.destroy()

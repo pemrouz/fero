@@ -13,7 +13,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
-import { DRAIN_TICKS, LEAVE_TICKS } from './membership.ts'
+import { DRAIN_TICKS, LEAVE_TICKS, LEAVE_WINDOW } from './membership.ts'
 import { JK } from './journal.ts'
 import { SCOPE } from './scope.ts'
 import { Framer, VERB, encodeControl, encodeRuns } from './codec.ts'
@@ -104,7 +104,7 @@ test('DRAIN — the exit proof no longer ends a scoped leave: `left` is held whi
   //! the proof arrived, but p is undrained: the leave is in its second wait
   assert.equal(h.of('left').length, 0, 'the echo alone does not let a scoped leaver go')
   assert.equal(h.jk(JK.left).length, 0)
-  assert.deepEqual(h.node.membership.leaving, { ticks: 0, done: true, drain: 0, clean: true }, 'the view half is done (and was clean); the drain counts from 0')
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: 0, done: true, drain: 0, clean: true }, 'the view half is done (and was clean); the drain counts from 0')
   assert.deepEqual(h.node.scope!.undrained(h.node), { waiting: 1, stranded: 0 })
   //! the install's round asked bb; bb (absent and assigned) answers need — aa teaches p exactly as any orphan would
   assert.equal(h.sentOn(1, VERB.HAVEQ).length, 1, 'the install round announced p to its new holder')
@@ -184,22 +184,23 @@ test('DRAIN, the bound: a holder that never attests holds the leaver for exactly
   assert.deepEqual(d.of('left'), [['left', false]])
 })
 
-test('DRAIN never follows a vote that did not come back: a scoped leaver whose shrunk view never commits goes at leaveTicks + 1 with left(false), no drain, no `undrained` row — it still holds p (nothing froze), and the survivors evict it the slow way', () => {
-  //! the ballot is proposed but nobody votes: the leave's own bound (V4-6) ends it, clean=false. The drain is the
-  // SECOND wait of a leave whose first wait succeeded; a leaver going like a crash does not drain (there is no
-  // orphan: p is still held, no install re-ranged it) and counts nothing undrained — `undrained` counts only the
-  // drain window. Mutation: drop `clean &&` in #finishLeave and this leaver holds instead of going.
+test('DRAIN never follows a vote that did not come back: a scoped leaver whose shrunk view never commits goes at the knock window\'s end (leaveWindow + 1: its member links are up, DESIGN-LEAVE §10.7) with left(false), no drain, no `undrained` row — it still holds p (nothing froze), and the survivors evict it the slow way', () => {
+  //! the ballot is proposed but nobody votes: the leave's own bound (V4-6; the window while a member is linked,
+  // §10.7) ends it, clean=false. The drain is the SECOND wait of a leave whose first wait succeeded; a leaver going
+  // like a crash does not drain (there is no orphan: p is still held, no install re-ranged it) and counts nothing
+  // undrained — `undrained` counts only the drain window. Mutation: drop `clean &&` in #finishLeave and this leaver
+  // holds instead of going.
   const h = holderAtView1()
   h.node.step({ kind: 'leave' })
-  for (let i = 0; i < LEAVE_TICKS; i++) {
+  for (let i = 0; i < LEAVE_WINDOW; i++) {
     h.tick()
-    assert.equal(h.of('left').length, 0, `tick ${i + 1}: knocking`)
+    assert.equal(h.of('left').length, 0, `tick ${i + 1}: knocking (bb and cc are linked and could answer)`)
   }
   h.tick()
-  assert.deepEqual(h.of('left'), [['left', false]], 'leaveTicks + 1: it goes like a crash')
+  assert.deepEqual(h.of('left'), [['left', false]], 'leaveWindow + 1: it goes like a crash')
   assert.equal(h.node.epoch, 1, 'the view never changed')
   assert.equal(h.node.scope!.entries.get('p')?.state, SCOPE.held, 'p is still held: no install froze it into an orphan')
-  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, done: true, drain: undefined }, 'no drain was entered')
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, drain: undefined }, 'no drain was entered; no tick counted toward the bound (a member was linked throughout)')
   assert.equal(h.jk(JK.undrained).length, 0, 'nothing counted undrained: the count covers the drain window only')
   assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b]), [[1, 0]])
   //! a late vote changes nothing: the leave is over
@@ -209,11 +210,13 @@ test('DRAIN never follows a vote that did not come back: a scoped leaver whose s
   assert.equal(h.of('left').length, 1)
 })
 
-test('DRAIN after a timed-out view half: the votes came back and the leaver installed its own shrunk view, but no survivor echo arrived inside leaveTicks — p is an orphan with a reachable new holder all the same, so it drains; the verdict stays false (the view half was never proved) and `undrained` counts what was not copied', () => {
+test('DRAIN after a timed-out view half: the votes came back and the leaver installed its own shrunk view, but no survivor echo arrived inside the knock window — p is an orphan with a reachable new holder all the same, so it drains; the verdict stays false (the view half was never proved) and `undrained` counts what was not copied', () => {
   //! the shape (third review, 2026-10-10): aa is the proposer; bb and cc vote; aa commits epoch 2 itself (p
   // freezes into an orphan whose holder is bb); the VIEW echo is lost. Before the fix #finishLeave(false) skipped
   // the drain: at R=1 the only copy of p went with aa, uncounted, while bb had a live link. Mutation: make
-  // #finishLeave ask #exit only when clean and this leaver goes at leaveTicks + 1 with left(false) and no row.
+  // #finishLeave ask #exit only when clean and this leaver goes at the view half's end with left(false) and no row.
+  // The view half ends at leaveWindow + 1 here, not leaveTicks + 1: bb and cc are linked and could still echo
+  // (the knock window, DESIGN-LEAVE §10.7).
   const timedOut = (opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
     const h = holderAtView1(opts)
     h.node.step({ kind: 'leave' })
@@ -222,11 +225,11 @@ test('DRAIN after a timed-out view half: the votes came back and the leaver inst
     assert.equal(h.node.epoch, 2, 'the proposer commits from the votes alone')
     assert.equal(h.node.membership.isMember('aa'), false, 'its own view no longer holds it')
     assert.equal(h.node.scope!.entries.get('p')?.state, SCOPE.orphan, 'p froze into an orphan at the install')
-    for (let i = 0; i < LEAVE_TICKS; i++) { h.tick(); assert.equal(h.of('left').length, 0, `tick ${i + 1}: waiting for the echo`) }
-    h.tick() // leaveTicks + 1: the view half times out
+    for (let i = 0; i < LEAVE_WINDOW; i++) { h.tick(); assert.equal(h.of('left').length, 0, `tick ${i + 1}: waiting for the echo`) }
+    h.tick() // leaveWindow + 1: the view half times out
     assert.equal(h.of('left').length, 0, 'not gone: bb is reachable and has not proved it holds p — the drain begins')
     assert.deepEqual(h.node.scope!.undrained(h.node), { waiting: 1, stranded: 0 })
-    assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, done: true, drain: 0, clean: false }, 'the drain carries the view half\'s verdict')
+    assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, drain: 0, clean: false }, 'the drain carries the view half\'s verdict')
     return h
   }
   //! (a) bb attests at the frozen tail: shed, then left(false) — copied, but the stop was not clean all the way
@@ -252,7 +255,7 @@ test('DRAIN after a timed-out view half: the votes came back and the leaver inst
   s.bytes(1, vote(2, 'bb', 'cc'))
   s.bytes(2, vote(2, 'bb', 'cc'))
   s.node.step({ kind: 'linkDown', link: 1, reason: 'test' })
-  for (let i = 0; i <= LEAVE_TICKS; i++) s.tick()
+  for (let i = 0; i <= LEAVE_WINDOW; i++) s.tick() // cc is still linked, so the view half runs to the window's end
   assert.deepEqual(s.of('left'), [['left', false]])
   assert.deepEqual(s.jk(JK.undrained).map((e) => [e.a, e.b]), [[1, 2]], 'stranded: counted at once, no hold')
   assert.equal(s.node.membership.leaving!.drain, undefined)
@@ -380,7 +383,7 @@ test('UNSCOPED leaves never drain: the proposer leg and the knock leg report `le
   assert.equal(h.of('left').length, 0)
   h.bytes(1, view(2, 'bb', 'cc'))
   assert.deepEqual(h.of('left'), [['left', true]], 'the echo IS the exit, as V4-6 says')
-  assert.deepEqual(h.node.membership.leaving, { ticks: 0, done: true, drain: undefined })
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: 0, done: true, drain: undefined })
   assert.equal(h.jk(JK.undrained).length, 0)
   assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b]), [[2, 1]])
 })
