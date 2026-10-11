@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Runtime } from '../shell/runtime.ts'
 import { Bind } from './data.ts'
-import { derived, handlerScope, records } from './substrate.ts'
+import { derived, handlerScope, records, unwrap } from './substrate.ts'
 import { VERB, encodeControl } from '../kernel/codec.ts'
 import { bench, ratio } from '#utils'
 
@@ -65,10 +65,11 @@ test('ratio: 1000 views made through the handler scope cost about what they cost
 
 //! RATIO (I-29 skeptic): a child read off a wrapped view (view.r1 inside a handler) goes through the
 // wrapper's trap and then data's own, so it costs about 2x a raw read; there is no way under one extra
-// Proxy layer. What the pin guards is the cheap road: data caches each child handle, and `adopt` looks
-// the raw handle up in its wrapper cache FIRST, so a repeated read reuses the live wrapper. Read 20k
-// times over 2000 rows: 2.3-2.65x here (about 3.4x with the cache asked last, the first cut); a new
-// wrapper per read (no cache) reads about 15x and fails it.
+// Proxy layer. What the pin guards is the cheap road: data caches each child handle, and `adopt` reuses
+// the live wrapper for a raw handle it has seen, so a repeated read makes no new wrapper. A new wrapper
+// per read (no cache) reads about 15x and fails it. The pin does NOT tell apart WHERE adopt asks the
+// cache: first (now) reads 2.3-2.9x here, last (the first cut) 3.2-3.9x, and on this box the two ranges
+// nearly touch, so a budget between them would flake. Read 20k times over 2000 rows.
 test('ratio: child reads off a view made through the handler scope cost about 2x a raw read', async () => {
   const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0 })
   const bind = new Bind(rt)
@@ -79,8 +80,33 @@ test('ratio: child reads off a view made through the handler scope cost about 2x
   const read = (v: any) => () => { for (let i = 0; i < 20000; i++) if (v['r' + (i % 2000)] !== undefined) seen++ }
   const r = ratio.interleaved(read(raw), read(wrapped))
   assert.equal(seen, 20000 * 16, 'every read found its row')
-  assert.ok(r < 4, `child reads through the handler scope / raw = ${r.toFixed(2)}x (budget 4x; about 2.4x here, about 15x with no wrapper cache)`)
+  assert.ok(r < 4, `child reads through the handler scope / raw = ${r.toFixed(2)}x (budget 4x; about 2.3-2.9x here, about 15x with no wrapper cache)`)
   raw[NODE].dispose()
+  bind.destroy()
+  await rt.destroy()
+})
+
+//! RATIO (I-29 second skeptic): every operator call through the public lens (f.data.sum('n') in module
+// code) now marks the view it hands out as ESCAPED, so the collector never releases a view module code
+// holds (substrate `escaping`): one more closure, a node read through data's trap and a WeakSet add per
+// call. A view build dwarfs that; a deduped HIT (data hands back the view it already has) does not. 50k
+// deduped sum('n') hits over 100 rows, through the lens vs through data's own handle: about 1.15x before
+// I-29, about 1.45x with the mark (about 0.2-0.3 µs a call here). The pin is a coarse tripwire: a scan
+// of the graph per call (what `mark` does once per invocation) reads 3.0x and fails it; a smaller extra
+// (a registry cell per call, about 1.6x) passes.
+test('ratio: a deduped operator hit through the lens costs under 2x the same hit on the raw handle', async () => {
+  const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0 })
+  const bind = new Bind(rt)
+  for (let i = 0; i < 100; i++) bind.data['r' + i] = { n: i }
+  const lens: any = bind.data
+  const raw = unwrap(bind.data)
+  const kept = lens.sum('n')
+  let hits = 0
+  const hit = (d: any) => () => { for (let i = 0; i < 50000; i++) if (d.sum('n') === kept) hits++ }
+  const r = ratio.interleaved(hit(raw), hit(lens))
+  assert.equal(hits, 50000 * 16, 'every call was a dedup hit on the same view')
+  assert.ok(r < 2, `deduped sum('n') hits through the lens / raw = ${r.toFixed(2)}x (budget 2x; about 1.45x here, 1.15x before the escape mark)`)
+  kept[NODE].dispose()
   bind.destroy()
   await rt.destroy()
 })
