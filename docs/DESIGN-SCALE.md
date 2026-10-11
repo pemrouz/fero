@@ -789,6 +789,33 @@ probe and 134× in the pin with the scan put back. (3) The reply-only
 had no test; each has one now, and each goes red when its line is
 deleted.
 
+*The second review (2026-10-11).* It found no lost row and two costs.
+(1) The cost claim above ("costs what it ships, each frame encoded
+once") holds only when no record is spliced under a cover. Lowering a
+cover re-sends that lane's whole suffix above the splice, frames the
+peer already holds included. So splices that keep landing under one
+long torn answer keep moving its resume point back, and its reply
+waits until they stop. Every row still arrives. A probe (1,000 sparse
+records, a socket that pauses after every frame, a queue of 4): no
+splices, 1,000 records shipped in 400 drain rounds; a splice every
+round, 3,998 records (ideal 1,999) in 999 rounds; every 10 rounds,
+25,405 (ideal 1,977) in 9,770; every 50 rounds, 110,505 (ideal 1,877)
+in 43,850. Splices are cold on a feeder (a heal, a fetch fold), so this
+stays as written, and a STATUS idea names the cheaper shape: a small
+per-link list of spliced entries, sent at the resume ahead of the
+cover walk, falling back to lowering the cover past a size cap. (2)
+The cover check walked every client link on every interior insert,
+holding a cover or not: 19 ns per insert with no client links, 3,891
+ns with 1,000 idle ones. The node now keeps `#covered`, the client
+links where `#answer` set a cover; indexInsert walks only those and
+prunes a link once both its covers are null (linkDown prunes too), so
+an interior insert with no answer stopped or queued pays one size
+check. Mutations: dropping the inQueue add turns the frame-7 splice
+test red, and pruning a link that still holds one cover turns frames 7
+and 10 red. Dropping the torn add turns nothing red, and cannot: a
+stop needs a full queue, and with `queued` ≥ 1 the same call queued a
+frame first, which already added the link.
+
 *Still open, older than this fix.* A record tap-forwarded to a synced
 spoke and cleared from the queue in steady state (no answer in flight)
 leaves a hole the drain digest cannot see when the record is an
