@@ -36,16 +36,22 @@ export interface WriteReject {
   reached: 'issued' | 'committed'
   //! reason — 'timeout' | 'superseded' | 'dropped' | 'destroyed' (the kernel's outcomes), 'methods-only'
   // (the server takes client changes only through its `methods:` — V4-5), 'sparse-hole' (a remove of an
-  // array's own element, which data will not fold — write the spliced array), 'unencodable' (a value fero
-  // cannot send: a bigint, a function, a symbol, a getter that throws, a live view, deeper than 60 levels from
-  // the row, bigger than 255 MiB — V4-48), 'validation-threw' (the server's validation: rule threw on the
-  // record — V4-47), or the validation: rule's own reason (V4-4; any other answer than true, its text).
+  // array's own element, which data will not fold — write the spliced array), 'invalid-key' (a key data cannot
+  // fold: an update or a remove with none, I-30; an insert under a row or with no row, V4-52), 'unencodable' (a
+  // value fero cannot send: a bigint, a function, a symbol, a getter that throws, a live view or any other Proxy,
+  // a value that would arrive changed (a Date, a Map, a Set, a typed array other than Uint8Array, an ArrayBuffer,
+  // a RegExp, a Promise, an Error, a URL), deeper than 60 levels from the row, or bigger than 255 MiB; V4-48,
+  // V4-52), 'validation-threw' (the server's validation: rule threw on the record — V4-47), or the validation:
+  // rule's own reason (V4-4; any other answer than true, its text).
   reason: string
   localCommit?: { origin: string; seq: number; epoch: number }
 }
 
 //! Change — the argument shape of the default write methods: key as name or path; value; `at` for
 // ordered inserts. (`methods.update({key:'user42', value:{…}})` ≡ `data.user42 = {…}` — one ingest.)
+// An insert adds a ROW: no key and the row in `at` (fero mints one when `at` is absent), or a one-part key; a
+// longer key or an empty `at` rejects 'invalid-key' (V4-52: a field is an update). The value is copied at the
+// write, as every other copy will hold it: a change to the object afterwards is not sent (V4-52).
 export interface Change {
   key?: string | string[]
   value?: unknown
