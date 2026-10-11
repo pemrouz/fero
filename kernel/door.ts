@@ -62,8 +62,20 @@ export const doorMatrix = (mine: boolean, theirs: boolean): 'open' | 'secured' |
 // address rule cannot see it — yields a proof the real member cannot verify: `bad-proof`, never
 // admitted. JSON over an array of strings and numbers has one encoding, so there is no separator
 // ambiguity. The label versions the message.
+//! `v` (DESIGN-LEAVE §10.10.6, 2026-10-12) is signed INSIDE the array as [[e, p, h], …] — arrays of numbers
+// and strings, one encoding, where the objects as decoded would have the decoder's key order and a
+// canonical string would bring back the separator ambiguity. For consistency with the other HELLO keys
+// (the door guards the admit, and the HELLO is the one word read before a link is counted), not for
+// protection afterwards: the same holds travel unsigned in every PULL `vs` after admission, as a VOTE or
+// a VIEW does. The label is fero-door/2 on purpose: a peer from before this key never verifies here and
+// we never verify there, so a secured pair of mixed versions fails `bad-proof` at both ends at once,
+// rather than only once a hold rides a HELLO (mixed versions are unsupported before 1.0, V4-14).
 export const proofMsg = (side: 'dialer' | 'acceptor', verifierNonce: string, proverNonce: string, verifierUuid: string, verifierListen: string, h: HelloKeys): string =>
-  JSON.stringify(['fero-door/1', side, verifierNonce, proverNonce, verifierUuid, verifierListen, h.u, h.i, h.l, h.r ?? 0, h.n ?? '', h.c ?? '', h.m ?? 0])
+  JSON.stringify(['fero-door/2', side, verifierNonce, proverNonce, verifierUuid, verifierListen, h.u, h.i, h.l, h.r ?? 0, h.n ?? '', h.c ?? '', h.m ?? 0, holdsSigned(h.v)])
+
+//! holdsSigned — `v` as the proof signs it: each hold as [e, p, h]; [] when absent
+export const holdsSigned = (v: unknown): [number, string, string][] =>
+  Array.isArray(v) ? (v as { e: number; p: string; h: string }[]).map((x) => [x.e, x.p, x.h]) : []
 
 //! sign (§15) — which key signs this link: the DIALER's HELLO says. `r: 1` from the dialer makes a client
 // link, signed with the client key on both sides (the member's answer too: a client holds nothing else);
