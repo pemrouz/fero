@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import {
   Framer, FrameError, FrameFull, FULL, MAGIC, MAX_FRAME, VERB, HEADER, MAX_DEPTH, Outbox,
-  encodeControl, encodeFrame, encodeRuns, encodeRun, continuesRun, crcFrame, Writer, Cursor, VT, encodable, roomOf,
+  encodeControl, encodeFrame, encodeRuns, encodeRun, continuesRun, crcFrame, Writer, Cursor, VT, encodable, roomOf, copyOf, Unsendable,
 } from './codec.ts'
 import { REC, type Rec } from './env.ts'
 
@@ -575,4 +575,88 @@ test('a stream of frames split at random points decodes to exactly the frames se
     out.forEach((b, i) => assert.deepEqual(b, frames[i], `stream ${t} frame ${i}`))
     assert.equal(framer.held, 0)
   }
+})
+
+//! the limit's `part` rule (V4-52) is the api's say over an array or an object the codec would carry but change (a
+// Date sends its own fields, and it has none). Both walks ask it once for each array and object, before its parts are
+// visited, never for a Uint8Array (the codec's own bytes), and a refusal reads like any other: the reason, then where.
+test("encodable and copyOf ask the limit's part rule once for each array and object, never a Uint8Array, before its parts, and refuse at its path with one text", () => {
+  const value = { toys: ['a'], at: { x: 1 }, b: new Uint8Array(1) }
+  const seen: [object, boolean][] = []
+  const watch = { depth: MAX_DEPTH, bytes: MAX_FRAME, part: (o: object, array: boolean) => { seen.push([o, array]); return null } }
+  const asked = (): void => {
+    assert.equal(seen.length, 3, 'the value, toys and at — never the bytes')
+    assert.ok(seen[0][0] === value && !seen[0][1] && seen[1][0] === value.toys && seen[1][1] && seen[2][0] === value.at && !seen[2][1])
+    seen.length = 0
+  }
+  assert.equal(encodable(value, watch), null)
+  asked()
+  assert.deepEqual(copyOf(value, watch), value)
+  asked()
+  let ran = false
+  const stop = { depth: MAX_DEPTH, bytes: MAX_FRAME, part: (o: object) => ((o as { kind?: string }).kind === 'when' ? 'no' : null) }
+  const inside = { x: { when: { kind: 'when', get late() { ran = true; return 1 } } } }
+  assert.equal(encodable(inside, stop), 'no at x.when')
+  assert.throws(() => copyOf(inside, stop), (e: Error) => e instanceof Unsendable && e.message === 'no at x.when')
+  assert.equal(ran, false, 'a refused part is never read')
+  assert.equal(encodable({ kind: 'when' }, stop), 'no', 'no path for the value itself')
+  assert.equal(encodable({ a: 1 }, { depth: MAX_DEPTH, bytes: MAX_FRAME, part: () => 'never' }), 'never')
+})
+
+//! copyOf (V4-52) is the copy a local read hands out and a local write keeps: it must build exactly what a remote copy
+// decodes, or the copies disagree again. Over the codec's edges — numbers, text UTF-8 changes (a lone surrogate, a
+// leading byte order mark, two keys that meet once well formed), bytes, holes, extra fields, getters, prototypes, a
+// Proxy — it deep-equals decode(encode(v)) with the same prototypes and key order, and what it cannot copy it refuses
+// with encodable's own text.
+test('copyOf builds what decode(encode(v)) builds for every value the codec carries, and refuses what encodable refuses, with its text', () => {
+  const CODEC = { depth: MAX_DEPTH, bytes: MAX_FRAME }
+  const decoded = (v: unknown): unknown => new Framer().push(encodeControl(VERB.RESULT, v))[0].value
+  //! the same: structure, prototypes, own key order, -0 and NaN, undefined-valued keys, a plain Uint8Array's bytes
+  const same = (a: unknown, b: unknown): boolean => {
+    if (typeof a !== typeof b) return false
+    if (a === null || typeof a !== 'object') return Object.is(a, b)
+    if (b === null || Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false
+    if (a instanceof Uint8Array) return a.length === (b as Uint8Array).length && a.every((x, i) => x === (b as Uint8Array)[i])
+    const ka = Reflect.ownKeys(a), kb = Reflect.ownKeys(b as object)
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i]) &&
+      ka.every((k) => same((a as Record<string | symbol, unknown>)[k], (b as Record<string | symbol, unknown>)[k]))
+  }
+  class Point { x = 1; y = 2 }
+  class List extends Array {}
+  const shared = { s: [1] }
+  const corpus: unknown[] = [
+    null, undefined, true, false, 0, -0, 1.5, NaN, Infinity, -Infinity, 2 ** 31, -(2 ** 31), 2 ** 53, '', 'ünïcode 😺', 'x'.repeat(1000),
+    'lone \uD800 high', '\uDC00 lone low', '﻿bom', '﻿﻿two boms', 'mid﻿bom', { '﻿key': 1 }, { 'a\uD800': 1, x: 0, 'a\uDC00': 2 },
+    { '﻿__proto__': { x: 1 } }, new Uint8Array([1, 2, 3]), Buffer.from([4, 5]), new Uint8Array(new ArrayBuffer(8), 2, 3), [], {},
+    [1, [2, [3, [4]]]], [1, , 3], Object.assign([1, 2], { extra: 1 }), List.from([1, 2]), { a: undefined, b: null }, { a: { b: [1, 'x', null, { c: -0 }] } },
+    Object.create(null), { ['__proto__']: 1 }, JSON.parse('{"__proto__": {"x": 1}}'), { 2: 'two', 1: 'one', b: 'b', a: 'a' }, new Point(),
+    { get g() { return 7 } }, { a: shared, b: shared }, new Date(0), new Map([[1, 2]]), new Float64Array([1.5]), new Proxy({ a: 1 }, {}),
+  ]
+  for (const v of corpus) {
+    const c = copyOf(v, CODEC)
+    assert.ok(same(c, decoded(v)), `parity for ${(() => { try { return JSON.stringify(v) } catch { return String(v) } })()}: copy ${JSON.stringify(c)}`)
+    if (v !== null && typeof v === 'object') assert.notEqual(c, v, 'a copy, never the value itself')
+  }
+  //! what copyOf cannot copy, it refuses as encodable does, word for word, inside the same budget
+  let d65: unknown = 1, d64: unknown = 1
+  for (let i = 0; i < 65; i++) d65 = [d65]
+  for (let i = 0; i < 64; i++) d64 = [d64]
+  const cyclic: Record<string, unknown> = {}
+  cyclic.self = cyclic
+  const small = { depth: MAX_DEPTH, bytes: 300 }
+  const refused: [unknown, { depth: number; bytes: number }, number][] = [
+    [10n, CODEC, 0], [() => 1, CODEC, 0], [Symbol('s'), CODEC, 0], [{ n: 10n }, CODEC, 0], [{ toys: ['ball', { 'two words': 10n }] }, CODEC, 0],
+    [d65, CODEC, 0], [d64, CODEC, 1], [cyclic, CODEC, 0], [{ get g() { throw new Error('g') } }, CODEC, 0], ['x'.repeat(99), small, 0],
+    [{ k: true }, { depth: MAX_DEPTH, bytes: 12 }, 0], [new Array(1e9), CODEC, 0],
+  ]
+  for (const [v, limit, from] of refused) {
+    const why = encodable(v, limit, from)
+    assert.notEqual(why, null)
+    assert.throws(() => copyOf(v, limit, from), (e: Error) => e instanceof Unsendable && e.message === why, String(why))
+  }
+  assert.throws(() => copyOf('x'.repeat(98), small, 0, 3), /^Error: bigger than 0 MiB \(a string counts 3 bytes a character\)$/, 'what the key already spent counts')
+  //! a getter may copy too: the inner copy's bytes are its own, never the outer's
+  const nested = { a: 'x'.repeat(20), get g() { copyOf('y'.repeat(1000), CODEC); return 1 } }
+  assert.equal(encodable(nested, { depth: MAX_DEPTH, bytes: 100 }), null)
+  assert.deepEqual(copyOf(nested, { depth: MAX_DEPTH, bytes: 100 }), { a: 'x'.repeat(20), g: 1 })
 })
