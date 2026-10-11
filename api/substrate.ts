@@ -504,9 +504,10 @@ export const derived = (p: any): number => (unwrap(p)[NODE] as DataNode<unknown>
 //     child view, no subscription (effect), not ESCAPED — and its parents are tried in turn.
 //   - a view is ESCAPED when code outside a handler reached its raw handle: data dedups some operators
 //     (sum('n'), top(3), keys…) per parent, so f.data.sum('n') at module scope can return the very
-//     handle a handler made. The lens marks what it hands out outside a handler; a view made off an
-//     escaped one escapes too (its raw handle sits in the escaped one's dedup map). Escaped nodes are
-//     never released by the collector.
+//     handle a handler made. The lens marks what it hands out outside a handler. A view made off an
+//     escaped one counts as escaped too, in EITHER order: code that holds the escaped view raw can ask
+//     it for the same deduped child later, even when a handler made that child first. So the collector
+//     never releases a node that is escaped or sits under an escaped node (`held`).
 // A wrapper is NOT held by its raw handle (a WeakRef maps raw → wrapper), so a deduped view the source
 // still lists is released once no wrapper of it is alive; data evicts a disposed dedup hit and mints a
 // fresh view on the next call. Release is collector-timed: a dropped view stops being worked out at the
@@ -525,6 +526,16 @@ const gone = new FinalizationRegistry<DataNode<unknown>>((n) => {
 // handler scope adopts it instead)
 let scoped = 0
 
+//! held — is this node escaped, or made (at any depth) off a node that is? Asked at release time, not
+// when the view is made: module code may escape a parent AFTER a handler made a deduped child of it
+// (handler `ctx.data.top(3).sum('n')`, then module `f.data.top(3).sum('n')` gets the same sum handle).
+// A yes is remembered on the node; the walk stops at the source, which is never escaped.
+const held = (n: DataNode<unknown>): boolean => {
+  if (escaped.has(n)) return true
+  for (const p of n.parents) if (p.kind !== 'source' && held(p)) { escaped.add(n); return true }
+  return false
+}
+
 //! release — dispose a tracked node nothing reaches any more, then try its parents (a chain goes whole).
 // A node data already stopped (a function in it threw, data's SCHEDULE clause 4) is walked THROUGH to its
 // parents, as disposeMinted is (V4-47): the views the handler built under it still hang off the resource,
@@ -533,7 +544,7 @@ let scoped = 0
 const release = (n: DataNode<unknown>): void => {
   if (n.kind === 'source') return
   if (!n.disposed) {
-    if (live.get(n) !== 0 || escaped.has(n) || n.children.length > 0 || n.effects.length > 0) return
+    if (live.get(n) !== 0 || n.children.length > 0 || n.effects.length > 0 || held(n)) return
     live.delete(n)
     n.dispose()
   }
@@ -588,9 +599,7 @@ const VIEW: ProxyHandler<any> = forward({
         void self
         const r = Reflect.apply(v, t, a)
         if (sub) return unhooked(r as { dispose(): void }, t[NODE])
-        const out = adopt(r)
-        if (out !== r && escaped.has(t[NODE])) escaped.add((r as any)[NODE]) // made off an escaped view
-        return out
+        return adopt(r) // a view made off an escaped one is kept by release's `held` walk
       }
     }
     return typeof prop === 'symbol' ? v : adopt(v)
