@@ -163,6 +163,21 @@ test('the depth limit counts from the row: 60 levels at the row, 59 under a fiel
   await h.destroy()
 })
 
+//! a validation: rule answers true or the reason. Any other answer — false (the common slip), undefined (a rule
+// that forgot to return), a Symbol — was handed on as it was, and the write path, which reads a non-string outcome
+// as a commit's promise, threw 'r.then is not a function' at methods.update and 'r.catch is not a function' at
+// the assignment. It is a refusal, with its text as the reason.
+test("a validation: rule that answers neither true nor a string refuses the write, with its answer's text as the reason", async () => {
+  const answers: Record<string, unknown> = { f: false, u: undefined, s: Symbol('nope'), z: 0, e: '' }
+  const h = harness({ validate: ((rec: Rec) => (rec.key[0] in answers ? answers[rec.key[0]] : true)) as (rec: Rec) => true | string })
+  const out = h.bind.issue(Object.keys(answers).map((k) => ({ type: REC.update, key: [k], value: 1 })))
+  assert.deepEqual(out, ['the rule returned false', 'the rule returned undefined', 'the rule returned Symbol(nope)', 'the rule returned 0', 'the rule returned an empty reason'])
+  h.bind.data.f = 2 // refused, invisibly, like any refused assignment — it used to throw 'r.catch is not a function'
+  h.bind.data.ok = 1
+  assert.deepEqual(snapshot(h.bind.data), { ok: 1 })
+  await h.destroy()
+})
+
 //! the likely slip `data.b = data.a`: a live view written as a value was read through its traps — an empty object
 // for every leaf, on every copy and the writer's own, which also went on aliasing the source. And a remove carries
 // no value, but its key travels: one too big for a frame was stamped and then failed every frame that carried it.

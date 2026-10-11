@@ -19,7 +19,7 @@ import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { TUNE } from '../kernel/tune.ts'
-import { Bind, METHODS_ONLY, UNENCODABLE, CARRIES, unsendable, type Coords } from './data.ts'
+import { Bind, METHODS_ONLY, UNENCODABLE, CARRIES, unsendable, reasonOf, type Coords } from './data.ts'
 import { fnv } from '../kernel/ring.ts'
 import { Caller, Host, SYSTEM, handle, reapStopped, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
@@ -1148,21 +1148,26 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // could ever complete it: versions.size > 0 skips the retry forever). On first contact with an
   // existing cluster, LWW resolves collisions (higher-epoch cluster stamps win; fresh keys ride in).
   if (config.data !== undefined && rt.node.versions.size === 0) {
-    const recs: Rec[] = Object.entries(config.data as Record<string, unknown>).map(([k, v]) => ({ type: REC.update, key: [k], value: v }))
+    //! everything the seed runs of the user's — reading the rows (a getter), the rule, its answer — and the
+    // issue itself ends in abort, the resource named: a throw that escaped fero() bare skipped abort's
+    // teardown and left the Ctrl-C listener installed (V4-48)
+    let recs: Rec[]
+    try { recs = Object.entries(config.data as Record<string, unknown>).map(([k, v]) => ({ type: REC.update, key: [k], value: v })) }
+    catch (e) { return await abort(new Error(`fero('${name}'): reading the data seed threw: ${errText(e)}`)) }
     //! each row is asked, whole batch first, whether it can be sent (V4-48 — a bigint seed used to start fine
-    // and stop replication for good) and what the rule says; a rule that THROWS aborts like one that refuses,
-    // the resource and the row named (it used to escape fero() bare, past abort's teardown, with the Ctrl-C
-    // listener left installed)
+    // and stop replication for good) and what the rule says; a rule that throws aborts like one that refuses
     for (const r of recs) {
       const why = unsendable(r)
-      if (why !== null) await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' cannot be sent: ${why}\n  ${CARRIES}`))
+      if (why !== null) return await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' cannot be sent: ${why}\n  ${CARRIES}`))
       if (!validate) continue
-      let v: true | string
+      let v: unknown
       try { v = validate(r) } catch (e) { return await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' — validation threw: ${errText(e)}`)) }
-      if (v !== true) await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' rejected by validation — ${v}`))
+      if (v !== true) return await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' rejected by validation — ${reasonOf(v)}`))
     }
-    for (const r of bind.issue(recs))
-      if (typeof r === 'string') await abort(new Error(`fero('${name}'): data seed refused by the kernel — ${r}`))
+    let out: ReturnType<Bind['issue']>
+    try { out = bind.issue(recs) } catch (e) { return await abort(new Error(`fero('${name}'): the data seed could not be issued: ${errText(e)}`)) }
+    for (const r of out)
+      if (typeof r === 'string') return await abort(new Error(`fero('${name}'): data seed refused by the kernel — ${r}`))
   }
   try {
     await Promise.race([rt.start(), stoppedP])

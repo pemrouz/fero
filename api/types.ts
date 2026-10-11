@@ -39,7 +39,7 @@ export interface WriteReject {
   // array's own element, which data will not fold — write the spliced array), 'unencodable' (a value fero
   // cannot send: a bigint, a function, a symbol, a getter that throws, a live view, deeper than 60 levels from
   // the row, bigger than 255 MiB — V4-48), 'validation-threw' (the server's validation: rule threw on the
-  // record — V4-47), or the server's own validation: string for a relayed record it refused (V4-4).
+  // record — V4-47), or the validation: rule's own reason (V4-4; any other answer than true, its text).
   reason: string
   localCommit?: { origin: string; seq: number; epoch: number }
 }
