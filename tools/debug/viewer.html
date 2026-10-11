@@ -447,8 +447,9 @@ const outcomeOf = (capture, r, d) => {
 // With T set (time travel), everything comes from stateAt(·,·,T) instead —
 // values, winner AND divergence are the replayed picture at that instant.
 // One pass per resource (agreement's groups): a cell is compared only among the nodes of its
-// resource, and on a scoped resource only among the nodes holding its row (agreement's `rows`;
-// a row nobody holds is not judged). `group` names the resource when the capture mixes them.
+// resource that agreement judges (`judged`: not a member that left), and on a scoped resource only
+// among the nodes holding its row (agreement's `rows`; a row nobody holds is not judged). `group`
+// names the resource when the capture mixes them.
 const cellRows = (capture, d, T) => {
   const scrub = T != null;
   const states = new Map();                                   // uuid → its cells: captured (Map ck → encoded v) or replayed (ck → {v, …})
@@ -462,8 +463,11 @@ const cellRows = (capture, d, T) => {
     const keys = new Set();
     for (const n of gn) for (const k of stOf(n).keys()) keys.add(k);
     for (const ck of keys) {
-      const judged = g.scoped ? (g.rows.get(partOf(ck)) || []) : gn.map(n => n.uuid);
-      const shown = g.scoped && !judged.length ? gn.filter(n => stOf(n).has(ck)) : gn.filter(n => judged.includes(n.uuid));
+      //! unscoped: among agreement's `judged` (a member that left keeps an old copy by design — not compared); a cell
+      // only a left member holds is shown from it and judged among no one, like a scoped row nobody holds
+      let judged = g.scoped ? (g.rows.get(partOf(ck)) || []) : (g.judged || gn.map(n => n.uuid));
+      if (!g.scoped && !gn.some(n => judged.includes(n.uuid) && stOf(n).has(ck))) judged = [];
+      const shown = !judged.length ? gn.filter(n => stOf(n).has(ck)) : gn.filter(n => judged.includes(n.uuid));
       const vs = shown.map(n => {
         if (!stOf(n).has(ck)) return undefined;
         const cell = stOf(n).get(ck);

@@ -27,7 +27,7 @@ import { VERB, encodeControl } from '../../kernel/codec.ts'
 import * as MODEL from './model.mjs'
 import { tip } from './eli5.mjs'
 import { bootViewer, dragTo } from './dom-shim.ts'
-import { scopedCut, scopedTenure } from './fixtures.ts'
+import { scopedCut, scopedTenure, unscopedLeaver } from './fixtures.ts'
 import { fero } from '../../api/index.ts'
 import { diag } from '../../api/diagnostics.ts'
 import { ports } from '#utils'
@@ -641,4 +641,21 @@ test('a member that left and a client are judged right on the route: quiet where
   g(`navTo(${JSON.stringify(`g/writes/${missed}`)})`)
   insp = el('insp').innerHTML
   assert.ok(insp.includes(`data-rkey="g/nodes/n04">n04</span></span><span data-tip="stop:inflight">not yet arrived</span>`), 'n04 is the stop still missing it')
+})
+
+test('an unscoped member that left tells one story on every pane: converged header, no pill, no cell differs, no write waits for it (wave 5e)', async () => {
+  //! the review's capture: the header said converged ✓ while the cell said DIFFERS and three writes said in-flight ⊘ n04
+  const { cap, after } = unscopedLeaver()
+  const { el, g } = await bootViewer('leaver', cap)
+  assert.match(el('statusRight').innerHTML, /data-tip="converged">converged ✓</, 'the three that stay agree: converged')
+  assert.doesNotMatch(el('tree').innerHTML, /data-tip="node:(differs|diverged)"/, 'no node is pilled — the leaver keeps an old copy by design')
+  g(`expanded.add('g/cells'); expanded.add('g/writes'); render()`)
+  const tree = el('tree').innerHTML
+  assert.match(tree, /data-type="cell"[^>]*>(?:(?!<div class="trow).)*?>zeta</s, 'the zeta cell is on the page')
+  assert.doesNotMatch(tree, /data-tip="(cell|write):(differs|diverged|in-flight|never-arrived)"/, 'no cell or write is flagged')
+  assert.doesNotMatch(tree, /⊘/, 'no write lists the leaver as missing it')
+  g(`navTo(${JSON.stringify(`g/writes/${after[0]}`)})`)
+  const insp = el('insp').innerHTML
+  assert.ok(insp.includes('data-rkey="g/nodes/n04">n04</span></span><span class="x" data-tip="stop:not-a-holder">'), 'n04 is a quiet stop of a write made after it left')
+  assert.doesNotMatch(insp, /stop:(never|inflight)/)
 })

@@ -10,7 +10,7 @@ import { converged } from '../../sim/monitors.ts'
 import { JK } from '../../kernel/journal.ts'
 import { captureSim } from './capture.ts'
 import { encodeVal, decodeVal, kindNames, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology, agreement } from './model.mjs'
-import { scopedCut, scopedTenure, mixed } from './fixtures.ts'
+import { scopedCut, scopedTenure, mixed, unscopedLeaver } from './fixtures.ts'
 import { captureLive } from './capture.ts'
 import { REC } from '../../kernel/env.ts'
 
@@ -573,4 +573,18 @@ test('a capture of two resources is judged per resource: each agrees inside itse
     assert.deepEqual(Object.keys(r.nodes).sort(), g === 'shop' ? ['s1', 's2'] : ['d1'], 'only its own resource\'s nodes are stops')
     assert.ok(!Object.values(r.nodes).some((s) => s.status === 'never-arrived'))
   }
+})
+
+test('an unscoped member that left is judged by its tenure everywhere: not compared, quiet for writes made after it left, and the write it took while in still counts (wave 5e)', () => {
+  const { cap, before, after } = unscopedLeaver()
+  const a = agreement(cap) as Agreement & { groups: { judged?: string[] }[] }
+  assert.equal(a.groups[0].scoped, false)
+  assert.deepEqual(a.groups[0].judged, ['n01', 'n02', 'n03'], 'the three that stay are compared; the leaver keeps an old copy by design')
+  assert.equal(a.converged, true); assert.deepEqual(a.off, [])
+  const rs = routes(cap) as Map<string, Rt>
+  assert.equal(rs.get(before)!.nodes.n04.status, 'applied', 'the write made while n04 was in reached it')
+  //! the writes made after it left were never meant for it: quiet, never a missing stop (the header must not say
+  // converged above writes that still wait for the leaver)
+  for (const id of after) assert.equal(rs.get(id)!.nodes.n04.status, 'not-a-holder', `${id} came after n04 left`)
+  for (const r of rs.values()) assert.notEqual(r.nodes.n04?.status, 'never-arrived', `${r.origin}#${r.seq}: nothing n04 was meant to get is missing`)
 })

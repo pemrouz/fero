@@ -419,6 +419,8 @@ export const routes = (capture) => {
     tenures.set(node.uuid, t)
     return t
   }
+  //! a resource is scoped when any of its nodes carries a scoped fact (`held`, or an older capture's `holders`)
+  const scopedGroups = new Set(capture.nodes.filter((n) => Array.isArray(n.held) || n.holders).map(groupOf))
   for (const r of map.values()) {
     const o = byLane.get(r.origin)
     //! one resource per route: the writer's (or, with the writer not captured, that of a node that has a row for it —
@@ -427,6 +429,9 @@ export const routes = (capture) => {
     r.group = g === '' ? null : g
     const holders = o && o.holders && r.partition != null ? o.holders[r.partition] : null
     const members = holders && o.view ? o.view.members : null
+    //! unscoped: every member is meant to get every write, so only a node outside the writer's committed view needs
+    // its tenure (it left, or was voted out): a write stamped after its last member epoch never was meant for it
+    const inView = !scopedGroups.has(g) && o && o.view && o.view.epoch > 0 ? o.view.members : null
     for (const node of capture.nodes)
       if (!r.nodes[node.uuid] && groupOf(node) === g) {
         const got = r.partition != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(r.partition) : null
@@ -443,6 +448,9 @@ export const routes = (capture) => {
           // stamped while it was one (epoch ≤ until); a write whose record no log holds has no epoch — the row decides
           const tn = tenure(node), e = epochOf(r.origin, r.seq)
           quiet = !(tn.rows.has(r.partition) && (e === null || e <= tn.until))
+        } else if (inView && node.client !== true && !inView.includes(node.uuid)) {
+          const e = epochOf(r.origin, r.seq)
+          quiet = e !== null && e > tenure(node).until
         }
         r.nodes[node.uuid] = { status: quiet ? 'not-a-holder' : 'never-arrived', t: null }
       }
@@ -461,7 +469,9 @@ export const routes = (capture) => {
 //            is off when it sits outside a row's strict-majority side (or the row splits evenly). A row being copied
 //            in (acquiring) or frozen on its way out (orphan) has no claim on the node; a client with no feeder fact
 //            is not judged per row.
-// `rows` (scoped only): partition → the nodes judged for it — the page compares a cell among exactly these.
+// `rows` (scoped only): partition → the nodes judged for it; `judged` (unscoped only): the nodes compared. The page
+// compares a cell among exactly these, and routes() judges a node left out by its tenure, so the header, the pills,
+// the cells and the writes tell one story about a member that left.
 export const agreement = (capture) => {
   if (!capture.nodes.length) return { converged: null, groups: [], off: [] }
   const byName = new Map()
@@ -479,6 +489,7 @@ export const agreement = (capture) => {
     const out = { name: g === '' ? null : g, nodes: ns.map((n) => n.uuid), scoped, converged: true, split: false, sides: [ns.length] }
     if (!scoped) {
       const js = ns.filter(judged)
+      out.judged = js.map((n) => n.uuid) // the page compares a cell among exactly these
       const tally = new Map()
       for (const n of js) tally.set(n.stateHash, (tally.get(n.stateHash) || 0) + 1)
       let modal = js.length ? js[0].stateHash : 0, best = -1
