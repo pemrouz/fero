@@ -969,3 +969,117 @@ test('a node remembers EVERY vote it gave above its view, not the latest alone: 
   h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: [['bb', 'sim:bb'], ['cc', 'sim:cc']], p: 'cc' }) })
   assert.deepEqual(h.node.membership.votedFor, { e: 3, p: 'cc', h: 'bb,cc' })
 })
+
+//! fiveAt1 — `me` with its four peers admitted, at view 1 {aa,bb,cc,dd,ee}; `link[u]` is the link id to u
+const mem = (us: string[]): [string, string][] => us.map((u) => [u, `sim:${u}`])
+const fiveAt1 = (me: string) => {
+  const ids = ['aa', 'bb', 'cc', 'dd', 'ee']
+  const h = harness(me, { hosts: ids.filter((u) => u !== me).map((u) => `sim:${u}`) })
+  h.node.step({ kind: 'start' })
+  const link: Record<string, number> = {}
+  ids.filter((u) => u !== me).forEach((u, i) => { link[u] = i + 1; h.admit(i + 1, u) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: mem(ids) }) })
+  assert.equal(h.node.epoch, 1)
+  const vote = (l: number) => h.sentOn(l, VERB.VOTE).pop()!.value as { g: number; ce: number; hm?: string[] }
+  return { ...h, link, vote }
+}
+
+test('the hold (DESIGN-LEAVE §10.10.1-2): a vote for a view TWO members apart from mine closes my gate `held`; the same proposer\'s replacement at the same epoch is granted and re-read; while held I refuse a ballot that is not joint over the held view and name it (hm), and grant the re-offer that is (its own vote one apart holds nothing, the hold stays behind it) and a ballot whose member set IS the held view\'s; an install re-reads every vote against the new view', () => {
+  const h = fiveAt1('cc')
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+  //! aa evicts dd and ee at 2: {aa,bb,cc}, two apart from view 1
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: mem(['aa', 'bb', 'cc']), p: 'aa', o: 1 }) })
+  assert.equal(h.vote(h.link.aa).g, 1, 'granted: 2 is above view 1 and unspent')
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'held' })
+  assert.deepEqual(h.jk(JK.gateClose).map((e) => e.a), ['held'])
+  assert.deepEqual(h.node.membership.holds(h.node).map((x) => x.h), ['aa,bb,cc'])
+  //! aa's replacement ballot at the same epoch: granted (at most one of aa's ballots at 2 commits), and it is the hold now
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: mem(['aa', 'cc']), p: 'aa', o: 1 }) })
+  assert.equal(h.vote(h.link.aa).g, 1)
+  assert.deepEqual(h.node.membership.holds(h.node).map((x) => x.h), ['aa,cc'])
+  //! bb's ballot at 3 is one apart from view 1 but not joint over {aa,cc}: refused, and the refusal names the held view
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: mem(['bb', 'cc', 'dd', 'ee']), p: 'bb', o: 1 }) })
+  assert.equal(h.vote(h.link.bb).g, 0)
+  assert.deepEqual(h.vote(h.link.bb).hm, ['aa,cc'])
+  //! the re-offer joint over it is granted; that vote is one apart (no hold of its own), and the hold at 2 stays behind it
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: mem(['bb', 'cc', 'dd', 'ee']), p: 'bb', o: 1, j: ['aa,cc'] }) })
+  assert.equal(h.vote(h.link.bb).g, 1)
+  assert.deepEqual(h.node.membership.votedFor, { e: 3, p: 'bb', h: 'bb,cc,dd,ee', prior: [{ e: 2, p: 'aa', h: 'aa,cc' }] })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'held' })
+  //! a ballot whose member set IS the held view's — aa's escalation past a burn — is joint by construction: granted
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 4, m: mem(['aa', 'cc']), p: 'aa', o: 1 }) })
+  assert.equal(h.vote(h.link.aa).g, 1)
+  assert.deepEqual(h.node.membership.holds(h.node).map((x) => `${x.e}:${x.h}`), ['4:aa,cc', '2:aa,cc'])
+  //! view 2 = {aa,cc} installs: the votes at 2 are history; the vote at 4 is for view 2's own members (no hold) and the
+  // vote at 3 for {bb,cc,dd,ee} is now FOUR apart — held, by the re-read (the kept ballot in the reversed order)
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.VIEW, { e: 2, m: mem(['aa', 'cc']) }) })
+  assert.deepEqual(h.node.membership.holds(h.node).map((x) => `${x.e}:${x.h}`), ['3:bb,cc,dd,ee'])
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'held' })
+  //! view 4 installs: nothing above it — no hold; cc and aa are 2 of 2
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.VIEW, { e: 4, m: mem(['aa', 'cc']) }) })
+  assert.deepEqual(h.node.membership.holds(h.node), [])
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+  assert.deepEqual(h.jk(JK.gateOpen).length, 1)
+})
+
+test('form (β) (DESIGN-LEAVE §10.10.3): a PROPOSE carries the epoch of the view it is over (o); a ballot over a view BELOW mine is refused and the refusal teaches my view; one without o reads as over my own view; at the proposer NO ballot outlives an install — a ballot above the new view is dropped and re-proposed over the view I hold, with the new o', () => {
+  //! the voter: cc at view 2 = {aa,bb,cc}
+  const h = fiveAt1('cc')
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.VIEW, { e: 2, m: mem(['aa', 'bb', 'cc']) }) })
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: mem(['aa', 'cc']), p: 'aa', o: 1 }) })
+  assert.equal(h.vote(h.link.aa).g, 0, 'a ballot over view 1 while I hold view 2: its proposer is behind')
+  assert.equal(h.vote(h.link.aa).ce, 2, 'the refusal teaches it my view')
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: mem(['aa', 'cc']), p: 'aa', o: 2 }) })
+  assert.equal(h.vote(h.link.aa).g, 1, 'over my view: granted')
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: mem(['aa', 'cc']), p: 'aa' }) })
+  assert.equal(h.vote(h.link.aa).g, 1, 'no o (an older peer): over my own view, the same proposer re-grants')
+  //! the proposer: aa at view 1 = {aa,bb,cc} evicts cc at 2; bb's refusal burns 2; the ballot ages out and aa escalates to 3
+  const p = formedView1()
+  p.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  p.tick(); p.tick(); p.tick()
+  let dials = 800
+  //! exhaust the chain to cc (the heartbeat revives a given-up target, so the eviction waits on it again every time)
+  const giveUp = () => { for (let i = 0; i < 11; i++) { const t = p.of('timer').filter((x) => x[2] === TAG.redial).pop(); if (t) p.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial }); p.node.step({ kind: 'linkDown', link: dials++, reason: 'refused', to: 'sim:cc' }) } }
+  giveUp()
+  p.tick()
+  const proposes = () => p.sentOn(1, VERB.PROPOSE).map((f) => { const v = f.value as { e: number; o: number; j?: string[] }; return `${v.e}/${v.o}${v.j ? '+' : ''}` })
+  assert.deepEqual(proposes(), ['1/0', '2/1'], 'genesis over the empty view, then the eviction at 2 over view 1, joint over nothing')
+  p.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 0, ce: 1, h: 'aa,bb', ve: 2 }) })
+  for (let i = 0; i < 20 && !p.jk(JK.propose).some((e) => e.a === 3); i++) { giveUp(); p.tick() }
+  assert.deepEqual(p.jk(JK.propose).map((e) => e.a), [1, 2, 3], 'escalated past the burn to 3, still over view 1')
+  assert.equal(proposes().pop(), '3/1')
+  //! bb's VIEW 2 = {aa,bb,cc} lands: the ballot at 3 is above it and the base kept it (a ballot over view 1, which no
+  // voter at view 2 grants under (β)). Now it is dropped, and the next tick re-proposes the eviction over view 2.
+  p.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: mem(['aa', 'bb', 'cc']) }) })
+  assert.equal(p.node.epoch, 2)
+  giveUp(); p.tick()
+  assert.deepEqual(p.jk(JK.propose).map((e) => e.a), [1, 2, 3, 3], 'dropped at the install and re-proposed at 3 (never below my own ballot, V4-25)')
+  assert.equal(proposes().pop(), '3/2', 'over the view I hold now')
+})
+
+test('the joint commit (DESIGN-LEAVE §10.10.2, §10.10.4 supersession): a refusal naming a held view (hm) makes the ballot joint over it — the re-offer carries it (j) and the commit needs a majority of that view too; with the held view\'s majority consenting it commits', () => {
+  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd', 'ee'])
+  m.cut('aa', 'dd'); m.cut('aa', 'ee')
+  for (let i = 0; i < 3; i++) m.tick('aa')
+  m.giveUp('aa', 'dd'); m.giveUp('aa', 'ee')
+  m.tick('aa')
+  const aa = m.nodes.get('aa')!
+  assert.deepEqual(aa.journal.read().filter((e) => e.kind === JK.propose).map((e) => [e.a, e.b]), [[2, 3]], 'aa evicts dd and ee at 2')
+  const q = (a: string, b: string) => m.q.get(`${a}>${b}`)!
+  const first = q('aa', 'bb').shift()!.value as { o: number; j?: string[] }
+  assert.equal(first.o, 1); assert.equal(first.j, undefined)
+  q('aa', 'cc').shift()
+  const feed = (from: string, body: object) => aa.step({ kind: 'bytesIn', link: m.linkOf.get('aa')!.get(from)!, bytes: encodeControl(VERB.VOTE, body) })
+  //! bb refuses, naming the view it holds a vote for (a ballot of cc's, say): aa's ballot becomes joint over it
+  feed('bb', { e: 2, g: 0, ce: 1, h: 'aa,bb,cc', ve: 1, hm: ['bb,cc,dd,ee'] })
+  m.tick('aa'); m.tick('aa')
+  const re = q('aa', 'bb').pop()!.value as { o: number; j?: string[] }
+  assert.deepEqual(re.j, ['bb,cc,dd,ee'], 'the re-offer is joint over the held view')
+  //! bb and cc grant: 3 of the old 5, 3 of the new 3 — the base commits here — but 2 of the held view's 4
+  feed('bb', { e: 2, g: 1, ce: 1, h: 'aa,bb,cc', ve: 2 }); feed('cc', { e: 2, g: 1, ce: 1, h: 'aa,bb,cc', ve: 2 })
+  assert.equal(aa.epoch, 1, 'not committed: the held view {bb,cc,dd,ee} may be live and only two of its four consented')
+  //! dd comes back and consents: 3 of 4 — the held view cannot be live any more, the ballot commits
+  m.connect('aa', 'dd')
+  feed('dd', { e: 2, g: 1, ce: 1, h: 'aa,bb,cc', ve: 2 })
+  assert.equal(aa.epoch, 2, 'superseded by its own majority: committed')
+})
