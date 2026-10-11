@@ -364,3 +364,83 @@ test('the reborn clock and lane cannot collide with a lost life: the ceiling flo
   h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['k2'], value: 2 }] })
   assert.equal(h.node.logs.get('aa~2')!.pop()!.seq, 91, 'the next write can never collide with a lost stamp')
 })
+
+//! ── V4-51: WAL rows and the snapshot are cut by size ───────────────────────────
+// A commit, or a snapshot chunk, bigger than one frame is one ROW PER FRAME: each row its own batch, chained by prev,
+// covering only its own records. The rows are the frames the wire would carry, so replay reads them unchanged — and a
+// file written with one big row (before the cut existed) replays on a node that cuts. Driven at the tune row's 4 KiB.
+const bigRows = (n: number, from = 1): Rec[] => Array.from({ length: n }, (_, i) => ({ type: REC.update, key: [`r${from + i}`], value: new Uint8Array(1500).fill((from + i) & 255) }))
+const rowsOf = (h: ReturnType<typeof harness>) => h.of('persist').map((p) => ({ batch: p[1] as number, bytes: p[2] as Uint8Array, prev: p[3] as number }))
+const seqsOf = (bytes: Uint8Array) => new Framer().push(bytes.slice())[0].records().map((rv) => rv.seq)
+//! an ARMED durable aa at committed view 1 over {aa, bb, cc} that owns r1..r10 (the scoped suite's idiom: the boot
+// record installs epoch 1, a live peer's VIEW confirms it, the ring is placed by hand)
+const armedDurable = (tune: Record<string, number>) => {
+  const h = harness('aa', { replicas: 2, tune, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] } })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'bb')
+  h.admit(2, 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.node.armed, true)
+  h.node.membership.rejoinFloor = 0
+  for (let i = 1; i <= 10; i++) h.node.writes.ring.place(`r${i}`, 'aa', 'bb')
+  return h
+}
+
+test('a durable commit bigger than one frame is one WAL row per frame, chained by prev, each covering only its own partitions; replay restores every record', () => {
+  for (const armed of [false, true]) {
+    const h = armed ? armedDurable({ frame: 4096 }) : harness('aa', { tune: { frame: 4096 } })
+    const before = rowsOf(h).length
+    h.node.step({ kind: 'write', recs: bigRows(10) })
+    const rows = rowsOf(h).slice(before)
+    const seqs = rows.map((r) => seqsOf(r.bytes))
+    const s0 = h.node.logs.get('aa')![0].seq
+    assert.deepEqual(seqs, [0, 2, 4, 6, 8].map((k) => [s0 + k, s0 + k + 1]), `${armed ? 'armed' : 'unscoped'}: five rows of two`)
+    assert.deepEqual(rows.map((r) => r.prev), [0, ...seqs.slice(0, -1).map((x) => x[1])], 'each row chains onto the one before it')
+    assert.ok(rows.every((r) => r.bytes.length - 11 <= 4096), 'every row within the cap')
+    //! the echo of the FIRST row advances durable to that row's tail, and (armed) raises the durable floors of its own
+    // two partitions only: a cover over the whole commit would have raised all ten
+    const d = h.node.streams.get('aa')!
+    h.node.step({ kind: 'persisted', batch: rows[0].batch })
+    assert.equal(d.durable, s0 + 1, 'durable stops at the first row\'s tail')
+    const floors = () => Array.from({ length: 10 }, (_, i) => d.parts!.get(`r${i + 1}`)!.d)
+    if (armed) assert.deepEqual(floors(), [s0, s0 + 1, 0, 0, 0, 0, 0, 0, 0, 0], 'a row\'s cover holds only its own records')
+    for (const r of rows.slice(1)) h.node.step({ kind: 'persisted', batch: r.batch })
+    assert.equal(d.durable, s0 + 9)
+    if (armed) assert.deepEqual(floors(), Array.from({ length: 10 }, (_, i) => s0 + i))
+    //! replay the rows into a fresh node: every record, no taint
+    const r = harness('aa', { tune: { frame: 4096 } })
+    for (const row of rows) r.node.step({ kind: 'replay', bytes: row.bytes, prev: row.prev })
+    assert.equal(r.node.state.size, 10)
+    assert.equal(r.node.tainted, false)
+    assert.deepEqual(r.jk(JK.frameDrop), [])
+  }
+})
+
+test('the snapshot cuts a chunk by size; its rows chain; a one-row file written at the full cap replays on a node that cuts', () => {
+  const h = harness('aa', { tune: { frame: 4096 } })
+  for (let b = 0; b < 3; b++) h.node.step({ kind: 'write', recs: bigRows(10, 1 + b * 10) })
+  h.node.snapshot()
+  const rows = h.of('snapshot').pop()![2] as { bytes: Uint8Array; prev: number }[]
+  assert.equal(rows.length, 15, 'one chunk of 30 contiguous records, fifteen rows of two')
+  assert.ok(rows.every((r) => r.bytes.length - 11 <= 4096))
+  assert.deepEqual(rows.map((r) => r.prev), [0, ...rows.slice(0, -1).map((r) => seqsOf(r.bytes).pop()!)], 'each row chains onto the last seq before it')
+  assert.deepEqual(rows.flatMap((r) => seqsOf(r.bytes)), Array.from({ length: 30 }, (_, i) => i + 1))
+  const r = harness('aa', { tune: { frame: 4096 } })
+  for (const row of rows) r.node.step({ kind: 'replay', bytes: row.bytes, prev: row.prev })
+  assert.equal(r.node.state.size, 30)
+  assert.equal(r.node.tainted, false)
+  //! a chunk under the cap is one row, as before: the same history at the full cap snapshots to ONE row
+  const full = harness('aa')
+  for (let b = 0; b < 3; b++) full.node.step({ kind: 'write', recs: bigRows(10, 1 + b * 10) })
+  full.node.snapshot()
+  assert.equal((full.of('snapshot').pop()![2] as unknown[]).length, 1)
+  //! a file written before the cut existed: one row of ten records (a 15 KB body), replayed on a 4 KiB node
+  const old = harness('aa')
+  old.node.step({ kind: 'write', recs: bigRows(10) })
+  const [row] = rowsOf(old)
+  assert.ok(row.bytes.length - 11 > 4096, 'the old shape: one row past the small cap')
+  const n = harness('aa', { tune: { frame: 4096 } })
+  n.node.step({ kind: 'replay', bytes: row.bytes, prev: row.prev })
+  assert.equal(n.node.state.size, 10)
+  assert.equal(n.node.tainted, false)
+})
