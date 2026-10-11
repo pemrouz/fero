@@ -9,7 +9,8 @@ import { cluster, client, formed, writes } from '../../sim/harness.ts'
 import { converged } from '../../sim/monitors.ts'
 import { JK } from '../../kernel/journal.ts'
 import { captureSim } from './capture.ts'
-import { encodeVal, decodeVal, kindNames, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology } from './model.mjs'
+import { encodeVal, decodeVal, kindNames, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology, agreement } from './model.mjs'
+import { scopedCut, scopedTenure, mixed } from './fixtures.ts'
 import { captureLive } from './capture.ts'
 import { REC } from '../../kernel/env.ts'
 
@@ -491,4 +492,85 @@ test('the replay at a hand-off step: no cell of a row just shed, and no record a
   }
   assert.ok(backAgain > 0, `a node shed a row and acquired it back — the fixture is what it claims (${backAgain})`)
   assert.ok(liveAfter > 0, `a held record of an acquired row arrived live after the acquire — the fixture is what it claims (${liveAfter})`)
+})
+
+type Agreement = { converged: boolean | null; off: string[]; groups: { name: string | null; nodes: string[]; scoped: boolean; converged: boolean; rows?: Map<string, string[]>; bad?: string[] }[] }
+type Stop = { status: string; t: number | null }
+type Rt = { origin: string; seq: number; partition: string | null; group: string | null; nodes: Record<string, Stop> }
+
+test('a scoped capture is judged per row among its holders: converged when every row\'s holders agree, and only the lagging holder is off (wave 5e)', () => {
+  const { cut, healed, owner, lagging, row } = scopedCut()
+  //! whole-node fingerprints differ by design here (each member holds only its rows) — the old rule painted every node
+  const hashes = new Set(healed.nodes.map((n) => n.stateHash))
+  assert.ok(hashes.size > 1, 'the healed members still hold different rows: one fingerprint per node cannot judge them')
+  const h = agreement(healed) as Agreement
+  assert.equal(h.converged, true, 'every row\'s holders agree')
+  assert.deepEqual(h.off, [], 'nobody is off')
+  assert.equal(summarize(healed).converged, true, 'the header says converged')
+  assert.equal(h.groups[0].scoped, true)
+  //! the cut: the row's three holders are judged, two agree, the lagging one is the odd one out — nobody else
+  const c = agreement(cut) as Agreement
+  assert.equal(c.converged, false)
+  assert.deepEqual(c.groups[0].bad, [row], 'exactly the row the holders disagree on')
+  assert.deepEqual(c.off, [lagging], 'only the lagging holder is off — a strict majority of the row\'s holders agrees')
+  assert.ok(c.groups[0].rows!.get(row)!.includes(owner) && c.groups[0].rows!.get(row)!.includes(lagging), 'the row is judged among its holders')
+  assert.equal(summarize(cut).converged, false)
+})
+
+test('a plain scoped run agrees row by row, though its fingerprints differ by design (the header said differs on every node before wave 5e)', () => {
+  const cap = scopedCapture().cap
+  const a = agreement(cap) as Agreement
+  assert.ok(new Set(cap.nodes.map((n) => n.stateHash)).size > 1, 'its fingerprints differ by design')
+  assert.equal(a.converged, true); assert.deepEqual(a.off, [])
+})
+
+test('clients and members that left are judged right: a client against its feeder\'s rows, a leaver and a voted-out member only for rows they held while in (wave 5e)', () => {
+  const { cap, missed } = scopedTenure()
+  const rs = [...(routes(cap) as Map<string, Rt>).values()]
+  const by = (u: string) => cap.nodes.find((n) => n.uuid === u)!
+  const stops = (u: string) => rs.filter((r) => r.nodes[u]).map((r) => ({ r, s: r.nodes[u] }))
+  //! the client: quiet exactly for the rows its feeder does not hold; nothing it should have is missing here
+  const feeder = by(by('zc1').feeder as string)
+  const zq = stops('zc1').filter((x) => x.s.status === 'not-a-holder')
+  assert.ok(zq.length > 0, 'the client was meant to miss some writes — the fixture is what it claims')
+  for (const { r } of zq) assert.ok(!feeder.held!.includes(r.partition!), `${r.origin}#${r.seq}: quiet only for a row its feeder does not hold`)
+  for (const { r, s } of stops('zc1')) if (feeder.held!.includes(r.partition!)) assert.notEqual(s.status, 'not-a-holder', 'a row its feeder holds is one it is meant to have')
+  //! the leaver and the voted-out member: no red stop for a row they never held, and they were judged somewhere
+  //! the leaver missed exactly one write it was meant to get — a row it held, stamped while it was in — and that one is red
+  assert.deepEqual(stops('n04').filter((x) => x.s.status === 'never-arrived').map((x) => `${x.r.origin}#${x.r.seq}`), [missed], 'n04: the one real miss, and nothing else')
+  assert.deepEqual(stops('n05').filter((x) => x.s.status === 'never-arrived').map((x) => `${x.r.origin}#${x.r.seq}`), [], 'n05: nothing it held was missed while it was in')
+  for (const u of ['n04', 'n05']) {
+    assert.ok(stops(u).some((x) => x.s.status === 'not-a-holder'), `${u}: the writes after it went are quiet`)
+    assert.ok(stops(u).some((x) => x.s.status === 'applied' || x.s.status === 'origin'), `${u}: it took writes while it was in`)
+  }
+  //! every write stamped after the leave view is quiet at the leaver; a write it held the row of, stamped while it was in, is not
+  const n04 = by('n04')
+  const leftAt = n04.journal.filter((e) => e.kind === cap.vocab.viewInstall).at(-1)!.a as number
+  const epochOf = (r: Rt) => (cap.nodes.flatMap((n) => n.logs[r.origin] || []).find((x) => x.seq === r.seq) || { epoch: null }).epoch
+  for (const { r, s } of stops('n04')) if (epochOf(r) != null && (epochOf(r) as number) >= leftAt) assert.equal(s.status, 'not-a-holder', `${r.origin}#${r.seq} came after n04 left`)
+  //! the copies: a member that left keeps an old copy — never compared, never off. The three that stay agree. The client is
+  // compared against its feeder's rows only; here it misses a row its feeder took over in a hand-off (a real kernel gap,
+  // STATUS) — and the two folds say the same thing: off on exactly those rows, its stops for them never-arrived
+  const a = agreement(cap) as Agreement
+  assert.ok(!a.off.includes('n05') && !a.off.includes('n04'), 'a member that left is not compared')
+  assert.ok(a.off.every((u) => u === 'zc1'), 'the members of the newest view agree with each other')
+  for (const p of a.groups[0].bad ?? []) {
+    assert.ok(feeder.held!.includes(p), `${p}: a row the client is off on is one its feeder holds`)
+    assert.ok(rs.some((r) => r.partition === p && r.nodes.zc1?.status === 'never-arrived'), `${p}: and routes() names the write it lacks`)
+  }
+})
+
+test('a capture of two resources is judged per resource: each agrees inside itself, and a write\'s stops are its own resource\'s nodes (wave 5e)', () => {
+  const cap = mixed()
+  const a = agreement(cap) as Agreement
+  assert.deepEqual(a.groups.map((g) => [g.name, g.nodes]), [['shop', ['s1', 's2']], ['#directory', ['d1']]])
+  assert.equal(a.converged, true, 'shop agrees with shop; the directory alone agrees with itself')
+  assert.deepEqual(a.off, [])
+  assert.equal(summarize(cap).converged, true)
+  for (const r of (routes(cap) as Map<string, Rt>).values()) {
+    const g = r.origin === 'd1' ? '#directory' : 'shop'
+    assert.equal(r.group, g, `${r.origin}#${r.seq} belongs to ${g}`)
+    assert.deepEqual(Object.keys(r.nodes).sort(), g === 'shop' ? ['s1', 's2'] : ['d1'], 'only its own resource\'s nodes are stops')
+    assert.ok(!Object.values(r.nodes).some((s) => s.status === 'never-arrived'))
+  }
 })
