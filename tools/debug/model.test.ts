@@ -518,6 +518,14 @@ test('a scoped capture is judged per row among its holders: converged when every
   assert.equal(summarize(cut).converged, false)
 })
 
+test('a scoped row whose two holders disagree is an even split: both holders are off, since neither is the odd one out (wave 5e)', () => {
+  const { cut, owner, lagging, row } = scopedCut(2)
+  const c = agreement(cut) as Agreement
+  assert.deepEqual(c.groups[0].rows!.get(row)!.slice().sort(), [owner, lagging].sort(), 'the row has exactly its two holders — the fixture is what it claims')
+  assert.deepEqual(c.groups[0].bad, [row])
+  assert.deepEqual(c.off.slice().sort(), [owner, lagging].sort(), 'one against one: both are off')
+})
+
 test('a plain scoped run agrees row by row, though its fingerprints differ by design (the header said differs on every node before wave 5e)', () => {
   const cap = scopedCapture().cap
   const a = agreement(cap) as Agreement
