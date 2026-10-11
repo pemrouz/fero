@@ -49,8 +49,8 @@ export const HEADER = 11
 // the partition owner reuse the whole hot record-encode/decode path. WACK {u,c,n,s,e} answers a committed
 // run with its stamp coordinates — plus `o`, the lane it was stamped on, from an ARMED owner only (DESIGN-SCALE
 // stage 1: the issuer may never see the record; unscoped WACKs stay the v4.0 bytes) — or, on an armed relay's hop
-// to its spoke for a record that relay WILL tap, `l`, the same lane to keep while waiting for the tap (wave 5e: a
-// feeder that dies before its tap must not strand the write); WNACK {u,c,n,r,ce} rejects
+// to its spoke for a record that relay expects to tap, `l`, the same lane to keep while waiting for the tap (wave 5e:
+// a feeder that dies before its tap must not strand the write); WNACK {u,c,n,r,ce} rejects
 // one with a typed reason + the owner's epoch (`m`, the reason text, rides an `invalid`).
 export const VERB = {
   HELLO: 1, RECORDS: 2, PING: 3, PONG: 4, DIGEST: 5,

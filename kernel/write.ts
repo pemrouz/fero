@@ -174,7 +174,7 @@ export class Writes {
   // for a relayed one (its spoke's tap will stay silent). The fold sites delete the entry (#folded).
   // Bounded like a dedup lane; never written on an unscoped node (no lane reaches it).
   //! On a CLIENT of a scoped feeder (wave 5e) the same map keeps its own cleared-but-unseen attempts: the
-  // WACK that cleared them carried the lane under `l` (the feeder will tap the record), and the tap can die
+  // WACK that cleared them carried the lane under `l` (the feeder expects to tap the record), and the tap can die
   // with the feeder's link. strand() marks every entry at a primary failover (`x`); the failover's resync end
   // settles every marked entry still unseen through `acked` (settleStranded). `p` is unused there ('').
   #awaiting = new Map<string, { p: string; via: number; u: string; c: number; s: number; e: number; o: string; x?: boolean }>()
@@ -618,8 +618,9 @@ export class Writes {
     //! `o` (DESIGN-SCALE stage 1): the lane the owner stamped on. Present only from an armed owner (or a
     // relay hopping its answer), so an unscoped member never reads it and nothing below runs there.
     const lane = typeof v.o === 'string' ? v.o : undefined
-    //! `l` (wave 5e): the same lane, from a relay that WILL tap the record — "wait for the tap, but here is where it
-    // committed". Only a client reads it: it keeps the coordinates while the record is unseen (#awaiting), so a
+    //! `l` (wave 5e): the same lane, from a relay that expects to tap the record — "wait for the tap, but here is where
+    // it committed". An expectation, not a promise (an ACQUIRING relay folds the teacher's copy untapped: STATUS).
+    // Only a client reads it: it keeps the coordinates while the record is unseen (#awaiting), so a
     // feeder that dies before its tap cannot strand the write (strand / settleStranded). An old client ignores it.
     const tap = node.client && typeof v.l === 'string' ? v.l : undefined
     let hop: { via: number; c: number; n: number; s: number; o?: string; l?: string } | null = null
@@ -655,7 +656,7 @@ export class Writes {
       const silent = p !== undefined && !node.scope!.expects(node, p)
       if (a.via >= 0) {
         //! the spoke hears the lane either way: as `o` (settle now — this relay's tap stays silent) or as `l`
-        // (wait for this relay's tap, which follows; keep the coordinates in case the tap dies with the link)
+        // (wait for this relay's tap, which should follow; keep the coordinates in case the tap dies with the link)
         const o = silent ? lane : undefined
         const l = p !== undefined && !silent ? lane : undefined
         // no `hop.l !== l` test: within one WACK `lane` and `p`'s definedness are fixed, so `l` differs exactly when `o` does
