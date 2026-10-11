@@ -554,11 +554,12 @@ const release = (n: DataNode<unknown>): void => {
 //! adopt — the wrapper for a raw derived-view handle (made once per raw handle while it is alive);
 // anything else — a value, a source or its lens, a wrapper — passes through as it is
 const adopt = (x: unknown): unknown => {
-  if (x === null || (typeof x !== 'object' && typeof x !== 'function') || views.has(x)) return x
+  if (x === null || (typeof x !== 'object' && typeof x !== 'function')) return x
+  const known = wrappers.get(x)?.deref() // first: a repeated child read (data caches child handles) ends here
+  if (known !== undefined) return known
+  if (views.has(x)) return x
   const n = (x as any)[NODE]
   if (!(n instanceof DataNode) || n.kind === 'source') return x
-  const known = wrappers.get(x)?.deref()
-  if (known !== undefined) return known
   const t = Object.create(null)
   t[RAW] = x
   const w = new Proxy(t, VIEW)

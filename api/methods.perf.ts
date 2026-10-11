@@ -62,3 +62,25 @@ test('ratio: 1000 views made through the handler scope cost about what they cost
   bind.destroy()
   await rt.destroy()
 })
+
+//! RATIO (I-29 skeptic): a child read off a wrapped view (view.r1 inside a handler) goes through the
+// wrapper's trap and then data's own, so it costs about 2x a raw read; there is no way under one extra
+// Proxy layer. What the pin guards is the cheap road: data caches each child handle, and `adopt` looks
+// the raw handle up in its wrapper cache FIRST, so a repeated read reuses the live wrapper. Read 20k
+// times over 2000 rows: 2.3-2.65x here (about 3.4x with the cache asked last, the first cut); a new
+// wrapper per read (no cache) reads about 15x and fails it.
+test('ratio: child reads off a view made through the handler scope cost about 2x a raw read', async () => {
+  const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0 })
+  const bind = new Bind(rt)
+  for (let i = 0; i < 2000; i++) bind.data['r' + i] = { n: i }
+  const raw = (bind.data as any).filter((r: { n: number }) => r.n >= 0)
+  const wrapped = handlerScope(bind.data).filter((r: { n: number }) => r.n >= 0)
+  let seen = 0
+  const read = (v: any) => () => { for (let i = 0; i < 20000; i++) if (v['r' + (i % 2000)] !== undefined) seen++ }
+  const r = ratio.interleaved(read(raw), read(wrapped))
+  assert.equal(seen, 20000 * 16, 'every read found its row')
+  assert.ok(r < 4, `child reads through the handler scope / raw = ${r.toFixed(2)}x (budget 4x; about 2.4x here, about 15x with no wrapper cache)`)
+  raw[NODE].dispose()
+  bind.destroy()
+  await rt.destroy()
+})
