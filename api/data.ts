@@ -31,6 +31,7 @@
 
 import { proxy, applyRec, lens, holeAt, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
+import { encodable } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -39,6 +40,11 @@ import type { Runtime } from '../shell/runtime.ts'
 // methods-only hint gives the same reason LOCALLY in issue(), before the round trip. Defined here (the
 // composer re-exports it) because issue() is the one place that speaks it on a client.
 export const METHODS_ONLY = 'methods-only'
+
+//! UNENCODABLE — the reason issue() gives a record whose value the codec cannot carry (V4-48): a bigint, a
+// function, a symbol, nesting deeper than 64, or a getter that throws. Asked BEFORE the stamp: a value
+// stamped first failed in every frame that carried it afterwards, and replication stopped for good.
+export const UNENCODABLE = 'unencodable'
 
 //! SCOPED_FEEDER — does a server's HELLO contract (api/index.ts clusterContract: `v1;heartbeat.ms=…;
 // replicas=N;…`) say it is scoped? `replicas=0` is full replication. Read by #local on a client.
@@ -252,7 +258,9 @@ export class Bind {
   // data: seed all land here; the validation: hook therefore covers every spelling by
   // construction — v2's OQ6). Admit, register the pending entries, hand the records to the kernel;
   // the proxy changes only when a commit applies (#onApply).
-  issue(recs: Rec[]): Issued {
+  //! `checked` — the lens's own batch, whose values #fromLens has already asked (it throws instead, before
+  // anything is issued): the one walk per value is not paid twice on the assignment path.
+  issue(recs: Rec[], checked = false): Issued {
     const node = this.#rt.node
     const out: Issued = new Array(recs.length)
     //! the door, read ONCE per batch (DESIGN-DOOR §4): a CLIENT whose primary said methods-only (`m: 1`
@@ -270,7 +278,8 @@ export class Bind {
     const valid: Rec[] = []
     const t = this.#tracked?.()
     for (let i = 0; i < recs.length; i++) {
-      const v = this.admit(recs[i])
+      //! a value the wire cannot carry is refused before the user's rule sees it, and before any stamp
+      const v = !checked && recs[i].type !== REC.remove && encodable(recs[i].value) !== null ? UNENCODABLE : this.admit(recs[i])
       if (v !== true) {
         //! refused: an outcome row with the reason, and nothing else — the record never touched the
         // proxy, so there is nothing to undo (a refused write is invisible, not bounced)
@@ -478,9 +487,17 @@ export class Bind {
       for (const r of recs) this.#apply(r)
       return
     }
+    //! a value the wire cannot carry throws HERE, before anything of the batch is issued (V4-48) — like the
+    // lens's root-replace and sparse-hole refusals: a programming error, loud at the assignment, all or nothing
+    // for a patch() of several pairs. Nothing is stamped, so nothing is left to stop replication.
+    for (const r of recs) {
+      if (r.type === REC.remove) continue
+      const why = encodable(r.value)
+      if (why !== null) throw new TypeError(`fero: ${JSON.stringify(r.key)}: the value cannot be sent — ${why}; fero carries null, booleans, numbers, strings, Uint8Array, arrays and plain objects, at most 64 deep`)
+    }
     //! assignments have no await surface — swallow the coordinate promises (their journal/outcome
     // effects are the observable outcome), but NEVER let a reject become an unhandledRejection
-    const out = this.issue(recs)
+    const out = this.issue(recs, true)
     const t = this.#tracked?.()
     for (let i = 0; i < out.length; i++) {
       const r = out[i]

@@ -123,6 +123,44 @@ test('a view that throws inside a LOCAL write never cuts the write short: every 
   await h.destroy()
 })
 
+//! V4-48: a value the codec cannot carry is asked about BEFORE the stamp. Stamped first, it failed in every frame
+// that carried it afterwards (the WAL, each link, each digest answer): replication stopped for good, and a getter
+// that throws ended the server from its socket handler.
+test('a value the wire cannot carry throws at the assignment and stamps nothing — a bigint, a function, a symbol, deep nesting, a getter that throws; a patch with one such pair issues none of it', async () => {
+  const h = harness()
+  let deep: unknown = { leaf: 1 }
+  for (let i = 0; i < 70; i++) deep = { deep }
+  const bad: [string, unknown, RegExp][] = [
+    ['big', { n: 10n }, /a bigint/],
+    ['fn', { f: () => 1 }, /a function/],
+    ['sym', [Symbol('s')], /a symbol/],
+    ['deep', deep, /nesting deeper than 64/],
+    ['getter', { get age() { throw new Error('age trips') } }, /reading it threw \(Error: age trips\)/],
+  ]
+  for (const [k, v, why] of bad)
+    assert.throws(() => { h.bind.data[k] = v }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["${k}"]: the value cannot be sent — `) && why.test(e.message), k)
+  assert.throws(() => h.bind.data.patch([['ok', 1], ['bad', 2n]]), /\["bad"\]: the value cannot be sent — a bigint/)
+  assert.equal(h.jk(JK.writeLocal).length, 0, 'nothing was stamped, not even the good pair of the patch')
+  assert.equal(h.node.state.size, 0)
+  h.bind.data.fine = { when: new Date(0), bytes: new Uint8Array([1, 2]), list: [1, 'two', null, undefined] } // carried (a Date as its fields, as ever)
+  assert.equal(h.jk(JK.writeLocal).length, 1)
+  await h.destroy()
+})
+
+test("issue() refuses a record the wire cannot carry 'unencodable' (a cluster.writes row says so) and commits the rest of the batch", async () => {
+  const h = harness()
+  const out = h.bind.issue([
+    { type: REC.update, key: ['big'], value: 10n },
+    { type: REC.update, key: ['ok'], value: 1 },
+  ])
+  assert.equal(out[0], 'unencodable')
+  assert.notEqual(typeof out[1], 'string')
+  assert.deepEqual(snapshot(h.bind.data), { ok: 1 })
+  const rows = [...h.bind.outcomes.rows.values()]
+  assert.ok(rows.some((r) => r.key === JSON.stringify(['big']) && r.state === 'rejected' && r.reason === 'unencodable'), JSON.stringify(rows))
+  await h.destroy()
+})
+
 test('a re-entrant user write from a tap reacting to an inbound apply IS captured (drained inside the apply — the probed substrate contract)', async () => {
   const h = harness()
   h.admit(1, 'bb')

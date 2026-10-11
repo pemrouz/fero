@@ -1958,3 +1958,36 @@ test("a row's own fields cannot pick the printed place or pose as data's operato
   assert.ok(mine.every((l) => !l.includes('/etc/forged')), `no place from a row: ${JSON.stringify(mine, null, 1)}`)
   assert.ok(mine.some((l) => l.startsWith("fero('fields'): a tap or subscriber threw (Error: data: x0 threw on row")), JSON.stringify(mine, null, 1))
 })
+
+//! V4-48: methods.* and the data: seed meet the same question before the stamp. A refused update is typed
+// 'unencodable' and replication keeps flowing; a seed that cannot be sent, or whose rule throws, rejects fero()
+// with the resource and the row named, and leaves nothing behind (no Ctrl-C listener).
+test("methods.update with a value the wire cannot carry rejects 'unencodable' on a server and a client, and replication keeps flowing", async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('enc', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { luna: { mood: 'hungry' } } })
+  let c: Fero | null = null
+  try {
+    const cl = c = await fero('enc', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    assert.ok(await until(() => (snapshot(cl.data) as Record<string, unknown>).luna !== undefined, 8000), 'the client caught up')
+    const enc = (e: WriteReject & Error) => e.reason === 'unencodable' && e.message.includes('unencodable (the value cannot be sent')
+    await assert.rejects(s.methods.update({ key: 'big', value: { n: 10n } }, { timeout: 8000 }), enc)
+    await assert.rejects(cl.methods.update({ key: 'fn', value: () => 1 }, { timeout: 8000 }), enc)
+    s.data.after = 1
+    assert.ok(await until(() => (snapshot(cl.data) as Record<string, unknown>).after === 1, 8000), 'a later write still reaches the client')
+    assert.equal((snapshot(s.data) as Record<string, unknown>).big, undefined)
+  } finally {
+    await c?.destroy()
+    await s.destroy()
+  }
+})
+
+test('a data: seed the wire cannot carry, or whose validation: rule throws, rejects fero() naming the row — and leaves no Ctrl-C listener', async () => {
+  const before = process.listenerCount('SIGINT')
+  //! a start that wrongly resolves is destroyed at once, so a regression fails here instead of holding the battery open
+  const started = (p: Promise<Fero>) => p.then(async (f) => { await f.destroy(); return f })
+  await assert.rejects(started(fero('seedenc', { listen: false, data: { luna: { n: 10n } } })), /^Error: fero\('seedenc'\): data seed row 'luna' cannot be sent — a bigint$/)
+  await assert.rejects(started(fero('seedthrow', { listen: false, data: { luna: null }, validation: (r: { value: { mood: string } }) => r.value.mood.length > 0 || 'needs a mood' })),
+    /^Error: fero\('seedthrow'\): data seed row 'luna' — validation threw: TypeError: Cannot read properties of null/)
+  assert.equal(process.listenerCount('SIGINT'), before, 'no Ctrl-C listener left behind')
+})
