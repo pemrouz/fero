@@ -146,3 +146,47 @@ export const copyingHolder = () => {
   assert.deepEqual(cut.nodes.filter((n) => n.uuid !== owner && n.holders?.[row]).map((n) => n.uuid), [], 'no node but the writer names the row\'s holders')
   return { cut, owner, lagging, row }
 }
+
+//! abortedCopy — scopedCut's cut, where the lagging holder's copy-in of the row then ABORTS (wave 5f review). An abort
+// drops the latch whole, so `held` still leaves the row out, and the writer is again the only node whose `holders`
+// names the row. Two ways, and they mean opposite things:
+//   'linkDown' — the holder is cut from its teacher 5 ms after the capture point: the copy aborts, the ring is the same
+//     one, so the holder is still meant to hold the row (the next round re-offers it) and still lags.
+//   'epoch'    — the teacher is paused across a join (n05): the holder's latch opens, the join's install aborts it
+//     ('epoch') and the new ring gives the row to others, so the holder is no longer meant to hold it.
+export const abortedCopy = (how: 'linkDown' | 'epoch') => {
+  const sim = new Sim(3)
+  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 3 })
+  sim.run({ until: 1500 })
+  const row = 'row'
+  const [owner, teacher, lagging] = nodes[0].writes.ring.holders(row, 3)
+  sim.post(owner, { kind: 'write', recs: [{ type: REC.update, key: [row], value: 1 }] })
+  sim.run({ until: 1800 })
+  if (how === 'epoch') sim.pause(teacher, 300)
+  sim.partition(owner, lagging)
+  sim.post(owner, { kind: 'write', recs: [{ type: REC.update, key: [row], value: 2 }] })
+  sim.run({ until: 1810 })
+  if (how === 'linkDown') {
+    sim.partition(lagging, teacher)
+    sim.run({ until: 1815 })
+  } else {
+    sim.add({ uuid: 'n05', listen: 'sim:n05', hosts: nodes.map((n) => n.listen), heartbeatMs: 50, replicas: 3, redialMs: 20, journalCap: 1 << 16 })
+    sim.post('n05', { kind: 'start' })
+    sim.run({ until: 2200 })
+  }
+  const cap = captureSim(sim)
+  const K = cap.vocab
+  const by = (u: string) => cap.nodes.find((n) => n.uuid === u)!
+  const lag = by(lagging)
+  const tail = lag.journal.filter((e) => ([K.acquireStart, K.acquire, K.acquireAbort].includes(e.kind) && e.a === row) || e.kind === K.viewInstall)
+  const kinds = tail.slice(-3).map((e) => e.kind === K.viewInstall ? 'install' : e.kind === K.acquireStart ? 'start' : e.kind === K.acquire ? 'acquire' : `abort:${e.b}`)
+  assert.deepEqual(kinds.slice(how === 'linkDown' ? -2 : -3), how === 'linkDown' ? ['start', 'abort:linkDown'] : ['start', 'abort:epoch', 'install'],
+    `the holder's copy-in aborted (${how}) — the fixture is what it claims`)
+  assert.ok(Array.isArray(lag.held) && !lag.held.includes(row), '`held` leaves the row out')
+  const v = (u: string) => by(u).state.find(([k]) => k === '["row"]')?.[1]
+  assert.equal(v(owner), 2); assert.equal(v(lagging), 1, 'the holder lags')
+  const meant = nodes.find((n) => n.uuid === owner)!.writes.ring.holders(row, 3).includes(lagging)
+  assert.equal(meant, how === 'linkDown', how === 'linkDown' ? 'the ring still gives it the row' : 'the new ring gives the row to others')
+  assert.deepEqual(cap.nodes.filter((n) => n.uuid !== owner && n.holders?.[row]).map((n) => n.uuid), [], 'no node but the writer names the row\'s holders')
+  return { cap, owner, lagging, row }
+}

@@ -81,17 +81,21 @@ const newestView = (ns) => {
   return { top, node: ns.find((n) => n.view && n.view.epoch === top) || null }
 }
 
-//! copying — the rows a member is still copying in at capture end: an acquireStart (a=partition) its journal has not
-// yet closed with an acquire or an acquireAbort of the same row. Every open latch aborts at a view install
-// (kernel/scope.ts rescope), and a latch opens only on a row the ring makes this node hold, so an open one is a row
-// the ring gives the node on its CURRENT view that it does not hold yet — `held` leaves it out, and so, without
-// this, would every fold that reads `held` when no writer's `holders` fact names the row (the writer not captured).
-// A truncated journal may have lost the opening row: then there is no fact, and nothing is claimed.
+//! copying — the rows a member is meant to hold but is still copying in at capture end: an acquireStart (a=partition)
+// its journal has not yet closed with an acquire of the same row or with a view install. A latch opens only on a row
+// the ring makes this node hold (every #latch site checks ring.holdsAny), and the ring changes only at a view install
+// (kernel/membership.ts journals viewInstall right after rescope, which aborts every open latch 'epoch'). So until the
+// next install the node is still meant to hold that row — also after an abort for any other reason (teacher link down,
+// timeout, torn, overflow): the entry drops to `out` and the next round re-offers it, the ring unchanged. `held` leaves
+// such a row out, and so, without this, would every fold that reads `held` when no writer's `holders` fact names the
+// row (the writer not captured). A truncated journal may have lost the opening row: then there is no fact, and nothing
+// is claimed.
 const copying = (node, K) => {
   const open = new Set()
   for (const e of node.journal)
     if (e.kind === K.acquireStart) open.add(String(e.a))
-    else if (e.kind === K.acquire || e.kind === K.acquireAbort) open.delete(String(e.a))
+    else if (e.kind === K.acquire) open.delete(String(e.a))
+    else if (e.kind === K.viewInstall) open.clear()
   return open
 }
 //! feederHeld — a client's feeder when the page can judge the client by it: captured and carrying `held`. A client of
@@ -490,8 +494,8 @@ export const routes = (capture) => {
   }
   //! with the writer not captured, the holders of a row come from the rest of its resource: the ring's answer any
   // node on the newest view carries for that row (`holders`, a writer's own rows), else the members of that view
-  // whose `held` names it, or that are still copying it in on that view (copying(): an open latch — the ring gives
-  // them the row, and agreement() judges them on it too). null — the old rule — when the resource carries no scoped
+  // whose `held` names it, or that are still copying it in on that view (copying(): a latch since the last install — the
+  // ring gives them the row, and agreement() judges them on it too). null — the old rule — when the resource carries no scoped
   // fact, or no captured member holds the row.
   const byGroup = new Map()
   for (const n of capture.nodes) { const g = groupOf(n); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(n) }
@@ -568,8 +572,9 @@ export const routes = (capture) => {
 //            rows). The row's fingerprint at a node is its cells there, values only; a missing cell disagrees. A node
 //            is off when it sits outside a row's strict-majority side (or the row splits evenly). A row frozen on its
 //            way out (orphan) has no claim on the node; a row the ring gives a member — a writer's `holders` fact, or
-//            its own open latch (copying()) — is judged there even before the copy lands, so a holder still copying
-//            in an old value lags. A client with no feeder to judge it by is not judged per row (`unjudged`).
+//            its own latch since the last install (copying()) — is judged there even before the copy lands, so a
+//            holder still copying in an old value lags, and so does one whose copy aborted with the ring unchanged. A client
+//            with no feeder to judge it by is not judged per row (`unjudged`).
 // `rows` (scoped only): partition → the nodes judged for it; `judged` (unscoped only): the nodes compared. The page
 // compares a cell among exactly these, and routes() judges a node left out by its tenure, so the header, the pills,
 // the cells and the writes tell one story about a member that left.
@@ -621,7 +626,7 @@ export const agreement = (capture) => {
         if (n.holders && n.view && n.view.epoch === top)
           for (const [p, hs] of Object.entries(n.holders))
             for (const u of hs) { const h = byUuid.get(u); if (h && h.client !== true && judged(h) && !(rows.get(p) || []).includes(u)) join(p, u) }
-      //! and a member still copying a row in on the newest view (copying(): its open latch) — the ring gives it the row,
+      //! and a member still copying a row in on the newest view (copying(): its latch since the last install) — the ring gives it the row,
       // so it is judged there as lagging even when no captured writer's `holders` names it (the writer not reached)
       for (const n of ns)
         if (n.client !== true && judged(n) && n.view && n.view.epoch === top)
