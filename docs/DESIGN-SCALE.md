@@ -166,10 +166,10 @@ the relayed attempt and hops the WACK to the spoke at once; the tap rides
 the frame's flush right behind it on the same link. A link that dies in
 that gap leaves the spoke with its WACK (the attempt has left its queue,
 nothing is re-sent) and without the value. Shape chosen: the spoke keeps
-the coordinates itself. An armed relay that will tap the record names the
-lane in the hop as a new optional key `l` (both hop sites: the owner's
-WACK and the inbound clear); `o` keeps its meaning (settle now, no tap is
-coming). The spoke keeps each such attempt in `#awaiting` while its record
+the coordinates itself. An armed relay that expects to tap the record
+names the lane in the hop as a new optional key `l` (all three hop sites:
+the owner's WACK in onAck, the in-order clear in inbound and the interior
+clear in #splice); `o` keeps its meaning (settle now, no tap is coming). The spoke keeps each such attempt in `#awaiting` while its record
 is unseen; the fold sites drop it. At a primary failover the spoke marks
 every kept entry (`strand`), and at the end of the resync onto the next
 feeder it settles every marked entry still unseen through `acked`, on the
@@ -186,15 +186,36 @@ with it, not left over): a next feeder that holds the partition but has
 not yet received the record when its ship leaves. Before wave 5e that
 schedule kept V4-7's order (the record reached the new feeder later, it
 tapped it, and the join settled the write as the value showed). Now the
-resync's end settles it through `acked` first, and the value shows about
-45 ms later (the review's probe, n=4 R=3, the owner's record frame to the
-next feeder lost with their link; pinned as a known cost in
-sim/feeder-death.test.ts, on STATUS). The spoke cannot tell "holds it but
+resync's end settles it through `acked` first, and the value shows as
+long after as the next feeder lags the record. Nothing in the kernel
+bounds that gap; it ends when the record reaches the next feeder and is
+tapped (measured 43-48 ms in the review's probe, n=4 R=3, where the
+owner's record frame to the next feeder is lost with their link and the
+gap is the redial; pinned as a known cost in sim/feeder-death.test.ts,
+on STATUS). The same trade reaches one step further: if the spoke writes
+the same cell again in that gap, the early-settled write's late record
+reaches the api as a foreign apply (its pending entry is gone), the
+api's settlement probe runs, and it can resolve the newer write, WACKed
+but not yet tapped, from the dedup window before its value shows (the
+second review's binding-tier probe; narrow: the lag window, a rewrite of
+the same cell, the newer WACK overtaking the older record, and the two
+taps in separate steps). The spoke cannot tell "holds it but
 lags" from "does not hold it" without knowing its feeder's holdings, so
 keeping the order there needs a new piece of protocol. The costs that do
 stay from before: a spoke with no feeder at all keeps the write
 pending until a feeder admits it. A feeder that sends no `l` (a feeder
 older than this note: mixed versions, V4-14) still strands its spokes.
+And `l` is the feeder's expectation, not a promise. A relay that is
+ACQUIRING the partition when its spoke's write commits hops the WACK
+with `l`, but at ACQDONE it folds the teacher's copy through node.apply
+and taps nothing to its spokes (scope.ts onAcqDone; only the live span
+above the cut goes through inbound). The spoke's floor exchange ships
+only what is above its own tail on that lane, so once that tail has
+passed the write's seq the record never comes while the feeder lives.
+The write stays pending until a failover's resync end or the dedupKeep
+eviction (before wave 5e: for ever). This gap is older than wave 5e
+(V4-33) and lives in scope.ts; it is on STATUS for the next change
+there.
 Unscoped feeders never send `l`: unscoped bytes are unchanged.
 
 **Note, 2026-10-10 (stage 1 complete: the drain, part (b)).** The owner
