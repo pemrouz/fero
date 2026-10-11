@@ -75,6 +75,13 @@ export class Link {
   // makes it the torn answer, so the drain re-sends what the clear took and the reply, never the whole ship again.
   // The drain's flush empties it. Null when no answer has a frame queued.
   inQueue: { d: Record<string, number>; r: number | undefined; q: number | undefined } | null = null
+  //! onClear (wave 5f): set on a CLIENT link only (node.ts at admit), and called by a clear (ship below) with the frames
+  // it took. A synced client link is fed by tap-forward, and a tap-forward can carry a record SPLICED into a lane's
+  // interior, below the spoke's tails; a clear also leaves the frames shipped after it in the same flush, which then
+  // leapfrog what it took. The drain digest answers above the spoke's tails, so it heals neither. The node turns what
+  // the clear took into `torn` (node.ts #clearCover), and the drain re-sends it. Null on every other link: a member
+  // link's clear is unchanged.
+  onClear: ((link: Link, dropped: Uint8Array[]) => void) | null = null
   //! quiet — heartbeats since this link last carried a byte in (node.ts bytesIn resets it). Read only by a node
   // with watchClients (the #directory host's failure detector over client links); on every other node it stays 0.
   quiet = 0
@@ -145,17 +152,21 @@ export class Link {
   // drain handler triggers knows how to re-ship. De-syncing here stops any further records widening the hole.
   // A caller that ships a WHOLE suffix in one step (node.ts #answer) never overflows on purpose: the shell steps
   // `pause` inside a send, so it checks for a full queue before every frame and stops there. A digest answer whose
-  // frames this clear takes becomes the torn answer (`inQueue` → `torn`), resumed at the drain.
+  // frames this clear takes becomes the torn answer (`inQueue` → `torn`), resumed at the drain. On a client link the
+  // clear also hands what it took to `onClear`, so a tap-forward it took is re-sent too (wave 5f).
   ship(bytes: Uint8Array, sink: EffectSink, j: Journal) {
     if (this.dead) return
     if (!this.paused) return sink.send(this.id, bytes)
     this.queued.push(bytes)
     if (this.queued.length > this.maxQueued) {
       j.armed && j.emit(JK.dropOldest, this.id, this.queued.length)
-      this.queued.length = 0
+      const dropped = this.onClear !== null ? this.queued : null
+      if (dropped !== null) this.queued = []
+      else this.queued.length = 0
       this.droppedWhilePaused = true
       this.synced = false
       if (this.inQueue !== null) { this.torn = this.inQueue; this.inQueue = null }
+      if (dropped !== null) this.onClear!(this, dropped)
     }
   }
 
