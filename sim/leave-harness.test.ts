@@ -44,7 +44,7 @@
 // 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
@@ -511,9 +511,14 @@ test('leave harness, the third review\'s shapes: a client\'s word names a hold (
 // its own ballot — joint over the phantom hold — ages out and is disowned). One is RED today, pinned exactly per seed
 // and link delay: freshLinkSim — freshLink on REAL HELLOs in the Sim (the mesh writes its own HELLO for every link,
 // so freshLink never tests the node's), evictTwo's cut shape with the n03-n04 and n03-n05 links flapped 1.5 s after
-// the cut; today's kernel is split before the flap and through the window on the seeds evictTwo splits on (4000 of
-// 4000 ms), and on none of the others. A rule that holds n03 shows 0 everywhere ONLY when n03's own HELLO carries
-// its hold; without it, the stayer counts the fresh link for one round trip and the window shows 15 to 160 ms.
+// the cut. The count is the far side's writable split only (item 3 of §10.10's last note, 2026-10-12): a ms in which
+// a far-side node is writable at view 1 beside a node writable at a higher view — and the run is "not the shape"
+// unless n01's view at 2 evicts both. Today's kernel re-forms the far side as `{n03,n04,n05}`@3 within the 1.5 s
+// before the flap on every seed that reaches the shape (the chains at this cadence give up in about a second), so the
+// window counts 0 there while the monitors name the split (two views at epoch 3); the seeds whose first eviction
+// takes one suspect (the other chain still dialing) are not the shape. A rule that holds n03 never re-forms the far
+// side, and shows 0 ONLY when n03's own HELLO carries its hold; without it, the stayer counts the fresh link for one
+// round trip and the window shows 15 to 160 ms (measured on the scratch kernel at the old count; re-measured here).
 const CLIENT_GENESIS_END = 'aa@1{aa,bb,cc}W bb@1{aa,bb,cc}W cc@1{aa,bb,cc}W'
 const HELLO_HOLD_MIDS = [
   'aa with cc and dd: aa@1{aa,bb,cc,dd,ee}W bb@0{}W cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}W ee@0{}W',
@@ -521,19 +526,19 @@ const HELLO_HOLD_MIDS = [
 ]
 const HELLO_HOLD_END = 'aa@3{aa,cc,dd}W bb@3{aa,cc,dd}r:evicted cc@3{aa,cc,dd}W dd@3{aa,cc,dd}W ee@3{aa,cc,dd}r:evicted'
 const FRESH_LINK_SIM: string[] = [
-  'seed 1 delay 3-3: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
-  'seed 2 delay 3-3: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
-  'seed 3 delay 3-3: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors quiet',
-  'seed 4 delay 3-3: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
-  'seed 5 delay 3-3: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
-  'seed 1 delay 3-40: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
-  'seed 2 delay 3-40: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors quiet',
-  'seed 3 delay 3-40: before [n03:W n04:W n05:W] split-ms 31 of 4000; n04 gateOpen rows 1; monitors quiet',
-  'seed 4 delay 3-40: before [n03:W n04:W n05:W] split-ms 4000 of 4000; n04 gateOpen rows 0; monitors fired',
-  'seed 5 delay 3-40: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors quiet',
+  'seed 1 delay 3-3: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 2 delay 3-3: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 3 delay 3-3: not the shape: n01\'s view at 2 is {n01,n02,n03,n05}, not the two-evictee one',
+  'seed 4 delay 3-3: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 5 delay 3-3: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 1 delay 3-40: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 2 delay 3-40: not the shape: n01\'s view at 2 is {n01,n02,n03,n05}, not the two-evictee one',
+  'seed 3 delay 3-40: not the shape: n01\'s view at 2 is {n01,n02,n03,n04}, not the two-evictee one',
+  'seed 4 delay 3-40: before [n03:W n04:W n05:W] split-ms 0 of 4000; n04 gateOpen rows 0; monitors fired',
+  'seed 5 delay 3-40: not the shape: n01\'s view at 2 is {n01,n02,n03,n05}, not the two-evictee one',
 ]
 
-test('leave harness, the fourth review\'s shapes: a client\'s word at epoch 0 (clientGenesis) and a non-member server\'s word (serverAsk) teach nothing, and a hold learned from a HELLO alone is counted again when it ends (helloHold) — SAFE, and today\'s kernel is live on every one, pinned as the exact states; a held member\'s links flap on real HELLOs in the Sim (freshLinkSim) — today\'s kernel is split through the window on evictTwo\'s seeds, pinned exactly', () => {
+test('leave harness, the fourth review\'s shapes: a client\'s word at epoch 0 (clientGenesis) and a non-member server\'s word (serverAsk) teach nothing, and a hold learned from a HELLO alone is counted again when it ends (helloHold) — SAFE, and today\'s kernel is live on every one, pinned as the exact states; a held member\'s links flap on real HELLOs in the Sim (freshLinkSim) — today\'s kernel has re-formed the far side before the flap on evictTwo\'s seeds (the monitors name the split), pinned exactly', () => {
   const live: [string, ReturnType<typeof clientAsk>, string, string[]][] = [
     ...(['hello', 'pull'] as const).map((via) => [`clientGenesis ${via}`, clientGenesis(via), CLIENT_GENESIS_END, ['aa proposed: P(1,3)']] as [string, ReturnType<typeof clientAsk>, string, string[]]),
     ['serverAsk', serverAsk(), CLIENT_ASK_END, ['aa proposed: P(2,4)']],
@@ -551,6 +556,42 @@ test('leave harness, the fourth review\'s shapes: a client\'s word at epoch 0 (c
   for (const [name, o, end, mids] of live) {
     if (o.end !== end) teeth.push(`${name}: the end state moved — a rule that reads a word must say whose, and take it back when it ends; re-record with the why: ${o.end}`)
     if (o.mid!.join('\n') !== mids.join('\n')) teeth.push(`${name}: a mid point moved — ${name === 'helloHold' ? 'a stayer that read a hold from a HELLO must count the member again when the hold ends' : 'a stranger\'s word widened the ballot'}; re-record with the why:\n${o.mid!.join('\n')}`)
+  }
+  assert.deepEqual(teeth, [])
+})
+
+//! the fifth round's shapes (DESIGN-LEAVE §10.10's last note; built 2026-10-12), pinned on today's kernel as exact
+// states, one per open item of the note: askAfterHello — a hold announced by a HELLO on one link must reach every
+// member link at the next change (a stayer that linked before the hold counts the held member for a heartbeat
+// otherwise); lostRelease — a release lost on a cut is learned from the fresh link's HELLO, which names no hold (the
+// `onAdmit` line that takes the old word back; without it dd is `minority` for good with three of five linked);
+// askAtAdmit — the holds changed while the HELLO was in flight, so the ask goes out on the fresh link at admit (the
+// other `onAdmit` line; without it dd is `minority` for good). Today's kernel reads no hold, so every node is writable
+// at every point but where its links alone make it a minority. The build re-records each with the why.
+const ASK_AFTER_HELLO_MIDS = [
+  'dd installed: aa@1{aa,bb,cc,dd}W bb@0{}W cc@1{aa,bb,cc,dd}W dd@1{aa,bb,cc,dd}W ee@1{aa,bb,cc,dd}r:joining',
+  'one round: aa@1{aa,bb,cc,dd}W bb@0{}W cc@1{aa,bb,cc,dd}W dd@1{aa,bb,cc,dd}W ee@1{aa,bb,cc,dd}r:joining',
+]
+const ASK_AFTER_HELLO_END = 'aa@3{aa,cc,dd}W bb@3{aa,cc,dd}r:evicted cc@3{aa,cc,dd}W dd@3{aa,cc,dd}W ee@3{aa,cc,dd}r:joining'
+const FIVE_W = 'aa@1{aa,bb,cc,dd,ee}W bb@1{aa,bb,cc,dd,ee}W cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}W ee@1{aa,bb,cc,dd,ee}W'
+const DD_MINORITY = 'aa@1{aa,bb,cc,dd,ee}W bb@1{aa,bb,cc,dd,ee}W cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}r:minority ee@1{aa,bb,cc,dd,ee}W'
+const LOST_RELEASE_MIDS = [`abandoned: ${FIVE_W}`, `released, the bb-dd frame lost: ${DD_MINORITY}`, `re-linked: ${FIVE_W}`]
+const ASK_AT_ADMIT_MIDS = [`released before the admit: ${DD_MINORITY}`, `admitted: ${FIVE_W}`, `landed: ${FIVE_W}`]
+
+test('leave harness, the fifth round\'s shapes: a hold announced by one HELLO reaches every member link at the next change (askAfterHello), a release lost on a cut is learned from the fresh HELLO (lostRelease), and holds that changed while the HELLO was in flight are asked at admit (askAtAdmit) — SAFE, and today\'s kernel is writable at every point, pinned exactly', () => {
+  const runs: [string, ReturnType<typeof askAfterHello>, string, string[]][] = [
+    ['askAfterHello', askAfterHello(), ASK_AFTER_HELLO_END, ASK_AFTER_HELLO_MIDS],
+    ['lostRelease', lostRelease(), FIVE_W, LOST_RELEASE_MIDS],
+    ['askAtAdmit', askAtAdmit(), FIVE_W, ASK_AT_ADMIT_MIDS],
+  ]
+  //! safety first, one list: the shape, one view per epoch and the quiet point of every run
+  const unsafeOnes = runs.flatMap(([name, o]) => [...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])].map((p) => `${name}: ${p}`))
+  assert.deepEqual(unsafeOnes, [], 'not the shape, or UNSAFE')
+  //! liveness, one list: the end state and every mid point
+  const teeth: string[] = []
+  for (const [name, o, end, mids] of runs) {
+    if (o.end !== end) teeth.push(`${name}: the end state moved; re-record with the why: ${o.end}`)
+    if (o.mid!.join('\n') !== mids.join('\n')) teeth.push(`${name}: a mid point moved — ${name === 'askAfterHello' ? 'a stayer must stop counting a held member the instant its install has landed, not a heartbeat later' : name === 'lostRelease' ? 'a fresh HELLO that names no hold must take the old word back' : 'holds that changed while the HELLO was in flight must be asked on the fresh link at admit'}; re-record with the why:\n${o.mid!.join('\n')}`)
   }
   assert.deepEqual(teeth, [])
 })

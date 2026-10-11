@@ -9,6 +9,13 @@
 # names holds is an announcement, so the release follows it even when it went out at epoch 0, where no ask does; and holds() has its
 # common-case fast path, since gate() calls it on the write path. Apply with: git apply docs/leave-release.diff (then drop the `V`
 # line and every use of it).
+# THE LAST REVISION (2026-10-12, the build's first commit; §10.10's note of 2026-10-10 "open for the build"): (1) helloHolds sets
+# #lastAsk to HELLO_WORD, a word no key equals, so the next change's ask goes on EVERY member link — not only the one that carried
+# the HELLO (askAfterHello); (2) the two onAdmit lines have their pins (lostRelease, askAtAdmit); (3) freshLinkSim counts only the
+# far side's writable split and is "not the shape" unless n01 evicts both; (4) `v` is signed INSIDE proofMsg's JSON array as
+# [[e, p, h], …] under the label fero-door/2 (below). This diff was built on v4 at 145a70b and no longer applies to the tree after
+# V4-39 (the knock window moved kernel/membership.ts under it); the build applied its rule by hand, commit by commit, and it stays
+# here as the measured record §10.10.8 cites.
 --- a/kernel/codec.ts
 +++ b/kernel/codec.ts
 @@ -80,6 +80,8 @@ export const VERB = {
@@ -27,13 +34,25 @@
  // signs, so none of them can change in flight before admission. `u, i, l` are checked for shape before
  // anything reads them; the optional keys ride as decoded (shape-checked in node.ts).
 -export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: unknown; c?: unknown; m?: unknown; k?: unknown }
-+//! SCRATCH (DESIGN-LEAVE §10.10.6): `v` — the sender's holds, [{e, h, p}], absent when it holds nothing. Outside the
-+// proof here (proofMsg names its keys, and signs an array of strings and numbers — ONE encoding, which an array of
-+// objects whose key order is the decoder's does not have). The build signs it as one string: the canonical key
-+// Membership.#keyOf makes of it (`e:p:h|e:p:h`, '' when absent) — for consistency with the other HELLO keys, not
-+// for protection: the same holds travel unsigned in every PULL `vs` after admission (DESIGN-DOOR §: no frame after
-+// admission is signed), so a peer that can rewrite frames can rewrite the ask anyway.
++//! SCRATCH (DESIGN-LEAVE §10.10.6): `v` — the sender's holds, [{e, h, p}], absent when it holds nothing. SIGNED (the last
++// revision, 2026-10-12): inside proofMsg's JSON array as [[e, p, h], …] — arrays of strings and numbers, ONE encoding, which an
++// array of objects whose key order is the decoder's does not have, and which a canonical string would have given up (the
++// separator ambiguity the array exists to avoid). For consistency with the other HELLO keys, not for protection: the same
++// holds travel unsigned in every PULL `vs` after admission (DESIGN-DOOR: no frame after admission is signed), so a peer that
++// can rewrite frames can rewrite the ask anyway. The label is bumped to fero-door/2 on purpose: an old peer's proof never
++// verifies here and ours never verifies there (`bad-proof` at both ends, both print), so a secured pair of mixed versions
++// fails loudly and at once rather than only once a hold rides a HELLO; mixed versions are unsupported before 1.0 (V4-14).
++// An OPEN old peer ignores the new keys (`v`, `o`, `j`, `hm`, `vs`) and drops a NACK frame, keeping the link (node.ts's
++// unknown-verb arm): it is a stayer that counts a held member and a proposer that never disowns — the holes the rule closes.
 +export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: unknown; c?: unknown; m?: unknown; k?: unknown; v?: unknown }
++//! holdsSigned — `v` as the proof signs it: each hold as [e, p, h], or [] when absent
++export const holdsSigned = (v: unknown): [number, string, string][] =>
++  Array.isArray(v) ? (v as { e: number; p: string; h: string }[]).map((x) => [x.e, x.p, x.h]) : []
+@@ -64,2 +76,2 @@ export const doorMatrix
+-export const proofMsg = (side: 'dialer' | 'acceptor', verifierNonce: string, proverNonce: string, verifierUuid: string, verifierListen: string, h: HelloKeys): string =>
+-  JSON.stringify(['fero-door/1', side, verifierNonce, proverNonce, verifierUuid, verifierListen, h.u, h.i, h.l, h.r ?? 0, h.n ?? '', h.c ?? '', h.m ?? 0])
++export const proofMsg = (side: 'dialer' | 'acceptor', verifierNonce: string, proverNonce: string, verifierUuid: string, verifierListen: string, h: HelloKeys): string =>
++  JSON.stringify(['fero-door/2', side, verifierNonce, proverNonce, verifierUuid, verifierListen, h.u, h.i, h.l, h.r ?? 0, h.n ?? '', h.c ?? '', h.m ?? 0, holdsSigned(h.v)])
  
  //! the nonce bounds (§2): 16 random bytes as base64url is 22 characters (the api); the sim's toy sends 32
  // hex characters; anything outside 16..64 is a malformed HELLO.
@@ -95,7 +114,9 @@
 +  #heldPeers = new Map<string, { holds: { e: number; h: string; p: string }[]; tick: number }>()
 +  #tickNo = 0
 +  //! SCRATCH: the holds I last announced (as a key), so the ask goes out when they CHANGE and once more when the
-+  // last one ends — the release is a frame, never silence
++  // last one ends — the release is a frame, never silence. HELLO_WORD is what a HELLO that named holds leaves here: a
++  // word no key equals, so the next change goes out on every member link (the last revision; helloHolds —
++  // `const HELLO_WORD = '\0hello'` beside the V line).
 +  #lastAsk = ''
 +  //! SCRATCH: the tick each vote was given (the rejected `timeout` variant only)
 +  #voteTick = new Map<string, number>()
@@ -154,9 +175,11 @@
 +    //! §10.10.6 (the fourth review): a HELLO that names holds is an ANNOUNCEMENT, so the release must follow it — at
 +    // epoch 0 too, where no ask goes out and #lastAsk stayed empty: the install that ended the hold compared '' with ''
 +    // and sent nothing, and a stayer that had read the HELLO kept not counting a member that held nothing (helloHold:
-+    // aa `minority` with cc and dd linked, and its next ballot joint over the phantom hold). With the key here, the
-+    // first change after the HELLO goes out as the ask on every member link — an empty one when the last hold ended.
-+    if (key !== '') this.#lastAsk = key
++    // aa `minority` with cc and dd linked, and its next ballot joint over the phantom hold). The word it leaves is
++    // HELLO_WORD, which no key equals (the last revision, item 1 of §10.10's note): the HELLO went out on ONE link, so
++    // the next change's ask must go on EVERY member link, the same holds or not — a stayer that linked before the hold
++    // existed has heard nothing (askAfterHello: cc counted a held dd for a heartbeat when the key itself was kept here).
++    if (key !== '') this.#lastAsk = HELLO_WORD
 +    return hs
 +  }
 +  //! SCRATCH §10.10.6, the ask: PULL {e, vs: [{e, h, p}]} with my holds, on every admitted member link. Sent on every

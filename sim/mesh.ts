@@ -71,17 +71,34 @@ export class Mesh {
   }
   #qk(a: string, b: string) { const k = a + '>' + b; if (!this.q.has(k)) this.q.set(k, []); return k }
   //! connect a and b with a fresh link (both sides admitted), queues emptied
-  connect(a: string, b: string) {
+  connect(a: string, b: string) { this.open(a, b).land() }
+  //! #hello — the HELLO this mesh writes for y (the node's own is dropped with every non-membership frame, so the
+  // mesh's copy is what the peer reads; it says what the node's would)
+  #hello(y: string): Record<string, unknown> { return { u: y, i: 1, l: `sim:${y}` } }
+  //! open — the link comes up at both ends and each node ships its HELLO, but neither HELLO has LANDED yet: the
+  // caller moves the mesh (a grant, a release, a tick) and then calls `land`, which feeds each side the HELLO the
+  // other sent at open time (the holds as they were THEN, DESIGN-LEAVE §10.10.6: what changed while the HELLO was
+  // in flight is the ask at admit's shape). connect() is open + land with nothing between.
+  open(a: string, b: string): { land: () => void } {
     for (const [x, y] of [[a, b], [b, a]]) {
       const id = ++this.#seq
       this.linkOf.get(x)!.set(y, id); this.peerOf.get(x)!.set(id, y)
       this.q.set(this.#qk(x, y), [])
     }
+    const hellos = new Map<string, Uint8Array>()
     for (const [x, y] of [[a, b], [b, a]]) {
       const n = this.nodes.get(x)!, id = this.linkOf.get(x)!.get(y)!
       n.step({ kind: 'linkUp', link: id, dialed: x < y, to: x < y ? `sim:${y}` : undefined })
-      n.step({ kind: 'bytesIn', link: id, bytes: encodeControl(VERB.HELLO, { u: y, i: 1, l: `sim:${y}` }) })
-      n.step({ kind: 'bytesIn', link: id, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+      hellos.set(y, encodeControl(VERB.HELLO, this.#hello(y))) // y's HELLO as it left: read by x at land
+    }
+    return {
+      land: () => {
+        for (const [x, y] of [[a, b], [b, a]]) {
+          const n = this.nodes.get(x)!, id = this.linkOf.get(x)!.get(y)!
+          n.step({ kind: 'bytesIn', link: id, bytes: hellos.get(y)! })
+          n.step({ kind: 'bytesIn', link: id, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+        }
+      },
     }
   }
   //! one end sees its link drop
