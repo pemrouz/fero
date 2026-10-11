@@ -18,7 +18,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim, type Violation } from './exec.ts'
 import { cluster, writes } from './harness.ts'
-import { armScale } from './monitors.ts'
+import { armScale, ledgerOf } from './monitors.ts'
 import { runFamily, familyByName, type Mutation } from './scoped-sweep.ts'
 import { SCOPE } from '../kernel/scope.ts'
 import type { Node } from '../kernel/node.ts'
@@ -291,4 +291,28 @@ test('the ledger\'s scan reads every node on the first pass after run() entry: a
   assert.ok(b.seen, 'the scoped walk gathered it at the same pass')
   assert.deepEqual(b.keys, a.keys, 'the ledger holds the same records in the same order')
   assert.deepEqual(rows(b.sim.violations), rows(a.sim.violations))
+})
+
+test('the ledger\'s scan between two passes reads every node: a horizon read (stampOracle) after one unscanned pass gathers what the full walk gathers', () => {
+  //! the pass clears sim.stepped at its end, so a scan made between passes cannot trust it. A sim whose passes never
+  // scan (no scale monitors) and a horizon read before and after exactly one pass is the shape that went blind.
+  const go = (full: boolean) => walk(full, () => {
+    const sim = new Sim(3)
+    cluster(sim, 4, { heartbeatMs: 0 })
+    sim.run()
+    const L = ledgerOf(sim)
+    L.scan(sim) // a horizon read, as stampOracle makes
+    const before = L.recs.size
+    for (let i = 0; i < 5; i++) sim.post('n01', { kind: 'write', recs: [{ type: 0, key: ['k' + i], value: i }] }, i)
+    const p0 = sim.passes
+    sim.run({ checkEvery: 1 << 30 }) // one pass: the exit check
+    L.scan(sim) // the second horizon read
+    return { added: L.recs.size - before, keys: [...L.recs.keys()], passes: sim.passes - p0 }
+  })
+  const a = go(true)
+  const b = go(false)
+  assert.equal(a.passes, 1, 'exactly one pass ran between the two reads')
+  assert.equal(a.added, 5, 'the full walk gathered the five new writes')
+  assert.equal(b.added, a.added, 'the scoped walk gathered them too')
+  assert.deepEqual(b.keys, a.keys, 'the same records in the same order')
 })
