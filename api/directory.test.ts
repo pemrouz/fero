@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fero, RENDEZVOUS } from './index.ts'
 import { Directory, GRACE, MAX_PER_CALLER, boxDirectory, fromBox, hostMethods, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, unmap } from './directory.ts'
-import { snapshot } from './substrate.ts'
+import { proxy, snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { MEMBER_REDIALS } from '../kernel/node.ts'
 import { JK } from '../kernel/journal.ts'
@@ -503,6 +503,68 @@ test("a lookup the directory host FAILS shows on rendezvous.error — it is not 
     assert.ok(await until(() => d.error?.includes('lookup exploded') === true, 8000), `the failure is on the state (${d.error})`)
   } finally {
     await d.destroy(); await host.destroy()
+  }
+})
+
+test("a failed lookup is opened again with backoff: a successful register does not clear its error while it stays dead, and the error clears when the lookup itself recovers", async () => {
+  //! a stand-in host (user name, the real Directory through the compose seam) whose lookup throws while `broken`
+  // and whose register always succeeds — the shape where a register's success used to wipe the lookup's error
+  const name = `dirr${process.pid}`
+  const addr = `127.0.0.1:${await ports.free()}`
+  let broken = true, lookups = 0, registers = 0
+  const row = proxy({ u9: '127.0.0.1:7' })
+  const host = await fero(name, { listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, methods: {
+    lookup: () => { lookups++; if (broken) throw new Error('lookup exploded'); return row },
+    register: () => { registers++; return true },
+  } })
+  let hosts: string[] = []
+  const d = new Directory({
+    compose: (_n, o) => fero(name, o), addr, name: 'r', uuid: 'u1', listen: () => '127.0.0.1:9', serve: true,
+    heartbeatMs: 50, redialMs: 30, onHosts: (hs) => { hosts = hs }, onState: () => {},
+  })
+  try {
+    await d.start()
+    assert.ok(await until(() => d.error?.includes('lookup exploded') === true && registers >= 1, 8000), `the lookup failed and the register went through (${d.error}, ${registers})`)
+    //! a later register (a re-register on a primary change) succeeds too — the lookup is still dead, so its error stays
+    const before = lookups
+    assert.ok(await until(() => lookups >= before + 2, 8000), `the dead lookup is opened again, with backoff (${lookups} lookups)`)
+    assert.ok(d.error?.includes('lookup exploded'), `a register's success did not clear the dead lookup's error (${d.error})`)
+    assert.deepEqual(hosts, [], 'nothing found while the lookup is dead')
+    broken = false
+    assert.ok(await until(() => d.error === undefined, 10_000), `the lookup recovered and its error cleared (${d.error})`)
+    assert.ok(await until(() => hosts.includes('127.0.0.1:7')), `and it publishes again (${hosts})`)
+  } finally {
+    await d.destroy(); await host.destroy()
+  }
+})
+
+test("an asked box whose directory goes away and comes back: the failed lookup is opened again on the new directory, `error` stays while it is dead and clears when it answers, and the box's servers are found", async () => {
+  const name = `dirb${process.pid}`
+  const own = `127.0.0.1:${await ports.free()}` // nothing listens there: this box's directory is down, which is fine
+  const B = `127.0.0.1:${await ports.free()}`
+  const base = { heartbeat: { ms: 50 }, redial: { ms: 30 } }
+  //! box B's first directory answers every lookup with a failure
+  let b: Fero | undefined = await fero(name, { ...base, listen: B, methods: { lookup: () => { throw new Error('box B is broken') }, register: () => true } })
+  let hosts: string[] = []
+  const d = new Directory({
+    compose: (_n, o) => fero(name, o), addr: own, name: 'r', uuid: 'u1', listen: () => undefined, serve: false, boxes: [B],
+    heartbeatMs: 50, redialMs: 30, onHosts: (hs) => { hosts = hs }, onState: () => {},
+  })
+  try {
+    await d.start()
+    assert.ok(await until(() => d.boxes?.[B]?.error?.includes('box B is broken') === true, 8000), `the box's lookup failed (${JSON.stringify(d.boxes)})`)
+    //! box B's directory goes away
+    await b.destroy(); b = undefined
+    assert.ok(await until(() => d.boxes?.[B]?.up === false, 8000), 'the box reads down')
+    assert.ok(d.boxes?.[B]?.error?.includes('box B is broken'), 'its dead lookup still says so')
+    //! and comes back, healthy, on the same address
+    const row = proxy({ s1: '127.0.0.1:4100' })
+    b = await fero(name, { ...base, listen: B, methods: { lookup: () => row, register: () => true } })
+    assert.ok(await until(() => d.boxes?.[B]?.up === true && d.boxes[B].error === undefined, 10_000), `the lookup was opened again on the new directory and answered (${JSON.stringify(d.boxes)})`)
+    assert.deepEqual(d.boxes, { [B]: { up: true } }, 'no stale error key')
+    assert.ok(await until(() => hosts.includes('127.0.0.1:4100')), `box B's server is found (${hosts})`)
+  } finally {
+    await d.destroy(); await b?.destroy()
   }
 })
 

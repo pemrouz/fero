@@ -282,8 +282,13 @@ export class Directory {
   host: Fero | null = null
   #destroyed = false
   #up = false
-  #error: string | undefined
+  //! #errs — the trouble each part reports, kept apart so one part's recovery never clears another's: a
+  // successful register used to clear a lookup's error while that lookup stayed dead. `error` reads them
+  // joined, bind first (a test and a screen key on the `bind ` prefix).
+  #errs: { bind?: string; register?: string; lookup?: string } = {}
   #lastPeers = ''
+  //! the re-subscribe timers of failed lookups (this box's and every asked box's), cleared on destroy
+  #timers = new Set<NodeJS.Timeout>()
   #retry: NodeJS.Timeout | null = null
   #fails = 0
   //! the other boxes' directory clients (ask-only), their state, and every source's folded addresses
@@ -298,18 +303,26 @@ export class Directory {
   }
   get hosting(): boolean { return this.host !== null }
   get up(): boolean { return this.#up }
-  get error(): string | undefined { return this.#error }
+  get error(): string | undefined {
+    const e = [this.#errs.bind, this.#errs.register, this.#errs.lookup].filter((x) => x !== undefined)
+    return e.length === 0 ? undefined : e.join('; ')
+  }
   //! boxes — a copy per read: cluster.me folds it into a proxy row
   get boxes(): Record<string, BoxState> | undefined {
     const ks = Object.keys(this.#boxes)
     return ks.length === 0 ? undefined : Object.fromEntries(ks.map((k) => [k, { ...this.#boxes[k] }]))
   }
-  #state(): DirectoryState { return { hosting: this.hosting, up: this.#up, ...(this.#error !== undefined ? { error: this.#error } : {}), ...(this.boxes ? { boxes: this.boxes } : {}) } }
-  #setError(e: string | undefined) { if (e !== this.#error) { this.#error = e; this.#o.onState(this.#state()) } }
-  #setBox(addr: string, s: BoxState) {
+  #state(): DirectoryState { const error = this.error; return { hosting: this.hosting, up: this.#up, ...(error !== undefined ? { error } : {}), ...(this.boxes ? { boxes: this.boxes } : {}) } }
+  #setError(kind: 'bind' | 'register' | 'lookup', e: string | undefined) {
+    if (e === this.#errs[kind]) return
+    if (e === undefined) delete this.#errs[kind]
+    else this.#errs[kind] = e
+    this.#o.onState(this.#state())
+  }
+  #setBox(addr: string, up: boolean, error: string | undefined) {
     const b = this.#boxes[addr]
-    if (b.up === s.up && b.error === s.error) return
-    this.#boxes[addr] = s
+    if (b.up === up && b.error === error) return
+    this.#boxes[addr] = { up, ...(error !== undefined ? { error } : {}) }
     this.#o.onState(this.#state())
   }
   //! #publish — one source's addresses changed: the union over every source, minus own listen, posts
@@ -367,16 +380,7 @@ export class Directory {
     }))
     //! the live lookup: one subscription, re-subscribed by the Caller on every primary change (a fresh
     // host's snapshot root-replaces the mirror). Folds to the address set minus own listen.
-    //! a failed lookup (the host's handler threw, on the first host or on a later one after a takeover) is
-    // the directory's trouble, not the server's: `onError` hears every failure of the sub, so it shows on
-    // cluster.me.rendezvous.error instead of exiting the process as an unhandled `ready` rejection would
-    const onError = (e: Error) => { if (!this.#destroyed) this.#setError(`lookup: ${e?.message ?? String(e)}`) }
-    const h = c.methods.lookup(o.name, { onError }) as { tap: (fn: () => void) => void }
-    h.tap(afterFold(() => {
-      if (this.#destroyed) return
-      const row = (snapshot(h) as Row | undefined) ?? {}
-      this.#publish('', Object.values(row).filter((a) => typeof a === 'string'))
-    }))
+    this.#lookup(c, '', (row) => Object.values(row).filter((a) => typeof a === 'string'), (e) => this.#setError('lookup', e))
     //! the other boxes (§11): one ask-only client each, after this box's own
     for (const b of o.boxes ?? []) {
       if (this.#destroyed) return
@@ -399,17 +403,42 @@ export class Directory {
       const key = Object.keys(peers).filter((u) => peers[u].up).sort().join(',')
       if (key === lastPeers) return
       lastPeers = key
-      this.#setBox(addr, { ...this.#boxes[addr], up: key !== '' })
+      this.#setBox(addr, key !== '', this.#boxes[addr].error)
     }))
-    //! a failed lookup is over for good: the Caller drops a failed sub and never re-subscribes it on a
-    // later primary (api/methods.ts, Caller.#fail), so this box adds nothing more. `error` stays set on
-    // purpose — clearing it when the link comes back would read a dead lookup as a healthy box.
-    const onError = (e: Error) => { if (!this.#destroyed) this.#setBox(addr, { ...this.#boxes[addr], error: `lookup: ${e?.message ?? String(e)}` }) }
-    const h = c.methods.lookup(this.#o.name, { onError }) as { tap: (fn: () => void) => void }
+    //! `error` is a failed lookup; it stays set while the lookup is dead, even when the link comes back
+    // (that would read a dead lookup as a healthy box), and clears only when the lookup itself recovers
+    this.#lookup(c, addr, (row) => fromBox(addr, row), (e) => this.#setBox(addr, this.#boxes[addr].up, e))
+  }
+
+  //! #lookup — one live lookup of this instance's name on directory client `c`, its folded addresses posted as
+  // `source`. A failed lookup (the host's handler threw, on the first host or on a later one after a takeover)
+  // is the directory's trouble, not the server's: `onError` hears it, so it shows as `error` instead of
+  // exiting the process as an unhandled `ready` rejection would. The Caller drops a failed sub for good
+  // (api/methods.ts, Caller.#fail), so the lookup is opened again here, after a jittered delay that doubles
+  // per consecutive failure to the cap (the bind-retry loop's numbers): a host whose lookup throws every time
+  // costs one call every few seconds. A re-subscribe while the link is down is held and replayed on the next
+  // primary, like any sub. `error` clears only on the FIRST FRAME of a lookup opened after the failure — the
+  // lookup itself recovered — never because some other part of the directory succeeded.
+  #lookup(c: Fero, source: string, fold: (row: Row) => string[], setErr: (e: string | undefined) => void, fails = 0): void {
+    if (this.#destroyed) return
+    let failed = false
+    const onError = (e: Error) => {
+      if (this.#destroyed || failed) return
+      failed = true
+      setErr(`lookup: ${e?.message ?? String(e)}`)
+      const delay = Math.min(RETRY_CAP, (RETRY_BASE + Math.floor(Math.random() * 4 * RETRY_BASE)) * 2 ** Math.min(fails, 8))
+      const t = setTimeout(() => { this.#timers.delete(t); this.#lookup(c, source, fold, setErr, fails + 1) }, delay)
+      t.unref?.()
+      this.#timers.add(t)
+    }
+    const h = c.methods.lookup(this.#o.name, { onError }) as { tap: (fn: () => void) => void; ready: Promise<void> }
     h.tap(afterFold(() => {
       if (this.#destroyed) return
-      this.#publish(addr, fromBox(addr, (snapshot(h) as Row | undefined) ?? {}))
+      this.#publish(source, fold((snapshot(h) as Row | undefined) ?? {}))
     }))
+    //! the first frame of THIS lookup: it is alive, so any lookup error before it is over (the opening
+    // lookup's first frame clears nothing: no error was set yet)
+    h.ready.then(() => { if (!this.#destroyed && !failed) setErr(undefined) }, () => {})
   }
 
   //! #register — idempotent, re-issued on every primary; a host REFUSAL is deterministic (bad listen,
@@ -420,9 +449,9 @@ export class Directory {
     if (!c || !this.#o.serve || listen === undefined) return
     try {
       await (c.methods.register as (a: unknown, o?: unknown) => Promise<unknown>)({ name: this.#o.name, uuid: this.#o.uuid, listen }, { retry: true, timeout: 5000 })
-      this.#setError(undefined)
+      this.#setError('register', undefined)
     } catch (e) {
-      if (!this.#destroyed) this.#setError(`register: ${(e as Error)?.message ?? String(e)}`)
+      if (!this.#destroyed) this.#setError('register', `register: ${(e as Error)?.message ?? String(e)}`)
     }
   }
 
@@ -446,7 +475,7 @@ export class Directory {
     const o = this.#o
     const code = await this.#probe()
     if (this.#destroyed) return
-    if (code !== null) { this.#fails++; if (code !== 'EADDRINUSE') this.#setError(`bind ${o.addr}: ${code}`); return }
+    if (code !== null) { this.#fails++; if (code !== 'EADDRINUSE') this.#setError('bind', `bind ${o.addr}: ${code}`); return }
     let host: Fero | null = null
     const { methods, onPeers } = hostMethods(
       () => (host ? (snapshot(host.cluster) as { peers: Peers }).peers ?? {} : {}),
@@ -459,12 +488,12 @@ export class Directory {
       this.host = host
       this.#fails = 0
       host.cluster.tap(onPeers)
-      if (this.#error?.startsWith('bind ')) this.#error = undefined
+      delete this.#errs.bind
       this.#o.onState(this.#state())
     } catch (err) {
       this.#fails++
       const code = (err as NodeJS.ErrnoException)?.code
-      if (code !== undefined && code !== 'EADDRINUSE') this.#setError(`bind ${o.addr}: ${code}`)
+      if (code !== undefined && code !== 'EADDRINUSE') this.#setError('bind', `bind ${o.addr}: ${code}`)
     }
   }
 
@@ -490,6 +519,8 @@ export class Directory {
   async destroy(): Promise<void> {
     this.#destroyed = true
     this.#stopRetry()
+    for (const t of this.#timers) clearTimeout(t)
+    this.#timers.clear()
     const c = this.client; this.client = null
     if (c) await c.destroy()
     const bs = [...this.boxClients.values()]; this.boxClients.clear()
