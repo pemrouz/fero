@@ -70,13 +70,19 @@ export const portOf = (a: string): string => a.slice(a.lastIndexOf(':') + 1)
 // `::FFFF:127.0.0.1`, `0:0:0:0:0:ffff:127.0.0.1` and the hex form `::ffff:7f00:1` all dial (and bind)
 // the same socket as `127.0.0.1` — measured on this box: a mapped dial reaches a 127.0.0.1 listener and
 // a 127.0.0.1 dial reaches a mapped bind. Every other spelling comes back as it was. Brackets come off
-// only as a pair.
-const MAPPED = /^(?:(?:0{1,4}:){5}|::)ffff:(?:(\d{1,3}(?:\.\d{1,3}){3})|([0-9a-f]{1,4}):([0-9a-f]{1,4}))$/i
+// only as a pair. An IPv6 literal has many legal spellings (`0::ffff:127.0.0.1`, `0:0:0::ffff:7f00:1` …),
+// so it is first put in its one standard form (the URL parser's: lowercase, zeros compressed, the low 32
+// bits in hex, `::ffff:7f00:1`) and the mapped prefix is matched once. A scoped address (`fe80::1%eth0`)
+// does not parse there and comes back as it was. Not a hot path: compose-time checks and directory rows.
+const MAPPED = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/
 export const unmap = (h: string): string => {
-  const m = MAPPED.exec(h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h)
+  const bare = h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h
+  if (net.isIP(bare) !== 6) return h
+  let std: string
+  try { std = new URL(`http://[${bare}]`).hostname.slice(1, -1) } catch { return h }
+  const m = MAPPED.exec(std)
   if (m === null) return h
-  if (m[1] !== undefined) return m[1]
-  const a = parseInt(m[2], 16), b = parseInt(m[3], 16)
+  const a = parseInt(m[1], 16), b = parseInt(m[2], 16)
   return `${a >> 8}.${a & 255}.${b >> 8}.${b & 255}`
 }
 //! localish — a host spelling that reaches THIS box's loopback listeners: a loopback literal,

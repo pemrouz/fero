@@ -141,6 +141,13 @@ test('IPv4-mapped spellings: [::ffff:127.0.0.1] and its kin are loopback everywh
     assert.equal(unmap(h).startsWith('127.'), true, `${h} unmaps to ${unmap(h)}`)
   assert.equal(unmap('[::ffff:7f00:1]'), '127.0.0.1')
   assert.equal(unmap('[::ffff:0.0.0.0]'), '0.0.0.0')
+  //! every other legal compressed spelling of the same address (net.isIP says 6 for each) is the same socket
+  for (const h of ['0::ffff:127.0.0.1', '::0:ffff:127.0.0.1', '0:0:0::ffff:7f00:1', '[0:0::ffff:127.0.0.1]']) {
+    assert.equal(unmap(h), '127.0.0.1', `${h} unmaps to ${unmap(h)}`)
+    assert.ok(localish(h) && loopbackHost(h), `${h} is loopback`)
+    assert.ok(sameSocket(`[${h.replace(/^\[|\]$/g, '')}]:3376`, '127.0.0.1:3376'), `${h} cannot squat the directory`)
+  }
+  assert.equal(unmap('[fe80::1%eth0]'), '[fe80::1%eth0]', 'a scoped address is left as it was')
   //! not a mapped spelling: left exactly as it was (a lone bracket, another prefix, a plain v6)
   for (const h of ['[::1]', '[fe80::1]', '[::ffff:127.0.0.1', '::fffe:127.0.0.1', '10.0.0.5', 'localhost']) assert.equal(unmap(h), h, h)
   for (const h of ['[::ffff:127.0.0.1]', '::ffff:127.0.0.1', '::FFFF:127.9.9.9', '[::ffff:7f00:1]']) {
