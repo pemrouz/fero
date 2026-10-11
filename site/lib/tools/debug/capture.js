@@ -35,9 +35,13 @@ export const captureNode = (node      ) => {
     gate: d.gate,
     pendingWrites: d.pendingWrites,
     client: d.client,
-    //! scoped replication (ISSUES I-3): replicas, and per own-lane partition the holder set at capture end
+    //! a client's feeder (wave 5e): the uuid on its primary link — a client of a scoped feeder holds what it holds
+    ...('feeder' in d ? { feeder: d.feeder } : {}),
+    //! scoped replication (ISSUES I-3): replicas, and per own-lane partition the holder set at capture end;
+    // held (wave 5e): the partitions this node holds at capture end — the per-row comparison's participants
     replicas: d.replicas,
     ...(d.holders ? { holders: d.holders } : {}),
+    ...(d.held ? { held: d.held } : {}),
     stateHash: d.stateHash,
     dropped: d.dropped,
     journal: node.journal.read(0),

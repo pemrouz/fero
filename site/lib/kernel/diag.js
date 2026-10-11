@@ -18,6 +18,7 @@ import { VERB, encodeControl, FrameError } from './codec.js'
 import { LS,           } from './link.js'
 import { JK } from './journal.js'
 import { partitionOf } from './env.js'
+import { SCOPE } from './scope.js'
 import { ctEq } from './door.js'
                                      
 
@@ -25,25 +26,32 @@ import { ctEq } from './door.js'
 // (the review killed the monolithic whole-node pull: one oversized frame = FrameError = link drop = a
 // deterministic re-dial loop on exactly the busy nodes a debugger attaches to).
 export const DIAG_MAX = 4096
+//! SEQS_MAX: seqs per q:'seqs' page — a bare number list (a few bytes each), so a page holds 16× a logs page
+export const SEQS_MAX = DIAG_MAX * 16
 //! DIAG_P: the DIAG payload protocol version — reported in meta/ACCEPT; version skew degrades typed ('bad-op'), never fatally.
-export const DIAG_P = 1
+// 2 (wave 5e): q:'seqs', the paged q:'state' (f, n → sh, sz on every page); a bridge asks them only of a node at 2+.
+export const DIAG_P = 2
 
 //! ctEq (the constant-time token compare) lives in kernel/door.ts now: the door's proof check and this
 // token check are the same comparison, so there is one copy.
 
 //! reply — every DIAGA leaves through this gate: the encode is guarded (a FrameError from an oversized
 // body becomes a TYPED {ok:0, e:'too-large'} answer, never an escape into the bytesIn net where it
-// would read as a wire fault and drop the session).
-const reply = (node      , link      , body                         )       => {
+// would read as a wire fault and drop the session). Returns whether the body itself went out, so a data-bearing
+// read audits only what it really handed out.
+const reply = (node      , link      , body                         )          => {
   const j = node.journal
   let bytes            
+  let sent = true
   try {
     bytes = encodeControl(VERB.DIAGA, body)
   } catch (err) {
     if (!(err instanceof FrameError)) throw err
     bytes = encodeControl(VERB.DIAGA, { id: body.id, u: body.u, i: body.i, ok: 0, e: 'too-large' })
+    sent = false
   }
   link.ship(bytes, node.env.sink, j)
+  return sent
 }
 
 //! diagHello — the whole session machine. Guards in order: used-link (an r:2 on an admitted member/client
@@ -78,7 +86,7 @@ export const diagHello = (node      , link      , v                         )   
       link.state = LS.diag
       link.noRedial = true // a closed diag session is the client's to re-open; the node never redials it
       j.armed && j.emit(JK.diagAuth, link.id, name)
-      return reply(node, link, { id: 0, ok: 1, u: node.uuid, i: node.incarnation, p: DIAG_P })
+      return void reply(node, link, { id: 0, ok: 1, u: node.uuid, i: node.incarnation, p: DIAG_P })
     }
   deny('bad-token')
 }
@@ -106,6 +114,23 @@ const ownHolders = (node      )                           => {
   return Object.fromEntries(out)
 }
 
+//! heldOf — the partitions this node's scope machine HOLDS right now (SCOPE.held: on duty, its floors
+// advancing), sorted. The debugger judges a scoped capture per row among the nodes holding it (the
+// scopedConverged monitor's rule, sim/monitors.ts), and a client against what its feeder holds — both need
+// the node's own answer, never a re-derived one. A row still being copied in (acquiring) or frozen on its
+// way out (orphan) is not held: the page does not judge it there.
+const heldOf = (node      )           => {
+  const out           = []
+  for (const [p, e] of node.scope .entries) if (e.state === SCOPE.held) out.push(p)
+  return out.sort()
+}
+
+//! feederOf — a client's feeder: the uuid on its primary link (the ONE link it digests), null with none
+const feederOf = (node      )                => {
+  const l = node.primary !== null ? node.links.get(node.primary) : undefined
+  return l && l.uuid ? l.uuid : null
+}
+
 export const diagNode = (node      ) => ({
   uuid: node.uuid,
   //! name: the resource this node replicates (NodeOpts.name, the HELLO echo) — the debugger paints a `#`
@@ -120,10 +145,14 @@ export const diagNode = (node      ) => ({
   //! client: this node's OWN role (M5b spoke) — the debugger's topology replay needs it for the single-feeder
   // synced rule (a client digests only its primary); additive, so an older bridge simply never sees it
   client: node.client,
+  //! feeder (wave 5e): a client's primary's uuid — a client of a scoped feeder folds only what that feeder
+  // holds, so the debugger judges it against the feeder's `held`; additive, clients only
+  ...(node.client ? { feeder: feederOf(node) } : {}),
   //! replicas + holders (ISSUES I-3): scoped replication sends a write to its holders only, so a member
-  // outside the set never getting it is the design, not a loss — additive, an older bridge never sees them
+  // outside the set never getting it is the design, not a loss — additive, an older bridge never sees them.
+  // held (wave 5e): what this node holds now — the per-row comparison's participants
   replicas: node.replicas,
-  ...(node.armed ? { holders: ownHolders(node) } : {}),
+  ...(node.armed ? { holders: ownHolders(node), held: heldOf(node) } : {}),
   stateHash: node.stateHash,
   jn: node.journal.n,
   dropped: node.journal.dropped,
@@ -144,21 +173,21 @@ export const diagNode = (node      ) => ({
 //
 // EMISSION POLICY (deliberate asymmetry — do not "fix" it into spam): diagPull is emitted for the
 // data-bearing reads (node/logs/state) AFTER the reply builds (a pull never contains its own row).
-// q:'journal' and q:'meta' emit NOTHING: journaling reads-of-the-journal at follow cadence evicts the
+// q:'journal', q:'meta' and q:'seqs' emit NOTHING: journaling reads asked at follow cadence evicts the
 // very history being followed (a 1 Hz live-dash would eat a 4096-cap ring in minutes). The audit anchor
-// for a session is diagAuth + linkDown.
+// for a session is diagAuth + linkDown. (A paged q:'state' emits on EVERY page, with that page's cell count.)
+// Only a reply that went out is audited: one refused as 'too-large' handed out nothing and leaves no row.
 export const onDiagQ = (node      , link      , v                         )       => {
   const j = node.journal
   const id = typeof v.id === 'number' && v.id >= 1 ? Math.floor(v.id) : 0
   const base = { id, u: node.uuid, i: node.incarnation }
-  if (!id) return reply(node, link, { ...base, ok: 0, e: 'bad-args' })
+  if (!id) return void reply(node, link, { ...base, ok: 0, e: 'bad-args' })
   switch (v.q) {
     case 'meta':
       //! the node serves its OWN vocabulary — a capture stays self-describing across processes; version skew is data
-      return reply(node, link, { ...base, ok: 1, l: node.listen, p: DIAG_P, vocab: JK })
+      return void reply(node, link, { ...base, ok: 1, l: node.listen, p: DIAG_P, vocab: JK })
     case 'node': {
-      reply(node, link, { ...base, ok: 1, n: diagNode(node) })
-      j.armed && j.emit(JK.diagPull, link.id, 'node', 1)
+      if (reply(node, link, { ...base, ok: 1, n: diagNode(node) })) j.armed && j.emit(JK.diagPull, link.id, 'node', 1)
       return
     }
     case 'journal': {
@@ -176,14 +205,14 @@ export const onDiagQ = (node      , link      , v                         )     
         ev: page.map((e) => [e.t, e.kind, e.a, e.b, e.c]),
       }
       if (all.length > max) body.next = page[page.length - 1].t + 1
-      return reply(node, link, body) // NOT journaled — the follow-cadence eviction rule above
+      return void reply(node, link, body) // NOT journaled — the follow-cadence eviction rule above
     }
     case 'logs': {
       //! logs cursor f is EXCLUSIVE (the digest/AE convention: "I hold through f, ship me after"). The
       // TWO conventions in one protocol are an off-by-one factory — this comment and the adversarial
       // cursor tests are load-bearing; the one client everyone copies lives in tools/debug/attach.ts.
       const o = typeof v.o === 'string' ? v.o : null
-      if (!o) return reply(node, link, { ...base, ok: 0, e: 'bad-args' })
+      if (!o) return void reply(node, link, { ...base, ok: 0, e: 'bad-args' })
       const f = typeof v.f === 'number' && v.f >= 0 ? Math.floor(v.f) : 0
       const max = Math.min(typeof v.n === 'number' && v.n >= 1 ? Math.floor(v.n) : DIAG_MAX, DIAG_MAX)
       const entries = node.logs.get(o) ?? []
@@ -198,19 +227,59 @@ export const onDiagQ = (node      , link      , v                         )     
       }
       const body                          = { ...base, ok: 1, o, tail, ev }
       if (ev.length && (ev[ev.length - 1].s          ) < tail) body.next = ev[ev.length - 1].s
-      reply(node, link, body)
-      j.armed && j.emit(JK.diagPull, link.id, 'logs', ev.length)
+      if (reply(node, link, body)) j.armed && j.emit(JK.diagPull, link.id, 'logs', ev.length)
       return
     }
+    case 'seqs': {
+      //! seqs (wave 5e): one origin's record book as a bare seq list, ascending — what the bridge needs to keep its
+      // log cache exact. A record (origin, seq) never changes, but the SET does: compaction drops losers below the
+      // frontier, a shed drops a row, a splice or an acquire inserts BELOW the tail, a condemn or a resync wipes. So
+      // the bridge asks which seqs are there now and pulls only the ones it lacks. Cursor f EXCLUSIVE (the logs
+      // convention), paged by SEQS_MAX via next. Not journaled: it is asked at follow cadence (the policy above).
+      const o = typeof v.o === 'string' ? v.o : null
+      if (!o) return void reply(node, link, { ...base, ok: 0, e: 'bad-args' })
+      const f = typeof v.f === 'number' && v.f >= 0 ? Math.floor(v.f) : 0
+      const entries = node.logs.get(o) ?? []
+      const s           = []
+      for (const e of entries) {
+        if (e.seq <= f) continue
+        s.push(e.seq)
+        if (s.length >= SEQS_MAX) break
+      }
+      const tail = entries.length ? entries[entries.length - 1].seq : 0
+      const body                          = { ...base, ok: 1, o, tail, s }
+      if (s.length && s[s.length - 1] < tail) body.next = s[s.length - 1]
+      return void reply(node, link, body)
+    }
     case 'state': {
-      //! SINGLE frame, never chunked: append-only sources chunk torn-proof, a MUTABLE map must not tear
-      // across pulls. The guarded reply() turns an over-MAX_FRAME state into a typed 'too-large' (the
-      // named ceiling: such a node's state is honestly unpullable — DESIGN-M7 §1 open risk, never silent).
-      reply(node, link, { ...base, ok: 1, sh: node.stateHash, cells: [...node.state] })
-      j.armed && j.emit(JK.diagPull, link.id, 'state', node.state.size)
+      //! WHOLE (no n): one frame — the default, and every older bridge's question. The guarded reply() turns an
+      // over-MAX_FRAME state into a typed 'too-large'. PAGED (n ≥ 1, wave 5e): cells [f, f+n) in the map's own
+      // order, with the torn-snapshot marker on EVERY page — sh (the state hash) and sz (the cell count) at the
+      // instant that page was cut. The map is mutable, so pages taken across a write may tear (a cell skipped, or
+      // served twice, when the order shifts): the bridge compares the markers across its pages and the assembled
+      // cells against them, and says `torn` rather than stitch a state that never existed.
+      if (typeof v.n === 'number' && v.n >= 1) {
+        const f = typeof v.f === 'number' && v.f >= 0 ? Math.floor(v.f) : 0
+        const n = Math.floor(v.n)
+        const cells                      = []
+        let i = 0
+        for (const c of node.state) {
+          if (i++ < f) continue
+          cells.push(c)
+          if (cells.length >= n) break
+        }
+        const body                          = { ...base, ok: 1, sh: node.stateHash, sz: node.state.size, f, cells }
+        if (f + cells.length < node.state.size) body.next = f + cells.length
+        //! every page that goes out is audited, not only the last: each one hands out cells, and a reader that stops
+        // one page short must still leave its row (a paged read is at most a few pages of 2^20 cells, so this is no
+        // spam). A page refused as 'too-large' handed out nothing, so it leaves no row.
+        if (reply(node, link, body)) j.armed && j.emit(JK.diagPull, link.id, 'state', cells.length)
+        return
+      }
+      if (reply(node, link, { ...base, ok: 1, sh: node.stateHash, cells: [...node.state] })) j.armed && j.emit(JK.diagPull, link.id, 'state', node.state.size)
       return
     }
     default:
-      return reply(node, link, { ...base, ok: 0, e: 'bad-op' })
+      return void reply(node, link, { ...base, ok: 0, e: 'bad-op' })
   }
 }

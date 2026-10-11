@@ -48,7 +48,9 @@ export const HEADER = 11
 // REINTERPRETED as the ATTEMPT triple [issuer, baseCid, attemptEpoch] — un-sequenced attempts forwarded to
 // the partition owner reuse the whole hot record-encode/decode path. WACK {u,c,n,s,e} answers a committed
 // run with its stamp coordinates — plus `o`, the lane it was stamped on, from an ARMED owner only (DESIGN-SCALE
-// stage 1: the issuer may never see the record; unscoped WACKs stay the v4.0 bytes); WNACK {u,c,n,r,ce} rejects
+// stage 1: the issuer may never see the record; unscoped WACKs stay the v4.0 bytes) — or, on an armed relay's hop
+// to its spoke for a record that relay expects to tap, `l`, the same lane to keep while waiting for the tap (wave 5e:
+// a feeder that dies before its tap must not strand the write); WNACK {u,c,n,r,ce} rejects
 // one with a typed reason + the owner's epoch (`m`, the reason text, rides an `invalid`).
 export const VERB = {
   HELLO: 1, RECORDS: 2, PING: 3, PONG: 4, DIGEST: 5,
@@ -495,36 +497,35 @@ const encodeEmpty = (prov       )             => {
 // shape, the triple read as [issuer, baseCid, attemptEpoch]. Uses a module-level scratch Outbox (finish()
 // hands out owned copies; the kernel is single-threaded and encode never re-enters).
 const runsScratch = new Outbox()
+                                                                                                               
+//! continuesRun: the ONE run rule — does `r` extend the run that starts at `head` and is `k` records long? Same
+// origin, same epoch, the next seq, the same issuer, and (with attempt identity) the next cid. encodeRuns splits by
+// it; node.ts #answer collects one frame's run at a time by it, so a ship can stop at a frame boundary without
+// encoding the rest of the lane (the resume-cost fix of 2026-10-11).
+export const continuesRun = (head        , k        , r        )          =>
+  r.origin === head.origin &&
+  r.epoch === head.epoch &&
+  r.seq === head.seq + k &&
+  r.iss === head.iss &&
+  (head.iss === undefined || r.cid === head.cid  + k)
 export const encodeRuns = (
-  records                                                                                                     ,
+  records          ,
   verb         = VERB.RECORDS,
   //! withPp (M6 floor law): armed senders stamp every record's predecessor varint (FLAG_PP). NEVER a
   // run-split condition — pp is per-record data, so the split shape is identical either way (the
   // snapshot chunker's one-frame assert depends on this).
   withPp = false,
-  //! starts (optional): receives the index in `records` of each frame's first record, one push per frame —
-  // the one caller that resumes a torn ship (node.ts #answer) reads the seq it tears at from it. The split
-  // is unchanged; a caller that passes nothing pays one undefined check per frame.
-  starts           ,
 )               => {
   const frames               = []
   const o = runsScratch
   let i = 0
   while (i < records.length) {
     const head = records[i]
-    if (starts !== undefined) starts.push(i)
     o.begin(verb, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch },
       head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid  } : undefined, withPp)
     o.add(head.rec, head.pp)
     let j = i + 1
-    while (
-      j < records.length &&
-      records[j].origin === head.origin &&
-      records[j].epoch === head.epoch &&
-      records[j].seq === head.seq + (j - i) &&
-      records[j].iss === head.iss &&
-      (head.iss === undefined || records[j].cid === head.cid  + (j - i))
-    ) { o.add(records[j].rec, records[j].pp); j++ }
+    while (j < records.length && continuesRun(head, j - i, records[j])) { o.add(records[j].rec, records[j].pp); j++ }
     frames.push(o.finish() )
     i = j
   }

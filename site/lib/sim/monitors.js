@@ -14,6 +14,86 @@ import { partitionOf, REC } from '../kernel/env.js'
 import { foldInto,             } from './fold.js'
                                     
 
+//! ── the walk (wave 5e, 2026-10-11): what a monitor pass reads ──────────────────────────────────────
+// A pass used to read every node on every event: at n=100 that is about 16 ms a pass (measured: the four log and
+// stream cursors 3.3-3.9 ms each, the stamp oracle's ledger scan 3.6, queued-implies-paused 1.3), more than the
+// event itself costs. A node's state changes only inside its own step(), so a monitor that judges ONE node's
+// state owes a look only at the nodes a step touched. Each monitor below is in one of three classes:
+//
+//   LOCAL      judges one node's own state (or feeds a memory from one node's own log tail or view). Walks only
+//              the due nodes: those that stepped since the last pass (sim.stepped), all of them when a pass
+//              follows run() entry or an at() task (sim.allDirty: hand edits and restarts happen there), and the
+//              ones the monitor itself still owes (see Due). Same nodes in the same order, so the same verdict.
+//   CROSS-NODE compares nodes to each other. None runs per event: the cross-node laws (converged, exactlyR,
+//              scopedConverged, floorsAgree, marksAgree, stampOracle, boundedLogs, confirmedIntact, drained) are
+//              horizon checks, read at a quiet point. A per-event monitor that looks cross-node is a LOCAL walk
+//              feeding a shared MEMORY (the first view seen per epoch, the first writer per partition, the
+//              first commit per attempt): each node feeds the memory from its own change, which is exact
+//              because a node's view and log tail change only in its own step.
+//   LEDGER     reads the sim's ledger (sim/monitors.ts Ledger: every record ever appended, every release) or a
+//              sim map (sim.left, sim.inflight). Runs on the events that touched it.
+//
+//   queued-implies-paused   LOCAL   the node's links
+//   one-view-per-epoch      LOCAL   the node's view, into a first-seen-per-epoch memory
+//   epoch-monotone          LOCAL   the node's epoch, against its own last
+//   log-monotone            LOCAL   the node's lane tails, by cursor
+//   single-writer           LOCAL   the node's lane tails, into a writer-per-(partition, epoch) memory
+//   attempt-exactly-once    LOCAL   the node's lane tails, into a commit-per-attempt memory
+//   watermark-monotone      LOCAL   the node's applied marks, against its own last
+//   watermark-ordering      LOCAL   the node's streams
+//   scoped-lawful-holding   LOCAL   the node's scope against its ring
+//   orphan-frozen           LOCAL   the node's orphan floors (stale snapshots are dropped for every node first)
+//   stamp-oracle  M1        LEDGER  the cells the stepped nodes changed, against the ledger's removes
+//   frontier-sound M2       LOCAL   the stepped armed nodes' replaced lanes (reads the holders' floors)
+//   release-safety M3       LEDGER  the cells the stepped nodes changed, against the releases
+//   index-oracle  M4        LOCAL   the stepped nodes' indexes (the cost is the node's own entries)
+//   floor-truth   M5        LOCAL   the stepped armed nodes' floors, against the ledger
+//   census-truth  M6        LEDGER  runs only when the ledger queued a release
+//   leave-drain   M9        LEDGER  runs only when sim.left holds a row, or the ledger still remembers one
+//   resync-end   M10        LOCAL   the stepped spokes' resync ends
+//   resync-behind M11       LOCAL   the same ends, against the feeder
+//
+// What "the same verdict" costs, and why it holds. A full pass returns the FIRST violation in node order, and
+// repeats it on every pass while the state stays bad (a violation here is a state, and a cursor that has not
+// moved past a bad entry reports it again). So a scoped pass must (1) visit due nodes in node order, (2) stop at
+// the first violation as the full pass does, and (3) keep owing a look at the node it stopped on and at every due
+// node it did not reach: those are the nodes the full pass would have read next time. `Due` is that debt.
+// sim/monitor-walk.test.ts runs the same Sim both ways, violations planted, and compares the lists.
+//! sim.full (Sim.fullWalk = true before the Sim is built) walks every node on every pass, the way every pass used to run.
+class Due {
+  #owed = new Set        ()
+  //! walk — read the due nodes, in node order, with `look`; return the first violation. Nodes that were due and
+  // not read (after the first violation), and the node the violation names, stay owed to the next pass.
+  walk(sim     , look                                        )                {
+    const all = sim.full || sim.allDirty
+    let bad                = null
+    let next                     = null
+    for (const [id, n] of sim.nodes) {
+      if (!all && !sim.stepped.has(id) && !this.#owed.has(id)) continue
+      if (bad !== null) { (next ??= new Set()).add(id); continue }
+      bad = look(id, n)
+      if (bad !== null) (next ??= new Set()).add(id)
+    }
+    this.#owed = next ?? NOBODY
+    return bad
+  }
+}
+const NOBODY              = new Set()
+
+//! cursorOf — the per-(node, lane) scan position the log monitors keep, found without building a key string per
+// lane. The cursor keys on the node object AND the lane array's identity: compact() replaces the array (rescan
+// from 0 — idempotent), appends mutate it in place (incremental), a restart replaces the node. A length check
+// alone was blind to a same-tick append+compact that left the length unchanged while entries below the cursor
+// were new (M4-review monitor-blindness finding).
+                                                       
+const cursorOf = (tails                                  , id        , origin        , n      , entries         )         => {
+  let per = tails.get(id)
+  if (per === undefined) { per = new Map(); tails.set(id, per) }
+  let prev = per.get(origin)
+  if (prev === undefined || prev.node !== n || prev.arr !== entries) { prev = { node: n, arr: entries, len: 0 }; per.set(origin, prev) }
+  return prev
+}
+
 //! perEvent — invariants that must hold at every instant, checked after every event.
 // A FACTORY, not a shared array: the watermark monitor carries per-run memory, and
 // module-level monitor state bleeding across seeds would poison every sweep after the first.
@@ -24,14 +104,16 @@ export const perEvent = () => [
     // queued bound (the node's tune row) is deliberately NOT monitored alone: ship() enforces it at the only push site, so a
     // bound-only check is a tautology — an adversarial-review finding.)
     name: 'queued-implies-paused',
-    check: (sim     )                => {
-      for (const [id, n] of sim.nodes)
+    check: (() => {
+      const due = new Due()
+      return (sim     )                => due.walk(sim, (id, n) => {
         for (const l of n.links.values()) {
           if (l.queued.length > 0 && !l.paused) return `${id} link ${l.id} has ${l.queued.length} queued frames while FLOWING`
           if (l.queued.length > n.tune.queued) return `${id} link ${l.id} queued ${l.queued.length} > ${n.tune.queued}`
         }
-      return null
-    },
+        return null
+      })
+    })(),
   },
   {
     //! M2's headline safety invariant: at most ONE view commits per epoch — two nodes installing
@@ -39,17 +121,16 @@ export const perEvent = () => [
     name: 'one-view-per-epoch',
     check: (() => {
       const seen = new Map                ()
-      return (sim     )                => {
-        for (const [id, n] of sim.nodes) {
-          const v = n.membership.view
-          if (v.epoch === 0) continue
-          const key = JSON.stringify(v.members)
-          const prev = seen.get(v.epoch)
-          if (prev === undefined) seen.set(v.epoch, key)
-          else if (prev !== key) return `${id} installed a DIFFERENT view for epoch ${v.epoch}: ${key} vs ${prev}`
-        }
+      const due = new Due()
+      return (sim     )                => due.walk(sim, (id, n) => {
+        const v = n.membership.view
+        if (v.epoch === 0) return null
+        const key = JSON.stringify(v.members)
+        const prev = seen.get(v.epoch)
+        if (prev === undefined) seen.set(v.epoch, key)
+        else if (prev !== key) return `${id} installed a DIFFERENT view for epoch ${v.epoch}: ${key} vs ${prev}`
         return null
-      }
+      })
     })(),
   },
   {
@@ -59,91 +140,76 @@ export const perEvent = () => [
     name: 'epoch-monotone',
     check: (() => {
       const last = new Map                ()
-      return (sim     )                => {
-        for (const [id, n] of sim.nodes) {
-          if (n.client) continue
-          const prev = last.get(id) ?? 0
-          if (n.epoch < prev) return `${id} epoch went backwards: ${n.epoch} < ${prev}`
-          last.set(id, n.epoch)
-        }
+      const due = new Due()
+      return (sim     )                => due.walk(sim, (id, n) => {
+        if (n.client) return null
+        const prev = last.get(id) ?? 0
+        if (n.epoch < prev) return `${id} epoch went backwards: ${n.epoch} < ${prev}`
+        last.set(id, n.epoch)
         return null
-      }
+      })
     })(),
   },
   {
     //! per-origin LOGS are strictly seq-ascending — the structural invariant the AE suffix-slicer's
     // tail walk depends on. Checked incrementally (only appended tails), so it names the exact event
     // that poisoned a log (seed-79 regression: a self-echo append made a log non-monotone and an
-    // interior record became permanently unshippable). The cursor is keyed to the NODE OBJECT: a sim
-    // restart (sim.add replacing a node) resets the scan, or a stale cursor would silently skip the
+    // interior record became permanently unshippable). The cursor is keyed to the NODE OBJECT (see cursorOf):
+    // a sim restart (sim.add replacing a node) resets the scan, or a stale cursor would silently skip the
     // reborn node's early entries (adversarial-review monitor-blindness finding).
     name: 'log-monotone',
     check: (() => {
-      const tail = new Map                                                   ()
-      return (sim     )                => {
-        for (const [id, n] of sim.nodes)
-          for (const [origin, entries] of n.logs) {
-            const k = id + '|' + origin
-            let prev = tail.get(k)
-            //! the cursor keys on the log ARRAY's identity, not its length: compact() replaces the
-            // array (rescan from 0 — idempotent), appends mutate it in place (incremental). A length
-            // check alone was blind to a same-tick append+compact that left the length unchanged
-            // while entries below the cursor were new (M4-review monitor-blindness finding).
-            if (!prev || prev.node !== n || prev.arr !== entries) prev = { node: n, arr: entries, len: 0 }
-            if (entries.length > prev.len) {
-              for (let i = Math.max(prev.len, 1); i < entries.length; i++)
-                if (entries[i].seq <= entries[i - 1].seq)
-                  return `${id} log[${origin}] non-ascending at ${i}: ${entries[i].seq} after ${entries[i - 1].seq}`
-              prev.len = entries.length
-            }
-            tail.set(k, prev)
+      const tails = new Map                             ()
+      const due = new Due()
+      return (sim     )                => due.walk(sim, (id, n) => {
+        for (const [origin, entries] of n.logs) {
+          const prev = cursorOf(tails, id, origin, n, entries)
+          if (entries.length > prev.len) {
+            for (let i = Math.max(prev.len, 1); i < entries.length; i++)
+              if (entries[i].seq <= entries[i - 1].seq)
+                return `${id} log[${origin}] non-ascending at ${i}: ${entries[i].seq} after ${entries[i - 1].seq}`
+            prev.len = entries.length
           }
+        }
         return null
-      }
+      })
     })(),
   },
   {
     //! M3's headline invariant (the plan's single-writer monitor, v2 DECISIONS AA made structural):
     // for any (partition, epoch>0), at most ONE origin ever stamps a record — every AA conflict source
     // was some node stamping a partition it didn't solely own. Epoch 0 is exempt BY DESIGN (open
-    // genesis is multi-writer LWW). Incremental over appended log tails, like log-monotone; checked
-    // across ALL nodes' logs so a violation is caught wherever the colliding record first lands. The
+    // genesis is multi-writer LWW). Incremental over appended log tails, like log-monotone; fed from ALL nodes'
+    // logs so a violation is caught wherever the colliding record first lands. The
     // cursor is keyed to the NODE OBJECT so a sim restart rescans from 0 (a stale cursor would blind
     // the monitor exactly around the AA #4 restart shape it exists to police).
     name: 'single-writer',
     check: (() => {
       const owner = new Map                ()
-      const tail = new Map                                                   ()
+      const tails = new Map                             ()
+      const due = new Due()
       //! provenance LANES (uuid~incarnation) normalize to the NODE: the invariant is one WRITER per
       // (partition, epoch), and a reborn life stamping the partition its uuid still owns is the same writer
       const writerOf = (origin        ) => { const i = origin.indexOf('~'); return i < 0 ? origin : origin.slice(0, i) }
-      return (sim     )                => {
-        for (const [id, n] of sim.nodes)
-          for (const [origin, entries] of n.logs) {
-            const k = id + '|' + origin
-            let prev = tail.get(k)
-            //! the cursor keys on the log ARRAY's identity, not its length: compact() replaces the
-            // array (rescan from 0 — idempotent), appends mutate it in place (incremental). A length
-            // check alone was blind to a same-tick append+compact that left the length unchanged
-            // while entries below the cursor were new (M4-review monitor-blindness finding).
-            if (!prev || prev.node !== n || prev.arr !== entries) prev = { node: n, arr: entries, len: 0 }
-            if (entries.length > prev.len) {
-              const w = writerOf(origin)
-              for (let i = prev.len; i < entries.length; i++) {
-                const e = entries[i]
-                if (e.epoch === 0) continue
-                const pk = partitionOf(e.rec) + '|' + e.epoch
-                const held = owner.get(pk)
-                if (held === undefined) owner.set(pk, w)
-                else if (held !== w)
-                  return `TWO writers stamped partition '${partitionOf(e.rec)}' at epoch ${e.epoch}: ${held} and ${w} (seen at ${id})`
-              }
-              prev.len = entries.length
+      return (sim     )                => due.walk(sim, (id, n) => {
+        for (const [origin, entries] of n.logs) {
+          const prev = cursorOf(tails, id, origin, n, entries)
+          if (entries.length > prev.len) {
+            const w = writerOf(origin)
+            for (let i = prev.len; i < entries.length; i++) {
+              const e = entries[i]
+              if (e.epoch === 0) continue
+              const pk = partitionOf(e.rec) + '|' + e.epoch
+              const held = owner.get(pk)
+              if (held === undefined) owner.set(pk, w)
+              else if (held !== w)
+                return `TWO writers stamped partition '${partitionOf(e.rec)}' at epoch ${e.epoch}: ${held} and ${w} (seen at ${id})`
             }
-            tail.set(k, prev)
+            prev.len = entries.length
           }
+        }
         return null
-      }
+      })
     })(),
   },
   {
@@ -155,34 +221,27 @@ export const perEvent = () => [
     name: 'attempt-exactly-once',
     check: (() => {
       const committed = new Map                ()
-      const tail = new Map                                                   ()
-      return (sim     )                => {
-        for (const [id, n] of sim.nodes)
-          for (const [origin, entries] of n.logs) {
-            const k = id + '|' + origin
-            let prev = tail.get(k)
-            //! the cursor keys on the log ARRAY's identity, not its length: compact() replaces the
-            // array (rescan from 0 — idempotent), appends mutate it in place (incremental). A length
-            // check alone was blind to a same-tick append+compact that left the length unchanged
-            // while entries below the cursor were new (M4-review monitor-blindness finding).
-            if (!prev || prev.node !== n || prev.arr !== entries) prev = { node: n, arr: entries, len: 0 }
-            if (entries.length > prev.len) {
-              for (let i = prev.len; i < entries.length; i++) {
-                const e = entries[i]
-                if (e.iss === undefined) continue
-                const ak = e.iss + '|' + e.cid
-                const at = origin + '|' + e.seq + '|' + e.epoch
-                const held = committed.get(ak)
-                if (held === undefined) committed.set(ak, at)
-                else if (held !== at)
-                  return `attempt ${ak} committed TWICE: ${held} and ${at} (seen at ${id})`
-              }
-              prev.len = entries.length
+      const tails = new Map                             ()
+      const due = new Due()
+      return (sim     )                => due.walk(sim, (id, n) => {
+        for (const [origin, entries] of n.logs) {
+          const prev = cursorOf(tails, id, origin, n, entries)
+          if (entries.length > prev.len) {
+            for (let i = prev.len; i < entries.length; i++) {
+              const e = entries[i]
+              if (e.iss === undefined) continue
+              const ak = e.iss + '|' + e.cid
+              const at = origin + '|' + e.seq + '|' + e.epoch
+              const held = committed.get(ak)
+              if (held === undefined) committed.set(ak, at)
+              else if (held !== at)
+                return `attempt ${ak} committed TWICE: ${held} and ${at} (seen at ${id})`
             }
-            tail.set(k, prev)
+            prev.len = entries.length
           }
+        }
         return null
-      }
+      })
     })(),
   },
   {
@@ -193,19 +252,20 @@ export const perEvent = () => [
     // never in-place regressions.
     name: 'watermark-monotone',
     check: (() => {
-      const last = new Map                                               ()
-      return (sim     )                => {
-        for (const [id, n] of sim.nodes)
-          for (const [origin, s] of n.streams) {
-            const k = id + '|' + origin
-            let prev = last.get(k)
-            if (!prev || prev.streams !== n.streams) prev = { streams: n.streams, applied: 0 }
-            if (s.applied < prev.applied) return `${id} stream ${origin} watermark went backwards: ${s.applied} < ${prev.applied}`
-            prev.applied = s.applied
-            last.set(k, prev)
-          }
+      const last = new Map                                                            ()
+      const due = new Due()
+      return (sim     )                => due.walk(sim, (id, n) => {
+        let per = last.get(id)
+        if (per === undefined) { per = new Map(); last.set(id, per) }
+        for (const [origin, s] of n.streams) {
+          let prev = per.get(origin)
+          if (!prev || prev.streams !== n.streams) prev = { streams: n.streams, applied: 0 }
+          if (s.applied < prev.applied) return `${id} stream ${origin} watermark went backwards: ${s.applied} < ${prev.applied}`
+          prev.applied = s.applied
+          per.set(origin, prev)
+        }
         return null
-      }
+      })
     })(),
   },
   {
@@ -214,14 +274,16 @@ export const perEvent = () => [
     // stronger guarantee can never run ahead of the weaker one it implies. Durable stays 0 until M4b's
     // storage lands; the monitor is armed FIRST so nothing can ever violate the contract unobserved.
     name: 'watermark-ordering',
-    check: (sim     )                => {
-      for (const [id, n] of sim.nodes)
+    check: (() => {
+      const due = new Due()
+      return (sim     )                => due.walk(sim, (id, n) => {
         for (const [origin, s] of n.streams) {
           if (s.shippable > s.applied) return `${id} stream ${origin}: shippable ${s.shippable} > applied ${s.applied}`
           if (s.durable > s.shippable) return `${id} stream ${origin}: durable ${s.durable} > shippable ${s.shippable}`
         }
-      return null
-    },
+        return null
+      })
+    })(),
   },
   {
     //! M6 scoped-lawful-holding (the exactly-R shadow oracle's per-event half): a node's HELD entries
@@ -229,17 +291,18 @@ export const perEvent = () => [
     // inbound gate leaked or a rescope was missed (the freeze must fire the instant duty changes).
     // Skipped wholesale on unscoped nodes (scope is null — zero cost at R=∞).
     name: 'scoped-lawful-holding',
-    check: (sim     )                => {
-      for (const [id, n] of sim.nodes) {
-        if (!n.scope || !n.armed) continue
+    check: (() => {
+      const due = new Due()
+      return (sim     )                => due.walk(sim, (id, n) => {
+        if (!n.scope || !n.armed) return null
         const ring = n.writes.ring
         if (ring.epoch !== n.epoch) ring.build(n.epoch, n.membership.view.members)
         for (const [p, e] of n.scope.entries)
           if (e.state === SCOPE.held && !ring.holdsAny(n.uuid, p, n.replicas))
             return `${id} HOLDS '${p}' while epoch ${n.epoch}'s ring assigns it elsewhere — gate leak or missed rescope`
-      }
-      return null
-    },
+        return null
+      })
+    })(),
   },
   {
     //! M6 orphan-frozen (expected-empty): an orphan's possession floors never advance — the freeze is
@@ -248,18 +311,21 @@ export const perEvent = () => [
     name: 'orphan-frozen',
     check: (() => {
       const frozen = new Map                                                     ()
+      const due = new Due()
       return (sim     )                => {
         //! snapshot invalidation (M6-review finding 32): a shed or re-acquire ends the freeze — a
         // partition that is not CURRENTLY an orphan drops its snapshot, so a later re-orphaning of
         // the same (node, partition) starts a FRESH scan instead of comparing across lawful
-        // held-era floor advances (the false-violation class).
+        // held-era floor advances (the false-violation class). Read for EVERY node, due or not: it walks the
+        // snapshots (the orphans), not the nodes, and a scoped pass that deferred a node's drop could meet its
+        // re-orphaning with the old floors.
         for (const [k, snap] of frozen) {
           const bar = k.indexOf('|')
           const cur = sim.nodes.get(k.slice(0, bar))
           if (cur !== snap.node || cur.scope?.entries.get(k.slice(bar + 1))?.state !== SCOPE.orphan) frozen.delete(k)
         }
-        for (const [id, n] of sim.nodes) {
-          if (!n.scope) continue
+        return due.walk(sim, (id, n) => {
+          if (!n.scope) return null
           for (const [p, e] of n.scope.entries) {
             if (e.state !== SCOPE.orphan) continue
             const k = id + '|' + p
@@ -277,8 +343,8 @@ export const perEvent = () => [
               if (s > was) return `${id} orphan '${p}' floor ADVANCED on lane ${origin}: ${was} → ${s} — the freeze leaked`
             }
           }
-        }
-        return null
+          return null
+        })
       }
     })(),
   },
@@ -630,6 +696,7 @@ export class Ledger {
   #floors = new Map                           ()
   #left = new Map                 ()
   #scanned = -1
+  #scanPass = -2
   #walked = -1
   #classified = -1
   changed                                                       = []
@@ -654,10 +721,18 @@ export class Ledger {
   // on the node object and the lane array like log-monotone's: a compaction replaces the array (rescan,
   // idempotent — add() dedups), a restart replaces the node. An entry a latch SPLICES into a lane's interior
   // was in its teacher's log and was gathered there.
+  //! Wave 5e: when this scan runs INSIDE a monitor pass and the scan before it ran in the pass just before, only the
+  // nodes that stepped since (sim.stepped, in node order) can hold an entry it has not gathered, so only those are
+  // read; otherwise (a scan between passes, such as stampOracle's horizon read, where the last pass has already
+  // cleared sim.stepped; the first scan; a pass after run() entry or an at() task; a gap in the passes; sim.full)
+  // every node is. The same entries are added in the same order either way.
   scan(sim     ) {
     if (this.#scanned === sim.events) return
     this.#scanned = sim.events
-    for (const [id, n] of sim.nodes)
+    const some = sim.checking && !sim.full && !sim.allDirty && this.#scanPass === sim.passes - 1
+    this.#scanPass = sim.passes
+    for (const [id, n] of sim.nodes) {
+      if (some && !sim.stepped.has(id)) continue
       for (const [origin, entries] of n.logs) {
         const k = id + '|' + origin
         let prev = this.#cursors.get(k)
@@ -668,6 +743,7 @@ export class Ledger {
         }
         this.#cursors.set(k, prev)
       }
+    }
   }
 
   //! walk — once per pass: diff every stepped node's versions against its snapshot. `changed` = cells whose
@@ -715,6 +791,7 @@ export class Ledger {
 
   floorsOf(n      )                      { let m = this.#floors.get(n); if (!m) { m = new Map(); this.#floors.set(n, m) } return m }
   leftBefore(uuid        )                      { return this.#left.get(uuid) }
+  remembersLeft()          { return this.#left.size !== 0 }
   sawLeft(uuid        , clean         ) { this.#left.set(uuid, clean) }
   forgetLeft(uuid        ) { this.#left.delete(uuid) }
 }
@@ -950,6 +1027,8 @@ export const scaleMonitors = () => [
     name: 'leave-drain',
     check: (sim     )                => {
       const L = ledgerOf(sim)
+      //! LEDGER class: nothing to judge or forget while sim.left is empty and the ledger remembers no leaver
+      if (sim.left.size === 0 && !L.remembersLeft()) return null
       for (const [uuid, clean] of sim.left) {
         if (L.leftBefore(uuid) === clean) continue
         L.sawLeft(uuid, clean)
