@@ -720,6 +720,94 @@ setInterval(() => {}, 1000)
   }
 })
 
+test("I-19 probe — the EADDRINUSE path in #tryHost: a survivor binds the port between the newcomer's probe and its bind; the newcomer's start() resolves as a client of the survivor's directory, registers there and finds the survivor", async () => {
+  //! two Directories through the compose seam (user names stand in for #directory, as above), each with its own
+  // compose — two processes, so two clients. The newcomer's host compose first lets the survivor start and
+  // take the port: the newcomer's probe said free, its bind then meets EADDRINUSE — the race the line names.
+  const name = `race${process.pid}`
+  const addr = `127.0.0.1:${await ports.free()}`
+  let hostsSurvivor: string[] = [], hostsNewcomer: string[] = []
+  const survivor = new Directory({
+    compose: (_n, o) => fero(name, o), addr, name: 'r', uuid: 'surv', listen: () => '127.0.0.1:5001', serve: true,
+    heartbeatMs: 50, redialMs: 30, onHosts: (hs) => { hostsSurvivor = hs }, onState: () => {},
+  })
+  let raced = 0, bindError: unknown
+  const newcomer = new Directory({
+    compose: async (_n, o) => {
+      if (o.listen !== undefined && raced++ === 0) {
+        await survivor.start()
+        assert.ok(survivor.hosting, 'the survivor took the port first')
+        try { return await fero(name, o) } catch (e) { bindError = e; throw e }
+      }
+      return fero(name, o)
+    },
+    addr, name: 'r', uuid: 'new', listen: () => '127.0.0.1:5002', serve: true,
+    heartbeatMs: 50, redialMs: 30, onHosts: (hs) => { hostsNewcomer = hs }, onState: () => {},
+  })
+  try {
+    await newcomer.start()
+    assert.equal(raced, 1, 'the newcomer reached its bind once (its probe said free)')
+    assert.equal((bindError as NodeJS.ErrnoException | undefined)?.code, 'EADDRINUSE', `its bind met EADDRINUSE (${bindError})`)
+    assert.equal(newcomer.hosting, false)
+    assert.ok(await until(() => newcomer.up, 5000), 'the newcomer is a client of the survivor\'s directory')
+    assert.ok(await until(() => hostsNewcomer.includes('127.0.0.1:5001') && hostsSurvivor.includes('127.0.0.1:5002'), 5000), `each finds the other (${hostsNewcomer} / ${hostsSurvivor})`)
+    assert.equal(newcomer.error, undefined, 'EADDRINUSE is the ordinary outcome: nothing surfaced')
+  } finally {
+    await newcomer.destroy(); await survivor.destroy()
+  }
+})
+
+test("I-19 probe — the host is SIGKILLed while a SURVIVOR server (another process) is up, and a newcomer boots 0-400 ms later: the two race for the port, the newcomer's fero() resolves every time, one of them hosts, and the newcomer finds the survivor", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-i19r-'))
+  const script = path.join(dir, 'srv.ts')
+  fs.writeFileSync(script, `import { fero } from ${JSON.stringify(path.join(import.meta.dirname, 'index.ts'))}
+import { snapshot } from ${JSON.stringify(path.join(import.meta.dirname, 'substrate.ts'))}
+const f = await fero(process.argv[2], { server: true, rendezvous: process.argv[3], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+const me = () => (snapshot(f.cluster) as { me: { listen: string; rendezvous: { hosting: boolean; up: boolean } } }).me
+console.log('listen ' + me().listen + ' hosting ' + me().rendezvous.hosting)
+let last = ''
+f.cluster.tap(() => { const r = me().rendezvous; const s = 'state hosting ' + r.hosting + ' up ' + r.up; if (s !== last) { last = s; console.log(s) } })
+setInterval(() => {}, 1000)
+`)
+  const kids: ReturnType<typeof fero.spawn>[] = []
+  const tally: string[] = []
+  //! the survivor's current directory state: the last `state` line it printed (it prints on every change)
+  const lastState = (k: ReturnType<typeof fero.spawn>) => {
+    const m = [...k.out.matchAll(/state hosting (\w+) up (\w+)/g)].at(-1)
+    return m === undefined ? undefined : { hosting: m[1] === 'true', up: m[2] === 'true' }
+  }
+  try {
+    for (const gap of [0, 60, 120, 240, 400]) {
+      const name = `i19r${gap}${process.pid}`
+      const addr = `127.0.0.1:${await ports.free()}`
+      const host = fero.spawn(script, [name, addr]); kids.push(host)
+      assert.ok(await until(() => /hosting true/.test(host.out), 15_000), `gap ${gap}: the first server hosts (${host.out})`)
+      const surv = fero.spawn(script, [name, addr]); kids.push(surv)
+      assert.ok(await until(() => /state hosting false up true/.test(surv.out), 15_000), `gap ${gap}: the survivor is up on the host's directory (${surv.out})`)
+      const survListen = /listen (\S+)/.exec(surv.out)![1]
+      host.child.kill('SIGKILL')
+      await host.exited
+      await sleep(gap)
+      const b = await fero(name, { server: true, rendezvous: addr, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+      try {
+        assert.ok(await until(() => rz(b).up && me(b).hosts.includes(survListen), 10_000), `gap ${gap}: the newcomer is up and found the survivor (${JSON.stringify(rz(b))}, ${me(b).hosts})`)
+        //! exactly one hosts — the newcomer or the survivor — and both are up on that directory
+        assert.ok(await until(() => (rz(b).hosting || lastState(surv)?.hosting === true) && lastState(surv)?.up === true, 5000), `gap ${gap}: someone hosts and the survivor is up (${surv.out})`)
+        assert.ok(!(rz(b).hosting && lastState(surv)?.hosting === true), `gap ${gap}: not both`)
+        assert.equal(rz(b).error, undefined)
+        tally.push(`${gap}:${rz(b).hosting ? "newcomer" : "survivor"}`)
+      } finally {
+        await b.destroy()
+        surv.child.kill('SIGKILL'); await surv.exited
+      }
+    }
+    console.log(`# I-19 race: who hosted, per gap — ${tally.join(' ')}`)
+  } finally {
+    for (const k of kids) if (k.child.exitCode === null && k.child.signalCode === null) { k.child.kill('SIGKILL'); await k.exited }
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 //! ── cross-box discovery (docs/DESIGN-DIRECTORY.md §11): a bare host asks that box's directory ──
 
 test('cross-box helpers: a bare host (isBox) names a box, its directory sits at the rendezvous port, the same directory is spotted under either spelling, another box may not add loopback addresses, and leavesBox says exactly when a listen leaves this box', () => {
