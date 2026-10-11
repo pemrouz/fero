@@ -171,7 +171,7 @@ export const diagNode = (node: Node) => ({
 // data-bearing reads (node/logs/state) AFTER the reply builds (a pull never contains its own row).
 // q:'journal', q:'meta' and q:'seqs' emit NOTHING: journaling reads asked at follow cadence evicts the
 // very history being followed (a 1 Hz live-dash would eat a 4096-cap ring in minutes). The audit anchor
-// for a session is diagAuth + linkDown. (A paged q:'state' emits once, on its LAST page.)
+// for a session is diagAuth + linkDown. (A paged q:'state' emits on EVERY page, with that page's cell count.)
 export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): void => {
   const j = node.journal
   const id = typeof v.id === 'number' && v.id >= 1 ? Math.floor(v.id) : 0
@@ -268,7 +268,9 @@ export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): voi
         const body: Record<string, unknown> = { ...base, ok: 1, sh: node.stateHash, sz: node.state.size, f, cells }
         if (f + cells.length < node.state.size) body.next = f + cells.length
         reply(node, link, body)
-        if (body.next === undefined) j.armed && j.emit(JK.diagPull, link.id, 'state', node.state.size)
+        //! every page is audited, not only the last: each one hands out cells, and a reader that stops one page
+        // short must still leave its row (a paged read is at most a few pages of 2^20 cells, so this is no spam)
+        j.armed && j.emit(JK.diagPull, link.id, 'state', cells.length)
         return
       }
       reply(node, link, { ...base, ok: 1, sh: node.stateHash, cells: [...node.state] })
