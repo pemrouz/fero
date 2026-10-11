@@ -2105,7 +2105,8 @@ export class Node {
   //! #answer — what a peer's digest gets: the suffix ship, the link sync, and the r=0 reply to an r=1. For each
   // origin I hold, everything past the peer's high-water (`d`): the codec's run rule splits Lamport gaps into valid
   // contiguous frames, and a run bigger than this node's frame cap leaves in cuts (V4-51, encodeRun) — attempt
-  // identity rides along, so a healed peer rebuilds its cid-dedup window too; ship() honours backpressure. The peer's digest is what SYNCS the link: the suffix shipped covers everything up to this instant,
+  // identity rides along, so a healed peer rebuilds its cid-dedup window too; ship() honours backpressure. The peer's
+  // digest is what SYNCS the link: the suffix shipped covers everything up to this instant,
   // and every record from here on has a higher seq — per-origin monotonicity holds on the wire. r=1 means "answer
   // with yours": the reply carries r=0, so the exchange is two-legged, never a loop.
   //! M6 (armed): a MEMBER link gets NOTHING (DESIGN-SCALE stage 2, §3): on a scoped cluster a member receives history
