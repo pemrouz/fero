@@ -508,6 +508,8 @@ export const routes = (capture) => {
     const ns = byGroup.get(g)
     for (const n of ns) if (n.holders && n.view && n.view.epoch === top && n.holders[p]) return n.holders[p]
     if (!tv || !scopedG.get(g)) return null
+    //! the client and newest-view checks are defensive (no capture under test needs them): a client never latches,
+    // and a member off the newest view latched against an older ring that may no longer give it the row
     const hs = tv.view.members.filter((u) => {
       const n = byUuid.get(u)
       return !!n && n.client !== true && ((Array.isArray(n.held) && n.held.includes(p)) || (!!n.view && n.view.epoch === top && copyingOf(n).has(p)))
@@ -627,7 +629,8 @@ export const agreement = (capture) => {
           for (const [p, hs] of Object.entries(n.holders))
             for (const u of hs) { const h = byUuid.get(u); if (h && h.client !== true && judged(h) && !(rows.get(p) || []).includes(u)) join(p, u) }
       //! and a member still copying a row in on the newest view (copying(): its latch since the last install) — the ring gives it the row,
-      // so it is judged there as lagging even when no captured writer's `holders` names it (the writer not reached)
+      // so it is judged there as lagging even when no captured writer's `holders` names it (the writer not reached).
+      // The newest-view check is defensive: a member off that view latched against an older ring
       for (const n of ns)
         if (n.client !== true && judged(n) && n.view && n.view.epoch === top)
           for (const p of copying(n, K)) if (!(rows.get(p) || []).includes(n.uuid)) join(p, n.uuid)
