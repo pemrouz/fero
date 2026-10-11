@@ -68,13 +68,25 @@ export class Link {
   // it did not; `r` and `q` are its digest's. The node resumes the answer from there at the drain (node.ts #answer —
   // an answer with the cover as its tails ships exactly the rest), so the reply always follows the whole ship. Null
   // when no answer is torn. Set only on a link that ships suffixes (an unscoped member's, a client's); an armed member
-  // link gets no suffix and never tears.
-  torn                                                                                     = null
+  // link gets no suffix and never tears. A clear on a CLIENT link sets or lowers it too (wave 5f, onClear below). A
+  // cover the clear SETS (no answer was owed: `r` and `q` undefined) is a ceiling, marked `c`: the drain does not resume
+  // it; the peer's next digest (its reply to the drain digest) is answered from the lower of its tails and the ceiling,
+  // lane by lane (node.ts #clearCover), so the tap-forwards the clear took are re-sent and nothing else is assumed.
+  torn                                                                                               = null
   //! inQueue: the same shape, for the answer whose frames (or reply) sit in the queue right now — the cover at its
   // FIRST queued frame. It is what keeps an answer resumable until its reply has left the queue: a clear (ship below)
   // makes it the torn answer, so the drain re-sends what the clear took and the reply, never the whole ship again.
   // The drain's flush empties it. Null when no answer has a frame queued.
   inQueue                                                                                     = null
+  //! onClear (wave 5f): set on a CLIENT link only (node.ts at admit), and called by a clear (ship below) with the frames
+  // it took. A synced client link is fed by tap-forward, and a tap-forward can carry a record SPLICED into a lane's
+  // interior, below the spoke's tails; a clear also leaves the frames shipped after it in the same flush, which then
+  // leapfrog what it took. The drain digest answers above the spoke's tails, so it heals neither. The node turns what
+  // the clear took into `torn` (node.ts #clearCover), and the next answer to this link re-sends it. `wasSynced` is the link's synced flag
+  // from just before this clear: a clear on a synced link leaves a cover even when it took no record frame, because
+  // from then on the link is unsynced and nothing is tapped to it. Null on every other link: a member link's clear is
+  // unchanged.
+  onClear                                                                           = null
   //! quiet — heartbeats since this link last carried a byte in (node.ts bytesIn resets it). Read only by a node
   // with watchClients (the #directory host's failure detector over client links); on every other node it stays 0.
   quiet = 0
@@ -145,17 +157,22 @@ export class Link {
   // drain handler triggers knows how to re-ship. De-syncing here stops any further records widening the hole.
   // A caller that ships a WHOLE suffix in one step (node.ts #answer) never overflows on purpose: the shell steps
   // `pause` inside a send, so it checks for a full queue before every frame and stops there. A digest answer whose
-  // frames this clear takes becomes the torn answer (`inQueue` → `torn`), resumed at the drain.
+  // frames this clear takes becomes the torn answer (`inQueue` → `torn`), resumed at the drain. On a client link the
+  // clear also hands what it took to `onClear`, so a tap-forward it took is re-sent too (wave 5f).
   ship(bytes            , sink            , j         ) {
     if (this.dead) return
     if (!this.paused) return sink.send(this.id, bytes)
     this.queued.push(bytes)
     if (this.queued.length > this.maxQueued) {
       j.armed && j.emit(JK.dropOldest, this.id, this.queued.length)
-      this.queued.length = 0
+      const dropped = this.onClear !== null ? this.queued : null
+      if (dropped !== null) this.queued = []
+      else this.queued.length = 0
+      const wasSynced = this.synced
       this.droppedWhilePaused = true
       this.synced = false
       if (this.inQueue !== null) { this.torn = this.inQueue; this.inQueue = null }
+      if (dropped !== null) this.onClear (this, dropped, wasSynced)
     }
   }
 

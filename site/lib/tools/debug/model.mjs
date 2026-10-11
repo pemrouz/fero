@@ -19,7 +19,7 @@
 //! the CLOSED enums (M7 honesty gate): every fold-minted status string lives in one of these two lists —
 // the string-leaf traceability test walks fold outputs and rejects any leaf outside capture-strings ∪
 // these enums ∪ vocab names ∪ cellKey encodings. Add a status HERE (and to its fold) or the gate fails.
-export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived', 'not-a-holder', 'acquired']
+export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived', 'not-a-holder', 'acquired', 'feeder-unknown']
 export const ABSENT_REASONS = ['refused', 'timeout', 'unauthorized', 'frame', 'vocab-mismatch', 'restarted', 'error']
 
 export const encodeVal = (v) => {
@@ -81,6 +81,33 @@ const newestView = (ns) => {
   return { top, node: ns.find((n) => n.view && n.view.epoch === top) || null }
 }
 
+//! copying — the rows a member is meant to hold but is still copying in at capture end: an acquireStart (a=partition)
+// its journal has not yet closed with an acquire of the same row or with a view install. A latch opens only on a row
+// the ring makes this node hold (every #latch site checks ring.holdsAny), and the ring changes only at a view install
+// (kernel/membership.ts journals viewInstall right after rescope, which aborts every open latch 'epoch'). So until the
+// next install the node is still meant to hold that row — also after an abort for any other reason (teacher link down,
+// timeout, torn, overflow): the entry drops to `out`, or to an orphan when the node already holds entries of the row
+// (kernel/scope.ts #abort), and either way the next round re-latches it while the ring still gives it the row. `held` leaves
+// such a row out, and so, without this, would every fold that reads `held` when no writer's `holders` fact names the
+// row (the writer not captured). A truncated journal may have lost the opening row: then there is no fact, and nothing
+// is claimed.
+const copying = (node, K) => {
+  const open = new Set()
+  for (const e of node.journal)
+    if (e.kind === K.acquireStart) open.add(String(e.a))
+    else if (e.kind === K.acquire) open.delete(String(e.a))
+    else if (e.kind === K.viewInstall) open.clear()
+  return open
+}
+//! feederHeld — a client's feeder when the page can judge the client by it: captured and carrying `held`. A client of
+// a scoped resource folds only what its feeder holds (DESIGN-SCALE stage 2), so with no such feeder (no primary at
+// capture end, or a live attach that could not reach it) the page cannot tell which rows the client is meant to have:
+// agreement() does not compare it per row and routes() gives its stops `feeder-unknown` — one rule, both folds.
+const feederHeld = (node, byUuid) => {
+  const f = node.feeder != null ? byUuid.get(node.feeder) : null
+  return f && Array.isArray(f.held) ? f : null
+}
+
 //! newer — the ONE conflict rule, mirrored from kernel/node.ts #apply: lexicographic (epoch, seq, origin).
 const newer = (a, b) => // is `a` strictly newer than `b`?
   a.epoch > b.epoch || (a.epoch === b.epoch && (a.seq > b.seq || (a.seq === b.seq && a.origin > b.origin)))
@@ -109,6 +136,40 @@ const laneOf = (node) => {
     if (Number.isInteger(n) && n > inc) { inc = n; lane = o }
   }
   return lane
+}
+
+//! handoffs — what an acquire (journal acquire, a=partition) folded at a node: the one-teacher fold puts the teacher's
+// entries for p into the node's book with NO per-write row. The ones it taught are the captured entries of p that do
+// not arrive by their own row later on: an entry with an apply row after the acquire came in live (the kernel's
+// covered-below-the-cut rule makes a taught entry's later copy a dupDrop, never an applyInbound). Returns
+// (p, ta) → [{origin, seq, rows}] (rows: the journal t of every apply row for that entry at this node). Built once per
+// fold and only on the first acquire, so a capture without hand-offs pays nothing. A row compacted or shed again
+// before capture end is absent from the book — rendered unknown, never invented, like every other absent record.
+// stateAt folds these entries' cells; topologyAt raises their lanes' watermarks; routes() names the same last
+// acquire for an `acquired` stop — one rule for every plane.
+//! a row acquired MORE THAN ONCE (a heal re-latches a holder that fell behind — kernel/scope.ts held-found-lagging):
+// an entry with no row of its own after the first acquire may have come in at that one or at a later one; the book
+// cannot say which (the acquire row carries only the count the teacher shipped). Folding it at the first claimed
+// the later hand-offs' records early, so the replay ran AHEAD of the kernel with nothing on the page to say so (the
+// wave 5f review: up to 10 records ahead for dozens of rows). Each such entry is folded at the row's LAST acquire, and
+// an earlier acquire of the row folds nothing: the replay may trail the kernel between the two hand-offs, never lead.
+const handoffs = (node, K) => {
+  const lane = laneOf(node)
+  const rowsAt = new Map() // 'origin#seq' → the journal t of every apply row for it at this node
+  const row = (k, at) => { if (!rowsAt.has(k)) rowsAt.set(k, []); rowsAt.get(k).push(at) }
+  const lastAt = new Map() // partition → the journal t of its last acquire at this node
+  for (const e of node.journal)
+    if (e.kind === K.writeLocal) row(lane + '#' + e.a, e.t)
+    else if (e.kind === K.applyInbound) row(e.a + '#' + e.b, e.t)
+    else if (e.kind === K.acquire) lastAt.set(String(e.a), e.t)
+  const byPart = new Map()
+  for (const [origin, entries] of Object.entries(node.logs || {}))
+    for (const x of entries) {
+      const q = partOf(x)
+      if (!byPart.has(q)) byPart.set(q, [])
+      byPart.get(q).push({ origin, seq: x.seq, rows: rowsAt.get(origin + '#' + x.seq) || [] })
+    }
+  return (p, ta) => lastAt.get(p) !== ta ? [] : (byPart.get(p) || []).filter((x) => !x.rows.some((r) => r > ta))
 }
 
 //! stateAt — TIME TRAVEL: replay a node's journal to event-index t (its per-node counter) through the LWW
@@ -152,35 +213,14 @@ export const stateAt = (capture, uuid, t) => {
   }
   //! hand-offs (scoped replication, kernel/scope.ts). shed(a=p): the row lawfully leaves this node — its cells AND
   // their versions go, outside the election (#shed + dropCell). acquire(a=p): the one-teacher fold puts the
-  // teacher's entries for p into this node's book and state with NO per-write row. The ones it taught are the
-  // captured entries of p that do not arrive by their own row later on: an entry with an apply row after the
-  // acquire came in live (the kernel's covered-below-the-cut rule makes a taught entry's later copy a dupDrop,
-  // never an applyInbound). Re-folding one already held is a no-op (the election). Built on first need only,
-  // so a capture without hand-offs pays nothing. A row compacted or shed again before capture end is absent
-  // from the book — rendered unknown, never invented, like every other absent record.
-  let byPart = null
-  const taught = (p, ta) => {
-    if (!byPart) {
-      const rowsAt = new Map() // 'origin#seq' → the journal t of every apply row for it at this node
-      const row = (k, at) => { if (!rowsAt.has(k)) rowsAt.set(k, []); rowsAt.get(k).push(at) }
-      for (const e of node.journal)
-        if (e.kind === K.writeLocal) row(lane + '#' + e.a, e.t)
-        else if (e.kind === K.applyInbound) row(e.a + '#' + e.b, e.t)
-      byPart = new Map()
-      for (const [origin, entries] of Object.entries(node.logs || {}))
-        for (const x of entries) {
-          const q = partOf(x)
-          if (!byPart.has(q)) byPart.set(q, [])
-          byPart.get(q).push({ origin, seq: x.seq, rows: rowsAt.get(origin + '#' + x.seq) || [] })
-        }
-    }
-    for (const x of byPart.get(p) || []) if (!x.rows.some((r) => r > ta)) applyOne(x.origin, x.seq)
-  }
+  // teacher's entries for p into this node's book and state with NO per-write row — handoffs() names them.
+  // Re-folding one already held is a no-op (the election).
+  let taught = null
   for (const e of node.journal) {
     if (e.t > t) break
     if (e.kind === K.writeLocal) applyOne(lane, e.a)
     else if (e.kind === K.applyInbound) applyOne(e.a, e.b)
-    else if (e.kind === K.acquire) taught(String(e.a), e.t)
+    else if (e.kind === K.acquire) { if (!taught) taught = handoffs(node, K); for (const x of taught(String(e.a), e.t)) applyOne(x.origin, x.seq) }
     else if (e.kind === K.shed) {
       const p = String(e.a)
       for (const [k, v] of versions) if (v.p === p) { versions.delete(k); state.delete(k) }
@@ -233,7 +273,8 @@ export const verifyReplay = (capture) => {
 //   streams  writeLocal(a=seq) advances the OWN lane's applied+shippable together (node.ts commit: the stamp
 //            site) · applyInbound(a=origin, b=seq) advances both by max (write.ts: the fast path sets them to
 //            seq, a splice fills BELOW the fence and never lowers them) · gateDrop(a=origin) names a lane
-//            without advancing it (streams.for runs before the gate).
+//            without advancing it (streams.for runs before the gate) · acquire(a=partition) merges each lane
+//            up to the hand-off's cut (scope.ts onAcqDone), read off the entries it folded (handoffs()).
 // NOT derivable — carried as null, never guessed: `queued` while paused (ship() parks frames silently),
 // `durable` once anything was ever persisted (persist/persisted carry batch ids, never origins; a node with
 // no persisted/replayed row anywhere in its journal provably never reached disk, so its durable IS 0), and
@@ -247,7 +288,14 @@ export const verifyReplay = (capture) => {
 // elect such a link for the one round-trip before the echo; (2) armed (replicas) and durable nodes mint
 // EMPTY lanes with no journal row (boot floors, the replay entry, a staged record) — lane PRESENCE at an
 // intermediate step is a lower bound there; (3) `synced` flips at the END of the digestIn step, after any
-// aeShip row the same step emits — one row early at row granularity.
+// aeShip row the same step emits — one row early at row granularity; (4) the hand-off's cut is not journaled:
+// the replay raises each lane to the highest seq the acquire folded (armed nodes never compact, so the book keeps
+// them). The teacher's cut can sit above that seq (its floor for the row covers seqs past the row's last record —
+// the common case, the lane trails), or below it when its floor waits on a gap (the lane leads; no chaos seed has
+// shown it), and a row shed again before capture end has left the book — the jump is then too low or too high until
+// the lane's next row (the ∞ guard refuses a node whose END tables it misses); when the same row is acquired twice,
+// an entry with no row of its own is folded at the LAST acquire of that row (handoffs()), so between the two the
+// lane may trail the kernel, never lead it (a per-step chaos oracle, 30 seeds: 0 steps ahead).
 export const topologyAt = (capture, uuid, t) => {
   const node = capture.nodes.find((n) => n.uuid === uuid)
   const K = capture.vocab
@@ -264,6 +312,8 @@ export const topologyAt = (capture, uuid, t) => {
   }
   const advance = (origin, seq) => { const d = lane(origin); if (seq > d.a) d.a = seq; if (seq > d.s) d.s = seq; d.n++ }
   const electPrimary = () => { primary = null; for (const l of links.values()) if (l.admitted && !l.closing) { primary = l.id; break } }
+  let taught = null // handoffs(), built on the first acquire row
+  const counted = new Set() // 'origin#seq' an acquire already counted as folded
   for (const e of node.journal) {
     if (e.t > t) break
     const k = e.kind
@@ -295,6 +345,20 @@ export const topologyAt = (capture, uuid, t) => {
       if (l) l.diag = true
     } else if (k === K.writeLocal) advance(uuid, e.a)
     else if (k === K.applyInbound) advance(e.a, e.b)
+    else if (k === K.acquire) {
+      //! the hand-off's watermark jump (kernel/scope.ts onAcqDone): each lane's applied and shippable merge up to the
+      // teacher's cut, with no row per record. The cut is not journaled; the entries it folded are (handoffs(), the
+      // rule stateAt folds by), and the highest of them per lane stands for the cut (KNOWN BOUND 4)
+      if (!taught) taught = handoffs(node, K)
+      for (const x of taught(String(e.a), e.t)) {
+        const d = lane(x.origin)
+        if (x.seq > d.a) d.a = x.seq
+        if (x.seq > d.s) d.s = x.seq
+        //! folded: an entry with no apply row before this acquire came in this hand-off (counted once, at the first)
+        const id = x.origin + '#' + x.seq
+        if (!counted.has(id) && !x.rows.some((r) => r < e.t)) { counted.add(id); d.n++ }
+      }
+    }
     else if (k === K.gateDrop) lane(e.a)
     else if (k === K.walTaint || k === K.resync) streams.clear() // condemn() / a spoke's resync: every lane is wiped with the fold; AE re-teaches (links untouched)
   }
@@ -351,6 +415,8 @@ export const verifyTopology = (capture) => {
 // it that way: closed status `acquired`, at the last such acquire row, with the teacher. Both facts or none.
 // The writer not in the capture (a live attach that could not reach it): the route's partition comes from a captured
 // log entry, its view from the resource's newest committed view, its holders from the rest of the resource.
+// feeder-unknown: a client of a scoped resource whose feeder the page cannot see (no primary at capture end, or not
+// captured) — whether it was meant to get the write is unknown, so its stop is not judged, as agreement() leaves it out.
 export const routes = (capture) => {
   const K = capture.vocab
   const map = new Map() // 'origin#seq' → { origin, seq, partition, nodes: {uuid: {status, t}} }
@@ -440,17 +506,26 @@ export const routes = (capture) => {
   }
   //! with the writer not captured, the holders of a row come from the rest of its resource: the ring's answer any
   // node on the newest view carries for that row (`holders`, a writer's own rows), else the members of that view
-  // whose `held` names it (a holder still copying the row in is not in `held`, so it reads as not a holder there).
-  // null — the old rule — when the resource carries no scoped fact, or no captured member holds the row.
+  // whose `held` names it, or that are still copying it in on that view (copying(): a latch since the last install — the
+  // ring gives them the row, and agreement() judges them on it too). null — the old rule — when the resource carries no scoped
+  // fact, or no captured member holds the row.
   const byGroup = new Map()
   for (const n of capture.nodes) { const g = groupOf(n); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(n) }
   const newest = new Map([...byGroup].map(([g, ns]) => [g, newestView(ns)]))
+  const scopedG = new Map([...byGroup].map(([g, ns]) => [g, ns.some((n) => Array.isArray(n.held))]))
+  const copies = new Map() // uuid → copying(node), built on first need
+  const copyingOf = (n) => { if (!copies.has(n.uuid)) copies.set(n.uuid, copying(n, K)); return copies.get(n.uuid) }
   const holdersFromGroup = (g, p) => {
     const { top, node: tv } = newest.get(g)
     const ns = byGroup.get(g)
     for (const n of ns) if (n.holders && n.view && n.view.epoch === top && n.holders[p]) return n.holders[p]
-    if (!tv || !ns.some((n) => Array.isArray(n.held))) return null
-    const hs = tv.view.members.filter((u) => { const n = byUuid.get(u); return !!n && Array.isArray(n.held) && n.held.includes(p) })
+    if (!tv || !scopedG.get(g)) return null
+    //! the client and newest-view checks are defensive (no capture under test needs them): a client never latches,
+    // and a member off the newest view latched against an older ring that may no longer give it the row
+    const hs = tv.view.members.filter((u) => {
+      const n = byUuid.get(u)
+      return !!n && n.client !== true && ((Array.isArray(n.held) && n.held.includes(p)) || (!!n.view && n.view.epoch === top && copyingOf(n).has(p)))
+    })
     return hs.length ? hs : null
   }
   for (const r of map.values()) {
@@ -474,12 +549,16 @@ export const routes = (capture) => {
       if (!r.nodes[node.uuid] && groupOf(node) === g) {
         const got = part != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(part) : null
         if (got && holds(node, r.origin, r.seq)) { r.nodes[node.uuid] = { status: 'acquired', t: got.t, from: got.from }; continue }
+        //! a client of a scoped resource with no feeder to judge it by (no primary at capture end, or a live attach that
+        // could not reach the feeder) is not judged: agreement() does not compare it either, so the header and the stops
+        // tell one story. An older capture (no `held` anywhere) keeps the old rule
+        if (node.client === true && scopedG.get(g) && !feederHeld(node, byUuid)) { r.nodes[node.uuid] = { status: 'feeder-unknown', t: null }; continue }
         let quiet = false
         if (members && node.client === true) {
           //! a client folds what its feeder holds (DESIGN-SCALE stage 2): meant to get a write only when its feeder holds
-          // the write's row at capture end. No feeder fact (an older capture, no primary, the feeder not captured) → the old rule
-          const f = node.feeder != null ? byUuid.get(node.feeder) : null
-          quiet = !!(f && Array.isArray(f.held)) && !f.held.includes(part)
+          // the write's row at capture end. No feeder fact on an older capture → the old rule
+          const f = feederHeld(node, byUuid)
+          quiet = !!f && !f.held.includes(part)
         } else if (members && members.includes(node.uuid)) quiet = !holders.includes(node.uuid)
         else if (members) {
           //! a node outside the view is judged only for rows it held while a member, and only for writes stamped
@@ -505,14 +584,17 @@ export const routes = (capture) => {
 //            differ by design. Each ROW is compared among the nodes that hold it (the scopedConverged monitor's rule):
 //            the members whose `held` names it, and every client whose feeder holds it (a client folds its feeder's
 //            rows). The row's fingerprint at a node is its cells there, values only; a missing cell disagrees. A node
-//            is off when it sits outside a row's strict-majority side (or the row splits evenly). A row being copied
-//            in (acquiring) or frozen on its way out (orphan) has no claim on the node; a client with no feeder fact
-//            is not judged per row.
+//            is off when it sits outside a row's strict-majority side (or the row splits evenly). A row frozen on its
+//            way out (orphan) has no claim on the node; a row the ring gives a member — a writer's `holders` fact, or
+//            its own latch since the last install (copying()) — is judged there even before the copy lands, so a
+//            holder still copying in an old value lags, and so does one whose copy aborted with the ring unchanged. A client
+//            with no feeder to judge it by is not judged per row (`unjudged`).
 // `rows` (scoped only): partition → the nodes judged for it; `judged` (unscoped only): the nodes compared. The page
 // compares a cell among exactly these, and routes() judges a node left out by its tenure, so the header, the pills,
 // the cells and the writes tell one story about a member that left.
 export const agreement = (capture) => {
   if (!capture.nodes.length) return { converged: null, groups: [], off: [] }
+  const K = capture.vocab
   const byName = new Map()
   for (const n of capture.nodes) { const g = groupOf(n); if (!byName.has(g)) byName.set(g, []); byName.get(g).push(n) }
   const groups = []
@@ -558,11 +640,22 @@ export const agreement = (capture) => {
         if (n.holders && n.view && n.view.epoch === top)
           for (const [p, hs] of Object.entries(n.holders))
             for (const u of hs) { const h = byUuid.get(u); if (h && h.client !== true && judged(h) && !(rows.get(p) || []).includes(u)) join(p, u) }
+      //! and a member still copying a row in on the newest view (copying(): its latch since the last install) — the ring gives it the row,
+      // so it is judged there as lagging even when no captured writer's `holders` names it (the writer not reached).
+      // The newest-view check is defensive: a member off that view latched against an older ring
       for (const n of ns)
-        if (n.client === true && n.feeder != null) {
-          const f = byUuid.get(n.feeder)
-          if (f && Array.isArray(f.held)) for (const p of f.held) join(p, n.uuid)
-        }
+        if (n.client !== true && judged(n) && n.view && n.view.epoch === top)
+          for (const p of copying(n, K)) if (!(rows.get(p) || []).includes(n.uuid)) join(p, n.uuid)
+      const unjudged = []
+      for (const n of ns) {
+        if (n.client !== true) continue
+        const f = feederHeld(n, byUuid)
+        if (f) for (const p of f.held) join(p, n.uuid)
+        else unjudged.push(n.uuid)
+      }
+      //! a client with no feeder to judge it by (no primary, or the feeder not captured) is compared on no row; the page
+      // names it so the header's converged never reads as a verdict on it (routes() gives its stops `feeder-unknown`)
+      out.unjudged = unjudged
       const bad = []
       for (const [p, us] of rows) {
         if (us.length < 2) continue
