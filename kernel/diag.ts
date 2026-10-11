@@ -26,8 +26,11 @@ import type { Node } from './node.ts'
 // (the review killed the monolithic whole-node pull: one oversized frame = FrameError = link drop = a
 // deterministic re-dial loop on exactly the busy nodes a debugger attaches to).
 export const DIAG_MAX = 4096
+//! SEQS_MAX: seqs per q:'seqs' page — a bare number list (a few bytes each), so a page holds 16× a logs page
+export const SEQS_MAX = DIAG_MAX * 16
 //! DIAG_P: the DIAG payload protocol version — reported in meta/ACCEPT; version skew degrades typed ('bad-op'), never fatally.
-export const DIAG_P = 1
+// 2 (wave 5e): q:'seqs'; a bridge asks it only of a node at 2+.
+export const DIAG_P = 2
 
 //! ctEq (the constant-time token compare) lives in kernel/door.ts now: the door's proof check and this
 // token check are the same comparison, so there is one copy.
@@ -166,7 +169,7 @@ export const diagNode = (node: Node) => ({
 //
 // EMISSION POLICY (deliberate asymmetry — do not "fix" it into spam): diagPull is emitted for the
 // data-bearing reads (node/logs/state) AFTER the reply builds (a pull never contains its own row).
-// q:'journal' and q:'meta' emit NOTHING: journaling reads-of-the-journal at follow cadence evicts the
+// q:'journal', q:'meta' and q:'seqs' emit NOTHING: journaling reads asked at follow cadence evicts the
 // very history being followed (a 1 Hz live-dash would eat a 4096-cap ring in minutes). The audit anchor
 // for a session is diagAuth + linkDown.
 export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): void => {
@@ -223,6 +226,27 @@ export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): voi
       reply(node, link, body)
       j.armed && j.emit(JK.diagPull, link.id, 'logs', ev.length)
       return
+    }
+    case 'seqs': {
+      //! seqs (wave 5e): one origin's record book as a bare seq list, ascending — what the bridge needs to keep its
+      // log cache exact. A record (origin, seq) never changes, but the SET does: compaction drops losers below the
+      // frontier, a shed drops a row, a splice or an acquire inserts BELOW the tail, a condemn or a resync wipes. So
+      // the bridge asks which seqs are there now and pulls only the ones it lacks. Cursor f EXCLUSIVE (the logs
+      // convention), paged by SEQS_MAX via next. Not journaled: it is asked at follow cadence (the policy above).
+      const o = typeof v.o === 'string' ? v.o : null
+      if (!o) return reply(node, link, { ...base, ok: 0, e: 'bad-args' })
+      const f = typeof v.f === 'number' && v.f >= 0 ? Math.floor(v.f) : 0
+      const entries = node.logs.get(o) ?? []
+      const s: number[] = []
+      for (const e of entries) {
+        if (e.seq <= f) continue
+        s.push(e.seq)
+        if (s.length >= SEQS_MAX) break
+      }
+      const tail = entries.length ? entries[entries.length - 1].seq : 0
+      const body: Record<string, unknown> = { ...base, ok: 1, o, tail, s }
+      if (s.length && s[s.length - 1] < tail) body.next = s[s.length - 1]
+      return reply(node, link, body)
     }
     case 'state': {
       //! SINGLE frame, never chunked: append-only sources chunk torn-proof, a MUTABLE map must not tear

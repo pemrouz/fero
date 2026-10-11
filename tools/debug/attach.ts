@@ -131,17 +131,20 @@ export class DiagClient {
 //   journal — rows are immutable per t: keep rows [dropped, cursor) and ask from the cursor (INCLUSIVE f), where
 //             cursor = the last snapshot's head. A ring wrap past the cursor (the answer's f0 > cursor) is a hole:
 //             the cache is dropped and the slice starts at f0, its `dropped` raised to say so — never a splice.
+//   logs    — a record (origin, seq) is immutable too, but the SET changes (compaction, shed, splice, acquire,
+//             condemn, resync): ask q:'seqs' for the seqs there NOW, pull only the missing ones (q:'logs' from just
+//             below the lowest), and keep exactly the listed seqs — nothing below the node's base survives a rebuild.
 type JRow = { t: number; kind: number; a?: unknown; b?: unknown; c?: unknown }
 type LogEntry = { k: unknown; at: unknown; ty: number; v: unknown; seq: number; epoch: number; iss?: string; cid?: number }
-type Cache = { u: string; i: number; rows: JRow[]; cursor: number }
+type Cache = { u: string; i: number; rows: JRow[]; cursor: number; logs: Map<string, Map<number, LogEntry>> }
 const caches = new WeakMap<object, Cache>()
 //! the client surface pullNode needs — a DiagClient, or any object answering the same questions (the suites drive a
 // kernel Node through onDiagQ directly to make restarts, ring wraps and hand-offs happen on cue)
 export type Puller = { target: string; peer: { u: string; i: number } | null; q: (body: Record<string, unknown>, deadlineMs: number) => Promise<Record<string, unknown>> }
 
 //! pullNode — one truthful node slice via the chunked ops: meta (vocab) → node (the fold) → state (single
-// frame) → journal delta (INCLUSIVE f from the cache's cursor) → per-origin logs
-// loops (EXCLUSIVE f — the digest/AE convention). The blob it assembles is captureNode's EXACT
+// frame) → journal delta (INCLUSIVE f from the cache's cursor) → per-origin seqs
+// + the missing log entries (EXCLUSIVE f — the digest/AE convention). The blob it assembles is captureNode's EXACT
 // shape — the parity pins in attach.test.ts hold them deepEqual — with encodeVal applied bridge-side (the wire
 // carries values raw; JSON safety is the capture's concern).
 export const pullNode = async (c: Puller, budgetMs = PULL_BUDGET_MS): Promise<AttachAnswer> => {
@@ -152,7 +155,7 @@ export const pullNode = async (c: Puller, budgetMs = PULL_BUDGET_MS): Promise<At
   const peer = c.peer ?? { u: meta.u as string, i: meta.i as number }
   let cache = caches.get(c)
   if (!cache || cache.u !== peer.u || cache.i !== peer.i) {
-    cache = { u: peer.u, i: peer.i, rows: [], cursor: 0 }
+    cache = { u: peer.u, i: peer.i, rows: [], cursor: 0, logs: new Map() }
     caches.set(c, cache)
   }
   const nq = await c.q({ q: 'node' }, left())
@@ -188,10 +191,39 @@ export const pullNode = async (c: Puller, budgetMs = PULL_BUDGET_MS): Promise<At
   rows = rows.filter((r) => r.t >= start)
   cache.rows = rows
   cache.cursor = w.jn
-  //! logs: EXCLUSIVE cursor per origin — resume from `next` (the last served seq), never re-request it
+  //! logs: the seqs there now, then only the missing entries — EXCLUSIVE cursor, resumed from `next` (the last served seq)
   const logs: Record<string, unknown[]> = {}
+  for (const o of [...cache.logs.keys()]) if (!(o in w.origins)) cache.logs.delete(o)
   for (const o of Object.keys(w.origins)) {
-    logs[o] = await pullLogs(c, o, left)
+    if (!((meta.p as number) >= 2)) { logs[o] = await pullLogs(c, o, left); continue } // an older node has no q:'seqs': the whole book, uncached
+    const have = cache.logs.get(o) ?? new Map<number, LogEntry>()
+    const seqs: number[] = []
+    for (let f = 0; ; ) {
+      const page = await c.q({ q: 'seqs', o, f }, left())
+      for (const s of page.s as number[]) seqs.push(s)
+      if (page.next === undefined) break
+      f = page.next as number
+    }
+    const missing = seqs.filter((s) => !have.has(s))
+    if (missing.length) {
+      const want = new Set(missing)
+      for (let f = missing[0] - 1; ; ) {
+        const page = await c.q({ q: 'logs', o, f }, left())
+        for (const e of page.ev as { s: number; e: number; ty: number; k: unknown; at: unknown; v: unknown; iss?: string; cid?: number }[]) {
+          //! a seq listed now, or a new tail landed after the list (the old whole pull took it too)
+          if (!want.has(e.s) && e.s <= seqs[seqs.length - 1]) continue
+          if (!want.has(e.s)) seqs.push(e.s)
+          have.set(e.s, { k: e.k, at: e.at, ty: e.ty, v: encodeVal(e.v), seq: e.s, epoch: e.e, iss: e.iss, cid: e.cid })
+        }
+        if (page.next === undefined) break
+        f = page.next as number
+      }
+    }
+    const keep = new Map<number, LogEntry>()
+    const entries: LogEntry[] = []
+    for (const s of seqs) { const e = have.get(s); if (e) { keep.set(s, e); entries.push(e) } }
+    cache.logs.set(o, keep)
+    logs[o] = entries
   }
   return {
     target: c.target,
@@ -212,7 +244,7 @@ export const pullNode = async (c: Puller, budgetMs = PULL_BUDGET_MS): Promise<At
   }
 }
 
-//! pullLogs — one origin's whole record book (EXCLUSIVE cursor, resumed from `next`)
+//! pullLogs — one origin's whole record book (EXCLUSIVE cursor, resumed from `next`): the pre-5e pull, kept for an older node
 const pullLogs = async (c: Puller, o: string, left: () => number): Promise<LogEntry[]> => {
   const entries: LogEntry[] = []
   for (let f = 0; ; ) {

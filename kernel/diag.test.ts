@@ -258,6 +258,25 @@ test('meta + node + state: self-describing vocab, the shared fold, atomic state 
     assert.deepEqual([(f.value as { u: string }).u, (f.value as { i: number }).i], ['aa', 1])
 })
 
+test('seqs (DIAG_P 2): one origin\'s seq list, exclusive f, paged by next, typed bad-args — and never journaled (wave 5e)', () => {
+  const h = diagged()
+  h.open(9); h.attach(9)
+  for (let i = 0; i < 5; i++) h.node.step({ kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] })
+  assert.ok(DIAG_P >= 2, 'the version says the op exists')
+  const before = h.jk(JK.diagPull).length
+  h.q(9, { id: 2, q: 'seqs', o: 'aa', f: 0 })
+  let a = h.lastA(9)
+  assert.deepEqual([a.ok, a.tail, a.s, a.next], [1, 5, [1, 2, 3, 4, 5], undefined], 'every seq in the book, ascending')
+  h.q(9, { id: 3, q: 'seqs', o: 'aa', f: 3 })
+  assert.deepEqual(h.lastA(9).s, [4, 5], 'f is exclusive, like the logs cursor')
+  h.q(9, { id: 4, q: 'seqs', o: 'nobody', f: 0 })
+  a = h.lastA(9)
+  assert.deepEqual([a.ok, a.tail, a.s], [1, 0, []], 'an origin it never saw: an empty book')
+  h.q(9, { id: 5, q: 'seqs' })
+  assert.equal(h.lastA(9).e, 'bad-args')
+  assert.equal(h.jk(JK.diagPull).length, before, 'asked at follow cadence, so never journaled')
+})
+
 test('parity by construction: captureNode is diagNode + the chunked planes (deepEqual, kinds ≥ 68 filtered)', () => {
   const h = diagged()
   h.admit(3, 'bb')

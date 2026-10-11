@@ -332,3 +332,42 @@ test('journal deltas are safe across a restart (a new life starts the cursor at 
   sameAsLocal(b2, small[0], 'after the wrap', true)
 })
 
+test('the log cache: an unchanged book asks no log entries, a new write asks only the tail, and compaction and hand-offs leave nothing stale (wave 5e)', async () => {
+  //! compaction: compactAt 8 — losers below the frontier leave the book between two pulls
+  const sim = new Sim(4)
+  const nodes = cluster(sim, 2, { heartbeatMs: 50, tune: { compactAt: 8 } })
+  sim.run({ until: 1000 })
+  for (let i = 0; i < 6; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['k' + (i % 3)], value: i }] }, i * 5)
+  sim.run({ until: 1500 })
+  const p = kernelPuller(() => nodes[0])
+  sameAsLocal(await pullNode(p), nodes[0], 'first pull')
+  let mark = p.asked.length
+  sameAsLocal(await pullNode(p), nodes[0], 'an unchanged pull')
+  assert.equal(logAsks(p, mark).length, 0, 'nothing changed: no log entry is asked for')
+  assert.ok(p.asked.slice(mark).some((b) => b.q === 'seqs'), 'only which seqs are there')
+  //! one write (stamped by its key's owner, either lane): exactly the lane whose tail moved is asked, from just below the new entry
+  const tails = () => new Map([...nodes[0].logs].map(([o, e]) => [o, e.length ? e[e.length - 1].seq : 0]))
+  const t0 = tails()
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['k0'], value: 'new' }] })
+  sim.run({ until: 1510 })
+  const moved = [...tails()].filter(([o, t]) => t !== t0.get(o))
+  assert.equal(moved.length, 1, 'one lane took the write — the fixture is what it claims')
+  mark = p.asked.length
+  sameAsLocal(await pullNode(p), nodes[0], 'after one write')
+  assert.deepEqual(logAsks(p, mark).map((b) => [b.o, b.f]), [[moved[0][0], moved[0][1] - 1]], 'one log question, for the new entry alone')
+  for (let i = 0; i < 30; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['k' + (i % 3)], value: i }] }, i * 5)
+  sim.run({ until: 3000 })
+  assert.ok(nodes[0].journal.read().some((e) => e.kind === JK.compacted), 'the book compacted between the pulls — the fixture is what it claims')
+  sameAsLocal(await pullNode(p), nodes[0], 'after compaction')
+  //! hand-offs: a scoped cluster pulled before a join; the join sheds rows from some members and copies rows into others
+  const s2 = new Sim(11)
+  const four = cluster(s2, 4, { heartbeatMs: 50, replicas: 2 })
+  writes(s2, four, 6, 100); s2.run({ until: 1500 }); writes(s2, four, 8, 200); s2.run({ until: 4000 })
+  const pullers = four.map((n) => kernelPuller(() => n))
+  for (const [i, pl] of pullers.entries()) sameAsLocal(await pullNode(pl), four[i], `${four[i].uuid} before the join`)
+  s2.add({ uuid: 'n05', listen: 'sim:n05', hosts: four.map((n) => n.listen), heartbeatMs: 50, replicas: 2, redialMs: 20, journalCap: 1 << 16 })
+  s2.post('n05', { kind: 'start' }); s2.run({ until: 12000 })
+  assert.ok(four.some((n) => n.journal.read().some((e) => e.kind === JK.shed)) && four.some((n) => n.journal.read().some((e) => e.kind === JK.acquire)), 'the join shed and acquired rows — the fixture is what it claims')
+  for (const [i, pl] of pullers.entries()) sameAsLocal(await pullNode(pl), four[i], `${four[i].uuid} after the join`)
+})
+
