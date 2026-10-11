@@ -450,6 +450,9 @@ export const mark = (p: any): number => {
 //! A view made through ctx.data (a handler view, below) is never disposed here: the handler may have kept
 // it, so only the collector's word releases it. disposeMinted is for a view minted some other way (a
 // handler that closed over the resource and called f.data.filter(…)) — the eager release it had before.
+// Two guards do this on purpose, each backing the other up: methods.ts skips disposeMinted for a wrapper
+// (`handlerView`, in Host.#release), and the walk below skips a node the collector tracks (`live.has`).
+// Dropping either alone stays green; dropping both turns the proxy-return cousin test in api/views.test.ts red.
 export const disposeMinted = (view: any, mark: number): boolean => {
   const n = unwrap(view)?.[NODE]
   if (!(n instanceof DataNode)) return false
