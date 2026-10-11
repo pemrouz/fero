@@ -683,10 +683,8 @@ test('an unscoped member that left tells one story on every pane: converged head
 test('a live attach that could not reach the writer still tells one story: converged header, no ⊘ for a member that left or a non-holder (wave 5e review)', async () => {
   //! the review's two captures, as the attach bridge builds them when one target times out: the header said converged ✓
   // above amber ⊘ stops, because with no writer the stops fell back to the old never-arrived rule
-  const drop = (cap: { nodes: { uuid: string }[] }, u: string) =>
-    ({ ...cap, kind: 'live', seed: null, nodes: cap.nodes.filter((n) => n.uuid !== u), absent: [{ target: '127.0.0.1:9001', reason: 'timeout' }] })
   const { healed, owner } = scopedCut()
-  for (const [name, cap] of [['leaverNoWriter', drop(unscopedLeaver().cap, 'n01')], ['scopedNoWriter', drop(healed, owner)]] as const) {
+  for (const [name, cap] of [['leaverNoWriter', attachMissing(unscopedLeaver().cap, 'n01')], ['scopedNoWriter', attachMissing(healed, owner)]] as const) {
     const { el, g } = await bootViewer(name, cap)
     assert.match(el('statusRight').innerHTML, /data-tip="converged">converged ✓</, `${name}: converged`)
     assert.match(el('statusRight').innerHTML, /absent/, `${name}: the missing target is named`)
