@@ -22,10 +22,20 @@ const pair = async (methods: Record<string, unknown> = {}, extra: Record<string,
   const pa = await ports.free()
   const pb = await ports.free()
   const hosted = Object.keys(methods).length ? { methods } : {}
-  const a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, ...hosted, ...extra } as never)
-  const b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, ...hosted, ...extra } as never)
-  assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
-  return { a, b, addrs: [`127.0.0.1:${pa}`, `127.0.0.1:${pb}`] }
+  let a: any
+  let b: any
+  try {
+    a = await fero('r', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, ...hosted, ...extra } as never)
+    b = await fero('r', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 }, ...hosted, ...extra } as never)
+    assert.ok(await until(() => (snapshot(a.cluster) as { epoch: number }).epoch >= 1, 8000), 'view formed')
+    return { a, b, addrs: [`127.0.0.1:${pa}`, `127.0.0.1:${pb}`] }
+  } catch (e) {
+    //! a setup that throws must not leave a server listening: every test here calls pair() before its own
+    // try, so a leaked server kept the file from ever exiting and the battery hung (2026-10-11, about 7 hours)
+    await b?.destroy().catch(() => {})
+    await a?.destroy().catch(() => {})
+    throw e
+  }
 }
 
 test('one-shot CALL: values round-trip, a returned proxy snapshots, unknown methods and thrown handlers reject typed', async () => {
