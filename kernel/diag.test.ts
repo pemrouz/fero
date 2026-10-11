@@ -295,6 +295,19 @@ test('an armed node serves replicas + its own-lane holder sets (the ring\'s answ
   assert.equal(wire.replicas, 2)
   assert.deepEqual(wire.holders, { p1: ['aa', 'cc'], p2: ['aa', 'bb'] }, 'one entry per own-lane partition, the ring\'s list')
   assert.deepEqual(captureNode(h.node).holders, wire.holders, 'the capture carries the same fact')
+  //! held (wave 5e): the partitions its scope machine holds — the debugger's per-row participants
+  assert.deepEqual(wire.held, ['p1', 'p2'], 'both rows it holds, sorted')
+  assert.deepEqual(captureNode(h.node).held, wire.held)
+  assert.equal('held' in diagNode(plain.node), false, 'unscoped: no held claim')
+  assert.equal('feeder' in wire, false, 'a member names no feeder')
+})
+
+test('a client serves its feeder: the uuid on its primary link, null before it has one (wave 5e)', () => {
+  const c = diagged({ client: true, hosts: ['sim:bb'] })
+  assert.equal(diagNode(c.node).feeder, null, 'no primary yet')
+  c.admit(1, 'bb')
+  assert.equal(diagNode(c.node).feeder, 'bb', 'the primary\'s uuid')
+  assert.equal(captureNode(c.node).feeder, 'bb', 'the capture carries the same fact')
 })
 
 test('structural non-membership: a live session sees ZERO replication bytes while members converge', () => {
