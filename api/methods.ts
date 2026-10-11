@@ -39,7 +39,7 @@ import { VERB, copyOf } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
-import { ARG, lostAssignment, type Coords, type Refused } from './data.ts'
+import { ARG, RESULT, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 import { FULL } from '../kernel/codec.ts'
 
@@ -62,6 +62,13 @@ const settle = async (tracked: Promise<Coords>[]): Promise<void> => {
     if (lost !== null)
       throw new Error(OUTCOMES.has(lost.outcome) ? `write ${lost.outcome} (${lost.key})` : `write refused (${lost.key}): ${lost.outcome}`)
   }
+}
+
+//! answer — a server-local call's result as a client's call decodes it (V4-52): copyOf with RESULT's limits, so
+// what a reply could not carry (a bigint, a getter that throws, a value too deep or too big for one frame) is
+// refused here too, with the remote reply's words
+const answer = (m: string, v: unknown): unknown => {
+  try { return copyOf(v, RESULT) } catch (e) { throw new Error(`methods.${m}: the result could not be sent: ${(e as Error).message}`) }
 }
 
 //! SYSTEM — the reserved method-name prefix (unreachable from fero() opts: the composer rejects it):
@@ -336,26 +343,32 @@ export class Host {
   //! invokeLocal — a SERVER-side one-shot call (no wire): the SAME flush-on-return + non-blind-await +
   // proxy-collapse discipline as a remote CALL (M5-review #5: the old server-local path used a no-op
   // flush and no ALS, so a handler's writes were NOT awaited before the value returned — local and wire
-  // invocation of the same handler gave opposite durability). A returned ViewProxy is CLONED to its
-  // snapshot (M5-review #10: returning the live proxy value handed the caller a mutable alias of
-  // committed kernel state; the wire path serializes to a fresh copy, so local must clone to match).
+  // invocation of the same handler gave opposite durability). A returned ViewProxy collapses to a copy of
+  // its snapshot (M5-review #10: returning the live proxy value handed the caller a mutable alias of
+  // committed kernel state; the wire path serializes to a fresh copy, so local must copy to match).
+  //! Both ends are what the wire makes of them (V4-52): the handler gets fero's own copy of the argument, refused
+  // as a client's call refuses it, and the caller gets copyOf of the result — a plain value too, which it used
+  // to get by reference — with RESULT's limits. structuredClone kept a Date a client gets as {}, kept a lone
+  // surrogate UTF-8 turns into U+FFFD, and threw a DataCloneError on a view of Proxies the wire carries as plain
+  // objects; a handler changed the caller's own object.
   async invokeLocal(m: string, a: unknown): Promise<unknown> {
     const fn = this.#methods[m]
     if (!fn) throw new Error(`unknown method '${m}'`)
+    let arg: unknown
+    try { arg = copyOf(a, ARG) } catch (e) { throw new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`) }
     const tracked: Promise<Coords>[] = []
     const minted = mark(this.#data)
     //! peer is this node: a local call's caller IS the server (the Context doc above)
     const ctx: Context = { data: this.#data, flush: () => settle(tracked.splice(0)), peer: this.#rt.node.uuid }
-    let result: unknown = this.#als.run(tracked, () => fn(a, ctx))
+    let result: unknown = this.#als.run(tracked, () => fn(arg, ctx))
     if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
       result = await result
     await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
-    if (!isProxy(result)) return result // a plain value keeps the views it minted (#invoke's note)
+    if (!isProxy(result)) return answer(m, result) // a plain value keeps the views it minted (#invoke's note)
     //! a view data has stopped answers a frozen picture: refused, as for a remote call
     if (stopped(result)) { if (disposeMinted(result, minted)) reapStopped(); throw new Error(`methods.${m}: ${STOPPED_CALL}`) }
-    const value = structuredClone(snapshot(result))
-    if (disposeMinted(result, minted)) reapStopped() // the view minted for this call is dead once cloned (I-29)
-    return value
+    //! the view minted for this call is dead once copied (I-29), and released even when the copy is refused
+    try { return answer(m, snapshot(result)) } finally { if (disposeMinted(result, minted)) reapStopped() }
   }
 
   //! #end — end one live sub loudly: the caller's handle fails with the reason (Caller.#onResult: mode

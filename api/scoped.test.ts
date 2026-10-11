@@ -422,6 +422,34 @@ test('TOO-LARGE [V4-51] — the gather names a member whose rows do not fit one 
   } finally { g.destroy() }
 })
 
+//! V4-52: the gather's one-shot answer (`await data` and methods.read() on a scoped server) was structuredClone of the
+// union, not what a client's whole read decodes from the reply: a value the codec changes came back unchanged, and a
+// union a reply could not carry came back all the same. It is copyOf with a reply's limits now. The union's values
+// are planted through the members' answers (a fake node, as above).
+test("the gather's one-shot answer is what a client's whole read decodes: the codec's copy of the union, refused when a reply could not carry it", async () => {
+  const { Gather } = await import('./fold.ts')
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2,
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['h1', 'h2'] } },
+    scope: { entries: new Map() },
+    versions: new Map(), state: new Map(),
+  }
+  const nest = (d: number): unknown => { let v: unknown = 1; for (let i = 0; i < d; i++) v = [v]; return v }
+  const claim = (v: unknown, seq: number) => ({ v, st: [1, seq, 'h1'] as [number, number, string] })
+  let rows: Record<string, unknown> = { a: claim({ when: new Date(0), s: 'x\uD800', m: new Map([[1, 2]]) }, 1) }
+  const g = new Gather({ node: fake } as never, async (uuid: string) => (uuid === 'h1' ? { c: Object.fromEntries(Object.entries(rows).map(([k, c]) => [JSON.stringify([k]), c])), att: ['a', 'deep'] } : { c: {}, att: ['a', 'deep'] }) as never)
+  const got = await g.refresh({ node: fake } as never, { throwOnPartial: true }) as Record<string, unknown>
+  assert.deepStrictEqual(got, { a: { when: {}, s: 'x\uFFFD', m: {} } }, 'the value a client decodes')
+  assert.notEqual(got.a, (snapshot(g.proxy) as Record<string, unknown>).a, 'a copy, never the live union')
+  //! the row 62 deep sits 63 deep in the answer, the most a reply carries; one level more is refused
+  rows = { deep: claim(nest(62), 2) }
+  assert.deepStrictEqual(((await g.refresh({ node: fake } as never, { throwOnPartial: true })) as Record<string, unknown>).deep, nest(62))
+  rows = { deep: claim(nest(63), 3) }
+  await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true }), /^Error: the result could not be sent: deeper than 63 levels$/)
+  g.destroy()
+})
+
 test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the kernel\'s stamp rule: a field remove newer than its row takes the field out, a field at or below an ancestor\'s stamp is hidden, a parked field never tears into a live row', async () => {
   const { Gather } = await import('./fold.ts')
   const fake = {
