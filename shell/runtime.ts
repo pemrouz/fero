@@ -38,6 +38,26 @@ const syncDir = (dir: string) => {
   } catch { /* platform without dir-fsync: nothing stronger exists to ask for */ }
 }
 
+//! rowOf — one WAL row, [varint prev][frame], built at its EXACT size (V4-51): never in a frame-capped Writer — a frame
+// received within a few bytes of MAX_FRAME is a legal row, and its prev varint must never make it unwritable (that
+// threw FULL inside the RECORDS step that received it and dropped a good link). The varint goes through one reused
+// scratch (Infinity: not a frame); the kernel owns `bytes` only until return, so the row is copied out at call time.
+const ROW = new Writer(Infinity)
+const rowOf = (prev: number, bytes: Uint8Array): Uint8Array => {
+  ROW.len = 0
+  ROW.varint(prev)
+  const row = new Uint8Array(ROW.len + bytes.length)
+  row.set(ROW.buf.subarray(0, ROW.len), 0)
+  row.set(bytes, ROW.len)
+  return row
+}
+//! writeAll — fs.writeSync until every byte is down: one call may write fewer bytes than asked (Linux writes at most
+// ~2 GiB at once), and a short write would tear the snapshot file in the middle
+const writeAll = (fd: number, b: Uint8Array): void => { for (let off = 0; off < b.length;) off += fs.writeSync(fd, b, off) }
+//! STAGE — the snapshot file is streamed, never assembled whole: rows under 1 MiB are staged and written 1 MiB at a
+// time, a bigger row goes straight to the fd
+const STAGE = 1 << 20
+
 //! RuntimeOpts: NodeOpts + the storage directory (presence = durable mode; NodeOpts.durable derives from it).
 export interface RuntimeOpts extends NodeOpts { dir?: string }
 
@@ -185,10 +205,7 @@ export class Runtime {
         // through the ordered #ioq (see its banner — unordered appends corrupt the chain on disk).
         persist(batch, bytes, prev) {
           if (runtime.#wal === null) return
-          const w = new Writer()
-          w.varint(prev)
-          w.bytes(bytes)
-          const row = w.buf.slice(0, w.len)
+          const row = rowOf(prev, bytes)
           runtime.#ioq = runtime.#ioq.then(() => new Promise<void>((done) => {
             const fd = runtime.#wal
             //! a queued append still RUNS after destroy() begins — a clean shutdown must flush what the
@@ -213,6 +230,9 @@ export class Runtime {
         //! snapshot (M4e): the atomic whole-file swap — write every row to wal.log.tmp, fsync, close,
         // rename over wal.log, reopen the append fd. Synchronous inside its #ioq slot (a swap is cold
         // and must not interleave with appends); the old file survives any crash before the rename.
+        //! STREAMED (V4-51): the file is every live row, which passes one frame by far on a big store. It used to be
+        // assembled in ONE Writer capped at MAX_FRAME + HEADER, so the first swap of a store whose live data passed
+        // 256 MiB threw here, latched #walFailed, and the store lost its WAL for good (persistFail 'swap').
         snapshot(batch, rows) {
           if (!runtime.#opts.dir) return
           const p = path.join(runtime.#opts.dir, 'wal.log')
@@ -220,11 +240,16 @@ export class Runtime {
           runtime.#ioq = runtime.#ioq.then(() => {
             if (runtime.#wal === null || runtime.#walFailed || runtime.node.destroyed) return
             try {
-              const w = new Writer()
-              for (const r of rows) { w.varint(r.prev); w.bytes(r.bytes) }
               const fd = fs.openSync(p + '.tmp', 'w')
               try {
-                fs.writeSync(fd, w.buf.subarray(0, w.len))
+                const w = new Writer(Infinity)
+                for (const r of rows) {
+                  w.varint(r.prev)
+                  if (r.bytes.length >= STAGE) { writeAll(fd, w.buf.subarray(0, w.len)); w.len = 0; writeAll(fd, r.bytes); continue }
+                  w.bytes(r.bytes)
+                  if (w.len >= STAGE) { writeAll(fd, w.buf.subarray(0, w.len)); w.len = 0 }
+                }
+                if (w.len > 0) writeAll(fd, w.buf.subarray(0, w.len))
                 fs.fsyncSync(fd)
               } finally { fs.closeSync(fd) }
               fs.renameSync(p + '.tmp', p)
