@@ -884,6 +884,75 @@ leaves a hole the drain digest cannot see when the record is an
 interior one (a splice): the spoke's tails already sit above it. The
 old kernel loses it the same way. It is a STATUS bug line.
 
+*Closed on 2026-10-11 (wave 5f, the note below).*
+
+**Note, 2026-10-11 (wave 5f: a clear in steady state).** The line
+above, fixed (kernel/link.ts `onClear`, kernel/node.ts `#clearCover`).
+
+*What was wrong.* A synced client link is fed by tap-forward, and a
+clear (the paused queue overflowing) left only the drain digest to heal
+what it took. That digest answers above the spoke's tails, so two kinds
+of record were lost for good. (1) A record spliced into a lane's
+interior: its tap-forward sits below the spoke's tails (the filed
+line). (2) Found while building its test: any record whose lane a
+frame shipped after the clear, in the same flush, leapfrogs. A tap
+flush can ship several frames: on a scoped feeder one inbound frame's
+tap is gappy (a record of a partition it does not hold, or one it
+already has, breaks the run), and the frames after the clear are
+queued and survive it. They land first and raise the spoke's
+tail above the lost records, plain appends included.
+
+*The fix.* A clear on a client link hands the frames it took to
+`Link.onClear` (null on every other link). `#clearCover` reads each
+record frame's header and lowers each lane of the link's cover
+(`Link.torn`) to just under the lowest record the clear took there.
+Every other lane stays where the cover already was: at the torn
+answer's cover when an answer's frames were in the queue (V4-42's
+inQueue move runs first), else at the feeder's tail right now. The
+tail is safe because a synced link is tapped every record the feeder
+folds, so each record on a lane so far was sent or sits in a frame the
+clear left. The drain resumes the cover like any torn answer (`#answer`,
+with no reply when none was owed) before the drain digest.
+
+*Why nothing else is lost.* After the clear the link is unsynced, so
+nothing is tapped until the resume. A record committed before the
+drain is above the feeder's tail at the clear, so the resume ships it.
+A record spliced before the drain is lowered into the cover by
+`indexInsert` (the link joins `#covered`). A second clear before the
+drain lowers the same cover again and never raises it. A clear that
+takes an answer's frames, its reply and tap frames together keeps the
+answer's cover and its reply: a tap frame's records sit above that
+cover, or a splice already lowered it. A clear that took no record
+frame changes nothing.
+
+*Costs.* One frame-header read per frame a clear took (the clear is
+cold: it already writes a journal row). The resume re-sends a lowered
+lane's suffix above the lowest lost record, frames the spoke holds
+included (its lane drops them). There is one cover per link, and no
+frame is encoded twice inside one resume. A member link's clear is
+unchanged.
+
+*What moves.* Only a client link whose queue a clear empties of record
+frames. The resume now re-sends at the drain what the drain exchange
+used to re-send (or lose) one round trip later. The sim never pauses
+inside a send, so the golden, the 300-seed sweep, 59,500 and 104,050
+stay byte-identical.
+
+*Tests* (kernel/client.test.ts): the steady-state splice, the leapfrog
+inside one flush, two clears in a row with a splice and a commit before
+the drain, the mixed clear, and a member link unchanged. The first
+three are red on the old kernel (the spoke misses r11; r32 and r34;
+r11). Five mutations, each caught: no `onClear` at admit, a second
+clear that starts a fresh cover, no `#covered` add, no lowering, the
+last lost seq instead of the lowest.
+
+*Members.* A member link has no such hole. An unscoped member gets
+one frame per flush (a commit is one contiguous run, and a member
+never taps), so nothing survives a clear, and the drain digest heals
+the tail it took. An armed member is repaired by the holder handshake
+and the drain round, not by the digest, and its floors move only
+through the pp chain.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
