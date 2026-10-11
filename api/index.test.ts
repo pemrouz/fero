@@ -1989,6 +1989,10 @@ test('a data: seed the wire cannot carry, or whose validation: rule throws, reje
   await assert.rejects(started(fero('seedenc', { listen: false, data: { luna: { n: 10n } } })), /^Error: fero\('seedenc'\): data seed row 'luna' cannot be sent: a bigint at n\n  fero sends null, /)
   await assert.rejects(started(fero('seedthrow', { listen: false, data: { luna: null }, validation: (r: { value: { mood: string } }) => r.value.mood.length > 0 || 'needs a mood' })),
     /^Error: fero\('seedthrow'\): data seed row 'luna' — validation threw: TypeError: Cannot read properties of null/)
+  //! the rest of what the seed runs of the user's ends the same way: a getter on the seed object, a rule's answer that is not text
+  await assert.rejects(started(fero('seedget', { listen: false, data: { get luna() { throw new Error('no luna') } } })), /^Error: fero\('seedget'\): reading the data seed threw: Error: no luna$/)
+  await assert.rejects(started(fero('seedsym', { listen: false, data: { luna: 1 }, validation: (() => Symbol('nope')) as unknown as () => true })),
+    /^Error: fero\('seedsym'\): data seed row 'luna' rejected by validation — the rule returned Symbol\(nope\)$/)
   //! a getter that throws a revoked Proxy: the check used to test it with instanceof, and threw out of itself
   const { proxy: revoked, revoke } = Proxy.revocable({}, {})
   revoke()

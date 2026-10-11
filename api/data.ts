@@ -29,7 +29,7 @@
 // that land synchronously inside the write() call settle through the same join as
 // commits that echo back seconds later off the owner.
 
-import { proxy, applyRec, lens, holeAt, isProxy, SPARSE_HOLE, type Fault } from './substrate.ts'
+import { proxy, applyRec, lens, holeAt, errText, isProxy, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
 import { encodable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
@@ -73,6 +73,12 @@ export const unsendable = (r: Rec): string | null => {
   if (isProxy(r.value)) return LIVE_VIEW
   return encodable(r.value, WRITE, r.key.length > 1 ? r.key.length - 1 : 0, n)
 }
+
+//! reasonOf — a validation: rule's refusal as text. A rule answers `true` or the reason; any other answer (false,
+// undefined, '', a Symbol) refuses, with its text as the reason. Passed on as it was, it broke the write path,
+// which reads a non-string outcome as a commit's promise ("r.then is not a function"), and '' said nothing.
+export const reasonOf = (v: unknown): string =>
+  typeof v === 'string' && v !== '' ? v : v === '' ? 'the rule returned an empty reason' : `the rule returned ${errText(v)}`
 
 //! SCOPED_FEEDER — does a server's HELLO contract (api/index.ts clusterContract: `v1;heartbeat.ms=…;
 // replicas=N;…`) say it is scoped? `replicas=0` is full replication. Read by #local on a client.
@@ -271,9 +277,9 @@ export class Bind {
   // remove (api/index.ts). Reads THIS node's projection: a node that does not hold the row cannot see
   // the array, so a scoped non-holder forwards it as before. One type compare for every other record.
   admit(rec: Rec): true | string {
-    const v = this.#validate ? this.#validate(rec) : true
-    if (v === true && rec.type === REC.remove && rec.key.length > 1 && holeAt(this.#handle, rec.key)) return SPARSE_HOLE
-    return v
+    const v: unknown = this.#validate ? this.#validate(rec) : true
+    if (v !== true) return reasonOf(v)
+    return rec.type === REC.remove && rec.key.length > 1 && holeAt(this.#handle, rec.key) ? SPARSE_HOLE : true
   }
 
   //! hole — the sparse-hole half of admit alone, for the OWNER's re-check of a remove a scoped member
