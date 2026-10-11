@@ -35,7 +35,7 @@
 // object-born (substrate.applyStreamRec, I-27); the one-shot stays the bare number.
 
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { VERB, encodable } from '../kernel/codec.ts'
+import { VERB, copyOf } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
@@ -487,9 +487,11 @@ export class Caller {
   call(m: string, a: unknown, opts: { timeout?: number; retry?: boolean; to?: string } = {}): Promise<unknown> {
     //! an argument the wire cannot carry is refused here, before the step (V4-48): encoded inside it, it threw
     // out of the kernel — at once, or from a socket handler when a held call replayed on the next primary —
-    // and ended the client
-    const why = encodable(a, ARG)
-    if (why !== null) return Promise.reject(new Error(`methods.${m}: the argument cannot be sent: ${why}`))
+    // and ended the client. What is sent is fero's own copy, taken by the same walk (V4-52): a held call, or a
+    // retried one, re-encoded the caller's object when it replayed, so a change made meanwhile was sent, and a
+    // change to something fero cannot send (a bigint) threw from the socket handler while the call hung.
+    let arg: unknown
+    try { arg = copyOf(a, ARG) } catch (e) { return Promise.reject(new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`)) }
     const id = ++this.#seq
     const ms = opts.timeout ?? 10_000
     return new Promise((resolve, reject) => {
@@ -499,13 +501,13 @@ export class Caller {
       }, ms)
       t.unref?.()
       this.#calls.set(id, {
-        m, a, retry: opts.retry === true, held: false,
+        m, a: arg, retry: opts.retry === true, held: false,
         ...(opts.to !== undefined ? { to: opts.to } : {}),
         resolve: (v) => { clearTimeout(t); resolve(v) },
         reject: (e) => { clearTimeout(t); reject(e) },
       })
       //! `to` (M6): a named member instead of the primary — the scoped gather/remote-read fan-out
-      this.#rt.node.step({ kind: 'rpc', id, mode: VERB.CALL, m, a, ...(opts.to !== undefined ? { to: opts.to } : {}) })
+      this.#rt.node.step({ kind: 'rpc', id, mode: VERB.CALL, m, a: arg, ...(opts.to !== undefined ? { to: opts.to } : {}) })
     })
   }
 
@@ -513,18 +515,18 @@ export class Caller {
   // identity server-side (keyed by link|id there, so the same id re-used on a NEW primary is clean).
   subscribe(m: string, a: unknown, onError: ((e: Error) => void) | null = null): Sub {
     const id = ++this.#seq
-    const sub = { id, m, a, proxy: proxy({}), error: null, onError } as Sub
+    const sub = { id, m, a: undefined, proxy: proxy({}), error: null, onError } as Sub
     arm(sub)
-    //! the same question as call(): a sub whose argument cannot be sent fails at once and nothing is stepped.
-    // The handle's touch throws the reason, so its `ready` is marked handled: one failure, told once.
-    const why = encodable(a, ARG)
-    if (why !== null) {
+    //! the same question as call(), and the same copy (a re-subscribe on the next primary sends it): a sub whose
+    // argument cannot be sent fails at once and nothing is stepped. The handle's touch throws the reason, so its
+    // `ready` is marked handled: one failure, told once.
+    try { sub.a = copyOf(a, ARG) } catch (e) {
       sub.ready.catch(noop)
-      this.#fail(sub, new Error(`methods.${m}: the argument cannot be sent: ${why}`))
+      this.#fail(sub, new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`))
       return sub
     }
     this.#subs.set(id, sub)
-    this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m, a })
+    this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m, a: sub.a })
     return sub
   }
 

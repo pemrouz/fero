@@ -32,7 +32,7 @@
 import { types } from 'node:util'
 import { proxy, applyRec, lens, holeAt, errText, isProxy, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
-import { encodable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
+import { encodable, copyOf, Unsendable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -81,8 +81,9 @@ const KINDS: [(o: object) => boolean, (o: object) => string][] = [
   [types.isBoxedPrimitive, () => 'a boxed primitive (send x.valueOf())'],
   [(o) => o instanceof URL, () => 'a URL (send url.href)'],
 ]
-//! INSTANCES — a class instance (V4-52's lenient rule): 'take' sends its own enumerable fields, as V4-48 did;
-// 'refuse' refuses it like a Date. The one line to change.
+//! INSTANCES — a class instance (V4-52's lenient rule): 'take' sends its own enumerable fields, as V4-48 did, and
+// the write's copy (unsendable) is a plain object on the writer too, so every copy reads the same; 'refuse'
+// refuses it like a Date. The one line to change.
 const INSTANCES = 'take' as 'take' | 'refuse'
 //! nameOf — a class's name, from its prototype's own constructor, read without running a getter
 const nameOf = (p: object): string => {
@@ -99,7 +100,7 @@ const nameOf = (p: object): string => {
 // inline-cached load, about 40 ns a part with the brand test). Then the prototype: Object.prototype is plain,
 // null is plain unless it is a module namespace, and the rest is a kind (KINDS), a plain object of another
 // realm (its prototype's prototype is null), or a class instance (INSTANCES). Object.create(plainObject) passes
-// the fast path: its inherited fields do not travel.
+// the fast path: its inherited fields do not travel, and the write's copy leaves them behind on the writer too.
 export const partOf = (o: object, array: boolean): string | null => {
   if (types.isProxy(o)) return isProxy(o) ? LIVE_VIEW : PROXY
   if (array || (o as { constructor?: unknown }).constructor === Object) return null
@@ -126,11 +127,25 @@ export const CARRIES = `fero sends null, undefined, true and false, numbers, str
 //! unsendable — why a local write's record cannot travel every path fero reads it back on, or null (V4-48):
 // the value from where it sits in its row (a field write starts one level down), its key and `at` counted
 // into the bytes. A remove carries no value: only its key is counted.
+//! A value it takes is REPLACED in the record by fero's own copy (V4-52), built by the same walk that asks
+// (kernel/codec.ts copyOf), as the decoder would build it. The kernel kept the program's object: a change made
+// after the write reached the writer's fold and the copies that caught up later (the log held the same object,
+// a client's retry re-encoded it), but not the copies that already had it — and changed to something fero
+// cannot send (`o.n = 10n`), it stopped replication for good. Now the kernel, the log, the WAL, each link's
+// frames and this node's own fold hold one value, the one every other copy decodes; a later change to the
+// program's object reaches none of them. The record is fero's own (the lens, methods.* and the seed build it),
+// never the program's.
 export const unsendable = (r: Rec): string | null => {
   let n = r.at === undefined ? 0 : 4 + r.at.length * 3
   for (const k of r.key) n += 4 + k.length * 3
   if (r.type === REC.remove) return encodable(undefined, WRITE, 0, n)
-  return encodable(r.value, WRITE, r.key.length > 1 ? r.key.length - 1 : 0, n)
+  try {
+    r.value = copyOf(r.value, WRITE, r.key.length > 1 ? r.key.length - 1 : 0, n)
+    return null
+  } catch (e) {
+    if (e instanceof Unsendable) return e.message
+    throw e
+  }
 }
 
 //! reasonOf — a validation: rule's refusal as text. A rule answers `true` or the reason; any other answer (false,
@@ -584,8 +599,8 @@ export class Bind {
     }
     //! a record that cannot be sent throws HERE, before anything of the batch is issued (V4-48) — like the
     // lens's root-replace and sparse-hole refusals: a programming error, loud at the assignment, all or nothing
-    // for a patch() of several pairs. Nothing is stamped. The kernel keeps the caller's object, though: a value
-    // changed after the write is not asked again (STATUS).
+    // for a patch() of several pairs. Nothing is stamped. Each record it takes now carries fero's own copy of its
+    // value (unsendable, V4-52), so a change the program makes to its object afterwards is never sent.
     for (const r of recs) {
       const why = unsendable(r)
       if (why !== null) throw new TypeError(`fero: ${JSON.stringify(r.key)} cannot be sent: ${why}\n  ${CARRIES}`)
