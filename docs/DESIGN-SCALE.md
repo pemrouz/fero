@@ -363,7 +363,10 @@ reached on an unscoped node.
    answer tears — its queue overflowing partway through the ship — resumes
    it at the drain, so a torn ship is a late reply, never a missing one,
    and the drain digest's `h: 1` is for an ask that arrived while the link
-   was paused, see that note*; and a client
+   was paused, see that note; made true at the resume-cost fix
+   (2026-10-11): the ship stops at a full queue instead of overflowing it,
+   and an answer stays resumable until its reply has left the queue, so a
+   clear that takes a queued reply no longer costs a re-download*; and a client
    of a SCOPED feeder (`replicas=` in the feeder's HELLO contract,
    `node.feederScoped`) resyncs at every failover, unioning the sweep set
    when begun mid-resync. The sim's scoped clusters now carry the api's
@@ -548,7 +551,11 @@ surviving behind its last frames — the ship loop ran on past the clear,
 so the spoke's tails rose above the hole and its resync ended over it.
 The feeder now resumes a torn answer at the drain and the reply follows
 the whole ship, so the one ask a live feeder leaves unanswered is the
-swallowed one; see the third re-check's note below.* So now that
+swallowed one; see the third re-check's note below. That was still not
+quite true: a reply queued behind the ship's last frames went with any
+later clear, and the spoke downloaded everything again. Since the
+resume-cost fix (2026-10-11) an answer stays resumable until its reply
+has left the queue, so now it is true; see that note.* So now that
 digest, toward a CLIENT, carries `h: 1`
 (`#sendDigest`; member digests never carry it — member bytes unchanged),
 and a spoke in resync (1) sends no heartbeat floor to its primary (the
@@ -678,6 +685,81 @@ tear (4 red: queued 3), no resume at the drain (4 red), no wait on a
 second tear (1 red: the drain digest went out ahead), resume from the
 origin's start instead of the tear (4 red: ten frames re-shipped where
 eight).
+
+*Superseded in part on 2026-10-11 (the note below): the ship no longer
+overflows the queue, so "stops at the first clear" became "stops at a
+full queue"; `torn` holds a cover map, not a frame; `starts` and
+`drops` are gone; and the tests above assert the new middle (the queue
+kept, no drain digest, aeShip 6, 4).*
+
+**Note, 2026-10-11 (stage 2, the resume costs).** The third re-check
+recorded two costs of the resume and named the fix; this note is that
+fix (kernel/node.ts `#answer`, kernel/link.ts).
+
+*What was wrong.* (1) CPU grew with the square of a torn ship: every
+drain round re-walked the rest of the torn lane, re-encoded all of it,
+shipped about one socket buffer, and queued 257 more frames only to
+clear them. (2) The text above said a torn ship is a late reply, never
+a missing one. But a reply still in the paused queue went with any
+later clear — one live tap-forward, or the drain digest right after a
+resume — and a spoke in resync then re-asked on `h: 1` and downloaded
+the feeder's whole held subset again (the re-check's cases B, C, C0).
+
+*The fix.* (a) Each lane's resume point is a binary search (lanes are
+seq-ascending; a splice inserts at its seq). (b) The answer collects
+one frame's run at a time by the codec's own rule (`continuesRun`, the
+predicate encodeRuns now splits by) and encodes a frame only to hand it
+to the link. (c) No deliberate overflow: when the link is paused and
+the queue is full, the ship stops BEFORE the next frame; the reply is
+one more frame and is held to the same rule. The drain delivers the
+queue, then the resume goes on past it, so each drain round delivers
+the queue plus what the socket takes and nothing encoded is wasted.
+(d) `torn` is now a cover map: the peer's tails raised to what the
+answer already handed the link. The resume is an answer to that map,
+so it also covers records committed on an already-walked lane while
+the ship was stopped (the link stays unsynced meanwhile, so live
+records wait rather than overflow the full queue). (e) `Link.inQueue`
+holds the cover at the answer's FIRST queued frame; a clear in `ship`
+makes it the torn answer, so the drain re-sends what the clear took and
+the reply. The drain's flush empties it. (f) The drain digest never
+goes into a full queue: the debt stays and the next drain sends it,
+after the reply.
+
+So the premise is now true: a torn ship or a cleared reply is a late
+reply, never a missing one, and the one ask a live feeder leaves
+unanswered is an ask that arrived while its link was paused.
+
+*Measured* (feeder CPU, a first connect, sparse lane, a socket that
+pauses at 64 KiB, queue 256, on this box): 20k records 166-186 ms →
+48-55 ms; 160k 20.8 s → 246-262 ms, where an untorn ship of 160k is
+310 ms. Frames handed to the link: 22,829 → 20,001 for 20k, 183,903 →
+160,001 for 160k (N records plus the reply, each once). A cleared reply
+(C0): aeShip [10, 11] → [10, 4]; the spoke asks once.
+
+*What moves.* Only a link that really pauses inside a send: a stopped
+ship keeps its queue (no clear, no drop row, no `h: 1` drain digest
+after it), and the journal's aeShip row counts what the answer handed
+the link. The sim never pauses inside a send, and an untorn walk ships
+the same frames in the same order, so the golden, the 300-seed sweep,
+59,500 and 104,050 stay byte-identical.
+
+*The tests.* kernel/client.test.ts: the four torn-answer tests keep
+their scenarios and their ends; their middles assert the stop (queue
+4 kept, no drop, no drain digest, aeShip 6, 4; the second uses a queue
+of 2 so the resume stops again). New: C0, C and B as one-ship tests
+(aeShip [10, 4], [6, 4, 4], and the drain digest waiting with no
+clear), the reply that would overflow (it waits instead), the cover over
+a lane walked before the stop (first connect and resync), and the cost
+probe at 3,000 records (every seq once and in order, the reply last).
+kernel/node.perf.ts pins the cost: handed = sent = N + 1 and 160k / 20k
+under 20× (about 6× measured; 76.7× with the old re-encode put back).
+Mutations, each caught: no inQueue → torn on a clear, no drain-digest
+wait, a cover that skips walked lanes, no stop at a full queue, a reply
+that may overflow.
+
+*Not covered by a pin.* The binary search alone: putting back the
+linear scan from the lane's end costs comparisons only, a few ms at
+160k, inside the ratio's noise. The encode is the cost that mattered.
 
 ## §0 The decision, in ten lines
 
