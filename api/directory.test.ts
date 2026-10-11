@@ -448,6 +448,49 @@ test('one directory client per process: a server that stops (destroy or crash) r
   } finally { await settle([c, live, keep, h]) }
 })
 
+test("one directory client per process: the same identity stopped and restarted in one process (a durable server keeps its uuid) keeps its NEW entry — the old instance's register, answered late, sends no unregister after the stop", async () => {
+  //! unregister is keyed by (name, uuid) and the calling link, and in one process the link is shared: an
+  // unregister the OLD instance sent after the NEW one registered dropped the live entry. A stand-in host on the
+  // real hostMethods applies every register at once but answers it LAG ms late (a register that "timed out
+  // here but still landed" has the same shape). Through the compose seam, as the I-19 probe does.
+  const LAG = 1500
+  const name = `same${process.pid}`
+  const addr = `127.0.0.1:${await ports.free()}`
+  let host: Fero | undefined
+  const { methods, onPeers } = hostMethods(
+    () => (host ? (snapshot(host.cluster) as { peers: Record<string, { up: boolean }> }).peers ?? {} : {}),
+    () => (host ? (snapshot(host.cluster) as { me: { uuid: string } }).me.uuid : undefined))
+  const slow = { ...methods, register: async (a: unknown, ctx: Context) => { const r = methods.register(a, ctx); await sleep(LAG); return r } }
+  const row = () => (snapshot(methods.lookup('r', {} as Context) as never) as Record<string, string> | undefined) ?? {}
+  const compose = (_n: string, o: Record<string, unknown>) => fero(name, o)
+  const dir = (uuid: string, listen: string | undefined) => new Directory({
+    compose, addr, name: 'r', uuid, listen: () => listen, serve: listen !== undefined,
+    heartbeatMs: 50, redialMs: 30, onHosts: () => {}, onState: () => {},
+  })
+  const keep = dir('keep', undefined)
+  let a: Directory | undefined, a2: Directory | undefined
+  try {
+    host = await fero(name, { listen: addr, heartbeat: { ms: 50 }, methods: slow })
+    host.cluster.tap(onPeers)
+    await keep.start()
+    assert.ok(await until(() => keep.up, 5000), 'the sibling holds the shared client, link up')
+    a = dir('same', '127.0.0.1:5101')
+    await a.start()
+    assert.equal(a.client, keep.client, 'one shared client, so one link for both instances')
+    assert.ok(await until(() => row().same === '127.0.0.1:5101', 5000), 'the first instance registered (its answer is still on the way)')
+    await a.destroy(); a = undefined
+    assert.equal(row().same, undefined, 'its stop took the entry out')
+    a2 = dir('same', '127.0.0.1:5102')
+    await a2.start()
+    assert.ok(await until(() => row().same === '127.0.0.1:5102', 5000), 'the restart registered under the same uuid')
+    //! past the old register's late answer, and past the restart's own
+    await sleep(LAG + 700)
+    assert.deepEqual(row(), { same: '127.0.0.1:5102' }, `the live restart's entry is still there after the old register's late answer (${JSON.stringify(row())})`)
+  } finally {
+    await a2?.destroy(); await a?.destroy(); await keep.destroy(); await settle([host])
+  }
+})
+
 test('two names on one box never collide, never cross-talk, and the diagnostics seam exposes the directory nodes as real instances', async () => {
   const o = await fast()
   let a: Fero | undefined, b: Fero | undefined, ca: Fero | undefined, cb: Fero | undefined
