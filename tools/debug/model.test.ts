@@ -736,11 +736,11 @@ test('the topology replay folds a hand-off\'s watermark jump: at every step a sc
   const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2 })
   writes(sim, nodes, 6, 100); sim.run({ until: 1500 })
   writes(sim, nodes, 8, 200); sim.run({ until: 4000 })
-  const real = new Map<string, Map<number, Record<string, [number, number]>>>()
+  const real = new Map<string, Map<number, Record<string, [number, number, number]>>>()
   sim.monitors.push({ name: 'watermarks', check(s) {
     for (const n of s.nodes.values()) {
       if (!real.has(n.uuid)) real.set(n.uuid, new Map())
-      real.get(n.uuid)!.set(n.journal.n - 1, Object.fromEntries([...n.streams].map(([o, w]) => [o, [w.applied, w.shippable]])))
+      real.get(n.uuid)!.set(n.journal.n - 1, Object.fromEntries([...n.streams].map(([o, w]) => [o, [w.applied, w.shippable, n.logs.get(o)?.length ?? 0]])))
     }
     return null
   } })
@@ -753,24 +753,30 @@ test('the topology replay folds a hand-off\'s watermark jump: at every step a sc
   const acquirers = cap.nodes.filter((n) => n.journal.some((e) => e.kind === K.acquire)).map((n) => n.uuid)
   assert.ok(acquirers.includes('n05'), 'the joiner copied rows in — the fixture is what it claims')
   for (const r of verifyTopology(cap) as { uuid: string; ok: boolean; reason?: string }[]) assert.ok(r.ok, `${r.uuid}: ${r.reason}`)
-  let steps = 0, jumps = 0
+  let steps = 0, jumps = 0, counts = 0
   for (const [u, byT] of real) {
     //! the first step at or after each acquire row (one event may journal more rows after it) is the jump's own step
-    const acq = cap.nodes.find((n) => n.uuid === u)!.journal.filter((e) => e.kind === K.acquire).map((e) => e.t)
+    const journal = cap.nodes.find((n) => n.uuid === u)!.journal
+    const acq = journal.filter((e) => e.kind === K.acquire).map((e) => e.t)
+    //! the folded count (the page's `folded` column): every entry this node folded so far, a hand-off's once each —
+    // the kernel's own record book until the node first sheds a row (a shed drops entries the count keeps)
+    const shedAt = journal.find((e) => e.kind === K.shed)?.t ?? Infinity
     const ts = [...byT.keys()].sort((x, y) => x - y)
     jumps += acq.filter((ta) => ts.some((t) => t >= ta)).length
     for (const [t, lanes] of byT) {
       if (t < 0) continue
       const { streams } = topologyAt(cap, u, t) as { streams: Map<string, { a: number; s: number }> }
       steps++
-      for (const [o, [a, s]] of Object.entries(lanes)) {
-        const r = streams.get(o)
+      for (const [o, [a, s, n]] of Object.entries(lanes)) {
+        const r = streams.get(o) as { a: number; s: number; n: number } | undefined
         if (!r && a === 0 && s === 0) continue // KNOWN BOUND 2: an armed node mints an empty lane with no row
         assert.ok(r, `${u} t${t}: the kernel has lane ${o} (${a}), the replay does not`)
         assert.deepEqual([r.a, r.s], [a, s], `${u} t${t} lane ${o}: the replay's applied/shippable vs the kernel's`)
+        if (t < shedAt) { assert.equal(r.n, n, `${u} t${t} lane ${o}: the replay's folded count vs the kernel's record book`); if (acq.some((ta) => ta <= t)) counts++ }
       }
       for (const o of streams.keys()) assert.ok(o in lanes, `${u} t${t}: the replay has lane ${o}, the kernel does not`)
     }
   }
   assert.ok(jumps > 0 && steps > 500, `the acquire rows themselves were checked (${jumps} of ${steps} steps)`)
+  assert.ok(counts > 0, `the folded count was checked after a hand-off (${counts} lane-steps)`)
 })
