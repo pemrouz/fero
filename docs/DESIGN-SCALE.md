@@ -181,11 +181,18 @@ entries settles the evicted one from its coordinates. The other shape the
 plan named, asking the new feeder to settle each attempt from the owner's
 dedup window, was not needed: the spoke already holds the answer the
 window would give, so nothing asks the window, an aged-out window changes
-nothing, and no `unknown` outcome is needed. Costs, named: V4-7's order is
-kept only where the next feeder already holds the record when its ship
-leaves; a next feeder that holds the partition but has not yet received
-the record lets the write settle at the resync's end, with the value
-showing a moment later. A spoke with no feeder at all keeps the write
+nothing, and no `unknown` outcome is needed. One trade the fix makes (new
+with it, not left over): a next feeder that holds the partition but has
+not yet received the record when its ship leaves. Before wave 5e that
+schedule kept V4-7's order (the record reached the new feeder later, it
+tapped it, and the join settled the write as the value showed). Now the
+resync's end settles it through `acked` first, and the value shows about
+45 ms later (the review's probe, n=4 R=3, the owner's record frame to the
+next feeder lost with their link; pinned as a known cost in
+sim/feeder-death.test.ts, on STATUS). The spoke cannot tell "holds it but
+lags" from "does not hold it" without knowing its feeder's holdings, so
+keeping the order there needs a new piece of protocol. The costs that do
+stay from before: a spoke with no feeder at all keeps the write
 pending until a feeder admits it. A feeder that sends no `l` (a feeder
 older than this note: mixed versions, V4-14) still strands its spokes.
 Unscoped feeders never send `l`: unscoped bytes are unchanged.
