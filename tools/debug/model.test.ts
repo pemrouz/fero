@@ -10,7 +10,7 @@ import { converged } from '../../sim/monitors.ts'
 import { JK } from '../../kernel/journal.ts'
 import { captureSim } from './capture.ts'
 import { encodeVal, decodeVal, kindNames, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology, agreement } from './model.mjs'
-import { scopedCut, scopedTenure, mixed, unscopedLeaver, attachMissing, copyingHolder } from './fixtures.ts'
+import { scopedCut, scopedTenure, mixed, unscopedLeaver, attachMissing, copyingHolder, abortedCopy } from './fixtures.ts'
 import { captureLive } from './capture.ts'
 import { REC } from '../../kernel/env.ts'
 
@@ -707,6 +707,28 @@ test('a live attach missing the writer keeps the lag of a holder still copying i
   //! a latch that closed is no claim: the healed capture without the writer still agrees (the wave 5e test pins its stops)
   const { healed } = scopedCut()
   assert.equal(agreement(attachMissing(healed, owner)).converged, true)
+})
+
+test('a copy-in that aborted keeps its claim until the view changes: with the writer missing, a holder cut from its teacher is still judged on its row, and one whose row moved at a join is not — as with the writer captured (wave 5f review)', () => {
+  //! an abort other than at a view install leaves the ring as it was: the holder is still meant to hold the row and
+  // still lags (the writer's `holders` says so). Only an install changes the ring, so only an install ends the claim
+  for (const how of ['linkDown', 'epoch'] as const) {
+    const { cap, owner, lagging, row } = abortedCopy(how)
+    const blind = attachMissing(cap, owner)
+    const on = (a: Agreement) => (a.groups[0].rows!.get(row) || []).includes(lagging)
+    const full = agreement(cap) as Agreement, part = agreement(blind) as Agreement
+    assert.equal(on(full), how === 'linkDown', `${how}: with the writer captured, the holder is judged on its row only while the ring gives it the row`)
+    assert.equal(on(part), on(full), `${how}: with the writer missing, the holder is judged on its row as with the writer captured`)
+    assert.equal(part.converged, full.converged, `${how}: the header says the same`)
+    assert.equal(part.off.includes(lagging), full.off.includes(lagging), `${how}: the holder is off the same way`)
+    const fr = routes(cap) as Map<string, Rt>, pr = routes(blind) as Map<string, Rt>
+    let seen = 0
+    for (const [id, r] of fr) if (r.origin === owner && r.nodes[lagging]) {
+      assert.equal(pr.get(id)!.nodes[lagging].status, r.nodes[lagging].status, `${how}: ${id} at ${lagging} reads as it does with the writer captured`)
+      seen++
+    }
+    assert.ok(seen > 0, `${how}: the writer's routes reach the holder — the fixture is what it claims`)
+  }
 })
 
 //! the topology replay at every step around a hand-off, against the REAL kernel's watermarks at that step (a sim
