@@ -611,3 +611,62 @@ test('an unscoped member that left is judged by its tenure everywhere: not compa
   for (const id of after) assert.equal(rs.get(id)!.nodes.n04.status, 'not-a-holder', `${id} came after n04 left`)
   for (const r of rs.values()) assert.notEqual(r.nodes.n04?.status, 'never-arrived', `${r.origin}#${r.seq}: nothing n04 was meant to get is missing`)
 })
+
+//! dropOut — a capture as the attach bridge builds it when one target does not answer: that node gone, an absent row
+const dropOut = (cap: ReturnType<typeof captureSim>, uuid: string) =>
+  ({ ...cap, kind: 'live', seed: null, nodes: cap.nodes.filter((n) => n.uuid !== uuid), absent: [{ target: '127.0.0.1:9001', reason: 'timeout' }] }) as unknown as ReturnType<typeof captureSim>
+
+test('a capture missing the writer (a live attach that could not reach it) tells the same story about every other node (wave 5e review)', () => {
+  //! the review's two captures: the header said converged ✓ above amber ⊘ stops for a member that left (unscoped) and
+  // for non-holders (scoped), because with no writer the stops fell back to the old never-arrived rule
+  const same = (whole: ReturnType<typeof captureSim>, writer: string, what: string) => {
+    const full = routes(whole) as Map<string, Rt>
+    const part = dropOut(whole, writer)
+    assert.equal(agreement(part).converged, true, `${what}: the header says converged`)
+    const rs = routes(part) as Map<string, Rt>
+    let judged = 0
+    for (const [id, r] of rs) {
+      if (r.origin !== writer) continue
+      for (const [u, s] of Object.entries(r.nodes)) {
+        assert.equal(s.status, full.get(id)!.nodes[u].status, `${what}: ${id} at ${u} reads as it does with the writer captured`)
+        judged++
+      }
+      assert.ok(!Object.values(r.nodes).some((s) => s.status === 'never-arrived'), `${what}: ${id} waits for nobody`)
+    }
+    assert.ok(judged > 0, `${what}: the writer's routes were judged — the fixture is what it claims`)
+    return rs
+  }
+  const { cap, after } = unscopedLeaver()
+  const lr = same(cap, 'n01', 'unscoped leaver')
+  for (const id of after) assert.equal(lr.get(id)!.nodes.n04.status, 'not-a-holder', `${id} came after n04 left`)
+  const { healed, owner } = scopedCut()
+  const sr = same(healed, owner, 'scoped')
+  assert.ok([...sr.values()].some((r) => r.origin === owner && Object.values(r.nodes).some((s) => s.status === 'not-a-holder')), 'scoped: a non-holder is a quiet stop')
+  assert.ok([...sr.values()].some((r) => r.origin === owner && Object.values(r.nodes).some((s) => s.status === 'acquired')), 'scoped: the holder that copied the row in reads acquired')
+})
+
+test('a stop whose write no captured log holds has no epoch: a member that left is never-arrived there, not quiet — nothing proves it came after the leave (wave 5e review)', () => {
+  const { cap, after } = unscopedLeaver()
+  const [o, s] = after[0].split('#')
+  const blind = structuredClone(cap)
+  for (const n of blind.nodes) if (n.logs[o]) n.logs[o] = n.logs[o].filter((x) => x.seq !== Number(s))
+  assert.equal((routes(cap) as Map<string, Rt>).get(after[0])!.nodes.n04.status, 'not-a-holder', 'with its record, the epoch places it after the leave')
+  assert.equal((routes(blind) as Map<string, Rt>).get(after[0])!.nodes.n04.status, 'never-arrived', 'without it, the old rule')
+})
+
+test('a scoped write whose writer carries no holder fact still judges a member that left by its tenure: a write after the leave was never meant for it (wave 5e review)', () => {
+  //! an older capture (`holders` from ISSUES I-3, no `held`) where one writer carries no holder fact (e.g. not armed
+  // at capture end): the old rule painted every post-leave write of that writer ⊘ at the leaver, scoped or not
+  const { cap } = scopedTenure()
+  const old = structuredClone(cap)
+  for (const n of old.nodes) delete (n as { held?: unknown }).held
+  delete (old.nodes.find((n) => n.uuid === 'n02') as { holders?: unknown }).holders
+  assert.ok(old.nodes.some((n) => n.holders), 'the resource still carries a scoped fact')
+  const rs = [...(routes(old) as Map<string, Rt>).values()]
+  const n04 = old.nodes.find((n) => n.uuid === 'n04')!
+  const leftAt = n04.journal.filter((e) => e.kind === old.vocab.viewInstall).at(-1)!.a as number
+  const epochOf = (r: Rt) => (old.nodes.flatMap((n) => n.logs[r.origin] || []).find((x) => x.seq === r.seq) || { epoch: null }).epoch
+  const later = rs.filter((r) => r.origin === 'n02' && r.nodes.n04 && epochOf(r) != null && (epochOf(r) as number) >= leftAt)
+  assert.ok(later.length > 0, 'n02 wrote after n04 left — the fixture is what it claims')
+  for (const r of later) assert.equal(r.nodes.n04.status, 'not-a-holder', `${r.origin}#${r.seq} came after n04 left`)
+})
