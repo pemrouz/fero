@@ -323,3 +323,31 @@ test('I-29 — the registry at volume: a handler that makes 5000 views in one ca
     await s.stop()
   }
 })
+
+test("I-29 — a write through ctx.data that fires module code: a deduped view module code makes then stays when a handler later drops the same view (set, patch)", async () => {
+  const NODE = Symbol.for('data.v4.node')
+  for (const verb of ['set', 'patch'] as const) {
+    let total: any = null
+    let fired = 0
+    const s = solo({
+      add: (k: string, ctx: { data: any }) => { if (verb === 'set') ctx.data.set(k, { n: 5 }); else ctx.data.patch([[k, { n: 5 }]]) },
+      total: (_: unknown, ctx: { data: any }) => snapshot(ctx.data.sum('n')),
+    }, { r1: { n: 1 }, r2: { n: 2 } })
+    try {
+      //! a module sink that makes f.data.sum('n') the first time a write commits after it is hooked. The
+      // write a handler makes through ctx.data commits synchronously, so this runs INSIDE that ctx.data
+      // call — the sum is still module code's raw handle, and the handler's sum('n') later is the same one
+      const hook = s.bind.data.connect({}, () => { if (++fired > 1 && total === null) total = s.bind.data.sum('n') })
+      await s.host.invokeLocal('add', 'r3')
+      assert.ok(total !== null, `${verb}: the module sink made its sum during the write`)
+      for (let i = 0; i < 3; i++) assert.equal(await s.host.invokeLocal('total', undefined), 8)
+      await settle()
+      assert.equal(total[NODE].disposed, false, `${verb}: the sum module code made during a ctx.data.${verb} was released under it`)
+      s.bind.data.r4 = { n: 100 }
+      assert.equal(snapshot(total), 108, `${verb}: the module sum still folds`)
+      hook.dispose()
+    } finally {
+      await s.stop()
+    }
+  }
+})

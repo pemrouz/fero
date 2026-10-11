@@ -388,7 +388,7 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
           return lens(h.get(k), [...path, k], sink, inflight, h)
         }
       //! operators + READ built-ins: v4's own dispatch. An operator's view handed out here is ESCAPED
-      // unless a handler scope made the call (I-29, handlerScope below): code outside a handler holds it raw
+      // (I-29, handlerScope below): the caller holds it raw. ctx.data calls data's operator itself
       if (RESERVED_NAMES.has(prop)) return OPERATORS.has(prop) ? escaping(h[prop]) : h[prop]
       const child = h.get(prop)
       return lens(child, [...path, prop], sink, inflight, h)
@@ -507,10 +507,11 @@ export const derived = (p: any): number => (unwrap(p)[NODE] as DataNode<unknown>
 //     child view, no subscription (effect), not ESCAPED — and its parents are tried in turn.
 //   - a view is ESCAPED when code outside a handler reached its raw handle: data dedups some operators
 //     (sum('n'), top(3), keys…) per parent, so f.data.sum('n') at module scope can return the very
-//     handle a handler made. The lens marks what it hands out outside a handler. A view made off an
-//     escaped one counts as escaped too, in EITHER order: code that holds the escaped view raw can ask
-//     it for the same deduped child later, even when a handler made that child first. So the collector
-//     never releases a node that is escaped or sits under an escaped node (`held`).
+//     handle a handler made. The lens marks every operator view it hands out; ctx.data never goes
+//     through that mark (it calls data's own operator). A view made off an escaped one counts as
+//     escaped too, in EITHER order: code that holds the escaped view raw can ask it for the same
+//     deduped child later, even when a handler made that child first. So the collector never releases
+//     a node that is escaped or sits under an escaped node (`held`).
 // A wrapper is NOT held by its raw handle (a WeakRef maps raw → wrapper), so a deduped view the source
 // still lists is released once no wrapper of it is alive; data evicts a disposed dedup hit and mints a
 // fresh view on the next call. Release is collector-timed: a dropped view stops being worked out at the
@@ -525,9 +526,6 @@ const gone = new FinalizationRegistry<DataNode<unknown>>((n) => {
   live.set(n, c - 1)
   release(n)
 })
-//! scoped — > 0 while a call through ctx.data runs: the lens then leaves its result unescaped (the
-// handler scope adopts it instead)
-let scoped = 0
 
 //! held — is this node escaped, or made (at any depth) off a node that is? Asked at release time, not
 // when the view is made: module code may escape a parent AFTER a handler made a deduped child of it
@@ -626,25 +624,31 @@ export const handlerScope = (surface: any): any => {
   target[RAW] = surface
   return new Proxy(target, SCOPE)
 }
+//! An operator is called on DATA'S OWN handle (`unwrap`), never through the lens's `escaping`, so its
+// view is the handler's and nothing else changes while it runs. The surface still answers first: the
+// scoped facade throws its typed error for an operator right there. There is no "a handler call is
+// running" flag: a write through ctx.data commits synchronously and can run module code (a sink that
+// makes f.data.sum('n')), and that module code's views must be marked as ever.
 const SCOPE: ProxyHandler<any> = forward({
   get(s, prop) {
     const t = s[RAW]
     const v = t[prop]
     if (typeof v !== 'function') return v
-    return (...a: unknown[]) => {
-      scoped++
-      try { return adopt(Reflect.apply(v, t, a)) } finally { scoped-- }
+    if (typeof prop === 'string' && OPERATORS.has(prop)) {
+      const op = unwrap(t)[prop]
+      return (...a: unknown[]) => adopt(op(...a))
     }
+    return (...a: unknown[]) => adopt(Reflect.apply(v, t, a))
   },
 })
 
 //! handlerView — is this one of the wrappers above (a view the collector will release)?
 export const handlerView = (x: unknown): boolean => x !== null && typeof x === 'object' && views.has(x)
 
-//! escaping — the lens's operators outside a handler: a view handed out raw is ESCAPED (above)
+//! escaping — the lens's operators: a view handed out raw is ESCAPED (above). ctx.data does not come here
 const escaping = (fn: (...a: unknown[]) => unknown) => (...a: unknown[]): unknown => {
   const r = fn(...a)
-  if (scoped === 0 && r !== null && typeof r === 'object') {
+  if (r !== null && typeof r === 'object') {
     const n = (r as any)[NODE]
     if (n instanceof DataNode && n.kind !== 'source') escaped.add(n)
   }
