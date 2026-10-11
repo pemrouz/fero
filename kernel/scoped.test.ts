@@ -665,6 +665,50 @@ test('ACQUISITION — a co-holder\'s HAVEQ announce latches the from-zero assign
   assert.deepEqual(h.node.logs.get('bb')!.map((e) => e.seq), [3, 5, 6], 'the lane: teacher records at their seqs + the live tail')
 })
 
+//! wave 6a (2026-10-12): the fold's SPOKE FORWARD (kernel/scope.ts onAcqDone). A feeder used to fold the teacher's
+// records through node.apply alone, so a spoke never heard them; its floor exchange ships only what is above its own
+// tail per lane, so once a later record had been tapped live the latch's rows were below the tail for good (STATUS,
+// two sightings; sim/scale-probes.test.ts pins both). Red on the base at "the synced spoke heard the fold" (got []).
+test('ACQUISITION forwards to spokes — the teacher records the fold takes in reach a SYNCED client link in one flush, attempt identity intact, with the replayed live span behind them; an UNSYNCED client link hears nothing and its first answer brings them; a record already in the lane is not re-sent', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('px', 'bb', 'aa')
+  const spoke = (link: number, u: string, sync: boolean) => {
+    h.node.step({ kind: 'linkUp', link, dialed: false })
+    h.node.step({ kind: 'bytesIn', link, bytes: encodeControl(VERB.HELLO, { u, i: 1, l: `sim:${u}`, r: 1 }) })
+    if (sync) h.node.step({ kind: 'bytesIn', link, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  }
+  spoke(3, 'zz', true)
+  spoke(4, 'zy', false)
+  const sent = (link: number) => h.of('send').filter((e) => e[1] === link)
+    .map((e) => new Framer().push((e[2] as Uint8Array).slice())[0]).filter((f) => f && f.verb === VERB.RECORDS)
+    .flatMap((f) => [...f.records()].map((r) => ({ origin: r.origin, seq: r.seq, iss: r.issuer, cid: r.cid })))
+  assert.deepEqual(sent(3), [], 'nothing shipped yet: aa holds nothing of px')
+  //! the latch opens; a live record for px stages (nothing folds, nothing is forwarded)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 6, rec: rec(['px', 'fresh'], 'live'), pp: 5 }]) })
+  assert.deepEqual(sent(3), [], 'a staged live record is not forwarded: nothing has folded')
+  //! the teacher's transfer: seq 3 carries an attempt identity (a client's write the owner committed), seq 5 none
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['px', 'a'], 1), origin: 'bb', seq: 3, epoch: 1, iss: 'cli~1', cid: 7, pp: 0 }], VERB.ACQ, true)[0] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 5, rec: rec(['px', 'b'], 2), pp: 3 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 5 }, n: 2 }) })
+  assert.equal(h.jk(JK.acquire).length, 1, 'the fold committed')
+  assert.deepEqual(sent(3), [{ origin: 'bb', seq: 3, iss: 'cli~1', cid: 7 }, { origin: 'bb', seq: 5, iss: '', cid: 0 }, { origin: 'bb', seq: 6, iss: '', cid: 0 }],
+    'the synced spoke heard the fold: the two teacher records (attempt identity intact — the spoke\'s write-route join reads it) and the replayed live record behind them, in this step')
+  assert.deepEqual(h.node.logs.get('bb')!.map((e) => e.seq), [3, 5, 6], 'the records are in the lane the forward was sent from (the feeder committed them first: V4-7)')
+  assert.deepEqual(sent(4), [], 'the unsynced spoke heard nothing')
+  //! the unsynced spoke's first ask brings them: its digest answer ships the held subset
+  h.node.step({ kind: 'bytesIn', link: 4, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  assert.deepEqual(sent(4).map((r) => r.seq), [3, 5, 6], 'the answer that syncs the link covers what the fold took in')
+  //! a second latch whose teacher re-ships a record the lane already holds forwards nothing for it (not re-sent)
+  const before = sent(3).length
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(1, { px: { bb: 7 } }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: acqFrame('bb', [{ seq: 5, rec: rec(['px', 'b'], 2), pp: 3 }]) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: acqFrame('bb', [{ seq: 7, rec: rec(['px', 'c'], 3), pp: 6 }]) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 7 }, n: 2 }) })
+  assert.equal(h.jk(JK.acquire).length, 2, 'the second fold committed')
+  assert.deepEqual(sent(3).slice(before).map((r) => r.seq), [7], 'only the record the lane lacked was forwarded; seq 5 was already there')
+})
+
 test('ACQUISITION aborts — torn count, foreign ACQ, teacher death, epoch flip, tick timeout: the buffer drops whole, nothing folds', () => {
   //! torn: DONE's n disagrees with the staged teacher count
   const t1 = armedView1()

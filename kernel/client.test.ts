@@ -1662,26 +1662,31 @@ test('a clear on a link that was never synced leaves no cover: the drain digest 
   assert.deepEqual([...S.node.state.keys()].sort(), [...F.node.state.keys()].sort())
 })
 
-//! the review of the wave-5f fix: a scoped feeder folds a record through the LATCH (scope.ts onAcqDone) and taps
-// nothing, so the spoke does not hold it (the open STATUS latch bug). A control-only clear then lands on the synced link,
-// and a later record on the same lane folds before the drain. The clear's cover sits at the feeder's tails, ABOVE the
-// latch-folded record. When the drain resumed that cover, it shipped the later record alone, the spoke's tail rose past
-// the latch row, and the row never arrived while the feeder lived (7 of 8 rows; the base tree heals it through the
-// drain digest). Now a cover the clear SET is a ceiling (`c`): the drain does not resume it, and the spoke's reply to
-// the drain digest is answered from the lower of its own tail and the ceiling, so the latch row is shipped as on the base.
+//! the review of the wave-5f fix found this shape: a scoped feeder folded a record through the LATCH (scope.ts
+// onAcqDone) and tapped nothing (the STATUS latch bug, closed by wave 6a), so the spoke lacked it; a control-only clear
+// then set a cover at the feeder's tails, ABOVE the latch row, and a drain that RESUMED that cover shipped a later
+// record alone, so the spoke's tail rose past the latch row and it never arrived while the feeder lived (7 of 8 rows;
+// the base tree healed it through the drain digest). V4-49's answer: a cover the clear SETS is a ceiling (`c`) — the
+// drain does not resume it; the spoke's reply to the drain digest is answered from the lower of its own tail and the
+// ceiling. RE-RECORDED for wave 6a (2026-10-12): the fold now taps the latch row onto the client link as the live tap
+// would (here: into the paused queue), so the clear that follows takes a RECORD frame and lowers the ceiling to just
+// under it (bb: 22, where the feeder's tail is 23); the rule's steps are the same — not resumed at the drain, used up
+// by the spoke's reply — and the row arrives. With the forward in place a cover at a synced link's feeder tails would
+// be a sound claim about the spoke (every record it folds is tapped to a synced link or lies above those tails), so
+// the ceiling is belt and braces now; it stays as V4-49 recorded it.
 const PX = (k: string, v: number): Rec => ({ type: REC.update, key: ['px', k], value: v })
-test('a clear\'s cover is a ceiling, never a claim: a latch-folded record the spoke never got, a control-only clear and a later record on its lane before the drain — the latch row still arrives (the drain digest\'s heal, kept)', () => {
+test('a clear\'s cover is a ceiling, never a claim: a latch-folded record (tapped onto the paused link since wave 6a), a clear that takes its frame and lowers the ceiling to just under it, and a later record on its lane before the drain — the ceiling is not resumed, the spoke\'s reply uses it up, the latch row arrives', () => {
   const { F, S, p, link, rows } = steady(2)
   F.node.writes.ring.place('px', 'bb', 'aa')
   F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 23 } } }) })
   F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: PX('a', 23), origin: 'bb', seq: 23, epoch: 1, pp: 0 }], VERB.ACQ, true)[0] })
   F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 23 }, n: 1 }) })
   assert.equal(F.node.scope!.held('px'), true, 'the latch folded px')
-  assert.equal(link.queued.length, 0, 'the latch fold tapped nothing (the open STATUS bug)')
+  assert.equal(link.queued.length, 1, 'the latch fold tapped the row onto the paused link (wave 6a; it tapped nothing before)')
   for (let i = 0; i < 3; i++) F.node.step({ kind: 'reply', link: 7, id: i + 1, ok: true, value: i })
-  assert.equal(F.jk(JK.dropOldest).length, 1, 'a control-only clear')
-  assert.deepEqual(link.torn, { d: { bb: 23 }, r: undefined, q: undefined, c: true }, 'the cover: the feeder\'s tails, a ceiling')
-  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(24, 20) }) // folds; not tapped (unsynced)
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'one clear: it took the tap frame and two replies')
+  assert.deepEqual(link.torn, { d: { bb: 22 }, r: undefined, q: undefined, c: true }, 'the cover: the feeder\'s tails lowered to just under the latch row the clear took, a ceiling')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(24, 20) }) // folds; not tapped (unsynced); above the ceiling
   F.node.step({ kind: 'drain', link: 7 })
   assert.equal(link.torn?.c, true, 'the drain does not resume a ceiling: it waits for the spoke\'s reply to the drain digest')
   p.settle()

@@ -702,6 +702,18 @@ export class Scope {
     const teach = e.buf!.filter((s) => !s.live)
     if (teach.length !== (v.n ?? 0)) { this.#abort(node, p, 'torn'); return }
     const cut = v.t ?? {}
+    //! THE SPOKE FORWARD (wave 6a, 2026-10-12): every teacher record this fold takes in goes to each SYNCED client
+    // link, exactly as the live tap gives a spoke a fresh inbound record (write.ts inbound): the record, its lane
+    // coordinates and its attempt identity (the spoke's write-route join reads it; V4-7's order holds — the value
+    // shows, then the write settles), no pp (a spoke attests nothing). The spoke's own dual fence takes a record
+    // below its lane tail (write.ts #splice, the client leg) and drops one it already holds. Before this, a feeder
+    // folded here through node.apply alone and its spokes never heard: a spoke's floor exchange ships only what is
+    // above its own tail on each lane, so once a later record on the lane had been tapped live, the rows the latch
+    // brought never came while that feeder lived (STATUS, two sightings: a lost owner-to-holder frame repaired
+    // through the latch; an acquire in a hand-off). An UNSYNCED client link is not fed, as the live tap does not
+    // feed it: the answer that syncs it covers these records — a resync asks with d = {}, and a stopped or queued
+    // answer's cover is lowered to just under each interior insert by node.indexInsert below.
+    const taps = node.clientLinks.size !== 0
     //! fold the teacher records: insert into lanes at seq position through the LWW election. The
     // teacher walked each lane ascending, so per-lane order is preserved by construction.
     for (const s of teach) {
@@ -717,6 +729,10 @@ export class Scope {
       node.indexInsert(s.origin, entry)
       node.apply(s.rec, s.origin, s.seq, s.epoch, s.iss, s.cid)
       if (s.iss) node.writes.remember(node, s.iss, s.cid!, s.seq, s.epoch, s.origin) // the lane too: a dup WACK from here must name it
+      if (taps)
+        for (const cl of node.clientLinks)
+          if (cl.state === LS.admitted && cl.synced && !cl.dead)
+            cl.add(s.rec, { origin: s.origin, baseSeq: s.seq, epoch: s.epoch }, s.iss ? { issuer: s.iss, baseCid: s.cid! } : undefined)
     }
     //! floors and fences advance to the CUT (the teacher's attestation), never past it on the
     // teacher's word; the scalar fence merges up so replayed-live below the cut dedups
@@ -752,6 +768,10 @@ export class Scope {
       if (s.seq <= (cut[s.origin] ?? 0)) continue
       node.writes.inbound(node, s.origin, s.seq, s.epoch, { rec: () => s.rec, issuer: s.iss ?? '', cid: s.cid ?? 0, pp: s.pp })
     }
+    //! one flush per fold on each client link, as the RECORDS handler flushes once per frame: the forwarded teacher
+    // records and the replayed live span (inbound added them to the same outbox; before wave 6a nothing flushed them
+    // here, so they left with the feeder's next frame or commit) leave in this step
+    if (taps) for (const cl of node.clientLinks) cl.flush(node.env.sink, j)
     //! durable: the base entered memory only — arm the snapshot swap so it reaches disk atomically
     // (never persistRun: interior rows condemn the chain), and dirty until the echo
     if (node.durable) node.spliced(p)
