@@ -16,6 +16,8 @@
 // node.step() a single fail-closed dispatch site.
 
 //! One inbound stimulus. The closed union node.step() dispatches on — nothing else moves the kernel.
+import type { Vote } from './membership.ts'
+
 export type Event =
   //! start: boot stimulus — dial the configured hosts. Posted once by the embedder (shell runtime or sim).
   | { kind: 'start' }
@@ -179,7 +181,7 @@ export interface BootRecord {
   members: [string, string][]
   lamport: number
   incarnation: number
-  votedFor: { e: number; p: string; h: string }
+  votedFor: Vote
   heldPartitions?: string[]
   orphanParts?: string[]
   dirtyParts?: string[]

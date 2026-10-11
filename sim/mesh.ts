@@ -8,6 +8,7 @@
 // A plain module, not a test: sim/explore.test.ts asserts over a pinned range of seeds; a scratch script can import
 // `explore` to run more.
 import { Node } from '../kernel/node.ts'
+import type { Vote } from '../kernel/membership.ts'
 import { Framer, VERB, encodeControl } from '../kernel/codec.ts'
 import { TAG, type BootRecord, type EffectSink, type Env } from '../kernel/env.ts'
 
@@ -15,7 +16,7 @@ import { TAG, type BootRecord, type EffectSink, type Env } from '../kernel/env.t
 const MV = new Set<number>([VERB.JOIN, VERB.PROPOSE, VERB.VOTE, VERB.VIEW, VERB.PULL, VERB.LEAVE])
 const vname = (v: number) => Object.entries(VERB).find(([, x]) => x === v)?.[0] ?? String(v)
 type Frame = { verb: number; bytes: Uint8Array; value: unknown }
-type Boot = { epoch: number; members: [string, string][]; votedFor?: { e: number; p: string; h: string } }
+type Boot = { epoch: number; members: [string, string][]; votedFor?: Vote }
 
 export class Mesh {
   nodes = new Map<string, Node>()
