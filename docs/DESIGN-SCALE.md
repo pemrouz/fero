@@ -157,6 +157,39 @@ spoke's write waits for a value that reaches it only if its next
 feeder holds the partition. That is the one residual of the `acked`
 effect.
 
+**Note, 2026-10-11 (wave 5e: the feeder-death residual closed).** The
+residual above is closed, and the fix settles, never re-commits. What the
+repro showed first (sim/feeder-death.test.ts): the common order is not the
+owner's WACK. The owner flushes its fan-out before it answers, so a
+co-holder relay folds the record first, and the replicated record clears
+the relayed attempt and hops the WACK to the spoke at once; the tap rides
+the frame's flush right behind it on the same link. A link that dies in
+that gap leaves the spoke with its WACK (the attempt has left its queue,
+nothing is re-sent) and without the value. Shape chosen: the spoke keeps
+the coordinates itself. An armed relay that will tap the record names the
+lane in the hop as a new optional key `l` (both hop sites: the owner's
+WACK and the inbound clear); `o` keeps its meaning (settle now, no tap is
+coming). The spoke keeps each such attempt in `#awaiting` while its record
+is unseen; the fold sites drop it. At a primary failover the spoke marks
+every kept entry (`strand`), and at the end of the resync onto the next
+feeder it settles every marked entry still unseen through `acked`, on the
+owner's lane (`settleStranded`). A record the next feeder holds comes in
+its ship first and settles through the join, after its value shows (V4-7).
+A scoped feeder elected at an admit with an empty fold resyncs when
+something is stranded, so the end comes. A spoke past dedupKeep kept
+entries settles the evicted one from its coordinates. The other shape the
+plan named, asking the new feeder to settle each attempt from the owner's
+dedup window, was not needed: the spoke already holds the answer the
+window would give, so nothing asks the window, an aged-out window changes
+nothing, and no `unknown` outcome is needed. Costs, named: V4-7's order is
+kept only where the next feeder already holds the record when its ship
+leaves; a next feeder that holds the partition but has not yet received
+the record lets the write settle at the resync's end, with the value
+showing a moment later. A spoke with no feeder at all keeps the write
+pending until a feeder admits it. A feeder that sends no `l` (a feeder
+older than this note: mixed versions, V4-14) still strands its spokes.
+Unscoped feeders never send `l`: unscoped bytes are unchanged.
+
 **Note, 2026-10-10 (stage 1 complete: the drain, part (b)).** The owner
 said yes to Q8 (DECISIONS V4-31), and the drain-then-go is in the tree.
 What "drained" means, in the kernel's terms: the shed bar. Once the view
