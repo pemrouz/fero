@@ -612,16 +612,12 @@ test('an unscoped member that left is judged by its tenure everywhere: not compa
   for (const r of rs.values()) assert.notEqual(r.nodes.n04?.status, 'never-arrived', `${r.origin}#${r.seq}: nothing n04 was meant to get is missing`)
 })
 
-//! dropOut — a capture as the attach bridge builds it when one target does not answer: that node gone, an absent row
-const dropOut = (cap: ReturnType<typeof captureSim>, uuid: string) =>
-  ({ ...cap, kind: 'live', seed: null, nodes: cap.nodes.filter((n) => n.uuid !== uuid), absent: [{ target: '127.0.0.1:9001', reason: 'timeout' }] }) as unknown as ReturnType<typeof captureSim>
-
 test('a capture missing the writer (a live attach that could not reach it) tells the same story about every other node (wave 5e review)', () => {
   //! the review's two captures: the header said converged ✓ above amber ⊘ stops for a member that left (unscoped) and
   // for non-holders (scoped), because with no writer the stops fell back to the old never-arrived rule
   const same = (whole: ReturnType<typeof captureSim>, writer: string, what: string) => {
     const full = routes(whole) as Map<string, Rt>
-    const part = dropOut(whole, writer)
+    const part = attachMissing(whole, writer)
     assert.equal(agreement(part).converged, true, `${what}: the header says converged`)
     const rs = routes(part) as Map<string, Rt>
     let judged = 0
