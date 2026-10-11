@@ -68,7 +68,8 @@ export class Link {
   // it did not; `r` and `q` are its digest's. The node resumes the answer from there at the drain (node.ts #answer —
   // an answer with the cover as its tails ships exactly the rest), so the reply always follows the whole ship. Null
   // when no answer is torn. Set only on a link that ships suffixes (an unscoped member's, a client's); an armed member
-  // link gets no suffix and never tears.
+  // link gets no suffix and never tears. A clear on a CLIENT link sets or lowers it too (wave 5f, onClear below): the
+  // cover then re-sends the tap-forwards the clear took, with `r` and `q` undefined when no answer was owed.
   torn: { d: Record<string, number>; r: number | undefined; q: number | undefined } | null = null
   //! inQueue: the same shape, for the answer whose frames (or reply) sit in the queue right now — the cover at its
   // FIRST queued frame. It is what keeps an answer resumable until its reply has left the queue: a clear (ship below)

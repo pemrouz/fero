@@ -460,7 +460,7 @@ export class Node {
   // so the member hot path pays nothing (M5b).
   clientLinks = new Set<Link>()
   //! #covered — the client links that may hold a digest answer's cover (Link.torn / Link.inQueue): added where #answer
-  // sets one, pruned lazily by indexInsert once both are null, and at linkDown. It keeps indexInsert's cover check to
+  // or #clearCover sets one, pruned lazily by indexInsert once both are null, and at linkDown. It keeps indexInsert's cover check to
   // the links that can need it, so an interior insert on a node with many idle clients pays one size check.
   #covered = new Set<Link>()
   //! resync (spokes only, 2026-09-06 — DECISIONS V4-5): a spoke's fold is a VIEW of its feeder's, never a
@@ -891,6 +891,7 @@ export class Node {
         // socket again (the shell steps `pause` inside a send): then the resume, the exchange and the round all wait for
         // the next drain. A resume that stops again likewise leaves the exchange for the drain that completes it — the
         // ask it carries would otherwise go out AHEAD of the rest of the ship and buy a spoke in resync a second download.
+        // The same resume re-sends what a clear on a client link took in steady state (#clearCover, wave 5f: no reply).
         if (link.torn !== null) {
           if (link.paused) return
           const t = link.torn
@@ -2011,7 +2012,8 @@ export class Node {
   // shipped, and one tap-forwarded behind a queued reply and cleared with it is never shipped again — a spoke in
   // resync ends without that row and sweeps it (the review of the resume-cost fix, 2026-10-11). Only client links
   // carry a cover on a node that splices (an armed one: its member links get no suffix), and only while paused.
-  // The check walks #covered, not every client link: one size check when no answer is stopped or queued.
+  // The check walks #covered, not every client link: one size check when no answer is stopped or queued. A cover a clear
+  // left on a client link (#clearCover, wave 5f) is lowered here the same way, so a splice before the drain is re-sent.
   //! The cost: lowering a cover re-sends that lane's whole suffix above the splice, frames the peer may already
   // hold included, so splices that keep landing under one long torn answer keep moving its resume point back and
   // delay its reply until they stop (every row still arrives). Splices are cold (a heal, a fetch fold); a per-link
