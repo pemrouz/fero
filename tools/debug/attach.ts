@@ -125,15 +125,36 @@ export class DiagClient {
   close() { this.#teardown(new Error('closed')) }
 }
 
-//! pullNode — one truthful node slice via the chunked ops: meta (vocab) → node (the fold) → journal
-// cursor loop (INCLUSIVE f, resumed via next) → per-origin logs loops (EXCLUSIVE f — the digest/AE
-// convention) → state (single frame). The blob it assembles is captureNode's EXACT shape — the parity
-// pin in attach.test.ts holds them deepEqual — with encodeVal applied bridge-side (the wire carries
-// values raw; JSON safety is the capture's concern).
-export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promise<AttachAnswer> => {
+//! the per-attach caches (wave 5e) — what this bridge already pulled from one node LIFE, so a rebuild asks only
+// for what changed. Keyed by the client object (one per target); a cache belongs to one (uuid, incarnation): a
+// restarted node starts a new journal at t=0 and new lanes, so a different peer drops the cache whole.
+//   journal — rows are immutable per t: keep rows [dropped, cursor) and ask from the cursor (INCLUSIVE f), where
+//             cursor = the last snapshot's head. A ring wrap past the cursor (the answer's f0 > cursor) is a hole:
+//             the cache is dropped and the slice starts at f0, its `dropped` raised to say so — never a splice.
+type JRow = { t: number; kind: number; a?: unknown; b?: unknown; c?: unknown }
+type LogEntry = { k: unknown; at: unknown; ty: number; v: unknown; seq: number; epoch: number; iss?: string; cid?: number }
+type Cache = { u: string; i: number; rows: JRow[]; cursor: number }
+const caches = new WeakMap<object, Cache>()
+//! the client surface pullNode needs — a DiagClient, or any object answering the same questions (the suites drive a
+// kernel Node through onDiagQ directly to make restarts, ring wraps and hand-offs happen on cue)
+export type Puller = { target: string; peer: { u: string; i: number } | null; q: (body: Record<string, unknown>, deadlineMs: number) => Promise<Record<string, unknown>> }
+
+//! pullNode — one truthful node slice via the chunked ops: meta (vocab) → node (the fold) → state (single
+// frame) → journal delta (INCLUSIVE f from the cache's cursor) → per-origin logs
+// loops (EXCLUSIVE f — the digest/AE convention). The blob it assembles is captureNode's EXACT
+// shape — the parity pins in attach.test.ts hold them deepEqual — with encodeVal applied bridge-side (the wire
+// carries values raw; JSON safety is the capture's concern).
+export const pullNode = async (c: Puller, budgetMs = PULL_BUDGET_MS): Promise<AttachAnswer> => {
   const t0 = performance.now()
   const left = () => Math.max(50, budgetMs - (performance.now() - t0))
   const meta = await c.q({ q: 'meta' }, left())
+  //! one cache per node life: the peer the latch (or the meta reply) named
+  const peer = c.peer ?? { u: meta.u as string, i: meta.i as number }
+  let cache = caches.get(c)
+  if (!cache || cache.u !== peer.u || cache.i !== peer.i) {
+    cache = { u: peer.u, i: peer.i, rows: [], cursor: 0 }
+    caches.set(c, cache)
+  }
   const nq = await c.q({ q: 'node' }, left())
   const w = nq.n as {
     uuid: string; name?: string; listen: string; seq: number; epoch: number
@@ -150,31 +171,27 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
   // slice says so, so the viewer paints "torn read" where a replay mismatch would have read as a fault (ISSUES I-2)
   const st = await c.q({ q: 'state' }, left())
   const torn = st.sh !== w.stateHash
-  //! journal: resume via next until the head; the first page's f0 is where retention starts (loss below
-  // it is the node's business — dropped rides the fold; the viewer disables time-travel loudly on it).
-  // CUT at the snapshot's head: a row with t ≥ w.jn landed AFTER the node fold was taken (a busy node keeps
-  // writing while we page), and folding it against the snapshot's links/streams read as drift where there
-  // was only skew (ISSUES I-18). The slice is one instant — the snapshot's; later rows belong to the next pull.
-  const journal: { t: number; kind: number; a?: unknown; b?: unknown; c?: unknown }[] = []
-  for (let f = 0; ; ) {
+  //! journal: the delta from the cursor, resumed via next until the snapshot's head. CUT at the head: a row with
+  // t ≥ w.jn landed AFTER the node fold was taken (a busy node keeps writing while we page), and folding it against
+  // the snapshot's links/streams read as drift where there was only skew (ISSUES I-18). Rows below the snapshot's
+  // `dropped` left the node's ring and leave the cache; a hole past the cursor drops the cache (never a splice).
+  let rows = [...cache.rows] // a fresh array: a slice handed out earlier must never grow under its reader
+  let start = w.dropped
+  for (let f = cache.cursor; f < w.jn; ) {
     const page = await c.q({ q: 'journal', f }, left())
+    if ((page.f0 as number) > f) { rows = []; start = Math.max(start, page.f0 as number) } // the ring wrapped past f: rows [f, f0) are gone
     for (const row of page.ev as [number, number, unknown, unknown, unknown][])
-      if (row[0] < w.jn) journal.push({ t: row[0], kind: row[1], a: row[2], b: row[3], c: row[4] })
+      if (row[0] < w.jn && row[0] >= f) rows.push({ t: row[0], kind: row[1], a: row[2], b: row[3], c: row[4] })
     if (page.next === undefined || (page.next as number) >= w.jn) break
     f = page.next as number
   }
+  rows = rows.filter((r) => r.t >= start)
+  cache.rows = rows
+  cache.cursor = w.jn
   //! logs: EXCLUSIVE cursor per origin — resume from `next` (the last served seq), never re-request it
   const logs: Record<string, unknown[]> = {}
   for (const o of Object.keys(w.origins)) {
-    const entries: unknown[] = []
-    for (let f = 0; ; ) {
-      const page = await c.q({ q: 'logs', o, f }, left())
-      for (const e of page.ev as { s: number; e: number; ty: number; k: unknown; at: unknown; v: unknown; iss?: string; cid?: number }[])
-        entries.push({ k: e.k, at: e.at, ty: e.ty, v: encodeVal(e.v), seq: e.s, epoch: e.e, iss: e.iss, cid: e.cid })
-      if (page.next === undefined) break
-      f = page.next as number
-    }
-    logs[o] = entries
+    logs[o] = await pullLogs(c, o, left)
   }
   return {
     target: c.target,
@@ -186,13 +203,26 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
       replicas: w.replicas,
       ...(w.holders ? { holders: w.holders } : {}),
       ...(w.held ? { held: w.held } : {}),
-      stateHash: w.stateHash, dropped: w.dropped,
-      journal, logs,
+      stateHash: w.stateHash, dropped: start,
+      journal: rows, logs,
       state: (st.cells as [string, unknown][]).map(([k, v]) => [k, encodeVal(v)]),
       streams: w.streams, links: w.links,
       ...(torn ? { torn: true } : {}),
     } as AttachAnswer['node'],
   }
+}
+
+//! pullLogs — one origin's whole record book (EXCLUSIVE cursor, resumed from `next`)
+const pullLogs = async (c: Puller, o: string, left: () => number): Promise<LogEntry[]> => {
+  const entries: LogEntry[] = []
+  for (let f = 0; ; ) {
+    const page = await c.q({ q: 'logs', o, f }, left())
+    for (const e of page.ev as { s: number; e: number; ty: number; k: unknown; at: unknown; v: unknown; iss?: string; cid?: number }[])
+      entries.push({ k: e.k, at: e.at, ty: e.ty, v: encodeVal(e.v), seq: e.s, epoch: e.e, iss: e.iss, cid: e.cid })
+    if (page.next === undefined) break
+    f = page.next as number
+  }
+  return entries
 }
 
 //! reasonOf — map a pull failure onto the CLOSED absent-reason set (anything unrecognized is 'refused':
