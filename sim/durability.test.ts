@@ -8,7 +8,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
-import { cluster, formed } from './harness.ts'
+import { cluster, client, formed } from './harness.ts'
 import { converged, confirmedIntact } from './monitors.ts'
 import { frontier, compact } from '../kernel/log.ts'
 import { JK } from '../kernel/journal.ts'
@@ -319,4 +319,35 @@ test('I-36 — a boot record that fails mid-life condemns the store: the node li
   assert.equal(reborn.incarnation, nodes[2].incarnation + 1)
   assert.equal(converged(sim), null)
   assert.deepEqual(sim.violations, [])
+})
+
+//! V4-51 end to end: frames cut by size EVERYWHERE, at a 4 KiB cap (the tune row `frame`), on the executive with every
+// per-event monitor armed. Every batch is bigger than a frame, so every path cuts: the commit fan-out, the tap to a
+// client, the WAL rows, the snapshot, the catch-up of a late client and of a member restarted from its disk.
+test('frames cut by size everywhere at a 4 KiB cap: three durable members and two clients, batches bigger than a frame, a snapshot and a restart', () => {
+  const big = (tag: string, n: number, size: number) => Array.from({ length: n }, (_, i) => ({ type: REC.update, key: [`${tag}-${i}`], value: new Uint8Array(size).fill(i & 255) }))
+  for (const seed of [3, 7]) {
+    const sim = new Sim(seed)
+    const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true, tune: { frame: 4096 } })
+    sim.run({ until: 400 })
+    assert.ok(formed(nodes), `seed ${seed}: formed`)
+    const early = client(sim, 'c1', nodes, { heartbeatMs: 50 })
+    sim.run({ until: 600 })
+    //! ten batches of six records of 1.2-1.4 KB, at every member in turn: each batch is two frames' worth or more
+    for (let k = 0; k < 10; k++) sim.at(50 + 50 * k, () => sim.post(`n0${1 + (k % 3)}`, { kind: 'write', recs: big(`b${k}`, 6, 1200 + 100 * (k % 3)) }))
+    sim.run({ until: 1300 })
+    for (const n of nodes) n.snapshot()
+    sim.run({ until: 1400 })
+    const reborn = sim.restart('n03')
+    const late = client(sim, 'c2', [nodes[0], nodes[1]], { heartbeatMs: 50 })
+    sim.run({ until: 5000 })
+    assert.equal(converged(sim), null, `seed ${seed}: converged`)
+    assert.deepEqual(sim.violations, [], `seed ${seed}: no monitor fired`)
+    for (const n of [nodes[0], nodes[1], reborn, early, late]) assert.equal(n.state.size, 60, `seed ${seed}: ${n.uuid} holds every row`)
+    assert.ok(jk(reborn, JK.replayed).length >= 1, 'the restarted member replayed its cut rows')
+    //! the cut really happened: a member's WAL holds one row per frame, every row within the cap
+    const rows = sim.stores.get('n01')!.wal
+    assert.ok(rows.length > 10, `n01 holds ${rows.length} rows (one per frame)`)
+    assert.ok(rows.every((r) => r.bytes.length - 11 <= 4096), 'every row within the cap')
+  }
 })
