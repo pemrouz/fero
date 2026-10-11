@@ -41,6 +41,7 @@ import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
 import { ARG, LIVE_VIEW, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
+import { FULL } from '../kernel/codec.ts'
 
 //! settle — flush-on-return's wait (V4-5): every tracked write reaches an outcome; a write the validator
 // REFUSED (api/data.ts Refused) fails the handler with the reason — a reply that claims an effect that
@@ -66,6 +67,22 @@ const settle = async (tracked: Promise<Coords>[]): Promise<void> => {
 //! SYSTEM — the reserved method-name prefix (unreachable from fero() opts: the composer rejects it):
 // internal RPCs (confirm-over-the-wire) share the method plane without stealing any user name.
 export const SYSTEM = '\u0000'
+
+//! tooLarge — the typed refusal of a read too big to send (V4-51). A RESULT or a SUBREC carries ONE value and cannot
+// be cut, so a whole read, a live sub's first picture or one of its changes bigger than one frame is refused — never
+// cut, never a dropped link, never the untyped 'the result could not be sent'. `scoped: true` makes every caller hand
+// it over as-is (rehydrate, below; old clients too: no wire change). `frame` is the answering node's cap.
+export const tooLarge = (m: string, replicas: number, frame: number, what: string): ScopedError => ({
+  scoped: true, op: m.startsWith(SYSTEM) ? m.slice(1) : m, reason: 'too-large', replicas,
+  hint: `${what} is bigger than one frame (${sizeOf(frame)}), so fero cannot send it: read one key at a time (methods.read(key)), or use a method that returns a smaller part`,
+})
+//! isTooLarge — is this thrown value the refusal above (a member's `rows` answer, in the gather)? Every read guarded:
+// a rejection can be anything
+export const isTooLarge = (e: unknown): boolean => {
+  try { return typeof e === 'object' && e !== null && (e as { scoped?: unknown }).scoped === true && (e as { reason?: unknown }).reason === 'too-large' } catch { return false }
+}
+//! sizeOf — a byte count as people say it: MiB, or KiB under one MiB
+export const sizeOf = (n: number): string => n >= 1 << 20 ? `${+(n / (1 << 20)).toFixed(1)} MiB` : `${+(n / 1024).toFixed(1)} KiB`
 
 //! Context — the second argument every handler receives. `data` is the server's own resource surface
 // (writes route through the ONE ingest: validation + the write-route join + owner routing all apply); `flush()`
@@ -227,6 +244,13 @@ export class Host {
       } catch (err) {
         if (entry && this.#subs.get(skey) === entry) { entry.cancelled = true; entry.stop(); this.#subs.delete(skey) }
         if (isProxy(result) && disposeMinted(result, minted)) reapStopped()
+        //! an answer bigger than one frame (a CALL's value, a value SUB's one frame — V4-51): the typed refusal, and one
+        // plain line for the server's owner (the printer's de-duplication: once per resource and method)
+        if (err === FULL) {
+          const frame = this.#rt.node.tune.frame
+          this.#report(FULL, `refused a read whose answer is bigger than one frame, ${sizeOf(frame)} (methods.${m}) — the caller was told to read a smaller part`)
+          return this.#reply(link, id, false, tooLarge(m, this.#rt.node.replicas, frame, 'the answer'))
+        }
         this.#report(err, `a method's result could not be sent (methods.${m}) — the call was refused`)
         this.#reply(link, id, false, `the result could not be sent: ${errText(err)}`)
       }
@@ -248,7 +272,9 @@ export class Host {
     try {
       this.#reply(link, id, false, value)
     } catch {
-      try { this.#reply(link, id, false, `the handler threw a value that could not be sent: ${errText(err)}`) } catch {}
+      //! cut to 1 KiB, so the last resort always fits a frame (a handler's 300 MB message once made it fail too, and the
+      // caller waited out its timeout)
+      try { this.#reply(link, id, false, `the handler threw a value that could not be sent: ${errText(err).slice(0, 1024)}`) } catch {}
     }
   }
 
@@ -270,8 +296,12 @@ export class Host {
     // held only by `result`, so without this strong ref the chain is GC'd and the stream goes silent.
     entry.live = result
     //! clone: false — the record is encoded into frame bytes inside subOut at once (substrate.ts records)
+    //! first: the attach record — the whole picture — is the first this sink sees; every later one is a change
+    let first = true
     const stream = records(result, (rec) => {
       if (rec.type === 'move' || entry.cancelled) return // a move: documented M5c limitation (banner), sort client-side instead
+      const picture = first
+      first = false
       //! fero's own sink, run by data as the commit closes: a record it cannot send (a value the wire cannot
       // carry) ends this sub loudly — never a throw into data's commit, where it read as a user's tap and left
       // the caller's mirror frozen behind 'live'. (The composer's post-step fold cannot throw through here: its
@@ -279,6 +309,16 @@ export class Host {
       try {
         this.#rt.node.step({ kind: 'subOut', link, id, recs: [rec as unknown as Rec] })
       } catch (err) {
+        //! a record bigger than one frame (V4-51): the first picture of a whole read, or one change that grew past it —
+        // the sub ends with the typed refusal, and the server's owner hears it once
+        if (err === FULL) {
+          const frame = this.#rt.node.tune.frame
+          this.#report(FULL, picture
+            ? `refused a live read whose first picture is bigger than one frame, ${sizeOf(frame)} (methods.${m}) — the caller was told to read a smaller part`
+            : `ended a live read: one change is bigger than one frame, ${sizeOf(frame)} (methods.${m})`)
+          this.#end(skey, link, id, tooLarge(m, this.#rt.node.replicas, frame, picture ? "this subscription's first picture" : 'a change in this subscription'))
+          return
+        }
         this.#report(err, `a live subscription ended: a record could not be sent (methods.${m})`)
         this.#end(skey, link, id, `the stream could not send a record: ${errText(err)}`)
       }
@@ -320,8 +360,9 @@ export class Host {
 
   //! #end — end one live sub loudly: the caller's handle fails with the reason (Caller.#onResult: mode
   // 'failed', `ready` rejects if it has not framed, onError hears it). Called from inside a kernel step and
-  // data's commit, so the stop and the reply wait for a microtask, outside both.
-  #end(skey: string, link: number, id: number, reason: string) {
+  // data's commit, so the stop and the reply wait for a microtask, outside both. The reason is text, or a typed
+  // ScopedError the caller hands over as-is (too-large, V4-51).
+  #end(skey: string, link: number, id: number, reason: unknown) {
     const sub = this.#subs.get(skey)
     if (sub === undefined) return
     sub.cancelled = true
@@ -330,6 +371,16 @@ export class Host {
       sub.stop()
       this.#reply(link, id, false, reason)
     })
+  }
+
+  //! endLive — end every live sub streaming `proxy` with `reason` (V4-51): the scoped gather's union could not take a
+  // member's share (bigger than one frame), and a live whole read must never show a silent partial (plan §9)
+  endLive(proxy: unknown, reason: unknown) {
+    for (const [skey, sub] of this.#subs) {
+      if (sub.live !== proxy) continue
+      const bar = skey.indexOf('|')
+      this.#end(skey, Number(skey.slice(0, bar)), Number(skey.slice(bar + 1)), reason)
+    }
   }
 
   //! reapStopped — end every live sub whose view data has stopped since it opened (a function in it, or in a

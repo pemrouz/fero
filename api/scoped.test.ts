@@ -380,6 +380,48 @@ test('COVERAGE ATTESTATION [0/28/53] — an answerer that does not ATTEST a part
   g.destroy()
 })
 
+//! V4-51: a member whose claims are bigger than one frame refuses its `rows` answer typed ('too-large'). It is
+// reachable, and retrying cannot help, so the gather must never file it as unreachable ('retry when the view heals' —
+// wrong), and the live union must never park its old claims silently: the one-shot rejects too-large, the live path
+// ends its subscribers (onRefused) and remembers the refusal until a generation gathers every share.
+test('TOO-LARGE [V4-51] — the gather names a member whose rows do not fit one frame: one-shot rejects too-large, not unreachable; the live union ends its subscribers; an all-fit generation clears it', async () => {
+  const { Gather } = await import('./fold.ts')
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
+    membership: { view: { epoch: 1, members: [['self', ''], ['x', ''], ['y', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['x', 'y'] } },
+    scope: { entries: new Map() },
+    versions: new Map(), state: new Map(),
+  }
+  const big = { scoped: true, op: 'rows', reason: 'too-large', replicas: 2, hint: 'the answer is bigger than one frame' }
+  const fine = { c: {}, att: ['p'] }
+  let answer: Record<string, () => Promise<unknown>> = { x: async () => { throw big }, y: async () => fine }
+  const refused: ScopedError[] = []
+  const g = new Gather({ node: fake } as never, (uuid: string) => answer[uuid]() as never, undefined, (r) => refused.push(r))
+  try {
+    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true }), (e: ScopedError) => {
+      assert.deepEqual({ ...e, hint: '' }, { scoped: true, op: 'gather', reason: 'too-large', replicas: 2, missing: ['x'], hint: '' })
+      assert.match(e.hint, /^the rows x holds are bigger than one frame \(8 KiB\), so the whole-resource read cannot gather them: read one key at a time/)
+      return true
+    })
+    assert.deepEqual(refused, [], 'a one-shot read rejects; it does not end the live reads')
+    //! too-large wins over unreachable when both happen: retrying cannot help the one that is too large
+    answer = { x: async () => { throw big }, y: async () => { throw new Error('timeout') } }
+    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true }), (e: ScopedError) => e.reason === 'too-large' && e.missing!.join() === 'x')
+    //! the live path: onRefused once, the refusal remembered for the next live read
+    answer = { x: async () => { throw big }, y: async () => fine }
+    await g.refresh({ node: fake } as never, { throwOnPartial: false })
+    assert.equal(refused.length, 1)
+    assert.equal(refused[0].reason, 'too-large')
+    assert.equal(g.refused?.reason, 'too-large')
+    //! an unreachable member alone is lawful parking on the live path, as before: no refusal
+    answer = { x: async () => fine, y: async () => { throw new Error('timeout') } }
+    await g.refresh({ node: fake } as never, { throwOnPartial: false })
+    assert.equal(g.refused, null, 'every share that answered fit: the refusal clears')
+    assert.equal(refused.length, 1)
+  } finally { g.destroy() }
+})
+
 test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the kernel\'s stamp rule: a field remove newer than its row takes the field out, a field at or below an ancestor\'s stamp is hidden, a parked field never tears into a live row', async () => {
   const { Gather } = await import('./fold.ts')
   const fake = {
