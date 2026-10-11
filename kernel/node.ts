@@ -1973,6 +1973,7 @@ export class Node {
       case VERB.VOTE:
       case VERB.VIEW:
       case VERB.PULL:
+      case VERB.NACK:
       case VERB.LEAVE: {
         if (link.state !== LS.admitted) {
           j.armed && j.emit(JK.frameDrop, link.id, 'membership before hello')
@@ -1992,6 +1993,7 @@ export class Node {
         else if (f.verb === VERB.VOTE) this.membership.onVote(this, link, v)
         else if (f.verb === VERB.VIEW) this.membership.onView(this, link, v)
         else if (f.verb === VERB.PULL) this.membership.onPull(this, link, v)
+        else if (f.verb === VERB.NACK) this.membership.onNack(this, link, v)
         else this.membership.onLeave(this, link)
         this.membership.settle(this)
         return
