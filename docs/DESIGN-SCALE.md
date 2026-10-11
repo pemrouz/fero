@@ -909,10 +909,20 @@ record frame's header and lowers each lane of the link's cover
 Every other lane stays where the cover already was: at the torn
 answer's cover when an answer's frames were in the queue (V4-42's
 inQueue move runs first), else at the feeder's tail right now. The
-tail is safe because a synced link is tapped every record the feeder
-folds, so each record on a lane so far was sent or sits in a frame the
-clear left. The drain resumes the cover like any torn answer (`#answer`,
-with no reply when none was owed) before the drain digest.
+tail is safe only when the link was synced right up to this clear
+(`onClear` gets the synced flag from just before it): then every
+record the feeder folded so far was tapped, so it was sent, or it sits
+in a frame the clear left or in the outbox (flushed after the clear,
+into the queue). So EVERY clear on a synced client link leaves a
+cover, even one that took no record frame (only method replies, SUBREC
+deltas or a WACK). A clear on an unsynced link with no cover changes
+nothing: such a link has had no answer complete since its admit
+(synced falls only at a clear, which now leaves a cover, or at a torn
+ship, which sets one; a cover leaves only at the drain resume, which
+syncs the link or tears again), so nothing was tapped to it, and a
+tails cover there would sync it at the drain with no download. The
+drain resumes the cover like any torn answer (`#answer`, with no reply
+when none was owed) before the drain digest.
 
 *Why nothing else is lost.* After the clear the link is unsynced, so
 nothing is tapped until the resume. A record committed before the
@@ -923,7 +933,23 @@ drain lowers the same cover again and never raises it. A clear that
 takes an answer's frames, its reply and tap frames together keeps the
 answer's cover and its reply: a tap frame's records sit above that
 cover, or a splice already lowered it. A clear that took no record
-frame changes nothing.
+frame still leaves the tails cover, so a later splice or a later clear
+has a cover to lower.
+
+*The review's correction (same day).* The first version of this fix
+left a cover only when a clear took a record frame. The review found
+two losses in that gap. (a) A regression: a clear of control frames
+only (in the common relay order the WACK hop ships before the tap is
+flushed, so it can overflow a queue of method replies) left the link
+unsynced with no cover; the tap frame flushed after it survived; a
+record on another lane folded and was not tapped; a second clear took
+the tap frame and set the cover at the feeder's tails, above that
+record. Once a later record on its lane was resumed, it was lost (the
+spoke held 8 of 9 rows; the old kernel heals it through the drain
+digest). (b) A splice between a control-only clear and the drain was
+never tapped and lowered no cover, so the drain digest answered above
+it (6 of 7 rows; the old kernel loses it too). Both close with the
+rule above: every clear on a synced link leaves a cover.
 
 *Costs.* One frame-header read per frame a clear took (the clear is
 cold: it already writes a journal row). The resume re-sends a lowered
@@ -932,9 +958,10 @@ included (its lane drops them). There is one cover per link, and no
 frame is encoded twice inside one resume. A member link's clear is
 unchanged.
 
-*What moves.* Only a client link whose queue a clear empties of record
-frames. The resume now re-sends at the drain what the drain exchange
-used to re-send (or lose) one round trip later. The sim never pauses
+*What moves.* Only a client link that was synced when a clear emptied
+its queue. The resume now re-sends at the drain what the drain
+exchange used to re-send (or lose) one round trip later: after a
+control-only clear, that is the records folded since the clear. The sim never pauses
 inside a send, so the golden, the 300-seed sweep, 59,500 and 104,050
 stay byte-identical.
 
@@ -944,7 +971,13 @@ the drain, the mixed clear, and a member link unchanged. The first
 three are red on the old kernel (the spoke misses r11; r32 and r34;
 r11). Five mutations, each caught: no `onClear` at admit, a second
 clear that starts a fresh cover, no `#covered` add, no lowering, the
-last lost seq instead of the lowest.
+last lost seq instead of the lowest. From the review: a control-only
+clear then a splice, with method replies and with SUBREC deltas (red
+on the old kernel and on the first fix: r11 missing), the relay
+WACK-hop clear then a second clear (red on the first fix only: c25
+missing), and a clear on a never-synced link that leaves no cover
+(dropping the synced guard turns it red: the drain would sync the link
+with no download).
 
 *Members.* A member link has no such hole. An unscoped member gets
 one frame per flush (a commit is one contiguous run, and a member
