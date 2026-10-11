@@ -323,8 +323,33 @@ test('ACKED (DESIGN-SCALE stage 1) — an armed owner names its lane in the WACK
   assert.equal(framesOn(h, 1, VERB.WRITE).length, 4, 'both relayed to bb')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'zz~1', c: 1, n: 2, s: 20, e: 1, o: 'bb' }) })
   const hops = framesOn(h, 3, VERB.WACK).map((f) => f.value)
-  assert.deepEqual(hops, [{ u: 'zz~1', c: 1, n: 1, s: 20, e: 1, o: 'bb' }, { u: 'zz~1', c: 2, n: 1, s: 21, e: 1 }], 'the lane hops only where the tap will stay silent')
+  assert.deepEqual(hops, [{ u: 'zz~1', c: 1, n: 1, s: 20, e: 1, o: 'bb' }, { u: 'zz~1', c: 2, n: 1, s: 21, e: 1, l: 'bb' }], 'the lane hops as `o` only where the tap will stay silent; where it will tap, as `l` (wave 5e: the spoke keeps it in case the tap dies)')
   assert.equal(h.of('acked').length, 1, 'a relayed attempt never settles here')
+})
+
+//! wave 5e: where an armed relay WILL tap the record, it now names the lane to its spoke as `l` — on BOTH hop sites:
+// the owner's WACK (above) and the replicated record clearing the relayed attempt first (the common order: the owner
+// flushes its fan-out before its WACK, so the record reaches a co-holder relay first). The hop goes out at once and
+// the tap rides the frame's flush behind it, on the same link: that gap is where a link death strands the spoke.
+// Red without the inbound site: the hop reads {u, c, n, s, e} with no `l`.
+test('wave 5e — an armed relay that folds a relayed record before the owner\'s WACK hops the WACK to its spoke with `l` (the lane), and the tap follows it on the same link', () => {
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('ours', 'bb', 'aa')
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: '', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: writeFrame('zz~1', 1, 0, [rec(['ours'], 2)]) })
+  assert.equal(framesOn(h, 1, VERB.WRITE).length, 1, 'relayed to the owner bb')
+  const before = h.of('send').length
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['ours'], 2), origin: 'bb', seq: 20, epoch: 1, iss: 'zz~1', cid: 1, pp: 0 }], VERB.RECORDS, true)[0] })
+  assert.equal(h.node.writes.pending.size, 0, 'replication is the ACK')
+  const out = h.of('send').slice(before).filter((e) => e[1] === 3).map((e) => new Framer().push((e[2] as Uint8Array).slice())[0])
+  assert.deepEqual(out.map((f) => f.verb), [VERB.WACK, VERB.RECORDS], 'the WACK first, the tap behind it')
+  assert.deepEqual(out[0].value, { u: 'zz~1', c: 1, n: 1, s: 20, e: 1, l: 'bb' }, 'the hop names the lane the tap will carry')
+  //! the owner's own WACK lands after: nothing left to clear, nothing hopped twice
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'zz~1', c: 1, n: 1, s: 20, e: 1, o: 'bb' }) })
+  assert.equal(framesOn(h, 3, VERB.WACK).length, 1)
 })
 
 //! a commit can enter the owner's dedup window WITHOUT passing #commit: through an ACQ fold (the partition
@@ -387,7 +412,7 @@ test('ACKED after a view change — a cleared attempt whose record was expected 
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'zz~1', c: 1, n: 1, s: 8, e: 1, o: 'bb' }) })
   assert.equal(h.node.writes.pending.size, 0, 'all three cleared')
   assert.deepEqual(h.of('acked'), [], 'expected to fold here: every WACK stays silent')
-  assert.deepEqual(framesOn(h, 3, VERB.WACK).map((f) => f.value), [{ u: 'zz~1', c: 1, n: 1, s: 8, e: 1 }], 'the hop carries no lane')
+  assert.deepEqual(framesOn(h, 3, VERB.WACK).map((f) => f.value), [{ u: 'zz~1', c: 1, n: 1, s: 8, e: 1, l: 'bb' }], 'the hop carries no `o`: only `l`, the lane to keep while waiting for the tap')
   //! the live record for px arrives mid-latch and is STAGED; then the view moves px and py to bb, cc: the
   // latch aborts (epoch), the staged record drops, py is no longer assigned — neither record will ever fold here
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['px', 'mine'], 1), origin: 'bb', seq: 6, epoch: 1, iss: 'aa~1', cid: 1, pp: 5 }], VERB.RECORDS, true)[0] })

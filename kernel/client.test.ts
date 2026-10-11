@@ -31,6 +31,7 @@ const harness = (uuid: string, opts: Partial<ConstructorParameters<typeof Node>[
     invoke: (link, id, mode, m, a) => effects.push(['invoke', link, id, mode, m, a]),
     result: (id, ok, value, local) => effects.push(['result', id, ok, value, local]),
     subRecs: (id, recs) => effects.push(['subRecs', id, recs]),
+    acked: (iss, cid, origin, seq, epoch) => effects.push(['acked', iss, cid, origin, seq, epoch]),
   }
   const env: Env = { now: () => 0, rng: () => 0, sink }
   const node = new Node({ uuid, listen: `sim:${uuid}`, heartbeatMs: 50, ...opts }, env)
@@ -651,6 +652,107 @@ test('a feeder\'s r=1 that crosses the resync\'s ask inside its first tick gets 
   u.admit(2, 'oo')
   assert.equal(u.node.resync, null, 'unscoped: no resync at a re-admit')
   assert.deepEqual(digests(u, 2), [{ d: { tt: 6 }, r: 1, q: 2 }], 'the real tails: an unscoped feeder holds every lane in full')
+})
+
+//! wave 5e — the feeder dies between the WACK and the tap (the one residual of V4-33's `acked`). A scoped feeder that
+// will tap the record WACKs its spoke with the lane under `l`; the spoke clears the attempt (nothing is re-sent) and
+// keeps the coordinates while the record is unseen. At a failover it marks them (strand), and the resync onto the next
+// feeder settles each one still unseen at its end, through `acked`, committed on the owner's lane. One whose record
+// the next feeder's ship brings folds first and settles through the join (V4-7: the value shows, then the promise).
+// Red without the fix: `acked` stays [] after the resync's end and the write waits for ever.
+const tapRec = (origin: string, seq: number, key: string, cid: number) =>
+  encodeRuns([{ rec: { type: REC.update, key: [key], value: key } as Rec, origin, seq, epoch: 1, iss: 'cl~1', cid }])[0]
+test('wave 5e — a spoke whose feeder dies between the WACK (`l`: the lane, the tap will follow) and the tap settles the write at the failover\'s resync end from the WACK\'s coordinates; one the next feeder holds settles through the join; a write the NEW feeder WACKed is not touched; no `l`, nothing kept', () => {
+  const h = harness('cl', { client: true, hosts: ['sim:pp', 'sim:oo'] })
+  h.node.step({ kind: 'start' })
+  admitScoped(h, 1, 'pp')
+  h.digestFrom(1)
+  admitScoped(h, 2, 'oo')
+  //! three writes through pp: px (oo will not hold it), py (oo will), pz (the tap lands before the death)
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['px'], value: 'px' }, { type: REC.update, key: ['py'], value: 'py' }, { type: REC.update, key: ['pz'], value: 'pz' }] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 1, n: 3, s: 7, e: 1, l: 'tt' }) })
+  assert.equal(h.node.writes.pending.size, 0, 'cleared: nothing will be re-sent')
+  assert.deepEqual(h.of('acked'), [], 'the WACK with `l` is not the settlement: the tap is')
+  assert.deepEqual(h.node.writes.committed('cl~1', 1), { s: 7, e: 1, o: 'tt' }, 'the window names the lane too')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: tapRec('tt', 9, 'pz', 3) })
+  assert.ok(h.of('apply').some((e) => (e[1] as { iss?: string; cid?: number }).iss === 'cl~1' && (e[1] as { cid?: number }).cid === 3), 'pz settles through the join')
+  //! pp dies before the px and py taps: the failover onto oo is a resync; nothing settles before its end
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  assert.equal(h.node.primary, 2)
+  assert.notEqual(h.node.resync, null)
+  assert.deepEqual(h.of('acked'), [], 'not at the failover: oo may hold the record')
+  assert.equal(h.sentOn(2, VERB.WRITE).length, 0, 'nothing is re-sent to oo: the WACKed attempts left the queue')
+  //! a write after the failover, WACKed by oo with `l`: not stranded, it waits for oo's tap
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['pw'], value: 'pw' }] })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 4, n: 1, s: 12, e: 1, l: 'tt' }) })
+  //! oo's ship: it holds py (lane tt seq 8) and not px; the reply ends the resync
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: tapRec('tt', 8, 'py', 2) })
+  const ds = digests(h, 2)
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { tt: 8 }, r: 0, q: ds[ds.length - 1].q, w: 1 }) })
+  assert.equal(h.node.resync, null, 'the resync ended')
+  assert.ok(h.of('apply').some((e) => (e[1] as { iss?: string; cid?: number }).iss === 'cl~1' && (e[1] as { cid?: number }).cid === 2), 'py: the value showed (the join)')
+  assert.deepEqual(h.of('acked'), [['acked', 'cl~1', 1, 'tt', 7, 1]], 'px — and only px — settles from its WACK: committed on the owner\'s lane; py folded, pw is oo\'s to tap')
+  //! a second failover later: nothing is left marked from the first, and pw (oo's) is marked now
+  admitScoped(h, 3, 'qq')
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  assert.equal(h.node.primary, 3)
+  const ds3 = digests(h, 3)
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0, q: ds3[ds3.length - 1].q, w: 1 }) })
+  assert.deepEqual(h.of('acked').slice(1), [['acked', 'cl~1', 4, 'tt', 12, 1]], 'pw settles at the second resync\'s end, once')
+  //! no `l` (an unscoped feeder never sends one): nothing is kept, a failover settles nothing — the old bytes
+  const u = harness('cl', { client: true, hosts: ['sim:pp', 'sim:oo'] })
+  u.node.step({ kind: 'start' })
+  u.admit(1, 'pp')
+  u.digestFrom(1)
+  u.admit(2, 'oo')
+  u.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['k'], value: 1 }] })
+  u.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 1, n: 1, s: 7, e: 1 }) })
+  u.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  u.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0, q: 2, w: 1 }) })
+  assert.equal(u.node.writes.stranded, false)
+  assert.deepEqual(u.of('acked'), [], 'unscoped: no `l`, nothing kept, nothing settled by the kernel')
+})
+
+//! the failover's SECOND path (node.ts onHello): the feeder dies with no other link up, and the spoke holds NOTHING in
+// its fold (its only write was never tapped). A scoped spoke that holds nothing asks its next feeder as before — no
+// resync — so there would be no end to settle at. A stranded write makes it resync anyway. And the bound: a spoke
+// past dedupKeep writes WACKed and untapped settles the evicted one from its coordinates instead of forgetting it.
+test('wave 5e — the second failover path (no other link up, an empty fold): a stranded write makes the admit a resync, and its end settles it; past the bound an evicted attempt settles at once', () => {
+  const h = harness('cl', { client: true, hosts: ['sim:pp', 'sim:oo'] })
+  h.node.step({ kind: 'start' })
+  admitScoped(h, 1, 'pp')
+  h.digestFrom(1)
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['px'], value: 'px' }] })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 1, n: 1, s: 7, e: 1, l: 'tt' }) })
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  assert.equal(h.node.primary, null)
+  assert.equal(h.node.logs.size, 0, 'the fold is empty')
+  assert.equal(h.node.writes.stranded, true)
+  admitScoped(h, 2, 'oo')
+  assert.notEqual(h.node.resync, null, 'the admit is a resync: a stranded write needs its end')
+  const ds = digests(h, 2)
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0, q: ds[ds.length - 1].q, w: 1 }) })
+  assert.deepEqual(h.of('acked'), [['acked', 'cl~1', 1, 'tt', 7, 1]])
+  assert.equal(h.node.writes.stranded, false)
+  //! a kept attempt that a relay's SECOND WACK (with `o`: the partition moved off the relay) settles leaves the map:
+  // the next failover's resync end does not settle it again
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['pv'], value: 'pv' }] })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 2, n: 1, s: 9, e: 1, l: 'tt' }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 2, n: 1, s: 9, e: 1, o: 'tt' }) })
+  assert.deepEqual(h.of('acked').slice(1), [['acked', 'cl~1', 2, 'tt', 9, 1]], 'settled by the second WACK')
+  admitScoped(h, 3, 'qq')
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  const d3 = digests(h, 3)
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0, q: d3[d3.length - 1].q, w: 1 }) })
+  assert.equal(h.of('acked').length, 2, 'and never again at the next resync\'s end')
+  //! the bound (dedupKeep 2): the third untapped WACK evicts the first, which settles from its coordinates
+  const b = harness('cl', { client: true, hosts: ['sim:pp'], tune: { dedupKeep: 2 } })
+  b.node.step({ kind: 'start' })
+  admitScoped(b, 1, 'pp')
+  b.digestFrom(1)
+  b.node.step({ kind: 'write', recs: [1, 2, 3].map((i) => ({ type: REC.update, key: ['k' + i], value: i })) })
+  b.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 1, n: 3, s: 7, e: 1, l: 'tt' }) })
+  assert.deepEqual(b.of('acked'), [['acked', 'cl~1', 1, 'tt', 7, 1]], 'the oldest settles when the bound evicts it')
 })
 
 test('a scoped failover MID-RESYNC keeps every cell of the first reset in the sweep set (the screen still shows them) and wipes the partial re-download: the end sweeps exactly what the third feeder does not hold — no screen-only ghost', () => {

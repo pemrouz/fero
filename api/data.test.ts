@@ -514,3 +514,53 @@ test("V4-7 NO GHOST — the CLIENT role at the binding tier: a spoke's own write
   bind.destroy()
   await rt.destroy()
 })
+
+//! wave 5e at the binding tier — a spoke of a SCOPED cluster whose feeder dies between the WACK and the tap. The
+// feeder WACKed both writes with `l` (the lane: it will tap the records) and died before either tap left. The spoke
+// fails over onto oo and resyncs; oo holds py and not px. py settles through the join with its value already on the
+// proxy (V4-7); px settles at the resync's end, committed on the owner's lane from the WACK's coordinates, and its
+// value never shows here (oo does not hold it). Neither cluster.writes row is left pending. Red without the fix: px's
+// row stays `pending` and its promise never settles.
+test('wave 5e — a spoke whose scoped feeder dies between the WACK and the tap: a write the next feeder holds settles after its value shows; one it does not hold settles committed on the owner\'s lane at the resync\'s end; no row left pending', async () => {
+  const rt = new Runtime({ uuid: 'zz', heartbeatMs: 0, client: true })
+  const bind = new Bind(rt)
+  const node = rt.node
+  const SCOPED = 'v1;heartbeat.ms=50;replicas=2;methods=0;validation=none;ring=fmix32'
+  //! real-looking addresses: the failover's redial dials the dead feeder through the Runtime's real socket layer
+  // (a 'sim:' label is not a port); port 9 refuses, and the test is over before the backoff fires anyway
+  const admit = (link: number, u: string) => {
+    const at = u === 'pp' ? '127.0.0.1:9' : '127.0.0.1:7'
+    node.step({ kind: 'linkUp', link, dialed: true, to: at })
+    node.step({ kind: 'bytesIn', link, bytes: encodeControl(VERB.HELLO, { u, i: 1, l: at, c: SCOPED }) })
+  }
+  admit(1, 'pp')
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['pp', '127.0.0.1:9'], ['oo', '127.0.0.1:7'], ['tt', '127.0.0.1:13']] }) })
+  admit(2, 'oo')
+  const rows = () => [...bind.outcomes.rows.values()]
+  const [pa] = bind.issue([{ type: REC.update, key: ['px'], value: 'x' }]) as Promise<{ origin: string; seq: number; epoch: number }>[]
+  const [pb] = bind.issue([{ type: REC.update, key: ['py'], value: 'y' }]) as Promise<{ origin: string; seq: number; epoch: number }>[]
+  let shownAtSettle: unknown = 'unset'
+  const pbSeen = pb.then((c) => { shownAtSettle = (snapshot(bind.data) as Record<string, unknown>).py; return c })
+  let paDone = false
+  pa.then(() => { paDone = true }, () => { paDone = true })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'zz~1', c: 1, n: 2, s: 7, e: 1, l: 'tt' }) })
+  await new Promise((r) => setImmediate(r))
+  assert.equal(node.writes.pending.size, 0, 'cleared: nothing will be re-sent')
+  assert.equal(rows().filter((r) => r.state === 'pending').length, 2, 'both still pending: waiting for the tap')
+  assert.equal(paDone, false)
+  //! pp dies before the taps; the failover onto oo is a resync; oo ships py and then its reply
+  node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  node.step({ kind: 'bytesIn', link: 2, bytes: records('tt', 8, 1, [{ type: REC.update, key: ['py'], value: 'y' }], 'zz~1', 2) })
+  node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.DIGEST, { d: { tt: 8 }, r: 0 }) })
+  assert.equal(node.resync, null, 'the resync ended')
+  //! bounded: a regression must fail here, not hang the battery (on the base kernel px never settles)
+  const within = <T>(p: Promise<T>, what: string) => Promise.race([p, new Promise<T>((_, no) => setTimeout(() => no(new Error(what + ' never settled')), 2000).unref())])
+  assert.deepEqual(await within(pbSeen, 'py'), { origin: 'tt', seq: 8, epoch: 1, cid: 2 }, 'py: through the join')
+  assert.equal(shownAtSettle, 'y', 'py: its value was on the proxy when the promise resolved (V4-7)')
+  assert.deepEqual(await within(pa, 'px'), { origin: 'tt', seq: 7, epoch: 1, cid: 1 }, 'px: committed on the owner\'s lane, from the WACK')
+  assert.equal((snapshot(bind.data) as Record<string, unknown>).px, undefined, 'px never shows here: oo does not hold it')
+  assert.deepEqual(rows().map((r) => [r.key, r.state, r.origin]).sort(), [[JSON.stringify(['px']), 'committed', 'tt'], [JSON.stringify(['py']), 'committed', 'tt']], 'no row left pending')
+  bind.destroy()
+  await rt.destroy()
+})

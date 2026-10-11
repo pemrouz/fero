@@ -836,6 +836,9 @@ export class Node {
         if (this.client && this.primary === e.link) {
           this.primary = null
           this.feederOpen = null
+          //! the dead feeder's taps die with it (wave 5e): every attempt its WACK cleared whose record has not
+          // landed here is marked; the resync onto the next feeder settles what that feeder's ship does not bring
+          this.writes.strand()
           for (const l of this.links.values())
             if (l.state === LS.admitted && !l.dead) { this.primary = l.id; this.#feederLast = l.contract; break }
           if (this.primary !== null) {
@@ -1249,6 +1252,9 @@ export class Node {
       if (path.length > 1) this.#unvivify(path, ancestorsOf(path))
     }
     this.journal.armed && this.journal.emit(JK.resynced, ghosts)
+    //! the new feeder's ship has landed: a write the dead feeder WACKed and never tapped either folded in it (the
+    // join settled it, after its value showed) or will not come from here — it settles from its WACK (wave 5e)
+    this.writes.settleStranded(this)
   }
 
   //! persistBoot — (re)write the durable boot record: the committed view, the Lamport CEILING (the
@@ -1448,7 +1454,9 @@ export class Node {
         // one holds below them and leave what it does not hold on the screen. It resyncs onto this feeder too —
         // whenever it holds anything, or a resync is already open (a mid-resync death: the sweep set must union, as in
         // the linkDown arm). A spoke that holds nothing yet asks its first feeder as before: bytes unchanged.
-        if (this.feederScoped && (this.resync !== null || this.logs.size > 0)) this.#resyncBegin(link)
+        // A spoke with stranded writes (wave 5e: WACKed by the dead feeder, never tapped) resyncs too, even with an
+        // empty fold: the resync's end is where they settle.
+        if (this.feederScoped && (this.resync !== null || this.logs.size > 0 || this.writes.stranded)) this.#resyncBegin(link)
         else this.#sendDigest(link, 1)
       }
     } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)

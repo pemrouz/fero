@@ -172,8 +172,12 @@ export class Writes {
   // record never folds here, the apply join never fires and the api's write hangs. rescoped() settles
   // them from the coordinates the WACK carried: `acked` for an own attempt, a second WACK with the lane
   // for a relayed one (its spoke's tap will stay silent). The fold sites delete the entry (#folded).
-  // Bounded like a dedup lane; never written on an unscoped node or a client (no lane reaches them).
-  #awaiting = new Map<string, { p: string; via: number; u: string; c: number; s: number; e: number; o: string }>()
+  // Bounded like a dedup lane; never written on an unscoped node (no lane reaches it).
+  //! On a CLIENT of a scoped feeder (wave 5e) the same map keeps its own cleared-but-unseen attempts: the
+  // WACK that cleared them carried the lane under `l` (the feeder will tap the record), and the tap can die
+  // with the feeder's link. strand() marks every entry at a primary failover (`x`); the failover's resync end
+  // settles every marked entry still unseen through `acked` (settleStranded). `p` is unused there ('').
+  #awaiting = new Map<string, { p: string; via: number; u: string; c: number; s: number; e: number; o: string; x?: boolean }>()
 
   //! issuer — my cid-lane identity: uuid + incarnation, so a restarted node opens a FRESH dedup lane
   // instead of aliasing cids its predecessor already spent (the counter is volatile until M4's boot record).
@@ -405,11 +409,50 @@ export class Writes {
   //! #await / #folded — the #awaiting bookkeeping: an attempt enters when its WACK clears it and the record
   // is still expected here; it leaves when that record folds (any ingest site that carries attempt
   // identity) or when rescoped() settles it. The size test keeps every unscoped fold site at one compare.
+  //! A CLIENT that overflows the bound settles the evicted attempt from its coordinates instead of forgetting it:
+  // the owner committed it (the WACK said so), and a forgotten entry could wait for ever if the tap then died.
+  // The cost is V4-7's order for that one write (it may settle before its value shows), past dedupKeep writes
+  // WACKed and not yet tapped. A member forgets as before (its record is still expected to fold).
   #await(node: Node, key: string, w: { p: string; via: number; u: string; c: number; s: number; e: number; o: string }) {
     this.#awaiting.set(key, w)
-    if (this.#awaiting.size > node.tune.dedupKeep) this.#awaiting.delete(this.#awaiting.keys().next().value!)
+    if (this.#awaiting.size > node.tune.dedupKeep) {
+      const oldest = this.#awaiting.keys().next().value!
+      const v = this.#awaiting.get(oldest)!
+      this.#awaiting.delete(oldest)
+      if (node.client) node.env.sink.acked?.(v.u, v.c, v.o, v.s, v.e)
+    }
   }
   #folded(issuer: string, cid: number) { if (this.#awaiting.size) this.#awaiting.delete(issuer + '|' + cid) }
+
+  //! strand — a CLIENT's primary died (node.ts linkDown): every attempt its WACK cleared and whose record has
+  // not reached this spoke yet may never come — the dead feeder held the bookkeeping, and the next feeder may
+  // not hold the partition. Mark them; the failover's resync end settles what is still unseen then.
+  strand() {
+    if (!this.#awaiting.size) return
+    for (const w of this.#awaiting.values()) w.x = true
+  }
+
+  //! stranded — is any attempt marked by strand() still unseen? Read at a scoped feeder elected at an admit
+  // (node.ts: such a spoke resyncs even with an empty fold, so the end comes and settles them).
+  get stranded(): boolean {
+    if (!this.#awaiting.size) return false
+    for (const w of this.#awaiting.values()) if (w.x) return true
+    return false
+  }
+
+  //! settleStranded — the failover's resync end (node.ts #resyncEnd): the new feeder's ship has landed, so a
+  // marked attempt whose record it held has folded and left the map (the join settled it after the value
+  // showed, V4-7). Every marked attempt still here will not come from this feeder: settle it COMMITTED from the
+  // owner's WACK coordinates, on the owner's lane — the commit happened once and is never re-sent. Unmarked
+  // entries (cleared by the new feeder) wait for its tap as usual.
+  settleStranded(node: Node) {
+    if (!this.#awaiting.size) return
+    for (const [key, w] of this.#awaiting) {
+      if (!w.x) continue
+      this.#awaiting.delete(key)
+      node.env.sink.acked?.(w.u, w.c, w.o, w.s, w.e)
+    }
+  }
 
   //! rescoped — the scope changed (an install's rescope, a latch abort): every awaiting attempt whose
   // partition no longer folds here settles NOW from its WACK's coordinates — the record will not come.
@@ -429,7 +472,7 @@ export class Writes {
   // `o` (DESIGN-SCALE stage 1): the lane the commit was stamped on, named with its incarnation — set by an
   // ARMED owner answering a commit, and hopped onward by a relay only when the relay itself will not tap
   // the record to the asker (see onAck). Unscoped nodes never set it: their WACK bytes are v4.0's.
-  #ack(node: Node, via: number, v: { u: string; c: number; n: number; s: number; e: number; o?: string }) {
+  #ack(node: Node, via: number, v: { u: string; c: number; n: number; s: number; e: number; o?: string; l?: string }) {
     if (via < 0) return
     const link = node.links.get(via)
     if (!link || link.dead) return // the asker is gone; its retransmit will hit the dedup window instead
@@ -568,18 +611,23 @@ export class Writes {
   //! onAck — commit coordinates arrived FROM THE OWNER OF RECORD: clear the pending attempts; a RELAY
   // batches the coordinates onward per contiguous run toward the client (`via`) — one WACK in, one WACK
   // out (the review measured the previous per-cid fan-out at n frames + n allocations per batch).
-  onAck(node: Node, link: Link, v: { u?: unknown; c?: unknown; n?: unknown; s?: unknown; e?: unknown; o?: unknown }) {
+  onAck(node: Node, link: Link, v: { u?: unknown; c?: unknown; n?: unknown; s?: unknown; e?: unknown; o?: unknown; l?: unknown }) {
     if (typeof v?.u !== 'string' || typeof v.c !== 'number' || typeof v.n !== 'number' || v.n <= 0 || v.n > MAX_RUN) return
     if (typeof v.s !== 'number' || typeof v.e !== 'number') return // coordinates hop onward to relays — garbage must not
     const j = node.journal
     //! `o` (DESIGN-SCALE stage 1): the lane the owner stamped on. Present only from an armed owner (or a
     // relay hopping its answer), so an unscoped member never reads it and nothing below runs there.
     const lane = typeof v.o === 'string' ? v.o : undefined
-    let hop: { via: number; c: number; n: number; s: number; o?: string } | null = null
+    //! `l` (wave 5e): the same lane, from a relay that WILL tap the record — "wait for the tap, but here is where it
+    // committed". Only a client reads it: it keeps the coordinates while the record is unseen (#awaiting), so a
+    // feeder that dies before its tap cannot strand the write (strand / settleStranded). An old client ignores it.
+    const tap = node.client && typeof v.l === 'string' ? v.l : undefined
+    let hop: { via: number; c: number; n: number; s: number; o?: string; l?: string } | null = null
     const flushHop = () => {
       if (!hop) return
-      const out: { u: string; c: number; n: number; s: number; e: number; o?: string } = { u: v.u as string, c: hop.c, n: hop.n, s: hop.s, e: v.e as number }
+      const out: { u: string; c: number; n: number; s: number; e: number; o?: string; l?: string } = { u: v.u as string, c: hop.c, n: hop.n, s: hop.s, e: v.e as number }
       if (hop.o !== undefined) out.o = hop.o
+      if (hop.l !== undefined) out.l = hop.l
       this.#ack(node, hop.via, out)
       hop = null
     }
@@ -595,7 +643,7 @@ export class Writes {
         //! a SPOKE's second WACK for an attempt its first one cleared, now carrying the lane: its relay's
         // rescoped() — the partition moved off the relay before the record reached the tap, so this is the
         // only settlement the spoke will get. Own attempts only; the api takes it idempotently.
-        if (!a && node.client && lane !== undefined && v.u === this.issuer(node)) node.env.sink.acked?.(v.u, v.c + i, lane, v.s + i, v.e)
+        if (!a && node.client && lane !== undefined && v.u === this.issuer(node)) { this.#folded(v.u, v.c + i); node.env.sink.acked?.(v.u, v.c + i, lane, v.s + i, v.e) }
         flushHop(); continue
       }
       //! the lane travels to whoever cannot learn the commit any other way: a RELAY hops it to its spoke only
@@ -606,10 +654,13 @@ export class Writes {
       const p = lane !== undefined && node.armed ? partitionOf(a.rec) : undefined
       const silent = p !== undefined && !node.scope!.expects(node, p)
       if (a.via >= 0) {
+        //! the spoke hears the lane either way: as `o` (settle now — this relay's tap stays silent) or as `l`
+        // (wait for this relay's tap, which follows; keep the coordinates in case the tap dies with the link)
         const o = silent ? lane : undefined
-        if (hop && (hop.via !== a.via || hop.c + hop.n !== v.c + i || hop.o !== o)) flushHop()
+        const l = p !== undefined && !silent ? lane : undefined
+        if (hop && (hop.via !== a.via || hop.c + hop.n !== v.c + i || hop.o !== o || hop.l !== l)) flushHop()
         if (hop) hop.n++
-        else { hop = { via: a.via, c: v.c + i, n: 1, s: v.s + i }; if (o !== undefined) hop.o = o }
+        else { hop = { via: a.via, c: v.c + i, n: 1, s: v.s + i }; if (o !== undefined) hop.o = o; if (l !== undefined) hop.l = l }
       }
       if (a.sent < 0) this.#queued--
       this.pending.delete(key)
@@ -619,9 +670,10 @@ export class Writes {
       // coordinates, from the owner of record. This closes the WACK-before-replication window where a
       // cleared attempt had no committed() evidence — the api's drop-sweep (and any dup arriving before
       // the record replicates back) reads the answer from here.
-      this.#remember(node, v.u, v.c + i, v.s + i, v.e, lane ?? (node.client ? undefined : link.uuid)) // a member's WACK comes from the owner
+      this.#remember(node, v.u, v.c + i, v.s + i, v.e, lane ?? tap ?? (node.client ? undefined : link.uuid)) // a member's WACK comes from the owner
       if (a.via < 0 && lane !== undefined && (node.client || silent)) node.env.sink.acked?.(v.u, v.c + i, lane, v.s + i, v.e)
       else if (p !== undefined && !silent) this.#await(node, key, { p, via: a.via, u: v.u, c: v.c + i, s: v.s + i, e: v.e, o: lane! })
+      else if (tap !== undefined && a.via < 0) this.#await(node, key, { p: '', via: -1, u: v.u, c: v.c + i, s: v.s + i, e: v.e, o: tap })
     }
     flushHop()
     if (cleared) j.armed && j.emit(JK.writeAck, v.u, first, cleared)
@@ -780,7 +832,9 @@ export class Writes {
       if (a) {
         //! replication IS an ACK: the commit is visible with its coordinates — clear the route
         j.armed && j.emit(JK.writeAck, rv.issuer, rv.cid, 1)
-        if (a.via >= 0) this.#ack(node, a.via, { u: rv.issuer, c: rv.cid, n: 1, s: seq, e: epoch })
+        //! an ARMED relay folded the record, so its tap carries it to the spoke right behind this WACK: the hop names
+        // the lane as `l` (wave 5e) — the spoke keeps the coordinates in case the link dies before the tap lands
+        if (a.via >= 0) this.#ack(node, a.via, node.armed ? { u: rv.issuer, c: rv.cid, n: 1, s: seq, e: epoch, l: origin } : { u: rv.issuer, c: rv.cid, n: 1, s: seq, e: epoch })
         this.#remove(a)
       }
     }
@@ -855,7 +909,9 @@ export class Writes {
       const a = this.pending.get(rv.issuer + '|' + rv.cid)
       if (a) {
         j.armed && j.emit(JK.writeAck, rv.issuer, rv.cid, 1)
-        if (a.via >= 0) this.#ack(node, a.via, { u: rv.issuer, c: rv.cid, n: 1, s: seq, e: epoch })
+        //! an ARMED relay folded the record, so its tap carries it to the spoke right behind this WACK: the hop names
+        // the lane as `l` (wave 5e) — the spoke keeps the coordinates in case the link dies before the tap lands
+        if (a.via >= 0) this.#ack(node, a.via, node.armed ? { u: rv.issuer, c: rv.cid, n: 1, s: seq, e: epoch, l: origin } : { u: rv.issuer, c: rv.cid, n: 1, s: seq, e: epoch })
         this.#remove(a)
       }
     }

@@ -398,6 +398,12 @@ test('client relay rule: attemptEpoch 0 is re-stamped by the FIRST server, which
   assert.equal(hop.length, 2, 'the commit coordinates hopped back to the client')
   assert.deepEqual(hop[1].value, { u: 'client-1~1', c: 2, n: 1, s: 30, e: 1 })
   assert.equal(h.node.writes.pending.size, 0)
+  //! case 3: the owner's record reaches the relay BEFORE its WACK — replication clears the route and hops the
+  // coordinates; an UNSCOPED relay's hop is the old bytes exactly (wave 5e's `l` is armed-only)
+  h.node.step({ kind: 'bytesIn', link: 5, bytes: writeFrame('client-1~1', 3, 0, [{ type: REC.update, key: ['far'], value: 'g' }]) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: recordFrame('cc', 31, 1, 'client-1~1', 3, [{ type: REC.update, key: ['far'], value: 'g' }]) })
+  assert.deepEqual(h.sentOn(5, VERB.WACK)[2].value, { u: 'client-1~1', c: 3, n: 1, s: 31, e: 1 }, 'no `l` from an unscoped relay')
+  assert.equal(h.node.writes.pending.size, 0)
 })
 
 test('a WRITE frame before HELLO is a protocol violation: the link closes, nothing routes', () => {
