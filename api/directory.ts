@@ -1,7 +1,8 @@
 //! ── api/directory — the per-box rendezvous directory (V4-3, docs/DESIGN-DIRECTORY.md) ──────────────
 // One fixed loopback address per box (RENDEZVOUS). Whoever binds it hosts the system resource
 // `#directory`: a soft-state registry `name → {uuid: listen}` held in a data proxy on the host —
-// never a log, never a WAL. Every dialable user instance opens a `#directory` CLIENT to it:
+// never a log, never a WAL. Every dialable user instance meets it through a `#directory` CLIENT (one per
+// process, shared by every instance there — see `share` below):
 // servers `register` {name, uuid, listen}; everyone opens `lookup(name)` as a LIVE subscription
 // whose folded address list feeds the kernel's dial set through the `discover` event.
 //
@@ -245,6 +246,19 @@ export const hostMethods = (peersOf: () => Peers, selfOf: () => string | undefin
         onPeers()
         return true
       },
+      //! unregister — one instance leaving while its process's SHARED directory client stays (one client per
+      // process, wave 5e): the link does not drop, so the peer-down cleanup cannot drop its entry. Only the
+      // entry's CURRENT owner (the calling link) may remove it; anything else is a no-op that says false.
+      unregister: (a: unknown, ctx: Context) => {
+        const { name, uuid } = (a ?? {}) as { name?: unknown; uuid?: unknown }
+        if (typeof name !== 'string' || typeof uuid !== 'string') throw new Error('unregister: name and uuid must be strings')
+        if (ctx.peer === undefined || ctx.peer === selfOf()) throw new Error('unregister: only a directory client may unregister (no caller identity)')
+        const k = key(name, uuid)
+        if (owner.get(k) !== ctx.peer) return false
+        owners.get(ctx.peer)?.delete(k)
+        drop(k)
+        return true
+      },
       lookup: (a: unknown) => {
         if (typeof a !== 'string' || a === '') throw new Error('lookup: name must be a non-empty string')
         return registry.get(a)
@@ -283,6 +297,37 @@ export interface DirectoryOpts {
 const RETRY_BASE = 50
 const RETRY_CAP = 5000
 
+//! ── one directory client per process (wave 5e) ──
+// Every instance in a process that meets the same directory, at the same heartbeat and redial, shares ONE
+// `#directory` client and its link: N resources in one process cost the host one link, not N. Each instance
+// still opens its own lookup on it, registers its own entry through it, and taps its link state. Counted by
+// reference: the last instance to let go destroys it (its link drops, the host forgets what is left). An
+// instance that lets go while others stay UNREGISTERS its entry, since the link stays up. Keyed by the compose
+// seam too, so a test's stand-in compose never meets the composer's clients. Different heartbeat or redial
+// settings get their own client: the client's cadence is the instance's failover speed.
+interface Shared { key: string; pool: Map<string, Shared>; refs: number; client: Promise<Fero> }
+const pools = new WeakMap<Compose, Map<string, Shared>>()
+const share = (compose: Compose, key: string, make: () => Promise<Fero>): Shared => {
+  let pool = pools.get(compose)
+  if (pool === undefined) pools.set(compose, (pool = new Map()))
+  let s = pool.get(key)
+  if (s === undefined) {
+    const made: Shared = { key, pool, refs: 0, client: make() }
+    //! a compose that failed is no one's client: the next instance composes afresh
+    made.client.catch(() => { if (pool!.get(key) === made) pool!.delete(key) })
+    pool.set(key, (s = made))
+  }
+  s.refs++
+  return s
+}
+//! unshare — let go; the last one out destroys the client
+const unshare = async (s: Shared): Promise<void> => {
+  if (--s.refs > 0) return
+  if (s.pool.get(s.key) === s) s.pool.delete(s.key)
+  const c = await s.client.catch(() => null)
+  if (c !== null) await c.destroy()
+}
+
 export class Directory {
   #o: DirectoryOpts
   client: Fero | null = null
@@ -296,6 +341,13 @@ export class Directory {
   #lastPeers = ''
   //! the re-subscribe timers of failed lookups (this box's and every asked box's), cleared on destroy
   #timers = new Set<NodeJS.Timeout>()
+  //! this instance's hold on the process's shared clients (this box's, then each asked box's), and what it
+  // attached to them — its taps and its lookups — undone on destroy, so a client that outlives the instance
+  // carries nothing of it
+  #own: Shared | null = null
+  #held: Shared[] = []
+  #undo = new Set<() => void>()
+  #registered = false
   #retry: NodeJS.Timeout | null = null
   #fails = 0
   //! the other boxes' directory clients (ask-only), their state, and every source's folded addresses
@@ -344,6 +396,19 @@ export class Directory {
     this.#last = key
     this.#o.onHosts(hosts)
   }
+  //! #share — this process's `#directory` client for `addr`, shared with every other instance here that
+  // meets it at the same settings; composed by the first, with the I-19 guard
+  #share(addr: string): Shared {
+    const o = this.#o
+    const s = share(o.compose, `${addr}|${o.heartbeatMs}|${o.redialMs ?? ''}`, () => this.#client(addr))
+    this.#held.push(s)
+    return s
+  }
+  //! #tap — a tap on a shared client's proxy, removed when this instance goes
+  #tap(target: { tap: (fn: () => void) => unknown }, fn: () => void): void {
+    const t = target.tap(fn) as { dispose?: () => void }
+    this.#undo.add(() => t.dispose?.())
+  }
   //! #client — compose one `#directory` client dialing `addr`, with the I-19 guard
   async #client(addr: string): Promise<Fero> {
     const o = this.#o
@@ -365,16 +430,17 @@ export class Directory {
     if (this.#o.serve) await this.#tryHost()
     if (this.#destroyed) return
     const o = this.#o
-    this.client = await this.#client(o.addr)
-    if (this.#destroyed) { await this.client.destroy(); this.client = null; return }
-    const c = this.client
+    this.#own = this.#share(o.addr)
+    const c = await this.#own.client
+    if (this.#destroyed) return // destroy() lets go of the share
+    this.client = c
     //! a server that lost the first bind (another host, or a squatter) starts the retry loop NOW — the
     // link-down transition below never fires for a directory that was never up
     if (o.serve && !this.hosting) this.#armRetry()
     //! the directory link, from the client's own cluster fold (read after the fold): up ⇒ (servers)
     // register on THIS primary; down ⇒ (servers) start the bind-retry loop. The peers key changes on
     // every primary change, so a takeover (new host uuid) re-registers even without an observed gap.
-    c.cluster.tap(afterFold(() => {
+    this.#tap(c.cluster, afterFold(() => {
       if (this.#destroyed) return
       const peers = (snapshot(c.cluster) as { peers: Peers }).peers ?? {}
       const key = Object.keys(peers).filter((u) => peers[u].up).sort().join(',')
@@ -400,11 +466,11 @@ export class Directory {
   // by its OWN box's directory), never hosts (that socket is on another box). An unreachable box is a
   // link that redials like any other; a misdial onto a non-directory is refused by the HELLO name echo.
   async #ask(addr: string): Promise<void> {
-    const c = await this.#client(addr)
-    if (this.#destroyed) { await c.destroy(); return }
+    const c = await this.#share(addr).client
+    if (this.#destroyed) return
     this.boxClients.set(addr, c)
     let lastPeers = ''
-    c.cluster.tap(afterFold(() => {
+    this.#tap(c.cluster, afterFold(() => {
       if (this.#destroyed) return
       const peers = (snapshot(c.cluster) as { peers: Peers }).peers ?? {}
       const key = Object.keys(peers).filter((u) => peers[u].up).sort().join(',')
@@ -429,20 +495,29 @@ export class Directory {
   #lookup(c: Fero, source: string, fold: (row: Row) => string[], setErr: (e: string | undefined) => void, fails = 0): void {
     if (this.#destroyed) return
     let failed = false
+    //! undo — this lookup's tap and its sub on the shared client: run on destroy, or when a failed lookup is
+    // opened again (the failed sub is already gone from the Caller; its tap is not)
+    let t: { dispose?: () => void } | undefined
+    const h = c.methods.lookup(this.#o.name, { onError: (e: Error) => onError(e) }) as { tap: (fn: () => void) => unknown; ready: Promise<void>; close: () => void }
+    const undo = () => { t?.dispose?.(); h.close() }
+    this.#undo.add(undo)
     const onError = (e: Error) => {
       if (this.#destroyed || failed) return
       failed = true
       setErr(`lookup: ${e?.message ?? String(e)}`)
       const delay = Math.min(RETRY_CAP, (RETRY_BASE + Math.floor(Math.random() * 4 * RETRY_BASE)) * 2 ** Math.min(fails, 8))
-      const t = setTimeout(() => { this.#timers.delete(t); this.#lookup(c, source, fold, setErr, fails + 1) }, delay)
-      t.unref?.()
-      this.#timers.add(t)
+      const r = setTimeout(() => {
+        this.#timers.delete(r)
+        this.#undo.delete(undo); undo()
+        this.#lookup(c, source, fold, setErr, fails + 1)
+      }, delay)
+      r.unref?.()
+      this.#timers.add(r)
     }
-    const h = c.methods.lookup(this.#o.name, { onError }) as { tap: (fn: () => void) => void; ready: Promise<void> }
-    h.tap(afterFold(() => {
+    t = h.tap(afterFold(() => {
       if (this.#destroyed) return
       this.#publish(source, fold((snapshot(h) as Row | undefined) ?? {}))
-    }))
+    })) as { dispose?: () => void }
     //! the first frame of THIS lookup: it is alive, so any lookup error before it is over (the opening
     // lookup's first frame clears nothing: no error was set yet)
     h.ready.then(() => { if (!this.#destroyed && !failed) setErr(undefined) }, () => {})
@@ -456,6 +531,7 @@ export class Directory {
     if (!c || !this.#o.serve || listen === undefined) return
     try {
       await (c.methods.register as (a: unknown, o?: unknown) => Promise<unknown>)({ name: this.#o.name, uuid: this.#o.uuid, listen }, { retry: true, timeout: 5000 })
+      this.#registered = true
       this.#setError('register', undefined)
     } catch (e) {
       if (!this.#destroyed) this.#setError('register', `register: ${(e as Error)?.message ?? String(e)}`)
@@ -520,18 +596,28 @@ export class Directory {
   }
   #stopRetry() { if (this.#retry) { clearTimeout(this.#retry); this.#retry = null } }
 
-  //! destroy — the client first (its link drops ⇒ the host forgets this instance's entries), then the
-  // hosted directory if this instance holds it (⇒ every other server's retry loop races for the port).
-  // A #tryHost in flight sees #destroyed and destroys what it built.
+  //! destroy — this instance's entry first: unregistered when the process's shared client stays up for
+  // others (the link does not drop, so nothing else would drop it), or gone with the link when this was the
+  // client's last user. Then its taps and lookups come off the shared clients, it lets go of them (the last
+  // one out destroys each), and last the hosted directory if this instance holds it (⇒ every other
+  // server's retry loop races for the port). A #tryHost in flight sees #destroyed and destroys what it built.
   async destroy(): Promise<void> {
     this.#destroyed = true
     this.#stopRetry()
     for (const t of this.#timers) clearTimeout(t)
     this.#timers.clear()
     const c = this.client; this.client = null
-    if (c) await c.destroy()
-    const bs = [...this.boxClients.values()]; this.boxClients.clear()
-    await Promise.allSettled(bs.map((b) => b.destroy()))
+    //! bounded and best-effort: a link that is down already cost this entry its place (the host drops a
+    // registrant's entries when its link dies); a host from before wave 5e has no unregister — the entry then
+    // lives until the shared client's link drops, as every entry did before
+    if (c !== null && this.#own !== null && this.#own.refs > 1 && this.#registered && this.#up) {
+      try { await (c.methods.unregister as (a: unknown, o?: unknown) => Promise<unknown>)({ name: this.#o.name, uuid: this.#o.uuid }, { timeout: 2000 }) } catch {}
+    }
+    for (const u of this.#undo) { try { u() } catch {} }
+    this.#undo.clear()
+    this.boxClients.clear()
+    const held = this.#held; this.#held = []; this.#own = null
+    await Promise.allSettled(held.map(unshare))
     const h = this.host; this.host = null
     if (h) await h.destroy()
   }

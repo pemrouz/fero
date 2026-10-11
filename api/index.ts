@@ -178,6 +178,9 @@ export const clientKeyOf = (secret: string): string => {
 export { clientKeyOf as clientKey }
 
 export const fero = (name: string, opts: FeroOpts = {}): Promise<Fero> => compose(name, opts, false)
+//! systemCompose — the ONE compose seam every instance hands its Directory: one function for the process, so
+// the directory clients it makes are shared by every instance here (api/directory.ts, one client per process)
+const systemCompose = (n: string, o: FeroOpts): Promise<Fero> => compose(n, o, true)
 //! fero.spawn(file, args?, opts?) (V4-9): `node <file> …` as a separate process — the reader's other terminal, from code (api/spawn.ts)
 fero.spawn = spawn
 //! fero.clientKey(secret) (DESIGN-DOOR §15): the derived client key, printed once by an operator and handed to
@@ -953,8 +956,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const clusterSurface: any = new Proxy(cluster, { get: (t, k) => (k === 'writes' ? writes : Reflect.get(t, k)) })
 
   //! teardown — everything destroy() does AFTER the graceful leave (V4-6): the local surfaces, the
-  // in-flight confirm probes (settled false = could not prove in time — never hang a caller), the
-  // directory client (its link drops ⇒ the host forgets this instance's entries), then the hosted
+  // in-flight confirm probes (settled false = could not prove in time — never hang a caller), this
+  // instance's directory entry and its hold on the process's shared directory client (unregistered while
+  // others share it; the last one out closes it, and the host forgets what is left), then the hosted
   // directory if this instance holds it (⇒ the other servers race for the port), then the runtime.
   // The diagnostics crash() door runs THIS alone: a process death, as the cluster would see it.
   //! `clean` is the leave's verdict (Runtime.leave): it rides through the teardown and is what destroy() resolves —
@@ -1027,7 +1031,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // set posts as `discover` (the kernel dials/parks) and re-folds cluster.me.hosts.
     if (meets) {
       directory = new Directory({
-        compose: (n, o) => compose(n, o, true),
+        compose: systemCompose,
         addr: rendezvous as string, name, uuid: node.uuid,
         listen: () => (isClient ? undefined : node.listen),
         serve: !isClient, boxes,
