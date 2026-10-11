@@ -1085,6 +1085,62 @@ test('a cleared reply (the third re-check\'s C0): an untorn answer whose last fr
   assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [10, 4], 'the ten, then the three the clear took and the live one — never a second download')
 })
 
+//! C0 with ONLY the reply queued (the review of the resume-cost fix): the last record frame pauses inside its send, so
+// the queue holds the reply alone and no record frame ever set inQueue. The reply branch sets it (the cover at the
+// reply: every lane walked), so a clear that takes the reply still resumes — it re-sends the live record and the reply.
+// Without that line the clear left nothing torn, and the drain digest's h: 1 bought a second download ([10, 11]).
+test('a cleared reply with nothing else queued (C0, the reply alone): the answer resumes at its reply — the drain re-sends the live record and the reply, ONE ask, no second download', () => {
+  const F = feeder('ff', 7, { tune: { queued: 1 } })
+  const { S, p, s0, link } = failover(F)
+  F.arm(10) // pause inside the last of 10 frames: the reply alone is queued, 1 of 1
+  p.toA()
+  assert.equal(link.torn, null)
+  assert.equal(link.queued.length, 1)
+  assert.equal(link.synced, true)
+  assert.deepEqual(link.inQueue && [link.inQueue.d.bb, link.inQueue.r, link.inQueue.q], [19, 1, 2], 'the cover at the reply: every lane walked')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([R11])[0] }) // the tap-forward overflows: the clear takes the reply
+  assert.equal(F.jk(JK.dropOldest).length, 1)
+  assert.deepEqual(link.torn && [link.torn.d.bb, link.torn.q], [19, 2], 'the answer is torn at its reply')
+  p.toB()
+  assert.notEqual(S.node.resync, null, 'the reply never reached the spoke')
+  const m1 = p.mark()
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.deepEqual(p.wire(m1), ['RECORDS', 'DIGEST{"d":{"bb":21},"r":0,"w":0,"q":2}', 'DIGEST{"d":{"bb":21},"r":1,"w":0,"h":1}'],
+    'the live record the clear took, the reply, then the drain digest')
+  p.settle()
+  whole(S, s0, ROWS11)
+  assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [10, 1], 'the ten, then the live one — never a second download')
+})
+
+//! a stop on a link that is ALREADY synced (the review of the resume-cost fix): a client's floor below its tails reaches
+// a flowing link, the suffix ship pauses inside its 2nd frame and stops at the full queue. The stop unsyncs the link, so
+// a live record committed while stopped waits for the resume instead of overflowing the full queue (which would clear
+// the four queued frames, buy an h: 1 drain digest, and re-send them).
+test('a torn answer on an already-synced link unsyncs it: a live record committed while stopped waits for the resume — no clear, no drain digest, every record once', () => {
+  const F = feeder('ff', 7, { tune: { queued: 4 } })
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: { bb: 19 }, r: 0 }) })
+  const link = F.node.links.get(7)!
+  assert.equal(link.synced, true, 'the link is synced before the floor arrives')
+  const sent = () => F.of('send').filter((e) => e[1] === 7).length
+  const m0 = sent()
+  F.arm(2)
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: { bb: 1 }, r: 0 }) }) // nine frames owed: 3..19
+  assert.equal(sent() - m0, 2, '3 and 5 reached the socket')
+  assert.equal(link.queued.length, 4, '7-13 queued')
+  assert.deepEqual(link.torn && link.torn.d.bb, 14, 'stopped before 15')
+  assert.equal(link.synced, false, 'the stop unsynced the link')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([R11])[0] }) // a live record while stopped
+  assert.equal(F.jk(JK.dropOldest).length, 0, 'it waited: nothing cleared')
+  assert.equal(link.droppedWhilePaused, false)
+  F.node.step({ kind: 'drain', link: 7 })
+  const wire = F.of('send').filter((e) => e[1] === 7).slice(m0).flatMap((e) => new Framer().push((e[2] as Uint8Array).slice()))
+  assert.deepEqual(wire.map((fr) => (fr.verb === VERB.RECORDS ? fr.records()[0].seq : -fr.verb)), [3, 5, 7, 9, 11, 13, 15, 17, 19, 21], 'every record once, in order, the live one in the resume; no drain digest')
+  assert.equal(link.torn, null)
+  assert.equal(link.synced, true)
+})
+
 //! C: the clear lands after a RESUME that completed with its tail and reply in the queue (the resume set synced, so
 // one live tap-forward reaches the same queue). Before: aeShip [2, 8, 11], a second download.
 test('a cleared reply after a resume (the third re-check\'s C): the resume ends with its tail and reply filling the queue, one live tap-forward clears it — the drain re-sends only what the clear took, ONE ask', () => {
