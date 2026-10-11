@@ -1564,6 +1564,104 @@ test('two clears in a row lower one cover and never raise it; a splice between t
   assert.deepEqual(rows(S), rows(F))
 })
 
+//! a clear that takes only CONTROL frames (method replies, SUBREC deltas) on a synced link (the review of wave 5f). The
+// link is unsynced from that clear on, so a later splice is not tapped. Before: no cover, the link was not in #covered,
+// and the drain digest answers above the spoke's tails, so the splice was never sent (on the base tree too). Now every
+// clear on a synced link leaves a cover at the feeder's tails, and the splice lowers it.
+for (const [what, fill] of [
+  ['method replies', (F: H) => { for (let i = 0; i < 3; i++) F.node.step({ kind: 'reply', link: 7, id: i + 1, ok: true, value: i }) }],
+  ['SUBREC deltas', (F: H) => { for (let i = 0; i < 3; i++) F.node.step({ kind: 'subOut', link: 7, id: 1, recs: [{ type: REC.update, key: ['x'], value: i }] }) }],
+] as const)
+  test(`a clear of control frames only (${what}) leaves a cover at the feeder's tails; a splice before the drain lowers it and reaches the spoke`, () => {
+    const { F, S, p, link, rows, drainAll } = steady(2)
+    fill(F)
+    assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear that took no record frame')
+    assert.equal(link.synced, false)
+    assert.deepEqual(link.torn && [link.torn.d.bb, link.torn.r, link.torn.q], [20, undefined, undefined], 'the cover: the feeder\'s tails, no reply owed')
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: p1frame(11, 10) })
+    assert.equal(link.queued.length, 0, '11 is not tapped: the link is unsynced')
+    assert.deepEqual(link.torn && link.torn.d.bb, 10, 'the splice lowered the cover')
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(22, 20) })
+    drainAll()
+    assert.equal(link.torn, null)
+    assert.equal(link.synced, true)
+    assert.ok(S.node.state.has(JSON.stringify(['p1', 'r11'])), 'r11 reached the spoke')
+    assert.deepEqual(rows(S), rows(F))
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(24, 22) })
+    p.settle()
+    assert.deepEqual(rows(S), rows(F), 'live records flow again')
+  })
+
+//! the review's P9 (wave 5f): a relayed write's record reaches the feeder and clears its attempt mid-frame, so the WACK
+// hop goes out BEFORE the tap flush (wave 5e's common order). The queue holds only control frames, so that WACK makes a
+// clear that takes no record frame, and the tap frame (22) is flushed after it and survives. cc's 25 folds while the
+// link is unsynced (not tapped). A second clear takes 22. Before: the first clear left no cover, the second set it at
+// the feeder's tails, above 25 — then 27 was resumed and 25 was lost for good (the base heals it through the drain
+// digest; the first wave-5f fix lost it). Now the first clear leaves the cover at the tails of that moment (below 25),
+// and the second only lowers bb.
+const wframe = (issuer: string, c0: number, recs: Rec[]) => encodeRuns(recs.map((r, i) => ({ rec: r, origin: issuer, seq: c0 + i, epoch: 0 })), VERB.WRITE)[0]
+const ccframe = (seq: number, pp: number) => encodeRuns([{ rec: { type: REC.update, key: ['p3', `c${seq}`], value: seq }, origin: 'cc', seq, epoch: 1, pp }], VERB.RECORDS, true)[0]
+test('a control-only clear (a relay\'s WACK hop) then a second clear that takes a surviving tap frame: a record on another lane folded between the clears still reaches the spoke', () => {
+  const { F, S, link, rows, drainAll } = steady(2)
+  F.node.membership.rejoinFloor = 0
+  F.node.writes.ring.place('p3', 'cc', 'aa')
+  for (let i = 0; i < 2; i++) F.node.step({ kind: 'reply', link: 7, id: i + 1, ok: true, value: i })
+  assert.equal(link.queued.length, 2, 'the queue is full of control frames')
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: wframe('cl~1', 1, [P1('w1', 1)]) }) // the spoke relays a write; aa forwards it to bb
+  //! bb's commit reaches aa with the attempt identity: the tap waits in the outbox, the WACK hop ships at once and clears
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: P1('w1', 1), origin: 'bb', seq: 22, epoch: 1, iss: 'cl~1', cid: 1, pp: 20 }], VERB.RECORDS, true)[0] })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'the WACK hop cleared a queue of control frames')
+  assert.equal(link.queued.length, 1, 'tap frame 22 was flushed after the clear and survived it')
+  assert.deepEqual(link.torn && [link.torn.d.bb, link.torn.d.cc], [22, undefined], 'the cover: the tails at the first clear')
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: ccframe(25, 0) }) // folds; not tapped (unsynced)
+  assert.ok(F.node.logs.get('cc')!.some((e) => e.seq === 25))
+  for (let i = 0; i < 2; i++) F.node.step({ kind: 'reply', link: 7, id: 10 + i, ok: true, value: i })
+  assert.equal(F.jk(JK.dropOldest).length, 2, 'a second clear takes tap frame 22')
+  assert.deepEqual(link.torn && [link.torn.d.bb, link.torn.d.cc], [21, undefined], 'bb lowered under 22; cc stays under 25')
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: ccframe(27, 25) })
+  drainAll()
+  assert.ok(S.node.state.has(JSON.stringify(['p3', 'c25'])), 'c25 reached the spoke')
+  assert.ok(S.node.state.has(JSON.stringify(['p1', 'w1'])), 'w1 reached the spoke')
+  assert.deepEqual(rows(S), rows(F))
+})
+
+//! the guard on the rule above: a clear on a link that was NOT synced, with no cover, leaves none. The spoke's first
+// connect digest reaches a paused feeder (swallowed: the drain digest is owed), and control frames clear the queue
+// before the link was ever synced. A cover at the feeder's tails would say the spoke holds everything: the drain would
+// resume it, ship nothing and mark the link synced, so a live record would go out ahead of the spoke's first download.
+test('a clear on a link that was never synced leaves no cover: the drain digest heals it as before, and nothing goes live ahead of the first download', () => {
+  const members = [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']]
+  const F = harness('aa', { replicas: 2, boot: { epoch: 1, members }, tune: { queued: 2 } })
+  F.node.step({ kind: 'start' })
+  F.admit(1, 'bb'); F.digestFrom(1)
+  F.admit(2, 'cc'); F.digestFrom(2)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: members }) })
+  F.node.writes.ring.place('p1', 'bb', 'aa')
+  for (let s = 10, prev = 0; s <= 20; prev = s, s += 2) F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(s, prev) })
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  const S = harness('cl', { client: true, hosts: ['sim:aa'] })
+  S.node.step({ kind: 'start' })
+  S.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:aa' })
+  const p = pump(F, 7, S, 2)
+  const link = F.node.links.get(7)!
+  F.node.step({ kind: 'pause', link: 7 })
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', c: SCOPED }) })
+  p.toA() // the first-connect digest reaches the paused feeder: swallowed, the drain digest is owed
+  assert.equal(link.synced, false)
+  for (let i = 0; i < 3; i++) F.node.step({ kind: 'reply', link: 7, id: i + 1, ok: true, value: i })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear of control frames on a never-synced link')
+  assert.equal(link.torn, null, 'no cover: nothing was ever tapped to this link')
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.equal(link.synced, false, 'still unsynced: only a real exchange syncs it')
+  const at = p.mark()
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(22, 20) })
+  assert.deepEqual(p.wire(at), [], 'the live record is withheld')
+  p.settle()
+  assert.equal(link.synced, true)
+  assert.deepEqual([...S.node.state.keys()].sort(), [...F.node.state.keys()].sort())
+})
+
 //! the mixed clear: an answer's frames and its reply are still queued (the spoke's first connect paused inside frame 4)
 // when a gappy tap lands; the clear takes the answer's frames, its reply and a tap frame, and the frame after it
 // survives. The torn answer keeps its own cover (no record the clear took sits below it) and its reply.

@@ -80,9 +80,11 @@ export class Link {
   // it took. A synced client link is fed by tap-forward, and a tap-forward can carry a record SPLICED into a lane's
   // interior, below the spoke's tails; a clear also leaves the frames shipped after it in the same flush, which then
   // leapfrog what it took. The drain digest answers above the spoke's tails, so it heals neither. The node turns what
-  // the clear took into `torn` (node.ts #clearCover), and the drain re-sends it. Null on every other link: a member
-  // link's clear is unchanged.
-  onClear: ((link: Link, dropped: Uint8Array[]) => void) | null = null
+  // the clear took into `torn` (node.ts #clearCover), and the drain re-sends it. `wasSynced` is the link's synced flag
+  // from just before this clear: a clear on a synced link leaves a cover even when it took no record frame, because
+  // from then on the link is unsynced and nothing is tapped to it. Null on every other link: a member link's clear is
+  // unchanged.
+  onClear: ((link: Link, dropped: Uint8Array[], wasSynced: boolean) => void) | null = null
   //! quiet — heartbeats since this link last carried a byte in (node.ts bytesIn resets it). Read only by a node
   // with watchClients (the #directory host's failure detector over client links); on every other node it stays 0.
   quiet = 0
@@ -164,10 +166,11 @@ export class Link {
       const dropped = this.onClear !== null ? this.queued : null
       if (dropped !== null) this.queued = []
       else this.queued.length = 0
+      const wasSynced = this.synced
       this.droppedWhilePaused = true
       this.synced = false
       if (this.inQueue !== null) { this.torn = this.inQueue; this.inQueue = null }
-      if (dropped !== null) this.onClear!(this, dropped)
+      if (dropped !== null) this.onClear!(this, dropped, wasSynced)
     }
   }
 

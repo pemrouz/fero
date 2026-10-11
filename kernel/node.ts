@@ -2164,28 +2164,37 @@ export class Node {
   // (that frame survives, is delivered first, and raises the spoke's tail above the lost one). The drain digest answers
   // above the spoke's tails, so it heals neither. So the cover is: each lane lowered to just under the lowest record the
   // clear took on it; every other lane at the torn answer's cover when an answer's frames were in the queue, else at my
-  // tail right now (every record on it so far was sent or sits in a frame the clear left: a synced link is tapped every
-  // record I fold, and nothing is tapped while it is unsynced). The drain resumes it like any torn answer (#answer, no
-  // reply when no answer was owed), BEFORE the drain digest. What happens next is covered too: a record committed before
-  // the drain is above my tail now, so the resume ships it; a record spliced before the drain is lowered into the cover
-  // by indexInsert (the link joins #covered here); a second clear before the drain lowers the same cover again, never
-  // raises it. The cost: one header read per frame the clear took (the clear is cold), and the resume re-sends a lowered
-  // lane's suffix above the lowest lost record, frames the spoke holds included (it drops them). A clear that took no
-  // record frame changes nothing.
-  #clearCover = (link: Link, dropped: Uint8Array[]): void => {
-    let low: Record<string, number> | null = null
+  // tail right now. The tail is right only when the link was SYNCED up to this clear (`wasSynced`): then every record I
+  // folded so far was tapped to it, so it was sent, or it sits in a frame the clear left or in the outbox (flushed
+  // after the clear, into the queue). So EVERY clear on a synced link leaves a cover, even one that took no record
+  // frame: from this clear on the link is unsynced and nothing is tapped to it, and only a cover lets a later clear
+  // lower a lane and a later splice be lowered into it (the review of wave 5f: a clear of control frames alone left no
+  // cover, then a second clear took a tap frame that had survived the first and set the cover at my tails, above a
+  // record folded in between that was never sent, and it was lost for good; a splice between a control-only clear and
+  // the drain was lost the same way, on the base too). A clear on an UNSYNCED link with no cover changes nothing: an
+  // unsynced client link with no cover has had no answer complete since its admit (synced falls only at a clear, which
+  // now leaves a cover, or at a torn ship, which sets one; a cover leaves only at the drain resume, which syncs the link
+  // or tears again), so nothing was tapped to it and the drain digest heals it as before. The drain resumes the cover
+  // like any torn answer (#answer, no reply when no answer was owed), BEFORE the drain digest. What happens next is
+  // covered too: a record committed before the drain is above my tail at the first clear, so the resume ships it; a
+  // record spliced before the drain is lowered into the cover by indexInsert (the link joins #covered here); a second
+  // clear before the drain lowers the same cover again, never raises it. The cost: one header read per frame the clear
+  // took (the clear is cold); the resume re-sends a lowered lane's suffix above the lowest lost record, frames the spoke
+  // holds included (it drops them); and a control-only clear's resume ships, at the drain, the records folded since
+  // the clear, which the drain exchange used to ship one round trip later.
+  #clearCover = (link: Link, dropped: Uint8Array[], wasSynced: boolean): void => {
+    let t = link.torn
+    if (t === null) {
+      if (!wasSynced) return
+      t = link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined }
+    }
     for (const b of dropped) {
       const f = new Frame(b)
       if (f.verb !== VERB.RECORDS) continue
       const p = f.prov()
       if (p === null) continue
-      if (low === null) low = {}
-      const at = low[p.origin]
-      if (at === undefined || p.baseSeq < at) low[p.origin] = p.baseSeq
+      if ((t.d[p.origin] ?? 0) >= p.baseSeq) t.d[p.origin] = p.baseSeq - 1
     }
-    if (low === null) return
-    const t = link.torn ?? (link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined })
-    for (const o in low) if ((t.d[o] ?? 0) >= low[o]) t.d[o] = low[o] - 1
     this.#covered.add(link)
   }
 
