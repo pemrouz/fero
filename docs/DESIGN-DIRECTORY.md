@@ -148,7 +148,8 @@ a watcher-hosted directory would churn with every watcher restart — Q1).
 ## §6 The directory client (api/directory.ts)
 
 Per fero instance (uniform, no process-level state — Q5 rejected a shared,
-refcounted per-process client): `compose('#directory', { hosts: [rendezvous],
+refcounted per-process client; superseded 2026-10-11, §12: one client per
+process): `compose('#directory', { hosts: [rendezvous],
 heartbeatMs, redialMs }, {system: true})`.
 
 - Link-up (the directory primary appears): servers `register` (`{retry: true}`
@@ -250,7 +251,8 @@ done by hand against the tree. Re-run the panel on the implementation.)
   `discover([...])` re-adds (covered targets just clear their park). A
   transient, not a strand.
 - **Panel answers:** Q1 no (clients host nothing). Q2 no settle. Q3 no
-  dial-back. Q4 3376 + `FERO_RENDEZVOUS`. Q5 per-instance. Q6 covered above.
+  dial-back. Q4 3376 + `FERO_RENDEZVOUS`. Q5 per-instance (superseded by §12:
+  one client per process). Q6 covered above.
 
 ## §10 The implementation panel (after landing)
 
@@ -362,7 +364,8 @@ listen, and post as ONE `discover`. Nothing in the kernel changes.
   to `{ up, error? }` (`error` is a failed lookup). A failed lookup is over
   for good (the Caller never re-subscribes a failed sub), so `error` stays
   set even when the link comes back: clearing it would read a dead lookup as
-  a healthy box. Present only when `hosts`
+  a healthy box. (2026-10-11, §12: the lookup is now opened again with
+  backoff, and `error` clears when it answers.) Present only when `hosts`
   names another box, so every existing shape reads as before. The internals
   door's `diag(f).rendezvous().boxes` holds the asked clients themselves.
 
@@ -444,3 +447,136 @@ loopback IPs at one port is the faithful shape, and the one used.
   SRV records). A box whose directory is down costs one dial per heartbeat
   after the redial chain gives up, like any parked target.
 
+## §12 The leftovers, closed (2026-10-11, wave 5e)
+
+Five things the earlier sections left open. Each landed as its own commit
+with its test.
+
+### IPv4-mapped loopback
+
+`[::ffff:127.0.0.1]` dials and binds the same socket as `127.0.0.1`
+(measured here: a mapped dial reaches a `127.0.0.1` listener, and a
+`127.0.0.1` dial reaches a mapped bind). The host checks compared strings,
+so a mapped spelling read as another box: it could squat the directory's
+socket, slip past the explicit-listen rule (§11), and be asked for a
+secret as if other machines could reach it. A new `unmap()` turns a mapped
+spelling (bracketed or bare, any case, the long zero form, the hex form
+`::ffff:7f00:1`) into its IPv4 address, and `localish`, `loopbackHost` and
+`canon` read through it. A mapped routable address (`[::ffff:10.0.0.5]`)
+stays routable. The composer's rules use the same helpers, so they follow.
+
+### A failed lookup is opened again
+
+§11 said a failed lookup is over for good (the Caller drops a failed sub)
+and kept its `error` set so a dead lookup would not read healthy. Two gaps
+were left: an asked box added nothing more until restart, and on this
+box's own directory the next successful register cleared the one shared
+`error` while the lookup stayed dead.
+
+Now each lookup (this box's and every asked box's) is opened again after a
+jittered delay that doubles per consecutive failure up to 5 s, the
+bind-retry loop's numbers. A re-subscribe while the link is down is held
+and replayed on the next primary, like any sub. The directory keeps its
+bind, register and lookup troubles apart, and `error` joins them (bind
+first). A lookup's error clears only on the first frame of a lookup opened
+after the failure: the lookup itself recovered. `rendezvous.boxes` follows
+the same rule.
+
+### A failure detector over client links
+
+§9 and §10 accepted that a hung-but-connected registrant keeps its entry
+(the kernel ran no failure detector over client links). A process stopped
+with its socket open kept its entry for ever, and every lookup handed out
+its dead address.
+
+The directory host now runs one. A new kernel option, `watchClients`, is
+set only on the `#directory` host (the composer sets it for a system
+compose of that name with a listen):
+
+- Every heartbeat the host PINGs every admitted client link, whatever the
+  uuid order. Before, only the lower uuid PINGed, so a client with a lower
+  uuid was heard only at its OWN heartbeat, and a client with heartbeats
+  off was never heard at all. A client answers a PING on receipt, so a
+  live one is heard every host heartbeat however slow its own cadence.
+- A client link that carries no byte in for more than `WATCH_TICKS` (20)
+  host heartbeats is closed: 10 s at the default 500 ms. Its entries go
+  through the existing peer-down cleanup. A registrant that wakes up finds
+  its link closed, redials and registers again.
+- The kernel change is the smallest one liveness needs: a `quiet` counter
+  on `Link`, reset by one store per chunk in, and the extra PING and the
+  close, both behind the option. Without the option nothing changes (no
+  extra PING, no close, no journal row), so every sim trajectory and golden
+  is unchanged. The close journals no row of its own (a named row would
+  need a new journal kind and the debugger's vocabulary); the linkDown
+  that follows shows it.
+
+Measured over three runs: a SIGSTOPped registrant left the lookup 1020 to
+1050 ms after the stop at a 1000 ms bound (heartbeat 50 ms); a live registrant whose
+own heartbeat was 40 times slower than the host's stayed through three
+bounds; the stopped one, continued, registered again.
+
+### One directory client per process
+
+§6 and §9 Q5 chose a client per instance ("uniform, no process-level
+state"). That is superseded: N resources in one process cost the host N
+links. Now instances in a process that meet the same directory at the same
+heartbeat and redial share one `#directory` client and its link; the same
+holds for each asked box's directory. Each instance still opens its own
+lookup on it, registers its own entry through it and taps its link state,
+and takes them off again on destroy.
+
+- Counted by reference. The last instance out destroys the client: its
+  link drops and the host forgets what is left, as before.
+- An instance that leaves while others stay cannot rely on the link
+  dropping, so the host has an `unregister({name, uuid})` method again
+  (§9 removed it when the link was the only mechanism). Only the entry's
+  current owner, the calling link, may remove it; anything else is a no-op
+  that says false. The leaving instance calls it bounded at 2 s, and only
+  while the link is up (a down link already cost the entry its place).
+- A host from before this change has no `unregister`: the entry then
+  lives until the shared link drops, as every entry did before.
+- Different heartbeat or redial settings get their own client: the
+  client's cadence is the instance's failover speed. The pool is keyed by
+  the compose seam too, so the composer hands every instance one
+  module-level compose, and a test's stand-in compose never meets the
+  composer's clients.
+
+### The I-19 probe
+
+STATUS named the next probe for I-19 (`c.methods.lookup is not a
+function`, seen once right after the host died): a survivor racing the
+newcomer for the port, the EADDRINUSE path in `#tryHost`. Two tests write
+it. One forces it through the compose seam (the newcomer's probe says
+free, a survivor binds before the newcomer's real bind, which meets
+EADDRINUSE); the other runs it for real (a hosting process and a survivor
+process, the host SIGKILLed, a newcomer 0 to 400 ms later; both the
+newcomer and the survivor win in one run). Every time the newcomer's
+`fero()` resolves, exactly one hosts, and the newcomer finds the survivor.
+Not reproduced: no fix, and the guard in `#client` stays.
+
+### Tests (api/directory.test.ts, kernel/watch.test.ts)
+
+- Every mapped spelling, the routable ones, and each place the helpers are
+  used (the squat guard, the asked-twice filter, the asking side's guard,
+  the rule, the composer's refusal and its secret rule).
+- A stand-in host whose lookup throws while a flag is set and whose
+  register succeeds: the error survives a successful register, the lookup
+  is opened again, the error clears when it answers. An asked box whose
+  directory fails, goes away and comes back healthy: its error stays while
+  dead and clears when the new one answers; its server is found.
+- The SIGSTOP test above; the kernel suite pins the PING to a lower-uuid
+  client, the bound, the reset on any byte, off by default, and members
+  left alone (mutation-checked: no extra PING, no close).
+- Sharing: four instances hold one client (the host counts one shared link
+  beside its own); one leaving unregisters and keeps the others' lookups
+  and registrations live; the last one out closes it. The host table's
+  `unregister` rules are unit-pinned. With the unregister call removed the
+  sharing test and the I-34 test both fail.
+- The two I-19 race tests above.
+
+### Left open
+
+- The debugger still cannot attach a `#directory` node (a system compose
+  takes no `diag.allow`).
+- An askable directory is still unauthenticated (V4-30).
+- A silenced client link has no journal row of its own.
