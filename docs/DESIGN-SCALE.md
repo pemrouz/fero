@@ -955,11 +955,11 @@ it (6 of 7 rows; the old kernel loses it too). Both close with the
 rule above: every clear on a synced link leaves a cover.
 
 *Costs.* One frame-header read per frame a clear took (the clear is
-cold: it already writes a journal row). The resume re-sends a lowered
-lane's suffix above the lowest lost record, frames the spoke holds
-included (its lane drops them). There is one cover per link, and no
-frame is encoded twice inside one resume. A member link's clear is
-unchanged.
+cold: it already writes a journal row). The answer that uses the cover
+re-sends a lowered lane's suffix above the lowest lost record, frames
+the spoke holds included (its lane drops them). There is one cover per
+link, and no frame is encoded twice inside one answer. A member link's
+clear is unchanged.
 
 *What moves.* Only a client link that was synced when a clear emptied
 its queue: the drain exchange's answer now starts, on each lane the
@@ -980,8 +980,10 @@ clear then a splice, with method replies and with SUBREC deltas (red
 on the old kernel and on the first fix: r11 missing), the relay
 WACK-hop clear then a second clear (red on the first fix only: c25
 missing), and a clear on a never-synced link that leaves no cover
-(dropping the synced guard turns it red: the drain would sync the link
-with no download).
+(dropping the synced guard turns it red; with the ceiling below, such a
+cover would only cap the answer to the spoke's first download, which
+starts from its empty tails anyway, but the guard keeps a never-synced
+link exactly as before).
 
 *The second review's correction (same day): a ceiling, not a claim.*
 The version above first resumed the clear's cover at the drain, before
