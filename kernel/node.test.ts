@@ -1058,4 +1058,7 @@ test('an unscoped member whose link overflows in the middle of a flush ships not
   pump()
   assert.equal(B.node.state.size, 10, 'the drain digest re-shipped the whole tail')
   assert.equal(B.node.streams.get('aa')!.applied, 10)
+  const frames = A.of('send').map((e) => new Framer().push((e[2] as Uint8Array).slice())[0]).filter((f) => f.verb === VERB.RECORDS)
+  assert.equal(frames.length, 5, 'the drain\'s catch-up answer left in five cuts too')
+  assert.ok(frames.every((f) => f.buf.length - 11 <= 4096), 'every frame within the cap')
 })

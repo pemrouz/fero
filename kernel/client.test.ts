@@ -1746,3 +1746,59 @@ test('a clear on an unscoped MEMBER link is unchanged: no onClear, no cover — 
   F.node.step({ kind: 'drain', link: 1 })
   assert.deepEqual(digests(F, 1).slice(-1), [{ d: { nn: F.node.seq }, r: 1 }], 'the drain digest, member bytes (no h)')
 })
+
+//! ── V4-51: a digest answer whose run passes the frame cap leaves in cuts ──────────
+// A server whose rows outgrow one frame TOGETHER (each row small, the run big) answers a late client frame by frame at
+// its cap. Before V4-51 the answer was one frame per run, so at full scale a run past 256 MiB threw a FrameError in the
+// DIGEST handler and the client's link was dropped for good; the tune row `frame` makes that reachable at 4 KiB.
+const bigRows = (n: number): Rec[] => Array.from({ length: n }, (_, i) => ({ type: REC.update, key: [`r${i + 1}`], value: new Uint8Array(1500).fill(i + 1) }))
+//! a feeder that wrote one run of ten 1.5 KB rows (one commit, its own lane), with a client admitted on link 7
+const bigFeeder = (tune: Record<string, number>, onSend?: (link: number) => void) => {
+  const F = harness('ff', { tune }, onSend)
+  F.node.step({ kind: 'write', recs: bigRows(10) })
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: '', r: 1 }) })
+  return F
+}
+//! the frames sent on a link from `from`, each as its seqs ('1+2') or its verb
+const wireOf = (h: H, link: number, from = 0) =>
+  h.of('send').filter((e) => e[1] === link).slice(from).flatMap((e) => new Framer().push((e[2] as Uint8Array).slice()))
+    .map((f) => f.verb === VERB.RECORDS ? f.records().map((rv) => rv.seq).join('+') : f.verb === VERB.DIGEST ? 'DIGEST' : `verb${f.verb}`)
+
+test('a late client of a server whose rows outgrow one frame together gets every row: the catch-up run leaves in cuts, the reply last', () => {
+  const F = bigFeeder({ frame: 4096 })
+  const m = F.of('send').filter((e) => e[1] === 7).length
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  assert.deepEqual(wireOf(F, 7, m), ['1+2', '3+4', '5+6', '7+8', '9+10', 'DIGEST'], 'five cuts of one run, every seq once, the reply last')
+  const sent = F.of('send').filter((e) => e[1] === 7).slice(m).map((e) => e[2] as Uint8Array)
+  assert.ok(sent.every((b) => b.length - 11 <= 4096), `every frame within the cap (${sent.map((b) => b.length - 11)})`)
+  assert.deepEqual(F.jk(JK.frameDrop), [])
+  assert.equal(F.node.links.get(7)!.dead, false, 'the link stays up')
+  assert.equal(F.node.links.get(7)!.synced, true)
+  assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [10])
+  //! the same answer at the default cap: one frame, as before
+  const G = bigFeeder({})
+  const g = G.of('send').filter((e) => e[1] === 7).length
+  G.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  assert.deepEqual(wireOf(G, 7, g), ['1+2+3+4+5+6+7+8+9+10', 'DIGEST'])
+})
+
+test('a torn answer between two cuts of one run: the cover names the first record not handed over, the drain resumes there, every row once, the reply last', () => {
+  let armed = false, count = 0
+  const F: H = bigFeeder({ frame: 4096, queued: 2 }, (link) => { if (link === 7 && armed && ++count === 2) { armed = false; F.node.step({ kind: 'pause', link: 7 }) } })
+  const link = F.node.links.get(7)!
+  const m = F.of('send').filter((e) => e[1] === 7).length
+  armed = true
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  assert.deepEqual(wireOf(F, 7, m), ['1+2', '3+4'], 'the socket took two cuts, then said it was full')
+  assert.deepEqual(link.queued.map((b) => new Framer().push(b.slice())[0].records().map((rv) => rv.seq).join('+')), ['5+6', '7+8'], 'two more wait in the queue')
+  assert.deepEqual(link.torn && [link.torn.d.ff, link.torn.r, link.torn.q], [8, 1, 1], 'the ship stopped INSIDE the run, before 9: the cover is 8')
+  assert.equal(link.synced, false)
+  assert.deepEqual(F.jk(JK.dropOldest), [], 'never a deliberate overflow')
+  const d = F.of('send').filter((e) => e[1] === 7).length
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.deepEqual(wireOf(F, 7, d), ['5+6', '7+8', '9+10', 'DIGEST'], 'the queue, the rest of the run from 9, then the reply')
+  assert.deepEqual(wireOf(F, 7, m).filter((x) => x !== 'DIGEST').flatMap((x) => x.split('+').map(Number)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'every row once')
+  assert.equal(link.synced, true)
+  assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [8, 2], 'the records each round handed over')
+})

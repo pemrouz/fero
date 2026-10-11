@@ -23,7 +23,7 @@
 // (v2's applying/committingForward/discarding flag family) has no place to
 // exist. That whole guard menagerie is deleted by construction, not by care.
 
-import { Frame, Framer, FrameError, VERB, continuesRun, encodeControl, encodeRuns, type AttemptRun } from './codec.ts'
+import { Frame, Framer, FrameError, VERB, continuesRun, encodeControl, encodeRun, encodeRuns, type AttemptRun } from './codec.ts'
 import { Link, LS, dialedByLower } from './link.ts'
 import { JK, Journal } from './journal.ts'
 import { Membership } from './membership.ts'
@@ -2085,9 +2085,9 @@ export class Node {
   }
 
   //! #answer — what a peer's digest gets: the suffix ship, the link sync, and the r=0 reply to an r=1. For each
-  // origin I hold, everything past the peer's high-water (`d`): encodeRuns splits Lamport gaps into valid contiguous
-  // frames (attempt identity rides along, so a healed peer rebuilds its cid-dedup window too); ship() honours
-  // backpressure. The peer's digest is what SYNCS the link: the suffix shipped covers everything up to this instant,
+  // origin I hold, everything past the peer's high-water (`d`): the codec's run rule splits Lamport gaps into valid
+  // contiguous frames, and a run bigger than this node's frame cap leaves in cuts (V4-51, encodeRun) — attempt
+  // identity rides along, so a healed peer rebuilds its cid-dedup window too; ship() honours backpressure. The peer's digest is what SYNCS the link: the suffix shipped covers everything up to this instant,
   // and every record from here on has a higher seq — per-origin monotonicity holds on the wire. r=1 means "answer
   // with yours": the reply carries r=0, so the exchange is two-legged, never a loop.
   //! M6 (armed): a MEMBER link gets NOTHING (DESIGN-SCALE stage 2, §3): on a scoped cluster a member receives history
@@ -2110,6 +2110,9 @@ export class Node {
   // first queued frame (Link.inQueue, kernel/link.ts ship): an answer stays resumable until its reply has left the
   // queue, so a cleared reply costs the frames it lost, never a re-download from zero. Before the 2026-10-10 fix the
   // loop ran on past a clear, the reply went out over the hole, and a spoke lost 5 of 10 rows with a queue of 4.
+  //! A run bigger than the frame cap (V4-51) leaves frame by frame, and the ship can stop between two cuts exactly as
+  // between two runs: the full-queue check runs before every frame, and the cover and the tear always name the first
+  // record not handed over (run[k].seq, a frame boundary). Each frame is encoded once, only when it ships.
   #answer(link: Link, d: Record<string, unknown>, r: number | undefined, q: number | undefined) {
     const j = this.journal
     let shipped = 0
@@ -2127,9 +2130,9 @@ export class Node {
         let i = lo
         while (i < entries.length) {
           if (link.paused && link.queued.length >= link.maxQueued) { tear = origin; tearSeq = entries[i].seq; break lanes }
-          //! one frame's run, by the codec's own rule: the split is exactly encodeRuns' over the held subset
-          // (armed AE answers carry each entry's STORED pp — the floor law: the receiver's floors advance only through
-          // chain-verified spans; unscoped answers stay flag-free, bytes unchanged)
+          //! one run, by the codec's own rule: the split is exactly encodeRuns' over the held subset — one frame, or
+          // several cuts past the frame cap (armed AE answers carry each entry's STORED pp — the floor law: the receiver's
+          // floors advance only through chain-verified spans; unscoped answers stay flag-free, bytes unchanged)
           run.length = 0
           for (; i < entries.length; i++) {
             const e = entries[i]
@@ -2139,12 +2142,19 @@ export class Node {
             run.push(m)
           }
           if (!run.length) break
-          if (link.paused && link.inQueue === null) {
-            link.inQueue = { d: this.#cover(d, origin, run[0].seq), r, q }
-            if (link.client) this.#covered.add(link)
+          for (let k = 0; k < run.length;) {
+            //! a stop between two cuts of one run (the stop between runs is the check above, at k = 0)
+            if (k > 0 && link.paused && link.queued.length >= link.maxQueued) { tear = origin; tearSeq = run[k].seq; break lanes }
+            if (link.paused && link.inQueue === null) {
+              link.inQueue = { d: this.#cover(d, origin, run[k].seq), r, q }
+              if (link.client) this.#covered.add(link)
+            }
+            const cut = encodeRun(run, k, VERB.RECORDS, this.armed, this.tune.frame)
+            const n = cut.n
+            link.ship(cut.bytes, this.env.sink, j)
+            shipped += n
+            k += n
           }
-          link.ship(encodeRuns(run, undefined, this.armed)[0], this.env.sink, j)
-          shipped += run.length
         }
       }
     }
