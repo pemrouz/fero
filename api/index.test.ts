@@ -2070,3 +2070,26 @@ test('a method argument the wire cannot carry fails the call — with no server 
     await s?.destroy()
   }
 })
+
+//! V4-52: a method's argument reaches the server through the codec, which sends an object's own fields: a Date in it
+// arrived there as {}, a Map as {}, a Float64Array as an object of its indices. It is refused at the call like a
+// bigint, with what to send instead and where it sits, and nothing is sent.
+test('a method argument that would arrive changed is refused at the call like a bigint, as a call and as a live sub, with what to send instead', async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('kinds', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { a: 1 }, methods: { echo: (a: unknown) => a } })
+  const c = await fero('kinds', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).a === 1, 8000), 'the client caught up')
+    const m = c.methods as Record<string, (a?: unknown, o?: { timeout?: number }) => any>
+    await assert.rejects(async () => { await m.echo({ when: new Date(0) }, { timeout: 8000 }) },
+      /^Error: methods\.echo: the argument cannot be sent: a Date \(send date\.getTime\(\) or date\.toISOString\(\)\) at when$/)
+    await assert.rejects(async () => { await m.echo([new Float64Array([1.5])], { timeout: 8000 }) }, /the argument cannot be sent: a Float64Array \(send Array\.from\(it\), or its bytes as a Uint8Array\) at \[0\]$/)
+    const h = m.echo(new Map([[1, 2]]))
+    assert.throws(() => h.anything, /^Error: methods\.echo: the argument cannot be sent: a Map \(send Object\.fromEntries\(map\), or \[\.\.\.map\]\)$/)
+    assert.deepEqual(await m.echo({ when: 0, list: [1] }, { timeout: 8000 }), { when: 0, list: [1] }, 'what it says to send arrives')
+  } finally {
+    await c.destroy()
+    await s.destroy()
+  }
+})
