@@ -460,9 +460,12 @@ with its test.
 so a mapped spelling read as another box: it could squat the directory's
 socket, slip past the explicit-listen rule (§11), and be asked for a
 secret as if other machines could reach it. A new `unmap()` turns a mapped
-spelling (bracketed or bare, any case, the long zero form, the hex form
-`::ffff:7f00:1`) into its IPv4 address, and `localish`, `loopbackHost` and
-`canon` read through it. A mapped routable address (`[::ffff:10.0.0.5]`)
+spelling into its IPv4 address, and `localish`, `loopbackHost` and
+`canon` read through it. An IPv6 literal has many legal spellings
+(`::ffff:127.0.0.1`, `0::ffff:127.0.0.1`, `0:0:0::ffff:7f00:1` …), so
+`unmap()` first puts it in its one standard form (the URL parser's:
+lowercase, zeros compressed, the low 32 bits in hex) and matches the mapped
+prefix once. A scoped address (`fe80::1%eth0`) comes back unchanged. A mapped routable address (`[::ffff:10.0.0.5]`)
 stays routable. The composer's rules use the same helpers, so they follow.
 
 ### A failed lookup is opened again
@@ -531,8 +534,17 @@ and takes them off again on destroy.
   dropping, so the host has an `unregister({name, uuid})` method again
   (§9 removed it when the link was the only mechanism). Only the entry's
   current owner, the calling link, may remove it; anything else is a no-op
-  that says false. The leaving instance calls it bounded at 2 s, and only
-  while the link is up (a down link already cost the entry its place).
+  that says false. A leaving server ALWAYS calls it while the shared
+  client stays, whatever it believes about its own register: `fero()`
+  resolves before the first register comes back, so a server stopped in
+  that window used to skip the call, and the register then landed for
+  good (the review's probe leaked 10 of 10 entries). The call carries
+  `retry: true`, so one held while the link is down, or lost with a dying
+  primary, is sent again on the next primary, after any register sent
+  before it (the Caller replays in call order). The stop waits for it only
+  while the link is up, bounded at 2 s. And a register that settles after
+  the stop sends one more `unregister`, so a late landing cannot put the
+  entry back.
 - A host from before this change has no `unregister`: the entry then
   lives until the shared link drops, as every entry did before.
 - Different heartbeat or redial settings get their own client: the
@@ -572,6 +584,12 @@ Not reproduced: no fix, and the guard in `#client` stays.
   and registrations live; the last one out closes it. The host table's
   `unregister` rules are unit-pinned. With the unregister call removed the
   sharing test and the I-34 test both fail.
+- The stop-at-once window: six servers started and stopped at once (three
+  destroy, three crash) beside a sibling holding the shared client leave
+  no entry. Before the fix: 6 of 6 leaked. Either guard alone (the
+  always-sent unregister, or the one after a late register) closes it.
+- The lookup re-subscribe never hammers: at most 10 lookups in 2 s while
+  the host keeps failing them (with no backoff: 538).
 - The two I-19 race tests above.
 
 ### Left open
