@@ -13,6 +13,7 @@ import { Runtime, restoreOpts } from '../shell/runtime.ts'
 import { REC } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { Ring } from '../kernel/ring.ts'
+import { Cursor, HEADER } from '../kernel/codec.ts'
 import { ports, until } from '#utils'
 
 test('a solo durable node survives a hard restart: WAL + boot record restore state, clock, lane, and incarnation', async () => {
@@ -72,6 +73,51 @@ test('M4-REVIEW PIN — a CLEAN destroy flushes every queued append: committed w
     b.restore()
     assert.equal(b.node.stateHash, hash, 'every committed write survived the clean shutdown')
     assert.equal(b.node.state.size, 8)
+  } finally {
+    await a?.destroy()
+    await b?.destroy()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+//! V4-51: a durable server whose log outgrows one frame. Its WAL rows and its snapshot are cut by size (one row per
+// frame), and the shell writes them as they are: a WAL row at its exact size, the snapshot file streamed row by row —
+// never assembled in one frame-capped Writer, which failed the first swap of any store whose live data passed 256 MiB
+// (persistFail 'swap', the WAL dead for good; the design's probe 15 shows it with the cap scaled down). Driven at the
+// tune row's 4 KiB; the full-size failure is by construction (the old cap was MAX_FRAME, too big for a test disk).
+test('a durable server whose log outgrows one frame snapshots and restores on a real disk, row by row', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-wal-cut-'))
+  let a: Runtime | null = null
+  let b: Runtime | null = null
+  try {
+    a = new Runtime({ uuid: 'aa', dir, tune: { frame: 4096 } })
+    await a.start()
+    for (let w = 0; w < 6; w++) a.write(Array.from({ length: 10 }, (_, i) => ({ type: REC.update, key: [`r${w * 10 + i}`], value: new Uint8Array(1500).fill(i) })))
+    assert.ok(await until(() => (a!.node.streams.get('aa')?.durable ?? 0) === 60), 'every row fsync-resolved')
+    a.node.snapshot()
+    const swap = a.node.journal.read().filter((e) => e.kind === JK.snapshot).pop()!.a as number
+    assert.ok(await until(() => a!.node.journal.read().some((e) => e.kind === JK.persisted && e.a === swap)), 'the swap resolved')
+    assert.deepEqual(a.node.journal.read().filter((e) => e.kind === JK.persistFail), [], 'no persistFail')
+    //! walk the swapped file: [varint prev][frame] rows, each frame within the cap, chained by prev
+    const file = new Uint8Array(fs.readFileSync(path.join(dir, 'wal.log')))
+    const c = new Cursor(file)
+    const prevs: number[] = []
+    let n = 0
+    while (c.pos < c.end) {
+      prevs.push(c.varint())
+      const bodyLen = file[c.pos + 3] | (file[c.pos + 4] << 8) | (file[c.pos + 5] << 16) | (file[c.pos + 6] * 0x1000000)
+      assert.ok(bodyLen <= 4096, `a row's frame body is ${bodyLen} bytes`)
+      c.pos += HEADER + bodyLen
+      n++
+    }
+    assert.equal(n, 30, 'one chunk of 60 records, thirty rows of two')
+    assert.deepEqual(prevs, Array.from({ length: 30 }, (_, i) => i * 2), 'each row chains onto the one before it')
+    await a.destroy()
+    a = null
+    b = new Runtime({ uuid: 'aa', dir, ...restoreOpts(dir) })
+    b.restore()
+    assert.equal(b.node.state.size, 60, 'the swapped file restores every record')
+    assert.equal(b.node.tainted, false)
   } finally {
     await a?.destroy()
     await b?.destroy()
