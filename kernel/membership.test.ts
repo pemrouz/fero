@@ -972,9 +972,9 @@ test('a node remembers EVERY vote it gave above its view, not the latest alone: 
 
 //! fiveAt1 — `me` with its four peers admitted, at view 1 {aa,bb,cc,dd,ee}; `link[u]` is the link id to u
 const mem = (us: string[]): [string, string][] => us.map((u) => [u, `sim:${u}`])
-const fiveAt1 = (me: string) => {
+const fiveAt1 = (me: string, opts: Partial<ConstructorParameters<typeof Node>[0]> = {}) => {
   const ids = ['aa', 'bb', 'cc', 'dd', 'ee']
-  const h = harness(me, { hosts: ids.filter((u) => u !== me).map((u) => `sim:${u}`) })
+  const h = harness(me, { hosts: ids.filter((u) => u !== me).map((u) => `sim:${u}`), ...opts })
   h.node.step({ kind: 'start' })
   const link: Record<string, number> = {}
   ids.filter((u) => u !== me).forEach((u, i) => { link[u] = i + 1; h.admit(i + 1, u) })
@@ -1158,4 +1158,55 @@ test('a HELLO whose v is not a list of holds is a malformed HELLO: the link clos
   h.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:cc' })
   h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'cc', i: 1, l: 'sim:cc', v: [{ e: 0, h: 'x', p: 'y' }] }) })
   assert.equal(h.of('close').length, 2, 'an epoch of 0 is no hold')
+})
+
+test('the release, the proposer\'s word (DESIGN-LEAVE §10.10.4): a held voter\'s ask reaches its vote\'s proposer, which holds no such ballot and no view at or above it, and DISOWNS it (NACK) — the vote stays spent, warns no more (release row, gate open, the empty ask), and a re-grant to the same proposer re-holds; the proposer answers no NACK for a ballot it holds, for another proposer\'s ballot, or when its VIEW answers', () => {
+  //! the voter: cc held on aa's {aa,bb,cc}@2
+  const h = fiveAt1('cc', { durable: true })
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: mem(['aa', 'bb', 'cc']), p: 'aa', o: 1 }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'held' })
+  //! a NACK from the wrong link, or for another ballot of aa's, releases nothing
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.NACK, { e: 2, h: 'aa,bb,cc' }) })
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.NACK, { e: 2, h: 'aa,cc' }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'held' })
+  //! aa's disown of the ballot cc holds a vote for
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.NACK, { e: 2, h: 'aa,bb,cc' }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' }, 'released: the vote warns no more')
+  assert.deepEqual(h.jk(JK.release).map((e) => [e.a, e.b]), [[2, 'aa']])
+  assert.deepEqual(h.jk(JK.gateOpen).length, 1)
+  assert.deepEqual(h.node.membership.votedFor, { e: 2, p: 'aa', h: 'aa,bb,cc', f: 1 }, 'disowned, and still the spent vote')
+  assert.deepEqual((h.of('boot').pop()![1] as { votedFor: unknown }).votedFor, { e: 2, p: 'aa', h: 'aa,bb,cc', f: 1 }, 'durable with the vote')
+  for (const u of ['aa', 'bb', 'dd', 'ee']) assert.deepEqual(h.sentOn(h.link[u], VERB.PULL).pop()!.value, { e: 1, vs: [] }, `the release announced on the ${u} link`)
+  //! still spent: a rival at 2 is refused (vote-once reads e and p, not f)
+  h.node.step({ kind: 'bytesIn', link: h.link.bb, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: mem(['bb', 'cc', 'dd', 'ee']), p: 'bb', o: 1 }) })
+  assert.equal(h.vote(h.link.bb).g, 0)
+  //! aa re-offers the same ballot: the re-grant replaces the vote un-disowned and re-reads the hold
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: mem(['aa', 'bb', 'cc']), p: 'aa', o: 1 }) })
+  assert.equal(h.vote(h.link.aa).g, 1)
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'held' })
+  //! the proposer: aa at view 1 = {aa,bb,cc} with no ballot disowns a hold on a ballot of its own, and only that
+  const p = formedView1()
+  const nacks = () => p.sentOn(1, VERB.NACK).map((f) => f.value)
+  p.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PULL, { e: 1, vs: [{ e: 2, h: 'aa,bb', p: 'aa' }, { e: 2, h: 'bb,cc', p: 'cc' }] }) })
+  assert.deepEqual(nacks(), [{ e: 2, h: 'aa,bb' }], 'mine and gone: disowned; cc\'s is not mine to answer')
+  p.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PULL, { e: 1, vs: [] }) }) // bb's release: holding nothing, its word is taken back (else aa's next ballot is joint over {bb,cc} and waits for cc)
+  //! with the ballot open there is no disown — it may still commit
+  p.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  p.tick(); p.tick(); p.tick()
+  for (let i = 0; i < 11; i++) {
+    const t = p.of('timer').filter((x) => x[2] === TAG.redial).pop()
+    if (t) p.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    p.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:cc' })
+  }
+  p.tick()
+  assert.ok(p.jk(JK.propose).some((e) => e.a === 2), 'the eviction of cc is open at 2')
+  p.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PULL, { e: 1, vs: [{ e: 2, h: 'aa,bb', p: 'aa' }] }) })
+  assert.equal(nacks().length, 1, 'no second disown while the ballot is open')
+  //! committed: the VIEW is the answer, never a disown
+  p.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,bb' }) })
+  assert.equal(p.node.epoch, 2)
+  const views = p.sentOn(1, VERB.VIEW).length
+  p.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PULL, { e: 1, vs: [{ e: 2, h: 'aa,bb', p: 'aa' }] }) })
+  assert.equal(nacks().length, 1)
+  assert.equal(p.sentOn(1, VERB.VIEW).length, views + 1, 'answered with the view at 2')
 })

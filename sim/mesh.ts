@@ -13,7 +13,7 @@ import { Framer, VERB, encodeControl } from '../kernel/codec.ts'
 import { TAG, type BootRecord, type EffectSink, type Env } from '../kernel/env.ts'
 
 //! the membership verbs: the only frames the mesh carries
-const MV = new Set<number>([VERB.JOIN, VERB.PROPOSE, VERB.VOTE, VERB.VIEW, VERB.PULL, VERB.LEAVE])
+const MV = new Set<number>([VERB.JOIN, VERB.PROPOSE, VERB.VOTE, VERB.VIEW, VERB.PULL, VERB.LEAVE, VERB.NACK])
 const vname = (v: number) => Object.entries(VERB).find(([, x]) => x === v)?.[0] ?? String(v)
 type Frame = { verb: number; bytes: Uint8Array; value: unknown }
 type Boot = { epoch: number; members: [string, string][]; votedFor?: Vote }

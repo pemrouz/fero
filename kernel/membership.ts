@@ -153,8 +153,9 @@ export interface View { epoch: number; members: [string, string][] }
 // node gave above its view behind it (`prior`, DESIGN-LEAVE §10.10.7): a vote is a fact about a view that MAY exist
 // (§10.10.1), and a later vote to another proposer does not unmake it. `votedFor` is the latest and vote-once reads it
 // as ever; `prior` holds the rest, each at its own epoch, pruned at every install to those still above the view. It
-// rides inside `votedFor`, so the boot record and every restart path carry it unchanged.
-export interface Vote { e: number; p: string; h: string; prior?: Vote[] }
+// rides inside `votedFor`, so the boot record and every restart path carry it unchanged. `f` marks a vote its proposer
+// DISOWNED (a NACK, §10.10.4: it holds no such ballot and no view at or above it): still spent, warns no more.
+export interface Vote { e: number; p: string; h: string; f?: 1; prior?: Vote[] }
 //! cloneVote — a vote as a record of its own (the boot record must not share the live list)
 export const cloneVote = (v: Vote): Vote => ({ ...v, ...(v.prior ? { prior: v.prior.map((x) => ({ ...x })) } : {}) })
 //! NO_HOLDS — what holds() returns in the common case, shared so the write path allocates nothing for it
@@ -249,7 +250,7 @@ export class Membership {
     if (this.votedFor.e <= this.view.epoch && !this.votedFor.prior?.length) return NO_HOLDS
     const out: Vote[] = []
     for (const x of [this.votedFor, ...(this.votedFor.prior ?? [])])
-      if (x.e > this.view.epoch && x.p !== node.uuid && x.p !== '' && this.#apart(x.h) >= 2) out.push(x)
+      if (x.e > this.view.epoch && x.p !== node.uuid && x.p !== '' && !x.f && this.#apart(x.h) >= 2) out.push(x)
     return out
   }
   held(node: Node): boolean { return this.holds(node).length > 0 }
@@ -695,10 +696,34 @@ export class Membership {
     //! a held member's ask (DESIGN-LEAVE §10.10.6): remember what it holds — my gate stops counting it, my next ballot
     // is joint over it — and an EMPTY list replaces what it held before: that is its release. A CLIENT's `vs` is not
     // read (I-23): one client PULL once made every ballot of the server it reached joint over members that do not exist.
+    //! THE DISOWN (§10.10.4, half the release): for each hold whose proposer I am — if I hold neither a ballot of that
+    // identity nor a view at or above its epoch, the ballot is gone and I say so (NACK {e, h}). A view at or above it
+    // was answered above (the hold's epoch is above the asker's view, so so am I). Only I could ever commit that
+    // ballot, and a ballot counts only VOTE frames that reach it after it opened, so the asker's vote can never be a
+    // committing vote unless it grants me AGAIN — which re-reads the hold. And my word cannot overtake my view: on
+    // this FIFO link my VIEW left before any disown I send after it.
     if (!node.client && !link.client && Array.isArray(v.vs)) {
       const holds = this.#holdsOf(v.vs, v.e)
       if (holds.length) this.#heldPeers.set(link.uuid, holds); else this.#heldPeers.delete(link.uuid)
+      for (const x of holds)
+        if (x.p === node.uuid && this.view.epoch < x.e && !(this.#proposal && this.#proposal.view.epoch === x.e && this.#proposal.h === x.h))
+          link.ship(encodeControl(VERB.NACK, { e: x.e, h: x.h }), node.env.sink, node.journal)
     }
+  }
+
+  //! onNack — the vote's proposer disowned the ballot (DESIGN-LEAVE §10.10.4). The vote stays SPENT (vote-once at that
+  // epoch is untouched: votedFor.e and .p still read it); it warns no more (`f`), durably with the vote; the release is
+  // announced at once (an empty ask when it was my last hold). What the disown does not say is that no view at that
+  // epoch exists elsewhere — another proposer may have committed one over another old set — which is why the vote
+  // stays spent. The next grant to that proposer at that epoch replaces it un-disowned (#remember) and re-reads the hold.
+  onNack(node: Node, link: Link, v: { e?: unknown; h?: unknown }) {
+    if (typeof v?.e !== 'number' || typeof v?.h !== 'string') return
+    const hit = [this.votedFor, ...(this.votedFor.prior ?? [])].find((x) => x.e === v.e && x.p === link.uuid && x.h === v.h && !x.f)
+    if (!hit) return
+    hit.f = 1
+    node.persistBoot()
+    node.journal.armed && node.journal.emit(JK.release, v.e, link.uuid)
+    this.#ask(node, 'change')
   }
 
   //! install — the ONE place a view becomes committed fact: bump the node epoch, clear satisfied stale/
