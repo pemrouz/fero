@@ -274,6 +274,41 @@ test('I-29 / V4-47 — a view data stopped (a function in it threw) is walked th
   }
 })
 
+test('I-29 — the handler FIRST, module code later: a deduped view module code reaches raw through a parent it escaped is kept (sum, a two-deep and a three-deep chain, a closure over f.data)', async () => {
+  const NODE = Symbol.for('data.v4.node')
+  let closed: any = null
+  const s = solo({
+    total: (_: unknown, ctx: { data: any }) => snapshot(ctx.data.top(3).sum('n')),
+    best: (_: unknown, ctx: { data: any }) => Object.keys(snapshot(ctx.data.top(2).top(1)) as object).length,
+    deep: (_: unknown, ctx: { data: any }) => Object.keys(snapshot(ctx.data.top(4).top(3).top(2)) as object).length,
+    min: (_: unknown, ctx: { data: any }) => snapshot(ctx.data.top(5).min('n')),
+    //! a handler that closes over the resource and keeps what it reaches raw: the same as module code
+    keep: () => { closed = s.bind.data.top(5).min('n'); return snapshot(closed) },
+  }, { r1: { n: 1 }, r2: { n: 2 }, r3: { n: 3 } })
+  try {
+    //! the handler makes each chain first and drops it; then module code asks for the same chain raw,
+    // and data's dedup hands it the handler's handles. The handler's wrappers die; the views must not.
+    assert.equal(await s.host.invokeLocal('total', undefined), 6)
+    assert.equal(await s.host.invokeLocal('best', undefined), 1)
+    assert.equal(await s.host.invokeLocal('deep', undefined), 2)
+    assert.equal(await s.host.invokeLocal('min', undefined), 1)
+    const sum = s.bind.data.top(3).sum('n')
+    const tail = s.bind.data.top(2).top(1)
+    const deep = s.bind.data.top(4).top(3).top(2)
+    assert.equal(await s.host.invokeLocal('keep', undefined), 1)
+    await settle()
+    for (const [name, v] of [['sum', sum], ['tail', tail], ['deep', deep], ['closed', closed]] as const)
+      assert.equal(v[NODE].disposed, false, `the ${name} module code holds raw was released under it`)
+    s.bind.data.r1 = { n: 100 }
+    assert.equal(snapshot(sum), 105, 'the module sum still folds')
+    assert.deepEqual(snapshot(tail), [{ n: 100 }], 'the module tail still folds')
+    assert.deepEqual(snapshot(deep), [{ n: 100 }, { n: 2 }], 'the three-deep chain still folds')
+    assert.equal(snapshot(closed), 2, 'the closure min still folds')
+  } finally {
+    await s.stop()
+  }
+})
+
 test('I-29 — the registry at volume: a handler that makes 5000 views in one call leaves none behind (the cost ratio is pinned in api/methods.perf.ts)', async () => {
   const N = 5000
   const s = solo({
