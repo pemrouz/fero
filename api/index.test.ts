@@ -19,7 +19,7 @@ import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { JK } from '../kernel/journal.ts'
 import { TUNE } from '../kernel/tune.ts'
-import { VERB, encodeControl } from '../kernel/codec.ts'
+import { VERB, encodeControl, MAX_FRAME } from '../kernel/codec.ts'
 import { ports, until, sleep } from '#utils'
 import type { Fero, WriteReject, WriteResolve } from './types.ts'
 
@@ -166,6 +166,19 @@ test('redial.tries reaches the kernel: a client dialing a dead port gives up aft
   } finally { await c.destroy() }
   await assert.rejects(fero('r', { redial: { tries: 1.5 } } as never), /redial\.tries must be an integer ≥ 0/)
   await assert.rejects(fero('r', { redial: { tries: -1 } } as never), /redial\.tries must be an integer ≥ 0/)
+})
+
+//! V4-51: the tune row `frame` is the kernel's test seam for frame cuts — it has no config key and the composer never
+// passes it, so every fero() builds at MAX_FRAME. A composer that started passing it (or a default that moved) would
+// make production cut frames smaller than the wire allows; this goes red first.
+test('fero() never sets the frame row: a server and a client run at MAX_FRAME', async () => {
+  const p = await ports.free()
+  const s = await fero(`frame-${process.pid}`, { listen: `127.0.0.1:${p}`, heartbeat: { ms: 0 } })
+  try {
+    assert.equal(diag(s)!.tune().frame, MAX_FRAME)
+    const c = await fero(`frame-${process.pid}`, { hosts: [`127.0.0.1:${p}`], heartbeat: { ms: 0 }, redial: { ms: 30 } })
+    try { assert.equal(diag(c)!.tune().frame, MAX_FRAME) } finally { await c.destroy() }
+  } finally { await s.destroy() }
 })
 
 test('leave.ms (the knock window, DESIGN-LEAVE §10.7) reaches the kernel as the tune row leaveWindow — ms ÷ heartbeat.ms, rounded up; 0 is the bound alone; heartbeats off leave the row at its default — and is shown with its source; its default is 16 heartbeats at this node\'s cadence; a bad value is refused naming the key', async () => {
