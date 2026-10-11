@@ -29,9 +29,9 @@
 // that land synchronously inside the write() call settle through the same join as
 // commits that echo back seconds later off the owner.
 
-import { proxy, applyRec, lens, holeAt, SPARSE_HOLE, type Fault } from './substrate.ts'
+import { proxy, applyRec, lens, holeAt, isProxy, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
-import { encodable } from '../kernel/codec.ts'
+import { encodable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -41,10 +41,37 @@ import type { Runtime } from '../shell/runtime.ts'
 // composer re-exports it) because issue() is the one place that speaks it on a client.
 export const METHODS_ONLY = 'methods-only'
 
-//! UNENCODABLE — the reason issue() gives a record whose value the codec cannot carry (V4-48): a bigint, a
-// function, a symbol, nesting deeper than 64, or a getter that throws. Asked BEFORE the stamp: a value
-// stamped first failed in every frame that carried it afterwards, and replication stopped for good.
+//! UNENCODABLE — the reason issue() gives a record a local write cannot send (V4-48; unsendable says why).
+// Asked BEFORE the stamp: a value stamped first failed in every frame that carried it afterwards, and
+// replication stopped for good.
 export const UNENCODABLE = 'unencodable'
+
+//! WRITE — what a local write's value may be (kernel/codec.ts encodable).
+// The wire carries 64 levels. The built-in reads wrap a stored value in up to four more — a live sub of the
+// whole resource ships it inside SUBREC, its recs list, the record and the row; the scoped gather's claim is
+// as deep — and a field write's value sits under its row: a value 61 deep was written, replicated, and then
+// could not be read back. It leaves a MiB under the frame cap for the frame's header, the record's key and the
+// envelopes.
+export const WRITE: Limit = { depth: MAX_DEPTH - 4, bytes: MAX_FRAME - (1 << 20) }
+
+//! CARRIES — what fero sends, said once for every refusal of a value (the lens, a methods.* reject, the seed)
+export const CARRIES = `fero sends null, undefined, true and false, numbers, strings, Uint8Array, and arrays and objects of these (an object sends its own fields), at most ${WRITE.depth} levels deep counted from the row and ${WRITE.bytes >> 20} MiB in all (a string counts 3 bytes a character)`
+
+//! LIVE_VIEW — the reason for a live view written as a value (`data.b = data.a`, the likely slip): read
+// through its traps it sent an empty object for every leaf, to every copy and the writer's own, and the writer's
+// copy went on aliasing the source (V4-48 review). Asked of the value itself, not of every part of it.
+export const LIVE_VIEW = "a live view, not a value (use a plain copy, such as the resource's snapshot of it)"
+
+//! unsendable — why a local write's record cannot travel every path fero reads it back on, or null (V4-48):
+// the value from where it sits in its row (a field write starts one level down), its key and `at` counted
+// into the bytes. A remove carries no value: only its key is counted.
+export const unsendable = (r: Rec): string | null => {
+  let n = r.at === undefined ? 0 : 4 + r.at.length * 3
+  for (const k of r.key) n += 4 + k.length * 3
+  if (r.type === REC.remove) return encodable(undefined, WRITE, 0, n)
+  if (isProxy(r.value)) return LIVE_VIEW
+  return encodable(r.value, WRITE, r.key.length > 1 ? r.key.length - 1 : 0, n)
+}
 
 //! SCOPED_FEEDER — does a server's HELLO contract (api/index.ts clusterContract: `v1;heartbeat.ms=…;
 // replicas=N;…`) say it is scoped? `replicas=0` is full replication. Read by #local on a client.
@@ -258,9 +285,11 @@ export class Bind {
   // data: seed all land here; the validation: hook therefore covers every spelling by
   // construction — v2's OQ6). Admit, register the pending entries, hand the records to the kernel;
   // the proxy changes only when a commit applies (#onApply).
-  //! `checked` — the lens's own batch, whose values #fromLens has already asked (it throws instead, before
-  // anything is issued): the one walk per value is not paid twice on the assignment path.
-  issue(recs: Rec[], checked = false): Issued {
+  issue(recs: Rec[]): Issued { return this.#issue(recs, false) }
+  //! `checked` — the lens's own batch, which #fromLens has already asked (it throws instead, before anything
+  // is issued): the one walk per value is not paid twice on the assignment path. Private, so no caller
+  // outside skips the question.
+  #issue(recs: Rec[], checked: boolean): Issued {
     const node = this.#rt.node
     const out: Issued = new Array(recs.length)
     //! the door, read ONCE per batch (DESIGN-DOOR §4): a CLIENT whose primary said methods-only (`m: 1`
@@ -278,8 +307,8 @@ export class Bind {
     const valid: Rec[] = []
     const t = this.#tracked?.()
     for (let i = 0; i < recs.length; i++) {
-      //! a value the wire cannot carry is refused before the user's rule sees it, and before any stamp
-      const v = !checked && recs[i].type !== REC.remove && encodable(recs[i].value) !== null ? UNENCODABLE : this.admit(recs[i])
+      //! a record that cannot be sent is refused before the user's rule sees it, and before any stamp
+      const v = !checked && unsendable(recs[i]) !== null ? UNENCODABLE : this.admit(recs[i])
       if (v !== true) {
         //! refused: an outcome row with the reason, and nothing else — the record never touched the
         // proxy, so there is nothing to undo (a refused write is invisible, not bounced)
@@ -487,17 +516,17 @@ export class Bind {
       for (const r of recs) this.#apply(r)
       return
     }
-    //! a value the wire cannot carry throws HERE, before anything of the batch is issued (V4-48) — like the
+    //! a record that cannot be sent throws HERE, before anything of the batch is issued (V4-48) — like the
     // lens's root-replace and sparse-hole refusals: a programming error, loud at the assignment, all or nothing
-    // for a patch() of several pairs. Nothing is stamped, so nothing is left to stop replication.
+    // for a patch() of several pairs. Nothing is stamped. The kernel keeps the caller's object, though: a value
+    // changed after the write is not asked again (STATUS).
     for (const r of recs) {
-      if (r.type === REC.remove) continue
-      const why = encodable(r.value)
-      if (why !== null) throw new TypeError(`fero: ${JSON.stringify(r.key)}: the value cannot be sent — ${why}; fero carries null, booleans, numbers, strings, Uint8Array, arrays and plain objects, at most 64 deep`)
+      const why = unsendable(r)
+      if (why !== null) throw new TypeError(`fero: ${JSON.stringify(r.key)} cannot be sent: ${why}\n  ${CARRIES}`)
     }
     //! assignments have no await surface — swallow the coordinate promises (their journal/outcome
     // effects are the observable outcome), but NEVER let a reject become an unhandledRejection
-    const out = this.issue(recs, true)
+    const out = this.#issue(recs, true)
     const t = this.#tracked?.()
     for (let i = 0; i < out.length; i++) {
       const r = out[i]

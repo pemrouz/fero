@@ -278,29 +278,59 @@ test('Writer.value writes an array by index over the length it writes — whatev
   }
 })
 
-//! encodable (V4-48) is asked before a local write is stamped: it must say yes exactly when Writer.value can
-// encode, or a value it lets through is the stamped-then-unshippable write it exists to stop (and one it refuses
-// is a write lost for nothing). Parity over the codec's edges, plus the reason it gives for each refusal.
-test('encodable agrees with Writer.value on every edge, and names what stops a refused value', () => {
+//! encodable (V4-48) is asked before a local write is stamped: within the codec's own bounds it must say yes
+// exactly when Writer.value can encode, or a value it lets through is the stamped-then-unshippable write it exists
+// to stop (and one it refuses is a write lost for nothing). Parity over the codec's edges, plus the reason it gives
+// for each refusal. The api asks tighter bounds (api/data.ts WRITE, ARG); those are pinned where they are asked.
+test('encodable agrees with Writer.value on every edge within the codec\'s bounds, and names what stops a refused value', () => {
+  const CODEC = { depth: MAX_DEPTH, bytes: MAX_FRAME }
   let d64: unknown = 1, d65: unknown = 1
   for (let i = 0; i < 64; i++) d64 = [d64]
   for (let i = 0; i < 65; i++) d65 = [d65]
   const cyclic: Record<string, unknown> = {}
   cyclic.self = cyclic
+  const [odd, ownBig, ownLong] = oddArrays()
   const values: unknown[] = [
     null, undefined, true, false, 0, -0, 1.5, NaN, Infinity, 2 ** 31, '', 'ünïcode', new Uint8Array([1]), [], {}, [1, [2, [3]]],
-    { a: { b: [1, 'x', null] } }, new Date(0), new Map([[1, 2]]), Object.create(null), [, 1], d64, d65, cyclic,
+    { a: { b: [1, 'x', null] } }, new Date(0), new Map([[1, 2]]), Object.create(null), [, 1], d64, d65, cyclic, odd, ownBig, ownLong,
     10n, () => 1, Symbol('s'), { n: 10n }, [Symbol('t')], { get g() { throw new Error('g') } }, { get ok() { return 1 } },
   ]
   for (const v of values) {
     let encodes = true
     try { new Writer().value(v) } catch { encodes = false }
-    assert.equal(encodable(v) === null, encodes, `parity for ${String(typeof v)} ${(() => { try { return JSON.stringify(v) } catch { return '(unprintable)' } })()}`)
+    assert.equal(encodable(v, CODEC) === null, encodes, `parity for ${String(typeof v)} ${(() => { try { return JSON.stringify(v) } catch { return '(unprintable)' } })()}`)
   }
-  assert.equal(encodable(10n), 'a bigint')
-  assert.equal(encodable({ f: () => 1 }), 'a function')
-  assert.equal(encodable([Symbol('s')]), 'a symbol')
-  assert.equal(encodable(d65), 'nesting deeper than 64')
-  assert.equal(encodable(cyclic), 'nesting deeper than 64')
-  assert.equal(encodable({ get g() { throw new Error('g') } }), 'reading it threw (Error: g)')
+  assert.equal(encodable(10n, CODEC), 'a bigint')
+  assert.equal(encodable({ f: () => 1 }, CODEC), 'a function at f')
+  assert.equal(encodable([Symbol('s')], CODEC), 'a symbol at [0]')
+  assert.equal(encodable({ toys: ['ball', { 'two words': 10n }] }, CODEC), 'a bigint at toys[1]["two words"]')
+  assert.equal(encodable({ a: { b: { c: { d: { e: { f: { g: 10n } } } } } } }, CODEC), 'a bigint at a.b.c.d.e.f…', 'the first six parts of a long path')
+  assert.equal(encodable(d65, CODEC), 'deeper than 64 levels', 'no path for depth: it is the path')
+  assert.equal(encodable(cyclic, CODEC), 'deeper than 64 levels')
+  assert.equal(encodable({ get g() { throw new Error('g') } }, CODEC), 'reading it threw (Error: g) at g')
+  assert.equal(encodable(d64, CODEC, 1), 'deeper than 64 levels', 'a value that starts one level down has one level less')
+  //! what a getter throws is never tested in a way that runs its code: a revoked Proxy, or a Proxy whose trap throws,
+  // answered with a throw out of encodable itself (an `instanceof` on it), and a data: seed escaped fero() bare
+  const { proxy: revoked, revoke } = Proxy.revocable({}, {})
+  revoke()
+  const trap = new Proxy({}, { getPrototypeOf() { throw new Error('trap') } })
+  assert.equal(encodable({ get x() { throw revoked } }, CODEC), 'reading it threw (an unreadable error) at x')
+  assert.equal(encodable({ get x() { throw trap } }, CODEC), 'reading it threw (an unreadable error) at x')
+})
+
+//! the byte budget: charged as Writer.ensure reserves (a string 4 + 3 per character), so a value it lets through
+// never meets the frame cap alone; and charged BEFORE the walk visits what it pays for, so the walk is bounded by the
+// budget, never by the value — a hostile shape costs what encoding it would, at most.
+test('encodable charges bytes as the writer reserves them and stops when the budget runs out: a sparse array a billion long and a value of shared parts are refused at once', () => {
+  const small = { depth: MAX_DEPTH, bytes: 300 }
+  assert.equal(encodable('x'.repeat(98), small), null, '4 + 3 × 98 = 298 bytes fit in 300')
+  assert.equal(encodable('x'.repeat(99), small), 'bigger than 0 MiB (a string counts 3 bytes a character)')
+  assert.equal(encodable('x'.repeat(98), small, 0, 2), null)
+  assert.match(encodable('x'.repeat(98), small, 0, 3)!, /^bigger than/, 'what the key already spent counts')
+  const t0 = performance.now()
+  assert.equal(encodable(new Array(1e9), { depth: MAX_DEPTH, bytes: MAX_FRAME }), 'bigger than 256 MiB', 'no note about characters when no string was counted')
+  let shared: unknown = 1
+  for (let i = 0; i < 64; i++) shared = [shared, shared] // 65 arrays, 2^64 paths through them
+  assert.equal(encodable(shared, { depth: MAX_DEPTH, bytes: 1 << 20 }), 'bigger than 1 MiB')
+  assert.ok(performance.now() - t0 < 1000, `both refusals stop at the budget (${Math.round(performance.now() - t0)} ms)`)
 })
