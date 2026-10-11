@@ -1240,3 +1240,64 @@ test('a big torn answer costs what it ships: 3,000 sparse records through a sock
   assert.equal(f.link.droppedWhilePaused, false, 'no overflow, no drain digest')
   assert.equal(f.link.synced, true)
 })
+
+//! a SPLICE under a stopped or queued answer (the review of the resume-cost fix, 2026-10-11). An armed feeder aa holds
+// bb's partition p1 at seqs 10, 12, ..., 28 but not 11 (that one reaches it later from cc: a cross-link interleave).
+// A spoke that held all eleven rows fails over to aa — a resync. The answer pauses inside frame 2 (the ship stops: the
+// cover sits above 11), 7 (it completes with three frames and its reply queued) or 10 (only the reply queued). Then 11
+// arrives and splices into the lane's interior; live records follow until the queue overflows. A cover is a map of
+// tails, so it cannot hold a record below it: the splice lowers it (Node.indexInsert). Before: the resume started at
+// the cover, 11 was never shipped (again), the spoke ended its resync without r11 and swept it.
+const P1 = (k: string, v: number): Rec => ({ type: REC.update, key: ['p1', k], value: v })
+const p1frame = (seq: number, pp?: number) => encodeRuns([{ rec: P1(`r${seq}`, seq), origin: 'bb', seq, epoch: 1, pp }], VERB.RECORDS, pp !== undefined)[0]
+for (const pauseAt of [2, 7, 10])
+  test(`a record spliced under a torn answer's cover reaches the spoke (pause inside frame ${pauseAt}): the splice lowers the cover, the resync ends on ONE ask with every row`, () => {
+    let armed = false, count = 0
+    const SEQS = Array.from({ length: 10 }, (_, i) => 10 + 2 * i)
+    const members = [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']]
+    const F = harness('aa', { replicas: 2, boot: { epoch: 1, members }, tune: { queued: 4 } }, (link) => {
+      if (link === 7 && armed && ++count === pauseAt) { armed = false; F.node.step({ kind: 'pause', link: 7 }) }
+    })
+    F.node.step({ kind: 'start' })
+    F.admit(1, 'bb'); F.digestFrom(1)
+    F.admit(2, 'cc'); F.digestFrom(2)
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: members }) })
+    assert.equal(F.node.armed, true)
+    F.node.writes.ring.place('p1', 'bb', 'aa')
+    let prev = 0
+    for (const s of SEQS) { F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(s, s === 10 ? 0 : s === 12 ? 11 : prev) }); prev = s }
+    F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+    F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+    const S = harness('cl', { client: true, hosts: ['sim:pp', 'sim:aa'] })
+    S.node.step({ kind: 'start' })
+    S.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:pp' })
+    S.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'pp', i: 1, l: 'sim:pp', c: SCOPED }) })
+    S.digestFrom(1)
+    S.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:aa' })
+    S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', c: SCOPED }) })
+    for (const s of [10, 11, ...SEQS.slice(1)]) S.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(s) })
+    assert.equal(S.node.state.size, 11, 'the spoke shows all eleven')
+    const p = pump(F, 7, S, 2)
+    const s0 = digests(S, 2).length
+    S.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+    assert.notEqual(S.node.resync, null)
+    armed = true
+    p.toA()
+    const link = F.node.links.get(7)!
+    const cover = (link.torn ?? link.inQueue)!.d.bb
+    assert.ok(cover > 11, `the answer's cover sits above 11 (${cover})`)
+    //! 11 reaches aa from cc: it splices; live records follow until the queue overflows (or, stopped, nothing goes live)
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: p1frame(11, 10) })
+    assert.ok(F.node.logs.get('bb')!.some((e) => e.seq === 11), 'aa spliced 11')
+    assert.equal((link.torn ?? link.inQueue)!.d.bb, 10, 'the splice lowered the cover to just under 11')
+    for (let k = 1; k <= 3 && F.jk(JK.dropOldest).length === 0 && link.synced; k++) F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(28 + 2 * k, 26 + 2 * k) })
+    if (pauseAt !== 2) assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear took the queued answer')
+    p.toB()
+    for (let d = 0; d < 4 && (link.paused || link.torn !== null); d++) { F.node.step({ kind: 'drain', link: 7 }); p.settle() }
+    p.settle()
+    assert.equal(S.node.resync, null, 'the resync ended')
+    assert.deepEqual([...S.node.state.keys()].sort(), [...F.node.state.keys()].sort(), 'the spoke holds every row its feeder holds, r11 included')
+    assert.ok(S.node.state.has(JSON.stringify(['p1', 'r11'])))
+    assert.deepEqual(S.jk(JK.resynced).map((e) => e.a), [0], 'nothing swept')
+    assert.equal(digests(S, 2).slice(s0).filter((d) => d.r === 1).length, 1, 'ONE ask')
+  })

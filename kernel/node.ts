@@ -1969,7 +1969,17 @@ export class Node {
 
   //! indexInsert — an entry spliced into a lane's INTERIOR (the dual fence, a fold, a replayed interior
   // row): binary search by seq in its (lane, p) array keeps that array ascending like the lane.
+  //! It is also the one place every interior insert passes, so it lowers the cover of a stopped or queued digest
+  // answer (Link.torn / Link.inQueue, #answer) that already sits at or above the new entry: a cover is a map of
+  // tails and cannot hold a record below it. Without this, a record spliced under a stopped answer's cover is never
+  // shipped, and one tap-forwarded behind a queued reply and cleared with it is never shipped again — a spoke in
+  // resync ends without that row and sweeps it (the review of the resume-cost fix, 2026-10-11). Only client links
+  // carry a cover on a node that splices (an armed one: its member links get no suffix), and only while paused.
   indexInsert(origin: string, e: LogEntry) {
+    if (this.clientLinks.size) for (const l of this.clientLinks) {
+      if (l.torn !== null && (l.torn.d[origin] ?? 0) >= e.seq) l.torn.d[origin] = e.seq - 1
+      if (l.inQueue !== null && (l.inQueue.d[origin] ?? 0) >= e.seq) l.inQueue.d[origin] = e.seq - 1
+    }
     const idx = this.byPart
     if (idx === null) return
     const p = partitionOf(e.rec)
