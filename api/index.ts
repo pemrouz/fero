@@ -702,9 +702,12 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // and LAZY (M6-review finding 41): constructed on FIRST consumption (read() / `await data`), so a
   // scoped server whose union nobody ever reads never fans out N² full-claims downloads on view
   // installs — the install-triggered refresh below fires only once `gather` is non-null.
+  //! A member whose share is bigger than one frame refuses its `rows` answer typed (V4-51): the live union then ends
+  // the live reads it feeds (host.endLive), never a silent partial (plan §9).
   let gather: Gather | null = null
   const gatherOf = (): Gather =>
-    (gather ??= new Gather(rt, (uuid, t) => memberCaller!.call(SYSTEM + 'rows', undefined, { timeout: t, to: uuid }) as Promise<Rows>, fault))
+    (gather ??= new Gather(rt, (uuid, t) => memberCaller!.call(SYSTEM + 'rows', undefined, { timeout: t, to: uuid }) as Promise<Rows>, fault,
+      (r) => { if (gather !== null) host?.endLive(gather.proxy, r) }))
 
   //! ── the scoped data facade (M6, DESIGN-M6 C6): §9's promise — an expression means the same at
   // R=2 and R=∞, TYPED ERRORS, never a silent partial. Operators would fold the held SHARD as if it
@@ -801,7 +804,15 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       if (!scoped || !node.armed) return ctx.data
       //! the live cadence is FLOORED (M6-review finding 9): heartbeat.ms 0 is the documented
       // heartbeat opt-out, not a request for a ~1ms full-cluster refresh storm
-      if (ctx.live) { const g = gatherOf(); g.live(liveCadence(heartbeatMs)); return g.proxy }
+      //! a gather whose last generation could not take a member's share (bigger than one frame, V4-51) fails a new
+      // live read at once, typed. One generation is kicked off, so a share that has shrunk is seen by the next try
+      // even when no live read keeps the paced re-gather running.
+      if (ctx.live) {
+        const g = gatherOf()
+        if (g.refused !== null) { void g.refresh(rt, { throwOnPartial: false }).catch(() => {}); throw g.refused }
+        g.live(liveCadence(heartbeatMs))
+        return g.proxy
+      }
       return gatherOf().refresh(rt, { throwOnPartial: true })
     },
     ...(userMethods as Record<string, (arg: unknown, ctx: Context) => unknown>),

@@ -228,10 +228,14 @@ export interface Partitions {
 // holistic op on a scoped node throws THIS, never warn + local partial; a gather that cannot reach
 // a partition's holders rejects with THIS, never a silent subset). `scoped: true` is the wire
 // discriminant — a RESULT error value carrying it rehydrates as-is instead of an Error-string wrap.
+//! 'too-large' (V4-51), scoped or not: a read whose answer, whose live first picture or change, or whose gathered
+// share is bigger than one frame (256 MiB) — one value cannot be cut, so it is refused, never cut or dropped; the
+// hint says what to do (read one key at a time). `op` names the method ('read'), or 'gather' with `missing` naming
+// the members whose share did not fit.
 export interface ScopedError {
   scoped: true
-  op: string // 'group' | 'top' | 'gather' | 'get' | 'predicate' | …
-  reason: 'holistic' | 'closure' | 'unreachable' | 'timeout' | 'shortfall'
+  op: string // 'group' | 'top' | 'gather' | 'get' | 'predicate' | 'read' | …
+  reason: 'holistic' | 'closure' | 'unreachable' | 'timeout' | 'shortfall' | 'too-large'
   replicas: number
   partition?: string
   missing?: string[]

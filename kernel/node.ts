@@ -722,16 +722,20 @@ export class Node {
       }
       //! reply/subOut: the HOST side answers an invoke — framed back down the link it came in on.
       // A dead/gone link is a silent no-op: the caller's own linkDown handling owns that failure.
+      //! At this node's frame cap (V4-51). A RESULT or a SUBREC carries ONE value and cannot be cut: past the cap the
+      // encode throws FULL out of this step — before anything is journaled or shipped, exactly where a FrameError left
+      // before — and the api's Host turns it into a typed refusal (reason 'too-large', api/methods.ts). 'rpc' and the
+      // protocol's own control frames keep MAX_FRAME: ARG (V4-48) or their own constants bound them.
       case 'reply': {
         const link = this.links.get(e.link)
         if (!link || link.state !== LS.admitted || link.dead) return
-        link.ship(encodeControl(VERB.RESULT, { id: e.id, ok: e.ok ? 1 : 0, v: e.value }), this.env.sink, j)
+        link.ship(encodeControl(VERB.RESULT, { id: e.id, ok: e.ok ? 1 : 0, v: e.value }, this.tune.frame), this.env.sink, j)
         return
       }
       case 'subOut': {
         const link = this.links.get(e.link)
         if (!link || link.state !== LS.admitted || link.dead) return
-        link.ship(encodeControl(VERB.SUBREC, { id: e.id, recs: e.recs }), this.env.sink, j)
+        link.ship(encodeControl(VERB.SUBREC, { id: e.id, recs: e.recs }, this.tune.frame), this.env.sink, j)
         return
       }
       case 'persistFail': {

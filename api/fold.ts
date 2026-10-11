@@ -39,6 +39,7 @@
 // refresh can only add or lawfully-remove keys, never blink one. A push-based
 // per-member claim stream is a wire optimization, tracked in IDEAS.
 
+import { isTooLarge, sizeOf } from './methods.ts'
 import { proxy, snapshot, applyStreamRec, type Fault } from './substrate.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import type { ScopedError } from './types.ts'
@@ -103,10 +104,16 @@ export class Gather {
   // Fault). The per-cell catches below are for a cell that cannot materialize; without this they swallowed a
   // user's throw too, silently.
   #fault: Fault | undefined
-  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number) => Promise<Rows>, fault?: Fault) {
+  //! refused (V4-51) — the last generation's typed refusal when a member's share was bigger than one frame (its
+  // `rows` answer refused 'too-large'), null once a generation gathered every share. A new live read fails with it
+  // at once (api/index.ts read); onRefused ends the live reads already open (Host.endLive): never a silent partial.
+  refused: ScopedError | null = null
+  #onRefused: ((r: ScopedError) => void) | undefined
+  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number) => Promise<Rows>, fault?: Fault, onRefused?: (r: ScopedError) => void) {
     this.#rt = rt
     this.#call = call
     this.#fault = fault
+    this.#onRefused = onRefused
   }
 
   //! refresh — one gather generation, SERIALIZED: concurrent callers (a one-shot read racing the
@@ -130,11 +137,23 @@ export class Gather {
     const members = node.membership.view.members.map((m) => m[0])
     const mine = rowsPartial(this.#rt)
     const answered = new Map<string, Rows>([[node.uuid, mine]])
-    const missing: string[] = []
+    const missing: string[] = [], tooBig: string[] = []
     await Promise.all(members.filter((u) => u !== node.uuid).map(async (u) => {
       try { answered.set(u, await this.#call(u, opts.timeoutMs ?? 8000)) }
-      catch { missing.push(u) }
+      catch (e) { (isTooLarge(e) ? tooBig : missing).push(u) }
     }))
+    //! a member whose claims are bigger than one frame (V4-51) refused its `rows` answer 'too-large': reachable, and
+    // retrying cannot help, so it is never filed as unreachable — the one-shot read rejects too-large (it wins over
+    // unreachable when both happen), and the live union ends its subscribers instead of parking that member silently
+    if (tooBig.length) {
+      const r: ScopedError = {
+        scoped: true, op: 'gather', reason: 'too-large', replicas: node.replicas, missing: tooBig,
+        hint: `the rows ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds are' : 'hold are'} bigger than one frame (${sizeOf(node.tune.frame)}), so the whole-resource read cannot gather them: read one key at a time (methods.read(key))`,
+      }
+      this.refused = r
+      if (opts.throwOnPartial) throw r
+      this.#onRefused?.(r)
+    } else this.refused = null
     if (missing.length && opts.throwOnPartial)
       throw {
         scoped: true, op: 'gather', reason: 'unreachable', replicas: node.replicas, missing,
