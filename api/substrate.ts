@@ -29,6 +29,12 @@ import {
 } from '../../data/api/index.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 
+//! DATA_ROOT, FERO_ROOT — where a stack frame is data's own or fero's own (api/index.ts sayFault skips them to
+// find the user's place). DATA_ROOT is resolved from the same specifier as the import above, the way the
+// loader resolves it: symlinks followed, the real path a stack shows.
+export const DATA_ROOT: string = new URL('../', import.meta.resolve('../../data/api/index.ts')).href
+export const FERO_ROOT: string = new URL('../', import.meta.url).href
+
 //! ORIGIN — the token every substrate apply carries. Nothing in fero suppresses on it today
 // (no capture sink exists to protect); it exists so any sink — diagnostics, a user tap, a
 // future spoke-forwarder — can OPT OUT of replication-applied noise declaratively
@@ -39,9 +45,52 @@ export const ORIGIN: symbol = Symbol('fero')
 // fero's thenable/assignable public shape is the LENS, layered by api/data.ts).
 export const proxy = (initial: unknown = {}): any => $(initial)
 
-//! batch — data's consolidated commit: every set inside fn lands as ONE batch, so a bare tap on the
-// container fires once with the whole picture (V4-8's cluster fold; the composer's one use).
-export const batch = <R>(fn: () => R): R => dataBatch(fn)
+//! Fault — where the user's own code lands when it throws because fero changed a source it watches: a
+// view's function or a tap. data runs those as a commit closes, AFTER the change has landed, and hands
+// their failures back as one AggregateError (data's SCHEDULE clause 4, VERSION 5: a filter or map leaves
+// the row out, any other view stops, everything else still updates). fero is in the middle of its own
+// work there — a kernel step, a socket handler, a timer, the post-step fold — and a throw out of it
+// crashed the process, or cut that work short (the rest of a write's records, the rest of a frame, a
+// spoke's feed). So the error goes to the composer's printer (api/index.ts sayFault) and fero carries on.
+export type Fault = (e: unknown) => void
+
+//! commit — fero's writes into a source the user can watch, as ONE data batch (V4-8: a bare tap fires once
+// with the whole picture), with what the user's views and taps throw as it closes handed to `fault`. A throw
+// from fn itself is fero's own and stays loud: it is caught inside the batch (so the batch still closes on
+// what fn wrote) and rethrown after. A batch issued inside data's effect phase runs later, at a later commit
+// of the same flush (data clause 5); fn's own throw there is thrown again from a microtask, outside data —
+// an uncaught error, as it would have been — never into the flush that drains it, where it would read as
+// the user's.
+const OWN = Symbol('own')
+export const commit = (fault: Fault, fn: () => void): void => {
+  let own: unknown = OWN
+  let returned = false
+  try {
+    dataBatch(() => {
+      try {
+        fn()
+      } catch (e) {
+        if (returned) queueMicrotask(() => { throw e })
+        else own = e
+      }
+    })
+  } catch (e) {
+    fault(e)
+  }
+  returned = true
+  if (own !== OWN) throw own
+}
+
+//! errText — a thrown value as text, whatever it is: an Error, a string, or a null-prototype object, a
+// getter that throws, a message that is not text. fero prints and replies with it from inside its own work,
+// where a second throw would be the very crash it is guarding against.
+export const errText = (e: unknown): string => {
+  const get = (k: string): unknown => { try { return e !== null && (typeof e === 'object' || typeof e === 'function') ? (e as Record<string, unknown>)[k] : undefined } catch { return undefined } }
+  const message = get('message')
+  if (typeof message === 'string') { const name = get('name'); return `${typeof name === 'string' ? name : 'Error'}: ${message}` }
+  if (typeof e === 'string') return e
+  try { return String(e) } catch { try { return Object.prototype.toString.call(e) } catch { return 'an unprintable value' } }
+}
 
 //! snapshot — the dense current value (v4 [value]: a fresh container per read; rows shared
 // by reference under the path-copy immutability law).
@@ -55,8 +104,11 @@ export const contract = exportContract
 // a raw handle, an operator view, or a fero lens (which forwards the symbol) — is
 // subscribable; every other value is a value. v4 handles are NOT thenable, so the v3
 // blind-await hazard shrinks to fero's own lens (which keeps the v2-parity thenable).
-export const isProxy = (x: unknown): boolean =>
-  x !== null && (typeof x === 'object' || typeof x === 'function') && (x as any)[NODE] instanceof DataNode
+//! Total: a handler may return anything, a Proxy whose traps throw included, and the Host asks this inside its
+// own catch blocks, where a throw is an unhandled rejection that ends the server.
+export const isProxy = (x: unknown): boolean => {
+  try { return x !== null && (typeof x === 'object' || typeof x === 'function') && (x as any)[NODE] instanceof DataNode } catch { return false }
+}
 
 //! lanes — one pre-resolved hot lane per handle (data W7): profile, source, and origin all
 // fixed at first use; per-apply work is the loop + writes only. Rejects surface through a
@@ -71,6 +123,14 @@ const laneOf = (p: any) => {
   }
   return l
 }
+//! laneFold — one lane call. The records fold first (a record data refuses is a reject, not a throw), so
+// whatever throws comes after they landed, as data's commit closes: the user's views and taps, data's cap on
+// a write loop, or a fault of data's own. With a `fault` that goes to it (see Fault); without one it throws,
+// as it always did.
+const laneFold = (p: any, recs: readonly Rec[], fault: Fault | undefined): void => {
+  if (fault === undefined) { laneOf(p)(recs); return }
+  try { laneOf(p)(recs) } catch (e) { fault(e) }
+}
 
 //! applyRec — one committed Rec into the handle via the hot lane (V4-7: only commits are ever
 // projected). ORPHAN-CELL
@@ -78,8 +138,9 @@ const laneOf = (p: any) => {
 // of) its row — data v4 keeps deep-writes-cannot-invent-rows LOUD (clause 10c), so the
 // substrate supplies fero's replication semantics here: a rejected deep write vivifies the
 // row ({}) and re-applies, byte-for-byte what data v2's auto-vivifying [view].res did.
-// Everything else that rejects is a genuine fault and rethrows.
-export const applyRec = (p: any, r: Rec): void => {
+// Everything else that rejects is a genuine fault and rethrows. What the user's own views and taps throw
+// once the record has landed goes to `fault` (see Fault) — the Bind passes the composer's printer.
+export const applyRec = (p: any, r: Rec, fault?: Fault): void => {
   //! SAVE/RESTORE, not set/null: applyRec re-enters through data's effect phase (a user
   // tap issuing a write → issue → the epoch-0 fast-path commit → #onApply → applyRec while the
   // outer lane is mid-flush), and a
@@ -90,14 +151,14 @@ export const applyRec = (p: any, r: Rec): void => {
   const prev = rejects
   rejects = []
   try {
-    laneOf(p)([r])
+    laneFold(p, [r], fault)
     const mine = rejects
     if (mine.length > 0) {
       const rj = mine[0]
       const msg = String((rj.error as Error)?.message ?? '')
       if (r.type === REC.update && r.key.length > 1 && msg.includes('not live')) {
         rejects = [] // the retry's rejects stay LOUD — a post-vivify failure is a genuine fault
-        laneOf(p)([{ type: REC.update, key: [r.key[0]], value: {} }, r])
+        laneFold(p, [{ type: REC.update, key: [r.key[0]], value: {} }, r], fault)
         if (rejects.length > 0) throw rejects[0].error
         return
       }
@@ -123,8 +184,12 @@ export const applyRec = (p: any, r: Rec): void => {
 // wire/user ownership). stop() is a REAL synchronous detach now (v4 SubscriptionHandle),
 // and the operator chain behind a derived view is graph-held — the v3 anchor/WeakRef
 // pinning contract is gone.
-export const records = (p: any, fn: (rec: { type: string; key: string[]; value?: unknown; at?: string }) => void): { stop(): void } => {
-  const h = (p as { connect: (a: object, f: unknown) => { dispose(): void } }).connect({}, fn)
+//! `clone: false` (the Host's streams): the values arrive by reference. fero encodes each record into frame
+// bytes at once (subOut), so data's copy buys nothing there, and a value the wire cannot carry (a function, a
+// getter that throws) then fails in fero's own sink, where the sub ends loudly — inside data's copy it read
+// as a user's tap, and the row was lost under a sub that still read 'live'.
+export const records = (p: any, fn: (rec: { type: string; key: string[]; value?: unknown; at?: string }) => void, opts: { clone?: boolean } = {}): { stop(): void } => {
+  const h = (p as { connect: (a: object, f: unknown, o?: object) => { dispose(): void } }).connect({}, fn, opts.clone === false ? { clone: false } : undefined)
   return { stop: () => h.dispose() }
 }
 
@@ -142,8 +207,9 @@ export const records = (p: any, fn: (rec: { type: string; key: string[]; value?:
 // keyed insert is ALSO key [] (`{ type:'insert', key:[], value, at:'k' }`) and must pass untouched.
 // The one-shot call is untouched: it stays the bare number.
 //! Returns the reject data still raised (null when the record folded) instead of swallowing it, so a
-// caller can tell a mirror that went stale from one that folded.
-export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?: unknown; at?: unknown }): unknown => {
+// caller can tell a mirror that went stale from one that folded. What the user's own views and taps on the
+// mirror throw once the record has landed goes to `fault` (see Fault), as in applyRec.
+export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?: unknown; at?: unknown }, fault?: Fault): unknown => {
   if (r.type === 'move') return null
   const key = Array.isArray(r.key) ? r.key : []
   let type = r.type, value = r.value
@@ -158,16 +224,23 @@ export const applyStreamRec = (p: any, r: { type: string; key?: string[]; value?
   // data v2's auto-vivifying res did. Everything else that rejects is RETURNED: fold.ts
   // ignores it (it wraps every cell in isolation anyway).
   let rejected: unknown = null
-  ingest(p, [rec as never], { origin: ORIGIN, onReject: (rj) => (rejected = rj.error) })
+  ingestFold(p, [rec], (rj) => (rejected = rj.error), fault)
   if (
     rejected !== null && r.type === 'update' && rec.key.length > 1 &&
     String((rejected as Error)?.message ?? '').includes('not live')
   ) {
     let again: unknown = null
-    ingest(p, [{ type: 'update', key: [rec.key[0]], value: {} } as never, rec as never], { origin: ORIGIN, onReject: (rj) => (again ??= rj.error) })
+    ingestFold(p, [{ type: 'update', key: [rec.key[0]], value: {} }, rec], (rj) => (again ??= rj.error), fault)
     return again
   }
   return rejected
+}
+
+//! ingestFold — one ingest call, the stream twin of laneFold: refusals go to onReject, and a throw after
+// the records landed (the user's views and taps on the mirror) to `fault` when there is one.
+const ingestFold = (p: any, recs: readonly object[], onReject: (rj: { error: unknown }) => void, fault: Fault | undefined): void => {
+  if (fault === undefined) { ingest(p, recs as never, { origin: ORIGIN, onReject }); return }
+  try { ingest(p, recs as never, { origin: ORIGIN, onReject }) } catch (e) { fault(e) }
 }
 
 //! ── the LENS: fero's OWN write surface (DESIGN-DATA3 §4.1) ────────────────────
@@ -350,16 +423,45 @@ export const mark = (p: any): number => {
 // existed before the call (a shared module-level view a handler hands out). Data keeps every derived
 // node in its parents' `children` until dispose() and re-evaluates it on every commit — without this a
 // server carried one dead filter per subscription or one-shot read it ever served.
-export const disposeMinted = (view: any, mark: number): void => {
+//! The walk goes on THROUGH a node data already disposed: data stops a view whose function threw (its
+// SCHEDULE clause 4), and the views the handler built above it (`ctx.data.filter(…).za(cmp)`, the za stopped)
+// still hang off the resource; stopping the walk there leaked them. Returns true when a node it released still
+// had a subscriber or another view on it (a view a handler cached and handed to another call, the I-29 cousin):
+// the Host then checks its live subs, since one of them may now stream a stopped view.
+export const disposeMinted = (view: any, mark: number): boolean => {
   const n = unwrap(view)?.[NODE]
-  if (!(n instanceof DataNode)) return
+  if (!(n instanceof DataNode)) return false
+  const seen = new Set<DataNode<unknown>>()
+  let shared = false
   const walk = (x: DataNode<unknown>): void => {
-    if (x.kind === 'source' || x.id <= mark || x.disposed) return
+    if (x.kind === 'source' || x.id <= mark || seen.has(x)) return
+    seen.add(x)
     const parents = x.parents
-    x.dispose()
+    if (!x.disposed) {
+      if (x.effects.length > 0 || x.children.length > 0) shared = true
+      x.dispose()
+    }
     for (const parent of parents) walk(parent)
   }
   walk(n)
+  return shared
+}
+
+//! stopped — is this view dead: has data stopped (disposed) it, or a view it reads from, because a function
+// in it threw (data's SCHEDULE clause 4)? A stopped view never moves again, so a live subscription over it
+// must end loudly rather than read 'live' over a frozen mirror (methods.ts Host.reapStopped).
+export const stopped = (view: any): boolean => {
+  const n = unwrap(view)?.[NODE]
+  if (!(n instanceof DataNode)) return false
+  const seen = new Set<DataNode<unknown>>()
+  const walk = (x: DataNode<unknown>): boolean => {
+    if (x.disposed) return true
+    if (seen.has(x)) return false
+    seen.add(x)
+    for (const parent of x.parents) if (walk(parent)) return true
+    return false
+  }
+  return walk(n)
 }
 
 //! derived — how many views hang directly off a handle's node (data's `children`): the I-29 leak-guard

@@ -16,7 +16,7 @@ import { REC, type Rec } from '../kernel/env.ts'
 
 //! a Runtime with no listen/hosts: real timers exist but nothing fires network-side; the node is
 // driven by direct step() calls (linkUp/HELLO/DIGEST/VOTE frames — the kernel-suite idiom)
-const harness = (opts: { validate?: (rec: Rec) => true | string } = {}) => {
+const harness = (opts: { validate?: (rec: Rec) => true | string; onFault?: (e: unknown) => void } = {}) => {
   const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0 })
   const bind = new Bind(rt, opts)
   const node = rt.node
@@ -71,6 +71,55 @@ test('inbound records project into the proxy and NEVER re-issue (the echo is con
   h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 3, 0, [{ type: REC.remove, key: ['u9'] }]) })
   assert.deepEqual(snapshot(h.bind.data), {})
   assert.equal(h.jk(JK.writeLocal).length, 0)
+  await h.destroy()
+})
+
+//! the user's own code throws inside the apply hook (data runs views and taps as each commit closes, AFTER
+// the record landed — its SCHEDULE clause 4). Before the fix the throw escaped into the kernel's step: on an
+// inbound frame the rest of the frame never folded, and the step threw (in a process: an uncaught exception
+// out of the socket handler, exit code 1). Now it goes to onFault and the step runs to its end.
+test('a view or a tap that throws on an inbound record never cuts the step short: the whole frame folds, kernel and proxy agree, and the failure goes to onFault', async () => {
+  const faults: unknown[] = []
+  const h = harness({ onFault: (e) => faults.push(e) })
+  h.admit(1, 'bb')
+  const hungry = h.bind.data.filter((c: { mood: string }) => c.mood === 'hungry') // throws on a null row
+  h.bind.data.tap(() => { if ((snapshot(h.bind.data) as Record<string, unknown>).mochi === null) throw new Error('the tap trips on mochi') })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 1, 0, [
+    { type: REC.update, key: ['mochi'], value: null },
+    { type: REC.update, key: ['luna'], value: { mood: 'hungry' } },
+  ]) })
+  assert.equal(h.node.state.size, 2, 'both records folded in the kernel')
+  assert.deepEqual(snapshot(h.bind.data), { mochi: null, luna: { mood: 'hungry' } }, 'and both show')
+  assert.deepEqual(snapshot(hungry), { luna: { mood: 'hungry' } }, 'the filter left the bad row out and kept the good one')
+  //! one data commit per record: the first failed in the filter AND the tap, the second in the tap again
+  assert.equal(faults.length, 2)
+  const msgs = faults.map((f) => (f as AggregateError).errors.map((x: Error) => x.message))
+  assert.deepEqual(msgs, [
+    ['data: filter threw on row "mochi" — left out of that view until the row changes', 'the tap trips on mochi'],
+    ['the tap trips on mochi'],
+  ])
+  //! the next frame folds as ever, and the row comes back when it changes
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 3, 0, [{ type: REC.update, key: ['mochi'], value: { mood: 'hungry' } }]) })
+  assert.deepEqual(snapshot(hungry), { luna: { mood: 'hungry' }, mochi: { mood: 'hungry' } })
+  await h.destroy()
+})
+
+test('a view that throws inside a LOCAL write never cuts the write short: every record of the issue is stamped, logged and shown, and issue() returns', async () => {
+  const faults: unknown[] = []
+  const h = harness({ onFault: (e) => faults.push(e) })
+  const hungry = h.bind.data.filter((c: { mood: string }) => c.mood === 'hungry')
+  //! before the fix the throw left the kernel's commit loop after the FIRST record: the second was never
+  // stamped, and issue() threw although the first had committed
+  const out = h.bind.issue([
+    { type: REC.update, key: ['mochi'], value: null },
+    { type: REC.update, key: ['luna'], value: { mood: 'hungry' } },
+  ])
+  assert.equal(out.length, 2)
+  assert.equal(h.jk(JK.writeLocal).length, 2, 'both records stamped')
+  assert.equal(h.node.state.size, 2)
+  assert.deepEqual(snapshot(h.bind.data), { mochi: null, luna: { mood: 'hungry' } })
+  assert.deepEqual(snapshot(hungry), { luna: { mood: 'hungry' } })
+  assert.equal(faults.length, 1)
   await h.destroy()
 })
 
