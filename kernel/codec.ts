@@ -392,9 +392,10 @@ export class Unsendable extends Error {}
 // (textOf), a Uint8Array (a Buffer too) as a plain Uint8Array of its own bytes, an array by index over its
 // length (a hole becomes undefined, other fields stay behind), an object as a plain object of its own
 // enumerable fields in Object.keys order, a '__proto__' field defined as Cursor.value defines it. Each getter
-// runs once. decode(encode(v)) would answer the same at 2-3x the cost of structuredClone (a TextEncoder and a
-// TextDecoder per string, a DataView per number); this costs about 0.4x of it. The parity test in
-// kernel/codec.test.ts holds it to the codec: a type the codec learns, copyOf must learn too.
+// runs once. decode(encode(v)) would answer the same at 3.6-3.9x the cost of structuredClone on small rows (a
+// TextEncoder and a TextDecoder per string, a DataView per number); this costs 0.4-0.7x of it (the pin in
+// kernel/codec.perf.ts). The parity test in kernel/codec.test.ts holds it to the codec: a type the codec
+// learns, copyOf must learn too.
 //! `copied` — the bytes charged so far: a module slot, saved and restored per call, since a getter can copy too
 let copied = 0
 export const copyOf = (v: unknown, limit: Limit, from = 0, spent = 0): unknown => {
