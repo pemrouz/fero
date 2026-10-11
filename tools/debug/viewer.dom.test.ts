@@ -603,6 +603,13 @@ test('a capture of two resources is judged per resource: a server holding a row 
   assert.match(tree, /data-type="write"[^>]*>(?:(?!<div class="trow).)*?<span class="tag" data-tip="resource">shop<\/span>(?:(?!<div class="trow).)*?applied 1\/1</s, 'the seed write wears it too, applied 1/1: the directory node is no stop of it')
   assert.doesNotMatch(tree, /data-tip="(cell|write):(differs|diverged|in-flight|never-arrived)"/, 'no cell or write is flagged')
   assert.doesNotMatch(tree, /⊘/, 'no write lists the other resource as missing it')
+  //! the write's inspector lists its own resource's nodes as stops, never the directory
+  const w = [...(MODEL.routes(cap) as Map<string, { origin: string; seq: number }>).values()].find((r) => r.origin === shop)
+  assert.ok(w, 'the shop wrote its seed — a write to open')
+  g(`navTo(${JSON.stringify(`g/writes/${w!.origin}#${w!.seq}`)})`)
+  const insp = el('insp').innerHTML
+  assert.ok(insp.includes(`data-rkey="g/nodes/${shop}"`), 'the shop node is a stop')
+  assert.ok(!insp.includes(`data-rkey="g/nodes/${dir}"`), 'the directory node is no stop of a shop write')
 })
 
 test('a scoped capture is judged per row among its holders: the scoped scenario is converged with no pill; a holder that lags on one row is the only node pilled (wave 5e)', async () => {
@@ -623,6 +630,13 @@ test('a scoped capture is judged per row among its holders: the scoped scenario 
   assert.match(el('insp').innerHTML, /<dt[^>]*>stateHash<\/dt><dd class="warn">/, 'the lagging holder\'s fingerprint is amber')
   g(`navTo('g/nodes/${owner}')`)
   assert.match(el('insp').innerHTML, /<dt[^>]*>stateHash<\/dt><dd class="">/, 'the owner\'s is not')
+  //! a cell is compared among its row's holders only: a member that does not hold the row lacks the cell by design. A
+  // scoped run never goes still (heartbeats), so mark a copy of the healed capture quiesced, where a missing cell counts
+  const healed = { ...scopedCut().healed, quiesced: true }
+  const b = await bootViewer('healed', healed)
+  b.g(`expanded.add('g/cells'); render()`)
+  assert.match(b.el('tree').innerHTML, /data-type="cell"[^>]*>(?:(?!<div class="trow).)*?>row</s, 'the row\'s cell is on the page')
+  assert.doesNotMatch(b.el('tree').innerHTML, /data-tip="cell:(differs|diverged)"/, 'no cell is flagged: the non-holders lacking it are not compared')
 })
 
 test('a member that left and a client are judged right on the route: quiet where they were never meant to get a write, in flight only for the one real miss (wave 5e)', async () => {

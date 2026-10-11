@@ -11,12 +11,14 @@ import { REC } from '../../kernel/env.ts'
 //! scopedCut — 4 members at replicas 3, one row written twice by its owner; the second write lands while the owner
 // is cut from one of the row's other holders, and the capture is taken 10 ms later (before the co-holders' next
 // round can carry it): two holders say 2, the cut one still says 1. Healed and run on, all three agree.
-export const scopedCut = () => {
+// At replicas 2 the row has two holders, so the cut leaves them one against one: an even split.
+export const scopedCut = (replicas = 3) => {
   const sim = new Sim(3)
-  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 3 })
+  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas })
   sim.run({ until: 1500 })
   assert.ok(nodes.every((n) => n.armed), 'the view armed scoping')
-  const [owner, , lagging] = nodes[0].writes.ring.holders('row', 3)
+  const hs = nodes[0].writes.ring.holders('row', replicas)
+  const owner = hs[0], lagging = hs[replicas - 1]
   sim.post(owner, { kind: 'write', recs: [{ type: REC.update, key: ['row'], value: 1 }] })
   sim.run({ until: 1800 })
   sim.partition(owner, lagging)
