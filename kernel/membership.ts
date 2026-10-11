@@ -135,6 +135,14 @@ import type { Node } from './node.ts'
 
 //! View: the committed membership fact — epoch + [uuid, listen] pairs, sorted by uuid (deterministic everywhere).
 export interface View { epoch: number; members: [string, string][] }
+//! Vote: a spent vote — (epoch, proposer, membersHash), the ballot identity of the banner — with the EARLIER votes this
+// node gave above its view behind it (`prior`, DESIGN-LEAVE §10.10.7): a vote is a fact about a view that MAY exist
+// (§10.10.1), and a later vote to another proposer does not unmake it. `votedFor` is the latest and vote-once reads it
+// as ever; `prior` holds the rest, each at its own epoch, pruned at every install to those still above the view. It
+// rides inside `votedFor`, so the boot record and every restart path carry it unchanged.
+export interface Vote { e: number; p: string; h: string; prior?: Vote[] }
+//! cloneVote — a vote as a record of its own (the boot record must not share the live list)
+export const cloneVote = (v: Vote): Vote => ({ ...v, ...(v.prior ? { prior: v.prior.map((x) => ({ ...x })) } : {}) })
 
 //! protocol constants — ticks are heartbeat ticks (the membership clock). Each is the DEFAULT of its
 // tune-table row (kernel/tune.ts: suspectTicks, pulls, proposalAge, rejoinTicks, leaveTicks); tick() reads node.tune.
@@ -175,9 +183,16 @@ const viewOk = (m: unknown): m is [string, string][] => {
 
 export class Membership {
   view: View = { epoch: 0, members: [] }
-  //! ballot state: one vote per epoch, identified by (epoch, proposer, membersHash) — see the banner
-  votedFor = { e: 0, p: '', h: '' }
+  //! ballot state: one vote per epoch, identified by (epoch, proposer, membersHash) — see the banner; the earlier votes
+  // above the view ride behind it (Vote.prior)
+  votedFor: Vote = { e: 0, p: '', h: '' }
   #proposal: { view: View; old: string[]; h: string; votes: Set<string>; ticks: number; age: number } | null = null
+  //! #remember — a new vote: the latest, with every other vote still above my view kept behind it, minus the one at
+  // the same epoch (the same proposer's replacement ballot — at most one of its ballots at an epoch commits)
+  #remember(v: Vote) {
+    const prior = [this.votedFor, ...(this.votedFor.prior ?? [])].filter((x) => x.p !== '' && x.e !== v.e && x.e > this.view.epoch).map(({ prior: _, ...x }) => x)
+    this.votedFor = { ...v, ...(prior.length ? { prior } : {}) }
+  }
   //! #burned — the highest epoch known to hold SPENT votes for a ballot that never committed (the
   // proposer vanished mid-round). Vote-once-per-epoch means a burned epoch is unwinnable by any OTHER
   // proposer, and with every proposal pinned to view.epoch+1 that was a PERMANENT liveness wedge: a
@@ -223,7 +238,7 @@ export class Membership {
   // ('joining') — onView hands a joiner the current view at admit time, before anyone votes it in.
   #wasMember = false
 
-  constructor(boot?: { epoch: number; members: [string, string][]; votedFor?: { e: number; p: string; h: string } }) {
+  constructor(boot?: { epoch: number; members: [string, string][]; votedFor?: Vote }) {
     if (boot && boot.epoch > 0 && viewOk(boot.members)) {
       //! the restored view WAS committed — it seeds ballot arithmetic and pull targets. But the node is
       // REJOINING: read-only until a live peer (or the rejoin self-ballot) confirms a view ≥ this epoch
@@ -232,8 +247,9 @@ export class Membership {
       this.rejoinFloor = boot.epoch
     }
     //! the restored SPENT ballot (M4b): a crash inside one ballot round restarts remembering who it
-    // voted for — the M2 double-vote-after-restart debt is unrepresentable once this rides the WAL
-    if (boot?.votedFor) this.votedFor = { ...boot.votedFor }
+    // voted for — the M2 double-vote-after-restart debt is unrepresentable once this rides the WAL.
+    // The earlier votes behind it come back too (prior), each a view that may exist.
+    if (boot?.votedFor) this.votedFor = cloneVote(boot.votedFor)
   }
 
   //! isMember — of the COMMITTED view (open genesis has no members: nobody is excluded).
@@ -465,7 +481,7 @@ export class Membership {
     const backIn = this.leaving?.done === true && inBallot
     const grant = v.e > this.view.epoch && !backIn && (leavingOut || !this.epochStale) && (this.votedFor.e < v.e || this.votedFor.p === proposer)
     if (grant) {
-      this.votedFor = { e: v.e, p: proposer, h }
+      this.#remember({ e: v.e, p: proposer, h }) // the latest vote, the earlier ones above my view kept behind it
       //! the vote is DURABLE before the VOTE frame leaves (sink.boot precedes the ship in this step —
       // the env contract): a crash between grant and send must not forget the spent ballot
       node.persistBoot()
@@ -536,6 +552,12 @@ export class Membership {
     this.view = { epoch: view.epoch, members: sorted(view.members) }
     if (this.isMember(node.uuid)) this.#wasMember = true
     node.epoch = view.epoch
+    //! votes at or below the view are history: the earlier ones leave the list (the latest stays for vote-once)
+    if (this.votedFor.prior) {
+      const prior = this.votedFor.prior.filter((x) => x.e > view.epoch)
+      const { prior: _, ...latest } = this.votedFor
+      this.votedFor = prior.length ? { ...latest, prior } : latest
+    }
     node.persistBoot() // the committed view is a durable fact from the instant it installs
     node.confirm.recount(node) // the view-change recount: thresholds are majorities OF THE COMMITTED VIEW
     if (this.epochStale && view.epoch >= this.#staleWant) { this.epochStale = false; this.#pullTicks = 0 }
@@ -729,7 +751,7 @@ export class Membership {
       return
     }
     const h = hashOf(view.members)
-    this.votedFor = { e: view.epoch, p: node.uuid, h }
+    this.#remember({ e: view.epoch, p: node.uuid, h }) // my own vote, the earlier ones above my view kept behind it
     node.persistBoot() // the self-vote is spent — durable before any PROPOSE frame leaves
     this.#proposal = { view, old: this.view.members.map((m) => m[0]), h, votes: new Set([node.uuid]), ticks: 0, age: 0 }
     node.journal.armed && node.journal.emit(JK.propose, view.epoch, view.members.length)

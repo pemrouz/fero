@@ -26,7 +26,7 @@
 import { Frame, Framer, FrameError, VERB, continuesRun, encodeControl, encodeRun, type AttemptRun } from './codec.ts'
 import { Link, LS, dialedByLower } from './link.ts'
 import { JK, Journal } from './journal.ts'
-import { Membership } from './membership.ts'
+import { Membership, cloneVote, type Vote } from './membership.ts'
 import { Writes } from './write.ts'
 import { Streams } from './streams.ts'
 import { Confirm } from './confirm.ts'
@@ -71,7 +71,7 @@ export interface NodeOpts {
   // (a node booted with epoch > 0 is REJOINING: read-only until a committed view ≥ this epoch is
   // confirmed live), the Lamport floor, and the spent ballot identity (votedFor durability is what makes
   // a crash inside one ballot round unable to double-vote — the M2 debt, closed here).
-  boot?: { epoch: number; members: [string, string][]; lamport?: number; votedFor?: { e: number; p: string; h: string }; heldPartitions?: string[]; dirtyParts?: string[] }
+  boot?: { epoch: number; members: [string, string][]; lamport?: number; votedFor?: Vote; heldPartitions?: string[]; dirtyParts?: string[] }
   //! client (M5b): EXPLICIT role mode — a SPOKE, never a view member. A client dials its hosts, keeps
   // exactly ONE primary link (the only link it digests — the single-feeder ordering guarantee), folds
   // the same replication stream as everyone else, and issues writes as ae=0 attempts relayed by the
@@ -1318,7 +1318,7 @@ export class Node {
       members: m.view.members.map((x) => [x[0], x[1]] as [string, string]),
       lamport: this.#seqCeiling,
       incarnation: this.incarnation,
-      votedFor: { ...m.votedFor },
+      votedFor: cloneVote(m.votedFor),
       //! M6 (armed only — unscoped boot bytes stay byte-identical): the dirty-partition ledger, the
       // data-authoritative held-set (a mid-latch entry rides under its PRE-latch classification;
       // the staged buffer itself is memory-only — C10 as amended by the review), the FROZEN orphan

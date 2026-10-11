@@ -938,3 +938,34 @@ test('the double vote splits the cluster: aa granted bb at 2, lost its own ballo
   assert.notEqual(aa.node.epoch, bb.node.epoch, `two views at one epoch: aa ${viewOf(aa)} vs bb ${viewOf(bb)}`)
   assert.deepEqual(evictBb, [[3, 2]], 'the eviction of bb opened at 3, never below aa\'s own last ballot')
 })
+
+//! ── the release rule (DESIGN-LEAVE §10.10, 2026-10-12) ──
+test('a node remembers EVERY vote it gave above its view, not the latest alone: granted aa at 2 then cc at 3, votedFor is the vote at 3 with the vote at 2 behind it (prior); the boot record carries it and a restart brings it back; an install at 2 prunes the vote at 2 and keeps the one at 3', () => {
+  const h = harness('bb', { hosts: ['sim:aa', 'sim:cc'], durable: true })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'aa')
+  h.admit(2, 'cc')
+  const three: [string, string][] = [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']]
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: three }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']], p: 'aa' }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: [['bb', 'sim:bb'], ['cc', 'sim:cc']], p: 'cc' }) })
+  const votes = [...h.sentOn(1, VERB.VOTE), ...h.sentOn(2, VERB.VOTE)].map((f) => (f.value as { g: number }).g)
+  assert.deepEqual(votes, [1, 1], 'both granted: 2 and 3 are above view 1 and unspent')
+  const vf = h.node.membership.votedFor
+  assert.equal(vf.e, 3); assert.equal(vf.p, 'cc')
+  assert.deepEqual(vf.prior, [{ e: 2, p: 'aa', h: 'aa,bb' }], 'the earlier vote above the view rides behind the latest')
+  //! durable with the vote: the last boot record carries prior, as a copy of its own
+  const boot = h.of('boot').pop()![1] as { votedFor: { e: number; prior?: unknown[] } }
+  assert.equal(boot.votedFor.e, 3)
+  assert.deepEqual(boot.votedFor.prior, [{ e: 2, p: 'aa', h: 'aa,bb' }])
+  assert.notEqual(boot.votedFor.prior, vf.prior, 'the record does not share the live list')
+  //! a restart from that record remembers both
+  const r = harness('bb', { hosts: ['sim:aa', 'sim:cc'], durable: true, boot: { epoch: 1, members: three, votedFor: boot.votedFor as never } })
+  assert.deepEqual(r.node.membership.votedFor, { e: 3, p: 'cc', h: 'bb,cc', prior: [{ e: 2, p: 'aa', h: 'aa,bb' }] })
+  //! a view at 2 installs: the vote at 2 is history, the vote at 3 stays (vote-once still reads it)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb']] }) })
+  assert.deepEqual(h.node.membership.votedFor, { e: 3, p: 'cc', h: 'bb,cc' }, 'pruned at the install: nothing at or below the view stays behind the latest')
+  //! a re-grant to the SAME proposer at the same epoch replaces the vote at that epoch, never doubles it
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: [['bb', 'sim:bb'], ['cc', 'sim:cc']], p: 'cc' }) })
+  assert.deepEqual(h.node.membership.votedFor, { e: 3, p: 'cc', h: 'bb,cc' })
+})
