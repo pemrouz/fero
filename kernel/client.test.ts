@@ -1459,3 +1459,163 @@ for (const pauseAt of [2, 7, 10])
     assert.deepEqual(S.jk(JK.resynced).map((e) => e.a), [0], 'nothing swept')
     assert.equal(digests(S, 2).slice(s0).filter((d) => d.r === 1).length, 1, 'ONE ask')
   })
+
+//! ── a clear in STEADY state (wave 5f; filed by the review of the resume-cost fix, 2026-10-11). No answer is in flight:
+// the spoke made its first connect long ago and its link is synced, so its feeder tap-forwards every record it folds.
+// A record SPLICED into a lane's interior is tap-forwarded too, below the spoke's tails. If the link pauses and a clear
+// takes that frame, the drain digest cannot see the hole (the spoke's tails already sit above it), so the record was
+// never sent again. Now the clear turns what it took into the link's cover (Link.torn, node.ts #clearCover): each lane
+// is lowered to just under the lowest record the clear took, the rest stand at the feeder's tails, and the drain
+// resumes from there before the drain digest. An armed feeder aa holds bb's partition p1 at seqs 10, 12, ..., `top`
+// (not 11); a spoke connects to it first (d = {}) and holds every row; then the link pauses.
+const steady = (Q: number, top = 20) => {
+  const F = harness('aa', { replicas: 2, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }, tune: { queued: Q } })
+  F.node.step({ kind: 'start' })
+  F.admit(1, 'bb'); F.digestFrom(1)
+  F.admit(2, 'cc'); F.digestFrom(2)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(F.node.armed, true)
+  F.node.writes.ring.place('p1', 'bb', 'aa')
+  for (let s = 10, prev = 0; s <= top; prev = s, s += 2) F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(s, s === 10 ? 0 : s === 12 ? 11 : prev) })
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  const S = harness('cl', { client: true, hosts: ['sim:aa'] })
+  S.node.step({ kind: 'start' })
+  S.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:aa' })
+  const p = pump(F, 7, S, 2)
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', c: SCOPED }) })
+  p.settle()
+  const link = F.node.links.get(7)!
+  assert.equal(link.synced, true, 'steady state: the link is synced')
+  assert.equal(S.node.state.size, (top - 10) / 2 + 1, 'the spoke holds every row')
+  assert.equal(S.node.resync, null)
+  F.node.step({ kind: 'pause', link: 7 })
+  const rows = (h: H) => [...h.node.state.keys()].sort()
+  const drainAll = () => { for (let d = 0; d < 8 && (link.paused || link.torn !== null); d++) { F.node.step({ kind: 'drain', link: 7 }); p.settle() } p.settle() }
+  return { F, S, p, link, rows, drainAll }
+}
+
+test('a record spliced in steady state, tap-forwarded and cleared from the paused queue reaches the spoke: the clear lowers that lane in the link\'s cover and the drain re-sends from just under it', () => {
+  const { F, S, p, link, rows, drainAll } = steady(2)
+  //! 11 reaches aa from cc: it splices below the spoke's tail (20) and is tap-forwarded into the paused queue
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: p1frame(11, 10) })
+  assert.ok(F.node.logs.get('bb')!.some((e) => e.seq === 11), 'aa spliced 11')
+  assert.equal(link.queued.length, 1, 'its tap-forward waits in the queue')
+  //! two live records from bb: the second overflows the queue — the clear takes 11 and 22
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(22, 20) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(24, 22) })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear')
+  assert.equal(link.synced, false)
+  assert.deepEqual(link.torn && [link.torn.d.bb, link.torn.r, link.torn.q], [10, undefined, undefined], 'the cover: bb lowered to just under 11, no reply owed')
+  //! a record committed between the clear and the drain (the link is unsynced: nothing goes live) is above the cover
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(26, 24) })
+  drainAll()
+  assert.equal(link.torn, null)
+  assert.equal(link.synced, true)
+  assert.ok(S.node.state.has(JSON.stringify(['p1', 'r11'])), 'r11 reached the spoke')
+  assert.deepEqual(rows(S), rows(F), 'the spoke holds every row its feeder holds')
+  assert.equal(S.node.resync, null)
+  //! after the drain a live record flows again
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(28, 26) })
+  p.settle()
+  assert.deepEqual(rows(S), rows(F))
+})
+
+//! a run of bb's records in ONE inbound frame, where the odd seqs are partition p2, which aa does not hold (placed on
+// bb and cc): aa folds and taps only the p1 records, so the tap is gappy and the spoke's outbox rotates — one flush
+// ships several frames, and a clear can land in the middle of it
+const gappy = (from: number, to: number) => {
+  const run = []
+  for (let s = from; s <= to; s++) run.push({ rec: s % 2 ? { type: REC.update, key: ['p2', `x${s}`], value: s } as Rec : P1(`r${s}`, s), origin: 'bb', seq: s, epoch: 1, pp: s - 1 })
+  return encodeRuns(run, VERB.RECORDS, true)[0]
+}
+
+test('a clear in the middle of one flush: the frame shipped after it survives and would raise the spoke\'s tail above what the clear took; the cover re-sends from just under the lowest lost record', () => {
+  const { F, S, link, rows, drainAll } = steady(1, 30)
+  F.node.writes.ring.place('p2', 'bb', 'cc')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(32, 30) })
+  assert.equal(link.queued.length, 1, '32 fills the queue')
+  //! 34 and 36 in one flush: 34 overflows the queue — the clear takes 32 and 34 — and 36 is queued after it
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: gappy(34, 36) })
+  assert.equal(F.jk(JK.dropOldest).length, 1)
+  assert.equal(link.queued.length, 1, '36 survived the clear')
+  assert.deepEqual(link.torn && link.torn.d.bb, 31, 'bb lowered to just under 32')
+  drainAll()
+  assert.deepEqual(rows(S), rows(F), 'r32 and r34 reached the spoke although 36 landed first')
+  assert.equal(link.torn, null)
+})
+
+test('two clears in a row lower one cover and never raise it; a splice between the clear and the drain (nothing tapped: the link is unsynced) lowers it too', () => {
+  const { F, S, link, rows, drainAll } = steady(1, 30)
+  F.node.writes.ring.place('p2', 'bb', 'cc')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(32, 30) })
+  //! 34, 36, 38 in one flush: 34 clears (32, 34), 36 is queued, 38 clears again (36, 38)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: gappy(34, 38) })
+  assert.equal(F.jk(JK.dropOldest).length, 2, 'two clears')
+  assert.equal(link.queued.length, 0)
+  assert.deepEqual(link.torn && link.torn.d.bb, 31, 'the second clear (lowest 36) kept the first one\'s cover')
+  //! while unsynced: 11 splices (no tap) and 40 commits (no tap)
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: p1frame(11, 10) })
+  assert.deepEqual(link.torn && link.torn.d.bb, 10, 'the splice lowered the cover')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(40, 38) })
+  assert.equal(link.queued.length, 0, 'nothing tapped while unsynced')
+  drainAll()
+  assert.ok(S.node.state.has(JSON.stringify(['p1', 'r11'])))
+  assert.deepEqual(rows(S), rows(F))
+})
+
+//! the mixed clear: an answer's frames and its reply are still queued (the spoke's first connect paused inside frame 4)
+// when a gappy tap lands; the clear takes the answer's frames, its reply and a tap frame, and the frame after it
+// survives. The torn answer keeps its own cover (no record the clear took sits below it) and its reply.
+test('a clear that takes an answer\'s queued frames, its reply and a tap-forward together: the torn answer keeps its cover and its reply, the spoke gets every row on ONE ask', () => {
+  let armed = false, count = 0
+  const members = [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']]
+  const F = harness('aa', { replicas: 2, boot: { epoch: 1, members }, tune: { queued: 3 } }, (l) => {
+    if (l === 7 && armed && ++count === 4) { armed = false; F.node.step({ kind: 'pause', link: 7 }) }
+  })
+  F.node.step({ kind: 'start' })
+  F.admit(1, 'bb'); F.digestFrom(1)
+  F.admit(2, 'cc'); F.digestFrom(2)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: members }) })
+  F.node.writes.ring.place('p1', 'bb', 'aa')
+  F.node.writes.ring.place('p2', 'bb', 'cc')
+  for (let s = 10, prev = 0; s <= 20; prev = s, s += 2) F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(s, prev) })
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  const S = harness('cl', { client: true, hosts: ['sim:aa'] })
+  S.node.step({ kind: 'start' })
+  S.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:aa' })
+  const p = pump(F, 7, S, 2)
+  armed = true
+  S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', c: SCOPED }) })
+  p.toA() // six frames: 10-16 reach the socket, 18 and 20 and the reply fill the queue (3 of 3)
+  const link = F.node.links.get(7)!
+  assert.equal(link.queued.length, 3)
+  assert.equal(link.synced, true)
+  assert.deepEqual(link.inQueue && [link.inQueue.d.bb, link.inQueue.q], [17, 1])
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: gappy(22, 24) }) // 22 clears (18, 20, the reply, 22), 24 survives
+  assert.equal(F.jk(JK.dropOldest).length, 1)
+  assert.equal(link.queued.length, 1)
+  assert.deepEqual(link.torn && [link.torn.d.bb, link.torn.r, link.torn.q], [17, 1, 1], 'the answer\'s cover and reply, not lowered further')
+  p.toB()
+  for (let d = 0; d < 4 && (link.paused || link.torn !== null); d++) { F.node.step({ kind: 'drain', link: 7 }); p.settle() }
+  p.settle()
+  assert.deepEqual([...S.node.state.keys()].sort(), [...F.node.state.keys()].sort())
+  assert.equal(digests(S, 2).filter((d) => d.r === 1).length, 1, 'ONE ask')
+})
+
+//! a MEMBER link is unchanged: its clear calls no onClear and leaves no cover; the drain digest is its heal, as before
+test('a clear on an unscoped MEMBER link is unchanged: no onClear, no cover — the drain digest heals it', () => {
+  const F = harness('nn', { tune: { queued: 1 } })
+  F.admit(1, 'zz'); F.digestFrom(1)
+  const link = F.node.links.get(1)!
+  assert.equal(link.synced, true)
+  assert.equal(link.onClear, null)
+  F.node.step({ kind: 'pause', link: 1 })
+  for (let i = 0; i < 3; i++) F.node.step({ kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'a clear on the member link')
+  assert.equal(link.torn, null, 'no cover')
+  assert.equal(link.droppedWhilePaused, true, 'the drain digest is owed, as before')
+  F.node.step({ kind: 'drain', link: 1 })
+  assert.deepEqual(digests(F, 1).slice(-1), [{ d: { nn: F.node.seq }, r: 1 }], 'the drain digest, member bytes (no h)')
+})

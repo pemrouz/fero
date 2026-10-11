@@ -23,7 +23,7 @@
 // (v2's applying/committingForward/discarding flag family) has no place to
 // exist. That whole guard menagerie is deleted by construction, not by care.
 
-import { Framer, FrameError, VERB, continuesRun, encodeControl, encodeRuns, type AttemptRun, type Frame } from './codec.ts'
+import { Frame, Framer, FrameError, VERB, continuesRun, encodeControl, encodeRuns, type AttemptRun } from './codec.ts'
 import { Link, LS, dialedByLower } from './link.ts'
 import { JK, Journal } from './journal.ts'
 import { Membership } from './membership.ts'
@@ -1433,7 +1433,7 @@ export class Node {
       }
     }
     link.uuid = v.u; link.incarnation = v.i; link.listen = v.l
-    if (r === 1) { link.client = true; this.clientLinks.add(link) }
+    if (r === 1) { link.client = true; link.onClear = this.#clearCover; this.clientLinks.add(link) }
     link.methodsOnly = m === 1 // the hint (§4): a client reads it live off its primary (feederMethodsOnly)
     if (typeof v.c === 'string') link.contract = v.c // the contract as sent: a client reads it live off its primary (feederContract)
     link.state = LS.admitted
@@ -2153,6 +2153,38 @@ export class Node {
     // (a stop needs a full queue, and with tune.queued ≥ 1 this call queued a frame first, so inQueue already added
     // the link; the add here keeps the rule local: wherever a cover is set, the link is in #covered)
     if (link.client) this.#covered.add(link)
+  }
+
+  //! #clearCover — what a clear on a CLIENT link took becomes the link's cover (wave 5f; Link.onClear calls it, after the
+  // clear has moved `inQueue` to `torn`). A synced client link is fed by tap-forward, and two kinds of record are lost
+  // for good if a clear takes their frame and nothing else is done: a record SPLICED into a lane's interior (it sits
+  // below the spoke's tails), and any record whose lane a frame shipped after the clear in the same flush leapfrogs
+  // (that frame survives, is delivered first, and raises the spoke's tail above the lost one). The drain digest answers
+  // above the spoke's tails, so it heals neither. So the cover is: each lane lowered to just under the lowest record the
+  // clear took on it; every other lane at the torn answer's cover when an answer's frames were in the queue, else at my
+  // tail right now (every record on it so far was sent or sits in a frame the clear left: a synced link is tapped every
+  // record I fold, and nothing is tapped while it is unsynced). The drain resumes it like any torn answer (#answer, no
+  // reply when no answer was owed), BEFORE the drain digest. What happens next is covered too: a record committed before
+  // the drain is above my tail now, so the resume ships it; a record spliced before the drain is lowered into the cover
+  // by indexInsert (the link joins #covered here); a second clear before the drain lowers the same cover again, never
+  // raises it. The cost: one header read per frame the clear took (the clear is cold), and the resume re-sends a lowered
+  // lane's suffix above the lowest lost record, frames the spoke holds included (it drops them). A clear that took no
+  // record frame changes nothing.
+  #clearCover = (link: Link, dropped: Uint8Array[]): void => {
+    let low: Record<string, number> | null = null
+    for (const b of dropped) {
+      const f = new Frame(b)
+      if (f.verb !== VERB.RECORDS) continue
+      const p = f.prov()
+      if (p === null) continue
+      if (low === null) low = {}
+      const at = low[p.origin]
+      if (at === undefined || p.baseSeq < at) low[p.origin] = p.baseSeq
+    }
+    if (low === null) return
+    const t = link.torn ?? (link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined })
+    for (const o in low) if ((t.d[o] ?? 0) >= low[o]) t.d[o] = low[o] - 1
+    this.#covered.add(link)
   }
 
   //! #cover — the cold path of a stopped or queued answer: the peer's tails `d` (as numbers: the decoded frame's map is
