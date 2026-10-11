@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fero, RENDEZVOUS } from './index.ts'
-import { Directory, GRACE, MAX_PER_CALLER, boxDirectory, fromBox, hostMethods, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, unmap } from './directory.ts'
+import { Directory, GRACE, MAX_PER_CALLER, WATCH_TICKS, boxDirectory, fromBox, hostMethods, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, unmap } from './directory.ts'
 import { proxy, snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { MEMBER_REDIALS } from '../kernel/node.ts'
@@ -306,6 +306,54 @@ test('I-34 — two servers and NOTHING else: a clean leave drops the leaver\'s e
     // close → fold → drop path, with slack for a loaded box.
     assert.ok(await until(() => me(a!).hosts.length === 0, 1500), `b's address left the lookup at once (hosts: ${JSON.stringify(me(a).hosts)})`)
   } finally { await settle([b, a]) }
+})
+
+test(`a hung registrant (SIGSTOP, its socket still open) leaves every lookup after WATCH_TICKS silent host heartbeats; a live registrant with a slow heartbeat of its own is never expired; the hung one, continued, registers again`, async () => {
+  //! the directory host is in-process at heartbeat 50 ms (the bound is WATCH_TICKS × 50 ms); the registrants are
+  // real processes, so one can be stopped the way a wedged process is: its kernel keeps the socket open
+  const o = await fast()
+  const bound = WATCH_TICKS * o.heartbeat.ms
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-watch-'))
+  const script = path.join(dir, 'reg.ts')
+  fs.writeFileSync(script, `import { fero } from ${JSON.stringify(path.join(import.meta.dirname, 'index.ts'))}
+import { snapshot } from ${JSON.stringify(path.join(import.meta.dirname, 'substrate.ts'))}
+const f = await fero(process.argv[2], { server: true, rendezvous: process.argv[3], heartbeat: { ms: Number(process.argv[4]) }, redial: { ms: 30 } })
+console.log('listen ' + (snapshot(f.cluster) as { me: { listen: string } }).me.listen)
+setInterval(() => {}, 1000)
+`)
+  const kids: ReturnType<typeof fero.spawn>[] = []
+  const listenOf = (k: ReturnType<typeof fero.spawn>) => /listen (\S+)/.exec(k.out)?.[1]
+  let host: Fero | undefined, cStop: Fero | undefined, cSlow: Fero | undefined
+  try {
+    host = await fero(`watch-host-${process.pid}`, { server: true, ...o })
+    assert.ok(await until(() => rz(host!).hosting, 5000), 'the in-process server hosts the directory')
+    //! one registrant at the host's cadence (it will be stopped), one whose OWN heartbeat is 40× slower than the
+    // host's (it must never be expired: the host PINGs it, and it answers on receipt)
+    const stop = fero.spawn(script, [`watch-stop-${process.pid}`, o.rendezvous, '50']); kids.push(stop)
+    const slow = fero.spawn(script, [`watch-slow-${process.pid}`, o.rendezvous, String(40 * o.heartbeat.ms)]); kids.push(slow)
+    assert.ok(await until(() => listenOf(stop) !== undefined && listenOf(slow) !== undefined, 15_000), `both registrants started (${stop.out} / ${slow.out})`)
+    cStop = await fero(`watch-stop-${process.pid}`, o)
+    cSlow = await fero(`watch-slow-${process.pid}`, o)
+    assert.ok(await until(() => me(cStop!).hosts.includes(listenOf(stop)!) && me(cSlow!).hosts.includes(listenOf(slow)!), 8000), 'both registered and are looked up')
+    //! the hang: the process stops, its socket stays open — before the detector, its entry lived for ever
+    assert.ok(stop.child.kill('SIGSTOP'), 'the registrant is stopped')
+    const t0 = Date.now()
+    assert.ok(await until(() => !me(cStop!).hosts.includes(listenOf(stop)!), bound + 4000), `the hung registrant left the lookup (bound ${bound} ms)`)
+    const took = Date.now() - t0
+    assert.ok(took >= bound * 0.8, `not before the bound: ${took} ms ≥ ${bound} ms`)
+    //! the slow one is alive the whole time, and stays through several more bounds
+    await sleep(2 * bound)
+    assert.ok(me(cSlow).hosts.includes(listenOf(slow)!), 'the live registrant with a slow heartbeat was never expired')
+    //! continued, the hung one finds its link closed, redials and registers again
+    stop.child.kill('SIGCONT')
+    assert.ok(await until(() => me(cStop!).hosts.includes(listenOf(stop)!), 10_000), 'continued, it registered again')
+    console.log(`# watch: the hung registrant left the lookup ${took} ms after SIGSTOP (bound ${bound} ms)`)
+  } finally {
+    await settle([cStop, cSlow])
+    for (const k of kids) if (k.child.exitCode === null && k.child.signalCode === null) { k.child.kill('SIGCONT'); k.child.kill('SIGKILL'); await k.exited }
+    await settle([host])
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('two names on one box never collide, never cross-talk, and the diagnostics seam exposes the directory nodes as real instances', async () => {

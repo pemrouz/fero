@@ -25,7 +25,7 @@ import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, batch, snapshot as snapshotOf, SPARSE_HOLE, holeMessage } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
-import { Directory, DIRECTORY, RENDEZVOUS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
+import { Directory, DIRECTORY, RENDEZVOUS, WATCH_TICKS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
 import { resolveConfig, src, secretHint, clientKeyHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
 import type { Door } from '../kernel/door.ts'
 import type { JEvent } from '../kernel/journal.ts'
@@ -471,6 +471,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     //! never the #directory: it is composed WITH methods (its register/lookup door), but it is the system
     // plane and its bytes stay v4.0 — no c, no m, no k (DESIGN-DOOR §6, §8)
     ...(methodsOnly && !isSystem ? { methodsOnly: true } : {}),
+    //! the #directory HOST watches its client links (wave 5e): a registrant hung with its socket still open
+    // (stopped, wedged) is closed after WATCH_TICKS silent heartbeats, and its entries go with its link
+    ...(isSystem && name === DIRECTORY && listen !== undefined ? { watchClients: WATCH_TICKS } : {}),
     //! the door (DESIGN-DOOR §3): the secret as two functions, the `validate` idiom — the kernel never holds
     // the string. mac = HMAC-SHA256 as base64url (43 characters, kernel/door.ts PROOF_LEN); nonce = 16
     // random bytes as base64url (22 characters), from node:crypto, never the shell's Math.random. Servers
