@@ -410,11 +410,13 @@ const derive = (capture) => {
 // a live capture (in-flight is normal); lww-lost is always warn; fully-applied is quiet.
 // not-a-holder (scoped replication, ISSUES I-3) is QUIET: those nodes were never meant to get the write,
 // so they leave the denominator — "applied 2/2 holders" — and raise no flag, pill or severity.
+// feeder-unknown is quiet the same way: a client whose feeder the capture cannot show is not judged (the header names it).
+const QUIET_STOPS = new Set(['not-a-holder', 'feeder-unknown']);
 const outcomeOf = (capture, r, d) => {
   const st = (u) => r.nodes[u] ? r.nodes[u].status : 'never-arrived';
   const all   = capture.nodes.filter(n => r.nodes[n.uuid]).map(n => n.uuid);   // routes() fills a stop for every node of the write's resource — another resource's nodes are no stop
-  const quiet = all.filter(u => st(u) === 'not-a-holder');
-  const uuids = quiet.length ? all.filter(u => st(u) !== 'not-a-holder') : all;   // the nodes meant to get it
+  const quiet = all.filter(u => QUIET_STOPS.has(st(u)));
+  const uuids = quiet.length ? all.filter(u => !QUIET_STOPS.has(st(u))) : all;   // the nodes meant to get it
   const ok    = uuids.filter(u => st(u) === 'origin' || st(u) === 'applied' || st(u) === 'acquired');   // acquired: came in a hand-off
   const lost  = uuids.filter(u => st(u) === 'lww-lost');
   const never = uuids.filter(u => st(u) === 'never-arrived');
@@ -936,6 +938,12 @@ function renderCrumb(){
 // status-bar atoms carry their ELI5 key (./eli5.mjs): sst = a severity-coloured statement, fact = a quiet one
 const sst = (st, txt, key) => `<span class="sst ${st || 'ok'}"${key ? ` data-tip="${esc(key)}"` : ''}>${txt}</span>`;
 const fact = (txt, key) => `<span data-tip="${esc(key)}">${txt}</span>`;
+// why a client is not judged (agreement's `unjudged`, routes' feeder-unknown) — read straight off the capture's facts
+const feederWhy = (u) => {
+  const n = CAP.nodes.find(x => x.uuid === u), f = n && n.feeder != null ? String(n.feeder) : null;
+  if (f === null) return 'no feeder at capture end';
+  return CAP.nodes.some(x => x.uuid === f) ? `its feeder ${esc(f)} keeps no held list` : `its feeder ${esc(f)} is not in the capture`;
+};
 // the capture header facts — everything from summarize() + the cached verifyReplay()
 function headerFacts(){
   const s = SUMMARY;
@@ -956,8 +964,12 @@ function headerFacts(){
     : sst('warn', 'differs (in flight)', 'differs'));                     // live / a horizon: a change may still be on its way
   // absent rows (M7 attach): targets that yielded no slice this rebuild — named with their typed reason,
   // never synthesized into node cards (absence renders as absence)
+  //! clients agreement() could not judge (scoped, no feeder in the capture): converged ✓ is no verdict on them — say so
+  const unjudged = s.converged === null ? [] : D.ag.groups.flatMap(g => g.unjudged || []);
+  if (unjudged.length)
+    bits.push(sst('info', `not judged: ${unjudged.map(u => `${esc(u)} (${feederWhy(u)})`).join(', ')}`, 'clients-unjudged'));
   if (s.absent && s.absent.length)
-    bits.push(sst('warn', `absent: ${s.absent.map(a => `${esc(a.target)} (<span data-tip="absent:${esc(a.reason)}">${esc(a.reason)}</span>)`).join(', ')}`, 'absent'));
+    bits.push(sst('warn', `absent:${s.absent.map(a => `${esc(a.target)} (<span data-tip="absent:${esc(a.reason)}">${esc(a.reason)}</span>)`).join(', ')}`, 'absent'));
   if (s.converged !== null) { // zero nodes ⇒ no replay basis — claim nothing rather than a vacuous ✓
     //! a TORN attach read (the bridge's `torn` flag, ISSUES I-2): rows landed between a node's snapshot and its state
     // pull, so its state is a later instant than its journal — a replay mismatch there is the read, not a fault.
@@ -1155,7 +1167,7 @@ function inspWrite(nd){
   const t = scrubT();
   const allStops = CAP.nodes.filter(n => r.nodes[n.uuid]).map(n => ({ uuid: n.uuid, ...r.nodes[n.uuid] }));   // the write's own resource: routes() fills each of its nodes
   const okAtT = t != null ? allStops.filter(s => s.t != null && s.t <= t && (s.status === 'origin' || s.status === 'applied' || s.status === 'acquired')).length : 0;
-  const meant = allStops.length - o.quiet.length;    // not-a-holder stops were never meant to get it (ISSUES I-3)
+  const meant = allStops.length - o.quiet.length;    // not-a-holder stops were never meant to get it (ISSUES I-3); feeder-unknown ones are not judged
   const rollup = t != null ? `applied ${okAtT}/${o.quiet.length ? meant + ' holders' : meant} by t${t}` : o.summaryText;
   const sub = rec
     ? `<span class="mono" data-tip="rec-key">${esc(key)}</span>${rec.ty === 2 ? ' <span class="warnt" data-tip="rec:remove">removed</span>' : ' = <span class="mono" data-tip="rec-value">' + esc(fmtVal(rec.v, 48)) + '</span>'} · <span data-tip="route:summary">${esc(rollup)}</span>`
@@ -1185,6 +1197,8 @@ function inspWrite(nd){
     //! a non-holder is quiet at every step: the write was never meant for it, rewound or not (holders as of the capture end)
     if (s.status === 'not-a-holder')
       return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="x" data-tip="stop:not-a-holder">not a holder — never meant to get it</span></li>`;
+    //! a client with no feeder the capture can show is not judged at any step (agreement leaves it out too)
+    if (s.status === 'feeder-unknown') return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="x" data-tip="stop:feeder-unknown">not judged — ${feederWhy(s.uuid)}</span></li>`;
     if (t != null && (s.t == null || s.t > t))
       return `<li class="now"><span class="ep">${ref(s.uuid, 'g/nodes/' + s.uuid)}</span><span class="x" data-tip="stop:not-yet">not arrived by t${t}</span></li>`;
     const at = s.t != null ? ` <span class="x" data-tip="t">· t${s.t}</span>` : '';

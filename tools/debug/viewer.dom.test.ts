@@ -27,7 +27,7 @@ import { VERB, encodeControl } from '../../kernel/codec.ts'
 import * as MODEL from './model.mjs'
 import { tip } from './eli5.mjs'
 import { bootViewer, dragTo } from './dom-shim.ts'
-import { scopedCut, scopedTenure, unscopedLeaver } from './fixtures.ts'
+import { scopedCut, scopedTenure, unscopedLeaver, attachMissing, copyingHolder } from './fixtures.ts'
 import { fero } from '../../api/index.ts'
 import { diag } from '../../api/diagnostics.ts'
 import { ports } from '#utils'
@@ -695,4 +695,41 @@ test('a live attach that could not reach the writer still tells one story: conve
     assert.doesNotMatch(el('tree').innerHTML, /⊘/, `${name}: no write waits for a node that was never meant to get it`)
     assert.doesNotMatch(el('tree').innerHTML, /data-tip="write:(in-flight|never-arrived)"/)
   }
+})
+
+test('a live attach missing a client\'s feeder tells one story: the header names the client it cannot judge, and its stops say not judged — never a ⊘ under converged (wave 5f)', async () => {
+  const { cap } = scopedTenure()
+  const feeder = cap.nodes.find((n) => n.uuid === 'zc1')!.feeder as string
+  const blind = attachMissing(cap, feeder)
+  type R = { origin: string; seq: number; nodes: Record<string, { status: string }> }
+  const r = [...(MODEL.routes(blind) as Map<string, R>).values()].find((x) => x.nodes.zc1?.status === 'feeder-unknown')!
+  assert.ok(r, 'a write the client lacks — the fixture is what it claims')
+  const { el, g } = await bootViewer('feeder-missing', blind)
+  const head = el('statusRight').innerHTML
+  assert.match(head, /data-tip="converged">converged ✓</, 'the members that answered agree')
+  assert.ok(head.includes(`<span class="sst info" data-tip="clients-unjudged">not judged: zc1 (its feeder ${feeder} is not in the capture)</span>`), 'the header names the client it cannot judge, and why')
+  g(`expanded.add('g/writes'); render()`)
+  assert.doesNotMatch(el('tree').innerHTML, /⊘[^<]*zc1/, 'no write lists the client as missing it')
+  g(`navTo(${JSON.stringify(`g/writes/${r.origin}#${r.seq}`)})`)
+  const insp = el('insp').innerHTML
+  assert.ok(insp.includes(`data-rkey="g/nodes/zc1">zc1</span></span><span class="x" data-tip="stop:feeder-unknown">not judged — its feeder ${feeder} is not in the capture</span>`), 'its stop says not judged')
+  assert.doesNotMatch(insp, /data-rkey="g\/nodes\/zc1">zc1<\/span><\/span><span data-tip="stop:(never|inflight)"/)
+  //! with its feeder captured, nothing is said: the client is judged
+  const full = await bootViewer('feeder-present', cap)
+  assert.doesNotMatch(full.el('statusRight').innerHTML, /clients-unjudged/)
+})
+
+test('a live attach missing the writer keeps a copying holder\'s lag on every pane: differs header, the holder pilled, the row\'s cell differs, its stop not yet arrived (wave 5f)', async () => {
+  const { cut, owner, lagging, row } = copyingHolder()
+  type R = { origin: string; seq: number; nodes: Record<string, { status: string }> }
+  const late = [...(MODEL.routes(cut) as Map<string, R>).values()].find((x) => x.origin === owner && x.nodes[lagging]?.status === 'never-arrived')!
+  assert.ok(late, 'the write the copying holder lacks — the fixture is what it claims')
+  const { el, g } = await bootViewer('copying-no-writer', attachMissing(cut, owner))
+  assert.match(el('statusRight').innerHTML, /class="sst warn" data-tip="differs">differs \(in flight\)</, 'its old value is a disagreement, mid-flight: amber')
+  const pilled = [...el('tree').innerHTML.matchAll(/data-type="node"[^>]*>(?:(?!<div class="trow).)*?<span class="lab" data-tip="node">([^<]+)<(?:(?!<div class="trow).)*?data-tip="node:differs"/gs)].map((m) => m[1])
+  assert.ok(pilled.includes(lagging), 'the copying holder is pilled')
+  g(`expanded.add('g/cells'); render()`)
+  assert.match(el('tree').innerHTML, new RegExp(`data-type="cell"[^>]*>(?:(?!<div class="trow).)*?>${row}<(?:(?!<div class="trow).)*?data-tip="cell:differs"`, 's'), 'the row\'s cell says differs')
+  g(`navTo(${JSON.stringify(`g/writes/${late.origin}#${late.seq}`)})`)
+  assert.ok(el('insp').innerHTML.includes(`data-rkey="g/nodes/${lagging}">${lagging}</span></span><span data-tip="stop:inflight">not yet arrived</span>`), 'the write it lacks waits for it')
 })

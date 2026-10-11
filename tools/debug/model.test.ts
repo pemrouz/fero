@@ -10,7 +10,7 @@ import { converged } from '../../sim/monitors.ts'
 import { JK } from '../../kernel/journal.ts'
 import { captureSim } from './capture.ts'
 import { encodeVal, decodeVal, kindNames, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology, agreement } from './model.mjs'
-import { scopedCut, scopedTenure, mixed, unscopedLeaver } from './fixtures.ts'
+import { scopedCut, scopedTenure, mixed, unscopedLeaver, attachMissing, copyingHolder } from './fixtures.ts'
 import { captureLive } from './capture.ts'
 import { REC } from '../../kernel/env.ts'
 
@@ -669,6 +669,44 @@ test('a scoped write whose writer carries no holder fact still judges a member t
   const later = rs.filter((r) => r.origin === 'n02' && r.nodes.n04 && epochOf(r) != null && (epochOf(r) as number) >= leftAt)
   assert.ok(later.length > 0, 'n02 wrote after n04 left — the fixture is what it claims')
   for (const r of later) assert.equal(r.nodes.n04.status, 'not-a-holder', `${r.origin}#${r.seq} came after n04 left`)
+})
+
+test('a live attach missing a client\'s feeder judges the client one way: compared on no row, every stop it lacks `feeder-unknown`, never a missing stop under a converged header (wave 5f)', () => {
+  const { cap } = scopedTenure()
+  const feeder = cap.nodes.find((n) => n.uuid === 'zc1')!.feeder as string
+  const blind = attachMissing(cap, feeder)
+  //! every stop it lacks says one thing: not judged — before wave 5f these were never-arrived under a converged header
+  const zs = [...(routes(blind) as Map<string, Rt>).values()].map((r) => r.nodes.zc1).filter(Boolean)
+  for (const s of zs) assert.ok(['applied', 'feeder-unknown'].includes(s.status), `a stop of the client whose feeder is missing reads ${s.status}`)
+  assert.ok(zs.filter((s) => s.status === 'feeder-unknown').length > 0, 'the client lacks some writes — the fixture is what it claims')
+  //! and the header leaves it out, and names it; with its feeder captured, it is judged
+  const a = agreement(blind) as Agreement & { groups: { unjudged?: string[] }[] }
+  for (const [p, us] of a.groups[0].rows!) assert.ok(!us.includes('zc1'), `${p}: the client is compared on no row`)
+  assert.deepEqual(a.groups[0].unjudged, ['zc1'], 'the client the page cannot judge is named')
+  assert.deepEqual((agreement(cap) as Agreement & { groups: { unjudged?: string[] }[] }).groups[0].unjudged, [], 'with its feeder, the client is judged')
+  assert.equal(a.converged, true, 'the members that answered agree')
+  assert.equal(summarize(blind).converged, true)
+})
+
+test('a live attach missing the writer keeps the lag of a holder still copying its row in: its open latch puts it on the row, and the write it lacks is a missing stop (wave 5f)', () => {
+  const { cut, owner, lagging, row } = copyingHolder()
+  const blind = attachMissing(cut, owner)
+  //! the writer captured: the ring's `holders` already judges the copying holder — the story to keep with it missing
+  const full = agreement(cut) as Agreement
+  assert.ok(full.groups[0].rows!.get(row)!.includes(lagging) && full.off.includes(lagging))
+  const late = [...(routes(cut) as Map<string, Rt>).values()].find((r) => r.origin === owner && r.nodes[lagging]?.status === 'never-arrived')!
+  assert.ok(late, 'the write the copying holder lacks — the fixture is what it claims')
+  //! the writer missing: before wave 5f the copying holder read as not a holder (silent on every pane)
+  const a = agreement(blind) as Agreement
+  assert.ok(a.groups[0].rows!.get(row)!.includes(lagging), 'the copying holder is judged on its row')
+  assert.equal(a.converged, false, 'its old value is a disagreement')
+  assert.ok(a.off.includes(lagging), 'and it is off')
+  assert.equal(summarize(blind).converged, false)
+  const rs = routes(blind) as Map<string, Rt>
+  assert.equal(rs.get(`${late.origin}#${late.seq}`)!.nodes[lagging].status, 'never-arrived', 'the write it lacks is a missing stop, as with the writer captured')
+  //! a latch that closed is no claim: the healed capture without the writer still agrees (the wave 5e test pins its stops)
+  const { healed } = scopedCut()
+  assert.equal(agreement(attachMissing(healed, owner)).converged, true)
 })
 
 //! the topology replay at every step around a hand-off, against the REAL kernel's watermarks at that step (a sim

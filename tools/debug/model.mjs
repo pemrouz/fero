@@ -19,7 +19,7 @@
 //! the CLOSED enums (M7 honesty gate): every fold-minted status string lives in one of these two lists —
 // the string-leaf traceability test walks fold outputs and rejects any leaf outside capture-strings ∪
 // these enums ∪ vocab names ∪ cellKey encodings. Add a status HERE (and to its fold) or the gate fails.
-export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived', 'not-a-holder', 'acquired']
+export const ROUTE_STATUS = ['origin', 'applied', 'lww-lost', 'duplicate', 'never-arrived', 'not-a-holder', 'acquired', 'feeder-unknown']
 export const ABSENT_REASONS = ['refused', 'timeout', 'unauthorized', 'frame', 'vocab-mismatch', 'restarted', 'error']
 
 export const encodeVal = (v) => {
@@ -79,6 +79,28 @@ const groupOf = (n) => (typeof n.name === 'string' ? n.name : '')
 const newestView = (ns) => {
   const top = Math.max(0, ...ns.map((n) => (n.view ? n.view.epoch : 0)))
   return { top, node: ns.find((n) => n.view && n.view.epoch === top) || null }
+}
+
+//! copying — the rows a member is still copying in at capture end: an acquireStart (a=partition) its journal has not
+// yet closed with an acquire or an acquireAbort of the same row. Every open latch aborts at a view install
+// (kernel/scope.ts rescope), and a latch opens only on a row the ring makes this node hold, so an open one is a row
+// the ring gives the node on its CURRENT view that it does not hold yet — `held` leaves it out, and so, without
+// this, would every fold that reads `held` when no writer's `holders` fact names the row (the writer not captured).
+// A truncated journal may have lost the opening row: then there is no fact, and nothing is claimed.
+const copying = (node, K) => {
+  const open = new Set()
+  for (const e of node.journal)
+    if (e.kind === K.acquireStart) open.add(String(e.a))
+    else if (e.kind === K.acquire || e.kind === K.acquireAbort) open.delete(String(e.a))
+  return open
+}
+//! feederHeld — a client's feeder when the page can judge the client by it: captured and carrying `held`. A client of
+// a scoped resource folds only what its feeder holds (DESIGN-SCALE stage 2), so with no such feeder (no primary at
+// capture end, or a live attach that could not reach it) the page cannot tell which rows the client is meant to have:
+// agreement() does not compare it per row and routes() gives its stops `feeder-unknown` — one rule, both folds.
+const feederHeld = (node, byUuid) => {
+  const f = node.feeder != null ? byUuid.get(node.feeder) : null
+  return f && Array.isArray(f.held) ? f : null
 }
 
 //! newer — the ONE conflict rule, mirrored from kernel/node.ts #apply: lexicographic (epoch, seq, origin).
@@ -377,6 +399,8 @@ export const verifyTopology = (capture) => {
 // it that way: closed status `acquired`, at the last such acquire row, with the teacher. Both facts or none.
 // The writer not in the capture (a live attach that could not reach it): the route's partition comes from a captured
 // log entry, its view from the resource's newest committed view, its holders from the rest of the resource.
+// feeder-unknown: a client of a scoped resource whose feeder the page cannot see (no primary at capture end, or not
+// captured) — whether it was meant to get the write is unknown, so its stop is not judged, as agreement() leaves it out.
 export const routes = (capture) => {
   const K = capture.vocab
   const map = new Map() // 'origin#seq' → { origin, seq, partition, nodes: {uuid: {status, t}} }
@@ -466,17 +490,24 @@ export const routes = (capture) => {
   }
   //! with the writer not captured, the holders of a row come from the rest of its resource: the ring's answer any
   // node on the newest view carries for that row (`holders`, a writer's own rows), else the members of that view
-  // whose `held` names it (a holder still copying the row in is not in `held`, so it reads as not a holder there).
-  // null — the old rule — when the resource carries no scoped fact, or no captured member holds the row.
+  // whose `held` names it, or that are still copying it in on that view (copying(): an open latch — the ring gives
+  // them the row, and agreement() judges them on it too). null — the old rule — when the resource carries no scoped
+  // fact, or no captured member holds the row.
   const byGroup = new Map()
   for (const n of capture.nodes) { const g = groupOf(n); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(n) }
   const newest = new Map([...byGroup].map(([g, ns]) => [g, newestView(ns)]))
+  const scopedG = new Map([...byGroup].map(([g, ns]) => [g, ns.some((n) => Array.isArray(n.held))]))
+  const copies = new Map() // uuid → copying(node), built on first need
+  const copyingOf = (n) => { if (!copies.has(n.uuid)) copies.set(n.uuid, copying(n, K)); return copies.get(n.uuid) }
   const holdersFromGroup = (g, p) => {
     const { top, node: tv } = newest.get(g)
     const ns = byGroup.get(g)
     for (const n of ns) if (n.holders && n.view && n.view.epoch === top && n.holders[p]) return n.holders[p]
-    if (!tv || !ns.some((n) => Array.isArray(n.held))) return null
-    const hs = tv.view.members.filter((u) => { const n = byUuid.get(u); return !!n && Array.isArray(n.held) && n.held.includes(p) })
+    if (!tv || !scopedG.get(g)) return null
+    const hs = tv.view.members.filter((u) => {
+      const n = byUuid.get(u)
+      return !!n && n.client !== true && ((Array.isArray(n.held) && n.held.includes(p)) || (!!n.view && n.view.epoch === top && copyingOf(n).has(p)))
+    })
     return hs.length ? hs : null
   }
   for (const r of map.values()) {
@@ -500,12 +531,16 @@ export const routes = (capture) => {
       if (!r.nodes[node.uuid] && groupOf(node) === g) {
         const got = part != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(part) : null
         if (got && holds(node, r.origin, r.seq)) { r.nodes[node.uuid] = { status: 'acquired', t: got.t, from: got.from }; continue }
+        //! a client of a scoped resource with no feeder to judge it by (no primary at capture end, or a live attach that
+        // could not reach the feeder) is not judged: agreement() does not compare it either, so the header and the stops
+        // tell one story. An older capture (no `held` anywhere) keeps the old rule
+        if (node.client === true && scopedG.get(g) && !feederHeld(node, byUuid)) { r.nodes[node.uuid] = { status: 'feeder-unknown', t: null }; continue }
         let quiet = false
         if (members && node.client === true) {
           //! a client folds what its feeder holds (DESIGN-SCALE stage 2): meant to get a write only when its feeder holds
-          // the write's row at capture end. No feeder fact (an older capture, no primary, the feeder not captured) → the old rule
-          const f = node.feeder != null ? byUuid.get(node.feeder) : null
-          quiet = !!(f && Array.isArray(f.held)) && !f.held.includes(part)
+          // the write's row at capture end. No feeder fact on an older capture → the old rule
+          const f = feederHeld(node, byUuid)
+          quiet = !!f && !f.held.includes(part)
         } else if (members && members.includes(node.uuid)) quiet = !holders.includes(node.uuid)
         else if (members) {
           //! a node outside the view is judged only for rows it held while a member, and only for writes stamped
@@ -531,14 +566,16 @@ export const routes = (capture) => {
 //            differ by design. Each ROW is compared among the nodes that hold it (the scopedConverged monitor's rule):
 //            the members whose `held` names it, and every client whose feeder holds it (a client folds its feeder's
 //            rows). The row's fingerprint at a node is its cells there, values only; a missing cell disagrees. A node
-//            is off when it sits outside a row's strict-majority side (or the row splits evenly). A row being copied
-//            in (acquiring) or frozen on its way out (orphan) has no claim on the node; a client with no feeder fact
-//            is not judged per row.
+//            is off when it sits outside a row's strict-majority side (or the row splits evenly). A row frozen on its
+//            way out (orphan) has no claim on the node; a row the ring gives a member — a writer's `holders` fact, or
+//            its own open latch (copying()) — is judged there even before the copy lands, so a holder still copying
+//            in an old value lags. A client with no feeder to judge it by is not judged per row (`unjudged`).
 // `rows` (scoped only): partition → the nodes judged for it; `judged` (unscoped only): the nodes compared. The page
 // compares a cell among exactly these, and routes() judges a node left out by its tenure, so the header, the pills,
 // the cells and the writes tell one story about a member that left.
 export const agreement = (capture) => {
   if (!capture.nodes.length) return { converged: null, groups: [], off: [] }
+  const K = capture.vocab
   const byName = new Map()
   for (const n of capture.nodes) { const g = groupOf(n); if (!byName.has(g)) byName.set(g, []); byName.get(g).push(n) }
   const groups = []
@@ -584,11 +621,21 @@ export const agreement = (capture) => {
         if (n.holders && n.view && n.view.epoch === top)
           for (const [p, hs] of Object.entries(n.holders))
             for (const u of hs) { const h = byUuid.get(u); if (h && h.client !== true && judged(h) && !(rows.get(p) || []).includes(u)) join(p, u) }
+      //! and a member still copying a row in on the newest view (copying(): its open latch) — the ring gives it the row,
+      // so it is judged there as lagging even when no captured writer's `holders` names it (the writer not reached)
       for (const n of ns)
-        if (n.client === true && n.feeder != null) {
-          const f = byUuid.get(n.feeder)
-          if (f && Array.isArray(f.held)) for (const p of f.held) join(p, n.uuid)
-        }
+        if (n.client !== true && judged(n) && n.view && n.view.epoch === top)
+          for (const p of copying(n, K)) if (!(rows.get(p) || []).includes(n.uuid)) join(p, n.uuid)
+      const unjudged = []
+      for (const n of ns) {
+        if (n.client !== true) continue
+        const f = feederHeld(n, byUuid)
+        if (f) for (const p of f.held) join(p, n.uuid)
+        else unjudged.push(n.uuid)
+      }
+      //! a client with no feeder to judge it by (no primary, or the feeder not captured) is compared on no row; the page
+      // names it so the header's converged never reads as a verdict on it (routes() gives its stops `feeder-unknown`)
+      out.unjudged = unjudged
       const bad = []
       for (const [p, us] of rows) {
         if (us.length < 2) continue

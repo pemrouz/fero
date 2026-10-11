@@ -126,3 +126,23 @@ export const mixed = () => {
   assert.ok(h('s1') === h('s2') && h('s1') !== h('d1'), 'the two shop members agree; the directory holds other data')
   return cap
 }
+
+//! attachMissing — a capture as the attach bridge builds it when one target does not answer (wave 5f): that node's
+// slice gone, an absent row in its place, a live capture (never settled). Every other slice is the real producer's.
+export const attachMissing = <C extends { nodes: { uuid: string }[] }>(cap: C, uuid: string) =>
+  ({ ...cap, kind: 'live', seed: null, nodes: cap.nodes.filter((n) => n.uuid !== uuid), absent: [{ target: '127.0.0.1:9001', reason: 'timeout' }] }) as C
+
+//! copyingHolder — scopedCut's cut, with the facts it carries for wave 5f pinned: the lagging holder is still copying the
+// row in (an acquireStart its journal has not closed), so `held` leaves the row out, and it still holds the old value.
+// The writer is the only node whose `holders` names the row, so a capture missing it keeps the lag only by the latch.
+export const copyingHolder = () => {
+  const { cut, owner, lagging, row } = scopedCut()
+  const K = cut.vocab
+  const lag = cut.nodes.find((n) => n.uuid === lagging)!
+  const latch = lag.journal.filter((e) => (e.kind === K.acquireStart || e.kind === K.acquire || e.kind === K.acquireAbort) && e.a === row).at(-1)
+  assert.equal(latch?.kind, K.acquireStart, 'the lagging holder is still copying the row in — the fixture is what it claims')
+  assert.ok(Array.isArray(lag.held) && !lag.held.includes(row), '`held` leaves a row being copied in out')
+  assert.equal(lag.state.find(([k]) => k === '["row"]')?.[1], 1, 'it still holds the old value')
+  assert.deepEqual(cut.nodes.filter((n) => n.uuid !== owner && n.holders?.[row]).map((n) => n.uuid), [], 'no node but the writer names the row\'s holders')
+  return { cut, owner, lagging, row }
+}
