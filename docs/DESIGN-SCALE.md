@@ -719,9 +719,17 @@ answer already handed the link. The resume is an answer to that map,
 so it also covers records committed on an already-walked lane while
 the ship was stopped (the link stays unsynced meanwhile, so live
 records wait rather than overflow the full queue). (e) `Link.inQueue`
-holds the cover at the answer's FIRST queued frame; a clear in `ship`
-makes it the torn answer, so the drain re-sends what the clear took and
-the reply. The drain's flush empties it. (f) The drain digest never
+holds the cover at the answer's FIRST queued frame (at its reply, when
+only the reply is queued); a clear in `ship` makes it the torn answer,
+so the drain re-sends what the clear took and the reply. The drain's
+flush empties it. A cover is a map of tails, so it cannot hold a record
+below it: a record spliced into a lane's interior under a cover (an
+armed feeder's dual fence, a scoped fetch fold) lowers that lane's
+cover to just under it (`Node.indexInsert`, the one place every
+interior insert passes). Without that, a splice under a stopped
+answer's cover was never shipped, and one tap-forwarded behind a queued
+reply and cleared with it was never shipped again (found by the
+review, below). (f) The drain digest never
 goes into a full queue: the debt stays and the next drain sends it,
 after the reply.
 
@@ -749,17 +757,43 @@ their scenarios and their ends; their middles assert the stop (queue
 of 2 so the resume stops again). New: C0, C and B as one-ship tests
 (aeShip [10, 4], [6, 4, 4], and the drain digest waiting with no
 clear), the reply that would overflow (it waits instead), the cover over
-a lane walked before the stop (first connect and resync), and the cost
-probe at 3,000 records (every seq once and in order, the reply last).
-kernel/node.perf.ts pins the cost: handed = sent = N + 1 and 160k / 20k
-under 20× (about 6× measured; 76.7× with the old re-encode put back).
+a lane walked before the stop (first connect and resync), the cost
+probe at 3,000 records (every seq once and in order, the reply last),
+and from the review: a splice under the cover (three shapes), a cleared
+reply with only the reply queued (aeShip [10, 1]), and a stop on an
+already-synced link (the live record waits; no clear).
+kernel/node.perf.ts pins the cost on two shapes: handed = sent = N + 1
+and 160k / 20k under 20× (about 6-8× measured; 76.7× with the old
+re-encode put back; on the small-socket shape 134× with a linear
+resume-point scan put back).
 Mutations, each caught: no inQueue → torn on a clear, no drain-digest
 wait, a cover that skips walked lanes, no stop at a full queue, a reply
 that may overflow.
 
-*Not covered by a pin.* The binary search alone: putting back the
-linear scan from the lane's end costs comparisons only, a few ms at
-160k, inside the ratio's noise. The encode is the cost that mattered.
+*The review (2026-10-11).* A skeptic found four things, all settled
+on the branch. (1) A regression: a record spliced under a cover was
+lost, where the old kernel got it back through the second full download
+this fix removed — on an armed feeder, a spoke in resync ended without
+the spliced row and swept it (pause inside frame 7 or 10 of an answer,
+then a splice of seq 11 tap-forwarded behind the queued reply and
+cleared with it). The stop path (pause inside frame 2) lost it on the
+old kernel too. Fixed by the cover lowering in (e); a test in three
+shapes (frames 2, 7, 10), red without it: the spoke held 10 of 11 rows.
+(2) The binary search had no pin: the pin's one shape (64 KiB socket,
+queue 256) needs only 93 drain rounds for 160k records, so a linear
+scan from the lane's end hides in its noise there (8×). The pin now
+runs a second shape under the same 20× bound, a 512-byte socket and a
+queue of 4 (about 11k rounds): about 7× with the search, 38× in a
+probe and 134× in the pin with the scan put back. (3) The reply-only
+`inQueue` line and (4) the unsync at a stop on an already-synced link
+had no test; each has one now, and each goes red when its line is
+deleted.
+
+*Still open, older than this fix.* A record tap-forwarded to a synced
+spoke and cleared from the queue in steady state (no answer in flight)
+leaves a hole the drain digest cannot see when the record is an
+interior one (a splice): the spoke's tails already sit above it. The
+old kernel loses it the same way. It is a STATUS bug line.
 
 ## §0 The decision, in ten lines
 
