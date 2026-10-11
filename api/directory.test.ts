@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fero, RENDEZVOUS } from './index.ts'
-import { Directory, GRACE, MAX_PER_CALLER, boxDirectory, fromBox, hostMethods, isAddr, isBox, leavesBox, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
+import { Directory, GRACE, MAX_PER_CALLER, boxDirectory, fromBox, hostMethods, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket, unmap } from './directory.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { MEMBER_REDIALS } from '../kernel/node.ts'
@@ -112,6 +112,40 @@ test('address helpers: isAddr (digits, 1–65535, port 0 only for listen), sameS
     delete process.env.FERO_RENDEZVOUS; assert.equal(rendezvousDefault(), RENDEZVOUS)
     process.env.FERO_RENDEZVOUS = '127.0.0.1:4000'; assert.equal(rendezvousDefault(), '127.0.0.1:4000')
   } finally { if (saved === undefined) delete process.env.FERO_RENDEZVOUS; else process.env.FERO_RENDEZVOUS = saved }
+})
+
+test('IPv4-mapped spellings: [::ffff:127.0.0.1] and its kin are loopback everywhere a host is judged; a mapped routable address stays routable', async () => {
+  //! the spellings of 127.x that a mapped IPv6 socket dials (and binds): bracketed or bare, any case, the long
+  // zero form, the hex form; a mapped wildcard is a wildcard
+  for (const h of ['[::ffff:127.0.0.1]', '::ffff:127.0.0.1', '::FFFF:127.0.0.1', '[::ffff:127.1.2.3]', '[0:0:0:0:0:ffff:127.0.0.1]', '[::ffff:7f00:1]'])
+    assert.equal(unmap(h).startsWith('127.'), true, `${h} unmaps to ${unmap(h)}`)
+  assert.equal(unmap('[::ffff:7f00:1]'), '127.0.0.1')
+  assert.equal(unmap('[::ffff:0.0.0.0]'), '0.0.0.0')
+  //! not a mapped spelling: left exactly as it was (a lone bracket, another prefix, a plain v6)
+  for (const h of ['[::1]', '[fe80::1]', '[::ffff:127.0.0.1', '::fffe:127.0.0.1', '10.0.0.5', 'localhost']) assert.equal(unmap(h), h, h)
+  for (const h of ['[::ffff:127.0.0.1]', '::ffff:127.0.0.1', '::FFFF:127.9.9.9', '[::ffff:7f00:1]']) {
+    assert.ok(localish(h), `${h} reaches this box's loopback`)
+    assert.ok(loopbackHost(h), `${h} is loopback`)
+  }
+  assert.ok(localish('[::ffff:0.0.0.0]'), 'a mapped wildcard is a wildcard')
+  assert.equal(loopbackHost('[::ffff:0.0.0.0]'), false, 'and, like 0.0.0.0, not loopback')
+  for (const h of ['[::ffff:10.0.0.5]', '::ffff:10.0.0.5', '[::ffff:a00:5]']) {
+    assert.equal(localish(h), false, `${h} is another box`)
+    assert.equal(loopbackHost(h), false, `${h} is not loopback`)
+  }
+  //! where the helpers are used: the squat guard, the asked-twice filter, the asking side's guard, the rule
+  assert.ok(sameSocket('[::ffff:127.0.0.1]:3376', '127.0.0.1:3376'), 'a mapped listen cannot squat the directory')
+  assert.ok(sameDirectory('[::ffff:127.0.0.1]:3376', '127.0.0.1:3376'), "the mapped spelling of this box's directory is not asked twice")
+  assert.deepEqual(fromBox('10.0.0.5:3376', { a: '[::ffff:127.0.0.1]:4000', b: '[::ffff:10.0.0.9]:4001' }), ['[::ffff:10.0.0.9]:4001'], 'another box may not hand out a mapped loopback')
+  assert.equal(leavesBox('[::ffff:127.0.0.1]:3376', ['[::ffff:127.0.0.1]:4000', '[::ffff:127.0.0.1]']), null, 'every mapped loopback is this box')
+  assert.match(leavesBox('[::ffff:10.0.0.5]:3376', [])!, /answers other boxes/, 'a mapped routable directory answers other boxes')
+  assert.match(leavesBox(false, ['[::ffff:10.0.0.5]:4000'])!, /another box/)
+  //! the composer: a mapped loopback listen beside another box is the explicit-listen rule's refusal (it used to
+  // slip past the rule and meet the off-loopback secret rule instead, as if it reached other machines)
+  await assert.rejects(fero(`m-${process.pid}`, { heartbeat: { ms: 0 }, rendezvous: false, listen: '[::ffff:127.0.0.1]:0', hosts: ['[::ffff:10.0.0.6]:4000'] }), /to be reachable from another box, listen on a routable address — .* only reaches this box$/)
+  //! and alone, it is a loopback server: no secret demanded
+  const s = await fero(`m-${process.pid}`, { server: true, heartbeat: { ms: 0 }, rendezvous: false, listen: '::ffff:127.0.0.1:0' })
+  try { assert.match(me(s).listen, /^::ffff:127\.0\.0\.1:[1-9]\d*$/) } finally { await s.destroy() }
 })
 
 //! ── the composer's refusals and the config surface ──
