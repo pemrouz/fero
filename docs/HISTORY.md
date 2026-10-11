@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902 on 2026-10-11 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -732,6 +732,13 @@ working as designed.
   survivor for up to leave.ms, 8 s by default; no ballot rule moved; the sweep's stall
   became a real pause; `leave` is a reserved resource name); stage 2 of the scale design (V4-40: announce-on-change anti-entropy replaces the member heartbeat digest on scoped clusters, the spoke's failover resync fixed, a torn digest answer resumes); the release page for the three splits (V4-41: the rule and its release, measured on a scratch kernel, not built).
   798/798 + 18/18, perf 50/50, sim:scale green.
+
+- 2026-10-11 — wave 5e, on Opus (Fable's weekly quota spent; Sonnet is blocked for
+  Claude Code here): the torn digest answer's resume costs (V4-42) and the feeder-death
+  residual (V4-43), the scoped sim monitor walk (V4-44) and the directory's leftovers (V4-45), and the debugger's per-holder judgement with a delta DIAG wire (V4-46). Its reviews found an older scoped
+  bug: a feeder that folds records through the latch taps none of them to its spokes.
+  902/902 + 18/18, perf 51/51, 1000/1000 seeds; sim:scale green on the four kernel
+  lanes (the debugger changed only kernel/diag.ts, which the sweep never runs).
 
 ## The debug tool
 
