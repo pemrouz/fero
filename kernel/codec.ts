@@ -294,7 +294,7 @@ export interface Limit { depth: number; bytes: number; part?: (o: object, array:
 // its socket handler). It walks the value as Writer.value would and writes nothing. `from` is the depth the
 // value starts at, `spent` the bytes already counted (a record's key).
 export const encodable = (v: unknown, limit: Limit, from = 0, spent = 0): string | null => {
-  at.length = 0
+  if (at.length !== 0) at.length = 0 // a store to an empty array's length is a slow path, about 80 ns a call
   text = false
   try {
     walk(v, from, spent, limit)
@@ -399,7 +399,7 @@ export class Unsendable extends Error {}
 let copied = 0
 export const copyOf = (v: unknown, limit: Limit, from = 0, spent = 0): unknown => {
   const outer = copied
-  at.length = 0
+  if (at.length !== 0) at.length = 0
   text = false
   copied = spent
   try {
@@ -464,8 +464,15 @@ const copy = (v: unknown, depth: number, limit: Limit): unknown => {
 }
 //! textOf — a string as it comes back from UTF-8: a lone surrogate (half of a pair) has no UTF-8 spelling, so
 // the encoder writes U+FFFD for it, and the decoder drops one leading U+FEFF (TextDecoder reads it as a byte
-// order mark). Every other copy holds this text. A one-byte string has no surrogate: isWellFormed is a flag test.
+// order mark). Every other copy holds this text. Most strings in a row are short keys and words: those are scanned
+// here, since only a code unit from U+D800 up can be either, and the scan costs less than a builtin call.
 const textOf = (s: string): string => {
+  const n = s.length
+  if (n <= 32) {
+    let i = 0
+    while (i < n && s.charCodeAt(i) < 0xd800) i++
+    if (i === n) return s
+  }
   const t = s.isWellFormed() ? s : s.toWellFormed()
   return t.charCodeAt(0) === 0xfeff ? t.slice(1) : t
 }

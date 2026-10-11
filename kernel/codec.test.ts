@@ -626,8 +626,9 @@ test('copyOf builds what decode(encode(v)) builds for every value the codec carr
   const shared = { s: [1] }
   const corpus: unknown[] = [
     null, undefined, true, false, 0, -0, 1.5, NaN, Infinity, -Infinity, 2 ** 31, -(2 ** 31), 2 ** 53, '', 'ünïcode 😺', 'x'.repeat(1000),
-    'lone \uD800 high', '\uDC00 lone low', '﻿bom', '﻿﻿two boms', 'mid﻿bom', { '﻿key': 1 }, { 'a\uD800': 1, x: 0, 'a\uDC00': 2 },
-    { '﻿__proto__': { x: 1 } }, new Uint8Array([1, 2, 3]), Buffer.from([4, 5]), new Uint8Array(new ArrayBuffer(8), 2, 3), [], {},
+    'lone \uD800 high', '\uDC00 lone low', '\uFEFFbom', '\uFEFF\uFEFFtwo boms', 'mid\uFEFFbom', { '\uFEFFkey': 1 }, { 'a\uD800': 1, x: 0, 'a\uDC00': 2 },
+    'y'.repeat(40) + '\uD800', '\uFEFF' + 'z'.repeat(40), { ['k'.repeat(40) + '\uDC00']: 1 },
+    { '\uFEFF__proto__': { x: 1 } }, new Uint8Array([1, 2, 3]), Buffer.from([4, 5]), new Uint8Array(new ArrayBuffer(8), 2, 3), [], {},
     [1, [2, [3, [4]]]], [1, , 3], Object.assign([1, 2], { extra: 1 }), List.from([1, 2]), { a: undefined, b: null }, { a: { b: [1, 'x', null, { c: -0 }] } },
     Object.create(null), { ['__proto__']: 1 }, JSON.parse('{"__proto__": {"x": 1}}'), { 2: 'two', 1: 'one', b: 'b', a: 'a' }, new Point(),
     { get g() { return 7 } }, { a: shared, b: shared }, new Date(0), new Map([[1, 2]]), new Float64Array([1.5]), new Proxy({ a: 1 }, {}),
