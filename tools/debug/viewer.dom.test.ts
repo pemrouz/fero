@@ -733,3 +733,28 @@ test('a live attach missing the writer keeps a copying holder\'s lag on every pa
   g(`navTo(${JSON.stringify(`g/writes/${late.origin}#${late.seq}`)})`)
   assert.ok(el('insp').innerHTML.includes(`data-rkey="g/nodes/${lagging}">${lagging}</span></span><span data-tip="stop:inflight">not yet arrived</span>`), 'the write it lacks waits for it')
 })
+
+test('under rewind, a node that acquired a row replays its streams at the acquire row — no `@ end` on the scoped scenario (wave 5f)', async () => {
+  const cap = captures.get('scoped') as { vocab: Record<string, number>; nodes: { uuid: string; journal: { t: number; kind: number }[] }[] }
+  const K = cap.vocab
+  const n05 = cap.nodes.find((n) => n.uuid === 'n05')!
+  const ta = n05.journal.find((e) => e.kind === K.acquire)!.t
+  assert.ok((MODEL.verifyTopology(cap) as { uuid: string; ok: boolean }[]).every((r) => r.ok), 'every node replays — before wave 5f the joiner was refused')
+  const lanes = (t: number) => [...(MODEL.topologyAt(cap, 'n05', t) as { streams: Map<string, { a: number; s: number }> }).streams]
+  const before = new Map(lanes(ta - 1)), after = lanes(ta)
+  const jumped = after.filter(([o, w]) => w.a > (before.get(o)?.a ?? 0))
+  assert.ok(jumped.length > 0, 'a lane jumps at the acquire row itself')
+  const { el, g } = await bootViewer('scoped-rewind', cap)
+  g(`for (const n of CAP.nodes){ expanded.add('g/nodes/' + n.uuid); expanded.add('g/nodes/' + n.uuid + '/g/streams') } render()`)
+  dragTo(el, ta)
+  const groups = JSON.parse(g(`JSON.stringify(FOREST.find(x => x.key === 'g/nodes').kids.map(n => ({ u: n.label, pills: n.kids.map(k => k.pill && k.pill.lab) })))`)) as { u: string; pills: (string | null)[] }[]
+  for (const x of groups) assert.ok(!x.pills.includes('@ end'), `${x.u}: no @ end pill`)
+  g(`navTo('g/nodes/n05')`)
+  const insp = el('insp').innerHTML
+  assert.doesNotMatch(insp, /@ capture end|links & streams @ end/, 'the joiner\'s panes replay')
+  assert.match(insp, new RegExp(`data-tip="streams@t">@ t${ta}<`), 'its streams are the replay at the scrub point')
+  for (const [o, w] of jumped)
+    assert.ok(insp.includes(`data-rkey="g/nodes/${o}">${o}</span></td><td data-tip="wm:applied">${w.a}</td><td data-tip="wm:shippable">${w.s}</td>`), `lane ${o} shows the jump to ${w.a}`)
+  dragTo(el, ta - 1); g(`navTo('g/nodes/n05')`)
+  for (const [o, w] of jumped) assert.ok(!el('insp').innerHTML.includes(`data-rkey="g/nodes/${o}">${o}</span></td><td data-tip="wm:applied">${w.a}</td>`), `lane ${o} is not at ${w.a} one row earlier`)
+})
