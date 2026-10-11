@@ -412,6 +412,35 @@ test('one directory client per process: instances share one client and one link,
   } finally { await settle([cb, ca, a2, b, a, h]) }
 })
 
+test('one directory client per process: a server that stops (destroy or crash) right after it started, beside a sibling that keeps the shared client, leaves no entry behind', async () => {
+  //! the window: fero() resolves before the server's register has come back, so the stop used to find it "not
+  // registered yet" and skip the unregister — then the register landed on the host, and the shared link (kept
+  // up by the sibling) never dropped, so every lookup handed out the dead address
+  const o = await fast()
+  const name = `leak-${process.pid}`
+  let h: Fero | undefined, keep: Fero | undefined, live: Fero | undefined, c: Fero | undefined
+  const dead: string[] = []
+  try {
+    h = await fero(`leakh-${process.pid}`, { server: true, ...o, redial: { ms: 31 } })
+    assert.ok(await until(() => rz(h!).hosting && rz(h!).up, 5000))
+    keep = await fero(`leakk-${process.pid}`, { server: true, ...o })
+    assert.ok(await until(() => rz(keep!).up, 5000))
+    for (let i = 0; i < 6; i++) {
+      const y = await fero(name, { server: true, ...o })
+      dead.push(me(y).listen)
+      if (i % 2 === 0) await y.destroy()
+      else await diag(y)!.crash!()
+    }
+    //! a live server of the same name, registered AFTER every stop: once a fresh client sees it, the row is current
+    live = await fero(name, { server: true, ...o })
+    c = await fero(name, o)
+    assert.ok(await until(() => me(c!).hosts.includes(me(live!).listen), 8000), 'the live server is looked up')
+    await sleep(500)
+    const left = me(c).hosts.filter((a) => dead.includes(a))
+    assert.deepEqual(left, [], `no stopped server's entry is left (${left.length}/${dead.length} leaked: ${JSON.stringify(me(c).hosts)})`)
+  } finally { await settle([c, live, keep, h]) }
+})
+
 test('two names on one box never collide, never cross-talk, and the diagnostics seam exposes the directory nodes as real instances', async () => {
   const o = await fast()
   let a: Fero | undefined, b: Fero | undefined, ca: Fero | undefined, cb: Fero | undefined
