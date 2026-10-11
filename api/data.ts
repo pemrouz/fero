@@ -116,7 +116,8 @@ export const partOf = (o: object, array: boolean): string | null => {
   return INSTANCES === 'take' ? null : `an instance of ${nameOf(p)} (fero sends plain objects: send { ...value })`
 }
 
-//! WRITE, ARG — what a local write's value, and a method call's argument, may be (kernel/codec.ts encodable).
+//! WRITE, ARG — what a local write's value, and a method call's argument, may be (kernel/codec.ts copyOf, the walk
+// that checks a value and copies it; encodable asks the same without the copy).
 // The wire carries 64 levels. The built-in reads wrap a stored value in up to four more — a live sub of the
 // whole resource ships it inside SUBREC, its recs list, the record and the row; the scoped gather's claim is
 // as deep — and a field write's value sits under its row: a value 61 deep was written, replicated, and then
