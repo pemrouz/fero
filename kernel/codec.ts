@@ -495,8 +495,18 @@ const encodeEmpty = (prov?: Prov): Uint8Array => {
 // shape, the triple read as [issuer, baseCid, attemptEpoch]. Uses a module-level scratch Outbox (finish()
 // hands out owned copies; the kernel is single-threaded and encode never re-enters).
 const runsScratch = new Outbox()
+type RunRec = { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }
+//! continuesRun: the ONE run rule — does `r` extend the run that starts at `head` and is `k` records long? Same
+// origin, same epoch, the next seq, the same issuer, and (with attempt identity) the next cid. encodeRuns splits by
+// it, and so may a caller that collects one frame's run at a time.
+export const continuesRun = (head: RunRec, k: number, r: RunRec): boolean =>
+  r.origin === head.origin &&
+  r.epoch === head.epoch &&
+  r.seq === head.seq + k &&
+  r.iss === head.iss &&
+  (head.iss === undefined || r.cid === head.cid! + k)
 export const encodeRuns = (
-  records: { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }[],
+  records: RunRec[],
   verb: number = VERB.RECORDS,
   //! withPp (M6 floor law): armed senders stamp every record's predecessor varint (FLAG_PP). NEVER a
   // run-split condition — pp is per-record data, so the split shape is identical either way (the
@@ -517,14 +527,7 @@ export const encodeRuns = (
       head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid! } : undefined, withPp)
     o.add(head.rec, head.pp)
     let j = i + 1
-    while (
-      j < records.length &&
-      records[j].origin === head.origin &&
-      records[j].epoch === head.epoch &&
-      records[j].seq === head.seq + (j - i) &&
-      records[j].iss === head.iss &&
-      (head.iss === undefined || records[j].cid === head.cid! + (j - i))
-    ) { o.add(records[j].rec, records[j].pp); j++ }
+    while (j < records.length && continuesRun(head, j - i, records[j])) { o.add(records[j].rec, records[j].pp); j++ }
     frames.push(o.finish()!)
     i = j
   }
