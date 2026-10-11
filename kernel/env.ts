@@ -129,6 +129,10 @@ export interface EffectSink {
   // the settlement: committed, exactly there. Never fires where the record will fold here (the apply join
   // settles those, after the value shows — V4-7), never on an unscoped member (its WACK carries no lane),
   // never for a relayed attempt (the relay hops the WACK onward instead).
+  //! Wave 5e adds the spoke whose feeder WOULD have tapped the record but died first: its WACK named the lane as
+  // `l`, the spoke kept the coordinates, and at the failover's resync end every such attempt the new feeder's ship
+  // did not bring settles here. So "never where the record will fold here" now reads: never while the feeder
+  // that will tap it is alive; a record that does arrive afterwards still projects, and the api absorbs a repeat.
   acked?(iss: string, cid: number, origin: string, seq: number, epoch: number): void
   //! snapshot(batch, rows) (M4e): ATOMICALLY REPLACE the whole WAL with `rows` — the disk counterpart
   // of compaction (a swap is not an append; it gets its own verb). Rows are [frame + fresh chain link]
