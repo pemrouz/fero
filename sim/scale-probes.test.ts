@@ -22,8 +22,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
-import { cluster, formed } from './harness.ts'
-import { armScale, ledgerOf, stampOracle, floorsAgree, boundedLogs, converged, scopedConverged, exactlyR, screenMatches } from './monitors.ts'
+import { cluster, formed, client, writes } from './harness.ts'
+import { armScale, ledgerOf, stampOracle, floorsAgree, boundedLogs, converged, scopedConverged, exactlyR, screenMatches, spokeMirror, spokeStale } from './monitors.ts'
 import { mesh, join, frameTally, perTick, inject, type MeshOpts } from './scoped-sweep.ts'
 import { LS } from '../kernel/link.ts'
 import { Ring } from '../kernel/ring.ts'
@@ -615,6 +615,111 @@ test('M10 resync-end and M11 resync-behind: lawful on the crossing schedule (the
   assert.match(m10[0]?.detail ?? '', /s1's resync ended on link \d+ on the reply to its digest #\d+, sent before the resync asked for the re-download \(#\d+\) — a stale reply/, 'M10 names the stale reply')
   assert.match(m11[0]?.detail ?? '', /s1's resync ended with its fold behind its feeder n0[123]: it held \["x\d"\] at the reset, n0[123] holds it @\d+\/\d+\/n0[123] .* and s1 no longer has it \(a ghost that is live at the feeder\)/, 'M11 names an X row the ghost sweep removed')
   assert.equal(m10[0].event, m11[0].event, 'both at the event the stale reply ended the resync')
+})
+
+// ── the latch tap (wave 6a, 2026-10-12): a feeder forwards what it folds through the latch to its spokes ────────
+
+//! STATUS (two sightings): "A scoped feeder that folds records through the latch taps none of them to its spokes."
+// Sighting 1, probe P2 of the wave-5e review: n=4 R=3, a spoke fed by P (its only host), fifty rows owned by T and
+// held by {T, P, ·}, five ms apart; the T→P RECORDS frame of the tenth dies with the link (a link reset: the pair
+// redials, the epoch stays 1), forty more follow over 400 ms. The lost row and the rows T committed while the link
+// was down reach P through the latch (one acquire per partition, one record each). The spoke's own floor exchange
+// still ships the ones above its lane tail, so most arrive; the one folded after a later row had been tapped live is
+// below the spoke's tail and never comes while P lives: on the base tree lane T at the spoke read 1-13, 15-50 on
+// seeds 1 and 4 (k124, seq 14), 1-14, 16-50 on seeds 2 and 3 (k125, seq 15) — the row P holds and the spoke lacks —
+// and no monitor fired (there was no M12). On the tree BEFORE stage 2 (the parent of 237bab1) the same probe lost
+// more: seqs 10-13 on seeds 1, 3, 4 and 10-15 on seed 2 — the holder's HAVEQ round at the re-admit latched the
+// partition before the admit digest's suffix landed, and the live copy that then arrived staged and was discarded at
+// ACQDONE as covered by the cut. So V4-40 did not open this hole; it made the latch the only repair path. Now the
+// fold forwards each folded record to its synced spokes (kernel/scope.ts onAcqDone) and every row is at the spoke.
+// Red on the base tree at "lane T at the spoke is whole" (and M12 at "the spoke mirrors": `s1 lacks ["k124"], which
+// its feeder n02 holds = 14 @1/14/n01 for 'k124', a partition n02 holds`).
+test('the latch tap, sighting 1 (P2\'s shape): n=4 R=3, one owner-to-holder frame lost at a steady epoch, forty later writes — every row the feeder folded through the latch reaches its spoke (one was below the spoke\'s tail for good before), M12 compared all fifty, on four seeds', () => {
+  for (const seed of [1, 2, 3, 4]) {
+    const ids = ['n01', 'n02', 'n03', 'n04'], T = 'n01', P = 'n02'
+    const sim = new Sim(seed)
+    const nodes = mesh(sim, 4, { hb: 50, replicas: 3, fault: { delay: [1, 5] } })
+    sim.run({ until: 1500 })
+    assert.ok(formed(nodes) && nodes.every((n) => n.armed), `seed ${seed}: formed and armed`)
+    const s1 = sim.add({ uuid: 's1', listen: 'sim:s1', hosts: ['sim:' + P], heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
+    sim.post('s1', { kind: 'start' }, 0)
+    sim.run({ until: sim.now + 300 })
+    assert.equal(s1.links.get(s1.primary!)?.uuid, P, `seed ${seed}: fed by P`)
+    const keys: string[] = []
+    for (let i = 0; i < 100_000 && keys.length < 50; i++) { const k = 'k' + i; const h = holdersAt(ids, k, 3); if (h[0] === T && h.includes(P)) keys.push(k) }
+    for (let i = 0; i < 9; i++) sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [keys[i]], value: i + 1 }] }, i * 5)
+    sim.run({ until: sim.now + 100 })
+    sim.severOnFrame(T, P, VERB.RECORDS, 1)
+    sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [keys[9]], value: 10 }] }, 0)
+    sim.run({ until: sim.now + 10 })
+    for (let i = 10; i < 50; i++) sim.post(T, { kind: 'write', recs: [{ type: REC.update, key: [keys[i]], value: i + 1 }] }, (i - 10) * 10)
+    sim.run({ until: sim.now + 3000 })
+    const Pn = sim.nodes.get(P)!
+    const all = Array.from({ length: 50 }, (_, i) => i + 1)
+    assert.equal(Pn.epoch, 1, `seed ${seed}: a steady epoch — the reset was a redial, not an eviction`)
+    assert.ok(count(Pn, JK.acquire) > 0, `seed ${seed}: P repaired through the latch (${count(Pn, JK.acquire)} acquires)`)
+    assert.deepEqual(Pn.logs.get(T)!.map((e) => e.seq), all, `seed ${seed}: P holds every row of lane T`)
+    assert.deepEqual(s1.logs.get(T)!.map((e) => e.seq), all, `seed ${seed}: lane T at the spoke is whole`)
+    const c = { parts: 0, cells: 0 }
+    assert.equal(spokeMirror(sim, 's1', c), null, `seed ${seed}: the spoke mirrors its feeder's held subset`)
+    assert.equal(c.cells, 50, `seed ${seed}: M12 compared all fifty rows`)
+    assert.equal(spokeStale(sim, 's1').n, 0, `seed ${seed}: nothing moved off P: no stale row`)
+    assert.deepEqual(sim.violations, [], `seed ${seed}: no monitor fired`)
+    assert.equal(screenMatches(sim, 's1'), null, `seed ${seed}: screen = kernel`)
+  }
+})
+
+//! Sighting 2, the debugger's per-row comparison (V4-46; tools/debug/fixtures.ts scopedTenure shows the same miss):
+// Sim(11), four members at R=2 with a 50 ms heartbeat, a client of all four admitted after formation, eight writes
+// from 2.5 s, n04 leaves at 4 s. Its partitions move to the survivors; the client's feeder n01 acquires `gamma3` from
+// n03's orphan copy (one record, n04#4) and folded it through node.apply alone: the client never got it — still
+// missing at 40 s of sim time on the base tree (`zc1 lacks ["gamma3"], which its feeder n01 holds = {"0":1,"1":0}
+// @1/4/n04 for 'gamma3', a partition n01 holds`). The client dialing THREE members instead, or the writes starting
+// at formation, elects another feeder or moves the partitions elsewhere and the recipe does not bite (measured).
+// Then M12's own plants on the same run: a row removed from the spoke's kernel, a value changed, a cell of a held
+// partition the feeder does not have — each named; the mutation check of the oracle against the KERNEL is the fix
+// itself taken out (the forward in onAcqDone): both sightings then fail at the M12 line quoted in each comment.
+test('the latch tap, sighting 2 (the debugger\'s hand-off recipe): Sim(11), four members at R=2, a client of all four, eight writes, n04 leaves — the feeder n01 acquires gamma3 and the client gets n04#4 (never, before); M12 agrees, and names a planted missing row, a planted value and a planted extra cell', () => {
+  const sim = new Sim(11)
+  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2 })
+  armScale(sim)
+  sim.run({ until: 1500 })
+  assert.ok(formed(nodes) && nodes.every((n) => n.armed), 'formed and armed')
+  const zc1 = client(sim, 'zc1', nodes, { heartbeatMs: 50 })
+  sim.run({ until: 2500 })
+  writes(sim, nodes, 8)
+  sim.run({ until: 4000 })
+  sim.post('n04', { kind: 'leave' })
+  sim.run({ until: 40_000 })
+  const F = sim.nodes.get(zc1.links.get(zc1.primary!)!.uuid)!
+  assert.equal(F.uuid, 'n01', 'fed by n01 — the recipe')
+  const acq = F.journal.read().filter((e) => e.kind === JK.acquire).map((e) => `${e.a}:${e.b}:${e.c}`)
+  assert.ok(acq.includes('gamma3:1:n03'), `n01 acquired gamma3 (one record) from n03's orphan copy in the hand-off (${acq.join(', ')})`)
+  const g3 = JSON.stringify(['gamma3'])
+  assert.ok(F.state.has(g3) && F.versions.get(g3)!.origin === 'n04' && F.versions.get(g3)!.seq === 4, 'the feeder shows gamma3 at n04#4')
+  assert.ok(zc1.state.has(g3), 'the client got gamma3 (n04#4), which it never did before')
+  assert.deepEqual(zc1.logs.get('n04')!.map((e) => e.seq), F.logs.get('n04')!.map((e) => e.seq), 'lane n04 at the client equals the feeder\'s ([1,5,6] against [1,4,5,6] before)')
+  const c = { parts: 0, cells: 0 }
+  assert.equal(spokeMirror(sim, 'zc1', c), null, 'the client mirrors its feeder\'s held subset')
+  assert.ok(c.parts >= 2 && c.cells >= 2, `non-vacuity: M12 compared ${c.cells} cells over ${c.parts} partitions`)
+  assert.equal(spokeStale(sim, 'zc1').n, 0, 'a leave moves partitions ONTO the feeder, never off it: no stale row')
+  assert.deepEqual(sim.violations, [], 'no monitor fired')
+  //! the plants (the oracle against its own reading): a row taken out of the spoke's kernel, a value changed, a cell
+  // the feeder does not have under a partition it holds
+  const held = [...F.state.keys()].filter((k) => F.scope!.held((JSON.parse(k) as string[])[0]))
+  const k0 = held[0]
+  const v0 = zc1.state.get(k0)
+  zc1.state.delete(k0)
+  assert.match(spokeMirror(sim, 'zc1') ?? '', new RegExp(`^M12: zc1 lacks ${k0.replace(/[[\]"]/g, '\\$&')}, which its feeder n01 holds = .* @\\d+/\\d+/n0\\d for '.*', a partition n01 holds$`), 'a missing row is named with the feeder\'s value and stamp')
+  zc1.state.set(k0, 'planted')
+  assert.match(spokeMirror(sim, 'zc1') ?? '', /^M12: zc1 shows .* = string:planted; its feeder n01 holds .* @\d+\/\d+\/n0\d$/, 'a wrong value is named (values print in stable() form)')
+  zc1.state.set(k0, v0)
+  assert.equal(spokeMirror(sim, 'zc1'), null, 'restored: green again')
+  const ghost = JSON.stringify([(JSON.parse(k0) as string[])[0], 'ghost'])
+  zc1.state.set(ghost, 1)
+  assert.match(spokeMirror(sim, 'zc1') ?? '', /^M12: zc1 shows .*"ghost"\] = number:1 of '.*', a partition its feeder n01 holds without that cell$/, 'an extra cell under a held partition is named')
+  zc1.state.delete(ghost)
+  assert.equal(spokeMirror(sim, 'zc1'), null)
 })
 
 // ── the counted floors, recorded from today ─────────────────────────────────────────────────────
