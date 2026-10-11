@@ -530,3 +530,223 @@ test("`ready` settles when the sub ends without a frame: close() rejects it 'clo
     await c.destroy().catch(() => {}); await s.destroy()
   }
 })
+
+//! A view on a live method mirror that throws as a streamed record folds (api/substrate.ts Fault): before the fix
+// the error left the caller's onSubRecs, inside the kernel's step, and the client process exited.
+test('a view on a live method mirror that throws on a streamed row is reported, not fatal: the sub keeps streaming and the row comes back', async () => {
+  const { a, b, addrs } = await pair({ watch: (_: unknown, ctx: { data: any }) => ctx.data })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const out: string[] = []
+  const orig = process.stderr.write
+  process.stderr.write = ((chunk: string | Uint8Array) => { out.push(String(chunk)); return true }) as typeof process.stderr.write
+  type Cats = Record<string, { mood: string } | null>
+  try {
+    a.data.luna = { mood: 'hungry' }
+    const live = c.methods.watch()
+    assert.ok(await until(() => (snapshot(live.open()) as Cats).luna !== undefined, 8000), 'the mirror folded')
+    const hungry = live.open().filter((cat: { mood: string }) => cat.mood === 'hungry') // throws on a null row
+    a.data.mochi = null
+    a.data.biscuit = { mood: 'hungry' }
+    assert.ok(await until(() => 'biscuit' in (snapshot(hungry) as Cats), 8000), 'the mirror keeps streaming past the bad row')
+    assert.equal(live.mode, 'live', 'the sub did not fail')
+    a.data.mochi = { mood: 'hungry' }
+    assert.ok(await until(() => 'mochi' in (snapshot(hungry) as Cats), 8000), 'the left-out row comes back')
+  } finally {
+    process.stderr.write = orig
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+  const mine = out.join('').split('\n').filter((l) => l.startsWith(`fero('r'): filter threw on row "mochi"`))
+  assert.equal(mine.length, 1, JSON.stringify(out))
+})
+
+//! data stops a view whose function threw (its SCHEDULE clause 4). A live subscription over it used to read
+// 'live' over a mirror that would never move again; now the caller's handle fails with the reason, and the
+// views the handler minted above the stopped one are released (disposeMinted walks through it).
+test("a live subscription whose view data stops fails loudly: the handle reads 'failed' with the reason, and the server keeps nothing it minted", async () => {
+  const unlucky = (x: { n: number }, y: { n: number }) => { if (x.n === 13 || y.n === 13) throw new Error('unlucky'); return x.n - y.n }
+  //! a long-lived view per server (made outside any handler) that a one-shot call returns
+  const boards = new Map<unknown, unknown>()
+  const { a, b, addrs } = await pair({
+    frozen: (_: unknown, ctx: { data: any }) => boards.get(ctx.data),
+    board: (_: unknown, ctx: { data: any }) => ctx.data.filter((r: unknown) => r !== null).za(unlucky),
+    //! the handler's own write stops the view before its stream opens
+    trip: (_: unknown, ctx: { data: any }) => { const v = ctx.data.za(unlucky); ctx.data.bad = { n: 13 }; return v },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const out: string[] = []
+  const orig = process.stderr.write
+  process.stderr.write = ((chunk: string | Uint8Array) => { out.push(String(chunk)); return true }) as typeof process.stderr.write
+  try {
+    a.data.one = { n: 1 }
+    assert.ok(await until(() => (snapshot(b.data) as Record<string, unknown>).one !== undefined, 8000), 'both servers hold the row')
+    //! either server may serve the sub: count the derived views on both. The two boards are made after the
+    // count; data stops them too, so after the stop the count is back where it was.
+    const views = () => derived(a.data) + derived(b.data)
+    const before = views()
+    boards.set(a.data, a.data.za(unlucky))
+    boards.set(b.data, b.data.za(unlucky))
+    const errs: string[] = []
+    const live = c.methods.board(undefined, { onError: (e: Error) => errs.push(e.message) })
+    //! a mirror is a keyed source: an ordered view arrives as { 0: …, 1: … }
+    assert.ok(await until(() => Object.keys(snapshot(live.open()) as object).length === 1, 8000), 'the board streamed')
+    a.data.thirteen = { n: 13 }
+    assert.ok(await until(() => live.mode === 'failed', 8000), `the sub failed (mode ${live.mode})`)
+    assert.ok(errs.some((m) => m.includes('the view this subscription streams has stopped')), JSON.stringify(errs))
+    assert.ok(await until(() => views() === before, 3000), `the filter above the stopped za was released (${views()} derived, ${before} before)`)
+    //! a one-shot call over a stopped view is refused too, never answered with a frozen picture
+    await assert.rejects(c.methods.frozen(undefined, { timeout: 8000 }), /the view this method returns has stopped/)
+    await assert.rejects(a.methods.frozen(), /the view this method returns has stopped/)
+    const tripped = c.methods.trip(undefined, { onError: () => {} })
+    tripped.open()
+    assert.ok(await until(() => tripped.mode === 'failed', 8000), `a view stopped by the handler's own write fails at open (mode ${tripped.mode})`)
+  } finally {
+    process.stderr.write = orig
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+})
+
+test('a method whose result cannot be sent rejects that call with the reason, and the server carries on', async () => {
+  const { a, b, addrs } = await pair({
+    big: () => 10n,
+    odd: () => { throw Object.create(null) },
+    ok: () => 'fine',
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    await assert.rejects(c.methods.big(undefined, { timeout: 8000 }), /the result could not be sent: .*bigint/)
+    await assert.rejects(c.methods.odd(undefined, { timeout: 8000 }), /object/)
+    assert.equal(await c.methods.ok(undefined, { timeout: 8000 }), 'fine', 'the server is alive')
+  } finally {
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+})
+
+//! data's record sink used to copy each value (structuredClone) before fero's own sink saw it, so a value
+// the copy cannot take (a function) failed inside data's commit: the row was lost, the sub read 'live' and the
+// server blamed a tap. The Host now takes the records by reference and encodes them itself.
+test("a served value the wire cannot carry ends the live sub loudly, once; the server prints one line and keeps nothing it minted", async () => {
+  const { a, b, addrs } = await pair({
+    shapes: (_: unknown, ctx: { data: any }) => ctx.data.map((r: { bad?: boolean }) => (r !== null && r.bad === true ? { f: () => 1 } : r)),
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const out: string[] = []
+  const orig = process.stderr.write
+  process.stderr.write = ((chunk: string | Uint8Array) => { out.push(String(chunk)); return true }) as typeof process.stderr.write
+  try {
+    a.data.good = { n: 1 }
+    const views = () => derived(a.data) + derived(b.data)
+    const before = views()
+    const errs: string[] = []
+    const live = c.methods.shapes(undefined, { onError: (e: Error) => errs.push(e.message) })
+    assert.ok(await until(() => Object.keys(snapshot(live.open()) as object).length === 1, 8000), 'the view streamed')
+    a.data.worse = { bad: true }
+    assert.ok(await until(() => live.mode === 'failed', 8000), `the sub failed (mode ${live.mode})`)
+    assert.equal(errs.length, 1)
+    assert.ok(errs[0].includes('the stream could not send a record'), errs[0])
+    assert.ok(await until(() => views() === before, 3000), `nothing minted is left (${views()} derived, ${before} before)`)
+  } finally {
+    process.stderr.write = orig
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+  const mine = out.join('').split('\n').filter((l) => l.startsWith("fero('r'): a live subscription ended: a record could not be sent (methods.shapes)"))
+  assert.equal(mine.length, 1, JSON.stringify(out))
+  assert.ok(mine[0].endsWith(' — fero carried on'), mine[0])
+})
+
+test('a handler that throws a hostile value is refused, and the server carries on: a message getter that throws, a Proxy whose traps throw, a scoped error carrying a bigint', async () => {
+  const bad = new Error('x')
+  Object.defineProperty(bad, 'message', { get() { throw new Error('no message') } })
+  const { a, b, addrs } = await pair({
+    getter: () => { throw bad },
+    trap: () => { throw new Proxy({}, { get() { throw new Error('get trap') }, getPrototypeOf() { throw new Error('proto trap') } }) },
+    scoped: () => { throw { scoped: true, op: 'x', reason: 'unreachable', n: 10n } },
+    ok: () => 'fine',
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    for (const m of ['getter', 'trap', 'scoped'])
+      await assert.rejects((c.methods as Record<string, (a?: unknown, o?: object) => Promise<unknown>>)[m](undefined, { timeout: 8000 }), `methods.${m} is refused`)
+    assert.equal(await c.methods.ok(undefined, { timeout: 8000 }), 'fine', 'the server is alive')
+  } finally {
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+})
+
+//! A handler may return anything, a Proxy whose traps throw included: the Host's guards ask isProxy() inside
+// their own catch blocks, where a throw was an unhandled rejection that ended the server (the third review).
+test('a handler that returns a hostile Proxy is answered or refused, as a call and as a sub, and the server carries on', async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('r', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { luna: { mood: 'hungry' } }, methods: {
+    hostile: () => new Proxy({}, { get() { throw new Error('get trap') } }),
+    ok: () => 'fine',
+  } } as never)
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const out: string[] = []
+  const orig = process.stderr.write
+  process.stderr.write = ((chunk: string | Uint8Array) => { out.push(String(chunk)); return true }) as typeof process.stderr.write
+  try {
+    await c.methods.hostile(undefined, { timeout: 8000 }).then(() => {}, () => {})
+    const live = c.methods.hostile(undefined, { onError: () => {} })
+    live.open()
+    assert.ok(await until(() => live.mode === 'failed', 8000), `the sub was refused (mode ${live.mode})`)
+    assert.equal(await c.methods.ok(undefined, { timeout: 8000 }), 'fine', 'the server is alive')
+  } finally {
+    process.stderr.write = orig
+    await c.destroy(); await s.destroy()
+  }
+})
+
+test('a SUB closed while its handler is still flushing leaves nothing it minted on the server', async () => {
+  const { a, b, addrs } = await pair({
+    touchy: (_: unknown, ctx: { data: any }) => { ctx.data.touch = Date.now(); return ctx.data.filter((r: unknown) => r !== null) },
+  })
+  const c = await fero('r', { uuid: 'zz', hosts: addrs, heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  try {
+    //! linked first: a SUB opened before the client's first link is held, and a close drops it unsent
+    assert.ok(await until(() => (snapshot(c.cluster) as { me: { primary: string | null } }).me.primary !== null, 8000), 'the client linked')
+    const views = () => derived(a.data) + derived(b.data)
+    const before = views()
+    for (let i = 0; i < 10; i++) {
+      const h = c.methods.touchy(undefined, { onError: () => {} })
+      h.open()
+      h.close()
+    }
+    await sleep(1000)
+    assert.equal(views(), before, 'the ten views the handlers minted were released')
+  } finally {
+    await c.destroy(); await a.destroy(); await b.destroy()
+  }
+})
+
+//! data cuts a write loop at its cap and drops the errors it had collected, a view it stopped among them: the
+// composer sweeps the live subs on the loop error itself, or the sub would read 'live' over a frozen mirror.
+test('a served view that data stops inside a write loop still fails its live sub', async () => {
+  const cmp = (x: { n?: number } | null, y: { n?: number } | null) => { if (x?.n === 13 || y?.n === 13) throw new Error('unlucky 13'); return (x?.n ?? 0) - (y?.n ?? 0) }
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('r', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { a: { n: 1 }, k: { n: 0 } }, methods: {
+    board: (_: unknown, ctx: { data: any }) => ctx.data.za(cmp),
+  } } as never)
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  const out: string[] = []
+  const orig = process.stderr.write
+  process.stderr.write = ((chunk: string | Uint8Array) => { out.push(String(chunk)); return true }) as typeof process.stderr.write
+  try {
+    const errs: string[] = []
+    const live = c.methods.board(undefined, { onError: (e: Error) => errs.push(e.message) })
+    assert.ok(await until(() => Object.keys(snapshot(live.open()) as object).length === 2, 8000), 'the board streamed')
+    let armed = false
+    let i = 0
+    s.data.tap(() => { if (armed) s.data.k = { n: ++i } })
+    armed = true
+    s.data.go = { n: 100 } // the tap writes k on every change: data cuts the loop, and k.n passes 13 on the way
+    armed = false
+    assert.ok(await until(() => live.mode === 'failed', 8000), `the sub failed (mode ${live.mode})`)
+    assert.ok(errs.some((m) => m.includes('has stopped')), JSON.stringify(errs))
+  } finally {
+    process.stderr.write = orig
+    await c.destroy(); await s.destroy()
+  }
+  assert.ok(out.join('').includes("fero('r'): data cut a write loop after "), out.join(''))
+})

@@ -29,7 +29,7 @@
 // that land synchronously inside the write() call settle through the same join as
 // commits that echo back seconds later off the owner.
 
-import { proxy, applyRec, lens, holeAt, SPARSE_HOLE } from './substrate.ts'
+import { proxy, applyRec, lens, holeAt, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
@@ -163,11 +163,12 @@ export class Bind {
     return id
   }
 
-  constructor(rt: Runtime, opts: { validate?: (rec: Rec) => true | string; tracked?: () => Promise<Coords>[] | undefined; onOutcome?: (id: number) => void } = {}) {
+  constructor(rt: Runtime, opts: { validate?: (rec: Rec) => true | string; tracked?: () => Promise<Coords>[] | undefined; onOutcome?: (id: number) => void; onFault?: Fault } = {}) {
     this.#rt = rt
     this.#validate = opts.validate
     this.#tracked = opts.tracked
     this.#onOutcome = opts.onOutcome
+    this.#fault = opts.onFault
     this.#iss = rt.node.uuid + '~' + rt.node.incarnation
     //! the two-layer surface (DESIGN-DATA3 §4.1): #handle is the data v4 source holding the
     // projection; data is FERO'S OWN LENS over it — assignment/delete trap straight into
@@ -450,9 +451,12 @@ export class Bind {
 
   //! apply — project one record into the projection handle (the hot lane, fero's origin).
   // No echo arming: nothing subscribes that could re-issue (the lens routes user writes
-  // BEFORE data; data-side sinks never write back).
+  // BEFORE data; data-side sinks never write back). This runs inside the kernel's step — between a
+  // record's commit and the rest of that step's work — so what the user's views and taps throw here
+  // goes to `#fault` (the composer's printer), never up into the step (substrate.ts Fault).
+  #fault?: Fault
   #apply(rec: Rec) {
-    applyRec(this.#handle, rec)
+    applyRec(this.#handle, rec, this.#fault)
   }
 
   //! shedPartition (M6): the kernel shed partition p — the data lawfully left this node without a

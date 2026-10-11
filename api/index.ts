@@ -21,9 +21,9 @@ import { JK } from '../kernel/journal.ts'
 import { TUNE } from '../kernel/tune.ts'
 import { Bind, METHODS_ONLY, type Coords } from './data.ts'
 import { fnv } from '../kernel/ring.ts'
-import { Caller, Host, SYSTEM, handle, type Context } from './methods.ts'
+import { Caller, Host, SYSTEM, handle, reapStopped, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
-import { proxy, contract, batch, snapshot as snapshotOf, SPARSE_HOLE, holeMessage } from './substrate.ts'
+import { proxy, contract, commit, errText, snapshot as snapshotOf, SPARSE_HOLE, holeMessage, DATA_ROOT, FERO_ROOT, type Fault } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, WATCH_TICKS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
 import { resolveConfig, src, secretHint, clientKeyHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
@@ -83,10 +83,14 @@ const VERB_NAMES = ['update', 'insert', 'remove'] as const
 // is capped: past SAID_MAX entries it is cleared and may repeat a line, never grow without bound.
 const SHOWN_MAX = 64
 const SAID_MAX = 1024
-const shown = (s: string): string => {
-  const t = s.replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
-  return t.length > SHOWN_MAX ? t.slice(0, SHOWN_MAX) + '…' : t
+//! clean — the one filter for printed text: no control character (a newline would forge a line, an escape
+// would drive the terminal), cut at max from the right, or from the left (a place: the file and line survive)
+const clean = (s: string, max: number, left = false): string => {
+  const cut = s.length > max * 4 ? (left ? s.slice(s.length - max * 4) : s.slice(0, max * 4)) : s
+  const t = cut.replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+  return t.length <= max ? t : left ? '…' + t.slice(t.length - max) : t.slice(0, max) + '…'
 }
+const shown = (s: string): string => clean(s, SHOWN_MAX)
 const said = new Set<string>()
 const refusalLine = (name: string, to: string | undefined, e: JEvent, node: Node, clientOnly: boolean): string | null => {
   const c = e.c === undefined ? '' : String(e.c)
@@ -150,6 +154,129 @@ const sayRefusal = (name: string, node: Node, e: JEvent, clientOnly: boolean): v
   if (said.size >= SAID_MAX) said.clear()
   said.add(key)
   process.stderr.write(line + '\n')
+}
+
+//! sayFault — the user's own code threw because fero changed a source it watches (substrate.ts Fault): a view's
+// function, a tap or another subscriber, run by data as the commit closed, AFTER the change landed. The change
+// stands, data has left the row out of a filter or map that threw on it (and stopped any other view that
+// threw), and fero carries on; this says so on stderr, once per bug. `what` is for the composer's and the
+// host's own refusals (a validation rule that threw, a result the wire cannot carry), which say what was
+// refused instead. It is total: the thrown value can be anything (a null-prototype object, a Proxy, getters
+// that throw), and a printer that throws would crash the very step it protects.
+//! A bug is the resource, what threw (data's operator name, `tap`, `given`), the thrown value's constructor
+// and the user's own place in the stack (`where`) — never the row or the message, which a peer can choose: a
+// filter that throws on ten thousand rows is one line, and a burst of bad rows cannot buy a line each. data's
+// own errors are known by their shape (a `cause`, and data's wording), not a prefix a message could carry.
+// Reading a stack makes V8 format it (tens of µs), so a pre-key without the place is counted first and,
+// past FORMAT_MAX repeats, a stack is read at most once a second: a second bug that differs only in its place
+// shows within a second of a flood of the first, or is missed if it throws only inside one. The kind of value
+// is in the key, so one bug that throws rows of different kinds prints a line per kind (a handful). The sets are their own and capped, so a burst of these never lets the refusal lines repeat.
+// Known blur: data runs one runtime per process, so a view of another resource whose commit drained inside
+// this one's prints under this one's name.
+const FAULT_MAX = 160
+const FAULTS_MAX = 1024
+const FORMAT_MAX = 64
+const faults = new Set<string>()
+const formats = new Map<string, { n: number; at: number }>()
+const DATA_VIEW = /^data: (\S+) (?:threw on (?:row |\d+ rows )|view threw during a commit and is stopped)/
+//! OPS — data's operator names (its exported contract): the only first words a view error of data's carries
+// (`filter(rescope)` is filter's re-scoped node); anything else is a user's own error dressed in data's words
+const OPS: ReadonlySet<string> = new Set(Object.keys(contract().operators))
+const DATA_LOOP = /^data: re-entrant write cascade exceeded (\d+) commits/
+//! read — one guarded property read: a getter or a Proxy trap may throw
+const read = (x: unknown, k: string): unknown => {
+  try { return x !== null && (typeof x === 'object' || typeof x === 'function') ? (x as Record<string, unknown>)[k] : undefined } catch { return undefined }
+}
+const kindOf = (x: unknown): string => {
+  try { const c = x !== null && (typeof x === 'object' || typeof x === 'function') ? Object.getPrototypeOf(x)?.constructor?.name : undefined; return typeof c === 'string' ? clean(c, 40) : typeof x } catch { return typeof x }
+}
+//! dataView — data's own error for a view (its SCHEDULE clause 4): it always carries the user's throw as
+// `cause`, and says which operator; anything else in data's AggregateError is what a tap or subscriber threw
+const dataView = (x: unknown): string | null => {
+  try {
+    if (!(x instanceof Error) || !Object.hasOwn(x, 'cause')) return null
+    const m = x.message
+    const v = typeof m === 'string' ? DATA_VIEW.exec(m) : null
+    return v !== null && OPS.has(v[1].replace(/\(.*\)$/, '')) ? m.slice('data: '.length) : null
+  } catch { return null }
+}
+//! stopsAView — did this fault stop a view (not just leave a row out)? Only then can a live sub be frozen
+//! data's cut of a write loop drops the errors it had collected, a view it stopped included — so it counts too
+const stopsAView = (e: unknown): boolean => {
+  try {
+    if (e instanceof Error && !(e instanceof AggregateError) && typeof e.message === 'string' && DATA_LOOP.test(e.message)) return true
+    return e instanceof AggregateError && Array.isArray(e.errors) && e.errors.some((x) => dataView(x)?.includes(' view threw during a commit and is stopped') === true)
+  } catch { return false }
+}
+//! where — the user's own place in a thrown value's stack, `file:line:col`: the frames after the message (the
+// stack starts with "Name: message", which can carry a row's text), at most 32 of them, skipping frames with
+// no file (`<anonymous>`, `node:` internals, natives), data's install and fero's own runtime files, so a
+// JSON.parse inside a predicate names the predicate. Cut from the left, so the file and line survive.
+const FERO_OWN = /^(?:api|kernel|shell|utils)\/[^/.]+\.ts:/
+const where = (x: unknown): string => {
+  let real = false
+  try { real = x instanceof Error } catch {}
+  if (!real) return '' // a stack is read only off a real Error: plain data a peer wrote can carry a `stack` field
+  const stack = read(x, 'stack')
+  if (typeof stack !== 'string') return ''
+  const head = errText(x)
+  let i = stack.startsWith(head) ? head.length : 0
+  for (let n = 0; n < 32 && i < stack.length; n++) {
+    const j = stack.indexOf('\n', i + 1)
+    const line = stack.slice(stack[i] === '\n' ? i + 1 : i, j < 0 ? stack.length : j)
+    i = j < 0 ? stack.length : j
+    const m = /^\s+at (?:.*? \()?(.+?)\)?$/.exec(line)
+    if (m === null) continue
+    const place = m[1]
+    if (!/:\d+:\d+$/.test(place) || place.startsWith('node:') || place.startsWith(DATA_ROOT)) continue
+    if (place.startsWith(FERO_ROOT) && FERO_OWN.test(place.slice(FERO_ROOT.length))) continue
+    return clean(place, FAULT_MAX, true)
+  }
+  return ''
+}
+const sayFault = (name: string, e: unknown, what?: string): void => {
+  try {
+    //! data's cut of a write loop is thrown alone, never inside its AggregateError
+    const loop = what === undefined && e instanceof Error && !(e instanceof AggregateError) && typeof e.message === 'string' ? DATA_LOOP.exec(e.message) : null
+    if (loop !== null) {
+      if (note(`${name}\0loop`)) process.stderr.write(`fero('${name}'): data cut a write loop after ${loop[1]} commits (a tap or subscriber that writes on every change?) — the last writes it dropped may not show on this node until those rows change again, and what else threw inside the loop was dropped with them; fero carried on\n`)
+      return
+    }
+    const all = what === undefined && e instanceof AggregateError && Array.isArray(e.errors) ? e.errors : [e]
+    for (const x of all) sayOne(name, x, what)
+  } catch {
+    try { process.stderr.write(`fero('${name}'): user code threw while fero applied a change, and its error could not be printed — fero carried on\n`) } catch {}
+  }
+}
+const sayOne = (name: string, x: unknown, given?: string): void => {
+  const view = given === undefined ? dataView(x) : null
+  const thrown = view !== null ? read(x, 'cause') : x
+  //! a given line's text is fero's own words (never a peer's), so it is part of the key: two refusals are two lines
+  const op = given !== undefined ? `given\0${given}` : view !== null ? view.split(' ')[0] : 'tap'
+  const pre = `${name}\0${op}\0${kindOf(thrown)}`
+  const now = performance.now()
+  const f = formats.get(pre)
+  if (f === undefined) {
+    if (formats.size >= FAULTS_MAX) formats.clear()
+    formats.set(pre, { n: 1, at: now })
+  } else {
+    f.n++
+    if (f.n > FORMAT_MAX && now - f.at < 1000) return
+    f.at = now
+  }
+  const at = where(thrown)
+  if (!note(`${pre}\0${at}`)) return
+  const head = given ?? view ?? 'a tap or subscriber threw'
+  const why = ` (${clean(errText(thrown), FAULT_MAX)}${at !== '' ? `, at ${at}` : ''})`
+  const tail = given !== undefined ? 'fero carried on' : 'the change stands; fero carried on'
+  process.stderr.write(`fero('${name}'): ${clean(head, FAULT_MAX)}${why} — ${tail}\n`)
+}
+//! note — true the first time a key is seen (a new line to print); capped like the refusal lines' set
+const note = (key: string): boolean => {
+  if (faults.has(key)) return false
+  if (faults.size >= FAULTS_MAX) faults.clear()
+  faults.add(key)
+  return true
 }
 
 //! discovery (V4-3, docs/DESIGN-DIRECTORY.md): no name hashing — a server binds a FREE loopback port and
@@ -490,7 +617,13 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // stamped; the client's own projection may not show the array yet). Zero kernel change for the door:
     // it is what the composer puts INTO the one hook. Inert on a client (nobody relays through a spoke).
     // `bind` is created below, before the runtime can step.
-    validate: methodsOnly ? METHODS_ONLY_ADMIT : (rec: Rec) => bind.admit(rec),
+    //! a rule that THROWS on a relayed record (it read rec.value.x, and a remove has no value) refuses that
+    // record 'validation-threw' and prints the line: it used to end the server, from the socket handler, for
+    // an ordinary delete from any client. The server's own write keeps throwing to its own caller, before
+    // anything is stamped.
+    validate: methodsOnly ? METHODS_ONLY_ADMIT : (rec: Rec) => {
+      try { return bind.admit(rec) } catch (e) { sayFault(name, e, `validation threw on a record a client sent — refused it ('validation-threw')`); return 'validation-threw' }
+    },
     //! the owner's re-check of a forwarded remove under a row (DESIGN-SCALE §11 Q12): a scoped member that
     // does not hold the row forwards a remove it cannot judge; the owner, which holds it, asks the sparse-hole
     // half of the same rule again. Armed nodes only (the kernel gates it); never the directory's concern.
@@ -509,6 +642,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // that moved; ONE microtask per burst publishes them (a burst of a thousand assignments is one batch),
   // so a solo write reads `committed` one microtask after it applied — never a kernel step later.
   const writes: any = proxy({})
+  //! fault — where the user's own views and taps land when they throw because fero changed a source they
+  // watch (substrate.ts Fault): the resource's data, a method's live mirror, the scoped union, the cluster
+  // view and its writes ring. One stderr line per failure (sayFault); fero's own work carries on.
+  const fault: Fault = (e) => { sayFault(name, e); if (stopsAView(e)) reapStopped() }
   const movedWrites = new Set<number>()
   const shownWrites = new Set<number>()
   let writesQueued = false
@@ -518,7 +655,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // reads what the write's promise said, not `pending` for ever. Nothing moves after that: a destroyed
     // Bind issues nothing (the surface is a local value), and `writes` is a local source with no I/O.
     const rows = bind.outcomes.rows
-    batch(() => {
+    commit(fault, () => {
       for (const id of movedWrites) {
         const row = rows.get(id)
         if (row !== undefined) { writes.set(String(id), { ...row }); shownWrites.add(id) }
@@ -529,6 +666,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   }
   const bind = new Bind(rt, {
     validate,
+    onFault: fault,
     tracked: () => host?.tracked(),
     onOutcome: (id) => {
       movedWrites.add(id)
@@ -559,14 +697,14 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // non-held remote read ride the same method plane a client uses; one Caller per node either way.
   const node = rt.node
   const scoped = !isClient && typeof config.replicas === 'number'
-  const memberCaller = scoped ? new Caller(rt) : null
+  const memberCaller = scoped ? new Caller(rt, fault) : null
   //! the gather (M6, DESIGN-M6 C5): whole-resource read() under scoping — memoized, ONE per node,
   // and LAZY (M6-review finding 41): constructed on FIRST consumption (read() / `await data`), so a
   // scoped server whose union nobody ever reads never fans out N² full-claims downloads on view
   // installs — the install-triggered refresh below fires only once `gather` is non-null.
   let gather: Gather | null = null
   const gatherOf = (): Gather =>
-    (gather ??= new Gather(rt, (uuid, t) => memberCaller!.call(SYSTEM + 'rows', undefined, { timeout: t, to: uuid }) as Promise<Rows>))
+    (gather ??= new Gather(rt, (uuid, t) => memberCaller!.call(SYSTEM + 'rows', undefined, { timeout: t, to: uuid }) as Promise<Rows>, fault))
 
   //! ── the scoped data facade (M6, DESIGN-M6 C6): §9's promise — an expression means the same at
   // R=2 and R=∞, TYPED ERRORS, never a silent partial. Operators would fold the held SHARD as if it
@@ -685,8 +823,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // `ctx.data[id]` / `ctx.data.filter(…)` must mean the same as the public surface — typed
   // routing/refusal, never a silent shard read. Unscoped servers: dataSurface IS bind.data,
   // byte-identical to before.
-  host = new Host(rt, dataSurface, table, system)
-  const caller = isClient ? new Caller(rt) : null
+  host = new Host(rt, dataSurface, table, system, (e, what) => sayFault(name, e, what))
+  const caller = isClient ? new Caller(rt, fault) : null
 
   //! ── the default write methods: the SAME ingest as assignment, plus await surfaces ──
   const write = async (rec: Rec, o: WriteOpts = {}): Promise<WriteResolve> => {
@@ -698,6 +836,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     const reject = (fields: Omit<WriteReject, 'guarantee'>, what: string, tail = ''): WriteRejectError =>
       new WriteRejectError({ guarantee: want, ...fields }, `fero('${name}') ${VERB_NAMES[rec.type]} ${JSON.stringify(key)}: ${what} — reached ${fields.reached}${tail}`)
     const explain = (reason: string): string => reason === METHODS_ONLY ? `${reason} (the server takes changes only through its methods)`
+      : reason === 'validation-threw' ? `${reason} (the server's validation: rule threw on this record; the server's stderr says where)`
       : reason === SPARSE_HOLE ? `${reason} (${holeMessage(key)})` : reason
     //! the one hint a timed-out client needs most (rung 04's finding): nothing is connected to write to
     const nobody = (): string => caller && node.primary === null ? ' (nobody to write to: a bare fero(name) is a client; pass server: true to host)' : ''
@@ -876,7 +1015,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         else if (e.kind === JK.shed) { shedEver++; bind.shedPartition(String(e.a)) }
         else if (e.kind === JK.acquire) acquiredEver++
         //! the drain gave up on this many partitions (DESIGN-SCALE stage 1 (b)): cluster.me says so before the teardown
-        else if (e.kind === JK.undrained) { undrained = e.a as number; cluster.set('me', meRow()) }
+        else if (e.kind === JK.undrained) { undrained = e.a as number; commit(fault, () => cluster.set('me', meRow())) }
         //! the door refused a peer (DESIGN-DOOR §3): one stderr line per peer and reason, deduped per process
         else if (e.kind === JK.doorReject || e.kind === JK.contractReject) sayRefusal(name, node, e, clientOnly)
         //! M6: a view install re-gathers the LIVE union against the new ring (the Q3a leg) — but
@@ -925,7 +1064,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // fold with the whole picture landed — never per field, and never for a refold that changed nothing
     // (data skips a same-value primitive but not an equal-but-new object, so members, peers and the
     // partitions row are compared by signature here). A render loop needs no coalescing and no dedupe.
-    batch(() => {
+    // `commit`: a user's cluster tap that throws is reported, and the fold (and the step) still ends.
+    commit(fault, () => {
       if (refold || feederMoved || primaryMoved) cluster.set('writable', writableNow())
       if (refold) {
         cluster.set('epoch', node.epoch)
@@ -948,7 +1088,10 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       if (!samePartitions(row, lastPartitions)) { lastPartitions = row; cluster.set('partitions', row) }
     })
   }
-  rt.hook(fold)
+  //! the fold is fero's own code: a throw from it is a bug and stays loud (an uncaught error), but it leaves
+  // from a microtask, never through the node.step that ran it — a caller that guards its step (the Host's reply
+  // and its stream sink) would otherwise take fero's bug for its own failure and swallow it
+  rt.hook(() => { try { fold() } catch (e) { queueMicrotask(() => { throw e }) } })
   //! the public cluster handle: the view, with `writes` answered by the ring's own source. A thin Proxy —
   // every other key (snapshot, tap, the operators, [value]) forwards to the data proxy untouched (data's
   // methods close over their own state, never `this`), so `f.cluster.writes.tap(…)` and
@@ -1036,8 +1179,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         listen: () => (isClient ? undefined : node.listen),
         serve: !isClient, boxes,
         heartbeatMs: rtOpts.heartbeatMs as number, redialMs: rtOpts.redialMs,
-        onHosts: (hs) => { discovered = hs; node.step({ kind: 'discover', hosts: hs }); if (stopping === null) cluster.set('me', meRow()) },
-        onState: () => { if (stopping === null) cluster.set('me', meRow()) },
+        onHosts: (hs) => { discovered = hs; node.step({ kind: 'discover', hosts: hs }); if (stopping === null) commit(fault, () => cluster.set('me', meRow())) },
+        onState: () => { if (stopping === null) commit(fault, () => cluster.set('me', meRow())) },
       })
       try { await directory.start() } catch (err) { await abort(err) }
     }

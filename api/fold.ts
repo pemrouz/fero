@@ -39,7 +39,7 @@
 // refresh can only add or lawfully-remove keys, never blink one. A push-based
 // per-member claim stream is a wire optimization, tracked in IDEAS.
 
-import { proxy, snapshot, applyStreamRec } from './substrate.ts'
+import { proxy, snapshot, applyStreamRec, type Fault } from './substrate.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import type { ScopedError } from './types.ts'
 
@@ -99,9 +99,14 @@ export class Gather {
   #timer: ReturnType<typeof setInterval> | null = null
   #gen = 0
 
-  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number) => Promise<Rows>) {
+  //! fault — where the user's views and taps on the union land when they throw as a cell projects (substrate.ts
+  // Fault). The per-cell catches below are for a cell that cannot materialize; without this they swallowed a
+  // user's throw too, silently.
+  #fault: Fault | undefined
+  constructor(rt: Runtime, call: (uuid: string, timeoutMs: number) => Promise<Rows>, fault?: Fault) {
     this.#rt = rt
     this.#call = call
+    this.#fault = fault
   }
 
   //! refresh — one gather generation, SERIALIZED: concurrent callers (a one-shot read racing the
@@ -235,14 +240,14 @@ export class Gather {
     let root = snapshot(this.proxy) as Record<string, unknown>
     const emptied: string[][] = [] // the deep cells deleted this generation — their parent levels may be made-up ones
     for (const key of dropped)
-      if (key.length === 1 || present(root, key)) { try { applyCell(this.proxy, key, undefined, true); if (key.length > 1) emptied.push(key) } catch { /* absent subtree */ } }
+      if (key.length === 1 || present(root, key)) { try { applyCell(this.proxy, key, undefined, true, this.#fault); if (key.length > 1) emptied.push(key) } catch { /* absent subtree */ } }
     stamped.sort((a, b) => a.key.length - b.key.length)
     let depth = 1
     for (const s of stamped) {
-      if (!s.t) { try { applyCell(this.proxy, s.key, s.v, false) } catch { /* blocked intermediate */ } continue }
+      if (!s.t) { try { applyCell(this.proxy, s.key, s.v, false, this.#fault) } catch { /* blocked intermediate */ } continue }
       //! a deep tombstone looks at the object as the shallower cells left it (one fresh read per depth)
       if (s.key.length > depth) { root = snapshot(this.proxy) as Record<string, unknown>; depth = s.key.length }
-      if (s.key.length === 1 || present(root, s.key)) { try { applyCell(this.proxy, s.key, undefined, true); if (s.key.length > 1) emptied.push(s.key) } catch { /* absent subtree */ } }
+      if (s.key.length === 1 || present(root, s.key)) { try { applyCell(this.proxy, s.key, undefined, true, this.#fault); if (s.key.length > 1) emptied.push(s.key) } catch { /* absent subtree */ } }
     }
     //! UN-VIVIFY (V4-18, the kernel's #unvivify for the gather): the projection makes `{}` up for the
     // levels a field lands in (applyStreamRec's orphan-cell vivify), so after a field's tombstone (or
@@ -288,7 +293,7 @@ export class Gather {
         if (aw != null && aw.t === 1) break // a row remove at this level: whatever is under it was re-made by a field
       }
       if (held) return
-      try { applyCell(this.proxy, level, undefined, true) } catch { return }
+      try { applyCell(this.proxy, level, undefined, true, this.#fault) } catch { return }
     }
   }
 
@@ -307,8 +312,8 @@ export class Gather {
 }
 
 //! applyCell — project one folded cell into the result proxy through the ONE substrate seam.
-const applyCell = (p: any, key: string[], v: unknown, remove: boolean) =>
-  applyStreamRec(p, remove ? { type: 'remove', key } : { type: 'update', key, value: v })
+const applyCell = (p: any, key: string[], v: unknown, remove: boolean, fault: Fault | undefined) =>
+  applyStreamRec(p, remove ? { type: 'remove', key } : { type: 'update', key, value: v }, fault)
 
 //! liveCadence — the live gather's re-poll interval: 4× the heartbeat with a 1s FLOOR (M6-review
 // finding 9: heartbeatMs: 0 is the composer's documented heartbeat opt-out — without the floor it

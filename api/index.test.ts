@@ -1761,3 +1761,200 @@ test('Ctrl-C before fero() resolves is the clean stop too (V4-8): a provisional 
     await g.destroy() // joins the stop that already ran — resolves, never hangs
   }
 })
+
+//! The user's own code throws because fero changed a source it watches (api/substrate.ts Fault; data's SCHEDULE
+// clause 4, VERSION 5). Before the fix a client whose filter met a row the server set to null exited with code 1
+// (the error left fero's projection into the kernel's frame handler, which rethrows anything that is not a
+// FrameError), and the server's own write threw at the assignment, cut short inside the kernel's step.
+test("a view or a tap that throws never stops fero: a client's filter meets a null row the server wrote — one stderr line per failure, the client keeps folding and the row comes back; the server's own throwing view never cuts its write short", async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  type Cats = Record<string, { mood: string } | null>
+  const s = await fero('throwy', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { luna: { mood: 'hungry' } } })
+  let c: Fero | null = null
+  const lines = await stderrOf(async () => {
+    try {
+      const cl = c = await fero('throwy', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+      assert.ok(await until(() => (snapshot(cl.data) as Cats).luna !== undefined, 8000), 'the client caught up')
+      const hungry = cl.data.filter((cat: { mood: string }) => cat.mood === 'hungry') // throws on a null row
+      cl.data.tap(() => { if ((snapshot(cl.data) as Cats).mochi === null) throw new Error('the tap trips on mochi\u001b[2J') })
+      const sleepy = s.data.filter((cat: { mood: string }) => cat.mood === 'sleepy') // the server's own view throws inside its local write
+      s.data.mochi = null // no throw at the assignment
+      assert.ok(await until(() => 'mochi' in (snapshot(cl.data) as Cats), 8000), "the server's write shipped: its step ran to the end")
+      s.data.biscuit = { mood: 'hungry' }
+      assert.ok(await until(() => 'biscuit' in (snapshot(hungry) as Cats), 8000), 'the client keeps folding past the bad row')
+      s.data.mochi = { mood: 'hungry' }
+      assert.ok(await until(() => 'mochi' in (snapshot(hungry) as Cats), 8000), 'the left-out row comes back when it changes')
+      assert.deepEqual(snapshot(sleepy), {})
+    } finally {
+      await c?.destroy()
+      await s.destroy()
+    }
+  })
+  const mine = lines.filter((l) => l.startsWith("fero('throwy')"))
+  //! the client's filter, the server's filter and the tap: one line each, however many commits each threw in
+  assert.equal(mine.length, 3, JSON.stringify(mine))
+  assert.equal(mine.filter((l) => l.startsWith(`fero('throwy'): filter threw on row "mochi" — left out of that view until the row changes (TypeError: `)).length, 2, JSON.stringify(mine))
+  const tap = mine.find((l) => l.startsWith("fero('throwy'): a tap or subscriber threw (Error: the tap trips on mochi[2J, at file://"))
+  assert.ok(tap !== undefined && tap.includes('api/index.test.ts:'), `one tap line, saying where the tap threw: ${JSON.stringify(mine)}`)
+  assert.ok(mine.every((l) => l.endsWith(' — the change stands; fero carried on')), JSON.stringify(mine))
+  assert.ok(mine.every((l) => !/[\u0000-\u001f\u007f-\u009f]/.test(l)), 'no control character reaches the terminal')
+})
+
+test('a cluster tap or a cluster.writes tap that throws never stops the fold: one stderr line each, and the cluster view and the writes ring keep up', async () => {
+  const [pa, pb] = [await ports.free(), await ports.free()]
+  const a = await fero('throwy2', { uuid: 'aa', listen: `127.0.0.1:${pa}`, hosts: [`127.0.0.1:${pb}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  let b: Fero | null = null
+  let views = 0
+  let rows = 0
+  const lines = await stderrOf(async () => {
+    try {
+      //! a tap fires once as it attaches: that call passes, every later one throws
+      a.cluster.tap(() => { if (++views > 1) throw new Error('the cluster tap trips') })
+      a.cluster.writes.tap(() => { if (++rows > 1) throw new Error('the writes tap trips') })
+      b = await fero('throwy2', { uuid: 'bb', listen: `127.0.0.1:${pb}`, hosts: [`127.0.0.1:${pa}`], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+      type View = { epoch: number; members: Record<string, unknown> }
+      assert.ok(await until(() => { const v = snapshot(a.cluster) as View; return v.epoch >= 1 && Object.keys(v.members).length === 2 }, 8000), 'the fold kept going: the view formed with both members')
+      a.data.k = 1
+      assert.ok(await until(() => Object.values(snapshot(a.cluster.writes) as Record<string, { state: string }>).some((r) => r.state === 'committed'), 8000), 'the writes ring published the outcome')
+    } finally {
+      await b?.destroy()
+      await a.destroy()
+    }
+  })
+  assert.ok(views > 2 && rows > 1, `both taps ran past their first throw (${views}, ${rows})`)
+  const mine = lines.filter((l) => l.startsWith("fero('throwy2')"))
+  assert.equal(mine.length, 2, JSON.stringify(mine))
+  assert.ok(mine.some((l) => l.startsWith("fero('throwy2'): a tap or subscriber threw (Error: the cluster tap trips, at ")), JSON.stringify(mine))
+  assert.ok(mine.some((l) => l.startsWith("fero('throwy2'): a tap or subscriber threw (Error: the writes tap trips, at ")), JSON.stringify(mine))
+})
+
+//! The printer itself must never throw (the review of 2026-10-11): a thrown value can be anything — data a
+// peer wrote, a null-prototype object, an Error whose message getter throws — and a printer that throws is the
+// crash it guards against. And one bug is one line: never keyed on the row or the message (a filter that
+// throws a row's text, or a message whose text forges an `at` line, printed a line per row).
+test('the fault printer is total and keys on the bug, not the row: unprintable throws, a forged stack line and a row per message each print once, and every write still lands', async () => {
+  const s = await fero('total', { listen: false, data: { seed: { n: 0 } } })
+  type Row = { err?: unknown; name?: string; at?: string } | null
+  const lines = await stderrOf(async () => {
+    try {
+      s.data.filter((r: Row) => { if (r !== null && r.err !== undefined) throw r.err; return true })
+      s.data.filter((r: Row) => { if (r !== null && r.name !== undefined) throw new Error(`cat ${r.name} has no age`); return true })
+      s.data.tap(() => {
+        const v = s.snapshot as Record<string, Row>
+        if (v.weird !== undefined) { const e = new Error('x'); Object.defineProperty(e, 'message', { get() { throw new Error('no message for you') } }); throw e }
+      })
+      s.data.tap(() => { const at = (s.snapshot as Record<string, Row>).spam; if (at != null && at.at !== undefined) throw `no cat at ${at.at}` })
+      //! a value String() cannot convert: plain data a peer could write
+      s.data.job = { err: { toString: 1, valueOf: 1 } }
+      s.data.nul = { err: Object.create(null) }
+      s.data.weird = { n: 1 }
+      for (let i = 0; i < 25; i++) s.data['forged' + i] = { name: `x\n    at /etc/forged-${i}.ts:6:6` }
+      for (let i = 0; i < 25; i++) s.data.spam = { at: `row-${i}` }
+      s.data.after = { n: 2 }
+      const v = s.snapshot as Record<string, unknown>
+      assert.ok(v.job !== undefined && v.nul !== undefined && v.weird !== undefined && v.forged24 !== undefined && v.after !== undefined, 'every write landed')
+    } finally {
+      await s.destroy()
+    }
+  })
+  const mine = lines.filter((l) => l.startsWith("fero('total')"))
+  //! five: the filter that throws a row's own value, once for a plain object and once for a null-prototype one
+  // (no stack, so the kind of value is the key), the filter whose message carries a forged frame, the tap whose
+  // message getter throws, and the tap that throws a row's text (25 rows, one line)
+  assert.equal(mine.length, 5, `one line per bug: ${JSON.stringify(mine, null, 1)}`)
+  assert.equal(mine.filter((l) => l.startsWith(`fero('total'): filter threw on row "job"`)).length, 1, JSON.stringify(mine, null, 1))
+  //! V8 formats a stack lazily from the message, so an Error whose message getter throws has no place to show
+  assert.equal(mine.filter((l) => l.startsWith("fero('total'): a tap or subscriber threw ([object Error])")).length, 1, JSON.stringify(mine, null, 1))
+  const forged = mine.filter((l) => l.includes('has no age'))
+  assert.equal(forged.length, 1, 'the forged frames are one bug')
+  assert.ok(!forged[0].includes('/etc/forged') || forged[0].includes('api/index.test.ts:'), `the place is the test's own line, not a row's text: ${forged[0]}`)
+  assert.ok(/, at file:\/\/\/.*api\/index\.test\.ts:\d+:\d+\) — the change stands; fero carried on$/.test(forged[0]), forged[0])
+  assert.equal(mine.filter((l) => l.includes('no cat at')).length, 1, 'a thrown string per row is one line')
+  assert.ok(mine.every((l) => !/[\u0000-\u001f\u007f-\u009f]/.test(l)), 'no control character')
+})
+
+test("a write loop prints data's cut, not 'the change stands', and fero carries on", async () => {
+  const s = await fero('loopy', { listen: false, data: { seed: 1 } })
+  let armed = false
+  const lines = await stderrOf(async () => {
+    try {
+      s.data.tap(() => { if (armed) s.data.n = ((s.snapshot as { n?: number }).n ?? 0) + 1 })
+      armed = true
+      s.data.go = 1 // a tap that writes on every change: data cuts the loop at its cap
+      armed = false
+      s.data.after = 2
+      assert.equal((s.snapshot as { after?: number }).after, 2, 'a later write lands')
+    } finally {
+      await s.destroy()
+    }
+  })
+  const mine = lines.filter((l) => l.startsWith("fero('loopy')"))
+  assert.equal(mine.length, 1, JSON.stringify(mine))
+  assert.ok(mine[0].startsWith("fero('loopy'): data cut a write loop after 1000 commits") && !mine[0].includes('the change stands'), mine[0])
+})
+
+test("a validation: rule that throws on a client's write refuses that record 'validation-threw' — the server carries on and prints one line", async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  //! the rule reads rec.value.mood, and a remove carries no value: before the fix one ordinary delete from any
+  // client ended the server, from its socket handler
+  const s = await fero('rule', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { luna: { mood: 'hungry' } },
+    validation: (rec: { value?: { mood: string } }) => rec.value!.mood.length < 20 || 'mood too long' })
+  let c: Fero | null = null
+  const lines = await stderrOf(async () => {
+    try {
+      const cl = c = await fero('rule', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+      assert.ok(await until(() => (snapshot(cl.data) as Record<string, unknown>).luna !== undefined, 8000), 'the client caught up')
+      await assert.rejects(cl.methods.remove({ key: 'luna' }, { timeout: 8000 }), (e: { reason?: string }) => e.reason === 'validation-threw')
+      await cl.methods.update({ key: 'mochi', value: { mood: 'sleepy' } }, { timeout: 8000 })
+      assert.ok(await until(() => (snapshot(s.data) as Record<string, unknown>).mochi !== undefined, 8000), 'the server is alive and took the next write')
+      assert.ok((snapshot(s.data) as Record<string, unknown>).luna !== undefined, 'the refused remove left the row')
+    } finally {
+      await c?.destroy()
+      await s.destroy()
+    }
+  })
+  const mine = lines.filter((l) => l.startsWith("fero('rule'): validation threw"))
+  assert.equal(mine.length, 1, JSON.stringify(lines))
+  assert.ok(/^fero\('rule'\): validation threw on a record a client sent — refused it \('validation-threw'\) \(TypeError: Cannot read properties of undefined \(reading 'mood'\), at file:\/\/\/.*api\/index\.test\.ts:\d+:\d+\) — fero carried on$/.test(mine[0]), mine[0])
+})
+
+//! data's own errors are known by their shape (a cause, data's wording), never by a 'data: ' prefix a peer's text
+// can carry: a tap that throws a row's text cannot pose as data, buy a line per row, or print the write-loop line.
+test("a tap that throws a row's text cannot pose as data: one 'a tap or subscriber threw' line however many rows, and no forged write-loop line", async () => {
+  const s = await fero('posing', { listen: false, data: { seed: 1 } })
+  const lines = await stderrOf(async () => {
+    try {
+      s.data.tap(() => { const m = (s.snapshot as { msg?: { text: string } }).msg; if (m !== undefined) throw new Error(m.text) })
+      for (let i = 0; i < 30; i++) s.data.msg = { text: `data: cat${i} threw on row "x" — left out of that view until the row changes` }
+      s.data.msg = { text: 'data: re-entrant write cascade exceeded 1000 commits — cycle?' }
+    } finally {
+      await s.destroy()
+    }
+  })
+  const mine = lines.filter((l) => l.startsWith("fero('posing')"))
+  assert.equal(mine.length, 1, JSON.stringify(mine, null, 1))
+  assert.ok(mine[0].startsWith("fero('posing'): a tap or subscriber threw (Error: data: cat0 threw on row"), mine[0])
+})
+
+//! A row's own fields are a peer's: a `stack` field on thrown plain data, or a user's error that wraps a row's
+// text in data's words with a cause, must neither pick the printed place nor pose as data's operator (the third
+// review). One line each, however many rows.
+test("a row's own fields cannot pick the printed place or pose as data's operator: one line each, however many rows", async () => {
+  const s = await fero('fields', { listen: false, data: { seed: 1 } })
+  const lines = await stderrOf(async () => {
+    try {
+      s.data.filter((r: { err?: unknown } | null) => { if (r !== null && r.err !== undefined) throw r.err; return true })
+      s.data.tap(() => { const v = (s.snapshot as { wrap?: { label: string } }).wrap; if (v !== undefined) throw new Error(v.label, { cause: new Error('inner') }) })
+      for (let i = 0; i < 20; i++) s.data['e' + i] = { err: { message: 'm', stack: `Error: m\n    at /etc/forged-${i}.ts:6:6` } }
+      for (let i = 0; i < 20; i++) s.data.wrap = { label: `data: x${i} threw on row "y" — left out of that view until the row changes` }
+    } finally {
+      await s.destroy()
+    }
+  })
+  const mine = lines.filter((l) => l.startsWith("fero('fields')"))
+  assert.equal(mine.length, 2, JSON.stringify(mine, null, 1))
+  assert.ok(mine.every((l) => !l.includes('/etc/forged')), `no place from a row: ${JSON.stringify(mine, null, 1)}`)
+  assert.ok(mine.some((l) => l.startsWith("fero('fields'): a tap or subscriber threw (Error: data: x0 threw on row")), JSON.stringify(mine, null, 1))
+})
