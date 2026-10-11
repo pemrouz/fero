@@ -135,23 +135,29 @@ test('counted + absolute: digest build over 100 origin lanes — every lane exac
 // the records is linear — about 8× (6× measured: the small run pays the warm-up); before the fix every round
 // re-walked and re-encoded the rest of the lane and queued 257 frames only to clear them, and the same runs cost
 // 224 ms and 15.8 s (70×). The bound, 20×, sits far under the quadratic 64× and leaves the box its 2-3× noise.
+// The SECOND shape (the review of the fix, 2026-10-11) guards the binary-search resume point: a 512-byte socket and a
+// queue of 4 make about 11k drain rounds for 160k records, so a linear scan for the resume point (from the lane's end
+// down to the cover) costs real time there — about 38× put back, 7× with the search. The first shape's 93 rounds
+// cannot see the scan at all (8×).
 test('ratio + counted: a torn digest answer of N sparse records costs feeder CPU linear in N; every frame encoded once', () => {
-  const run = (n: number) => {
-    const f = tornFeeder(n, 65536)
-    const t0 = performance.now()
-    f.ask()
-    let rounds = 0
-    while (f.link.torn !== null || f.link.queued.length) { f.drain(); if (++rounds > n) throw new Error('the torn answer never ended') }
-    const ms = performance.now() - t0
-    assert.equal(f.c.handed, n + 1, `${n} records: ${f.c.handed} frames handed to the link — every record encoded once, plus the reply`)
-    assert.equal(f.c.sent, n + 1, `${n} records: ${f.c.sent} frames reached the socket`)
-    assert.equal(new Framer().push(f.c.last!.slice())[0].verb, VERB.DIGEST, 'the reply is the last frame')
-    assert.equal(f.link.droppedWhilePaused, false, 'the queue never overflowed')
-    return ms
+  for (const [hwm, queued] of [[65536, undefined], [512, 4]] as const) {
+    const run = (n: number) => {
+      const f = tornFeeder(n, hwm, queued)
+      const t0 = performance.now()
+      f.ask()
+      let rounds = 0
+      while (f.link.torn !== null || f.link.queued.length) { f.drain(); if (++rounds > n) throw new Error('the torn answer never ended') }
+      const ms = performance.now() - t0
+      assert.equal(f.c.handed, n + 1, `${n} records: ${f.c.handed} frames handed to the link — every record encoded once, plus the reply`)
+      assert.equal(f.c.sent, n + 1, `${n} records: ${f.c.sent} frames reached the socket`)
+      assert.equal(new Framer().push(f.c.last!.slice())[0].verb, VERB.DIGEST, 'the reply is the last frame')
+      assert.equal(f.link.droppedWhilePaused, false, 'the queue never overflowed')
+      return ms
+    }
+    run(20_000) // warm-up
+    const small = Math.min(run(20_000), run(20_000), run(20_000))
+    const big = run(160_000)
+    const r = big / small
+    assert.ok(r < 20, `socket ${hwm} B, queue ${queued ?? 256}: 160k / 20k torn-answer CPU ${r.toFixed(1)}x (${big.toFixed(0)} / ${small.toFixed(0)} ms) — linear is ~8x, the quadratic resume was 70x, a linear resume-point scan 38x on the small socket`)
   }
-  run(20_000) // warm-up
-  const small = Math.min(run(20_000), run(20_000), run(20_000))
-  const big = run(160_000)
-  const r = big / small
-  assert.ok(r < 20, `160k / 20k torn-answer CPU ${r.toFixed(1)}x (${big.toFixed(0)} / ${small.toFixed(0)} ms) — linear is ~8x, the quadratic resume was 70x`)
 })
