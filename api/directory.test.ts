@@ -83,6 +83,26 @@ test('host table: the LATER registrant of a (name, uuid) owns the cell — a wed
   assert.equal(row('my inventory')!.u, undefined, 'cleaned up by (name, uuid), not by a split on the first space')
 })
 
+test('host table: unregister removes an entry only for its CURRENT owner — another caller, a stale owner, a local invoke get false or a refusal', async () => {
+  const peers: Record<string, { up: boolean }> = { p1: { up: true }, p2: { up: true } }
+  const { methods } = hostMethods(() => peers, () => 'self')
+  const ctx = (peer?: string) => ({ peer } as unknown as Context)
+  const row = () => snapshot(methods.lookup('r', ctx('x')) as never) as Record<string, string> | undefined
+  methods.register({ name: 'r', uuid: 'u1', listen: '127.0.0.1:1' }, ctx('p1'))
+  methods.register({ name: 'r', uuid: 'u2', listen: '127.0.0.1:2' }, ctx('p1'))
+  assert.equal(methods.unregister({ name: 'r', uuid: 'u1' }, ctx('p2')), false, 'another caller cannot remove it')
+  assert.deepEqual(row(), { u1: '127.0.0.1:1', u2: '127.0.0.1:2' })
+  assert.equal(methods.unregister({ name: 'r', uuid: 'u1' }, ctx('p1')), true, 'its owner can')
+  assert.deepEqual(row(), { u2: '127.0.0.1:2' }, 'the other entry of the same caller stays')
+  assert.equal(methods.unregister({ name: 'r', uuid: 'u1' }, ctx('p1')), false, 'twice is a no-op')
+  //! a later registrant took the cell over: the stale owner's unregister does not take it from the new one
+  methods.register({ name: 'r', uuid: 'u2', listen: '127.0.0.1:3' }, ctx('p2'))
+  assert.equal(methods.unregister({ name: 'r', uuid: 'u2' }, ctx('p1')), false)
+  assert.deepEqual(row(), { u2: '127.0.0.1:3' })
+  assert.throws(() => methods.unregister({ name: 'r', uuid: 'u2' }, ctx('self')), /no caller identity/, 'a local invoke has no caller')
+  assert.throws(() => methods.unregister({ name: 7 }, ctx('p2')), /must be strings/)
+})
+
 test('host table: refusals are typed — bad name / uuid / listen, no caller identity, the per-caller cap', () => {
   const { methods } = hostMethods(() => ({}))
   const ctx = (peer?: string) => ({ peer } as unknown as Context)
@@ -354,6 +374,42 @@ setInterval(() => {}, 1000)
     await settle([host])
     fs.rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('one directory client per process: instances share one client and one link, an instance going keeps the others\' lookups and registrations, and the last one out closes it', async () => {
+  //! the host is an instance at its OWN redial, so it does not share the others' client: what the host counts
+  // beyond its own client link is the one shared link
+  const o = await fast()
+  const alpha = `sha-${process.pid}`, beta = `shb-${process.pid}`
+  let h: Fero | undefined, a: Fero | undefined, a2: Fero | undefined, b: Fero | undefined, ca: Fero | undefined, cb: Fero | undefined
+  const clientLinks = () => Object.values((snapshot(diag(h!)!.rendezvous()!.host!.cluster) as { peers: Record<string, { client: boolean }> }).peers).filter((p) => p.client).length
+  try {
+    h = await fero(`shh-${process.pid}`, { server: true, ...o, redial: { ms: 31 } })
+    assert.ok(await until(() => rz(h!).hosting && rz(h!).up, 5000))
+    a = await fero(alpha, { server: true, ...o })
+    b = await fero(beta, { server: true, ...o })
+    ca = await fero(alpha, o)
+    cb = await fero(beta, o)
+    const shared = diag(a)!.rendezvous()!.client!
+    for (const f of [b, ca, cb]) assert.equal(diag(f!)!.rendezvous()!.client, shared, 'every instance at the same settings holds the same client')
+    assert.notEqual(diag(h)!.rendezvous()!.client, shared, 'a different redial gets its own')
+    assert.ok(await until(() => me(ca!).hosts.includes(me(a!).listen) && me(cb!).hosts.includes(me(b!).listen), 8000), 'each instance registered and looks its own name up through the one client')
+    assert.equal(clientLinks(), 2, `the host holds two client links: the host instance's own and the ONE shared link of four instances (${clientLinks()})`)
+    //! b goes: its entry leaves (unregistered — the shared link stays up), alpha's lookups and registration stay
+    const gone = me(b).listen
+    await b.destroy(); b = undefined
+    assert.ok(await until(() => !me(cb!).hosts.includes(gone), 3000), "b's entry left beta's lookup though the shared link stayed up")
+    assert.ok(me(ca).hosts.includes(me(a).listen), "a's entry is still looked up")
+    assert.equal(clientLinks(), 2, 'the shared link is still up')
+    a2 = await fero(alpha, { server: true, ...o })
+    assert.ok(await until(() => me(ca!).hosts.includes(me(a2!).listen) && me(a!).hosts.includes(me(a2!).listen), 8000), "alpha's lookup is live: a new server is found by the client and by a")
+    assert.ok(await until(() => members(a!) === 2 && members(a2!) === 2, 10_000), 'and the two alpha servers form through it')
+    //! the last ones out close the shared client: the host is back to its own link alone
+    await settle([cb, ca, a2]); cb = ca = a2 = undefined
+    assert.equal(clientLinks(), 2, 'a still holds it')
+    await a.destroy(); a = undefined
+    assert.ok(await until(() => clientLinks() === 1, 3000), `the last destroy closed the shared client (${clientLinks()})`)
+  } finally { await settle([cb, ca, a2, b, a, h]) }
 })
 
 test('two names on one box never collide, never cross-talk, and the diagnostics seam exposes the directory nodes as real instances', async () => {
