@@ -47,30 +47,35 @@ const commitsOf = (nodes: Node[], iss: string, cid: number): string[] => {
   return [...out]
 }
 
-const scenario = (seed: number, opts: { holdsAtO: boolean; dedupKeep?: number; two?: boolean }) => {
-  const ids = ['n01', 'n02', 'n03']
+const scenario = (seed: number, opts: { holdsAtO: boolean; dedupKeep?: number; two?: boolean; n?: number; replicas?: number; lagO?: boolean }) => {
+  const n = opts.n ?? 3, r = opts.replicas ?? 2
+  const ids = Array.from({ length: n }, (_, i) => 'n0' + (i + 1))
   const sim = new Sim(seed)
-  const ns = mesh(sim, 3, { hb: 50, replicas: 2, fault: { delay: [1, 5] }, ...(opts.dedupKeep ? { tune: { dedupKeep: opts.dedupKeep } } : {}) })
+  const ns = mesh(sim, n, { hb: 50, replicas: r, fault: { delay: [1, 5] }, ...(opts.dedupKeep ? { tune: { dedupKeep: opts.dedupKeep } } : {}) })
   sim.run({ until: 1500 })
   assert.ok(formed(ns) && ns.every((n) => n.armed), `seed ${seed}: formed and armed`)
   const { s1, P, O, settled } = spoke(sim, ids.slice(0, 2))
   //! the row: held by P, owned by someone other than P (so P RELAYS it — the residual's shape); at O or not
+  //! (with lagO the owner must not be O either: the T-O frame is what lags)
   let k = ''
   for (let i = 0; i < 100_000 && !k; i++) {
-    const h = holdersAt(ids, 'k' + i, 2)
-    if (h[0] !== P && h.includes(P) && h.includes(O) === opts.holdsAtO) k = 'k' + i
+    const h = holdersAt(ids, 'k' + i, r)
+    if (h[0] !== P && (!opts.lagO || h[0] !== O) && h.includes(P) && h.includes(O) === opts.holdsAtO) k = 'k' + i
   }
-  const T = holdersAt(ids, k, 2)[0]
+  const T = holdersAt(ids, k, r)[0]
   //! a second row with the same owner and holders (the dedup leg writes both in one batch)
   let k2 = ''
   for (let i = 0; i < 100_000 && !k2; i++) {
-    const h = holdersAt(ids, 'j' + i, 2)
+    const h = holdersAt(ids, 'j' + i, r)
     if (h[0] === T && h.includes(P) && h.includes(O) === opts.holdsAtO) k2 = 'j' + i
   }
   //! the tap frame dies in P's buffer as the link to the spoke severs. The pair's delay is pinned to 1 ms so the
   // WACK, sent first, lands before the linkDown the sever posts (a sever's linkDown takes the pair's minimum delay)
   sim.fault(P, 's1', { delay: [1, 1] })
   sim.severOnFrame(P, 's1', VERB.RECORDS, 1)
+  //! lagO: the owner's first record frame to O dies with their link too, so O holds the row but has not got the
+  // record when the spoke's resync onto it ships; O learns it only from the digest after the T-O redial
+  if (opts.lagO) sim.severOnFrame(T, O, VERB.RECORDS, 1)
   sim.post('s1', { kind: 'write', recs: [{ type: REC.update, key: [k], value: 'v' }, ...(opts.two ? [{ type: REC.update, key: [k2], value: 'w' }] : [])] }, 0)
   for (let t = sim.now + 1; t <= sim.now + 400 && s1.primary !== null && s1.links.get(s1.primary)?.uuid === P; t += 1) sim.run({ until: t })
   sim.partition(P, 's1')
@@ -126,6 +131,28 @@ test('a stranded write whose dedup entry aged out at the owner (dedupKeep 1) sti
     assert.equal(commitsOf(ns, 's1~1', 1).length, 1, `seed ${seed}: cid 1 committed exactly once`)
     assert.equal(commitsOf(ns, 's1~1', 2).length, 1, `seed ${seed}: cid 2 committed exactly once`)
     assert.equal(s1.writes.pending.size, 0, `seed ${seed}: nothing left to re-send`)
+    assert.deepEqual(sim.violations, [], `seed ${seed}: no monitor fired`)
+  }
+})
+
+//! A KNOWN COST of the fix (wave 5e's review; STATUS): the next feeder O HOLDS the row but has NOT YET received the
+// record when the spoke's resync onto it ships (n=4 R=3, holders {T, P, O}; the owner's first record frame to O dies
+// with the T-O link, so O learns it only from the digest after the redial). The resync ends without the record, so
+// the write settles through `acked` at the resync's end, and its value shows a moment later, when O's copy arrives
+// and O taps it. Before wave 5e this schedule kept V4-7's order (the join alone, as the value showed); now `acked`
+// comes first. It is still committed exactly once, and the value does show. This test PINS the cost so a change that
+// fixes it (flip the order assertion) or worsens it (the value never shows, a second commit) is seen.
+test('known cost: the next feeder holds the row but lags the record at the resync — `acked` settles first and the value shows after (V4-7\'s order lost here), committed once — on four seeds', () => {
+  for (const seed of [1, 2, 3, 4]) {
+    const { sim, ns, s1, O, k, settled, wackedBeforeDeath } = scenario(seed, { holdsAtO: true, n: 4, replicas: 3, lagO: true })
+    assert.ok(wackedBeforeDeath, `seed ${seed}: the spoke had its WACK before the link died`)
+    let shown = -1
+    for (let t = sim.now + 1, end = sim.now + 2000; t <= end; t += 1) { sim.run({ until: t }); if (shown < 0 && s1.state.get(JSON.stringify([k])) === 'v') shown = sim.now }
+    assert.equal(s1.links.get(s1.primary!)!.uuid, O, `seed ${seed}: fed by O now`)
+    assert.ok(shown > 0, `seed ${seed}: the value reached the spoke through O in the end`)
+    assert.equal(settled[0]?.how, 'acked', `seed ${seed}: settled first through \`acked\` at the resync's end: ${JSON.stringify(settled)}`)
+    assert.ok(settled[0].at < shown, `seed ${seed}: \`acked\` (${settled[0].at}) came before the value showed (${shown}) — the cost`)
+    assert.equal(commitsOf(ns, 's1~1', 1).length, 1, `seed ${seed}: committed exactly once`)
     assert.deepEqual(sim.violations, [], `seed ${seed}: no monitor fired`)
   }
 })
