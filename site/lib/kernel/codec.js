@@ -243,6 +243,33 @@ export class Writer {
   }
 }
 
+//! encodable — can this value become bytes? null when it can, else what stops it, in a few words. A local
+// write asks it BEFORE the kernel stamps the record (api/data.ts, V4-48): stamped first, a value the codec
+// refuses failed in every frame that carried it afterwards — the WAL append, each link's ship, each digest
+// answer — so replication stopped for good (a getter that throws ended the server from its socket handler).
+// It walks the value exactly as Writer.value does — the same vtOf, the same Object.entries (so a getter runs,
+// and one that throws is the answer), the same depth bound from 0 — and writes nothing. Not asked: the frame
+// cap (MAX_FRAME, 256 MiB); a value that size fails at its first ship.
+export const encodable = (v         )                => {
+  try {
+    walkValue(v, vtOf(v), 0)
+    return null
+  } catch (e) {
+    if (e instanceof FrameError) {
+      const t = /^unencodable value type: (\w+)$/.exec(e.message)
+      return t !== null ? `a ${t[1]}` : `nesting deeper than ${MAX_DEPTH}`
+    }
+    let m        
+    try { m = e instanceof Error ? `${e.name}: ${e.message}` : String(e) } catch { m = 'an unreadable error' }
+    return `reading it threw (${m.length > 120 ? m.slice(0, 120) + '…' : m})`
+  }
+}
+const walkValue = (v         , vt        , depth        )       => {
+  if (depth > MAX_DEPTH) throw new FrameError('value nesting exceeds MAX_DEPTH')
+  if (vt === VT.arr) { for (const x of v             ) walkValue(x, vtOf(x), depth + 1); return }
+  if (vt === VT.obj) for (const [, x] of Object.entries(v          )) walkValue(x, vtOf(x), depth + 1)
+}
+
 //! ── Cursor — THE bounds-checked reader (exactly one; never inline a varint) ──
 // Every length/count is checked against `end` BEFORE any allocation or slice —
 // v2's rule, kept — but here the check exists once per primitive instead of
