@@ -75,6 +75,9 @@ export class Link {
   // makes it the torn answer, so the drain re-sends what the clear took and the reply, never the whole ship again.
   // The drain's flush empties it. Null when no answer has a frame queued.
   inQueue: { d: Record<string, number>; r: number | undefined; q: number | undefined } | null = null
+  //! quiet — heartbeats since this link last carried a byte in (node.ts bytesIn resets it). Read only by a node
+  // with watchClients (the #directory host's failure detector over client links); on every other node it stays 0.
+  quiet = 0
   dead = false // set on wire fault so a half-processed chunk can't keep dispatching before linkDown arrives
   //! noRedial: set before a DELIBERATE close (dup-link, self-reject) — without it, closing the loser of a dial race would redial and re-create the race forever
   noRedial = false

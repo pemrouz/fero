@@ -135,6 +135,13 @@ export interface NodeOpts {
   // Absent = the defaults, which equal the old constants (trajectories stay byte-identical). Validated
   // once in the constructor and frozen: an unknown row or a non-integer or negative value throws.
   tune?: Partial<Tune>
+  //! watchClients (wave 5e, the #directory host only): a failure detector over CLIENT links. Every heartbeat
+  // this node PINGs every admitted client link whatever the uuid order (a client answers a PING on receipt,
+  // at no cadence of its own), and a client link it has heard NOTHING from for more than this many
+  // heartbeats is closed. A hung client (stopped, its socket still open) goes; a live one answers every
+  // tick, however slow its own heartbeat. Absent or 0 = off: no extra PING, no close, the trajectory of
+  // every other node unchanged.
+  watchClients?: number
 }
 
 export class Node {
@@ -783,6 +790,7 @@ export class Node {
       case 'bytesIn': {
         const link = this.links.get(e.link)
         if (!link || link.dead) return // raced close — ids are never reused, so late chunks are safely ignored
+        link.quiet = 0 // heard from (watchClients): one field store per chunk
         //! the FrameError net covers BOTH framing AND dispatch: decode is LAZY, so a crc-valid frame with a
         // malformed body (bad vt, overrun count, trailing bytes) throws inside #dispatch when a getter first
         // touches it — outside this catch it would crash the node on one hostile frame (adversarial-review
@@ -923,7 +931,21 @@ export class Node {
           this.#refuse(link, 'door-timeout')
         }
         else if (meta.tag === TAG.heartbeat) {
-          for (const link of this.links.values())
+          //! watchClients: close every client link silent past the bound, then PING the rest of them below
+          // (the PING is what makes silence mean something: a live client answers it within a round trip)
+          const watch = this.#opts.watchClients ?? 0
+          if (watch > 0)
+            for (const link of this.links.values())
+              if (link.client && !link.dead && link.state === LS.admitted && ++link.quiet > watch) {
+                link.dead = link.noRedial = true
+                this.env.sink.close(link.id, 'silent')
+              }
+          for (const link of this.links.values()) {
+            //! a watched client link is PINGed from this side whatever the uuid order (no digest: the rule below)
+            if (watch > 0 && link.client && !link.dead && link.state === LS.admitted && !link.paused && this.uuid > link.uuid) {
+              link.ship(encodeControl(VERB.PING), this.env.sink, j)
+              j.armed && j.emit(JK.ping, link.id)
+            }
             //! lower-uuid side originates PINGs (halves N² probe traffic — v2's rule, kept). Paused links
             // are SKIPPED entirely: control frames queued into a drop-oldest queue are doomed work, and a
             // drain would flush every stale r=1 digest at once, each triggering a duplicate suffix ship
@@ -946,6 +968,7 @@ export class Node {
               // what re-proves every pair. The digest to a CLIENT link is unchanged: a spoke floors on it.
               if ((!this.client || (link.id === this.primary && this.resync === null)) && !(this.armed && !link.client)) this.#sendDigest(link, 1)
             }
+          }
           //! membership acts on the heartbeat clock too (explicit protocol mode): genesis, suspicion,
           // eviction/join ballots, stale pulls, rejoin nudges — all only when heartbeats are on.
           this.membership.tick(this)

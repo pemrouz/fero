@@ -162,6 +162,13 @@ export const afterFold = (fn: () => void): (() => void) => {
 // HELLO→fold window, not dead; if it still is not up after this many passes, its link died inside
 // that window and the entry would otherwise leak until the host dies.
 export const GRACE = 3
+//! WATCH_TICKS — the directory host's failure detector over client links (kernel/node.ts watchClients): a
+// registrant's link that carries nothing for this many of the HOST's heartbeats is closed, and its entries go
+// with it (the peer-down cleanup below). The host PINGs every client link every heartbeat and a live client
+// answers on receipt, so silence this long is a hung process (stopped, its socket still open), not a slow
+// one: 20 heartbeats is 10 s at the default 500 ms. A registrant that wakes up finds its link gone, redials
+// and registers again.
+export const WATCH_TICKS = 20
 //! MAX_PER_CALLER — entries one directory client may hold (a runaway registrant, not an attacker: the
 // plane is unauthenticated by design — see the banner). Refused loudly past the cap.
 export const MAX_PER_CALLER = 4096
@@ -199,9 +206,9 @@ export const hostMethods = (peersOf: () => Peers, selfOf: () => string | undefin
   // uuid TRANSITIONS off the host's cluster.peers fold, read AFTER the fold — a registrant that
   // reconnects before its old link's close is processed keeps its uuid up, so nothing is deleted; if
   // the close lands first the entries go and the registrant's link-up re-register restores them.
-  // Entry lifetime IS the registrant's TCP connection: a hung-but-connected process keeps its entry
-  // (the kernel runs no failure detector over client links; a crash or a clean close drops the
-  // socket at once). Runs on every host fold AND at the end of every register (see there).
+  // Entry lifetime IS the registrant's link: a crash or a clean close drops the socket at once, and a
+  // hung-but-connected process loses its link after WATCH_TICKS silent host heartbeats (the host's
+  // failure detector over client links). Runs on every host fold AND at the end of every register (see there).
   const onPeers = afterFold(() => {
     const peers = peersOf()
     for (const [peer, keys] of owners) {
