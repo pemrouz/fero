@@ -30,7 +30,7 @@
 // commits that echo back seconds later off the owner.
 
 import { types } from 'node:util'
-import { proxy, applyRec, lens, holeAt, errText, isProxy, SPARSE_HOLE, type Fault } from './substrate.ts'
+import { proxy, applyRec, lens, holeAt, errText, isProxy, unfoldable, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
 import { encodable, copyOf, Unsendable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
@@ -46,6 +46,10 @@ export const METHODS_ONLY = 'methods-only'
 // Asked BEFORE the stamp: a value stamped first failed in every frame that carried it afterwards, and
 // replication stopped for good.
 export const UNENCODABLE = 'unencodable'
+
+//! INVALID_KEY — the reason for a record whose key data cannot fold (substrate.ts unfoldable): an empty key on an
+// update or a remove (I-30), and since V4-52 an insert with a key of two parts or more, or with no row
+export const INVALID_KEY = 'invalid-key'
 
 //! LIVE_VIEW — the reason for a live view written or passed as a value (`data.b = data.a`, the likely slip): read
 // through its traps it sent an empty object for every leaf, to every copy and the writer's own, and the writer's
@@ -354,7 +358,12 @@ export class Bind {
   // lens (methods.remove({ key: ['g', 0] })) and, as the server's relay predicate, a client's relayed
   // remove (api/index.ts). Reads THIS node's projection: a node that does not hold the row cannot see
   // the array, so a scoped non-holder forwards it as before. One type compare for every other record.
+  //! First of all, before the user's rule, a key data cannot fold is refused INVALID_KEY (V4-52): stamped, such a
+  // record made data throw at apply — one `methods.insert({ key: ['row', 'f'] })` from any client threw in the
+  // server's socket handler, and again in every client that caught up on it. write() refuses the local spellings
+  // first, with a hint; this is the relay's rule for a client that skips that (an older fero, a raw frame).
   admit(rec: Rec): true | string {
+    if (unfoldable(rec)) return INVALID_KEY
     const v: unknown = this.#validate ? this.#validate(rec) : true
     if (v !== true) return reasonOf(v)
     return rec.type === REC.remove && rec.key.length > 1 && holeAt(this.#handle, rec.key) ? SPARSE_HOLE : true

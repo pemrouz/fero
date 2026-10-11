@@ -19,11 +19,11 @@ import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { TUNE } from '../kernel/tune.ts'
-import { Bind, METHODS_ONLY, UNENCODABLE, CARRIES, unsendable, reasonOf, type Coords } from './data.ts'
+import { Bind, METHODS_ONLY, UNENCODABLE, INVALID_KEY, CARRIES, unsendable, reasonOf, type Coords } from './data.ts'
 import { fnv } from '../kernel/ring.ts'
 import { Caller, Host, SYSTEM, handle, reapStopped, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
-import { proxy, contract, commit, errText, snapshot as snapshotOf, SPARSE_HOLE, holeMessage, DATA_ROOT, FERO_ROOT, type Fault } from './substrate.ts'
+import { proxy, contract, commit, errText, snapshot as snapshotOf, unfoldable, SPARSE_HOLE, holeMessage, DATA_ROOT, FERO_ROOT, type Fault } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
 import { Directory, DIRECTORY, RENDEZVOUS, WATCH_TICKS, boxDirectory, hostOf, isAddr, isBox, leavesBox, localish, loopbackHost, rendezvousDefault, sameDirectory, sameSocket } from './directory.ts'
 import { resolveConfig, src, secretHint, clientKeyHint, CONFIG_LEAVES, SECRET_MIN } from './config.ts'
@@ -849,7 +849,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     const explain = (reason: string): string => reason === METHODS_ONLY ? `${reason} (the server takes changes only through its methods)`
       : reason === 'validation-threw' ? `${reason} (the server's validation: rule threw on this record; the server's stderr says where)`
       : reason === UNENCODABLE ? `${reason} (${unsendable(rec) ?? 'the value cannot be sent'}; ${CARRIES})`
-      : reason === SPARSE_HOLE ? `${reason} (${holeMessage(key)})` : reason
+      : reason === SPARSE_HOLE ? `${reason} (${holeMessage(key)})`
+      : reason === INVALID_KEY ? `${reason} (a key data cannot fold)` : reason
     //! the one hint a timed-out client needs most (rung 04's finding): nothing is connected to write to
     const nobody = (): string => caller && node.primary === null ? ' (nobody to write to: a bare fero(name) is a client; pass server: true to host)' : ''
     //! an EMPTY key on update/remove is refused HERE, before any stamp (ISSUES I-30): `Change.key` is
@@ -857,9 +858,17 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     // object, by throwing inside step(): the process died, and on a cluster died a second time when the
     // record re-applied a second later, outside any try. An insert without a key is fine: `at` is its row.
     if (rec.key.length === 0 && rec.type !== REC.insert)
-      throw reject({ reached: 'issued', reason: 'invalid-key' }, 'invalid-key', rec.type === REC.remove
+      throw reject({ reached: 'issued', reason: INVALID_KEY }, INVALID_KEY, rec.type === REC.remove
         ? " (a remove needs a key: methods.remove({ key: 'k' }) is delete data.k)"
         : " (a write needs a key: methods.update({ key: 'k', value }) is data.k = v)")
+    //! an insert adds a ROW (V4-52): data folds it at the resource (key [] and a row in `at`) or at a one-part key,
+    // never under a row. `methods.insert({ key: ['row', 'f'] })` was stamped and then refused by data: the call
+    // rejected with data's words after the stamp and its write stayed `pending` for ever; a client's threw in the
+    // server's socket handler. Refused here, before anything is stamped or relayed, like the empty key above.
+    if (unfoldable(rec))
+      throw reject({ reached: 'issued', reason: INVALID_KEY }, INVALID_KEY, rec.key.length > 1
+        ? ' (an insert adds a row: its key is the row alone, or none; methods.update({ key: [row, field], value }) sets a field)'
+        : ' (an insert needs its row: a non-empty at, or none and fero mints one)')
     const r = bind.issue([rec])[0]
     if (typeof r === 'string') throw reject({ reached: 'issued', reason: r }, explain(r))
     //! the timeout timer is CAPTURED and CLEARED on settle (M5-review #3: the bare setTimeout leaked one

@@ -140,7 +140,13 @@ const laneFold = (p: any, recs: readonly Rec[], fault: Fault | undefined): void 
 // row ({}) and re-applies, byte-for-byte what data v2's auto-vivifying [view].res did.
 // Everything else that rejects is a genuine fault and rethrows. What the user's own views and taps throw
 // once the record has landed goes to `fault` (see Fault) — the Bind passes the composer's printer.
+//! A record data cannot fold (unfoldable) that was stamped all the same — before V4-52 refused it at the issue
+// and the relay, or by a node that does not refuse it, and kept since in a log or a WAL — folds as the cell the
+// kernel holds it under (kernel/node.ts apply: its key, or [at ?? '']): an insert under a row as an update of
+// that field, a keyless record as its row's. data threw on it, inside the step that applied it: the rest of that
+// frame never applied, on the node that stamped it and on every node that caught up on it later.
 export const applyRec = (p: any, r: Rec, fault?: Fault): void => {
+  if (unfoldable(r)) r = asCell(r)
   //! SAVE/RESTORE, not set/null: applyRec re-enters through data's effect phase (a user
   // tap issuing a write → issue → the epoch-0 fast-path commit → #onApply → applyRec while the
   // outer lane is mid-flush), and a
@@ -177,6 +183,16 @@ export const applyRec = (p: any, r: Rec, fault?: Fault): void => {
     rejects = prev
   }
 }
+
+//! unfoldable — a record whose key data cannot fold (V4-52; data/seam/index.ts refuses each): an insert with a key
+// of two parts or more (data inserts rows, never a field — a field is an update) or with no key and no row (`at`
+// absent or ''), and an update or a remove with no key (the whole source). Two compares for the usual record.
+export const unfoldable = (r: Rec): boolean =>
+  r.type === REC.insert ? r.key.length > 1 || (r.key.length === 0 && !r.at) : r.key.length === 0
+//! asCell — such a record as the update or remove of the cell the kernel's apply keyed it under
+const asCell = (r: Rec): Rec =>
+  r.key.length > 0 ? { type: REC.update, key: r.key, value: r.value }
+  : r.type === REC.remove ? { type: REC.remove, key: [r.at ?? ''] } : { type: REC.update, key: [r.at ?? ''], value: r.value }
 
 //! records — a RECORD-interface subscription: fn gets v2-profile change records
 // {type:'update'|'insert'|'remove'|'move', key, value, at?} with an initial whole-value

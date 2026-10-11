@@ -601,6 +601,70 @@ test("a remove record that skips the lens (methods.remove's spelling) is refused
   await h.destroy()
 })
 
+//! V4-52: data folds an insert at the row only (at the resource with `at`, or at a one-part key) and an update or a
+// remove at a key. A record of any other shape was stamped and then thrown by data at apply — from the server's socket
+// handler for a client's relayed insert under a row, and again in every client that caught up on it. admit, the
+// issue's rule and the relay's, refuses it first, before the user's rule sees it.
+test("a record data cannot fold is refused 'invalid-key' before the stamp and before the user's rule, by issue() and by admit", async () => {
+  let asked = 0
+  const h = harness({ validate: () => { asked++; return true } })
+  const bad: Rec[] = [
+    { type: REC.insert, key: ['row', 'f'], at: 'y', value: 3 },
+    { type: REC.insert, key: ['a', 'b', 'c'], at: 'y', value: 3 },
+    { type: REC.insert, key: [], at: '', value: 1 },
+    { type: REC.insert, key: [], value: 1 },
+    { type: REC.update, key: [], value: 1 },
+    { type: REC.remove, key: [] },
+  ]
+  for (const r of bad) assert.equal(h.bind.admit(r), 'invalid-key', JSON.stringify(r))
+  assert.deepEqual(h.bind.issue(bad), bad.map(() => 'invalid-key'))
+  assert.equal(asked, 0, "the user's rule never saw them")
+  assert.equal(h.jk(JK.writeLocal).length, 0, 'nothing was stamped')
+  //! the shapes data folds are the rule's to judge: a row insert at the resource or at a one-part key, a field update
+  for (const r of [{ type: REC.insert, key: [], at: 'x', value: 1 }, { type: REC.insert, key: ['k'], at: 'y', value: 1 }, { type: REC.update, key: ['k', 'f'], value: 1 }])
+    assert.equal(h.bind.admit(r), true, JSON.stringify(r))
+  assert.equal(asked, 3)
+  await h.destroy()
+})
+
+//! the relay's rule is admit (api/index.ts passes it as NodeOpts.validate): a client that skips write()'s refusal —
+// an older fero, a raw frame — gets a WNACK with the reason, and the server stamps nothing and carries on
+test("a client's relayed record data cannot fold is refused 'invalid-key' at the relay, and the server stamps nothing", async () => {
+  let bind!: Bind
+  const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0, validate: (rec: Rec) => bind.admit(rec) })
+  bind = new Bind(rt)
+  const node = rt.node
+  node.step({ kind: 'linkUp', link: 1, dialed: false, to: 'sim:zz' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', r: 1 }) })
+  const write = (c0: number, recs: Rec[]) => encodeRuns(recs.map((rec, i) => ({ rec, origin: 'zz~1', seq: c0 + i, epoch: 0 })), VERB.WRITE)[0]
+  node.step({ kind: 'bytesIn', link: 1, bytes: write(1, [{ type: REC.insert, key: ['row', 'f'], at: 'y', value: 3 }, { type: REC.update, key: ['ok'], value: 1 }]) })
+  const nacks = node.journal.read().filter((e) => e.kind === JK.writeNack)
+  assert.equal(nacks.length, 1, 'one WNACK, for the insert under a row')
+  assert.deepEqual(snapshot(bind.data), { ok: 1 }, 'the good record of the frame committed, the bad one nowhere')
+  assert.equal(node.state.has(JSON.stringify(['row', 'f'])), false)
+  bind.destroy()
+  await rt.destroy()
+})
+
+//! records of those shapes are stamped already — by a node from before this fix, kept in a log or a WAL. Each folds as
+// the cell the kernel holds it under (its key, or [at ?? '']), and the rest of its frame folds after it.
+test('a record data cannot fold that arrives already stamped folds as the cell the kernel holds it under, and the rest of its frame folds', async () => {
+  const h = harness()
+  h.admit(1, 'bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 1, 0, [
+    { type: REC.insert, key: ['row', 'f'], at: 'y', value: 3 },
+    { type: REC.update, key: ['after'], value: 1 },
+    { type: REC.insert, key: [], at: '', value: 4 },
+  ]) })
+  assert.deepEqual(snapshot(h.bind.data), { row: { f: 3 }, after: 1, '': 4 })
+  assert.equal(h.node.state.get(JSON.stringify(['row', 'f'])), 3, 'the kernel holds the same cell')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 4, 0, [{ type: REC.update, key: [], value: 5 }]) })
+  assert.equal((snapshot(h.bind.data) as Record<string, unknown>)[''], 5, 'a keyless update is its row\'s')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: records('bb', 5, 0, [{ type: REC.remove, key: [] }]) })
+  assert.deepEqual(snapshot(h.bind.data), { row: { f: 3 }, after: 1 }, 'and a keyless remove takes that row away')
+  await h.destroy()
+})
+
 test('M5a — issue() resolves coordinates: synchronously on the fast path, via the apply join when forwarded', async () => {
   const h = harness()
   //! fast path (epoch 0): coordinates resolve within the call
