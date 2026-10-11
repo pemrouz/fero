@@ -542,9 +542,14 @@ and takes them off again on destroy.
   `retry: true`, so one held while the link is down, or lost with a dying
   primary, is sent again on the next primary, after any register sent
   before it (the Caller replays in call order). The stop waits for it only
-  while the link is up, bounded at 2 s. And a register that settles after
-  the stop sends one more `unregister`, so a late landing cannot put the
-  entry back.
+  while the link is up, bounded at 2 s. A register that settles after the
+  stop sends nothing more: that call order already puts every register this
+  instance sent before its `unregister`, and a register that timed out here
+  is never replayed. A second `unregister` sent then was tried and taken
+  out again (same day, second review): `unregister` is keyed by
+  `(name, uuid)` and the calling link, the link is shared, so when the same
+  identity restarted in the same process (a `dir` server keeps its uuid)
+  the old instance's late call dropped the NEW instance's live entry.
 - A host from before this change has no `unregister`: the entry then
   lives until the shared link drops, as every entry did before.
 - Different heartbeat or redial settings get their own client: the
@@ -586,8 +591,14 @@ Not reproduced: no fix, and the guard in `#client` stays.
   sharing test and the I-34 test both fail.
 - The stop-at-once window: six servers started and stopped at once (three
   destroy, three crash) beside a sibling holding the shared client leave
-  no entry. Before the fix: 6 of 6 leaked. Either guard alone (the
-  always-sent unregister, or the one after a late register) closes it.
+  no entry. Before the fix: 6 of 6 leaked. The always-sent unregister
+  closes it alone.
+- The same identity stopped and restarted in one process keeps its new
+  entry: a stand-in host on the real `hostMethods` applies each register
+  at once and answers it 1.5 s late; the restart's entry is still there
+  after the old register's answer. With the late-register unregister it
+  failed (the row read `{}`); the reviewer's real-process probe lost the
+  live server in 6 of 8 runs, and 0 of 8 without that call.
 - The lookup re-subscribe never hammers: at most 10 lookups in 2 s while
   the host keeps failing them (with no backoff: 538).
 - The two I-19 race tests above.
