@@ -11,10 +11,18 @@ import '../utils/battery.ts'
 
 import { test } from 'node:test'
 import assert from 'node:assert'
+import v8 from 'node:v8'
+import vm from 'node:vm'
 import { fero } from './index.ts'
 import { derived, records, snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { ports, until, sleep } from '#utils'
+
+//! collected — `until`, with a garbage collection before every check: a view a handler made through
+// ctx.data is released when the collector finds its handle unreachable (I-29), not when the call ends.
+// `npm test` runs without --expose-gc, so the collector is turned on here (a vm context hands back `gc`).
+const gc: () => void = (globalThis as { gc?: () => void }).gc ?? (v8.setFlagsFromString('--expose-gc'), vm.runInNewContext('gc') as () => void)
+const collected = (check: () => boolean, ms: number) => until(() => { gc(); return check() }, ms)
 
 //! pair — two servers; `methods` (if any) are hosted under `methods:` (V4-5 — which also makes the pair
 // PROTECTED: a spoke changes data only through them), `extra` is further config for both
@@ -348,7 +356,7 @@ test("I-28 — 'open, then act' right after a client's fero() resolves shows the
   }
 })
 
-test("I-29 — a derived view minted for a subscription or a one-shot call is DISPOSED when it is done: the source's derived count returns to 0; a shared view and the resource itself are never touched", async () => {
+test("I-29 — a derived view minted for a subscription or a one-shot call is RELEASED once it is done and collected: the source's derived count returns to 0; a shared view and the resource itself are never touched", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
   let shared: any = null
   const s = await fero('r', {
@@ -372,18 +380,19 @@ test("I-29 — a derived view minted for a subscription or a one-shot call is DI
       assert.ok(await until(() => Object.keys(snapshot(live) as object).length === 1, 8000), 'the filtered snapshot arrived')
       h.close()
     }
-    assert.ok(await until(() => derived(s.data) === 1, 3000), `five closed subscriptions left nothing (${derived(s.data)} derived)`)
+    assert.ok(await collected(() => derived(s.data) === 1, 3000), `five closed subscriptions left nothing (${derived(s.data)} derived)`)
     //! a chain disposes whole; a one-shot CALL and a server-local call release theirs once collapsed
     const h = c.methods.chain('alice'); const live = h.open()
     assert.ok(await until(() => Object.keys(snapshot(live) as object).length === 1, 8000))
     h.close()
     assert.deepEqual(await c.methods.feed('bob'), { u2: { who: 'bob', n: 2 } })
     assert.deepEqual(await s.methods.chain('bob'), { u2: { who: 'bob', n: 2 } })
-    assert.ok(await until(() => derived(s.data) === 1, 3000), `the chain, the call and the local call left nothing (${derived(s.data)} derived)`)
+    assert.ok(await collected(() => derived(s.data) === 1, 3000), `the chain, the call and the local call left nothing (${derived(s.data)} derived)`)
     //! never the resource itself, never the shared view: both still serve after their subscriptions close
     const whole = c.methods.all(); whole.open(); const bobs = c.methods.bobs(); bobs.open()
     assert.ok(await until(() => Object.keys(snapshot(whole.open()) as object).length === 2 && Object.keys(snapshot(bobs.open()) as object).length === 1, 8000))
     whole.close(); bobs.close()
+    await collected(() => false, 300)
     assert.equal(derived(s.data), 1, 'the shared view is still on the source')
     assert.deepEqual(snapshot(shared), { u2: { who: 'bob', n: 2 } }, 'and still live')
     s.data.u3 = { who: 'bob', n: 3 }
@@ -492,7 +501,7 @@ test("a kernel outcome fails the call (the reply is true): an ASSIGNMENT in a ha
   }
 })
 
-test("I-29 — a returned SUM (a scalar view) is released on close like an operator; a view the handler hooked a sink onto stays", async () => {
+test("I-29 — a returned SUM (a scalar view) is released on close and collection like an operator; a view the handler hooked a sink onto stays", async () => {
   const addr = `127.0.0.1:${await ports.free()}`
   const seen: number[] = []
   const s = await fero('r', {
@@ -511,8 +520,9 @@ test("I-29 — a returned SUM (a scalar view) is released on close like an opera
     const t = c.methods.total(); const sum = t.open()
     assert.ok(await until(() => (snapshot(sum) as { value?: number }).value === 3, 8000), `the sum streamed (${JSON.stringify(snapshot(sum))})`)
     t.close()
-    assert.ok(await until(() => derived(s.data) === 0, 3000), `the closed sum left nothing (${derived(s.data)} derived)`)
+    assert.ok(await collected(() => derived(s.data) === 0, 3000), `the closed sum left nothing (${derived(s.data)} derived)`)
     assert.equal(await c.methods.hook(), 'hooked')
+    await collected(() => false, 300)
     assert.equal(derived(s.data), 1, 'the hooked view stays')
   } finally {
     await c.destroy(); await s.destroy()
@@ -533,6 +543,8 @@ test("a view a plain-value handler minted and KEPT (a lazily cached module-level
   const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
   try {
     assert.equal(await c.methods.cachedCount(), 1)
+    //! the collector runs between the calls: the cache is reachable from module scope, so it is never released
+    await collected(() => false, 300)
     await c.methods.add('r2')
     //! before: the plain-value path disposed every view minted in the call that nothing hooked — the
     // handler's own cache among them — so the second call read the frozen first answer
@@ -633,9 +645,12 @@ test('a view on a live method mirror that throws on a streamed row is reported, 
 // views the handler minted above the stopped one are released (disposeMinted walks through it).
 test("a live subscription whose view data stops fails loudly: the handle reads 'failed' with the reason, and the server keeps nothing it minted", async () => {
   const unlucky = (x: { n: number }, y: { n: number }) => { if (x.n === 13 || y.n === 13) throw new Error('unlucky'); return x.n - y.n }
-  //! a long-lived view per server (made outside any handler) that a one-shot call returns
+  //! a long-lived view per server (made outside any handler, through the server's own f.data) that a one-shot
+  // call returns. ctx.data is the handler scope, one object per server and not f.data itself (I-29), so it
+  // keys the board, and a local `prime` call hands each server its own
   const boards = new Map<unknown, unknown>()
   const { a, b, addrs } = await pair({
+    prime: (board: unknown, ctx: { data: any }) => { boards.set(ctx.data, board) },
     frozen: (_: unknown, ctx: { data: any }) => boards.get(ctx.data),
     board: (_: unknown, ctx: { data: any }) => ctx.data.filter((r: unknown) => r !== null).za(unlucky),
     //! the handler's own write stops the view before its stream opens
@@ -652,8 +667,8 @@ test("a live subscription whose view data stops fails loudly: the handle reads '
     // count; data stops them too, so after the stop the count is back where it was.
     const views = () => derived(a.data) + derived(b.data)
     const before = views()
-    boards.set(a.data, a.data.za(unlucky))
-    boards.set(b.data, b.data.za(unlucky))
+    await a.methods.prime(a.data.za(unlucky))
+    await b.methods.prime(b.data.za(unlucky))
     const errs: string[] = []
     const live = c.methods.board(undefined, { onError: (e: Error) => errs.push(e.message) })
     //! a mirror is a keyed source: an ordered view arrives as { 0: …, 1: … }
@@ -661,7 +676,8 @@ test("a live subscription whose view data stops fails loudly: the handle reads '
     a.data.thirteen = { n: 13 }
     assert.ok(await until(() => live.mode === 'failed', 8000), `the sub failed (mode ${live.mode})`)
     assert.ok(errs.some((m) => m.includes('the view this subscription streams has stopped')), JSON.stringify(errs))
-    assert.ok(await until(() => views() === before, 3000), `the filter above the stopped za was released (${views()} derived, ${before} before)`)
+    //! the filter is a handler view: the collector releases it once the failed sub let go of the za (I-29)
+    assert.ok(await collected(() => views() === before, 3000), `the filter above the stopped za was released (${views()} derived, ${before} before)`)
     //! a one-shot call over a stopped view is refused too, never answered with a frozen picture
     await assert.rejects(c.methods.frozen(undefined, { timeout: 8000 }), /the view this method returns has stopped/)
     await assert.rejects(a.methods.frozen(), /the view this method returns has stopped/)
@@ -712,7 +728,7 @@ test("a served value the wire cannot carry ends the live sub loudly, once; the s
     assert.ok(await until(() => live.mode === 'failed', 8000), `the sub failed (mode ${live.mode})`)
     assert.equal(errs.length, 1)
     assert.ok(errs[0].includes('the stream could not send a record'), errs[0])
-    assert.ok(await until(() => views() === before, 3000), `nothing minted is left (${views()} derived, ${before} before)`)
+    assert.ok(await collected(() => views() === before, 3000), `nothing minted is left (${views()} derived, ${before} before)`)
   } finally {
     process.stderr.write = orig
     await c.destroy(); await a.destroy(); await b.destroy()
@@ -781,8 +797,7 @@ test('a SUB closed while its handler is still flushing leaves nothing it minted 
       h.open()
       h.close()
     }
-    await sleep(1000)
-    assert.equal(views(), before, 'the ten views the handlers minted were released')
+    assert.ok(await collected(() => views() === before, 3000), `the ten views the handlers minted were released (${views()} derived, ${before} before)`)
   } finally {
     await c.destroy(); await a.destroy(); await b.destroy()
   }

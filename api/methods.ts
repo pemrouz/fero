@@ -38,7 +38,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { VERB, MAX_DEPTH, encodable, sizeOf, Unsendable } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
-import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
+import { applyStreamRec, disposeMinted, errText, handlerScope, handlerView, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
 import { atCap, copyBounded, replyCopy, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 import { FULL } from '../kernel/codec.ts'
@@ -149,6 +149,9 @@ const STOPPED_CALL = 'the view this method returns has stopped: data disposed it
 export class Host {
   #rt: Runtime
   #data: any
+  //! #scope — what a handler gets as ctx.data: the surface, with every view a call through it makes
+  // wrapped so the collector can tell when the handler let go of it (I-29, substrate.handlerScope)
+  #scope: any
   #methods: Record<string, Handler>
   #system: Record<string, Handler>
   #als = new AsyncLocalStorage<Promise<Coords>[]>()
@@ -164,6 +167,7 @@ export class Host {
   constructor(rt: Runtime, data: any, methods: Record<string, Handler>, system: Record<string, Handler>, report: (e: unknown, what: string) => void = () => {}) {
     this.#rt = rt
     this.#data = data
+    this.#scope = handlerScope(data)
     this.#methods = methods
     this.#system = system
     this.#report = report
@@ -195,20 +199,22 @@ export class Host {
     //! each invocation gets its own write collector; the handler runs OUTSIDE the kernel step (async),
     // and its return implicitly flushes — the reply provably follows its own commits
     const tracked: Promise<Coords>[] = []
-    //! the views this handler mints are ITS (I-29): marked before it runs, disposed when the reply has
-    // collapsed them (CALL) or the stream they fed closes (SUB) — substrate.disposeMinted
+    //! the views this handler makes through ctx.data are released when the handler's handle to them is
+    // collected (I-29, substrate.handlerScope) — whether it returned a value, returned the view, or kept
+    // it. The mark is for a view made some other way (f.data.filter(…) in a closure): that one, when
+    // RETURNED, is still disposed once the reply collapsed it or its stream closed (disposeMinted)
     const minted = mark(this.#data)
     const ctx: Context = {
-      data: this.#data,
+      data: this.#scope,
       flush: () => settle(tracked.splice(0)),
       live: mode === VERB.SUB,
       ...(this.#rt.node.links.get(link)?.uuid ? { peer: this.#rt.node.links.get(link)!.uuid } : {}),
     }
     void (async () => {
       let result: unknown
-      //! a handler that returns a plain VALUE keeps every view it minted (the I-29 residue stays open):
-      // nothing tells a view it dropped from one it cached for its next call (`cached ??= ctx.data.filter(…)`
-      // in module scope) — the graph holds both alike — and disposing a cached one froze it silently
+      //! a handler that returns a plain VALUE does not release its views here: nothing tells a view it
+      // dropped from one it cached for its next call (`cached ??= ctx.data.filter(…)`) — the graph holds
+      // both alike, and disposing a cached one froze it silently (V4-16). The collector tells them apart.
       try {
         //! NEVER blind-await the handler result: a ViewProxy is THENABLE (data's await-for-snapshot
         // feature), so `await proxy` would collapse the live view to a value before isProxy could see
@@ -229,7 +235,7 @@ export class Host {
       } catch (err) {
         if (entry && this.#subs.get(skey) === entry) this.#subs.delete(skey)
         //! a sync open that failed after the handler returned a view: the view it minted goes too
-        if (isProxy(result) && disposeMinted(result, minted)) reapStopped()
+        this.#release(result, minted)
         return this.#refuse(link, id, err)
       }
       //! the reply, and a value SUB's one frame, encode the handler's result inside the kernel step: a value
@@ -242,19 +248,20 @@ export class Host {
         if (mode === VERB.CALL) {
           //! a returned ViewProxy collapses to its snapshot for a one-shot call (v2's forWire, kept;
           // no clone — the reply's codec copies the value into frame bytes synchronously inside step);
-          // a derived view minted for this call is dead once collapsed — released (I-29). A view data has
-          // stopped would answer a frozen picture as if it were current: refused instead.
+          // a view made through ctx.data waits for the collector (the handler may have kept it — a view cached
+          // on the first call and returned there); one made another way is dead once collapsed (I-29). A view
+          // data has stopped would answer a frozen picture as if it were current: refused instead.
           if (!isProxy(result)) { sent = result; return this.#reply(link, id, true, result) }
-          if (stopped(result)) { if (disposeMinted(result, minted)) reapStopped(); return this.#reply(link, id, false, STOPPED_CALL) }
+          if (stopped(result)) { this.#release(result, minted); return this.#reply(link, id, false, STOPPED_CALL) }
           const value = sent = snapshot(result)
-          if (disposeMinted(result, minted)) reapStopped()
+          this.#release(result, minted)
           return this.#reply(link, id, true, value)
         }
         //! the sub may have been UNSUBbed or its link reaped during the handler/flush — the entry is gone
         // or cancelled; do not open a stream nobody is listening to (M5-review #2/#6)
         if (!entry || entry.cancelled || this.#subs.get(skey) !== entry) {
           //! cancelled during the handler or its flush: the view it made is released all the same
-          if (isProxy(result) && disposeMinted(result, minted)) reapStopped()
+          this.#release(result, minted)
           return
         }
         //! SUB: a proxy streams (initial snapshot rides the record interface's attach emit); a plain
@@ -268,7 +275,7 @@ export class Host {
         this.#open(entry, skey, link, id, result, minted, m)
       } catch (err) {
         if (entry && this.#subs.get(skey) === entry) { entry.cancelled = true; entry.stop(); this.#subs.delete(skey) }
-        if (isProxy(result) && disposeMinted(result, minted)) reapStopped()
+        this.#release(result, minted)
         //! an answer bigger than one frame (a CALL's value, a value SUB's one frame — V4-51): the typed refusal, and one
         // plain line for the server's owner (the printer's de-duplication: once per resource and method)
         if (err === FULL) {
@@ -287,6 +294,15 @@ export class Host {
         this.#reply(link, id, false, `the result could not be sent: ${why ?? errText(err)}`)
       }
     })()
+  }
+
+  //! #release — the eager release of what a handler returned, for a view made some other way than ctx.data
+  // (f.data.filter(…) in a closure): disposeMinted, the release it had before. A handler view (made through
+  // ctx.data) waits for the collector instead — the handler may have kept it (I-29). When the eager walk
+  // released a view another sub still read, the live subs are checked: one may now stream a stopped view
+  // (V4-47). Guarded by handlerView AND by disposeMinted's own `live.has` skip, each backing the other up.
+  #release(result: unknown, minted: number) {
+    if (isProxy(result) && !handlerView(result) && disposeMinted(result, minted)) reapStopped()
   }
 
   //! #refuse — reply a handler's failure, whatever it threw. A typed ScopedError ships as the value (M6,
@@ -314,12 +330,12 @@ export class Host {
   // interface's attach emit, every later change is one SUBREC. Skipped when the sub was UNSUBbed or its
   // link reaped meanwhile (M5-review #2/#6) — the view the handler minted for it is released either way.
   #open(entry: { stop(): void; cancelled: boolean; live: unknown }, skey: string, link: number, id: number, result: unknown, minted: number, m: string) {
-    if (entry.cancelled || this.#subs.get(skey) !== entry) { if (disposeMinted(result, minted)) reapStopped(); return }
+    if (entry.cancelled || this.#subs.get(skey) !== entry) { this.#release(result, minted); return }
     //! a view data has already stopped (the handler's own write made a function in it throw) never moves
     // again: fail the sub now, never open a stream over a frozen picture
     if (stopped(result)) {
       this.#subs.delete(skey)
-      if (disposeMinted(result, minted)) reapStopped()
+      this.#release(result, minted)
       return this.#reply(link, id, false, STOPPED)
     }
     hosts.add(this)
@@ -356,9 +372,11 @@ export class Host {
       }
     }, { clone: false })
     //! stop = the stream AND the view minted for it (I-29): UNSUB, reapLink and destroy all come here.
-    // Only what this invocation minted goes — `read` returns ctx.data itself, the gather hands out its
-    // one shared proxy, a module-level view predates the mark; disposeMinted leaves every one of them.
-    entry.stop = () => { stream.stop(); if (disposeMinted(result, minted)) reapStopped() }
+    // A view made through ctx.data is released by the collector once this entry lets go of it (the
+    // handler may have cached it); one made another way goes now, and only what this invocation minted —
+    // `read` returns ctx.data itself, the gather hands out its one shared proxy, a module-level view
+    // predates the mark; disposeMinted leaves every one of them.
+    entry.stop = () => { stream.stop(); this.#release(result, minted) }
   }
 
   #reply(link: number, id: number, ok: boolean, value: unknown) {
@@ -384,17 +402,17 @@ export class Host {
     const tracked: Promise<Coords>[] = []
     const minted = mark(this.#data)
     //! peer is this node: a local call's caller IS the server (the Context doc above)
-    const ctx: Context = { data: this.#data, flush: () => settle(tracked.splice(0)), peer: this.#rt.node.uuid }
+    const ctx: Context = { data: this.#scope, flush: () => settle(tracked.splice(0)), peer: this.#rt.node.uuid }
     let result: unknown = this.#als.run(tracked, () => fn(arg, ctx))
     if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
       result = await result
     await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
     const keyed = a != null && KEYED.has(fn)
-    if (!isProxy(result)) return answer(m, result, this.#rt.node, keyed) // a plain value keeps the views it minted (#invoke's note)
+    if (!isProxy(result)) return answer(m, result, this.#rt.node, keyed) // its views wait for the collector (#invoke's note)
     //! a view data has stopped answers a frozen picture: refused, as for a remote call
-    if (stopped(result)) { if (disposeMinted(result, minted)) reapStopped(); throw new Error(`methods.${m}: ${STOPPED_CALL}`) }
-    //! the view minted for this call is dead once copied (I-29), and released even when the copy is refused
-    try { return answer(m, snapshot(result), this.#rt.node, keyed) } finally { if (disposeMinted(result, minted)) reapStopped() }
+    if (stopped(result)) { this.#release(result, minted); throw new Error(`methods.${m}: ${STOPPED_CALL}`) }
+    //! a view made another way is dead once copied (I-29), and released even when the copy is refused
+    try { return answer(m, snapshot(result), this.#rt.node, keyed) } finally { this.#release(result, minted) }
   }
 
   //! #end — end one live sub loudly: the caller's handle fails with the reason (Caller.#onResult: mode
