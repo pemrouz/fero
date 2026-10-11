@@ -324,6 +324,13 @@ test('journal deltas are safe across a restart (a new life starts the cursor at 
   const q = kernelPuller(() => small[0])
   const b1 = await pullNode(q)
   sameAsLocal(b1, small[0], 'before the wrap', true)
+  //! a short wrap first: the ring drops some rows the cache holds, but not past its cursor — they leave the cache
+  const cursor1 = b1.node.journal.at(-1)!.t + 1
+  for (let i = 0; small[0].journal.dropped < 1 && i < 200; i++) { sim2.post('s2', { kind: 'write', recs: [{ type: REC.update, key: ['short' + i], value: i }] }); sim2.run() }
+  const b1b = await pullNode(q)
+  assert.ok(b1b.node.dropped > b1.node.dropped && b1b.node.dropped < cursor1, `the ring dropped cached rows below the old cursor only (${b1.node.dropped} → ${b1b.node.dropped}, cursor ${cursor1}) — the fixture is what it claims`)
+  assert.equal(b1b.node.journal[0].t, b1b.node.dropped, 'no cached row below the node\'s dropped survives')
+  sameAsLocal(b1b, small[0], 'after a short wrap', true)
   writes(sim2, small, 80, 200); sim2.run()
   const b2 = await pullNode(q)
   assert.ok(small[0].journal.dropped > b1.node.journal.at(-1)!.t, 'the ring wrapped past the old cursor — the fixture is what it claims')
@@ -426,6 +433,23 @@ test('a state over one frame is read in pages with a torn-snapshot marker: quiet
   const u = await pullNode(r)
   assert.ok(again)
   assert.equal(u.node.torn, true, 'a cell served twice is a torn read too')
+  //! a tear only the markers see: a cell already served changes value in place between two pages — same count, same
+  // order, no cell twice; only the state hash on the later page moved
+  let inPlace = false
+  const ip = kernelPuller(() => nodes[0], {
+    frame: 2,
+    before: (b) => {
+      if (b.q !== 'state' || b.f !== after || inPlace) return
+      inPlace = true
+      const sh = nodes[0].stateHash, ks = [...nodes[0].state.keys()]
+      nodes[1].step({ kind: 'write', recs: [{ type: REC.update, key: k0, value: 'changed-in-place' }] }); sim.run({ until: sim.now + 50 })
+      assert.deepEqual([...nodes[0].state.keys()], ks, 'the same cells in the same order — the fixture is what it claims')
+      assert.notEqual(nodes[0].stateHash, sh, 'and the hash moved')
+    },
+  })
+  const w = await pullNode(ip)
+  assert.ok(inPlace)
+  assert.equal(w.node.torn, true, 'a value changed under a served page is a torn read')
   const cap = { v: 1, kind: 'live', vocab: t.vocab, seed: null, nodes: [t.node] }
   const { el } = await (await import('./dom-shim.ts')).bootViewer('paged', cap, { search: '' })
   assert.match(el('statusRight').innerHTML, /data-tip="torn-read">torn read/, 'and the header says torn read, never replay ✗')

@@ -15,6 +15,9 @@ import { VERB, Framer, encodeControl, type Frame } from './codec.ts'
 import { DIAG_P, diagNode } from './diag.ts'
 import { REC, TAG, type EffectSink, type Env } from './env.ts'
 import { captureNode } from '../tools/debug/capture.ts'
+import { SCOPE } from './scope.ts'
+import { Sim } from '../sim/exec.ts'
+import { cluster, writes } from '../sim/harness.ts'
 
 const TOKEN = 'secret-token-abc'
 
@@ -344,6 +347,26 @@ test('an armed node serves replicas + its own-lane holder sets (the ring\'s answ
   assert.deepEqual(captureNode(h.node).held, wire.held)
   assert.equal('held' in diagNode(plain.node), false, 'unscoped: no held claim')
   assert.equal('feeder' in wire, false, 'a member names no feeder')
+})
+
+test('held is the scope machine\'s HELD rows only: a row frozen as an orphan, or still being copied in, is not in it (wave 5e)', () => {
+  //! writes land before the view arms, so every member gets every row; at arming the rows a member is not assigned
+  // freeze into orphans (shed later), and a member the ring moves a row to copies it in (acquiring) — real states
+  const sim = new Sim(11)
+  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2 })
+  writes(sim, nodes, 6, 100)
+  const seen = new Set<number>()
+  for (let t = 50; t <= 3000; t += 10) {
+    sim.run({ until: t })
+    for (const n of nodes) {
+      if (!n.armed) continue
+      const wire = diagNode(n)
+      const want = [...n.scope!.entries].filter(([, e]) => e.state === SCOPE.held).map(([p]) => p).sort()
+      assert.deepEqual(wire.held, want, `${n.uuid} @${t}: held is exactly the held entries, sorted`)
+      for (const [p, e] of n.scope!.entries) if (e.state !== SCOPE.held) { seen.add(e.state); assert.ok(!wire.held!.includes(p), `${n.uuid} @${t}: ${p} is not held`) }
+    }
+  }
+  assert.ok(seen.has(SCOPE.orphan), 'an orphan row was seen — the fixture is what it claims')
 })
 
 test('a client serves its feeder: the uuid on its primary link, null before it has one (wave 5e)', () => {
