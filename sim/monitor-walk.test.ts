@@ -170,10 +170,13 @@ const PLANTS: Plant[] = [
   },
 ]
 
-const runPlant = (p: Plant, K: number, full: boolean) => walk(full, () => {
+//! armed: the scale monitors ride along (the comparison covers all of them, and `sim.watch` is on). Unarmed: the
+// original monitors alone, `sim.watch` off, the way every sweep runs, so `stepped` is filled only because a monitor
+// is installed.
+const runPlant = (p: Plant, K: number, full: boolean, armed: boolean) => walk(full, () => {
   const sim = new Sim(11)
   const nodes = cluster(sim, 6, { heartbeatMs: 100, fault: { delay: [1, 6], dupP: 0.05 }, ...(p.scoped ? { replicas: 2 } : {}) })
-  armScale(sim) // the scale monitors ride along: the comparison covers all of them, not the original nine alone
+  if (armed) armScale(sim)
   writes(sim, nodes, 60, 300)
   p.install(nodes, nodes[4], nodes[1])
   sim.run({ until: 3000, checkEvery: K, maxEvents: 2_000_000 })
@@ -182,10 +185,12 @@ const runPlant = (p: Plant, K: number, full: boolean) => walk(full, () => {
 
 for (const p of PLANTS)
   for (const K of [1, 7])
-    test(`scoped walk = full walk, planted: ${p.name} (${p.monitor}), checkEvery ${K} — the whole violation list is identical`, () => {
-      const a = runPlant(p, K, true)
-      const b = runPlant(p, K, false)
+    for (const armed of [true, false])
+    test(`scoped walk = full walk, planted: ${p.name} (${p.monitor}), checkEvery ${K}, ${armed ? 'scale monitors armed' : 'unarmed'} — the whole violation list is identical`, () => {
+      const a = runPlant(p, K, true, armed)
+      const b = runPlant(p, K, false, armed)
       assert.ok(a.full && !b.full, 'the knob picked the walk')
+      assert.equal(b.watch, armed, 'armed exactly when asked')
       assert.ok(a.violations.some((v) => v.monitor === p.monitor), `the plant bit: the full walk saw ${p.monitor} (it saw ${[...new Set(a.violations.map((v) => v.monitor))].join(', ') || 'nothing'})`)
       assert.deepEqual(rows(b.violations), rows(a.violations))
       sameTrajectory(a, b, p.name)
@@ -293,6 +298,34 @@ test('the ledger\'s scan reads every node on the first pass after run() entry: a
   assert.deepEqual(rows(b.sim.violations), rows(a.sim.violations))
 })
 
+test('a pause replay is a step: a state change made inside a replayed event is seen by the scoped walk at the same pass', () => {
+  //! Sim.pause holds a sleeper's events and the wake replays them through #deliver, not #step. #deliver must mark the
+  // node stepped too, or the scoped walk is blind to the replayed events until the node steps again.
+  const go = (full: boolean) => walk(full, () => {
+    const sim = new Sim(5)
+    const nodes = cluster(sim, 3, { heartbeatMs: 50 })
+    sim.run({ until: 800 })
+    let armed = false, done = false, replayed = false
+    stepsOf(nodes[1], (n) => {
+      if (!armed || done) return
+      const l = [...n.links.values()].find((x) => !x.paused)
+      if (l) { l.queued.push(new Uint8Array(1)); done = true; replayed = sim.now === wake }
+    })
+    sim.pause('n02', 311)
+    const wake = sim.now + 311
+    sim.run({ until: sim.now + 300 })
+    armed = true
+    sim.run({ until: sim.now + 50 })
+    return { sim, replayed }
+  })
+  const a = go(true)
+  const b = go(false)
+  assert.ok(a.replayed && b.replayed, 'the plant landed inside a replayed event (n02 steps nothing while paused; its first step after is the wake\'s drain, at the wake instant)')
+  assert.ok(a.sim.violations.some((v) => v.monitor === 'queued-implies-paused' && v.detail.includes('n02')), 'the full walk saw the plant')
+  assert.deepEqual(rows(b.sim.violations), rows(a.sim.violations))
+  sameTrajectory(a.sim, b.sim, 'pause replay')
+})
+
 test('the ledger\'s scan between two passes reads every node: a horizon read (stampOracle) after one unscanned pass gathers what the full walk gathers', () => {
   //! the pass clears sim.stepped at its end, so a scan made between passes cannot trust it. A sim whose passes never
   // scan (no scale monitors) and a horizon read before and after exactly one pass is the shape that went blind.
@@ -315,4 +348,34 @@ test('the ledger\'s scan between two passes reads every node: a horizon read (st
   assert.equal(a.added, 5, 'the full walk gathered the five new writes')
   assert.equal(b.added, a.added, 'the scoped walk gathered them too')
   assert.deepEqual(b.keys, a.keys, 'the same records in the same order')
+})
+
+test('a monitor stops at its first violation, as v4 did: a view fed behind a standing violation names the node v4 named', () => {
+  //! one-view-per-epoch. n02 holds a bad view (a standing violation), then n05 installs an epoch-9 view X, then n02
+  // changes to an epoch-9 view Y. While n02 is bad, every pass stops at n02 and never reads n05, so nothing records
+  // X. When n02 moves to Y, it is read first and records Y for epoch 9; then n05 is read, and X is the DIFFERENT
+  // view. v4 (8aab625) names n05. A walk that keeps looking after the first violation lets n05 record X first and
+  // names n02 instead. The two walks here share Due.walk, so comparing them alone would miss that: this pins the
+  // row to v4's answer.
+  const go = (full: boolean) => walk(full, () => {
+    const sim = new Sim(11)
+    const nodes = cluster(sim, 6, { heartbeatMs: 100 })
+    sim.run({ until: 1500 })
+    const early = nodes[1], late = nodes[4]
+    const members = early.membership.view.members
+    let phase = 0
+    stepsOf(early, (n) => {
+      if (phase === 0) { n.membership.view = { epoch: n.membership.view.epoch, members: members.slice(1) } as never; phase = 1 }
+      else if (phase === 2) { n.membership.view = { epoch: 9, members: members.slice(3) } as never; phase = 3 }
+    })
+    stepsOf(late, (n) => { if (phase === 1) { n.membership.view = { epoch: 9, members: members.slice(2) } as never; phase = 2 } })
+    sim.run({ until: 4000, checkEvery: 1 })
+    return sim
+  })
+  const a = go(true)
+  const b = go(false)
+  const nine = (s: Sim) => [...new Set(s.violations.filter((v) => v.monitor === 'one-view-per-epoch' && v.detail.includes('epoch 9')).map((v) => v.detail.split(' ')[0]))]
+  assert.deepEqual(nine(a), ['n05'], 'the full walk names n05 for epoch 9, as v4 does')
+  assert.deepEqual(nine(b), ['n05'], 'the scoped walk names n05 for epoch 9, as v4 does')
+  assert.deepEqual(rows(b.violations), rows(a.violations))
 })
