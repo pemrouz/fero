@@ -810,7 +810,8 @@ ns with 1,000 idle ones. The node now keeps `#covered`, the client
 links where `#answer` set a cover; indexInsert walks only those and
 prunes a link once both its covers are null (linkDown prunes too), so
 an interior insert with no answer stopped or queued pays one size
-check. Mutations: dropping the inQueue add turns the frame-7 splice
+check (the same probe after: 10-29 ns per insert for 0 to 1,000 idle
+client links). Mutations: dropping the inQueue add turns the frame-7 splice
 test red, and pruning a link that still holds one cover turns frames 7
 and 10 red. Dropping the torn add turns nothing red, and cannot: a
 stop needs a full queue, and with `queued` ≥ 1 the same call queued a
