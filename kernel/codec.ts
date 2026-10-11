@@ -279,10 +279,13 @@ export class Writer {
   }
 }
 
-//! Limit — how deep and how big a value encodable() lets through. The codec's own bounds are
-// { depth: MAX_DEPTH, bytes: MAX_FRAME }; the api asks tighter ones (api/data.ts WRITE and ARG), leaving room
-// for the envelopes its replies and calls wrap around a value.
-export interface Limit { depth: number; bytes: number }
+//! Limit — how deep and how big a value encodable() and copyOf() let through. The codec's own bounds are
+// { depth: MAX_DEPTH, bytes: MAX_FRAME }; the api asks tighter ones (api/data.ts WRITE, ARG and RESULT), leaving
+// room for the envelopes its replies and calls wrap around a value. `part` is the api's rule for an array or an
+// object the codec would carry but change (a Date sends its own fields, and it has none): asked once for each,
+// never for a Uint8Array, it answers why not, or null. It comes in from the api because the kernel stays pure
+// (no node:util — site/strip.mjs ships this file to the browser).
+export interface Limit { depth: number; bytes: number; part?: (o: object, array: boolean) => string | null }
 
 //! encodable — can this value become bytes within `limit`? null when it can, else what stops it, in a few
 // words. A local write asks it BEFORE the kernel stamps the record (api/data.ts, V4-48): stamped first, a
@@ -297,19 +300,23 @@ export const encodable = (v: unknown, limit: Limit, from = 0, spent = 0): string
     walk(v, from, spent, limit)
     return null
   } catch (e) {
-    //! the path first, before any user code runs below (formatting what a getter threw can call back in here)
-    const where = place(at)
-    at.length = 0
-    if (e === REFUSED) {
-      //! no path for depth (it is the path) or for size (the sum of every part)
-      if (refusedWhy === DEEP) return `deeper than ${limit.depth} levels`
-      if (refusedWhy === OVER) return `bigger than ${limit.bytes >> 20} MiB${text ? ' (a string counts 3 bytes a character)' : ''}`
-      return refusedWhy + where
-    }
-    let m: string
-    try { m = e instanceof Error ? `${e.name}: ${e.message}` : String(e) } catch { m = 'an unreadable error' }
-    return `reading it threw (${m.length > 120 ? m.slice(0, 120) + '…' : m})${where}`
+    return reasonOf(e, limit)
   }
+}
+//! reasonOf — what stopped a walk or a copy, said plainly; encodable and copyOf share it, so both give one text
+const reasonOf = (e: unknown, limit: Limit): string => {
+  //! the path first, before any user code runs below (formatting what a getter threw can call back in here)
+  const where = place(at)
+  at.length = 0
+  if (e === REFUSED) {
+    //! no path for depth (it is the path) or for size (the sum of every part)
+    if (refusedWhy === DEEP) return `deeper than ${limit.depth} levels`
+    if (refusedWhy === OVER) return `bigger than ${limit.bytes >> 20} MiB${text ? ' (a string counts 3 bytes a character)' : ''}`
+    return refusedWhy + where
+  }
+  let m: string
+  try { m = e instanceof Error ? `${e.name}: ${e.message}` : String(e) } catch { m = 'an unreadable error' }
+  return `reading it threw (${m.length > 120 ? m.slice(0, 120) + '…' : m})${where}`
 }
 //! REFUSED — what the walk throws to refuse, compared by IDENTITY: a test such as `e instanceof Refused` runs
 // user code on whatever a getter threw (a revoked Proxy's getPrototypeOf trap), and threw out of encodable itself
@@ -337,7 +344,8 @@ const place = (path: (string | number)[]): string => {
 // Object.entries: no pair array per field, which was a third of the walk on a small object. Bytes are charged as
 // Writer.ensure reserves them (a string 4 + 3 per character, each element its tag byte), and an array's or an
 // object's length before its parts are visited, so the walk is bounded by the budget: a sparse array a billion
-// long is refused at once, and a value built of shared parts costs no more than encoding it would.
+// long is refused at once, and a value built of shared parts costs no more than encoding it would. The limit's
+// `part` rule is asked of each array and object before its parts are visited (never of a Uint8Array).
 const walk = (v: unknown, depth: number, n: number, limit: Limit): number => {
   if (depth > limit.depth) refuse(DEEP)
   switch (typeof v) {
@@ -347,11 +355,14 @@ const walk = (v: unknown, depth: number, n: number, limit: Limit): number => {
     case 'object': {
       if (v === null) break
       if (v instanceof Uint8Array) { n += 5 + v.length; break }
-      if (Array.isArray(v)) {
-        const len = v.length
+      const array = Array.isArray(v)
+      if (limit.part !== undefined) { const why = limit.part(v, array); if (why !== null) refuse(why) }
+      if (array) {
+        const a = v as unknown[]
+        const len = a.length
         if ((n += 5 + len) > limit.bytes) refuse(OVER)
         for (let i = 0; i < len; i++) {
-          try { n = walk(v[i], depth + 1, n, limit) } catch (e) { at.push(i); throw e }
+          try { n = walk(a[i], depth + 1, n, limit) } catch (e) { at.push(i); throw e }
         }
         break
       }
@@ -368,6 +379,95 @@ const walk = (v: unknown, depth: number, n: number, limit: Limit): number => {
   }
   if (n > limit.bytes) refuse(OVER)
   return n
+}
+
+//! Unsendable — what copyOf throws for a value it cannot copy; the message is encodable's reason, word for word
+export class Unsendable extends Error {}
+
+//! copyOf — the value Cursor.value would build from Writer.value's bytes, built directly, with no bytes: the copy
+// a server's own read hands out, so it equals a client's read, and the copy a local write takes, so a change the
+// program makes to its object afterwards reaches no copy at all (V4-52). It walks as encodable does — the same
+// classes, order, limits, `part` rule and charges — and throws Unsendable with encodable's text for what
+// encodable refuses. It builds what the decoder builds: a number as it is, a string as UTF-8 gives it back
+// (textOf), a Uint8Array (a Buffer too) as a plain Uint8Array of its own bytes, an array by index over its
+// length (a hole becomes undefined, other fields stay behind), an object as a plain object of its own
+// enumerable fields in Object.keys order, a '__proto__' field defined as Cursor.value defines it. Each getter
+// runs once. decode(encode(v)) would answer the same at 2-3x the cost of structuredClone (a TextEncoder and a
+// TextDecoder per string, a DataView per number); this costs about 0.4x of it. The parity test in
+// kernel/codec.test.ts holds it to the codec: a type the codec learns, copyOf must learn too.
+//! `copied` — the bytes charged so far: a module slot, saved and restored per call, since a getter can copy too
+let copied = 0
+export const copyOf = (v: unknown, limit: Limit, from = 0, spent = 0): unknown => {
+  const outer = copied
+  at.length = 0
+  text = false
+  copied = spent
+  try {
+    return copy(v, from, limit)
+  } catch (e) {
+    throw new Unsendable(reasonOf(e, limit))
+  } finally {
+    copied = outer
+  }
+}
+const copy = (v: unknown, depth: number, limit: Limit): unknown => {
+  if (depth > limit.depth) refuse(DEEP)
+  let out: unknown = v
+  switch (typeof v) {
+    case 'number': copied += 8; break
+    case 'string':
+      //! charged before textOf reads it, so a string over the budget is refused unread
+      copied += 4 + v.length * 3
+      text = true
+      if (copied > limit.bytes) refuse(OVER)
+      out = textOf(v)
+      break
+    case 'boolean': case 'undefined': break
+    case 'object': {
+      if (v === null) break
+      if (v instanceof Uint8Array) { if ((copied += 5 + v.length) > limit.bytes) refuse(OVER); out = new Uint8Array(v); break }
+      const array = Array.isArray(v)
+      if (limit.part !== undefined) { const why = limit.part(v, array); if (why !== null) refuse(why) }
+      if (array) {
+        const a = v as unknown[]
+        const len = a.length
+        if ((copied += 5 + len) > limit.bytes) refuse(OVER)
+        const c = new Array(len)
+        for (let i = 0; i < len; i++) {
+          try { c[i] = copy(a[i], depth + 1, limit) } catch (e) { at.push(i); throw e }
+        }
+        out = c
+        break
+      }
+      const o = v as Record<string, unknown>
+      const ks = Object.keys(o)
+      if ((copied += 5 + ks.length) > limit.bytes) refuse(OVER)
+      const c: Record<string, unknown> = {}
+      for (let i = 0; i < ks.length; i++) {
+        const k = ks[i]
+        copied += 4 + k.length * 3
+        let x: unknown
+        try { x = copy(o[k], depth + 1, limit) } catch (e) { at.push(k); throw e }
+        //! the key as the decoder reads it back (two keys that differ only in a lone surrogate become one, the
+        // later value in the earlier place, as there), then defined like Cursor.value defines '__proto__'
+        const t = textOf(k)
+        if (t === '__proto__') Object.defineProperty(c, t, { value: x, enumerable: true, writable: true, configurable: true })
+        else c[t] = x
+      }
+      out = c
+      break
+    }
+    default: refuse(`a ${typeof v}`)
+  }
+  if (copied > limit.bytes) refuse(OVER)
+  return out
+}
+//! textOf — a string as it comes back from UTF-8: a lone surrogate (half of a pair) has no UTF-8 spelling, so
+// the encoder writes U+FFFD for it, and the decoder drops one leading U+FEFF (TextDecoder reads it as a byte
+// order mark). Every other copy holds this text. A one-byte string has no surrogate: isWellFormed is a flag test.
+const textOf = (s: string): string => {
+  const t = s.isWellFormed() ? s : s.toWellFormed()
+  return t.charCodeAt(0) === 0xfeff ? t.slice(1) : t
 }
 
 //! ── Cursor — THE bounds-checked reader (exactly one; never inline a varint) ──

@@ -6,7 +6,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { Framer, Outbox, VERB, encodeFrame } from './codec.ts'
+import { Framer, Outbox, VERB, encodeFrame, copyOf, MAX_DEPTH, MAX_FRAME } from './codec.ts'
 import { REC } from './env.ts'
 import { bench, ratio } from '#utils'
 //! fixtures single-sourced with the M8 baseline probes (tools/perf/fixtures.ts) — declaration move
@@ -40,6 +40,25 @@ test('ratio: lazy records() scan < full value decode', () => {
     () => { frame().records() },                            // candidate: boundary scan only
   )
   assert.ok(r < 0.75, `scan/decode ratio ${r.toFixed(2)} — lazy decode no longer pays`)
+})
+
+//! RATIO (V4-52): a server's own read hands out copyOf of the value (api/methods.ts invokeLocal, api/fold.ts), the
+// copy a client's read decodes. decode(encode(v)) — the plain way to get the same answer — costs 2.9-3.2x
+// structuredClone here (a TextEncoder and a TextDecoder per string, a DataView per number); copyOf builds the value
+// with no bytes, at about 0.4x. The pin: copying 1k small rows costs under structuredClone of the same rows, so a
+// switch to the byte round trip, or a copy that turns quadratic, shows here.
+test('ratio: copyOf of 1k small rows costs under structuredClone of the same', () => {
+  let c = 0
+  const rows: Record<string, unknown> = {}
+  for (let i = 0; i < 1000; i++) rows['r' + i] = { name: 'cat ' + c++, mood: 'hungry', n: c, toys: ['ball', 'mouse'], at: { x: 1.5, y: 2 } }
+  const CODEC = { depth: MAX_DEPTH, bytes: MAX_FRAME }
+  let sink = 0
+  const r = ratio.interleaved(
+    () => { for (let k = 0; k < 5; k++) sink += Object.keys(structuredClone(rows)).length },
+    () => { for (let k = 0; k < 5; k++) sink += Object.keys(copyOf(rows, CODEC) as object).length },
+  )
+  assert.equal(sink, 1000 * 5 * 2 * 8, 'every copy held every row')
+  assert.ok(r < 1, `copyOf / structuredClone of 1k small rows = ${r.toFixed(2)}x (budget 1x; about 0.4x here, decode(encode) 2.9-3.2x)`)
 })
 
 //! ABSOLUTE (tripwire tier): encode+decode 10k object records — generous ceiling, catches superlinear regressions only.
