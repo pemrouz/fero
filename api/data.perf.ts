@@ -33,12 +33,14 @@ test('absolute: 5k assignments/rep through capture→issue→commit→echo-consu
   await rt.destroy()
 })
 
-//! RATIO (V4-48): every local write's record is walked once before its stamp (api/data.ts unsendable →
-// kernel/codec.ts encodable). On a small object (four fields, a list, a nested object) the walk read about
-// 3% of the whole write in a profile here, a quarter more while it used vtOf and Object.entries. The pin:
-// checking such records costs under a tenth of writing them (about 0.02x here), so a walk that turns
-// quadratic or starts copying shows here. Numbers cost a type test and are not pinned apart.
-test('ratio: the check a local write runs before its stamp (V4-48) costs under a tenth of the write itself on a small object', async () => {
+//! RATIO (V4-48, V4-52): every local write's record is walked once before its stamp (api/data.ts unsendable →
+// kernel/codec.ts copyOf), and since V4-52 the same walk builds fero's own copy of the value, the one the kernel
+// keeps, so a change the program makes afterwards reaches no copy. On a small object (four fields, a list, a
+// nested object) the check alone read about 0.03x of the whole write; the check and the copy read 0.04-0.06x
+// here. The pin: checking and copying such records costs under a tenth of writing them, so a walk that turns
+// quadratic, or a copy through bytes or structuredClone (about 0.3x), shows here. Numbers cost a type test and
+// are not pinned apart. The records are reused across reps: each rep copies again what the last one left.
+test('ratio: the check and the copy a local write runs before its stamp (V4-48, V4-52) cost under a tenth of the write itself on a small object', async () => {
   const { rt, bind } = harness()
   const N = 1000
   let v = 0 // fresh values every rep — never the dedup'd no-op path
@@ -50,7 +52,7 @@ test('ratio: the check a local write runs before its stamp (V4-48) costs under a
     () => { for (let i = 0; i < N; i++) if (unsendable(recs[i]) !== null) refused++ },
   )
   assert.equal(refused, 0)
-  assert.ok(r < 0.1, `checking a small object / writing it = ${r.toFixed(3)}x (budget 0.1x; about 0.02x here)`)
+  assert.ok(r < 0.1, `checking and copying a small object / writing it = ${r.toFixed(3)}x (budget 0.1x; 0.04-0.06x here)`)
   bind.destroy()
   await rt.destroy()
 })

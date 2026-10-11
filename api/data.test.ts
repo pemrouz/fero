@@ -209,6 +209,39 @@ test("issue() refuses a record the wire cannot carry 'unencodable' (a cluster.wr
   await h.destroy()
 })
 
+//! V4-52: the kernel kept the program's object. A change made after the write reached the writer's fold and every copy
+// that caught up later (the log held the same object), but not the copies that already had it — and changed to a
+// bigint, it stopped replication for good. Each write keeps fero's own copy now, built by the walk that checks it, as
+// the decoder builds it: the writer reads what every other copy decodes.
+test("a value fero takes is fero's own copy: a change to the program's object after the write reaches neither the kernel, nor its log, nor the fold, and the writer reads what the wire carries", async () => {
+  const h = harness()
+  const o = { n: 1, list: [1, { deep: true }] as unknown[], bytes: new Uint8Array([1, 2]) }
+  h.bind.data.r = o
+  o.n = 2
+  o.list.push(3)
+  ;(o.list[1] as { deep: unknown }).deep = 10n
+  o.bytes[0] = 9
+  const want = { n: 1, list: [1, { deep: true }], bytes: new Uint8Array([1, 2]) }
+  const held = h.node.state.get(JSON.stringify(['r']))
+  assert.deepEqual(held, want, 'the kernel holds what was written')
+  assert.notEqual(held, o, "fero's own copy, never the program's object")
+  assert.deepEqual(h.node.logs.get(h.node.origin)!.at(-1)!.rec.value, want, 'its log too: what a copy that catches up is sent')
+  assert.deepEqual(snapshot(h.bind.data).r, want, 'and the fold')
+  //! issue() keeps a copy too, and the copy is the wire's: a Buffer becomes a plain Uint8Array, a class instance a
+  // plain object of its own fields, a lone surrogate U+FFFD, and a leading byte order mark goes
+  const v = { n: 1 }
+  h.bind.issue([{ type: REC.update, key: ['v'], value: v }])
+  v.n = 2
+  class Point { x = 1; y = 2 }
+  h.bind.data.w = { buf: Buffer.from([1]), point: new Point(), s: 'x\uD800', bom: '\uFEFFhi' }
+  const got = snapshot(h.bind.data) as Record<string, Record<string, unknown>>
+  assert.equal(got.v.n, 1)
+  assert.equal(Object.getPrototypeOf(got.w.buf), Uint8Array.prototype)
+  assert.equal(Object.getPrototypeOf(got.w.point), Object.prototype)
+  assert.deepEqual(got.w, { buf: new Uint8Array([1]), point: { x: 1, y: 2 }, s: 'x\uFFFD', bom: 'hi' })
+  await h.destroy()
+})
+
 //! V4-52: the codec sends an object's own fields, so a built-in whose data is not its own fields arrived as something
 // else on every other copy (a Date or a Map as {}, a Float64Array as an object of its indices), and a Proxy as whatever
 // its traps answered, while the writer kept the real thing. Each is refused at the write like a bigint, wherever it

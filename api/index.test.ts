@@ -1851,16 +1851,17 @@ test('the fault printer is total and keys on the bug, not the row: unprintable t
   type Row = { err?: unknown; name?: string; at?: string } | null
   const lines = await stderrOf(async () => {
     try {
-      s.data.filter((r: Row) => { if (r !== null && r.err !== undefined) throw r.err; return true })
+      s.data.filter((r: Row) => { if (r !== null && r.err !== undefined) throw r.err === 'bare' ? Object.create(null) : r.err; return true })
       s.data.filter((r: Row) => { if (r !== null && r.name !== undefined) throw new Error(`cat ${r.name} has no age`); return true })
       s.data.tap(() => {
         const v = s.snapshot as Record<string, Row>
         if (v.weird !== undefined) { const e = new Error('x'); Object.defineProperty(e, 'message', { get() { throw new Error('no message for you') } }); throw e }
       })
       s.data.tap(() => { const at = (s.snapshot as Record<string, Row>).spam; if (at != null && at.at !== undefined) throw `no cat at ${at.at}` })
-      //! a value String() cannot convert: plain data a peer could write
+      //! a value String() cannot convert: plain data a peer could write, and a null-prototype object (the filter makes
+      // it: a row written as one is fero's own plain copy since V4-52, as every other copy decodes it)
       s.data.job = { err: { toString: 1, valueOf: 1 } }
-      s.data.nul = { err: Object.create(null) }
+      s.data.nul = { err: 'bare' }
       s.data.weird = { n: 1 }
       for (let i = 0; i < 25; i++) s.data['forged' + i] = { name: `x\n    at /etc/forged-${i}.ts:6:6` }
       for (let i = 0; i < 25; i++) s.data.spam = { at: `row-${i}` }
@@ -2091,5 +2092,97 @@ test('a method argument that would arrive changed is refused at the call like a 
   } finally {
     await c.destroy()
     await s.destroy()
+  }
+})
+
+//! V4-52: fero kept the object the program wrote. A change made after the write reached the writer at once, and every
+// copy that caught up later (the writer's log held the same object), but not a copy that already had it; a change to a
+// bigint left a late client unable to catch up at all. Each write keeps fero's own copy now: a later change reaches
+// no copy, and every copy reads what was written.
+test('a value changed after its write reaches no copy: the writer, its own read, a live client and a late client all read what was written', async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('chg', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, server: true })
+  let live: Fero | null = null
+  let late: Fero | null = null
+  const rows = (f: Fero) => snapshot(f.data) as Record<string, unknown>
+  try {
+    const lv = live = await fero('chg', { uuid: 'yy', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    const o = { n: 1, list: [1] }
+    const big: Record<string, unknown> = { n: 1 }
+    const sd = s.data as Record<string, unknown>
+    sd.r = o
+    sd.big = big
+    assert.ok(await until(() => rows(lv).big !== undefined, 8000), 'the live client has both rows')
+    o.n = 2
+    o.list.push(2)
+    big.n = 10n
+    sd.after = 1
+    const lt = late = await fero('chg', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    assert.ok(await until(() => rows(lt).after === 1, 8000), 'the late client caught up')
+    assert.ok(await until(() => rows(lv).after === 1, 8000))
+    for (const [who, got] of [['the writer', rows(s)], ['the live client', rows(lv)], ['the late client', rows(lt)]] as const)
+      assert.deepEqual({ r: got.r, big: got.big }, { r: { n: 1, list: [1] }, big: { n: 1 } }, who)
+    assert.deepEqual(await s.methods.read('r'), { n: 1, list: [1] }, "the writer's own read")
+  } finally {
+    await late?.destroy()
+    await live?.destroy()
+    await s.destroy()
+  }
+})
+
+//! V4-52: the same for the other ways a value is written — a client's methods.update, held by its kernel until a
+// server is there (its retries re-encoded the program's object), and the data: seed
+test('a client write held for a server that is not up yet, and a data: seed, send the value as it was at the write', async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const c = await fero('held', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  let s: Fero | null = null
+  try {
+    const v = { n: 1 }
+    const w = c.methods.update({ key: 'r', value: v }, { timeout: 8000 })
+    v.n = 2
+    const seed = { a: { n: 1 } }
+    const sv = s = await fero('held', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: seed })
+    seed.a.n = 2
+    await w
+    assert.deepEqual(rows(sv), { a: { n: 1 }, r: { n: 1 } }, 'the server has what was written')
+    assert.ok(await until(() => JSON.stringify(rows(c)) === JSON.stringify({ a: { n: 1 }, r: { n: 1 } }), 8000), `the client too: ${JSON.stringify(rows(c))}`)
+  } finally {
+    await c.destroy()
+    await s?.destroy()
+  }
+  function rows(f: Fero) { return snapshot(f.data) as Record<string, unknown> }
+})
+
+//! V4-52: a call or a live sub made before there is a server is held, and replayed on the next primary. It re-encoded
+// the caller's object then: a change made meanwhile was sent, and one to a bigint threw from the client's socket
+// handler while the call hung. The argument is copied at the call now, by the walk that checks it.
+test('a held call and a held live sub send their argument as it was at the call: a change made meanwhile is not sent, and a change to a bigint ends nothing', async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const c = await fero('heldarg', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  let s: Fero | null = null
+  try {
+    const m = c.methods as Record<string, (a?: unknown, o?: { timeout?: number }) => any>
+    const arg = { n: 1 }
+    const big: Record<string, unknown> = { n: 1 }
+    const sub = { n: 1 }
+    const first = m.echo(arg, { timeout: 8000 }).then((x: unknown) => x)
+    const second = m.echo(big, { timeout: 8000 }).then((x: unknown) => x)
+    const h = m.echo(sub)
+    h.open()
+    arg.n = 2
+    big.n = 10n
+    sub.n = 2
+    s = await fero('heldarg', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, methods: { echo: (a: unknown) => a } })
+    assert.deepEqual(await first, { n: 1 })
+    assert.deepEqual(await second, { n: 1 })
+    await h.ready
+    assert.deepEqual(snapshot(h.open()), { n: 1 }, 'the sub, re-sent on the primary')
+    h.close()
+  } finally {
+    await c.destroy()
+    await s?.destroy()
   }
 })
