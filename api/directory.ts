@@ -540,10 +540,11 @@ export class Directory {
     } catch (e) {
       if (!this.#destroyed) this.#setError('register', `register: ${(e as Error)?.message ?? String(e)}`)
     }
-    //! a register that settled after this instance stopped (held while the link was down and replayed on the
-    // next primary, or one that timed out here but still landed) may have put the entry back: take it out
-    // again. A no-op when the client went with its last user (its link drop cleans the host up).
-    if (this.#destroyed) void this.#unregister(c).catch(() => {})
+    //! NO unregister here when this settles after the stop. destroy()'s unregister already comes after every
+    // register this instance sent (same link, call order, and a held or retried register replays before it; a
+    // register that timed out here is never replayed). One sent now could land after a NEW instance of the same
+    // identity registered on the same shared link — a durable server restarted in this process — and the host,
+    // which keys unregister by (name, uuid) and the calling link, would drop the live entry.
   }
 
   //! #unregister — take this instance's entry out through the shared client. Owner-only and idempotent at the
