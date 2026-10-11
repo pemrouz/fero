@@ -144,14 +144,26 @@ const laneOf = (node) => {
 // (p, ta) → [{origin, seq, rows}] (rows: the journal t of every apply row for that entry at this node). Built once per
 // fold and only on the first acquire, so a capture without hand-offs pays nothing. A row compacted or shed again
 // before capture end is absent from the book — rendered unknown, never invented, like every other absent record.
-// stateAt folds these entries' cells; topologyAt raises their lanes' watermarks — one rule for both planes.
+// stateAt folds these entries' cells; topologyAt raises their lanes' watermarks; routes() names the same last
+// acquire for an `acquired` stop — one rule for every plane.
+//! a row acquired MORE THAN ONCE (a heal re-latches a holder that fell behind — kernel/scope.ts held-found-lagging):
+// an entry with no row of its own after the first acquire may have come in at that one or at a later one; the book
+// cannot say which (the acquire row carries only the count the teacher shipped). Folding it at the first claimed
+// the later hand-offs' records early, so the replay ran AHEAD of the kernel with nothing on the page to say so (the
+// wave 5f review: up to 10 records ahead for dozens of rows). Each such entry is folded at the row's LAST acquire —
+// the replay may trail the kernel between the two hand-offs, never lead it — and the earlier acquire hands back the
+// entries it may have folded as `later`, so a fold can mark what it is unsure of. Returns
+// (p, ta) → { taught, later, last }: `taught` the entries folded here, `later` the ones a later acquire (at `last`)
+// folds instead.
 const handoffs = (node, K) => {
   const lane = laneOf(node)
   const rowsAt = new Map() // 'origin#seq' → the journal t of every apply row for it at this node
   const row = (k, at) => { if (!rowsAt.has(k)) rowsAt.set(k, []); rowsAt.get(k).push(at) }
+  const lastAt = new Map() // partition → the journal t of its last acquire at this node
   for (const e of node.journal)
     if (e.kind === K.writeLocal) row(lane + '#' + e.a, e.t)
     else if (e.kind === K.applyInbound) row(e.a + '#' + e.b, e.t)
+    else if (e.kind === K.acquire) lastAt.set(String(e.a), e.t)
   const byPart = new Map()
   for (const [origin, entries] of Object.entries(node.logs || {}))
     for (const x of entries) {
@@ -159,7 +171,12 @@ const handoffs = (node, K) => {
       if (!byPart.has(q)) byPart.set(q, [])
       byPart.get(q).push({ origin, seq: x.seq, rows: rowsAt.get(origin + '#' + x.seq) || [] })
     }
-  return (p, ta) => (byPart.get(p) || []).filter((x) => !x.rows.some((r) => r > ta))
+  const none = []
+  return (p, ta) => {
+    const open = (byPart.get(p) || none).filter((x) => !x.rows.some((r) => r > ta))
+    const last = lastAt.get(p)
+    return last === ta ? { taught: open, later: none, last } : { taught: none, later: open, last }
+  }
 }
 
 //! stateAt — TIME TRAVEL: replay a node's journal to event-index t (its per-node counter) through the LWW
@@ -210,7 +227,7 @@ export const stateAt = (capture, uuid, t) => {
     if (e.t > t) break
     if (e.kind === K.writeLocal) applyOne(lane, e.a)
     else if (e.kind === K.applyInbound) applyOne(e.a, e.b)
-    else if (e.kind === K.acquire) { if (!taught) taught = handoffs(node, K); for (const x of taught(String(e.a), e.t)) applyOne(x.origin, x.seq) }
+    else if (e.kind === K.acquire) { if (!taught) taught = handoffs(node, K); for (const x of taught(String(e.a), e.t).taught) applyOne(x.origin, x.seq) }
     else if (e.kind === K.shed) {
       const p = String(e.a)
       for (const [k, v] of versions) if (v.p === p) { versions.delete(k); state.delete(k) }
@@ -283,7 +300,8 @@ export const verifyReplay = (capture) => {
 // them). The teacher's cut can trail that seq when its floor waits on a gap, and a row shed again before capture
 // end has left the book — the jump is then too high or too low until the lane's next row (the ∞ guard refuses a
 // node whose END tables it misses); when the same row is acquired twice, an entry with no row of its own is
-// folded at the first.
+// folded at the LAST acquire of that row (handoffs()), so between the two the lane may trail the kernel, never
+// lead it.
 export const topologyAt = (capture, uuid, t) => {
   const node = capture.nodes.find((n) => n.uuid === uuid)
   const K = capture.vocab
@@ -338,7 +356,7 @@ export const topologyAt = (capture, uuid, t) => {
       // teacher's cut, with no row per record. The cut is not journaled; the entries it folded are (handoffs(), the
       // rule stateAt folds by), and the highest of them per lane stands for the cut (KNOWN BOUND 4)
       if (!taught) taught = handoffs(node, K)
-      for (const x of taught(String(e.a), e.t)) {
+      for (const x of taught(String(e.a), e.t).taught) {
         const d = lane(x.origin)
         if (x.seq > d.a) d.a = x.seq
         if (x.seq > d.s) d.s = x.seq

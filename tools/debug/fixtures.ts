@@ -190,3 +190,50 @@ export const abortedCopy = (how: 'linkDown' | 'epoch') => {
   assert.deepEqual(cap.nodes.filter((n) => n.uuid !== owner && n.holders?.[row]).map((n) => n.uuid), [], 'no node but the writer names the row\'s holders')
   return { cap, owner, lagging, row }
 }
+
+//! reacquired — a chaotic scoped run where a node copies the SAME row in twice (wave 5f review): 5 members at replicas
+// 2, writes all the way through, nodes cut off from everyone or from one peer and paused at seeded moments, a sixth
+// member joining at 2 s, then every cut healed. A heal re-latches a holder that fell behind (kernel/scope.ts
+// held-found-lagging), so the joiner n06 acquires rows it already acquired. A sim monitor records each node's REAL
+// kernel marks after every event — `real`: uuid → (journal head t → origin → [applied, shippable, log length]) — the
+// per-step oracle a fold is checked against. `twice`: the rows n06 acquired more than once.
+export const reacquired = () => {
+  const seed = 4
+  let x = seed * 2654435761 >>> 0
+  const rnd = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 2 ** 32 }
+  const sim = new Sim(seed)
+  const R = rnd() < 0.5 ? 2 : 3
+  const nodes = cluster(sim, 5, { heartbeatMs: 50, replicas: R })
+  const real = new Map<string, Map<number, Record<string, [number, number, number]>>>()
+  sim.monitors.push({ name: 'marks', check(s) {
+    for (const n of s.nodes.values()) {
+      if (!real.has(n.uuid)) real.set(n.uuid, new Map())
+      real.get(n.uuid)!.set(n.journal.n - 1, Object.fromEntries([...n.streams].map(([o, w]) => [o, [w.applied, w.shippable, n.logs.get(o)?.length ?? 0]])))
+    }
+    return null
+  } })
+  writes(sim, nodes, 10, 300)
+  const ids = nodes.map((n) => n.uuid), all = [...ids, 'n06']
+  for (let i = 0; i < 10; i++) {
+    const at = 300 + Math.floor(rnd() * 3500)
+    const a = ids[Math.floor(rnd() * 5)]
+    const r = rnd()
+    const dur = 200 + Math.floor(rnd() * 800)
+    if (r < 0.4) { sim.at(at, () => { for (const b of all) if (b !== a) sim.partition(a, b) }); sim.at(at + dur, () => { for (const b of all) if (b !== a) sim.heal(a, b) }) }
+    else if (r < 0.7) { const b = ids[Math.floor(rnd() * 5)]; if (a !== b) { sim.at(at, () => sim.partition(a, b)); sim.at(at + dur, () => sim.heal(a, b)) } }
+    else sim.at(at, () => sim.pause(a, 100 + Math.floor(rnd() * 400)))
+  }
+  for (let w = 0; w < 8; w++) sim.at(200 + w * 500, () => writes(sim, [...sim.nodes.values()], 6, 500))
+  sim.at(1500, () => writes(sim, nodes, 10, 800))
+  sim.at(2000, () => { sim.add({ uuid: 'n06', listen: 'sim:n06', hosts: nodes.map((n) => n.listen), heartbeatMs: 50, replicas: R, redialMs: 20, journalCap: 1 << 16 }); sim.post('n06', { kind: 'start' }) })
+  sim.at(3000, () => writes(sim, [...sim.nodes.values()], 10, 800))
+  sim.at(4200, () => { for (const a of ids) for (const b of all) if (a !== b) sim.heal(a, b) })
+  sim.run({ until: 6000 })
+  assert.equal(R, 2)
+  const cap = captureSim(sim)
+  const K = cap.vocab
+  const rows = cap.nodes.find((n) => n.uuid === 'n06')!.journal.filter((e) => e.kind === K.acquire).map((e) => String(e.a))
+  const twice = [...new Set(rows.filter((p, i) => rows.indexOf(p) !== i))]
+  assert.ok(twice.length > 0, 'the joiner copied a row in twice — the fixture is what it claims')
+  return { cap, real, twice }
+}
