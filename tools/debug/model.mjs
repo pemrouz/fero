@@ -74,6 +74,12 @@ const partOfCell = (ck) => {
 // `#directory`). Two resources never share a record (the HELLO refuses a different name), so every fold that
 // compares nodes compares them inside one resource. A capture without names (the sim) is one group.
 const groupOf = (n) => (typeof n.name === 'string' ? n.name : '')
+//! newestView — the newest view a resource's nodes carry: { top, node } (node = one carrying it; null when none
+// does). agreement() judges only its members; routes() falls back to it when the writer is not in the capture.
+const newestView = (ns) => {
+  const top = Math.max(0, ...ns.map((n) => (n.view ? n.view.epoch : 0)))
+  return { top, node: ns.find((n) => n.view && n.view.epoch === top) || null }
+}
 
 //! newer — the ONE conflict rule, mirrored from kernel/node.ts #apply: lexicographic (epoch, seq, origin).
 const newer = (a, b) => // is `a` strictly newer than `b`?
@@ -343,6 +349,8 @@ export const verifyTopology = (capture) => {
 // fold (journal acquire, a=partition, c=teacher) — no applyInbound row per write. A node with no row for
 // the write whose record book HOLDS (origin, seq) and that journaled an acquire of the write's partition got
 // it that way: closed status `acquired`, at the last such acquire row, with the teacher. Both facts or none.
+// The writer not in the capture (a live attach that could not reach it): the route's partition comes from a captured
+// log entry, its view from the resource's newest committed view, its holders from the rest of the resource.
 export const routes = (capture) => {
   const K = capture.vocab
   const map = new Map() // 'origin#seq' → { origin, seq, partition, nodes: {uuid: {status, t}} }
@@ -419,36 +427,67 @@ export const routes = (capture) => {
     tenures.set(node.uuid, t)
     return t
   }
-  //! a resource is scoped when any of its nodes carries a scoped fact (`held`, or an older capture's `holders`)
-  const scopedGroups = new Set(capture.nodes.filter((n) => Array.isArray(n.held) || n.holders).map(groupOf))
+  //! the partition of a write whose writeLocal row is not in the capture (the writer was not reached, or it is a
+  // reborn origin's old life): partOf of any captured log entry for it — the kernel's own partitionOf rule on the
+  // record's key, a fact, never a guess. null when no log holds the record.
+  let parts = null
+  const partFromLogs = (origin, seq) => {
+    if (!parts) {
+      parts = new Map()
+      for (const n of capture.nodes) for (const [o, entries] of Object.entries(n.logs || {})) for (const x of entries) parts.set(o + '#' + x.seq, partOf(x))
+    }
+    return parts.get(origin + '#' + seq) ?? null
+  }
+  //! with the writer not captured, the holders of a row come from the rest of its resource: the ring's answer any
+  // node on the newest view carries for that row (`holders`, a writer's own rows), else the members of that view
+  // whose `held` names it (a holder still copying the row in is not in `held`, so it reads as not a holder there).
+  // null — the old rule — when the resource carries no scoped fact, or no captured member holds the row.
+  const byGroup = new Map()
+  for (const n of capture.nodes) { const g = groupOf(n); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(n) }
+  const newest = new Map([...byGroup].map(([g, ns]) => [g, newestView(ns)]))
+  const holdersFromGroup = (g, p) => {
+    const { top, node: tv } = newest.get(g)
+    const ns = byGroup.get(g)
+    for (const n of ns) if (n.holders && n.view && n.view.epoch === top && n.holders[p]) return n.holders[p]
+    if (!tv || !ns.some((n) => Array.isArray(n.held))) return null
+    const hs = tv.view.members.filter((u) => { const n = byUuid.get(u); return !!n && Array.isArray(n.held) && n.held.includes(p) })
+    return hs.length ? hs : null
+  }
   for (const r of map.values()) {
     const o = byLane.get(r.origin)
     //! one resource per route: the writer's (or, with the writer not captured, that of a node that has a row for it —
     // records never cross resources). Only that resource's nodes are stops; another resource never was meant to get it
     const g = o ? groupOf(o) : groupOf(capture.nodes.find((n) => r.nodes[n.uuid]) || {})
     r.group = g === '' ? null : g
-    const holders = o && o.holders && r.partition != null ? o.holders[r.partition] : null
-    const members = holders && o.view ? o.view.members : null
-    //! unscoped: every member is meant to get every write, so only a node outside the writer's committed view needs
-    // its tenure (it left, or was voted out): a write stamped after its last member epoch never was meant for it
-    const inView = !scopedGroups.has(g) && o && o.view && o.view.epoch > 0 ? o.view.members : null
+    //! the writer's own facts when it is captured; else the resource's newest committed view, the same view the
+    // header (agreement) judges by, so a live attach that could not reach the writer still tells one story
+    const part = r.partition != null ? r.partition : o ? null : partFromLogs(r.origin, r.seq)
+    const tv = newest.get(g).node
+    const view = o ? o.view : tv && tv.view.epoch > 0 ? tv.view : null
+    const holders = part == null ? null : o ? (o.holders ? o.holders[part] : null) : holdersFromGroup(g, part)
+    const members = holders && view ? view.members : null
+    //! no holder fact (unscoped, or an older capture): every member is meant to get every write, so only a node
+    // outside the committed view needs its tenure (it left, or was voted out): a write stamped after its last member
+    // epoch never was meant for it — scoped or not
+    const inView = view && view.epoch > 0 ? view.members : null
     for (const node of capture.nodes)
       if (!r.nodes[node.uuid] && groupOf(node) === g) {
-        const got = r.partition != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(r.partition) : null
+        const got = part != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(part) : null
         if (got && holds(node, r.origin, r.seq)) { r.nodes[node.uuid] = { status: 'acquired', t: got.t, from: got.from }; continue }
         let quiet = false
         if (members && node.client === true) {
           //! a client folds what its feeder holds (DESIGN-SCALE stage 2): meant to get a write only when its feeder holds
           // the write's row at capture end. No feeder fact (an older capture, no primary, the feeder not captured) → the old rule
           const f = node.feeder != null ? byUuid.get(node.feeder) : null
-          quiet = !!(f && Array.isArray(f.held)) && !f.held.includes(r.partition)
+          quiet = !!(f && Array.isArray(f.held)) && !f.held.includes(part)
         } else if (members && members.includes(node.uuid)) quiet = !holders.includes(node.uuid)
         else if (members) {
-          //! a node outside the writer's view is judged only for rows it held while a member, and only for writes
-          // stamped while it was one (epoch ≤ until); a write whose record no log holds has no epoch — the row decides
+          //! a node outside the view is judged only for rows it held while a member, and only for writes stamped
+          // while it was one (epoch ≤ until); a write whose record no log holds has no epoch — the row decides
           const tn = tenure(node), e = epochOf(r.origin, r.seq)
-          quiet = !(tn.rows.has(r.partition) && (e === null || e <= tn.until))
+          quiet = !(tn.rows.has(part) && (e === null || e <= tn.until))
         } else if (inView && node.client !== true && !inView.includes(node.uuid)) {
+          //! an unknown epoch (no log holds the record) proves nothing: the old rule, never-arrived
           const e = epochOf(r.origin, r.seq)
           quiet = e !== null && e > tenure(node).until
         }
@@ -483,8 +522,7 @@ export const agreement = (capture) => {
     //! who is judged: a member of the newest committed view the resource's nodes carry, and every client. A node that
     // left (cleanly, or voted out while cut off) keeps a copy that later writes lawfully never reach — its routes are
     // judged by its tenure (routes()), its copy is not compared. With no committed view yet (epoch 0) everyone is.
-    const top = Math.max(...ns.map((n) => (n.view ? n.view.epoch : 0)))
-    const topView = ns.find((n) => n.view && n.view.epoch === top)
+    const { top, node: topView } = newestView(ns)
     const judged = (n) => n.client === true || top === 0 || !topView || topView.view.members.includes(n.uuid)
     const out = { name: g === '' ? null : g, nodes: ns.map((n) => n.uuid), scoped, converged: true, split: false, sides: [ns.length] }
     if (!scoped) {

@@ -673,3 +673,20 @@ test('an unscoped member that left tells one story on every pane: converged head
   assert.ok(insp.includes('data-rkey="g/nodes/n04">n04</span></span><span class="x" data-tip="stop:not-a-holder">'), 'n04 is a quiet stop of a write made after it left')
   assert.doesNotMatch(insp, /stop:(never|inflight)/)
 })
+
+test('a live attach that could not reach the writer still tells one story: converged header, no ⊘ for a member that left or a non-holder (wave 5e review)', async () => {
+  //! the review's two captures, as the attach bridge builds them when one target times out: the header said converged ✓
+  // above amber ⊘ stops, because with no writer the stops fell back to the old never-arrived rule
+  const drop = (cap: { nodes: { uuid: string }[] }, u: string) =>
+    ({ ...cap, kind: 'live', seed: null, nodes: cap.nodes.filter((n) => n.uuid !== u), absent: [{ target: '127.0.0.1:9001', reason: 'timeout' }] })
+  const { healed, owner } = scopedCut()
+  for (const [name, cap] of [['leaverNoWriter', drop(unscopedLeaver().cap, 'n01')], ['scopedNoWriter', drop(healed, owner)]] as const) {
+    const { el, g } = await bootViewer(name, cap)
+    assert.match(el('statusRight').innerHTML, /data-tip="converged">converged ✓</, `${name}: converged`)
+    assert.match(el('statusRight').innerHTML, /absent/, `${name}: the missing target is named`)
+    g(`expanded.add('g/writes'); render()`)
+    assert.match(el('tree').innerHTML, /data-type="write"/, `${name}: the writes are on the page`)
+    assert.doesNotMatch(el('tree').innerHTML, /⊘/, `${name}: no write waits for a node that was never meant to get it`)
+    assert.doesNotMatch(el('tree').innerHTML, /data-tip="write:(in-flight|never-arrived)"/)
+  }
+})
