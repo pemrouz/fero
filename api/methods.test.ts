@@ -217,6 +217,65 @@ test('M5-REVIEW #5/#10 — a SERVER-local method flushes before returning AND re
   }
 })
 
+//! V4-52: a server's own call answered through structuredClone, which is not what the wire makes of a value: it kept a
+// Date or a Map a client gets as {}, kept text UTF-8 changes (a lone surrogate, a leading byte order mark), threw a
+// DataCloneError on a view of Proxies the wire carries as plain objects, and handed a plain result out by reference.
+// Local and remote now answer the same: copyOf, the codec's own copy, with a reply's limits.
+test("a server's own call answers what a client's call of the same handler answers: views of Proxies, Dates, Maps and text UTF-8 changes, a plain result, the deepest value a reply carries", async () => {
+  const nest = (d: number): unknown => { let v: unknown = 1; for (let i = 0; i < d; i++) v = [v]; return v }
+  const plain = { when: new Date(0), s: 'x\uD800' }
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('r', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { luna: { mood: 'hungry' } }, methods: {
+    proxies: (_: unknown, ctx: { data: any }) => ctx.data.map((r: object) => new Proxy(r, {})),
+    dates: (_: unknown, ctx: { data: any }) => ctx.data.map(() => new Date(0)),
+    maps: (_: unknown, ctx: { data: any }) => ctx.data.map(() => ({ m: new Map([[1, 2]]) })),
+    text: (_: unknown, ctx: { data: any }) => ctx.data.map(() => ({ s: 'x\uD800', bom: '\uFEFFhi' })),
+    plain: () => plain,
+    deepest: () => nest(63),
+    deeper: () => nest(64),
+  } } as never)
+  const c = await fero('r', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  type M = Record<string, (a?: unknown, o?: { timeout?: number }) => Promise<unknown>>
+  try {
+    assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).luna !== undefined, 8000), 'the client caught up')
+    for (const m of ['proxies', 'dates', 'maps', 'text', 'plain', 'deepest', 'read']) {
+      const local = await (s.methods as M)[m]()
+      const remote = await (c.methods as M)[m](undefined, { timeout: 8000 })
+      assert.deepStrictEqual(local, remote, `methods.${m}: the server's own call and a client's agree, prototypes and all`)
+    }
+    assert.deepStrictEqual(await (s.methods as M).dates(), { luna: {} })
+    assert.deepStrictEqual(await (s.methods as M).text(), { luna: { s: 'x\uFFFD', bom: 'hi' } })
+    const got = await (s.methods as M).plain()
+    assert.notEqual(got, plain, 'a plain result is a copy, never the handler\'s object')
+    await assert.rejects((s.methods as M).deeper(), /^Error: methods\.deeper: the result could not be sent: deeper than 63 levels$/)
+    await assert.rejects((c.methods as M).deeper(undefined, { timeout: 8000 }), /^Error: methods\.deeper: the result could not be sent: /)
+  } finally {
+    await c.destroy(); await s.destroy()
+  }
+})
+
+//! V4-52: a server-local call handed the handler the caller's own object, so a handler that changed its argument
+// changed the caller's object, and an argument a client's call refuses (a bigint, a Date) went through
+test("a server-local call gives its handler fero's own copy of the argument, and refuses an argument a client's call refuses", async () => {
+  const s = await fero('r', { uuid: 'aa', listen: false, methods: {
+    touch: (a: { n: number }) => { a.n = 2; return a.n },
+    echo: (a: unknown) => a,
+  } } as never)
+  type M = Record<string, (a?: unknown) => Promise<unknown>>
+  try {
+    const form = { n: 1 }
+    assert.equal(await (s.methods as M).touch(form), 2, 'the handler changed its copy')
+    assert.equal(form.n, 1, "the caller's object is as it was")
+    await assert.rejects((s.methods as M).echo({ when: new Date(0) }), /^Error: methods\.echo: the argument cannot be sent: a Date \(send date\.getTime\(\) or date\.toISOString\(\)\) at when$/)
+    await assert.rejects((s.methods as M).echo(10n), /^Error: methods\.echo: the argument cannot be sent: a bigint$/)
+    await assert.rejects((s.methods as M).echo(s.data), /^Error: methods\.echo: the argument cannot be sent: a live view, not a value/)
+    assert.deepStrictEqual(await (s.methods as M).echo({ n: [1, 'x'] }), { n: [1, 'x'] })
+  } finally {
+    await s.destroy()
+  }
+})
+
 test("V4-5 — a validator-refused write inside a HANDLER fails the call with the reason (wire and local); ctx.flush() throws it so a handler can recover; admitted writes still resolve", async () => {
   const { a, b, addrs } = await pair({
     poke: (_: unknown, ctx: { data: any }) => { ctx.data.admin = 1; return 'ok' },

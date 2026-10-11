@@ -120,6 +120,10 @@ export const partOf = (o: object, array: boolean): string | null => {
 // frame's header, the record's key and the envelopes. Both ask partOf of every array and object (V4-52).
 export const WRITE: Limit = { depth: MAX_DEPTH - 4, bytes: MAX_FRAME - (1 << 20), part: partOf }
 export const ARG: Limit = { depth: MAX_DEPTH - 1, bytes: MAX_FRAME - (1 << 20), part: partOf }
+//! RESULT — what a server's own read hands out (api/methods.ts invokeLocal, api/fold.ts): the copy a client's
+// call decodes from the RESULT frame, which wraps the value once, as a CALL wraps its argument. No part rule: a
+// result travels as the codec carries it (a Date in a view arrives as {}, locally as remotely, V4-52).
+export const RESULT: Limit = { depth: MAX_DEPTH - 1, bytes: MAX_FRAME - (1 << 20) }
 
 //! CARRIES — what fero sends, said once for every refusal of a value (the lens, a methods.* reject, the seed)
 export const CARRIES = `fero sends null, undefined, true and false, numbers, strings, Uint8Array, and arrays and objects of these (an object sends its own fields, so not a Date, a Map, a Set or another built-in), at most ${WRITE.depth} levels deep counted from the row and ${WRITE.bytes >> 20} MiB in all (a string counts 3 bytes a character)`
