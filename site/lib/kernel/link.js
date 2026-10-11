@@ -62,12 +62,22 @@ export class Link {
   //! set when overflow cleared the queue: the peer now has a TAIL hole, and the drain handler follows up
   // with a digest exchange to re-ship it (loss heals, never lingers)
   droppedWhilePaused = false
-  //! torn (the third re-check of DESIGN-SCALE stage 2, 2026-10-10): a digest ANSWER whose suffix ship overflowed
-  // this queue partway — the peer's tails `d` it answered, the `r` and `q` of that digest, and the first frame the
-  // socket did not take (`origin`, `seq`). The node resumes the answer from there at the drain (node.ts #answer),
-  // so the reply always follows the whole ship. Null when no answer is torn. Set only on a link that ships
-  // suffixes (an unscoped member's, a client's); an armed member link gets no suffix and never tears.
-  torn                                                                                                                  = null
+  //! torn (the third re-check of DESIGN-SCALE stage 2, 2026-10-10; reshaped 2026-10-11): a digest ANSWER whose
+  // suffix ship stopped because this link was paused and its queue full (or whose queued frames a clear took since).
+  // `d` is the cover: the peer's tails, raised to what that answer had already handed the link before the first frame
+  // it did not; `r` and `q` are its digest's. The node resumes the answer from there at the drain (node.ts #answer —
+  // an answer with the cover as its tails ships exactly the rest), so the reply always follows the whole ship. Null
+  // when no answer is torn. Set only on a link that ships suffixes (an unscoped member's, a client's); an armed member
+  // link gets no suffix and never tears.
+  torn                                                                                     = null
+  //! inQueue: the same shape, for the answer whose frames (or reply) sit in the queue right now — the cover at its
+  // FIRST queued frame. It is what keeps an answer resumable until its reply has left the queue: a clear (ship below)
+  // makes it the torn answer, so the drain re-sends what the clear took and the reply, never the whole ship again.
+  // The drain's flush empties it. Null when no answer has a frame queued.
+  inQueue                                                                                     = null
+  //! quiet — heartbeats since this link last carried a byte in (node.ts bytesIn resets it). Read only by a node
+  // with watchClients (the #directory host's failure detector over client links); on every other node it stays 0.
+  quiet = 0
   dead = false // set on wire fault so a half-processed chunk can't keep dispatching before linkDown arrives
   //! noRedial: set before a DELIBERATE close (dup-link, self-reject) — without it, closing the loser of a dial race would redial and re-create the race forever
   noRedial = false
@@ -133,9 +143,9 @@ export class Link {
   // not the oldest entry: partial drops manufacture interior gaps (survivors leapfrog the hole at drain time,
   // ahead of any heal), while a full clear keeps the loss a pure TAIL — exactly what the digest exchange the
   // drain handler triggers knows how to re-ship. De-syncing here stops any further records widening the hole.
-  // The same rule binds a caller that ships a WHOLE suffix in one step (node.ts #answer): the shell steps
-  // `pause` inside a send, so the clear can land partway through that ship — the caller must stop at the first
-  // clear, or the frames it ships after it leapfrog the hole and the peer's tails rise above it.
+  // A caller that ships a WHOLE suffix in one step (node.ts #answer) never overflows on purpose: the shell steps
+  // `pause` inside a send, so it checks for a full queue before every frame and stops there. A digest answer whose
+  // frames this clear takes becomes the torn answer (`inQueue` → `torn`), resumed at the drain.
   ship(bytes            , sink            , j         ) {
     if (this.dead) return
     if (!this.paused) return sink.send(this.id, bytes)
@@ -144,14 +154,10 @@ export class Link {
       j.armed && j.emit(JK.dropOldest, this.id, this.queued.length)
       this.queued.length = 0
       this.droppedWhilePaused = true
-      this.drops++
       this.synced = false
+      if (this.inQueue !== null) { this.torn = this.inQueue; this.inQueue = null }
     }
   }
-  //! drops — every clear this link ever made. droppedWhilePaused is the DEBT (sticky until the drain settles it);
-  // a caller shipping many frames in one step reads this count before and after to see whether ITS ship tore
-  // (node.ts #answer: a resume runs while the earlier tear's debt is still set).
-  drops = 0
 
   //! drain: the env's socket buffer emptied — release the parked frames in order.
   drain(sink            , j         ) {
@@ -159,6 +165,7 @@ export class Link {
     j.armed && j.emit(JK.drain, this.id)
     for (const bytes of this.queued) sink.send(this.id, bytes)
     this.queued.length = 0
+    this.inQueue = null // every queued frame has left: an answer is past the reach of a clear once its reply is out
   }
 }
 

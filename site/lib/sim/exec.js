@@ -71,6 +71,10 @@ export const mulberry32 = (seed        ) => () => {
                                                                              
 
 export class Sim {
+  //! fullWalk — the default for every Sim built after it is set: true runs the old full monitor walk. A switch on the
+  // class, not an environment variable: only api/config.ts reads a FERO_* variable (CLAUDE.md), and the stripped
+  // browser copy (site/strip.mjs) has no `process`. sim/monitor-walk.test.ts flips it to run one trajectory both ways.
+  static fullWalk = false
   now = 0
   rng              
   events = 0
@@ -139,16 +143,32 @@ export class Sim {
   // owner, peer, this end's link id, the peer's, whether this end dialed, the bytes. Null by default,
   // zero cost on every other run.
   tap                                                                                                                  = null
-  //! watch (DESIGN-SCALE §6, stage 0): the scale monitors are installed (sim/monitors.ts armScale) — only then are
-  // `stepped` and `inflight` kept. False on every other run: one boolean read per event and per frame, so every
-  // golden, sweep and counted pin runs exactly the code it ran before.
+  //! watch (DESIGN-SCALE §6, stage 0): the scale monitors are installed (sim/monitors.ts armScale) — only then is
+  // `inflight` kept. False on every other run: one boolean read per frame, so every golden, sweep and counted pin
+  // runs exactly the code it ran before. (`stepped` is kept whenever a monitor is installed since wave 5e.)
   watch = false
   //! stepped (stage 0): the uuids of the nodes that stepped since the last monitor pass. A
   // per-event monitor that walks STATE (cells, versions, floors) walks only these — state changes only inside
   // step(), so the walk is complete and costs one node per event instead of every node (STATUS: "every new
   // per-event monitor walks only the node that stepped"). Under checkEvery sampling it holds every node that
-  // stepped in the window. Cleared by the monitor pass itself.
+  // stepped in the window. Kept whenever the Sim has a monitor (the original ones walk it too, since wave 5e).
+  // Cleared by the monitor pass itself.
   stepped = new Set        ()
+  //! allDirty (2026-10-11, wave 5e): "any node may have changed" for the next monitor pass. The per-event monitors that
+  // read ONE node's state walk only the nodes in `stepped`, which is complete only for changes made inside step(). Three
+  // things change a node outside it, so each marks the next pass whole: run() entry (a scenario or a test may have
+  // touched a node between two runs), an `at()` task (chaos callbacks restart, add, partition and mutate by hand), and
+  // construction (a direct caller before any run). Cleared by the pass itself, with `stepped`.
+  allDirty = true
+  //! passes — monitor passes completed. The ledger's scan reads it to know its last scan was the previous pass's.
+  passes = 0
+  //! checking — true while a monitor pass runs. `stepped` describes "since the last pass" only DURING a pass: the pass
+  // clears it at its end, so a read made between passes (a horizon check such as stampOracle) must read every node.
+  checking = false
+  //! full (the old walk, kept as a switch): every per-event monitor walks EVERY node on every pass, as before wave 5e.
+  // Sim.fullWalk sets it for every Sim built after; a test may also set `sim.full` on one Sim. The two
+  // walks must report identical violation lists (sim/monitor-walk.test.ts): this is how that stays true.
+  full = Sim.fullWalk
   //! inflight (stage 0, monitor M6): every frame between a send and its bytesIn delivery, by task id — the
   // wire as the sim can see it and no shell can. M6 reads it at a tombstone release to prove nothing
   // older than the released stamp is still on its way to a holder. One Map set/delete per delivered frame.
@@ -239,7 +259,7 @@ export class Sim {
 
   //! at — schedule arbitrary chaos (partition/heal/fault changes) at a virtual time, so fault windows are part
   // of the seeded trajectory instead of applying at whatever `now` the scenario code happened to run.
-  at(delay        , fn            ) { this.#schedule(delay, fn) }
+  at(delay        , fn            ) { this.#schedule(delay, () => { this.allDirty = true; fn() }) }
 
   //! directed one-shot frame traps: sever the pair INSTEAD of delivering the nth matching-verb frame.
   #severOn = new Map                                     ()
@@ -305,15 +325,21 @@ export class Sim {
     const max = opts.maxEvents ?? 1_000_000
     const every = opts.checkEvery ?? 1
     const v0 = this.violations.length // stop on violations pushed by THIS call, not an earlier phase's
+    this.allDirty = true // the first pass of a call reads every node: the caller may have touched one since the last run
     let n = 0 // per-CALL budget — the cumulative counter would trip a later phase for the sins of an earlier one
     let unchecked = false // events have run since the last monitor pass — the exit check owes one
     const check = ()       => {
       unchecked = false
-      for (const m of this.monitors) {
-        const bad = m.check(this)
-        if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
-      }
+      this.checking = true
+      try {
+        for (const m of this.monitors) {
+          const bad = m.check(this)
+          if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
+        }
+      } finally { this.checking = false }
       this.stepped.clear()
+      this.allDirty = false
+      this.passes++
     }
     while (this.#queue.length) {
       if (opts.until !== undefined && this.#queue[0].at > opts.until) break
@@ -339,7 +365,7 @@ export class Sim {
     const node = this.nodes.get(uuid)
     if (!node) return
     node.step(ev)
-    if (this.watch) this.stepped.add(uuid)
+    if (this.watch || this.monitors.length !== 0) this.stepped.add(uuid)
     this.trace.push(node.stateHash)
   }
 
@@ -349,7 +375,7 @@ export class Sim {
     const node = this.nodes.get(uuid)
     if (!node) return
     node.step(ev)
-    if (this.watch) this.stepped.add(uuid)
+    if (this.watch || this.monitors.length !== 0) this.stepped.add(uuid)
     this.trace.push(node.stateHash)
   }
 

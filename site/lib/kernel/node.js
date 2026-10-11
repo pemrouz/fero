@@ -23,7 +23,7 @@
 // (v2's applying/committingForward/discarding flag family) has no place to
 // exist. That whole guard menagerie is deleted by construction, not by care.
 
-import { Framer, FrameError, VERB, encodeControl, encodeRuns,                             } from './codec.js'
+import { Framer, FrameError, VERB, continuesRun, encodeControl, encodeRuns,                             } from './codec.js'
 import { Link, LS, dialedByLower } from './link.js'
 import { JK, Journal } from './journal.js'
 import { Membership } from './membership.js'
@@ -135,6 +135,13 @@ export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.
                                                                                                        
                                                                                                   
                       
+                                                                                                             
+                                                                                                            
+                                                                                                   
+                                                                                                        
+                                                                                                        
+                                
+                       
  
 
 export class Node {
@@ -452,6 +459,10 @@ export class Node {
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
   // so the member hot path pays nothing (M5b).
   clientLinks = new Set      ()
+  //! #covered — the client links that may hold a digest answer's cover (Link.torn / Link.inQueue): added where #answer
+  // sets one, pruned lazily by indexInsert once both are null, and at linkDown. It keeps indexInsert's cover check to
+  // the links that can need it, so an interior insert on a node with many idle clients pays one size check.
+  #covered = new Set      ()
   //! resync (spokes only, 2026-09-06 — DECISIONS V4-5): a spoke's fold is a VIEW of its feeder's, never a
   // source. When the feeder's digest shows a lane tail BELOW ours, the cluster's truth moved under us
   // (records died with a server; a failover landed on a lagging feeder) — the fold resets, an empty r=1
@@ -470,15 +481,17 @@ export class Node {
   // know. But kept, those records RAISE the lane tails this node holds, and on a wiped fold a raised tail has
   // nothing under it — so while in resync every digest this node sends announces d = {} (#sendDigest): "send me
   // everything", the lane drops what it has. A reply with no `q` is an older server's (V4-14): it ends as before.
-  //! One ask per resync (the second review of stage 2, 2026-10-10; its premise corrected at the third re-check). In
-  // resync every digest this node sends says d = {}, so every ask costs the feeder a ship of its whole held subset —
-  // and the ask's reply is the end. On this FIFO link the feeder answers the ask in the step that handles it, and an
-  // answer whose ship TEARS (the feeder's queue overflowing partway through it) is resumed at the feeder's drain
-  // with its reply after the whole ship (#answer): a torn ship is a late reply, never a missing one. So the ONLY way
-  // a live feeder leaves an ask unanswered is the ask arriving while its link is paused (swallowed: the paused branch
-  // of the DIGEST handler marks the debt and ships nothing). The feeder knows that, and says so on its drain digest
-  // (`h: 1`, #sendDigest; a torn ship sets the same debt, and that digest follows the resumed reply, when this node
-  // is out of resync and answers it with its real tails). So in resync this node (1)
+  //! One ask per resync (the second review of stage 2, 2026-10-10; its premise corrected at the third re-check and
+  // made true on 2026-10-11). In resync every digest this node sends says d = {}, so every ask costs the feeder a ship
+  // of its whole held subset — and the ask's reply is the end. On this FIFO link the feeder answers the ask in the step
+  // that handles it. An answer whose ship meets a full paused queue STOPS there and resumes at the feeder's drain with
+  // its reply after the whole ship, and an answer whose frames or reply a later clear takes from the queue (a live
+  // tap-forward, the drain digest) resumes from its first queued frame (#answer, Link.inQueue): the answer stays
+  // resumable until its reply has left the queue, so a torn ship or a cleared reply is a late reply, never a missing
+  // one. So the ONLY way a live feeder leaves an ask unanswered is the ask arriving while its link is paused
+  // (swallowed: the paused branch of the DIGEST handler marks the debt and ships nothing). The feeder knows that, and
+  // says so on its drain digest (`h: 1`, #sendDigest; a clear sets the same debt, and that digest follows the resumed
+  // reply, when this node is out of resync and answers it with its real tails). So in resync this node (1)
   // sends no heartbeat floor to its primary (the ask IS the floor), (2) answers a feeder's r=1 that carries `h: 1`
   // with an r=1 of its own (a fresh q): that exchange ships everything and its reply ends the resync, one exchange
   // after the drain, and (3) answers any other r=1 from the feeder with NOTHING — it was sent before the feeder
@@ -777,6 +790,7 @@ export class Node {
       case 'bytesIn': {
         const link = this.links.get(e.link)
         if (!link || link.dead) return // raced close — ids are never reused, so late chunks are safely ignored
+        link.quiet = 0 // heard from (watchClients): one field store per chunk
         //! the FrameError net covers BOTH framing AND dispatch: decode is LAZY, so a crc-valid frame with a
         // malformed body (bad vt, overrun count, trailing bytes) throws inside #dispatch when a getter first
         // touches it — outside this catch it would crash the node on one hostile frame (adversarial-review
@@ -808,6 +822,7 @@ export class Node {
         if (link.proveTimer !== -1) this.#unprove(link)
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
+        this.#covered.delete(link)
         //! a bare close while PROVING — before or after my proof — is a LINK LOSS, not a refusal (DESIGN-DOOR
         // §3, settled at the third review): the door speaks only through DOOR {e}, and a peer that refused
         // me sent one. A crash, a cut or a reset mid-handshake looks exactly like this close, and with
@@ -829,6 +844,9 @@ export class Node {
         if (this.client && this.primary === e.link) {
           this.primary = null
           this.feederOpen = null
+          //! the dead feeder's taps die with it (wave 5e): every attempt its WACK cleared whose record has not
+          // landed here is marked; the resync onto the next feeder settles what that feeder's ship does not bring
+          this.writes.strand()
           for (const l of this.links.values())
             if (l.state === LS.admitted && !l.dead) { this.primary = l.id; this.#feederLast = l.contract; break }
           if (this.primary !== null) {
@@ -866,23 +884,25 @@ export class Node {
         const link = this.links.get(e.link)
         if (!link) return
         link.drain(this.env.sink, j)
-        //! a TORN answer resumes FIRST (the third re-check of DESIGN-SCALE stage 2): the suffix ship this link was
-        // sending when its queue overflowed goes on from the first frame the socket did not take, and its reply
-        // follows the whole ship — so the peer's tails never rise above the hole, and a spoke in resync ends on the
-        // reply with every row (see #answer). The flush above may have filled the socket again (the shell steps
-        // `pause` inside a send): then the resume, the exchange and the round all wait for the next drain. A resume
-        // that tears again likewise leaves the exchange for the drain that completes it — the ask it carries would
-        // otherwise go out AHEAD of the rest of the ship and buy a spoke in resync a whole second download.
+        //! a TORN answer resumes FIRST (the third re-check of DESIGN-SCALE stage 2; its costs fixed 2026-10-11): the
+        // suffix ship that stopped at a full queue goes on from where it stopped (or from its first queued frame, when a
+        // clear took that frame since), and its reply follows the whole ship — so the peer's tails never rise above a
+        // hole, and a spoke in resync ends on the reply with every row (see #answer). The flush above may have filled the
+        // socket again (the shell steps `pause` inside a send): then the resume, the exchange and the round all wait for
+        // the next drain. A resume that stops again likewise leaves the exchange for the drain that completes it — the
+        // ask it carries would otherwise go out AHEAD of the rest of the ship and buy a spoke in resync a second download.
         if (link.torn !== null) {
           if (link.paused) return
           const t = link.torn
           link.torn = null
-          this.#answer(link, t.d, t.r, t.q, t)
+          this.#answer(link, t.d, t.r, t.q)
           if (link.torn !== null) return
         }
-        //! drop-under-backpressure left the peer with a tail hole in our stream — follow the drain with a
-        // digest exchange so the loss heals within two round-trips instead of lingering until the next admit
-        if (link.droppedWhilePaused && link.state === LS.admitted) {
+        //! drop-under-backpressure (or a digest swallowed while paused) left the peer with a tail hole in our stream —
+        // follow the drain with a digest exchange so the loss heals within two round-trips instead of lingering until the
+        // next admit. Never into a FULL queue (the resume can end with its tail and reply filling it): that digest would
+        // clear the very reply it follows — the debt stays, and the next drain sends it.
+        if (link.droppedWhilePaused && link.state === LS.admitted && !(link.paused && link.queued.length >= link.maxQueued)) {
           link.droppedWhilePaused = false
           //! toward a member (armed): it re-syncs the link and ships nothing — the round below repairs. Toward a CLIENT it
           // says `h: 1`: this link dropped frames, so a spoke whose resync ask got no reply asks again (see `resync`)
@@ -911,7 +931,21 @@ export class Node {
           this.#refuse(link, 'door-timeout')
         }
         else if (meta.tag === TAG.heartbeat) {
-          for (const link of this.links.values())
+          //! watchClients: close every client link silent past the bound, then PING the rest of them below
+          // (the PING is what makes silence mean something: a live client answers it within a round trip)
+          const watch = this.#opts.watchClients ?? 0
+          if (watch > 0)
+            for (const link of this.links.values())
+              if (link.client && !link.dead && link.state === LS.admitted && ++link.quiet > watch) {
+                link.dead = link.noRedial = true
+                this.env.sink.close(link.id, 'silent')
+              }
+          for (const link of this.links.values()) {
+            //! a watched client link is PINGed from this side whatever the uuid order (no digest: the rule below)
+            if (watch > 0 && link.client && !link.dead && link.state === LS.admitted && !link.paused && this.uuid > link.uuid) {
+              link.ship(encodeControl(VERB.PING), this.env.sink, j)
+              j.armed && j.emit(JK.ping, link.id)
+            }
             //! lower-uuid side originates PINGs (halves N² probe traffic — v2's rule, kept). Paused links
             // are SKIPPED entirely: control frames queued into a drop-oldest queue are doomed work, and a
             // drain would flush every stale r=1 digest at once, each triggering a duplicate suffix ship
@@ -934,6 +968,7 @@ export class Node {
               // what re-proves every pair. The digest to a CLIENT link is unchanged: a spoke floors on it.
               if ((!this.client || (link.id === this.primary && this.resync === null)) && !(this.armed && !link.client)) this.#sendDigest(link, 1)
             }
+          }
           //! membership acts on the heartbeat clock too (explicit protocol mode): genesis, suspicion,
           // eviction/join ballots, stale pulls, rejoin nudges — all only when heartbeats are on.
           this.membership.tick(this)
@@ -1240,6 +1275,9 @@ export class Node {
       if (path.length > 1) this.#unvivify(path, ancestorsOf(path))
     }
     this.journal.armed && this.journal.emit(JK.resynced, ghosts)
+    //! the new feeder's ship has landed: a write the dead feeder WACKed and never tapped either folded in it (the
+    // join settled it, after its value showed) or will not come from here — it settles from its WACK (wave 5e)
+    this.writes.settleStranded(this)
   }
 
   //! persistBoot — (re)write the durable boot record: the committed view, the Lamport CEILING (the
@@ -1439,7 +1477,9 @@ export class Node {
         // one holds below them and leave what it does not hold on the screen. It resyncs onto this feeder too —
         // whenever it holds anything, or a resync is already open (a mid-resync death: the sweep set must union, as in
         // the linkDown arm). A spoke that holds nothing yet asks its first feeder as before: bytes unchanged.
-        if (this.feederScoped && (this.resync !== null || this.logs.size > 0)) this.#resyncBegin(link)
+        // A spoke with stranded writes (wave 5e: WACKed by the dead feeder, never tapped) resyncs too, even with an
+        // empty fold: the resync's end is where they settle.
+        if (this.feederScoped && (this.resync !== null || this.logs.size > 0 || this.writes.stranded)) this.#resyncBegin(link)
         else this.#sendDigest(link, 1)
       }
     } else if (!link.client && this.uuid < link.uuid) this.#sendDigest(link, 1)
@@ -1843,8 +1883,9 @@ export class Node {
           // ship its held subset a SECOND time (the review of stage 2 measured the double ship on 30 of 30 tick-aligned
           // seeds; the lane dropped the duplicates, the cost was a second download). So it gets no answer; the gate it
           // carried was read above. The one r=1 that means the ask needs re-sending is the feeder's DRAIN digest
-          // (`h: 1`: its queue overflowed while paused — an ask that arrived then was swallowed; an answer whose ship
-          // tore the feeder resumes itself, #answer, and its reply lands BEFORE this digest): that one is answered
+          // (`h: 1`: its queue overflowed, or a digest arrived, while paused — an ask that arrived then was swallowed; an
+          // answer whose ship stopped or whose reply a clear took the feeder resumes itself, #answer, and its reply
+          // lands BEFORE this digest): that one is answered
           // with an r=1 of our own, so the exchange ships everything and its reply ends the resync, one exchange
           // after the drain (see `resync`).
           if (v.r === 1) {
@@ -1863,8 +1904,8 @@ export class Node {
           return
         }
         //! the answer: the suffix ship, the link sync and the r=0 reply (#answer — resumable at the drain when
-        // the ship tears). A client's r=1 carries `q`; the reply echoes it (only clients send one).
-        this.#answer(link, v.d, v.r, typeof v.q === 'number' ? v.q : undefined, null)
+        // its ship stops at a full queue or a clear takes it). A client's r=1 carries `q`; the reply echoes it (only clients send one).
+        this.#answer(link, v.d, v.r, typeof v.q === 'number' ? v.q : undefined)
         return
       }
       //! M6 scoped-replication plane (DESIGN-M6 C3/C8): HAVEQ/HAVEA carry the possession handshake,
@@ -1964,7 +2005,23 @@ export class Node {
 
   //! indexInsert — an entry spliced into a lane's INTERIOR (the dual fence, a fold, a replayed interior
   // row): binary search by seq in its (lane, p) array keeps that array ascending like the lane.
+  //! It is also the one place every interior insert passes, so it lowers the cover of a stopped or queued digest
+  // answer (Link.torn / Link.inQueue, #answer) that already sits at or above the new entry: a cover is a map of
+  // tails and cannot hold a record below it. Without this, a record spliced under a stopped answer's cover is never
+  // shipped, and one tap-forwarded behind a queued reply and cleared with it is never shipped again — a spoke in
+  // resync ends without that row and sweeps it (the review of the resume-cost fix, 2026-10-11). Only client links
+  // carry a cover on a node that splices (an armed one: its member links get no suffix), and only while paused.
+  // The check walks #covered, not every client link: one size check when no answer is stopped or queued.
+  //! The cost: lowering a cover re-sends that lane's whole suffix above the splice, frames the peer may already
+  // hold included, so splices that keep landing under one long torn answer keep moving its resume point back and
+  // delay its reply until they stop (every row still arrives). Splices are cold (a heal, a fetch fold); a per-link
+  // list of spliced entries sent ahead of the cover walk would make each cost one record (a STATUS idea).
   indexInsert(origin        , e          ) {
+    if (this.#covered.size) for (const l of this.#covered) {
+      if (l.torn === null && l.inQueue === null) { this.#covered.delete(l); continue }
+      if (l.torn !== null && (l.torn.d[origin] ?? 0) >= e.seq) l.torn.d[origin] = e.seq - 1
+      if (l.inQueue !== null && (l.inQueue.d[origin] ?? 0) >= e.seq) l.inQueue.d[origin] = e.seq - 1
+    }
     const idx = this.byPart
     if (idx === null) return
     const p = partitionOf(e.rec)
@@ -2024,64 +2081,92 @@ export class Node {
   // the round that follows it is the repair. A suffix shipped from a ring-filtered walk was the second teacher the H3
   // resurrection needs once compaction runs (stage 3 requires this). A CLIENT link is unchanged: it gets this node's
   // HELD subset (an orphan's frozen copy is a teacher for holders, never a spoke feed), with each entry's STORED pp.
-  //! A TORN ship (the third re-check of stage 2, 2026-10-10). The shell steps `pause` inside a send, so this link can
-  // pause partway through the ship and its bounded queue overflow before the ship ends — ship() then clears the whole
-  // queue: every frame queued since the pause is gone, and the socket took only the frames before it. The ship STOPS
-  // at that first clear: a frame shipped past it would leapfrog the hole, and the peer's tails would rise above it —
-  // a hole no digest can see, and the fold of a spoke in resync would sweep the hole's rows as ghosts. The link stays
-  // unsynced, no reply goes out, and the rest is kept on the link (`torn`: the peer's tails, its r and q, and the
-  // first frame the socket did not take). The drain handler calls back here with `from`, and the ship goes on from
-  // that frame: every drain round delivers at least what the socket takes, so a ship larger than the socket plus the
-  // queue still completes (a re-ask from zero would tear at the same frame for ever), and the reply follows the whole
-  // ship, so a spoke in resync ends on it with every row. Before: the loop ran on past the clear, the reply went out
-  // with the ship's last frames, and a spoke lost 5 of 10 rows with a queue of 4, 257 of 600 at the default bound.
-  #answer(link      , d                         , r                    , q                    , from                                        ) {
+  //! A TORN ship (the third re-check of stage 2, 2026-10-10; its costs fixed 2026-10-11). The shell steps `pause`
+  // inside a send, so this link can pause partway through the ship, and then every further frame waits in the link's
+  // bounded queue. The ship never overflows that queue on purpose: when the link is paused and the queue is full it
+  // STOPS before the next frame, encodes nothing more, and keeps the rest of the answer on the link (`torn`: a cover
+  // map — the peer's tails raised to what this answer has already handed the link — and the digest's r and q). The
+  // link stays unsynced (live records wait: the resume walks every lane to its end, so it covers them) and no reply
+  // goes out. The drain flushes the queue and calls back here with the cover as `d`: each lane's resume point is a
+  // binary search, and only the frames shipped this round are encoded, so a torn ship costs what it ships — linear in
+  // its size, where re-walking and re-encoding the rest of the lane every round was quadratic (160k sparse records:
+  // 93 rounds and 15.8 s of feeder CPU). Every drain round delivers the queue plus what the socket takes, so a ship
+  // larger than both still ends, and the reply follows the whole ship. A frame of this answer that is still queued
+  // when ANYTHING clears the queue (a live tap-forward, the drain digest) moves the resume point back to the answer's
+  // first queued frame (Link.inQueue, kernel/link.ts ship): an answer stays resumable until its reply has left the
+  // queue, so a cleared reply costs the frames it lost, never a re-download from zero. Before the 2026-10-10 fix the
+  // loop ran on past a clear, the reply went out over the hole, and a spoke lost 5 of 10 rows with a queue of 4.
+  #answer(link      , d                         , r                    , q                    ) {
     const j = this.journal
     let shipped = 0
-    let tear                                         = null
-    let taken = -1 // the records the socket took before the first queued frame — the honest aeShip count of a torn ship
-    const drops = link.drops // a clear DURING this answer is a tear; the debt flag may still be set from an earlier one
+    let tear                = null // the origin the ship stopped in ('' = the lanes are done, only the reply waits)
+    let tearSeq = 0 // and the first seq it did not ship
     if (!this.armed || link.client) {
       const scopedTo = this.armed ? (p        ) => this.scope .held(p) : null
-      let skip = from !== null && this.logs.has(from.origin) // the origins before the torn one went out whole
-      for (const [origin, entries] of this.logs) {
-        if (skip) { if (origin !== from .origin) continue; skip = false }
-        let theirs = typeof d[origin] === 'number' ? (d[origin]          ) : 0
-        if (from !== null && origin === from.origin && from.seq - 1 > theirs) theirs = from.seq - 1
-        let lo = entries.length
-        while (lo > 0 && entries[lo - 1].seq > theirs) lo-- // entries are seq-ascending; find the missing suffix
-        if (lo === entries.length) continue
-        let tail = entries.slice(lo)
-        if (scopedTo !== null) tail = tail.filter((e) => scopedTo(partitionOf(e.rec)))
-        if (!tail.length) continue
-        //! armed AE answers carry each entry's STORED pp (the floor law): the receiver's floors
-        // advance only through chain-verified spans, so a suffix landing above a gap folds without
-        // forging coverage of the still-missing interior (finding 10's AE leg / the multi-source
-        // interleave). Unscoped answers stay flag-free — bytes unchanged.
-        const missing = tail.map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp }))
-        const starts           = []
-        const frames = encodeRuns(missing, undefined, this.armed, starts)
-        for (let k = 0; k < frames.length; k++) {
-          if (tear === null && link.paused) { tear = { origin, seq: missing[starts[k]].seq }; taken = shipped + starts[k] }
-          link.ship(frames[k], this.env.sink, j)
-          if (link.drops !== drops) break
+      const run                                                                                                      = []
+      lanes: for (const [origin, entries] of this.logs) {
+        const theirs = typeof d[origin] === 'number' ? (d[origin]          ) : 0
+        //! the resume point: entries are seq-ascending (a splice inserts at its seq), so the first one past the peer's
+        // tail is a binary search — never a walk of the lane
+        let lo = 0, hi = entries.length
+        while (lo < hi) { const mid = (lo + hi) >>> 1; if (entries[mid].seq > theirs) hi = mid; else lo = mid + 1 }
+        let i = lo
+        while (i < entries.length) {
+          if (link.paused && link.queued.length >= link.maxQueued) { tear = origin; tearSeq = entries[i].seq; break lanes }
+          //! one frame's run, by the codec's own rule: the split is exactly encodeRuns' over the held subset
+          // (armed AE answers carry each entry's STORED pp — the floor law: the receiver's floors advance only through
+          // chain-verified spans; unscoped answers stay flag-free, bytes unchanged)
+          run.length = 0
+          for (; i < entries.length; i++) {
+            const e = entries[i]
+            if (scopedTo !== null && !scopedTo(partitionOf(e.rec))) continue
+            const m = { rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp }
+            if (run.length && !continuesRun(run[0], run.length, m)) break
+            run.push(m)
+          }
+          if (!run.length) break
+          if (link.paused && link.inQueue === null) {
+            link.inQueue = { d: this.#cover(d, origin, run[0].seq), r, q }
+            if (link.client) this.#covered.add(link)
+          }
+          link.ship(encodeRuns(run, undefined, this.armed)[0], this.env.sink, j)
+          shipped += run.length
         }
-        if (link.drops !== drops) break
-        shipped += missing.length
       }
     }
-    if (link.drops === drops) {
-      if (shipped) j.armed && j.emit(JK.aeShip, link.uuid, shipped)
+    //! the reply is one more frame: it never overflows the queue either
+    if (tear === null && r === 1 && link.paused && link.queued.length >= link.maxQueued) tear = ''
+    if (shipped) j.armed && j.emit(JK.aeShip, link.uuid, shipped)
+    if (tear === null) {
       link.synced = true
-      if (r === 1) this.#sendDigest(link, 0, q)
-      if (link.drops === drops) return
-      //! the reply itself overflowed: the queue held the ship's frames since the pause, and they went with it — the
-      // count above stands (its clear is the journal's own row) and the resume re-sends them
-    } else if (taken > 0) j.armed && j.emit(JK.aeShip, link.uuid, taken)
-    //! the cold path: keep the peer's tails as numbers (the decoded frame's map is not ours to hold)
-    const tails                         = {}
-    for (const origin in d) if (typeof d[origin] === 'number') tails[origin] = d[origin]          
-    link.torn = { d: tails, r, q, origin: tear !== null ? tear.origin : '', seq: tear !== null ? tear.seq : 0 }
+      if (r === 1) {
+        if (link.paused && link.inQueue === null) {
+          link.inQueue = { d: this.#cover(d, null, 0), r, q }
+          if (link.client) this.#covered.add(link)
+        }
+        this.#sendDigest(link, 0, q)
+      }
+      return
+    }
+    link.synced = false
+    link.torn = { d: this.#cover(d, tear === '' ? null : tear, tearSeq), r, q }
+    // (a stop needs a full queue, and with tune.queued ≥ 1 this call queued a frame first, so inQueue already added
+    // the link; the add here keeps the rule local: wherever a cover is set, the link is in #covered)
+    if (link.client) this.#covered.add(link)
+  }
+
+  //! #cover — the cold path of a stopped or queued answer: the peer's tails `d` (as numbers: the decoded frame's map is
+  // not ours to hold), raised on every lane this answer walked before `origin` to that lane's tail, and on `origin`
+  // to just under `seq`; `origin` null = every lane walked. An answer from it as `d` ships exactly what is left.
+  #cover(d                         , origin               , seq        )                         {
+    const c                         = {}
+    for (const o in d) if (typeof d[o] === 'number') c[o] = d[o]          
+    for (const [o, entries] of this.logs) {
+      const t = o === origin ? seq - 1 : entries.length ? entries[entries.length - 1].seq : 0
+      if (t > (c[o] ?? 0)) c[o] = t
+      if (o === origin) break
+    }
+    return c
   }
 
   //! #sendDigest — announce {origin: highestHeldSeq} (the log tails: exactly what this node can serve).

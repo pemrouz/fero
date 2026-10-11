@@ -66,6 +66,21 @@ export const cellKey = (k, at) => JSON.stringify(k.length ? k : [at ?? ''])
 //! partOf — a captured log entry's partition, the kernel's partitionOf (kernel/env.ts): key[0], or `at` for a root insert
 const partOf = (x) => String(x.k.length ? x.k[0] : (x.at ?? ''))
 
+//! partOfCell — a captured state cell's partition: the first part of its cellKey (the same key[0]-or-`at` rule)
+const partOfCell = (ck) => {
+  try { const p = JSON.parse(ck); return String(Array.isArray(p) ? p[0] : p) } catch { return null }
+}
+//! groupOf — the resource a node replicates: its captured name (diagNode carries it; a `#` name is fero's own
+// `#directory`). Two resources never share a record (the HELLO refuses a different name), so every fold that
+// compares nodes compares them inside one resource. A capture without names (the sim) is one group.
+const groupOf = (n) => (typeof n.name === 'string' ? n.name : '')
+//! newestView — the newest view a resource's nodes carry: { top, node } (node = one carrying it; null when none
+// does). agreement() judges only its members; routes() falls back to it when the writer is not in the capture.
+const newestView = (ns) => {
+  const top = Math.max(0, ...ns.map((n) => (n.view ? n.view.epoch : 0)))
+  return { top, node: ns.find((n) => n.view && n.view.epoch === top) || null }
+}
+
 //! newer — the ONE conflict rule, mirrored from kernel/node.ts #apply: lexicographic (epoch, seq, origin).
 const newer = (a, b) => // is `a` strictly newer than `b`?
   a.epoch > b.epoch || (a.epoch === b.epoch && (a.seq > b.seq || (a.seq === b.seq && a.origin > b.origin)))
@@ -334,12 +349,14 @@ export const verifyTopology = (capture) => {
 // fold (journal acquire, a=partition, c=teacher) — no applyInbound row per write. A node with no row for
 // the write whose record book HOLDS (origin, seq) and that journaled an acquire of the write's partition got
 // it that way: closed status `acquired`, at the last such acquire row, with the teacher. Both facts or none.
+// The writer not in the capture (a live attach that could not reach it): the route's partition comes from a captured
+// log entry, its view from the resource's newest committed view, its holders from the rest of the resource.
 export const routes = (capture) => {
   const K = capture.vocab
   const map = new Map() // 'origin#seq' → { origin, seq, partition, nodes: {uuid: {status, t}} }
   const touch = (origin, seq) => {
     const id = origin + '#' + seq
-    if (!map.has(id)) map.set(id, { origin, seq, partition: null, nodes: {} }) // null until a writeLocal row names it — a route seen only inbound (a reborn origin's old life) has no partition FACT
+    if (!map.has(id)) map.set(id, { origin, seq, partition: null, group: null, nodes: {} }) // null until a writeLocal row names it — a route seen only inbound (a reborn origin's old life) has no partition FACT
     return map.get(id)
   }
   const acquired = new Map() // uuid → Map<partition, {t, from}> — the LAST acquire of each partition at that node
@@ -369,25 +386,202 @@ export const routes = (capture) => {
   // or, on a scoped capture, was never one of its holders
   const byLane = new Map()
   for (const node of capture.nodes) byLane.set(laneOf(node), node)
+  const byUuid = new Map(capture.nodes.map((n) => [n.uuid, n]))
   const seqs = new Map() // 'uuid lane' → Set of the seqs that node's record book holds (built on first need)
   const holds = (node, lane, seq) => {
     const k = node.uuid + ' ' + lane
     if (!seqs.has(k)) seqs.set(k, new Set(((node.logs || {})[lane] || []).map((x) => x.seq)))
     return seqs.get(k).has(seq)
   }
+  //! epochOf — the epoch a write was stamped at, from any captured record book (null when no log holds it)
+  let epochs = null
+  const epochOf = (origin, seq) => {
+    if (!epochs) {
+      epochs = new Map()
+      for (const n of capture.nodes) for (const [o, entries] of Object.entries(n.logs || {})) for (const x of entries) epochs.set(o + '#' + x.seq, x.epoch)
+    }
+    return epochs.has(origin + '#' + seq) ? epochs.get(origin + '#' + seq) : null
+  }
+  //! tenure — for a node outside the writer's view (it left cleanly, or was voted out), what it can be shown to
+  // have held while it was a member, and the last epoch it was one. `until`: its own view's epoch while that
+  // view still names it (a node cut off and voted out never installed the view without it); else the last view
+  // it installed before its own evict row (install journals evict(self) just before the new viewInstall), else
+  // one below the view that left it out. `rows`: what it holds now, every row it acquired, and every row that
+  // froze into an orphan at an epoch past `until` — the rescope of the install that left it out freezes exactly
+  // the rows it held at the exit (an orphan minted at arming, for a row it was never assigned, is at or below
+  // `until` and does not count). Built on first need.
+  const tenures = new Map()
+  const tenure = (node) => {
+    if (tenures.has(node.uuid)) return tenures.get(node.uuid)
+    const view = node.view || { epoch: 0, members: [] }
+    let until = view.members.includes(node.uuid) ? view.epoch : null
+    if (until === null) {
+      let last = null
+      for (const e of node.journal) if (e.kind === K.viewInstall) last = e.a; else if (e.kind === K.evict && e.a === node.uuid) until = last
+      if (until === null) until = view.epoch - 1
+    }
+    const rows = new Set(Array.isArray(node.held) ? node.held : [])
+    for (const e of node.journal)
+      if (e.kind === K.acquire || (e.kind === K.orphaned && Number(e.b) > until)) rows.add(String(e.a))
+    const t = { until, rows }
+    tenures.set(node.uuid, t)
+    return t
+  }
+  //! the partition of a write whose writeLocal row is not in the capture (the writer was not reached, or it is a
+  // reborn origin's old life): partOf of any captured log entry for it — the kernel's own partitionOf rule on the
+  // record's key, a fact, never a guess. null when no log holds the record.
+  let parts = null
+  const partFromLogs = (origin, seq) => {
+    if (!parts) {
+      parts = new Map()
+      for (const n of capture.nodes) for (const [o, entries] of Object.entries(n.logs || {})) for (const x of entries) parts.set(o + '#' + x.seq, partOf(x))
+    }
+    return parts.get(origin + '#' + seq) ?? null
+  }
+  //! with the writer not captured, the holders of a row come from the rest of its resource: the ring's answer any
+  // node on the newest view carries for that row (`holders`, a writer's own rows), else the members of that view
+  // whose `held` names it (a holder still copying the row in is not in `held`, so it reads as not a holder there).
+  // null — the old rule — when the resource carries no scoped fact, or no captured member holds the row.
+  const byGroup = new Map()
+  for (const n of capture.nodes) { const g = groupOf(n); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(n) }
+  const newest = new Map([...byGroup].map(([g, ns]) => [g, newestView(ns)]))
+  const holdersFromGroup = (g, p) => {
+    const { top, node: tv } = newest.get(g)
+    const ns = byGroup.get(g)
+    for (const n of ns) if (n.holders && n.view && n.view.epoch === top && n.holders[p]) return n.holders[p]
+    if (!tv || !ns.some((n) => Array.isArray(n.held))) return null
+    const hs = tv.view.members.filter((u) => { const n = byUuid.get(u); return !!n && Array.isArray(n.held) && n.held.includes(p) })
+    return hs.length ? hs : null
+  }
   for (const r of map.values()) {
     const o = byLane.get(r.origin)
-    const holders = o && o.holders && r.partition != null ? o.holders[r.partition] : null
-    const members = holders && o.view ? o.view.members : null
+    //! one resource per route: the writer's (or, with the writer not captured, that of a node that has a row for it —
+    // records never cross resources). Only that resource's nodes are stops; another resource never was meant to get it
+    const g = o ? groupOf(o) : groupOf(capture.nodes.find((n) => r.nodes[n.uuid]) || {})
+    r.group = g === '' ? null : g
+    //! the writer's own facts when it is captured; else the resource's newest committed view, the same view the
+    // header (agreement) judges by, so a live attach that could not reach the writer still tells one story
+    const part = r.partition != null ? r.partition : o ? null : partFromLogs(r.origin, r.seq)
+    const tv = newest.get(g).node
+    const view = o ? o.view : tv && tv.view.epoch > 0 ? tv.view : null
+    const holders = part == null ? null : o ? (o.holders ? o.holders[part] : null) : holdersFromGroup(g, part)
+    const members = holders && view ? view.members : null
+    //! no holder fact (unscoped, or an older capture): every member is meant to get every write, so only a node
+    // outside the committed view needs its tenure (it left, or was voted out): a write stamped after its last member
+    // epoch never was meant for it — scoped or not
+    const inView = view && view.epoch > 0 ? view.members : null
     for (const node of capture.nodes)
-      if (!r.nodes[node.uuid]) {
-        const got = r.partition != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(r.partition) : null
+      if (!r.nodes[node.uuid] && groupOf(node) === g) {
+        const got = part != null && acquired.has(node.uuid) ? acquired.get(node.uuid).get(part) : null
         if (got && holds(node, r.origin, r.seq)) { r.nodes[node.uuid] = { status: 'acquired', t: got.t, from: got.from }; continue }
-        const quiet = members && node.client !== true && members.includes(node.uuid) && !holders.includes(node.uuid)
+        let quiet = false
+        if (members && node.client === true) {
+          //! a client folds what its feeder holds (DESIGN-SCALE stage 2): meant to get a write only when its feeder holds
+          // the write's row at capture end. No feeder fact (an older capture, no primary, the feeder not captured) → the old rule
+          const f = node.feeder != null ? byUuid.get(node.feeder) : null
+          quiet = !!(f && Array.isArray(f.held)) && !f.held.includes(part)
+        } else if (members && members.includes(node.uuid)) quiet = !holders.includes(node.uuid)
+        else if (members) {
+          //! a node outside the view is judged only for rows it held while a member, and only for writes stamped
+          // while it was one (epoch ≤ until); a write whose record no log holds has no epoch — the row decides
+          const tn = tenure(node), e = epochOf(r.origin, r.seq)
+          quiet = !(tn.rows.has(part) && (e === null || e <= tn.until))
+        } else if (inView && node.client !== true && !inView.includes(node.uuid)) {
+          //! an unknown epoch (no log holds the record) proves nothing: the old rule, never-arrived
+          const e = epochOf(r.origin, r.seq)
+          quiet = e !== null && e > tenure(node).until
+        }
         r.nodes[node.uuid] = { status: quiet ? 'not-a-holder' : 'never-arrived', t: null }
       }
   }
   return map
+}
+
+//! agreement — do the nodes agree? The header's `converged`, and the nodes the page pills `differs`. Per resource
+// (groupOf): two resources hold different data by design. Inside one resource:
+//   unscoped — one fingerprint per node (stateHash): the modal side is a STRICT majority; in an even split no side
+//            is the cluster, so every side is off (ISSUES I-7).
+//   scoped   — (any node of the resource carries `held`) each node holds only its rows, so whole-node fingerprints
+//            differ by design. Each ROW is compared among the nodes that hold it (the scopedConverged monitor's rule):
+//            the members whose `held` names it, and every client whose feeder holds it (a client folds its feeder's
+//            rows). The row's fingerprint at a node is its cells there, values only; a missing cell disagrees. A node
+//            is off when it sits outside a row's strict-majority side (or the row splits evenly). A row being copied
+//            in (acquiring) or frozen on its way out (orphan) has no claim on the node; a client with no feeder fact
+//            is not judged per row.
+// `rows` (scoped only): partition → the nodes judged for it; `judged` (unscoped only): the nodes compared. The page
+// compares a cell among exactly these, and routes() judges a node left out by its tenure, so the header, the pills,
+// the cells and the writes tell one story about a member that left.
+export const agreement = (capture) => {
+  if (!capture.nodes.length) return { converged: null, groups: [], off: [] }
+  const byName = new Map()
+  for (const n of capture.nodes) { const g = groupOf(n); if (!byName.has(g)) byName.set(g, []); byName.get(g).push(n) }
+  const groups = []
+  const off = new Set()
+  for (const [g, ns] of byName) {
+    const scoped = ns.some((n) => Array.isArray(n.held))
+    //! who is judged: a member of the newest committed view the resource's nodes carry, and every client. A node that
+    // left (cleanly, or voted out while cut off) keeps a copy that later writes lawfully never reach — its routes are
+    // judged by its tenure (routes()), its copy is not compared. With no committed view yet (epoch 0) everyone is.
+    const { top, node: topView } = newestView(ns)
+    const judged = (n) => n.client === true || top === 0 || !topView || topView.view.members.includes(n.uuid)
+    const out = { name: g === '' ? null : g, nodes: ns.map((n) => n.uuid), scoped, converged: true, split: false, sides: [ns.length] }
+    if (!scoped) {
+      const js = ns.filter(judged)
+      out.judged = js.map((n) => n.uuid) // the page compares a cell among exactly these
+      const tally = new Map()
+      for (const n of js) tally.set(n.stateHash, (tally.get(n.stateHash) || 0) + 1)
+      let modal = js.length ? js[0].stateHash : 0, best = -1
+      for (const [h, c] of tally) if (c > best) { best = c; modal = h }
+      out.sides = [...tally.values()].sort((a, b) => b - a)
+      out.split = js.length > 1 && best * 2 <= js.length
+      out.converged = tally.size <= 1
+      if (!out.converged) for (const n of js) if (out.split || n.stateHash !== modal) off.add(n.uuid)
+    } else {
+      const byUuid = new Map(ns.map((n) => [n.uuid, n]))
+      const fps = new Map() // uuid → Map<partition, fingerprint> (built on first need)
+      const fpOf = (n, p) => {
+        if (!fps.has(n.uuid)) {
+          const m = new Map()
+          for (const [ck, v] of n.state) { const q = partOfCell(ck); if (!m.has(q)) m.set(q, []); m.get(q).push(JSON.stringify([ck, v])) }
+          for (const [q, a] of m) m.set(q, a.sort().join('\n'))
+          fps.set(n.uuid, m)
+        }
+        return fps.get(n.uuid).get(p) ?? ''
+      }
+      const rows = new Map()
+      const join = (p, u) => { if (!rows.has(p)) rows.set(p, []); rows.get(p).push(u) }
+      for (const n of ns) if (Array.isArray(n.held) && n.client !== true && judged(n)) for (const p of n.held) join(p, n.uuid)
+      //! the ring's duty too: a node the ring names a holder of a row (a writer's `holders` fact, from the writers on
+      // the newest committed view — an older view's list may name a node now lawfully shedding) that does not hold it
+      // yet — never got a record of it, or is still copying it in — is judged as lagging, never skipped
+      for (const n of ns)
+        if (n.holders && n.view && n.view.epoch === top)
+          for (const [p, hs] of Object.entries(n.holders))
+            for (const u of hs) { const h = byUuid.get(u); if (h && h.client !== true && judged(h) && !(rows.get(p) || []).includes(u)) join(p, u) }
+      for (const n of ns)
+        if (n.client === true && n.feeder != null) {
+          const f = byUuid.get(n.feeder)
+          if (f && Array.isArray(f.held)) for (const p of f.held) join(p, n.uuid)
+        }
+      const bad = []
+      for (const [p, us] of rows) {
+        if (us.length < 2) continue
+        const sides = new Map()
+        for (const u of us) { const fp = fpOf(byUuid.get(u), p); if (!sides.has(fp)) sides.set(fp, []); sides.get(fp).push(u) }
+        if (sides.size <= 1) continue
+        bad.push(p)
+        let top = []
+        for (const s of sides.values()) if (s.length > top.length) top = s
+        const split = top.length * 2 <= us.length
+        for (const s of sides.values()) if (split || s !== top) for (const u of s) off.add(u)
+      }
+      out.converged = bad.length === 0
+      out.rows = rows
+      out.bad = bad.sort()
+    }
+    groups.push(out)
+  }
+  return { converged: groups.every((x) => x.converged), groups, off: [...off] }
 }
 
 //! contested — cells where an LWW election ACTUALLY rejected a candidate somewhere (journal lwwSkip,
@@ -432,8 +626,9 @@ export const summarize = (capture) => ({
   journalRows: capture.nodes.reduce((n, x) => n + x.journal.length, 0),
   truncated: capture.nodes.filter((n) => n.dropped > 0).map((n) => n.uuid),
   //! converged is NULL on zero nodes — `every()` over an empty set is vacuously true, and a fold must
-  // never synthesize a green claim about a cluster it holds no facts for (M7 honesty gate)
-  converged: capture.nodes.length === 0 ? null : capture.nodes.every((n) => n.stateHash === capture.nodes[0].stateHash),
+  // never synthesize a green claim about a cluster it holds no facts for (M7 honesty gate). Otherwise it is
+  // agreement()'s verdict: per resource, and per row among its holders on a scoped capture
+  converged: agreement(capture).converged,
   //! absent (M7 attach): targets that yielded no slice this rebuild — passthrough of recorded facts;
   // absence contributes ZERO facts to every other fold (they range over nodes[] only)
   absent: capture.absent ?? [],
