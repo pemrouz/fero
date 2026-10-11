@@ -908,28 +908,31 @@ record frame's header and lowers each lane of the link's cover
 (`Link.torn`) to just under the lowest record the clear took there.
 Every other lane stays where the cover already was: at the torn
 answer's cover when an answer's frames were in the queue (V4-42's
-inQueue move runs first), else at the feeder's tail right now. The
-tail is safe only when the link was synced right up to this clear
-(`onClear` gets the synced flag from just before it): then every
-record the feeder folded so far was tapped, so it was sent, or it sits
-in a frame the clear left or in the outbox (flushed after the clear,
-into the queue). So EVERY clear on a synced client link leaves a
-cover, even one that took no record frame (only method replies, SUBREC
-deltas or a WACK). A clear on an unsynced link with no cover changes
-nothing: such a link has had no answer complete since its admit
-(synced falls only at a clear, which now leaves a cover, or at a torn
-ship, which sets one; a cover leaves only at the drain resume, which
-syncs the link or tears again), so nothing was tapped to it, and a
-tails cover there would sync it at the drain with no download. The
-drain resumes the cover like any torn answer (`#answer`, with no reply
-when none was owed) before the drain digest.
+inQueue move runs first; the drain resumes it as ever), else at the
+feeder's tail right now. A cover the clear SETS this way (no answer was
+owed) is a ceiling, marked `c`, never a claim about what the spoke
+holds (the second review's correction, below): the drain does not
+resume it; it sends the drain digest as before, and the spoke's reply
+is answered from the lower of the spoke's own tail and the ceiling on
+each lane, which uses the ceiling up. EVERY clear on a synced client
+link sets one (`onClear` gets the synced flag from just before the
+clear), even a clear that took no record frame (only method replies,
+SUBREC deltas or a WACK): from that clear on the link is unsynced and
+nothing is tapped to it, and only a cover lets a later clear lower a
+lane and a later splice be lowered into it. A clear on an unsynced
+link with no cover changes nothing: such a link has had no answer
+complete since its admit (synced falls only at a clear on a synced
+link, which now sets a cover, or at a torn ship, which sets one; a
+cover leaves only at the answer that resumes or uses it up, which
+syncs the link or tears again), so nothing was tapped to it, and the
+drain digest heals it as before.
 
 *Why nothing else is lost.* After the clear the link is unsynced, so
-nothing is tapped until the resume. A record committed before the
-drain is above the feeder's tail at the clear, so the resume ships it.
-A record spliced before the drain is lowered into the cover by
-`indexInsert` (the link joins `#covered`). A second clear before the
-drain lowers the same cover again and never raises it. A clear that
+nothing is tapped until the answer that uses the cover. A record
+committed before that answer is above the spoke's tail, so the answer
+ships it. A record spliced before it is lowered into the cover by
+`indexInsert` (the link joins `#covered`). A second clear lowers the
+same cover again and never raises it. A clear that
 takes an answer's frames, its reply and tap frames together keeps the
 answer's cover and its reply: a tap frame's records sit above that
 cover, or a splice already lowered it. A clear that took no record
@@ -959,11 +962,12 @@ frame is encoded twice inside one resume. A member link's clear is
 unchanged.
 
 *What moves.* Only a client link that was synced when a clear emptied
-its queue. The resume now re-sends at the drain what the drain
-exchange used to re-send (or lose) one round trip later: after a
-control-only clear, that is the records folded since the clear. The sim never pauses
-inside a send, so the golden, the 300-seed sweep, 59,500 and 104,050
-stay byte-identical.
+its queue: the drain exchange's answer now starts, on each lane the
+clear took a record from, just under the lowest one, where it started
+at the spoke's tail. The timing does not move: the re-send goes out
+with that answer, one round trip after the drain, as before. The sim
+never pauses inside a send, so the golden, the 300-seed sweep, 59,500
+and 104,050 stay byte-identical.
 
 *Tests* (kernel/client.test.ts): the steady-state splice, the leapfrog
 inside one flush, two clears in a row with a splice and a commit before
@@ -978,6 +982,34 @@ WACK-hop clear then a second clear (red on the first fix only: c25
 missing), and a clear on a never-synced link that leaves no cover
 (dropping the synced guard turns it red: the drain would sync the link
 with no download).
+
+*The second review's correction (same day): a ceiling, not a claim.*
+The version above first resumed the clear's cover at the drain, before
+the drain digest, on the claim that every record the feeder had folded
+so far was tapped to a synced link. That is false on a scoped feeder:
+a record it folds through the latch (`kernel/scope.ts` onAcqDone) is
+never tapped (the open STATUS latch bug). The cover sat at the
+feeder's tails, above that record; when a later record on the same
+lane folded before the drain, the resume shipped the later record
+alone, the spoke's tail rose past the latch row, and the row never
+arrived while the feeder lived (the spoke held 7 of 8 rows, and 8 of 9
+after heartbeats and one more live record). The old kernel heals that
+row through the drain digest, so it was a regression in that window.
+Now the cover the clear sets is a ceiling (`Link.torn.c`): not resumed
+at the drain, but capping the spoke's reply to the drain digest lane
+by lane. A lane the clear did not touch is answered from the spoke's
+own tail, exactly the old drain exchange, so the latch row is shipped
+as before; a lowered lane is answered from just under what the clear
+took. Test: 'a clear's cover is a ceiling, never a claim' (red on the
+first resume version: the latch row did not reach the spoke). Four
+mutations, each caught: the drain resumes the ceiling, or the clear's
+cover is not marked as one (that test red either way); the spoke's
+reply answered from its own tails alone (6 red: the steady splice, the
+leapfrog, the two clears, the two control-only clears and that test);
+the reply answered from the ceiling alone (that test red).
+The latch bug itself is unchanged and still open: with no clear, a
+later record on the lane goes live and the latch row is lost, on this
+tree and the old one alike.
 
 *Members.* A member link has no such hole. An unscoped member gets
 one frame per flush (a commit is one contiguous run, and a member
