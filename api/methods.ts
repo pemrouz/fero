@@ -39,7 +39,7 @@ import { VERB, encodable } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
-import { ARG, LIVE_VIEW, lostAssignment, type Coords, type Refused } from './data.ts'
+import { ARG, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 import { FULL } from '../kernel/codec.ts'
 
@@ -488,7 +488,7 @@ export class Caller {
     //! an argument the wire cannot carry is refused here, before the step (V4-48): encoded inside it, it threw
     // out of the kernel — at once, or from a socket handler when a held call replayed on the next primary —
     // and ended the client
-    const why = isProxy(a) ? LIVE_VIEW : encodable(a, ARG)
+    const why = encodable(a, ARG)
     if (why !== null) return Promise.reject(new Error(`methods.${m}: the argument cannot be sent: ${why}`))
     const id = ++this.#seq
     const ms = opts.timeout ?? 10_000
@@ -517,7 +517,7 @@ export class Caller {
     arm(sub)
     //! the same question as call(): a sub whose argument cannot be sent fails at once and nothing is stepped.
     // The handle's touch throws the reason, so its `ready` is marked handled: one failure, told once.
-    const why = isProxy(a) ? LIVE_VIEW : encodable(a, ARG)
+    const why = encodable(a, ARG)
     if (why !== null) {
       sub.ready.catch(noop)
       this.#fail(sub, new Error(`methods.${m}: the argument cannot be sent: ${why}`))

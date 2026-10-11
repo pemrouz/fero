@@ -29,6 +29,7 @@
 // that land synchronously inside the write() call settle through the same join as
 // commits that echo back seconds later off the owner.
 
+import { types } from 'node:util'
 import { proxy, applyRec, lens, holeAt, errText, isProxy, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
 import { encodable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
@@ -46,22 +47,81 @@ export const METHODS_ONLY = 'methods-only'
 // replication stopped for good.
 export const UNENCODABLE = 'unencodable'
 
+//! LIVE_VIEW — the reason for a live view written or passed as a value (`data.b = data.a`, the likely slip): read
+// through its traps it sent an empty object for every leaf, to every copy and the writer's own, and the writer's
+// copy went on aliasing the source (V4-48 review). Since V4-52 asked of every part (partOf), so a live view inside
+// a value is refused too, at its path.
+export const LIVE_VIEW = "a live view, not a value (use a plain copy, such as the resource's snapshot of it)"
+//! PROXY — any other Proxy in a value: the codec sends whatever its traps answer while it reads, and no copy of
+// it keeps what the traps do (V4-52)
+export const PROXY = 'a Proxy (send a plain copy of it)'
+
+//! KINDS — the built-in objects whose data is not their own enumerable fields. The codec sends an object's own
+// fields, so each arrived as something else on every other copy — a Date or a Map as {}, a Float64Array as an
+// object of its indices — while the writer kept the real thing. Refused at the write like a bigint (V4-52), each
+// with what to send instead. Told by brand (util.types works across realms and runs no trap), and asked only of an
+// object whose prototype is not Object.prototype (partOf's slow path).
+const tagOf = (o: object): string => Object.prototype.toString.call(o).slice(8, -1)
+const an = (name: string): string => (/^[AEIO]/.test(name) ? 'an ' : 'a ') + name
+const KINDS: [(o: object) => boolean, (o: object) => string][] = [
+  [types.isDate, () => 'a Date (send date.getTime() or date.toISOString())'],
+  [types.isMap, () => 'a Map (send Object.fromEntries(map), or [...map])'],
+  [types.isSet, () => 'a Set (send [...set])'],
+  [types.isWeakMap, () => 'a WeakMap (it cannot be sent)'],
+  [types.isWeakSet, () => 'a WeakSet (it cannot be sent)'],
+  //! this realm's Uint8Array (a Buffer too) is the codec's own and never asked; one of another realm (a vm
+  // context, a test runner's) is not `instanceof` it, and went as an object of its indices
+  [types.isUint8Array, () => 'a Uint8Array of another realm (send new Uint8Array(it))'],
+  [types.isTypedArray, (o) => `${an(tagOf(o))} (send Array.from(it), or its bytes as a Uint8Array)`],
+  [types.isDataView, () => 'a DataView (send its bytes as a Uint8Array)'],
+  [types.isAnyArrayBuffer, (o) => `${an(tagOf(o))} (send new Uint8Array(buffer))`],
+  [types.isRegExp, () => 'a RegExp (send re.source)'],
+  [types.isPromise, () => 'a Promise (await it and write what it gives)'],
+  [types.isNativeError, () => 'an Error (send err.message)'],
+  [types.isBoxedPrimitive, () => 'a boxed primitive (send x.valueOf())'],
+  [(o) => o instanceof URL, () => 'a URL (send url.href)'],
+]
+//! INSTANCES — a class instance (V4-52's lenient rule): 'take' sends its own enumerable fields, as V4-48 did;
+// 'refuse' refuses it like a Date. The one line to change.
+const INSTANCES = 'take' as 'take' | 'refuse'
+//! nameOf — a class's name, from its prototype's own constructor, read without running a getter
+const nameOf = (p: object): string => {
+  try {
+    const c: unknown = Object.getOwnPropertyDescriptor(p, 'constructor')?.value
+    const n: unknown = typeof c === 'function' ? Object.getOwnPropertyDescriptor(c, 'name')?.value : undefined
+    return typeof n === 'string' && n !== '' ? n : 'a class'
+  } catch { return 'a class' }
+}
+
+//! partOf — WRITE's and ARG's part rule (kernel/codec.ts Limit.part): why this array or object would arrive
+// changed, or null. A Proxy first, by brand (util.types.isProxy runs no trap): one of fero's live views is named
+// as one, any other is a Proxy. Then the fast path, an array or an object whose constructor is Object (one
+// inline-cached load, about 40 ns a part with the brand test). Then the prototype: Object.prototype is plain,
+// null is plain unless it is a module namespace, and the rest is a kind (KINDS), a plain object of another
+// realm (its prototype's prototype is null), or a class instance (INSTANCES). Object.create(plainObject) passes
+// the fast path: its inherited fields do not travel.
+export const partOf = (o: object, array: boolean): string | null => {
+  if (types.isProxy(o)) return isProxy(o) ? LIVE_VIEW : PROXY
+  if (array || (o as { constructor?: unknown }).constructor === Object) return null
+  const p: object | null = Object.getPrototypeOf(o)
+  if (p === Object.prototype) return null
+  if (p === null) return types.isModuleNamespaceObject(o) ? 'a module namespace (send a plain copy: { ...ns })' : null
+  for (let i = 0; i < KINDS.length; i++) if (KINDS[i][0](o)) return KINDS[i][1](o)
+  if (Object.getPrototypeOf(p) === null) return null
+  return INSTANCES === 'take' ? null : `an instance of ${nameOf(p)} (fero sends plain objects: send { ...value })`
+}
+
 //! WRITE, ARG — what a local write's value, and a method call's argument, may be (kernel/codec.ts encodable).
 // The wire carries 64 levels. The built-in reads wrap a stored value in up to four more — a live sub of the
 // whole resource ships it inside SUBREC, its recs list, the record and the row; the scoped gather's claim is
 // as deep — and a field write's value sits under its row: a value 61 deep was written, replicated, and then
 // could not be read back. A CALL frame wraps its argument once. Both leave a MiB under the frame cap for the
-// frame's header, the record's key and the envelopes.
-export const WRITE: Limit = { depth: MAX_DEPTH - 4, bytes: MAX_FRAME - (1 << 20) }
-export const ARG: Limit = { depth: MAX_DEPTH - 1, bytes: MAX_FRAME - (1 << 20) }
+// frame's header, the record's key and the envelopes. Both ask partOf of every array and object (V4-52).
+export const WRITE: Limit = { depth: MAX_DEPTH - 4, bytes: MAX_FRAME - (1 << 20), part: partOf }
+export const ARG: Limit = { depth: MAX_DEPTH - 1, bytes: MAX_FRAME - (1 << 20), part: partOf }
 
 //! CARRIES — what fero sends, said once for every refusal of a value (the lens, a methods.* reject, the seed)
-export const CARRIES = `fero sends null, undefined, true and false, numbers, strings, Uint8Array, and arrays and objects of these (an object sends its own fields), at most ${WRITE.depth} levels deep counted from the row and ${WRITE.bytes >> 20} MiB in all (a string counts 3 bytes a character)`
-
-//! LIVE_VIEW — the reason for a live view written or passed as a value (`data.b = data.a`, the likely slip): read
-// through its traps it sent an empty object for every leaf, to every copy and the writer's own, and the writer's
-// copy went on aliasing the source (V4-48 review). Asked of the value itself, not of every part of it.
-export const LIVE_VIEW = "a live view, not a value (use a plain copy, such as the resource's snapshot of it)"
+export const CARRIES = `fero sends null, undefined, true and false, numbers, strings, Uint8Array, and arrays and objects of these (an object sends its own fields, so not a Date, a Map, a Set or another built-in), at most ${WRITE.depth} levels deep counted from the row and ${WRITE.bytes >> 20} MiB in all (a string counts 3 bytes a character)`
 
 //! unsendable — why a local write's record cannot travel every path fero reads it back on, or null (V4-48):
 // the value from where it sits in its row (a field write starts one level down), its key and `at` counted
@@ -70,7 +130,6 @@ export const unsendable = (r: Rec): string | null => {
   let n = r.at === undefined ? 0 : 4 + r.at.length * 3
   for (const k of r.key) n += 4 + k.length * 3
   if (r.type === REC.remove) return encodable(undefined, WRITE, 0, n)
-  if (isProxy(r.value)) return LIVE_VIEW
   return encodable(r.value, WRITE, r.key.length > 1 ? r.key.length - 1 : 0, n)
 }
 

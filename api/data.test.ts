@@ -7,6 +7,8 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
+import vm from 'node:vm'
+import * as pathNs from 'node:path'
 import { Runtime } from '../shell/runtime.ts'
 import { Bind, cellOf } from './data.ts'
 import { snapshot } from './substrate.ts'
@@ -126,7 +128,7 @@ test('a view that throws inside a LOCAL write never cuts the write short: every 
 //! V4-48: a value the codec cannot carry is asked about BEFORE the stamp. Stamped first, it failed in every frame
 // that carried it afterwards (the WAL, each link, each digest answer): replication stopped for good, and a getter
 // that throws ended the server from its socket handler.
-test('a value the wire cannot carry throws at the assignment and stamps nothing — a bigint, a function, a symbol, deep nesting, a getter that throws; a patch with one such pair issues none of it', async () => {
+test('a value the wire cannot carry throws at the assignment and stamps nothing — a bigint, a function, a symbol, deep nesting, a getter that throws, a Date; a patch with one such pair issues none of it', async () => {
   const h = harness()
   let deep: unknown = { leaf: 1 }
   for (let i = 0; i < 70; i++) deep = { deep }
@@ -137,6 +139,7 @@ test('a value the wire cannot carry throws at the assignment and stamps nothing 
     ['deep', deep, /deeper than 60 levels/],
     ['getter', { get age() { throw new Error('age trips') } }, /reading it threw \(Error: age trips\)/],
     ['huge', { s: 'x'.repeat(90_000_000) }, /bigger than 255 MiB/],
+    ['date', { when: new Date(0) }, /a Date \(send date\.getTime\(\) or date\.toISOString\(\)\) at when/],
   ]
   for (const [k, v, why] of bad)
     assert.throws(() => { h.bind.data[k] = v }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["${k}"] cannot be sent: `) && why.test(e.message) &&
@@ -144,7 +147,7 @@ test('a value the wire cannot carry throws at the assignment and stamps nothing 
   assert.throws(() => h.bind.data.patch([['ok', 1], ['bad', 2n]]), /\["bad"\] cannot be sent: a bigint/)
   assert.equal(h.jk(JK.writeLocal).length, 0, 'nothing was stamped, not even the good pair of the patch')
   assert.equal(h.node.state.size, 0)
-  h.bind.data.fine = { when: new Date(0), bytes: new Uint8Array([1, 2]), list: [1, 'two', null, undefined] } // carried (a Date as its fields, as ever)
+  h.bind.data.fine = { bytes: new Uint8Array([1, 2]), list: [1, 'two', null, undefined] } // carried
   assert.equal(h.jk(JK.writeLocal).length, 1)
   await h.destroy()
 })
@@ -203,6 +206,54 @@ test("issue() refuses a record the wire cannot carry 'unencodable' (a cluster.wr
   assert.deepEqual(snapshot(h.bind.data), { ok: 1 })
   const rows = [...h.bind.outcomes.rows.values()]
   assert.ok(rows.some((r) => r.key === JSON.stringify(['big']) && r.state === 'rejected' && r.reason === 'unencodable'), JSON.stringify(rows))
+  await h.destroy()
+})
+
+//! V4-52: the codec sends an object's own fields, so a built-in whose data is not its own fields arrived as something
+// else on every other copy (a Date or a Map as {}, a Float64Array as an object of its indices), and a Proxy as whatever
+// its traps answered, while the writer kept the real thing. Each is refused at the write like a bigint, wherever it
+// sits, with what to send instead. A class instance is taken as its own fields (V4-52's lenient rule).
+test('a value that would arrive changed is refused at the write like a bigint, anywhere inside, with what to send instead; a Buffer, a null-prototype object, a class instance and a plain object of another realm are taken', async () => {
+  const h = harness()
+  h.bind.data.a = { x: 1 }
+  const realm = vm.createContext({})
+  const bad: [unknown, string][] = [
+    [new Date(0), 'a Date (send date.getTime() or date.toISOString())'],
+    [vm.runInContext('new Date(0)', realm), 'a Date (send date.getTime() or date.toISOString())'],
+    [new Map([[1, 2]]), 'a Map (send Object.fromEntries(map), or [...map])'],
+    [new Set([1]), 'a Set (send [...set])'],
+    [new WeakMap(), 'a WeakMap (it cannot be sent)'],
+    [new WeakSet(), 'a WeakSet (it cannot be sent)'],
+    [new Float64Array([1.5]), 'a Float64Array (send Array.from(it), or its bytes as a Uint8Array)'],
+    [new Int8Array(1), 'an Int8Array (send Array.from(it), or its bytes as a Uint8Array)'],
+    [vm.runInContext('new Uint8Array(2)', realm), 'a Uint8Array of another realm (send new Uint8Array(it))'],
+    [new DataView(new ArrayBuffer(4)), 'a DataView (send its bytes as a Uint8Array)'],
+    [new ArrayBuffer(4), 'an ArrayBuffer (send new Uint8Array(buffer))'],
+    [new SharedArrayBuffer(4), 'a SharedArrayBuffer (send new Uint8Array(buffer))'],
+    [/x/g, 'a RegExp (send re.source)'],
+    [Promise.resolve(1), 'a Promise (await it and write what it gives)'],
+    [new TypeError('e'), 'an Error (send err.message)'],
+    [new Number(1), 'a boxed primitive (send x.valueOf())'],
+    [new URL('http://x/'), 'a URL (send url.href)'],
+    [pathNs, 'a module namespace (send a plain copy: { ...ns })'],
+    [new Proxy({ a: 1 }, {}), 'a Proxy (send a plain copy of it)'],
+    [new Proxy([1], {}), 'a Proxy (send a plain copy of it)'],
+    [h.bind.data.a, "a live view, not a value (use a plain copy, such as the resource's snapshot of it)"],
+  ]
+  for (const [v, why] of bad) {
+    //! as the value, and deep inside one: the reason, then where it sits
+    assert.throws(() => { h.bind.data.k = v }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["k"] cannot be sent: ${why}\n  fero sends `), why)
+    assert.throws(() => { h.bind.data.k = { toys: [1, { when: v }] } }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["k"] cannot be sent: ${why} at toys[1].when\n`), why)
+  }
+  assert.deepEqual(h.bind.issue([{ type: REC.update, key: ['k'], value: [new Date(0)] }]), ['unencodable'], 'issue() refuses it too')
+  assert.equal(h.jk(JK.writeLocal).length, 1, 'nothing was stamped but the first row')
+  class Point { x = 1; y = 2 }
+  h.bind.data.buf = Buffer.from([1, 2])
+  h.bind.data.bare = Object.assign(Object.create(null), { a: 1 })
+  h.bind.data.point = new Point()
+  h.bind.data.other = vm.runInContext('({ a: [1, { b: 2 }] })', realm)
+  h.bind.data.ctor = { constructor: 'Ford', a: 1 }
+  assert.equal(h.jk(JK.writeLocal).length, 6, 'each of these is taken')
   await h.destroy()
 })
 
