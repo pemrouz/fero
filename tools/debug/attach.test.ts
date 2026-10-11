@@ -11,7 +11,12 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Runtime } from '../../shell/runtime.ts'
 import { fero } from '../../api/index.ts'
-import { AttachPool, DiagClient, pullNode } from './attach.ts'
+import { AttachPool, DiagClient, pullNode, type Puller } from './attach.ts'
+import { onDiagQ } from '../../kernel/diag.ts'
+import { Framer, VERB } from '../../kernel/codec.ts'
+import type { Node } from '../../kernel/node.ts'
+import { Sim } from '../../sim/exec.ts'
+import { cluster, writes } from '../../sim/harness.ts'
 import { captureNode } from './capture.ts'
 import { verifyReplay, summarize, routes, verifyTopology } from './model.mjs'
 import { REC } from '../../kernel/env.ts'
@@ -230,3 +235,100 @@ test('diag.allow on a REAL fero(): the attach pool reads a composed cluster with
     assert.ok(cap.nodes[0].state.some(([k]) => String(k).includes('"k"')), 'and the slice is the real node: its row is there')
   } finally { pool.close(); await s2.destroy(); await s1.destroy() }
 })
+
+//! ── the DIAG wire's deltas, caching and paging (wave 5e) — driven against kernel Nodes IN-PROCESS: each question runs
+// the kernel's own onDiagQ on a stand-in link and decodes the DIAGA it ships, so a restart, a ring wrap, a compaction
+// or a hand-off happens exactly between two pulls. The bar every case holds: the cached slice deepEquals the
+// in-process captureNode of the same instant (journal by prefix: the pulls themselves journal diagPull rows after it).
+type Asked = Record<string, unknown>
+const kernelPuller = (get: () => Node, opts: { frame?: number; before?: (body: Asked) => void } = {}) => {
+  let id = 1
+  const asked: Asked[] = []
+  const p: Puller & { asked: Asked[] } = {
+    target: 'k', asked,
+    get peer() { const n = get(); return { u: n.uuid, i: n.incarnation } },
+    q: async (body) => {
+      asked.push(body)
+      opts.before?.(body)
+      const node = get()
+      //! a frame that holds only `frame` cells: a whole state or a bigger page is too large for it (the real ceiling is 256 MiB)
+      if (opts.frame !== undefined && body.q === 'state' && (body.n === undefined || (body.n as number) > opts.frame)) throw new Error('too-large')
+      const fr = new Framer()
+      let out: Asked | null = null
+      const link = { id: 99, ship: (bytes: Uint8Array) => { for (const f of fr.push(bytes)) if (f.verb === VERB.DIAGA) out = f.value as Asked } }
+      onDiagQ(node, link as never, { id: id++, ...body })
+      const v = out as unknown as Asked
+      if (v.ok !== 1) throw new Error(v.e === 'too-large' ? 'too-large' : 'error')
+      return v
+    },
+  }
+  return p
+}
+const DIAGPULL = JK.diagPull
+//! parity at one instant: everything equal, the journal equal up to the slice's own end, and every local row past it one of this pull's diagPull rows
+// (on a tiny ring the pull's own rows can push the oldest rows out after the slice was cut: there the journal is
+// compared row for row over the t both hold, and the slice may start a little lower than the capture does)
+const sameAsLocal = (answer: Awaited<ReturnType<typeof pullNode>>, node: Node, why: string, ring = false) => {
+  const local = captureNode(node)
+  for (const k of ['uuid', 'seq', 'epoch', 'view', 'gate', 'stateHash', 'streams', 'logs', 'state', ...(ring ? [] : ['dropped'] as const)] as const)
+    assert.deepEqual(answer.node[k], local[k], `${why}: ${k} must match the in-process capture`)
+  const j = answer.node.journal
+  const lj = ring ? local.journal.filter((e) => e.t <= (j.at(-1)?.t ?? -1)) : local.journal.slice(0, j.length)
+  assert.deepEqual(ring ? j.filter((e) => e.t >= (lj[0]?.t ?? Infinity)) : j, lj, `${why}: the journal is the capture's, row for row`)
+  assert.ok(local.journal.filter((e) => e.t > (j.at(-1)?.t ?? -1)).every((e) => e.kind === DIAGPULL), `${why}: nothing past the slice but this pull's own diagPull rows`)
+}
+const journalAsks = (p: { asked: Asked[] }, from: number) => p.asked.slice(from).filter((b) => b.q === 'journal').map((b) => b.f)
+const logAsks = (p: { asked: Asked[] }, from: number) => p.asked.slice(from).filter((b) => b.q === 'logs')
+
+test('journal deltas: a second pull asks only from the first pull\'s head, and the cached slice is still the capture, row for row (wave 5e)', async () => {
+  const sim = new Sim(4)
+  const nodes = cluster(sim, 2, { heartbeatMs: 50 })
+  writes(sim, nodes, 6, 100); sim.run({ until: 1000 })
+  const p = kernelPuller(() => sim.nodes.get('n01')!)
+  const a1 = await pullNode(p)
+  sameAsLocal(a1, nodes[0], 'first pull')
+  assert.deepEqual(journalAsks(p, 0), [0], 'the first pull reads the journal from 0')
+  const head = a1.node.journal.at(-1)!.t + 1
+  writes(sim, nodes, 6, 100); sim.run({ until: 2000 })
+  const mark = p.asked.length
+  const a2 = await pullNode(p)
+  sameAsLocal(a2, nodes[0], 'second pull')
+  const asks = journalAsks(p, mark) as number[]
+  assert.equal(asks[0], head, 'the delta starts at the snapshot head the first pull cut at')
+  assert.ok(asks.every((f) => f >= head), 'and never re-reads a row it holds')
+  assert.ok(a2.node.journal.length > a1.node.journal.length, 'new rows came in')
+  assert.deepEqual(a2.node.journal.slice(0, a1.node.journal.length), a1.node.journal, 'the old rows are kept, the new ones appended')
+})
+
+test('journal deltas are safe across a restart (a new life starts the cursor at 0) and a ring wrap (a hole past the cursor is never spliced) (wave 5e)', async () => {
+  //! restart: a durable pair, the puller follows n01's current Node object
+  const sim = new Sim(21)
+  const pair = cluster(sim, 2, { durable: true }); writes(sim, pair, 6, 100); sim.run()
+  const p = kernelPuller(() => sim.nodes.get('n01')!)
+  const a1 = await pullNode(p)
+  sameAsLocal(a1, sim.nodes.get('n01')!, 'before the restart')
+  const i1 = sim.nodes.get('n01')!.incarnation
+  sim.restart('n01'); sim.run()
+  for (let i = 0; i < 3; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`after${i}`], value: i }] }, i * 5)
+  sim.run()
+  assert.ok(sim.nodes.get('n01')!.incarnation > i1, 'a new incarnation — the fixture restarted')
+  const mark = p.asked.length
+  const a2 = await pullNode(p)
+  assert.equal(journalAsks(p, mark)[0], 0, 'a new life: the journal is read from 0 again')
+  sameAsLocal(a2, sim.nodes.get('n01')!, 'after the restart')
+  //! ring wrap: a 64-row ring, pulled, then far more than 64 rows before the next pull
+  const sim2 = new Sim(5)
+  const small = ['s1', 's2'].map((uuid, i, all) => sim2.add({ uuid, listen: `sim:${uuid}`, hosts: all.filter((_, j) => j !== i).map((u) => `sim:${u}`), redialMs: 20, journalCap: 64 }))
+  for (const n of small) sim2.post(n.uuid, { kind: 'start' })
+  sim2.run()
+  const q = kernelPuller(() => small[0])
+  const b1 = await pullNode(q)
+  sameAsLocal(b1, small[0], 'before the wrap', true)
+  writes(sim2, small, 80, 200); sim2.run()
+  const b2 = await pullNode(q)
+  assert.ok(small[0].journal.dropped > b1.node.journal.at(-1)!.t, 'the ring wrapped past the old cursor — the fixture is what it claims')
+  assert.equal(b2.node.journal[0].t, b2.node.dropped, 'the slice starts where its dropped says, no hole below')
+  assert.ok(b2.node.journal.every((e, i) => i === 0 || e.t === b2.node.journal[i - 1].t + 1), 'and runs without a gap')
+  sameAsLocal(b2, small[0], 'after the wrap', true)
+})
+
