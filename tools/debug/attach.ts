@@ -142,8 +142,11 @@ const caches = new WeakMap<object, Cache>()
 // kernel Node through onDiagQ directly to make restarts, ring wraps and hand-offs happen on cue)
 export type Puller = { target: string; peer: { u: string; i: number } | null; q: (body: Record<string, unknown>, deadlineMs: number) => Promise<Record<string, unknown>> }
 
-//! pullNode — one truthful node slice via the chunked ops: meta (vocab) → node (the fold) → state (single
-// frame) → journal delta (INCLUSIVE f from the cache's cursor) → per-origin seqs
+//! STATE_PAGE: the first page size (cells) once a whole state does not fit one frame; halved on each too-large page
+export const STATE_PAGE = 1 << 20
+
+//! pullNode — one truthful node slice via the chunked ops: meta (vocab) → node (the fold) → state (whole, or
+// paged when it does not fit one frame) → journal delta (INCLUSIVE f from the cache's cursor) → per-origin seqs
 // + the missing log entries (EXCLUSIVE f — the digest/AE convention). The blob it assembles is captureNode's EXACT
 // shape — the parity pins in attach.test.ts hold them deepEqual — with encodeVal applied bridge-side (the wire
 // carries values raw; JSON safety is the capture's concern).
@@ -172,8 +175,8 @@ export const pullNode = async (c: Puller, budgetMs = PULL_BUDGET_MS): Promise<At
   // oracle compares. The state's own hash (sh) against the snapshot's says whether anything landed in that window:
   // if so the read is TORN — the state is a later instant than the journal (cut at the snapshot, below) — and the
   // slice says so, so the viewer paints "torn read" where a replay mismatch would have read as a fault (ISSUES I-2)
-  const st = await c.q({ q: 'state' }, left())
-  const torn = st.sh !== w.stateHash
+  const st = await pullState(c, left)
+  const torn = st.torn || st.sh !== w.stateHash
   //! journal: the delta from the cursor, resumed via next until the snapshot's head. CUT at the head: a row with
   // t ≥ w.jn landed AFTER the node fold was taken (a busy node keeps writing while we page), and folding it against
   // the snapshot's links/streams read as drift where there was only skew (ISSUES I-18). Rows below the snapshot's
@@ -237,7 +240,7 @@ export const pullNode = async (c: Puller, budgetMs = PULL_BUDGET_MS): Promise<At
       ...(w.held ? { held: w.held } : {}),
       stateHash: w.stateHash, dropped: start,
       journal: rows, logs,
-      state: (st.cells as [string, unknown][]).map(([k, v]) => [k, encodeVal(v)]),
+      state: st.cells.map(([k, v]) => [k, encodeVal(v)]),
       streams: w.streams, links: w.links,
       ...(torn ? { torn: true } : {}),
     } as AttachAnswer['node'],
@@ -255,6 +258,41 @@ const pullLogs = async (c: Puller, o: string, left: () => number): Promise<LogEn
     f = page.next as number
   }
   return entries
+}
+
+//! pullState — the whole state in one frame; when it does not fit (the node answers 'too-large'), paged: n cells
+// from offset f, the page size halved on each too-large page. Every page carries the torn-snapshot marker (sh, sz);
+// the pages are one instant only if every marker matches the first and the assembled cells are exactly sz distinct
+// keys — otherwise the read is torn (a write landed between pages and may have shifted the map's order). An older
+// node that ignores n answers whole again: its reply has no sz, and the state stays honestly 'too-large'.
+const pullState = async (c: Puller, left: () => number): Promise<{ sh: unknown; cells: [string, unknown][]; torn: boolean }> => {
+  try {
+    const st = await c.q({ q: 'state' }, left())
+    return { sh: st.sh, cells: st.cells as [string, unknown][], torn: false }
+  } catch (e) {
+    if (!(e instanceof Error) || e.message !== 'too-large') throw e
+  }
+  const cells: [string, unknown][] = []
+  let first: { sh: unknown; sz: number } | null = null
+  let torn = false
+  let n = STATE_PAGE
+  for (let f = 0; ; ) {
+    let page: Record<string, unknown>
+    try {
+      page = await c.q({ q: 'state', f, n }, left())
+    } catch (e) {
+      if (e instanceof Error && e.message === 'too-large' && n > 1) { n = Math.max(1, n >> 1); continue }
+      throw e
+    }
+    if (typeof page.sz !== 'number') throw new Error('too-large') // an older node: it ignored the page and answered whole
+    if (!first) first = { sh: page.sh, sz: page.sz }
+    else if (page.sh !== first.sh || page.sz !== first.sz) torn = true
+    for (const cell of page.cells as [string, unknown][]) cells.push(cell)
+    if (page.next === undefined) break
+    f = page.next as number
+  }
+  if (cells.length !== first!.sz || new Set(cells.map(([k]) => k)).size !== cells.length) torn = true
+  return { sh: first!.sh, cells, torn }
 }
 
 //! reasonOf — map a pull failure onto the CLOSED absent-reason set (anything unrecognized is 'refused':

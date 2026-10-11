@@ -277,6 +277,31 @@ test('seqs (DIAG_P 2): one origin\'s seq list, exclusive f, paged by next, typed
   assert.equal(h.jk(JK.diagPull).length, before, 'asked at follow cadence, so never journaled')
 })
 
+test('state pages (DIAG_P 2): cells [f, f+n) with the torn-snapshot marker (sh, sz) on every page; a write between pages moves the marker (wave 5e)', () => {
+  const h = diagged()
+  h.open(9); h.attach(9)
+  for (let i = 0; i < 5; i++) h.node.step({ kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] })
+  const all = [...h.node.state]
+  const pulls = h.jk(JK.diagPull).length
+  h.q(9, { id: 2, q: 'state', f: 0, n: 2 })
+  let a = h.lastA(9)
+  assert.deepEqual([a.f, a.cells, a.next, a.sz, a.sh], [0, all.slice(0, 2), 2, 5, h.node.stateHash], 'the first page, with its marker and next')
+  assert.equal(h.jk(JK.diagPull).length, pulls, 'no audit row until the last page')
+  h.q(9, { id: 3, q: 'state', f: 2, n: 2 })
+  assert.deepEqual(h.lastA(9).cells, all.slice(2, 4))
+  const sh0 = h.node.stateHash
+  h.node.step({ kind: 'write', recs: [{ type: REC.update, key: ['late'], value: 9 }] })
+  h.q(9, { id: 4, q: 'state', f: 4, n: 2 })
+  a = h.lastA(9)
+  assert.ok(a.sh !== sh0 && a.sz === 6, 'the marker moved: the pages are not one instant')
+  assert.deepEqual([a.cells, a.next], [[...h.node.state].slice(4, 6), undefined], 'the last page')
+  assert.equal(h.jk(JK.diagPull).filter((e) => e.b === 'state').length, 1, 'one audit row for the whole paged read')
+  //! no n: the whole map, the pre-5e answer every older bridge asks
+  h.q(9, { id: 5, q: 'state' })
+  a = h.lastA(9)
+  assert.deepEqual([a.cells, a.sz], [[...h.node.state], undefined])
+})
+
 test('parity by construction: captureNode is diagNode + the chunked planes (deepEqual, kinds ≥ 68 filtered)', () => {
   const h = diagged()
   h.admit(3, 'bb')

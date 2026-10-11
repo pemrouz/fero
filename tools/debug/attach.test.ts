@@ -371,3 +371,62 @@ test('the log cache: an unchanged book asks no log entries, a new write asks onl
   for (const [i, pl] of pullers.entries()) sameAsLocal(await pullNode(pl), four[i], `${four[i].uuid} after the join`)
 })
 
+test('a state over one frame is read in pages with a torn-snapshot marker: quiet pages assemble the capture\'s state; a write between pages is a torn read (wave 5e)', async () => {
+  const sim = new Sim(4)
+  const nodes = cluster(sim, 2, { heartbeatMs: 50 })
+  writes(sim, nodes, 12, 100); sim.run({ until: 1000 })
+  assert.ok(nodes[0].state.size >= 6, 'enough cells for several pages')
+  //! a frame that holds 2 cells: the whole state is too large, the first page too, the page halves down to 2
+  const p = kernelPuller(() => nodes[0], { frame: 2 })
+  const a = await pullNode(p)
+  const pages = p.asked.filter((b) => b.q === 'state' && b.n !== undefined)
+  assert.ok(pages.filter((b) => b.n === 2).length >= 3, 'read in pages of 2')
+  assert.equal(a.node.torn, undefined, 'quiet pages are one instant: no torn flag')
+  sameAsLocal(a, nodes[0], 'paged')
+  //! a write lands between two pages: the markers move, the slice says torn
+  let once = false
+  const q = kernelPuller(() => nodes[0], {
+    frame: 2,
+    //! a cell lands in n01's map between two pages: an inbound apply of a record from its peer (a write n02 stamps, delivered now)
+    before: (b) => {
+      if (b.q !== 'state' || b.f !== 2 || once) return
+      once = true
+      const size = nodes[0].state.size
+      nodes[1].step({ kind: 'write', recs: [{ type: REC.update, key: ['zz-mid-page'], value: 1 }] })
+      sim.run({ until: sim.now + 50 })
+      assert.ok(nodes[0].state.size > size, 'the cell reached n01 between the pages')
+    },
+  })
+  const t = await pullNode(q)
+  assert.ok(once, 'the write landed between pages')
+  assert.equal(t.node.torn, true, 'the pages are not one instant: torn')
+  //! a tear the markers cannot see: a cell already served is removed and written back with the same value between two
+  // pages — the hash and the count come back, but the cell moved to the end of the map and is served twice
+  //! a whole-row cell with nothing under it (a row remove would sweep a field under it, moving the count), not the last;
+  // the move happens just after the page that served it
+  const keys = [...nodes[0].state.keys()]
+  const at = keys.findIndex((k, i) => i < keys.length - 1 && JSON.parse(k).length === 1 && !keys.some((o) => o !== k && o.startsWith(k.slice(0, -1) + ',')))
+  assert.ok(at >= 0, 'a leaf row to move')
+  const k0 = JSON.parse(keys[at]) as string[]
+  const after = (Math.floor(at / 2) + 1) * 2
+  const v0 = nodes[0].state.get(JSON.stringify(k0))
+  let again = false
+  const r = kernelPuller(() => nodes[0], {
+    frame: 2,
+    before: (b) => {
+      if (b.q !== 'state' || b.f !== after || again) return
+      again = true
+      const sh = nodes[0].stateHash, size = nodes[0].state.size
+      nodes[1].step({ kind: 'write', recs: [{ type: REC.remove, key: k0 }] }); sim.run({ until: sim.now + 50 })
+      nodes[1].step({ kind: 'write', recs: [{ type: REC.update, key: k0, value: v0 }] }); sim.run({ until: sim.now + 50 })
+      assert.deepEqual([nodes[0].stateHash, nodes[0].state.size], [sh, size], 'the markers came back — the fixture is what it claims')
+      assert.equal([...nodes[0].state.keys()].at(-1), JSON.stringify(k0), 'and the cell moved to the end')
+    },
+  })
+  const u = await pullNode(r)
+  assert.ok(again)
+  assert.equal(u.node.torn, true, 'a cell served twice is a torn read too')
+  const cap = { v: 1, kind: 'live', vocab: t.vocab, seed: null, nodes: [t.node] }
+  const { el } = await (await import('./dom-shim.ts')).bootViewer('paged', cap, { search: '' })
+  assert.match(el('statusRight').innerHTML, /data-tip="torn-read">torn read/, 'and the header says torn read, never replay ✗')
+})
