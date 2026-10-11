@@ -494,6 +494,7 @@ test('the replay at a hand-off step: no cell of a row just shed, and no record a
   assert.ok(liveAfter > 0, `a held record of an acquired row arrived live after the acquire — the fixture is what it claims (${liveAfter})`)
 })
 
+const partOfKey = (ck: string) => { const p = JSON.parse(ck); return String(Array.isArray(p) ? p[0] : p) }
 type Agreement = { converged: boolean | null; off: string[]; groups: { name: string | null; nodes: string[]; scoped: boolean; converged: boolean; rows?: Map<string, string[]>; bad?: string[] }[] }
 type Stop = { status: string; t: number | null }
 type Rt = { origin: string; seq: number; partition: string | null; group: string | null; nodes: Record<string, Stop> }
@@ -553,6 +554,20 @@ test('clients and members that left are judged right: a client against its feede
   // STATUS) — and the two folds say the same thing: off on exactly those rows, its stops for them never-arrived
   const a = agreement(cap) as Agreement
   assert.ok(!a.off.includes('n05') && !a.off.includes('n04'), 'a member that left is not compared')
+  //! the client IS compared, row by row, on exactly the rows its feeder holds (the assertions below pass vacuously
+  // when it is never compared, so pin the participants themselves)
+  const rows = a.groups[0].rows!
+  for (const p of feeder.held!) assert.ok((rows.get(p) || []).includes('zc1'), `${p}: the client is judged on a row its feeder holds`)
+  for (const [p, us] of rows) if (!feeder.held!.includes(p)) assert.ok(!us.includes('zc1'), `${p}: and on no other row`)
+  //! a value the client got wrong on such a row makes it the odd one out (a copy of the real capture, one cell changed)
+  const p0 = feeder.held!.find((p) => by('zc1').state.some(([k]) => partOfKey(k) === p) && rows.get(p)!.length >= 3 && !(a.groups[0].bad ?? []).includes(p))!
+  assert.ok(p0, 'a row the client and at least two members hold and agree on — the fixture is what it claims')
+  const planted = structuredClone(cap)
+  const zc = planted.nodes.find((n) => n.uuid === 'zc1')!
+  const ci = zc.state.findIndex(([k]) => partOfKey(k) === p0)
+  zc.state[ci] = [zc.state[ci][0], 'planted']
+  const pa = agreement(planted) as Agreement
+  assert.ok(pa.off.includes('zc1') && pa.groups[0].bad!.includes(p0), 'the client disagrees with its row\'s holders: it is off')
   assert.ok(a.off.every((u) => u === 'zc1'), 'the members of the newest view agree with each other')
   for (const p of a.groups[0].bad ?? []) {
     assert.ok(feeder.held!.includes(p), `${p}: a row the client is off on is one its feeder holds`)
