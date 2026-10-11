@@ -347,7 +347,6 @@ export class Directory {
   #own: Shared | null = null
   #held: Shared[] = []
   #undo = new Set<() => void>()
-  #registered = false
   #retry: NodeJS.Timeout | null = null
   #fails = 0
   //! the other boxes' directory clients (ask-only), their state, and every source's folded addresses
@@ -531,11 +530,23 @@ export class Directory {
     if (!c || !this.#o.serve || listen === undefined) return
     try {
       await (c.methods.register as (a: unknown, o?: unknown) => Promise<unknown>)({ name: this.#o.name, uuid: this.#o.uuid, listen }, { retry: true, timeout: 5000 })
-      this.#registered = true
       this.#setError('register', undefined)
     } catch (e) {
       if (!this.#destroyed) this.#setError('register', `register: ${(e as Error)?.message ?? String(e)}`)
     }
+    //! a register that settled after this instance stopped (held while the link was down and replayed on the
+    // next primary, or one that timed out here but still landed) may have put the entry back: take it out
+    // again. A no-op when the client went with its last user (its link drop cleans the host up).
+    if (this.#destroyed) void this.#unregister(c).catch(() => {})
+  }
+
+  //! #unregister — take this instance's entry out through the shared client. Owner-only and idempotent at the
+  // host, so it needs no "registered yet?" gate. `retry`: a call held while the link is down, or shipped and lost
+  // with a dying primary, is sent again on the next primary — AFTER any register sent before it, since the
+  // Caller replays in call order — so an entry can never land after the unregister that should remove it.
+  //! async: a client already destroyed may throw at the call, and that must stay a rejection here
+  async #unregister(c: Fero): Promise<unknown> {
+    return await (c.methods.unregister as (a: unknown, o?: unknown) => Promise<unknown>)({ name: this.#o.name, uuid: this.#o.uuid }, { retry: true, timeout: 5000 })
   }
 
   //! #probe — can this process bind the rendezvous? One listen()/close() — the cheap gate in front of
@@ -607,11 +618,19 @@ export class Directory {
     for (const t of this.#timers) clearTimeout(t)
     this.#timers.clear()
     const c = this.client; this.client = null
-    //! bounded and best-effort: a link that is down already cost this entry its place (the host drops a
-    // registrant's entries when its link dies); a host from before wave 5e has no unregister — the entry then
-    // lives until the shared client's link drops, as every entry did before
-    if (c !== null && this.#own !== null && this.#own.refs > 1 && this.#registered && this.#up) {
-      try { await (c.methods.unregister as (a: unknown, o?: unknown) => Promise<unknown>)({ name: this.#o.name, uuid: this.#o.uuid }, { timeout: 2000 }) } catch {}
+    //! ALWAYS sent when the shared client stays (a server only: a client never registers), whatever this
+    // instance believes about its register: one may still be in flight (fero() resolves before it comes back)
+    // or held for the next primary, and either lands BEFORE this unregister — same link, call order. Awaited
+    // only while the link is up, and then bounded at 2 s; while it is down the Caller holds it for the next
+    // primary and the stop does not wait. A host from before wave 5e has no unregister — the entry then lives
+    // until the shared client's link drops, as every entry did before.
+    if (c !== null && this.#o.serve && this.#own !== null && this.#own.refs > 1) {
+      const gone = this.#unregister(c).catch(() => {})
+      if (this.#up) {
+        let t: NodeJS.Timeout | undefined
+        await Promise.race([gone, new Promise<void>((r) => { t = setTimeout(r, 2000); t.unref?.() })])
+        clearTimeout(t)
+      }
     }
     for (const u of this.#undo) { try { u() } catch {} }
     this.#undo.clear()
