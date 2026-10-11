@@ -75,20 +75,23 @@ export const scopedTenure = () => {
   return { cap, missed: `${owner}#${missed.seq}` }
 }
 
-//! unscopedLeaver — 4 unscoped members: writes, then n01 writes `zeta` once (every node gets it), n04 leaves cleanly
-// and is cut from the rest, and n01 writes `zeta` three more times. n04 keeps its old copy by design: the writes after
-// its leave were never meant for it. Returns the capture, the write stamped while n04 was in, and the three after.
+//! unscopedLeaver — 4 unscoped members: writes, then n01 writes `zeta` and `gone` once (every node gets them), n04
+// leaves cleanly and is cut from the rest, and n01 writes `zeta` three more times and removes `gone`. n04 keeps its old
+// copy by design: the writes after its leave were never meant for it, so `gone` is a cell only the leaver still holds.
+// Returns the capture, the write stamped while n04 was in, and the three after.
 export const unscopedLeaver = () => {
   const sim = new Sim(7)
   const nodes = cluster(sim, 4, { heartbeatMs: 50 })
   writes(sim, nodes, 6, 100)
   sim.run({ until: 1500 })
   sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['zeta'], value: 'before' }] })
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['gone'], value: 'kept' }] })
   sim.run({ until: 2000 })
   sim.post('n04', { kind: 'leave' })
   sim.run({ until: 6000 })
   for (const n of nodes) if (n.uuid !== 'n04') sim.partition('n04', n.uuid)
   for (let i = 0; i < 3; i++) sim.post('n01', { kind: 'write', recs: [{ type: REC.update, key: ['zeta'], value: 'after' + i }] }, i * 5)
+  sim.post('n01', { kind: 'write', recs: [{ type: REC.remove, key: ['gone'] }] }, 20)
   sim.run({ until: 9000 })
   const cap = captureSim(sim)
   const by = (u: string) => cap.nodes.find((n) => n.uuid === u)!
@@ -97,6 +100,8 @@ export const unscopedLeaver = () => {
   assert.equal(by('n01').held, undefined, 'unscoped: no node carries `held`')
   assert.ok(['n01', 'n02', 'n03'].every((u) => JSON.stringify(zeta(u)) === JSON.stringify(zeta('n01'))) && JSON.stringify(zeta('n04')) !== JSON.stringify(zeta('n01')),
     'the stayers agree on zeta and n04 keeps its old copy — the fixture is what it claims')
+  assert.ok(['n01', 'n02', 'n03'].every((u) => !by(u).state.some(([k]) => k === '["gone"]')) && by('n04').state.some(([k, v]) => k === '["gone"]' && v === 'kept'),
+    'only the leaver still holds `gone`')
   const log = by('n01').logs.n01.filter((x) => x.k[0] === 'zeta')
   assert.equal(log.length, 4)
   return { cap, before: `n01#${log[0].seq}`, after: log.slice(1).map((x) => `n01#${x.seq}`) }
