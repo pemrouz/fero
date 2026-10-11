@@ -1083,3 +1083,79 @@ test('the joint commit (DESIGN-LEAVE §10.10.2, §10.10.4 supersession): a refus
   feed('dd', { e: 2, g: 1, ce: 1, h: 'aa,bb,cc', ve: 2 })
   assert.equal(aa.epoch, 2, 'superseded by its own majority: committed')
 })
+
+test('the stayer\'s count (DESIGN-LEAVE §10.5, §10.10.6): a member whose last word names a hold above my view is not counted — learned from its ask (PULL vs) and from its HELLO (v) at admit; an empty ask or a HELLO that names no hold takes the word back; a client\'s word is not read', () => {
+  const h = fiveAt1('dd')
+  h.node.step({ kind: 'linkDown', link: h.link.bb, reason: 'cut' }); h.node.step({ kind: 'linkDown', link: h.link.ee, reason: 'cut' })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' }, 'dd, aa and cc: three of five')
+  const hold = [{ e: 2, h: 'aa,bb,cc', p: 'aa' }]
+  //! cc's ask: it holds a vote at 2 above view 1 — cc is reachable, but not a member to count toward writing at view 1
+  h.node.step({ kind: 'bytesIn', link: h.link.cc, bytes: encodeControl(VERB.PULL, { e: 1, vs: hold }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'minority' })
+  assert.deepEqual(h.jk(JK.gateClose).map((e) => e.a), ['minority'])
+  //! the release is a frame: cc's empty ask, and cc counts again
+  h.node.step({ kind: 'bytesIn', link: h.link.cc, bytes: encodeControl(VERB.PULL, { e: 1, vs: [] }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+  //! a fresh link from cc whose HELLO names the hold: admitted knowing it — never a round trip in which cc is counted
+  h.node.step({ kind: 'linkDown', link: h.link.cc, reason: 'cut' })
+  h.node.step({ kind: 'linkUp', link: 21, dialed: true, to: 'sim:cc' })
+  h.node.step({ kind: 'bytesIn', link: 21, bytes: encodeControl(VERB.HELLO, { u: 'cc', i: 2, l: 'sim:cc', v: hold }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'minority' })
+  //! ...and a fresh HELLO that names no hold replaces the old word (a release lost on the dead link is learned here)
+  h.node.step({ kind: 'linkDown', link: 21, reason: 'cut' })
+  h.node.step({ kind: 'linkUp', link: 22, dialed: true, to: 'sim:cc' })
+  h.node.step({ kind: 'bytesIn', link: 22, bytes: encodeControl(VERB.HELLO, { u: 'cc', i: 3, l: 'sim:cc' }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+  //! a client's word is not read (I-23): its HELLO's v and its PULL's vs change nothing
+  h.node.step({ kind: 'linkUp', link: 31, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 31, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: '', r: 1, v: [{ e: 9, h: 'q1,q2,q3', p: 'q1' }] }) })
+  h.node.step({ kind: 'bytesIn', link: 31, bytes: encodeControl(VERB.PULL, { e: 1, vs: [{ e: 9, h: 'aa,cc,dd', p: 'aa' }] }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+})
+
+test('the ask (DESIGN-LEAVE §10.10.6): a grant that holds me is announced at once as PULL {e, vs} on every member link, again on every tick, and once more, empty, when the last hold ends at an install (to the new view\'s members); nothing at epoch 0, where the HELLO alone carries the hold (v); at admit the ask goes on the fresh link only when my holds are not what my HELLO on it said', () => {
+  const h = fiveAt1('cc')
+  const pulls = (l: number) => h.sentOn(l, VERB.PULL).map((f) => f.value as { e: number; vs?: unknown[] })
+  const hold = { e: 2, h: 'aa,bb,cc', p: 'aa' }
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: mem(['aa', 'bb', 'cc']), p: 'aa', o: 1 }) })
+  for (const u of ['aa', 'bb', 'dd', 'ee']) assert.deepEqual(pulls(h.link[u]), [{ e: 1, vs: [hold] }], `the ask on the ${u} link, at once`)
+  h.tick()
+  for (const u of ['aa', 'bb', 'dd', 'ee']) assert.equal(pulls(h.link[u]).length, 2, `the refresh on the ${u} link`)
+  //! view 2 = {aa,bb,cc} installs: the hold ends; the empty ask is the release, to the members of the view I hold now
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.VIEW, { e: 2, m: mem(['aa', 'bb', 'cc']) }) })
+  for (const u of ['aa', 'bb']) assert.deepEqual(pulls(h.link[u]).pop(), { e: 2, vs: [] }, `the release on the ${u} link`)
+  for (const u of ['dd', 'ee']) assert.equal(pulls(h.link[u]).length, 2, `${u} is not a member of view 2: nothing`)
+  h.tick()
+  for (const u of ['aa', 'bb']) assert.equal(pulls(h.link[u]).length, 3, 'holding nothing, the tick asks nothing more')
+  //! epoch 0: a genesis grant is a hold, but no ask goes out — the HELLO on a fresh link carries it
+  const g = harness('cc', { hosts: ['sim:aa', 'sim:bb'] })
+  g.node.step({ kind: 'start' })
+  g.admit(1, 'aa')
+  g.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PROPOSE, { e: 1, m: mem(['aa', 'bb', 'cc']), p: 'aa', o: 0 }) })
+  assert.equal((g.sentOn(1, VERB.VOTE).pop()!.value as { g: number }).g, 1)
+  assert.deepEqual(g.node.membership.holds(g.node).map((x) => x.h), ['aa,bb,cc'], 'three apart from the empty view')
+  g.tick()
+  assert.equal(g.sentOn(1, VERB.PULL).length, 0, 'no ask at epoch 0')
+  g.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:bb' })
+  assert.deepEqual((g.sentOn(2, VERB.HELLO)[0].value as { v: unknown }).v, [{ e: 1, h: 'aa,bb,cc', p: 'aa' }], 'the HELLO names the hold')
+  //! the hold ends while that HELLO is in flight (view 1 lands): at admit the ask on the fresh link says so, once
+  g.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: mem(['aa', 'bb', 'cc']) }) })
+  assert.deepEqual(g.node.membership.holds(g.node), [])
+  g.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb' }) })
+  assert.deepEqual(g.sentOn(2, VERB.PULL).map((f) => f.value), [{ e: 1, vs: [] }], 'the ask at admit: not what my HELLO said')
+  g.node.step({ kind: 'linkUp', link: 3, dialed: true, to: 'sim:dd' })
+  g.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'dd', i: 1, l: 'sim:dd' }) })
+  assert.equal(g.sentOn(3, VERB.PULL).length, 0, 'a HELLO that said nothing and holds that are nothing: no ask at admit')
+})
+
+test('a HELLO whose v is not a list of holds is a malformed HELLO: the link closes', () => {
+  const h = harness('aa', { hosts: ['sim:bb'] })
+  h.node.step({ kind: 'start' })
+  h.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', v: 'held' }) })
+  assert.deepEqual(h.jk(JK.frameDrop).map((e) => e.b), ['malformed hello'])
+  assert.deepEqual(h.of('close').map((e) => e[2]), ['malformed-hello'])
+  h.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:cc' })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'cc', i: 1, l: 'sim:cc', v: [{ e: 0, h: 'x', p: 'y' }] }) })
+  assert.equal(h.of('close').length, 2, 'an epoch of 0 is no hold')
+})

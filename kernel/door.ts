@@ -27,8 +27,9 @@ export interface Door { mac(msg: string): string; nonce(): string; clientMac?(ms
 
 //! HelloKeys — a HELLO's identity keys as a peer sent them (and as this node sent its own): what a proof
 // signs, so none of them can change in flight before admission. `u, i, l` are checked for shape before
-// anything reads them; the optional keys ride as decoded (shape-checked in node.ts).
-export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: unknown; c?: unknown; m?: unknown; k?: unknown }
+// anything reads them; the optional keys ride as decoded (shape-checked in node.ts). `v` (DESIGN-LEAVE
+// §10.10.6) is the sender's holds, [{e, h, p}], absent when it holds nothing.
+export interface HelloKeys { u: string; i: number; l: string; r?: unknown; n?: unknown; c?: unknown; m?: unknown; k?: unknown; v?: unknown }
 
 //! the nonce bounds (§2): 16 random bytes as base64url is 22 characters (the api); the sim's toy sends 32
 // hex characters; anything outside 16..64 is a malformed HELLO.
