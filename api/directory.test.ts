@@ -663,6 +663,11 @@ test("a failed lookup is opened again with backoff: a successful register does n
     assert.ok(await until(() => lookups >= before + 2, 8000), `the dead lookup is opened again, with backoff (${lookups} lookups)`)
     assert.ok(d.error?.includes('lookup exploded'), `a register's success did not clear the dead lookup's error (${d.error})`)
     assert.deepEqual(hosts, [], 'nothing found while the lookup is dead')
+    //! …and it never hammers: by now the delay is at least 200 ms and doubling, so 2 s holds a handful of tries
+    // at most (with no backoff it was ~190 in 2 s)
+    const n0 = lookups
+    await sleep(2000)
+    assert.ok(lookups - n0 <= 10, `the re-subscribe backs off: ${lookups - n0} lookups in 2 s`)
     broken = false
     assert.ok(await until(() => d.error === undefined, 10_000), `the lookup recovered and its error cleared (${d.error})`)
     assert.ok(await until(() => hosts.includes('127.0.0.1:7')), `and it publishes again (${hosts})`)
