@@ -708,6 +708,7 @@ test('a live attach missing a client\'s feeder tells one story: the header names
   const head = el('statusRight').innerHTML
   assert.match(head, /data-tip="converged">converged ✓</, 'the members that answered agree')
   assert.ok(head.includes(`<span class="sst info" data-tip="clients-unjudged">not judged: zc1 (its feeder ${feeder} is not in the capture)</span>`), 'the header names the client it cannot judge, and why')
+  assert.ok(head.includes('<span class="sst warn" data-tip="absent">absent: 127.0.0.1:9001 (<span data-tip="absent:timeout">timeout</span>)</span>'), 'the target that did not answer is named, as the header has always written it')
   g(`expanded.add('g/writes'); render()`)
   assert.doesNotMatch(el('tree').innerHTML, /⊘[^<]*zc1/, 'no write lists the client as missing it')
   g(`navTo(${JSON.stringify(`g/writes/${r.origin}#${r.seq}`)})`)
