@@ -511,7 +511,9 @@ export const derived = (p: any): number => (unwrap(p)[NODE] as DataNode<unknown>
 //     through that mark (it calls data's own operator). A view made off an escaped one counts as
 //     escaped too, in EITHER order: code that holds the escaped view raw can ask it for the same
 //     deduped child later, even when a handler made that child first. So the collector never releases
-//     a node that is escaped or sits under an escaped node (`held`).
+//     a node that is escaped or sits under an escaped node (`held`) — unless the node is PRIVATE: made
+//     by an operator data never dedups (filter(fn), map(fn) …), so no parent's reuse table lists it and
+//     no code but the handler's wrappers can reach it.
 // A wrapper is NOT held by its raw handle (a WeakRef maps raw → wrapper), so a deduped view the source
 // still lists is released once no wrapper of it is alive; data evicts a disposed dedup hit and mints a
 // fresh view on the next call. Release is collector-timed: a dropped view stops being worked out at the
@@ -526,13 +528,23 @@ const gone = new FinalizationRegistry<DataNode<unknown>>((n) => {
   live.set(n, c - 1)
   release(n)
 })
+//! PRIVATE_OPS — the operators data never dedups: their dedupKey is always null (an opaque function has
+// no value identity; set ops dedup by nothing). A view one of them makes is reachable only through the
+// handle it returned, so `held` does not look past it. api/views.test.ts pins the rule against data:
+// if data ever starts reusing one, that test goes red before the collector can release a reused view.
+// An operator left out is only slower to go (`held` walks up from it), never released early.
+export const PRIVATE_OPS: ReadonlySet<string> = new Set(['filter', 'map', 'reduce', 'group', 'tap', 'to', 'union', 'intersect', 'except'])
+const owned = new WeakSet<DataNode<unknown>>()
 
 //! held — is this node escaped, or made (at any depth) off a node that is? Asked at release time, not
 // when the view is made: module code may escape a parent AFTER a handler made a deduped child of it
 // (handler `ctx.data.top(3).sum('n')`, then module `f.data.top(3).sum('n')` gets the same sum handle).
-// A yes is remembered on the node; the walk stops at the source, which is never escaped.
+// A yes is remembered on the node; the walk stops at the source, which is never escaped, and at a
+// PRIVATE node (owned), which nothing outside its wrappers can reach — so a deduped child of one stops
+// there too.
 const held = (n: DataNode<unknown>): boolean => {
   if (escaped.has(n)) return true
+  if (owned.has(n)) return false
   for (const p of n.parents) if (p.kind !== 'source' && held(p)) { escaped.add(n); return true }
   return false
 }
@@ -553,14 +565,16 @@ const release = (n: DataNode<unknown>): void => {
 }
 
 //! adopt — the wrapper for a raw derived-view handle (made once per raw handle while it is alive);
-// anything else — a value, a source or its lens, a wrapper — passes through as it is
-const adopt = (x: unknown): unknown => {
+// anything else — a value, a source or its lens, a wrapper — passes through as it is. `op` names the
+// operator that made x: a PRIVATE_OPS view is always a fresh handle, so it always reaches the mint below
+const adopt = (x: unknown, op?: string | symbol): unknown => {
   if (x === null || (typeof x !== 'object' && typeof x !== 'function')) return x
   const known = wrappers.get(x)?.deref() // first: a repeated child read (data caches child handles) ends here
   if (known !== undefined) return known
   if (views.has(x)) return x
   const n = (x as any)[NODE]
   if (!(n instanceof DataNode) || n.kind === 'source') return x
+  if (typeof op === 'string' && PRIVATE_OPS.has(op)) owned.add(n)
   const t = Object.create(null)
   t[RAW] = x
   const w = new Proxy(t, VIEW)
@@ -601,7 +615,7 @@ const VIEW: ProxyHandler<any> = forward({
         void self
         const r = Reflect.apply(v, t, a)
         if (sub) return unhooked(r as { dispose(): void }, t[NODE])
-        return adopt(r) // a view made off an escaped one is kept by release's `held` walk
+        return adopt(r, prop) // a view made off an escaped one is kept by release's `held` walk
       }
     }
     return typeof prop === 'symbol' ? v : adopt(v)
@@ -636,7 +650,7 @@ const SCOPE: ProxyHandler<any> = forward({
     if (typeof v !== 'function') return v
     if (typeof prop === 'string' && OPERATORS.has(prop)) {
       const op = unwrap(t)[prop]
-      return (...a: unknown[]) => adopt(op(...a))
+      return (...a: unknown[]) => adopt(op(...a), prop)
     }
     return (...a: unknown[]) => adopt(Reflect.apply(v, t, a))
   },

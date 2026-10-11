@@ -11,7 +11,7 @@ import vm from 'node:vm'
 import { Runtime } from '../shell/runtime.ts'
 import { Bind } from './data.ts'
 import { Host } from './methods.ts'
-import { derived, snapshot } from './substrate.ts'
+import { PRIVATE_OPS, derived, snapshot } from './substrate.ts'
 import { VERB, Framer, encodeControl } from '../kernel/codec.ts'
 
 const gc: () => void = (globalThis as { gc?: () => void }).gc ?? (v8.setFlagsFromString('--expose-gc'), vm.runInNewContext('gc') as () => void)
@@ -349,5 +349,41 @@ test("I-29 — a write through ctx.data that fires module code: a deduped view m
     } finally {
       await s.stop()
     }
+  }
+})
+
+test('I-29 — a filter a handler makes off a view module code holds raw is released: no code can reach a view data never reuses (filter, map, and a sum made off one)', async () => {
+  const s = solo({
+    team: (t: string, ctx: { data: any }) => Object.keys(snapshot(ctx.data.top(10).filter((r: { t: string }) => r.t === t)) as object).length,
+    names: (_: unknown, ctx: { data: any }) => Object.keys(snapshot(ctx.data.top(10).map((r: { t: string }) => r.t)) as object).length,
+    teamTotal: (t: string, ctx: { data: any }) => snapshot(ctx.data.top(10).filter((r: { t: string }) => r.t === t).sum('n')),
+  }, { r1: { n: 1, t: 'a' }, r2: { n: 2, t: 'b' } })
+  try {
+    //! module code holds top(10) raw (one debug print is enough to escape it): the handler's ctx.data.top(10)
+    // is the same view. Before: every filter made off it stayed, one per call, for good
+    const board = s.bind.data.top(10)
+    for (let i = 0; i < 20; i++) assert.equal(await s.host.invokeLocal('team', 'a'), 1)
+    for (let i = 0; i < 20; i++) assert.equal(await s.host.invokeLocal('names', undefined), 2)
+    for (let i = 0; i < 20; i++) assert.equal(await s.host.invokeLocal('teamTotal', 'b'), 2)
+    assert.ok(await settle(() => derived(board) === 0), `60 handler views under the shared top(10) left ${derived(board)} behind`)
+    s.bind.data.r3 = { n: 3, t: 'a' }
+    assert.equal(Object.keys(snapshot(board) as object).length, 3, 'the top(10) module code holds still folds')
+  } finally {
+    await s.stop()
+  }
+})
+
+test("I-29 — the views the collector treats as private are the ones data never reuses: two calls with the same arguments give two views (data's dedup rule pinned)", async () => {
+  const s = solo({}, { r1: { n: 1 }, r2: { n: 2 } })
+  try {
+    const d = s.bind.data
+    const fn = (r: unknown) => r
+    for (const op of PRIVATE_OPS) {
+      const args = op === 'union' || op === 'intersect' || op === 'except' ? [d.top(1)] : op === 'reduce' ? [(acc: unknown) => acc, 0] : [fn]
+      const a = d[op](...args), b = d[op](...args)
+      assert.notEqual(a, b, `data now reuses ${op}(…): the collector would release a view module code can reach (substrate PRIVATE_OPS)`)
+    }
+  } finally {
+    await s.stop()
   }
 })
