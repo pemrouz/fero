@@ -74,8 +74,13 @@ export class Mesh {
   //! connect a and b with a fresh link (both sides admitted), queues emptied
   connect(a: string, b: string) { this.open(a, b).land() }
   //! #hello — the HELLO this mesh writes for y (the node's own is dropped with every non-membership frame, so the
-  // mesh's copy is what the peer reads; it says what the node's would)
-  #hello(y: string): Record<string, unknown> { return { u: y, i: 1, l: `sim:${y}` } }
+  // mesh's copy is what the peer reads; it says what the node's would): y's holds ride as `v`, as on the node's own
+  // (DESIGN-LEAVE §10.10.6), absent when it holds nothing or is a client
+  #hello(y: string): Record<string, unknown> {
+    const peer = this.nodes.get(y)!
+    const vs = peer.client ? [] : peer.membership.holds(peer).map((h) => ({ e: h.e, h: h.h, p: h.p }))
+    return { u: y, i: 1, l: `sim:${y}`, ...(vs.length ? { v: vs } : {}) }
+  }
   //! open — the link comes up at both ends and each node ships its HELLO, but neither HELLO has LANDED yet: the
   // caller moves the mesh (a grant, a release, a tick) and then calls `land`, which feeds each side the HELLO the
   // other sent at open time (the holds as they were THEN, DESIGN-LEAVE §10.10.6: what changed while the HELLO was

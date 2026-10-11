@@ -159,6 +159,20 @@ export interface Vote { e: number; p: string; h: string; prior?: Vote[] }
 export const cloneVote = (v: Vote): Vote => ({ ...v, ...(v.prior ? { prior: v.prior.map((x) => ({ ...x })) } : {}) })
 //! NO_HOLDS — what holds() returns in the common case, shared so the write path allocates nothing for it
 const NO_HOLDS: readonly Vote[] = Object.freeze([]) as readonly Vote[]
+//! Hold — a hold as a frame names it (the HELLO's `v`, the PULL's `vs`): the gate needs `e`, the next proposer needs
+// `h` (the members of the held view, to be joint over it), the disown needs `p` (whose ask it is to answer)
+export interface Hold { e: number; h: string; p: string }
+//! holdsOk — the HELLO's `v` shape (DESIGN-DOOR §2's rule for the optional keys: anything else is a malformed HELLO):
+// a bounded list of {e, h, p} with e a positive integer, h and p strings. A PULL's `vs` is read more gently (#holdsOf
+// keeps the well-formed entries), as every membership frame's body is.
+export const holdsOk = (x: unknown): x is Hold[] =>
+  Array.isArray(x) && x.length <= 4096 && x.every((y) => typeof y === 'object' && y !== null
+    && Number.isInteger((y as { e?: unknown }).e) && (y as { e: number }).e > 0
+    && typeof (y as { h?: unknown }).h === 'string' && typeof (y as { p?: unknown }).p === 'string')
+//! HELLO_WORD — what a HELLO that named holds leaves as the node's last word: a word no key equals, so the next
+// change's ask goes on EVERY member link (the HELLO went out on one; a stayer that linked before the hold existed
+// has heard nothing — DESIGN-LEAVE §10.10.6, the last note's item 1)
+const HELLO_WORD = '\0hello'
 
 //! protocol constants — ticks are heartbeat ticks (the membership clock). Each is the DEFAULT of its
 // tune-table row (kernel/tune.ts: suspectTicks, pulls, proposalAge, rejoinTicks, leaveTicks); tick() reads node.tune.
@@ -243,6 +257,63 @@ export class Membership {
   // live only while a majority of its members may hold it; once a majority of them consent to this ballot it cannot
   // be — that is how a hold is SUPERSEDED when its proposer is gone (§10.10.4).
   #jointOk(p: { joint: Set<string>; votes: Set<string> }): boolean { return [...p.joint].every((hh) => majority(hh.split(','), p.votes)) }
+  //! #heldPeers — what linked SERVERS last told me they hold (DESIGN-LEAVE §10.10.6): their HELLO's `v` at admit, their
+  // ask PULL {vs} after. An entry stays until that peer's NEXT word replaces it — an empty ask when its last hold
+  // ended (the entry goes), the HELLO of a fresh link to it (which names no hold when it holds none: a release lost
+  // on the dead link is learned here) — never a clock (a two-tick memory counted a held member again when its
+  // heartbeat was late: the second review's blocker) and never a window (forgetting the old link's word at admit and
+  // learning the new one from an ask one round trip later had the stayer count the held member for that round trip,
+  // across the cut, on every flap: the third review). Nothing from a CLIENT link (I-23: a client's PULL is a question,
+  // never a teaching). Read for MEMBERS of my view (the gate, #propose); kept for any server, so a joiner's word is
+  // there the moment it is a member. A stayer's gate counts no link whose member sits on a hold above my view (§10.5).
+  #heldPeers = new Map<string, Hold[]>()
+  #heldPeer(u: string): boolean {
+    const hs = this.#heldPeers.get(u)
+    return hs !== undefined && hs.some((x) => x.e > this.view.epoch)
+  }
+  //! #lastAsk — the holds I last announced, as a key, so the ask goes out when they CHANGE and once more when the last
+  // one ends (the release is a frame, never silence); HELLO_WORD after a HELLO that named holds (helloHolds)
+  #lastAsk = ''
+  //! my holds as a frame names them, and as one key (the same spelling for the ask, the HELLO and #heldPeers)
+  #named(hs: readonly Vote[]): Hold[] { return hs.map((x) => ({ e: x.e, h: x.h, p: x.p })) }
+  #keyOf(hs: Hold[]): string { return hs.map((x) => `${x.e}:${x.p}:${x.h}`).join('|') }
+  //! #holdsOf — the holds a frame named: the well-formed entries above `above`
+  #holdsOf(x: unknown, above: number): Hold[] {
+    return Array.isArray(x) ? (x as unknown[]).filter((y): y is Hold => typeof y === 'object' && y !== null && typeof (y as { e?: unknown }).e === 'number' && typeof (y as { h?: unknown }).h === 'string' && typeof (y as { p?: unknown }).p === 'string' && (y as { e: number }).e > above) : []
+  }
+  //! helloHolds — what my HELLO carries on a fresh link (`v`): my holds, so the peer ADMITS the link knowing them and
+  // there is no round trip in which it counts me before my ask lands (the fresh link, §10.10.6). The key goes on the
+  // Link (what this HELLO said), so my own admit sends the ask on this link only when my holds changed while the HELLO
+  // was in flight (onAdmit). Nothing from a client (I-23). Carried at epoch 0 too, unlike the ask: a genesis grant is a
+  // hold, and a fresh proposer must learn it before its first ballot; a fresh node's HELLO is byte-identical with
+  // before. A HELLO that names holds is an ANNOUNCEMENT, so the release must follow it — at epoch 0 too, where no ask
+  // goes out: the word it leaves is HELLO_WORD, and the first change after it goes out as the ask on every member link
+  // (an empty one when the last hold ended), not only on the link that carried the HELLO.
+  helloHolds(node: Node, link: Link): Hold[] {
+    if (node.client) return []
+    const hs = this.#named(this.holds(node))
+    link.saidHolds = this.#keyOf(hs)
+    if (hs.length) this.#lastAsk = HELLO_WORD
+    return hs
+  }
+  //! the ask (§10.10.6): PULL {e, vs} with my holds, on every admitted member link — every tick while I hold anything
+  // (the refresh); the moment my holds CHANGE (a grant that holds me, a disown, an install), so a quiet point never
+  // sees a stale count; once more when the last hold ends (the release IS this frame); and at admit on the fresh link
+  // when my holds are not what my HELLO on it said (onAdmit). The vote's proposer answers with a VIEW at or above it or
+  // disowns it (onPull); every other member learns not to count me and which view a ballot must be joint over.
+  // Nothing at epoch 0: a genesis grant IS a hold but nobody is a member, the gate is open genesis whatever I hold, and
+  // a rival genesis proposer reads the hold from my HELLO or from my refusal (`hm`) — and the frames would perturb
+  // every forming cluster (§10.10.5: the in-tree sweep's seed 89 moved on timing alone).
+  #askFrame(hs: Hold[]): Uint8Array { return encodeControl(VERB.PULL, { e: this.view.epoch, vs: hs }) }
+  #ask(node: Node, on: 'tick' | 'change') {
+    if (node.client || this.view.epoch === 0) return
+    const hs = this.#named(this.holds(node))
+    const key = this.#keyOf(hs)
+    if (key === '' && this.#lastAsk === '') return
+    if (on === 'change' && key === this.#lastAsk) return
+    this.#send(node, this.#admitted(node).filter((l) => !l.client && this.isMember(l.uuid)), this.#askFrame(hs))
+    this.#lastAsk = key
+  }
   //! #burned — the highest epoch known to hold SPENT votes for a ballot that never committed (the
   // proposer vanished mid-round). Vote-once-per-epoch means a burned epoch is unwinnable by any OTHER
   // proposer, and with every proposal pinned to view.epoch+1 that was a PERMANENT liveness wedge: a
@@ -315,8 +386,9 @@ export class Membership {
     if (!this.isMember(node.uuid)) return { open: false, reason: this.#wasMember ? 'evicted' : 'joining' }
     if (this.held(node)) return { open: false, reason: 'held' } // a warning vote closes my gate (DESIGN-LEAVE §10.10.2)
     let reachable = 1 // self
+    const anyHeld = this.#heldPeers.size > 0 // the common case reads one size
     for (const l of node.links.values())
-      if (l.state === LS.admitted && !l.dead && this.isMember(l.uuid)) reachable++
+      if (l.state === LS.admitted && !l.dead && this.isMember(l.uuid) && !(anyHeld && this.#heldPeer(l.uuid))) reachable++ // a held member is not counted (§10.5): its link proves reachability, not consent to write at my view
     return reachable * 2 > this.view.members.length
       ? { open: true, reason: '' }
       : { open: false, reason: 'minority' }
@@ -331,6 +403,7 @@ export class Membership {
   // proposals, proposal retry/abandon, stale-pull retries + alarmed release, rejoin/evictee recovery.
   tick(node: Node) {
     const j = node.journal
+    this.#ask(node, 'tick') // the per-tick refresh of my holds (DESIGN-LEAVE §10.10.6; nothing when I hold none)
     //! genesis: fully-formed open mesh + lowest uuid ⇒ propose view 1 over the admitted set.
     // CLIENT links are invisible here (M5b): a spoke never counts toward formation, never enters the
     // member sweep, and never wins the lowest-uuid race — and a client NODE runs none of the member
@@ -444,10 +517,21 @@ export class Membership {
   //! onAdmit — view-on-admit, symmetric with digest-on-admit: every admission announces the committed
   // view, so a healed partition re-converges its VIEWS even when no epoch-stamped records flow (the
   // plan's split-brain-heal re-announce). A rejoiner/evictee learns its status in one round-trip.
-  onAdmit(node: Node, link: Link) {
+  onAdmit(node: Node, link: Link, hello?: { v?: unknown }) {
     this.#leavers.delete(link.uuid) // a fresh admit forgets what an earlier link heard: a non-lowest leaver still leaving knocks again next tick; the lowest re-proposes only after its ballot ages out (§10.7, the #leavers note)
     if (!node.client && this.view.epoch > 0) // a spoke announces nothing: its view is its feeder's, and a reborn feeder must not inherit it
       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
+    if (node.client || link.client) return // a client reads no word and a client's is not read (I-23)
+    //! a fresh link is admitted KNOWING the peer's holds — its HELLO carried them (`v`) — so the old link's word is
+    // REPLACED here, never forgotten into a window (DESIGN-LEAVE §10.10.6, the fresh link). A HELLO that names no hold
+    // says the peer holds nothing: a release announced on the dead link and lost is learned here (lostRelease).
+    const hs = this.#holdsOf(hello?.v, 0)
+    if (hs.length) this.#heldPeers.set(link.uuid, hs); else this.#heldPeers.delete(link.uuid)
+    //! ...and my side of it: my HELLO on this link carried my holds as they were when it left (helloHolds); if they
+    // changed while it was in flight, the ask on this link says so now — one frame, only then (askAtAdmit); at epoch 0
+    // nothing, as every ask (the HELLO exchange is the one window there; a genesis duel is a hosts question, I-22)
+    const mine = this.#named(this.holds(node))
+    if (this.view.epoch > 0 && this.#keyOf(mine) !== link.saidHolds) this.#send(node, [link], this.#askFrame(mine))
   }
 
   //! staleObserved — the epoch-staleness contract: any epoch above the committed view closes the gate
@@ -553,6 +637,7 @@ export class Membership {
     j.armed && j.emit(JK.vote, v.e, grant ? 1 : 0, proposer)
     //! a refusal while held carries `hm`, the views my holds are for, so the proposer re-offers joint over them
     link.ship(encodeControl(VERB.VOTE, { e: v.e, g: grant ? 1 : 0, ce: this.view.epoch, h, ve: this.votedFor.e, ...(!grant && hs.length ? { hm: hs.map((x) => x.h) } : {}) }), node.env.sink, j)
+    if (grant) this.#ask(node, 'change') // a grant that holds me is announced at once, behind the VOTE on the proposer's link
   }
 
   onVote(node: Node, link: Link, v: { e?: unknown; g?: unknown; ce?: unknown; h?: unknown; ve?: unknown; hm?: unknown }) {
@@ -603,10 +688,17 @@ export class Membership {
       this.#finishLeave(node, true)
   }
 
-  onPull(node: Node, link: Link, v: { e?: unknown }) {
+  onPull(node: Node, link: Link, v: { e?: unknown; vs?: unknown }) {
     if (typeof v?.e !== 'number') return
     if (!node.client && this.view.epoch > v.e) // a spoke's view is hearsay — only a member answers a PULL
       link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal)
+    //! a held member's ask (DESIGN-LEAVE §10.10.6): remember what it holds — my gate stops counting it, my next ballot
+    // is joint over it — and an EMPTY list replaces what it held before: that is its release. A CLIENT's `vs` is not
+    // read (I-23): one client PULL once made every ballot of the server it reached joint over members that do not exist.
+    if (!node.client && !link.client && Array.isArray(v.vs)) {
+      const holds = this.#holdsOf(v.vs, v.e)
+      if (holds.length) this.#heldPeers.set(link.uuid, holds); else this.#heldPeers.delete(link.uuid)
+    }
   }
 
   //! install — the ONE place a view becomes committed fact: bump the node epoch, clear satisfied stale/
@@ -653,6 +745,7 @@ export class Membership {
     // same FIFO links — a peer still on the old epoch must receive the VIEW before the round, or it
     // deterministically drops the round for epoch skew and the offer waits a full re-round cadence.
     if (!node.client) this.#send(node, this.#admitted(node), encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members })) // a spoke never floods (I-23)
+    this.#ask(node, 'change') // my holds were re-read against the new view — say so, behind the VIEW on every link
     //! M6: every install re-derives the scope machine against the new ring — held partitions that
     // left the R-set freeze into orphans HERE, the instant the duty changes (kernel/scope.ts)
     if (node.armed) node.scope!.rescope(node)
@@ -825,8 +918,11 @@ export class Membership {
     this.#remember({ e: view.epoch, p: node.uuid, h }) // my own vote, the earlier ones above my view kept behind it
     node.persistBoot() // the self-vote is spent — durable before any PROPOSE frame leaves
     //! joint over every hold of MY OWN (DESIGN-LEAVE §10.10.2: a held member leads too — the lowest live member leads,
-    // held or not — with its holds kept behind its own vote in `prior`); refusals (`hm`) add more
+    // held or not — with its holds kept behind its own vote in `prior`) and every hold a linked MEMBER of my view told
+    // me of (its HELLO, its asks) — at epoch 0 every linked server, the formation set; only a member's word, never a
+    // client's or an ex-member's, may widen my ballot (§10.10.6); refusals (`hm`) add more
     const joint = new Set<string>(this.holds(node).map((x) => x.h))
+    for (const [u, hs] of this.#heldPeers) if (node.byUuid.has(u) && (this.view.epoch === 0 || this.isMember(u))) for (const x of hs) if (x.e > this.view.epoch) joint.add(x.h)
     this.#proposal = { view, old: this.view.members.map((m) => m[0]), oldEpoch: this.view.epoch, h, votes: new Set([node.uuid]), ticks: 0, age: 0, joint }
     node.journal.armed && node.journal.emit(JK.propose, view.epoch, view.members.length)
     //! a solo proposal (single-member old and new sets) commits immediately — solo boot mode
