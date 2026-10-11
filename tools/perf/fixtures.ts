@@ -96,3 +96,53 @@ export const ringFixture = (): Ring => {
   return r
 }
 export const ringKeys = Array.from({ length: 4096 }, (_, i) => `part${i}`)
+
+//! the TORN-SHIP fixture (the resume-cost fix, 2026-10-11 — kernel/node.perf.ts and kernel/client.test.ts): a feeder
+// holding `n` sparse records of lane `bb` (every other seq, so one frame per record — the shape of a held-filtered
+// scoped lane), and a client on link 7 whose socket behaves like the shell's: a send that leaves more than `hwm` bytes
+// buffered steps `pause` from INSIDE the send, and drain() empties the buffer and steps `drain`. ask() sends the
+// client's first-connect digest (d = {}, r = 1). The counters: `handed` = frames handed to the link's send gate (each
+// one encoded once — the answer encodes a frame only to hand it over), `sent` = frames that reached the socket,
+// `last` = the last frame's bytes. The timed loop stays in its owning file.
+export const tornFeeder = (n: number, hwm: number, queued?: number) => {
+  const c = { buffered: 0, paused: false, handed: 0, sent: 0, last: null as Uint8Array | null }
+  let node: Node
+  const env: Env = {
+    now: () => 0, rng: () => 0.5,
+    sink: {
+      connect() {}, close() {}, timer() {}, cancel() {}, apply() {}, persist() {}, boot() {}, confirm() {}, snapshot() {},
+      send(link, bytes) {
+        if (link !== 7) return
+        c.sent++; c.last = bytes; c.buffered += bytes.length
+        if (!c.paused && c.buffered > hwm) { c.paused = true; node.step({ kind: 'pause', link: 7 }) }
+      },
+    },
+  }
+  node = new Node({ uuid: 'ff', listen: 'x:1', heartbeatMs: 50, ...(queued !== undefined ? { tune: { queued } } : {}) }, env)
+  node.journal.armed = false
+  node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'x:2' })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'x:2' }) })
+  node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  for (let at = 0; at < n; at += 4096) {
+    const frames = encodeRuns(Array.from({ length: Math.min(4096, n - at) }, (_, k) => {
+      const i = at + k
+      return { rec: { type: REC.update, key: [`r${i}`], value: i } as Rec, origin: 'bb', seq: 2 * i + 1, epoch: 1 }
+    }))
+    const chunk = new Uint8Array(frames.reduce((s, f) => s + f.length, 0))
+    let o = 0
+    for (const f of frames) { chunk.set(f, o); o += f.length }
+    node.step({ kind: 'bytesIn', link: 1, bytes: chunk })
+  }
+  node.step({ kind: 'linkUp', link: 7, dialed: false })
+  node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'x:9', r: 1 }) })
+  const link = node.links.get(7)!
+  const ship = link.ship.bind(link)
+  link.ship = (bytes, sink, j) => { c.handed++; ship(bytes, sink, j) }
+  c.sent = 0; c.buffered = 0 // the HELLO went out at admit; count from the ask
+  const ask = encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 })
+  return {
+    node, link, c,
+    ask: () => node.step({ kind: 'bytesIn', link: 7, bytes: ask }),
+    drain: () => { c.buffered = 0; c.paused = false; node.step({ kind: 'drain', link: 7 }) },
+  }
+}

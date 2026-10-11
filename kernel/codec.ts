@@ -498,7 +498,8 @@ const runsScratch = new Outbox()
 type RunRec = { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }
 //! continuesRun: the ONE run rule — does `r` extend the run that starts at `head` and is `k` records long? Same
 // origin, same epoch, the next seq, the same issuer, and (with attempt identity) the next cid. encodeRuns splits by
-// it, and so may a caller that collects one frame's run at a time.
+// it; node.ts #answer collects one frame's run at a time by it, so a ship can stop at a frame boundary without
+// encoding the rest of the lane (the resume-cost fix of 2026-10-11).
 export const continuesRun = (head: RunRec, k: number, r: RunRec): boolean =>
   r.origin === head.origin &&
   r.epoch === head.epoch &&
@@ -512,17 +513,12 @@ export const encodeRuns = (
   // run-split condition — pp is per-record data, so the split shape is identical either way (the
   // snapshot chunker's one-frame assert depends on this).
   withPp = false,
-  //! starts (optional): receives the index in `records` of each frame's first record, one push per frame —
-  // the one caller that resumes a torn ship (node.ts #answer) reads the seq it tears at from it. The split
-  // is unchanged; a caller that passes nothing pays one undefined check per frame.
-  starts?: number[],
 ): Uint8Array[] => {
   const frames: Uint8Array[] = []
   const o = runsScratch
   let i = 0
   while (i < records.length) {
     const head = records[i]
-    if (starts !== undefined) starts.push(i)
     o.begin(verb, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch },
       head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid! } : undefined, withPp)
     o.add(head.rec, head.pp)
