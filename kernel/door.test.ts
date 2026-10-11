@@ -966,3 +966,32 @@ test('the client key (§15): a client-key dialer is admitted r:1 and verifies th
     assert.deepEqual([a.rows(JK.doorReject), b.rows(JK.doorReject)], [[], []], 'two members, one old: a member link is signed with the secret on both')
     assert.deepEqual([a.node.admitted(), b.node.admitted()], [['bb'], ['aa']]) }
 })
+
+// ── the release rule (DESIGN-LEAVE §10.10.6, 2026-10-12): `v` on the HELLO, signed ──────────────────────────────
+
+test('v is signed: a held dialer\'s HELLO carries its holds after k, and its proof covers them as [[e, p, h]] under fero-door/2 — the secured pair admits; the same HELLO with v rewritten in flight fails bad-proof at the acceptor', () => {
+  const five: [string, string][] = ['aa', 'bb', 'cc', 'dd', 'ee'].map((u) => [u, `sim:${u}`])
+  //! aa holds a vote at 2 for {bb,cc,dd}, two apart from view 1: a hold, restored from its dir
+  const held: NodeOpts['boot'] = { epoch: 1, members: five, votedFor: { e: 2, p: 'bb', h: 'bb,cc,dd' } }
+  const a = rec('aa', { door: doorFor(1), boot: held }), b = rec('bb', { door: doorFor(2), boot: { epoch: 1, members: five } })
+  a.up(1, true, 'sim:bb'); b.up(1)
+  const ha = dec(a.sends(1)[0]).value as Record<string, unknown>
+  assert.deepEqual(Object.keys(ha), ['u', 'i', 'l', 'k', 'v'], 'v rides last')
+  assert.deepEqual(ha.v, [{ e: 2, h: 'bb,cc,dd', p: 'bb' }])
+  const msg = proofMsg('dialer', 'n1', 'n2', 'bb', 'sim:bb', ha as never)
+  assert.ok(msg.startsWith('["fero-door/2",'), 'the label versions the message')
+  assert.ok(msg.endsWith(',[[2,"bb","bb,cc,dd"]]]'), 'the holds as arrays of numbers and strings: one encoding')
+  assert.ok(proofMsg('dialer', 'n1', 'n2', 'bb', 'sim:bb', { u: 'x', i: 1, l: '' }).endsWith(',[]]'), 'absent: an empty list, still inside the array')
+  pump(a, 1, b, 1)
+  assert.deepEqual(a.rows(JK.identified).map((r) => r[1]), ['bb']); assert.deepEqual(b.rows(JK.identified).map((r) => r[1]), ['aa'])
+  assert.deepEqual(b.rows(JK.doorReject), [])
+  //! a relay that strips the hold from the HELLO: the acceptor rebuilds the message from what it read, and the proof fails
+  const a2 = rec('aa', { door: doorFor(3), boot: held }), b2 = rec('bb', { door: doorFor(4), boot: { epoch: 1, members: five } })
+  a2.up(1, true, 'sim:bb'); b2.up(1)
+  const { v: _, ...stripped } = dec(a2.sends(1)[0]).value as Record<string, unknown>
+  b2.feed(1, encodeControl(VERB.HELLO, stripped))
+  a2.feed(1, b2.sends(1)[0]) // bb's HELLO: the dialer proves over the HELLO it SENT (with v)
+  b2.feed(1, a2.sends(1)[1]) // the proof, against the HELLO bb read (without v)
+  assert.deepEqual(b2.rows(JK.doorReject).map((r) => r[1]), ['bad-proof'])
+  assert.deepEqual(b2.rows(JK.identified), [])
+})
