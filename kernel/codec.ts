@@ -35,6 +35,12 @@ import { REC, type Rec } from './env.ts'
 export const MAGIC = 0xf3
 export const MAX_FRAME = 1 << 28 // 256 MiB
 export const HEADER = 11
+//! roomOf — the most bytes ONE record may take, counted as the writer reserves them (encodable's count: a string
+// 4 + 3 a character), and still fit ALONE in a frame of `cap` body bytes beside its envelope (provenance, attempt
+// identity, the count, a pp varint). MAX_FRAME less 1 MiB at the production cap (api/data.ts WRITE's number); at a
+// test cap (a node's tune row `frame`) a sixteenth less, never less than 256 bytes — what an envelope with two
+// uuid-sized names takes. The relay asks it before a client's record is stamped (kernel/write.ts onWrite).
+export const roomOf = (cap: number): number => cap - Math.min(1 << 20, Math.max(256, cap >> 4))
 
 //! VERB: dense 1-byte frame verbs, append-only. The codec fails closed on unknowns at dispatch, not here.
 // DIGEST carries {d: {origin: highestHeldSeq}, r: 0|1} — "here is what I hold; r=1 means please answer with yours".
@@ -164,21 +170,46 @@ const vtOf = (v: unknown): number =>
 const utf8 = new TextEncoder()
 const utf8d = new TextDecoder()
 
+//! FrameFull — a frame reached its cap while it was written (Writer.ensure). It is a FrameError, so every net that
+// takes one still takes it (diag's too-large gate, the bytesIn net), and it is thrown as the ONE instance FULL,
+// compared by identity where a caller cuts (Outbox.put) or refuses (api/methods.ts): no user code runs to tell it.
+export class FrameFull extends FrameError {}
+export const FULL = new FrameFull('frame exceeds MAX_FRAME')
+
 //! ── Writer — one growable scratch buffer with back-patching ──────────────────
 // Backs both the standalone encodeFrame() and the per-link Outbox. ensure()
 // doubles; u32at() patches a reserved slot (bodyLen / crc / count) after the
 // records are appended, which is what makes streaming encoding possible.
+//! The limit is EXACT (V4-51, the frame cuts): ensure() throws FULL when the bytes NEEDED pass it, and growth stops at
+// it. It used to compare the DOUBLED buffer with MAX_FRAME + HEADER, so the real bound was a 2^28-byte buffer and no
+// caller could ask a smaller one. A frame's writer holds its cap + HEADER (MAX_FRAME, or a node's tune row `frame`);
+// the shell's WAL rows and snapshot file are not frames and use an Infinity limit.
 export class Writer {
   buf = new Uint8Array(4096)
   len = 0
+  //! limit — the most bytes this writer may hold; end — min(buf.length, limit): the fast path's one compare
+  limit: number
+  end: number
+  constructor(limit = MAX_FRAME + HEADER) { this.limit = limit; this.end = Math.min(4096, limit) }
+  setLimit(limit: number) { this.limit = limit; this.end = Math.min(this.buf.length, limit) }
   ensure(n: number) {
-    if (this.len + n <= this.buf.length) return
+    if (this.len + n <= this.end) return
+    const need = this.len + n
+    if (need > this.limit) throw FULL
     let cap = this.buf.length * 2
-    while (cap < this.len + n) cap *= 2
-    if (cap > MAX_FRAME + HEADER) throw new FrameError('frame exceeds MAX_FRAME')
+    while (cap < need) cap *= 2
+    if (cap > this.limit) cap = this.limit
     const next = new Uint8Array(cap)
     next.set(this.buf.subarray(0, this.len))
     this.buf = next
+    this.end = cap
+  }
+  //! shrink — drop a buffer a big frame grew past `past` bytes (a writer reused for ever must not keep 256 MiB for good
+  // after one big frame). Only between frames: the bytes written so far go with the buffer.
+  shrink(past: number) {
+    if (this.buf.length <= past) return
+    this.buf = new Uint8Array(4096)
+    this.end = Math.min(4096, this.limit)
   }
   u8(v: number) { this.ensure(1); this.buf[this.len++] = v }
   u32(v: number) { this.ensure(4); this.u32at(this.len, v); this.len += 4 }
@@ -475,8 +506,12 @@ export interface AttemptRun { issuer: string; baseCid: number }
 // (socket.write queues; sim delivers later), so handing out the reusable scratch
 // would corrupt in-flight frames — one slice per FRAME per flush (not per record)
 // is the M0 cost, revisited with a buffer ring in M8.
+//! CUT BY SIZE (V4-51): a frame holds at most `cap` body bytes. add() appends a record if it fits; when it would pass
+// the cap, the open frame goes to `pending` and the record opens the next frame of the SAME run (cut). The writer
+// rolls back a record that did not fit, so a frame only ever holds whole records — an overflow used to throw after
+// the record's tag and key were written, and the next flush shipped a frame the receiver refused ('frame truncated').
 export class Outbox {
-  w = new Writer()
+  w: Writer
   count = 0
   countAt = 0
   open = false
@@ -487,18 +522,27 @@ export class Outbox {
   // fan-out filter a link's record subset is lawfully GAPPY — add() detects the break and ROTATES
   // (finishes the open frame into `pending`, begins a fresh one), mirroring encodeRuns' split rule.
   // Unscoped fan-out is every-record-to-every-link, so rotation never fires there (byte-identity).
+  // A run longer than the cap also leaves in several frames (cut), each a valid run of its own.
   pending: Uint8Array[] = []
+  //! the open frame's verb and whether it carries provenance: what cut() needs to begin the next frame of the run
+  #verb = 0
+  #prov = false
   #origin = ''
   #nextSeq = 0
   #epoch = 0
   #iss: string | undefined
   #nextCid = 0
+  //! cap — the most body bytes one frame of this outbox may hold: MAX_FRAME, or a node's tune row `frame` (the test
+  // seam). The writer is built here, once: its identity never changes (kernel/alloc.perf.ts R0b).
+  constructor(cap = MAX_FRAME) { this.w = new Writer(cap + HEADER) }
   begin(verb: number, prov?: Prov, attempt?: AttemptRun, pp = false) {
     const w = this.w
     w.len = 0
     w.u8(MAGIC); w.u8((prov ? FLAG_PROV : 0) | (prov && attempt ? FLAG_ATTEMPT : 0) | (pp ? FLAG_PP : 0)); w.u8(verb)
     w.u32(0) // bodyLen, patched
     w.u32(0) // crc, patched
+    this.#verb = verb
+    this.#prov = !!prov
     if (prov) {
       w.str(prov.origin); w.varint(prov.baseSeq); w.varint(prov.epoch)
       if (attempt) { w.str(attempt.issuer); w.varint(attempt.baseCid) }
@@ -523,12 +567,38 @@ export class Outbox {
     const bytes = this.finish()
     if (bytes) this.pending.push(bytes)
   }
+  //! add — append one record; when it would pass the cap, cut: the open frame goes to `pending` and the record opens
+  // the next frame of the same run
   add(r: Rec, pp?: number) {
-    if (this.pp) this.w.varint((pp ?? -1) + 1) // wire 0 = unknown predecessor (fails closed)
-    writeRecord(this.w, r)
+    if (!this.put(r, pp)) { this.cut(); this.put(r, pp) }
+  }
+  //! put — append one record if it fits under the cap: true. False when the frame is full, and then NOTHING of the
+  // record is left in it (any throw rolls the writer back to the record's start). A record that does not fit even an
+  // EMPTY frame throws: nobody could ever send it, so it must never have been stamped (V4-48 asks a local write, the
+  // relay a client's — kernel/write.ts onWrite).
+  put(r: Rec, pp?: number): boolean {
+    const w = this.w, at = w.len
+    try {
+      if (this.pp) w.varint((pp ?? -1) + 1) // wire 0 = unknown predecessor (fails closed)
+      writeRecord(w, r)
+    } catch (e) {
+      w.len = at
+      if (e !== FULL) throw e
+      if (this.count === 0) throw tooBig(w.limit - HEADER)
+      return false
+    }
     this.count++
     this.#nextSeq++
     this.#nextCid++
+    return true
+  }
+  //! cut — finish the open frame into `pending` and begin the next frame of the same run where it stopped: the same
+  // verb, origin, epoch, issuer and pp mode, its baseSeq and baseCid the next record's own
+  cut() {
+    const verb = this.#verb, prov = this.#prov, pp = this.pp
+    const origin = this.#origin, seq = this.#nextSeq, epoch = this.#epoch, iss = this.#iss, cid = this.#nextCid
+    this.pending.push(this.finish()!)
+    this.begin(verb, prov ? { origin, baseSeq: seq, epoch } : undefined, prov && iss !== undefined ? { issuer: iss, baseCid: cid } : undefined, pp)
   }
   //! finish(): patch + checksum + hand over an owned copy. Returns null for an empty frame (nothing queued this step).
   finish(): Uint8Array | null {
@@ -541,36 +611,57 @@ export class Outbox {
     w.u32at(3, bodyLen)
     w.u32at(this.countAt, this.count)
     w.u32at(7, crcFrame(w.buf, w.len))
-    return w.buf.slice(0, w.len)
+    const out = w.buf.slice(0, w.len)
+    w.shrink(SHRINK)
+    return out
   }
 }
+//! SHRINK — past this a writer's buffer goes back to 4 KiB once its frame is out: a per-link outbox is reused for the
+// link's life, and one 200 MiB catch-up must not pin 256 MiB for good. A fitting steady cycle keeps its buffer (R0b).
+const SHRINK = 1 << 24
+//! tooBig — a record bigger than an empty frame reached the encoder: fero's own bug (a check before the stamp missed
+// it), never a peer's fault — so a plain Error, loud, never a FrameError that would only drop a link
+const tooBig = (cap: number): Error =>
+  new Error(`a record bigger than one frame (${cap} bytes) reached the encoder — it can never be sent, so it must never be stamped`)
 
 //! encodeControl: a control frame (HELLO/PING/...) carrying exactly ONE value as its body — v2's controlFrame shape, kept.
 // Encodes into a MODULE-LEVEL scratch Writer (adversarial-review perf finding: a fresh 4KB Writer per
 // control frame on the ACK/NACK paths) — safe because the kernel is single-threaded, encode never
 // re-enters, and the return is always an owned slice. A rare oversized frame (a huge VIEW) is not
-// allowed to pin its grown buffer forever: the scratch resets past 64KB.
+// allowed to pin its grown buffer forever: the scratch resets past 64KB — after a refused or failed
+// encode too (one refused 256 MiB reply would otherwise keep the buffer). The failure leg is a catch
+// that rethrows, not a finally: a finally on this path measured ~8% on small control frames, a catch 0%.
+//! cap (V4-51): a control frame carries ONE value and cannot be cut. Past `cap` body bytes it throws FULL to the
+// caller: RESULT and SUBREC ask the node's tune row `frame` (node.ts 'reply' / 'subOut'), and the api turns FULL into
+// a typed refusal (api/methods.ts, reason 'too-large'); every other control frame asks MAX_FRAME.
 const ctrl = new Writer()
-export const encodeControl = (verb: number, value?: unknown): Uint8Array => {
+export const encodeControl = (verb: number, value?: unknown, cap = MAX_FRAME): Uint8Array => {
   const w = ctrl
+  if (w.limit !== cap + HEADER) w.setLimit(cap + HEADER)
   w.len = 0
-  w.u8(MAGIC); w.u8(0); w.u8(verb)
-  w.u32(0); w.u32(0)
-  const vt = vtOf(value)
-  w.u8(vt)
-  w.value(value, vt)
+  try {
+    w.u8(MAGIC); w.u8(0); w.u8(verb)
+    w.u32(0); w.u32(0)
+    const vt = vtOf(value)
+    w.u8(vt)
+    w.value(value, vt)
+  } catch (e) {
+    w.shrink(1 << 16)
+    throw e
+  }
   w.u32at(3, w.len - HEADER)
   w.u32at(7, crcFrame(w.buf, w.len))
   const out = w.buf.slice(0, w.len)
-  if (w.buf.length > 1 << 16) w.buf = new Uint8Array(4096)
+  w.shrink(1 << 16)
   return out
 }
 
-//! encodeFrame: one-shot RECORDS encode (tests, catch-up). The hot path uses a per-link Outbox instead.
+//! encodeFrame: one-shot RECORDS encode (tests, catch-up). The hot path uses a per-link Outbox instead. ONE frame:
+// a batch that does not fit one throws FULL (a FrameError, as before), never a quietly shorter frame.
 export const encodeFrame = (records: Rec[], prov?: Prov): Uint8Array => {
   const o = new Outbox()
   o.begin(VERB.RECORDS, prov)
-  for (const r of records) o.add(r)
+  for (const r of records) if (!o.put(r)) throw FULL
   return o.finish() ?? encodeEmpty(prov)
 }
 const encodeEmpty = (prov?: Prov): Uint8Array => {
@@ -604,26 +695,43 @@ export const continuesRun = (head: RunRec, k: number, r: RunRec): boolean =>
   r.seq === head.seq + k &&
   r.iss === head.iss &&
   (head.iss === undefined || r.cid === head.cid! + k)
+//! Cut — one frame of a run and how many of the run's records it took (encodeRun's answer)
+export interface Cut { bytes: Uint8Array; n: number }
+//! CUT — encodeRun's one reused answer, like runsScratch: read it before the next call (the kernel is single-threaded)
+const CUT: Cut = { bytes: new Uint8Array(0), n: 0 }
+//! encodeRun (V4-51) — ONE frame from records[from..]: the run that starts there (continuesRun), as many of its
+// records as fit `cap` body bytes, at least one. A frame ends inside a run only at the cap. encodeRuns is this in a
+// loop; node.ts #answer, the commit's WAL rows and the snapshot call it frame by frame, so a ship that must stop has
+// encoded nothing past where it stops (V4-42's rule: only the frames shipped this round are encoded).
+export const encodeRun = (records: RunRec[], from: number, verb: number = VERB.RECORDS, withPp = false, cap = MAX_FRAME): Cut => {
+  const o = runsScratch
+  o.w.setLimit(cap + HEADER)
+  const head = records[from]
+  o.begin(verb, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch },
+    head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid! } : undefined, withPp)
+  o.put(head.rec, head.pp) // an empty frame takes the first record, or put throws: it could never be sent
+  let j = from + 1
+  while (j < records.length && continuesRun(head, j - from, records[j]) && o.put(records[j].rec, records[j].pp)) j++
+  CUT.bytes = o.finish()!
+  CUT.n = j - from
+  return CUT
+}
 export const encodeRuns = (
   records: RunRec[],
   verb: number = VERB.RECORDS,
   //! withPp (M6 floor law): armed senders stamp every record's predecessor varint (FLAG_PP). NEVER a
-  // run-split condition — pp is per-record data, so the split shape is identical either way (the
-  // snapshot chunker's one-frame assert depends on this).
+  // run-split condition — pp is per-record data, so the split shape is identical either way.
   withPp = false,
+  //! cap (V4-51): the most body bytes one frame may hold — MAX_FRAME, or a node's tune row `frame`. Under it the
+  // frames are exactly the runs; a run bigger than it leaves in several frames, each cut where the next record
+  // would not fit.
+  cap = MAX_FRAME,
 ): Uint8Array[] => {
   const frames: Uint8Array[] = []
-  const o = runsScratch
-  let i = 0
-  while (i < records.length) {
-    const head = records[i]
-    o.begin(verb, { origin: head.origin, baseSeq: head.seq, epoch: head.epoch },
-      head.iss !== undefined ? { issuer: head.iss, baseCid: head.cid! } : undefined, withPp)
-    o.add(head.rec, head.pp)
-    let j = i + 1
-    while (j < records.length && continuesRun(head, j - i, records[j])) { o.add(records[j].rec, records[j].pp); j++ }
-    frames.push(o.finish()!)
-    i = j
+  for (let i = 0; i < records.length;) {
+    const c = encodeRun(records, i, verb, withPp, cap)
+    frames.push(c.bytes)
+    i += c.n
   }
   return frames
 }
@@ -671,6 +779,9 @@ export class RecordView {
     if (this.#hasAt) this.#at = c.str()
     this.#valueAt = c.pos
   }
+  //! span — the record's own bytes on the wire, its tag through its value (no pp varint): the relay's size gate
+  // reads it (kernel/write.ts onWrite) — no decode, two fields
+  get span(): number { return this.#end - this.#keyAt + 1 }
   get key(): string[] { this.#head(); return this.#key! }
   get at(): string | undefined { this.#head(); return this.#at }
   get value(): unknown {

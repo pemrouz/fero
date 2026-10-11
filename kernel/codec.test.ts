@@ -6,8 +6,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import {
-  Framer, FrameError, MAGIC, MAX_FRAME, VERB, HEADER, MAX_DEPTH,
-  encodeControl, encodeFrame, encodeRuns, crcFrame, Writer, Cursor, VT, encodable,
+  Framer, FrameError, FrameFull, FULL, MAGIC, MAX_FRAME, VERB, HEADER, MAX_DEPTH, Outbox,
+  encodeControl, encodeFrame, encodeRuns, encodeRun, continuesRun, crcFrame, Writer, Cursor, VT, encodable, roomOf,
 } from './codec.ts'
 import { REC, type Rec } from './env.ts'
 
@@ -333,4 +333,165 @@ test('encodable charges bytes as the writer reserves them and stops when the bud
   for (let i = 0; i < 64; i++) shared = [shared, shared] // 65 arrays, 2^64 paths through them
   assert.equal(encodable(shared, { depth: MAX_DEPTH, bytes: 1 << 20 }), 'bigger than 1 MiB')
   assert.ok(performance.now() - t0 < 1000, `both refusals stop at the budget (${Math.round(performance.now() - t0)} ms)`)
+})
+
+//! ── V4-51: frames cut by size ─────────────────────────────────────────────────
+// A frame holds at most `cap` body bytes (MAX_FRAME, or a node's tune row `frame`): a run bigger than that leaves in
+// several frames, each a valid run of its own, cut where the next record would not fit. These pin the codec's half:
+// the cut, the roll-back that keeps a frame whole, the refusal of a record no frame can hold, and the control cap.
+
+type RR = { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }
+//! a seeded batch: runs of contiguous seqs broken by gaps, epoch bumps, origin switches and attempt-lane changes; values
+// from a few bytes to 1.5 KB, so a 4 KiB cap cuts inside runs
+const batchOf = (seed: number, n: number): RR[] => {
+  let s = seed
+  const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
+  const value = (): unknown => {
+    const r = rnd()
+    if (r < 0.25) return Math.floor(rnd() * 1e6)
+    if (r < 0.5) return 'v'.repeat(Math.floor(rnd() * 400))
+    if (r < 0.75) return new Uint8Array(Math.floor(rnd() * 1500))
+    return { a: rnd(), b: ['x'.repeat(Math.floor(rnd() * 100)), 2, { c: null }] }
+  }
+  const out: RR[] = []
+  let origin = 'aa', seq = 1, epoch = 1, iss: string | undefined, cid = 0
+  for (let i = 0; i < n; i++) {
+    const r = rnd()
+    if (r < 0.04) origin = origin === 'aa' ? 'bb~2' : 'aa'
+    else if (r < 0.08) seq += 2
+    else if (r < 0.1) epoch++
+    else if (r < 0.16) { iss = rnd() < 0.5 ? undefined : 'cl~1'; cid = Math.floor(rnd() * 100) }
+    const rec: Rec = rnd() < 0.1 ? { type: REC.remove, key: ['k' + i] } : { type: REC.update, key: ['k' + i, 'f'], value: value() }
+    out.push({ rec, origin, seq: seq++, epoch, ...(iss !== undefined ? { iss, cid: cid++ } : {}), pp: Math.floor(rnd() * 50) - 1 })
+  }
+  return out
+}
+const bytesOf = (v: unknown) => JSON.stringify(v, (_, x) => (x instanceof Uint8Array ? [...x] : x))
+
+test('a run bigger than the cap leaves in cuts: every frame within the cap, every record back once with its own seq, epoch, issuer, cid and pp; under the cap the frames are the runs', () => {
+  const CAP = 4096
+  let inside = 0
+  for (let t = 0; t < 40; t++) {
+    const b = batchOf(1000 + t, 30 + (t % 30))
+    for (const withPp of [false, true]) {
+      const frames = encodeRuns(b, VERB.RECORDS, withPp, CAP)
+      let k = 0
+      for (const bytes of frames) {
+        assert.ok(bytes.length - HEADER <= CAP, `a body of ${bytes.length - HEADER} bytes passed the cap`)
+        const [f] = new Framer().push(bytes.slice())
+        const views = f.records()
+        assert.ok(views.length >= 1)
+        for (const rv of views) {
+          const want = b[k++]
+          assert.deepEqual([rv.origin, rv.seq, rv.epoch], [want.origin, want.seq, want.epoch], `provenance of record ${k}`)
+          assert.deepEqual([rv.issuer || undefined, want.iss === undefined ? undefined : rv.cid], [want.iss, want.cid], `attempt identity of record ${k}`)
+          assert.equal(rv.pp, withPp ? want.pp : -1, `pp of record ${k}`)
+          assert.equal(bytesOf(rv.rec()), bytesOf(want.rec), `record ${k}`)
+        }
+      }
+      assert.equal(k, b.length, 'every record once, in order')
+      //! a frame ends inside a run ONLY where the next record does not fit: the same writer, refilled with the frame's
+      // records, refuses the next one
+      for (let i = 0; i < b.length;) {
+        const n = encodeRun(b, i, VERB.RECORDS, withPp, CAP).n
+        const next = i + n
+        if (next < b.length && continuesRun(b[i], n, b[next])) {
+          inside++
+          const o = new Outbox(CAP)
+          o.begin(VERB.RECORDS, { origin: b[i].origin, baseSeq: b[i].seq, epoch: b[i].epoch }, b[i].iss !== undefined ? { issuer: b[i].iss!, baseCid: b[i].cid! } : undefined, withPp)
+          for (let x = i; x < next; x++) assert.equal(o.put(b[x].rec, b[x].pp), true)
+          assert.equal(o.put(b[next].rec, b[next].pp), false, `the frame at ${i} stopped inside its run with room for the next record`)
+        }
+        i = next
+      }
+    }
+    //! at the default cap the frames are exactly the runs (one per run), as before the cut existed
+    let runs = 0
+    for (let i = 0; i < b.length; runs++) { let j = i + 1; while (j < b.length && continuesRun(b[i], j - i, b[j])) j++; i = j }
+    assert.equal(encodeRuns(b).length, runs)
+  }
+  assert.ok(inside > 20, `the batches cut inside runs (${inside} times)`)
+})
+
+test('the per-link Outbox cuts as it streams and keeps only whole records: ten 1.5 KB records at a 4 KiB cap leave in five frames of the same run', () => {
+  const recs: Rec[] = Array.from({ length: 10 }, (_, i) => ({ type: REC.update, key: [`r${i + 1}`], value: new Uint8Array(1500).fill(i + 1) }))
+  for (const attempt of [undefined, { issuer: 'cl~1', baseCid: 41 }]) {
+    const o = new Outbox(4096)
+    o.begin(VERB.RECORDS, { origin: 'aa', baseSeq: 1, epoch: 3 }, attempt)
+    for (const r of recs) o.add(r)
+    const frames = [...o.pending, o.finish()!]
+    o.pending.length = 0
+    assert.equal(frames.length, 5)
+    const decoded = frames.map((b) => new Framer().push(b)[0])
+    assert.deepEqual(decoded.map((f) => f.prov()!.baseSeq), [1, 3, 5, 7, 9], 'each cut begins at its first record\'s own seq')
+    assert.deepEqual(decoded.map((f) => f.prov()!.epoch), [3, 3, 3, 3, 3])
+    if (attempt) assert.deepEqual(decoded.map((f) => f.attempt()!.baseCid), [41, 43, 45, 47, 49], 'and its own cid')
+    else assert.ok(decoded.every((f) => f.attempt() === null))
+    assert.deepEqual(decoded.flatMap((f) => f.records().map((rv) => rv.key[0])), recs.map((r) => r.key[0]), 'every record once, no trailing bytes')
+  }
+})
+
+test('a record bigger than an empty frame is refused loudly, and a record that stops part-way leaves nothing behind: the frame keeps only whole records', () => {
+  const o = new Outbox(1024)
+  o.begin(VERB.RECORDS, { origin: 'aa', baseSeq: 1, epoch: 1 })
+  o.add({ type: REC.update, key: ['a'], value: 1 })
+  assert.equal(o.put({ type: REC.update, key: ['b'], value: new Uint8Array(5000) }), false, 'put: the frame is full, nothing written')
+  assert.throws(() => o.add({ type: REC.update, key: ['b'], value: new Uint8Array(5000) }), /^Error: a record bigger than one frame \(1024 bytes\) reached the encoder/)
+  const frames = [...o.pending, o.finish()].filter((b): b is Uint8Array => b !== null)
+  assert.equal(frames.length, 1)
+  assert.deepEqual(new Framer().push(frames[0])[0].records().map((rv) => [rv.key[0], rv.value]), [['a', 1]], 'the frame holds the small record and decodes')
+  //! any throw rolls back, not only a full frame: a value the codec cannot carry, found part-way through a record (its
+  // tag, key and first field already written), used to leave those bytes in the open frame — the next flush shipped a
+  // frame its receiver refused
+  const p = new Outbox()
+  p.begin(VERB.RECORDS, { origin: 'aa', baseSeq: 1, epoch: 1 })
+  p.add({ type: REC.update, key: ['a'], value: 1 })
+  assert.throws(() => p.add({ type: REC.update, key: ['b'], value: { x: 'fine', y: 10n } }), FrameError)
+  p.add({ type: REC.update, key: ['c'], value: 3 })
+  const [f] = new Framer().push(p.finish()!)
+  assert.deepEqual(f.records().map((rv) => [rv.key[0], rv.seq, rv.value]), [['a', 1, 1], ['c', 2, 3]], 'whole records only; the next record takes the next seq')
+})
+
+test('encodeControl past its cap throws FULL, a FrameError, and the next control frame encodes', () => {
+  let e: unknown
+  try { encodeControl(VERB.RESULT, { id: 1, ok: 1, v: 'x'.repeat(30_000) }, 4096) } catch (x) { e = x }
+  assert.equal(e, FULL)
+  assert.ok(e instanceof FrameFull && e instanceof FrameError, 'a FrameError: every net that takes one still does')
+  const [ok] = new Framer().push(encodeControl(VERB.RESULT, { id: 2, ok: 1, v: 'y'.repeat(1000) }, 4096))
+  assert.deepEqual(ok.value, { id: 2, ok: 1, v: 'y'.repeat(1000) })
+  //! the default cap is MAX_FRAME: a big value encodes, and a small frame after it is unchanged
+  const big = encodeControl(VERB.RESULT, { id: 3, ok: 1, v: 'z'.repeat(200_000) })
+  assert.equal(new Framer().push(big)[0].verb, VERB.RESULT)
+  assert.deepEqual(new Framer().push(encodeControl(VERB.PING))[0].value, undefined)
+})
+
+test('roomOf: the most one record may take and still go alone in a frame — MAX_FRAME less a MiB in production, and at a test cap it fits beside an envelope with uuid-sized names', () => {
+  assert.equal(roomOf(MAX_FRAME), MAX_FRAME - (1 << 20), 'the same number as api/data.ts WRITE.bytes')
+  assert.deepEqual([roomOf(1024), roomOf(4096), roomOf(65536)], [768, 3840, 61440])
+  const uuid = '0123abcd-4567-89ef-0123-456789abcdef~12'
+  for (const cap of [1024, 2048, 4096, 65536]) {
+    const room = roomOf(cap)
+    //! a record charged exactly `room` by encodable's count (a Uint8Array value: 5 + its length; the key 4 + 3 a character)
+    const kb = 4 + 3
+    const value = new Uint8Array(room - kb - 5)
+    assert.equal(encodable(value, { depth: MAX_DEPTH, bytes: room }, 0, kb), null)
+    assert.notEqual(encodable(new Uint8Array(room - kb - 4), { depth: MAX_DEPTH, bytes: room }, 0, kb), null)
+    const o = new Outbox(cap)
+    o.begin(VERB.RECORDS, { origin: uuid, baseSeq: 2 ** 40, epoch: 9 }, { issuer: uuid, baseCid: 2 ** 40 }, true)
+    assert.equal(o.put({ type: REC.update, key: ['k'], value }, 2 ** 40), true, `cap ${cap}: the record fits alone`)
+    assert.ok(o.finish()!.length - HEADER <= cap)
+  }
+})
+
+test('RecordView.span is the record\'s own bytes, its tag through its value', () => {
+  const recs: Rec[] = [{ type: REC.update, key: ['k', 'é'], value: { a: [1, 'two'] } }, { type: REC.remove, key: ['gone'] }, { type: REC.insert, key: [], at: 'x', value: 'v' }]
+  for (const r of recs) {
+    const bytes = encodeFrame([r]) // no provenance: the body is the u32 count and the record
+    assert.equal(new Framer().push(bytes)[0].records()[0].span, bytes.length - HEADER - 4)
+  }
+})
+
+test('encodeFrame is ONE frame: a batch that does not fit throws FULL, never a quietly shorter frame', () => {
+  const recs: Rec[] = Array.from({ length: 3 }, (_, i) => ({ type: REC.update, key: [`k${i}`], value: new Uint8Array(100 << 20) }))
+  assert.throws(() => encodeFrame(recs, { origin: 'o', baseSeq: 1, epoch: 0 }), (e) => e === FULL)
 })

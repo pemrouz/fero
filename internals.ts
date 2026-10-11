@@ -16,9 +16,9 @@ export { frontier, compact, gcTombstones, maybeCompact, COMPACT_AT } from './ker
 export { Link, LS, MAX_QUEUED } from './kernel/link.ts'
 export { Journal, JK, type JEvent } from './kernel/journal.ts'
 export {
-  Framer, Frame, RecordView, Outbox, Cursor, Writer, FrameError,
+  Framer, Frame, RecordView, Outbox, Cursor, Writer, FrameError, FrameFull, FULL,
   VERB, VT, MAGIC, MAX_FRAME, HEADER, FLAG_PROV,
-  encodeFrame, encodeControl, encodeRuns, crc32c, crcFrame, type Prov,
+  encodeFrame, encodeControl, encodeRuns, encodeRun, roomOf, crc32c, crcFrame, type Prov, type Cut,
 } from './kernel/codec.ts'
 export { REC, TAG, partitionOf, type Rec, type Applied, type Event, type EffectSink, type Env } from './kernel/env.ts'
 export { Sim, mulberry32, pairKey, type Fault, type Violation } from './sim/exec.ts'
