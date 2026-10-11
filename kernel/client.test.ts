@@ -1465,8 +1465,8 @@ for (const pauseAt of [2, 7, 10])
 // A record SPLICED into a lane's interior is tap-forwarded too, below the spoke's tails. If the link pauses and a clear
 // takes that frame, the drain digest cannot see the hole (the spoke's tails already sit above it), so the record was
 // never sent again. Now the clear turns what it took into the link's cover (Link.torn, node.ts #clearCover): each lane
-// is lowered to just under the lowest record the clear took, the rest stand at the feeder's tails, and the drain
-// resumes from there before the drain digest. An armed feeder aa holds bb's partition p1 at seqs 10, 12, ..., `top`
+// is lowered to just under the lowest record the clear took, the rest stand at the feeder's tails (a ceiling, `c`),
+// and the spoke's reply to the drain digest is answered from the lower of its tails and that ceiling. An armed feeder aa holds bb's partition p1 at seqs 10, 12, ..., `top`
 // (not 11); a spoke connects to it first (d = {}) and holds every row; then the link pauses.
 const steady = (Q: number, top = 20) => {
   const F = harness('aa', { replicas: 2, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }, tune: { queued: Q } })
@@ -1660,6 +1660,35 @@ test('a clear on a link that was never synced leaves no cover: the drain digest 
   p.settle()
   assert.equal(link.synced, true)
   assert.deepEqual([...S.node.state.keys()].sort(), [...F.node.state.keys()].sort())
+})
+
+//! the review of the wave-5f fix: a scoped feeder folds a record through the LATCH (scope.ts onAcqDone) and taps
+// nothing, so the spoke does not hold it (the open STATUS latch bug). A control-only clear then lands on the synced link,
+// and a later record on the same lane folds before the drain. The clear's cover sits at the feeder's tails, ABOVE the
+// latch-folded record. When the drain resumed that cover, it shipped the later record alone, the spoke's tail rose past
+// the latch row, and the row never arrived while the feeder lived (7 of 8 rows; the base tree heals it through the
+// drain digest). Now a cover the clear SET is a ceiling (`c`): the drain does not resume it, and the spoke's reply to
+// the drain digest is answered from the lower of its own tail and the ceiling, so the latch row is shipped as on the base.
+const PX = (k: string, v: number): Rec => ({ type: REC.update, key: ['px', k], value: v })
+test('a clear\'s cover is a ceiling, never a claim: a latch-folded record the spoke never got, a control-only clear and a later record on its lane before the drain — the latch row still arrives (the drain digest\'s heal, kept)', () => {
+  const { F, S, p, link, rows } = steady(2)
+  F.node.writes.ring.place('px', 'bb', 'aa')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 23 } } }) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: PX('a', 23), origin: 'bb', seq: 23, epoch: 1, pp: 0 }], VERB.ACQ, true)[0] })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 23 }, n: 1 }) })
+  assert.equal(F.node.scope!.held('px'), true, 'the latch folded px')
+  assert.equal(link.queued.length, 0, 'the latch fold tapped nothing (the open STATUS bug)')
+  for (let i = 0; i < 3; i++) F.node.step({ kind: 'reply', link: 7, id: i + 1, ok: true, value: i })
+  assert.equal(F.jk(JK.dropOldest).length, 1, 'a control-only clear')
+  assert.deepEqual(link.torn, { d: { bb: 23 }, r: undefined, q: undefined, c: true }, 'the cover: the feeder\'s tails, a ceiling')
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: p1frame(24, 20) }) // folds; not tapped (unsynced)
+  F.node.step({ kind: 'drain', link: 7 })
+  assert.equal(link.torn?.c, true, 'the drain does not resume a ceiling: it waits for the spoke\'s reply to the drain digest')
+  p.settle()
+  assert.equal(link.torn, null, 'the spoke\'s reply used it up')
+  assert.equal(link.synced, true)
+  assert.ok(S.node.state.has(JSON.stringify(['px', 'a'])), 'the latch row reached the spoke')
+  assert.deepEqual(rows(S), rows(F))
 })
 
 //! the mixed clear: an answer's frames and its reply are still queued (the spoke's first connect paused inside frame 4)

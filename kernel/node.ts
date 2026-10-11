@@ -891,8 +891,9 @@ export class Node {
         // socket again (the shell steps `pause` inside a send): then the resume, the exchange and the round all wait for
         // the next drain. A resume that stops again likewise leaves the exchange for the drain that completes it — the
         // ask it carries would otherwise go out AHEAD of the rest of the ship and buy a spoke in resync a second download.
-        // The same resume re-sends what a clear on a client link took in steady state (#clearCover, wave 5f: no reply).
-        if (link.torn !== null) {
+        // A cover a clear SET on a client link (`c`, #clearCover, wave 5f) is not an answer: it is not resumed here. It
+        // waits for the spoke's reply to the drain digest below, which it caps lane by lane (the DIGEST handler).
+        if (link.torn !== null && link.torn.c !== true) {
           if (link.paused) return
           const t = link.torn
           link.torn = null
@@ -1906,6 +1907,16 @@ export class Node {
         }
         //! the answer: the suffix ship, the link sync and the r=0 reply (#answer — resumable at the drain when
         // its ship stops at a full queue or a clear takes it). A client's r=1 carries `q`; the reply echoes it (only clients send one).
+        //! a clear's ceiling (`c`, #clearCover, wave 5f) caps this digest's tails lane by lane, and this answer uses it up:
+        // a lane the clear took a record from is answered from just under it, every other lane from the spoke's own tail
+        const t = link.torn
+        if (t !== null && t.c === true) {
+          link.torn = null
+          const capped: Record<string, number> = {}
+          for (const o in v.d) if (typeof v.d[o] === 'number') capped[o] = Math.min(v.d[o] as number, t.d[o] ?? 0)
+          this.#answer(link, capped, v.r, typeof v.q === 'number' ? v.q : undefined)
+          return
+        }
         this.#answer(link, v.d, v.r, typeof v.q === 'number' ? v.q : undefined)
         return
       }
@@ -2162,31 +2173,33 @@ export class Node {
   // for good if a clear takes their frame and nothing else is done: a record SPLICED into a lane's interior (it sits
   // below the spoke's tails), and any record whose lane a frame shipped after the clear in the same flush leapfrogs
   // (that frame survives, is delivered first, and raises the spoke's tail above the lost one). The drain digest answers
-  // above the spoke's tails, so it heals neither. So the cover is: each lane lowered to just under the lowest record the
-  // clear took on it; every other lane at the torn answer's cover when an answer's frames were in the queue, else at my
-  // tail right now. The tail is right only when the link was SYNCED up to this clear (`wasSynced`): then every record I
-  // folded so far was tapped to it, so it was sent, or it sits in a frame the clear left or in the outbox (flushed
-  // after the clear, into the queue). So EVERY clear on a synced link leaves a cover, even one that took no record
-  // frame: from this clear on the link is unsynced and nothing is tapped to it, and only a cover lets a later clear
-  // lower a lane and a later splice be lowered into it (the review of wave 5f: a clear of control frames alone left no
-  // cover, then a second clear took a tap frame that had survived the first and set the cover at my tails, above a
-  // record folded in between that was never sent, and it was lost for good; a splice between a control-only clear and
-  // the drain was lost the same way, on the base too). A clear on an UNSYNCED link with no cover changes nothing: an
-  // unsynced client link with no cover has had no answer complete since its admit (synced falls only at a clear, which
-  // now leaves a cover, or at a torn ship, which sets one; a cover leaves only at the drain resume, which syncs the link
-  // or tears again), so nothing was tapped to it and the drain digest heals it as before. The drain resumes the cover
-  // like any torn answer (#answer, no reply when no answer was owed), BEFORE the drain digest. What happens next is
-  // covered too: a record committed before the drain is above my tail at the first clear, so the resume ships it; a
-  // record spliced before the drain is lowered into the cover by indexInsert (the link joins #covered here); a second
-  // clear before the drain lowers the same cover again, never raises it. The cost: one header read per frame the clear
-  // took (the clear is cold); the resume re-sends a lowered lane's suffix above the lowest lost record, frames the spoke
-  // holds included (it drops them); and a control-only clear's resume ships, at the drain, the records folded since
-  // the clear, which the drain exchange used to ship one round trip later.
+  // above the spoke's tails, so it heals neither. So each lane the clear took a record from is lowered to just under the
+  // lowest one. When an answer's frames were in the queue, that is the torn answer's own cover, resumed at the drain as
+  // ever. Otherwise no answer was owed and the clear SETS the cover, at my tails right now, marked `c`: a CEILING, not a
+  // claim. My tails are NOT what the spoke holds: a record I folded through the latch (scope.ts onAcqDone) was never
+  // tapped (the open STATUS latch bug), so a cover at my tails would sit above it, and a resume from it would ship a
+  // later record on that lane alone, raise the spoke's tail past the latch row and lose the row the drain digest used to
+  // heal (the review of wave 5f, 7 of 8 rows). So the drain does not resume a ceiling: it sends the drain digest as
+  // before, and the spoke's reply is answered from the LOWER of its own tail and the ceiling on each lane (the DIGEST
+  // handler), which uses the ceiling up. A lane the clear did not touch is answered from the spoke's tail, exactly the
+  // base's drain exchange; a lowered lane from just under what the clear took, frames the spoke holds included (it drops
+  // them). Every clear on a SYNCED link sets one, even one that took no record frame: from this clear on the link is
+  // unsynced and nothing is tapped to it, and only a cover lets a later clear lower a lane and a later splice be lowered
+  // into it (the review of wave 5f: a clear of control frames alone left no cover, then a second clear took a tap frame
+  // that had survived the first and its cover was lowered on that lane only; a splice between a control-only clear and
+  // the drain was lost on the base too). A clear on an UNSYNCED link with no cover changes nothing: such a link has had
+  // no answer complete since its admit (synced falls only at a clear on a synced link, which now sets a cover, or at a
+  // torn ship, which sets one; a cover leaves only at the answer that resumes or uses it up, which syncs the link or tears
+  // again), so nothing was tapped to it and the drain digest heals it as before. What happens before the spoke's reply is
+  // covered too: a record committed meanwhile is above the spoke's tail, so the answer ships it; a record spliced
+  // meanwhile is lowered into the ceiling by indexInsert (the link joins #covered here); a second clear lowers the same
+  // ceiling again, never raises it. The cost: one header read per frame the clear took (the clear is cold), and the
+  // answer re-sends a lowered lane's suffix above the lowest lost record.
   #clearCover = (link: Link, dropped: Uint8Array[], wasSynced: boolean): void => {
     let t = link.torn
     if (t === null) {
       if (!wasSynced) return
-      t = link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined }
+      t = link.torn = { d: this.#cover({}, null, 0), r: undefined, q: undefined, c: true }
     }
     for (const b of dropped) {
       const f = new Frame(b)
