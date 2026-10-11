@@ -269,7 +269,7 @@
 // same bytes Node's capture tests replay, so the folds structurally cannot drift.
 // The viewer NEVER reimplements LWW: stateAt/routes/contested/verifyReplay do
 // all conflict reasoning; this file is projection + interaction only.
-import { decodeVal, kindNames, cellKey, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology } from './model.mjs';
+import { decodeVal, kindNames, cellKey, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology, agreement } from './model.mjs';
 // the ELI5 layer: every data-tip="<key>" on this page resolves in ./eli5.mjs (the shared glossary + hover card)
 import { mountTips } from './eli5.mjs';
 
@@ -285,6 +285,8 @@ const klog = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+'k' : ''+n;
 // isSystem — a node of a SYSTEM resource: its name starts with `#` (fero's own `#directory`; the public fero()
 // refuses such names, so a user resource never wears the badge). A capture without names (the sim) has none.
 const isSystem = n => typeof n.name === 'string' && n.name.startsWith('#');
+// resTag — the quiet resource tag a cell or write row wears on a capture that mixes resources (the node rows keep the # tag)
+const resTag = name => name == null ? null : { lab: name, key: name.startsWith('#') ? 'node:system' : 'resource' };
 // watermark normalizer: M4a captures carry the ladder {a: applied, s: shippable, d: durable};
 // pre-M4a captures carried a bare number (the applied watermark) — both stay renderable.
 const wm = v => typeof v === 'number' ? { a: v, s: v, d: 0 } : (v || { a: 0, s: 0, d: 0 });
@@ -372,15 +374,17 @@ const derive = (capture) => {
   const names = kindNames(capture);
   const routeMap = routes(capture);
   const cmap = new Map(contested(capture).map(c => [c.cell, c]));
-  // the cluster's MODAL stateHash — a node off it has diverged (crit). Only a STRICT majority is a modal side:
-  // in an even split (1 vs 1, 2 vs 2) no fingerprint is "the common one", so every side is off (ISSUES I-7:
-  // the first node's hash used to win the tie, pilling only the other side of a symmetric disagreement)
-  const tally = new Map();
-  for (const n of capture.nodes) tally.set(n.stateHash, (tally.get(n.stateHash) || 0) + 1);
-  let modal = capture.nodes.length ? capture.nodes[0].stateHash : 0, best = -1;
-  for (const [h, c] of tally) if (c > best) { best = c; modal = h; }
-  const sides = [...tally.values()].sort((a, b) => b - a);          // side sizes, largest first — the header's "1 vs 1"
-  const split = capture.nodes.length > 1 && best * 2 <= capture.nodes.length;
+  // who disagrees — agreement() (model.mjs) decides, per resource: one fingerprint per node, a STRICT majority the
+  // modal side and an even split leaving every side off (ISSUES I-7); on a scoped resource each ROW among the nodes
+  // holding it, since a member holds only its rows. `off` is the set the page pills; the header's split ✗ a vs b
+  // speaks only for one unscoped resource split evenly, every other disagreement is diverged ✗ / differs
+  const ag = agreement(capture);
+  const off = new Set(ag.off);
+  const badGroups = ag.groups.filter(g => !g.converged);
+  const split = badGroups.length === 1 && !badGroups[0].scoped && badGroups[0].split;
+  const sides = split ? badGroups[0].sides : [];                     // side sizes, largest first — the header's "1 vs 1"
+  // a capture of more than one resource paints each cell and write with its resource (the # tag stays on the node)
+  const mixed = ag.groups.length > 1;
   const maxT = Math.max(0, ...capture.nodes.map(n => n.journal.length ? n.journal[n.journal.length - 1].t : 0));
   const origins = [...new Set(capture.nodes.flatMap(n => Object.keys(n.logs)))].sort();
   const kindFreq = new Map();
@@ -388,7 +392,7 @@ const derive = (capture) => {
     const nm = names[e.kind] || ('kind' + e.kind);
     kindFreq.set(nm, (kindFreq.get(nm) || 0) + 1);
   }
-  const d = { names, routes: routeMap, contested: cmap, modal, split, sides, maxT, origins, kindFreq,
+  const d = { names, routes: routeMap, contested: cmap, ag, off, mixed, split, sides, maxT, origins, kindFreq,
               quiesced: !!capture.quiesced, live: capture.kind === 'live',
               // settled: nothing else is coming — only a QUIESCED SIM can prove a write lost or a disagreement final;
               // a live view or a run stopped at a horizon paints the same facts as warn (in flight), never crit
@@ -408,7 +412,7 @@ const derive = (capture) => {
 // so they leave the denominator — "applied 2/2 holders" — and raise no flag, pill or severity.
 const outcomeOf = (capture, r, d) => {
   const st = (u) => r.nodes[u] ? r.nodes[u].status : 'never-arrived';
-  const all   = capture.nodes.map(n => n.uuid);
+  const all   = capture.nodes.filter(n => r.nodes[n.uuid]).map(n => n.uuid);   // routes() fills a stop for every node of the write's resource — another resource's nodes are no stop
   const quiet = all.filter(u => st(u) === 'not-a-holder');
   const uuids = quiet.length ? all.filter(u => st(u) !== 'not-a-holder') : all;   // the nodes meant to get it
   const ok    = uuids.filter(u => st(u) === 'origin' || st(u) === 'applied' || st(u) === 'acquired');   // acquired: came in a hand-off
@@ -438,41 +442,51 @@ const outcomeOf = (capture, r, d) => {
 };
 
 // ── cellRows: the Cells union — end state from the CAPTURED per-node states
-// (the ground truth), provenance from replaying ONE converged untruncated node
-// through stateAt (verifyReplay proves that replay equals its captured state).
+// (the ground truth), provenance from replaying an untruncated node that holds the
+// cell and agrees (verifyReplay proves that replay equals its captured state).
 // With T set (time travel), everything comes from stateAt(·,·,T) instead —
 // values, winner AND divergence are the replayed picture at that instant.
+// One pass per resource (agreement's groups): a cell is compared only among the nodes of its
+// resource, and on a scoped resource only among the nodes holding its row (agreement's `rows`;
+// a row nobody holds is not judged). `group` names the resource when the capture mixes them.
 const cellRows = (capture, d, T) => {
   const scrub = T != null;
-  const per = scrub ? capture.nodes.map(n => stateAt(capture, n.uuid, T))       // Map ck → {v, origin, seq, epoch}
-                    : capture.nodes.map(n => new Map(n.state));                 // Map ck → encoded v
-  const keys = new Set();
-  for (const m of per) for (const k of m.keys()) keys.add(k);
-  const provNode = capture.nodes.find(n => n.dropped === 0 && n.stateHash === d.modal)
-                || capture.nodes.find(n => n.dropped === 0) || null;
-  const prov = provNode ? (scrub ? per[capture.nodes.indexOf(provNode)] : stateAt(capture, provNode.uuid, Infinity)) : null;
+  const states = new Map();                                   // uuid → its cells: captured (Map ck → encoded v) or replayed (ck → {v, …})
+  const stOf = n => { if (!states.has(n.uuid)) states.set(n.uuid, scrub ? stateAt(capture, n.uuid, T) : new Map(n.state)); return states.get(n.uuid); };
+  const replays = new Map();                                  // uuid → the replay at ∞ (provenance at present), built on first need
+  const provOf = n => scrub ? stOf(n) : (replays.has(n.uuid) ? replays.get(n.uuid) : (replays.set(n.uuid, stateAt(capture, n.uuid, Infinity)), replays.get(n.uuid)));
+  const partOf = ck => { try { const p = JSON.parse(ck); return String(Array.isArray(p) ? p[0] : p); } catch { return null; } };
   const out = [];
-  for (const ck of keys) {
-    const vs = capture.nodes.map((n, i) => {
-      if (!per[i].has(ck)) return undefined;
-      const cell = per[i].get(ck);
-      return scrub ? cell.v : cell;                          // scrub entries wrap the encoded value
-    });
-    const present = vs.filter(v => v !== undefined).map(v => JSON.stringify(v));
-    // divergence: values disagree; a MISSING cell counts as disagreement only on a
-    // quiesced end state (mid-replay absence is just propagation, not a fault)
-    const diverged = capture.nodes.length > 1 &&
-      (new Set(present).size > 1 || (!scrub && d.quiesced && present.length < capture.nodes.length));
-    const p = prov ? prov.get(ck) : null;                    // {v, origin, seq, epoch} or undefined
-    const iFirst = vs.findIndex(v => v !== undefined);
-    const value = p ? p.v : vs[iFirst];
-    const cont = scrub ? null : (d.contested.get(ck) || null); // election data is end-of-run; suppressed while scrubbing
-    out.push({ ck, value,
-      winner: p ? { origin: p.origin, seq: p.seq, epoch: p.epoch } : null,   // no replayable node → provenance '—', never guessed
-      diverged, contested: !!cont, cand: cont ? cont.candidates.length : 1,
-      perNode: capture.nodes.map((n, i) => ({ uuid: n.uuid, has: vs[i] !== undefined, v: vs[i] })) });
+  for (const g of d.ag.groups) {
+    const gn = capture.nodes.filter(n => g.nodes.includes(n.uuid));
+    const keys = new Set();
+    for (const n of gn) for (const k of stOf(n).keys()) keys.add(k);
+    for (const ck of keys) {
+      const judged = g.scoped ? (g.rows.get(partOf(ck)) || []) : gn.map(n => n.uuid);
+      const shown = g.scoped && !judged.length ? gn.filter(n => stOf(n).has(ck)) : gn.filter(n => judged.includes(n.uuid));
+      const vs = shown.map(n => {
+        if (!stOf(n).has(ck)) return undefined;
+        const cell = stOf(n).get(ck);
+        return scrub ? cell.v : cell;                          // scrub entries wrap the encoded value
+      });
+      const present = vs.filter(v => v !== undefined).map(v => JSON.stringify(v));
+      // divergence: values disagree; a MISSING cell counts as disagreement only on a
+      // quiesced end state (mid-replay absence is just propagation, not a fault)
+      const diverged = judged.length > 1 &&
+        (new Set(present).size > 1 || (!scrub && d.quiesced && present.length < shown.length));
+      // provenance: a node of `shown` that holds the cell, untruncated, preferably one that agrees
+      const pn = shown.find(n => n.dropped === 0 && !d.off.has(n.uuid) && stOf(n).has(ck)) || shown.find(n => n.dropped === 0 && stOf(n).has(ck)) || null;
+      const p = pn ? provOf(pn).get(ck) : null;               // {v, origin, seq, epoch} or undefined
+      const iFirst = vs.findIndex(v => v !== undefined);
+      const value = p ? p.v : vs[iFirst];
+      const cont = scrub ? null : (d.contested.get(ck) || null); // election data is end-of-run; suppressed while scrubbing
+      out.push({ ck, group: d.mixed ? g.name : null, value,
+        winner: p ? { origin: p.origin, seq: p.seq, epoch: p.epoch } : null,   // no replayable node → provenance '—', never guessed
+        diverged, contested: !!cont, cand: cont ? cont.candidates.length : 1,
+        perNode: shown.map((n, i) => ({ uuid: n.uuid, has: vs[i] !== undefined, v: vs[i] })) });
+    }
   }
-  return out.sort((a, b) => prettyCell(a.ck) < prettyCell(b.ck) ? -1 : 1);
+  return out.sort((a, b) => prettyCell(a.ck) < prettyCell(b.ck) ? -1 : prettyCell(a.ck) > prettyCell(b.ck) ? 1 : String(a.group) < String(b.group) ? -1 : 1);
 };
 
 // a fixed-width, right-aligned stat cell (value + dim unit) → columns line up across sibling rows;
@@ -510,17 +524,17 @@ const buildForest = (capture, T) => {
     // read-only observer that is never admitted — counting it read as a stuck 2/3 on a healthy pair (ISSUES I-6)
     const peers = lks.filter(l => !l.diag);
     const adm = peers.filter(l => l.admitted).length;
-    // off the modal fingerprint: DIVERGED (crit) only on a settled capture — elsewhere a change may still be on its
-    // way, so the same fact is warn 'differs' (ISSUES I-4: a live view mid-propagation painted the red of a real fault)
-    const off = capture.nodes.length > 1 && (d.split || n.stateHash !== d.modal);
+    // off its resource's agreement (agreement(): the modal fingerprint, or on a scoped resource a row its holders
+    // disagree on): DIVERGED (crit) only on a settled capture — elsewhere a change may still be on its way, so the
+    // same fact is warn 'differs' (ISSUES I-4: a live view mid-propagation painted the red of a real fault)
+    const off = d.off.has(n.uuid);
     const diverged = off && d.settled;
     const sev = diverged ? 'crit' : off || n.dropped > 0 ? 'warn' : '';
     const pill = diverged ? { cls:'crit', lab:'diverged', key:'node:diverged' }
       : off ? { cls:'warn', lab:'differs', key:'node:differs' }
       : n.dropped > 0 ? { cls:'warn', lab:'truncated +' + klog(n.dropped), key:'node:truncated', fact: `${n.dropped} oldest events dropped` } : null;
     // a SYSTEM resource (a `#` name: fero's own `#directory`) is not the user's data — badged quietly beside the
-    // label, info only, never in the pill slot: an identity is not a problem, and a problem pill there must not hide
-    // it (a capture that mixes resources paints every node 'differs' today — STATUS — and that hid the pill badge)
+    // label, info only, never in the pill slot: an identity is not a problem, and a problem pill there must not hide it
     const tag = isSystem(n) ? { lab: n.name, key: 'node:system' } : null;
     const kinds = new Set();
     for (const e of n.journal) kinds.add((d.names[e.kind] || ('kind' + e.kind)).toLowerCase());
@@ -577,6 +591,7 @@ const buildForest = (capture, T) => {
       : `<span class="x" data-tip="not-captured">record not captured</span>`;   // honest: the payload is absent from this capture
     return { key: 'g/writes/' + r.origin + '#' + r.seq, type: 'write', label: r.origin + '#' + r.seq, icon: '·',
       sev: o.sev, pill: o.pill, tdim: scrub && tmin > T, tmax,            // tdim: nothing about this write happened yet at the scrub point
+      tag: d.mixed ? resTag(r.group) : null,                             // a mixed capture names each write's resource
       metaRaw: `${kvv} <span class="x">·</span> ${o.summaryHtml}`,
       entity: { kind: 'write', r, rec, o },
       f: { origin: r.origin, key: rec ? prettyCell(cellKey(rec.k, rec.at)) : '', write: o.flags }, kids: [] };
@@ -595,7 +610,9 @@ const buildForest = (capture, T) => {
     const flags = new Set();
     if (c.diverged) flags.add(proven ? 'diverged' : 'differs');
     if (c.contested) flags.add('contested');
-    return { key: 'g/cells/' + encodeURIComponent(c.ck), type: 'cell', label: prettyCell(c.ck), icon: '▪', sev, pill,
+    //! a mixed capture holds one cell row per resource: the same key text in two resources is two cells
+    return { key: 'g/cells/' + encodeURIComponent(c.ck) + (d.mixed ? '/' + encodeURIComponent(c.group ?? '') : ''), type: 'cell', label: prettyCell(c.ck), icon: '▪', sev, pill,
+      tag: d.mixed ? resTag(c.group) : null,
       metaRaw: `<span data-tip="cell-value">= ${esc(fmtVal(c.value))}</span> <span class="x">·</span> <span data-tip="cell-winner">by ${c.winner ? esc(c.winner.origin + '#' + c.winner.seq) : '—'}</span>`
              + (c.cand > 1 ? ` <span class="x">·</span> <span data-tip="candidates">${c.cand} candidates</span>` : ''),
       entity: { kind: 'cell', cell: c },
@@ -1074,7 +1091,7 @@ function inspNode(nd){
     ['listen', esc(String(n.listen ?? '—')), '', 'listen'],
     ['seq', esc(String(n.seq ?? '—')), '', 'seq'],
     ['epoch', esc(String(n.epoch ?? '—')), '', 'epoch'],
-    ['stateHash', esc(String(n.stateHash)), (D.split || n.stateHash !== D.modal) && CAP.nodes.length > 1 ? (D.settled ? 'bad' : 'warn') : '', 'statehash'],
+    ['stateHash', esc(String(n.stateHash)), D.off.has(n.uuid) ? (D.settled ? 'bad' : 'warn') : '', 'statehash'],
     ['keys', t != null ? `${stateAt(CAP, n.uuid, t).size} <span class="x">@ t${t} · ${n.state.length} at end</span>` : String(n.state.length), '', t != null ? 'keys@t' : 'keys'],
     ['journal', t != null ? `${klog(rows.length)} <span class="x">≤ t${t} · ${klog(n.journal.length)} retained</span>`
                           : klog(n.journal.length) + (n.dropped > 0 ? ` / ${klog(n.dropped)} dropped` : ' / 0 dropped'), n.dropped > 0 ? 'warn' : '', t != null ? 'jrnl@t' : 'journal'],
@@ -1132,9 +1149,9 @@ function inspWrite(nd){
   // own s.t, so counting stops with s.t ≤ T is a derivation) — o.summaryText is the END-of-run
   // verdict and would contradict the banner; same reason the sev colour is muted while scrubbing
   const t = scrubT();
-  const allStops = CAP.nodes.map(n => ({ uuid: n.uuid, ...(r.nodes[n.uuid] || { status: 'never-arrived', t: null }) }));
+  const allStops = CAP.nodes.filter(n => r.nodes[n.uuid]).map(n => ({ uuid: n.uuid, ...r.nodes[n.uuid] }));   // the write's own resource: routes() fills each of its nodes
   const okAtT = t != null ? allStops.filter(s => s.t != null && s.t <= t && (s.status === 'origin' || s.status === 'applied' || s.status === 'acquired')).length : 0;
-  const meant = CAP.nodes.length - o.quiet.length;   // not-a-holder stops were never meant to get it (ISSUES I-3)
+  const meant = allStops.length - o.quiet.length;    // not-a-holder stops were never meant to get it (ISSUES I-3)
   const rollup = t != null ? `applied ${okAtT}/${o.quiet.length ? meant + ' holders' : meant} by t${t}` : o.summaryText;
   const sub = rec
     ? `<span class="mono" data-tip="rec-key">${esc(key)}</span>${rec.ty === 2 ? ' <span class="warnt" data-tip="rec:remove">removed</span>' : ' = <span class="mono" data-tip="rec-value">' + esc(fmtVal(rec.v, 48)) + '</span>'} · <span data-tip="route:summary">${esc(rollup)}</span>`

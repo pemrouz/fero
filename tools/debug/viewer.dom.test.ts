@@ -27,6 +27,7 @@ import { VERB, encodeControl } from '../../kernel/codec.ts'
 import * as MODEL from './model.mjs'
 import { tip } from './eli5.mjs'
 import { bootViewer, dragTo } from './dom-shim.ts'
+import { scopedCut, scopedTenure } from './fixtures.ts'
 import { fero } from '../../api/index.ts'
 import { diag } from '../../api/diagnostics.ts'
 import { ports } from '#utils'
@@ -575,10 +576,10 @@ test('a SYSTEM resource wears a quiet # badge: a real server and the #directory 
   assert.ok(tip('node:system') && tip('resource'), 'both keys explain themselves')
 })
 
-//! the capture the badge is FOR: the user's resource holding data beside its #directory. The viewer's fingerprint
-// assumes one resource, so two resources with different state paint both nodes 'differs' (a known limit, in
-// STATUS: group by the node's name). The badge must survive that: it is a tag beside the label, not the pill.
-test('the # badge survives a problem pill: a server holding a row beside its #directory — both rows differ today, the # tag still shows', async () => {
+//! the capture the badge is FOR: the user's resource holding data beside its #directory. The two resources hold
+// different data by design, so the page judges each by itself (agreement(), wave 5e): neither node is pilled, the
+// header says converged, every cell and write wears its resource's tag, and a write's stops are its own resource's.
+test('a capture of two resources is judged per resource: a server holding a row beside its #directory agrees, the # tag shows, cells and writes name their resource (wave 5e)', async () => {
   const rz = `127.0.0.1:${await ports.free()}`
   const f = await fero('shop', { server: true, rendezvous: rz, heartbeat: { ms: 100 }, data: { widgets: { stock: 3 } } })
   let cap: { nodes: { uuid: string; name?: string; stateHash: number }[] }
@@ -589,9 +590,55 @@ test('the # badge survives a problem pill: a server holding a row beside its #di
   } finally { await f.destroy() }
   assert.notEqual(cap.nodes[0].stateHash, cap.nodes[1].stateHash, 'the fixture is mixed: the two resources hold different state')
   const [shop, dir] = cap.nodes.map((n) => n.uuid)
-  const { el } = await bootViewer('mixed', cap, { search: '' })
+  const { el, g } = await bootViewer('mixed', cap, { search: '' })
   const row = (uuid: string) => (el('tree').innerHTML.match(new RegExp(`<div class="trow[^"]*"[^>]*data-type="node"[^>]*>(?:(?!<div class="trow).)*?>${uuid}<(?:(?!<div class="trow).)*`, 's')) ?? [''])[0]
-  assert.match(row(dir), /data-tip="node:differs"/, 'the known limit, pinned: a mixed capture paints the # node differs (flips when the fold groups by name)')
-  assert.match(row(dir), /<span class="tag" data-tip="node:system">#directory<\/span>/, 'and the # tag still shows beside the label')
+  assert.doesNotMatch(row(dir), /data-tip="node:(differs|diverged)"/, 'the #directory is not pilled: it is compared with no one')
+  assert.doesNotMatch(row(shop), /data-tip="node:(differs|diverged)"/, 'and neither is the shop')
+  assert.match(el('statusRight').innerHTML, /data-tip="converged">converged ✓</, 'the header says converged')
+  assert.match(row(dir), /<span class="tag" data-tip="node:system">#directory<\/span>/, 'the # tag still shows beside the label')
   assert.doesNotMatch(row(shop), /node:system/, 'the user resource carries no badge')
+  g(`expanded.add('g/cells'); expanded.add('g/writes'); render()`)
+  const tree = el('tree').innerHTML
+  assert.match(tree, /data-type="cell"[^>]*>(?:(?!<div class="trow).)*?>widgets<\/span><span class="tag" data-tip="resource">shop<\/span>/s, 'the shop cell wears its resource')
+  assert.match(tree, /data-type="write"[^>]*>(?:(?!<div class="trow).)*?<span class="tag" data-tip="resource">shop<\/span>(?:(?!<div class="trow).)*?applied 1\/1</s, 'the seed write wears it too, applied 1/1: the directory node is no stop of it')
+  assert.doesNotMatch(tree, /data-tip="(cell|write):(differs|diverged|in-flight|never-arrived)"/, 'no cell or write is flagged')
+  assert.doesNotMatch(tree, /⊘/, 'no write lists the other resource as missing it')
+})
+
+test('a scoped capture is judged per row among its holders: the scoped scenario is converged with no pill; a holder that lags on one row is the only node pilled (wave 5e)', async () => {
+  {
+    const { el } = await bootViewer('scoped', captures.get('scoped'))
+    assert.match(el('statusRight').innerHTML, /data-tip="converged">converged ✓</, 'the scenario\'s holders agree row by row: converged')
+    assert.doesNotMatch(el('statusRight').innerHTML, /differs \(in flight\)/)
+    assert.doesNotMatch(el('tree').innerHTML, /data-tip="node:(differs|diverged)"/, 'no node is pilled — each holds only its rows, by design')
+  }
+  const { cut, owner, lagging } = scopedCut()
+  const { el, g } = await bootViewer('cut', cut)
+  assert.match(el('statusRight').innerHTML, /class="sst warn" data-tip="differs">differs \(in flight\)</, 'the holders of one row disagree, mid-flight: amber')
+  const pilled = [...el('tree').innerHTML.matchAll(/data-type="node"[^>]*>(?:(?!<div class="trow).)*?<span class="lab" data-tip="node">([^<]+)<(?:(?!<div class="trow).)*?data-tip="node:differs"/gs)].map((m) => m[1])
+  assert.deepEqual(pilled, [lagging], 'exactly the lagging holder is pilled')
+  g(`expanded.add('g/cells'); render()`)
+  assert.match(el('tree').innerHTML, /data-type="cell"[^>]*>(?:(?!<div class="trow).)*?>row<(?:(?!<div class="trow).)*?data-tip="cell:differs"/s, 'the row\'s cell says differs')
+  g(`navTo('g/nodes/${lagging}')`)
+  assert.match(el('insp').innerHTML, /<dt[^>]*>stateHash<\/dt><dd class="warn">/, 'the lagging holder\'s fingerprint is amber')
+  g(`navTo('g/nodes/${owner}')`)
+  assert.match(el('insp').innerHTML, /<dt[^>]*>stateHash<\/dt><dd class="">/, 'the owner\'s is not')
+})
+
+test('a member that left and a client are judged right on the route: quiet where they were never meant to get a write, in flight only for the one real miss (wave 5e)', async () => {
+  const { cap, missed } = scopedTenure()
+  type R = { origin: string; seq: number; nodes: Record<string, { status: string }> }
+  const rs = [...(MODEL.routes(cap) as Map<string, R>).values()]
+  const { el, g } = await bootViewer('tenure', cap)
+  //! a write stamped after n04 left: its stop is quiet, never a missing one
+  const later = rs.find((r) => r.nodes.n04?.status === 'not-a-holder' && r.nodes.zc1?.status === 'not-a-holder')!
+  assert.ok(later, 'a write neither the leaver nor the client was meant to get — the fixture is what it claims')
+  g(`navTo(${JSON.stringify(`g/writes/${later.origin}#${later.seq}`)})`)
+  let insp = el('insp').innerHTML
+  for (const u of ['n04', 'zc1']) assert.ok(insp.includes(`data-rkey="g/nodes/${u}">${u}</span></span><span class="x" data-tip="stop:not-a-holder">`), `${u} is a quiet stop`)
+  assert.doesNotMatch(insp, /stop:(never|inflight)/)
+  //! the write n04 was meant to get and never did: its stop is the one that says so (amber: a live run is never settled)
+  g(`navTo(${JSON.stringify(`g/writes/${missed}`)})`)
+  insp = el('insp').innerHTML
+  assert.ok(insp.includes(`data-rkey="g/nodes/n04">n04</span></span><span data-tip="stop:inflight">not yet arrived</span>`), 'n04 is the stop still missing it')
 })

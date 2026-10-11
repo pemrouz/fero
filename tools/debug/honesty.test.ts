@@ -21,8 +21,9 @@ import { Sim } from '../../sim/exec.ts'
 import { cluster, writes } from '../../sim/harness.ts'
 import { shrink, sweepBuild } from '../../sim/shrink.ts'
 import { captureLive, captureSim, captureAttached } from './capture.ts'
+import { scopedTenure, mixed } from './fixtures.ts'
 import {
-  kindNames, stateAt, verifyReplay, routes, contested, summarize, cellKey, topologyAt, verifyTopology,
+  kindNames, stateAt, verifyReplay, routes, contested, summarize, cellKey, topologyAt, verifyTopology, agreement,
   ROUTE_STATUS, ABSENT_REASONS,
 } from './model.mjs'
 
@@ -50,6 +51,7 @@ test('(a) fold closure on EMPTY real-producer captures: exhaustive goldens, noth
   assert.deepEqual(contested(A0), [])
   assert.deepEqual(verifyReplay(A0), [])
   assert.deepEqual(verifyTopology(A0), [])
+  assert.deepEqual(agreement(A0), { converged: null, groups: [], off: [] }, 'no nodes: no verdict, no group, nobody off')
 
   const A1 = captureLive([bareNode()])
   assert.equal((stateAt(A1, 'gate', Infinity) as Map<string, unknown>).size, 0, 'no state at any t')
@@ -120,6 +122,10 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
   for (let i = 0; i < 3; i++) sim4.post('n01', { kind: 'write', recs: [{ type: REC.update, key: [`after${i}`], value: i }] }, i * 5)
   sim4.run()
   const reborn = captureSim(sim4)
+  //! a SCOPED capture with a client, a leaver and a voted-out member (wave 5e): agreement's per-row branch and routes'
+  // tenure rule mint their strings from `held`, `feeder` and the journal — exercised by a producer, never dormant
+  const tenure = scopedTenure().cap
+  const mixedCap = mixed()
 
   const universe = (c: unknown) =>
     new Set([...capStrings(c), ...ROUTE_STATUS, ...ABSENT_REASONS, ...Object.keys(JK)])
@@ -138,7 +144,7 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
     return false
   }
   let empties = 0, closings = 0, refusals = 0
-  for (const cap of [chaotic, attached, captureLive([bareNode()]), reborn]) {
+  for (const cap of [chaotic, attached, captureLive([bareNode()]), reborn, tenure, mixedCap]) {
     const allowed = universe(cap)
     const nums = capNumbers(cap)
     //! cell keys are JSON encodings of capture keys — derived, so add them to the universe explicitly
@@ -146,7 +152,7 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
       for (const [, entries] of Object.entries(n.logs))
         for (const e of entries as { k: string[]; at?: string }[]) allowed.add(cellKey(e.k, e.at))
     for (const [name, fold] of [
-      ['summarize', summarize], ['routes', routes], ['contested', contested], ['kindNames', kindNames],
+      ['summarize', summarize], ['routes', routes], ['contested', contested], ['kindNames', kindNames], ['agreement', agreement],
     ] as const) {
       for (const s of leaves(fold(cap)))
         assert.ok(traces(s, allowed, nums), `${name} minted an untraceable string: ${JSON.stringify(s)}`)
@@ -223,6 +229,7 @@ test('(c) absent honesty: an absent row changes summarize verbatim and NOTHING e
   assert.deepEqual(verifyReplay(withAbsent), verifyReplay(base))
   assert.deepEqual(verifyTopology(withAbsent), verifyTopology(base))
   assert.deepEqual(contested(withAbsent), contested(base))
+  assert.deepEqual(agreement(withAbsent), agreement(base))
 })
 
 test('(c2) shrunk facts are passthrough only: the viewer can never infer shrunk-ness', () => {
@@ -243,7 +250,7 @@ test('(d) the viewer data plane: exactly one model import, no local fold redefin
   // the ELI5 hover layer (words + wiring, no folds). A third import would be a new seam to police here.
   assert.deepEqual(imports.map((m) => m[2]), ['./model.mjs', './eli5.mjs'], 'the viewer imports the model and the ELI5 layer — nothing else')
   const imported = imports[0][1].split(',').map((s) => s.trim()).sort()
-  assert.deepEqual(imported, ['cellKey', 'contested', 'decodeVal', 'kindNames', 'routes', 'stateAt', 'summarize', 'topologyAt', 'verifyReplay', 'verifyTopology'])
+  assert.deepEqual(imported, ['agreement', 'cellKey', 'contested', 'decodeVal', 'kindNames', 'routes', 'stateAt', 'summarize', 'topologyAt', 'verifyReplay', 'verifyTopology'])
   assert.deepEqual(imports[1][1].split(',').map((s) => s.trim()), ['mountTips'], 'the chrome import is the hover mount alone — the glossary is read through it, never copied into the page')
   //! no local shadowing: a fold reimplemented in the page is exactly v2's dual-language drift bug
   for (const name of [...imported, 'mountTips', 'tip', 'tipHTML', 'ELI5'])
