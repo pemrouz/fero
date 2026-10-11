@@ -14,7 +14,7 @@ import { REC, type Env, type Rec } from './env.ts'
 import { bench, ratio } from '#utils'
 //! fixtures single-sourced with the M8 baseline probes (tools/perf/fixtures.ts) — declaration move
 // only; every timed loop body below is byte-identical to its pre-extraction form
-import { NODE_BATCH as BATCH, nodeRecs as recs, formedNode } from '../tools/perf/fixtures.ts'
+import { NODE_BATCH as BATCH, nodeRecs as recs, formedNode, tornFeeder } from '../tools/perf/fixtures.ts'
 
 test('ratio: full kernel write path vs direct-call strawman stays within budget', () => {
   const node = formedNode()
@@ -125,4 +125,33 @@ test('counted + absolute: digest build over 100 origin lanes — every lane exac
   const d = (answer.value as { d: Record<string, number> }).d
   assert.equal(Object.keys(d).length, ORIGINS, 'every origin lane appears in the digest exactly once')
   assert.ok(ms < 50, `100-lane digest build took ${ms.toFixed(2)}ms (tripwire 50ms)`)
+})
+
+//! RATIO + COUNTED (the resume-cost fix, 2026-10-11 — the third re-check of DESIGN-SCALE stage 2 measured it): a
+// digest answer to a client's first connect, N sparse records (one frame each) through a socket that pauses at a 64 KiB
+// high-water mark and a queue of 256. Each drain round delivers the queue plus one socket buffer. COUNTED: every
+// record is encoded exactly once and reaches the socket exactly once (handed = sent = N frames + the reply — the queue
+// is never overflowed, so nothing encoded is wasted), and the reply is the last frame. RATIO: the feeder's CPU for 8×
+// the records is linear — about 8× (6× measured: the small run pays the warm-up); before the fix every round
+// re-walked and re-encoded the rest of the lane and queued 257 frames only to clear them, and the same runs cost
+// 224 ms and 15.8 s (70×). The bound, 20×, sits far under the quadratic 64× and leaves the box its 2-3× noise.
+test('ratio + counted: a torn digest answer of N sparse records costs feeder CPU linear in N; every frame encoded once', () => {
+  const run = (n: number) => {
+    const f = tornFeeder(n, 65536)
+    const t0 = performance.now()
+    f.ask()
+    let rounds = 0
+    while (f.link.torn !== null || f.link.queued.length) { f.drain(); if (++rounds > n) throw new Error('the torn answer never ended') }
+    const ms = performance.now() - t0
+    assert.equal(f.c.handed, n + 1, `${n} records: ${f.c.handed} frames handed to the link — every record encoded once, plus the reply`)
+    assert.equal(f.c.sent, n + 1, `${n} records: ${f.c.sent} frames reached the socket`)
+    assert.equal(new Framer().push(f.c.last!.slice())[0].verb, VERB.DIGEST, 'the reply is the last frame')
+    assert.equal(f.link.droppedWhilePaused, false, 'the queue never overflowed')
+    return ms
+  }
+  run(20_000) // warm-up
+  const small = Math.min(run(20_000), run(20_000), run(20_000))
+  const big = run(160_000)
+  const r = big / small
+  assert.ok(r < 20, `160k / 20k torn-answer CPU ${r.toFixed(1)}x (${big.toFixed(0)} / ${small.toFixed(0)} ms) — linear is ~8x, the quadratic resume was 70x`)
 })
