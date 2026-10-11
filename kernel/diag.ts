@@ -18,6 +18,7 @@ import { VERB, encodeControl, FrameError } from './codec.ts'
 import { LS, type Link } from './link.ts'
 import { JK } from './journal.ts'
 import { partitionOf } from './env.ts'
+import { SCOPE } from './scope.ts'
 import { ctEq } from './door.ts'
 import type { Node } from './node.ts'
 
@@ -106,6 +107,23 @@ const ownHolders = (node: Node): Record<string, string[]> => {
   return Object.fromEntries(out)
 }
 
+//! heldOf — the partitions this node's scope machine HOLDS right now (SCOPE.held: on duty, its floors
+// advancing), sorted. The debugger judges a scoped capture per row among the nodes holding it (the
+// scopedConverged monitor's rule, sim/monitors.ts), and a client against what its feeder holds — both need
+// the node's own answer, never a re-derived one. A row still being copied in (acquiring) or frozen on its
+// way out (orphan) is not held: the page does not judge it there.
+const heldOf = (node: Node): string[] => {
+  const out: string[] = []
+  for (const [p, e] of node.scope!.entries) if (e.state === SCOPE.held) out.push(p)
+  return out.sort()
+}
+
+//! feederOf — a client's feeder: the uuid on its primary link (the ONE link it digests), null with none
+const feederOf = (node: Node): string | null => {
+  const l = node.primary !== null ? node.links.get(node.primary) : undefined
+  return l && l.uuid ? l.uuid : null
+}
+
 export const diagNode = (node: Node) => ({
   uuid: node.uuid,
   //! name: the resource this node replicates (NodeOpts.name, the HELLO echo) — the debugger paints a `#`
@@ -120,10 +138,14 @@ export const diagNode = (node: Node) => ({
   //! client: this node's OWN role (M5b spoke) — the debugger's topology replay needs it for the single-feeder
   // synced rule (a client digests only its primary); additive, so an older bridge simply never sees it
   client: node.client,
+  //! feeder (wave 5e): a client's primary's uuid — a client of a scoped feeder folds only what that feeder
+  // holds, so the debugger judges it against the feeder's `held`; additive, clients only
+  ...(node.client ? { feeder: feederOf(node) } : {}),
   //! replicas + holders (ISSUES I-3): scoped replication sends a write to its holders only, so a member
-  // outside the set never getting it is the design, not a loss — additive, an older bridge never sees them
+  // outside the set never getting it is the design, not a loss — additive, an older bridge never sees them.
+  // held (wave 5e): what this node holds now — the per-row comparison's participants
   replicas: node.replicas,
-  ...(node.armed ? { holders: ownHolders(node) } : {}),
+  ...(node.armed ? { holders: ownHolders(node), held: heldOf(node) } : {}),
   stateHash: node.stateHash,
   jn: node.journal.n,
   dropped: node.journal.dropped,

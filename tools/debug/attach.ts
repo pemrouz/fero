@@ -138,7 +138,7 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
   const w = nq.n as {
     uuid: string; name?: string; listen: string; seq: number; epoch: number
     view: { epoch: number; members: string[] }; gate: string
-    pendingWrites: number; client?: boolean; replicas?: number; holders?: Record<string, string[]>
+    pendingWrites: number; client?: boolean; feeder?: string | null; replicas?: number; holders?: Record<string, string[]>; held?: string[]
     stateHash: number; jn: number; dropped: number
     streams: Record<string, { a: number; s: number; d: number }>
     origins: Record<string, { tail: number; base: number }>
@@ -181,8 +181,11 @@ export const pullNode = async (c: DiagClient, budgetMs = PULL_BUDGET_MS): Promis
     vocab: meta.vocab as Record<string, number>,
     node: {
       uuid: w.uuid, ...(w.name !== undefined ? { name: w.name } : {}), listen: w.listen, seq: w.seq, epoch: w.epoch, view: w.view, gate: w.gate,
-      pendingWrites: w.pendingWrites, client: w.client, replicas: w.replicas,
+      pendingWrites: w.pendingWrites, client: w.client,
+      ...('feeder' in w ? { feeder: w.feeder } : {}),
+      replicas: w.replicas,
       ...(w.holders ? { holders: w.holders } : {}),
+      ...(w.held ? { held: w.held } : {}),
       stateHash: w.stateHash, dropped: w.dropped,
       journal, logs,
       state: (st.cells as [string, unknown][]).map(([k, v]) => [k, encodeVal(v)]),
