@@ -969,7 +969,7 @@ function headerFacts(){
   if (unjudged.length)
     bits.push(sst('info', `not judged: ${unjudged.map(u => `${esc(u)} (${feederWhy(u)})`).join(', ')}`, 'clients-unjudged'));
   if (s.absent && s.absent.length)
-    bits.push(sst('warn', `absent:${s.absent.map(a => `${esc(a.target)} (<span data-tip="absent:${esc(a.reason)}">${esc(a.reason)}</span>)`).join(', ')}`, 'absent'));
+    bits.push(sst('warn', `absent: ${s.absent.map(a => `${esc(a.target)} (<span data-tip="absent:${esc(a.reason)}">${esc(a.reason)}</span>)`).join(', ')}`, 'absent'));
   if (s.converged !== null) { // zero nodes ⇒ no replay basis — claim nothing rather than a vacuous ✓
     //! a TORN attach read (the bridge's `torn` flag, ISSUES I-2): rows landed between a node's snapshot and its state
     // pull, so its state is a later instant than its journal — a replay mismatch there is the read, not a fault.
