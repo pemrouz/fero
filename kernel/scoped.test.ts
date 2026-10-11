@@ -352,6 +352,30 @@ test('wave 5e — an armed relay that folds a relayed record before the owner\'s
   assert.equal(framesOn(h, 3, VERB.WACK).length, 1)
 })
 
+//! the third hop site (wave 5e's review): the relayed record lands BELOW a lane tail this relay already holds (a later
+// record on the same owner lane, for another row, arrived first), so it is an interior record and folds through
+// #splice, not the in-order path. The splice clears the relayed attempt the same way and must name the lane too.
+// Red without the #splice site: the hop reads {u, c, n, s, e} with no `l`.
+test('wave 5e — an armed relay whose relayed record lands as an interior record (#splice) hops the WACK to its spoke with `l`, and the tap follows it', () => {
+  const h = armedView1()
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('ours', 'bb', 'aa')
+  h.node.writes.ring.place('other', 'bb', 'aa')
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: '', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: writeFrame('zz~1', 1, 0, [rec(['ours'], 2)]) })
+  assert.equal(framesOn(h, 1, VERB.WRITE).length, 1, 'relayed to the owner bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['other'], 3), origin: 'bb', seq: 30, epoch: 1, pp: 0 }], VERB.RECORDS, true)[0] })
+  assert.equal(h.node.writes.pending.size, 1, 'a later record for another row clears nothing')
+  const before = h.of('send').length
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['ours'], 2), origin: 'bb', seq: 20, epoch: 1, iss: 'zz~1', cid: 1, pp: 0 }], VERB.RECORDS, true)[0] })
+  assert.equal(h.node.writes.pending.size, 0, 'the interior record is the ACK')
+  const out = h.of('send').slice(before).filter((e) => e[1] === 3).map((e) => new Framer().push((e[2] as Uint8Array).slice())[0])
+  assert.deepEqual(out.map((f) => f.verb), [VERB.WACK, VERB.RECORDS], 'the WACK first, the tap behind it')
+  assert.deepEqual(out[0].value, { u: 'zz~1', c: 1, n: 1, s: 20, e: 1, l: 'bb' }, 'the splice hop names the lane the tap will carry')
+})
+
 //! a commit can enter the owner's dedup window WITHOUT passing #commit: through an ACQ fold (the partition
 // moved to this node after the commit) or through WAL replay (the owner restarted). A write re-sent to such
 // an owner after a lost WACK is answered from that window, and the answer must still name the lane, or a
