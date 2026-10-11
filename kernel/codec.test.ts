@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import {
   Framer, FrameError, MAGIC, MAX_FRAME, VERB, HEADER, MAX_DEPTH,
-  encodeControl, encodeFrame, encodeRuns, crcFrame, Writer,
+  encodeControl, encodeFrame, encodeRuns, crcFrame, Writer, encodable,
 } from './codec.ts'
 import { REC, type Rec } from './env.ts'
 
@@ -251,4 +251,31 @@ test('seeded random-record fuzz round-trips (200 mixed frames)', () => {
       if (recs[i].type !== REC.remove) assert.deepEqual(v.value, recs[i].value)
     })
   }
+})
+
+//! encodable (V4-48) is asked before a local write is stamped: it must say yes exactly when Writer.value can
+// encode, or a value it lets through is the stamped-then-unshippable write it exists to stop (and one it refuses
+// is a write lost for nothing). Parity over the codec's edges, plus the reason it gives for each refusal.
+test('encodable agrees with Writer.value on every edge, and names what stops a refused value', () => {
+  let d64: unknown = 1, d65: unknown = 1
+  for (let i = 0; i < 64; i++) d64 = [d64]
+  for (let i = 0; i < 65; i++) d65 = [d65]
+  const cyclic: Record<string, unknown> = {}
+  cyclic.self = cyclic
+  const values: unknown[] = [
+    null, undefined, true, false, 0, -0, 1.5, NaN, Infinity, 2 ** 31, '', 'ünïcode', new Uint8Array([1]), [], {}, [1, [2, [3]]],
+    { a: { b: [1, 'x', null] } }, new Date(0), new Map([[1, 2]]), Object.create(null), [, 1], d64, d65, cyclic,
+    10n, () => 1, Symbol('s'), { n: 10n }, [Symbol('t')], { get g() { throw new Error('g') } }, { get ok() { return 1 } },
+  ]
+  for (const v of values) {
+    let encodes = true
+    try { new Writer().value(v) } catch { encodes = false }
+    assert.equal(encodable(v) === null, encodes, `parity for ${String(typeof v)} ${(() => { try { return JSON.stringify(v) } catch { return '(unprintable)' } })()}`)
+  }
+  assert.equal(encodable(10n), 'a bigint')
+  assert.equal(encodable({ f: () => 1 }), 'a function')
+  assert.equal(encodable([Symbol('s')]), 'a symbol')
+  assert.equal(encodable(d65), 'nesting deeper than 64')
+  assert.equal(encodable(cyclic), 'nesting deeper than 64')
+  assert.equal(encodable({ get g() { throw new Error('g') } }), 'reading it threw (Error: g)')
 })

@@ -36,8 +36,10 @@ export interface WriteReject {
   reached: 'issued' | 'committed'
   //! reason — 'timeout' | 'superseded' | 'dropped' | 'destroyed' (the kernel's outcomes), 'methods-only'
   // (the server takes client changes only through its `methods:` — V4-5), 'sparse-hole' (a remove of an
-  // array's own element, which data will not fold — write the spliced array), or the server's own
-  // validation: string for a relayed record it refused (V4-4).
+  // array's own element, which data will not fold — write the spliced array), 'unencodable' (a value the
+  // wire cannot carry: a bigint, a function, a symbol, nesting deeper than 64, a getter that throws —
+  // V4-48), 'validation-threw' (the server's validation: rule threw on the record — V4-47), or the server's
+  // own validation: string for a relayed record it refused (V4-4).
   reason: string
   localCommit?: { origin: string; seq: number; epoch: number }
 }
