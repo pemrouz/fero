@@ -35,11 +35,11 @@
 // object-born (substrate.applyStreamRec, I-27); the one-shot stays the bare number.
 
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { VERB } from '../kernel/codec.ts'
+import { VERB, encodable } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
-import { lostAssignment, type Coords, type Refused } from './data.ts'
+import { ARG, LIVE_VIEW, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 
 //! settle — flush-on-return's wait (V4-5): every tracked write reaches an outcome; a write the validator
@@ -434,6 +434,11 @@ export class Caller {
   //! call — one-shot RPC. `retry` re-dispatches on primary failover (idempotent methods ONLY — the
   // banner's re-execution warning); default is fail-fast with a typed reason.
   call(m: string, a: unknown, opts: { timeout?: number; retry?: boolean; to?: string } = {}): Promise<unknown> {
+    //! an argument the wire cannot carry is refused here, before the step (V4-48): encoded inside it, it threw
+    // out of the kernel — at once, or from a socket handler when a held call replayed on the next primary —
+    // and ended the client
+    const why = isProxy(a) ? LIVE_VIEW : encodable(a, ARG)
+    if (why !== null) return Promise.reject(new Error(`methods.${m}: the argument cannot be sent: ${why}`))
     const id = ++this.#seq
     const ms = opts.timeout ?? 10_000
     return new Promise((resolve, reject) => {
@@ -459,6 +464,14 @@ export class Caller {
     const id = ++this.#seq
     const sub = { id, m, a, proxy: proxy({}), error: null, onError } as Sub
     arm(sub)
+    //! the same question as call(): a sub whose argument cannot be sent fails at once and nothing is stepped.
+    // The handle's touch throws the reason, so its `ready` is marked handled: one failure, told once.
+    const why = isProxy(a) ? LIVE_VIEW : encodable(a, ARG)
+    if (why !== null) {
+      sub.ready.catch(noop)
+      this.#fail(sub, new Error(`methods.${m}: the argument cannot be sent: ${why}`))
+      return sub
+    }
     this.#subs.set(id, sub)
     this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m, a })
     return sub
