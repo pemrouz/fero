@@ -29,7 +29,7 @@ export const DIAG_MAX = 4096
 //! SEQS_MAX: seqs per q:'seqs' page — a bare number list (a few bytes each), so a page holds 16× a logs page
 export const SEQS_MAX = DIAG_MAX * 16
 //! DIAG_P: the DIAG payload protocol version — reported in meta/ACCEPT; version skew degrades typed ('bad-op'), never fatally.
-// 2 (wave 5e): q:'seqs'; a bridge asks it only of a node at 2+.
+// 2 (wave 5e): q:'seqs', the paged q:'state' (f, n → sh, sz on every page); a bridge asks them only of a node at 2+.
 export const DIAG_P = 2
 
 //! ctEq (the constant-time token compare) lives in kernel/door.ts now: the door's proof check and this
@@ -171,7 +171,7 @@ export const diagNode = (node: Node) => ({
 // data-bearing reads (node/logs/state) AFTER the reply builds (a pull never contains its own row).
 // q:'journal', q:'meta' and q:'seqs' emit NOTHING: journaling reads asked at follow cadence evicts the
 // very history being followed (a 1 Hz live-dash would eat a 4096-cap ring in minutes). The audit anchor
-// for a session is diagAuth + linkDown.
+// for a session is diagAuth + linkDown. (A paged q:'state' emits once, on its LAST page.)
 export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): void => {
   const j = node.journal
   const id = typeof v.id === 'number' && v.id >= 1 ? Math.floor(v.id) : 0
@@ -249,9 +249,28 @@ export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): voi
       return reply(node, link, body)
     }
     case 'state': {
-      //! SINGLE frame, never chunked: append-only sources chunk torn-proof, a MUTABLE map must not tear
-      // across pulls. The guarded reply() turns an over-MAX_FRAME state into a typed 'too-large' (the
-      // named ceiling: such a node's state is honestly unpullable — DESIGN-M7 §1 open risk, never silent).
+      //! WHOLE (no n): one frame — the default, and every older bridge's question. The guarded reply() turns an
+      // over-MAX_FRAME state into a typed 'too-large'. PAGED (n ≥ 1, wave 5e): cells [f, f+n) in the map's own
+      // order, with the torn-snapshot marker on EVERY page — sh (the state hash) and sz (the cell count) at the
+      // instant that page was cut. The map is mutable, so pages taken across a write may tear (a cell skipped, or
+      // served twice, when the order shifts): the bridge compares the markers across its pages and the assembled
+      // cells against them, and says `torn` rather than stitch a state that never existed.
+      if (typeof v.n === 'number' && v.n >= 1) {
+        const f = typeof v.f === 'number' && v.f >= 0 ? Math.floor(v.f) : 0
+        const n = Math.floor(v.n)
+        const cells: [string, unknown][] = []
+        let i = 0
+        for (const c of node.state) {
+          if (i++ < f) continue
+          cells.push(c)
+          if (cells.length >= n) break
+        }
+        const body: Record<string, unknown> = { ...base, ok: 1, sh: node.stateHash, sz: node.state.size, f, cells }
+        if (f + cells.length < node.state.size) body.next = f + cells.length
+        reply(node, link, body)
+        if (body.next === undefined) j.armed && j.emit(JK.diagPull, link.id, 'state', node.state.size)
+        return
+      }
       reply(node, link, { ...base, ok: 1, sh: node.stateHash, cells: [...node.state] })
       j.armed && j.emit(JK.diagPull, link.id, 'state', node.state.size)
       return
