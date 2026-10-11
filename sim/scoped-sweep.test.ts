@@ -1,4 +1,5 @@
-//! The scoped adversarial sweep (DESIGN-SCALE stage 0, §6): the adversaries A1-A11 of sim/scoped-sweep.ts, each run
+//! The scoped adversarial sweep (DESIGN-SCALE stage 0, §6): the adversaries A1-A11 of sim/scoped-sweep.ts (and A12, the
+// spoke across two hand-offs, since wave 6a, with M12 judging every spoke against its feeder's held subset), each run
 // on seeded scoped clusters (n from the family's list, R 1-3, memory or durable, 50-500 partitions, row and field
 // writes, removes, re-writes of removed cells; compactAt and snapshotAt at 16) with M1-M10 armed, and the mutation
 // runner's pinned catches.

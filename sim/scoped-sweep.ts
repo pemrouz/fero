@@ -9,7 +9,8 @@
 //   - mesh / plan: a scoped cluster built like harness.cluster() but with a tune table (compactAt and snapshotAt
 //     low enough that passes really fire), and a workload over 50 to 500 partitions with row writes, field
 //     writes, removes and re-writes of removed cells (harness.writesPlan draws from 20 keys only).
-//   - the adversaries A1-A11 of DESIGN-SCALE §6, one schedule builder each, run by one family runner.
+//   - the adversaries A1-A11 of DESIGN-SCALE §6 and A12 (wave 6a: a spoke across two hand-offs), one schedule
+//     builder each, run by one family runner.
 //   - the mutation runner: a switch that weakens one rule of today's injected-drop class (a release the kernel
 //     does not do) and the monitors that must go red.
 //
@@ -240,7 +241,7 @@ const others = (c: Ctx, id: string) => [...c.sim.nodes.keys()].filter((x) => x !
 const cutFromAll = (c: Ctx, id: string) => { for (const o of others(c, id)) c.sim.partition(id, o) }
 const healAll = (c: Ctx, id: string) => { for (const o of others(c, id)) c.sim.heal(id, o) }
 
-//! the adversaries A1-A11 (DESIGN-SCALE §6). Each draws its own timings from the seeded rng; `mutateAt` is when the
+//! the adversaries A1-A11 (DESIGN-SCALE §6) and A12 (wave 6a). Each draws its own timings from the seeded rng; `mutateAt` is when the
 // mutation runner injects (ms after the workload starts), placed BEFORE the family's fold-forcing step.
 export const FAMILIES: readonly Family[] = [
   {
