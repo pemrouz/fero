@@ -2029,3 +2029,27 @@ test('a value at the write limit reads back through every built-in read — the 
     await s.destroy()
   }
 })
+
+//! V4-48: a method's argument is encoded into the CALL frame inside the kernel step; one the wire cannot carry threw out
+// of it and ended the client — at once when it had a server, and when a held call replayed on the next primary when it
+// had none. It is asked at the call now, and the call (or the live sub) fails with the reason.
+test('a method argument the wire cannot carry fails the call — with no server yet, with one, and on a live sub — and the client carries on', async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const c = await fero('args', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+  let s: Fero | null = null
+  try {
+    const m = c.methods as Record<string, (a?: unknown, o?: { timeout?: number }) => any>
+    await assert.rejects(async () => { await m.echo(10n, { timeout: 8000 }) }, /^Error: methods\.echo: the argument cannot be sent: a bigint$/)
+    s = await fero('args', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { a: 1 }, methods: { echo: (a: unknown) => a } })
+    assert.ok(await until(() => (snapshot(c.data) as Record<string, unknown>).a === 1, 8000), 'the client caught up')
+    await assert.rejects(async () => { await m.echo({ f: () => 1 }, { timeout: 8000 }) }, /the argument cannot be sent: a function/)
+    const h = m.echo([Symbol('s')])
+    assert.throws(() => h.anything, /^Error: methods\.echo: the argument cannot be sent: a symbol at \[0\]$/)
+    await assert.rejects(async () => { await m.echo(c.data, { timeout: 8000 }) }, /the argument cannot be sent: a live view, not a value/)
+    assert.equal(await m.echo('fine', { timeout: 8000 }), 'fine')
+  } finally {
+    await c.destroy()
+    await s?.destroy()
+  }
+})

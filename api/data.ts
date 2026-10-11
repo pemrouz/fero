@@ -46,18 +46,19 @@ export const METHODS_ONLY = 'methods-only'
 // replication stopped for good.
 export const UNENCODABLE = 'unencodable'
 
-//! WRITE — what a local write's value may be (kernel/codec.ts encodable).
+//! WRITE, ARG — what a local write's value, and a method call's argument, may be (kernel/codec.ts encodable).
 // The wire carries 64 levels. The built-in reads wrap a stored value in up to four more — a live sub of the
 // whole resource ships it inside SUBREC, its recs list, the record and the row; the scoped gather's claim is
 // as deep — and a field write's value sits under its row: a value 61 deep was written, replicated, and then
-// could not be read back. It leaves a MiB under the frame cap for the frame's header, the record's key and the
-// envelopes.
+// could not be read back. A CALL frame wraps its argument once. Both leave a MiB under the frame cap for the
+// frame's header, the record's key and the envelopes.
 export const WRITE: Limit = { depth: MAX_DEPTH - 4, bytes: MAX_FRAME - (1 << 20) }
+export const ARG: Limit = { depth: MAX_DEPTH - 1, bytes: MAX_FRAME - (1 << 20) }
 
 //! CARRIES — what fero sends, said once for every refusal of a value (the lens, a methods.* reject, the seed)
 export const CARRIES = `fero sends null, undefined, true and false, numbers, strings, Uint8Array, and arrays and objects of these (an object sends its own fields), at most ${WRITE.depth} levels deep counted from the row and ${WRITE.bytes >> 20} MiB in all (a string counts 3 bytes a character)`
 
-//! LIVE_VIEW — the reason for a live view written as a value (`data.b = data.a`, the likely slip): read
+//! LIVE_VIEW — the reason for a live view written or passed as a value (`data.b = data.a`, the likely slip): read
 // through its traps it sent an empty object for every leaf, to every copy and the writer's own, and the writer's
 // copy went on aliasing the source (V4-48 review). Asked of the value itself, not of every part of it.
 export const LIVE_VIEW = "a live view, not a value (use a plain copy, such as the resource's snapshot of it)"
