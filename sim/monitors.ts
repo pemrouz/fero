@@ -721,14 +721,15 @@ export class Ledger {
   // on the node object and the lane array like log-monotone's: a compaction replaces the array (rescan,
   // idempotent — add() dedups), a restart replaces the node. An entry a latch SPLICES into a lane's interior
   // was in its teacher's log and was gathered there.
-  //! Wave 5e: when the scan before this one ran in the pass just before this pass, only the nodes that stepped
-  // since (sim.stepped, in node order) can hold an entry it has not gathered, so only those are read; otherwise
-  // (the first scan, a pass after run() entry or an at() task, a gap in the passes, sim.full) every node is.
-  // The same entries are added in the same order either way.
+  //! Wave 5e: when this scan runs INSIDE a monitor pass and the scan before it ran in the pass just before, only the
+  // nodes that stepped since (sim.stepped, in node order) can hold an entry it has not gathered, so only those are
+  // read; otherwise (a scan between passes, such as stampOracle's horizon read, where the last pass has already
+  // cleared sim.stepped; the first scan; a pass after run() entry or an at() task; a gap in the passes; sim.full)
+  // every node is. The same entries are added in the same order either way.
   scan(sim: Sim) {
     if (this.#scanned === sim.events) return
     this.#scanned = sim.events
-    const some = !sim.full && !sim.allDirty && this.#scanPass === sim.passes - 1
+    const some = sim.checking && !sim.full && !sim.allDirty && this.#scanPass === sim.passes - 1
     this.#scanPass = sim.passes
     for (const [id, n] of sim.nodes) {
       if (some && !sim.stepped.has(id)) continue

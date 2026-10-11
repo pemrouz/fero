@@ -162,6 +162,9 @@ export class Sim {
   allDirty = true
   //! passes — monitor passes completed. The ledger's scan reads it to know its last scan was the previous pass's.
   passes = 0
+  //! checking — true while a monitor pass runs. `stepped` describes "since the last pass" only DURING a pass: the pass
+  // clears it at its end, so a read made between passes (a horizon check such as stampOracle) must read every node.
+  checking = false
   //! full (the old walk, kept as a switch): every per-event monitor walks EVERY node on every pass, as before wave 5e.
   // FERO_SIM_MONITOR_FULL=1 turns it on for the whole process; a test sets `sim.full` to run one Sim both ways. The two
   // walks must report identical violation lists (sim/monitor-walk.test.ts): this is how that stays true.
@@ -327,10 +330,13 @@ export class Sim {
     let unchecked = false // events have run since the last monitor pass — the exit check owes one
     const check = (): void => {
       unchecked = false
-      for (const m of this.monitors) {
-        const bad = m.check(this)
-        if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
-      }
+      this.checking = true
+      try {
+        for (const m of this.monitors) {
+          const bad = m.check(this)
+          if (bad) this.violations.push({ event: this.events, monitor: m.name, detail: bad })
+        }
+      } finally { this.checking = false }
       this.stepped.clear()
       this.allDirty = false
       this.passes++
