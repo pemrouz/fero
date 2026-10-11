@@ -269,3 +269,26 @@ test('a pass after run() entry or an at() task reads every node: a state edit ma
   assert.ok(a.violations.some((v) => v.detail.includes('n03')) && a.violations.some((v) => v.detail.includes('n02')), 'both edits were seen by the full walk')
   assert.deepEqual(rows(b.violations), rows(a.violations))
 })
+
+test('the ledger\'s scan reads every node on the first pass after run() entry: a log entry appended outside any step is gathered at once, as the full walk gathers it', () => {
+  //! the ledger scan reads only the stepped nodes when its last scan was the pass before; a pass after run() entry must
+  // read them all. Without that, an entry appended by hand at a node that has not stepped since is missed until it does.
+  const go = (full: boolean) => walk(full, () => {
+    const sim = new Sim(3)
+    const nodes = cluster(sim, 4, { heartbeatMs: 100 })
+    const L = armScale(sim)
+    sim.run({ until: 600 })
+    //! outside any step: n03 gets a new lane with one epoch-0 entry (exempt from single-writer, no attempt identity)
+    nodes[2].logs.set('zz', [{ seq: 1, epoch: 0, rec: { type: 0, key: ['zz'], value: 1 } } as never])
+    sim.post('n01', { kind: 'write', recs: [{ type: 0, key: ['x'], value: 1 }] }, 1) // the one event before the pass, at another node
+    sim.run({ until: 601 })
+    return { sim, seen: L.recs.has('zz|1'), keys: [...L.recs.keys()] }
+  })
+  const a = go(true)
+  const b = go(false)
+  assert.ok(a.seen, 'the full walk gathered the hand-appended entry')
+  assert.ok(!b.sim.stepped.has('n03') && b.sim.passes > 0, 'n03 did not step before the pass: only the run() entry rule reads it')
+  assert.ok(b.seen, 'the scoped walk gathered it at the same pass')
+  assert.deepEqual(b.keys, a.keys, 'the ledger holds the same records in the same order')
+  assert.deepEqual(rows(b.sim.violations), rows(a.sim.violations))
+})
