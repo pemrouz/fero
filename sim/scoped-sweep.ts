@@ -20,7 +20,7 @@
 // stage 1 (b), 2026-10-10): a leave-drain violation is now UNSAFE like any other.
 
 import { Sim } from './exec.ts'
-import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLogs, screenMatches } from './monitors.ts'
+import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLogs, screenMatches, spokeMirror, spokeStale } from './monitors.ts'
 import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
@@ -198,6 +198,8 @@ export interface Out {
 interface Ctx {
   sim: Sim; r: () => number; n: number; R: number; durable: boolean; o: MeshOpts; nodes: Node[]
   eng: Record<string, number>; t0: number
+  //! the workload's partition count (a family that posts a second burst draws over the same range)
+  parts: number
   //! when the mutation runner injects (absolute virtual ms); a family may move it from inside its chaos
   mutAt: number
   //! every 5 ms of virtual time, these run (the leave sweep's slice loop): reactive chaos
@@ -509,6 +511,29 @@ export const FAMILIES: readonly Family[] = [
       })
     },
   },
+  {
+    //! A12 a spoke across two hand-offs at its feeder (wave 6a, 2026-10-12; STATUS's second sighting, the debugger's
+    // recipe): a client that dials every member; a join at 400 ms (partitions move onto the joiner — the feeder's
+    // copies of those freeze into orphans and shed, and the spoke keeps their rows: `stale` counts them); a clean leave
+    // at 2000 ms of a member that is NOT the spoke's feeder (the feeder acquires the leaver's partitions from their
+    // orphan copies through the latch — the records it folds there must reach the spoke); a second burst of writes
+    // after the leave. M12 (spokeMirror) judges the spoke at the horizon; `feederAcquires` is the engagement key (a
+    // feeder that acquired nothing proves nothing about the latch's forward).
+    name: 'A12-spoke-handoff', ns: [3, 5], Rs: [2, 3], mutateAt: 300,
+    chaos: (c) => {
+      const spoke = c.sim.add({ uuid: 's1', listen: 'sim:s1', hosts: c.nodes.map((x) => `sim:${x.uuid}`), heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
+      c.sim.post('s1', { kind: 'start' }, 0)
+      c.sim.at(400, () => join(c.sim, 'n90', c.o))
+      c.sim.at(2000, () => {
+        const f = spoke.primary !== null ? spoke.links.get(spoke.primary)?.uuid : undefined
+        const leaver = c.nodes.map((x) => x.uuid).filter((u) => u !== f && c.sim.nodes.has(u)).at(-1)
+        if (leaver === undefined || f === undefined) return
+        c.eng.handoff = 1
+        leaveAndGo(c, leaver, 0)
+      })
+      c.sim.at(2600, () => post(c.sim, plan(c.r, [...c.sim.nodes.values()].filter((x) => !x.client).map((x) => x.uuid), 30, c.parts, 400), c.sim.now))
+    },
+  },
 ]
 
 //! runFamily — one seed of one family to its horizon, with an optional mutation. Never throws on a red run.
@@ -540,7 +565,7 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   sim.run({ until: 1500 })
   if (!nodes.every((x) => x.armed)) { out.notLive.push('never formed'); return out }
   const t0 = sim.now
-  const c: Ctx = { sim, r, n, R, durable, o, nodes, eng, t0, polls: [], mutAt: t0 + fam.mutateAt }
+  const c: Ctx = { sim, r, n, R, durable, o, nodes, eng, t0, parts, polls: [], mutAt: t0 + fam.mutateAt }
   post(sim, plan(r, nodes.map((x) => x.uuid), count, parts, 600), t0)
   fam.chaos(c)
   //! the mutation fires at the first 5 ms slice at or past c.mutAt; its draws come from a separate stream so the
@@ -570,6 +595,21 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   //! every spoke's screen equals its kernel at the horizon (a spoke is compared to no other node, so projected()
   // does not cover it): a screen-only ghost is UNSAFE, whatever the kernel holds
   for (const [id, n] of sim.nodes) if (n.client) { const m = screenMatches(sim, id); if (m !== null) { out.red.add('screen'); out.unsafe.push('screen: ' + m) } }
+  //! M12 (wave 6a): every spoke's kernel holds exactly its feeder's held subset, by value — a missing or differing
+  // row is UNSAFE (a spoke that silently lacks a row its feeder holds is a lost write to its reader). Counted:
+  // eng.spokeParts / eng.spokeCells (non-vacuity), eng.feederAcquires (what the spoke's feeder folded through the
+  // latch — the records the forward must carry), eng.stale (rows of partitions that moved off the feeder, kept at the
+  // spoke: counted, not judged — STATUS names the gap)
+  const m12 = { parts: 0, cells: 0 }
+  for (const [id, n] of sim.nodes) {
+    if (!n.client) continue
+    const m = spokeMirror(sim, id, m12)
+    if (m !== null) { out.red.add('spoke-mirror'); out.unsafe.push(m) }
+    eng.stale = (eng.stale ?? 0) + spokeStale(sim, id).n
+    const f = n.primary !== null ? sim.nodes.get(n.links.get(n.primary)!.uuid) : undefined
+    if (f !== undefined) for (const e of f.journal.read()) if (e.kind === JK.acquire) eng.feederAcquires = (eng.feederAcquires ?? 0) + 1
+  }
+  eng.spokeParts = m12.parts; eng.spokeCells = m12.cells
   if (boundedLogs(sim)) out.redToday.push('M8')
   const L = ledgerOf(sim)
   Object.assign(eng, { cells: L.counts.cells, advances: L.counts.advances, releases: L.counts.releases, census: L.counts.census, drops: L.counts.drops, leaves: L.counts.leaves, resyncs: L.counts.resyncs, resyncRows: L.counts.resyncRows })
