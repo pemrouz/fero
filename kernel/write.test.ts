@@ -613,3 +613,60 @@ test('M5a PIN — a locally ISSUED attempt (epoch ≥ 1, self-owned) applies wit
   assert.equal(a.iss, 'aa~1')
   assert.equal(a.cid, before + 1)
 })
+
+//! ── V4-51: WRITE frames are cut by size; the relay refuses before the stamp what it could not send ──
+const bigRecs = (n: number): Rec[] => Array.from({ length: n }, (_, i) => ({ type: REC.update, key: [`r${i + 1}`], value: new Uint8Array(1500).fill(i + 1) }))
+
+test('a WRITE batch bigger than one frame leaves in cuts; the owner commits and WACKs each run; every attempt settles once', () => {
+  const A = formedView1('aa', { tune: { frame: 4096 } })
+  const B = formedView1('bb', { tune: { frame: 4096 } })
+  for (let i = 1; i <= 10; i++) { A.node.writes.ring.place(`r${i}`, 'bb'); B.node.writes.ring.place(`r${i}`, 'bb') }
+  const w0 = A.sentOn(1, VERB.WRITE).length
+  A.node.step({ kind: 'write', recs: bigRecs(10) })
+  assert.equal(A.node.writes.pending.size, 10)
+  const writes = A.sentOn(1, VERB.WRITE).slice(w0)
+  assert.deepEqual(writes.map((f) => f.prov()!.baseSeq), [1, 3, 5, 7, 9], 'five WRITE frames, each run beginning at its first attempt\'s cid')
+  assert.ok(writes.every((f) => f.buf.length - 11 <= 4096), 'every frame within the cap')
+  assert.deepEqual(writes.flatMap((f) => f.records().map((rv) => rv.key[0])), bigRecs(10).map((r) => r.key[0]))
+  //! the owner takes each frame as it comes: one commit and one WACK per run, all ten stamped once
+  const k0 = B.sentOn(1, VERB.WACK).length
+  for (const f of writes) B.node.step({ kind: 'bytesIn', link: 1, bytes: f.buf.slice() })
+  assert.equal(B.node.logs.get('bb')!.length, 10, 'committed once each')
+  const wacks = B.sentOn(1, VERB.WACK).slice(k0).map((f) => f.value as { c: number; n: number })
+  assert.deepEqual(wacks.map((v) => [v.c, v.n]), [[1, 2], [3, 2], [5, 2], [7, 2], [9, 2]], 'a WACK per run')
+  //! the WACKs settle the issuer: nothing pending, nothing re-sent
+  for (const f of B.sentOn(1, VERB.WACK).slice(k0)) A.node.step({ kind: 'bytesIn', link: 1, bytes: f.buf.slice() })
+  assert.equal(A.node.writes.pending.size, 0, 'every attempt settled once')
+  //! a retransmit of a cut frame dup-ACKs with the original coordinates, never a second commit
+  B.node.step({ kind: 'bytesIn', link: 1, bytes: writes[2].buf.slice() })
+  assert.equal(B.node.logs.get('bb')!.length, 10)
+})
+
+test('the relay refuses before the stamp a client record it could not send alone (V4-51\'s size gate); the rest of the frame commits', () => {
+  const h = harness('ff', { tune: { frame: 4096 } })
+  h.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: '', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
+  //! a client's WRITE frame fits the wire (~3.5 KB), but its first record, a 2,000-character string, would need ~6 KB
+  // of this node's writer once re-encoded (a string reserves 3 bytes a character, V4-48's count): it could never go
+  // alone in a frame of 4096. Before the gate it was stamped, then the encoder threw from this socket handler.
+  const [w] = encodeRuns([
+    { rec: { type: REC.update, key: ['big'], value: 'x'.repeat(2000) }, origin: 'cl~1', seq: 1, epoch: 0 },
+    { rec: { type: REC.update, key: ['ok'], value: new Uint8Array(1500) }, origin: 'cl~1', seq: 2, epoch: 0 },
+  ], VERB.WRITE)
+  const sent0 = h.of('send').length
+  h.node.step({ kind: 'bytesIn', link: 7, bytes: w })
+  const out = h.of('send').slice(sent0).map((e) => new Framer().push((e[2] as Uint8Array).slice())[0])
+  const nacks = out.filter((f) => f.verb === VERB.WNACK).map((f) => f.value as { c: number; n: number; r: string; m: string })
+  assert.equal(nacks.length, 1)
+  assert.deepEqual([nacks[0].c, nacks[0].n, nacks[0].r], [1, 1, 'invalid'], 'cid 1 refused, typed')
+  assert.match(nacks[0].m, /^unencodable: bigger than/, nacks[0].m)
+  assert.equal(h.node.seq, 1, 'only the record that fits was stamped')
+  assert.deepEqual([...h.node.state.keys()], [JSON.stringify(['ok'])])
+  assert.deepEqual(out.filter((f) => f.verb === VERB.RECORDS).map((f) => f.records().map((rv) => rv.key[0])), [['ok']], 'one RECORDS frame tapped to the client')
+  assert.deepEqual(out.filter((f) => f.verb === VERB.WACK).map((f) => (f.value as { c: number }).c), [2], 'and its WACK')
+  assert.equal(h.node.links.get(7)!.dead, false)
+  //! a frame of small records takes the fast loop as before: one compare, nothing walked, everything committed
+  h.node.step({ kind: 'bytesIn', link: 7, bytes: encodeRuns([{ rec: { type: REC.update, key: ['s'], value: 's' }, origin: 'cl~1', seq: 3, epoch: 0 }], VERB.WRITE)[0] })
+  assert.equal(h.node.seq, 2)
+})
