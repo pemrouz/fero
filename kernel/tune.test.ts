@@ -4,13 +4,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node, MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './node.ts'
-import { TUNE, tuneOf, PROVE_MS, type Tune } from './tune.ts'
+import { TUNE, tuneOf, PROVE_MS, FRAME_MIN, type Tune } from './tune.ts'
 import { SUSPECT_TICKS, MAX_PULLS, PROPOSAL_AGE, REJOIN_TICKS, LEAVE_TICKS, LEAVE_WINDOW, DRAIN_TICKS } from './membership.ts'
 import { MAX_PENDING, RETRY_TICKS, DEDUP_KEEP, MAX_ISSUERS } from './write.ts'
 import { MAX_PROBES } from './confirm.ts'
 import { MAX_QUEUED } from './link.ts'
 import { COMPACT_AT } from './log.ts'
 import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT, AE_FAN } from './scope.ts'
+import { MAX_FRAME } from './codec.ts'
 import type { EffectSink, Env } from './env.ts'
 
 const env = (): Env => {
@@ -28,12 +29,12 @@ test('TUNE is the old constants by name, and a node with no tune reads exactly t
     retryTicks: RETRY_TICKS, pending: MAX_PENDING, dedupKeep: DEDUP_KEEP, issuers: MAX_ISSUERS,
     probes: MAX_PROBES, queued: MAX_QUEUED, compactAt: COMPACT_AT, snapshotAt: SNAPSHOT_AT, lamportLease: LAMPORT_LEASE,
     shedTicks: SHED_TICKS, stageTicks: STAGE_TICKS, acqLiveMax: ACQ_LIVE_MAX, stallAt: STALL_AT, aeFan: AE_FAN,
-    proveMs: PROVE_MS,
+    proveMs: PROVE_MS, frame: MAX_FRAME,
   })
   //! the values the plan's table lists — a changed default is a DECISIONS line, not a drift
   assert.deepEqual(
-    [TUNE.redials, TUNE.memberRedials, TUNE.suspectTicks, TUNE.leaveTicks, TUNE.leaveWindow, TUNE.drainTicks, TUNE.pulls, TUNE.proposalAge, TUNE.rejoinTicks, TUNE.retryTicks, TUNE.pending, TUNE.dedupKeep, TUNE.issuers, TUNE.probes, TUNE.queued, TUNE.compactAt, TUNE.snapshotAt, TUNE.lamportLease, TUNE.shedTicks, TUNE.stageTicks, TUNE.acqLiveMax, TUNE.stallAt, TUNE.aeFan, TUNE.proveMs],
-    [10, 5, 3, 4, 16, 16, 5, 10, 10, 2, 1024, 1024, 1024, 1024, 256, 4096, 4096, 4096, 2, 8, 8192, 8, 8, 5000],
+    [TUNE.redials, TUNE.memberRedials, TUNE.suspectTicks, TUNE.leaveTicks, TUNE.leaveWindow, TUNE.drainTicks, TUNE.pulls, TUNE.proposalAge, TUNE.rejoinTicks, TUNE.retryTicks, TUNE.pending, TUNE.dedupKeep, TUNE.issuers, TUNE.probes, TUNE.queued, TUNE.compactAt, TUNE.snapshotAt, TUNE.lamportLease, TUNE.shedTicks, TUNE.stageTicks, TUNE.acqLiveMax, TUNE.stallAt, TUNE.aeFan, TUNE.proveMs, TUNE.frame],
+    [10, 5, 3, 4, 16, 16, 5, 10, 10, 2, 1024, 1024, 1024, 1024, 256, 4096, 4096, 4096, 2, 8, 8192, 8, 8, 5000, 268435456],
   )
   const node = new Node({ uuid: 'aa' }, env())
   assert.strictEqual(node.tune, TUNE, 'no overrides ⇒ the shared frozen table itself, nothing allocated')
@@ -76,7 +77,22 @@ test('zero: allowed for the two redial counts (no redial at all) and for aeFan (
   assert.equal(tuneOf({ aeFan: 0 }).aeFan, 0, 'aeFan 0: announce-on-change alone (the counted pins\' posture, DESIGN-SCALE stage 2)')
   for (const k of Object.keys(TUNE) as (keyof Tune)[]) {
     if (k === 'redials' || k === 'memberRedials' || k === 'aeFan') continue
+    if (k === 'frame') continue // its floor is FRAME_MIN (its own test below)
     assert.throws(() => tuneOf({ [k]: 0 }), new RegExp(`${k} must be an integer ≥ 1, got 0`), k)
     assert.equal(tuneOf({ [k]: 1 })[k], 1, `${k}: 1 is the floor`)
   }
+})
+
+//! V4-51: the frame cap is a tune row so a test can make every cut happen with KB-sized values. It bounds only what a
+// node BUILDS, so it may go down, never up: the wire's one receive bound is the Framer's MAX_FRAME.
+test('frame (V4-51): the most body bytes one frame this node builds may hold — default MAX_FRAME, an integer from 1024 to MAX_FRAME, no config key', () => {
+  assert.equal(TUNE.frame, MAX_FRAME)
+  assert.equal(FRAME_MIN, 1024)
+  assert.equal(tuneOf({ frame: 1024 }).frame, 1024)
+  assert.equal(tuneOf({ frame: MAX_FRAME }).frame, MAX_FRAME)
+  assert.equal(new Node({ uuid: 'aa', tune: { frame: 4096 } }, env()).tune.frame, 4096)
+  for (const bad of [1023, MAX_FRAME + 1, 0, 4096.5, '4096'] as unknown[])
+    assert.throws(() => tuneOf({ frame: bad as number }), new RegExp(`^Error: tune: frame must be an integer from 1024 to 268435456, got ${String(bad).replace('.', '\\.')}$`), String(bad))
+  assert.throws(() => new Node({ uuid: 'aa', tune: { frame: 512 } }, env()), /frame must be an integer from 1024 to 268435456, got 512/, 'refused in the Node constructor')
+  assert.strictEqual(new Node({ uuid: 'aa' }, env()).tune, TUNE, 'a node with no tune runs the shared table: frame = MAX_FRAME')
 })

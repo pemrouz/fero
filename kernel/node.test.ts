@@ -1026,3 +1026,36 @@ test('M6 arming predicate: scoped is config, armed requires a committed view —
   const { node: restored } = harness('aa', { replicas: 2, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb']] } })
   assert.equal(restored.armed, true, 'scoped ∧ epoch > 0 ⇒ armed')
 })
+
+//! ── V4-51: a flush that clears the queue ships nothing more ─────────────────────
+// A run bigger than the frame cap leaves in several frames, so one flush can now ship several. If the paused queue
+// overflows at one of them, the rest of the flush must not follow it into the queue: those frames would sit ABOVE the
+// hole, reach the peer at the drain, and move its scalar fence past the lost records — and the drain digest re-ships
+// only above the peer's tails, so the hole would never heal (the design's probe E: 4 of 10 rows, for good).
+test('an unscoped member whose link overflows in the middle of a flush ships nothing more of it, and converges after the drain', () => {
+  const A = harness('aa', { tune: { frame: 4096, queued: 2 } })
+  const B = harness('bb', { tune: { frame: 4096 } })
+  A.node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+  B.node.step({ kind: 'linkUp', link: 1, dialed: false })
+  let ai = 0, bi = 0
+  const pump = () => {
+    for (let round = 0; round < 8; round++) {
+      const as = A.of('send'), bs = B.of('send')
+      for (; ai < as.length; ai++) B.node.step({ kind: 'bytesIn', link: 1, bytes: as[ai][2] as Uint8Array })
+      for (; bi < bs.length; bi++) A.node.step({ kind: 'bytesIn', link: 1, bytes: bs[bi][2] as Uint8Array })
+    }
+  }
+  pump()
+  const la = A.node.links.get(1)!
+  assert.equal(la.synced, true, 'admitted and synced: live records flow')
+  A.node.step({ kind: 'pause', link: 1 })
+  //! one commit of ten 1.5 KB records: five cut frames of two records each, into a paused queue with room for two
+  A.node.step({ kind: 'write', recs: Array.from({ length: 10 }, (_, i) => ({ type: REC.update, key: [`r${i + 1}`], value: new Uint8Array(1500).fill(i + 1) })) })
+  assert.ok(A.node.journal.read().some((e) => e.kind === JK.dropOldest), 'the third frame overflowed the queue')
+  assert.deepEqual(la.queued, [], 'nothing queued after the clear: the rest of the flush is part of the lost tail')
+  assert.equal(la.synced, false)
+  A.node.step({ kind: 'drain', link: 1 })
+  pump()
+  assert.equal(B.node.state.size, 10, 'the drain digest re-shipped the whole tail')
+  assert.equal(B.node.streams.get('aa')!.applied, 10)
+})

@@ -762,7 +762,7 @@ export class Node {
         return
       }
       case 'linkUp': {
-        const link = new Link(e.link, e.dialed, e.to, this.tune.queued)
+        const link = new Link(e.link, e.dialed, e.to, this.tune.queued, this.tune.frame)
         this.links.set(e.link, link)
         j.armed && j.emit(JK.linkUp, e.link, e.dialed ? 1 : 0)
         //! both sides open with HELLO — identity first, before anything routes. Clients declare the
@@ -807,7 +807,7 @@ export class Node {
           this.env.sink.close(e.link, 'wire-fault')
           return
         }
-        link.flush(this.env.sink, j) // one frame per link per step, even when a chunk carried many inbound frames
+        link.flush(this.env.sink, j) // one flush per link per step (one frame, unless a run passed the frame cap), even when a chunk carried many inbound frames
         return
       }
       case 'linkDown': {
@@ -1741,7 +1741,8 @@ export class Node {
         if (maxSeq && this.durable) this.persistRun(prov.origin, maxSeq, f.buf.slice(), this.armed ? this.writes.rxParts ?? undefined : undefined)
         if (fresh) this.confirm.recount(this) // my shippable for this origin advanced — evidence for a probe
         //! flush the tap-forward (M5b): inbound() queued fresh records onto synced CLIENT links (the
-        // spoke feed) — one flush per FRAME keeps the one-frame-per-tick shape on the client wire too
+        // spoke feed) — one flush per FRAME keeps the one-frame-per-tick shape on the client wire too (a run past
+        // this node's frame cap leaves in cuts, V4-51)
         if (fresh && this.clientLinks.size)
           for (const cl of this.clientLinks) cl.flush(this.env.sink, j)
         return

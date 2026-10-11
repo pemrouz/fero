@@ -16,6 +16,13 @@
 // bound, DIAG_*, VNODES, the snapshot chunk, and MAX_RUN (write.ts — the longest WACK/WNACK run a
 // peer may send us, split off MAX_PENDING so tuning the queue cannot change what the wire accepts).
 //
+// The row `frame` (V4-51) is not wire hygiene, though it sounds like it: it bounds only what this node BUILDS —
+// records frames, WAL rows, RESULT and SUBREC — and a node may only cut smaller, which no peer can tell from a
+// bigger write; receivers never read it (the Framer's MAX_FRAME is the wire's one receive bound). It has no config
+// key and the composer never passes it: it is the test seam that makes every cut reachable with KB-sized values,
+// and production runs at MAX_FRAME (api/index.test.ts guards it). Tests run one cap per cluster: a node with a
+// smaller cap than a peer could meet a peer's record it cannot send alone (its answer, its tap, its WAL), a loud throw.
+//
 // The three node-level constants are DEFINED here and re-exported by kernel/node.ts under their
 // old names: node.ts imports this file, so defining them there would make an import cycle.
 
@@ -25,6 +32,7 @@ import { MAX_PROBES } from './confirm.ts'
 import { MAX_QUEUED } from './link.ts'
 import { COMPACT_AT } from './log.ts'
 import { SHED_TICKS, STAGE_TICKS, ACQ_LIVE_MAX, STALL_AT, AE_FAN } from './scope.ts'
+import { MAX_FRAME } from './codec.ts'
 
 //! MAX_REDIALS: bounded dial persistence per target — after this, give up loudly (JK.giveUp). With
 // heartbeats on, the heartbeat tick revives given-up targets (JK.revive) — give-up is a cool-down.
@@ -49,6 +57,8 @@ export const SNAPSHOT_AT = 4096
 // `k` to the DOOR that proves it — before the node gives up on it (doorReject 'timeout'). A timer per
 // proving link, never a heartbeat sweep (heartbeat.ms 0 is an opt-out). Draws nothing on the open path.
 export const PROVE_MS = 5000
+//! FRAME_MIN — the smallest `frame` a node may run with: a frame must still hold a record beside its envelope
+export const FRAME_MIN = 1024
 
 export interface Tune {
   //! redials — dial attempts per target before the chain gives up (JK.giveUp; heartbeats revive it)
@@ -105,6 +115,9 @@ export interface Tune {
   aeFan: number
   //! proveMs — milliseconds a link may wait in LS.proving for the peer's DOOR before it is refused `timeout`
   proveMs: number
+  //! frame — the most body bytes one frame this node BUILDS may hold (records frames, WAL rows, RESULT, SUBREC):
+  // MAX_FRAME, or less in a test (FRAME_MIN..MAX_FRAME). See the banner: never wire hygiene, never configured.
+  frame: number
 }
 
 //! TUNE — the defaults: today's constants, by name. Frozen; a node copies it, never mutates it.
@@ -135,6 +148,7 @@ export const TUNE: Readonly<Tune> = Object.freeze({
   stallAt: STALL_AT,
   aeFan: AE_FAN,
   proveMs: PROVE_MS,
+  frame: MAX_FRAME,
 })
 
 //! ZERO_OK — the rows where 0 means something: no redial at all (the config key redial.tries allows
@@ -148,8 +162,9 @@ const ZERO_OK: ReadonlySet<string> = new Set(['redials', 'memberRedials', 'aeFan
 
 //! tuneOf — the validated, frozen table for one node: TUNE under the embedder's overrides. Fails
 // closed: a row that is not in TUNE, or a value that is not an integer at or above the row's floor
-// (0 for the two redial counts, 1 for everything else), throws — a typo must never silently leave a
-// bound at its default, and a fraction or a negative bound has no meaning the kernel could honour.
+// (0 for the two redial counts and aeFan, 1 for everything else), throws — a typo must never silently leave a
+// bound at its default, and a fraction or a negative bound has no meaning the kernel could honour. `frame` has a
+// range of its own, FRAME_MIN..MAX_FRAME: a node may cut smaller than the wire allows, never bigger.
 // No overrides ⇒ the shared frozen TUNE itself (zero allocation).
 export const tuneOf = (over?: Partial<Tune>): Readonly<Tune> => {
   if (over === undefined) return TUNE
@@ -159,8 +174,12 @@ export const tuneOf = (over?: Partial<Tune>): Readonly<Tune> => {
     if (!Object.hasOwn(TUNE, k)) throw new Error(`tune: unknown row '${k}'`)
     const v = (over as Record<string, unknown>)[k]
     if (v === undefined) continue
-    const floor = ZERO_OK.has(k) ? 0 : 1
-    if (typeof v !== 'number' || !Number.isInteger(v) || v < floor) throw new Error(`tune: ${k} must be an integer ≥ ${floor}, got ${String(v)}`)
+    if (k === 'frame') {
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < FRAME_MIN || v > MAX_FRAME) throw new Error(`tune: frame must be an integer from ${FRAME_MIN} to ${MAX_FRAME}, got ${String(v)}`)
+    } else {
+      const floor = ZERO_OK.has(k) ? 0 : 1
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < floor) throw new Error(`tune: ${k} must be an integer ≥ ${floor}, got ${String(v)}`)
+    }
     out[k as keyof Tune] = v
   }
   return Object.freeze(out)
