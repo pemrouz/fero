@@ -226,10 +226,15 @@ export class Writer {
       case VT.f64: return this.f64(v as number)
       case VT.str: return this.str(v as string)
       case VT.u8: { const b = v as Uint8Array; this.varint(b.length); return this.bytes(b) }
+      //! by index over the length written, read once: the count on the wire and the elements after it are one
+      // reading of the array. An array whose own iterator disagrees with its length (a subclass, an own
+      // Symbol.iterator) wrote a count and then other elements — a frame that failed to decode, or a value
+      // encodable's walk never saw (V4-48 review). Plain arrays encode to the same bytes as before.
       case VT.arr: {
         const a = v as unknown[]
-        this.varint(a.length)
-        for (const x of a) { const t = vtOf(x); this.u8(t); this.value(x, t, depth + 1) }
+        const len = a.length
+        this.varint(len)
+        for (let i = 0; i < len; i++) { const x = a[i]; const t = vtOf(x); this.u8(t); this.value(x, t, depth + 1) }
         return
       }
       case VT.obj: {

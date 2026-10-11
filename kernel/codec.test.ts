@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import {
   Framer, FrameError, MAGIC, MAX_FRAME, VERB, HEADER, MAX_DEPTH,
-  encodeControl, encodeFrame, encodeRuns, crcFrame, Writer, encodable,
+  encodeControl, encodeFrame, encodeRuns, crcFrame, Writer, Cursor, VT, encodable,
 } from './codec.ts'
 import { REC, type Rec } from './env.ts'
 
@@ -250,6 +250,31 @@ test('seeded random-record fuzz round-trips (200 mixed frames)', () => {
       assert.deepEqual(v.key, recs[i].key)
       if (recs[i].type !== REC.remove) assert.deepEqual(v.value, recs[i].value)
     })
+  }
+})
+
+//! arrays whose own iterator disagrees with their indices: a subclass, an own Symbol.iterator — one yields a value
+// the length never covered, one more elements than the length, one fewer
+const oddArrays = (): unknown[][] => {
+  class Odd extends Array { *[Symbol.iterator]() { yield 'x' } }
+  return [
+    Odd.from([1, 2]),
+    Object.assign([1, 2], { *[Symbol.iterator]() { yield 10n } }),
+    Object.assign([1, 2], { *[Symbol.iterator]() { yield 1; yield 2; yield 3 } }),
+  ]
+}
+
+//! Writer.value writes an array's length and then its elements: with for-of, an array whose iterator disagreed wrote
+// a count and other elements — a frame that would not decode ('frame truncated', trailing bytes), or one that met a
+// value the length never covered (a bigint, thrown from inside the step). By index over the length it writes, the
+// count and the elements are one reading (the V4-48 review); plain arrays encode to the same bytes.
+test('Writer.value writes an array by index over the length it writes — whatever its own iterator yields — and it decodes whole', () => {
+  for (const a of oddArrays()) {
+    const w = new Writer()
+    w.value(a, VT.arr)
+    const c = new Cursor(w.buf, 0, w.len)
+    assert.deepEqual(c.value(VT.arr), [1, 2], 'the elements by index, whatever the iterator says')
+    assert.equal(c.pos, w.len, 'and nothing after them')
   }
 })
 
