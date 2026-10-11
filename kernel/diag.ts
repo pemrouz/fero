@@ -37,17 +37,21 @@ export const DIAG_P = 2
 
 //! reply — every DIAGA leaves through this gate: the encode is guarded (a FrameError from an oversized
 // body becomes a TYPED {ok:0, e:'too-large'} answer, never an escape into the bytesIn net where it
-// would read as a wire fault and drop the session).
-const reply = (node: Node, link: Link, body: Record<string, unknown>): void => {
+// would read as a wire fault and drop the session). Returns whether the body itself went out, so a data-bearing
+// read audits only what it really handed out.
+const reply = (node: Node, link: Link, body: Record<string, unknown>): boolean => {
   const j = node.journal
   let bytes: Uint8Array
+  let sent = true
   try {
     bytes = encodeControl(VERB.DIAGA, body)
   } catch (err) {
     if (!(err instanceof FrameError)) throw err
     bytes = encodeControl(VERB.DIAGA, { id: body.id, u: body.u, i: body.i, ok: 0, e: 'too-large' })
+    sent = false
   }
   link.ship(bytes, node.env.sink, j)
+  return sent
 }
 
 //! diagHello — the whole session machine. Guards in order: used-link (an r:2 on an admitted member/client
@@ -82,7 +86,7 @@ export const diagHello = (node: Node, link: Link, v: Record<string, unknown>): v
       link.state = LS.diag
       link.noRedial = true // a closed diag session is the client's to re-open; the node never redials it
       j.armed && j.emit(JK.diagAuth, link.id, name)
-      return reply(node, link, { id: 0, ok: 1, u: node.uuid, i: node.incarnation, p: DIAG_P })
+      return void reply(node, link, { id: 0, ok: 1, u: node.uuid, i: node.incarnation, p: DIAG_P })
     }
   deny('bad-token')
 }
@@ -172,18 +176,18 @@ export const diagNode = (node: Node) => ({
 // q:'journal', q:'meta' and q:'seqs' emit NOTHING: journaling reads asked at follow cadence evicts the
 // very history being followed (a 1 Hz live-dash would eat a 4096-cap ring in minutes). The audit anchor
 // for a session is diagAuth + linkDown. (A paged q:'state' emits on EVERY page, with that page's cell count.)
+// Only a reply that went out is audited: one refused as 'too-large' handed out nothing and leaves no row.
 export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): void => {
   const j = node.journal
   const id = typeof v.id === 'number' && v.id >= 1 ? Math.floor(v.id) : 0
   const base = { id, u: node.uuid, i: node.incarnation }
-  if (!id) return reply(node, link, { ...base, ok: 0, e: 'bad-args' })
+  if (!id) return void reply(node, link, { ...base, ok: 0, e: 'bad-args' })
   switch (v.q) {
     case 'meta':
       //! the node serves its OWN vocabulary — a capture stays self-describing across processes; version skew is data
-      return reply(node, link, { ...base, ok: 1, l: node.listen, p: DIAG_P, vocab: JK })
+      return void reply(node, link, { ...base, ok: 1, l: node.listen, p: DIAG_P, vocab: JK })
     case 'node': {
-      reply(node, link, { ...base, ok: 1, n: diagNode(node) })
-      j.armed && j.emit(JK.diagPull, link.id, 'node', 1)
+      if (reply(node, link, { ...base, ok: 1, n: diagNode(node) })) j.armed && j.emit(JK.diagPull, link.id, 'node', 1)
       return
     }
     case 'journal': {
@@ -201,14 +205,14 @@ export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): voi
         ev: page.map((e) => [e.t, e.kind, e.a, e.b, e.c]),
       }
       if (all.length > max) body.next = page[page.length - 1].t + 1
-      return reply(node, link, body) // NOT journaled — the follow-cadence eviction rule above
+      return void reply(node, link, body) // NOT journaled — the follow-cadence eviction rule above
     }
     case 'logs': {
       //! logs cursor f is EXCLUSIVE (the digest/AE convention: "I hold through f, ship me after"). The
       // TWO conventions in one protocol are an off-by-one factory — this comment and the adversarial
       // cursor tests are load-bearing; the one client everyone copies lives in tools/debug/attach.ts.
       const o = typeof v.o === 'string' ? v.o : null
-      if (!o) return reply(node, link, { ...base, ok: 0, e: 'bad-args' })
+      if (!o) return void reply(node, link, { ...base, ok: 0, e: 'bad-args' })
       const f = typeof v.f === 'number' && v.f >= 0 ? Math.floor(v.f) : 0
       const max = Math.min(typeof v.n === 'number' && v.n >= 1 ? Math.floor(v.n) : DIAG_MAX, DIAG_MAX)
       const entries = node.logs.get(o) ?? []
@@ -223,8 +227,7 @@ export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): voi
       }
       const body: Record<string, unknown> = { ...base, ok: 1, o, tail, ev }
       if (ev.length && (ev[ev.length - 1].s as number) < tail) body.next = ev[ev.length - 1].s
-      reply(node, link, body)
-      j.armed && j.emit(JK.diagPull, link.id, 'logs', ev.length)
+      if (reply(node, link, body)) j.armed && j.emit(JK.diagPull, link.id, 'logs', ev.length)
       return
     }
     case 'seqs': {
@@ -234,7 +237,7 @@ export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): voi
       // the bridge asks which seqs are there now and pulls only the ones it lacks. Cursor f EXCLUSIVE (the logs
       // convention), paged by SEQS_MAX via next. Not journaled: it is asked at follow cadence (the policy above).
       const o = typeof v.o === 'string' ? v.o : null
-      if (!o) return reply(node, link, { ...base, ok: 0, e: 'bad-args' })
+      if (!o) return void reply(node, link, { ...base, ok: 0, e: 'bad-args' })
       const f = typeof v.f === 'number' && v.f >= 0 ? Math.floor(v.f) : 0
       const entries = node.logs.get(o) ?? []
       const s: number[] = []
@@ -246,7 +249,7 @@ export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): voi
       const tail = entries.length ? entries[entries.length - 1].seq : 0
       const body: Record<string, unknown> = { ...base, ok: 1, o, tail, s }
       if (s.length && s[s.length - 1] < tail) body.next = s[s.length - 1]
-      return reply(node, link, body)
+      return void reply(node, link, body)
     }
     case 'state': {
       //! WHOLE (no n): one frame — the default, and every older bridge's question. The guarded reply() turns an
@@ -267,17 +270,16 @@ export const onDiagQ = (node: Node, link: Link, v: Record<string, unknown>): voi
         }
         const body: Record<string, unknown> = { ...base, ok: 1, sh: node.stateHash, sz: node.state.size, f, cells }
         if (f + cells.length < node.state.size) body.next = f + cells.length
-        reply(node, link, body)
-        //! every page is audited, not only the last: each one hands out cells, and a reader that stops one page
-        // short must still leave its row (a paged read is at most a few pages of 2^20 cells, so this is no spam)
-        j.armed && j.emit(JK.diagPull, link.id, 'state', cells.length)
+        //! every page that goes out is audited, not only the last: each one hands out cells, and a reader that stops
+        // one page short must still leave its row (a paged read is at most a few pages of 2^20 cells, so this is no
+        // spam). A page refused as 'too-large' handed out nothing, so it leaves no row.
+        if (reply(node, link, body)) j.armed && j.emit(JK.diagPull, link.id, 'state', cells.length)
         return
       }
-      reply(node, link, { ...base, ok: 1, sh: node.stateHash, cells: [...node.state] })
-      j.armed && j.emit(JK.diagPull, link.id, 'state', node.state.size)
+      if (reply(node, link, { ...base, ok: 1, sh: node.stateHash, cells: [...node.state] })) j.armed && j.emit(JK.diagPull, link.id, 'state', node.state.size)
       return
     }
     default:
-      return reply(node, link, { ...base, ok: 0, e: 'bad-op' })
+      return void reply(node, link, { ...base, ok: 0, e: 'bad-op' })
   }
 }

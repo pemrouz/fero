@@ -305,6 +305,24 @@ test('state pages (DIAG_P 2): cells [f, f+n) with the torn-snapshot marker (sh, 
   assert.deepEqual([a.cells, a.sz], [[...h.node.state], undefined])
 })
 
+test('a data-bearing read audits only what went out: a page or a whole map refused as too-large leaves no diagPull row (wave 5e review)', () => {
+  const h = diagged()
+  h.open(9); h.attach(9)
+  for (let i = 0; i < 3; i++) h.node.step({ kind: 'write', recs: [{ type: REC.update, key: [`k${i}`], value: i }] })
+  //! a frame over 256 MiB is out of reach in a test; a cell the codec cannot encode takes the same path through the
+  // guarded reply (a FrameError becomes the typed 'too-large'). Planted last, so it is the map's fourth cell
+  ;(h.node.state as Map<string, unknown>).set('["bad"]', Symbol('unencodable'))
+  const pulls = h.jk(JK.diagPull).length
+  h.q(9, { id: 2, q: 'state', f: 3, n: 1 })
+  assert.deepEqual([h.lastA(9).ok, h.lastA(9).e], [0, 'too-large'], 'the page is refused')
+  h.q(9, { id: 3, q: 'state' })
+  assert.deepEqual([h.lastA(9).ok, h.lastA(9).e], [0, 'too-large'], 'and so is the whole map')
+  assert.equal(h.jk(JK.diagPull).length, pulls, 'neither handed out a cell, so neither is audited')
+  h.q(9, { id: 4, q: 'state', f: 0, n: 3 })
+  assert.equal(h.lastA(9).ok, 1)
+  assert.deepEqual(h.jk(JK.diagPull).slice(pulls).map((e) => [e.b, e.c]), [['state', 3]], 'a page that went out still is')
+})
+
 test('parity by construction: captureNode is diagNode + the chunked planes (deepEqual, kinds ≥ 68 filtered)', () => {
   const h = diagged()
   h.admit(3, 'bb')
