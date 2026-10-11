@@ -21,6 +21,7 @@ import { REC, type EffectSink } from '../../kernel/env.ts'
 import { Node } from '../../kernel/node.ts'
 import { VERB, encodeControl } from '../../kernel/codec.ts'
 import { frontier, compact } from '../../kernel/log.ts'
+import { scopedTenure, attachMissing } from './fixtures.ts'
 
 type Entry = { t: string; d: string }
 const G = ELI5 as Record<string, Entry>
@@ -135,6 +136,18 @@ const sweepViewer = async () => {
     const { el, g } = await bootViewer('scoped-handoff', scoped, {})
     g(`navTo(${JSON.stringify('g/writes/' + r.origin + '#' + r.seq)})`)
     sweep(el, 'scoped/handoff')
+  }
+  //! a LIVE ATTACH that could not reach a client's feeder (wave 5f), built as the attach bridge builds it: the header
+  // names the client it cannot judge, and the client's stop for a write it lacks says not judged
+  {
+    const { cap } = scopedTenure()
+    const blind = attachMissing(cap, cap.nodes.find((n) => n.uuid === 'zc1')!.feeder as string)
+    const r = [...routes(blind).values()].find((x: { nodes: Record<string, { status: string }> }) => x.nodes.zc1?.status === 'feeder-unknown') as { origin: string; seq: number } | undefined
+    assert.ok(r, 'the client lacks a write its missing feeder would decide — the fixture is what it claims')
+    await drive('feeder-missing', blind, '')
+    const { el, g } = await bootViewer('feeder-missing/write', blind, { search: '' })
+    g(`navTo(${JSON.stringify('g/writes/' + r.origin + '#' + r.seq)})`)
+    sweep(el, 'feeder-missing/write')
   }
   //! a LIVE capture of real nodes frozen MID-FLIGHT (run to a horizon, not to quiescence): the poll path with
   // writes still travelling (in-flight pills, not-yet-arrived stops), then a deep-linked scrub point → paused

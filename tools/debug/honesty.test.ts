@@ -21,7 +21,7 @@ import { Sim } from '../../sim/exec.ts'
 import { cluster, writes } from '../../sim/harness.ts'
 import { shrink, sweepBuild } from '../../sim/shrink.ts'
 import { captureLive, captureSim, captureAttached } from './capture.ts'
-import { scopedTenure, mixed } from './fixtures.ts'
+import { scopedTenure, mixed, attachMissing, copyingHolder } from './fixtures.ts'
 import {
   kindNames, stateAt, verifyReplay, routes, contested, summarize, cellKey, topologyAt, verifyTopology, agreement,
   ROUTE_STATUS, ABSENT_REASONS,
@@ -125,6 +125,11 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
   //! a SCOPED capture with a client, a leaver and a voted-out member (wave 5e): agreement's per-row branch and routes'
   // tenure rule mint their strings from `held`, `feeder` and the journal — exercised by a producer, never dormant
   const tenure = scopedTenure().cap
+  //! a live attach missing a node (wave 5f): the client's feeder (routes mints feeder-unknown, agreement names the client)
+  // and the writer of a row a holder is still copying in (the open latch puts that holder on the row)
+  const noFeeder = attachMissing(tenure, tenure.nodes.find((n) => n.uuid === 'zc1')!.feeder as string)
+  const copying = copyingHolder()
+  const noWriter = attachMissing(copying.cut, copying.owner)
   const mixedCap = mixed()
 
   const universe = (c: unknown) =>
@@ -144,7 +149,7 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
     return false
   }
   let empties = 0, closings = 0, refusals = 0
-  for (const cap of [chaotic, attached, captureLive([bareNode()]), reborn, tenure, mixedCap]) {
+  for (const cap of [chaotic, attached, captureLive([bareNode()]), reborn, tenure, mixedCap, noFeeder, noWriter]) {
     const allowed = universe(cap)
     const nums = capNumbers(cap)
     //! cell keys are JSON encodings of capture keys — derived, so add them to the universe explicitly
@@ -195,6 +200,9 @@ test('(b) string-leaf traceability: every fold-emitted string traces to a captur
   assert.ok(empties > 0, 'a pre-HELLO link (uuid \'\') was seen at a linkUp row')
   assert.ok(closings > 0, 'a closing loser was seen at a dupLink row')
   assert.ok(refusals > 0, 'the reborn producer exercised a refusal template')
+  //! the wave 5f branches are exercised too: a feeder-unknown stop, and a copying holder judged on its row
+  assert.ok([...(routes(noFeeder) as Map<string, { nodes: Record<string, { status: string }> }>).values()].some((r) => r.nodes.zc1?.status === 'feeder-unknown'), 'a feeder-unknown stop was minted')
+  assert.ok(((agreement(noWriter) as { groups: { rows: Map<string, string[]> }[] }).groups[0].rows.get(copying.row) || []).includes(copying.lagging), 'the copying holder was judged on its row')
 })
 
 test('(b2) the prose carve-out is EXERCISED, not dormant: a truncated capture mints its pinned template', () => {
