@@ -452,6 +452,10 @@ export class Node {
   // tap-forward (write.ts inbound) iterates this set — one size check when a node serves no clients,
   // so the member hot path pays nothing (M5b).
   clientLinks = new Set<Link>()
+  //! #covered — the client links that may hold a digest answer's cover (Link.torn / Link.inQueue): added where #answer
+  // sets one, pruned lazily by indexInsert once both are null, and at linkDown. It keeps indexInsert's cover check to
+  // the links that can need it, so an interior insert on a node with many idle clients pays one size check.
+  #covered = new Set<Link>()
   //! resync (spokes only, 2026-09-06 — DECISIONS V4-5): a spoke's fold is a VIEW of its feeder's, never a
   // source. When the feeder's digest shows a lane tail BELOW ours, the cluster's truth moved under us
   // (records died with a server; a failover landed on a lagging feeder) — the fold resets, an empty r=1
@@ -810,6 +814,7 @@ export class Node {
         if (link.proveTimer !== -1) this.#unprove(link)
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
+        this.#covered.delete(link)
         //! a bare close while PROVING — before or after my proof — is a LINK LOSS, not a refusal (DESIGN-DOOR
         // §3, settled at the third review): the door speaks only through DOOR {e}, and a peer that refused
         // me sent one. A crash, a cut or a reset mid-handshake looks exactly like this close, and with
@@ -1975,8 +1980,14 @@ export class Node {
   // shipped, and one tap-forwarded behind a queued reply and cleared with it is never shipped again — a spoke in
   // resync ends without that row and sweeps it (the review of the resume-cost fix, 2026-10-11). Only client links
   // carry a cover on a node that splices (an armed one: its member links get no suffix), and only while paused.
+  // The check walks #covered, not every client link: one size check when no answer is stopped or queued.
+  //! The cost: lowering a cover re-sends that lane's whole suffix above the splice, frames the peer may already
+  // hold included, so splices that keep landing under one long torn answer keep moving its resume point back and
+  // delay its reply until they stop (every row still arrives). Splices are cold (a heal, a fetch fold); a per-link
+  // list of spliced entries sent ahead of the cover walk would make each cost one record (a STATUS idea).
   indexInsert(origin: string, e: LogEntry) {
-    if (this.clientLinks.size) for (const l of this.clientLinks) {
+    if (this.#covered.size) for (const l of this.#covered) {
+      if (l.torn === null && l.inQueue === null) { this.#covered.delete(l); continue }
       if (l.torn !== null && (l.torn.d[origin] ?? 0) >= e.seq) l.torn.d[origin] = e.seq - 1
       if (l.inQueue !== null && (l.inQueue.d[origin] ?? 0) >= e.seq) l.inQueue.d[origin] = e.seq - 1
     }
@@ -2083,7 +2094,10 @@ export class Node {
             run.push(m)
           }
           if (!run.length) break
-          if (link.paused && link.inQueue === null) link.inQueue = { d: this.#cover(d, origin, run[0].seq), r, q }
+          if (link.paused && link.inQueue === null) {
+            link.inQueue = { d: this.#cover(d, origin, run[0].seq), r, q }
+            if (link.client) this.#covered.add(link)
+          }
           link.ship(encodeRuns(run, undefined, this.armed)[0], this.env.sink, j)
           shipped += run.length
         }
@@ -2095,13 +2109,17 @@ export class Node {
     if (tear === null) {
       link.synced = true
       if (r === 1) {
-        if (link.paused && link.inQueue === null) link.inQueue = { d: this.#cover(d, null, 0), r, q }
+        if (link.paused && link.inQueue === null) {
+          link.inQueue = { d: this.#cover(d, null, 0), r, q }
+          if (link.client) this.#covered.add(link)
+        }
         this.#sendDigest(link, 0, q)
       }
       return
     }
     link.synced = false
     link.torn = { d: this.#cover(d, tear === '' ? null : tear, tearSeq), r, q }
+    if (link.client) this.#covered.add(link)
   }
 
   //! #cover — the cold path of a stopped or queued answer: the peer's tails `d` (as numbers: the decoded frame's map is
