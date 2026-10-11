@@ -1063,3 +1063,39 @@ test('COMPACTION keeps byPart in step — a scoped node\'s superseded entries le
   assert.deepEqual(h.node.byPart!.get('q')!.get('aa'), kept.filter((e) => e.rec.key[0] === 'q'), 'q untouched')
   assert.equal(h.node.byPart!.get('k')!.get('aa')!.length, 1)
 })
+
+//! ── V4-51: a teach bigger than one frame leaves in cuts ───────────────────────────
+// ACQDONE's n counts RECORDS, so a teach cut into several ACQ frames folds exactly as one frame did: the learner's
+// staged count matches, no 'torn' abort, the cut is attested.
+test('an ACQ teach bigger than one frame leaves in cuts; the learner\'s count matches and the fold completes', () => {
+  const T = armedView1({ tune: { aeFan: 0, frame: 4096 } })
+  T.node.membership.rejoinFloor = 0
+  T.node.writes.ring.place('p', 'aa', 'bb')
+  T.node.step({ kind: 'write', recs: Array.from({ length: 10 }, (_, i) => rec(['p', `f${i}`], new Uint8Array(1500).fill(i))) })
+  const lane = T.node.logs.get('aa')!.map((e) => e.seq)
+  assert.equal(lane.length, 10)
+  //! the learner: bb at view 1, assigned p, latches aa on aa's announcement and asks from zero
+  const L = harness('bb', { replicas: 2, tune: { frame: 4096 }, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] } })
+  L.node.step({ kind: 'start' })
+  L.admit(1, 'aa')
+  L.admit(2, 'cc')
+  L.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(L.node.armed, true)
+  L.node.writes.ring.place('p', 'aa', 'bb')
+  L.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { p: { aa: lane[9] } }) })
+  assert.equal(L.jk(JK.acquireStart).length, 1, 'the latch opened on aa')
+  const need = sentOn(L, 1, VERB.HAVEA).pop()!
+  //! the teacher answers the need: five ACQ cuts of two records each, then ACQDONE counting all ten
+  T.node.step({ kind: 'bytesIn', link: 1, bytes: need.buf.slice() })
+  const acq = sentOn(T, 1, VERB.ACQ)
+  assert.deepEqual(acq.map((f) => f.records().map((rv) => rv.seq)), [0, 2, 4, 6, 8].map((k) => [lane[k], lane[k + 1]]))
+  assert.ok(acq.every((f) => f.buf.length - 11 <= 4096), 'every ACQ frame within the cap')
+  const done = sentOn(T, 1, VERB.ACQDONE)
+  assert.deepEqual(done.map((f) => (f.value as { n: number }).n), [10])
+  for (const f of [...acq, ...done]) L.node.step({ kind: 'bytesIn', link: 1, bytes: f.buf.slice() })
+  assert.equal(L.jk(JK.acquire).length, 1, 'the fold committed')
+  assert.deepEqual(L.jk(JK.acquireAbort), [], 'no torn abort')
+  assert.equal(L.node.scope!.held('p'), true)
+  assert.equal(L.node.state.size, 10)
+  assert.equal(L.node.streams.get('aa')!.parts!.get('p')!.s, lane[9], 'the teacher\'s cut is attested')
+})
