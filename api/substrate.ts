@@ -272,6 +272,7 @@ const ingestFold = (p: any, recs: readonly object[], onReject: (rj: { error: unk
 // gather — api/index.ts).
 const LENS = Symbol('fero.lens')
 const RESERVED_NAMES: ReadonlySet<string> = new Set(contract().reserved)
+const OPERATORS: ReadonlySet<string> = new Set(Object.keys(contract().operators))
 
 //! `inflight(key)` — the binding's settlement index: true while one of OUR writes to that cell is
 // on the wire. The no-op delete filter asks it before swallowing: since V4-7 the fold does not
@@ -386,7 +387,9 @@ export const lens = (h: any, path: string[], sink: (recs: Rec[]) => void, inflig
           const k = prop === 'first' ? keys[0] ?? '0' : keys[keys.length - 1] ?? '0'
           return lens(h.get(k), [...path, k], sink, inflight, h)
         }
-      if (RESERVED_NAMES.has(prop)) return h[prop] // operators + READ built-ins: v4's own dispatch
+      //! operators + READ built-ins: v4's own dispatch. An operator's view handed out here is ESCAPED
+      // unless a handler scope made the call (I-29, handlerScope below): code outside a handler holds it raw
+      if (RESERVED_NAMES.has(prop)) return OPERATORS.has(prop) ? escaping(h[prop]) : h[prop]
       const child = h.get(prop)
       return lens(child, [...path, prop], sink, inflight, h)
     },
@@ -444,13 +447,16 @@ export const mark = (p: any): number => {
 // still hang off the resource; stopping the walk there leaked them. Returns true when a node it released still
 // had a subscriber or another view on it (a view a handler cached and handed to another call, the I-29 cousin):
 // the Host then checks its live subs, since one of them may now stream a stopped view.
+//! A view made through ctx.data (a handler view, below) is never disposed here: the handler may have kept
+// it, so only the collector's word releases it. disposeMinted is for a view minted some other way (a
+// handler that closed over the resource and called f.data.filter(…)) — the eager release it had before.
 export const disposeMinted = (view: any, mark: number): boolean => {
   const n = unwrap(view)?.[NODE]
   if (!(n instanceof DataNode)) return false
   const seen = new Set<DataNode<unknown>>()
   let shared = false
   const walk = (x: DataNode<unknown>): void => {
-    if (x.kind === 'source' || x.id <= mark || seen.has(x)) return
+    if (x.kind === 'source' || x.id <= mark || seen.has(x) || live.has(x)) return
     seen.add(x)
     const parents = x.parents
     if (!x.disposed) {
@@ -483,3 +489,151 @@ export const stopped = (view: any): boolean => {
 //! derived — how many views hang directly off a handle's node (data's `children`): the I-29 leak-guard
 // scalar, the way `served` is the host's — a server that closed every subscription reads 0 again.
 export const derived = (p: any): number => (unwrap(p)[NODE] as DataNode<unknown>).children.length
+
+//! ── handler views (I-29): released when the handler's handle to them is collected ──────────────────
+// A handler that makes a view (ctx.data.filter(…)) and returns a plain value used to leave that view on
+// the source for good: data keeps every derived node in its parents' `children` and works it out again
+// on every commit. Releasing it when the call ends is not safe — a handler may KEEP the view for its next
+// call (`cached ??= ctx.data.filter(…)`), and in the data graph a dropped view and a kept one look the
+// same (V4-16: releasing it froze the cache silently). Only JS reachability tells them apart, so:
+//   - ctx.data is `handlerScope(surface)`: every view a call through it returns comes back WRAPPED (a
+//     thin Proxy over data's handle), and every view made off a wrapper, or read off it as a child
+//     handle, is wrapped too. A wrapper is the only public road to the raw handle under it.
+//   - each wrapper is registered with a FinalizationRegistry; `live` counts a node's wrappers still
+//     reachable. When the last one is collected the node is released — if nothing else needs it: no
+//     child view, no subscription (effect), not ESCAPED — and its parents are tried in turn.
+//   - a view is ESCAPED when code outside a handler reached its raw handle: data dedups some operators
+//     (sum('n'), top(3), keys…) per parent, so f.data.sum('n') at module scope can return the very
+//     handle a handler made. The lens marks what it hands out outside a handler; a view made off an
+//     escaped one escapes too (its raw handle sits in the escaped one's dedup map). Escaped nodes are
+//     never released by the collector.
+// A wrapper is NOT held by its raw handle (a WeakRef maps raw → wrapper), so a deduped view the source
+// still lists is released once no wrapper of it is alive; data evicts a disposed dedup hit and mints a
+// fresh view on the next call. Release is collector-timed: a dropped view stops being worked out at the
+// next GC that finds it, not when the call ends.
+const live = new WeakMap<DataNode<unknown>, number>()
+const escaped = new WeakSet<DataNode<unknown>>()
+const wrappers = new WeakMap<object, WeakRef<object>>()
+const views = new WeakSet<object>()
+const gone = new FinalizationRegistry<DataNode<unknown>>((n) => {
+  const c = live.get(n)
+  if (c === undefined) return
+  live.set(n, c - 1)
+  release(n)
+})
+//! scoped — > 0 while a call through ctx.data runs: the lens then leaves its result unescaped (the
+// handler scope adopts it instead)
+let scoped = 0
+
+//! release — dispose a tracked node nothing reaches any more, then try its parents (a chain goes whole).
+// A node data already stopped (a function in it threw, data's SCHEDULE clause 4) is walked THROUGH to its
+// parents, as disposeMinted is (V4-47): the views the handler built under it still hang off the resource,
+// and a parent whose own wrapper died while this node was still its child was refused then — nothing
+// else would try it again.
+const release = (n: DataNode<unknown>): void => {
+  if (n.kind === 'source') return
+  if (!n.disposed) {
+    if (live.get(n) !== 0 || escaped.has(n) || n.children.length > 0 || n.effects.length > 0) return
+    live.delete(n)
+    n.dispose()
+  }
+  for (const p of n.parents) release(p)
+}
+
+//! adopt — the wrapper for a raw derived-view handle (made once per raw handle while it is alive);
+// anything else — a value, a source or its lens, a wrapper — passes through as it is
+const adopt = (x: unknown): unknown => {
+  if (x === null || (typeof x !== 'object' && typeof x !== 'function') || views.has(x)) return x
+  const n = (x as any)[NODE]
+  if (!(n instanceof DataNode) || n.kind === 'source') return x
+  const known = wrappers.get(x)?.deref()
+  if (known !== undefined) return known
+  const t = Object.create(null)
+  t[RAW] = x
+  const w = new Proxy(t, VIEW)
+  views.add(w)
+  wrappers.set(x, new WeakRef(w))
+  live.set(n, (live.get(n) ?? 0) + 1)
+  gone.register(w, n)
+  return w
+}
+
+//! RAW / forward — a wrapper's Proxy target is an EMPTY object carrying the raw handle under RAW, never
+// the handle itself: the engine checks every trap's answer against the target's own property of that
+// name, and asking a data handle for one materializes its whole value (readAt) — a full snapshot per
+// property read. The empty target answers that check for free; every trap but `get` forwards as is.
+const RAW = Symbol('fero.raw')
+const forward = (h: ProxyHandler<any>): ProxyHandler<any> => ({
+  ...h,
+  set: (t, p, v) => Reflect.set(t[RAW], p, v),
+  deleteProperty: (t, p) => Reflect.deleteProperty(t[RAW], p),
+  has: (t, p) => Reflect.has(t[RAW], p),
+  ownKeys: (t) => Reflect.ownKeys(t[RAW]),
+  getOwnPropertyDescriptor: (t, p) => Reflect.getOwnPropertyDescriptor(t[RAW], p),
+})
+
+//! VIEW — the wrapper's one handler: a method's result is adopted (a view made off a view, a child
+// handle from get/first/last, a mirror); a child handle read by property sugar is adopted; a
+// subscription (connect/sink) re-tries the release when it is disposed, since a view whose wrappers died
+// while it had a subscriber waits on that. Everything else is data's own answer.
+const VIEW: ProxyHandler<any> = forward({
+  get(w, prop, self) {
+    const t = w[RAW]
+    const v = t[prop]
+    if (typeof v === 'function') {
+      const sub = prop === 'connect' || prop === 'sink'
+      //! the method holds its WRAPPER (`self`), not just the raw handle: a method taken off a view
+      // (`const top = view.top`) keeps that view from being released while the method is still around
+      return (...a: unknown[]) => {
+        void self
+        const r = Reflect.apply(v, t, a)
+        if (sub) return unhooked(r as { dispose(): void }, t[NODE])
+        const out = adopt(r)
+        if (out !== r && escaped.has(t[NODE])) escaped.add((r as any)[NODE]) // made off an escaped view
+        return out
+      }
+    }
+    return typeof prop === 'symbol' ? v : adopt(v)
+  },
+})
+
+//! unhooked — a subscription whose dispose() also re-tries the view's release. Built out here, not inside
+// the trap: a closure made there would hold the trap's scope, the wrapper with it, for as long as the
+// caller holds the subscription — and the view could never be released after the unhook.
+const unhooked = <S extends { dispose(): void }>(r: S, n: DataNode<unknown>): S => {
+  const d = r.dispose
+  r.dispose = () => { d.call(r); release(n) }
+  return r
+}
+
+//! handlerScope — ctx.data: the surface (the lens, or the scoped facade) with every call's result
+// adopted. Reads, writes, deletes and `in` reach the surface unchanged (only `get` is trapped).
+export const handlerScope = (surface: any): any => {
+  const target = Object.create(null)
+  target[RAW] = surface
+  return new Proxy(target, SCOPE)
+}
+const SCOPE: ProxyHandler<any> = forward({
+  get(s, prop) {
+    const t = s[RAW]
+    const v = t[prop]
+    if (typeof v !== 'function') return v
+    return (...a: unknown[]) => {
+      scoped++
+      try { return adopt(Reflect.apply(v, t, a)) } finally { scoped-- }
+    }
+  },
+})
+
+//! handlerView — is this one of the wrappers above (a view the collector will release)?
+export const handlerView = (x: unknown): boolean => x !== null && typeof x === 'object' && views.has(x)
+
+//! escaping — the lens's operators outside a handler: a view handed out raw is ESCAPED (above)
+const escaping = (fn: (...a: unknown[]) => unknown) => (...a: unknown[]): unknown => {
+  const r = fn(...a)
+  if (scoped === 0 && r !== null && typeof r === 'object') {
+    const n = (r as any)[NODE]
+    if (n instanceof DataNode && n.kind !== 'source') escaped.add(n)
+  }
+  return r
+}
