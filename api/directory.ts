@@ -65,11 +65,26 @@ export const isAddr = (a: unknown, zero = false): a is string => {
 }
 export const hostOf = (a: string): string => a.slice(0, a.lastIndexOf(':'))
 export const portOf = (a: string): string => a.slice(a.lastIndexOf(':') + 1)
+//! unmap — an IPv4-mapped IPv6 spelling as the IPv4 address it stands for: `[::ffff:127.0.0.1]`,
+// `::FFFF:127.0.0.1`, `0:0:0:0:0:ffff:127.0.0.1` and the hex form `::ffff:7f00:1` all dial (and bind)
+// the same socket as `127.0.0.1` — measured on this box: a mapped dial reaches a 127.0.0.1 listener and
+// a 127.0.0.1 dial reaches a mapped bind. Every other spelling comes back as it was. Brackets come off
+// only as a pair.
+const MAPPED = /^(?:(?:0{1,4}:){5}|::)ffff:(?:(\d{1,3}(?:\.\d{1,3}){3})|([0-9a-f]{1,4}):([0-9a-f]{1,4}))$/i
+export const unmap = (h: string): string => {
+  const m = MAPPED.exec(h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h)
+  if (m === null) return h
+  if (m[1] !== undefined) return m[1]
+  const a = parseInt(m[2], 16), b = parseInt(m[3], 16)
+  return `${a >> 8}.${a & 255}.${b >> 8}.${b & 255}`
+}
 //! localish — a host spelling that reaches THIS box's loopback listeners: a loopback literal,
 // `localhost` (in any case: host names are case-blind), or a wildcard (a wildcard bind answers on
-// 127.0.0.1 too)
-export const localish = (h: string): boolean =>
-  h === '' || h.toLowerCase() === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1' || h === '0.0.0.0' || h === '::' || h === '[::]'
+// 127.0.0.1 too). An IPv4-mapped spelling reads as the IPv4 address it maps (unmap).
+export const localish = (raw: string): boolean => {
+  const h = unmap(raw)
+  return h === '' || h.toLowerCase() === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1' || h === '0.0.0.0' || h === '::' || h === '[::]'
+}
 //! sameSocket — would binding `listen` take the socket `rendezvous` dials? Same port, and a host that
 // lands on the same interface class (both localish, or the identical spelling). The compose-time
 // guard uses this so `0.0.0.0:3376` / `localhost:3376` / `[::]:3376` cannot squat the directory.
@@ -82,8 +97,12 @@ export const sameSocket = (listen: string, rendezvous: string): boolean =>
 // instance only ASKS there — it looks its name up, it never registers and never hosts on another box.
 
 //! loopbackHost — a host spelling that only THIS box can reach (a wildcard is not one: a socket bound
-// to 0.0.0.0 answers other boxes too)
-export const loopbackHost = (h: string): boolean => h.toLowerCase() === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1'
+// to 0.0.0.0 answers other boxes too). An IPv4-mapped loopback (`[::ffff:127.0.0.1]`) is one; a mapped
+// routable address (`[::ffff:10.0.0.5]`) is not.
+export const loopbackHost = (raw: string): boolean => {
+  const h = unmap(raw)
+  return h.toLowerCase() === 'localhost' || h.startsWith('127.') || h === '[::1]' || h === '::1'
+}
 //! isBox — a bare host with no port: a DNS name or dotted IPv4 (labels of letters, digits and inner
 // hyphens), or a bracketed IPv6. An all-digit entry is refused: it is a port missing its host, and a
 // flag such as `--fero.heartbeat.ms` read off argv is not a host either.
@@ -93,9 +112,10 @@ export const isBox = (h: unknown): h is string =>
   typeof h === 'string' && ((NAME.test(h) && !/^\d+$/.test(h)) || /^\[[0-9A-Fa-f:.]+\]$/.test(h))
 //! canon — one spelling per host a dial lands on, so 'localhost', 'LOCALHOST', '0.0.0.0' and '127.0.0.1'
 // read as one box: names are case-blind, and a wildcard dialed reaches loopback (a wildcard directory
-// answers there too). '[::1]' stays apart from '127.0.0.1': two sockets, not one.
+// answers there too). '[::1]' stays apart from '127.0.0.1': two sockets, not one. An IPv4-mapped
+// spelling is its IPv4 address: one socket (unmap).
 const canon = (h: string): string => {
-  const l = h.toLowerCase()
+  const l = unmap(h).toLowerCase()
   return l === 'localhost' || l === '0.0.0.0' ? '127.0.0.1' : l === '::1' || l === '::' || l === '[::]' ? '[::1]' : l
 }
 //! boxDirectory — the directory address a bare host names, at this instance's rendezvous port
