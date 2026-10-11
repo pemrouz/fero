@@ -668,6 +668,12 @@ test('an unscoped member that left tells one story on every pane: converged head
   assert.match(tree, /data-type="cell"[^>]*>(?:(?!<div class="trow).)*?>zeta</s, 'the zeta cell is on the page')
   assert.doesNotMatch(tree, /data-tip="(cell|write):(differs|diverged|in-flight|never-arrived)"/, 'no cell or write is flagged')
   assert.doesNotMatch(tree, /⊘/, 'no write lists the leaver as missing it')
+  //! `gone` was removed after the leave, so only the leaver still holds it: the row is shown FROM the leaver (its value
+  // and its winner), judged among no one — not as an empty value read off the three that stay
+  const gone = tree.match(/data-type="cell"[^>]*>(?:(?!<div class="trow).)*?>gone<(?:(?!<div class="trow).)*?(?=<div class="trow|$)/s)
+  assert.ok(gone, 'the gone cell is on the page')
+  assert.match(gone![0], /data-tip="cell-value">= &#39;kept&#39;</, 'it shows the leaver\'s value')
+  assert.match(gone![0], /data-tip="cell-winner">by n01#\d+/, 'and the write that set it')
   g(`navTo(${JSON.stringify(`g/writes/${after[0]}`)})`)
   const insp = el('insp').innerHTML
   assert.ok(insp.includes('data-rkey="g/nodes/n04">n04</span></span><span class="x" data-tip="stop:not-a-holder">'), 'n04 is a quiet stop of a write made after it left')
