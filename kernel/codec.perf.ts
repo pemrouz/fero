@@ -7,6 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Framer, Outbox, VERB, encodeFrame } from './codec.ts'
+import { REC } from './env.ts'
 import { bench, ratio } from '#utils'
 //! fixtures single-sourced with the M8 baseline probes (tools/perf/fixtures.ts) — declaration move
 // only; every timed loop body below is byte-identical to its pre-extraction form
@@ -48,4 +49,32 @@ test('absolute: encode+decode 10k records under the tripwire ceiling', () => {
     for (const v of new Framer().push(bytes)[0].records()) v.value
   })
   assert.ok(ms < 300, `10k encode+decode took ${ms.toFixed(1)}ms (ceiling 300ms)`)
+})
+
+//! RATIO (V4-51): a frame that straddles chunks arrives in time LINEAR in its size — the Framer builds it once in a
+// buffer that doubles as its bytes come. The old carry was re-copied whole with every chunk: a 16 MiB frame in 64 KiB
+// chunks took 62-82x a 2 MiB one (quadratic in the limit, 64x); linear is ~8x (6.5-8.6x on the prototype). Best of
+// three of each, so one slow round on a busy box cannot fail it.
+test('ratio: a 16 MiB frame in 64 KiB chunks arrives in time linear in its size (16 MiB / 2 MiB < 20x)', () => {
+  const CHUNK = 64 * 1024
+  const chunksOf = (mib: number) => {
+    const frame = encodeFrame([{ type: REC.update, key: ['big'], value: new Uint8Array(mib << 20) }], { origin: 'aa', baseSeq: 1, epoch: 1 })
+    const cs: Uint8Array[] = []
+    for (let at = 0; at < frame.length; at += CHUNK) cs.push(frame.slice(at, Math.min(frame.length, at + CHUNK)))
+    return cs
+  }
+  const time = (cs: Uint8Array[]) => {
+    let best = Infinity
+    for (let r = 0; r < 3; r++) {
+      const f = new Framer()
+      const t0 = performance.now()
+      let n = 0
+      for (const c of cs) n += f.push(c).length
+      best = Math.min(best, performance.now() - t0)
+      assert.equal(n, 1)
+    }
+    return best
+  }
+  const small = time(chunksOf(2)), big = time(chunksOf(16))
+  assert.ok(big / small < 20, `16 MiB took ${(big / small).toFixed(1)}x 2 MiB (${big.toFixed(1)} / ${small.toFixed(1)} ms) — split frames no longer arrive linearly`)
 })

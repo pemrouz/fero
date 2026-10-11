@@ -495,3 +495,84 @@ test('encodeFrame is ONE frame: a batch that does not fit throws FULL, never a q
   const recs: Rec[] = Array.from({ length: 3 }, (_, i) => ({ type: REC.update, key: [`k${i}`], value: new Uint8Array(100 << 20) }))
   assert.throws(() => encodeFrame(recs, { origin: 'o', baseSeq: 1, epoch: 0 }), (e) => e === FULL)
 })
+
+//! ── the Framer builds each split frame once (V4-51) ──────────────────────────────
+// A frame inside one chunk is a view of it; a frame across chunks is built in a buffer of its own that grows with the
+// bytes that arrive — never with what a header claims — so arrival is linear and a hostile header buys 4 KiB at most.
+test('the Framer assembles a split frame in a buffer of its own and holds no more than twice what arrived; a whole frame stays a view', () => {
+  const big = encodeFrame([{ type: REC.update, key: ['big'], value: new Uint8Array(1 << 20).fill(7) }], { origin: 'o', baseSeq: 1, epoch: 0 })
+  const framer = new Framer()
+  const got: ReturnType<Framer['push']> = []
+  let received = 0
+  for (let at = 0; at < big.length; at += 997) {
+    const chunk = big.slice(at, Math.min(big.length, at + 997))
+    got.push(...framer.push(chunk))
+    received += chunk.length
+    chunk.fill(0) // the framer copied what it kept: a chunk is never retained
+    if (got.length === 0) assert.ok(framer.held <= Math.max(4096, 2 * received), `held ${framer.held} after ${received} bytes`)
+  }
+  assert.equal(got.length, 1)
+  assert.equal(framer.held, 0, 'nothing held once the frame is out')
+  assert.equal(got[0].buf.length, big.length, 'the assembled frame is exactly its length')
+  assert.equal(got[0].buf.byteOffset, 0)
+  assert.equal(got[0].buf.buffer.byteLength, big.length, 'it owns exactly the frame')
+  assert.deepEqual((got[0].records()[0].value as Uint8Array).subarray(0, 4), new Uint8Array([7, 7, 7, 7]))
+  //! a whole frame inside one chunk is a VIEW of it (no copy), as before
+  const small = encodeFrame([{ type: REC.update, key: ['s'], value: 1 }], { origin: 'o', baseSeq: 1, epoch: 0 })
+  const [view] = new Framer().push(small)
+  assert.equal(view.buf.buffer, small.buffer)
+  //! a header claiming MAX_FRAME and 100 body bytes: the framer holds what came, not what the header claims
+  const hostile = new Uint8Array(HEADER + 100)
+  hostile[0] = MAGIC
+  new DataView(hostile.buffer).setUint32(3, MAX_FRAME, true)
+  const h = new Framer()
+  assert.deepEqual(h.push(hostile), [])
+  assert.ok(h.held <= 4096, `a hostile header bought ${h.held} bytes`)
+})
+
+test('hostile headers split at every byte still fail at the header; a bad crc in a split frame fails', () => {
+  const badMagic = encodeFrame([{ type: REC.update, key: ['k'], value: 1 }], { origin: 'o', baseSeq: 1, epoch: 0 }).slice()
+  badMagic[0] = 0x00
+  const oversized = new Uint8Array(HEADER + 8)
+  oversized[0] = MAGIC
+  new DataView(oversized.buffer).setUint32(3, MAX_FRAME + 1, true)
+  for (let cut = 0; cut <= HEADER; cut++) {
+    for (const [bytes, why] of [[badMagic, 'bad magic'], [oversized, 'frame exceeds MAX_FRAME']] as const) {
+      const f = new Framer()
+      assert.throws(() => { f.push(bytes.subarray(0, cut)); f.push(bytes.subarray(cut)) }, (e) => e instanceof FrameError && e.message === why, `${why} split at ${cut}`)
+    }
+  }
+  const frame = encodeFrame([{ type: REC.update, key: ['k'], value: new Uint8Array(100_000).fill(3) }], { origin: 'o', baseSeq: 1, epoch: 0 }).slice()
+  frame[frame.length - 50] ^= 0x10
+  for (const cut of [5, 11, 12, 70_000, frame.length - 1]) {
+    const f = new Framer()
+    assert.throws(() => { f.push(frame.subarray(0, cut)); f.push(frame.subarray(cut)) }, (e) => e instanceof FrameError && e.message === 'bad crc', `bad crc split at ${cut}`)
+  }
+})
+
+test('a stream of frames split at random points decodes to exactly the frames sent, in order: empty chunks, split headers, frames of HEADER bytes, frames ending at a chunk\'s end', () => {
+  let s = 9
+  const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
+  //! a bodyLen-0 frame: legal on the wire (the framer must take it whole, split or not)
+  const empty = new Uint8Array(HEADER)
+  empty[0] = MAGIC; empty[2] = VERB.PING
+  new DataView(empty.buffer).setUint32(7, crcFrame(empty, HEADER), true)
+  for (let t = 0; t < 120; t++) {
+    const frames: Uint8Array[] = []
+    for (let i = 0, n = 1 + Math.floor(rnd() * 8); i < n; i++)
+      frames.push(rnd() < 0.15 ? empty : encodeFrame([{ type: REC.update, key: [`k${i}`], value: new Uint8Array(Math.floor(rnd() * (rnd() < 0.2 ? 20_000 : 300))) }], { origin: 'o', baseSeq: i + 1, epoch: 0 }))
+    const stream = new Uint8Array(frames.reduce((a, f) => a + f.length, 0))
+    let off = 0
+    for (const f of frames) { stream.set(f, off); off += f.length }
+    const framer = new Framer()
+    const out: Uint8Array[] = []
+    for (let at = 0; at < stream.length;) {
+      const n = rnd() < 0.1 ? 0 : 1 + Math.floor(rnd() * (rnd() < 0.5 ? 12 : 3000))
+      for (const f of framer.push(stream.slice(at, at + n))) out.push(f.buf.slice())
+      at += n
+    }
+    assert.equal(out.length, frames.length, `stream ${t}`)
+    out.forEach((b, i) => assert.deepEqual(b, frames[i], `stream ${t} frame ${i}`))
+    assert.equal(framer.held, 0)
+  }
+})

@@ -863,37 +863,96 @@ export class Frame {
 }
 
 //! ── Framer — one per link; re-slices a TCP byte stream into complete frames ──
-// Straddle handling kept from v2 (it measured well): a partial frame is carried
-// as a single subarray; Buffer-level concat happens ONLY on a genuine straddle.
-// bodyLen is bounds-checked against MAX_FRAME BEFORE the straddle check, so one
-// hostile header can never balloon the carry (anti-OOM), and the crc is verified
-// BEFORE a Frame is handed to dispatch.
+// A frame wholly inside one chunk is handed out as a VIEW of that chunk (no copy — v2's measured win, kept). A frame
+// that straddles chunks is built in a buffer of its OWN as its bytes arrive (V4-51): the buffer starts at what is in
+// hand (at least FIRST) and doubles, never past the frame's length, so arrival is LINEAR in the frame's size — every
+// straddled byte is copied in once, plus once per doubling. The old carry was re-copied whole with every chunk, so a
+// 16 MiB frame in 64 KiB chunks cost 62-82x a 2 MiB one (quadratic), where the cut frames of V4-51 made such frames
+// common. The anti-OOM rules stand: magic and bodyLen are checked the moment the 11 header bytes are in hand, BEFORE
+// any allocation they size, and a header alone never buys more than FIRST bytes — memory follows the bytes the peer
+// has actually sent (at most max(FIRST, 2 × received)), where allocating the whole frame at its header would let
+// one 11-byte header make this node hold up to 256 MiB. The crc is verified BEFORE a Frame is handed to dispatch, and
+// no chunk is ever retained: a split header and a split frame are both copies (v2's chunk-pinning trap, closed).
+const FIRST = 4096
 export class Framer {
-  #carry: Uint8Array | null = null
+  //! a header split across chunks: its first #headN bytes (owned, reused)
+  #head = new Uint8Array(HEADER)
+  #headN = 0
+  //! a frame split across chunks: an owned buffer holding its first #have of its #need bytes; null when none
+  #part: Uint8Array | null = null
+  #have = 0
+  #need = 0
+  //! held — the bytes this framer holds between pushes (the test seam for the anti-OOM bound)
+  get held(): number { return this.#part !== null ? this.#part.length : this.#headN > 0 ? HEADER : 0 }
   push(chunk: Uint8Array): Frame[] {
-    let buf = this.#carry ? concat(this.#carry, chunk) : chunk
-    this.#carry = null
     const out: Frame[] = []
     let at = 0
-    while (buf.length - at >= HEADER) {
-      if (buf[at] !== MAGIC) throw new FrameError('bad magic')
-      const bodyLen = readU32(buf, at + 3)
-      if (bodyLen > MAX_FRAME) throw new FrameError('frame exceeds MAX_FRAME')
-      if (buf.length - at < HEADER + bodyLen) break
-      const frame = buf.subarray(at, at + HEADER + bodyLen)
+    //! 1. a header the last chunk began: complete it from this one, then judge it like any header
+    if (this.#headN > 0) {
+      const take = Math.min(HEADER - this.#headN, chunk.length)
+      this.#head.set(chunk.subarray(0, take), this.#headN)
+      this.#headN += take
+      at = take
+      if (this.#headN < HEADER) return out
+      this.#headN = 0
+      this.#start(this.#head, 0, HEADER, chunk.length - at, judge(this.#head, 0))
+    }
+    //! 2. a frame the last chunks began: copy in only the bytes it still needs
+    if (this.#part !== null) {
+      const take = Math.min(this.#need - this.#have, chunk.length - at)
+      this.#fill(chunk, at, take)
+      at += take
+      if (this.#have < this.#need) return out
+      const frame = this.#part // exactly the frame's length: its growth stops there
+      this.#part = null
+      this.#have = this.#need = 0
       if (crcFrame(frame, frame.length) !== readU32(frame, 7)) throw new FrameError('bad crc')
       out.push(new Frame(frame))
-      at += HEADER + bodyLen
     }
-    //! the carry is a COPY, not a subarray: retaining a view would pin every prior receive chunk (v2's chunk-pinning trap, closed).
-    if (at < buf.length) this.#carry = buf.slice(at)
+    //! 3. every frame wholly inside the chunk: a view, no copy
+    while (chunk.length - at >= HEADER) {
+      const need = judge(chunk, at)
+      if (chunk.length - at < need) { this.#start(chunk, at, chunk.length - at, 0, need); return out }
+      const frame = chunk.subarray(at, at + need)
+      if (crcFrame(frame, frame.length) !== readU32(frame, 7)) throw new FrameError('bad crc')
+      out.push(new Frame(frame))
+      at += need
+    }
+    //! 4. a header split at the chunk's end: copied into the owned head, never viewed
+    if (at < chunk.length) { this.#head.set(chunk.subarray(at), 0); this.#headN = chunk.length - at }
     return out
   }
+  //! #start — open a split frame from its first n bytes at src[at..], with `more` bytes of this chunk still to come:
+  // the first buffer is the whole frame when that is small or already in hand, else what is in hand (at least FIRST)
+  #start(src: Uint8Array, at: number, n: number, more: number, need: number) {
+    const part = new Uint8Array(Math.min(need, Math.max(FIRST, n + more)))
+    part.set(src.subarray(at, at + n), 0)
+    this.#part = part
+    this.#have = n
+    this.#need = need
+  }
+  //! #fill — append n bytes of chunk[at..] to the split frame, doubling its buffer (never past the frame's length)
+  // when they do not fit
+  #fill(chunk: Uint8Array, at: number, n: number) {
+    let part = this.#part!
+    if (this.#have + n > part.length) {
+      let cap = part.length * 2
+      while (cap < this.#have + n) cap *= 2
+      if (cap > this.#need) cap = this.#need
+      const next = new Uint8Array(cap)
+      next.set(part.subarray(0, this.#have), 0)
+      part = this.#part = next
+    }
+    part.set(chunk.subarray(at, at + n), this.#have)
+    this.#have += n
+  }
+}
+//! judge — a header's two checks, magic then size, before anything is allocated by its length: HEADER + bodyLen
+const judge = (b: Uint8Array, at: number): number => {
+  if (b[at] !== MAGIC) throw new FrameError('bad magic')
+  const bodyLen = readU32(b, at + 3)
+  if (bodyLen > MAX_FRAME) throw new FrameError('frame exceeds MAX_FRAME')
+  return HEADER + bodyLen
 }
 const readU32 = (b: Uint8Array, p: number): number =>
   (b[p] | (b[p + 1] << 8) | (b[p + 2] << 16)) + b[p + 3] * 0x1000000
-const concat = (a: Uint8Array, b: Uint8Array): Uint8Array => {
-  const out = new Uint8Array(a.length + b.length)
-  out.set(a); out.set(b, a.length)
-  return out
-}
