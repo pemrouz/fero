@@ -23,7 +23,7 @@
 // (v2's applying/committingForward/discarding flag family) has no place to
 // exist. That whole guard menagerie is deleted by construction, not by care.
 
-import { Frame, Framer, FrameError, VERB, continuesRun, encodeControl, encodeRun, encodeRuns, type AttemptRun } from './codec.ts'
+import { Frame, Framer, FrameError, VERB, continuesRun, encodeControl, encodeRun, type AttemptRun } from './codec.ts'
 import { Link, LS, dialedByLower } from './link.ts'
 import { JK, Journal } from './journal.ts'
 import { Membership } from './membership.ts'
@@ -1102,18 +1102,26 @@ export class Node {
     }
     for (const link of this.links.values()) link.flush(this.env.sink, j)
     //! WAL the committed run (durable mode): the row is the SAME encoded frame shape the wire carries —
-    // one format for log entry, WAL row, and payload (plan §7). One contiguous run ⇒ one frame.
+    // one format for log entry, WAL row, and payload (plan §7). One contiguous run ⇒ one frame — or, past this
+    // node's frame cap, one ROW PER FRAME (V4-51): each its own batch, chained by prev, covering only its own records.
+    // (It used to keep only the first frame of `encodeRuns`, and a run past the cap threw from the write's step.)
     if (this.durable && recs.length) {
       const tail = this.logFor(this.origin).slice(-recs.length)
-      const [bytes] = encodeRuns(tail.map((e) => ({ rec: e.rec, origin: this.origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp })), undefined, this.armed)
-      //! armed: the batch records per-partition maxes so its echo advances exactly the durable floors
-      // this row covers (never a floor the WAL can't restore — DESIGN-M6 §0)
-      let parts: Map<string, number> | undefined
-      if (this.armed) {
-        parts = new Map()
-        for (const e of tail) { const p = partitionOf(e.rec); const m = parts.get(p); if (m === undefined || e.seq > m) parts.set(p, e.seq) }
+      const run = tail.map((e) => ({ rec: e.rec, origin: this.origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp }))
+      for (let k = 0; k < run.length;) {
+        const cut = encodeRun(run, k, VERB.RECORDS, this.armed, this.tune.frame)
+        const bytes = cut.bytes, end = k + cut.n
+        //! armed: the batch records per-partition maxes so its echo advances exactly the durable floors
+        // this row covers (never a floor the WAL can't restore — DESIGN-M6 §0). Per ROW: a cover over the whole
+        // commit on its first row would let that row's echo raise floors for records the next row still carries.
+        let parts: Map<string, number> | undefined
+        if (this.armed) {
+          parts = new Map()
+          for (let x = k; x < end; x++) { const e = tail[x]; const p = partitionOf(e.rec); const m = parts.get(p); if (m === undefined || e.seq > m) parts.set(p, e.seq) }
+        }
+        this.persistRun(this.origin, run[end - 1].seq, bytes, parts)
+        k = end
       }
-      this.persistRun(this.origin, this.seq, bytes, parts)
     }
     if (recs.length) this.confirm.recount(this) // own shippable advanced at the stamp site
     return s0
@@ -1150,25 +1158,31 @@ export class Node {
     if (!this.durable || this.#walDead) return
     //! BUILD first, COMMIT after: every row is encoded into locals before any node state mutates, so a
     // throw mid-encode (however unlikely) leaves walTail/inflight/counters untouched instead of half-
-    // reset against the on-disk chain (M4-review finding). Chunks are contiguity-split exactly like
-    // encodeRuns (each chunk encodes to EXACTLY one frame — asserted, so codec drift is a loud throw)
-    // and additionally capped at 1024 records, keeping any single row far from MAX_FRAME.
+    // reset against the on-disk chain (M4-review finding). Chunks come from the codec's one run rule
+    // (continuesRun), at most 1024 records each, and each chunk is CUT BY SIZE at this node's frame cap
+    // (V4-51): one row per frame, chained by prev — a chunk under the cap is one row, as before. (A chunk
+    // past MAX_FRAME used to throw from the heartbeat timer and end a durable server.)
     const rows: { bytes: Uint8Array; prev: number }[] = []
     const tails = new Map<string, number>()
     for (const [origin, entries] of this.logs) {
       if (!entries.length) continue
+      const as = (e: LogEntry) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp })
       let prev = 0
       let i = 0
       while (i < entries.length) {
-        const h = entries[i]
-        let j = i + 1
-        while (j < entries.length && j - i < 1024 && entries[j].epoch === h.epoch && entries[j].seq === h.seq + (j - i) &&
-               entries[j].iss === h.iss && (h.iss === undefined || entries[j].cid === h.cid! + (j - i))) j++
-        const frames = encodeRuns(entries.slice(i, j).map((e) => ({ rec: e.rec, origin, seq: e.seq, epoch: e.epoch, iss: e.iss, cid: e.cid, pp: e.pp })), undefined, this.armed)
-        if (frames.length !== 1) throw new Error('snapshot: chunk split diverged from encodeRuns')
-        rows.push({ bytes: frames[0], prev })
-        prev = entries[j - 1].seq
-        i = j
+        const chunk = [as(entries[i])]
+        for (let j = i + 1; j < entries.length && chunk.length < 1024; j++) {
+          const m = as(entries[j])
+          if (!continuesRun(chunk[0], chunk.length, m)) break
+          chunk.push(m)
+        }
+        for (let k = 0; k < chunk.length;) {
+          const cut = encodeRun(chunk, k, VERB.RECORDS, this.armed, this.tune.frame)
+          rows.push({ bytes: cut.bytes, prev })
+          k += cut.n
+          prev = chunk[k - 1].seq
+        }
+        i += chunk.length
       }
       tails.set(origin, prev)
     }
