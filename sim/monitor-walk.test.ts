@@ -1,8 +1,8 @@
 //! ── The scoped monitor walk reports exactly what the full walk reports (wave 5e) ─────────────────────────
 // A monitor pass used to read every node; since wave 5e it reads the nodes a step changed (sim/monitors.ts, the
 // table above `Due`). That is only worth having if it is the SAME monitor. This suite runs the same seeded
-// trajectory both ways, the scoped walk and the old full walk (FERO_SIM_MONITOR_FULL=1, the switch a Sim reads when
-// it is built), and compares what the monitors said: the whole violation list (every row, repeats included,
+// trajectory both ways, the scoped walk and the old full walk (Sim.fullWalk, the switch a Sim reads when it is
+// built), and compares what the monitors said: the whole violation list (every row, repeats included,
 // event index and text), the event count, and the trace of node hashes (the monitors read, never move, a
 // trajectory).
 //
@@ -23,12 +23,11 @@ import { runFamily, familyByName, type Mutation } from './scoped-sweep.ts'
 import { SCOPE } from '../kernel/scope.ts'
 import type { Node } from '../kernel/node.ts'
 
-const KNOB = 'FERO_SIM_MONITOR_FULL'
-//! walk — run `f` with the knob set (the full walk) or unset (the scoped walk): a Sim reads it when it is built
+//! walk — run `f` with Sim.fullWalk set (the full walk) or unset (the scoped walk): a Sim reads it when it is built
 const walk = <T>(full: boolean, f: () => T): T => {
-  const prev = process.env[KNOB]
-  if (full) process.env[KNOB] = '1'; else delete process.env[KNOB]
-  try { return f() } finally { if (prev === undefined) delete process.env[KNOB]; else process.env[KNOB] = prev }
+  const prev = Sim.fullWalk
+  Sim.fullWalk = full
+  try { return f() } finally { Sim.fullWalk = prev }
 }
 const rows = (vs: Violation[]) => vs.map((v) => `${v.event} ${v.monitor}: ${v.detail}`)
 const sameTrajectory = (a: Sim, b: Sim, what: string) => {

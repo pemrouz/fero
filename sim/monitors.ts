@@ -59,7 +59,7 @@ import type { Sim } from './exec.ts'
 // the first violation as the full pass does, and (3) keep owing a look at the node it stopped on and at every due
 // node it did not reach: those are the nodes the full pass would have read next time. `Due` is that debt.
 // sim/monitor-walk.test.ts runs the same Sim both ways, violations planted, and compares the lists.
-//! sim.full (FERO_SIM_MONITOR_FULL=1) walks every node on every pass, the way every pass used to run.
+//! sim.full (Sim.fullWalk = true before the Sim is built) walks every node on every pass, the way every pass used to run.
 class Due {
   #owed = new Set<string>()
   //! walk — read the due nodes, in node order, with `look`; return the first violation. Nodes that were due and

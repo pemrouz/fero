@@ -70,11 +70,11 @@ export interface SimStore {
 //! Violation: what a monitor returns to fail a trajectory — event-indexed so the shrink/debug loop starts AT the violation.
 export interface Violation { event: number; monitor: string; detail: string }
 
-//! envFull — FERO_SIM_MONITOR_FULL=1: run the full monitor walk. The `typeof` guard keeps the stripped browser copy
-// (site/strip.mjs) from reading `process`.
-const envFull = (): boolean => typeof process !== 'undefined' && process.env?.FERO_SIM_MONITOR_FULL === '1'
-
 export class Sim {
+  //! fullWalk — the default for every Sim built after it is set: true runs the old full monitor walk. A switch on the
+  // class, not an environment variable: only api/config.ts reads a FERO_* variable (CLAUDE.md), and the stripped
+  // browser copy (site/strip.mjs) has no `process`. sim/monitor-walk.test.ts flips it to run one trajectory both ways.
+  static fullWalk = false
   now = 0
   rng: () => number
   events = 0
@@ -166,9 +166,9 @@ export class Sim {
   // clears it at its end, so a read made between passes (a horizon check such as stampOracle) must read every node.
   checking = false
   //! full (the old walk, kept as a switch): every per-event monitor walks EVERY node on every pass, as before wave 5e.
-  // FERO_SIM_MONITOR_FULL=1 turns it on for the whole process; a test sets `sim.full` to run one Sim both ways. The two
+  // Sim.fullWalk sets it for every Sim built after; a test may also set `sim.full` on one Sim. The two
   // walks must report identical violation lists (sim/monitor-walk.test.ts): this is how that stays true.
-  full = envFull()
+  full = Sim.fullWalk
   //! inflight (stage 0, monitor M6): every frame between a send and its bytesIn delivery, by task id — the
   // wire as the sim can see it and no shell can. M6 reads it at a tombstone release to prove nothing
   // older than the released stamp is still on its way to a holder. One Map set/delete per delivered frame.
