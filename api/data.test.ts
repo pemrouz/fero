@@ -134,16 +134,46 @@ test('a value the wire cannot carry throws at the assignment and stamps nothing 
     ['big', { n: 10n }, /a bigint/],
     ['fn', { f: () => 1 }, /a function/],
     ['sym', [Symbol('s')], /a symbol/],
-    ['deep', deep, /nesting deeper than 64/],
+    ['deep', deep, /deeper than 60 levels/],
     ['getter', { get age() { throw new Error('age trips') } }, /reading it threw \(Error: age trips\)/],
+    ['huge', { s: 'x'.repeat(90_000_000) }, /bigger than 255 MiB/],
   ]
   for (const [k, v, why] of bad)
-    assert.throws(() => { h.bind.data[k] = v }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["${k}"]: the value cannot be sent — `) && why.test(e.message), k)
-  assert.throws(() => h.bind.data.patch([['ok', 1], ['bad', 2n]]), /\["bad"\]: the value cannot be sent — a bigint/)
+    assert.throws(() => { h.bind.data[k] = v }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["${k}"] cannot be sent: `) && why.test(e.message) &&
+      e.message.includes('\n  fero sends null, undefined, true and false, numbers, strings, Uint8Array, and arrays and objects of these'), k)
+  assert.throws(() => h.bind.data.patch([['ok', 1], ['bad', 2n]]), /\["bad"\] cannot be sent: a bigint/)
   assert.equal(h.jk(JK.writeLocal).length, 0, 'nothing was stamped, not even the good pair of the patch')
   assert.equal(h.node.state.size, 0)
   h.bind.data.fine = { when: new Date(0), bytes: new Uint8Array([1, 2]), list: [1, 'two', null, undefined] } // carried (a Date as its fields, as ever)
   assert.equal(h.jk(JK.writeLocal).length, 1)
+  await h.destroy()
+})
+
+//! the depth limit counts from the ROW: the built-in reads wrap a row in up to four levels (a live sub of the whole
+// resource), so a value fero takes is a value every read can send back (api/index.test.ts drives each read)
+test('the depth limit counts from the row: 60 levels at the row, 59 under a field of it', async () => {
+  const h = harness()
+  const nest = (d: number): unknown => { let v: unknown = 1; for (let i = 0; i < d; i++) v = [v]; return v }
+  h.bind.data.row = nest(60)
+  assert.throws(() => { h.bind.data.over = nest(61) }, /\["over"\] cannot be sent: deeper than 60 levels/)
+  h.bind.data.obj = { a: 1 }
+  h.bind.data.obj.f = nest(59)
+  assert.throws(() => { h.bind.data.obj.g = nest(60) }, /\["obj","g"\] cannot be sent: deeper than 60 levels/)
+  assert.equal(h.jk(JK.writeLocal).length, 3)
+  await h.destroy()
+})
+
+//! the likely slip `data.b = data.a`: a live view written as a value was read through its traps — an empty object
+// for every leaf, on every copy and the writer's own, which also went on aliasing the source. And a remove carries
+// no value, but its key travels: one too big for a frame was stamped and then failed every frame that carried it.
+test('a live view written as a value is refused, and a remove whose key is too big to send is too', async () => {
+  const h = harness()
+  h.bind.data.a = { x: 1, o: { y: 'z' } }
+  assert.throws(() => { h.bind.data.b = h.bind.data.a }, (e: Error) => e instanceof TypeError &&
+    e.message.startsWith(`fero: ["b"] cannot be sent: a live view, not a value (use a plain copy, such as the resource's snapshot of it)\n`))
+  assert.equal(snapshot(h.bind.data).b, undefined)
+  assert.deepEqual(h.bind.issue([{ type: REC.remove, key: ['x'.repeat(90_000_000)] }]), ['unencodable'])
+  assert.equal(h.jk(JK.writeLocal).length, 1, 'only the first write was stamped')
   await h.destroy()
 })
 

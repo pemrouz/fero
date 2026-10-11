@@ -248,31 +248,95 @@ export class Writer {
   }
 }
 
-//! encodable — can this value become bytes? null when it can, else what stops it, in a few words. A local
-// write asks it BEFORE the kernel stamps the record (api/data.ts, V4-48): stamped first, a value the codec
-// refuses failed in every frame that carried it afterwards — the WAL append, each link's ship, each digest
-// answer — so replication stopped for good (a getter that throws ended the server from its socket handler).
-// It walks the value exactly as Writer.value does — the same vtOf, the same Object.entries (so a getter runs,
-// and one that throws is the answer), the same depth bound from 0 — and writes nothing. Not asked: the frame
-// cap (MAX_FRAME, 256 MiB); a value that size fails at its first ship.
-export const encodable = (v: unknown): string | null => {
+//! Limit — how deep and how big a value encodable() lets through. The codec's own bounds are
+// { depth: MAX_DEPTH, bytes: MAX_FRAME }; the api asks tighter ones (api/data.ts WRITE and ARG), leaving room
+// for the envelopes its replies and calls wrap around a value.
+export interface Limit { depth: number; bytes: number }
+
+//! encodable — can this value become bytes within `limit`? null when it can, else what stops it, in a few
+// words. A local write asks it BEFORE the kernel stamps the record (api/data.ts, V4-48): stamped first, a
+// value the codec refuses failed in every frame that carried it afterwards — the WAL append, each link's
+// ship, each digest answer — so replication stopped for good (a getter that throws ended the server from
+// its socket handler). It walks the value as Writer.value would and writes nothing. `from` is the depth the
+// value starts at, `spent` the bytes already counted (a record's key).
+export const encodable = (v: unknown, limit: Limit, from = 0, spent = 0): string | null => {
+  at.length = 0
+  text = false
   try {
-    walkValue(v, vtOf(v), 0)
+    walk(v, from, spent, limit)
     return null
   } catch (e) {
-    if (e instanceof FrameError) {
-      const t = /^unencodable value type: (\w+)$/.exec(e.message)
-      return t !== null ? `a ${t[1]}` : `nesting deeper than ${MAX_DEPTH}`
+    //! the path first, before any user code runs below (formatting what a getter threw can call back in here)
+    const where = place(at)
+    at.length = 0
+    if (e === REFUSED) {
+      //! no path for depth (it is the path) or for size (the sum of every part)
+      if (refusedWhy === DEEP) return `deeper than ${limit.depth} levels`
+      if (refusedWhy === OVER) return `bigger than ${limit.bytes >> 20} MiB${text ? ' (a string counts 3 bytes a character)' : ''}`
+      return refusedWhy + where
     }
     let m: string
     try { m = e instanceof Error ? `${e.name}: ${e.message}` : String(e) } catch { m = 'an unreadable error' }
-    return `reading it threw (${m.length > 120 ? m.slice(0, 120) + '…' : m})`
+    return `reading it threw (${m.length > 120 ? m.slice(0, 120) + '…' : m})${where}`
   }
 }
-const walkValue = (v: unknown, vt: number, depth: number): void => {
-  if (depth > MAX_DEPTH) throw new FrameError('value nesting exceeds MAX_DEPTH')
-  if (vt === VT.arr) { for (const x of v as unknown[]) walkValue(x, vtOf(x), depth + 1); return }
-  if (vt === VT.obj) for (const [, x] of Object.entries(v as object)) walkValue(x, vtOf(x), depth + 1)
+//! REFUSED — what the walk throws to refuse, compared by IDENTITY: a test such as `e instanceof Refused` runs
+// user code on whatever a getter threw (a revoked Proxy's getPrototypeOf trap), and threw out of encodable itself
+// (V4-48 review). The reason rides beside it; `at` collects the path as the throw unwinds (innermost first), and
+// `text` says whether a string was charged, for the size reason.
+const REFUSED = {}
+const DEEP = 'deep', OVER = 'over'
+let refusedWhy = ''
+let text = false
+const at: (string | number)[] = []
+const refuse = (why: string): never => { refusedWhy = why; throw REFUSED }
+//! place — ' at toys[2].n' for the walk's path, the first six parts; '' for the value itself
+const place = (path: (string | number)[]): string => {
+  if (path.length === 0) return ''
+  let out = ''
+  for (let i = path.length - 1, k = 0; i >= 0 && k < 6; i--, k++) {
+    const p = path[i]
+    out += typeof p === 'number' ? `[${p}]` : /^[A-Za-z_$][\w$]*$/.test(p) ? (out === '' ? p : `.${p}`) : `[${JSON.stringify(p)}]`
+  }
+  return ` at ${path.length > 6 ? out + '…' : out}`
+}
+//! walk — Writer.value's classes, told by typeof (the walk needs no exact tag: a number is charged 8, the most
+// either number tag takes), arrays by index over their length read once (as Writer.value reads them), objects
+// by their own enumerable keys, each getter run once (and one that throws is the answer). Object.keys, not
+// Object.entries: no pair array per field, which was a third of the walk on a small object. Bytes are charged as
+// Writer.ensure reserves them (a string 4 + 3 per character, each element its tag byte), and an array's or an
+// object's length before its parts are visited, so the walk is bounded by the budget: a sparse array a billion
+// long is refused at once, and a value built of shared parts costs no more than encoding it would.
+const walk = (v: unknown, depth: number, n: number, limit: Limit): number => {
+  if (depth > limit.depth) refuse(DEEP)
+  switch (typeof v) {
+    case 'number': n += 8; break
+    case 'string': n += 4 + v.length * 3; text = true; break
+    case 'boolean': case 'undefined': break
+    case 'object': {
+      if (v === null) break
+      if (v instanceof Uint8Array) { n += 5 + v.length; break }
+      if (Array.isArray(v)) {
+        const len = v.length
+        if ((n += 5 + len) > limit.bytes) refuse(OVER)
+        for (let i = 0; i < len; i++) {
+          try { n = walk(v[i], depth + 1, n, limit) } catch (e) { at.push(i); throw e }
+        }
+        break
+      }
+      const o = v as Record<string, unknown>
+      const ks = Object.keys(o)
+      if ((n += 5 + ks.length) > limit.bytes) refuse(OVER)
+      for (let i = 0; i < ks.length; i++) {
+        const k = ks[i]
+        try { n = walk(o[k], depth + 1, n + 4 + k.length * 3, limit) } catch (e) { at.push(k); throw e }
+      }
+      break
+    }
+    default: refuse(`a ${typeof v}`) // a bigint, a function, a symbol: vtOf's FrameError, said plainly
+  }
+  if (n > limit.bytes) refuse(OVER)
+  return n
 }
 
 //! ── Cursor — THE bounds-checked reader (exactly one; never inline a varint) ──

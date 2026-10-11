@@ -1970,7 +1970,7 @@ test("methods.update with a value the wire cannot carry rejects 'unencodable' on
   try {
     const cl = c = await fero('enc', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
     assert.ok(await until(() => (snapshot(cl.data) as Record<string, unknown>).luna !== undefined, 8000), 'the client caught up')
-    const enc = (e: WriteReject & Error) => e.reason === 'unencodable' && e.message.includes('unencodable (the value cannot be sent')
+    const enc = (e: WriteReject & Error) => e.reason === 'unencodable' && /: unencodable \((a bigint at n|a function); fero sends null, /.test(e.message)
     await assert.rejects(s.methods.update({ key: 'big', value: { n: 10n } }, { timeout: 8000 }), enc)
     await assert.rejects(cl.methods.update({ key: 'fn', value: () => 1 }, { timeout: 8000 }), enc)
     s.data.after = 1
@@ -1986,8 +1986,46 @@ test('a data: seed the wire cannot carry, or whose validation: rule throws, reje
   const before = process.listenerCount('SIGINT')
   //! a start that wrongly resolves is destroyed at once, so a regression fails here instead of holding the battery open
   const started = (p: Promise<Fero>) => p.then(async (f) => { await f.destroy(); return f })
-  await assert.rejects(started(fero('seedenc', { listen: false, data: { luna: { n: 10n } } })), /^Error: fero\('seedenc'\): data seed row 'luna' cannot be sent — a bigint$/)
+  await assert.rejects(started(fero('seedenc', { listen: false, data: { luna: { n: 10n } } })), /^Error: fero\('seedenc'\): data seed row 'luna' cannot be sent: a bigint at n\n  fero sends null, /)
   await assert.rejects(started(fero('seedthrow', { listen: false, data: { luna: null }, validation: (r: { value: { mood: string } }) => r.value.mood.length > 0 || 'needs a mood' })),
     /^Error: fero\('seedthrow'\): data seed row 'luna' — validation threw: TypeError: Cannot read properties of null/)
+  //! a getter that throws a revoked Proxy: the check used to test it with instanceof, and threw out of itself
+  const { proxy: revoked, revoke } = Proxy.revocable({}, {})
+  revoke()
+  await assert.rejects(started(fero('seedrevoked', { listen: false, data: { luna: { get x() { throw revoked } } } })),
+    /^Error: fero\('seedrevoked'\): data seed row 'luna' cannot be sent: reading it threw \(an unreadable error\) at x\n/)
   assert.equal(process.listenerCount('SIGINT'), before, 'no Ctrl-C listener left behind')
+})
+
+//! V4-48: the write limit is what every built-in read can send back. The wire carries 64 levels; a keyed call wraps a
+// value once, a whole read twice, a keyed live sub three times, a live sub of the whole resource four (the scoped
+// gather's claim is as deep), and a field sits a level under its row. A value 61 deep was written and replicated, and
+// then could not be read back.
+test('a value at the write limit reads back through every built-in read — the copy, a call and a live sub, keyed and whole', async () => {
+  const nest = (d: number): unknown => { let v: unknown = 1; for (let i = 0; i < d; i++) v = [v]; return v }
+  const want = { row: nest(60), obj: { f: nest(59) } }
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('limit', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: want })
+  let c: Fero | null = null
+  try {
+    assert.throws(() => { (s.data as Record<string, unknown>).over = nest(61) }, /\["over"\] cannot be sent: deeper than 60 levels/)
+    assert.throws(() => { (s.data as Record<string, any>).obj.g = nest(60) }, /\["obj","g"\] cannot be sent: deeper than 60 levels/)
+    const cl = c = await fero('limit', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    assert.ok(await until(() => (snapshot(cl.data) as Record<string, unknown>).obj !== undefined, 8000), 'the client caught up')
+    assert.deepEqual(snapshot(cl.data), want, 'the copy')
+    const m = cl.methods as Record<string, (a?: unknown, o?: { timeout?: number }) => any>
+    assert.deepEqual(await m.read('row', { timeout: 8000 }), want.row, 'a keyed call')
+    assert.deepEqual(await m.read('obj', { timeout: 8000 }), want.obj, 'a keyed call of a field')
+    assert.deepEqual(await m.read(undefined, { timeout: 8000 }), want, 'a whole call')
+    for (const [k, v] of [['obj', want.obj], [undefined, want]] as const) {
+      const h = m.read(k, { timeout: 8000 })
+      await h.ready
+      assert.deepEqual(snapshot(h.open()), v, `a live sub of ${k ?? 'the whole resource'}`)
+      h.close()
+    }
+  } finally {
+    await c?.destroy()
+    await s.destroy()
+  }
 })

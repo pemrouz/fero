@@ -19,8 +19,7 @@ import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { TUNE } from '../kernel/tune.ts'
-import { encodable } from '../kernel/codec.ts'
-import { Bind, METHODS_ONLY, UNENCODABLE, type Coords } from './data.ts'
+import { Bind, METHODS_ONLY, UNENCODABLE, CARRIES, unsendable, type Coords } from './data.ts'
 import { fnv } from '../kernel/ring.ts'
 import { Caller, Host, SYSTEM, handle, reapStopped, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
@@ -838,7 +837,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       new WriteRejectError({ guarantee: want, ...fields }, `fero('${name}') ${VERB_NAMES[rec.type]} ${JSON.stringify(key)}: ${what} — reached ${fields.reached}${tail}`)
     const explain = (reason: string): string => reason === METHODS_ONLY ? `${reason} (the server takes changes only through its methods)`
       : reason === 'validation-threw' ? `${reason} (the server's validation: rule threw on this record; the server's stderr says where)`
-      : reason === UNENCODABLE ? `${reason} (the value cannot be sent: fero carries null, booleans, numbers, strings, Uint8Array, arrays and plain objects, at most 64 deep)`
+      : reason === UNENCODABLE ? `${reason} (${unsendable(rec) ?? 'the value cannot be sent'}; ${CARRIES})`
       : reason === SPARSE_HOLE ? `${reason} (${holeMessage(key)})` : reason
     //! the one hint a timed-out client needs most (rung 04's finding): nothing is connected to write to
     const nobody = (): string => caller && node.primary === null ? ' (nobody to write to: a bare fero(name) is a client; pass server: true to host)' : ''
@@ -1150,13 +1149,13 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // existing cluster, LWW resolves collisions (higher-epoch cluster stamps win; fresh keys ride in).
   if (config.data !== undefined && rt.node.versions.size === 0) {
     const recs: Rec[] = Object.entries(config.data as Record<string, unknown>).map(([k, v]) => ({ type: REC.update, key: [k], value: v }))
-    //! each row is asked, whole batch first, whether the wire can carry it (V4-48 — a bigint seed used to
-    // start fine and stop replication for good) and what the rule says; a rule that THROWS aborts like one
-    // that refuses, the resource and the row named (it used to escape fero() bare, past abort's teardown,
-    // with the Ctrl-C listener left installed)
+    //! each row is asked, whole batch first, whether it can be sent (V4-48 — a bigint seed used to start fine
+    // and stop replication for good) and what the rule says; a rule that THROWS aborts like one that refuses,
+    // the resource and the row named (it used to escape fero() bare, past abort's teardown, with the Ctrl-C
+    // listener left installed)
     for (const r of recs) {
-      const why = encodable(r.value)
-      if (why !== null) await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' cannot be sent — ${why}`))
+      const why = unsendable(r)
+      if (why !== null) await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' cannot be sent: ${why}\n  ${CARRIES}`))
       if (!validate) continue
       let v: true | string
       try { v = validate(r) } catch (e) { return await abort(new Error(`fero('${name}'): data seed row '${r.key[0]}' — validation threw: ${errText(e)}`)) }

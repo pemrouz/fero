@@ -9,7 +9,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Runtime } from '../shell/runtime.ts'
-import { Bind } from './data.ts'
+import { Bind, unsendable } from './data.ts'
 import { VERB, encodeControl, encodeRuns } from '../kernel/codec.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 import { bench, ratio } from '#utils'
@@ -29,6 +29,28 @@ test('absolute: 5k assignments/rep through capture→issue→commit→echo-consu
   assert.equal(rt.node.state.size, 1024)
   assert.equal(rt.node.seq, N * 6, 'all six reps (warmup + 5) committed for real')
   assert.ok(ms < 400, `5k captured writes took ${ms.toFixed(1)}ms (ceiling 400ms)`)
+  bind.destroy()
+  await rt.destroy()
+})
+
+//! RATIO (V4-48): every local write's record is walked once before its stamp (api/data.ts unsendable →
+// kernel/codec.ts encodable). On a small object (four fields, a list, a nested object) the walk read about
+// 3% of the whole write in a profile here, a quarter more while it used vtOf and Object.entries. The pin:
+// checking such records costs under a tenth of writing them (about 0.02x here), so a walk that turns
+// quadratic or starts copying shows here. Numbers cost a type test and are not pinned apart.
+test('ratio: the check a local write runs before its stamp (V4-48) costs under a tenth of the write itself on a small object', async () => {
+  const { rt, bind } = harness()
+  const N = 1000
+  let v = 0 // fresh values every rep — never the dedup'd no-op path
+  const value = () => ({ mood: 'hungry', n: ++v, toys: ['ball', 'mouse'], at: { x: 1, y: 2 } })
+  const recs: Rec[] = Array.from({ length: N }, (_, i) => ({ type: REC.update, key: ['k' + i], value: value() }))
+  let refused = 0
+  const r = ratio.interleaved(
+    () => { for (let i = 0; i < N; i++) bind.data['k' + i] = value() },
+    () => { for (let i = 0; i < N; i++) if (unsendable(recs[i]) !== null) refused++ },
+  )
+  assert.equal(refused, 0)
+  assert.ok(r < 0.1, `checking a small object / writing it = ${r.toFixed(3)}x (budget 0.1x; about 0.02x here)`)
   bind.destroy()
   await rt.destroy()
 })
