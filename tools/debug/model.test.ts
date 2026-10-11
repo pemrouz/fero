@@ -10,7 +10,7 @@ import { converged } from '../../sim/monitors.ts'
 import { JK } from '../../kernel/journal.ts'
 import { captureSim } from './capture.ts'
 import { encodeVal, decodeVal, kindNames, stateAt, verifyReplay, routes, contested, summarize, topologyAt, verifyTopology, agreement } from './model.mjs'
-import { scopedCut, scopedTenure, mixed, unscopedLeaver, attachMissing, copyingHolder, abortedCopy } from './fixtures.ts'
+import { scopedCut, scopedTenure, mixed, unscopedLeaver, attachMissing, copyingHolder, abortedCopy, reacquired } from './fixtures.ts'
 import { captureLive } from './capture.ts'
 import { REC } from '../../kernel/env.ts'
 
@@ -779,4 +779,35 @@ test('the topology replay folds a hand-off\'s watermark jump: at every step a sc
   }
   assert.ok(jumps > 0 && steps > 500, `the acquire rows themselves were checked (${jumps} of ${steps} steps)`)
   assert.ok(counts > 0, `the folded count was checked after a hand-off (${counts} lane-steps)`)
+})
+
+//! a row copied in TWICE (wave 5f review). An entry with no row of its own may have come in at either hand-off; the
+// fold used to take it at the first, so the replay ran AHEAD of the kernel between the two — applied, shippable and
+// the folded count — while the end-of-capture proof still passed and the page showed no warning. Now it is folded at
+// the row's last acquire: the replay may trail the kernel there, never lead it. Checked against the REAL kernel's
+// marks after every event of a chaotic run where a heal re-latches the joiner on rows it already holds.
+test('a row copied in twice never puts the topology replay ahead of the kernel: at every step applied, shippable and the folded count stay at or below the kernel\'s own (wave 5f review)', () => {
+  const { cap, real, twice } = reacquired()
+  const K = cap.vocab
+  const proved = new Map((verifyTopology(cap) as { uuid: string; ok: boolean }[]).map((r) => [r.uuid, r.ok]))
+  assert.ok(proved.get('n06'), 'the joiner\'s replay is proved at capture end — the page replays it under rewind')
+  let steps = 0, between = 0
+  for (const [u, byT] of real) {
+    if (!proved.get(u)) continue // a node the ∞ guard refuses shows its end tables, labelled — never this replay
+    const journal = cap.nodes.find((n) => n.uuid === u)!.journal
+    const shedAt = journal.find((e) => e.kind === K.shed)?.t ?? Infinity
+    const acq = journal.filter((e) => e.kind === K.acquire)
+    for (const [t, lanes] of byT) {
+      if (t < 0) continue
+      const { streams } = topologyAt(cap, u, t) as { streams: Map<string, { a: number; s: number; n: number }> }
+      steps++
+      if (twice.some((p) => acq.some((e) => String(e.a) === p && e.t <= t) && acq.some((e) => String(e.a) === p && e.t > t))) between++
+      for (const [o, r] of streams) {
+        const [a, s, n] = lanes[o] ?? [0, 0, 0]
+        assert.ok(r.a <= a && r.s <= s, `${u} t${t} lane ${o}: the replay's applied/shippable ${r.a}/${r.s} are ahead of the kernel's ${a}/${s}`)
+        if (t < shedAt) assert.ok(r.n <= n, `${u} t${t} lane ${o}: the replay's folded count ${r.n} is ahead of the kernel's record book ${n}`)
+      }
+    }
+  }
+  assert.ok(steps > 500 && between > 0, `the steps between two hand-offs of one row were checked (${between} of ${steps})`)
 })
