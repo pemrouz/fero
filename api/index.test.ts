@@ -14,6 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import net from 'node:net'
+import { isDeepStrictEqual } from 'node:util'
 import { fero, WriteRejectError } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
@@ -2184,5 +2185,41 @@ test('a held call and a held live sub send their argument as it was at the call:
   } finally {
     await c.destroy()
     await s?.destroy()
+  }
+})
+
+//! V4-52: data folds an insert at the row only. methods.insert({ key: ['row', 'f'] }) was stamped and then refused by
+// data: on a server the call rejected with data's words after the stamp and its write stayed `pending` for ever; on a
+// client the call resolved 'committed' while the server threw from its socket handler, and every client that caught up
+// later threw too. It is refused before the stamp now, typed, with what to write instead.
+test("methods.insert with a key of two parts or more, or an empty at, is refused 'invalid-key' before the stamp, on a server and on a client, and every node carries on", async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('ins', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { row: { a: 1 } } })
+  let c: Fero | null = null
+  let late: Fero | null = null
+  const rows = (f: Fero) => snapshot(f.data) as Record<string, unknown>
+  const pending = (f: Fero) => Object.values(f.cluster.writes.snapshot() as Record<string, { state: string }>).filter((w) => w.state === 'pending').length
+  const bad = (hint: RegExp) => (e: WriteRejectError) => e instanceof WriteRejectError && e.reason === 'invalid-key' && e.reached === 'issued' && hint.test(e.message)
+  try {
+    const cl = c = await fero('ins', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    assert.ok(await until(() => rows(cl).row !== undefined, 8000), 'the client caught up')
+    for (const f of [s, cl]) {
+      await assert.rejects(f.methods.insert({ key: ['row', 'f'], at: 'y', value: 3 }, { timeout: 8000 }), bad(/: invalid-key — reached issued \(an insert adds a row: /))
+      await assert.rejects(f.methods.insert({ key: ['row', 'f', 'g'], value: 3 }, { timeout: 8000 }), bad(/an insert adds a row/))
+      await assert.rejects(f.methods.insert({ at: '', value: 1 }, { timeout: 8000 }), bad(/an insert needs its row/))
+      assert.equal(pending(f), 0, 'no write left pending')
+    }
+    //! the shapes data folds still insert: a row under the resource, and a row at a one-part key
+    await s.methods.insert({ at: 'made', value: { n: 1 } })
+    await cl.methods.insert({ key: 'row2', value: { n: 2 } }, { timeout: 8000 })
+    s.data.after = 1
+    const lt = late = await fero('ins', { uuid: 'yy', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    const want = { row: { a: 1 }, made: { n: 1 }, row2: { n: 2 }, after: 1 }
+    for (const f of [s, cl, lt]) assert.ok(await until(() => isDeepStrictEqual(rows(f), want), 8000), JSON.stringify(rows(f)))
+  } finally {
+    await late?.destroy()
+    await c?.destroy()
+    await s.destroy()
   }
 })
