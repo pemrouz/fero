@@ -2119,6 +2119,8 @@ export class Node {
     }
     link.synced = false
     link.torn = { d: this.#cover(d, tear === '' ? null : tear, tearSeq), r, q }
+    // (a stop needs a full queue, and with tune.queued ≥ 1 this call queued a frame first, so inQueue already added
+    // the link; the add here keeps the rule local: wherever a cover is set, the link is in #covered)
     if (link.client) this.#covered.add(link)
   }
 
