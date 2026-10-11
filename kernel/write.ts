@@ -658,7 +658,8 @@ export class Writes {
         // (wait for this relay's tap, which follows; keep the coordinates in case the tap dies with the link)
         const o = silent ? lane : undefined
         const l = p !== undefined && !silent ? lane : undefined
-        if (hop && (hop.via !== a.via || hop.c + hop.n !== v.c + i || hop.o !== o || hop.l !== l)) flushHop()
+        // no `hop.l !== l` test: within one WACK `lane` and `p`'s definedness are fixed, so `l` differs exactly when `o` does
+        if (hop && (hop.via !== a.via || hop.c + hop.n !== v.c + i || hop.o !== o)) flushHop()
         if (hop) hop.n++
         else { hop = { via: a.via, c: v.c + i, n: 1, s: v.s + i }; if (o !== undefined) hop.o = o; if (l !== undefined) hop.l = l }
       }
