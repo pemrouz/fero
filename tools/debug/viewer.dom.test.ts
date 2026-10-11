@@ -714,6 +714,11 @@ test('a live attach missing a client\'s feeder tells one story: the header names
   const insp = el('insp').innerHTML
   assert.ok(insp.includes(`data-rkey="g/nodes/zc1">zc1</span></span><span class="x" data-tip="stop:feeder-unknown">not judged — its feeder ${feeder} is not in the capture</span>`), 'its stop says not judged')
   assert.doesNotMatch(insp, /data-rkey="g\/nodes\/zc1">zc1<\/span><\/span><span data-tip="stop:(never|inflight)"/)
+  //! and it is out of the count, like a non-holder: "applied n/m holders" counts only the nodes the page can judge
+  const st = Object.values(r.nodes).map((x) => x.status)
+  const meant = st.filter((x) => x !== 'not-a-holder' && x !== 'feeder-unknown').length
+  const got = st.filter((x) => x === 'origin' || x === 'applied' || x === 'acquired').length
+  assert.ok(insp.includes(`applied ${got}/${meant} holders`), `the rollup leaves the client out: applied ${got}/${meant} holders`)
   //! with its feeder captured, nothing is said: the client is judged
   const full = await bootViewer('feeder-present', cap)
   assert.doesNotMatch(full.el('statusRight').innerHTML, /clients-unjudged/)
