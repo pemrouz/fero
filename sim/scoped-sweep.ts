@@ -21,7 +21,7 @@
 // stage 1 (b), 2026-10-10): a leave-drain violation is now UNSAFE like any other.
 
 import { Sim } from './exec.ts'
-import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLogs, screenMatches, spokeMirror, spokeStale } from './monitors.ts'
+import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLogs, screenMatches, spokeMirror, spokeStale, laneUniqueCounts } from './monitors.ts'
 import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
@@ -688,6 +688,8 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   Object.assign(eng, { cells: L.counts.cells, advances: L.counts.advances, releases: L.counts.releases, census: L.counts.census, drops: L.counts.drops, leaves: L.counts.leaves, resyncs: L.counts.resyncs, resyncRows: L.counts.resyncRows })
   eng.sheds = jcount(sim, JK.shed); eng.acquires = jcount(sim, JK.acquire); eng.compactions = jcount(sim, JK.compacted)
   eng.stalls = jcount(sim, JK.shedStall); eng.epoch = Math.max(...[...sim.nodes.values()].map((x) => x.epoch))
+  //! the lane rule (wave 6b): how many neighbouring (seq, seq) pairs the lane-unique monitor compared over the run
+  eng.lanePairs = laneUniqueCounts(sim)?.pairs ?? 0
   return out
 }
 

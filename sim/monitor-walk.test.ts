@@ -101,6 +101,16 @@ const PLANTS: Plant[] = [
     },
   },
   {
+    //! the lane rule (wave 6b): a copy of an entry spliced into the lane's INTERIOR — below the length log-monotone last
+    // saw, so only lane-unique's rescan (the entry it last saw at the tail moved) names it
+    name: 'a lane that holds one seq twice, in its interior', monitor: 'lane-unique',
+    install: (_, late, early) => {
+      const plant = (from: number) => once(from, (n) => { for (const [, lane] of n.logs) if (lane.length >= 3) { lane.splice(1, 0, { ...lane[1] }); return true } return false })
+      stepsOf(late, plant(35))
+      stepsOf(early, plant(50))
+    },
+  },
+  {
     name: 'two writers in one (partition, epoch)', monitor: 'single-writer',
     install: (_, late) => {
       stepsOf(late, once(40, (n) => { const e = fakeEntry(n); if (!e) return false; n.logs.set('zw', [{ ...e, seq: 1 } as never]); return true }))
