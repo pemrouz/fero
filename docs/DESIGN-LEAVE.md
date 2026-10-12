@@ -1684,6 +1684,36 @@ heartbeat's give-up revival has the evictee's chain dialing again by then, so `#
   is the operator's choice. With no live majority (two dead at three) the ballot is the one before and nothing can
   commit — the crash-at-two class (§7).
 
+**2026-10-12, the scoped leaver whose vote never came back (wave 6b).** STATUS carried: "still in its own view
+when its bound ends, it goes like a crash: nothing froze, so there is no orphan to drain and `undrained` reads 0
+even though at R=1 its rows go with it" (V4-38's note). Two changes in `kernel/membership.ts`, and the row says why.
+
+- *It counts what goes with it.* `#finishLeave(false)` asks the same last question for a leaver still in its own
+  view as for one bounded out of it: `scope.undrained` already reads a HELD entry's live tails against the ring's
+  other holders (the solo view's case), so at R=1 — no other holder — every partition with content is stranded and
+  counted in `undrained`, and `left` b=0 follows at once; at R≥2 the leaver waits, bounded by `drainTicks`, for each
+  reachable co-holder to have attested floors at or above its tails (the holders' own HAVEQ/HAVEA rounds feed those
+  marks), and counts what none did. Nothing moves in the ballot rules: `done` is set first, so the leaver grants no
+  ballot that puts it back in, and a vote that comes late commits the shrunk view at the proposer as before (the
+  drain's re-read then sees the orphans). `cluster.me.undrained` is honest at R=1 now.
+- *It learns the fate it can.* A knock from a member whose leave COMMITTED — my view no longer holds it, and it
+  never saw the VIEW (lost on the wire; or it knocked at a member that learned the view before it did) — is
+  answered with the view (`onLeave`), so the leaver reads its exit proof and drains instead of knocking until its
+  bound ends. Any node that holds a committed view answers, member or not. Beside it, V4-55's ask already does this
+  work where the leave ballot is two apart (the eviction riding with the leave, the note above): the leaver's vote
+  is a hold, it asks every heartbeat, and the proposer's VIEW or NACK is the answer. The fate it cannot learn is a
+  proposer it has no link to: the bound counts there, as before.
+- *The row says why.* `left` b=0 carries `c`: `unanswered` (the vote never came back; it is still in its own view)
+  or `unechoed` (it committed the view without itself and no survivor echoed it); a clean view half with an
+  `undrained` drain has the `undrained` row before it and no `c`. The ELI5 and `kernel/journal.ts` read it; no
+  frame changed.
+- *Pinned.* `kernel/drain.test.ts`: the re-recorded pin — at R=1 with aa p's lawful holder, `undrained` [1, 1] and
+  `left` [1, 0, unanswered] at the window's end (the base: no row, 0); at R=2 with the co-holder attested, nothing
+  counted; at R=2 with the co-holder silent, the drain waits and its attestation ends it with nothing counted; the
+  committed-no-echo pin reads `unechoed`. `kernel/membership.test.ts`: the knock answered with the view, no ballot.
+  The README's Membership bullet and the `replicas` row, and `api/types.ts`'s `undrained`, say the count is honest
+  and name the two words.
+
 ### §10.8 The harness (`sim/leave-harness.ts`, `sim/leave-harness.test.ts`): the floor, and the teeth
 
 The families, rebuilt from the reports (every one asserts the split check and the monitors; liveness is

@@ -1484,3 +1484,23 @@ test('the eviction rides with the leave, the lowest leaver: aa leaves at {aa,bb,
   for (let i = 0; i <= LEAVE_TICKS; i++) g.tick()
   assert.deepEqual(g.of('left'), [['left', false]])
 })
+
+test('a knock from a member my view no longer holds is answered with the VIEW (wave 6b, 2026-10-12): bb left and aa installed {aa,cc}@2, but bb never saw the VIEW and knocks on — aa ships view 2 on bb\'s link and proposes nothing; on bb\'s side the VIEW without it is the exit proof', () => {
+  const h = formedView1()
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(proposed(h, 1, 2), [['aa', 'cc']])
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,cc' }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,cc' }) })
+  assert.equal(h.node.epoch, 2, 'bb (the old set) and cc (the new) voted')
+  const views = () => h.sentOn(1, VERB.VIEW).filter((f) => (f.value as { e: number }).e === 2).length
+  assert.equal(views(), 1, 'the install flooded view 2 to bb once (lost, in this story)')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.equal(views(), 2, 'bb knocked again: answered with the view it is missing')
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 2]], 'no new ballot: bb is out already')
+  //! bb\'s seat: still at view 1, knocking; the VIEW without it is the exit proof (onView), as for the flood
+  const k = knockingPair()
+  k.node.step({ kind: 'leave' })
+  k.tick(); k.tick()
+  k.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa']] }) })
+  assert.deepEqual(k.of('left'), [['left', true]])
+})
