@@ -44,7 +44,7 @@
 // HELLOs in the Sim, since the mesh writes its own — red on the base as evictTwo was); and genesisProposerAndGranterDie
 // now records every node's proposal list and bb's vote, so a rule that re-proposes while frozen is pinned to the SAME
 // epoch. The fifth round (the page's last note; 2026-10-12) added askAfterHello, lostRelease and askAtAdmit, one per
-// open item. THE BUILD (2026-10-12, V4-51): the four holes are closed and every red pin is re-recorded to the rule's
+// open item. THE BUILD (2026-10-12, V4-55): the four holes are closed and every red pin is re-recorded to the rule's
 // safe state; the two liveness pins the rule moves on purpose are proposerAndGranterDie and
 // genesisProposerAndGranterDie, the CP answer (§10.10.4, §10.10.1); the mid points of the release shapes show held
 // members where the base showed writable ones; no pin of any existing family moved (rebirth, both isolate families,
@@ -266,7 +266,7 @@ test('leave harness, the quiet-point check: two nodes writable in different view
 // stays at the old view with the two "suspects" as a reachable majority of it, and as their lowest live member leads
 // them into a view of its own — at the SAME epoch the proposer's side reaches next, so the sim's one-view-per-epoch
 // monitor fires, and both sides are writable. Seeds 1, 2, 4 and 5 of 5 in both variants (seed 3 misses the timing);
-// the one-evictee control never splits (the arithmetic forbids it). CLOSED 2026-10-12 (V4-51): the sets are empty.
+// the one-evictee control never splits (the arithmetic forbids it). CLOSED 2026-10-12 (V4-55): the sets are empty.
 // n03 is held on its vote for {n01,n02,n03}@2, two apart from view 1; it leads {n03,n04,n05}@3 joint over that view,
 // which needs n01 or n02 across the cut; n04 and n05 grant it and are held on it in turn; the far side stays
 // read-only until the cut heals — the CP answer (§10.10.8). A kernel that reopens the hole fills these lists.
@@ -302,7 +302,7 @@ test('leave harness, evictTwo: two suspects evicted at once at n=5 with the thir
 // no seed. Measured on the scratch kernels (§10.2): the two-part rule (gate closed, lead nothing) leaves the quiet
 // point clean but STILL splits at epoch 4 — cc, holding a vote at 3 above view 2, grants bb's `{bb,cc}`@4; the
 // three-part rule (the grant clause too) ends with no split anywhere and bb and cc read-only for good. CLOSED
-// 2026-10-12 (V4-51) by form (β) at the voter: cc and dd, at view 2, REFUSE aa's ballot over view 1 (its PROPOSE
+// 2026-10-12 (V4-55) by form (β) at the voter: cc and dd, at view 2, REFUSE aa's ballot over view 1 (its PROPOSE
 // carries o: 1), so the schedule's `shape` list now names exactly the three moves that no longer happen — the pin
 // of the refusal (§10.10.9); aa installs view 2 evicted and holds nothing; bb and cc end writable at {bb,cc}@3 with
 // dd `minority` and aa `evicted`: one writable view, no split at any epoch. The base: quiet point
@@ -365,7 +365,7 @@ test('leave harness, a failed ballot in a healthy cluster: one member flaps duri
 // (seed 5 reaches the shape and misses the split's timing). Plainly, it is evictTwo with a delay and has no teeth
 // evictTwo lacks (the second review): any clock shorter than the run splits both. The "commit 200 ms after the grant"
 // check only guards that the slow link was in effect (true by construction when the ballot commits).
-// CLOSED 2026-10-12 (V4-51): the base split on [1, 2, 3, 4]; under the rule there is no clock, n03 holds until the
+// CLOSED 2026-10-12 (V4-55): the base split on [1, 2, 3, 4]; under the rule there is no clock, n03 holds until the
 // cut heals, and the set is empty — a kernel whose hold ends on a clock fills it again.
 const SPLITS_RELEASED_EARLY: number[] = []
 
