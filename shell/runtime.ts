@@ -190,6 +190,7 @@ const heldError = (who: string, dir: string, h: Holder, why: Why): DirHeld =>
       why === 'elsewhere' ? ` (a lock from another machine is never taken over: remove ${path.join(dir, LOCK)} by hand once that machine is gone)`
       : why === 'ns' ? ' (a container on this kernel: it still touches its lock)' : ''}`), { code: 'dir-held' as const, pid: h.pid, host: h.host })
 const UNKNOWN: Holder = { pid: 0, host: HOST, boot: BOOT, ns: NS, start: null }
+const sameHolder = (a: Holder, b: Holder): boolean => a.pid === b.pid && a.host === b.host && a.boot === b.boot && a.ns === b.ns && a.start === b.start
 //! lockDir — take the dir for this process (made if missing); returns the release, which is also run at process exit.
 // `who` prefixes the refusal (the composer's fero('name')).
 export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
@@ -218,7 +219,17 @@ export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
   if (!claim(take, mine)) {
     const t = holderAt(take), tw = liveHolder(take, t)
     if (tw !== null) throw heldError(who, dir, t!, tw)
-    try { fs.unlinkSync(take) } catch { /* the other heir finished first */ }
+    //! a stale marker (its heir crashed inside the takeover) is removed by a RENAME to a name of my own and a look at what
+    // came: only the record I judged stale is deleted. An unlink removed whatever was there — a FRESH marker another
+    // heir had put in place between my look and my unlink — and both heirs then held the dir. A fresh one goes back.
+    const gone = `${take}.${process.pid}.${Math.random().toString(36).slice(2, 8)}`
+    try { fs.renameSync(take, gone) } catch { /* another heir removed it first */ }
+    const got = holderOf(gone)
+    if (got !== null && (t === null || !sameHolder(got, t))) {
+      try { fs.renameSync(gone, take) } catch { /* its heir is done with it */ }
+      throw heldError(who, dir, got, 'alive')
+    }
+    try { fs.unlinkSync(gone) } catch { /* never renamed */ }
     if (!claim(take, mine)) throw heldError(who, dir, holderAt(take) ?? UNKNOWN, 'alive')
   }
   try {

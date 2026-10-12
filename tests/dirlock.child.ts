@@ -3,7 +3,8 @@
 // (fero.spawn's stop(): the clean stop, V4-8). Refused, it prints `refused <code> <pid> <host> <message>` and exits 2.
 // The modes shape the life: `exit` ends at once through process.exit (the exit hook releases the lock); `crash` ends
 // without any exit hook, so the lock stays as after a kill -9; `take-slow` holds the takeover of a stale lock open for three
-// seconds between the look and the unlink, and prints `taking` as it enters that window (two heirs at once); `nolink`
+// seconds between the look and the unlink, and prints `taking` as it enters that window (two heirs at once); `marker-slow`
+// sits 2.5 seconds between its look at a stale takeover marker and its removal, printing `pausing` (see below); `nolink`
 // runs on a filesystem without hard links (linkSync refused), and `nolink-slow` on top sits one second between the
 // create of the empty lock and the write of its record (the gap a second opener may meet there); `touch` opens nothing:
 // it plays a holder in another pid namespace, touching the dir's `lock` every 100 ms until Ctrl-C (the lease). Not a
@@ -24,6 +25,15 @@ if (mode === 'touch') {
 if (mode === 'take-slow') {
   const unlink = fs.unlinkSync
   fs.unlinkSync = (p) => { if (String(p).endsWith('/lock')) { console.log('taking'); nap(3000) } return unlink(p) }
+}
+//! `marker-slow`: an heir that meets a STALE takeover marker and sits 2.5 s between its look at it and its removal (the
+// rename), printing `pausing` as it enters that window — another heir removes the stale marker and claims its own meanwhile
+if (mode === 'marker-slow') {
+  const rename = fs.renameSync, unlink = fs.unlinkSync
+  let first = true
+  const pause = (p: fs.PathLike) => { if (String(p).endsWith('/lock.take') && first) { first = false; console.log('pausing'); nap(2500) } }
+  fs.renameSync = (a, b) => { pause(a); return rename(a, b) }
+  fs.unlinkSync = (p) => { pause(p); return unlink(p) }
 }
 if (mode === 'nolink' || mode === 'nolink-slow') {
   fs.linkSync = () => { throw Object.assign(new Error('ENOTSUP: no hard links here'), { code: 'ENOTSUP' }) }
