@@ -1186,7 +1186,7 @@ test('COMPACTION PIN (stage 3) — an armed node compacts only on attested crash
   h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: 2000 } }) })
   maybeCompact(h.node)
   assert.equal(h.node.logs.get('aa')!.length, 2200, '2000 losers at or under bb\'s mark left; 2200 above it stayed')
-  assert.deepEqual(compactedRows(h), [['aa', 2000, 'k']], 'one journal row per (lane, partition), with the partition')
+  assert.deepEqual(compactedRows(h), [['aa', 2000, 1]], 'one journal row per lane per pass: the lane, the entries dropped, the partitions dropped from')
   assert.ok(laneSeqs(h).every((s) => s > 2000), 'nothing below the frontier is left but winners (there is none below it)')
   assert.deepEqual(h.node.byPart!.get('k')!.get('aa'), h.node.logs.get('aa'), 'the per-partition index is the lane\'s filter after the pass')
   assert.equal(h.node.state.get(JSON.stringify(['k', 'x'])), 4199, 'the fold is untouched')
@@ -1194,7 +1194,7 @@ test('COMPACTION PIN (stage 3) — an armed node compacts only on attested crash
   h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: 4200 } }) })
   maybeCompact(h.node)
   assert.deepEqual(laneSeqs(h), [4200], 'the winner alone')
-  assert.deepEqual(compactedRows(h), [['aa', 2000, 'k'], ['aa', 2199, 'k']])
+  assert.deepEqual(compactedRows(h), [['aa', 2000, 1], ['aa', 2199, 1]])
   //! (d) the compactor's OWN open latch pins (C1): q held by aa and cc; cc announces a lane aa lacks, aa latches cc —
   // q's losers stay though cc's marks for q cover them; the fold closes the latch and the next pass drops them
   h.node.writes.ring.place('q', 'aa', 'cc')
@@ -1303,7 +1303,7 @@ test('COMPACTION (stage 3) — V4-18 at an armed node: a field a row write swept
   assert.equal(h.node.scope!.entries.get('r')!.state, SCOPE.held)
   compactScoped(h.node, 'aa') // the pass itself (the lane is far under the size trigger)
   assert.deepEqual(laneSeqs(h), [s3, s4, s5, s7, s8], 'the winners: the row, its fenced field remove, the live field, the row remove, the tail')
-  assert.deepEqual(compactedRows(h).sort(), [['aa', 1, 'r'], ['aa', 2, 'm']].sort())
+  assert.deepEqual(compactedRows(h), [['aa', 3, 2]], 'three entries dropped, from two partitions')
   assert.equal(h.node.versions.has(JSON.stringify(['r'])), true, 'the tombstone lives: GC stays pinned under scoping')
   //! C4: a lane whose LAST entry is a loser (a record on bb\'s lane, a higher stamp, beat it — the gate folds it, aa
   // holds k) keeps that entry
@@ -1318,7 +1318,7 @@ test('COMPACTION (stage 3) — V4-18 at an armed node: a field a row write swept
   c.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: t2, bb: t2 + 5 } }) })
   compactScoped(c.node, 'aa')
   assert.deepEqual(laneSeqs(c), [t2], 'the first loser dropped; the last entry stays though it lost (the client digest reports the lane tail)')
-  assert.deepEqual([t1 < t2, compactedRows(c)], [true, [['aa', 1, 'k']]])
+  assert.deepEqual([t1 < t2, compactedRows(c)], [true, [['aa', 1, 1]]])
 })
 
 test('COMPACTION (stage 3) — an ORPHAN never compacts (its content tails are the shed evidence), and the memo skips a lane the last pass could not advance until the evidence or the lane changes', () => {
