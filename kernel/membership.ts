@@ -489,9 +489,11 @@ export class Membership {
       }
       //! a LEAVE ballot in flight is re-read against the chains (#leaveView): a suspect whose chain gave up since the
       // ballot opened leaves the ballot too, at the same epoch (my vote there is my own: the same-proposer case, which
-      // the voters re-grant; a grant for the dropped ballot echoes its identity and counts for nothing)
+      // the voters re-grant; a grant for the dropped ballot echoes its identity and counts for nothing). The re-read
+      // starts from the ballot in flight, so it only ever removes (the drop is sticky): the revival below re-arms a
+      // dropped member's chain in this very step, and that must not put it back next tick
       else if (this.#suspects.size && !this.epochStale && this.#proposal !== null && this.#proposal.leaver !== undefined) {
-        const m = this.#leaveView(node, this.#proposal.leaver)
+        const m = this.#leaveView(node, this.#proposal.leaver, this.#proposal.view.members)
         if (hashOf(m) !== this.#proposal.h) { const leaver = this.#proposal.leaver; this.#proposal = null; this.#propose(node, { epoch: this.#nextEpoch(node), members: m }, leaver) }
       }
       //! THE OPENER (DESIGN-LEAVE §10.10.4, the fifth review, 2026-10-12): supersession needs a ballot, and every other
@@ -672,11 +674,20 @@ export class Membership {
   // or more apart from the view, so V4-55 holds its granters — the leaver, and a stayer — until the VIEW lands, exactly
   // as for a two-suspect eviction today, and a granter cut before the VIEW stays read-only (the CP answer, §10.10.4).
   // A leave whose plain ballot the live members CAN carry is byte-identical with before: one apart, no hold.
-  #leaveView(node: Node, leaver: string): [string, string][] {
-    const without = this.view.members.filter(([u]) => u !== leaver)
-    const live = without.filter(([u, l]) => !this.#dead(node, u, l))
-    if (live.length * 2 > without.length) return without
-    return this.view.members.filter(([u]) => !this.#suspects.has(u)).length * 2 > this.view.members.length ? live : without
+  //! THE DROP IS STICKY (the note's amendment of 2026-10-12, the first review of wave 6b): `ballot` is the leave ballot
+  // in flight for this leaver, when there is one, and the re-read starts from IT, not from the view — a re-read may
+  // only REMOVE members from a ballot in flight, never put one back. Without it the heartbeat's give-up revival (V4-20),
+  // which runs right after membership.tick in the same step, re-armed the dropped member's chain; the next tick read it
+  // as dialing again — not #dead — computed the plain ballot from the view and re-proposed it, discarding the vote in
+  // flight: the dropped ballot lived one heartbeat, and a vote whose round trip was longer than that never committed
+  // (the review's probe: a 30 ms link on a 50 ms heartbeat, unclean at the window's end like the base). A member comes
+  // BACK only by its link: the tick's suspicion branch abandons a ballot that leaves a re-admitted member out, and the
+  // next knock opens a fresh one from the view — the eviction's own rule, which the revival never cancels either.
+  #leaveView(node: Node, leaver: string, ballot?: [string, string][]): [string, string][] {
+    const base = ballot ?? this.view.members.filter(([u]) => u !== leaver)
+    const live = base.filter(([u, l]) => !this.#dead(node, u, l))
+    if (live.length * 2 > base.length) return base
+    return this.view.members.filter(([u]) => !this.#suspects.has(u)).length * 2 > this.view.members.length ? live : base
   }
 
   onPropose(node: Node, link: Link, v: { e?: unknown; m?: unknown; o?: unknown; j?: unknown }) {
@@ -953,10 +964,13 @@ export class Membership {
       //! the view without me — and without the dead, when the live cannot carry it (#leaveView). An EVICTION in flight
       // (a ballot of mine that is no leave and leaves members of my view out) is replaced, as every other ballot of mine
       // is (leaving outranks), but my exit carries its evictees: it opened on the give-up, and the heartbeat's revival
-      // (V4-20) has that chain dialing again by the time I knock, so #dead alone would keep them and doom my exit
+      // (V4-20) has that chain dialing again by the time I knock, so #dead alone would keep them and doom my exit. My
+      // own exit already in flight is re-read from ITSELF (the drop is sticky): a member it left out stays out
       const p = this.#proposal
+      const mine = p !== null && p.leaver === node.uuid ? p.view.members : undefined
       const evictees = p !== null && p.leaver === undefined ? new Set(this.view.members.filter(([u]) => !p.view.members.some((m) => m[0] === u)).map((m) => m[0])) : null
-      const shrunk = this.#leaveView(node, node.uuid).filter(([u]) => evictees === null || !evictees.has(u))
+      const read = this.#leaveView(node, node.uuid, mine)
+      const shrunk = evictees === null ? read : read.filter(([u]) => !evictees.has(u))
       if (this.#proposal && this.#proposal.h !== hashOf(shrunk)) this.#proposal = null
       if (!this.#proposal) this.#propose(node, { epoch: this.#nextEpoch(node), members: shrunk }, node.uuid)
       return

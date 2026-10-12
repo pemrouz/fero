@@ -1656,7 +1656,9 @@ heartbeat's give-up revival has the evictee's chain dialing again by then, so `#
   torn down, and n02 was left alone in a TWO-member view with n01 dead in it, where the base's three-member view let
   n02 and the returning n03 evict n01 (live on the base, wedged under two ballots). A chain's give-up can land
   anywhere in the window, and two ballots do not fit what the chain has used up. One ballot commits in one round
-  trip: seed 47 is live again (n01 `left` b=1 at 812 ms, n02 alone at 2, n03 back in at 3).
+  trip — a round trip of any length, since the drop is sticky (the amendment below; as first built it held only for
+  a round trip inside one heartbeat): seed 47 is live again (n01 `left` b=1 at 812 ms, n02 alone at 2, n03 back in
+  at 3).
 - *Safety.* The old-set majority is unchanged. The new set is smaller than the plain ballot's, so it needs fewer
   votes and never a dead one. The ballot is two or more apart from the view, so V4-55 holds its granters — the
   leaver, and a stayer — until the VIEW lands, exactly as it holds the granters of a two-suspect eviction today: a
@@ -1683,6 +1685,43 @@ heartbeat's give-up revival has the evictee's chain dialing again by then, so `#
   member chain about 3.5 s): the stop ends unclean before the chain gives up, as a bound must; the operator's window
   is the operator's choice. With no live majority (two dead at three) the ballot is the one before and nothing can
   commit — the crash-at-two class (§7).
+
+**2026-10-12, the drop is sticky (the first review of wave 6b).** The note above said "one ballot commits in one
+round trip". The review's probe showed that held only when the round trip fit inside ONE heartbeat. The heartbeat
+step runs `membership.tick` first and the give-up revival (V4-20) right after it, in the same step: the tick's
+re-read dropped the dead member from the ballot, and the revival then re-seeded that member's redial chain (`{tries:
+0, member: true}`, no give-up), so `node.dialing` read true again for the chain's five tries; the NEXT tick's re-read
+read `#dead` as false, computed the plain ballot from the view again, and re-proposed it, discarding the vote in
+flight. The dropped ballot lived exactly one heartbeat — `P(2,2) P(2,1) P(2,2) P(2,1) …` for the window's length —
+and the stop went unclean at the window's end at 16 and 64 ticks alike, exactly as on the base, whenever the vote's
+round trip was longer than a heartbeat: `starved` with a one-way link delay of 30 or 40 ms on the 50 ms heartbeat
+went `left` b=0 at 800 and 3200 ms after the stop, for either leaver; at 3, 15 and 20 ms the vote landed inside the
+heartbeat and the fix held (510, 610, 660 ms). The knock window's own target — a survivor stalled for a few seconds
+(V4-39) — is exactly the voter this missed. The same flip hit the lowest leaver's exit one tick after it replaced an
+eviction in flight: the tick's re-read read the view, not the evictees the exit carried.
+
+- *The rule, amended: a re-read may only REMOVE members from a leave ballot in flight, never put one back.* The
+  re-read starts from the ballot in flight, not from the view: `#leaveView` takes the in-flight ballot's member list
+  as its base, and the tick's re-read and `#knockLeave` (my own exit in flight) pass it. A member dropped stays
+  dropped for the ballot's life. A revived chain is not a member coming back — it is a dial in flight to a member
+  whose chain already gave up once. What DOES put a member back is the member itself: a suspect whose link is
+  re-admitted leaves `#suspects`, and the tick's suspicion branch abandons any ballot of mine that leaves it out (the
+  eviction's rule, unchanged: "the suspect came BACK"); the leaver's next knock then opens a fresh ballot from the
+  view with that member in it. So the two cases are told apart by evidence, as the eviction tells them apart: an
+  admitted link puts a member back, through a new ballot; a dial in flight puts nobody back.
+- *Why it is safe.* The ballot only ever shrinks between re-reads. The old-set majority is the view's, unchanged by
+  any re-read. A smaller new set needs fewer votes, never a dead one. Each re-read is a ballot of the same proposer at
+  the same epoch — the same-proposer case the banner allows, at most one of them commits — and the release rule
+  (V4-55) holds its granters until the VIEW lands: a granter cut before the VIEW stays read-only. The dropped member's
+  fate is exactly the eviction's today: an eviction ballot opens on the give-up and is not cancelled by the revival
+  either, only by the suspect's link coming back — so a sticky leave ballot gives a dead member what the eviction
+  gives it, out at this epoch, or back in by a fresh ballot when its link returns. Nothing new is counted or granted.
+- *Measured.* `starved` at a one-way delay of 30 and 40 ms, 16 and 64 ticks, both leavers: `left` b=1 with one
+  re-read kept (`P(1,3) P(2,2) P(2,1)`) — the numbers are in `sim/leave-sweep.test.ts`'s pin beside the 3 ms ones.
+  The kernel pins (`kernel/membership.test.ts`): after the re-read drops cc, the same tick's revival has cc's chain
+  dialing again and the next tick keeps `{aa}@2` (before: `{aa,cc}@2` again, and bb's grant for `{aa}` counted for
+  nothing); the lowest leaver's exit `{bb}@2` survives two ticks of revival, and so does the exit that carried an
+  eviction's evictees.
 
 **2026-10-12, the scoped leaver whose vote never came back (wave 6b).** STATUS carried: "still in its own view
 when its bound ends, it goes like a crash: nothing froze, so there is no orphan to drain and `undrained` reads 0
