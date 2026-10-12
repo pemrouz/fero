@@ -1381,10 +1381,20 @@ the fence at the tail the replay drops the copy on the dual fence (one
 `dupDrop`), V4-53's forward ships each record once (the fold forwards it,
 the replay forwards nothing), the spoke's fence rule is untouched, and
 the floor stays at the cut: the fold attests what the teacher attested,
-never the chain (the floor law), and the next announce trues it up — the
-one behaviour that moves, the staged copy no longer advancing the floor
-through the fast path's chain rule, is one round trip of liveness, no
-data. Nothing peer-facing reads `applied` on an armed node: the digest
+never the chain (the floor law). The one behaviour that moves is the
+floor's: on the base the staged copy appended through the fast path and
+its chain rule walked the floor up (the probe's second shape, live 7
+with pp 5 and live 9 with pp 7 after a cut of 5: lane [3, 5, 7, 7, 9],
+floor 9); now the copy drops, the chain is not walked, and the floor
+stays at the cut (lane [3, 5, 7, 9], fence 9, floor 5). What it costs:
+the floor waits for a holder whose floor is higher to answer, and that
+answer opens a SECOND latch (held-found-lagging: `onHaveA`'s asker-behind
+leg, `acquireStart` once more) which re-ships every entry above the cut,
+each dropping on the dual fence, and stages whatever arrives live while
+it is open. No data is lost, and the shape never occurs in the sweep
+(below). A chain-walk at the fold would spare the second latch; that is
+a floor-law change, left for its own decision. Nothing peer-facing reads
+`applied` on an armed node: the digest
 body is the lane tail (node.ts `#sendDigest`), coverage for M1 is the
 floor (`covers`), the frontier is pinned while armed; a client compares
 its own `applied` to its feeder's digest, and a client never folds.
@@ -1411,21 +1421,32 @@ scans (strictly ascending ⇒ no repeat) but scans from the length it last
 saw, so a copy an interior insert puts below that length is outside its
 window; lane-unique keeps the entry it last saw at the tail, scans the
 new tail while that entry still stands at its index, and the whole lane
-when it moved (an interior insert) or the array was replaced (a
-compaction — the case stage 3 adds). Counted (`laneUniqueCounts`: lane
-scans and neighbouring pairs); the scoped sweep records `eng.lanePairs`
-and asserts it above zero on every family. Checked: the kernel probe
-(kernel/scoped.test.ts 'THE LANE RULE', red on the base at "the lane
-holds 7 once", actual [3, 5, 7, 7]); the same frames on a formed sim node
+when it moved (an interior insert) or the array was replaced. The extra
+coverage over log-monotone is exactly the in-place interior copy: a
+REPLACED array (a `compact()` rewrite) is rescanned from the start by
+log-monotone too, since its cursor keys on the array's identity
+(`cursorOf`). Counted (`laneUniqueCounts`: lane scans and neighbouring
+pairs); the scoped sweep records `eng.lanePairs` and asserts it above
+zero on every family. Checked: the kernel probe (kernel/scoped.test.ts
+'THE LANE RULE', red on the base at "the lane holds 7 once", actual
+[3, 5, 7, 7]); the same frames on a formed sim node
 (sim/scale-probes.test.ts 'the lane rule in a sim': lane-unique and
-log-monotone both fire with the fence rise reverted, nothing fires now);
-an interior copy planted in sim/monitor-walk.test.ts, which lane-unique
-names and log-monotone does not, the scoped and full walks agreeing.
+log-monotone both fire with the fence rise reverted, since the copy
+lands at the tail; nothing fires now); and the plant in
+sim/monitor-walk.test.ts, a copy at index 1 of a lane of six or more
+that the monitors already read whole (from step 150), where lane-unique
+fires (event 973 on the seeded run) and the test pins that log-monotone
+never does (`silent`) — the scoped and full walks agreeing. The plant's
+first shape (a lane of three from step 35) landed on a lane that had just
+grown, so the copy sat at log-monotone's cursor and both fired at one
+event; a lane-unique with log-monotone's cursor rule passed it. The
+2026-10-12 review caught that; the deeper plant turns that mutant red.
 
 *For stage 3.* Compaction may assume a lane holds each seq once and the
-fence covers the tail; `compact()` replaces the lane array, which
-lane-unique rescans whole, so a rewrite that kept a copy would be named
-at the next pass.
+fence covers the tail. A rewrite that kept a copy at the tail or
+replaced the array is named by log-monotone and lane-unique both at the
+next pass; a copy an in-place rewrite left in the interior is named by
+lane-unique alone.
 
 ## §0 The decision, in ten lines
 
