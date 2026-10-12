@@ -685,3 +685,18 @@ test('the size reason keeps its note about characters when a getter ran a walk o
   assert.equal(encodable(v, small), 'bigger than 100 bytes (a string counts 3 bytes a character)')
   assert.throws(() => copyOf(v, small), /^Error: bigger than 100 bytes \(a string counts 3 bytes a character\)$/)
 })
+
+//! the fix check: the writer reserved 3 bytes a character for every string while it wrote it, so a 3,000-character
+// ASCII string (3 KB) was refused a frame of 8 KiB, on a reply and in the outbox alike. A string whose worst case does
+// not fit the limit is encoded first and takes its real bytes; a frame that never nears its limit is byte-identical.
+test('a string is sized by its real bytes when its worst case would not fit: a 3 KB string fits a frame of 8 KiB', () => {
+  const f = encodeControl(VERB.RESULT, { id: 1, ok: 1, v: 'x'.repeat(3000) }, 8192)
+  assert.equal(new Framer().push(f)[0].value.v, 'x'.repeat(3000))
+  const o = new Outbox(4096)
+  o.begin(VERB.RECORDS, { origin: 'aa', baseSeq: 1, epoch: 1 })
+  o.add({ type: REC.update, key: ['s'], value: 'y'.repeat(2000) })
+  assert.equal(o.pending.length, 0, 'one frame: the record fits as it really is')
+  assert.equal(new Framer().push(o.finish()!)[0].records()[0].value, 'y'.repeat(2000))
+  const small = new Writer(); small.value('short'); const again = new Writer(); again.value('short')
+  assert.deepEqual(small.buf.subarray(0, small.len), again.buf.subarray(0, again.len))
+})
