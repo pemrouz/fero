@@ -4,7 +4,9 @@
 // The modes shape the life: `exit` ends at once through process.exit (the exit hook releases the lock); `crash` ends
 // without any exit hook, so the lock stays as after a kill -9; `take-slow` holds the takeover of a stale lock open for three
 // seconds between the look and the unlink, and prints `taking` as it enters that window (two heirs at once); `marker-slow`
-// sits 2.5 seconds between its look at a stale takeover marker and its removal, printing `pausing` (see below); `nolink`
+// sits 2.5 seconds between its look at a stale takeover marker and its removal, printing `pausing`; `slow-put` sits three
+// seconds at the moment it puts its record in place, printing `putting`; `look-slow` sits three seconds after its first
+// look at a stale lock, printing `looked` (all three below); `nolink`
 // runs on a filesystem without hard links (linkSync refused), and `nolink-slow` on top sits one second between the
 // create of the empty lock and the write of its record (the gap a second opener may meet there); `touch` opens nothing:
 // it plays a holder in another pid namespace, touching the dir's `lock` every 100 ms until Ctrl-C (the lease). Not a
@@ -34,6 +36,20 @@ if (mode === 'marker-slow') {
   const pause = (p: fs.PathLike) => { if (String(p).endsWith('/lock.take') && first) { first = false; console.log('pausing'); nap(2500) } }
   fs.renameSync = (a, b) => { pause(a); return rename(a, b) }
   fs.unlinkSync = (p) => { pause(p); return unlink(p) }
+}
+//! `slow-put`: sits 3 s at the moment this process puts its record in place — before the hard link (the shipped path),
+// or between the exclusive create and the write (the fallback) — printing `putting`: a second opener starts in that window
+if (mode === 'slow-put') {
+  const link = fs.linkSync, open = fs.openSync
+  fs.linkSync = ((a: fs.PathLike, b: fs.PathLike) => { if (String(b).endsWith('/lock')) { console.log('putting'); nap(3000) } return link(a, b) }) as typeof fs.linkSync
+  fs.openSync = ((p: fs.PathLike, flags?: fs.OpenMode, m?: fs.Mode) => { const fd = open(p, flags, m); if (String(p).endsWith('/lock') && flags === 'wx') { console.log('putting'); nap(3000) } return fd }) as typeof fs.openSync
+}
+//! `look-slow`: sits 3 s after its FIRST look at a stale lock, before it claims the takeover marker, printing `looked`:
+// another heir completes its takeover in that window, and the look again under the marker must see the fresh record
+if (mode === 'look-slow') {
+  const read = fs.readFileSync
+  let first = true
+  fs.readFileSync = ((p: fs.PathOrFileDescriptor, o?: unknown) => { const r = read(p, o as BufferEncoding); if (first && String(p).endsWith('/lock')) { first = false; console.log('looked'); nap(3000) } return r }) as typeof fs.readFileSync
 }
 if (mode === 'nolink' || mode === 'nolink-slow') {
   fs.linkSync = () => { throw Object.assign(new Error('ENOTSUP: no hard links here'), { code: 'ENOTSUP' }) }
