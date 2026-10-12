@@ -1004,7 +1004,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     //! M6: the scope lifecycle re-folds cluster.partitions (tallies + lifetime counters + the H7 surface)
     JK.shed, JK.acquire, JK.orphaned, JK.acquireStart, JK.acquireAbort, JK.shedStall])
   let cursor = 0
-  let lastPrimary = node.primary
+  let lastPrimary = node.primary, refed = false
   let lastFeederOpen = node.feederOpen
   let lastScopeN = -1
   let lastMembers = '0:'
@@ -1041,6 +1041,9 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         // remove, echo pre-consumed: nothing re-issues) and count the lifetime tallies
         else if (e.kind === JK.shed) { shedEver++; bind.shedPartition(String(e.a)) }
         else if (e.kind === JK.acquire) acquiredEver++
+        //! the client closed its own feeder link (wave 6b, kernel #refeed): the primary change that follows is a MOVE,
+        // not a death — the caller's reject for a shipped call says so
+        else if (e.kind === JK.refeed) refed = true
         //! the drain gave up on this many partitions (DESIGN-SCALE stage 1 (b)): cluster.me says so before the teardown
         else if (e.kind === JK.undrained) { undrained = e.a as number; commit(fault, () => cluster.set('me', meRow())) }
         //! the door refused a peer (DESIGN-DOOR §3): one stderr line per peer and reason, deduped per process
@@ -1053,7 +1056,8 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       if (node.primary !== lastPrimary) {
         lastPrimary = node.primary
         primaryMoved = true
-        if (caller && node.primary !== null) caller.onPrimaryChange()
+        if (caller && node.primary !== null) caller.onPrimaryChange(refed)
+        refed = false
       }
       if (events.some((e) => FOLD.has(e.kind))) refold = true
       if (lost) {

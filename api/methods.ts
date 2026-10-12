@@ -685,7 +685,9 @@ export class Caller {
   //! SUBs FIRST (I-28): both ride the same link in order, and a client's fero() resolves before its
   // first link — so "open, then act" right after it is a held SUB and a held CALL. Replaying the CALL
   // first made the view's first frame already hold the call's effect; the delta never rendered.
-  onPrimaryChange() {
+  //! `moved` (wave 6b): the client LEFT its feeder on purpose (its gate was shut while another server's was open, kernel
+  // #refeed); the old server is alive and may still run a call it had — the reject says so instead of "died".
+  onPrimaryChange(moved = false) {
     for (const [id, sub] of this.#subs) {
       //! a sub that had framed starts a NEW attempt (a fresh eager `ready`): the new primary may fail it,
       // and that must not land on a promise already resolved — silent, the mirror kept as if live
@@ -698,7 +700,7 @@ export class Caller {
         this.#rt.node.step({ kind: 'rpc', id, mode: VERB.CALL, m: c.m, a: c.a })
       } else {
         this.#calls.delete(id)
-        c.reject(new Error(`methods.${c.m}: link-down (the connected server died; pass {retry: true} on idempotent calls)`))
+        c.reject(new Error(`methods.${c.m}: link-down (${moved ? 'left a server whose writes were shut; it may still run this call' : 'the connected server died'}; pass {retry: true} on idempotent calls)`))
       }
     }
   }
