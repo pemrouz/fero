@@ -2593,7 +2593,8 @@ these items open, each with the reviewer's probe under the session's scratch fol
    fails as `bad-proof` (or bump the label to `fero-door/2`); mixed versions are unsupported before
    1.0 (V4-14).
 
-**2026-10-12, BUILT (V4-51; branch `w6/relbuild` on v4 at 35d7300: nine commits for the build itself — this note
+**2026-10-12, BUILT (V4-55 — written V4-51 until the eighth round, when V4-51 and V4-52 had landed from another session
+and V4-53 and V4-54 were taken by this wave's other lanes; branch `w6/relbuild` on v4 at 35d7300: nine commits for the build itself — this note
 first said eleven; `git rev-list --count 35d7300..7551d18` says nine — and the reviews below each count their own on
 top; the counts in THIS note are the build's at the time, 46 membership pins, 18 harness pins, 964 tests, and the
 tree's are in the review notes).** The rule of §10.10 is in the
