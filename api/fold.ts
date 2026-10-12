@@ -352,7 +352,7 @@ export class Gather {
 // the wire carries as a plain object), and refused when a reply could not carry it — for size, by its real size
 const answer = (v: unknown, node: Runtime['node'], keyed = false): unknown => {
   try { return replyCopy(v, node.tune.frame) } catch (e) {
-    if (e instanceof Unsendable && e.over) throw tooLarge('read', node.replicas, node.tune.frame, keyed ? 'the answer' : 'the whole resource')
+    if (e instanceof Unsendable && e.over) throw tooLarge('read', node.replicas, node.tune.frame, keyed ? 'the answer' : 'the whole resource', keyed)
     throw new Error(`the result could not be sent: ${(e as Error).message}`)
   }
 }

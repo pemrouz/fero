@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Runtime } from '../shell/runtime.ts'
 import { Bind } from './data.ts'
-import { Host } from './methods.ts'
+import { Host, takesKey } from './methods.ts'
 import { VERB, Framer, encodeControl } from '../kernel/codec.ts'
 
 test('M5-REVIEW #2/#6 — UNSUB during the flush-on-return window cancels the sub; the deferred open never streams', async () => {
@@ -118,6 +118,27 @@ const tooLargeHost = (methods: Record<string, (a: unknown, ctx: { data: any }) =
   return { rt, node, bind, host, frames, closes, reports, results, settle, done }
 }
 const read = (a: unknown, ctx: { data: any }) => (a == null ? ctx.data : ctx.data.get(a))
+
+//! the last check: a keyed read whose one row is bigger than one frame was told to read one key at a time — it had.
+// The built-in read and the system plane's read are marked (takesKey): given a key, a too-large answer says to read a
+// smaller part of the row, locally and remotely alike. A method the program wrote keeps the whole-read words.
+test('V4-51 — a keyed read whose row is bigger than one frame is told to read a smaller part of the row; a program\'s own method is not', async () => {
+  const h = tooLargeHost({ read: takesKey((a, ctx) => read(a, ctx)), mine: read }, 2)
+  try {
+    for (const f of ['s', 't', 'u', 'v', 'w']) h.bind.data.r1[f] = f.repeat(2000) // each write fits; the row does not
+    await h.settle()
+    const keyed = /^the answer is bigger than one frame \(8 KiB\), so fero cannot send it: read a smaller part of the row with a method that returns it$/
+    await assert.rejects(h.host.invokeLocal('read', 'r1'), (e: { reason?: string; op?: string; hint?: string }) => e.reason === 'too-large' && e.op === 'read' && keyed.test(e.hint ?? ''))
+    h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.CALL, { id: 1, m: 'read', a: 'r1' }) })
+    await h.settle()
+    const [r] = h.results()
+    assert.deepEqual([r.ok, r.v.reason, r.v.op], [0, 'too-large', 'read'])
+    assert.match(r.v.hint, keyed, 'the remote keyed read, in the same words')
+    const whole = /^the answer is bigger than one frame \(8 KiB\), so fero cannot send it: read one key at a time \(methods\.read\(key\)\)/
+    await assert.rejects(h.host.invokeLocal('mine', 'r1'), (e: { hint?: string }) => whole.test(e.hint ?? ''), 'a method the program wrote')
+    await assert.rejects(h.host.invokeLocal('read', undefined), (e: { hint?: string }) => whole.test(e.hint ?? ''), 'the whole read')
+  } finally { await h.done() }
+})
 
 test('V4-51 — a whole read bigger than one frame is refused typed with plain words; the link stays up and a keyed read still answers', async () => {
   const h = tooLargeHost({ read })

@@ -68,9 +68,9 @@ const settle = async (tracked: Promise<Coords>[]): Promise<void> => {
 // cap, so what a reply could not carry is refused here too, in the remote reply's words: too big for one frame — by
 // the reply's real size — is the same typed 'too-large' (V4-51), anything else 'the result could not be sent: <why>'
 // (#invoke derives the same why for a remote reply that failed)
-const answer = (m: string, v: unknown, node: Runtime['node']): unknown => {
+const answer = (m: string, v: unknown, node: Runtime['node'], keyed = false): unknown => {
   try { return replyCopy(v, node.tune.frame) } catch (e) {
-    if (e instanceof Unsendable && e.over) throw tooLarge(m, node.replicas, node.tune.frame, 'the answer')
+    if (e instanceof Unsendable && e.over) throw tooLarge(m, node.replicas, node.tune.frame, 'the answer', keyed)
     throw new Error(`methods.${m}: the result could not be sent: ${(e as Error).message}`)
   }
 }
@@ -86,9 +86,13 @@ export const SYSTEM = '\u0000'
 // be cut, so a whole read, a live sub's first picture or one of its changes bigger than one frame is refused — never
 // cut, never a dropped link, never the untyped 'the result could not be sent'. `scoped: true` makes every caller hand
 // it over as-is (rehydrate, below; old clients too: no wire change). `frame` is the answering node's cap.
-export const tooLarge = (m: string, replicas: number, frame: number, what: string): ScopedError => ({
+//! `keyed` — the caller already read one key (methods.read(key), a keyed gather): it is told to read a smaller part of
+// the row, never to read one key at a time
+export const tooLarge = (m: string, replicas: number, frame: number, what: string, keyed = false): ScopedError => ({
   scoped: true, op: m.startsWith(SYSTEM) ? m.slice(1) : m, reason: 'too-large', replicas,
-  hint: `${what} is bigger than one frame (${sizeOf(frame)}), so fero cannot send it: read one key at a time (methods.read(key)), or use a method that returns a smaller part`,
+  hint: keyed
+    ? `${what} is bigger than one frame (${sizeOf(frame)}), so fero cannot send it: read a smaller part of the row with a method that returns it`
+    : `${what} is bigger than one frame (${sizeOf(frame)}), so fero cannot send it: read one key at a time (methods.read(key)), or use a method that returns a smaller part`,
 })
 //! isTooLarge — is this thrown value the refusal above (a member's `rows` answer, in the gather)? Every read guarded:
 // a rejection can be anything
@@ -114,6 +118,11 @@ export interface Context {
 }
 
 type Handler = (arg: unknown, ctx: Context) => unknown
+//! KEYED — the handlers whose argument names one key: the built-in read and the system plane's read (a member's hop
+// to the key's owner). A too-large answer from one, given a key, tells the caller to read a smaller part of the row,
+// never to read one key at a time. Marked by the handler, not its name: a program's own `read` replaces the built-in.
+const KEYED = new WeakSet<Handler>()
+export const takesKey = <F extends Handler>(f: F): F => (KEYED.add(f), f)
 
 //! hosts — every Host in the process that has opened a live stream (a Host whose fero() never finished is
 // never added). data runs ONE runtime per process, so a function that throws in one resource's commit can stop
@@ -265,7 +274,7 @@ export class Host {
         if (err === FULL) {
           const frame = this.#rt.node.tune.frame
           this.#report(FULL, `refused a read whose answer is bigger than one frame, ${sizeOf(frame)} (methods.${m}) — the caller was told to read a smaller part`)
-          return this.#reply(link, id, false, tooLarge(m, this.#rt.node.replicas, frame, 'the answer'))
+          return this.#reply(link, id, false, tooLarge(m, this.#rt.node.replicas, frame, 'the answer', a != null && KEYED.has(fn)))
         }
         //! the reply's words are the local answer's (answer above): what stopped the value — a plain result or a view's
         // picture — by encodable's walk, asked only here, on the failure, so a reply that encodes pays nothing for it.
@@ -380,11 +389,12 @@ export class Host {
     if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
       result = await result
     await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
-    if (!isProxy(result)) return answer(m, result, this.#rt.node) // a plain value keeps the views it minted (#invoke's note)
+    const keyed = a != null && KEYED.has(fn)
+    if (!isProxy(result)) return answer(m, result, this.#rt.node, keyed) // a plain value keeps the views it minted (#invoke's note)
     //! a view data has stopped answers a frozen picture: refused, as for a remote call
     if (stopped(result)) { if (disposeMinted(result, minted)) reapStopped(); throw new Error(`methods.${m}: ${STOPPED_CALL}`) }
     //! the view minted for this call is dead once copied (I-29), and released even when the copy is refused
-    try { return answer(m, snapshot(result), this.#rt.node) } finally { if (disposeMinted(result, minted)) reapStopped() }
+    try { return answer(m, snapshot(result), this.#rt.node, keyed) } finally { if (disposeMinted(result, minted)) reapStopped() }
   }
 
   //! #end — end one live sub loudly: the caller's handle fails with the reason (Caller.#onResult: mode

@@ -701,14 +701,17 @@ test('a keyed gather reads only its own row, a refresh nobody reads builds no an
     scope: { entries: new Map() },
     versions: new Map(), state: new Map(),
   }
-  const rows = { c: { [JSON.stringify(['a'])]: { v: { x: 1 }, st: [1, 1, 'h1'] } }, att: ['a'] }
+  const rows = { c: { [JSON.stringify(['a'])]: { v: { x: 1 }, st: [1, 1, 'h1'] }, [JSON.stringify(['big'])]: { v: { s: 'x'.repeat(9000) }, st: [1, 2, 'h1'] } }, att: ['a', 'big'] }
   let h1: () => Promise<unknown> = async () => rows
-  const g = new Gather({ node: fake } as never, async (uuid: string) => (uuid === 'h1' ? h1() : { c: {}, att: ['a'] }) as never)
+  const g = new Gather({ node: fake } as never, async (uuid: string) => (uuid === 'h1' ? h1() : { c: {}, att: ['a', 'big'] }) as never)
   try {
     for (const key of ['constructor', 'toString', '__proto__', 'nope'])
       assert.equal(await g.refresh({ node: fake } as never, { throwOnPartial: true, key }), undefined, key)
     assert.deepStrictEqual(await g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'a' }), { x: 1 })
     assert.equal(await g.refresh({ node: fake } as never, { throwOnPartial: false, want: false }), undefined, 'no answer is built for nobody')
+    //! the last check: one row bigger than one frame, read by its key, is told to read a smaller part of the row
+    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'big' }), (e: ScopedError) =>
+      e.reason === 'too-large' && e.op === 'read' && /^the answer is bigger than one frame \(8 KiB\), so fero cannot send it: read a smaller part of the row with a method that returns it$/.test(e.hint))
     h1 = async () => { throw { scoped: true, op: 'rows', reason: 'too-large', replicas: 2, hint: 'the answer is bigger than one frame' } }
     await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'a' }), (e: ScopedError) => e.reason === 'too-large' && /this key is changing owner: retry in a moment$/.test(e.hint))
     //! the last check: the stored refusal, which the next live whole read hears, keeps the whole read's words
