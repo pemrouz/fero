@@ -388,6 +388,19 @@ export class Writes {
     if (this.pending.delete(a.issuer + '|' + a.cid)) { this.released++; if (a.sent < 0) this.#queued-- }
   }
 
+  //! dropVia (wave 6b, DECISIONS V4-NN) — a CLIENT link died at this relay (node.ts linkDown): every attempt it was
+  // relaying for that client leaves the queue, parked or in flight. The client's own queue is the source of truth —
+  // an attempt leaves it only at its WACK or WNACK, and a client that moved (a failover, or the move off a shut
+  // feeder) re-sends everything in flight to its next relay, where the owner's dedup absorbs what this relay already
+  // forwarded. What this relay still HELD would otherwise be forwarded at its next flush with nobody to answer: a
+  // feeder cut into the minority parked a client's write behind its gate, the client moved and the write committed at
+  // the majority, and after the heal the old feeder committed its parked copy again under its stale view — the second
+  // commit of one attempt (sim/feeder-shut.test.ts, scoped, every seed before this).
+  dropVia(link: number) {
+    if (this.pending.size === 0) return
+    for (const a of this.pending.values()) if (a.via === link) this.#remove(a)
+  }
+
   //! #remember — record a committed cid in the issuer's exact dedup window (oldest-first eviction), with
   // the lane count itself bounded: the oldest LANE evicts (journal-surfaced) past MAX_ISSUERS.
   #remember(node: Node, issuer: string, cid: number, s: number, e: number, o?: string, p?: string) {

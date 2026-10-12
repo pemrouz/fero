@@ -2162,3 +2162,27 @@ test("wave 6b — a server's PONG toward a CLIENT link carries its gate (w); tow
   c.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.PING) })
   assert.deepEqual(c.sentOn(1, VERB.PONG).map((f) => f.value), [undefined], "a client's PONG is bare: it has no gate")
 })
+
+test('wave 6b — a relay forgets what it held for a client whose link died: a write parked behind the shut gate leaves the queue at the linkDown (the client re-sends it to its next relay; a kept copy committed a second time after the heal); the client back on this relay re-sends and it is queued afresh', () => {
+  const h = harness('aa', { hosts: ['sim:bb'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'bb')
+  //! a four-member view with one member linked: two of four is no majority — the gate is shut, every relayed attempt parks
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc'], ['dd', 'sim:dd']] }) })
+  assert.equal(h.node.membership.gate(h.node).open, false, 'minority: the gate is shut')
+  h.admit(2, 'zz', 1)
+  const write = (link: number) => h.node.step({ kind: 'bytesIn', link, bytes: encodeRuns([{ rec: { type: REC.update, key: ['k'], value: 1 }, origin: 'zz~1', seq: 1, epoch: 0 }], VERB.WRITE, false)[0] })
+  write(2)
+  assert.equal(h.node.writes.pending.size, 1, 'parked behind the gate')
+  assert.equal(h.jk(JK.writeBuffered).length, 1)
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'feeder-shut' })
+  assert.equal(h.node.writes.pending.size, 0, 'the client is gone: nothing is held for it')
+  //! the client is back (a redial, a re-election of this relay): its re-send is queued afresh, under the new link
+  h.admit(3, 'zz', 1)
+  write(3)
+  assert.equal(h.node.writes.pending.size, 1)
+  assert.equal([...h.node.writes.pending.values()][0].via, 3)
+  //! a MEMBER link's death drops nothing: an attempt a member forwarded is its own to retry
+  h.node.step({ kind: 'linkDown', link: 1, reason: 'close' })
+  assert.equal(h.node.writes.pending.size, 1, "the member's linkDown left the client's attempt in place")
+})

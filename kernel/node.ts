@@ -855,6 +855,9 @@ export class Node {
         if (this.byUuid.get(link.uuid) === e.link) this.byUuid.delete(link.uuid)
         this.clientLinks.delete(link)
         this.#covered.delete(link)
+        //! a client's link died: what this relay still held for it leaves the queue (wave 6b, write.ts dropVia) — the
+        // client re-sends what it has in flight to its next relay, and a copy kept here would commit a second time
+        if (link.client && link.state === LS.admitted) this.writes.dropVia(link.id)
         //! a bare close while PROVING — before or after my proof — is a LINK LOSS, not a refusal (DESIGN-DOOR
         // §3, settled at the third review): the door speaks only through DOOR {e}, and a peer that refused
         // me sent one. A crash, a cut or a reset mid-handshake looks exactly like this close, and with
