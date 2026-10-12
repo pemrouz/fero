@@ -561,6 +561,18 @@ export class Node {
     return !!b && !b.gaveUp && !b.parked
   }
 
+  //! #refused — the DIALED targets that refused this node as a stranger (DESIGN-DIRECTORY §13, 2026-10-12): the
+  // address I dialed answered for another name, another cluster contract, or at the door (no secret where I have one,
+  // a secret where I have none, the address rule, a proof refused). Such a target can never be admitted here and so
+  // can never be in a view with me; genesis (kernel/membership.ts) stops counting it toward `links >= hosts`, where
+  // before a squatter the directory handed out held the first view for good. Only MY dial's outcome at the address I
+  // dialed counts — never a claim on an accepted link (a stranger that can connect could otherwise name a real
+  // member's listen and shrink the count), and never a target that merely never answers (a closed port, a cut: dead
+  // and cut look the same from here, and two halves of one host list must never each form a genesis view). An entry
+  // leaves when the target admits (#admit: a fixed secret or config heals it) or the directory forgets it (discover).
+  #refused = new Set<string>()
+  refused(to: string): boolean { return this.#refused.has(to) }
+
   //! #revivable — the give-up revival target set: static hosts ∪ committed-view member listens (a
   // joiner learned via a VIEW is as entitled to revival as a configured host — it may OWN partitions).
   // The value says whether the target is a committed member's listen: a revived MEMBER keeps the
@@ -630,6 +642,7 @@ export class Node {
           for (const [id, m] of this.#timers) if (m.tag === TAG.redial && m.to === to) { this.#timers.delete(id); this.env.sink.cancel(id) }
           if (covered(to) || this.dialing(to)) this.#backoff.set(to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true, parked: true })
           else this.#backoff.delete(to)
+          this.#refused.delete(to) // the directory forgot it: a refusal remembered for nothing the node dials
         }
         for (const to of next) {
           if (prev.has(to) || statics.has(to)) continue
@@ -966,7 +979,7 @@ export class Node {
           if (link === undefined || link.dead || link.state !== LS.proving) return
           link.proveTimer = -1
           j.armed && j.emit(JK.doorReject, link.id, 'timeout', link.to ?? '')
-          this.#refuse(link, 'door-timeout')
+          this.#refuse(link, 'door-timeout', false)
         }
         else if (meta.tag === TAG.heartbeat) {
           //! watchClients: close every client link silent past the bound, then PING the rest of them below
@@ -1554,8 +1567,8 @@ export class Node {
     // listen: when the peer dialed us while our own chain to it was mid-backoff (or a dup-race left
     // our dialed link the loser), the listen-keyed entry would otherwise orphan with gaveUp unset,
     // reporting dialing() forever and permanently holding eviction (review finding)
-    if (link.to) this.#backoff.delete(link.to)
-    if (v.l) this.#backoff.delete(v.l)
+    if (link.to) { this.#backoff.delete(link.to); this.#refused.delete(link.to) }
+    if (v.l) { this.#backoff.delete(v.l); this.#refused.delete(v.l) }
     j.armed && j.emit(JK.identified, link.id, v.u, v.i)
     //! digest-on-admit, ONE opener: the LOWER uuid sends the r=1 digest, the higher answers r=0
     // (2026-10-06). The rule is direction-independent — it asks who sorts lowest, never who dialed
@@ -1624,9 +1637,15 @@ export class Node {
   // GIVEN-UP — never a redial chain (that would hammer a misconfigured or hostile port) — so the heartbeat's
   // give-up revival re-dials it once per heartbeat while it stays in hosts ∪ view: a fixed secret, a fixed
   // config or a resource that moves onto the right port heals at heartbeat cadence. The caller journals.
-  #refuse(link: Link, reason: string) {
+  //! `stranger`: the target proved it is not one of us (every refusal but a proving timeout — a lost frame, maybe a
+  // member — and a `uuid-taken` notice, which says the far side holds a member running as me): a DIALED target is then
+  // remembered in #refused, so genesis stops waiting for it.
+  #refuse(link: Link, reason: string, stranger = true) {
     link.dead = link.noRedial = true
-    if (link.dialed && link.to) this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
+    if (link.dialed && link.to) {
+      this.#backoff.set(link.to, { ms: this.#opts.redialMs ?? 100, tries: this.tune.redials, gaveUp: true })
+      if (stranger) this.#refused.add(link.to)
+    }
     this.env.sink.close(link.id, reason)
   }
 
@@ -1779,7 +1798,7 @@ export class Node {
             return this.env.sink.close(link.id, 'malformed-door')
           }
           j.armed && j.emit(JK.doorReject, link.id, v.e === 'uuid-taken' ? 'uuid-taken' : 'refused', link.to ?? '')
-          return this.#refuse(link, 'door')
+          return this.#refuse(link, 'door', v.e !== 'uuid-taken')
         }
         if (typeof v?.p !== 'string' || v.p.length !== PROOF_LEN) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed door')
