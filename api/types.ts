@@ -127,12 +127,14 @@ export interface FeroConfig {
   rendezvous?: string | false
   //! dir — the folder for the write-ahead log and the boot record (durable mode). One process at a time (wave 6b): a
   // node holds its dir with a `lock` file naming its pid, host, boot id, pid namespace and start time, and touches it
-  // every half second; a second process that opens the dir while the first holds it is refused at fero() with an error
-  // whose `code` is 'dir-held' and whose `pid` and `host` name the holder; a clean stop or the process exit releases it;
-  // a lock a crashed process left is taken over once that process is gone (a dead or reused pid, a rebooted box; a
-  // holder in another container cannot be checked by its pid and is stale once its lock went four seconds untouched, so
-  // a container that restarts waits up to that long); a lock from another machine is never taken over (the message says
-  // to remove it by hand once that machine is gone).
+  // every half second from a thread of its own (a long WAL replay never starves the touch); a second process that opens
+  // the dir while the first holds it is refused at fero() with an error whose `code` is 'dir-held' and whose `pid` and
+  // `host` name the holder; a clean stop or the process exit releases it; a lock a crashed process left is taken over
+  // once that process is gone (a dead or reused pid, a rebooted box; a holder in another container cannot be checked by
+  // its pid and is stale once its lock went four seconds untouched, so a container that restarts waits up to that long,
+  // and a process frozen or paused longer than that can lose its lock to a starter in another container — it says so
+  // on stderr once it runs again); a lock from another machine is never taken over (the message says to remove it by
+  // hand once that machine is gone).
   dir?: string
   //! heartbeat.ms (V4-10 spelling; was heartbeatMs) — the one clock: pings, membership ticks, the write
   // retry clock, compaction and WAL-snapshot arming all run on it. 500 by default; 0 = off (an

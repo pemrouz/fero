@@ -8,9 +8,10 @@
 // seconds at the moment it puts its record in place, printing `putting`; `look-slow` sits three seconds after its first
 // look at a stale lock, printing `looked` (all three below); `nolink`
 // runs on a filesystem without hard links (linkSync refused), and `nolink-slow` on top sits one second between the
-// create of the empty lock and the write of its record (the gap a second opener may meet there); `touch` opens nothing:
-// it plays a holder in another pid namespace, touching the dir's `lock` every 100 ms until Ctrl-C (the lease). Not a
-// test file (the battery's glob is tests/*.test.ts).
+// create of the empty lock and the write of its record (the gap a second opener may meet there); `boot-slow` blocks the
+// main thread six seconds right after the lock is taken (at the wal.log open: a long WAL replay), printing `booting` as
+// it enters the block; `touch` opens nothing: it plays a holder in another pid namespace, touching the dir's `lock`
+// every 100 ms until Ctrl-C (the lease). Not a test file (the battery's glob is tests/*.test.ts).
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -50,6 +51,13 @@ if (mode === 'look-slow') {
   const read = fs.readFileSync
   let first = true
   fs.readFileSync = ((p: fs.PathOrFileDescriptor, o?: unknown) => { const r = read(p, o as BufferEncoding); if (first && String(p).endsWith('/lock')) { first = false; console.log('looked'); nap(3000) } return r }) as typeof fs.readFileSync
+}
+//! `boot-slow`: blocks the main thread 6 s at the wal.log open, right after the lock is taken (what a long WAL replay
+// does), printing `booting`: a second container that starts in that window must still be refused — the lease is held
+// from a thread of its own, never from a timer on the blocked loop
+if (mode === 'boot-slow') {
+  const open = fs.openSync
+  fs.openSync = ((p: fs.PathLike, flags?: fs.OpenMode, m?: fs.Mode) => { if (String(p).endsWith('/wal.log')) { console.log('booting'); nap(6000) } return open(p, flags, m) }) as typeof fs.openSync
 }
 if (mode === 'nolink' || mode === 'nolink-slow') {
   fs.linkSync = () => { throw Object.assign(new Error('ENOTSUP: no hard links here'), { code: 'ENOTSUP' }) }
