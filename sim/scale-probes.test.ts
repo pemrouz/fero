@@ -23,11 +23,11 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed, client, writes } from './harness.ts'
-import { armScale, ledgerOf, stampOracle, floorsAgree, boundedLogs, converged, scopedConverged, exactlyR, screenMatches, spokeMirror, spokeStale } from './monitors.ts'
+import { armScale, ledgerOf, stampOracle, floorsAgree, boundedLogs, converged, scopedConverged, exactlyR, screenMatches, spokeMirror, spokeStale, laneUniqueCounts } from './monitors.ts'
 import { mesh, join, frameTally, perTick, inject, type MeshOpts } from './scoped-sweep.ts'
 import { LS } from '../kernel/link.ts'
 import { Ring } from '../kernel/ring.ts'
-import { VERB } from '../kernel/codec.ts'
+import { VERB, encodeControl, encodeRuns } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
 import { REC } from '../kernel/env.ts'
@@ -818,6 +818,50 @@ test('KNOWN (STATUS): the vanish-and-return at a resync ending across the fold �
     assert.equal(screenMatches(sim, 's1'), null, `seed ${seed} off ${off}: screen = kernel`)
     void s1
   }
+})
+
+// ── the lane rule (wave 6b, 2026-10-12) ─────────────────────────────────────────────────────────
+
+//! THE LANE RULE: a lane holds each (origin, seq) once. The wave-6a review's probe (kernel/scoped.test.ts 'THE LANE RULE'):
+// a teacher record ABOVE the cut (an entry above the teacher's own floor) that also staged live during the latch was
+// spliced by the fold and appended again by the live replay — the fold raised the fence only to the cut, and the fast
+// path appends on `seq > applied` alone. Here the same frames drive the kernel's own fold on a FORMED sim node (n01,
+// a holder of a partition n02 owns, fed from n02's admitted link id), and the per-event monitors read the lane at the
+// next pass: on the tree before the fix lane-unique fires ("n01 lane n02 holds seq 7 TWICE (at 2 and 3; epochs 1 and 1)
+// — the lane rule") and log-monotone beside it ("7 after 7"); now the lane is [3, 5, 7], the fence 7, no monitor fires.
+// Why hand-fed frames: the shape needs a teacher whose floor lags its lane at the moment it teaches, and the sweep's
+// repairs close such a lag within one round trip — at FERO_SCOPED_SEEDS=8 none of the sweep's 4,646 folds had a
+// teacher record above the cut (measured with the fence rise switched off), so no seeded schedule makes it. The
+// monitor-walk suite plants an interior copy for the monitor's own rescan rule.
+test('the lane rule in a sim: the review\'s probe frames on a formed scoped node — the fold splices bb#7 above the cut, the staged live copy drops on the dual fence, the lane is [3, 5, 7] with the fence at 7, and no monitor fires (lane-unique and log-monotone fired on the tree before the fix)', () => {
+  const ids = ['n01', 'n02', 'n03']
+  const p = keyFor('lane', (h) => { const x = h(ids, 2); return x[0] === 'n02' && x[1] === 'n01' })
+  const sim = new Sim(5)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, replicas: 2, fault: { delay: [1, 3] } })
+  sim.run({ until: 1500 })
+  assert.ok(formed(nodes) && nodes.every((n) => n.armed), 'formed and armed')
+  const L = nodes[0]
+  const link = L.byUuid.get('n02')!
+  const e = L.epoch
+  const rec = (f: string, v: number) => ({ type: REC.update, key: [p, f], value: v })
+  const one = (verb: number, seq: number, f: string, v: number, pp: number) => encodeRuns([{ rec: rec(f, v), origin: 'n02', seq, epoch: e, pp }], verb, true)[0]
+  //! n02 announces p at floor 5 on its lane: n01, assigned and entry-less, latches it; n02#7 then arrives LIVE and stages
+  L.step({ kind: 'bytesIn', link, bytes: encodeControl(VERB.HAVEQ, { e, q: { [p]: { n02: 5 } } }) })
+  assert.equal(L.scope!.entries.get(p)?.state, SCOPE.acquiring, 'the latch opened on n02')
+  L.step({ kind: 'bytesIn', link, bytes: one(VERB.RECORDS, 7, 'c', 3, 5) })
+  //! the teacher ships what it holds — 3, 5 and 7 — with its floor 5 as the cut: 7 is above the cut
+  L.step({ kind: 'bytesIn', link, bytes: one(VERB.ACQ, 3, 'a', 1, 0) })
+  L.step({ kind: 'bytesIn', link, bytes: one(VERB.ACQ, 5, 'b', 2, 3) })
+  L.step({ kind: 'bytesIn', link, bytes: one(VERB.ACQ, 7, 'c', 3, 5) })
+  L.step({ kind: 'bytesIn', link, bytes: encodeControl(VERB.ACQDONE, { p, e, t: { n02: 5 }, n: 3 }) })
+  assert.equal(count(L, JK.acquire), 1, 'the fold committed')
+  sim.run({ until: sim.now + 20 }) // the first pass after run() entry reads every node (the next event is within a few ms)
+  assert.deepEqual(L.logs.get('n02')!.map((x) => x.seq), [3, 5, 7], 'the lane holds 7 once ([3, 5, 7, 7] before the fix)')
+  assert.equal(L.streams.get('n02')!.applied, 7, 'the fence is at the lane\'s tail')
+  assert.equal(L.streams.get('n02')!.parts!.get(p)!.s, 5, 'the floor is the cut')
+  assert.deepEqual(sim.violations.map((v) => `${v.monitor}: ${v.detail}`), [], 'no monitor fired (lane-unique and log-monotone both named the second 7 before the fix)')
+  const counts = laneUniqueCounts(sim)!
+  assert.ok(counts.pairs >= 2 && counts.lanes >= 1, `the lane rule compared ${counts.pairs} pairs over ${counts.lanes} lane scans — it read this lane`)
 })
 
 // ── the counted floors, recorded from today ─────────────────────────────────────────────────────
