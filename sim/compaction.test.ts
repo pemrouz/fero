@@ -12,6 +12,12 @@
 //             below its content and latches a holder for rows it holds.
 //   spoke     a client of a scoped server across its feeder's passes: zero resyncs (C4 keeps the lane's last entry,
 //             so the feeder's digest tail never regresses), the spoke mirrors its feeder (M12), screen = kernel.
+//   slow disk a durable co-holder whose fsync lags by seconds: its possession floors run seconds ahead of its
+//             durable ones under writes, the frontier for its partitions pins at its DURABLE floor while the other
+//             partitions compact, and M2 judges every pass against the holders' real crash-stable floors (a durable
+//             holder at pe.d). This is the §6 mutation "volatile instead of durable floors (A4)" given a schedule the
+//             sweep lacks: A4's writes land in its first 600 ms under a 40-80 ms fsync delay, so every pass there
+//             runs after the lagging disk caught up and the mutation goes unseen.
 // The counted pin P4 (50,000 updates over 500 cells at n=8 R=3) lives in sim/scale.perf.ts with the other
 // expensive counted pins: it takes about a minute here.
 
@@ -20,7 +26,7 @@ import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { formed } from './harness.ts'
 import { mesh, type MeshOpts } from './scoped-sweep.ts'
-import { scopedConverged, exactlyR, floorsAgree, spokeMirror, screenMatches } from './monitors.ts'
+import { scopedConverged, exactlyR, floorsAgree, spokeMirror, screenMatches, boundedLanes } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
 import { REC } from '../kernel/env.ts'
 import { SCOPE } from '../kernel/scope.ts'
@@ -87,4 +93,36 @@ test('a client on a scoped server across a compaction pass: zero resyncs (the la
   assert.equal(spokeMirror(sim, 's1'), null, 'M12: the spoke holds exactly its feeder\'s held subset')
   assert.equal(screenMatches(sim, 's1'), null)
   assert.deepEqual(sim.violations, [])
+})
+
+//! The slow-disk schedule (the §6 "volatile instead of durable floors" mutation, A4's class). Mutation check, once, by
+// hand (2026-10-12): kernel/scope.ts stableMarks returning e.marks.get(uuid) for every peer — this test red at
+// 'M2 ...' ("n01 compacted (n01, N) of 'cM' while holder n03's real floor for that lane is F — below the frontier"),
+// sim/scoped-sweep.test.ts A4 green at both its seeds (the schedule gap named in the banner).
+test('a durable co-holder whose fsync lags by seconds: the frontier for its partitions pins at its DURABLE floor while the others compact, M2 judges every pass at the holders\' crash-stable floors, and the pinned partitions compact once the disk catches up', () => {
+  const sim = new Sim(34)
+  const o: MeshOpts = { replicas: 2, durable: true, hb: 50, tune: { compactAt: 16, snapshotAt: 16 }, fault: { delay: [1, 1] } }
+  const nodes = mesh(sim, 3, o)
+  sim.run({ until: 1500 })
+  assert.ok(formed(nodes) && nodes.every((n) => n.armed), 'armed')
+  const slow = nodes[2]
+  sim.storeFault(slow.uuid, { delay: [1500, 2000] }) // every fsync at n03 answers 1.5-2 s late from here on
+  //! non-vacuity: passes that dropped entries somewhere while n03's durable floors were behind its possession floors
+  const compactions = () => nodes.reduce((a, n) => a + count(n, JK.compacted), 0)
+  const behind = () => [...slow.streams].some(([, d]) => [...(d.parts ?? [])].some(([, pe]) => pe.d < pe.s))
+  let lagged = 0, rows = 0
+  sim.monitors.push({ name: 'lag-at-pass', check: () => { const c = compactions(); if (c > rows) { rows = c; if (behind()) lagged++ } return null } })
+  hot(sim, nodes, 6, 240, 3)
+  sim.run({ until: sim.now + 1200 }) // the writes (720 ms) and the passes they arm, all inside n03's fsync lag
+  assert.ok(lagged > 0, `${lagged} passes dropped entries while ${slow.uuid}'s durable floors were behind its possession floors`)
+  assert.ok(behind(), 'n03 is still behind its own possession floors: its disk has not answered yet')
+  assert.deepEqual(sim.violations, [], 'M2: every drop at or under every holder\'s crash-stable floor (n03 at its durable one)')
+  sim.run({ until: sim.now + 4000 }) // the disk answers: n03's durable floors reach its possession floors
+  assert.equal(behind(), false, 'n03 caught up')
+  assert.ok(count(slow, JK.compacted) > 0, `n03 compacted on its own durable floor (${count(slow, JK.compacted)} rows)`)
+  assert.equal(boundedLanes(sim), null, 'every lane at every node within winners + compactAt')
+  assert.deepEqual(sim.violations, [])
+  assert.equal(scopedConverged(sim), null)
+  assert.equal(exactlyR(sim), null)
+  assert.equal(floorsAgree(sim), null)
 })
