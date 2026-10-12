@@ -37,6 +37,7 @@ import type { Sim } from './exec.ts'
 //   one-view-per-epoch      LOCAL   the node's view, into a first-seen-per-epoch memory
 //   epoch-monotone          LOCAL   the node's epoch, against its own last
 //   log-monotone            LOCAL   the node's lane tails, by cursor
+//   lane-unique             LOCAL   the node's lanes, by tail identity (the whole lane when the last entry moved or the array changed)
 //   single-writer           LOCAL   the node's lane tails, into a writer-per-(partition, epoch) memory
 //   attempt-exactly-once    LOCAL   the node's lane tails, into a commit-per-attempt memory
 //   watermark-monotone      LOCAL   the node's applied marks, against its own last
@@ -189,7 +190,9 @@ export const perEvent = () => [
     // reads a lane's interior. Found by the wave-6a review: the fold spliced a teacher record above the cut and the
     // live replay appended it again (lane bb at aa [3, 5, 7, 7]); fixed in kernel/scope.ts onAcqDone (the fence rises
     // to the fold's top). Counted: `counts.pairs` is the neighbouring pairs compared, `counts.lanes` the lane scans
-    // (laneUniqueCounts reads them).
+    // (laneUniqueCounts reads them). The limit (the third review, 2026-10-12): an in-place rewrite that keeps the
+    // array, its length AND its last entry is seen by no per-event monitor — the tail stands, so the lane is not read
+    // again — so a rewrite of a lane must replace the array (compact() builds a new one) or bring its own check.
     ...(() => {
       const counts = { lanes: 0, pairs: 0 }
       const tails = new Map<string, Map<string, { node: Node; arr: unknown; len: number; last: unknown }>>()

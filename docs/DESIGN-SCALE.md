@@ -1461,8 +1461,13 @@ later plant step.
 *For stage 3.* Compaction may assume a lane holds each seq once and the
 fence covers the tail. A rewrite that kept a copy at the tail or
 replaced the array is named by log-monotone and lane-unique both at the
-next pass; a copy an in-place rewrite left anywhere in the interior,
-beside its original or not, is named by lane-unique alone.
+next pass; a copy an interior insert put anywhere, beside its original
+or not, is named by lane-unique alone, because the insert moved the last
+entry. The limit (the third review): an in-place rewrite that keeps the
+array, its length and its last entry is seen by NO per-event monitor —
+lane-unique skips a lane whose tail stands, and M4 reads the entries, not
+their order — so a rewrite of a lane must replace the array (compact()
+builds a new one) or bring its own check.
 
 ## §0 The decision, in ten lines
 
