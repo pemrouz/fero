@@ -57,7 +57,7 @@
 // 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { meshState, evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, keptBallotProposerGone, openerBesideSuspect, ownHoldProposerGone, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { stopsOneByOne, meshState, evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, keptBallotProposerGone, openerBesideSuspect, ownHoldProposerGone, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
@@ -765,4 +765,22 @@ test('leave harness, explorer: 300 seeded random schedules (2001..2300) over rea
   const bad: string[] = []
   for (let seed = 2001; seed <= 2300; seed++) { const o = exploreQuiet(seed); if (o.bad) bad.push(`seed ${seed} n=${o.n}: ${o.bad}`) }
   assert.deepEqual(bad, [])
+})
+
+//! one-at-a-time clean stops (wave 6b, 2026-10-12; DESIGN-LEAVE §10.7's note of the same day): the shape the platform
+// spikes found (STATUS: "After every member stops cleanly one at a time, only the last to stop can bring the cluster
+// back"). Pinned as TODAY'S behaviour, on purpose — the argument in the note says no kernel rule can re-form the first
+// two without the last safely: the last view any of them committed is {n03}@3, whose only voter is n03; a re-form
+// without its vote splits the moment n03 comes back from its dir and self-ballots its solo view (dead and down look the
+// same from here). The remedy is the operator's word, specified there and not built here. Every other combination is
+// live, and no shape ever shows two views at one epoch.
+test('leave harness, one-at-a-time clean stops: three durable members stop cleanly in turn (each leave clean; the boot records {n02,n03}@2, {n03}@3, {n03}@3) — the first two back with the last down sit `joining` at {n03}@3 for good; all three back are writable at 5; the last two at 4; the last alone at 4; no monitor fires', () => {
+  const a2 = stopsOneByOne(['n01', 'n02'])
+  assert.deepEqual(a2.left, [true, true, true], 'every stop was clean (the last had nothing to leave)')
+  assert.deepEqual(a2.boots, ['n01:2{n02,n03}', 'n02:3{n03}', 'n03:3{n03}'], 'each leaver\'s disk holds the view it saw last — one it is not in')
+  assert.deepEqual(a2.ends, ['n01@3{n03}r:joining', 'n02@3{n03}r:joining'], 'outside the last view they know, with nobody of it to join through')
+  assert.equal(a2.violations, 0)
+  assert.deepEqual(stopsOneByOne(['n01', 'n02', 'n03']).ends, ['n01@5{n01,n02,n03}W', 'n02@5{n01,n02,n03}W', 'n03@5{n01,n02,n03}W'], 'the last member confirms its solo view; the other two join it, one ballot each')
+  assert.deepEqual(stopsOneByOne(['n02', 'n03']).ends, ['n02@4{n02,n03}W', 'n03@4{n02,n03}W'])
+  assert.deepEqual(stopsOneByOne(['n03']).ends, ['n03@4{n03}W'], 'the rejoin self-ballot of a solo view')
 })

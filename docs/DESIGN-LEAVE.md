@@ -1714,6 +1714,50 @@ even though at R=1 its rows go with it" (V4-38's note). Two changes in `kernel/m
   The README's Membership bullet and the `replicas` row, and `api/types.ts`'s `undrained`, say the count is honest
   and name the two words.
 
+**2026-10-12, one-at-a-time clean stops: decided, not changed (wave 6b).** The platform spikes found
+(`~/.claude/plans/fero-platform/spikes/local/r2/`, restart-all a2) that after every member stops cleanly one at a
+time, only the last to stop can bring the cluster back. Reproduced on the sim (`sim/leave-harness.ts`
+`stopsOneByOne`) and on real sockets and WALs (`tests/stops.test.ts`): three durable members, aa then bb then cc
+stop cleanly (every verdict true; cc, the last, has nothing to leave). The dirs hold {bb,cc}@2, {cc}@3 and {cc}@3 —
+each leaver's the view it saw last, one it is not in. aa and bb back with cc down: both at {cc}@3 `joining`, for
+good, taking no write; all three back: writable at 5 (cc confirms its solo view, the other two join, one ballot
+each); the last two: writable at 4; cc alone: writable at 4 (the rejoin self-ballot). Pinned as today's behaviour.
+
+*The rule asked for — "a restarted leaver that finds nobody and holds a boot record from a view it left re-forms
+with the others that left after it, by the last view any of them committed" — is unsafe, and no kernel rule is
+safe here.* The last view any of them committed is {cc}@3, and its only voter is cc; a ballot joint over it
+(V4-55's shape) needs cc, which is exactly today's wedge. A ballot NOT joint over it — a genesis-style re-form by
+aa and bb over the admitted set at the next epoch — commits two views at one epoch the moment cc comes back from
+its dir: cc restores {cc}@3 rejoining, finds nobody for `rejoinTicks` (or is cut from the pair), and self-ballots
+{cc}@4, writable alone, beside {aa,bb}@4; and equal-epoch VIEWs with other members are ignored on both sides, so
+the two clusters never merge (one view per epoch is the safety rule). From aa's and bb's seat "cc is gone for
+good" and "cc is down for an hour" are the same fact, as a dead member and a cut one are everywhere in this record
+(§7, §10.10.4, the genesis gate's note in DESIGN-DIRECTORY §13). The chain of clean leaves shrinks the views until
+the last member holds all the authority; that is what makes two clean stops survivable at three members (V4-6),
+and it is what makes the last member the only one who can continue. A kill of all three leaves {aa,bb,cc}@1 on
+every dir, and any two re-form (b2 in the spike): the joint-majority arithmetic protects that case, and the leave
+chain spends it on purpose.
+
+Two kernel-side variants were weighed and refused: a leaver's dir keeping the view it was LAST IN (then aa's
+self-ballot over {aa,bb,cc} needs bb, whose dir says {bb,cc}@2 and who refuses a ballot at 2; bb's own self-ballot
+over {bb,cc} needs cc — the chain still ends at cc); and the last member's solo stop writing a "dissolved" record
+(aa and bb never see cc's dir).
+
+*The remedy is the operator's word, and it is specified here to be built by its own decision* (it changes the
+deployment story in the README and touches the config and composer layers): `reform` — a flag for a restart
+(`--fero.<name>.reform`, `FERO_<NAME>_REFORM=1`, the call; never the project file: it is a one-time act) that says
+"the members not here are gone for good". A restored node started with it, whose boot view does not hold it,
+proposes a genesis-style ballot over the members it has admitted, at one past the highest epoch any of them knows,
+with an EMPTY old set — so it commits on the new set's majority alone (aa + bb), as genesis does — and the others
+install it as any higher view. Its hazard is the operator's: a member declared gone that comes back cut from the
+rest self-ballots its own view, and the two sides never merge; one that comes back linked installs the new view,
+is evicted and rejoins, and its data merges on the data plane as any member's does. The same word is the remedy
+STATUS already names for the crash-at-two class and for V4-55's three frozen shapes ("forget the dead"), given a
+spelling. What it does not need: a change to any ballot rule, a frame, or the boot record.
+
+*The STATUS line stays, reworded to the decision:* the shape is pinned, the automatic re-form is refused for the
+reason above, the operator's word is the fix and is not built.
+
 ### §10.8 The harness (`sim/leave-harness.ts`, `sim/leave-harness.test.ts`): the floor, and the teeth
 
 The families, rebuilt from the reports (every one asserts the split check and the monitors; liveness is

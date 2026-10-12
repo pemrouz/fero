@@ -1526,6 +1526,36 @@ export const runC = (s: ScheduleC): string[] => {
 }
 export const shapeC = (s: ScheduleC) => `${s.seed} n=${s.n} crash=${s.crashed}@${s.offset} back=${s.back} leavers=${s.leavers} restart=${s.restart}`
 
+// ── one-at-a-time clean stops, then a restart of some of them (wave 6b, 2026-10-12; the platform spikes' r2/restart-all) ──
+//! stopsOneByOne — three durable members form; each stops cleanly in turn and is torn down (cut from everyone, kept in the
+// sim so it can restart from its dir); then the members in `back` restart from their dirs and heal to each other, the
+// others stay down. Each leaver's boot record is the view it saw last: n01's says {n02,n03}@2, n02's {n03}@3, and n03,
+// the last, stops as a solo (nothing to leave: no ballot) with {n03}@3. Returns each member's end state and the sim's
+// violations. The shape STATUS names: with the first two back and the last still down, both are outside the last view
+// they know and can get back in only through a live member of it — n03 — so they sit read-only for good. Every other
+// combination is live: all three (the last member confirms the view, the other two join), the last two, the last alone.
+export const stopsOneByOne = (back: string[], seed = 3): { ends: string[]; violations: number; left: (boolean | undefined)[]; boots: string[] } => {
+  const sim = new Sim(seed)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, durable: true, fault: { delay: [3, 3] } })
+  sim.run({ until: 800 })
+  if (!nodes.every((x) => x.epoch === 1)) throw new Error('never formed')
+  const ids = nodes.map((x) => x.uuid)
+  const left: (boolean | undefined)[] = [], boots: string[] = []
+  for (const u of ids) {
+    sim.post(u, { kind: 'leave' })
+    for (let t = sim.now; t <= sim.now + 3000; t += 5) { sim.run({ until: t }); if (sim.left.has(u)) break }
+    const x = sim.nodes.get(u)!
+    left.push(sim.left.get(u))
+    boots.push(`${u}:${x.epoch}{${members(x)}}`)
+    for (const o of ids) if (o !== u) sim.partition(u, o)
+    sim.run({ until: sim.now + 300 })
+  }
+  for (const u of back) { sim.restart(u); for (const o of back) if (o !== u) sim.heal(u, o) }
+  sim.run({ until: sim.now + 8000 })
+  const ends = back.map((u) => { const x = sim.nodes.get(u)!; const g = x.membership.gate(x); return `${u}@${x.epoch}{${members(x)}}${g.open ? 'W' : 'r:' + g.reason}` })
+  return { ends, violations: sim.violations.length, left, boots }
+}
+
 // ── explorer: the random mesh over real Nodes with the quiet-point split check ──
 export interface OutcomeX { seed: number; n: number; bad: string | null }
 export const exploreQuiet = (seed: number, steps = 400): OutcomeX => {
