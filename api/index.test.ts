@@ -655,8 +655,10 @@ test('the door: two members with DIFFERENT secrets never link — the acceptor j
   })
   //! one line per peer and reason, however many revivals wrote the row again
   assert.equal(lines.filter((l) => /^fero\('doorkeys'\): refused a peer that connected as 127\.0\.0\.1:\d+ — its secret differs from this node's$/.test(l)).length, 1, `aa printed once, naming the listen bb CLAIMED (aa accepted this link): ${JSON.stringify(lines)}`)
-  //! bb's row is the NOTICE's (DOOR {e: 'denied'}, read on the real socket before aa's close), so its line says so; a bare close would print nothing
-  assert.equal(lines.filter((l) => l === `fero('doorkeys'): refused 127.0.0.1:${p} — it refused this node's proof (the secrets probably differ)`).length, 1, `bb printed once: ${JSON.stringify(lines)}`)
+  //! bb's row is the NOTICE's (DOOR {e: 'denied'}, read on the real socket before aa's close), so its line says so; a bare close would print nothing.
+  // bb holds no view and aa is its one host, so the line also says the first view waits on it (DESIGN-DIRECTORY §13: a door
+  // refusal keeps the target in the genesis count, loudly)
+  assert.equal(lines.filter((l) => l === `fero('doorkeys'): refused 127.0.0.1:${p} — it refused this node's proof (the secrets probably differ) — the first view waits on it`).length, 1, `bb printed once: ${JSON.stringify(lines)}`)
   assert.equal(lines.length, 2, `nothing else: ${JSON.stringify(lines)}`)
   assert.ok(!lines.join('\n').includes(S1) && !lines.join('\n').includes(S2), 'no secret in a line')
 })
@@ -808,6 +810,9 @@ test('the printer says the SIDE, not the link table (the third review\'s minor):
       //! bb dials aa and the raw host; the host holds its answer until aa is admitted at bb, then claims aa's uuid as a client
       b = await fero('doorside', { uuid: 'bb', server: true, hosts: [`127.0.0.1:${p}`, x.addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
       assert.ok(await until(() => 'aa' in view(b!).peers, 8000), 'bb admitted aa over its dialed link')
+      //! and the pair has FORMED before the host answers: a member that holds no view yet says "the first view waits on it"
+      // on every refusal of a dialed host (DESIGN-DIRECTORY §13), which is not this test's line
+      assert.ok(await until(() => Object.keys(view(b!).members).length === 2, 8000), 'the pair formed')
       release()
       assert.ok(await until(() => doorRows(b!).length >= 1, 8000), 'bb refused the host')
       assert.deepEqual(doorRows(b!)[0], ['uuid-taken', 'aa'], 'the refusing side\'s row on a DIALED link: c is the uuid the host claimed')

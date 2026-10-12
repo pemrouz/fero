@@ -6,42 +6,42 @@ Terminals 1 and 2, one member each, the same secret in the environment of both �
 ```
 $ cd examples/18-secret
 $ FERO_SECRET=wnxH+ZDVQyfo9xZAS/1cwBu0caZpkD+t node server.ts 4801 4802
-{ '3114061': 'member' }
-MEMBER 3114061 on 127.0.0.1:4801 — members 0
-{ '3114061': 'member', '3114062': 'member' }
-MEMBER 3114061 on 127.0.0.1:4801 — members 2
+{ '51577': 'member' }
+MEMBER 51577 on 127.0.0.1:4801 — members 0
+{ '51577': 'member', '51578': 'member' }
+MEMBER 51577 on 127.0.0.1:4801 — members 2
 fero('vault'): refused a peer that connected as 127.0.0.1:4803 — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT
-{ '3114061': 'member', '3114062': 'member', '3114180': 'member' }
-MEMBER 3114061 on 127.0.0.1:4801 — members 3
+{ '51577': 'member', '51578': 'member', '51710': 'member' }
+MEMBER 51577 on 127.0.0.1:4801 — members 3
 ```
 
 ```
 $ FERO_SECRET=wnxH+ZDVQyfo9xZAS/1cwBu0caZpkD+t node server.ts 4802 4801
-{ '3114062': 'member' }
-MEMBER 3114062 on 127.0.0.1:4802 — members 0
-{ '3114061': 'member', '3114062': 'member' }
-MEMBER 3114062 on 127.0.0.1:4802 — members 2
+{ '51578': 'member' }
+MEMBER 51578 on 127.0.0.1:4802 — members 0
+{ '51577': 'member', '51578': 'member' }
+MEMBER 51578 on 127.0.0.1:4802 — members 2
 fero('vault'): refused a peer that connected as 127.0.0.1:4803 — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT
-{ '3114061': 'member', '3114062': 'member', '3114180': 'member' }
-MEMBER 3114062 on 127.0.0.1:4802 — members 3
+{ '51577': 'member', '51578': 'member', '51710': 'member' }
+MEMBER 51578 on 127.0.0.1:4802 — members 3
 ```
 
 Terminal 3, over two runs — the same file without the secret, then with it:
 
 ```
 $ node server.ts 4803 4801 4802
-{ '3114100': 'member' }
-MEMBER 3114100 on 127.0.0.1:4803 — members 0
-fero('vault'): refused by 127.0.0.1:4801 — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)
-fero('vault'): refused by 127.0.0.1:4802 — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)
+{ '51642': 'member' }
+MEMBER 51642 on 127.0.0.1:4803 — members 0
+fero('vault'): refused by 127.0.0.1:4801 — it has a secret and this process has none (set FERO_SECRET to the cluster's secret) — the first view waits on it
+fero('vault'): refused by 127.0.0.1:4802 — it has a secret and this process has none (set FERO_SECRET to the cluster's secret) — the first view waits on it
 ^C
 $ FERO_SECRET=wnxH+ZDVQyfo9xZAS/1cwBu0caZpkD+t node server.ts 4803 4801 4802
-{ '3114180': 'member' }
-MEMBER 3114180 on 127.0.0.1:4803 — members 0
-MEMBER 3114180 on 127.0.0.1:4803 — members 2
-{ '3114062': 'member', '3114180': 'member' }
-{ '3114061': 'member', '3114062': 'member', '3114180': 'member' }
-MEMBER 3114180 on 127.0.0.1:4803 — members 3
+{ '51710': 'member' }
+MEMBER 51710 on 127.0.0.1:4803 — members 0
+MEMBER 51710 on 127.0.0.1:4803 — members 2
+{ '51578': 'member', '51710': 'member' }
+{ '51577': 'member', '51578': 'member', '51710': 'member' }
+MEMBER 51710 on 127.0.0.1:4803 — members 3
 ```
 
 - The secret is config, never code: `FERO_SECRET` in the environment (or `secret:` in a `fero.opt.ts` in your

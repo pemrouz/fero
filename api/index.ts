@@ -153,8 +153,16 @@ const sayRefusal = (name: string, node: Node, e: JEvent, clientOnly: boolean): v
   if (line === null) return
   if (said.size >= SAID_MAX) said.clear()
   said.add(key)
-  process.stderr.write(line + '\n')
+  process.stderr.write(line + genesisWaits(node, to) + '\n')
 }
+//! genesisWaits — the tail of a refusal line while this member holds NO view yet and the refusing target is one it
+// counts toward the first view (DESIGN-DIRECTORY §13, 2026-10-12): a contract or door refusal keeps the target in the
+// genesis count (the same process with its config fixed is one of us, and counting it out split one host list into
+// two clusters for good), so the first view waits on it — and says so, once per target, on the line the refusal
+// already earns. A client forms nothing; a formed member waits on nothing; a name refusal prints nothing (as since
+// V4-3) and leaves the count. Read at fold time: a step after the refusal, the node's epoch and hosts are the same.
+const genesisWaits = (node: Node, to: string | undefined): string =>
+  to !== undefined && !node.client && node.epoch === 0 && node.hosts.includes(to) ? ' — the first view waits on it' : ''
 
 //! sayFault — the user's own code threw because fero changed a source it watches (substrate.ts Fault): a view's
 // function, a tap or another subscriber, run by data as the commit closed, AFTER the change landed. The change

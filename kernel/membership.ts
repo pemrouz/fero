@@ -441,10 +441,12 @@ export class Membership {
     // members that dialed it (I-22, 2026-09-28): in a one-sided static pair (`{ listen }` + `{ listen,
     // hosts: [it] }`) the hostless side never proposed, so whenever its uuid sorted lowest the pair sat at
     // epoch 0 for good. One admitted member link is enough; a later arrival joins at the next epoch (V4-3). A host
-    // that REFUSED this node as a stranger (node.refused: another name, another contract, the door) is not waited for
-    // (DESIGN-DIRECTORY §13, 2026-10-12): it can never be in a view with me, and a squatter the directory handed out
-    // once held the first view for good. A host that merely never answers IS waited for: dead and cut look the same
-    // from here, and two halves of one host list must never each form a view.
+    // that answered this node's HELLO for ANOTHER RESOURCE NAME (node.refused) is not waited for (DESIGN-DIRECTORY
+    // §13, 2026-10-12): another resource can never be in a view with me, and a squatter the directory handed out once
+    // held the first view for good. Every other host IS waited for — one that merely never answers (dead and cut look
+    // the same from here) AND one that refused my contract or my proof (the same process with its config fixed is one
+    // of us; counting it out let two halves of one host list each form a view at epoch 1, and they never merged): two
+    // halves of one host list must never each form a view, so genesis waits, and the composer says so on stderr.
     if (!node.client && this.view.epoch === 0 && !this.#proposal && !this.rejoining() && !this.epochStale) {
       let want = 0
       for (const h of node.hosts) if (!node.refused(h)) want++

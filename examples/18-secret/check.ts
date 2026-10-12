@@ -36,9 +36,10 @@ const m1 = start([a, b], SECRET), m2 = start([b, a], SECRET), err1 = errs(m1), e
 assert.ok(await until(() => [m1, m2].every((r) => members(r) === 2), 30_000), 'two members with the secret: members 2 on both screens (is this example open in another terminal?)')
 assert.ok(await until(() => [m1, m2].every((r) => r.out.includes(`'${m1.pid}': 'member'`) && r.out.includes(`'${m2.pid}': 'member'`))), 'both rows on both screens')
 
-// a third server started without the secret: refused at the door by both, and its own screen says why, once per member
+// a third server started without the secret: refused at the door by both, and its own screen says why, once per member —
+// and that its first view waits on them (it holds no view, and they are its hosts; DESIGN-DIRECTORY §13)
 const m3 = start([c, a, b]), err3 = errs(m3)
-const line = (p: string) => `fero('vault'): refused by 127.0.0.1:${p} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret)`
+const line = (p: string) => `fero('vault'): refused by 127.0.0.1:${p} — it has a secret and this process has none (set FERO_SECRET to the cluster's secret) — the first view waits on it`
 assert.ok(await until(() => refusals(err3).includes(line(a)) && refusals(err3).includes(line(b)), 15_000), `the third's screen names both members and FERO_SECRET: ${JSON.stringify(refusals(err3))}`)
 const inbound = `fero('vault'): refused a peer that connected as 127.0.0.1:${c} — it has no secret and this node has one; every member must share FERO_SECRET, a client holds it or FERO_SECRET_CLIENT`
 assert.ok(await until(() => refusals(err1).includes(inbound) && refusals(err2).includes(inbound)), `each member's screen shows the refusal too: ${JSON.stringify([refusals(err1), refusals(err2)])}`)

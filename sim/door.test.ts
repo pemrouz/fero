@@ -201,7 +201,7 @@ test('a cut DURING the handshake, secured, heartbeats OFF (the third review\'s m
   }
 })
 
-test('the door family: ~200 seeds, a secret on every member and one intruder per seed under the chaos defaults — never admitted, never in a view or a lane, the members form, converge and agree', () => {
+test('the door family: ~200 seeds, a secret on every member and one intruder per seed under the chaos defaults — never admitted, never in a view or a lane, the members form, converge and agree; on the even seeds where the LOWEST member was told of a same-name squatter it waits, loudly, and nothing forms (the data still agrees)', () => {
   const failures: string[] = []
   const seen = { kinds: new Set<number>(), chaos: new Set<number>() }
   for (let seed = 0; seed < 200; seed++) {
@@ -244,14 +244,19 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
         if (bad !== undefined) secured.add('zz')
         sim.post('zz', { kind: 'start' })
         //! and a member is told about it (the directory's squatter): it dials, is refused, re-dials once per heartbeat.
-        // On even seeds the LOWEST member is told too (the genesis gate, wave 6b, 2026-10-12: a dialed target that
-        // refuses it as a stranger leaves its genesis count — before, a squatter it was told about held genesis for good,
-        // a V4-3 property with or without a door). Its link to zz has a fixed delay so the refusal notice lands before
-        // the close, as TCP delivers it (the sim's random-delay close model loses the notice, DESIGN-DOOR §3): a wrong
-        // secret and the client key are refused by zz's notice, no secret at HELLO time. One rng draw either way.
+        // On even seeds the LOWEST member is told too (the genesis gate, wave 6b, 2026-10-12, narrowed after its first
+        // review: a same-name dialer that refuses it at the DOOR stays in its genesis count — it is one of us with its
+        // secret fixed, and counting it out split one host list into two clusters that never merged — so the lowest member
+        // waits, loudly, and no view forms on those seeds; only a target that answers for another NAME leaves the count,
+        // kernel/discover.test.ts). Its link to zz has a fixed delay so the refusal notice lands before the close, as TCP
+        // delivers it (the sim's random-delay close model loses the notice, DESIGN-DOOR §3): a wrong secret and the client
+        // key are refused by zz's notice, no secret at HELLO time. One rng draw either way.
         const told = 10 + sim.rng() * 100
         if (seed % 2 === 0) sim.fault(members[0], 'zz', { delay: [2, 2] })
-        sim.at(told, () => { sim.post(members[n - 1], { kind: 'discover', hosts: ['sim:zz'] }); if (seed % 2 === 0) sim.post(members[0], { kind: 'discover', hosts: ['sim:zz'] }) })
+        sim.at(told, () => sim.post(members[n - 1], { kind: 'discover', hosts: ['sim:zz'] }))
+        //! the lowest is told BEFORE its first heartbeat at 50 ms (the same draw, scaled to 10..45, no extra draw): told
+        // after it, it may already have proposed genesis over the formed mesh, and the shape would read two ways
+        if (seed % 2 === 0) sim.at(10 + (told - 10) * 0.35, () => sim.post(members[0], { kind: 'discover', hosts: ['sim:zz'] }))
       } else if (kind === 2) {
         const sink = rawClient(sim, 'zz', members[1], door, got)
         sim.at(1500, () => sink.connect(addrs[0]))
@@ -285,11 +290,18 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
       const problems: string[] = []
       if (sim.violations.length) problems.push(`monitor ${sim.violations[0].monitor}: ${sim.violations[0].detail}`)
       if (bad.length) problems.push(`oracle: ${bad[0]}`)
-      if (!formed(live)) problems.push('members never formed')
+      //! the genesis gate (DESIGN-DIRECTORY §13, narrowed after wave 6b's first review): on even seeds the LOWEST member was
+      // told of the squatter before any view formed, and a same-name dialer with a wrong secret (or none) is NOT counted
+      // out — it is one of us with its config fixed, and counting it out split one host list into two clusters — so the
+      // lowest member WAITS, loudly (its refusal row on its own dial; the composer prints the line), and nobody forms a view.
+      // A lowest member reborn by chaos 2 has no discover set and forms. The data still agrees: at epoch 0 every member's
+      // gate is open and the admitted mesh replicates.
+      const waits = seed % 2 === 0 && (kind === 0 || kind === 1 || kind === 4) && (chaos !== 2 || live[0].incarnation === 1)
+      if (!formed(live)) problems.push('members never formed') // the MESH (every member admitted every other): it closes either way
       const dis = agree(live); if (dis) problems.push(`members disagree: ${dis}`)
       if (!live[0].state.has(JSON.stringify(['late']))) problems.push('the late write did not land')
       for (const m of live) {
-        if (m.epoch === 0) problems.push(`${m.uuid} never installed a view`)
+        if (waits ? m.epoch !== 0 : m.epoch === 0) problems.push(waits ? `${m.uuid} installed a view at ${m.epoch} while genesis waits` : `${m.uuid} never installed a view`)
         for (const [u] of m.membership.view.members) if (!memberSet.has(u)) problems.push(`${m.uuid}: view holds ${u}`)
         if (m.byUuid.has('zz')) problems.push(`${m.uuid}: byUuid holds the intruder`)
         for (const o of m.logs.keys()) if (o.startsWith('zz')) problems.push(`${m.uuid}: a lane from the intruder`)
@@ -320,13 +332,13 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
           if (!rows(d, JK.redial).some((e) => e.b === 'sim:zz')) problems.push(`${d.uuid} never re-dialed the intruder on the chain after the bare close — no redial row toward sim:zz (a park?): ${rows(d, JK.dial).filter((e) => e.a === 'sim:zz').length} dial(s), ${rows(d, JK.redial).filter((e) => e.b === 'sim:zz').length} redial(s)`)
         }
         //! the genesis gate: the lowest member, told of zz on even seeds, read a refusal on its own dial (`refused` from
-        // the notice, or `no-secret` at HELLO time) and stopped waiting for it — `formed` above is the teeth
-        if (seed % 2 === 0 && (kind === 0 || kind === 1 || kind === 4)) {
+        // the notice, or `no-secret` at HELLO time) — loudly — and KEEPS WAITING for it (`waits` above is the teeth: no
+        // view forms; the squatter is the same-name wrong-secret dialer, one of us with its secret fixed)
+        if (waits) {
           const low = live[0]
-          if (chaos !== 2 || low.incarnation === 1) {
-            if (!rows(low, JK.doorReject).some((e) => (e.b === 'refused' || e.b === 'no-secret') && e.c === 'sim:zz')) problems.push(`${low.uuid} never read a refusal on its own dial to the intruder: ${JSON.stringify(rows(low, JK.doorReject).map((e) => [e.b, e.c]))}`)
-            if (!low.refused('sim:zz')) problems.push(`${low.uuid} still waits for the intruder`)
-          }
+          if (!rows(low, JK.doorReject).some((e) => (e.b === 'refused' || e.b === 'no-secret') && e.c === 'sim:zz')) problems.push(`${low.uuid} never read a refusal on its own dial to the intruder: ${JSON.stringify(rows(low, JK.doorReject).map((e) => [e.b, e.c]))}`)
+          if (low.refused('sim:zz')) problems.push(`${low.uuid} counted the intruder out (a door refusal must keep it in the count)`)
+          if (rows(low, JK.propose).length) problems.push(`${low.uuid} proposed a view while it counts the intruder`)
         }
         if (kind === 1 && !mr.includes('no-secret')) problems.push(`members never refused the missing secret: ${mr.join(',')}`)
       }
@@ -351,11 +363,17 @@ test('the door family: ~200 seeds, a secret on every member and one intruder per
   assert.deepEqual(failures, [])
 })
 
-//! the genesis gate alone (wave 6b, 2026-10-12; DESIGN-DIRECTORY §13): the LOWEST member is told of a squatter and nothing
-// else happens — no chaos, no other intruder. Red on the base on every seed (the lowest member waited for the squatter
-// for good, so nothing formed); green once a dialed target that refuses it leaves its count. The pair's delay is fixed
-// so the DOOR notice lands before the close, as TCP delivers it.
-test('the genesis gate: the lowest member told of a squatter — a wrong secret, no secret, or the client key alone — reads the refusal on its own dial and forms without it; the squatter is never admitted, never in a view; 30 seeds at n 3..5', () => {
+//! the genesis gate alone (wave 6b, 2026-10-12; DESIGN-DIRECTORY §13, narrowed after its first review): the LOWEST member
+// is told of a same-name squatter at the door and nothing else happens — no chaos, no other intruder. It reads the
+// refusal on its own dial (`refused` from the notice, `no-secret` at HELLO time) — the row the composer prints as the
+// refusal line with "the first view waits on it" — and WAITS: a door refusal keeps the target in the count, since the
+// same process with its secret fixed is one of us, and counting it out let each consistent half of one host list form
+// its own view at epoch 1 (the review's probe: two clusters under one name, never merged). So no view forms on any seed,
+// as on the base; what is new is the row, and the composer's line. As first built the gate counted the squatter out and
+// formed; that pin is replaced by this one. The pair's delay is fixed so the DOOR notice lands before the close, as TCP
+// delivers it (the sim's random-delay close model loses it, DESIGN-DOOR §3). The permanent refusal — another resource
+// NAME — leaves the count and forms: kernel/discover.test.ts, the first genesis-gate test.
+test('the genesis gate: the lowest member told of a same-name squatter — a wrong secret, no secret, or the client key alone — reads the refusal on its own dial and WAITS, loudly: no view forms, nothing is proposed, the squatter stays in the count (one of us with its secret fixed) and is never admitted; 30 seeds at n 3..5', () => {
   const failures: string[] = []
   for (let seed = 0; seed < 30; seed++) {
     const n = 3 + (seed % 3)
@@ -369,21 +387,21 @@ test('the genesis gate: the lowest member told of a squatter — a wrong secret,
     const intruder = sim.add({ uuid: 'zz', listen: 'sim:zz', hosts: addrs, heartbeatMs: 50, redialMs: 20, journalCap: 1 << 16, ...(bad !== undefined ? { door: bad } : {}) })
     sim.post('zz', { kind: 'start' })
     sim.fault(members[0], 'zz', { delay: [2, 2] })
-    sim.at(5 + sim.rng() * 30, () => sim.post(members[0], { kind: 'discover', hosts: ['sim:zz'] })) // before the first heartbeat at 50 ms, so the base is blocked on every seed
+    sim.at(5 + sim.rng() * 30, () => sim.post(members[0], { kind: 'discover', hosts: ['sim:zz'] })) // before the first heartbeat at 50 ms
     sim.run({ until: 4000, maxEvents: 2_000_000 })
     const problems: string[] = []
     if (sim.violations.length) problems.push(`monitor ${sim.violations[0].monitor}`)
-    if (!formed(nodes)) problems.push('members never formed')
+    if (!formed(nodes)) problems.push('the mesh never closed') // the members admit each other either way; the VIEW is what waits
     for (const m of nodes) {
-      if (m.epoch !== 1) problems.push(`${m.uuid} at epoch ${m.epoch}`)
+      if (m.epoch !== 0) problems.push(`${m.uuid} at epoch ${m.epoch}`)
+      if (rows(m, JK.propose).length) problems.push(`${m.uuid} proposed`)
       if (m.byUuid.has('zz')) problems.push(`${m.uuid}: byUuid holds the intruder`)
-      for (const [u] of m.membership.view.members) if (u === 'zz') problems.push(`${m.uuid}: view holds the intruder`)
     }
     if (intruder.epoch !== 0 || intruder.byUuid.size) problems.push('the intruder learned a view or a peer')
     const low = nodes[0]
     const want = kind === 1 ? 'no-secret' : 'refused'
     if (!rows(low, JK.doorReject).some((e) => e.b === want && e.c === 'sim:zz')) problems.push(`${low.uuid} never read \`${want}\` on its own dial: ${JSON.stringify(rows(low, JK.doorReject).map((e) => [e.b, e.c]))}`)
-    if (!low.refused('sim:zz')) problems.push(`${low.uuid} still waits for the intruder`)
+    if (low.refused('sim:zz')) problems.push(`${low.uuid} counted the intruder out`)
     if (problems.length) failures.push(`seed ${seed} (n=${n}, intruder ${kind}): ${problems.join('; ')}`)
   }
   assert.deepEqual(failures, [])
