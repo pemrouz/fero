@@ -711,5 +711,7 @@ test('a keyed gather reads only its own row, a refresh nobody reads builds no an
     assert.equal(await g.refresh({ node: fake } as never, { throwOnPartial: false, want: false }), undefined, 'no answer is built for nobody')
     h1 = async () => { throw { scoped: true, op: 'rows', reason: 'too-large', replicas: 2, hint: 'the answer is bigger than one frame' } }
     await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'a' }), (e: ScopedError) => e.reason === 'too-large' && /this key is changing owner: retry in a moment$/.test(e.hint))
+    //! the last check: the stored refusal, which the next live whole read hears, keeps the whole read's words
+    assert.match(g.refused!.hint, /so the whole-resource read cannot gather them: read one key at a time \(methods\.read\(key\)\)$/)
   } finally { g.destroy() }
 })
