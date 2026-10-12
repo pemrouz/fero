@@ -171,7 +171,7 @@ test('a stale lock is taken over: a dead pid, a pid the kernel gave to another p
     //! a record of an older shape names no namespace: its lease decides too
     plant(dir, { pid: dead }); fs.writeFileSync(path.join(dir, 'lock'), JSON.stringify({ pid: dead, host: HOST, boot: BOOT, start: null }) + '\n'); age(dir, 60)
     lockDir(dir, 'test')(); assert.equal(lockOf(dir), null, 'a record without a namespace, its lease out: stale')
-    //! a stale takeover marker (an heir that crashed mid-takeover) is removed the same way
+    //! a stale takeover marker (an heir that crashed mid-takeover) is removed too — by a rename and a look (the marker test below)
     plant(dir, { pid: dead }); plant(dir, { pid: dead }, 'lock.take')
     const release = lockDir(dir, 'test')
     assert.deepEqual(lockOf(dir), mine())
