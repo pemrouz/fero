@@ -7,8 +7,10 @@
 //
 // Lawful runs, per seed: no monitor fires and M1's horizon form agrees (SAFE); holders converge, exactly-R holds,
 // the holders' floors agree at the horizon and every holder's marks of each co-holder equal that co-holder's floors
-// (M7's two forms: floors-agree and marks-agree — LIVE); M8 is red (RED TODAY by design: logs are unbounded under
-// scoping). M9 (leave drain) was red at R=1 until the drain landed (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): a
+// (M7's two forms: floors-agree and marks-agree — LIVE); M8's LANE half is green (since DESIGN-SCALE stage 3,
+// 2026-10-12: every lane at or under winners + compactAt at the horizon — a lane over it is NOT LIVE) and its
+// TOMBSTONE half red (RED TODAY by design: no pin surface until stage 4; M2 frontier-sound judges every compaction
+// pass in every family, and every family compacts — eng.compactions). M9 (leave drain) was red at R=1 until the drain landed (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): a
 // clean leaver now hands what it held to the new holders before it goes, so a leave-drain violation is UNSAFE
 // like any other; A7 always runs its seed 4 (n=2 R=1), the one shape at the battery's seed count where that check
 // can bite. Per family, an engagement count proves the chaos bit.
@@ -24,10 +26,15 @@
 // below must turn M1, M3 or M6 red. Measured on 3 seeds per family (2026-10-09): `release-all` (the release step
 // with no census and no lane accounting) is caught in all 11 families; `drop-one` (one tombstone and its record at
 // one holder) only in A6, and in A1/A2/A7/A10 under earlier timings: it needs that one holder to teach the
-// partition later; `version-only` (G1: the stamp goes, every lane keeps its entries) in A1 and A11 only. On today's
-// kernel the remove's entry stays in every lane, so a refold re-derives the tombstone; G1 bites only where an older
-// record still arrives above the fence (A1's zombie after the heal, A11's spoke). Stage 3's
-// compaction drops that entry, and its mutation must then be caught across the families.
+// partition later; `version-only` (G1: the stamp goes, every lane keeps its entries) in A1 and A11 only. Before stage
+// 3 the remove's entry stayed in every lane, so a refold re-derived the tombstone; G1 bit only where an older record
+// still arrived above the fence (A1's zombie after the heal, A11's spoke). SINCE STAGE 3 (2026-10-12) compaction
+// drops the remove's entry once its stamp is gone (it is no winner), and the next teach or spoke forward ships the
+// older record without it: `version-only` is caught on A1 seeds 1-8, A3 seeds 5-7, A11 seeds 5-7 and A12 seeds 1, 2,
+// 5, 7 (scanned seeds 1-8 of every family). The same pass takes `drop-one`'s bite away on most seeds: the older
+// write under the dropped remove is already compacted at that holder when the mutation fires, so its later teach
+// has nothing to resurrect; it is caught where an older record survives outside the frontier — the zombie's
+// stranded lane (A1 seed 8), and A2 seed 14 (scanned A1/A6/A7 seeds 1-8 and A2/A6/A7/A10 seeds 9-16).
 // Cost: about 50 s at low priority on this box (2 seeds per family plus the pinned unsafe seeds, then five
 // pinned mutation schedules, each run clean and mutated). More seeds: FERO_SCOPED_SEEDS=N (8 per family took about
 // 70 s on 2026-10-09, before the pinned seeds were added). The known-unsafe seeds below run in every battery on top
@@ -123,9 +130,9 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
 const SPOKED = new Set(['A11-spoke', 'A12-spoke-handoff', 'A13-spoke-repair'])
 
 for (const fam of FAMILIES) {
-  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
+  test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live (lanes bounded), M8's tombstone half red today on every seed, compaction engaged, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
-    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0, spokeCells = 0, feederAcquires = 0, spokeStale = 0, lanePairs = 0
+    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0, spokeCells = 0, feederAcquires = 0, spokeStale = 0, lanePairs = 0, compactions = 0
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
     const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
@@ -139,7 +146,8 @@ for (const fam of FAMILIES) {
       }
       else if (known.has(seed)) newlySafe.push(seed)
       if (o.notLive.length) notLive.push(`${o.shape}: ${o.notLive.join(' | ')}`)
-      assert.ok(o.redToday.includes('M8'), `${o.shape}: M8 is red today on every scoped run with a remove (if green, stage 3/4 landed: flip the pin)`)
+      assert.ok(o.redToday.includes('M8'), `${o.shape}: M8's tombstone half is red today on every scoped run with a remove (if green, stage 4 landed: flip the pin); its lane half is a law since stage 3 (notLive above)`)
+      compactions += o.eng.compactions
       assert.ok(!o.red.has('leave-drain'), `${o.shape}: M9 red — a clean leaver took the only copy of a row with it (the drain, DESIGN-SCALE stage 1 (b), should have held it)`)
       if (ENGAGED[fam.name](o.eng)) engaged++
       cells += o.eng.cells; advances += o.eng.advances; resyncs += o.eng.resyncs; resyncRows += o.eng.resyncRows
@@ -168,6 +176,8 @@ for (const fam of FAMILIES) {
       assert.ok(spokeStale > 0, `the spoke kept ${spokeStale} rows of partitions that moved off its feeder (known gap; 0 means it closed — flip this pin)`)
     }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
+    //! stage 3: compaction fired on this family (compactAt 16), so M2 frontier-sound judged real passes and the lane bound above was tested
+    assert.ok(compactions > 0, `${fam.name}: non-vacuity — ${compactions} (lane, partition) compaction rows over the seeds`)
     //! the lane rule (wave 6b): the lane-unique monitor compared neighbouring pairs on every family (a lane holds each seq once)
     assert.ok(lanePairs > 0, `${fam.name}: non-vacuity — the lane rule compared ${lanePairs} neighbouring pairs across every node's lanes`)
     //! M7 compares nothing on an R=1 seed (one holder per partition): the row bites only where some seed drew R ≥ 2
@@ -226,19 +236,31 @@ test('runFamily names a screen-only row on a spoke as UNSAFE ("screen: s1: …")
 const CAUGHT: [string, number, Mutation, string[]][] = [
   ['A1-zombie', 1, 'release-all', ['stamp-oracle', 'release-safety', 'census-truth']], // M6 at the release: the zombie still holds an older record
   ['A1-zombie', 1, 'version-only', ['stamp-oracle', 'release-safety', 'census-truth']], // G1: the zombie's write lands above the fence after the heal
-  ['A7-down-to-one', 2, 'release-all', ['stamp-oracle', 'release-safety']], // a re-joiner is taught the dead writes
-  //! `drop-one` needs the dropping holder to TEACH the partition later, so its catch follows the trajectory. Stage 2
-  // (2026-10-10) moved it twice: with the targeted rounds alone A6 seed 3 stopped catching (the dropping holder no
-  // longer taught that partition to anyone) and A1 seed 4 caught; with the member digest retired A6 seed 3 catches
-  // again and A1 seed 4 does not. Three pins, scanned over A1/A6/A7 seeds 1-8 on the final tree: A6 seed 3, A7 seed 4
-  // (n=2 R=1: the leaver's drain teaches every partition it held to the one new holder, the dropped tombstone's
-  // among them — the stage-1 drain made that teach certain), and A1 seed 8 (the healed zombie is re-taught).
-  ['A6-flip-mid-latch', 3, 'drop-one', ['release-safety']], // the dropping holder teaches the partition after the flip
-  ['A7-down-to-one', 4, 'drop-one', ['release-safety', 'stamp-oracle']], // the drain teaches the dropped tombstone's partition to the new holder
+  //! moved from A7 seed 2 to seed 5 with stage 3 (2026-10-12): on seed 2 (n=2 R=2) every lane passed compactAt before
+  // the mutation fired and the superseded writes were gone, so the release left nothing older on a lane for a teach to
+  // ship below the released stamp (release-safety's shape); stamp-oracle alone named it at the horizon (a joiner lacking
+  // the row — the mutation runner's own lane filter dropped the row's winning entry: a swept field's tombstone carries
+  // its parent's stamp, V4-18, so `inject` drops the parent's record; M2 names that drop too, as it always did, but M2
+  // is not a CATCHER). Seed 5 (n=3 R=2) keeps an older field write on a short lane: both catch (scanned A7 seeds 1-8).
+  ['A7-down-to-one', 5, 'release-all', ['stamp-oracle', 'release-safety']], // a re-joiner is taught the dead writes
+  //! `drop-one` needs the dropping holder to TEACH the partition later WITH an older record still in its lane, so its
+  // catch follows the trajectory. Stage 2 (2026-10-10) moved it twice (A6 seed 3 and A1 seed 4 traded places with the
+  // targeted rounds and the member digest's retirement). Stage 3 (2026-10-12) took its bite away on most seeds: with
+  // compactAt 16 the older write under the dropped remove is already compacted at that holder when the mutation fires
+  // (mutateAt 300), so a later teach ships the live state without the remove but also without anything to resurrect
+  // — A6 seed 3 and A7 seed 4 catch nothing now (scanned A1/A6/A7 seeds 1-8 and A2/A6/A7/A10 seeds 9-16: two seeds
+  // catch). It is caught where an older record survives OUTSIDE the frontier: the healed zombie's stranded lane (A1
+  // seed 8), and A2 seed 14 (n=3 R=1).
   ['A1-zombie', 8, 'drop-one', ['stamp-oracle', 'release-safety', 'census-truth']], // the healed zombie is re-taught the partition without the remove
+  ['A2-slow-owner-join', 14, 'drop-one', ['stamp-oracle']], // the demoted owner's lane keeps the older record past the frontier
   //! moved from A11 seed 3 to seed 7 with stage 2 (the members' handshake timing changed the spoke's trajectory;
   // scanned over A11 seeds 1-12: 7 is the clean seed that catches it)
   ['A11-spoke', 7, 'version-only', ['release-safety']], // the spoke applies an old write under a released stamp
+  //! NEW with stage 3 (2026-10-12): G1 bites across the families now. The released stamp makes the remove's entry a
+  // loser, the next pass drops it, and the next teach (A3: a fresh acquirer) or spoke forward (A12: a re-entry ships
+  // the whole partition in lane order) ships the older record without it. Before stage 3 neither family caught it.
+  ['A3-orphan-cut', 5, 'version-only', ['stamp-oracle', 'release-safety', 'census-truth']], // the compacted remove never reaches the acquirer; the old write does
+  ['A12-spoke-handoff', 1, 'version-only', ['release-safety']], // the re-entry forward ships the old field write, the remove is gone from the lane
 ]
 
 test('mutation runner: today\'s injected-drop class — each pinned schedule is green as is and caught by the named monitors when the release rule is weakened', () => {

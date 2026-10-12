@@ -21,7 +21,7 @@
 // stage 1 (b), 2026-10-10): a leave-drain violation is now UNSAFE like any other.
 
 import { Sim } from './exec.ts'
-import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLogs, screenMatches, spokeMirror, spokeStale, laneUniqueCounts } from './monitors.ts'
+import { perEvent, armScale, ledgerOf, scopedConverged, exactlyR, stampOracle, floorsAgree, marksAgree, boundedLanes, boundedTombs, screenMatches, spokeMirror, spokeStale, laneUniqueCounts } from './monitors.ts'
 import { VERB } from '../kernel/codec.ts'
 import { JK } from '../kernel/journal.ts'
 import { SCOPE } from '../kernel/scope.ts'
@@ -683,7 +683,12 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
     if (f !== undefined) for (const e of f.journal.read()) if (e.kind === JK.acquire) eng.feederAcquires = (eng.feederAcquires ?? 0) + 1
   }
   eng.spokeParts = m12.parts; eng.spokeCells = m12.cells
-  if (boundedLogs(sim)) out.redToday.push('M8')
+  //! M8 in two halves (DESIGN-SCALE stage 3, 2026-10-12): the LANE half is a law now — scoped compaction keeps every lane
+  // at or under winners + compactAt at the horizon, so a lane over it is a liveness problem (compaction did not keep up);
+  // the TOMBSTONE half stays red today (no pin surface until stage 4)
+  const lanes = boundedLanes(sim)
+  if (lanes !== null) { out.red.add('bounded-lanes'); out.notLive.push('M8 lanes: ' + lanes) }
+  if (boundedTombs(sim)) out.redToday.push('M8')
   const L = ledgerOf(sim)
   Object.assign(eng, { cells: L.counts.cells, advances: L.counts.advances, releases: L.counts.releases, census: L.counts.census, drops: L.counts.drops, leaves: L.counts.leaves, resyncs: L.counts.resyncs, resyncRows: L.counts.resyncRows })
   eng.sheds = jcount(sim, JK.shed); eng.acquires = jcount(sim, JK.acquire); eng.compactions = jcount(sim, JK.compacted)
