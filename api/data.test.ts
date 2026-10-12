@@ -881,3 +881,23 @@ test('a built-in that keeps its data out of sight is refused by its tag; a class
   assert.equal(h.jk(JK.writeLocal).length, 1)
   await h.destroy()
 })
+
+//! the fix check: no test reached a write taken after three passes (a part copy, the walk, the whole copy), and a
+// mutant that kept the program's object there passed every test. At a 16 MiB frame cap the budget is 15 MiB and the
+// share 960 KiB: a value just past the share is taken as fero's own copy, its getter run three times; one whose third
+// answer is a bigint is refused, nothing stamped.
+test('a write past the first share is taken as fero\'s own copy after the walk, and one that changes into a bigint on the last pass is refused', async () => {
+  const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0, tune: { frame: 16 << 20 } })
+  const bind = new Bind(rt)
+  try {
+    const big = Array.from({ length: 120_000 }, (_, i) => i & 63) // charged about 1.08 MB: past the share
+    let calls = 0
+    bind.data.r = { get big() { calls++; return big } }
+    assert.equal(calls, 3, 'a part copy, the walk, the whole copy')
+    big[0] = 99
+    assert.equal(((snapshot(bind.data) as Record<string, { big: number[] }>).r.big)[0], 0, 'fero holds its own copy')
+    calls = 0
+    assert.throws(() => { bind.data.s = { get g() { return ++calls === 3 ? 10n : 1 }, big } }, /cannot be sent: a bigint at g/) // the getter first: every pass reads it
+    assert.equal(rt.node.seq, 1, 'nothing more was stamped')
+  } finally { bind.destroy(); await rt.destroy() }
+})

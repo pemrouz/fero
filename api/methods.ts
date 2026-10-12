@@ -35,11 +35,11 @@
 // object-born (substrate.applyStreamRec, I-27); the one-shot stays the bare number.
 
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { VERB, copyOf, encodable, sizeOf, Unsendable } from '../kernel/codec.ts'
+import { VERB, MAX_DEPTH, encodable, sizeOf, Unsendable } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
-import { atCap, replyCopy, lostAssignment, type Coords, type Refused } from './data.ts'
+import { atCap, copyBounded, replyCopy, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 import { FULL } from '../kernel/codec.ts'
 
@@ -268,9 +268,12 @@ export class Host {
           return this.#reply(link, id, false, tooLarge(m, this.#rt.node.replicas, frame, 'the answer'))
         }
         //! the reply's words are the local answer's (answer above): what stopped the value — a plain result or a view's
-        // picture — by encodable's walk, asked only here, on the failure, so a reply that encodes pays nothing for it
+        // picture — by encodable's walk, asked only here, on the failure, so a reply that encodes pays nothing for it.
+        // With no byte bound: the encode failed for something other than its size (FULL is above), and the walk's
+        // worst-case charge would answer 'bigger than' first for a value with text before the bigint (the V4-51/52
+        // review). At the depth the frame carries the value: a RESULT one level down, a value SUB's SUBREC three.
         let why: string | null = null
-        if (sent !== NOTHING) try { why = encodable(sent, atCap(this.#rt.node.tune.frame).result) } catch { why = null }
+        if (sent !== NOTHING) try { why = encodable(sent, { depth: MAX_DEPTH - (mode === VERB.CALL ? 1 : 3), bytes: Infinity }) } catch { why = null }
         this.#report(err, `a method's result could not be sent (methods.${m}) — the call was refused`)
         this.#reply(link, id, false, `the result could not be sent: ${why ?? errText(err)}`)
       }
@@ -368,7 +371,7 @@ export class Host {
     const fn = this.#methods[m]
     if (!fn) throw new Error(`unknown method '${m}'`)
     let arg: unknown
-    try { arg = copyOf(a, atCap(this.#rt.node.tune.frame).arg) } catch (e) { throw new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`) }
+    try { arg = copyBounded(a, atCap(this.#rt.node.tune.frame).arg) } catch (e) { throw new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`) }
     const tracked: Promise<Coords>[] = []
     const minted = mark(this.#data)
     //! peer is this node: a local call's caller IS the server (the Context doc above)
@@ -516,7 +519,7 @@ export class Caller {
   //! argOf — fero's own copy of a call's argument at the node's cap (ARG), or the refusal in the call's words. A
   // handle takes it once, when it is made (handle below), and hands it to every call and sub it starts.
   argOf(m: string, a: unknown): Arg {
-    try { return { v: copyOf(a, atCap(this.#rt.node.tune.frame).arg) } } catch (e) { return { e: new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`) } }
+    try { return { v: copyBounded(a, atCap(this.#rt.node.tune.frame).arg) } } catch (e) { return { e: new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`) } }
   }
 
   call(m: string, a: unknown, opts: { timeout?: number; retry?: boolean; to?: string } = {}, pre?: Arg): Promise<unknown> {
@@ -706,7 +709,8 @@ export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: 
   let last: Sub | null = null // the sub close() ended: `ready` keeps answering from it
   //! the argument as it was when the handle was made (V4-52): fero's own copy, taken HERE, once — not at the await or
   // the first touch, which sent a change the program made in between (a server's own call copies at the call too) —
-  // and the same copy for every call and sub this handle starts; a refusal is kept and told at first use
+  // and the same copy for every call and sub this handle starts; a refusal is kept and told at first use. A handle the
+  // program keeps holds that copy for as long as it keeps the handle.
   const pre = caller.argOf(m, a)
   const call = (): Promise<unknown> => caller.call(m, a, opts, pre)
   const subscribe = (): Sub => caller.subscribe(m, a, opts.onError ?? null, pre)
