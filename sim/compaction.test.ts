@@ -9,7 +9,9 @@
 //             it had (the boot record's seed, written when the compaction-armed swap is issued, sits above every gap
 //             the pass opened), re-latches nothing, and M5 is green on the whole seed. Red without that boot write:
 //             the seed is stale, replay chains from it, stalls at the first compacted gap, the reborn announces
-//             floors below its content and latches a holder for rows it holds.
+//             floors below its content and latches a holder for rows it holds. Mutation check, by hand
+//             (2026-10-12): no boot write at a compacting swap at all — red at 'the floor restored from the seed'
+//             (n01|c1 restored 2, was 158), read at the restore instant, and with that line off at 'no re-latch' (5).
 //   window    the same holder crashed BETWEEN the swap and its echo (its fsync slowed): the seed was written at the
 //             issue, so the restore is the same — floors chained to the content, no re-latch, and nothing a peer
 //             counted as this node's crash-stable mark is above what its disk restored. Red when the seed is written
@@ -68,10 +70,13 @@ test('a durable holder restarted after compaction restores its floors from the s
   const gaps = [...victim.logs].filter(([o, lane]) => { const f = Math.max(...[...before].filter(([k]) => k.startsWith(o + '|')).map(([, s]) => s), 0); return lane.length > 0 && lane[0].seq < f && lane.length < f }).length
   assert.ok(gaps >= 1, `${gaps} lane(s) of n02 hold fewer entries than their floor spans: the pass opened gaps the seed must cover`)
   const reborn = sim.restart('n02')
+  //! the restore instant: replay and start done, nothing on the wire yet — read what the DISK restored here, before
+  // any peer's digest or a re-latch can repair it (read 3 s later, a wrong seed is already healed and the line is mute)
+  sim.run({ until: sim.now })
+  const restored = floorsOf(reborn)
+  for (const [k, s] of before) assert.equal(restored.get(k), s, `${k}: the floor restored from the seed equals the pre-crash floor`)
   sim.run({ until: sim.now + 3000 })
   assert.equal(reborn.armed, true)
-  const after = floorsOf(reborn)
-  for (const [k, s] of before) assert.equal(after.get(k), s, `${k}: the floor restored from the seed equals the pre-crash floor`)
   assert.equal(count(reborn, JK.acquireStart), 0, 'no re-latch: the reborn announced the floors it holds, nobody found it behind')
   assert.equal(count(reborn, JK.walHole), 0)
   assert.deepEqual(sim.violations, [], 'M5 (the whole seed at start), M2 and every per-event monitor green')
@@ -84,10 +89,13 @@ test('a durable holder restarted after compaction restores its floors from the s
 // swap, so the gaps the window's pass opens must sit ABOVE that seed for the window to matter: six FRESH cells are
 // written after the quiet (winners, no loser for a pass to drop, so the seed stays put), then a burst rewrites them
 // with the holder's fsync slowed — the pass drops the six, arms the swap, and the swap's echo is the window.
-// Mutation check, once, by hand (2026-10-12): the boot write moved back to the swap's echo (node.ts snapshot(): the
-// persistBoot after sink.snapshot() removed; the echo's `if (cleared)` made `if (cleared || compaction-armed)`
-// again) — this test red at 'the seed on disk covers the gap' first and, with that line removed, at 'no re-latch';
-// the restore test (a crash after the echo) stays green under it, which is why the window needs its own schedule.
+// Mutation check, by hand (2026-10-12, a scratch copy): the boot write moved back to the swap's echo (a5dc99c's
+// node.ts hunk reversed) — this test red at 'the seed on disk covers the gap' first, and each restore check red ON
+// ITS OWN with the other three switched off: 'the floor restored equals the pre-crash floor' (n01|c1 restored 158,
+// was 211), 'n01 held n02's crash-stable mark at 162 ... its disk restored 158', and 'no re-latch' (5). The two
+// floor checks read the reborn at the restore instant (`run({ until: sim.now })` after `restart`): read 3 s later,
+// as they first were, both stay green under the mutation (peers' digests and the re-latch have healed the floors).
+// The restore test (a crash after the echo) stays green under it, which is why the window needs its own schedule.
 test('a durable holder crashed between a compaction-armed swap and its echo (its fsync slowed): the boot record written at the swap\'s issue covers the gaps, the reborn restores the floors it had, re-latches nothing, and no mark a peer held as its crash-stable floor is above what its disk restored', () => {
   const sim = new Sim(35)
   //! compactAt 2: every lane is walked, so the quiet leaves nothing a later pass could drop (at 16 a lane under the
@@ -139,16 +147,19 @@ test('a durable holder crashed between a compaction-armed swap and its echo (its
   for (const n of nodes) if (n !== victim) for (const [p, e] of n.scope!.entries) for (const [o, d] of e.marksD.get(victim.uuid) ?? []) held.push([n.uuid, p, o, d])
   assert.ok(held.length >= 1, `${held.length} (peer, partition, lane) marks held for n02`)
   const reborn = sim.restart(victim.uuid)
-  sim.run({ until: sim.now + 3000 })
-  assert.equal(reborn.armed, true)
-  const after = floorsOf(reborn)
-  for (const [k, s] of before) assert.equal(after.get(k), s, `${k}: the floor restored equals the pre-crash floor`)
-  assert.equal(count(reborn, JK.acquireStart), 0, 'no re-latch: the seed chained over the gaps to the content')
-  assert.equal(count(reborn, JK.walHole), 0)
+  //! the restore instant: replay and start done, nothing on the wire yet — both checks read what the DISK restored,
+  // before a peer's digest or a re-latch repairs it (3 s later both pass with the seed written at the echo)
+  sim.run({ until: sim.now })
+  const restored = floorsOf(reborn)
+  for (const [k, s] of before) assert.equal(restored.get(k), s, `${k}: the floor restored equals the pre-crash floor`)
   for (const [peer, p, o, d] of held) {
     const got = reborn.streams.get(o)?.parts?.get(p)?.d ?? 0
     assert.ok(got >= d, `${peer} held n02's crash-stable mark at ${d} for (${o}, ${p}); its disk restored ${got}`)
   }
+  sim.run({ until: sim.now + 3000 })
+  assert.equal(reborn.armed, true)
+  assert.equal(count(reborn, JK.acquireStart), 0, 'no re-latch: the seed chained over the gaps to the content')
+  assert.equal(count(reborn, JK.walHole), 0)
   assert.deepEqual(sim.violations, [], 'M5 (the whole seed at start), M2 and every per-event monitor green')
   assert.equal(scopedConverged(sim), null)
   assert.equal(exactlyR(sim), null)
