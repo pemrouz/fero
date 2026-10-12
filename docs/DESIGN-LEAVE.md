@@ -2560,9 +2560,10 @@ these items open, each with the reviewer's probe under the session's scratch fol
    fails as `bad-proof` (or bump the label to `fero-door/2`); mixed versions are unsupported before
    1.0 (V4-14).
 
-**2026-10-12, BUILT (V4-51; branch `w6/relbuild` on v4 at 35d7300: eleven commits for the build itself; the three
-reviews below add nine more, twenty in all, and the counts in THEIR notes are the tree's — this note's are the build's
-at the time: 46 membership pins, 18 harness pins, 964 tests).** The rule of §10.10 is in the
+**2026-10-12, BUILT (V4-51; branch `w6/relbuild` on v4 at 35d7300: nine commits for the build itself — this note
+first said eleven; `git rev-list --count 35d7300..7551d18` says nine — and the reviews below each count their own on
+top; the counts in THIS note are the build's at the time, 46 membership pins, 18 harness pins, 964 tests, and the
+tree's are in the review notes).** The rule of §10.10 is in the
 kernel, applied by hand commit by commit (`docs/leave-release.diff` was built on 145a70b and no longer applies after
 the knock window; it stays as the measured record). What landed, in the kernel's words: `Vote.prior` (§10.10.7) and
 `Vote.f` (the disown); `holds()` with its common-case fast path and the gate word `held`; form (β) at the voter (`o` on
@@ -2684,9 +2685,11 @@ from entering one. Mutation-checked once (the comparison back to a majority: bot
 moved.
 
 **2026-10-12, the seventh review (the skeptic's third pass, over the whole tree at ca98049): ship, one minor and
-one nit — both closed on the page, two commits on top.** The minor was the record, not the kernel: the implementer's
-report and its ledger text described the build at its eleventh commit (964 tests, a rule without the fifth and sixth
-reviews' two lines), while the tree had eighteen commits and 970 tests (`kernel/membership.test.ts` 38 → 50,
+one nit — both closed on the page, three commits on top.** The minor was the record, not the kernel: the implementer's
+report and its ledger text described the build at its last commit (964 tests, a rule without the fifth and sixth
+reviews' two lines), while the tree had seventeen commits — nine for the build, five for the fifth review, three for
+the sixth; the build's note said eleven and the review said eighteen, both counted by hand, so every count here is
+`git rev-list --count` — and 970 tests (`kernel/membership.test.ts` 38 → 50,
 `sim/leave-harness.test.ts` 17 → 20, `kernel/door.test.ts` 34 → 35; two full batteries at ca98049 read 970 of 970
 and the 18-clause data contract), the ask to a non-member proposer (`#askTargets`), the opener (`#openOverHolds`,
 every member linked), the `holds()` memo, the empty-hold check and the `hm` identity guard. The built note above now
