@@ -113,6 +113,11 @@ export const partOf = (o: object, array: boolean): string | null => {
   if (p === null) return types.isModuleNamespaceObject(o) ? 'a module namespace (send a plain copy: { ...ns })' : null
   for (let i = 0; i < KINDS.length; i++) if (KINDS[i][0](o)) return KINDS[i][1](o)
   if (Object.getPrototypeOf(p) === null) return null
+  //! a built-in KINDS does not name keeps its data where Object.keys cannot see it — a URLSearchParams, Headers, a Blob,
+  // a WeakRef, a generator or an iterator arrived as {} on every copy, the writer's too (the V4-51/52 review). Its tag
+  // says what it is; a class instance's tag is 'Object' unless it names its own.
+  const tag = Object.prototype.toString.call(o).slice(8, -1)
+  if (tag !== 'Object') return `a ${tag} (it keeps its data where fero cannot see it: send a plain copy of what it holds)`
   return INSTANCES === 'take' ? null : `an instance of ${nameOf(p)} (fero sends plain objects: send { ...value })`
 }
 

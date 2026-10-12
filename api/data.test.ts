@@ -861,3 +861,23 @@ test('a key with half of a surrogate pair in it is refused at the write — a ro
   assert.equal(h.jk(JK.writeLocal).length, 2, 'only the row and the well-formed key were stamped')
   await h.destroy()
 })
+
+//! the V4-51/52 review: built-ins the kind list does not name keep their data where Object.keys cannot see it, so each
+// was taken as {} on every copy, the writer's too. Refused now by their tag; a class instance (tag 'Object') is taken.
+test('a built-in that keeps its data out of sight is refused by its tag; a class instance is still taken as its own fields', async () => {
+  const h = harness()
+  function* gen() { yield 1 }
+  const hidden: [string, unknown][] = [
+    ['URLSearchParams', new URLSearchParams('a=1')], ['Headers', new Headers({ a: '1' })], ['Blob', new Blob(['x'])],
+    ['WeakRef', new WeakRef({})], ['Generator', gen()], ['Map Iterator', new Map([[1, 2]]).entries()],
+  ]
+  for (const [tag, v] of hidden)
+    assert.throws(() => { h.bind.data.x = { v } }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["x"] cannot be sent: a ${tag} (it keeps its data where fero cannot see it`) && e.message.includes(') at v'), tag)
+  class Point { x = 1; y = 2 }
+  class Money { amount = 5; get [Symbol.toStringTag]() { return 'Money' } }
+  h.bind.data.p = { at: new Point() }
+  assert.deepEqual(snapshot(h.bind.data).p, { at: { x: 1, y: 2 } }, 'a class instance is its own fields')
+  assert.throws(() => { h.bind.data.m = new Money() }, /cannot be sent: a Money \(it keeps its data/, 'a class that names its own tag says what it is')
+  assert.equal(h.jk(JK.writeLocal).length, 1)
+  await h.destroy()
+})
