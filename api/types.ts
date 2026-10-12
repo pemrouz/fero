@@ -287,10 +287,11 @@ export interface ClusterShape {
     // an unscoped member or a client. Set in the fold just before the teardown, so a screen closing on the stop
     // can show it; the kernel's `undrained` journal row is the same number. A leaver still in its own view when the
     // vote never came back (the bound: leaveTicks with no member linked, the knock window leaveWindow with one) goes
-    // like a crash — but first it counts what goes with it: at `replicas: 1` every partition it holds with content
-    // (nobody else holds a copy), at 2 or more only those no reachable co-holder has proved it holds inside the copy
-    // window (2026-10-12; before, such a stop counted nothing). A leaver whose own view already dropped it (it held
-    // the votes; the survivors' echo was lost) drains and counts like any other.
+    // like a crash — but first it counts the partitions it could not PROVE are held elsewhere: at `replicas: 1` every
+    // partition it holds with content (nobody else holds a copy); at 2 or more, those no co-holder it could reach has
+    // proved it holds inside the copy window — a co-holder it is cut from holds the copy but cannot prove it, so that
+    // partition counts (2026-10-12; before, such a stop counted nothing). A leaver whose own view already dropped it
+    // (it held the votes; the survivors' echo was lost) drains and counts like any other.
     undrained: number
     //! primary: on a CLIENT, the uuid of the ONE server feeding it (a spoke digests exactly one) — null
     // until a link is admitted, and re-set to the survivor on failover; always null on a server
