@@ -1347,6 +1347,86 @@ guard out), sim/scale-probes.test.ts the KNOWN vanish-and-return and the
 swept counts on sighting 3, and sim/scoped-sweep.test.ts A13 with its
 engagement and M12 non-vacuity; M11 reads `feeds`.
 
+**Note, 2026-10-12 (wave 6b: the lane rule).** The STATUS line "a
+teacher record above the cut that also staged live goes into the
+feeder's lane twice" is closed (kernel/scope.ts `onAcqDone`).
+
+*The rule.* A lane holds each (origin, seq) ONCE, and the scalar fence
+(`streams.applied`) never sits below the lane's tail. The second half is
+what the first rests on: the fast path (write.ts `inbound`) appends at
+the tail on `seq > applied` alone, and only an arrival at or under the
+fence takes the dual fence (`#splice`: present in the lane ⇒ dropped,
+absent ⇒ spliced at its seq). So every site that puts an entry into a
+lane above the fence must raise the fence over it. The fold did not.
+
+*What was wrong.* A teacher ships every entry of p it holds, with its
+OWN floor as the cut (`#teach`, `#myFloors`). An entry above the
+teacher's floor — a gapped chain there, a lost frame not yet repaired —
+arrives above the cut. The fold spliced it and raised the fence only to
+the cut, so three arrivals of a record the fold already held went down
+the fast path and appended: the same record staged live during the latch
+and replayed after the fold (the review's probe: lane bb at aa
+[3, 5, 7, 7]; the forward shipped it twice and the spoke dropped the
+copy), a later re-ship of it (a third copy), and any record between the
+cut and the tail (appended out of order: [3, 5, 7, 6]). The base tree
+has the same lanes.
+
+*The fix, and the choice.* The fence rises to the top of what the
+teacher shipped on each lane (`top`, one Map set per teach record),
+after the cut loop. Not the other shape the plan offered ("the live
+replay skips what the fold already holds"): that closes one site and
+leaves the tail above the fence, so the next re-ship or the next record
+between the cut and the tail still appends twice or out of order. With
+the fence at the tail the replay drops the copy on the dual fence (one
+`dupDrop`), V4-53's forward ships each record once (the fold forwards it,
+the replay forwards nothing), the spoke's fence rule is untouched, and
+the floor stays at the cut: the fold attests what the teacher attested,
+never the chain (the floor law), and the next announce trues it up — the
+one behaviour that moves, the staged copy no longer advancing the floor
+through the fast path's chain rule, is one round trip of liveness, no
+data. Nothing peer-facing reads `applied` on an armed node: the digest
+body is the lane tail (node.ts `#sendDigest`), coverage for M1 is the
+floor (`covers`), the frontier is pinned while armed; a client compares
+its own `applied` to its feeder's digest, and a client never folds.
+
+*What the sweep says.* With the fence rise switched off and a counter in
+the fold, the scoped sweep at FERO_SCOPED_SEEDS=8 made 4,646 folds and
+NOT ONE had a teacher record above the cut: the sweep's repairs close a
+lagging floor within one round trip (the owner's announce, the admit
+round after a redial), and no learner latched from a lagging teacher in
+that window on any seed. So no seeded schedule makes the duplicate, no
+monitor could have fired on it there (log-monotone would have: a copy
+appended at the tail is `7 after 7`), and the sweep is not this fix's
+mutation check. Every scoped trajectory is unchanged — the sweep's
+counts (spokeStale 6 on A12 seed 3, sighting 3's swept 9, 10, 7 and 8,
+the counted floors 5,337 / 600 / 14,791 / 60) stand as recorded, and the
+unscoped golden, the 300-seed sweep, 59,500 and 104,050 are untouched
+(`Scope` is built on scoped nodes only).
+
+*The invariant in the sim.* `lane-unique` (sim/monitors.ts `perEvent`):
+after every event, on every stepped node's lanes, a seq equal to its
+neighbour's fires ("n01 lane n02 holds seq 7 TWICE (at 2 and 3; epochs 1
+and 1) — the lane rule"). log-monotone proves uniqueness for the tail it
+scans (strictly ascending ⇒ no repeat) but scans from the length it last
+saw, so a copy an interior insert puts below that length is outside its
+window; lane-unique keeps the entry it last saw at the tail, scans the
+new tail while that entry still stands at its index, and the whole lane
+when it moved (an interior insert) or the array was replaced (a
+compaction — the case stage 3 adds). Counted (`laneUniqueCounts`: lane
+scans and neighbouring pairs); the scoped sweep records `eng.lanePairs`
+and asserts it above zero on every family. Checked: the kernel probe
+(kernel/scoped.test.ts 'THE LANE RULE', red on the base at "the lane
+holds 7 once", actual [3, 5, 7, 7]); the same frames on a formed sim node
+(sim/scale-probes.test.ts 'the lane rule in a sim': lane-unique and
+log-monotone both fire with the fence rise reverted, nothing fires now);
+an interior copy planted in sim/monitor-walk.test.ts, which lane-unique
+names and log-monotone does not, the scoped and full walks agreeing.
+
+*For stage 3.* Compaction may assume a lane holds each seq once and the
+fence covers the tail; `compact()` replaces the lane array, which
+lane-unique rescans whole, so a rewrite that kept a copy would be named
+at the next pass.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
