@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 on 2026-10-12 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 then 1062 then 1072 on 2026-10-12 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -767,6 +767,11 @@ working as designed.
   held view's own majority supersedes it, never a clock; the holds ride the HELLO (signed, fero-door/2)
   and the PULL; NACK is verb 27. evictTwo, evictTwoB, keptBallot and genesisSplit green; the CP costs
   pinned. Eight review rounds (Fable), the last two on the opener's own-hold gap. 1062/1062 + 18/18,
+  perf 60/60, 1000/1000 seeds, sim:scale green.
+
+- 2026-10-12 — wave 6b part 1: the lane rule as V4-56 (the ACQDONE fold raises the fence to the lane's tail;
+  a lane holds each (origin, seq) once; the lane-unique per-event monitor), the precondition for
+  stage 3. Fable built, two Opus review rounds and a third on the monitor's claim. 1072/1072 + 18/18,
   perf 60/60, 1000/1000 seeds, sim:scale green.
 
 ## The debug tool
