@@ -173,7 +173,9 @@ test('a DIALED target that hangs up mid-handshake WITHOUT a notice is a link los
       assert.ok(rows(m!, JK.giveUp).some((e) => e.a === x.addr) || rows(m!, JK.redial).filter((e) => e.b === x.addr).length >= 3, 'the silent host runs the redial chain, not a park')
     } finally { await m?.destroy() }
   }).finally(() => { x.close(); y.close(); z.close() })
-  assert.deepEqual(lines, [`fero('tcphangup'): refused ${z.addr} — it refused this node's proof (the secrets probably differ)`], `one line, for the one host that refused; none for a hang-up: ${JSON.stringify(lines)}`)
+  //! the member holds no view yet and z is one of its hosts, so the line also says the first view waits on it (DESIGN-DIRECTORY
+  // §13, narrowed after wave 6b's first review: a door refusal keeps the target in the genesis count, loudly)
+  assert.deepEqual(lines, [`fero('tcphangup'): refused ${z.addr} — it refused this node's proof (the secrets probably differ) — the first view waits on it`], `one line, for the one host that refused; none for a hang-up: ${JSON.stringify(lines)}`)
   assert.ok(!lines.join('\n').includes(S))
 })
 

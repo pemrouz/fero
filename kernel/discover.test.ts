@@ -187,10 +187,13 @@ test('sim: genesis over a DISCOVERED set — empty static hosts never form; disc
   assert.deepEqual(sim.violations, [])
 })
 
-//! ── the genesis gate (wave 6b, 2026-10-12; DESIGN-DIRECTORY §13). Genesis at the lowest-uuid member waits for links ≥
-// hosts, and hosts counts the discovered set, so a squatter the directory handed out held the first view for good. Now a
-// DIALED target that refused this node as a stranger — another name, another contract, the door — leaves the count; a
-// target that merely never answers stays in it (dead and cut look the same from here). ──
+//! ── the genesis gate (wave 6b, 2026-10-12; DESIGN-DIRECTORY §13, narrowed after its first review). Genesis at the
+// lowest-uuid member waits for links ≥ hosts, and hosts counts the discovered set, so a squatter the directory handed out
+// held the first view for good. Now a DIALED target that answered for ANOTHER RESOURCE NAME leaves the count — permanent
+// and symmetric, another resource for good. Every other target stays in it: one that merely never answers (dead and cut
+// look the same from here) AND one that refused this node's contract or its proof — the same process with its config
+// fixed is one of us, and counting it out let two halves of one host list each form a view at epoch 1 that never merged
+// (the review's probe) — so genesis waits on it, and the composer's refusal line says so (api/index.ts genesisWaits). ──
 test('the genesis gate: a DIALED target that answers for another name leaves the count — aa, the lowest, told of bb and the squatter zz, forms {aa,bb}@1 at the next heartbeat once zz refused it (the base waited for links ≥ hosts for good); a target that never answers (its chain gave up) stays in the count; a refused target that admits later is a link again', () => {
   const { node, of, fire } = harness('aa', { name: 'r', hosts: ['sim:bb', 'sim:zz'], heartbeatMs: 100 })
   const heartbeat = () => fire(of('timer').filter((e) => e[2] === TAG.heartbeat).pop()!) // the LAST armed heartbeat (the harness's fires the first)
@@ -241,27 +244,38 @@ test('the genesis gate: a DIALED target that answers for another name leaves the
   assert.ok(!node.refused('sim:zz'), 'admitted on ITS dial, claiming the listen I had refused: forgotten too')
 })
 
-test('the genesis gate, the door: a dialed target with NO secret where I have one (the HELLO-time matrix) and one that refuses my proof (the DOOR notice) both leave the count; a proving TIMEOUT does not (a lost frame may be a member), nor does a `uuid-taken` notice (the far side holds a member running as me); a target the directory forgets takes its refusal with it, a static one keeps it', () => {
+test('the genesis gate, the door and the contract: a dialed target with NO secret where I have one, one that refuses my proof (the DOOR notice), one with another cluster contract, a proving TIMEOUT and a `uuid-taken` notice ALL stay in the count (as first built the first three left it: a fixable mismatch across one host list formed two clusters that never merged); only a target that answers for another NAME leaves it — forgotten with the target when the directory forgets it, kept for a static host', () => {
   const door = toyDoor('s', () => 0.5)
-  const { node, of } = harness('aa', { name: 'r', hosts: ['sim:tt', 'sim:uu', 'sim:ss'], heartbeatMs: 100, door })
+  const { node, of } = harness('aa', { name: 'r', hosts: ['sim:tt', 'sim:uu', 'sim:ss', 'sim:qq'], heartbeatMs: 100, door, contract: 'v1;heartbeat.ms=100;replicas=1;methods=0;validation=none' })
   node.step({ kind: 'start' })
-  node.step({ kind: 'discover', hosts: ['sim:nn', 'sim:pp'] })
-  //! nn: no `k` on its HELLO — no-secret, refused at HELLO time
+  node.step({ kind: 'discover', hosts: ['sim:nn', 'sim:pp', 'sim:mm'] })
+  //! nn: no `k` on its HELLO — no-secret, refused at HELLO time; counted (the same process with FERO_SECRET set is one of us)
   node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:nn' })
   node.step({ kind: 'bytesIn', link: 2, bytes: hello('nn', 'sim:nn') })
   assert.deepEqual(of('close').at(-1), ['close', 2, 'door'])
-  assert.ok(node.refused('sim:nn'))
-  //! pp: a HELLO with `k`, then a refusal notice for my proof
+  assert.ok(!node.refused('sim:nn'), 'no-secret stays in the count')
+  //! pp: a HELLO with `k`, then a refusal notice for my proof — counted (the secrets differ; one fix and it is one of us)
   node.step({ kind: 'linkUp', link: 3, dialed: true, to: 'sim:pp' })
   node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'pp', i: 1, l: 'sim:pp', k: 'a'.repeat(32) }) })
   assert.equal(node.links.get(3)!.proved, true, 'the dialer proved at HELLO time')
   node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DOOR, { e: 'denied' }) })
   assert.deepEqual(of('close').at(-1), ['close', 3, 'door'])
-  assert.ok(node.refused('sim:pp'))
-  //! ss: a static host that answers for another name — refused, and kept (a static host is never forgotten)
+  assert.ok(!node.refused('sim:pp'), 'a refused proof stays in the count')
+  //! qq: another cluster contract (replicas=2 against my 1) — contractReject, counted (the review's probe: counting it
+  // out let each half of one list form its own view at epoch 1, and fixing the contract could not merge them)
+  node.step({ kind: 'linkUp', link: 7, dialed: true, to: 'sim:qq' })
+  node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'qq', i: 1, l: 'sim:qq', c: 'v1;heartbeat.ms=100;replicas=2;methods=0;validation=none', k: 'd'.repeat(32) }) })
+  assert.deepEqual(of('close').at(-1), ['close', 7, 'contract-mismatch'])
+  assert.deepEqual(node.journal.read().filter((e) => e.kind === JK.contractReject).map((e) => [e.b, e.c]), [['replicas', '2']])
+  assert.ok(!node.refused('sim:qq'), 'a contract mismatch stays in the count')
+  //! ss: a static host that answers for another name — out of the count, and kept (a static host is never forgotten)
   node.step({ kind: 'linkUp', link: 6, dialed: true, to: 'sim:ss' })
   node.step({ kind: 'bytesIn', link: 6, bytes: encodeControl(VERB.HELLO, { u: 'ss', i: 1, l: 'sim:ss', n: 'other', k: 'e'.repeat(32) }) })
-  assert.ok(node.refused('sim:ss'), 'name-mismatch before any proof')
+  assert.ok(node.refused('sim:ss'), 'name-mismatch before any proof: another resource, out of the count')
+  //! mm: a discovered target that answers for another name — out of the count until the directory forgets it
+  node.step({ kind: 'linkUp', link: 8, dialed: true, to: 'sim:mm' })
+  node.step({ kind: 'bytesIn', link: 8, bytes: encodeControl(VERB.HELLO, { u: 'mm', i: 1, l: 'sim:mm', n: 'other', k: 'f'.repeat(32) }) })
+  assert.ok(node.refused('sim:mm'))
   //! tt: a HELLO with `k`, then silence — the proving deadline refuses it `timeout`, and it stays counted
   node.step({ kind: 'linkUp', link: 4, dialed: true, to: 'sim:tt' })
   node.step({ kind: 'bytesIn', link: 4, bytes: encodeControl(VERB.HELLO, { u: 'tt', i: 1, l: 'sim:tt', k: 'b'.repeat(32) }) })
@@ -269,16 +283,42 @@ test('the genesis gate, the door: a dialed target with NO secret where I have on
   node.step({ kind: 'timer', id: prove[1] as number, tag: TAG.prove })
   assert.deepEqual(of('close').at(-1), ['close', 4, 'door-timeout'])
   assert.ok(!node.refused('sim:tt'), 'a timeout is not a refusal: the peer may be one of us with a frame lost')
-  //! uu: the far side holds a member running as me — `uuid-taken` is MY misconfiguration, not a stranger
+  //! uu: the far side holds a member running as me — `uuid-taken` is MY misconfiguration, counted
   node.step({ kind: 'linkUp', link: 5, dialed: true, to: 'sim:uu' })
   node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.HELLO, { u: 'uu', i: 1, l: 'sim:uu', k: 'c'.repeat(32) }) })
   node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.DOOR, { e: 'uuid-taken' }) })
   assert.deepEqual(of('close').at(-1), ['close', 5, 'door'])
   assert.ok(!node.refused('sim:uu'))
-  //! the directory forgets nn and pp: the refusals go with them; ss, static, keeps its
+  //! the directory forgets nn, pp and mm: mm's name refusal goes with it; ss, static, keeps its
   node.step({ kind: 'discover', hosts: [] })
-  assert.ok(!node.refused('sim:nn') && !node.refused('sim:pp'), 'a refusal is remembered only for a target the node still dials')
+  assert.ok(!node.refused('sim:mm'), 'a name refusal is remembered only for a target the node still dials')
   assert.ok(node.refused('sim:ss'))
+})
+
+//! the gate WAITS on a door or contract refusal (the narrowing): with bb admitted and the one other host refusing — the
+// secret, or the contract — the count still wants it, so no ballot opens; red as first built (it proposed {aa,bb}@1)
+test('the genesis gate waits, loudly, on a same-name host that refuses this node: aa, the lowest, with bb admitted and the only other host refusing at the door (it has a secret, aa has none) or for its contract proposes NOTHING at the heartbeat — the host is one of us with a config fix, and counting it out split one list into two clusters; a host that answers for another name is not waited for (the test above)', () => {
+  for (const tag of ['peer-secret', 'contract'] as const) {
+    const { node, of, fire } = harness('aa', { name: 'r', hosts: ['sim:bb', 'sim:zz'], heartbeatMs: 100, contract: 'v1;heartbeat.ms=100;replicas=1;methods=0;validation=none' })
+    const heartbeat = () => fire(of('timer').filter((e) => e[2] === TAG.heartbeat).pop()!)
+    const mine = node.contract! // the kernel appends its ring (`;ring=…`): a peer must echo the whole string
+    const close = tag === 'contract' ? 'contract-mismatch' : 'door'
+    const bytes = tag === 'contract'
+      ? encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', c: mine.replace('replicas=1', 'replicas=2') })
+      : encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', c: mine, k: 'a'.repeat(32) })
+    node.step({ kind: 'start' })
+    node.step({ kind: 'linkUp', link: 1, dialed: true, to: 'sim:bb' })
+    node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HELLO, { u: 'bb', i: 1, l: 'sim:bb', c: mine }) })
+    assert.deepEqual(node.admitted(), ['bb'], tag)
+    node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:zz' })
+    node.step({ kind: 'bytesIn', link: 2, bytes })
+    assert.deepEqual(of('close').at(-1), ['close', 2, close], tag)
+    assert.ok(!node.refused('sim:zz'), `${tag}: still counted`)
+    node.step({ kind: 'linkDown', link: 2, reason: close, to: 'sim:zz' })
+    heartbeat()
+    assert.equal(node.epoch, 0, `${tag}: no view`)
+    assert.equal(node.journal.read().filter((e) => e.kind === JK.propose).length, 0, `${tag}: genesis waits on zz (as first built: {aa,bb}@1 proposed here)`)
+  }
 })
 
 test('the genesis gate, the guard: a host list cut in two halves never forms two views — four members told of each other, {n01,n02} cut from {n03,n04} before the start; every chain gives up and gives up again at every heartbeat, and nobody forms a view (a closed port and a cut look the same); the heal forms ONE view of four', () => {
