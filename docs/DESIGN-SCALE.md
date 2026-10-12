@@ -1495,8 +1495,9 @@ marks. The memo keys a lane's last fruitless pass on (length,
 `Scope.evidence`), the counter bumped where a mark rises or is voided,
 at an install, a seal, a fold, a shed, and where a durable floor
 advances. A compacting pass on a durable node arms the snapshot swap and
-the swap's echo rewrites the boot record, so the floor seed sits above
-the pp gaps the pass opened. ACQDONE gains `w`, the teacher's
+the boot record is written when that swap is issued (at its echo until
+the second review, see below), so the floor seed sits above the pp gaps
+the pass opened at every crash point. ACQDONE gains `w`, the teacher's
 dedup-window tuples for p, and armed window entries record their
 partition. The shed bar, the drain and `shedWaitingOn` read the same
 crash-stable ladder as C3. Tombstone GC stays pinned while armed (stage
@@ -1545,6 +1546,14 @@ change needed).
    holds with compaction off too (checked with the frontier forced to
    0), so the sweep's catch for "compaction off" is its per-family
    `compactions > 0` count, and P4 is where the bound bites.
+7. **The boot record is written when the compaction-armed swap is
+   issued**, not at its echo (the row's words; the second review, below).
+   At the echo it left a window between the swap's fsync and its echo
+   where the compacted file sat under the old seed: a crash there
+   re-latched once, and the marks the node had announced were above what
+   its disk restored while peers counted them as crash-stable. The seed
+   written at the issue is the pre-swap durable floor, which is at or
+   above every gap and backed by either file on disk (§4).
 
 *The numbers.* Every family of the sweep compacts (2 to 111 passes per
 seed at compactAt 16) and every family is safe and live at the battery's
@@ -1555,7 +1564,7 @@ entries for 1,500 held cells over eight nodes after 50,000 updates, the
 worst node 311 entries over its cells. A durable holder restarted after
 its lanes compacted below their floors and its WAL swapped restores its
 floors from the seed and re-latches nothing (5 re-latches with the boot
-rewrite at the echo removed). A client of a scoped server across its
+write removed). A client of a scoped server across its
 feeder's passes: zero resyncs, M12 green. Mutation checks, each once:
 the acquiring/absent pin removed turns M2 red on 2 of 26 sweep runs
 (A2 seed 1: "n01 compacted (n01, 51) of 'p114' while holder n02's real
@@ -1630,8 +1639,9 @@ under 240 hot writes, so every pass the writes arm runs inside the lag
 behind its possession floors). Under the mutation the test is red with 20
 M2 violations ("n03's real floor for that lane is 0 — below the
 frontier"); with the old M2 line it passes, so both halves are needed.
-§6's list names the schedule. Stage 4's R2 ("crash-stable floor per
-lane") is checked against the same schedule. (2) `scopedFrontier`'s
+§6's list names the schedule. It never crashes a node, so it says nothing
+about what a disk restores; stage 4's R2 ("crash-stable floor per lane")
+has the window test below for that. (2) `scopedFrontier`'s
 self-is-a-holder guard (`mine`) was not pinned: removing it left every
 test green, because an install that moves p off a node makes it an orphan
 in the same step. It is pinned now through the ring's test seam
@@ -1640,9 +1650,44 @@ longer places here never compacts though both holders attest the tail,
 and placed back the same marks compact it. (3) P4 summed the cluster-wide
 pass count once per node; the printed line was right, the sum is out of
 the loop. (4) §4 said "a crash before the echo restores the previous
-snapshot plus appended rows"; it now names the window after the swap's
+snapshot plus appended rows"; it then named the window after the swap's
 fsync and before its echo: the compacted lanes under the old boot record,
 one re-latch, nothing lost — the shape the restore test's mutation shows.
+
+*Reviewed again, 2026-10-12 (the second review: one minor, one nit; the
+window closed in the kernel).* The minor: §4's window sentence described
+only the node's own re-latch. In that window the node's already-announced
+durable marks were higher than what its disk would restore, and peers' C3
+frontier and the shed (both on `stableMarks`) counted them as crash-stable
+until the reborn's HELLO voided them; the slow-disk schedule never
+crashes, so it could not show this. The reviewer's probe (n=3 R=2
+durable, one holder's fsync at 150-500 ms, a crash inside the window on 8
+of 8 runs) found 12 (lane, partition) pairs where peers held marks of
+2-5 while the disk restored 0, and 0 in the control that crashed after
+the echo. Harmless in stage 3 (every winner is kept, removes are never
+compacted, the restore re-latches once), an R2 hazard for stage 4.
+Confirmed by reading node.ts: the only write of the seed after a pass was
+at the echo. Closed in the kernel rather than in the text, since the close
+is one line and clearly right: `snapshot()` writes the boot record right
+after it hands a compaction-armed swap to the sink, with the pre-swap
+durable floors as the seed (§4 above says why either file backs it), and
+the echo writes nothing more — one boot write per compacting swap, as
+before. The test (sim/compaction.test.ts "window"): compactAt 2 so the
+quiet leaves no loser for a later pass, six fresh FIELD cells written
+above the seed on disk (a fresh row is a fresh partition, whose seal at a
+durable holder writes the record), the holder's fsync slowed to 400-500
+ms, a burst that turns the six into losers, the sim stepped one virtual
+ms at a time until the holder has issued a compaction-armed swap whose
+echo has not landed, then a restart: the seed on disk covers every gap,
+the floors restored equal the pre-crash floors, 0 re-latches, and no
+mark a peer held for the holder is above what its disk restored. With
+the write moved back to the echo it is red at "the seed on disk covers
+the gap" and, with that line removed, at "no re-latch" (5); the restore
+test stays green under the same mutation. The kernel test pins the write
+at the issue and none at the echo. The nit: the COMPACTION PIN's title
+said the journal row carried the partition; it carries the count since
+b0291a7. The deviation list above gains a seventh entry: the row's "the
+boot record rewritten at its echo" is "written when the swap is issued".
 
 ## §0 The decision, in ten lines
 
@@ -1994,15 +2039,28 @@ boot record's seed and then only through chain-verified rows (write.ts:
 846-849). Compaction opens pp gaps at or below F ≤ my own durable floor,
 so the seed must cover them: a pass that dropped entries arms the snapshot
 (`#walRows = snapshotAt`, the `spliced()` idiom at node.ts:333-339) and
-the swap's echo rewrites the boot record (today only when a dirty entry
-clears, node.ts:535-536). A crash before the swap's fsync restores the
-previous snapshot plus appended rows: still honest. A crash after the
-swap's fsync but before its echo restores the compacted lanes under the
-OLD boot record: replay chains from the stale seed, stops at the first gap
-the pass opened, and the floors come up below the content, so the node
-re-latches those partitions from a holder, once — honest-low, nothing lost
-(the restore test's mutation, the echo's rewrite removed, shows exactly
-this shape: 5 re-latches). Memory nodes have no replay and no constraint.
+the boot record is written WHEN THAT SWAP IS ISSUED (`snapshot()`, right
+after the swap is handed to the sink; before the second review it was
+written at the swap's echo, which left the window below). The seed it
+carries is the pre-swap durable floor per (lane, partition): at or above
+every gap the pass opened (the pass dropped at or under it), and backed by
+either file on disk — the old WAL has no gap above it, the new one none
+at all. The shell writes the record synchronously and queues the swap, so
+the seed lands first; the sim lands the swap at once. So every crash point
+restores floors that chain to the content: before the swap lands, the old
+rows under the new seed; after it, the compacted rows under the same seed;
+the echo writes nothing more. The marks a durable node announced are
+therefore never above what its disk restores on account of compaction,
+which is what C3 and the shed assume when they count them as crash-stable
+(a splice's dirty partition is DESIGN-M6's own honest-low case, zeroed at
+the restore, unchanged here). With the write at the ECHO, a crash after
+the swap's fsync and before its echo restored the compacted lanes under
+the OLD seed: replay chained from it, stopped at the first gap, and the
+floors came up below the content — one re-latch (the window test's
+mutation: 5), nothing lost in stage 3, but peers' C3 frontier and the
+shed had counted the announced marks as crash-stable until the reborn's
+HELLO voided them, which stage 4's R2 would have inherited. Memory nodes
+have no replay and no constraint.
 
 **Memory after the change, per node.** Log entries ≤ Σ over lanes of
 (winners for held partitions + `compactAt`) at quiescence; winners = live
@@ -2303,7 +2361,10 @@ weakened rule must be caught by M1, M3 or M6 within the pinned seed
 budget: no census (A3, A5); lane accounting off (A1, A7); R2 without the
 gapless bit (A2, G4); volatile instead of durable floors (A4's class — M2
 on the slow-disk schedule of sim/compaction.test.ts, since A4's own passes
-all run after its lagging disk has caught up; the stage-3 note); release of
+all run after its lagging disk has caught up; for what a disk RESTORES
+against announced marks, the window test of the same file, which crashes
+a holder between a compaction-armed swap and its echo; the stage-3 note
+and its second review); release of
 the version only, lanes untouched (G1, every family); teach without the
 `keep` filter (A3); compaction over orphans or over an acquiring holder's
 zero (M2); a dropped dirty site (M7's knowledge form, measured with the
