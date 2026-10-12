@@ -647,9 +647,9 @@ test('the relay refuses before the stamp a client record it could not send alone
   h.node.step({ kind: 'linkUp', link: 7, dialed: false })
   h.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: '', r: 1 }) })
   h.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 0 }) })
-  //! a client's WRITE frame fits the wire (~3.5 KB), but its first record, a 2,000-character string, would need ~6 KB
-  // of this node's writer once re-encoded (a string reserves 3 bytes a character, V4-48's count): it could never go
-  // alone in a frame of 4096. Before the gate it was stamped, then the encoder threw from this socket handler.
+  //! a client's WRITE frame fits the wire (~3.5 KB), but its first record, a 2,000-character string, is charged ~6 KB
+  // by V4-48's count (a string 4 + 3 bytes a character), past the room of a 4096 frame: the gate refuses what that count
+  // refuses, as an honest fero client's own check would have. (Before the gate such a record was stamped first.)
   const [w] = encodeRuns([
     { rec: { type: REC.update, key: ['big'], value: 'x'.repeat(2000) }, origin: 'cl~1', seq: 1, epoch: 0 },
     { rec: { type: REC.update, key: ['ok'], value: new Uint8Array(1500) }, origin: 'cl~1', seq: 2, epoch: 0 },

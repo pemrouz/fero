@@ -236,7 +236,10 @@ export class Writer {
   //! str: varint byteLen + utf8, in ONE pass via encodeInto (v2 computed Buffer.byteLength twice per string — sizing pass then write pass).
   //! The worst case (3 bytes a character) is reserved only when it fits the limit; a long string, or one near the
   // limit, is encoded first and takes only its real bytes, so a frame holds what really fits — a 3 KB string was
-  // refused a frame of 8 KiB (the V4-51/52 review). A frame that never nears its limit is byte-identical.
+  // refused a frame of 8 KiB (the V4-51/52 review). A frame that never nears its limit is byte-identical. The exact
+  // path first asks the least the string can take (a byte a UTF-16 unit, a byte of length), so a string far past the
+  // limit is refused unread, as before; and under 2^21 bytes it writes the same 3-byte length as the fast path, so a
+  // string takes the same bytes wherever it lands and a writer with more room never holds less (the last check).
   str(s: string) {
     const lenAt = this.len
     // reserve 3 varint bytes for lengths up to 2^21-1; longer strings re-encode via the slow path
@@ -249,9 +252,20 @@ export class Writer {
       this.buf[lenAt + 2] = written >>> 14
       this.len += written
     } else {
+      if (this.len + 1 + s.length > this.limit) throw FULL
       const bytes = utf8.encode(s)
-      this.varint(bytes.length)
-      this.bytes(bytes)
+      if (bytes.length < 1 << 21) {
+        this.ensure(3 + bytes.length)
+        const n = bytes.length
+        this.buf[this.len] = (n & 0x7f) | 0x80
+        this.buf[this.len + 1] = ((n >>> 7) & 0x7f) | 0x80
+        this.buf[this.len + 2] = n >>> 14
+        this.len += 3
+        this.bytes(bytes)
+      } else {
+        this.varint(bytes.length)
+        this.bytes(bytes)
+      }
     }
   }
   bytes(b: Uint8Array) { this.ensure(b.length); this.buf.set(b, this.len); this.len += b.length }

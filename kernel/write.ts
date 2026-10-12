@@ -509,7 +509,9 @@ export class Writes {
       //! the SIZE GATE (V4-51): a client's record this node could not send ALONE in one of its frames must never be
       // stamped — after the stamp it would be a loud throw from the encoder (the commit fan-out, the WAL row, an
       // answer), out of this socket handler. Asked by size only, with V4-48's own count (encodable, a string 4 + 3 a
-      // character), so a record an honest fero client's own check lets through is never refused here. A record's
+      // character): it refuses what that count refuses, which is more than the encoder cannot carry (the writer sizes
+      // a string by its real bytes when its worst case would not fit), and never what an honest fero client's own check
+      // lets through. A record's
       // encode peaks at 4 × its wire bytes + 4 at most, so a FRAME no longer than (room - 4) / 4 cannot hold one past
       // the room: one compare per frame, and the walk runs only for a record that long (~64 MiB at MAX_FRAME).
       const room = roomOf(node.tune.frame)

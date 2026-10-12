@@ -697,6 +697,18 @@ test('a string is sized by its real bytes when its worst case would not fit: a 3
   o.add({ type: REC.update, key: ['s'], value: 'y'.repeat(2000) })
   assert.equal(o.pending.length, 0, 'one frame: the record fits as it really is')
   assert.equal(new Framer().push(o.finish()!)[0].records()[0].value, 'y'.repeat(2000))
-  const small = new Writer(); small.value('short'); const again = new Writer(); again.value('short')
-  assert.deepEqual(small.buf.subarray(0, small.len), again.buf.subarray(0, again.len))
+  const small = new Writer(); small.value('short')
+  assert.deepEqual([...small.buf.subarray(0, small.len)], [0x85, 0x80, 0x00, 0x73, 0x68, 0x6f, 0x72, 0x74], 'a short string as ever: a 3-byte length, then its bytes')
+  //! the last check: the exact path wrote the fewest length bytes, so a string's size depended on where it landed and a
+  // writer with MORE room could hold LESS (fits, FULL, fits, FULL at rooms 996-1003 for this value). Both paths write the
+  // same 3-byte length now: once a value fits a room, it fits every bigger one.
+  const v = [new Uint8Array(399), 's'.repeat(198), 's'.repeat(131), 's'.repeat(86), 's'.repeat(56), 's'.repeat(36), 't'.repeat(72)]
+  let fitAt = -1
+  for (let room = 900; room <= 1100; room++) {
+    let fits = true
+    try { new Writer(room).value(v) } catch (e) { if (e !== FULL) throw e; fits = false }
+    if (fits && fitAt < 0) fitAt = room
+    if (fitAt >= 0) assert.ok(fits, `fits at ${fitAt}, so at ${room} too`)
+  }
+  assert.ok(fitAt > 0)
 })
