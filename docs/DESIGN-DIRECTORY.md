@@ -635,8 +635,9 @@ resource that moves onto the right port heals at the heartbeat's revival cadence
 name-reject park always did, §9) or when the directory forgets the target (a `discover` without it;
 a static host keeps its refusal, as it is never forgotten).
 
-Why the gate was narrowed — the first review's probe (`.review/split.test.ts`, 2026-10-12). As first
-built, every refusal that said "not one of us" — the name, the contract, the door — left the count.
+Why the gate was narrowed — the first review's probe (a sim scenario the reviewer wrote and ran on the
+first build, 2026-10-12; its shape is the `contractReject` case of `kernel/discover.test.ts` now). As
+first built, every refusal that said "not one of us" — the name, the contract, the door — left the count.
 The probe took four members on ONE host list, n01 and n02 with `replicas=1` in their contract, n03
 and n04 with `replicas=2`, heartbeat 50, durable. Each half refused the other by contract, each
 half's count dropped by the other half, and after 3 s there were TWO writable views at epoch 1:
