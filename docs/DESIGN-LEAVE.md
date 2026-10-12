@@ -2148,6 +2148,11 @@ members, and a majority of EACH held view's members linked or itself. Not for a 
 is itself (its disown answers that ask in one frame); nothing where some held view's majority is out
 of reach, so the far side of a cut and the two CP shapes below burn no epochs; nothing while a
 ballot is in flight, so a suspect's eviction (which is joint over the same holds) is never doubled.
+It does NOT wait for the opener's own gate to close (the reviewer's sketch had it fire only at a
+`minority` stayer): a held member in a cluster that is writable without it is still a member whose
+writes park and, past the bounded queue, drop, and no membership change may ever come; the ballot is
+the same safe ballot either way, and it costs one same-members epoch, once. In every pinned shape the
+two triggers coincide (the stayer that can open is the one the held members leave in the minority).
 Safety is unchanged: the opener grants nothing and counts nothing new; its ballot commits under the
 rule above and IS the supersession of §10.10.2. `keptBallotProposerGone` pins the three variants:
 `evicted` is released by aa's disown the moment the asks land, before any tick (bb proposes nothing
