@@ -174,13 +174,35 @@ export const unsendable = (r: Rec, limit: Limit = WRITE): string | null => {
   let n = r.at === undefined ? 0 : 4 + r.at.length * 3
   for (const k of r.key) n += 4 + k.length * 3
   if (r.type === REC.remove) return encodable(undefined, limit, 0, n)
+  const from = r.key.length > 1 ? r.key.length - 1 : 0
   try {
-    r.value = copyOf(r.value, limit, r.key.length > 1 ? r.key.length - 1 : 0, n)
+    r.value = copyOf(r.value, firstOf(limit), from, n)
+    return null
+  } catch (e) {
+    if (!(e instanceof Unsendable)) throw e
+    if (!e.over || firstOf(limit) === limit) return e.message
+  }
+  const why = encodable(r.value, limit, from, n)
+  if (why !== null) return why
+  try {
+    r.value = copyOf(r.value, limit, from, n)
     return null
   } catch (e) {
     if (e instanceof Unsendable) return e.message
     throw e
   }
+}
+//! firstOf — the share of a write's byte budget its copy may spend before it stops to ask without copying (the
+// V4-51/52 review): a value refused for its size was copied up to the whole budget first — about 660 MiB of heap and
+// 5 s for a value of shared parts at 255 MiB, where V4-48's walk refused in about 1 s and allocated nothing. Past a
+// sixteenth of the budget (at most 16 MiB), encodable, which allocates nothing, answers first, and the copy runs again
+// only for a value it passes. A value under that share pays one pass, as before; a getter in a bigger one runs up to
+// three times. Under a 1 MiB budget (a test's small frame cap) there is no first share.
+const FIRST = new WeakMap<Limit, Limit>()
+const firstOf = (limit: Limit): Limit => {
+  let f = FIRST.get(limit)
+  if (f === undefined) FIRST.set(limit, f = limit.bytes >> 4 < 1 << 16 ? limit : { ...limit, bytes: Math.min(16 << 20, limit.bytes >> 4) })
+  return f
 }
 
 //! reasonOf — a validation: rule's refusal as text. A rule answers `true` or the reason; any other answer (false,

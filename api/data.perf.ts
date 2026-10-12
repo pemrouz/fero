@@ -12,7 +12,7 @@ import { Runtime } from '../shell/runtime.ts'
 import { Bind, unsendable } from './data.ts'
 import { VERB, encodeControl, encodeRuns } from '../kernel/codec.ts'
 import { REC, type Rec } from '../kernel/env.ts'
-import { bench, ratio } from '#utils'
+import { alloc, bench, ratio } from '#utils'
 
 const harness = () => {
   const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0 })
@@ -153,4 +153,21 @@ test('ratio: a foreign ROW apply with 1k of our field writes in flight in that r
   assert.ok(r < 1.6, `foreign row apply with 1k of ours in flight / with none = ${r.toFixed(2)}x — the probe walks every field of ours in the row (budget 1.6x)`)
   none.bind.destroy(); many.bind.destroy()
   await none.rt.destroy(); await many.rt.destroy()
+})
+
+//! ALLOC (the V4-51/52 review): a write's check is a copy now (V4-52), and a value refused for its size was copied up
+// to the whole budget before the refusal — about 1 GiB of garbage and 7 s at the production cap for a value built of
+// shared parts, where V4-48's walk refused in about 1 s and allocated nothing. The copy now spends at most a sixteenth
+// of the budget, then encodable (no allocation) answers. At a 16 MiB frame cap: about 4 MiB and no collection; the
+// whole-budget copy left 64 MiB and four or five collections.
+test('alloc: a write refused for its size leaves at most a sixteenth of its budget in garbage, and no collection', async () => {
+  const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0, tune: { frame: 16 << 20 } })
+  const bind = new Bind(rt)
+  let dag: unknown = 1
+  for (let i = 0; i < 24; i++) dag = [dag, dag] // 16M leaves through 25 shared arrays: charged far past the budget
+  const r = await alloc.garbage(() => { assert.equal(bind.issue([{ type: REC.update, key: ['big'], value: dag }])[0], 'unencodable') }, 1, { k: 3, warm: 1 })
+  assert.ok(r.gcEvents === 0 && r.bytes < 16 << 20, `a refused write left ${(r.bytes / 1048576).toFixed(1)} MiB in ${r.gcEvents} collections (budget about 15 MiB; a sixteenth is under 1 MiB of charge, about 4 MiB of copies)`)
+  assert.equal(rt.node.seq, 0, 'nothing stamped')
+  bind.destroy()
+  await rt.destroy()
 })
