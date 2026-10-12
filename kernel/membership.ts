@@ -1031,7 +1031,12 @@ export class Membership {
   // proposer of a view can hold a vote it gave ABOVE that view, over the view before it, between its own PROPOSE and its
   // own commit (bb granted aa's {aa,bb,cc}@3 over view 1 while its {bb,cc,dd,ee}@2 was in flight, then committed 2:
   // held, alone, the lowest, aa dead and no member — ownHoldProposerGone). My own holds' epochs count toward `past`
-  // whoever their proposer is: a ballot at one of them would re-spend a vote I gave away there.
+  // whoever their proposer is: a ballot at one of them would re-spend a vote I gave away there. Two terms here are belt
+  // and braces, implied by the guards around them and so unpinnable: `!this.isMember(x.p)` (a member proposer is either
+  // linked, and `!linked.has` stops it, or unlinked, and the every-member guard returned first) and the fold of every own
+  // hold's epoch into `past` (#nextEpoch never proposes below an own vote). Linked means admitted: a HELLO in flight, or
+  // a chain still redialing a non-member, is no link from my seat, so the opener may fire in that window — one
+  // same-members epoch more, safe (the eighth re-check).
   #openOverHolds(node: Node) {
     const linked = new Set<string>([node.uuid])
     let reachable = 1, freeing = false, past = this.view.epoch

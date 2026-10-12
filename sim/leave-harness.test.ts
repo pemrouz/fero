@@ -44,7 +44,10 @@
 // HELLOs in the Sim, since the mesh writes its own — red on the base as evictTwo was); and genesisProposerAndGranterDie
 // now records every node's proposal list and bb's vote, so a rule that re-proposes while frozen is pinned to the SAME
 // epoch. The fifth round (the page's last note; 2026-10-12) added askAfterHello, lostRelease and askAtAdmit, one per
-// open item. THE BUILD (2026-10-12, V4-55): the four holes are closed and every red pin is re-recorded to the rule's
+// open item. The build's review rounds (the fifth to the eighth, 2026-10-12) added keptBallotProposerGone (the kept
+// ballot's proposer gone: supersession needs a ballot, and the ask reaches the proposer), openerBesideSuspect (the
+// opener waits for a lost member as the eviction does) and ownHoldProposerGone (the lowest live member held alone on
+// its own vote, its proposer dead and out of the view: the opener reads my own holds too). THE BUILD (2026-10-12, V4-55): the four holes are closed and every red pin is re-recorded to the rule's
 // safe state; the two liveness pins the rule moves on purpose are proposerAndGranterDie and
 // genesisProposerAndGranterDie, the CP answer (§10.10.4, §10.10.1); the mid points of the release shapes show held
 // members where the base showed writable ones; no pin of any existing family moved (rebirth, both isolate families,

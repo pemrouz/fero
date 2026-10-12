@@ -2215,7 +2215,10 @@ this time the base kernel is writable there. The fix is two lines of the same ru
 them would re-spend a vote I gave away there), and `tick` reaches the opener when `held()` as well as
 when a member's word names a hold. A LINKED proposer, member or not, gets no opener: my ask goes on
 its link (`#askTargets`) and its VIEW or disown is the release in one round trip — the opener never
-fires where a word can. `ownHoldProposerGone` pins both: `dead` — after the flood bb `held` and the
+fires where a word can. Linked means ADMITTED: a link whose HELLO is still in flight, or a redial chain
+still running toward a non-member, is no link from my seat, so in that window the opener fires and the
+returning proposer's disown is moot — one same-members epoch more than the linked path, safe (the
+eighth re-check's note). `ownHoldProposerGone` pins both: `dead` — after the flood bb `held` and the
 rest writable, then `P(2,4) P(4,4)` joint over `{aa,bb,cc}`, cc, dd and ee consent, everyone writable
 at 4; `linked` — bb ticks held with aa linked and opens nothing (`P(2,4)`; without the narrowing the
 mid reads `P(2,4) P(4,4)`), aa, evicted by the flood with the ballot dropped, disowns on bb's ask
