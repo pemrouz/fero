@@ -32,7 +32,7 @@
 import { types } from 'node:util'
 import { proxy, applyRec, lens, holeAt, errText, isProxy, unfoldable, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
-import { encodable, copyOf, roomOf, sizeOf, Unsendable, Writer, FULL, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
+import { encodable, copyOf, roomOf, sizeOf, wellFormed, Unsendable, Writer, FULL, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -172,7 +172,10 @@ export const CARRIES = `fero sends null, undefined, true and false, numbers, str
 // never the program's.
 export const unsendable = (r: Rec, limit: Limit = WRITE): string | null => {
   let n = r.at === undefined ? 0 : 4 + r.at.length * 3
-  for (const k of r.key) n += 4 + k.length * 3
+  //! a key is sent as UTF-8, which has no spelling for half of a surrogate pair: such a key arrived as another key
+  // (U+FFFD in its place) on every other copy, while the writer kept its own — refused, removes too (the V4-52 review)
+  if (r.at !== undefined && !wellFormed(r.at)) return HALF_PAIR
+  for (const k of r.key) { if (!wellFormed(k)) return HALF_PAIR; n += 4 + k.length * 3 }
   if (r.type === REC.remove) return encodable(undefined, limit, 0, n)
   const from = r.key.length > 1 ? r.key.length - 1 : 0
   try {
@@ -192,6 +195,7 @@ export const unsendable = (r: Rec, limit: Limit = WRITE): string | null => {
     throw e
   }
 }
+const HALF_PAIR = 'a key with half of a surrogate pair in it (UTF-8 cannot carry it, so every other copy would hold another key)'
 //! firstOf — the share of a write's byte budget its copy may spend before it stops to ask without copying (the
 // V4-51/52 review): a value refused for its size was copied up to the whole budget first — about 660 MiB of heap and
 // 5 s for a value of shared parts at 255 MiB, where V4-48's walk refused in about 1 s and allocated nothing. Past a

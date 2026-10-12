@@ -238,7 +238,7 @@ test("a value fero takes is fero's own copy: a change to the program's object af
   assert.equal(got.v.n, 1)
   assert.equal(Object.getPrototypeOf(got.w.buf), Uint8Array.prototype)
   assert.equal(Object.getPrototypeOf(got.w.point), Object.prototype)
-  assert.deepEqual(got.w, { buf: new Uint8Array([1]), point: { x: 1, y: 2 }, s: 'x\uFFFD', bom: 'hi' })
+  assert.deepEqual(got.w, { buf: new Uint8Array([1]), point: { x: 1, y: 2 }, s: 'x\uFFFD', bom: '\uFEFFhi' }) // a leading U+FEFF is text: kept, here and on the wire
   await h.destroy()
 })
 
@@ -843,4 +843,21 @@ test('wave 5e — a spoke whose scoped feeder dies between the WACK and the tap:
   assert.deepEqual(rows().map((r) => [r.key, r.state, r.origin]).sort(), [[JSON.stringify(['px']), 'committed', 'tt'], [JSON.stringify(['py']), 'committed', 'tt']], 'no row left pending')
   bind.destroy()
   await rt.destroy()
+})
+
+//! the V4-51/52 review: a key is sent as UTF-8, which has no spelling for half of a surrogate pair, so such a row key or
+// field arrived as another key (U+FFFD in its place) on every other copy while the writer kept its own. Refused at the
+// write, removes and an insert's `at` too.
+test('a key with half of a surrogate pair in it is refused at the write — a row, a field, a remove, an insert\'s at — and nothing is stamped', async () => {
+  const h = harness()
+  assert.throws(() => { h.bind.data['lone\uD800'] = 1 }, (e: Error) => e instanceof TypeError && e.message.startsWith('fero: ["lone\\ud800"] cannot be sent: a key with half of a surrogate pair in it'))
+  h.bind.data.row = { a: 1 }
+  assert.throws(() => { h.bind.data.row['f\uDC00'] = 2 }, /cannot be sent: a key with half of a surrogate pair in it/)
+  assert.deepEqual(h.bind.issue([
+    { type: REC.remove, key: ['x\uD800'] },
+    { type: REC.insert, key: [], at: 'y\uDC00', value: 1 },
+    { type: REC.update, key: ['ok\uD83D\uDE00'], value: 1 },
+  ]).map((r) => typeof r === 'string' ? r : 'issued'), ['unencodable', 'unencodable', 'issued'], 'a whole pair is a key like any other')
+  assert.equal(h.jk(JK.writeLocal).length, 2, 'only the row and the well-formed key were stamped')
+  await h.destroy()
 })
