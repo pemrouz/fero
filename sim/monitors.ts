@@ -1477,11 +1477,12 @@ export const spokeStale = (sim: Sim, id: string): { n: number; some: string[] } 
 }
 const partOfKey = (k: string): string => (JSON.parse(k) as string[])[0] ?? ''
 
-//! boundedLogs — M8's horizon form (I12): at every armed node every lane holds at most winners + compactAt
-// entries, and every tombstone is fenced (a live row still needs it) or pinned by a named uuid. No pin surface
-// exists today, so an unfenced tombstone reads as unbounded: RED TODAY wherever a scoped run removed a cell or
-// a lane outgrew compactAt. The sweep pins the count of red seeds; stage 3 and stage 4 flip them.
-export const boundedLogs = (sim: Sim): string | null => {
+//! boundedLogs — M8's horizon form (I12), in two halves: boundedLanes — at every armed node every lane holds at
+// most winners + compactAt entries (GREEN since DESIGN-SCALE stage 3, 2026-10-12: scoped compaction drops the
+// losers under the holders' crash-stable frontier; the sweep asserts it on every seed) — and boundedTombs — every
+// tombstone is fenced (a live row still needs it) or pinned by a named uuid. No pin surface exists yet, so an
+// unfenced tombstone reads as unbounded: RED TODAY wherever a scoped run removed a cell; stage 4 flips it.
+export const boundedLanes = (sim: Sim): string | null => {
   let worst: string | null = null, worstBy = 0
   for (const [id, n] of sim.nodes) {
     if (!n.armed) continue
@@ -1492,10 +1493,13 @@ export const boundedLogs = (sim: Sim): string | null => {
       if (over > worstBy) { worstBy = over; worst = `${id} lane ${o} holds ${entries.length} entries: ${winners} winners + compactAt ${n.tune.compactAt}, ${over} over — unbounded` }
     }
   }
-  if (worst) return worst
+  return worst
+}
+export const boundedTombs = (sim: Sim): string | null => {
   for (const [id, n] of sim.nodes) {
     if (!n.armed) continue
     for (const [k, v] of n.versions) if (!n.state.has(k) && !n.fenced(k)) return `${id} holds the tombstone of ${k} @${stampOf(v)}, neither fenced nor pinned by a named uuid`
   }
   return null
 }
+export const boundedLogs = (sim: Sim): string | null => boundedLanes(sim) ?? boundedTombs(sim)
