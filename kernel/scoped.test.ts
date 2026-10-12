@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
 import { JK } from './journal.ts'
-import { compact, maybeCompact } from './log.ts'
+import { compact, compactScoped, maybeCompact } from './log.ts'
 import { SCOPE } from './scope.ts'
 import { Framer, VERB, encodeControl, encodeRuns } from './codec.ts'
 import { REC, TAG, type BootRecord, type EffectSink, type Env, type Rec } from './env.ts'
@@ -302,7 +302,7 @@ test('ACKED (DESIGN-SCALE stage 1) — an armed owner names its lane in the WACK
   assert.equal(h.node.writes.pending.size, 1, 'forwarded to bb, pending')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'aa~1', c: 1, n: 1, s: 9, e: 1, o: 'bb~3' }) })
   assert.deepEqual(h.of('acked'), [['acked', 'aa~1', 1, 'bb~3', 9, 1]], 'the WACK is the settlement: committed on the owner lane')
-  assert.deepEqual(h.node.writes.committed('aa~1', 1), { s: 9, e: 1, o: 'bb~3' }, 'the window names the lane, not the link')
+  assert.deepEqual(h.node.writes.committed('aa~1', 1), { s: 9, e: 1, o: 'bb~3', p: 'theirs' }, 'the window names the lane, not the link (and the partition, since stage 3: the ACQDONE `w` body selects by it)')
   //! a partition aa HOLDS as a co-holder: the record follows the WACK on the same link — the join settles, never `acked`
   h.node.writes.ring.place('ours', 'bb', 'aa')
   h.node.step({ kind: 'write', recs: [rec(['ours'], 8)] })
@@ -390,14 +390,14 @@ test('ACKED after a lost WACK — a commit learned by an ACQ fold or by WAL repl
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: rec(['px', 'a'], 1), origin: 'bb', seq: 5, epoch: 1, iss: 'cc~1', cid: 7, pp: 0 }], VERB.ACQ, true)[0] })
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 5 }, n: 1 }) })
   assert.equal(h.node.scope!.held('px'), true, 'the fold committed')
-  assert.deepEqual(h.node.writes.committed('cc~1', 7), { s: 5, e: 1, o: 'bb' }, 'the window names the lane the fold put the record on')
+  assert.deepEqual(h.node.writes.committed('cc~1', 7), { s: 5, e: 1, o: 'bb', p: 'px' }, 'the window names the lane the fold put the record on (and the partition, stage 3)')
   //! cc re-sends cid 7 (its first WACK was lost): answered from the window, with the lane
   h.node.step({ kind: 'bytesIn', link: 2, bytes: writeFrame('cc~1', 7, 1, [rec(['px', 'a'], 1)]) })
   assert.deepEqual(framesOn(h, 2, VERB.WACK).map((f) => f.value), [{ u: 'cc~1', c: 7, n: 1, s: 5, e: 1, o: 'bb' }], 'the dup answer after a fold carries the lane')
   //! the REPLAY leg, armed: a restored owner replays a held row with attempt identity, then meets the re-send
   const r = harness('aa', { replicas: 2, boot: { epoch: 1, members: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']], heldPartitions: ['p1'] } })
   r.node.step({ kind: 'replay', bytes: encodeRuns([{ rec: rec(['p1', 'a'], 1), origin: 'bb', seq: 10, epoch: 1, iss: 'cc~1', cid: 3, pp: 0 }], VERB.RECORDS, true)[0], prev: 0 })
-  assert.deepEqual(r.node.writes.committed('cc~1', 3), { s: 10, e: 1, o: 'bb' }, 'replay names the lane')
+  assert.deepEqual(r.node.writes.committed('cc~1', 3), { s: 10, e: 1, o: 'bb', p: 'p1' }, 'replay names the lane (and the partition, stage 3)')
   r.node.step({ kind: 'start' }); r.admit(1, 'bb'); r.admit(2, 'cc')
   r.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
   r.node.step({ kind: 'bytesIn', link: 2, bytes: writeFrame('cc~1', 3, 1, [rec(['p1', 'a'], 1)]) })
@@ -867,7 +867,8 @@ test('MUTUAL LATCH — two holders each behind the other on a different lane of 
   const acq = sentOn(h, 1, VERB.ACQ)
   assert.equal(acq.length, 1, 'the acquiring node taught its pre-latch base (it used to refuse: the deadlock)')
   assert.deepEqual([...acq[0].records()].map((rv) => [rv.origin, rv.seq]), [['aa', 1]])
-  assert.deepEqual(sentOn(h, 1, VERB.ACQDONE).map((f) => f.value), [{ p: 'p', e: 1, t: { aa: 1 }, n: 1 }], 'with its own floors as the cut: a sound claim whatever its latch state')
+  //! `w` (stage 3): the teacher's dedup-window tuples for p — aa's own write was attempt (aa~1, cid 1), committed at aa@1
+  assert.deepEqual(sentOn(h, 1, VERB.ACQDONE).map((f) => f.value), [{ p: 'p', e: 1, t: { aa: 1 }, n: 1, w: [['aa~1', 1, 1, 1, 'aa']] }], 'with its own floors as the cut: a sound claim whatever its latch state')
   assert.equal(h.node.scope!.entries.get('p')!.state, SCOPE.acquiring, 'and its own latch is untouched')
   //! bb's transfer lands: aa folds, holds both lanes, and its post-fold round announces both floors to bb
   h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 1, rec: rec(['p', 'y'], 2), pp: 0 }]) })
@@ -1158,35 +1159,290 @@ test('SHED drops the partition\'s floor from a stream that has NO lane (a cut-le
   assert.equal(h.node.streams.get('dd')!.parts?.get('p'), undefined, 'the lane-less stream\'s floor is gone too')
 })
 
-test('COMPACTION PIN — armed nodes never compact or GC on the member-ranged frontier (unsound under scoping); the unscoped control still does', () => {
-  const build = (replicas?: number) => {
-    const h = replicas ? armedView1() : harness('aa', { hosts: ['sim:bb', 'sim:cc'] })
-    if (!replicas) {
-      h.node.step({ kind: 'start' })
-      h.admit(1, 'bb')
-      h.admit(2, 'cc')
-      const m: [string, string][] = [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']]
-      h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m }) })
-      assert.equal(h.node.epoch, 1)
-    }
-    h.node.writes.ring.place('k', 'aa', 'bb')
-    //! one hot cell overwritten past COMPACT_AT: every superseded entry is compactable
-    for (let i = 0; i < 4200; i += 100)
-      h.node.step({ kind: 'write', recs: Array.from({ length: 100 }, (_, k) => rec(['k', 'x'], i + k)) })
-    //! peers announce marks past the tail so the unscoped frontier is unpinned
-    const tail = h.node.streams.get('aa')!.applied
-    h.node.confirm.feed(h.node, 'bb', 'aa', tail, -1)
-    h.node.confirm.feed(h.node, 'cc', 'aa', tail, -1)
-    return h
-  }
-  const armed = build(2)
-  const lenBefore = armed.node.logs.get('aa')!.length
-  maybeCompact(armed.node)
-  assert.equal(armed.node.logs.get('aa')!.length, lenBefore, 'armed: pinned — no cut until per-(o,p) attested marks exist')
-  assert.equal(armed.jk(JK.compacted).length, 0)
-  const plain = build(undefined)
+//! ── DESIGN-SCALE stage 3: compaction on scoped nodes (kernel/log.ts, the banner's rule C1-C4) ──
+
+//! hot — `n` writes of one cell of `p` on aa's own lane (batches of 100): every entry but the last is a loser
+const hot = (h: ReturnType<typeof harness>, p: string, n: number) => {
+  for (let i = 0; i < n; i += 100)
+    h.node.step({ kind: 'write', recs: Array.from({ length: Math.min(100, n - i) }, (_, k) => rec([p, 'x'], i + k)) })
+}
+const laneSeqs = (h: ReturnType<typeof harness>, o = 'aa') => h.node.logs.get(o)!.map((e) => e.seq)
+const compactedRows = (h: ReturnType<typeof harness>) => h.jk(JK.compacted).map((e) => [e.a, e.b, e.c])
+
+test('COMPACTION PIN (stage 3) — an armed node compacts only on attested crash-stable marks: a holder that has attested nothing pins the frontier at 0, a co-holder\'s mark IS the frontier, the lane\'s last entry and every winner stay, the per-partition index and the journal row (with the partition) follow; the compactor\'s own open latch pins; the unscoped control compacts on the member frontier as before', () => {
+  //! compactAt 64: the trigger stays size-armed (a lane under it is never walked), and the lane here shrinks below the
+  // default 4,096 after its first pass
+  const h = armedView1({ tune: { aeFan: 0, compactAt: 64 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('k', 'aa', 'bb')
+  hot(h, 'k', 4200)
+  assert.equal(h.node.logs.get('aa')!.length, 4200, 'past compactAt')
+  //! (a) bb has attested nothing for k: F(aa, k) = 0 — nothing may drop (an acquiring holder attests nothing either)
+  maybeCompact(h.node)
+  assert.equal(h.node.logs.get('aa')!.length, 4200, 'pinned: a holder with no attestation is the frontier\'s 0')
+  assert.deepEqual(compactedRows(h), [])
+  assert.deepEqual(h.node.scope!.memo.get('aa'), { len: 4200, v: h.node.scope!.evidence }, 'the fruitless pass is memoized on (length, evidence)')
+  //! (b) bb attests half the lane: exactly the losers at or under its mark drop; the winner (the last entry) and everything above stay
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: 2000 } }) })
+  maybeCompact(h.node)
+  assert.equal(h.node.logs.get('aa')!.length, 2200, '2000 losers at or under bb\'s mark left; 2200 above it stayed')
+  assert.deepEqual(compactedRows(h), [['aa', 2000, 'k']], 'one journal row per (lane, partition), with the partition')
+  assert.ok(laneSeqs(h).every((s) => s > 2000), 'nothing below the frontier is left but winners (there is none below it)')
+  assert.deepEqual(h.node.byPart!.get('k')!.get('aa'), h.node.logs.get('aa'), 'the per-partition index is the lane\'s filter after the pass')
+  assert.equal(h.node.state.get(JSON.stringify(['k', 'x'])), 4199, 'the fold is untouched')
+  //! (c) bb attests the tail: every loser goes, the winner stays — one entry, the lane's last
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: 4200 } }) })
+  maybeCompact(h.node)
+  assert.deepEqual(laneSeqs(h), [4200], 'the winner alone')
+  assert.deepEqual(compactedRows(h), [['aa', 2000, 'k'], ['aa', 2199, 'k']])
+  //! (d) the compactor's OWN open latch pins (C1): q held by aa and cc; cc announces a lane aa lacks, aa latches cc —
+  // q's losers stay though cc's marks for q cover them; the fold closes the latch and the next pass drops them
+  h.node.writes.ring.place('q', 'aa', 'cc')
+  hot(h, 'q', 100)
+  const qTail = h.node.logs.get('aa')!.at(-1)!.seq
+  h.node.step({ kind: 'write', recs: [rec(['k', 'y'], 1)] }) // so q's last entry is not the lane's tail
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(1, { q: { aa: qTail, cc: 3 } }) })
+  assert.equal(h.node.scope!.entries.get('q')!.state, SCOPE.acquiring, 'aa is behind on lane cc: latched')
+  maybeCompact(h.node)
+  assert.equal(h.node.byPart!.get('q')!.get('aa')!.length, 100, 'an acquiring partition never compacts, whatever the marks say')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: acqFrame('cc', [{ seq: 3, rec: rec(['q', 'z'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.ACQDONE, { p: 'q', e: 1, t: { aa: qTail, cc: 3 }, n: 1 }) })
+  assert.equal(h.node.scope!.held('q'), true)
+  maybeCompact(h.node)
+  assert.equal(h.node.byPart!.get('q')!.get('aa')!.length, 1, 'held again: q\'s 99 losers under cc\'s mark drop')
+  assert.equal(h.node.logs.get('aa')!.length, 3, 'k\'s winner, q\'s winner, the tail')
+  //! the size trigger: a lane under compactAt is not walked (the memo is not even consulted)
+  hot(h, 'q', 10)
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(1, { q: { aa: h.node.logs.get('aa')!.at(-1)!.seq, cc: 3 } }) })
+  const rows = compactedRows(h).length
+  maybeCompact(h.node)
+  assert.deepEqual([h.node.logs.get('aa')!.length, compactedRows(h).length], [13, rows], 'under compactAt: nothing walked')
+  //! the unscoped control: the member-ranged frontier, as before (the digest plane's marks)
+  const plain = harness('aa', { hosts: ['sim:bb', 'sim:cc'] })
+  plain.node.step({ kind: 'start' })
+  plain.admit(1, 'bb')
+  plain.admit(2, 'cc')
+  plain.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  plain.node.writes.ring.place('k', 'aa', 'bb')
+  hot(plain, 'k', 4200)
+  const tail = plain.node.streams.get('aa')!.applied
+  plain.node.confirm.feed(plain.node, 'bb', 'aa', tail, -1)
+  plain.node.confirm.feed(plain.node, 'cc', 'aa', tail, -1)
   maybeCompact(plain.node)
-  assert.ok(plain.jk(JK.compacted).length > 0, 'unscoped control: the same evidence compacts')
+  assert.deepEqual(compactedRows(plain), [['aa', 4199, undefined]], 'unscoped: one row per lane, no partition')
+})
+
+test('COMPACTION (stage 3) — a DURABLE co-holder counts at its durable marks, never its volatile floors (the seed-27 class); a MEMORY co-holder at its floors', () => {
+  const h = armedView1({ tune: { aeFan: 0, compactAt: 64 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('k', 'aa', 'bb')
+  hot(h, 'k', 4200)
+  //! bb is durable: its HAVEQ carries `d`. Its volatile floor covers the whole lane, its durable floor 1,000
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { k: { aa: 4200 } }, d: { k: { aa: 1000 } } }) })
+  maybeCompact(h.node)
+  assert.equal(h.node.logs.get('aa')!.length, 3200, 'F = bb\'s DURABLE mark: a crash before its fsync would need the rows above it')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { k: { aa: 4200 } }, d: { k: { aa: 4200 } } }) })
+  maybeCompact(h.node)
+  assert.deepEqual(laneSeqs(h), [4200], 'the durable mark reaches the tail: everything but the winner goes')
+  //! a memory peer (never a `d` map) counts at its floors
+  const m = armedView1({ tune: { aeFan: 0 } })
+  m.node.membership.rejoinFloor = 0
+  m.node.writes.ring.place('k', 'aa', 'bb')
+  hot(m, 'k', 4200)
+  m.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: 4200 } }) })
+  maybeCompact(m.node)
+  assert.deepEqual(laneSeqs(m), [4200], 'a memory node\'s floors are crash-stable (its crash is a total refold)')
+})
+
+test('COMPACTION (stage 3) — a DURABLE compactor counts ITSELF at its durable floor; a compacting pass arms the snapshot swap, and the swap\'s echo rewrites the boot record with the floor seed above the gaps the pass opened', () => {
+  const h = armedView1({ durable: true, tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('k', 'aa', 'bb')
+  hot(h, 'k', 4200)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: 4200 } }) })
+  //! nothing fsynced yet: self's durable floor is 0 — F = 0 whatever bb says
+  const boots0 = h.of('boot').length, snaps0 = h.of('snapshot').length
+  h.tick()
+  assert.equal(h.node.logs.get('aa')!.length, 4200, 'pinned by this node\'s own un-fsynced rows')
+  assert.equal(h.of('snapshot').length, snaps0, 'no pass dropped anything: no swap armed')
+  //! the echoes land: the durable floor reaches the tail, the next tick compacts, and the SAME tick swaps the WAL
+  for (const p of h.of('persist')) h.node.step({ kind: 'persisted', batch: p[1] as number })
+  assert.equal(h.node.streams.get('aa')!.parts!.get('k')!.d, 4200)
+  h.tick()
+  assert.deepEqual(laneSeqs(h), [4200], 'compacted on its own durable floor and bb\'s mark')
+  assert.equal(h.of('snapshot').length, snaps0 + 1, 'the compacting pass armed the snapshot swap in the same tick')
+  const rows = h.of('snapshot').at(-1)![2] as { bytes: Uint8Array }[]
+  assert.equal(rows.length, 1, 'the swap carries the compacted lane: one row')
+  //! the swap's echo rewrites the boot record (no dirty entry cleared here — the compaction flag alone does it)
+  const boots1 = h.of('boot').length
+  assert.ok(boots1 >= boots0)
+  h.node.step({ kind: 'persisted', batch: h.of('snapshot').at(-1)![1] as number })
+  assert.equal(h.of('boot').length, boots1 + 1, 'the echo of a compaction-armed swap rewrites the boot record')
+  const seed = (h.of('boot').at(-1)![1] as BootRecord).floors!
+  assert.deepEqual(seed.aa.k, [4200, 4200], 'the seed\'s durable floor sits above every gap: a restore chains from it')
+})
+
+test('COMPACTION (stage 3) — V4-18 at an armed node: a field a row write swept drops, a superseded row drops, a fenced field remove stays, a row remove stays while its tombstone lives (until stage 4 releases it), and C4 keeps the lane\'s last entry even when it is a loser', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('m', 'aa', 'bb')
+  h.node.writes.ring.place('r', 'aa', 'bb')
+  const w = (r: Rec) => { h.node.step({ kind: 'write', recs: [r] }); return h.node.logs.get('aa')!.at(-1)!.seq }
+  const s1 = w(rec(['m'], { a: 1, b: 2 }))                       // the first row: superseded by s3
+  const s2 = w(rec(['m', 'c'], 3))                               // a field s3 sweeps
+  const s3 = w(rec(['m'], { a: 1, b: 2, d: 4 }))                 // the row's winner
+  const s4 = w({ type: REC.remove, key: ['m', 'a'] })            // a field remove above the live row: fenced
+  const s5 = w(rec(['m', 'z'], 9))                               // a live field on top
+  const s6 = w(rec(['r'], { v: 1 }))                             // superseded by the remove
+  const s7 = w({ type: REC.remove, key: ['r'] })                 // the row remove: a winner while its tombstone lives
+  const s8 = w(rec(['m', 'z2'], 1))                              // the lane's tail
+  assert.deepEqual(laneSeqs(h), [s1, s2, s3, s4, s5, s6, s7, s8])
+  //! bb attests each partition at ITS floor on lane aa (r's last record is s7: a mark of s8 for (aa, r) would read as
+  // "aa is behind" and open a latch, which pins r under C1 — the kernel's right answer to an unreal claim)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { m: { aa: s8 }, r: { aa: s7 } }) })
+  assert.equal(h.node.scope!.entries.get('r')!.state, SCOPE.held)
+  compactScoped(h.node, 'aa') // the pass itself (the lane is far under the size trigger)
+  assert.deepEqual(laneSeqs(h), [s3, s4, s5, s7, s8], 'the winners: the row, its fenced field remove, the live field, the row remove, the tail')
+  assert.deepEqual(compactedRows(h).sort(), [['aa', 1, 'r'], ['aa', 2, 'm']].sort())
+  assert.equal(h.node.versions.has(JSON.stringify(['r'])), true, 'the tombstone lives: GC stays pinned under scoping')
+  //! C4: a lane whose LAST entry is a loser (a record on bb\'s lane, a higher stamp, beat it — the gate folds it, aa
+  // holds k) keeps that entry
+  const c = armedView1({ tune: { aeFan: 0 } })
+  c.node.membership.rejoinFloor = 0
+  c.node.writes.ring.place('k', 'aa', 'bb')
+  c.node.step({ kind: 'write', recs: [rec(['k', 'x'], 1)] })
+  c.node.step({ kind: 'write', recs: [rec(['k', 'x'], 2)] })
+  const [t1, t2] = laneSeqs(c)
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: t2 + 5, rec: rec(['k', 'x'], 9), pp: 0 }]) })
+  assert.equal(c.node.state.get(JSON.stringify(['k', 'x'])), 9, 'bb\'s record won: both of aa\'s are losers')
+  c.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: t2, bb: t2 + 5 } }) })
+  compactScoped(c.node, 'aa')
+  assert.deepEqual(laneSeqs(c), [t2], 'the first loser dropped; the last entry stays though it lost (the client digest reports the lane tail)')
+  assert.deepEqual([t1 < t2, compactedRows(c)], [true, [['aa', 1, 'k']]])
+})
+
+test('COMPACTION (stage 3) — an ORPHAN never compacts (its content tails are the shed evidence), and the memo skips a lane the last pass could not advance until the evidence or the lane changes', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('k', 'aa', 'bb')
+  hot(h, 'k', 300)
+  //! the R-set moves off aa: k freezes into an orphan; ONE of the two new holders attests the whole lane (the shed
+  // wants both, so the entry stays an orphan); the pass must leave it whole
+  h.node.writes.ring.place('k', 'bb', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.node.scope!.entries.get('k')!.state, SCOPE.orphan)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(2, { k: { ok: 1, need: 0, m: { aa: 300 } } }) })
+  assert.equal(h.jk(JK.shed).length, 0, 'not shed: cc has not attested')
+  h.node.tune.compactAt > 300 || assert.fail('the default compactAt must sit above this lane')
+  for (const o of h.node.logs.keys()) compactScoped(h.node, o) // the pass itself, with no size trigger in the way
+  assert.equal(h.node.logs.get('aa')!.length, 300, 'an orphan\'s entries never drop, whatever the holders attest')
+  assert.deepEqual(compactedRows(h), [])
+  //! the memo: a held lane past compactAt with a pinned frontier is walked once, then skipped until a mark rises
+  const m = armedView1({ tune: { aeFan: 0, compactAt: 64 } })
+  m.node.membership.rejoinFloor = 0
+  m.node.writes.ring.place('k', 'aa', 'bb')
+  hot(m, 'k', 100)
+  let gets = 0
+  const real = m.node.versions
+  m.node.versions = new (class extends Map<string, { epoch: number; seq: number; origin: string }> { get(k: string) { gets++; return super.get(k) } })(real)
+  maybeCompact(m.node)
+  assert.equal(gets, 0, 'F = 0 (bb attested nothing): no entry is even looked at — keep() short-circuits on the frontier')
+  maybeCompact(m.node)
+  assert.deepEqual([gets, m.node.scope!.memo.get('aa')], [0, { len: 100, v: m.node.scope!.evidence }], 'the memoized pass is skipped')
+  m.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: 50 } }) })
+  maybeCompact(m.node)
+  assert.deepEqual([gets, m.node.logs.get('aa')!.length], [50, 50], 'the mark rose: re-walked (one version lookup per entry under F), 50 losers dropped')
+  const g1 = gets
+  maybeCompact(m.node)
+  assert.equal(gets, g1, 'nothing changed since: skipped again')
+  m.node.step({ kind: 'write', recs: [rec(['k', 'x'], -1)] })
+  const g2 = gets // the write's own LWW election reads versions too
+  maybeCompact(m.node)
+  assert.equal(gets, g2, 'the lane grew but the frontier did not: the pass runs and looks at nothing under F (bb is still at 50)')
+})
+
+//! a learner at epoch `e` whose ring places p on {owner, learner}: the harness of the V4-51 teach test, parameterized
+const learner = (uuid: string, e: number, p: string, owner: string) => {
+  const m: [string, string][] = [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']]
+  const L = harness(uuid, { replicas: 2, tune: { aeFan: 0 }, boot: { epoch: e, members: m } })
+  L.node.step({ kind: 'start' })
+  L.admit(1, 'aa')
+  L.admit(2, uuid === 'bb' ? 'cc' : 'bb')
+  L.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e, m }) })
+  assert.equal(L.node.armed, true)
+  L.node.membership.rejoinFloor = 0
+  L.node.writes.ring.place(p, owner, uuid)
+  return L
+}
+
+test('COMPACTION (stage 3) — the teacher ships exactly what compaction keeps: a learner taught by a compacted teacher folds the winners alone and reaches the teacher\'s state; the teach of an uncompacted lane ships the same entries a pass would keep', () => {
+  const T = armedView1({ tune: { aeFan: 0 } })
+  T.node.membership.rejoinFloor = 0
+  T.node.writes.ring.place('k', 'aa', 'bb')
+  hot(T, 'k', 300)
+  T.node.step({ kind: 'write', recs: [rec(['k', 'y'], 7)] })
+  T.node.step({ kind: 'write', recs: [rec(['k', 'y'], 8)] })
+  const tail = T.node.logs.get('aa')!.at(-1)!.seq
+  T.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: tail } }) })
+  for (const o of T.node.logs.keys()) compactScoped(T.node, o)
+  assert.equal(T.node.logs.get('aa')!.length, 2, 'x\'s winner and y\'s winner (the tail)')
+  //! the R-set moves to {aa, cc}: cc asks from zero; the teach is the compacted lane and ACQDONE carries the cut
+  T.node.writes.ring.place('k', 'aa', 'cc')
+  T.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  T.node.step({ kind: 'bytesIn', link: 2, bytes: havea(2, { k: { ok: 0, need: 1, m: {} } }) })
+  const acq = sentOn(T, 2, VERB.ACQ), done = sentOn(T, 2, VERB.ACQDONE)
+  assert.deepEqual(acq.flatMap((f) => [...f.records()].map((rv) => rv.seq)), laneSeqs(T), 'the teach IS the compacted lane')
+  assert.equal((done[0].value as { n: number }).n, 2)
+  const L = learner('cc', 2, 'k', 'aa')
+  L.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(2, { k: { aa: tail } }) })
+  assert.equal(L.jk(JK.acquireStart).length, 1, 'the from-zero latch opened on aa')
+  for (const f of [...acq, ...done]) L.node.step({ kind: 'bytesIn', link: 1, bytes: f.buf.slice() })
+  assert.equal(L.node.scope!.held('k'), true)
+  assert.equal(L.node.stateHash, T.node.stateHash, 'the learner\'s fold equals the teacher\'s state')
+  assert.deepEqual(laneSeqs(L), laneSeqs(T))
+  assert.equal(L.node.streams.get('aa')!.parts!.get('k')!.s, tail, 'the cut is the teacher\'s floor, above every gap the pass opened')
+  //! the same teach from an UNCOMPACTED twin ships the same entries: the one keep() predicate — here the learner pins
+  // the twin\'s frontier at 0 (it is a holder that attested nothing), so keep() passes everything above its marks
+  const U = armedView1({ tune: { aeFan: 0 } })
+  U.node.membership.rejoinFloor = 0
+  U.node.writes.ring.place('k', 'aa', 'cc')
+  hot(U, 'k', 300)
+  U.node.step({ kind: 'bytesIn', link: 2, bytes: havea(1, { k: { ok: 0, need: 1, m: {} } }) })
+  assert.equal(sentOn(U, 2, VERB.ACQ).flatMap((f) => [...f.records()]).length, 300, 'uncompacted, and the learner pins F at 0: every entry above its marks ships, as a teach always did')
+})
+
+test('COMPACTION (stage 3) — A9: a retry after a lost WACK and an owner move dup-acks at the new owner with the ORIGINAL coordinates, though compaction dropped the original commit from the teacher\'s lane: ACQDONE `w` carries the teacher\'s dedup window for the partition', () => {
+  const T = armedView1({ tune: { aeFan: 0 } })
+  T.node.membership.rejoinFloor = 0
+  T.node.writes.ring.place('k', 'aa', 'bb')
+  //! five attempts of issuer zz, each overwriting k.x, committed at aa (the owner) — the window holds all five with the partition
+  for (let c = 1; c <= 5; c++) T.node.step({ kind: 'bytesIn', link: 1, bytes: writeFrame('zz~1', c, 1, [rec(['k', 'x'], c)]) })
+  const lane = T.node.logs.get('aa')!.map((e) => ({ seq: e.seq, cid: e.cid }))
+  assert.deepEqual(lane.map((e) => e.cid), [1, 2, 3, 4, 5])
+  assert.deepEqual(T.node.writes.committed('zz~1', 3), { s: lane[2].seq, e: 1, o: 'aa', p: 'k' })
+  T.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: lane[4].seq } }) })
+  for (const o of T.node.logs.keys()) compactScoped(T.node, o)
+  assert.deepEqual(T.node.logs.get('aa')!.map((e) => e.cid), [5], 'the four losers are gone from the lane — their identities live in the window only')
+  //! the owner moves to cc (epoch 2); cc latches aa from zero; the teach ships cid 5 and `w` ships all five
+  T.node.writes.ring.place('k', 'cc', 'aa')
+  T.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  T.node.step({ kind: 'bytesIn', link: 2, bytes: havea(2, { k: { ok: 0, need: 1, m: {} } }) })
+  const done = sentOn(T, 2, VERB.ACQDONE)[0].value as { n: number; w: (string | number)[][] }
+  assert.equal(done.n, 1)
+  assert.deepEqual(done.w.map((t) => t[1]).sort(), [1, 2, 3, 4, 5], '`w`: the window\'s five tuples for k')
+  assert.deepEqual(done.w.find((t) => t[1] === 3), ['zz~1', 3, lane[2].seq, 1, 'aa'])
+  const L = learner('cc', 2, 'k', 'cc')
+  L.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(2, { k: { aa: lane[4].seq } }) })
+  for (const f of [...sentOn(T, 2, VERB.ACQ), ...sentOn(T, 2, VERB.ACQDONE)]) L.node.step({ kind: 'bytesIn', link: 1, bytes: f.buf.slice() })
+  assert.equal(L.node.scope!.held('k'), true)
+  assert.deepEqual(L.node.writes.committed('zz~1', 3), { s: lane[2].seq, e: 1, o: 'aa', p: 'k' }, 'the learner\'s window has the compacted loser\'s coordinates')
+  //! zz's retry of cid 3 (its WACK was lost) reaches the NEW owner: dedup'd with the original coordinates, no re-commit,
+  // the newer value stands — without `w` cc would commit value 3 afresh at epoch 2, on top of 5
+  L.node.step({ kind: 'bytesIn', link: 2, bytes: writeFrame('zz~1', 3, 2, [rec(['k', 'x'], 3)]) })
+  assert.equal(L.jk(JK.writeDup).length, 1, 'dup-acked')
+  assert.deepEqual(sentOn(L, 2, VERB.WACK).map((f) => f.value), [{ u: 'zz~1', c: 3, n: 1, s: lane[2].seq, e: 1, o: 'aa' }], 'the ORIGINAL coordinates and lane')
+  assert.equal(L.node.state.get(JSON.stringify(['k', 'x'])), 5, 'the old value did not land on top of the newer one')
+  assert.equal(L.node.logs.get('cc'), undefined, 'nothing re-committed')
 })
 
 //! the compaction site of the per-partition index (log.ts compact → node.indexDrop). No armed node reaches it
