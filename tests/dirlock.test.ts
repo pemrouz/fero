@@ -370,18 +370,28 @@ test('a container restart: the node is pid 1 of its namespace, killed -9, and pi
     const life1 = await inNs([CHILD, dir, 'crash'])
     assert.ok(life1.out.includes('up 1') && life1.code === 0, `life 1 ran as pid 1 and ended without releasing (${life1.out})`)
     assert.equal(lockOf(dir)?.pid, 1, 'the crash left its lock, naming pid 1')
-    //! the next life is pid 1 of a NEW namespace: its pid proves nothing, the lease does — it waits for one and takes over
+    const ns1 = lockOf(dir)?.ns
+    assert.equal(typeof ns1, 'string', 'the record names its pid namespace')
+    //! the next life is usually pid 1 of a NEW namespace: its pid proves nothing, the lease does — it waits for one and
+    // takes over. The kernel may give the new namespace the dead one's number (within tens of milliseconds of its end):
+    // then the record reads as this namespace's own pid 1 from a life before, stale at once — safe, the old namespace is
+    // gone. Life 2 crashes too, so its record says which of the two happened.
     const t = performance.now()
-    const life2 = await inNs([CHILD, dir, 'exit'])
+    const life2 = await inNs([CHILD, dir, 'crash'])
+    const waited = performance.now() - t
     assert.ok(life2.out.includes('up 1') && life2.code === 0, `life 2, pid 1 again on the same volume, took the stale lock over (${life2.out})`)
-    assert.ok(performance.now() - t >= 2000, 'after waiting for the lease (the old pid rule took over at once, in well under a second)')
-    assert.equal(lockOf(dir), null, 'and released it at exit')
+    const ns2 = lockOf(dir)?.ns
+    assert.equal(typeof ns2, 'string')
+    if (ns2 !== ns1) assert.ok(waited >= 2000, `a new namespace: the lease decided, after waiting for it (${waited.toFixed(0)} ms; the old pid rule took over at once, in well under a second)`)
+    else assert.ok(waited < 2000, `the namespace's number was reused: the pid rule applies and the takeover is at once (${waited.toFixed(0)} ms)`)
+    fs.unlinkSync(path.join(dir, 'lock')) // life 2 crashed too: clear its record, the recreate below starts on a released dir
     //! the recreate: the next container has a new host name; the kernel is the same, so the lease applies the same way
     const old = await inNs([CHILD, dir, 'crash'], 'c-old')
     assert.ok(old.out.includes('up 1'), `c-old ran as pid 1 and crashed (${old.out})`)
     assert.equal(lockOf(dir)?.host, 'c-old')
     const fresh = await inNs([CHILD, dir, 'exit'], 'c-new')
     assert.ok(fresh.out.includes('up 1') && fresh.code === 0, `c-new took c-old's stale lock over (${fresh.out})`)
+    assert.equal(lockOf(dir), null, 'and released it at exit')
     //! a plain restart outside any namespace: the box's own pid 1 is alive, but the record is another namespace's: the lease
     const crashed = await inNs([CHILD, dir, 'crash'])
     assert.ok(crashed.out.includes('up 1'), crashed.out)
