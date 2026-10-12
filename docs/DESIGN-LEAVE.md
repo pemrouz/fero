@@ -1637,6 +1637,53 @@ because no ballot rule moves.
 - *What remains.* A survivor stalled longer than the window (the I-20 line narrows to it); a survivor
   whose link is down (the bound alone, as before); the three splits of §10.2, untouched by design.
 
+**2026-10-12, the eviction rides with the leave (wave 6b).** The cost the review of §10.7 named is closed in the
+kernel (`kernel/membership.ts`, `#leaveView`, `#dead`, the tick's re-read of a leave ballot in flight): a leave
+ballot is the view without the leaver, and when the members of that view that are not dead — a suspect whose redial
+chain gave up — are no majority of it, the ballot leaves out every dead suspect too, provided the live members are a
+majority of the view (the eviction's own guard: with no live majority nothing can commit, and the ballot is the one
+before). The ballot in flight is re-read at every tick: a suspect whose chain gives up after the ballot opened leaves
+it too, at the same epoch (my own vote there is mine; the voters re-grant the same proposer; a grant for the dropped
+ballot echoes its identity and counts for nothing). The lowest leaver's own exit reads the same way, and an eviction
+in flight when it begins leaving is replaced by its exit WITH the evictees (leaving outranks, as before; the
+heartbeat's give-up revival has the evictee's chain dialing again by then, so `#dead` alone would keep it).
+
+- *Why one ballot and not "the eviction first, then the leave".* The first build of this rule did that: a knock
+  while a given-up suspect was evictable proposed the eviction, a leave ballot in flight yielded to it, and the leave
+  was the next ballot. The sweep's family 2 found the hole on seed 47 (n=3, n01 and n03 leaving, n03 cut from both at
+  0 for 1.5 s): n03's chain gave up at n01 at 776 ms, the eviction took the 16th tick of n01's 17-tick window (view 2
+  `{n01,n02}` at 809 ms), and the 17th tick ended the window before n01's exit could follow — n01 went unclean and was
+  torn down, and n02 was left alone in a TWO-member view with n01 dead in it, where the base's three-member view let
+  n02 and the returning n03 evict n01 (live on the base, wedged under two ballots). A chain's give-up can land
+  anywhere in the window, and two ballots do not fit what the chain has used up. One ballot commits in one round
+  trip: seed 47 is live again (n01 `left` b=1 at 812 ms, n02 alone at 2, n03 back in at 3).
+- *Safety.* The old-set majority is unchanged. The new set is smaller than the plain ballot's, so it needs fewer
+  votes and never a dead one. The ballot is two or more apart from the view, so V4-55 holds its granters — the
+  leaver, and a stayer — until the VIEW lands, exactly as it holds the granters of a two-suspect eviction today: a
+  granter cut before the VIEW stays read-only (the CP answer, §10.10.4), and no stale majority can write beside the
+  new view. A leave whose plain ballot the live members CAN carry is byte-identical with before: one apart, no hold.
+  Nothing new is counted or granted; dropping my own ballot in flight is the same-proposer case the banner allows.
+- *Measured.* The sim at heartbeat 50 with the third member cut 200 ms before the stop, under a 4 / 16 / 64-tick
+  window (`sim/leave-sweep.ts` `starved`): the base went `left` b=0 at exactly the window's end, 200 / 800 / 3200 ms
+  after the stop, with the stayer proposing the same doomed `P(2,2)` at every age-out; now `left` b=1 at about 510 ms
+  after the stop at 16 and 64 ticks (the plain `P(2,2)`, then the re-read `P(2,1)` the moment the chain gives up), and
+  still b=0 at 200 ms under the 4-tick window, which ends before the chain does — a window shorter than the redial
+  chain cannot see the give-up, and `leave.ms` now helps this shape where before it could not. With the member cut
+  800 ms before the stop the tick's eviction had already run and the stop is clean in a tick, as before. Whichever
+  member stops, the lowest included. The kernel pins (`kernel/membership.test.ts`, three tests, each red on the base
+  with the base's exact ballot): the knock at a stayer, the re-read of a ballot in flight with a late grant for the
+  dropped one not counted, the lowest leaver's own exit and an eviction in flight carried by it, and the guard (two
+  dead at n=3: nobody is dropped, the ballot is the one before, nothing can commit). The sweep: family 2's pin at the
+  default window is unchanged (10 of 100); at a 64-tick window seeds 15 and 56 are live now (the "survivor cut from a
+  leaver whose vote it needs" shape: the cut-off leaver's chain gives up at the proposer about 900 ms after the cut,
+  past the other leaver's default window but inside 64 ticks, and the ballot re-read without it commits on the other
+  leaver's grant) — before this a longer window healed nothing in family 2. The README's Membership and Process
+  bullets no longer tell the operator to let the eviction finish first.
+- *What remains.* A window shorter than the redial chain (a 4-tick `leave.ms` at the default cadence is 2 s, the
+  member chain about 3.5 s): the stop ends unclean before the chain gives up, as a bound must; the operator's window
+  is the operator's choice. With no live majority (two dead at three) the ballot is the one before and nothing can
+  commit — the crash-at-two class (§7).
+
 ### §10.8 The harness (`sim/leave-harness.ts`, `sim/leave-harness.test.ts`): the floor, and the teeth
 
 The families, rebuilt from the reports (every one asserts the split check and the monitors; liveness is
