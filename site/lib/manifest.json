@@ -1,5 +1,5 @@
 {
- "head": "fdbd839",
+ "head": "5c483ed",
  "entries": [
   "sim/exec.ts",
   "sim/monitors.ts",
@@ -34,5 +34,5 @@
   "tools/debug/eli5.mjs",
   "tools/debug/model.mjs"
  ],
- "bytes": 831673
+ "bytes": 844660
 }
