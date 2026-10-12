@@ -859,7 +859,8 @@ test('a client is a VIEW of the control plane: no view-on-admit, no flood, no PU
 })
 
 test("a client's writable is its feeder's gate (I-33): the DIGEST reply carries w on client links only, the client reads it off its PRIMARY, and keeps every server's last word on its link across a failover (wave 6b)", () => {
-  //! the client side: w on the primary's digest flips feederOpen; a non-primary's w teaches nothing
+  //! the client side: w on the primary's digest flips feederOpen; a non-primary's w does not change feederOpen but is
+  // kept on its link (wave 6b: the word that drives the move, and what a failover to that link reads at once)
   const h = harness('cl', { client: true, hosts: ['sim:aa', 'sim:bb'] })
   h.node.step({ kind: 'start' })
   assert.equal(h.node.feederOpen, null, 'no feeder yet: unknown')
