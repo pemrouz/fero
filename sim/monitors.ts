@@ -1174,8 +1174,13 @@ const resyncEnd = {
 // one at or below d[lane] was shipped before the reply and must have landed — the one exact line, where "on the
 // wire" would excuse the re-download itself behind a stale reply. For every cell of `old` (the kernel's set of
 // cells held at the reset) whose live version at the feeder is in the feeder's log, for a partition the feeder
-// holds (an armed feeder ships a spoke only its held subset), at or below the reply's tail for its lane, the
-// spoke must contain-or-cover that record: in its log, or a version at the cell or an ancestor at or above it.
+// FEEDS a spoke (Scope.feeds, wave 6a: held, or acquiring from a held base or from nothing — the answer ships those,
+// so their rows are judged too; an orphan's frozen copy and a re-entry from one are withheld, so theirs are not), at
+// or below the reply's tail for its lane, the spoke must contain-or-cover that record: in its log, or a version at the
+// cell or an ancestor at or above it. A latch fold between the reply's build and the end puts a record at or below the
+// tail into the feeder's lane that the answer did not ship: M11 fires on it, rightly — the spoke's fold IS behind, the
+// ghost sweep took the row and only the fold's forward brings it back (the KNOWN vanish-and-return in
+// sim/scale-probes.test.ts).
 // Fails at a stale end: the ghost sweep removed rows the feeder holds, and the rows the re-download then re-applies
 // land at older stamps first. Reads the kernel only (n.state, n.versions, the log — not the screen, and only at
 // the end); nothing here moves a trajectory. The screen against the kernel is `screenMatches` at the horizon.
@@ -1198,7 +1203,7 @@ const resyncBehind = {
         const vF = F.versions.get(cell)
         if (vF === undefined || !F.state.has(cell) || vF.seq > (D[vF.origin] ?? 0) || !inLane(F, vF.origin, vF.seq)) continue
         const path = JSON.parse(cell) as string[]
-        if (F.armed && !F.scope!.held(path[0])) continue
+        if (F.armed && !F.scope!.feeds(path[0])) continue
         L.counts.resyncRows++
         const e = L.recs.get(vF.origin + '|' + vF.seq)
         if (e === undefined || containsOrCovers(L, n, e)) continue
