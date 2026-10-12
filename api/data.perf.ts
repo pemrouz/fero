@@ -9,7 +9,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { Runtime } from '../shell/runtime.ts'
-import { Bind, unsendable } from './data.ts'
+import { Bind, unsendable, copyBounded, atCap } from './data.ts'
 import { VERB, encodeControl, encodeRuns } from '../kernel/codec.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 import { alloc, bench, ratio } from '#utils'
@@ -170,4 +170,21 @@ test('alloc: a write refused for its size leaves at most a sixteenth of its budg
   assert.equal(rt.node.seq, 0, 'nothing stamped')
   bind.destroy()
   await rt.destroy()
+})
+
+//! ALLOC (the fix check): the first share protected writes only — a server's own call still copied an argument or a
+// result up to the whole budget before refusing it, and the value a write refused in about 1 s ran a server with a
+// 400 MB heap out of memory. Every copy of a value from the program's hands takes copyBounded now: a call's argument
+// (Host.invokeLocal, Caller.argOf) and a reply (replyCopy, under Host.invokeLocal and the gather).
+test('alloc: a call\'s argument and a server\'s own reply too big to send are copied no further than the first share before they are refused', async () => {
+  const frame = 16 << 20
+  let dag: unknown = 1
+  for (let i = 0; i < 24; i++) dag = [dag, dag]
+  const refused = (f: () => unknown) => { try { f(); return false } catch { return true } }
+  //! a reply's copy, not its trial: past the room the real encoder decides, and that encode costs what a client's reply
+  // encode costs (a frame's buffer, external memory), on both paths alike
+  for (const [what, f] of [['an argument', () => copyBounded(dag, atCap(frame).arg)], ['a reply\'s copy', () => copyBounded(dag, atCap(frame).result)]] as const) {
+    const r = await alloc.garbage(() => { assert.ok(refused(f)) }, 1, { k: 3, warm: 1 })
+    assert.ok(r.gcEvents === 0 && r.bytes < 16 << 20, `${what}: ${(r.bytes / 1048576).toFixed(1)} MiB in ${r.gcEvents} collections before the refusal`)
+  }
 })

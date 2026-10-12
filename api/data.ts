@@ -32,7 +32,7 @@
 import { types } from 'node:util'
 import { proxy, applyRec, lens, holeAt, errText, isProxy, unfoldable, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
-import { encodable, copyOf, roomOf, sizeOf, wellFormed, Unsendable, Writer, FULL, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
+import { encodable, refusal, copyOf, roundTrip, roomOf, sizeOf, wellFormed, Unsendable, FULL, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -146,19 +146,36 @@ export const atCap = (frame: number): Limits => frame === MAX_FRAME ? AT_MAX
 
 //! replyCopy — a server's own answer as a client's reply decodes it (V4-52), refused for size only where the RESULT
 // frame would really not fit one frame at the node's cap (V4-51). copyOf's byte charge is a worst case — 3 bytes a
-// character, 8 a number, as the writer RESERVES them — and over a whole read it runs 1.5 to 4.5 times the real reply,
+// character, 8 a number, as the writer reserves them — and over a whole read it runs 1.5 to 4.5 times the real reply,
 // so judged by the charge alone a server refused its own read (and, through the gather, every whole read on a scoped
 // cluster) from about 57-90 MiB, where a client's reply of the same rows fit (the V4-51/52 review). So a charge past
-// the room asks the real encoder once, in a writer of its own sized to the frame less the RESULT envelope, and only a
-// FULL there is too big; under the room — every ordinary read — nothing more is paid. Throws Unsendable (`over` for size).
-const ENVELOPE = 64 // RESULT { id, ok, v } around the value: three short keys and two small numbers, with room to spare
+// the room asks the real encoder once — the value written from the depth a RESULT carries it at, within the frame
+// less the RESULT envelope — and the answer is those very bytes read back (kernel/codec.ts roundTrip): what a client
+// decodes, bounded by the frame, each getter run once more at most. Only a FULL there is too big; under the room —
+// every ordinary read — nothing more is paid. Throws Unsendable (`over` for size).
+const ENVELOPE = 28 // RESULT { id, ok, v } before the value: 21 bytes for a small id, 28 at most (an f64 id)
 export const replyCopy = (v: unknown, frame: number): unknown => {
   const limit = atCap(frame).result
-  try { return copyOf(v, limit) } catch (e) { if (!(e instanceof Unsendable) || !e.over) throw e }
-  let fits = true
-  try { new Writer(frame - ENVELOPE).value(v) } catch (e) { if (e === FULL) fits = false }
-  if (!fits) { const u = new Unsendable(`bigger than ${sizeOf(frame)}`); u.over = true; throw u }
-  return copyOf(v, { ...limit, bytes: Infinity }) // what else stops it (a bigint, too deep), in copyOf's own words
+  try { return copyBounded(v, limit) } catch (e) { if (!(e instanceof Unsendable) || !e.over) throw e }
+  try { return roundTrip(v, frame - ENVELOPE, 1) } catch (e) {
+    if (e === FULL) { const u = new Unsendable(`bigger than ${sizeOf(frame)}`); u.over = true; throw u }
+    //! not the size: what else stops it, in the walk's own words (a getter that changed its answer since is named as itself)
+    throw refusal(v, { ...limit, bytes: Infinity }) ?? new Unsendable(`reading it threw (${errText(e)})`)
+  }
+}
+
+//! copyBounded — copyOf, but a value past a sixteenth of the budget (firstOf) is asked by the walk, which copies
+// nothing, before it is copied whole: a value refused for its size is never copied up to the whole budget first (the
+// V4-51/52 review — the same value a write refused in about 1 s ran a server with a 400 MB heap out of memory as a
+// method's argument or result). Every value fero copies from the program's hands takes this road: a write, a call's
+// argument, a reply. A value under the share pays one pass; one past it pays a part copy, a walk and a whole copy —
+// about 1.5-2x the check — and a getter in it runs up to three times. Throws Unsendable.
+export const copyBounded = (v: unknown, limit: Limit, from = 0, spent = 0): unknown => {
+  const first = firstOf(limit)
+  try { return copyOf(v, first, from, spent) } catch (e) { if (!(e instanceof Unsendable) || !e.over || first === limit) throw e }
+  const u = refusal(v, limit, from, spent)
+  if (u !== null) throw u
+  return copyOf(v, limit, from, spent)
 }
 
 //! CARRIES — what fero sends, said once for every refusal of a value (the lens, a methods.* reject, the seed)
@@ -182,18 +199,8 @@ export const unsendable = (r: Rec, limit: Limit = WRITE): string | null => {
   if (r.at !== undefined && !wellFormed(r.at)) return HALF_PAIR
   for (const k of r.key) { if (!wellFormed(k)) return HALF_PAIR; n += 4 + k.length * 3 }
   if (r.type === REC.remove) return encodable(undefined, limit, 0, n)
-  const from = r.key.length > 1 ? r.key.length - 1 : 0
   try {
-    r.value = copyOf(r.value, firstOf(limit), from, n)
-    return null
-  } catch (e) {
-    if (!(e instanceof Unsendable)) throw e
-    if (!e.over || firstOf(limit) === limit) return e.message
-  }
-  const why = encodable(r.value, limit, from, n)
-  if (why !== null) return why
-  try {
-    r.value = copyOf(r.value, limit, from, n)
+    r.value = copyBounded(r.value, limit, r.key.length > 1 ? r.key.length - 1 : 0, n)
     return null
   } catch (e) {
     if (e instanceof Unsendable) return e.message
@@ -201,12 +208,12 @@ export const unsendable = (r: Rec, limit: Limit = WRITE): string | null => {
   }
 }
 const HALF_PAIR = 'a key with half of a surrogate pair in it (UTF-8 cannot carry it, so every other copy would hold another key)'
-//! firstOf — the share of a write's byte budget its copy may spend before it stops to ask without copying (the
-// V4-51/52 review): a value refused for its size was copied up to the whole budget first — about 660 MiB of heap and
-// 5 s for a value of shared parts at 255 MiB, where V4-48's walk refused in about 1 s and allocated nothing. Past a
-// sixteenth of the budget (at most 16 MiB), encodable, which allocates nothing, answers first, and the copy runs again
-// only for a value it passes. A value under that share pays one pass, as before; a getter in a bigger one runs up to
-// three times. Under a 1 MiB budget (a test's small frame cap) there is no first share.
+//! firstOf — the share of a byte budget a copy may CHARGE before it stops to ask the walk (copyBounded): a sixteenth
+// of the budget, at most 16 MiB. The garbage a refused value leaves is bounded by that charge, not equal to it: an
+// array of shared parts leaves about 4 MiB at a 16 MiB frame cap (where the whole-budget copy left 64 MiB); the copy's
+// arrays and the walk's key lists cost up to 8-10 bytes for each byte charged. At the production cap the old copy
+// grew the heap by 1,088 MiB in 6.8 s before refusing such a value; this one by 68 MiB in 1.6 s. Under a 1 MiB budget
+// (a test's small frame cap) there is no first share.
 const FIRST = new WeakMap<Limit, Limit>()
 const firstOf = (limit: Limit): Limit => {
   let f = FIRST.get(limit)

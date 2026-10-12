@@ -263,3 +263,32 @@ test('V4-52 — a view\'s result fero cannot send is refused in the same words o
     assert.deepEqual([r.ok, r.v], [0, 'the result could not be sent: a bigint at r0'])
   } finally { await h.done() }
 })
+
+//! the fix check of the V4-51/52 review fixes: (1) a remote reply that failed for a bigint after lots of text told the
+// client 'bigger than 7.5 KiB' — the reason walk kept the byte bound, and its worst-case charge answered first —
+// while the server's own call named the bigint; (2) a value SUB's reason asked RESULT's depth, though SUBREC carries
+// the value three levels down; (3) a server's own read past the charge answered a FINAL copy with no size bound, so a
+// getter that changed its answer after the trial was answered whole (a 1 MiB reply at an 8 KiB cap). The reason walk
+// has no byte bound now, at the frame's own depth, and the answer past the charge is the trial's own bytes decoded.
+test('V4-51/52 — a reply that cannot be sent names its real cause on both sides, at its frame\'s depth; past the charge the answer is what the encoder carried', async () => {
+  const text = Array.from({ length: 100 }, () => 'x'.repeat(50))
+  const nest = (d: number): unknown => { let v: unknown = 1; for (let i = 0; i < d; i++) v = [v]; return v }
+  let calls = 0
+  const h = tooLargeHost({
+    late: () => ({ text, z: 10n }),
+    deep: () => nest(62),
+    shifty: () => ({ get g() { return ++calls < 3 ? 1 : new Uint8Array(1 << 20) }, text: text.slice(0, 60) }), // the getter first: every pass reads it
+  }, 0)
+  try {
+    await assert.rejects(h.host.invokeLocal('late', undefined), /^Error: methods\.late: the result could not be sent: a bigint at z$/)
+    h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.CALL, { id: 1, m: 'late' }) })
+    await h.settle()
+    assert.deepEqual(h.results()[0].v, 'the result could not be sent: a bigint at z', 'the remote words name the bigint, not a size')
+    h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.SUB, { id: 2, m: 'deep' }) })
+    await h.settle()
+    assert.deepEqual(h.results()[1].v, 'the result could not be sent: deeper than 61 levels', 'a value SUB carries its value three levels down')
+    const got = await h.host.invokeLocal('shifty', undefined) as { g: unknown }
+    assert.equal(got.g, 1, 'the answer is the trial\'s own bytes: the getter\'s later answer is never sent')
+    assert.equal(calls, 2, 'the getter ran twice: the walk\'s charge and the trial')
+  } finally { await h.done() }
+})

@@ -301,7 +301,10 @@ export interface Limit { depth: number; bytes: number; part?: (o: object, array:
 // ship, each digest answer — so replication stopped for good (a getter that throws ended the server from
 // its socket handler). It walks the value as Writer.value would and writes nothing. `from` is the depth the
 // value starts at, `spent` the bytes already counted (a record's key).
-export const encodable = (v: unknown, limit: Limit, from = 0, spent = 0): string | null => {
+export const encodable = (v: unknown, limit: Limit, from = 0, spent = 0): string | null => refusal(v, limit, from, spent)?.message ?? null
+//! refusal — encodable's answer as an Unsendable (its message the reason, `over` when only the size stopped it), or
+// null: a caller that must tell a size refusal from the others (api/data.ts copyBounded) asks this
+export const refusal = (v: unknown, limit: Limit, from = 0, spent = 0): Unsendable | null => {
   if (at.length !== 0) at.length = 0 // a store to an empty array's length is a slow path, about 80 ns a call
   //! `text` is saved and restored like copyOf's `copied`: a getter that runs a walk or a copy of its own reset it,
   // and the outer reason lost its note about characters
@@ -311,10 +314,23 @@ export const encodable = (v: unknown, limit: Limit, from = 0, spent = 0): string
     walk(v, from, spent, limit)
     return null
   } catch (e) {
-    return reasonOf(e, limit)
+    const over = e === REFUSED && refusedWhy === OVER
+    const u = new Unsendable(reasonOf(e, limit))
+    u.over = over
+    return u
   } finally {
     text = outerText
   }
+}
+//! roundTrip — v as a client decodes it from a frame: its real bytes, written from `depth` (a RESULT carries its value
+// one level down) within `bytes`, read back. A server's own reply past the walk's worst-case charge is this
+// (api/data.ts replyCopy): its size is the encoder's, its value the decoder's, and each getter runs once. Throws FULL
+// past `bytes`, a FrameError for what the codec cannot carry, or what a getter throws.
+export const roundTrip = (v: unknown, bytes: number, depth = 0): unknown => {
+  const w = new Writer(bytes)
+  const vt = vtOf(v)
+  w.value(v, vt, depth)
+  return new Cursor(w.buf, 0, w.len).value(vt, depth)
 }
 //! reasonOf — what stopped a walk or a copy, said plainly; encodable and copyOf share it, so both give one text
 const reasonOf = (e: unknown, limit: Limit): string => {
