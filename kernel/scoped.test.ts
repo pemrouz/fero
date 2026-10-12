@@ -1362,6 +1362,30 @@ test('COMPACTION (stage 3) — an ORPHAN never compacts (its content tails are t
 })
 
 //! a learner at epoch `e` whose ring places p on {owner, learner}: the harness of the V4-51 teach test, parameterized
+test('COMPACTION (stage 3) — C1 at the ring: a partition HELD here that the ring no longer places here never compacts, whatever its holders attest; placed back, the same marks compact it', () => {
+  //! the window this guards: an install moves p off this node and rescope makes it an orphan in the same step, so a
+  // held-but-unassigned entry is not reachable from the wire today; scopedFrontier still refuses it (`mine`), since a
+  // node that is not among p's holders is not in F and must not drop on the others' marks. The ring's test seam
+  // (ring.place, no install) is the one way to build the state.
+  const h = armedView1({ tune: { aeFan: 0, compactAt: 64 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('k', 'aa', 'bb')
+  hot(h, 'k', 200)
+  assert.equal(h.node.scope!.held('k'), true)
+  h.node.writes.ring.place('k', 'bb', 'cc') // the ring moves k off aa; no install ran, so the entry stays held
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { k: { aa: 200 } }) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(1, { k: { aa: 200 } }) })
+  assert.equal(h.node.scope!.entries.get('k')!.state, SCOPE.held, 'still held here')
+  maybeCompact(h.node)
+  assert.equal(h.node.logs.get('aa')!.length, 200, 'aa is not among k\'s holders: F = 0, nothing drops though both holders attest the tail')
+  assert.deepEqual(compactedRows(h), [])
+  //! placed back among the holders, one more record grows the lane past the memo: the same marks compact it
+  h.node.writes.ring.place('k', 'aa', 'bb')
+  h.node.step({ kind: 'write', recs: [rec(['k', 'x'], 'last')] })
+  maybeCompact(h.node)
+  assert.deepEqual(laneSeqs(h), [201], 'a holder again: every loser at or under the marks goes')
+})
+
 const learner = (uuid: string, e: number, p: string, owner: string) => {
   const m: [string, string][] = [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']]
   const L = harness(uuid, { replicas: 2, tune: { aeFan: 0 }, boot: { epoch: e, members: m } })
