@@ -22,16 +22,19 @@ import { until } from '#utils'
 const CHILD = path.join(import.meta.dirname, 'dirlock.child.ts')
 const HOST = os.hostname()
 const BOOT = (() => { try { return fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim() } catch { return null } })()
-type Lock = { pid: number; host: string; boot: string | null; start: number | null }
+const NS = (() => { try { return fs.readlinkSync('/proc/self/ns/pid') } catch { return null } })()
+type Lock = { pid: number; host: string; boot: string | null; ns: string | null; start: number | null }
 const lockOf = (dir: string): Lock | null => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'lock'), 'utf8')) } catch { return null } }
 const startOf = (pid: number): number => { const s = fs.readFileSync(`/proc/${pid}/stat`, 'utf8'); return Number(s.slice(s.lastIndexOf(')') + 2).split(' ')[19]) }
-const plant = (dir: string, l: Partial<Lock>, file = 'lock') => fs.writeFileSync(path.join(dir, file), JSON.stringify({ pid: 1, host: HOST, boot: BOOT, start: null, ...l }) + '\n')
+const plant = (dir: string, l: Partial<Lock>, file = 'lock') => fs.writeFileSync(path.join(dir, file), JSON.stringify({ pid: 1, host: HOST, boot: BOOT, ns: NS, start: null, ...l }) + '\n')
+//! age — give a planted file an mtime `s` seconds ago (a lease that ran out)
+const age = (dir: string, s: number, file = 'lock') => { const t = Date.now() / 1000 - s; fs.utimesSync(path.join(dir, file), t, t) }
 //! deadPid — a pid nobody runs under on this box: from the top of Linux's range downward until kill(pid, 0) says ESRCH
 const deadPid = (): number => {
   for (let pid = 4_194_303; pid > 1; pid--) { try { process.kill(pid, 0) } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ESRCH') return pid } }
   throw new Error('no free pid')
 }
-const mine = (pid = process.pid): Lock => ({ pid, host: HOST, boot: BOOT, start: startOf(pid) })
+const mine = (pid = process.pid): Lock => ({ pid, host: HOST, boot: BOOT, ns: NS, start: startOf(pid) })
 
 test('one process, one dir: a second Runtime on a held dir is refused with code dir-held naming this process, under the same spelling or a symlinked one; destroy() releases the lock and the next open succeeds', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-')), link = dir + '-link'
@@ -146,9 +149,28 @@ test('a stale lock is taken over: a dead pid, a pid the kernel gave to another p
     takenOver({ pid: 1, start: startOf(1) + 7 }, 'pid 1 is alive, but its start time is not the record\'s')
     //! a boot id of this host that is not the running one: the box rebooted, nothing survives that
     if (BOOT !== null) takenOver({ pid: 1, boot: 'not-' + BOOT, start: startOf(1) }, 'a lock from before a reboot')
-    //! a lock from before this change (pid and host only) is judged by pid and host
-    plant(dir, { pid: dead }); fs.writeFileSync(path.join(dir, 'lock'), JSON.stringify({ pid: dead, host: HOST }) + '\n')
-    lockDir(dir, 'test')(); assert.equal(lockOf(dir), null, 'a two-field record with a dead pid: stale')
+    //! another pid namespace on this kernel (a container): its pid means nothing here — pid 1 started when the record says
+    // is init to this namespace — so its LEASE decides: a lock untouched for the lease is stale at once; one touched a
+    // moment ago is waited on, up to the rest of the lease, and is stale when no touch comes
+    plant(dir, { pid: 1, ns: 'pid:[1]', start: startOf(1) }); age(dir, 60)
+    let t = performance.now(); lockDir(dir, 'test')()
+    assert.ok(performance.now() - t < 1000, "a container's lock untouched for a lease: stale at once")
+    plant(dir, { pid: 1, ns: 'pid:[1]', start: startOf(1) })
+    t = performance.now(); lockDir(dir, 'test')()
+    assert.ok(performance.now() - t >= 3000, "a container's lock touched a moment ago: the look waited for the lease, no touch came, stale")
+    assert.equal(lockOf(dir), null)
+    //! and one that IS touched (a live container): refused within a touch, then taken over once the touching stops
+    plant(dir, { pid: 1, host: 'c-live', ns: 'pid:[1]', start: startOf(1) })
+    const toucher = fero.spawn(CHILD, [dir, 'touch']); kids.push(toucher)
+    assert.ok(await until(() => toucher.out.includes('touching'), 20_000), toucher.out)
+    t = performance.now()
+    assert.throws(() => lockDir(dir, 'test'), (e: Error & { code?: string }) => e.code === 'dir-held' && /pid 1 on c-live; .* \(a container on this kernel: it still touches its lock\)/.test(e.message), 'a touched lock from another namespace is live')
+    assert.ok(performance.now() - t < 2000, 'the touch proved it within a touch, not a lease')
+    assert.equal(await toucher.stop(), 0)
+    takenOver({ pid: 1, host: 'c-live', ns: 'pid:[1]', start: startOf(1) }, 'the touching stopped: taken over after the lease')
+    //! a record of an older shape names no namespace: its lease decides too
+    plant(dir, { pid: dead }); fs.writeFileSync(path.join(dir, 'lock'), JSON.stringify({ pid: dead, host: HOST, boot: BOOT, start: null }) + '\n'); age(dir, 60)
+    lockDir(dir, 'test')(); assert.equal(lockOf(dir), null, 'a record without a namespace, its lease out: stale')
     //! a stale takeover marker (an heir that crashed mid-takeover) is removed the same way
     plant(dir, { pid: dead }); plant(dir, { pid: dead }, 'lock.take')
     const release = lockDir(dir, 'test')
@@ -224,41 +246,77 @@ test('a filesystem without hard links: the lock falls back to the exclusive crea
 
 //! the container shapes: the node runs as pid 1 of its own pid namespace (docker, kubernetes, a Fly VM), is killed -9,
 // and the same image restarts as pid 1 again on the same volume; or a recreate gives the new container a new host name
-const NS = ['-Urpf', '--mount-proc'] // a user namespace with root mapped, a new pid namespace, fork, /proc of that namespace
-const canUnshare = spawnSync('unshare', [...NS, 'true'], { stdio: 'ignore' }).status === 0
+const NSARGS = ['-Urpf', '--mount-proc'] // a user namespace with root mapped, a new pid namespace, fork, /proc of that namespace
+const canUnshare = spawnSync('unshare', [...NSARGS, 'true'], { stdio: 'ignore' }).status === 0
+const nsCmd = (args: string[], hostname?: string) => hostname !== undefined
+  ? ['-Urpfu', '--mount-proc', 'sh', '-c', `hostname ${hostname}; exec "$0" "$@"`, process.execPath, ...args]
+  : [...NSARGS, process.execPath, ...args]
 const inNs = (args: string[], hostname?: string): Promise<{ out: string; code: number | null }> => new Promise((resolve) => {
-  const cmd = hostname !== undefined
-    ? ['-Urpfu', '--mount-proc', 'sh', '-c', `hostname ${hostname}; exec "$0" "$@"`, process.execPath, ...args]
-    : [...NS, process.execPath, ...args]
-  const c = spawn('unshare', cmd, { stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 })
+  const c = spawn('unshare', nsCmd(args, hostname), { stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 })
   let out = ''
   c.stdout.setEncoding('utf8').on('data', (d: string) => { out += d })
   c.stderr.setEncoding('utf8').on('data', (d: string) => { out += d })
   c.on('close', (code) => resolve({ out, code }))
 })
-test('a container restart: the node is pid 1 of its namespace, killed -9, and pid 1 again in the next life — it takes its own stale lock over; a recreate under a new host name does too; a plain restart outside the namespace too', { skip: !canUnshare && 'no user namespaces here (unshare -Urpf failed)' }, async () => {
+//! holdNs — a container that keeps running (a holder): killed -9 through unshare's --kill-child when the test is done
+const holdNs = (args: string[], hostname?: string) => {
+  const c = spawn('unshare', ['--kill-child', ...nsCmd(args, hostname)], { stdio: ['ignore', 'pipe', 'pipe'] })
+  const h = { out: '', kill: () => new Promise<void>((resolve) => { c.once('close', () => resolve()); c.kill('SIGKILL') }) }
+  c.stdout.setEncoding('utf8').on('data', (d: string) => { h.out += d })
+  c.stderr.setEncoding('utf8').on('data', (d: string) => { h.out += d })
+  return h
+}
+test('a container restart: the node is pid 1 of its namespace, killed -9, and pid 1 again in the next life — it takes its own stale lock over after one lease; a recreate under a new host name does too; a plain restart outside the namespace too. Two containers on one volume, or a container and a host process: the second is refused by the lease', { skip: !canUnshare && 'no user namespaces here (unshare -Urpf failed)' }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-ns-'))
+  const kids: ReturnType<typeof fero.spawn>[] = []
+  let held: ReturnType<typeof holdNs> | null = null
   try {
     const life1 = await inNs([CHILD, dir, 'crash'])
     assert.ok(life1.out.includes('up 1') && life1.code === 0, `life 1 ran as pid 1 and ended without releasing (${life1.out})`)
     assert.equal(lockOf(dir)?.pid, 1, 'the crash left its lock, naming pid 1')
+    //! the next life is pid 1 of a NEW namespace: its pid proves nothing, the lease does — it waits for one and takes over
+    const t = performance.now()
     const life2 = await inNs([CHILD, dir, 'exit'])
     assert.ok(life2.out.includes('up 1') && life2.code === 0, `life 2, pid 1 again on the same volume, took the stale lock over (${life2.out})`)
+    assert.ok(performance.now() - t >= 3000, 'after waiting for the lease')
     assert.equal(lockOf(dir), null, 'and released it at exit')
-    //! the recreate: the next container has a new host name; the kernel is the same, so the pid check still applies
+    //! the recreate: the next container has a new host name; the kernel is the same, so the lease applies the same way
     const old = await inNs([CHILD, dir, 'crash'], 'c-old')
     assert.ok(old.out.includes('up 1'), `c-old ran as pid 1 and crashed (${old.out})`)
     assert.equal(lockOf(dir)?.host, 'c-old')
     const fresh = await inNs([CHILD, dir, 'exit'], 'c-new')
     assert.ok(fresh.out.includes('up 1') && fresh.code === 0, `c-new took c-old's stale lock over (${fresh.out})`)
-    //! a plain restart outside any namespace: the box's own pid 1 is alive, but it is not the holder (its start time is not the record's)
+    //! a plain restart outside any namespace: the box's own pid 1 is alive, but the record is another namespace's: the lease
     const crashed = await inNs([CHILD, dir, 'crash'])
     assert.ok(crashed.out.includes('up 1'), crashed.out)
-    const plain = fero.spawn(CHILD, [dir, 'exit'])
+    const plain = fero.spawn(CHILD, [dir, 'exit']); kids.push(plain)
     assert.ok(await until(() => plain.out.includes('up ') || plain.out.includes('refused'), 20_000), plain.out)
     assert.equal(await plain.exited, 0, `a restart outside the namespace took the lock over (${plain.out})`)
     assert.equal(lockOf(dir), null)
+    //! two containers on one volume (two pods of a Deployment on one volume in a rolling update, `docker run` twice): the
+    // first holds and touches, the second is refused within a touch — pid 1 in both, so only the lease can tell them apart
+    held = holdNs([CHILD, dir], 'c-a')
+    assert.ok(await until(() => held!.out.includes('up 1'), 20_000), `c-a never said up (${held.out})`)
+    const second = await inNs([CHILD, dir, 'exit'], 'c-b')
+    assert.ok(second.out.includes('refused dir-held 1 c-a') && second.code === 2, `c-b was refused naming c-a (${second.out})`)
+    assert.ok(second.out.includes('(a container on this kernel: it still touches its lock)'), second.out)
+    //! and a process on the host opening the container's bind-mounted dir
+    const host = fero.spawn(CHILD, [dir, 'exit']); kids.push(host)
+    assert.ok(await until(() => host.out.includes('refused') || host.out.includes('up '), 20_000), host.out)
+    assert.equal(await host.exited, 2, `the host process was refused (${host.out})`)
+    assert.ok(host.out.includes('refused dir-held 1 c-a'), host.out)
+    assert.equal(lockOf(dir)?.host, 'c-a', 'c-a still holds')
+    await held.kill(); held = null
+    //! the other way round: a process on the host holds, a container starts on its dir
+    const holder = fero.spawn(CHILD, [dir]); kids.push(holder)
+    assert.ok(await until(() => holder.out.includes('up '), 20_000), holder.out)
+    const inside = await inNs([CHILD, dir, 'exit'], 'c-c')
+    assert.ok(inside.out.includes(`refused dir-held ${holder.pid} ${HOST}`) && inside.code === 2, `the container was refused naming the host's process (${inside.out})`)
+    assert.equal(await holder.stop(), 0)
+    assert.equal(lockOf(dir), null)
   } finally {
+    await held?.kill()
+    for (const k of kids) await k.stop()
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
