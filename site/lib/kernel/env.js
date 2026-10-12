@@ -16,6 +16,8 @@
 // node.step() a single fail-closed dispatch site.
 
 //! One inbound stimulus. The closed union node.step() dispatches on — nothing else moves the kernel.
+                                           
+
                    
                                                                                                            
                      
@@ -179,7 +181,7 @@
                              
                  
                      
-                                               
+                
                            
                         
                        

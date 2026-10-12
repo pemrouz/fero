@@ -119,6 +119,9 @@ export class Link {
   hello                   = null
   proved = false
   proveTimer = -1
+  //! saidHolds (DESIGN-LEAVE §10.10.6) — my holds as my HELLO on this link named them, as one key ('' when none): at
+  // admit, if my holds are not this any more, the ask goes out on this link at once (Membership.onAdmit)
+  saidHolds = ''
 
   id        
   dialed         

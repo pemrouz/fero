@@ -97,6 +97,10 @@ export const VERB = {
   // refusal notice sent just before a close (the shell's socket.destroy can lose it; the journal row is
   // the contract). Sent only by nodes with a door; an open node never ships it and drops it on arrival.
   DOOR: 26,
+  //! NACK {e, h} (DESIGN-LEAVE §10.10.4, the release): a vote's proposer disowns the ballot a held voter asked about — it
+  // holds no ballot of that identity and no view at or above it. The vote stays spent; it warns no more. An older peer
+  // drops the frame and keeps the link (an unknown verb is not a wire fault).
+  NACK: 27,
 }         
 
 //! FLAG_PROV: body opens with [originLen+utf8][baseSeq varint][epoch varint] before the record count.
