@@ -1434,10 +1434,18 @@ test('the eviction rides with the leave: a leave ballot in flight is re-read whe
   assert.ok(!h.node.dialing('sim:cc'))
   h.tick()
   assert.deepEqual(proposed(h, 1, 2), [['aa', 'cc'], ['aa']], 're-read: cc leaves the ballot too, at the same epoch (my own vote at 2 is re-spent on me)')
+  //! THE DROP IS STICKY (the first review of wave 6b): that same tick's give-up revival re-armed cc's chain, so cc reads as
+  // dialing again — not dead. The next tick's re-read starts from the ballot in flight and puts nobody back; before it
+  // read the view, proposed {aa,cc}@2 again, and bb's grant for {aa} — the vote in flight — counted for nothing
+  assert.ok(h.node.dialing('sim:cc'), 'the revival re-armed the chain in the same heartbeat step')
+  assert.deepEqual(h.jk(JK.revive).map((e) => e.a), ['sim:cc'])
+  h.tick()
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 2], [2, 1]], 'sticky: no new ballot — the one in flight is not re-read from the view (before: {aa,cc}@2 a third time, the vote in flight discarded)')
+  assert.equal(h.node.membership.votedFor.h, 'aa', 'my vote still stands on {aa}')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,cc' }) })
   assert.equal(h.node.epoch, 1, 'bb\'s grant for the dropped ballot is not counted')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa' }) })
-  assert.equal(h.node.epoch, 2, 'its grant for the re-read ballot commits it')
+  assert.equal(h.node.epoch, 2, 'its grant for the re-read ballot commits it — two ticks after the drop, the round trip longer than a heartbeat')
   assert.deepEqual(h.jk(JK.evict).map((e) => e.a), ['bb', 'cc'])
   h.tick()
   assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 2], [2, 1]], 'nothing more: the ballot is not re-read once it committed')
@@ -1449,19 +1457,33 @@ test('the eviction rides with the leave, the lowest leaver: aa leaves at {aa,bb,
   ccGone(h)
   h.node.step({ kind: 'leave' })
   assert.deepEqual(proposed(h, 1, 2), [['bb']], 'my exit without the dead member')
+  //! the drop is sticky (the first review of wave 6b): two heartbeats pass before bb's vote lands — the first tick's
+  // revival re-arms cc's chain (dialing again), and the second tick's knock re-reads my exit from ITSELF, keeping {bb};
+  // before, it re-read the view, saw cc dialing, and replaced {bb}@2 with {bb,cc}@2, which needed cc's vote
+  h.tick()
+  assert.ok(h.node.dialing('sim:cc'), 'the revival re-armed the chain')
+  h.tick()
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 1]], 'sticky: no new ballot — my exit in flight is not re-read from the view (before: {bb,cc}@2)')
+  assert.equal(h.node.membership.votedFor.h, 'bb')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb' }) })
   assert.equal(h.node.epoch, 2)
   assert.equal(h.of('left').length, 0, 'the echo is awaited')
   h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['bb', 'sim:bb']] }) })
   assert.deepEqual(h.of('left'), [['left', true]], 'clean: bb echoed the view without aa')
   assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 1]])
-  //! (ii) the eviction is in flight when the leave begins: my exit replaces it and carries it
+  //! (ii) the eviction is in flight when the leave begins: my exit replaces it and carries it — and keeps carrying it
+  // across the ticks that follow (the tick's re-read starts from the exit in flight, where before it read the view and
+  // put the evictee back one tick later)
   const k = formedView1()
   ccGone(k)
   k.tick()
   assert.deepEqual(proposed(k, 1, 2), [['aa', 'bb']], 'the tick opened the eviction')
+  assert.ok(k.node.dialing('sim:cc'), 'and its revival re-armed cc\'s chain')
   k.node.step({ kind: 'leave' })
   assert.deepEqual(proposed(k, 1, 2), [['aa', 'bb'], ['bb']], 'replaced at the same epoch by my exit, cc out with me')
+  k.tick(); k.tick()
+  assert.deepEqual(k.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 2], [2, 1]], 'sticky: the evictee stays out across the ticks, no new ballot (before: {bb,cc}@2 one tick later)')
+  assert.equal(k.node.membership.votedFor.h, 'bb')
   k.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb' }) })
   assert.equal(k.node.epoch, 2)
   //! (iii) the guard: bb AND cc lost for good (both suspects, both chains given up) — the live set {aa} is no majority, so

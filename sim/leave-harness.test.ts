@@ -150,7 +150,15 @@ test('leave harness, pledgeTwo: two leavers knock to n01, then n01 keeps one sta
 // `minority` in a view with two dead members and the reborn n02r `joining` for good. Now n02 is a suspect at n01 three
 // ticks after the cut, its chain gives up inside n01's window, and the ballot in flight is re-read without it — {n03}@2
 // — which n03's grant commits: n01 leaves cleanly, n03 is alone and writable, and n02r joins it. No other seed moved.
-const KNOWN_NOT_LIVE_R = new Set<number>([8, 9, 19, 25, 26, 31, 32, 33, 40, 41, 46, 47, 49, 60, 63, 82, 84, 98])
+// THE DROP IS STICKY (the first review of wave 6b, DESIGN-LEAVE §10.7's amendment of 2026-10-12) took 8 off it, 18 → 17:
+// n=3, n01 (the lowest) and n02 stop, n02 cut from n01 for 600 ms, and n03's links are SLOW (60 ms one way: a 120 ms
+// round trip on the 50 ms heartbeat). n01's exit {n02,n03}@2 needed n02's vote; n02's chain gave up at 703 ms and the
+// exit was re-read {n03}@2 at 750. As first built, the same step's revival re-armed n02's chain and the next tick put n02
+// back ({n02,n03}@2 again), so n03's grant for {n03}, 120 ms on the wire, found no ballot to count for — every tick, for
+// the whole window: n01 went unclean and n03 sat `minority` for good. Now the ballot is kept while the vote round-trips:
+// n03's grant commits {n03}@2 at n01 at 870, n03 installs it at 930 and ends alone, writable (n01 goes `unechoed` at 950 —
+// the echo would land at 990, past its window: its verdict, not the cluster's liveness). No other seed moved.
+const KNOWN_NOT_LIVE_R = new Set<number>([9, 19, 25, 26, 31, 32, 33, 40, 41, 46, 47, 49, 60, 63, 82, 84, 98])
 
 test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pairs with leavers reborn as fresh identities (the round-2 report\'s sweep2) — SAFE on every one; the not-live set is exactly the pinned one; the H9 seeds 306, 744 and 804 heal; the named shapes heal (seed 157 under 10 sim seeds, the n=3 two-stop pair once each)', () => {
   const unsafeOnes: string[] = [], notLive: number[] = [], shapes = new Map<number, string>()

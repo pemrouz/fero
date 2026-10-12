@@ -169,3 +169,32 @@ test('the knock starvation: n=3 at heartbeat 50, n03 cut 200 ms before the stop 
     assert.equal(given.ballots, 'P(1,3) P(2,2) P(3,1)', `${leaver}: the tick's eviction had already run; the leave is the next ballot, as on the base — ${JSON.stringify(given)}`)
   }
 })
+
+//! THE DROP IS STICKY (the first review of wave 6b, DESIGN-LEAVE §10.7's amendment of 2026-10-12): the same shape on a SLOW
+// link — a one-way delay of 30 or 40 ms on the 50 ms heartbeat, so the vote's round trip (60 / 80 ms) is longer than a
+// heartbeat. As first built the re-read oscillated with the heartbeat's give-up revival: the tick dropped n03 from the
+// ballot, the same step's revival re-armed n03's chain, the next tick read n03 as dialing again and re-proposed the plain
+// ballot, discarding the vote in flight — `P(2,2) P(2,1) P(2,2) P(2,1) …` and `left` b=0 at the window's end (800 / 3200
+// ms) at 16 and 64 ticks alike, for either leaver, exactly like the base. Now the re-read starts from the ballot in flight
+// and only ever removes: ONE re-read, kept while the vote round-trips. The ballots read `P(1,3) P(2,2) P(2,2) P(2,1)`: the
+// first plain ballot ages out (proposalAge, 10 ticks) before the slower chain gives up — a failed dial to a cut peer pays
+// the link's delay in the sim (sim/exec.ts connect), so the five-dial chain gives up 150 / 200 ms later than at 3 ms — the
+// re-knock reopens it, then the give-up's re-read drops n03 once. Measured, after the stop: delay 30 → n02 clean at 790 ms,
+// n01 at 820; delay 40 → n02 at 870, n01 at 910. At 64 ticks every one is clean; at 16 ticks the window ends at 800 ms, so
+// only n02 at delay 30 is inside it and the other three go unclean AT the window's end with the same four ballots and no
+// oscillation — the window-shorter-than-the-chain class the note names, not the flip. Pinned: the verdicts at 64 ticks, and
+// the ballot string at both windows (nothing after the one `P(2,1)`).
+test('the knock starvation on a slow link (the drop is sticky): n=3 at heartbeat 50 with every link 30 or 40 ms one way (a vote slower than a heartbeat), n03 cut 200 ms before the stop — whichever member stops, the re-read drops n03 ONCE and the ballot is kept while the vote round-trips: clean at 64 ticks for both delays and both leavers; at 16 ticks the same four ballots and no oscillation, the verdict decided by the window alone', () => {
+  for (const leaver of ['n02', 'n01'] as const) {
+    for (const delay of [30, 40]) {
+      const r = starved(leaver, 200, 64, delay)
+      assert.equal(r.left, true, `${leaver} at 64 ticks, delay ${delay}: ${JSON.stringify(r)}`)
+      assert.ok(r.afterStop > 700 && r.afterStop < 1000, `${leaver} at 64 ticks, delay ${delay}: clean once the chain gave up and the vote round-tripped — ${JSON.stringify(r)}`)
+      assert.equal(r.ballots, 'P(1,3) P(2,2) P(2,2) P(2,1)', `${leaver} at 64 ticks, delay ${delay}: the plain ballot, aged out and reopened, then dropped once and KEPT — ${JSON.stringify(r)}`)
+      assert.match(r.stayer, /@2\{n0[12]\}$/, `${leaver} at 64 ticks, delay ${delay}: the stayer alone at 2 — ${r.stayer}`)
+      const w16 = starved(leaver, 200, 16, delay)
+      assert.equal(w16.ballots, 'P(1,3) P(2,2) P(2,2) P(2,1)', `${leaver} at 16 ticks, delay ${delay}: no oscillation — the same four ballots, nothing after the one re-read — ${JSON.stringify(w16)}`)
+      assert.equal(w16.left, w16.afterStop < 800, `${leaver} at 16 ticks, delay ${delay}: the window alone decides (unclean exactly at its end, 800 ms) — ${JSON.stringify(w16)}`)
+    }
+  }
+})

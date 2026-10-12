@@ -202,9 +202,12 @@ export const run2 = (s: Schedule2, horizon = 30000, o: RunOpts = {}): string[] =
 // members cannot carry leaves the dead member out too, in flight or at the knock: the 200 ms shape is clean once n03's
 // chain gives up (about 510 ms after the stop, inside the 16-tick window; the 4-tick window still ends first, as a window
 // shorter than the chain must), the 800 ms shape stays clean in a tick. Returns the verdict and the ballots.
-export const starved = (leaver: 'n01' | 'n02', cutBefore: number, leaveWindow: number): { left: boolean | null; afterStop: number; stayer: string; ballots: string } => {
+//! `delay` is every link's one-way delay in ms (3 by default): at 30 or 40 on a 50 ms heartbeat the vote's round trip is
+// longer than a heartbeat, the shape that showed the re-read oscillating with the give-up revival (the first review of
+// wave 6b; the drop is sticky now, see #leaveView).
+export const starved = (leaver: 'n01' | 'n02', cutBefore: number, leaveWindow: number, delay = 3): { left: boolean | null; afterStop: number; stayer: string; ballots: string } => {
   const sim = new Sim(1)
-  const nodes = cluster(sim, 3, { heartbeatMs: 50, fault: { delay: [3, 3] }, tune: { leaveWindow } })
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, fault: { delay: [delay, delay] }, tune: { leaveWindow } })
   sim.run({ until: 800 })
   if (!nodes.every((x) => x.epoch === 1)) throw new Error('never formed')
   const t0 = sim.now
