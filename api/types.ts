@@ -285,11 +285,12 @@ export interface ClusterShape {
     //! undrained (DESIGN-SCALE stage 1 (b)): on a scoped member's clean stop, how many partitions it went with
     // because no reachable new holder proved it holds them inside the drain window; 0 until then, 0 forever on
     // an unscoped member or a client. Set in the fold just before the teardown, so a screen closing on the stop
-    // can show it; the kernel's `undrained` journal row is the same number. It counts the DRAIN window only: a
-    // leaver still in its own view when the vote never came back (the bound: leaveTicks with no member linked, the
-    // knock window leaveWindow with one) goes like a crash, never drained,
-    // and leaves this 0 too — at `replicas: 1` its rows go with it uncounted. A leaver whose own view already
-    // dropped it (it held the votes; the survivors' echo was lost) drains and counts like any other.
+    // can show it; the kernel's `undrained` journal row is the same number. A leaver still in its own view when the
+    // vote never came back (the bound: leaveTicks with no member linked, the knock window leaveWindow with one) goes
+    // like a crash — but first it counts what goes with it: at `replicas: 1` every partition it holds with content
+    // (nobody else holds a copy), at 2 or more only those no reachable co-holder has proved it holds inside the copy
+    // window (2026-10-12; before, such a stop counted nothing). A leaver whose own view already dropped it (it held
+    // the votes; the survivors' echo was lost) drains and counts like any other.
     undrained: number
     //! primary: on a CLIENT, the uuid of the ONE server feeding it (a spoke digests exactly one) — null
     // until a link is admitted, and re-set to the survivor on failover; always null on a server

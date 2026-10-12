@@ -642,7 +642,13 @@ export class Membership {
     const leaver = link.uuid
     node.journal.armed && node.journal.emit(JK.leave, leaver)
     this.#leavers.add(leaver) // this peer is leaving: its link no longer keeps my own knock window open (§10.7)
-    if (node.client || this.view.epoch === 0 || !this.isMember(node.uuid) || !this.isMember(leaver) || this.epochStale || this.rejoining()) return
+    if (node.client || this.view.epoch === 0) return
+    //! a knock from a member my view no longer holds: its leave committed and it never saw the VIEW (lost on the wire;
+    // or it knocked at a member that learned the view before it did) — answer with the view, so the leaver reads its exit
+    // proof and drains instead of knocking until its bound ends (the scoped leaver's fate, DESIGN-LEAVE §10.7's note of
+    // 2026-10-12). A committed view is a fact whoever holds it: a non-member or an epoch-stale member answers too.
+    if (!this.isMember(leaver)) { link.ship(encodeControl(VERB.VIEW, { e: this.view.epoch, m: this.view.members }), node.env.sink, node.journal); return }
+    if (!this.isMember(node.uuid) || this.epochStale || this.rejoining()) return
     if (this.#lowestLive() !== node.uuid || this.#proposal || this.view.members.length < 2) return
     this.#propose(node, { epoch: this.#nextEpoch(node), members: this.#leaveView(node, leaver) }, leaver)
   }
@@ -972,12 +978,16 @@ export class Membership {
   // (leaveTicks unlinked, leaveWindow with a survivor linked) its partitions are orphans with reachable new holders all the same (third review, 2026-10-10 — before, at
   // R=1 the only copy went with it, uncounted). The drain then carries the view half's verdict: the final
   // `left` is b=0 even when every row was handed over, since the commit was never proved to have reached a
-  // survivor. Still in its own view (the vote never came back), nothing froze: it goes like a crash, drains
-  // nothing and counts nothing — `undrained` is the drain window's count only.
+  // survivor. Still in its OWN view (the vote never came back — `unanswered`) nothing froze, but what it holds
+  // goes with it all the same, so it asks the same last question over its HELD partitions (scope.undrained reads a
+  // held entry's live tails against the ring's other holders): at R=1 there is no other holder and every partition
+  // with content is stranded — counted in `undrained`, `left` b=0 at once; at R≥2 it waits for each reachable
+  // co-holder to attest covering its tails, bounded by drainTicks, and counts what none did (wave 6b, 2026-10-12;
+  // before, it went like a crash and `undrained` read 0 while at R=1 its rows went with it).
   #finishLeave(node: Node, clean: boolean) {
     if (!this.leaving || this.leaving.done) return
     this.leaving.done = true
-    if (node.armed && (clean || !this.isMember(node.uuid)) && this.#exit(node, clean)) return
+    if (node.armed && this.#exit(node, clean)) return
     this.#left(node, clean, 0)
   }
 
@@ -989,7 +999,7 @@ export class Membership {
   #exit(node: Node, clean = true): boolean {
     const { waiting, stranded } = node.scope!.undrained(node)
     if (waiting > 0 && node.heartbeats) { this.leaving!.drain = 0; this.leaving!.clean = clean; return true }
-    if (waiting + stranded > 0) { this.#left(node, false, waiting + stranded); return true }
+    if (waiting + stranded > 0) { this.#left(node, false, waiting + stranded, clean); return true }
     return false
   }
 
@@ -1000,18 +1010,20 @@ export class Membership {
     const l = this.leaving
     if (!l || l.drain === undefined) return
     const { waiting, stranded } = node.scope!.undrained(node)
-    if (waiting === 0) this.#left(node, l.clean === true && stranded === 0, stranded)
-    else if (tick && ++l.drain > node.tune.drainTicks) this.#left(node, false, waiting + stranded)
+    if (waiting === 0) this.#left(node, l.clean === true && stranded === 0, stranded, l.clean === true)
+    else if (tick && ++l.drain > node.tune.drainTicks) this.#left(node, false, waiting + stranded, l.clean === true)
   }
 
   //! #left — the exit itself, once per leave: the `undrained` row (when any partition goes with the leaver),
   // then `left` (b = clean) and the env's effect. `clean` now means the whole stop was clean: the view without
-  // this node committed and echoed AND (scoped) everything it held was proved held elsewhere.
-  #left(node: Node, clean: boolean, undrained: number) {
+  // this node committed and echoed AND (scoped) everything it held was proved held elsewhere. `viewClean` is the
+  // view half's own verdict; when it failed the row says why (c): `unanswered` — the vote never came back and this
+  // node is still in its own view — or `unechoed` — it committed the view without itself and no survivor echoed it.
+  #left(node: Node, clean: boolean, undrained: number, viewClean = clean) {
     this.leaving!.drain = undefined
     const j = node.journal
     if (undrained > 0) j.armed && j.emit(JK.undrained, undrained, this.view.epoch)
-    j.armed && j.emit(JK.left, this.view.epoch, clean ? 1 : 0)
+    if (j.armed) { if (viewClean) j.emit(JK.left, this.view.epoch, clean ? 1 : 0); else j.emit(JK.left, this.view.epoch, 0, this.isMember(node.uuid) ? 'unanswered' : 'unechoed') }
     node.env.sink.left?.(clean)
   }
 
