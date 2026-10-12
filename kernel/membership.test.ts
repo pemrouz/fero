@@ -702,6 +702,25 @@ test('the knock window counts no link that is DEAD on a wire fault: the kernel m
   assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 3, done: true, why: 'unanswered', drain: undefined }, 'every tick since the fault counted toward the bound')
 })
 
+//! the why at epoch 0 (the rework review of wave 6b): a leaver that holds NO view — genesis waiting on a host that never
+// came — knocks on its admitted peers and nothing answers; nothing was proposed and there was no list to drop it from,
+// so the word is `unanswered`. Before, `isMember` alone read false at epoch 0 and the row said `unechoed` — "its own
+// list drops it, no stayer confirmed", which was false there.
+test('the why at epoch 0: bb, with aa admitted and cc never started (genesis waits), leaves — it knocks LEAVE at aa every tick, nothing answers, and at the bound the `left` row reads [0, 0, unanswered] (before: unechoed)', () => {
+  const h = harness('bb', { hosts: ['sim:aa', 'sim:cc'] })
+  h.node.step({ kind: 'start' })
+  h.admit(1, 'aa')
+  assert.equal(h.node.epoch, 0)
+  h.node.step({ kind: 'leave' })
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: 0, done: false }, 'a peer is admitted: the knock goes out, nothing is answered at once')
+  assert.equal(h.sentOn(1, VERB.LEAVE).length, 1, 'the knock, to every admitted peer')
+  for (let i = 0; i <= LEAVE_TICKS; i++) h.tick()
+  assert.deepEqual(h.of('left'), [['left', false]], 'the bound alone counts at epoch 0 (no member could answer)')
+  assert.equal(h.sentOn(1, VERB.LEAVE).length, LEAVE_TICKS + 1, 'one knock per tick until the bound')
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS + 1, done: true, why: 'unanswered', drain: undefined })
+  assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b, e.c]), [[0, 0, 'unanswered']], 'nothing was proposed, so nothing dropped it: the vote never came')
+})
+
 test('the knock window needs the clock: with heartbeats off a leaver knocks once and waits, as before — no tick is counted either way, and the answer still ends it', () => {
   const h = knockingPair({ heartbeatMs: 0 })
   h.node.step({ kind: 'leave' })

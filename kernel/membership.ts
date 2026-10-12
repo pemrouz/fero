@@ -1011,7 +1011,10 @@ export class Membership {
   #finishLeave(node: Node, clean: boolean) {
     if (!this.leaving || this.leaving.done) return
     this.leaving.done = true
-    if (!clean) this.leaving.why = this.isMember(node.uuid) ? 'unanswered' : 'unechoed' // the view half's reason, read NOW (a late vote may change the view during the drain)
+    //! the view half's reason, read NOW (a late vote may change the view during the drain). At epoch 0 nothing was ever
+    // proposed and there is no list to be dropped from — genesis waiting on a host that never came — so the honest word
+    // is `unanswered` (the rework review of wave 6b; isMember alone read false there and said `unechoed`)
+    if (!clean) this.leaving.why = this.view.epoch === 0 || this.isMember(node.uuid) ? 'unanswered' : 'unechoed'
     if (node.armed && this.#exit(node, clean)) return
     this.#left(node, clean, 0)
   }
