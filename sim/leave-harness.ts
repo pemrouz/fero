@@ -1002,6 +1002,78 @@ export const openerBesideSuspect = (variant: 'fresh' | 'dialing' | 'givenUp'): O
   return outcomeM(m, shape, quiet, mid)
 }
 
+//! ownHoldProposerGone — the own-hold variant of keptBallotProposerGone (the eighth round, 2026-10-12; the sixth
+// review's probe, which the seventh review had argued could not be built): the lowest live member of the committed
+// view held ALONE, on a vote it gave between its own ballot and its own commit, to a proposer now out of the view. n=5:
+// aa loses dd and ee (chains given up) and proposes `{aa,bb,cc}`@2; the aa-bb link is cut, bb suspects aa, its chain
+// gives up and bb proposes `{bb,cc,dd,ee}`@2; cc grants bb (two of five: nothing commits), dd's and ee's VOTEs wait on
+// their links; aa's PROPOSE@2 reaches cc late and is refused (`ve` 2: aa burns 2). aa-bb heals inside one of bb's
+// heartbeats (aa's ballot holds bb, so the returning suspect does not abandon it); aa's ballot at 2 ages out and it
+// escalates to `{aa,bb,cc}`@3 over view 1; bb reads the healed link — VIEW 1, the stale re-offers at 2 (refused: bb's
+// vote at 2 is its own), then PROPOSE@3 — and GRANTS it from view 1: two apart, held, its own ballot at 2 behind the
+// grant (`prior`). Then aa dies (`dead`) or lives on (`linked`: to bb and cc, cut from dd and ee), and dd's VOTE lands:
+// bb commits its own `{bb,cc,dd,ee}`@2, prunes its vote at 2 and keeps aa's at 3 — `{aa,bb,cc}` is three apart from
+// view 2. After the flood bb is `held` and cc, dd and ee writable without it. bb is view 2's lowest live member and
+// the only held one; aa is no member (nobody's suspect), nobody else holds anything, so no ask names a hold at bb.
+// With the opener reading members' holds only, bb stayed `held` for sixty rounds with the held view's majority (bb
+// itself and cc) linked. Now bb's own hold opens the ballot when its proposer is out of the view AND unlinked —
+// `dead`: `P(2,4) P(4,4)`, joint over `{aa,bb,cc}`, cc, dd and ee consent, everyone writable at 4. With aa LINKED the
+// ask is the path and the opener stays quiet: bb's ask (sent at the grant, behind its VOTE) lands at aa while aa still
+// holds the ballot — no disown yet — and bb ticks held with its proposer linked: nothing opens (`P(2,4)` alone); then
+// the flood brings aa view 2 (cc's copy first: `bb>aa` is a long FIFO), aa installs it evicted, drops the ballot, and
+// answers bb's next ask with the disown — bb writable at 2 before any further tick. aa's cut to dd and ee heals and it
+// knocks its way back in on bb's link: the ordinary rejoin, `P(4,5)` (at 4, past the disowned vote at 3), everyone
+// writable at 4. `mid` carries bb's list at the held tick (`linked`), the state after the flood, the state and bb's
+// list after the quiet point, and the list at the end.
+export const ownHoldProposerGone = (variant: 'dead' | 'linked'): OutcomeM => {
+  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd', 'ee'])
+  const shape: string[] = [], mid: string[] = []
+  const node = (u: string) => m.nodes.get(u)!
+  m.cut('aa', 'dd'); m.cut('aa', 'ee')
+  for (let i = 0; i < 3; i++) m.tick('aa')
+  m.giveUp('aa', 'dd'); m.giveUp('aa', 'ee')
+  m.tick('aa')
+  if (proposals(m, 'aa') !== 'P(2,3)') shape.push(`aa did not propose {aa,bb,cc} at 2: ${proposals(m, 'aa') || 'nothing'}`)
+  m.cut('aa', 'bb')
+  for (let i = 0; i < 3; i++) m.tick('bb')
+  m.giveUp('bb', 'aa')
+  m.tick('bb')
+  if (proposals(m, 'bb') !== 'P(2,4)') shape.push(`bb did not propose {bb,cc,dd,ee} at 2: ${proposals(m, 'bb') || 'nothing'}`)
+  //! cc grants bb; dd's and ee's VOTEs wait on their links; aa's PROPOSE@2 reaches cc late and is refused
+  if (m.deliver('bb', 'cc') !== 'PROPOSE' || m.deliver('cc', 'bb') !== 'VOTE') shape.push('cc did not answer bb\'s ballot')
+  m.deliver('bb', 'dd'); m.deliver('bb', 'ee')
+  allOf(m, 'aa', 'cc'); allOf(m, 'cc', 'aa')
+  //! the heal, and aa's escalation past the burn to 3 over view 1
+  m.connect('aa', 'bb')
+  for (let i = 0; i < 20 && !proposals(m, 'aa').includes('P(3'); i++) { m.giveUp('aa', 'dd'); m.giveUp('aa', 'ee'); m.tick('aa') }
+  if (proposals(m, 'aa') !== 'P(2,3) P(3,3)' || node('aa').epoch !== 1) shape.push(`aa did not escalate to 3 over view 1: ${proposals(m, 'aa')} at epoch ${node('aa').epoch}`)
+  //! bb reads the healed link and grants aa at 3 from view 1: held, its own ballot at 2 behind the grant
+  allOf(m, 'aa', 'bb')
+  const vf = node('bb').membership.votedFor
+  if (vf.e !== 3 || vf.p !== 'aa' || vf.prior?.[0]?.e !== 2 || node('bb').membership.gate(node('bb')).reason !== 'held') shape.push(`bb did not grant aa at 3 over its own ballot at 2: ${JSON.stringify(vf)} ${meshState(m)}`)
+  if (variant === 'dead') m.destroy('aa')
+  //! dd's VOTE lands: bb commits its own ballot and keeps aa's vote at 3, three apart from view 2
+  allOf(m, 'dd', 'bb')
+  if (node('bb').epoch !== 2 || node('bb').membership.gate(node('bb')).reason !== 'held') shape.push(`bb did not commit {bb,cc,dd,ee}@2 held on its vote at 3: ${meshState(m)}`)
+  if (variant === 'linked') {
+    //! bb's ask lands at aa while aa still holds the ballot (behind bb's seven VOTEs, before its VIEW 2): no disown; bb
+    // ticks held with its proposer linked — the ask is the path, so nothing may open
+    let v: string | null = null
+    for (let i = 0; i < 12 && v !== 'PULL'; i++) v = m.deliver('bb', 'aa')
+    if (v !== 'PULL' || node('aa').epoch !== 1 || m.q.get('aa>bb')!.some((f) => f.verb === VERB.NACK)) shape.push(`bb's ask did not reach aa holding the ballot: ${v} aa@${node('aa').epoch}`)
+    m.tick('bb')
+    mid.push(`bb ticked held, aa linked: bb=${proposals(m, 'bb') || '-'}`)
+  }
+  drain(m)
+  mid.push(`after the flood: ${meshState(m)}`)
+  if (variant === 'linked') { m.connect('aa', 'dd'); m.connect('aa', 'ee') } // the cut heals: aa's rejoin is the ordinary one
+  const quiet = quietSplit(m)
+  mid.push(`after the quiet point: ${meshState(m)} bb=${proposals(m, 'bb') || '-'}`)
+  settle(m, 30, variant === 'dead' ? ['bb', 'cc', 'dd', 'ee'].map((u) => [u, 'aa'] as [string, string]) : [])
+  mid.push(`proposals: bb=${proposals(m, 'bb') || '-'}`)
+  return outcomeM(m, shape, quiet, mid)
+}
+
 // ── the third review's shapes (DESIGN-LEAVE §10.10, 2026-10-10): whose word a stayer may read, the fresh link, and
 // genesis — each one fixed schedule on real Nodes ──
 //! clientAsk — a CLIENT's word teaches nothing (I-23). zz, a client, links into aa with a HELLO and then a PULL that
