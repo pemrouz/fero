@@ -6,7 +6,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { Framer, Outbox, VERB, encodeFrame, copyOf, MAX_DEPTH, MAX_FRAME } from './codec.ts'
+import { Framer, Outbox, VERB, FULL, encodeControl, encodeFrame, copyOf, MAX_DEPTH, MAX_FRAME } from './codec.ts'
 import { REC } from './env.ts'
 import { bench, ratio } from '#utils'
 //! fixtures single-sourced with the M8 baseline probes (tools/perf/fixtures.ts) — declaration move
@@ -96,4 +96,18 @@ test('ratio: a 16 MiB frame in 64 KiB chunks arrives in time linear in its size 
   }
   const small = time(chunksOf(2)), big = time(chunksOf(16))
   assert.ok(big / small < 20, `16 MiB took ${(big / small).toFixed(1)}x 2 MiB (${big.toFixed(1)} / ${small.toFixed(1)} ms) — split frames no longer arrive linearly`)
+})
+
+//! ABSOLUTE (the last check of V4-51/52): the writer's exact path — a string whose worst case does not fit — encoded
+// the whole string before it asked for room, so refusing a string far past a frame cost time and memory with the
+// string (20 million characters at an 8 KiB cap: about 20 ms and 19 MiB of encoded bytes each time, where the old
+// writer refused it at once). It asks the least the string can take first (a byte a UTF-16 unit and a byte of
+// length): refused unread, in about 0.1 ms. The ceiling is generous for this box; the encode it guards against is 200x.
+test('absolute: a string far past a frame is refused without being encoded', () => {
+  const big = 'x'.repeat(20_000_000)
+  //! only FULL counts as the refusal: anything else thrown here is a broken test, never a pass
+  const refuse = () => { try { encodeControl(VERB.RESULT, { id: 1, ok: 1, v: big }, 8192); return false } catch (e) { if (e !== FULL) throw e; return true } }
+  assert.ok(refuse()) // warm, and the string flattened once
+  const ms = bench.time(() => { assert.ok(refuse()) })
+  assert.ok(ms < 5, `refusing a 20M-character string took ${ms.toFixed(2)} ms (ceiling 5 ms; encoding it first took about 20 ms)`)
 })
