@@ -244,6 +244,76 @@ test('a stale takeover marker (an heir crashed inside its takeover) and two heir
   }
 })
 
+test('the claim is one step: an opener that stalls 3 s while it puts its record in place and a second opener in that window — exactly one holds, the other is refused naming it', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-put-'))
+  const kids: ReturnType<typeof fero.spawn>[] = []
+  try {
+    const a = fero.spawn(CHILD, [dir, 'slow-put']); kids.push(a)
+    assert.ok(await until(() => a.out.includes('putting'), 20_000), `a never reached the put (${a.out})`)
+    const b = fero.spawn(CHILD, [dir]); kids.push(b)
+    const said = (k: ReturnType<typeof fero.spawn>) => k.out.includes('up ') || k.out.includes('refused')
+    assert.ok(await until(() => said(a) && said(b), 20_000), `no answer (a: ${a.out} b: ${b.out})`)
+    //! with the hard link, the stall is BEFORE the name exists: b claims it and a's link fails; with a create-then-write
+    // claim, b met an empty lock, waited its grace, called it stale and both came up
+    const [up, off] = a.out.includes('up ') ? [a, b] : [b, a]
+    assert.ok(!off.out.includes('up '), `never both up (a: ${a.out} b: ${b.out})`)
+    assert.ok(off.out.includes(`refused dir-held ${up.pid} ${HOST}`), `the other is refused naming the holder (${off.out})`)
+    assert.deepEqual(lockOf(dir), mine(up.pid))
+    assert.equal(await up.stop(), 0)
+    assert.equal(lockOf(dir), null)
+  } finally {
+    for (const k of kids) await k.stop()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('the look again under the marker: an heir that stalls between its look at a stale lock and its claim of the marker, while another heir completes its takeover, sees the fresh record and is refused', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-look-'))
+  const kids: ReturnType<typeof fero.spawn>[] = []
+  try {
+    plant(dir, { pid: deadPid() })
+    const b = fero.spawn(CHILD, [dir, 'look-slow']); kids.push(b)
+    assert.ok(await until(() => b.out.includes('looked'), 20_000), `b never looked (${b.out})`)
+    const a = fero.spawn(CHILD, [dir]); kids.push(a)
+    assert.ok(await until(() => a.out.includes('up '), 20_000), `a never took the stale lock over (${a.out})`)
+    assert.ok(await until(() => b.out.includes('refused') || b.out.includes('up '), 20_000), `b said nothing (${b.out})`)
+    assert.ok(b.out.includes(`refused dir-held ${a.pid} ${HOST}`), `b looked again under the marker and saw a's record (${b.out})`)
+    assert.equal(await b.exited, 2)
+    assert.deepEqual(lockOf(dir), mine(a.pid), 'a still holds')
+    assert.equal(await a.stop(), 0)
+    assert.equal(lockOf(dir), null)
+  } finally {
+    for (const k of kids) await k.stop()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('every refusal after the lock gives it back — a store that failed mid-life, a wal.log that cannot be opened — and a release removes only a record that is still this process\'s own', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-back-'))
+  try {
+    //! the composer: the lock is taken, then restoreOpts refuses the condemned dir — the lock goes back, and a retry in
+    // this process meets the same refusal, not "held by this process already"
+    fs.writeFileSync(path.join(dir, 'condemned'), 'boot record failed: ENOSPC\n')
+    await assert.rejects(fero('notes', { dir, listen: false }), /failed mid-life/)
+    assert.equal(lockOf(dir), null, 'the refusal gave the lock back')
+    await assert.rejects(fero('notes', { dir, listen: false }), /failed mid-life/, 'the retry meets the dir\'s own refusal, not dir-held')
+    fs.rmSync(path.join(dir, 'condemned'))
+    //! the Runtime: the lock is taken, then the WAL fd fails to open (a directory in wal.log's place)
+    fs.mkdirSync(path.join(dir, 'wal.log'))
+    assert.throws(() => new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir }), { code: 'EISDIR' })
+    assert.equal(lockOf(dir), null, 'the failed open gave the lock back')
+    assert.throws(() => new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir }), { code: 'EISDIR' }, 'again the open\'s own error, not dir-held')
+    fs.rmdirSync(path.join(dir, 'wal.log'))
+    //! a release removes only its own record: a crash and a takeover may have put another holder's there since
+    const release = lockDir(dir, 'test')
+    plant(dir, { pid: 1, host: 'heir' })
+    release()
+    assert.equal(lockOf(dir)?.host, 'heir', 'the heir\'s record stays')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('a filesystem without hard links: the lock falls back to the exclusive create and the write; a second opener that meets the empty file in that gap waits for the record and is refused', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-nolink-'))
   const kids: ReturnType<typeof fero.spawn>[] = []
