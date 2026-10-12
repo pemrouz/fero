@@ -119,6 +119,8 @@ export const JK = {
   undrained: 79,     // a=partitions, b=epoch — a scoped leaver went with partitions no reachable new holder had proved it holds (the drain hit tune.drainTicks, or nobody was there to drain to: the last member, every new holder unreachable); the `left` row that follows carries b=0
   //! ── the release rule (2026-10-12, DESIGN-LEAVE §10.10) ──
   release: 80,       // a=epoch, b=proposer — the vote's proposer disowned the ballot this node held a vote for (a NACK to its ask): the vote stays spent, it warns no more, and the gate re-reads (`held` ends when it was the last hold)
+  //! ── a client moves off a shut feeder (2026-10-12, wave 6b) ──
+  refeed: 81,        // a=link (the feeder's), b=link (the open server's) — a CLIENT closed its feeder link on purpose: the feeder said its write-gate is shut (`w: 0`) while another linked server said its is open; the linkDown that follows elects that server, and the shut feeder is redialed as a non-primary
 } as const
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).

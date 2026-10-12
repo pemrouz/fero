@@ -11,6 +11,7 @@ import { cluster, client, writes } from './harness.ts'
 import { converged } from './monitors.ts'
 import { JK } from '../kernel/journal.ts'
 import { VERB } from '../kernel/codec.ts'
+import { LS } from '../kernel/link.ts'
 import { REC } from '../kernel/env.ts'
 import type { Node } from '../kernel/node.ts'
 
@@ -102,23 +103,26 @@ test("a feeder dies holding a record only it and its spoke had: the spoke fails 
   pin([...members, c], 'only', primary) // owned by the feeder: it commits, WACKs + tap-forwards to the spoke, broadcasts to the members…
   //! …but that broadcast never reaches the other members, and from then on the feeder is cut off from them
   for (const o of others) sim.severOnFrame(primary, o, VERB.RECORDS)
+  const t0 = sim.now
   sim.post(c.uuid, { kind: 'write', recs: [{ type: REC.update, key: ['only'], value: 'mine' }] }, 10)
   sim.at(25, () => { for (const o of others) sim.partition(primary, o) })
-  sim.run({ until: 800 })
+  //! the write is at the spoke before the cut (WACK + tap-forward from its feeder, within a few ms on this schedule)
+  sim.run({ until: t0 + 24 })
   assert.equal(JSON.stringify(c.state.get(key('only'))), '"mine"', 'the spoke holds the commit (WACK + tap-forward from its feeder)')
   assert.equal(c.writes.pending.size, 0, 'the route completed')
-  for (const o of others) assert.equal(sim.nodes.get(o)!.state.has(key('only')), false, 'the other members never saw it')
-  //! now the feeder vanishes from the spoke too: failover onto a member that is BEHIND the spoke
-  sim.at(800, () => sim.partition(c.uuid, primary))
+  //! the cut-off feeder's gate shuts; the spoke does not wait for its link to die (wave 6b): it leaves for an open
+  // member on its own — one that is BEHIND it. Failover onto a lagging feeder: resync DOWN, the record is a ghost
   sim.run({ until: 4000 })
+  for (const o of others) assert.equal(sim.nodes.get(o)!.state.has(key('only')), false, 'the other members never saw it')
   const feeder = c.primary === null ? null : [...c.links.values()].find((l) => l.id === c.primary)!.uuid
   assert.ok(feeder !== null && feeder !== primary, `failed over (feeder now ${feeder})`)
+  assert.equal(jk(c, JK.refeed).length, 1, 'the spoke left the shut feeder on its own (one deliberate close)')
   assert.equal(jk(c, JK.resync).length, 1, 'ahead of the new feeder → one resync')
-  assert.deepEqual(jk(c, JK.resynced).map((e) => e.a), [1], 'one ghost: the record only the dead feeder had')
+  assert.deepEqual(jk(c, JK.resynced).map((e) => e.a), [1], 'one ghost: the record only the cut-off feeder had')
   assert.equal(c.state.has(key('only')), false, "the spoke took the cluster's truth — it did not re-teach the record")
   for (const o of others) assert.equal(sim.nodes.get(o)!.state.has(key('only')), false, 'the members still never saw it')
   //! the old feeder returns: the record comes back through the CLUSTER (member AE), and the spoke hears it from its feeder
-  sim.at(4000, () => { for (const o of others) sim.heal(primary, o); sim.heal(c.uuid, primary) })
+  sim.at(4000, () => { for (const o of others) sim.heal(primary, o) })
   sim.run({ until: 14000 })
   assert.equal(JSON.stringify(c.state.get(key('only'))), '"mine"', 'back — via the cluster, not the spoke')
   assert.equal(jk(c, JK.resync).length, 1, 'no second resync')
@@ -126,13 +130,14 @@ test("a feeder dies holding a record only it and its spoke had: the spoke fails 
   assert.deepEqual(sim.violations, [])
 })
 
-test("a spoke follows its feeder's write-gate (I-33): the feeder is cut off from the other members, its gate closes, and the spoke's feederOpen follows within a heartbeat or two; healed, it opens again", () => {
+test("a spoke follows its feeder's write-gate (I-33) and LEAVES a shut feeder (wave 6b): the feeder is cut off from the other members, its gate closes, and within four heartbeats the spoke is fed by an open member and writable again; the shut feeder is kept as a spare; healed, nothing moves", () => {
   const sim = new Sim(76)
   const members = cluster(sim, 3, { heartbeatMs: 50 })
   const c = client(sim, 'zc1', members, { heartbeatMs: 50 })
   sim.run({ until: 500 })
   assert.equal(c.feederOpen, true, 'a writable member feeds the spoke')
-  const primary = [...c.links.values()].find((l) => l.id === c.primary)!.uuid
+  const fed = () => (c.primary === null ? null : [...c.links.values()].find((l) => l.id === c.primary)!.uuid)
+  const primary = fed()!
   const feeder = members.find((m) => m.uuid === primary)!
   const others = members.map((m) => m.uuid).filter((u) => u !== primary)
   sim.at(10, () => { for (const o of others) sim.partition(primary, o) })
@@ -143,14 +148,24 @@ test("a spoke follows its feeder's write-gate (I-33): the feeder is cut off from
     if (!feeder.membership.gate(feeder).open) closedAt = sim.now
   }
   assert.ok(closedAt > 0, "the cut-off feeder's gate closed (one of three is no majority)")
-  assert.equal(c.primary !== null && [...c.links.values()].find((l) => l.id === c.primary)!.uuid, primary, 'the spoke still hangs off the same feeder')
-  sim.run({ until: closedAt + 100 })
-  assert.equal(c.feederOpen, false, `the spoke knows within two heartbeats (closed at ${closedAt})`)
-  //! healed: the feeder rejoins, its gate opens, and the next digest says so
+  //! before wave 6b the spoke hung off the shut feeder until its link died (feederOpen false, every write parked at the
+  // relay); now a word from the feeder (shut) and one from another member (open) — one heartbeat each — move it
+  sim.run({ until: closedAt + 200 })
+  const now = fed()
+  assert.ok(now !== null && others.includes(now), `fed by an open member within four heartbeats of the gate closing (closed at ${closedAt}, fed by ${now})`)
+  assert.equal(c.feederOpen, true, 'and writable again')
+  assert.deepEqual(jk(c, JK.refeed).length, 1, 'one deliberate close of the shut feeder')
+  //! healed: the old feeder rejoins and its gate opens — the spoke is already on an open one, so it stays; the old feeder
+  // is linked again as a non-primary (the close was redialed like any lost link), its gate heard
   sim.at(0, () => { for (const o of others) sim.heal(primary, o) })
   sim.run({ until: closedAt + 8000 })
   assert.ok(feeder.membership.gate(feeder).open, 'the healed feeder is writable again')
-  assert.equal(c.primary !== null && c.feederOpen, true, 'and the spoke follows it back')
+  assert.equal(fed(), now, 'the spoke stays on the member it moved to')
+  assert.equal(c.feederOpen, true)
+  const spare = [...c.links.values()].find((l) => l.uuid === primary)
+  assert.ok(spare !== undefined && spare.state === LS.admitted && spare.gateOpen === true, 'the old feeder is a linked spare whose open gate the spoke has heard')
+  assert.equal(jk(c, JK.refeed).length, 1, 'no second move')
+  assert.equal(converged(sim), null)
   assert.deepEqual(sim.violations, [])
 })
 
