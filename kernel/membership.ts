@@ -163,13 +163,17 @@ const NO_HOLDS: readonly Vote[] = Object.freeze([]) as readonly Vote[]
 //! Hold — a hold as a frame names it (the HELLO's `v`, the PULL's `vs`): the gate needs `e`, the next proposer needs
 // `h` (the members of the held view, to be joint over it), the disown needs `p` (whose ask it is to answer)
 export interface Hold { e: number; h: string; p: string }
+//! holdOk — one hold as a frame may name it: e a positive integer above `above`, h a NON-EMPTY string (the member list
+// of the held view: a legitimate hold never names an empty one, viewOk needs members — and `''` would be a view nobody
+// can ever be a majority of, so one such word from a member would stop every ballot of the receiver and make it skip
+// that member for good: the fifth review), p a string
+const holdOk = (y: unknown, above = 0): y is Hold => typeof y === 'object' && y !== null
+  && Number.isInteger((y as { e?: unknown }).e) && (y as { e: number }).e > 0 && (y as { e: number }).e > above
+  && typeof (y as { h?: unknown }).h === 'string' && (y as { h: string }).h.length > 0 && typeof (y as { p?: unknown }).p === 'string'
 //! holdsOk — the HELLO's `v` shape (DESIGN-DOOR §2's rule for the optional keys: anything else is a malformed HELLO):
-// a bounded list of {e, h, p} with e a positive integer, h and p strings. A PULL's `vs` is read more gently (#holdsOf
-// keeps the well-formed entries), as every membership frame's body is.
-export const holdsOk = (x: unknown): x is Hold[] =>
-  Array.isArray(x) && x.length <= 4096 && x.every((y) => typeof y === 'object' && y !== null
-    && Number.isInteger((y as { e?: unknown }).e) && (y as { e: number }).e > 0
-    && typeof (y as { h?: unknown }).h === 'string' && typeof (y as { p?: unknown }).p === 'string')
+// a bounded list of well-formed holds. A PULL's `vs` is read more gently (#holdsOf keeps the well-formed entries), as
+// every membership frame's body is.
+export const holdsOk = (x: unknown): x is Hold[] => Array.isArray(x) && x.length <= 4096 && x.every((y) => holdOk(y))
 //! HELLO_WORD — what a HELLO that named holds leaves as the node's last word: a word no key equals, so the next
 // change's ask goes on EVERY member link (the HELLO went out on one; a stayer that linked before the hold existed
 // has heard nothing — DESIGN-LEAVE §10.10.6, the last note's item 1)
@@ -278,9 +282,9 @@ export class Membership {
   //! my holds as a frame names them, and as one key (the same spelling for the ask, the HELLO and #heldPeers)
   #named(hs: readonly Vote[]): Hold[] { return hs.map((x) => ({ e: x.e, h: x.h, p: x.p })) }
   #keyOf(hs: Hold[]): string { return hs.map((x) => `${x.e}:${x.p}:${x.h}`).join('|') }
-  //! #holdsOf — the holds a frame named: the well-formed entries above `above`
+  //! #holdsOf — the holds a frame named: the well-formed entries (holdOk) above `above`
   #holdsOf(x: unknown, above: number): Hold[] {
-    return Array.isArray(x) ? (x as unknown[]).filter((y): y is Hold => typeof y === 'object' && y !== null && typeof (y as { e?: unknown }).e === 'number' && typeof (y as { h?: unknown }).h === 'string' && typeof (y as { p?: unknown }).p === 'string' && (y as { e: number }).e > above) : []
+    return Array.isArray(x) ? (x as unknown[]).filter((y): y is Hold => holdOk(y, above)) : []
   }
   //! helloHolds — what my HELLO carries on a fresh link (`v`): my holds, so the peer ADMITS the link knowing them and
   // there is no round trip in which it counts me before my ask lands (the fresh link, §10.10.6). The key goes on the

@@ -1111,6 +1111,10 @@ test('the stayer\'s count (DESIGN-LEAVE §10.5, §10.10.6): a member whose last 
   h.node.step({ kind: 'bytesIn', link: 31, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: '', r: 1, v: [{ e: 9, h: 'q1,q2,q3', p: 'q1' }] }) })
   h.node.step({ kind: 'bytesIn', link: 31, bytes: encodeControl(VERB.PULL, { e: 1, vs: [{ e: 9, h: 'aa,cc,dd', p: 'aa' }] }) })
   assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+  //! a MEMBER's malformed hold is no hold (the fifth review): an empty member list, a fractional or negative epoch —
+  // the entry is dropped, cc is counted, and no ballot of mine is ever joint over a view nobody can be a majority of
+  h.node.step({ kind: 'bytesIn', link: 22, bytes: encodeControl(VERB.PULL, { e: 1, vs: [{ e: 5, h: '', p: 'zz' }, { e: 2.5, h: 'aa,bb', p: 'aa' }, { e: -3, h: 'aa,bb', p: 'aa' }] }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' }, 'none of the three is a hold')
 })
 
 test('the ask (DESIGN-LEAVE §10.10.6): a grant that holds me is announced at once as PULL {e, vs} on every member link, again on every tick, and once more, empty, when the last hold ends at an install (to the new view\'s members); nothing at epoch 0, where the HELLO alone carries the hold (v); at admit the ask goes on the fresh link only when my holds are not what my HELLO on it said', () => {
@@ -1158,6 +1162,9 @@ test('a HELLO whose v is not a list of holds is a malformed HELLO: the link clos
   h.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:cc' })
   h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'cc', i: 1, l: 'sim:cc', v: [{ e: 0, h: 'x', p: 'y' }] }) })
   assert.equal(h.of('close').length, 2, 'an epoch of 0 is no hold')
+  h.node.step({ kind: 'linkUp', link: 3, dialed: true, to: 'sim:dd' })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'dd', i: 1, l: 'sim:dd', v: [{ e: 2, h: '', p: 'y' }] }) })
+  assert.equal(h.of('close').length, 3, 'an empty member list is no hold (the fifth review)')
 })
 
 test('the release, the proposer\'s word (DESIGN-LEAVE §10.10.4): a held voter\'s ask reaches its vote\'s proposer, which holds no such ballot and no view at or above it, and DISOWNS it (NACK) — the vote stays spent, warns no more (release row, gate open, the empty ask), and a re-grant to the same proposer re-holds; the proposer answers no NACK for a ballot it holds, for another proposer\'s ballot, or when its VIEW answers', () => {
