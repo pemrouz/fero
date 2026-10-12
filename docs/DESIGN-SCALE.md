@@ -1111,16 +1111,25 @@ STATUS line is gone); the end-to-end test drives it (a spoke's write
 relayed through an ACQUIRING feeder, the WACK hopped with `l`, the
 record reaching the feeder through the teacher alone, one apply with
 the identity, no `acked`; with the identity dropped the write hangs);
-(3) the dedup window is untouched (`remember` runs as before); (4) a
-spoke in resync, or behind a stopped or queued answer, is an UNSYNCED
-link and is not fed, as the live tap does not feed it — the answer that
-syncs it covers p: a resync asks with d = {} and is answered with
-everything the feeder feeds, the partition under repair included; a
-stopped or queued answer's cover (or a clear's ceiling) is lowered to
-just under each interior insert by `node.indexInsert`, which the fold
-already calls, and at a re-entry from an orphan to just under p's
-lowest row, since that answer walked the lane while p was frozen and
-skipped it; (5) a spoke whose link dies mid-forward loses a tail of
+(3) the dedup window is untouched (`remember` runs as before); (4) the
+forward feeds a SYNCED link only, as the live tap does, and every
+unsynced link is covered by the answer that syncs it. Unsynced are: a
+link whose answer TORE (it paused with its queue full), a link a clear
+left a ceiling on, and a link never answered since its admit. A torn
+answer's cover, and a ceiling, are lowered to just under each interior
+insert by `node.indexInsert`, which the fold already calls, and at a
+re-entry from an orphan to just under p's lowest row, since that answer
+walked the lane while p was frozen and skipped it; a never-answered
+link's first answer ships p, fed by then. A link whose answer's reply
+merely sits in the queue is SYNCED (node.ts `#answer` sets `synced`
+when the ship did not tear and queues the reply behind it), and so is
+the link of a spoke resyncing on the same feeder (the DIGEST handler's
+`#resyncBegin` leaves it): both are fed, and the forward queues behind
+the answer, FIFO. A spoke whose failover resync a NEW feeder answers
+asks with d = {} and is answered with everything that feeder feeds,
+the partition under repair included (the note as first written called
+a queued answer's link and a resyncing spoke unsynced; the code was
+right, the text was not); (5) a spoke whose link dies mid-forward loses a tail of
 frames and fails over, and on a scoped cluster a failover is a resync
 onto the next feeder, which ships what it feeds from zero — the forward
 adds no hole the resync does not already cover; (6) unscoped bytes are
@@ -1130,22 +1139,89 @@ other shapes the plan named were not taken: an honest lane mark at the
 spoke would still leave the spoke asking, one round trip per repair; a
 resync trigger would re-download the whole held subset for one row; a
 per-link memory of which spokes held the base when the latch opened
-(the review's option 1) was built and dropped — the answer rule makes it
-unnecessary, and it left the vanish-and-return at a resync ending across
-the fold (M11 fired at the resync's end on one seed of sighting 3: the
-reply had been built while the partition was acquiring, the fold landed
-before the reply did, and the ghost sweep took the rows the forward then
-brought back). The spoke's side needed nothing: its dual fence already
+(the review's option 1) was built and dropped for the answer rule,
+which needs no per-link state and carries a fed latch's base in the
+answer itself. NEITHER rule closes the vanish-and-return at a resync
+ending across the fold (measured below): the rows a feeder LACKS when
+it builds the answer, or withholds as an orphan or a re-entry, are not
+in it, so a spoke that had them from its first feeder loses them at
+the ghost sweep and gets them back at the fold. The note as first
+written said the answer rule removed it; it does not. The spoke's side
+needed nothing: its dual fence already
 takes an interior record below its tail (kernel/scoped.test.ts CLIENT)
 and drops one it holds, so the whole-partition forward costs frames,
 never rows.
+
+*The vanish-and-return, measured (the review's review, 2026-10-12).*
+Sighting 3's schedule (n=4 R=3, five partitions of eight rows, the
+tenth T→P frame lost, the spoke cut from its first feeder Q as P
+re-latches) with the cut delayed 0 to 30 ms, over seeds 2, 4, 5 and 6:
+56 runs. On this tree the spoke mirrors P at the horizon on all 56 (M12
+green, screen = kernel). On 22 the ghost sweep at the resync's end
+removed 7 to 20 of the forty cells, which the fold's forward then
+brought back — on the four pinned seeds at the exact cut too (9, 10, 7
+and 8 cells), where M11 stays green only because the fold landed after
+the end. M11 fired on two: seed 2 with the cut 1 ms later (a delta row
+the lost frame carried, n01#12: P lacked it when it built the answer
+and folded it while the reply was in flight) and seed 6 with the cut
+10 ms later (a base row, n01#1: P's five repair latches had aborted
+into orphans on a link loss at 2046 ms and were re-entering at 2049
+when the answer was built at 2050, so `feeds` withheld them; the sweep
+at 2055 took 20 cells; the re-entry folds at 2056-2057 forwarded them
+back). M11 is right to fire: its one exact line says a record at or
+below the reply's tail was shipped before the reply, and an interior
+latch fold between the build and the end breaks that. The base tree on
+the same 56 runs: M11 on 8, and on 23 the rows never came back (M12
+red). Not a regression, then, but a cost the fix leaves: a spoke that
+fails over onto a feeder that is repairing a partition, or holding it
+as an orphan, loses that partition's rows from its screen at the
+resync's end — up to half its cells here — until the fold forwards them
+back. Closing it needs the answer to carry what the feeder is folding
+(an open latch's teacher records are staged, not yet in the lane), or
+the spoke to keep its rows across the end until the fold lands; a
+STATUS line. The two M11 schedules are pinned as KNOWN in
+sim/scale-probes.test.ts (the swept count, the one monitor, the
+message's shape, the mirror at the horizon), with the four pinned
+seeds' swept counts beside them. M11 now picks the rows it judges with
+`feeds`, not `held`: the answer ships what the feeder feeds, so the
+base rows of a partition under repair at the end are judged too — a
+superset; nothing new fires on the probes or the sweep.
+
+*The sweep's coverage of the two legs (the same review).* A11 and A12
+fold only from zero at a spoke's feeder (a probe classing each fold at
+a node with a synced client link by the partition's prior state: A12
+seeds 1-6 zero 4/10/5/8/7/4, repair 0, re-entry 0; A11 no folds), so
+the repair and re-entry legs had the kernel tests and sighting 3's
+fixed seeds alone. A13-spoke-repair (sim/scoped-sweep.ts): a client of
+every member; four times, one RECORDS frame from another member O to
+the spoke's feeder F dies with their link and O writes twenty rows over
+the next 40 ms to the partitions it owns and F holds, so the lost rows
+fold BELOW the spoke's tail on O's lane — sighting 1's shape; without
+the later writes the heartbeat exchange healed every seed, forwards or
+not, and the family proved nothing; the first 5 ms slice that finds F
+mid-repair cuts F from its teacher for 60 ms (under SUSPECT_TICKS), so
+the open latches abort into orphans and re-enter. A per-event probe
+counts F's folds by the partition's state when its latch opened; the
+engagement key is a repair AND a re-entry, which every seed of 1-8
+reaches (repairs 7-41, re-entries 2-27), so no ALWAYS seed is needed.
+Mutation-checked on seeds 1 and 2: the re-entry forward out, M12 names
+a row of a re-entered partition on both; the delta forward out, a row of
+a repaired one on both; the answer's filter back to `held`, green (its
+spoke is synced all along — sighting 3 and the kernel tests cover that
+rule). Two kernel tests close the review's other gaps: the re-entry
+twin of the V4-7 join (the attempt identity on `#forwardWhole`'s
+entries: 0 joins with it dropped, the value shows and the promise never
+settles) and a clear between the re-entry fold and the drain (the
+`inQueue` lowering: without it `indexInsert` leaves that cover at 6,
+under the one row the fold added, the clear promotes it, and the
+resumed answer never ships the base).
 
 *The oracle, M12.* `spokeMirror` (sim/monitors.ts): at the quiet point a
 spoke of a scoped cluster holds exactly its feeder's HELD subset, cell
 for cell by value, read from the kernel, with a count of the partitions
 and cells compared; a spoke still in resync at that point is reported.
 It runs on every spoke in the sweep's verdict (UNSAFE, red
-`spoke-mirror`), on A11 and on a new family A12-spoke-handoff (a client
+`spoke-mirror`), on A11, on A13 (above) and on a new family A12-spoke-handoff (a client
 of every member; a join at 400 ms; a clean leave of a member that is
 not the feeder at 2 s, so the feeder acquires the leaver's partitions
 through the latch; a second burst of writes), whose engagement key is
@@ -1265,7 +1341,11 @@ client pinned as converged and the never-arrived naming pinned on a
 planted miss. Mutation-checked: `feeds` narrowed to `held` (5 tests red,
 the sim one naming the row), the re-entry forward off (2), its cover
 lowering off (1), the delta forward off (10), the identity dropped (2:
-the join hangs).
+the join hangs). The review's review added kernel/client.test.ts the
+re-entry join and the clear between fold and drain (each red with its
+guard out), sim/scale-probes.test.ts the KNOWN vanish-and-return and the
+swept counts on sighting 3, and sim/scoped-sweep.test.ts A13 with its
+engagement and M12 non-vacuity; M11 reads `feeds`.
 
 ## §0 The decision, in ten lines
 
