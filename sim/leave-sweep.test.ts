@@ -44,7 +44,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { schedule, run, shape1, schedule2, run2, shape2, schedule3, run3, shape3, unsafe } from './leave-sweep.ts'
+import { schedule, run, shape1, schedule2, run2, shape2, schedule3, run3, shape3, unsafe, starved } from './leave-sweep.ts'
 
 //! sweep — run `count` seeds of a family; the safety problems are asserted empty, the not-live seeds are compared to the
 // pinned set in both directions (a wedge where the kernel used to heal, or a heal where it used to wedge, is a change
@@ -93,9 +93,19 @@ const KNOWN_NOT_LIVE_1_PAST_WINDOW = new Set<number>([1, 2, 8, 9, 15, 20, 21, 26
 // inside the window, and the knock then reached the lowest live member). The ten left: two-member pairs cut apart
 // inside the window with no third member to keep knocking at — the knock or the answer dies with the link and the
 // leaver is gone before it heals; a three-member view with the survivor cut from a leaver whose vote it needs; and a
-// leaver restarted from its dir that cannot rejoin a survivor left read-only. A 64-tick window changes none of them
-// (a longer window does not heal a cut). Pinned exactly; the sweep is red if the set moves either way.
+// leaver restarted from its dir that cannot rejoin a survivor left read-only. Pinned exactly; the sweep is red if the set
+// moves either way. At a 64-tick window the set used to be the same (a longer window does not heal a cut); since
+// 2026-10-12 (wave 6b, the eviction rides with the leave, kernel/membership.ts #leaveView) a longer window heals 15 and
+// 56 — 8 of 100 at 64 ticks. Both are the "survivor cut from a leaver whose vote it needs" shape: n=3, n02 and n03
+// leaving, n02 cut from the proposer n01, so n01's ballot for n03's leave, {n01,n02}@2, needed n02's vote, and n02 could
+// neither hear nor answer; n02 went at its bound and was torn down. n02 is a suspect at n01 three ticks after the cut and
+// its chain gives up about 900 ms after it; the ballot in flight is then re-read without n02 — {n01}@2 — and n03's grant
+// commits it, n03 leaves cleanly and n01 ends alone, writable. At the default window n03's own window has ended by then
+// (its leave began at 120 ms; the chain gives up past 970), so the two stay not live there, as on the base, where n01 sat
+// `minority` in a view with two dead members for good under any window. The eight left are the pair cuts and the
+// restarted leaver beside a read-only survivor, which no window heals.
 const KNOWN_NOT_LIVE_2 = new Set<number>([13, 15, 31, 35, 48, 56, 70, 75, 87, 94])
+const KNOWN_NOT_LIVE_2_64 = new Set<number>([13, 31, 35, 48, 70, 75, 87, 94])
 
 test('leave sweep, family 1: 100 seeded clean-stop schedules — n 2..5, up to three leavers at once, slow links, a stalled survivor, lingering leavers, a join mid-leave — SAFE on every one; live on every one at the default knock window (the not-live set is exactly the pinned one: empty)', () => {
   sweep(100, schedule, run, shape1, KNOWN_NOT_LIVE_1)
@@ -111,9 +121,9 @@ test('leave sweep, family 1 under the delay model: the same schedules with the s
   sweep(100, schedule, (s) => run(s, 12000, { model: 'delay', tune: { leaveWindow: 64 } }), shape1, KNOWN_NOT_LIVE_1_DELAY_64)
 })
 
-test('leave sweep, family 2: 100 seeded clean-stop schedules with cuts between pairs and leavers restarted from their dirs — SAFE on every one; the not-live set is exactly the pinned one, at the default window and at 64 ticks alike', () => {
+test('leave sweep, family 2: 100 seeded clean-stop schedules with cuts between pairs and leavers restarted from their dirs — SAFE on every one; the not-live set is exactly the pinned one at the default window (10), and at 64 ticks two fewer (15 and 56: the leave ballot re-read without the cut-off leaver once its chain gives up, while the other leaver still knocks)', () => {
   sweep(100, schedule2, run2, shape2, KNOWN_NOT_LIVE_2)
-  sweep(100, schedule2, (s) => run2(s, 30000, { tune: { leaveWindow: 64 } }), shape2, KNOWN_NOT_LIVE_2)
+  sweep(100, schedule2, (s) => run2(s, 30000, { tune: { leaveWindow: 64 } }), shape2, KNOWN_NOT_LIVE_2_64)
 })
 
 test('leave sweep, family 3: 40 seeded shapes of the two splits the parked I-20 drafts had — two clean stops with the two lowest cut apart at n=4, the restart split at n=3 — no monitor fires and no two nodes are ever writable in different views at a quiet point', () => {
@@ -131,4 +141,31 @@ test('leave sweep, family 3: 40 seeded shapes of the two splits the parked I-20 
   }
   assert.deepEqual(unsafeOnes, [], 'a split')
   assert.ok(reached['cut-apart'] >= 10 && reached['restart-split'] >= 10, `too few schedules reached their shape: ${JSON.stringify(reached)}`)
+})
+
+//! the knock starvation (wave 6b, 2026-10-12; DESIGN-LEAVE §10.7's note, STATUS's line "A LEAVE knock reopens an aged-out
+// leave ballot ahead of an evictable suspect"): three members, n03 crashed and not yet voted out, a second member stops.
+// Pinned on the base first — `left` b=0 at exactly the window's end, 200 / 800 / 3200 ms after the stop, with n01 proposing
+// the same doomed ballot P(2,2) = {n01,n03} again at every age-out and never the eviction — then re-recorded under THE
+// EVICTION RIDES WITH THE LEAVE: the moment n03's chain gives up the ballot is re-read as P(2,1) = the stayer alone, one
+// round trip commits it, and the stop is clean inside the default window (about 510 ms after the stop; a 4-tick window
+// still ends before the chain does, which is what a window shorter than the redial chain must do — the README no longer
+// tells the operator to wait for the eviction). With the cut 800 ms before the stop the tick's eviction had already run
+// and the stop is clean in a tick, both kernels: P(2,2) the eviction, P(3,1) the leave.
+test('the knock starvation: n=3 at heartbeat 50, n03 cut 200 ms before the stop — whichever member stops (n02, or n01 the lowest), the eviction of n03 runs first and the stop is CLEAN inside the default 16-tick window and at 64 (the base went unclean at the window\'s end); at a 4-tick window the chain outlasts the window, unclean at 200 ms as before; cut 800 ms before, clean in a tick', () => {
+  for (const leaver of ['n02', 'n01'] as const) {
+    for (const w of [16, 64]) {
+      const r = starved(leaver, 200, w)
+      assert.equal(r.left, true, `${leaver} at ${w} ticks: ${JSON.stringify(r)}`)
+      assert.ok(r.afterStop > 300 && r.afterStop < 800, `${leaver} at ${w} ticks: clean once n03's chain gave up, inside the default window — ${JSON.stringify(r)}`)
+      assert.equal(r.ballots, 'P(1,3) P(2,2) P(2,1)', `${leaver} at ${w} ticks: the plain leave ballot, then — the chain given up — the same ballot re-read without n03, at the same epoch — ${JSON.stringify(r)}`)
+      assert.match(r.stayer, /@2\{n0[12]\}$/, `${leaver} at ${w} ticks: the stayer alone at 2 — ${r.stayer}`)
+    }
+    const short = starved(leaver, 200, 4)
+    assert.deepEqual([short.left, short.afterStop], [false, 200], `${leaver} at 4 ticks: the window ends before the chain gives up — ${JSON.stringify(short)}`)
+    const given = starved(leaver, 800, 16)
+    assert.equal(given.left, true, `${leaver}, n03 given up before the stop: ${JSON.stringify(given)}`)
+    assert.ok(given.afterStop <= 50, `${leaver}: clean in a tick — ${JSON.stringify(given)}`)
+    assert.equal(given.ballots, 'P(1,3) P(2,2) P(3,1)', `${leaver}: the tick's eviction had already run; the leave is the next ballot, as on the base — ${JSON.stringify(given)}`)
+  }
 })

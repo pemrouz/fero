@@ -1379,3 +1379,108 @@ test('the opener\'s two older guards, each with EVERY member of my view linked (
   for (let i = 0; i < 3; i++) a.tick()
   assert.deepEqual(a.jk(JK.propose), [], 'mine to disown, not to supersede — with every member linked too')
 })
+
+//! ── THE EVICTION RIDES WITH THE LEAVE (wave 6b, 2026-10-12; DESIGN-LEAVE §10.7's note). A cluster on a bare majority —
+// three members with one crashed and not yet voted out — and a second member stops. The lowest stayer's leave ballot
+// kept the dead member in its new set, so it needed the dead member's vote and could never commit; it aged out, and the
+// leaver's next knock, landing between ticks, reopened it before the tick's eviction branch ran: the dead member was
+// never evicted while the leaver knocked, and the leaver went unclean at the window's end (the base: `left` b=0 at
+// 200/800/3200 ms for a 4/16/64-tick window on the sim). Now a leave ballot the live members cannot carry leaves out
+// every suspect whose chain gave up as well (#leaveView): one ballot, one round trip. ──
+//! cc, a member of {aa,bb,cc}, is lost for good: its link dies, three ticks make it a suspect, and its redial chain is
+// exhausted (every pending redial fired and refused) so it is dead to the ballot. No tick after the give-up: the
+// heartbeat's give-up revival would re-arm the chain (V4-20), and the shape under test is the knock landing BETWEEN ticks.
+const ccGone = (h: ReturnType<typeof harness>) => {
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  for (let i = 0; i < 3; i++) h.tick()
+  assert.deepEqual(h.jk(JK.suspect).map((e) => e.a), ['cc'])
+  for (let i = 0; i < 11; i++) {
+    const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
+    if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:cc' })
+  }
+  assert.ok(!h.node.dialing('sim:cc'), 'the chain gave up: cc is dead to a ballot')
+}
+
+test('the eviction rides with the leave (2026-10-12): a LEAVE knock at {aa,bb,cc} with cc given up proposes {aa}@2 — the leaver AND the dead member out — the leaver\'s grant commits it in one round trip, where the base proposed {aa,cc}@2, which needed cc\'s vote, and knocked for the whole window', () => {
+  const h = formedView1()
+  ccGone(h)
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(proposed(h, 1, 2), [['aa']], 'without bb (leaving) and without cc (dead): the plain {aa,cc} could not be carried')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa' }) })
+  assert.equal(h.node.epoch, 2, 'aa + bb: a majority of the old set; aa alone the new')
+  assert.deepEqual(h.node.membership.view.members.map((m) => m[0]), ['aa'])
+  assert.deepEqual(h.jk(JK.evict).map((e) => e.a), ['bb', 'cc'])
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 1]], 'genesis and one ballot — no doomed one')
+  assert.ok(h.sentOn(1, VERB.VIEW).some((f) => (f.value as { e: number }).e === 2), 'the VIEW to bb is its exit proof')
+  //! the same knock when the plain ballot CAN be carried — cc merely slow (not a suspect) — is byte-identical with before
+  const k = formedView1()
+  k.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(proposed(k, 1, 2), [['aa', 'cc']], 'one apart, as today')
+})
+
+test('the eviction rides with the leave: a leave ballot in flight is re-read when the suspect\'s chain gives up — bb knocks while cc is a suspect still dialing (the plain {aa,cc}@2 opens, as before), the chain gives up, and the next tick re-proposes {aa}@2 at the same epoch; a late grant for the dropped ballot counts for nothing (its identity differs). The base kept the doomed ballot until it aged out, and the next knock reopened it', () => {
+  const h = formedView1()
+  h.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  for (let i = 0; i < 3; i++) h.tick()
+  assert.ok(h.node.dialing('sim:cc'), 'a suspect, but the chain is still trying: its vote may still come')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.LEAVE, {}) })
+  assert.deepEqual(proposed(h, 1, 2), [['aa', 'cc']], 'the plain leave, as today')
+  for (let i = 0; i < 11; i++) {
+    const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
+    if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    h.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:cc' })
+  }
+  assert.ok(!h.node.dialing('sim:cc'))
+  h.tick()
+  assert.deepEqual(proposed(h, 1, 2), [['aa', 'cc'], ['aa']], 're-read: cc leaves the ballot too, at the same epoch (my own vote at 2 is re-spent on me)')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa,cc' }) })
+  assert.equal(h.node.epoch, 1, 'bb\'s grant for the dropped ballot is not counted')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'aa' }) })
+  assert.equal(h.node.epoch, 2, 'its grant for the re-read ballot commits it')
+  assert.deepEqual(h.jk(JK.evict).map((e) => e.a), ['bb', 'cc'])
+  h.tick()
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 2], [2, 1]], 'nothing more: the ballot is not re-read once it committed')
+})
+
+test('the eviction rides with the leave, the lowest leaver: aa leaves at {aa,bb,cc} with cc given up — its own exit ballot is {bb}@2 (the base proposed {bb,cc}@2, which needed cc\'s vote), bb\'s grant commits it and bb\'s echo is the exit proof; an eviction already in flight is replaced by it (leaving outranks, as before, and the exit carries the eviction); with no live majority nothing changes', () => {
+  //! (i) the knock itself
+  const h = formedView1()
+  ccGone(h)
+  h.node.step({ kind: 'leave' })
+  assert.deepEqual(proposed(h, 1, 2), [['bb']], 'my exit without the dead member')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb' }) })
+  assert.equal(h.node.epoch, 2)
+  assert.equal(h.of('left').length, 0, 'the echo is awaited')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['bb', 'sim:bb']] }) })
+  assert.deepEqual(h.of('left'), [['left', true]], 'clean: bb echoed the view without aa')
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 1]])
+  //! (ii) the eviction is in flight when the leave begins: my exit replaces it and carries it
+  const k = formedView1()
+  ccGone(k)
+  k.tick()
+  assert.deepEqual(proposed(k, 1, 2), [['aa', 'bb']], 'the tick opened the eviction')
+  k.node.step({ kind: 'leave' })
+  assert.deepEqual(proposed(k, 1, 2), [['aa', 'bb'], ['bb']], 'replaced at the same epoch by my exit, cc out with me')
+  k.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 2, g: 1, ce: 1, h: 'bb' }) })
+  assert.equal(k.node.epoch, 2)
+  //! (iii) the guard: bb AND cc lost for good (both suspects, both chains given up) — the live set {aa} is no majority, so
+  // nobody is dropped (nothing could commit either way), and the exit ballot {bb,cc}@2 is proposed as before; nobody is
+  // linked, so the bound ends it
+  const g = formedView1()
+  g.node.step({ kind: 'linkDown', link: 1, reason: 'cut' })
+  g.node.step({ kind: 'linkDown', link: 2, reason: 'cut' })
+  for (let i = 0; i < 3; i++) g.tick()
+  assert.deepEqual(g.jk(JK.suspect).map((e) => e.a).sort(), ['bb', 'cc'])
+  for (let i = 0; i < 11; i++) {
+    for (const t of g.of('timer').filter((x) => x[2] === TAG.redial)) g.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial }) // every pending redial (a fired id is ignored)
+    g.node.step({ kind: 'linkDown', link: 800 + i, reason: 'refused', to: 'sim:bb' })
+    g.node.step({ kind: 'linkDown', link: 850 + i, reason: 'refused', to: 'sim:cc' })
+  }
+  assert.ok(!g.node.dialing('sim:bb') && !g.node.dialing('sim:cc'), 'both chains gave up')
+  g.node.step({ kind: 'leave' })
+  assert.deepEqual(g.jk(JK.propose).map((e) => [e.a, e.b]), [[1, 3], [2, 2]])
+  assert.equal(g.node.membership.votedFor.h, 'bb,cc', 'my exit, as today: a ballot nobody can carry drops nobody')
+  for (let i = 0; i <= LEAVE_TICKS; i++) g.tick()
+  assert.deepEqual(g.of('left'), [['left', false]])
+})

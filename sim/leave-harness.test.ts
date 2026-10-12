@@ -143,8 +143,14 @@ test('leave harness, pledgeTwo: two leavers knock to n01, then n01 keeps one sta
 // leaver cut from the proposer for 300 ms kept an admitted link to another member and knocked on, where before it
 // gave up at the fifth tick; the cut healed inside the 16-tick window and the knock reached the lowest live member
 // (61: n=5, n02, n04 and n05 stop, n03-n01 and n04-n01 cut; 72: n=4, n01, n02 and n04 stop, n01-n04 cut 300 ms and
-// n02-n01 600 ms). No other seed moved.
-const KNOWN_NOT_LIVE_R = new Set<number>([8, 9, 19, 25, 26, 31, 32, 33, 40, 41, 46, 47, 49, 50, 60, 63, 64, 82, 84, 98])
+// n02-n01 600 ms). No other seed moved. The eviction riding with the leave (wave 6b, 2026-10-12, kernel/membership.ts
+// #leaveView) took 50 and 64 off it, 20 → 18: in both n=3, the lowest member n01 and n02 stop together, n01 is cut from
+// n02 for 1.5 s and n02 is reborn fresh 500 ms after it goes. n01's own exit ballot, {n02,n03}@2, needed n02's vote, and
+// n02 could neither hear nor answer across the cut, so n01 knocked for the whole window and went unclean, leaving n03
+// `minority` in a view with two dead members and the reborn n02r `joining` for good. Now n02 is a suspect at n01 three
+// ticks after the cut, its chain gives up inside n01's window, and the ballot in flight is re-read without it — {n03}@2
+// — which n03's grant commits: n01 leaves cleanly, n03 is alone and writable, and n02r joins it. No other seed moved.
+const KNOWN_NOT_LIVE_R = new Set<number>([8, 9, 19, 25, 26, 31, 32, 33, 40, 41, 46, 47, 49, 60, 63, 82, 84, 98])
 
 test('leave harness, rebirth: 100 seeded schedules of cuts and heals between pairs with leavers reborn as fresh identities (the round-2 report\'s sweep2) — SAFE on every one; the not-live set is exactly the pinned one; the H9 seeds 306, 744 and 804 heal; the named shapes heal (seed 157 under 10 sim seeds, the n=3 two-stop pair once each)', () => {
   const unsafeOnes: string[] = [], notLive: number[] = [], shapes = new Map<number, string>()
