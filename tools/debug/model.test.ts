@@ -439,6 +439,41 @@ test('scoped captures: a write a new holder copied in with the whole row (journa
   assert.ok(!st.includes('acquired'), 'no acquire row, no acquired claim')
 })
 
+//! DESIGN-SCALE stage 3 (2026-10-12): a scoped capture that COMPACTED. Scoped nodes compact now (kernel/log.ts
+// compactScoped), so a loser's entry can be gone from the book while its writeLocal/applyInbound row stays in the
+// journal: the fold renders it unknown and the winner (kept) carries the cell, so the end-state refold must still
+// agree; a join after the passes makes the new holder copy compacted rows in (an acquire from a compacted teacher).
+test('the replay agrees with the kernel on a scoped capture that compacted under scoping: losers gone from the book, winners kept, a joiner taught from compacted lanes — every node refolds to its captured state', () => {
+  const sim = new Sim(12)
+  const nodes = cluster(sim, 4, { heartbeatMs: 50, replicas: 2, tune: { compactAt: 16, snapshotAt: 16 } })
+  sim.run({ until: 1500 })
+  //! hot cells: 240 writes over 6 rows, so every lane passes compactAt many times over
+  for (let i = 0; i < 240; i++) sim.post(nodes[i % 4].uuid, { kind: 'write', recs: [{ type: REC.update, key: ['c' + (i % 6)], value: i }] }, i * 5)
+  sim.run({ until: 4000 })
+  sim.add({ uuid: 'n05', listen: 'sim:n05', hosts: nodes.map((n) => n.listen), heartbeatMs: 50, replicas: 2, tune: { compactAt: 16, snapshotAt: 16 }, redialMs: 20, journalCap: 1 << 16 })
+  sim.post('n05', { kind: 'start' })
+  sim.run({ until: 8000 })
+  for (let i = 0; i < 60; i++) sim.post(nodes[i % 4].uuid, { kind: 'write', recs: [{ type: REC.update, key: ['c' + (i % 6)], value: 1000 + i }] }, i * 5)
+  sim.run({ until: 12000 })
+  assert.deepEqual(sim.violations, [])
+  const cap = captureSim(sim)
+  const K = cap.vocab
+  const compacted = cap.nodes.filter((n) => n.journal.some((e) => e.kind === K.compacted))
+  assert.ok(compacted.length >= 4, `${compacted.length} nodes compacted — the fixture is what it claims`)
+  assert.ok(cap.nodes.some((n) => n.uuid === 'n05' && n.journal.some((e) => e.kind === K.acquire)), 'the joiner acquired from compacted teachers')
+  //! a compacted row: the journal still has the write's row, the book no longer has its entry
+  const n01 = cap.nodes.find((n) => n.uuid === 'n01')!
+  const own = n01.journal.filter((e) => e.kind === K.writeLocal).length
+  const held = Object.values(n01.logs).reduce((s, l) => s + l.length, 0)
+  assert.ok(own > held, `n01 journaled ${own} own writes and keeps ${held} entries in all its lanes: losers left the book`)
+  for (const r of verifyReplay(cap) as { uuid: string; ok: boolean; reason?: string }[]) assert.ok(r.ok, `${r.uuid}: ${r.reason}`)
+  //! the topology replay: a lane whose taught entries a pass dropped reads lower than the kernel at ∞ (KNOWN BOUND 4
+  // in model.mjs) — such a node is REFUSED with its reason, never shown as a replay; the others verify
+  const topo = verifyTopology(cap) as { uuid: string; ok: boolean; reason?: string }[]
+  for (const r of topo) if (!r.ok) assert.match(r.reason!, /^stream .* [asd]: \d+ vs \d+$/, `${r.uuid}: a refusal names the stream and the field (${r.reason})`)
+  assert.ok(topo.filter((r) => r.ok).length >= 1, `${topo.filter((r) => r.ok).length} of ${topo.length} topologies verify`)
+})
+
 test('the replay folds hand-offs: shed drops a row\'s cells, acquire copies a row in — every node of a scoped capture with a join refolds to its captured state', () => {
   const { cap } = movedCapture()
   const K = cap.vocab
