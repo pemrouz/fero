@@ -105,6 +105,26 @@ const nameOf = (p: object): string => {
 // null is plain unless it is a module namespace, and the rest is a kind (KINDS), a plain object of another
 // realm (its prototype's prototype is null), or a class instance (INSTANCES). Object.create(plainObject) passes
 // the fast path: its inherited fields do not travel, and the write's copy leaves them behind on the writer too.
+//! userClass — is this prototype a class the program wrote? Its own `constructor` is a function that is neither native
+// code nor a global of the same name (Node writes URLSearchParams, Headers, Blob and the like in JavaScript, so only
+// the global tells them apart). Read through the property's descriptor, so no getter runs, and once per prototype.
+const USER = new WeakMap<object, boolean>()
+const NATIVE = /\{\s*\[native code\]\s*\}$/
+const userClass = (p: object): boolean => {
+  let u = USER.get(p)
+  if (u === undefined) {
+    const c = Object.getOwnPropertyDescriptor(p, 'constructor')?.value
+    u = typeof c === 'function' && !NATIVE.test(Function.prototype.toString.call(c)) && (globalThis as Record<string, unknown>)[c.name] !== c
+    USER.set(p, u)
+  }
+  return u
+}
+//! hintOf — what to send instead of a built-in the KINDS list does not name, where it is known
+const hintOf = (tag: string): string =>
+  tag === 'URLSearchParams' || tag === 'Headers' || tag === 'FormData' ? 'send Object.fromEntries(it)'
+  : /Iterator$|^Generator$|^AsyncGenerator$/.test(tag) ? 'send [...it]'
+  : tag.startsWith('Temporal.') ? 'send it.toString()'
+  : 'it keeps its data where fero cannot see it: send a plain copy of what it holds'
 export const partOf = (o: object, array: boolean): string | null => {
   if (types.isProxy(o)) return isProxy(o) ? LIVE_VIEW : PROXY
   if (array || (o as { constructor?: unknown }).constructor === Object) return null
@@ -115,9 +135,12 @@ export const partOf = (o: object, array: boolean): string | null => {
   if (Object.getPrototypeOf(p) === null) return null
   //! a built-in KINDS does not name keeps its data where Object.keys cannot see it — a URLSearchParams, Headers, a Blob,
   // a WeakRef, a generator or an iterator arrived as {} on every copy, the writer's too (the V4-51/52 review). Its tag
-  // says what it is; a class instance's tag is 'Object' unless it names its own.
-  const tag = Object.prototype.toString.call(o).slice(8, -1)
-  if (tag !== 'Object') return `a ${tag} (it keeps its data where fero cannot see it: send a plain copy of what it holds)`
+  // says what it is. Asked only when its own prototype is not a user class: a class instance keeps its data in its own
+  // fields, whatever tag it names or built-in it extends (an EventTarget subclass), and is taken (INSTANCES).
+  if (!userClass(p)) {
+    const tag = tagOf(o)
+    if (tag !== 'Object') return `${an(tag)} (${hintOf(tag)})`
+  }
   return INSTANCES === 'take' ? null : `an instance of ${nameOf(p)} (fero sends plain objects: send { ...value })`
 }
 
