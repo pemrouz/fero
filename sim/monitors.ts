@@ -176,6 +176,46 @@ export const perEvent = () => [
     })(),
   },
   {
+    //! THE LANE RULE (wave 6b, 2026-10-12): a lane holds each (origin, seq) ONCE — what stage 3's compaction will assume
+    // when it rewrites a lane (a seq held twice is a winner beside its own copy, and the per-partition index holds both).
+    // log-monotone proves it for the tail it scans (strictly ascending ⇒ no repeat), but it scans from the length it
+    // last saw, so a copy an interior insert puts BELOW that length is outside its window. This monitor keeps the entry
+    // it last saw at the tail: while that entry is still at that index the lane only grew at the end and the new tail is
+    // scanned; otherwise (an interior insert moved it, a replaced array) the whole lane is. A repeat is a seq equal to
+    // its neighbour's — lanes are ascending (log-monotone's row), so equal seqs sit side by side. Found by the wave-6a
+    // review: the fold spliced a teacher record above the cut and the live replay appended it again (lane bb at aa
+    // [3, 5, 7, 7]); fixed in kernel/scope.ts onAcqDone (the fence rises to the fold's top). Counted: `counts.pairs` is the
+    // neighbouring pairs compared, `counts.lanes` the lane scans (laneUniqueCounts reads them).
+    ...(() => {
+      const counts = { lanes: 0, pairs: 0 }
+      const tails = new Map<string, Map<string, { node: Node; arr: unknown; len: number; last: unknown }>>()
+      const due = new Due()
+      return {
+        name: 'lane-unique',
+        counts,
+        check: (sim: Sim): string | null => due.walk(sim, (id, n) => {
+          let per = tails.get(id)
+          if (per === undefined) { per = new Map(); tails.set(id, per) }
+          for (const [origin, entries] of n.logs) {
+            let prev = per.get(origin)
+            if (prev === undefined || prev.node !== n || prev.arr !== entries) { prev = { node: n, arr: entries, len: 0, last: undefined }; per.set(origin, prev) }
+            const tailStands = prev.len > 0 && prev.len <= entries.length && entries[prev.len - 1] === prev.last
+            if (tailStands && entries.length === prev.len) continue
+            const from = tailStands ? prev.len : 1
+            counts.lanes++
+            counts.pairs += Math.max(0, entries.length - from)
+            for (let i = from; i < entries.length; i++)
+              if (entries[i].seq === entries[i - 1].seq)
+                return `${id} lane ${origin} holds seq ${entries[i].seq} TWICE (at ${i - 1} and ${i}; epochs ${entries[i - 1].epoch} and ${entries[i].epoch}) — the lane rule`
+            prev.len = entries.length
+            prev.last = entries.length ? entries[entries.length - 1] : undefined
+          }
+          return null
+        }),
+      }
+    })(),
+  },
+  {
     //! M3's headline invariant (the plan's single-writer monitor, v2 DECISIONS AA made structural):
     // for any (partition, epoch>0), at most ONE origin ever stamps a record — every AA conflict source
     // was some node stamping a partition it didn't solely own. Epoch 0 is exempt BY DESIGN (open
@@ -349,6 +389,13 @@ export const perEvent = () => [
     })(),
   },
 ]
+
+//! laneUniqueCounts — the lane rule's non-vacuity counts off the Sim's own monitor set (null when perEvent() is not
+// installed): `lanes` scans made, `pairs` neighbouring (seq, seq) pairs compared.
+export const laneUniqueCounts = (sim: Sim): { lanes: number; pairs: number } | null => {
+  const m = sim.monitors.find((x) => x.name === 'lane-unique') as { counts?: { lanes: number; pairs: number } } | undefined
+  return m?.counts ?? null
+}
 
 //! scopedConverged — the R-SCOPED quiescence check (M6): for every partition, every node HOLDING it
 // agrees cell-for-cell. Orphans are deliberately outside the comparison — a frozen copy is lawfully

@@ -125,7 +125,7 @@ const SPOKED = new Set(['A11-spoke', 'A12-spoke-handoff', 'A13-spoke-repair'])
 for (const fam of FAMILIES) {
   test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
-    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0, spokeCells = 0, feederAcquires = 0, spokeStale = 0
+    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0, spokeCells = 0, feederAcquires = 0, spokeStale = 0, lanePairs = 0
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
     const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
@@ -145,6 +145,7 @@ for (const fam of FAMILIES) {
       cells += o.eng.cells; advances += o.eng.advances; resyncs += o.eng.resyncs; resyncRows += o.eng.resyncRows
       floorLanes += o.eng.floorLanes; markPairs += o.eng.markPairs; if (o.R >= 2) rge2++
       spokeCells += o.eng.spokeCells; feederAcquires += o.eng.feederAcquires ?? 0; spokeStale += o.eng.spokeStale ?? 0
+      lanePairs += o.eng.lanePairs
     }
     assert.deepEqual(unsafe, [], 'UNSAFE: a monitor fired or M1\'s horizon form disagrees')
     assert.deepEqual(newlySafe, [], 'a schedule pinned unsafe is safe now: take it off KNOWN_UNSAFE, with the why')
@@ -167,6 +168,8 @@ for (const fam of FAMILIES) {
       assert.ok(spokeStale > 0, `the spoke kept ${spokeStale} rows of partitions that moved off its feeder (known gap; 0 means it closed — flip this pin)`)
     }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
+    //! the lane rule (wave 6b): the lane-unique monitor compared neighbouring pairs on every family (a lane holds each seq once)
+    assert.ok(lanePairs > 0, `${fam.name}: non-vacuity — the lane rule compared ${lanePairs} neighbouring pairs across every node's lanes`)
     //! M7 compares nothing on an R=1 seed (one holder per partition): the row bites only where some seed drew R ≥ 2
     if (rge2 > 0) assert.ok(floorLanes > 0 && markPairs > 0, `${fam.name}: non-vacuity — M7 compared ${floorLanes} (partition, lane) floors and ${markPairs} (holder, co-holder, partition) marks over ${rge2} seed(s) at R ≥ 2`)
   })
