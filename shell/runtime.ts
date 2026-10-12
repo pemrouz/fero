@@ -23,6 +23,7 @@
 
 import net from 'node:net'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { Node, type NodeOpts } from '../kernel/node.ts'
 import { Cursor, Writer, HEADER, MAGIC, MAX_FRAME, crcFrame } from '../kernel/codec.ts'
@@ -57,6 +58,66 @@ const writeAll = (fd: number, b: Uint8Array): void => { for (let off = 0; off < 
 //! STAGE — the snapshot file is streamed, never assembled whole: rows under 1 MiB are staged and written 1 MiB at a
 // time, a bigger row goes straight to the fd
 const STAGE = 1 << 20
+
+//! ── the dir lock (wave 6b, DECISIONS V4-NN) ──
+// One process at a time holds a `dir`. Before this nothing locked the folder: a second process started on a dir the
+// first still held restored it, ran as the SAME uuid, and both appended rows to one log (the platform spikes,
+// 2026-10-12); with sockets the two would also claim one identity on the wire. The lock is a file, `lock`, beside
+// wal.log, holding the holder's pid and host as JSON, taken with O_EXCL before the WAL opens and removed at destroy()
+// and at process exit. A holder on this host whose pid is alive refuses the open — a typed error, code 'dir-held',
+// naming the pid and host; a holder whose pid is gone (a crash: a kill -9 leaves the file) is taken over; a holder on
+// another host cannot be checked and counts as live (a shared network dir is not the deployment rule; the message says
+// to remove the file by hand when that machine is gone). A takeover is serialised through a second O_EXCL file,
+// `lock.take`: two heirs starting at once after a crash cannot both remove the stale lock and both hold the dir, and a
+// process that opens the dir fresh while a takeover runs wins or loses by the one O_EXCL create of `lock` itself.
+const LOCK = 'lock'
+const HOST = os.hostname()
+export interface DirHeld extends Error { code: 'dir-held'; pid: number; host: string }
+const alivePid = (pid: number): boolean => { try { process.kill(pid, 0); return true } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM' } }
+const holderOf = (p: string): { pid: number; host: string } | null => {
+  try { const v = JSON.parse(fs.readFileSync(p, 'utf8')) as { pid?: unknown; host?: unknown }; return typeof v?.pid === 'number' && typeof v?.host === 'string' ? { pid: v.pid, host: v.host } : null } catch { return null }
+}
+const liveHolder = (h: { pid: number; host: string } | null): h is { pid: number; host: string } => h !== null && (h.host !== HOST || alivePid(h.pid))
+//! claim — create the file with my record, O_EXCL: false when it exists (held, or stale), any other failure throws
+const claim = (p: string, mine: string): boolean => {
+  let fd: number
+  try { fd = fs.openSync(p, 'wx') } catch (e) { if ((e as NodeJS.ErrnoException).code === 'EEXIST') return false; throw e }
+  try { fs.writeSync(fd, mine) } finally { fs.closeSync(fd) }
+  return true
+}
+const heldError = (who: string, dir: string, h: { pid: number; host: string }): DirHeld =>
+  Object.assign(new Error(`${who}: dir ${dir} is held by another process — pid ${h.pid} on ${h.host}; one dir is one node: stop that process first, or give this one a dir of its own${h.host !== HOST ? ` (a lock from another machine is never taken over: remove ${path.join(dir, LOCK)} by hand once that machine is gone)` : ''}`), { code: 'dir-held' as const, pid: h.pid, host: h.host })
+//! lockDir — take the dir for this process; returns the release. `who` prefixes the refusal (the composer's fero('name')).
+export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
+  const p = path.join(dir, LOCK), take = p + '.take'
+  const mine = JSON.stringify({ pid: process.pid, host: HOST }) + '\n'
+  //! release only what is still mine: a crash and a takeover may have put another holder's record there since
+  const release = () => { try { if (fs.readFileSync(p, 'utf8') === mine) fs.unlinkSync(p) } catch { /* gone already */ } }
+  if (claim(p, mine)) return release
+  const h = holderOf(p)
+  if (liveHolder(h)) throw heldError(who, dir, h)
+  //! stale (or unreadable: a writer that died between the create and the write) — take it over, one heir at a time
+  if (!claim(take, mine)) {
+    const t = holderOf(take)
+    if (liveHolder(t)) throw heldError(who, dir, t)
+    try { fs.unlinkSync(take) } catch { /* the other heir finished first */ }
+    if (!claim(take, mine)) throw heldError(who, dir, holderOf(take) ?? { pid: 0, host: HOST })
+  }
+  try {
+    const now = holderOf(p) // read again under the marker: a holder that started between the two looks is live
+    if (liveHolder(now)) throw heldError(who, dir, now)
+    try { fs.unlinkSync(p) } catch { /* gone */ }
+    if (!claim(p, mine)) throw heldError(who, dir, holderOf(p) ?? { pid: 0, host: HOST }) // a fresh opener slipped in: it holds
+    return release
+  } finally { try { fs.unlinkSync(take) } catch { /* gone */ } }
+}
+//! every lock this process holds is released at exit, through ONE hook (a Runtime per test file would pile listeners up)
+const locks = new Set<() => void>()
+let exitHooked = false
+const holdLock = (release: () => void) => {
+  locks.add(release)
+  if (!exitHooked) { exitHooked = true; process.on('exit', () => { for (const r of locks) r() }) }
+}
 
 //! RuntimeOpts: NodeOpts + the storage directory (presence = durable mode; NodeOpts.durable derives from it).
 export interface RuntimeOpts extends NodeOpts { dir?: string }
@@ -120,6 +181,7 @@ export class Runtime {
   #leaving: Promise<boolean> | null = null
   #onLeft: ((clean: boolean) => void) | null = null
   #wal: number | null = null // fd, held open for append (the plan's fd-held contract)
+  #unlock: (() => void) | null = null // the dir lock's release (wave 6b): run at destroy() and at process exit
   //! WAL ops run STRICTLY IN ORDER through one promise chain: fs.write completions ride a threadpool
   // and are not order-guaranteed, so two appends landing swapped would replay as a chain hole on a
   // CLEAN restart; the queue is also what makes the snapshot swap atomic wrt appends (nothing
@@ -159,6 +221,9 @@ export class Runtime {
     this.onApply = onApply
     if (opts.dir) {
       fs.mkdirSync(opts.dir, { recursive: true })
+      //! the lock comes FIRST (wave 6b): a refused open has touched nothing but the folder itself
+      this.#unlock = lockDir(opts.dir, opts.name !== undefined ? `fero('${opts.name}')` : 'Runtime')
+      holdLock(this.#unlock)
       this.#wal = fs.openSync(path.join(opts.dir, 'wal.log'), 'a')
     }
     const runtime = this
@@ -518,6 +583,8 @@ export class Runtime {
     // here is what makes shutdown durable.
     await this.#ioq.catch(() => {})
     if (this.#wal !== null) { try { fs.closeSync(this.#wal) } catch {} this.#wal = null }
+    //! the dir is free once the WAL is closed: the next life (this process or another) may open it
+    if (this.#unlock !== null) { locks.delete(this.#unlock); this.#unlock(); this.#unlock = null }
     if (closed) await closed
   }
 }
