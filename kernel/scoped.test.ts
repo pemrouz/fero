@@ -709,6 +709,61 @@ test('ACQUISITION forwards to spokes — the teacher records the fold takes in r
   assert.deepEqual(sent(3).slice(before).map((r) => r.seq), [7], 'only the record the lane lacked was forwarded; seq 5 was already there')
 })
 
+//! the review of wave 6a (2026-10-12): the two legs of the forward at the frame level. A latch from a HELD base (a
+// repair) forwards the delta — the base is at every synced spoke already, because a client's digest answer ships every
+// partition the node FEEDS (Scope.feeds: held, or acquiring from a held base or from nothing), so a spoke that syncs
+// mid-repair gets the base from the answer. A latch that RE-ENTERS from an orphan forwards the WHOLE partition: an orphan
+// is no spoke feed, a spoke synced since the freeze has nothing of it, and one synced before holds the frozen rows and
+// drops the copies. kernel/client.test.ts drives the same two legs end to end with a real spoke.
+test('ACQUISITION forwards to spokes — the two legs: a spoke that syncs while px is under REPAIR is answered its base and hears the delta at the fold; a spoke synced all along hears the WHOLE of px when it re-enters from an orphan', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('px', 'bb', 'aa')
+  const spoke = (link: number, u: string) => {
+    h.node.step({ kind: 'linkUp', link, dialed: false })
+    h.node.step({ kind: 'bytesIn', link, bytes: encodeControl(VERB.HELLO, { u, i: 1, l: `sim:${u}`, r: 1 }) })
+  }
+  const sync = (link: number) => h.node.step({ kind: 'bytesIn', link, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  const sent = (link: number) => h.of('send').filter((e) => e[1] === link)
+    .map((e) => new Framer().push((e[2] as Uint8Array).slice())[0]).filter((f) => f && f.verb === VERB.RECORDS)
+    .flatMap((f) => [...f.records()].map((r) => r.seq))
+  spoke(3, 'zz'); sync(3)
+  spoke(4, 'zy')
+  //! px held at aa: bb#3, bb#5 — tapped live to the synced spoke zz
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 3, rec: rec(['px', 'a'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 5, rec: rec(['px', 'b'], 2), pp: 3 }]) })
+  assert.deepEqual(sent(3), [3, 5])
+  //! the repair: cc announces bb at 7, aa re-latches; zy syncs NOW and is answered the base (held() would have skipped it)
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(1, { px: { bb: 7 } }) })
+  assert.equal(h.node.scope!.held('px'), false)
+  assert.equal(h.node.scope!.feeds('px'), true)
+  sync(4)
+  assert.deepEqual(sent(4), [3, 5], 'the answer shipped the base of the partition under repair')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: acqFrame('bb', [{ seq: 7, rec: rec(['px', 'c'], 3), pp: 5 }]) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 7 }, n: 1 }) })
+  assert.equal(h.jk(JK.acquire).length, 1)
+  assert.deepEqual(sent(3), [3, 5, 7], 'the delta to the spoke synced all along')
+  assert.deepEqual(sent(4), [3, 5, 7], 'the delta to the spoke synced mid-repair: the base came with its answer')
+  //! the freeze: epoch 2 moves px off aa (an orphan); then epoch 3 gives it back, and cc's announce re-enters it
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  if (h.node.scope!.entries.get('px')?.state !== SCOPE.orphan) {
+    //! the ring's hash may still place px on aa at two members: force the freeze the way rescope does, by assignment
+    h.node.writes.ring.place('px', 'bb', 'cc')
+    h.node.scope!.rescope(h.node)
+  }
+  assert.equal(h.node.scope!.entries.get('px')!.state, SCOPE.orphan, 'px froze into an orphan at aa')
+  assert.equal(h.node.scope!.feeds('px'), false)
+  h.node.writes.ring.place('px', 'bb', 'aa')
+  const before = { zz: sent(3).length, zy: sent(4).length }
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: haveq(h.node.epoch, { px: { bb: 9 } }) })
+  assert.equal(h.node.scope!.entries.get('px')!.state, SCOPE.acquiring, 'the re-entry latch')
+  assert.equal(h.node.scope!.feeds('px'), false, 'not fed until its fold')
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: acqFrame('bb', [{ seq: 9, rec: rec(['px', 'd'], 4), pp: 7 }], h.node.epoch) })
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: h.node.epoch, t: { bb: 9 }, n: 1 }) })
+  assert.equal(h.jk(JK.acquire).length, 2, 'the re-entry fold')
+  assert.deepEqual(sent(3).slice(before.zz), [3, 5, 7, 9], 'the WHOLE of px to a spoke synced all along (it drops the three it holds)')
+  assert.deepEqual(sent(4).slice(before.zy), [3, 5, 7, 9], 'and to the other')
+})
+
 test('ACQUISITION aborts — torn count, foreign ACQ, teacher death, epoch flip, tick timeout: the buffer drops whole, nothing folds', () => {
   //! torn: DONE's n disagrees with the staged teacher count
   const t1 = armedView1()
