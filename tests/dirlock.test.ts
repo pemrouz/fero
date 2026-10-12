@@ -378,6 +378,19 @@ test('the lease is held from a thread of its own: the lock is touched while the 
     assert.equal(await holder.stop(), 0, 'the holder still stops cleanly')
     holder = null
     assert.equal(lockOf(dir)?.host, 'taker', "the release left the taker's record")
+    //! a release tells the thread: a process that gave its dir back cleanly and lives on says nothing when another
+    // process takes the dir after it — without the word the thread still watched the path and called the next
+    // holder's record a takeover of a live holder
+    fs.rmSync(path.join(dir, 'lock'))
+    holder = holdHere([CHILD, dir, 'release'])
+    assert.ok(await until(() => holder!.out.includes('released'), 20_000), `the holder never released (${holder.out})`)
+    assert.equal(lockOf(dir), null, 'the release removed its record')
+    plant(dir, { pid: 4243, host: 'next-owner' }, 'lock.next'); fs.renameSync(path.join(dir, 'lock.next'), path.join(dir, 'lock'))
+    await new Promise((r) => setTimeout(r, 1200)) // two touches and more
+    assert.ok(!holder.out.includes('taken over'), `a released dir taken by the next owner is no takeover (${holder.out})`)
+    assert.equal(await holder.stop(), 0, 'it lived on, and stops cleanly')
+    holder = null
+    assert.equal(lockOf(dir)?.host, 'next-owner')
   } finally {
     await holder?.stop()
     fs.rmSync(dir, { recursive: true, force: true })

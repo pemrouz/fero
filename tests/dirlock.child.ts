@@ -12,7 +12,8 @@
 // main thread six seconds right after the lock is taken (at the wal.log open: a long WAL replay), printing `booting` as
 // it enters the block; `touch` opens nothing: it plays a holder in another pid namespace, touching the dir's `lock`
 // every 100 ms until Ctrl-C (the lease); `two` also takes the lock of a second dir, `<dir>/second`, before it says up
-// (one thread touches both). Not a test file (the battery's glob is tests/*.test.ts).
+// (one thread touches both); `release` gives its dir back by a clean destroy() after it is up, prints `released`, and
+// lives on until Ctrl-C. Not a test file (the battery's glob is tests/*.test.ts).
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -70,9 +71,15 @@ if (mode === 'nolink' || mode === 'nolink-slow') {
 }
 if (mode !== 'touch') {
   try {
-    await fero('locked', { dir, listen: false })
+    const f = await fero('locked', { dir, listen: false })
     if (mode === 'two') lockDir(path.join(dir, 'second'), 'second')
     console.log(`up ${process.pid}`)
+    if (mode === 'release') {
+      await f.destroy()
+      console.log('released')
+      setInterval(() => {}, 60_000)
+      process.on('SIGINT', () => process.exit(0))
+    }
     if (mode === 'exit') process.exit(0)
     //! a crash leaves the lock: no exit hook runs (pid 1 of a namespace ignores a SIGKILL it sends itself, so not kill -9)
     if (mode === 'crash') { process.removeAllListeners('exit'); process.exit(0) }
