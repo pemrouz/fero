@@ -2223,3 +2223,31 @@ test("methods.insert with a key of two parts or more, or an empty at, is refused
     await s.destroy()
   }
 })
+
+//! the V4-51/52 review: a client's methods.x(o) copied `o` only at the await or the first touch — the handle is lazy —
+// so a change the program made in between was sent, and each await of the same handle sent the object as it then was.
+// A server's own call copies at the call. The handle takes its copy when it is made now, once, for every call and sub.
+test('a client method handle sends its argument as it was when the handle was made — every await of it, and a refusal stays one', async () => {
+  const p = await ports.free()
+  const addr = `127.0.0.1:${p}`
+  const s = await fero('handlearg', { uuid: 'aa', listen: addr, heartbeat: { ms: 50 }, redial: { ms: 30 }, data: { a: 1 }, methods: { echo: (a: unknown) => a } })
+  let c: Fero | null = null
+  try {
+    const cl = c = await fero('handlearg', { uuid: 'zz', hosts: [addr], heartbeat: { ms: 50 }, redial: { ms: 30 } })
+    assert.ok(await until(() => (snapshot(cl.data) as Record<string, unknown>).a === 1, 8000), 'the client caught up')
+    const m = cl.methods as Record<string, (a?: unknown, o?: { timeout?: number }) => any>
+    const o: Record<string, unknown> = { n: 1 }
+    const h = m.echo(o, { timeout: 8000 })
+    o.n = 2
+    assert.deepEqual(await h, { n: 1 }, 'the change after the call is not sent')
+    o.n = 10n
+    assert.deepEqual(await h, { n: 1 }, 'a second await sends the same copy, not the object as it is now')
+    const bad: Record<string, unknown> = { n: 10n }
+    const r = m.echo(bad, { timeout: 8000 })
+    bad.n = 1
+    await assert.rejects(async () => { await r }, /^Error: methods\.echo: the argument cannot be sent: a bigint at n$/)
+  } finally {
+    await c?.destroy()
+    await s.destroy()
+  }
+})

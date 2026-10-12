@@ -492,6 +492,9 @@ const end = (sub: Sub, why: string): void => {
   sub.reject(new Error(`methods.${sub.m}: ${why}`))
 }
 
+//! Arg — a call's argument as fero's own copy (`v`), or why it cannot be sent (`e`), taken once (Caller.argOf)
+type Arg = { v: unknown } | { e: Error }
+
 export class Caller {
   #rt: Runtime
   #seq = 0
@@ -510,14 +513,21 @@ export class Caller {
 
   //! call — one-shot RPC. `retry` re-dispatches on primary failover (idempotent methods ONLY — the
   // banner's re-execution warning); default is fail-fast with a typed reason.
-  call(m: string, a: unknown, opts: { timeout?: number; retry?: boolean; to?: string } = {}): Promise<unknown> {
+  //! argOf — fero's own copy of a call's argument at the node's cap (ARG), or the refusal in the call's words. A
+  // handle takes it once, when it is made (handle below), and hands it to every call and sub it starts.
+  argOf(m: string, a: unknown): Arg {
+    try { return { v: copyOf(a, atCap(this.#rt.node.tune.frame).arg) } } catch (e) { return { e: new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`) } }
+  }
+
+  call(m: string, a: unknown, opts: { timeout?: number; retry?: boolean; to?: string } = {}, pre?: Arg): Promise<unknown> {
     //! an argument the wire cannot carry is refused here, before the step (V4-48): encoded inside it, it threw
     // out of the kernel — at once, or from a socket handler when a held call replayed on the next primary —
     // and ended the client. What is sent is fero's own copy, taken by the same walk (V4-52): a held call, or a
     // retried one, re-encoded the caller's object when it replayed, so a change made meanwhile was sent, and a
     // change to something fero cannot send (a bigint) threw from the socket handler while the call hung.
-    let arg: unknown
-    try { arg = copyOf(a, atCap(this.#rt.node.tune.frame).arg) } catch (e) { return Promise.reject(new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`)) }
+    const got = pre ?? this.argOf(m, a)
+    if ('e' in got) return Promise.reject(got.e)
+    const arg = got.v
     const id = ++this.#seq
     const ms = opts.timeout ?? 10_000
     return new Promise((resolve, reject) => {
@@ -539,18 +549,20 @@ export class Caller {
 
   //! subscribe — open a live stream into a fresh local proxy. The id doubles as the subscription
   // identity server-side (keyed by link|id there, so the same id re-used on a NEW primary is clean).
-  subscribe(m: string, a: unknown, onError: ((e: Error) => void) | null = null): Sub {
+  subscribe(m: string, a: unknown, onError: ((e: Error) => void) | null = null, pre?: Arg): Sub {
     const id = ++this.#seq
     const sub = { id, m, a: undefined, proxy: proxy({}), error: null, onError } as Sub
     arm(sub)
     //! the same question as call(), and the same copy (a re-subscribe on the next primary sends it): a sub whose
     // argument cannot be sent fails at once and nothing is stepped. The handle's touch throws the reason, so its
     // `ready` is marked handled: one failure, told once.
-    try { sub.a = copyOf(a, atCap(this.#rt.node.tune.frame).arg) } catch (e) {
+    const got = pre ?? this.argOf(m, a)
+    if ('e' in got) {
       sub.ready.catch(noop)
-      this.#fail(sub, new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`))
+      this.#fail(sub, got.e)
       return sub
     }
+    sub.a = got.v
     this.#subs.set(id, sub)
     this.#rt.node.step({ kind: 'rpc', id, mode: VERB.SUB, m, a: sub.a })
     return sub
@@ -692,7 +704,12 @@ const COERCION = new Set(['toJSON', 'toString', 'valueOf', 'constructor', 'nodeT
 export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: number; retry?: boolean; onError?: (e: Error) => void } = {}): any => {
   let live: Sub | null = null
   let last: Sub | null = null // the sub close() ended: `ready` keeps answering from it
-  const subscribe = (): Sub => caller.subscribe(m, a, opts.onError ?? null)
+  //! the argument as it was when the handle was made (V4-52): fero's own copy, taken HERE, once — not at the await or
+  // the first touch, which sent a change the program made in between (a server's own call copies at the call too) —
+  // and the same copy for every call and sub this handle starts; a refusal is kept and told at first use
+  const pre = caller.argOf(m, a)
+  const call = (): Promise<unknown> => caller.call(m, a, opts, pre)
+  const subscribe = (): Sub => caller.subscribe(m, a, opts.onError ?? null, pre)
   const open = (): Sub => {
     live ??= subscribe()
     if (live.error !== null) throw live.error
@@ -714,11 +731,11 @@ export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: 
   const isPassive = (prop: string | symbol) => typeof prop === 'symbol' || (typeof prop === 'string' && COERCION.has(prop))
   return new Proxy(function () {}, {
     get(_t, prop) {
-      if (prop === 'then') return (onF?: (v: unknown) => unknown, onR?: (e: unknown) => unknown) => caller.call(m, a, opts).then(onF, onR)
+      if (prop === 'then') return (onF?: (v: unknown) => unknown, onR?: (e: unknown) => unknown) => call().then(onF, onR)
       //! catch/finally are thenable-adjacent, NOT reactive touches — `methods.x().catch(...)` must
       // behave like a promise, never open a subscription with a 'catch' operator (M6 papercut)
-      if (prop === 'catch') return (onR?: (e: unknown) => unknown) => caller.call(m, a, opts).catch(onR)
-      if (prop === 'finally') return (onD?: () => void) => caller.call(m, a, opts).finally(onD)
+      if (prop === 'catch') return (onR?: (e: unknown) => unknown) => call().catch(onR)
+      if (prop === 'finally') return (onD?: () => void) => call().finally(onD)
       if (prop === 'open') return () => open().proxy
       //! `ready` opens the sub (waiting for its first frame IS a reactive intent) and is the same promise
       // for the whole attempt — made when it began, so a failure before anyone looked is still delivered;
@@ -738,6 +755,6 @@ export const handle = (caller: Caller, m: string, a: unknown, opts: { timeout?: 
     // promise utility that probes for a function and calls it (assert.rejects, retry wrappers …) failed
     // with ERR_INVALID_RETURN_VALUE, so the examples had to write `assert.rejects(async () => { await h })`
     // (rungs 40 and 43). Arguments are ignored: the call's argument was bound when the handle was made.
-    apply() { return caller.call(m, a, opts) },
+    apply() { return call() },
   })
 }
