@@ -192,6 +192,35 @@ export const run2 = (s: Schedule2, horizon = 30000, o: RunOpts = {}): string[] =
   return verdict(sim, s.ids.filter((u) => !s.leavers.includes(u) || back.has(u)).sort())
 }
 
+// ── the knock starvation (wave 6b, 2026-10-12; DESIGN-LEAVE §10.7's note): a bare majority with a dead member, and a stop ──
+//! starved — n=3 at heartbeat 50 on 3 ms links; n03 is cut from everyone (a crash, never back) `cutBefore` ms before
+// `leaver` stops, under `leaveWindow` ticks. Measured on the base: the lowest stayer's leave ballot keeps n03 and can
+// never commit; it ages out and the next knock reopens it before the tick's eviction runs, so n03 is never evicted while
+// the leaver knocks — `left` b=0 at the window's end (200 / 800 / 3200 ms after the stop for 4 / 16 / 64 ticks) with the
+// cut 200 ms before the stop, and clean in a tick with the cut 800 ms before (n03's chain had given up, so the eviction
+// ran before the knock). Under THE EVICTION RIDES WITH THE LEAVE (kernel/membership.ts #leaveView) a leave ballot the live
+// members cannot carry leaves the dead member out too, in flight or at the knock: the 200 ms shape is clean once n03's
+// chain gives up (about 510 ms after the stop, inside the 16-tick window; the 4-tick window still ends first, as a window
+// shorter than the chain must), the 800 ms shape stays clean in a tick. Returns the verdict and the ballots.
+export const starved = (leaver: 'n01' | 'n02', cutBefore: number, leaveWindow: number): { left: boolean | null; afterStop: number; stayer: string; ballots: string } => {
+  const sim = new Sim(1)
+  const nodes = cluster(sim, 3, { heartbeatMs: 50, fault: { delay: [3, 3] }, tune: { leaveWindow } })
+  sim.run({ until: 800 })
+  if (!nodes.every((x) => x.epoch === 1)) throw new Error('never formed')
+  const t0 = sim.now
+  for (const o of ['n01', 'n02']) sim.partition('n03', o)
+  sim.post(leaver, { kind: 'leave' }, cutBefore)
+  const stop = t0 + cutBefore
+  let leftAt = -1
+  for (let t = sim.now; t <= stop + 50 * (leaveWindow + 4); t += 5) {
+    sim.run({ until: t })
+    if (sim.left.has(leaver)) { leftAt = sim.now; break }
+  }
+  const stayer = nodes.find((x) => x.uuid !== leaver && x.uuid !== 'n03')!
+  const ballots = stayer.journal.read().concat(sim.nodes.get(leaver)!.journal.read()).filter((e) => e.kind === JK.propose).map((e) => `P(${e.a},${e.b})`).join(' ')
+  return { left: sim.left.get(leaver) ?? null, afterStop: leftAt < 0 ? -1 : leftAt - stop, stayer: `${stayer.uuid}@${stayer.epoch}{${members(stayer)}}`, ballots }
+}
+
 export const shape1 = (s: Schedule) => `${s.seed} n=${s.n} leavers=${s.leavers} stall=${s.stall ? `${s.stall.node}/${s.stall.ms}` : '-'} slow=${s.stalls.map((x) => x.join(':')).join(',')} offsets=${s.offsets} linger=${s.linger}${s.join ? ' join' : ''}`
 export const shape2 = (s: Schedule2) => `${s.seed} n=${s.n} leavers=${s.leavers} cuts=${JSON.stringify(s.cuts)} restart=${s.restart} slow=${s.delay.filter((d) => d[2] > 3).map((d) => d.join(':')).join(',')}`
 

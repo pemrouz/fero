@@ -224,8 +224,10 @@ export class Membership {
   // above the view ride behind it (Vote.prior)
   votedFor: Vote = { e: 0, p: '', h: '' }
   //! `oldEpoch` is the epoch of the view the ballot is over (the PROPOSE carries it as `o`, form (β)); `joint` the held
-  // views (member lists) this ballot must ALSO carry a majority of — my own holds, and those a refusal named (`hm`)
-  #proposal: { view: View; old: string[]; oldEpoch: number; h: string; votes: Set<string>; ticks: number; age: number; joint: Set<string> } | null = null
+  // views (member lists) this ballot must ALSO carry a majority of — my own holds, and those a refusal named (`hm`);
+  // `leaver` names a LEAVE ballot (a knock's, or my own exit) by who is leaving, so the tick can re-read it against the
+  // redial chains (#leaveView) — no ballot rule reads it
+  #proposal: { view: View; old: string[]; oldEpoch: number; h: string; votes: Set<string>; ticks: number; age: number; joint: Set<string>; leaver?: string } | null = null
   //! #remember — a new vote: the latest, with every other vote still above my view kept behind it, minus the one at
   // the same epoch (the same proposer's replacement ballot — at most one of its ballots at an epoch commits)
   #remember(v: Vote) {
@@ -474,11 +476,18 @@ export class Membership {
       // evict/rejoin churn cycle into a plain re-admit. Give-up ends the hold.
       if (this.#suspects.size && !this.#proposal && !this.epochStale) {
         const live = this.view.members.map((m) => m[0]).filter((u) => !this.#suspects.has(u))
-        const evictable = this.view.members.filter(([u, listen]) => this.#suspects.has(u) && !node.dialing(listen))
+        const evictable = this.view.members.filter(([u, listen]) => this.#dead(node, u, listen))
         if (evictable.length && live[0] === node.uuid && live.length * 2 > this.view.members.length) {
           const gone = new Set(evictable.map((m) => m[0]))
           this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => !gone.has(u)) })
         }
+      }
+      //! a LEAVE ballot in flight is re-read against the chains (#leaveView): a suspect whose chain gave up since the
+      // ballot opened leaves the ballot too, at the same epoch (my vote there is my own: the same-proposer case, which
+      // the voters re-grant; a grant for the dropped ballot echoes its identity and counts for nothing)
+      else if (this.#suspects.size && !this.epochStale && this.#proposal !== null && this.#proposal.leaver !== undefined) {
+        const m = this.#leaveView(node, this.#proposal.leaver)
+        if (hashOf(m) !== this.#proposal.h) { const leaver = this.#proposal.leaver; this.#proposal = null; this.#propose(node, { epoch: this.#nextEpoch(node), members: m }, leaver) }
       }
       //! THE OPENER (DESIGN-LEAVE §10.10.4, the fifth review, 2026-10-12): supersession needs a ballot, and every other
       // ballot here answers a membership change — a suspect, a knock, a leave, a rejoin. A linked member of my view
@@ -630,7 +639,33 @@ export class Membership {
     this.#leavers.add(leaver) // this peer is leaving: its link no longer keeps my own knock window open (§10.7)
     if (node.client || this.view.epoch === 0 || !this.isMember(node.uuid) || !this.isMember(leaver) || this.epochStale || this.rejoining()) return
     if (this.#lowestLive() !== node.uuid || this.#proposal || this.view.members.length < 2) return
-    this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => u !== leaver) })
+    this.#propose(node, { epoch: this.#nextEpoch(node), members: this.#leaveView(node, leaver) }, leaver)
+  }
+
+  //! #dead — a suspect whose redial chain gave up: evictable (the tick), and a vote that will not come (#leaveView)
+  #dead(node: Node, u: string, listen: string): boolean { return this.#suspects.has(u) && !node.dialing(listen) }
+
+  //! #leaveView — THE EVICTION RIDES WITH THE LEAVE (DESIGN-LEAVE §10.7's note of 2026-10-12). A leave ballot is the
+  // view without the leaver; when the members of that view that are not dead (#dead) are no majority of it — on a bare
+  // majority, three members with one crashed and not yet voted out or five with two, its new-set majority would need
+  // the dead member's vote and it can never commit — the ballot leaves out every dead suspect as well, provided the
+  // live members are a majority of the view (the eviction's own guard: with no live majority nothing can commit, and
+  // the ballot is today's). Why: the plain ballot aged out, and the leaver's next knock, landing between ticks,
+  // reopened it before the tick's eviction branch ran, so the dead member was never evicted while the leaver knocked and
+  // the leaver went unclean at the window's end. And why ONE ballot rather than the eviction first and the leave after
+  // (the first build of this rule): the chain's give-up can land late in the leaver's window — the sweep's family 2,
+  // seed 47: at 776 ms of an 850 ms window — and the eviction then takes the window's last tick, the leaver goes unclean
+  // and the stayer is left alone in a TWO-member view with the leaver dead in it, where the base's three-member view let
+  // the stayer and the returning third member evict the leaver. One ballot commits in one round trip. Safety: the
+  // old-set majority is unchanged; the new set is smaller, so it needs fewer votes, never a dead one; the ballot is two
+  // or more apart from the view, so V4-55 holds its granters — the leaver, and a stayer — until the VIEW lands, exactly
+  // as for a two-suspect eviction today, and a granter cut before the VIEW stays read-only (the CP answer, §10.10.4).
+  // A leave whose plain ballot the live members CAN carry is byte-identical with before: one apart, no hold.
+  #leaveView(node: Node, leaver: string): [string, string][] {
+    const without = this.view.members.filter(([u]) => u !== leaver)
+    const live = without.filter(([u, l]) => !this.#dead(node, u, l))
+    if (live.length * 2 > without.length) return without
+    return this.view.members.filter(([u]) => !this.#suspects.has(u)).length * 2 > this.view.members.length ? live : without
   }
 
   onPropose(node: Node, link: Link, v: { e?: unknown; m?: unknown; o?: unknown; j?: unknown }) {
@@ -902,11 +937,17 @@ export class Membership {
       this.#send(node, this.#admitted(node).filter((l) => !l.client), encodeControl(VERB.LEAVE, {}))
       return
     }
-    const shrunk = this.view.members.filter(([u]) => u !== node.uuid)
-    if (shrunk.length === 0) { this.#finishLeave(node, true); return } // the last member simply goes
+    if (this.view.members.length === 1) { this.#finishLeave(node, true); return } // the last member simply goes
     if (this.#lowestLive() === node.uuid) {
+      //! the view without me — and without the dead, when the live cannot carry it (#leaveView). An EVICTION in flight
+      // (a ballot of mine that is no leave and leaves members of my view out) is replaced, as every other ballot of mine
+      // is (leaving outranks), but my exit carries its evictees: it opened on the give-up, and the heartbeat's revival
+      // (V4-20) has that chain dialing again by the time I knock, so #dead alone would keep them and doom my exit
+      const p = this.#proposal
+      const evictees = p !== null && p.leaver === undefined ? new Set(this.view.members.filter(([u]) => !p.view.members.some((m) => m[0] === u)).map((m) => m[0])) : null
+      const shrunk = this.#leaveView(node, node.uuid).filter(([u]) => evictees === null || !evictees.has(u))
       if (this.#proposal && this.#proposal.h !== hashOf(shrunk)) this.#proposal = null
-      if (!this.#proposal) this.#propose(node, { epoch: this.#nextEpoch(node), members: shrunk })
+      if (!this.#proposal) this.#propose(node, { epoch: this.#nextEpoch(node), members: shrunk }, node.uuid)
       return
     }
     this.#send(node, this.#admitted(node).filter((l) => !l.client && this.isMember(l.uuid)), encodeControl(VERB.LEAVE, {}))
@@ -980,7 +1021,7 @@ export class Membership {
     return Math.max(this.view.epoch, this.#burned, this.votedFor.p === node.uuid ? this.votedFor.e - 1 : this.votedFor.e) + 1
   }
 
-  #propose(node: Node, view: View) {
+  #propose(node: Node, view: View, leaver?: string) {
     //! proposing SPENDS your vote — and a vote already spent on another proposer for this epoch cannot
     // be spent again here (the review's critical: double-voting via propose committed two views/epoch).
     // The refusal records the burn so the next attempt escalates past it instead of wedging forever.
@@ -992,7 +1033,7 @@ export class Membership {
     this.#remember({ e: view.epoch, p: node.uuid, h }) // my own vote, the earlier ones above my view kept behind it
     node.persistBoot() // the self-vote is spent — durable before any PROPOSE frame leaves
     const joint = this.#jointViews(node) // refusals (`hm`) add more
-    this.#proposal = { view, old: this.view.members.map((m) => m[0]), oldEpoch: this.view.epoch, h, votes: new Set([node.uuid]), ticks: 0, age: 0, joint }
+    this.#proposal = { view, old: this.view.members.map((m) => m[0]), oldEpoch: this.view.epoch, h, votes: new Set([node.uuid]), ticks: 0, age: 0, joint, ...(leaver !== undefined ? { leaver } : {}) }
     node.journal.armed && node.journal.emit(JK.propose, view.epoch, view.members.length)
     //! a solo proposal (single-member old and new sets) commits immediately — solo boot mode
     if (majority(this.#proposal.old, this.#proposal.votes) && majority(view.members.map((m) => m[0]), this.#proposal.votes) && this.#jointOk(this.#proposal)) {
