@@ -11,7 +11,9 @@
 // create of the empty lock and the write of its record (the gap a second opener may meet there); `boot-slow` blocks the
 // main thread six seconds right after the lock is taken (at the wal.log open: a long WAL replay), printing `booting` as
 // it enters the block; `touch` opens nothing: it plays a holder in another pid namespace, touching the dir's `lock`
-// every 100 ms until Ctrl-C (the lease); `two` also takes the lock of a second dir, `<dir>/second`, before it says up
+// every 100 ms until Ctrl-C (the lease); `swap` opens nothing either: it prints `ready`, and 800 ms later puts the record
+// the test left at `lock.next` in place of `lock` (one rename: another heir's takeover) and touches it every 100 ms until
+// Ctrl-C; `two` also takes the lock of a second dir, `<dir>/second`, before it says up
 // (one thread touches both); `release` gives its dir back by a clean destroy() after it is up, prints `released`, and
 // lives on until Ctrl-C. Not a test file (the battery's glob is tests/*.test.ts).
 
@@ -27,6 +29,15 @@ if (mode === 'touch') {
   setInterval(() => { const now = Date.now() / 1000; try { fs.utimesSync(p, now, now) } catch { /* planted later, or gone */ } }, 100)
   process.on('SIGINT', () => process.exit(0))
   console.log('touching')
+}
+if (mode === 'swap') {
+  const p = path.join(dir, 'lock')
+  console.log('ready')
+  setTimeout(() => {
+    fs.renameSync(p + '.next', p)
+    setInterval(() => { const now = Date.now() / 1000; try { fs.utimesSync(p, now, now) } catch { /* gone */ } }, 100)
+  }, 800)
+  process.on('SIGINT', () => process.exit(0))
 }
 if (mode === 'take-slow') {
   const unlink = fs.unlinkSync
@@ -69,7 +80,7 @@ if (mode === 'nolink' || mode === 'nolink-slow') {
     fs.openSync = ((p: fs.PathLike, flags?: fs.OpenMode, m?: fs.Mode) => { const fd = open(p, flags, m); if (String(p).endsWith('/lock') && flags === 'wx') { console.log('created-empty'); nap(1000) } return fd }) as typeof fs.openSync
   }
 }
-if (mode !== 'touch') {
+if (mode !== 'touch' && mode !== 'swap') {
   try {
     const f = await fero('locked', { dir, listen: false })
     if (mode === 'two') lockDir(path.join(dir, 'second'), 'second')
