@@ -1613,6 +1613,37 @@ the unscoped rule and must gain the armed per-partition one (R0-R4);
 point the record names: logs are bounded, tombstones are not, and
 nothing here is unsound if stage 4 never lands.
 
+*Reviewed, 2026-10-12 (one review, four findings, no hole in the
+argument).* (1) M2 frontier-sound read every holder's possession floor
+(`pe.s`), never a durable holder's crash-stable one (`pe.d`), so the §6
+mutation "volatile instead of durable floors" was caught by the two kernel
+tests above and by no sweep family: A4's writes land in its first 600 ms
+under a 40-80 ms fsync delay, so every pass there runs after the lagging
+disk has caught up (A4 is green under the mutation at both its seeds). In
+stage 3 this class has no state-level consequence (removes are never
+compacted, every winner is kept, a learner folds winners), which is why
+M1, M3 and M6 cannot see it; it bites at stage 4. M2 reads a durable
+holder at `pe.d` now, and sim/compaction.test.ts has the schedule the
+sweep lacks: n=3 R=2 durable, one holder's fsync answering 1.5-2 s late
+under 240 hot writes, so every pass the writes arm runs inside the lag
+(28 passes dropped entries while the slow holder's durable floors were
+behind its possession floors). Under the mutation the test is red with 20
+M2 violations ("n03's real floor for that lane is 0 — below the
+frontier"); with the old M2 line it passes, so both halves are needed.
+§6's list names the schedule. Stage 4's R2 ("crash-stable floor per
+lane") is checked against the same schedule. (2) `scopedFrontier`'s
+self-is-a-holder guard (`mine`) was not pinned: removing it left every
+test green, because an install that moves p off a node makes it an orphan
+in the same step. It is pinned now through the ring's test seam
+(kernel/scoped.test.ts "C1 at the ring"): a held partition the ring no
+longer places here never compacts though both holders attest the tail,
+and placed back the same marks compact it. (3) P4 summed the cluster-wide
+pass count once per node; the printed line was right, the sum is out of
+the loop. (4) §4 said "a crash before the echo restores the previous
+snapshot plus appended rows"; it now names the window after the swap's
+fsync and before its echo: the compacted lanes under the old boot record,
+one re-latch, nothing lost — the shape the restore test's mutation shows.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
@@ -1964,9 +1995,14 @@ boot record's seed and then only through chain-verified rows (write.ts:
 so the seed must cover them: a pass that dropped entries arms the snapshot
 (`#walRows = snapshotAt`, the `spliced()` idiom at node.ts:333-339) and
 the swap's echo rewrites the boot record (today only when a dirty entry
-clears, node.ts:535-536). A crash before the echo restores the previous
-snapshot plus appended rows: still honest. Memory nodes have no replay and
-no constraint.
+clears, node.ts:535-536). A crash before the swap's fsync restores the
+previous snapshot plus appended rows: still honest. A crash after the
+swap's fsync but before its echo restores the compacted lanes under the
+OLD boot record: replay chains from the stale seed, stops at the first gap
+the pass opened, and the floors come up below the content, so the node
+re-latches those partitions from a holder, once — honest-low, nothing lost
+(the restore test's mutation, the echo's rewrite removed, shows exactly
+this shape: 5 re-latches). Memory nodes have no replay and no constraint.
 
 **Memory after the change, per node.** Log entries ≤ Σ over lanes of
 (winners for held partitions + `compactAt`) at quiescence; winners = live
@@ -2265,7 +2301,9 @@ printed so a seed whose chaos never bit reads as exactly that.
 **Mutation checks, required before the real rule is written.** Each
 weakened rule must be caught by M1, M3 or M6 within the pinned seed
 budget: no census (A3, A5); lane accounting off (A1, A7); R2 without the
-gapless bit (A2, G4); volatile instead of durable floors (A4); release of
+gapless bit (A2, G4); volatile instead of durable floors (A4's class — M2
+on the slow-disk schedule of sim/compaction.test.ts, since A4's own passes
+all run after its lagging disk has caught up; the stage-3 note); release of
 the version only, lanes untouched (G1, every family); teach without the
 `keep` filter (A3); compaction over orphans or over an acquiring holder's
 zero (M2); a dropped dirty site (M7's knowledge form, measured with the
