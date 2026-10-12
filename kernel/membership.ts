@@ -491,8 +491,11 @@ export class Membership {
       // membership change in the making — a suspect in suspectTicks ticks, then its eviction, joint over the same holds,
       // is the ballot (held back while its chain is dialing, as above) — or it is back in a tick. Else a held member's
       // ask landing in either window re-proposed the FULL view, the lost member included, and the eviction came one
-      // epoch later: safe, one doubled ballot (openerBesideSuspect).
-      if (!this.#proposal && !this.epochStale && !this.leaving && this.#heldPeers.size && this.#lowestLive() === node.uuid) this.#openOverHolds(node)
+      // epoch later: safe, one doubled ballot (openerBesideSuspect). MY OWN hold opens it too (the eighth round): the
+      // lowest live member can be the only held one — it granted a ballot over the OLD view between its own ballot and
+      // its own commit, and the proposer it granted is dead and out of the view it then installed (ownHoldProposerGone:
+      // bb `held` for good at view 2, cc, dd and ee writable without it, nobody asking anything).
+      if (!this.#proposal && !this.epochStale && !this.leaving && (this.#heldPeers.size || this.held(node)) && this.#lowestLive() === node.uuid) this.#openOverHolds(node)
     }
     //! proposal upkeep: re-offer to members that have not voted (idempotent re-grants make this safe and
     // make it HEAL a lost VOTE frame); abandon when the epoch passed or the ballot aged out (an aged-out
@@ -1020,10 +1023,15 @@ export class Membership {
   // cut, the CP shapes of §10.10.4 — where a ballot that cannot commit would only burn epochs. The epoch starts PAST
   // the holds' epochs: a held voter's vote there is spent on another proposer, so a ballot at that epoch is refused
   // for sure (and would teach the same by its `ve`, a proposal age later). The trigger reads my linked members' holds
-  // and not my own (the joint set below reads both): a hold of mine is for another proposer's ballot, and that proposer
-  // is a linked member (my ask reaches it), a lost member (a suspect: its eviction is the joint ballot, and I wait for
-  // it), or no member of mine (then its view is above mine, and a linked member of mine that installed it tells me on
-  // my ask) — so my own holds never need the opener (§10.10.4, the seventh review).
+  // AND my own (the eighth round, 2026-10-12; the joint set below always read both): a hold of mine is for another
+  // proposer's ballot, and when that proposer is a linked member or a linked ex-member my ask reaches it (a VIEW or a
+  // disown in one round trip), and when it is a lost member its eviction is the joint ballot (the wait above) — but
+  // when it is NO member of my view and unlinked, nothing else will ever open the ballot. The seventh review argued the
+  // shape could not be built (a view's lowest live member is its proposer, and its own vote never holds): it can — the
+  // proposer of a view can hold a vote it gave ABOVE that view, over the view before it, between its own PROPOSE and its
+  // own commit (bb granted aa's {aa,bb,cc}@3 over view 1 while its {bb,cc,dd,ee}@2 was in flight, then committed 2:
+  // held, alone, the lowest, aa dead and no member — ownHoldProposerGone). My own holds' epochs count toward `past`
+  // whoever their proposer is: a ballot at one of them would re-spend a vote I gave away there.
   #openOverHolds(node: Node) {
     const linked = new Set<string>([node.uuid])
     let reachable = 1, freeing = false, past = this.view.epoch
@@ -1035,6 +1043,7 @@ export class Membership {
       const hs = this.#heldPeers.get(l.uuid)
       if (hs) for (const x of hs) if (x.e > this.view.epoch) { past = Math.max(past, x.e); if (x.p !== node.uuid) freeing = true }
     }
+    for (const x of this.holds(node)) { past = Math.max(past, x.e); if (!this.isMember(x.p) && !linked.has(x.p)) freeing = true }
     if (!freeing || reachable !== this.view.members.length) return
     for (const hh of this.#jointViews(node)) if (!majority(hh.split(','), linked)) return
     this.#propose(node, { epoch: Math.max(this.#nextEpoch(node), past + 1), members: this.view.members })

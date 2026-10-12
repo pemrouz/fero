@@ -54,7 +54,7 @@
 // 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { meshState, evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, keptBallotProposerGone, openerBesideSuspect, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { meshState, evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, keptBallotProposerGone, openerBesideSuspect, ownHoldProposerGone, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
@@ -718,6 +718,36 @@ test('leave harness, the sixth review\'s shape: a held member\'s ask lands at th
     assert.deepEqual([...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])], [], `${v}: not the shape, or UNSAFE`)
     if (o.mid!.join('\n') !== OPENER_SUSPECT[v].mid.join('\n')) red.push(`${v}: a mid point moved; re-record with the why:\n${o.mid!.join('\n')}`)
     if (o.end !== OPENER_SUSPECT[v].end) red.push(`${v}: the end state moved; re-record with the why: ${o.end}`)
+  }
+  assert.deepEqual(red, [])
+})
+
+//! the eighth round's shape (2026-10-12): the lowest live member held ALONE on its OWN hold — the sixth review's probe,
+// which the seventh review had argued could not be built. bb granted aa's `{aa,bb,cc}`@3 over view 1 between its own
+// `{bb,cc,dd,ee}`@2 and that ballot's commit; at view 2 it is the lowest live member, held three apart, and nobody else
+// holds anything, so no ask names a hold at bb. With the opener reading members' holds only bb stayed `held` for sixty
+// rounds with the held view's majority (bb, cc) linked. `dead`: aa destroyed — bb's own hold opens `{bb,cc,dd,ee}`@4
+// joint over `{aa,bb,cc}`, everyone writable at 4. `linked`: aa alive — bb ticks held with its proposer linked and
+// opens NOTHING (the ask is the path: without the "unlinked" narrowing the mid reads `P(2,4) P(4,4)`); aa, evicted by
+// the flood with the ballot dropped, disowns on bb's ask, and the ordinary rejoin brings it back at 4.
+const OWN_HOLD_HELD = 'bb@2{bb,cc,dd,ee}r:held cc@2{bb,cc,dd,ee}W dd@2{bb,cc,dd,ee}W ee@2{bb,cc,dd,ee}W'
+const OWN_HOLD: Record<'dead' | 'linked', { mid: string[]; end: string }> = {
+  dead: {
+    mid: [`after the flood: ${OWN_HOLD_HELD}`, 'after the quiet point: bb@4{bb,cc,dd,ee}W cc@4{bb,cc,dd,ee}W dd@4{bb,cc,dd,ee}W ee@4{bb,cc,dd,ee}W bb=P(2,4) P(4,4)', 'proposals: bb=P(2,4) P(4,4)'],
+    end: 'bb@4{bb,cc,dd,ee}W cc@4{bb,cc,dd,ee}W dd@4{bb,cc,dd,ee}W ee@4{bb,cc,dd,ee}W',
+  },
+  linked: {
+    mid: ['bb ticked held, aa linked: bb=P(2,4)', 'after the flood: aa@2{bb,cc,dd,ee}r:evicted bb@2{bb,cc,dd,ee}W cc@2{bb,cc,dd,ee}W dd@2{bb,cc,dd,ee}W ee@2{bb,cc,dd,ee}W', 'after the quiet point: aa@4{aa,bb,cc,dd,ee}W bb@4{aa,bb,cc,dd,ee}W cc@4{aa,bb,cc,dd,ee}W dd@4{aa,bb,cc,dd,ee}W ee@4{aa,bb,cc,dd,ee}W bb=P(2,4) P(4,5)', 'proposals: bb=P(2,4) P(4,5)'],
+    end: 'aa@4{aa,bb,cc,dd,ee}W bb@4{aa,bb,cc,dd,ee}W cc@4{aa,bb,cc,dd,ee}W dd@4{aa,bb,cc,dd,ee}W ee@4{aa,bb,cc,dd,ee}W',
+  },
+}
+test('leave harness, the eighth round\'s shape: the lowest live member held ALONE on its own hold — it granted a ballot over the old view between its own ballot and its own commit, and the proposer is dead and out of the view (ownHoldProposerGone) — SAFE, and bb writable again: with aa dead its own hold opens {bb,cc,dd,ee}@4 joint over {aa,bb,cc} (before: held for good, the seventh review had called the shape unconstructible); with aa linked nothing opens at the held tick, the disown releases, and the ordinary rejoin brings aa back at 4 — pinned exactly', () => {
+  const red: string[] = []
+  for (const v of ['dead', 'linked'] as const) {
+    const o = ownHoldProposerGone(v)
+    assert.deepEqual([...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])], [], `${v}: not the shape, or UNSAFE`)
+    if (o.mid!.join('\n') !== OWN_HOLD[v].mid.join('\n')) red.push(`${v}: a mid point moved; re-record with the why:\n${o.mid!.join('\n')}`)
+    if (o.end !== OWN_HOLD[v].end) red.push(`${v}: the end state moved — bb must be writable again; re-record with the why: ${o.end}`)
   }
   assert.deepEqual(red, [])
 })

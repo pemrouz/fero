@@ -1327,3 +1327,36 @@ test('the opener waits for a LOST member as the eviction does (the sixth review)
   const p = h.sentOn(h.link.dd, VERB.PROPOSE).pop()!.value as { e: number; o: number; j?: string[] }
   assert.deepEqual([p.e, p.o, p.j], [2, 1, ['bb,dd,ee']], 'joint over dd\'s hold')
 })
+
+test('the opener on my OWN hold (the eighth round, DESIGN-LEAVE §10.10.4): bb, held at view 1 on aa\'s {aa,bb,cc}@3, installs {bb,cc,dd,ee}@2 — the lowest live member of a view aa is no member of, held alone (cc, dd and ee hold nothing, so no ask names a hold); with aa LINKED nothing opens (my ask reaches it, and its disown is the release); with a member of my view lost nothing opens (its eviction is the ballot); with aa gone and every member linked bb opens {bb,cc,dd,ee} at 4 — past its own hold — over view 2, joint over {aa,bb,cc}, and cc\'s, dd\'s and ee\'s grants commit it: the hold goes with the install', () => {
+  const h = fiveAt1('bb')
+  const pulls = (l: number) => h.sentOn(l, VERB.PULL).map((f) => f.value as { e: number; vs?: unknown[] })
+  const hold = { e: 3, h: 'aa,bb,cc', p: 'aa' }
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 3, m: mem(['aa', 'bb', 'cc']), p: 'aa', o: 1 }) })
+  assert.equal(h.vote(h.link.aa).g, 1)
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'held' }, 'two apart from view 1')
+  h.node.step({ kind: 'bytesIn', link: h.link.cc, bytes: encodeControl(VERB.VIEW, { e: 2, m: mem(['bb', 'cc', 'dd', 'ee']) }) })
+  assert.equal(h.node.epoch, 2)
+  assert.deepEqual(h.node.membership.gate(h.node), { open: false, reason: 'held' }, 'three apart from view 2, and I am its lowest live member')
+  //! aa linked (an ex-member): the ask goes to it, my proposer — its word is the release, so no ballot
+  h.tick()
+  assert.deepEqual(h.jk(JK.propose), [], 'aa linked: its disown answers the ask, nothing opens')
+  assert.deepEqual(pulls(h.link.aa).pop(), { e: 2, vs: [hold] }, 'the ask reaches aa, member or not')
+  //! aa gone, and dd's link lost too: every member of my view must be linked (dd's eviction is the ballot otherwise)
+  h.node.step({ kind: 'linkDown', link: h.link.aa, reason: 'cut' })
+  h.node.step({ kind: 'linkDown', link: h.link.dd, reason: 'cut' })
+  h.tick()
+  assert.deepEqual(h.jk(JK.propose), [], 'dd lost: a membership change in the making, and its eviction carries the hold')
+  //! dd back on a fresh link, its HELLO naming nothing: bb opens {bb,cc,dd,ee} at 4 over view 2, joint over {aa,bb,cc}
+  h.node.step({ kind: 'linkUp', link: 21, dialed: true, to: 'sim:dd' })
+  h.node.step({ kind: 'bytesIn', link: 21, bytes: encodeControl(VERB.HELLO, { u: 'dd', i: 2, l: 'sim:dd' }) })
+  h.tick()
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[4, 4]], 'the same members at 4: past my own hold at 3, where my vote is aa\'s')
+  const p = h.sentOn(h.link.cc, VERB.PROPOSE).pop()!.value as { e: number; o: number; j?: string[] }
+  assert.deepEqual([p.e, p.o, p.j], [4, 2, ['aa,bb,cc']], 'over view 2, joint over the held view')
+  //! cc, dd and ee grant: old {bb,cc,dd,ee} 4 of 4, new the same, {aa,bb,cc} bb and cc 2 of 3 — committed, held no more
+  for (const l of [h.link.cc, 21, h.link.ee]) h.node.step({ kind: 'bytesIn', link: l, bytes: encodeControl(VERB.VOTE, { e: 4, g: 1, ce: 2, h: 'bb,cc,dd,ee' }) })
+  assert.equal(h.node.epoch, 4, 'superseded by the held view\'s own majority: bb and cc')
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+  assert.deepEqual(h.node.membership.holds(h.node), [], 'the vote at 3 is history at view 4')
+})
