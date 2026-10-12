@@ -451,6 +451,38 @@ test("the gather's one-shot answer is what a client's whole read decodes: the co
   g.destroy()
 })
 
+//! the V4-51/52 review: the gather judged a reply's size by copyOf's charge, a worst case (3 bytes a character, 8 a
+// number) that ran 1.5-4.5x the real reply, so a scoped cluster refused whole reads a client's reply would carry (from
+// about 57-90 MiB at the production cap) — and a keyed read during a handover, which reads ONE row of the union, was
+// refused because the whole union would not fit. The real encoder decides now, and a keyed answer is its row's copy.
+test("TOO-LARGE BY REAL SIZE [V4-51/52] — the gather refuses only a reply that really would not fit one frame; a keyed answer is one row's copy", async () => {
+  const { Gather } = await import('./fold.ts')
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['h1', 'h2'] } },
+    scope: { entries: new Map() },
+    versions: new Map(), state: new Map(),
+  }
+  const row = (i: number) => ({ n: Array.from({ length: 16 }, (_, k) => k), s: 'x'.repeat(20), i })
+  const claims = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [JSON.stringify([`r${i}`]), { v: row(i), st: [1, i + 1, 'h1'] }]))
+  let n = 60
+  const parts = () => Array.from({ length: n }, (_, i) => `r${i}`)
+  const g = new Gather({ node: fake } as never, async (uuid: string) => (uuid === 'h1' ? { c: claims(n), att: parts() } : { c: {}, att: parts() }) as never)
+  try {
+    //! 60 rows: charged about 15 KB at the worst case, the real reply about 5 KB — answered
+    const got = await g.refresh({ node: fake } as never, { throwOnPartial: true }) as Record<string, unknown>
+    assert.equal(Object.keys(got).length, 60)
+    assert.deepStrictEqual(got.r7, row(7))
+    //! 300 rows: the real reply passes 8 KiB — refused too-large, naming the frame
+    n = 300
+    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true }), (e: ScopedError) =>
+      e.reason === 'too-large' && e.op === 'read' && /^the whole resource is bigger than one frame \(8 KiB\)/.test(e.hint))
+    //! a keyed answer reads one row of that same union: answered
+    assert.deepStrictEqual(await g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'r250' }), row(250))
+  } finally { g.destroy() }
+})
+
 test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the kernel\'s stamp rule: a field remove newer than its row takes the field out, a field at or below an ancestor\'s stamp is hidden, a parked field never tears into a live row', async () => {
   const { Gather } = await import('./fold.ts')
   const fake = {

@@ -749,8 +749,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       // THE GATHER — parked claims include every unshed orphan's, absence is attested by the full
       // holder set, and an unreachable member is a typed error, never a silent partial. A truly
       // absent key answers fast (one fan-out round-trip); a local-shard undefined never leaks.
-      const union = await gatherOf().refresh(rt, { throwOnPartial: true }) as Record<string, unknown>
-      return union[k]
+      return await gatherOf().refresh(rt, { throwOnPartial: true, key: k })
     }
     return bind.data.get(k)
   }

@@ -39,7 +39,7 @@ import { VERB, copyOf, encodable, sizeOf, Unsendable } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
-import { atCap, lostAssignment, type Coords, type Refused } from './data.ts'
+import { atCap, replyCopy, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 import { FULL } from '../kernel/codec.ts'
 
@@ -64,16 +64,19 @@ const settle = async (tracked: Promise<Coords>[]): Promise<void> => {
   }
 }
 
-//! answer — a server-local call's result as a client's call decodes it (V4-52): copyOf with RESULT's limits at the
-// node's cap, so what a reply could not carry is refused here too, in the remote reply's words: too big for one frame
-// is the same typed 'too-large' (V4-51), anything else 'the result could not be sent: <why>' (#invoke derives the same
-// why for a remote reply that failed)
+//! answer — a server-local call's result as a client's call decodes it (V4-52): replyCopy (api/data.ts) at the node's
+// cap, so what a reply could not carry is refused here too, in the remote reply's words: too big for one frame — by
+// the reply's real size — is the same typed 'too-large' (V4-51), anything else 'the result could not be sent: <why>'
+// (#invoke derives the same why for a remote reply that failed)
 const answer = (m: string, v: unknown, node: Runtime['node']): unknown => {
-  try { return copyOf(v, atCap(node.tune.frame).result) } catch (e) {
+  try { return replyCopy(v, node.tune.frame) } catch (e) {
     if (e instanceof Unsendable && e.over) throw tooLarge(m, node.replicas, node.tune.frame, 'the answer')
     throw new Error(`methods.${m}: the result could not be sent: ${(e as Error).message}`)
   }
 }
+
+//! NOTHING — no value was being sent (a reply that failed before it began)
+const NOTHING = Symbol('nothing')
 
 //! SYSTEM — the reserved method-name prefix (unreachable from fero() opts: the composer rejects it):
 // internal RPCs (confirm-over-the-wire) share the method plane without stealing any user name.
@@ -223,15 +226,18 @@ export class Host {
       //! the reply, and a value SUB's one frame, encode the handler's result inside the kernel step: a value
       // the wire cannot carry (a bigint, a getter that throws) threw out of here as an unhandled rejection and
       // ended the server. The caller hears why instead, and the server carries on.
+      //! `sent` — the value this reply was encoding, kept for the failure's words: a view minted for the call is
+      // disposed before its reply, so the catch below must not read the view again
+      let sent: unknown = NOTHING
       try {
         if (mode === VERB.CALL) {
           //! a returned ViewProxy collapses to its snapshot for a one-shot call (v2's forWire, kept;
           // no clone — the reply's codec copies the value into frame bytes synchronously inside step);
           // a derived view minted for this call is dead once collapsed — released (I-29). A view data has
           // stopped would answer a frozen picture as if it were current: refused instead.
-          if (!isProxy(result)) return this.#reply(link, id, true, result)
+          if (!isProxy(result)) { sent = result; return this.#reply(link, id, true, result) }
           if (stopped(result)) { if (disposeMinted(result, minted)) reapStopped(); return this.#reply(link, id, false, STOPPED_CALL) }
-          const value = snapshot(result)
+          const value = sent = snapshot(result)
           if (disposeMinted(result, minted)) reapStopped()
           return this.#reply(link, id, true, value)
         }
@@ -246,6 +252,7 @@ export class Host {
         // value degrades to a single-shot stream (one root update) — same consumption shape either way
         if (!isProxy(result)) {
           this.#subs.delete(skey) // a value SUB has no live stream to hold; drop the placeholder
+          sent = result
           this.#rt.node.step({ kind: 'subOut', link, id, recs: [{ type: 'update', key: [], value: result } as unknown as Rec] })
           return
         }
@@ -260,10 +267,10 @@ export class Host {
           this.#report(FULL, `refused a read whose answer is bigger than one frame, ${sizeOf(frame)} (methods.${m}) — the caller was told to read a smaller part`)
           return this.#reply(link, id, false, tooLarge(m, this.#rt.node.replicas, frame, 'the answer'))
         }
-        //! the reply's words are the local answer's (answer above): what stopped a plain result, by encodable's walk —
-        // asked only here, on the failure, so a reply that encodes pays nothing for it
+        //! the reply's words are the local answer's (answer above): what stopped the value — a plain result or a view's
+        // picture — by encodable's walk, asked only here, on the failure, so a reply that encodes pays nothing for it
         let why: string | null = null
-        if (!isProxy(result)) try { why = encodable(result, atCap(this.#rt.node.tune.frame).result) } catch { why = null }
+        if (sent !== NOTHING) try { why = encodable(sent, atCap(this.#rt.node.tune.frame).result) } catch { why = null }
         this.#report(err, `a method's result could not be sent (methods.${m}) — the call was refused`)
         this.#reply(link, id, false, `the result could not be sent: ${why ?? errText(err)}`)
       }
