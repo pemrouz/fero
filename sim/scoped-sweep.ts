@@ -9,8 +9,8 @@
 //   - mesh / plan: a scoped cluster built like harness.cluster() but with a tune table (compactAt and snapshotAt
 //     low enough that passes really fire), and a workload over 50 to 500 partitions with row writes, field
 //     writes, removes and re-writes of removed cells (harness.writesPlan draws from 20 keys only).
-//   - the adversaries A1-A11 of DESIGN-SCALE §6 and A12 (wave 6a: a spoke across two hand-offs), one schedule
-//     builder each, run by one family runner.
+//   - the adversaries A1-A11 of DESIGN-SCALE §6, A12 (wave 6a: a spoke across two hand-offs) and A13 (its review: a
+//     spoke whose feeder repairs and re-enters through the latch), one schedule builder each, run by one family runner.
 //   - the mutation runner: a switch that weakens one rule of today's injected-drop class (a release the kernel
 //     does not do) and the monitors that must go red.
 //
@@ -241,7 +241,7 @@ const others = (c: Ctx, id: string) => [...c.sim.nodes.keys()].filter((x) => x !
 const cutFromAll = (c: Ctx, id: string) => { for (const o of others(c, id)) c.sim.partition(id, o) }
 const healAll = (c: Ctx, id: string) => { for (const o of others(c, id)) c.sim.heal(id, o) }
 
-//! the adversaries A1-A11 (DESIGN-SCALE §6) and A12 (wave 6a). Each draws its own timings from the seeded rng; `mutateAt` is when the
+//! the adversaries A1-A11 (DESIGN-SCALE §6), A12 (wave 6a) and A13 (its review). Each draws its own timings from the seeded rng; `mutateAt` is when the
 // mutation runner injects (ms after the workload starts), placed BEFORE the family's fold-forcing step.
 export const FAMILIES: readonly Family[] = [
   {
@@ -533,6 +533,77 @@ export const FAMILIES: readonly Family[] = [
         leaveAndGo(c, leaver, 0)
       })
       c.sim.at(2600, () => post(c.sim, plan(c.r, [...c.sim.nodes.values()].filter((x) => !x.client).map((x) => x.uuid), 30, c.parts, 400), c.sim.now))
+    },
+  },
+  {
+    //! A13 a spoke whose feeder REPAIRS held partitions through the latch and RE-ENTERS some from orphans (the review of
+    // wave 6a's review, 2026-10-12: the other spoked families fold only from zero at the spoke's feeder, so the two legs
+    // the forward has — the delta of a repair, the whole partition at a re-entry — and the answer for a partition under
+    // repair had fixed-seed tests alone). A client of every member. From 300 ms on, four times at 400 ms intervals, the
+    // next RECORDS frame from one other member O to the spoke's feeder F dies with their link (severOnFrame), and O
+    // writes twenty rows over the next 40 ms to the partitions it owns and F holds: the first frame's rows are lost, the
+    // ones after the redial reach F and are tapped to the spoke, and O's announce then has F repair each lagging
+    // partition through the latch — the lost rows fold BELOW the spoke's tail on O's lane, where only the forward brings
+    // them (sighting 1's shape; the heartbeat exchange ships above the tail). The first time a 5 ms slice finds F
+    // mid-repair, F is cut from that teacher for 60 ms (under SUSPECT_TICKS): the open latches abort into orphans and
+    // re-enter when the link is back. The engagement key counts F's folds by what the partition was when its latch
+    // opened (a per-event probe reads F's scope entries: repairFolds, reentryFolds, zeroFolds); M12 judges the spoke at
+    // the horizon.
+    name: 'A13-spoke-repair', ns: [3, 4], Rs: [2, 3], mutateAt: 250,
+    chaos: (c) => {
+      const spoke = c.sim.add({ uuid: 's1', listen: 'sim:s1', hosts: c.nodes.map((x) => `sim:${x.uuid}`), heartbeatMs: 50, client: true, redialMs: 20, journalCap: 1 << 16 })
+      c.sim.post('s1', { kind: 'start' }, 0)
+      c.sim.at(300, () => {
+        const f = spoke.primary !== null ? spoke.links.get(spoke.primary)?.uuid : undefined
+        const F = f !== undefined ? c.sim.nodes.get(f) : undefined
+        if (f === undefined || F === undefined) return
+        const os = c.nodes.map((x) => x.uuid).filter((u) => u !== f)
+        const O = os[Math.floor(c.r() * os.length)]
+        //! the partitions O owns and F holds: what the lost frames carry and the repairs bring back
+        const ring = F.writes.ring
+        if (ring.epoch !== F.epoch) ring.build(F.epoch, F.membership.view.members)
+        const ps: string[] = []
+        for (let i = 0; i < c.parts; i++) { const p = 'p' + i, h = ring.holders(p, F.replicas); if (h[0] === O && h.includes(f)) ps.push(p) }
+        if (!ps.length) return
+        let v = 0
+        for (let k = 0; k < 4; k++) c.sim.at(k * 400, () => {
+          if (!c.sim.nodes.has(O) || !c.sim.nodes.has(f)) return
+          c.sim.severOnFrame(O, f, VERB.RECORDS, 1); c.eng.severArmed = (c.eng.severArmed ?? 0) + 1
+          for (let i = 0; i < 20; i++) c.sim.post(O, { kind: 'write', recs: [{ type: REC.update, key: [ps[(i + 20 * k) % ps.length], 'b' + k], value: ++v }] }, 2 * i)
+        })
+        //! the cut mid-repair: once, the first slice that finds a repair latch open at F, from its teacher
+        let cut = false
+        c.polls.push(() => {
+          if (cut || !c.sim.nodes.has(f)) return
+          for (const [, e] of F.scope!.entries) {
+            if (e.state !== SCOPE.acquiring || e.preState !== SCOPE.held || e.teacher === undefined || !c.sim.nodes.has(e.teacher)) continue
+            cut = true; c.eng.cutMidRepair = 1
+            const T = e.teacher
+            c.sim.partition(f, T); c.sim.at(60, () => c.sim.heal(f, T))
+            return
+          }
+        })
+        //! the folds at F by the partition's state when the latch opened: read per event (a latch opens and folds in
+        // different events — the announce and the ACQDONE — so the open latch is seen before its fold row)
+        const pre = new Map<string, number | undefined>()
+        let jn = F.journal.n
+        c.sim.monitors.push({
+          name: 'a13-folds-probe',
+          check: (sim) => {
+            if (!sim.stepped.has(f) || !sim.nodes.has(f)) return null
+            for (const [p, e] of F.scope!.entries) if (e.state === SCOPE.acquiring) pre.set(p, e.preState)
+            for (const row of F.journal.read(jn)) {
+              if (row.kind !== JK.acquire) continue
+              const was = pre.get(row.a as string)
+              const k = was === SCOPE.held ? 'repairFolds' : was === SCOPE.orphan ? 'reentryFolds' : 'zeroFolds'
+              c.eng[k] = (c.eng[k] ?? 0) + 1
+              pre.delete(row.a as string)
+            }
+            jn = F.journal.n
+            return null
+          },
+        })
+      })
     },
   },
 ]
