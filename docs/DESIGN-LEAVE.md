@@ -2682,3 +2682,18 @@ the given-up control: `P(2,4)` at the mid, the ordinary duel, `{aa,cc,dd,ee}`@3 
 everywhere in between). Which side of a cut wins the duel was never the opener's to decide; the guard only stops it
 from entering one. Mutation-checked once (the comparison back to a majority: both pins red, no other). No other pin
 moved.
+
+**2026-10-12, the seventh review (the skeptic's third pass, over the whole tree at ca98049): ship, one minor and
+one nit — both closed on the page, two commits on top.** The minor was the record, not the kernel: the implementer's
+report and its ledger text described the build at its eleventh commit (964 tests, a rule without the fifth and sixth
+reviews' two lines), while the tree had eighteen commits and 970 tests (`kernel/membership.test.ts` 38 → 50,
+`sim/leave-harness.test.ts` 17 → 20, `kernel/door.test.ts` 34 → 35; two full batteries at ca98049 read 970 of 970
+and the 18-clause data contract), the ask to a non-member proposer (`#askTargets`), the opener (`#openOverHolds`,
+every member linked), the `holds()` memo, the empty-hold check and the `hm` identity guard. The built note above now
+says its counts are the build's at the time and the tree's are in the review notes; the ledger the integrator gets is
+written from the tree. The nit: the opener's trigger reads only linked members' holds, never the lowest live member's
+own, while its joint set reads both — §10.10.4 now says why that is complete (the proposer of my own hold is a linked
+member, a lost member or a member of a view above mine, and each of those already has its path), and why the fold
+was NOT made: the shape it would catch cannot be built, so the guard would have no pin. No kernel line moved; the
+comment on `#openOverHolds` carries the same three lines. The targeted suites, the four gate-path perf files and one
+full battery were run on the final tree; their numbers are in the lane's report, not here.
