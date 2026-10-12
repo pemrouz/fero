@@ -1254,7 +1254,7 @@ test('COMPACTION (stage 3) — a DURABLE co-holder counts at its durable marks, 
   assert.deepEqual(laneSeqs(m), [4200], 'a memory node\'s floors are crash-stable (its crash is a total refold)')
 })
 
-test('COMPACTION (stage 3) — a DURABLE compactor counts ITSELF at its durable floor; a compacting pass arms the snapshot swap, and the swap\'s echo rewrites the boot record with the floor seed above the gaps the pass opened', () => {
+test('COMPACTION (stage 3) — a DURABLE compactor counts ITSELF at its durable floor; a compacting pass arms the snapshot swap, and the boot record is written WHEN THE SWAP IS ISSUED with the floor seed above the gaps the pass opened (not at its echo: that left a crash window)', () => {
   const h = armedView1({ durable: true, tune: { aeFan: 0 } })
   h.node.membership.rejoinFloor = 0
   h.node.writes.ring.place('k', 'aa', 'bb')
@@ -1268,18 +1268,21 @@ test('COMPACTION (stage 3) — a DURABLE compactor counts ITSELF at its durable 
   //! the echoes land: the durable floor reaches the tail, the next tick compacts, and the SAME tick swaps the WAL
   for (const p of h.of('persist')) h.node.step({ kind: 'persisted', batch: p[1] as number })
   assert.equal(h.node.streams.get('aa')!.parts!.get('k')!.d, 4200)
+  const boots1 = h.of('boot').length
+  assert.ok(boots1 >= boots0)
   h.tick()
   assert.deepEqual(laneSeqs(h), [4200], 'compacted on its own durable floor and bb\'s mark')
   assert.equal(h.of('snapshot').length, snaps0 + 1, 'the compacting pass armed the snapshot swap in the same tick')
   const rows = h.of('snapshot').at(-1)![2] as { bytes: Uint8Array }[]
   assert.equal(rows.length, 1, 'the swap carries the compacted lane: one row')
-  //! the swap's echo rewrites the boot record (no dirty entry cleared here — the compaction flag alone does it)
-  const boots1 = h.of('boot').length
-  assert.ok(boots1 >= boots0)
-  h.node.step({ kind: 'persisted', batch: h.of('snapshot').at(-1)![1] as number })
-  assert.equal(h.of('boot').length, boots1 + 1, 'the echo of a compaction-armed swap rewrites the boot record')
+  //! the boot record is written in the SAME tick, right after the swap is issued (no dirty entry here — the compaction
+  // flag alone does it): a crash between the swap and its echo restores from this seed, not the one before the pass
+  assert.equal(h.of('boot').length, boots1 + 1, 'the issue of a compaction-armed swap writes the boot record')
   const seed = (h.of('boot').at(-1)![1] as BootRecord).floors!
   assert.deepEqual(seed.aa.k, [4200, 4200], 'the seed\'s durable floor sits above every gap: a restore chains from it')
+  //! the echo writes nothing more: the seed it would carry is the one already on disk
+  h.node.step({ kind: 'persisted', batch: h.of('snapshot').at(-1)![1] as number })
+  assert.equal(h.of('boot').length, boots1 + 1, 'the echo of the swap writes no second record')
 })
 
 test('COMPACTION (stage 3) — V4-18 at an armed node: a field a row write swept drops, a superseded row drops, a fenced field remove stays, a row remove stays while its tombstone lives (until stage 4 releases it), and C4 keeps the lane\'s last entry even when it is a loser', () => {
