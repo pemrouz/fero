@@ -1360,3 +1360,22 @@ test('the opener on my OWN hold (the eighth round, DESIGN-LEAVE §10.10.4): bb, 
   assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
   assert.deepEqual(h.node.membership.holds(h.node), [], 'the vote at 3 is history at view 4')
 })
+
+test('the opener\'s two older guards, each with EVERY member of my view linked (the sixth review\'s minor: the every-member guard masked their pins): a held view whose majority is outside my view — cc\'s ask names {aa,cc,ee}@3 at view 2 = {bb,cc,dd} with aa and ee unlinked — opens nothing (a ballot that cannot commit would burn an epoch per proposal age, re-opened at every age-out); a hold on my OWN dropped ballot, all five linked, is disowned (one NACK) and opens nothing', () => {
+  //! guard one: the held view's majority must be linked. bb at view 2 = {bb,cc,dd}, every member linked, aa and ee cut
+  const h = fiveAt1('bb')
+  h.node.step({ kind: 'bytesIn', link: h.link.cc, bytes: encodeControl(VERB.VIEW, { e: 2, m: mem(['bb', 'cc', 'dd']) }) })
+  h.node.step({ kind: 'linkDown', link: h.link.aa, reason: 'cut' }); h.node.step({ kind: 'linkDown', link: h.link.ee, reason: 'cut' })
+  h.node.step({ kind: 'bytesIn', link: h.link.cc, bytes: encodeControl(VERB.PULL, { e: 2, vs: [{ e: 3, h: 'aa,cc,ee', p: 'aa' }] }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' }, 'bb and dd: two of three without the held cc')
+  for (let i = 0; i < 3; i++) h.tick()
+  assert.deepEqual(h.jk(JK.propose), [], 'cc alone is one of {aa,cc,ee}: a ballot joint over it could never commit, so none opens')
+  //! guard two: never for a hold whose proposer is me. aa at view 1 of five, all linked, bb's ask names aa's own dropped
+  // ballot at 2 — the disown answers it, and nothing opens
+  const a = fiveAt1('aa')
+  a.node.step({ kind: 'bytesIn', link: a.link.bb, bytes: encodeControl(VERB.PULL, { e: 1, vs: [{ e: 2, h: 'aa,bb,cc', p: 'aa' }] }) })
+  assert.equal(a.sentOn(a.link.bb, VERB.NACK).length, 1, 'the disown')
+  assert.deepEqual(a.node.membership.gate(a.node), { open: true, reason: '' }, 'aa, cc, dd and ee: four of five without the held bb')
+  for (let i = 0; i < 3; i++) a.tick()
+  assert.deepEqual(a.jk(JK.propose), [], 'mine to disown, not to supersede — with every member linked too')
+})
