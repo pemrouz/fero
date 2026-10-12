@@ -234,11 +234,14 @@ export class Writer {
     this.len += 8
   }
   //! str: varint byteLen + utf8, in ONE pass via encodeInto (v2 computed Buffer.byteLength twice per string — sizing pass then write pass).
+  //! The worst case (3 bytes a character) is reserved only when it fits the limit; a long string, or one near the
+  // limit, is encoded first and takes only its real bytes, so a frame holds what really fits — a 3 KB string was
+  // refused a frame of 8 KiB (the V4-51/52 review). A frame that never nears its limit is byte-identical.
   str(s: string) {
-    this.ensure(4 + s.length * 3) // worst-case utf8 + up to 3 varint len bytes
     const lenAt = this.len
     // reserve 3 varint bytes for lengths up to 2^21-1; longer strings re-encode via the slow path
-    if (s.length * 3 < 1 << 21) {
+    if (s.length * 3 < 1 << 21 && this.len + 4 + s.length * 3 <= this.limit) {
+      this.ensure(4 + s.length * 3) // worst-case utf8 + up to 3 varint len bytes
       this.len += 3
       const { written } = utf8.encodeInto(s, this.buf.subarray(this.len))
       this.buf[lenAt] = (written & 0x7f) | 0x80

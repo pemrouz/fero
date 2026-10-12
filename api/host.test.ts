@@ -163,7 +163,7 @@ test('V4-51 — a live subscription ends typed when one change grows past one fr
     await h.settle()
     assert.equal(h.frames.filter((f) => f.verb === VERB.SUBREC).length, 1, 'the first picture streamed')
     assert.equal(h.host.served, 1)
-    h.bind.data.b = { n: 5000 } // a small row; its mapped change is 5,000 characters, 15 KB as the writer counts them
+    h.bind.data.b = { n: 9000 } // a small row; its mapped change is 9,000 characters, more than one frame of 8 KiB
     await h.settle()
     const rs = h.results()
     assert.deepEqual(rs.map((r) => [r.id, r.ok, r.v.reason]), [[9, 0, 'too-large']])
