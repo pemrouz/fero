@@ -26,7 +26,7 @@
 import { Frame, Framer, FrameError, VERB, continuesRun, encodeControl, encodeRun,                 } from './codec.js'
 import { Link, LS, dialedByLower } from './link.js'
 import { JK, Journal } from './journal.js'
-import { Membership } from './membership.js'
+import { Membership, cloneVote, holdsOk,           } from './membership.js'
 import { Writes } from './write.js'
 import { Streams } from './streams.js'
 import { Confirm } from './confirm.js'
@@ -71,7 +71,7 @@ export { MAX_REDIALS, MEMBER_REDIALS, LAMPORT_LEASE, SNAPSHOT_AT } from './tune.
                                                                                                  
                                                                                                          
                                                                                        
-                                                                                                                                                                           
+                                                                                                                                            
                                                                                                       
                                                                                                       
                                                                                                     
@@ -775,10 +775,12 @@ export class Node {
         // byte-identical with v4.0 (the sim's byte-identical sweep contract rides on that). `c` is the
         // cluster contract and `m: 1` the methods-only hint (DESIGN-DOOR §2): user-resource servers
         // only. `k` (§3) is my nonce for this link, minted by the door and kept on the Link — only when
-        // this node has a door. Keys spread in only when present, in the order u, i, l, r, n, c, m, k.
+        // this node has a door. `v` (DESIGN-LEAVE §10.10.6) is my holds, only while I hold any: the peer admits
+        // the link knowing them. Keys spread in only when present, in the order u, i, l, r, n, c, m, k, v.
         // With a door the sent object is kept (link.said): my proof signs exactly these keys.
         const door = this.door
         if (door !== undefined) link.nonce = door.nonce()
+        const vs = this.membership.helloHolds(this, link)
         const body            = {
           u: this.uuid, i: this.incarnation, l: this.listen,
           ...(this.client ? { r: 1 } : {}),
@@ -786,6 +788,7 @@ export class Node {
           ...(this.contract !== undefined ? { c: this.contract } : {}),
           ...(this.methodsOnly ? { m: 1 } : {}),
           ...(door !== undefined ? { k: link.nonce } : {}),
+          ...(vs.length ? { v: vs } : {}),
         }
         if (door !== undefined) link.said = body
         link.ship(encodeControl(VERB.HELLO, body), this.env.sink, j)
@@ -1318,7 +1321,7 @@ export class Node {
       members: m.view.members.map((x) => [x[0], x[1]]                    ),
       lamport: this.#seqCeiling,
       incarnation: this.incarnation,
-      votedFor: { ...m.votedFor },
+      votedFor: cloneVote(m.votedFor),
       //! M6 (armed only — unscoped boot bytes stay byte-identical): the dirty-partition ledger, the
       // data-authoritative held-set (a mid-latch entry rides under its PRE-latch classification;
       // the staged buffer itself is memory-only — C10 as amended by the review), the FROZEN orphan
@@ -1506,7 +1509,7 @@ export class Node {
     //! view-on-admit (from BOTH ends, unlike the digest): announce the committed view so a healed peer's
     // membership converges even when no epoch-stamped records flow; then settle — an admitted member
     // can flip the gate back to majority, flushing any parked writes
-    this.membership.onAdmit(this, link)
+    this.membership.onAdmit(this, link, v) // the HELLO's `v` is the peer's holds, read at admit (DESIGN-LEAVE §10.10.6)
     this.membership.settle(this)
     //! round-on-admit (M6-review findings 13/23/33/40/49 — DESIGN-M6 C3's mandated trigger): the
     // post-reconnect multi-source window creates interior holes suffix AE cannot fill (they sit
@@ -1589,13 +1592,15 @@ export class Node {
         // replicate two unrelated logs (a durable merge). Refuse loudly instead: dead + noRedial,
         // the same idiom as the self-reject below. One side declaring and the other not is the
         // legacy/embedder case — no check (absent means "no claim", never "any resource").
-        const { n, c, m, r, k } = v                                                                       
+        const { n, c, m, r, k, v: vs } = v                                                                                    
         //! the optional keys' shape (§2): `n` a string, `c` a string of 1..256 chars, `m` exactly 1, `k` a
-        // string of 16..64 chars — anything else is a malformed HELLO. An r:2 HELLO never reaches here.
+        // string of 16..64 chars, `v` a list of holds (holdsOk) — anything else is a malformed HELLO. An r:2
+        // HELLO never reaches here.
         if ((n !== undefined && typeof n !== 'string')
           || (c !== undefined && (typeof c !== 'string' || c.length === 0 || c.length > 256))
           || (m !== undefined && m !== 1)
-          || (k !== undefined && (typeof k !== 'string' || k.length < NONCE_MIN || k.length > NONCE_MAX))) {
+          || (k !== undefined && (typeof k !== 'string' || k.length < NONCE_MIN || k.length > NONCE_MAX))
+          || (vs !== undefined && !holdsOk(vs))) {
           j.armed && j.emit(JK.frameDrop, link.id, 'malformed hello')
           link.dead = true
           return this.env.sink.close(link.id, 'malformed-hello')
@@ -1968,6 +1973,7 @@ export class Node {
       case VERB.VOTE:
       case VERB.VIEW:
       case VERB.PULL:
+      case VERB.NACK:
       case VERB.LEAVE: {
         if (link.state !== LS.admitted) {
           j.armed && j.emit(JK.frameDrop, link.id, 'membership before hello')
@@ -1987,6 +1993,7 @@ export class Node {
         else if (f.verb === VERB.VOTE) this.membership.onVote(this, link, v)
         else if (f.verb === VERB.VIEW) this.membership.onView(this, link, v)
         else if (f.verb === VERB.PULL) this.membership.onPull(this, link, v)
+        else if (f.verb === VERB.NACK) this.membership.onNack(this, link, v)
         else this.membership.onLeave(this, link)
         this.membership.settle(this)
         return

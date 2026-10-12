@@ -50,7 +50,7 @@ export const JK = {
   vote: 27,          // a=epoch, b=granted(0|1), c=proposer — this node answered a ballot
   viewInstall: 28,   // a=epoch, b=memberCount — a view became committed fact here
   epochStale: 29,    // a=observedEpoch — evidence of a higher committed view; the write-gate closes
-  gateClose: 30,     // a=reason ('stale-epoch'|'rejoining'|'evicted'|'joining'|'minority') — joining: not in the view and never was (a newcomer before its JOIN ballot)
+  gateClose: 30,     // a=reason ('stale-epoch'|'rejoining'|'evicted'|'joining'|'held'|'minority') — joining: not in the view and never was (a newcomer before its JOIN ballot); held: this node voted for a view two or more members apart from its own, which may exist (DESIGN-LEAVE §10.10), so it is read-only until that view commits, its proposer disowns it, or its own majority supersedes it
   gateOpen: 31,
   gateAlarm: 32,     // a=wantedEpoch — pull retries exhausted; gate RELEASED with this alarm (named, never silent)
   writeBuffered: 33, // a=queueDepth — a gated write parked in the bounded pending buffer
@@ -117,6 +117,8 @@ export const JK = {
   doorReject: 78,    // a=link (the one that closes), b=reason, c=the dial target or the claimed listen (for 'uuid-taken' on the refusing side the uuid; on the refused client the dial target) — the door refused a link. Reasons: 'no-secret' (I have a door, the peer sent no k) · 'peer-secret' (the peer has one, I do not) · 'bad-proof' (its DOOR did not verify) · 'uuid-taken' (a CLIENT may not take a member's uuid; a member evicts a client squatting on its uuid; the refused client that read the {e: 'uuid-taken'} notice writes it too) · 'address' (a discovered or view-learned target answered as another listen: a relay) · 'timeout' (no DOOR within tune.proveMs) · 'refused' (a DOOR {e} notice — 'denied', or a word this version does not know — read while proving, after I proved; ONLY then. A bare close while proving is a link loss, not a refusal: no row, no park, the ordinary bounded redial chain — a crash, a cut or a lost notice look exactly like it, and the door speaks only through DOOR {e} (the third review)). Never a secret, nonce or proof.
   //! ── drain-then-go (2026-10-10, DESIGN-SCALE §7 stage 1 (b)) ──
   undrained: 79,     // a=partitions, b=epoch — a scoped leaver went with partitions no reachable new holder had proved it holds (the drain hit tune.drainTicks, or nobody was there to drain to: the last member, every new holder unreachable); the `left` row that follows carries b=0
+  //! ── the release rule (2026-10-12, DESIGN-LEAVE §10.10) ──
+  release: 80,       // a=epoch, b=proposer — the vote's proposer disowned the ballot this node held a vote for (a NACK to its ask): the vote stays spent, it warns no more, and the gate re-reads (`held` ends when it was the last hold)
 }         
 
 //! JEvent: one journal row. `t` is a per-node monotone counter (NOT wall time — deterministic under sim).
