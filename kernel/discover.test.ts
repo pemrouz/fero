@@ -225,11 +225,20 @@ test('the genesis gate: a DIALED target that answers for another name leaves the
   node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VOTE, { e: 1, g: 1, ce: 0, h: 'aa,bb' }) })
   assert.equal(node.epoch, 1)
   assert.deepEqual(node.membership.view.members.map((m) => m[0]), ['aa', 'bb'])
-  //! the right resource moves onto zz's port later: it admits, the refusal is forgotten, and it joins at the next epoch
+  //! the right resource moves onto zz's port later and admits: the refusal is forgotten — by the address I DIALED (it may
+  // claim another listen on the open path), and by the listen it CLAIMS when it is the one that dialed me
   node.step({ kind: 'linkUp', link: 40, dialed: true, to: 'sim:zz' })
-  node.step({ kind: 'bytesIn', link: 40, bytes: hello('zz', 'sim:zz', 'r') })
-  assert.ok(!node.refused('sim:zz'), 'admitted: no longer a stranger')
+  node.step({ kind: 'bytesIn', link: 40, bytes: hello('zz', 'sim:zz-alias', 'r') })
+  assert.ok(!node.refused('sim:zz'), 'admitted on my dial: no longer a stranger, whatever listen it claims')
   assert.deepEqual(node.admitted().sort(), ['bb', 'zz'])
+  node.step({ kind: 'linkDown', link: 40, reason: 'close', to: 'sim:zz' })
+  node.step({ kind: 'linkUp', link: 41, dialed: true, to: 'sim:zz' })
+  node.step({ kind: 'bytesIn', link: 41, bytes: hello('zz', 'sim:zz', 'other') })
+  assert.ok(node.refused('sim:zz'), 'refused again on a later dial')
+  node.step({ kind: 'linkDown', link: 41, reason: 'name-mismatch', to: 'sim:zz' })
+  node.step({ kind: 'linkUp', link: 42, dialed: false })
+  node.step({ kind: 'bytesIn', link: 42, bytes: hello('zz', 'sim:zz', 'r') })
+  assert.ok(!node.refused('sim:zz'), 'admitted on ITS dial, claiming the listen I had refused: forgotten too')
 })
 
 test('the genesis gate, the door: a dialed target with NO secret where I have one (the HELLO-time matrix) and one that refuses my proof (the DOOR notice) both leave the count; a proving TIMEOUT does not (a lost frame may be a member), nor does a `uuid-taken` notice (the far side holds a member running as me); a target the directory forgets takes its refusal with it, a static one keeps it', () => {
