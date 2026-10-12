@@ -374,7 +374,7 @@ test('a container restart: the node is pid 1 of its namespace, killed -9, and pi
     const t = performance.now()
     const life2 = await inNs([CHILD, dir, 'exit'])
     assert.ok(life2.out.includes('up 1') && life2.code === 0, `life 2, pid 1 again on the same volume, took the stale lock over (${life2.out})`)
-    assert.ok(performance.now() - t >= 3000, 'after waiting for the lease')
+    assert.ok(performance.now() - t >= 2000, 'after waiting for the lease (the old pid rule took over at once, in well under a second)')
     assert.equal(lockOf(dir), null, 'and released it at exit')
     //! the recreate: the next container has a new host name; the kernel is the same, so the lease applies the same way
     const old = await inNs([CHILD, dir, 'crash'], 'c-old')
