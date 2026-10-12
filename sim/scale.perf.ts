@@ -131,15 +131,16 @@ test('counted P4: 50,000 updates over 500 cells at n=8 R=3 leave every node at m
   assert.equal(scopedConverged(sim), null)
   assert.equal(exactlyR(sim), null)
   assert.equal(boundedLanes(sim), null, 'every lane at every node within winners + compactAt')
-  let worst = 0, totalEntries = 0, totalCells = 0, passes = 0
+  let worst = 0, totalEntries = 0, totalCells = 0
   for (const n of nodes) {
     let entries = 0, lanes = 0
     for (const [, lane] of n.logs) if (lane.length) { entries += lane.length; lanes++ }
     const cells = n.state.size
     const bound = cells + lanes * (compactAt - 1)
     assert.ok(entries <= bound, `${n.uuid} holds ${entries} entries over ${lanes} lanes for ${cells} cells: over ${bound}`)
-    worst = Math.max(worst, entries - cells); totalEntries += entries; totalCells += cells; passes += jtotal(sim, JK.compacted)
+    worst = Math.max(worst, entries - cells); totalEntries += entries; totalCells += cells
   }
-  console.log(`  P4: ${totalEntries} entries for ${totalCells} held cells over 8 nodes after 50,000 updates (worst node ${worst} entries over its cells; ${jtotal(sim, JK.compacted)} compaction passes)`)
+  const passes = jtotal(sim, JK.compacted) // the cluster-wide count of passes that dropped entries (one journal row each)
+  console.log(`  P4: ${totalEntries} entries for ${totalCells} held cells over 8 nodes after 50,000 updates (worst node ${worst} entries over its cells; ${passes} compaction passes)`)
   assert.ok(passes > 0)
 })
