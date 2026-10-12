@@ -515,7 +515,7 @@ export const FAMILIES: readonly Family[] = [
   {
     //! A12 a spoke across two hand-offs at its feeder (wave 6a, 2026-10-12; STATUS's second sighting, the debugger's
     // recipe): a client that dials every member; a join at 400 ms (partitions move onto the joiner — the feeder's
-    // copies of those freeze into orphans and shed, and the spoke keeps their rows: `stale` counts them); a clean leave
+    // copies of those freeze into orphans and shed, and the spoke keeps their rows: `spokeStale` counts them); a clean leave
     // at 2000 ms of a member that is NOT the spoke's feeder (the feeder acquires the leaver's partitions from their
     // orphan copies through the latch — the records it folds there must reach the spoke); a second burst of writes
     // after the leave. M12 (spokeMirror) judges the spoke at the horizon; `feederAcquires` is the engagement key (a
@@ -599,14 +599,15 @@ export const runFamily = (fam: Family, seed: number, mut: Mutation = 'none', hor
   //! M12 (wave 6a): every spoke's kernel holds exactly its feeder's held subset, by value — a missing or differing
   // row is UNSAFE (a spoke that silently lacks a row its feeder holds is a lost write to its reader). Counted:
   // eng.spokeParts / eng.spokeCells (non-vacuity), eng.feederAcquires (what the spoke's feeder folded through the
-  // latch — the records the forward must carry), eng.stale (rows of partitions that moved off the feeder, kept at the
-  // spoke: counted, not judged — STATUS names the gap)
+  // latch — the records the forward must carry), eng.spokeStale (rows of partitions that moved off the feeder, kept at
+  // the spoke: counted, not judged — STATUS names the gap; its own key: eng.stale is A2's count of a demoted owner's
+  // commits)
   const m12 = { parts: 0, cells: 0 }
   for (const [id, n] of sim.nodes) {
     if (!n.client) continue
     const m = spokeMirror(sim, id, m12)
     if (m !== null) { out.red.add('spoke-mirror'); out.unsafe.push(m) }
-    eng.stale = (eng.stale ?? 0) + spokeStale(sim, id).n
+    eng.spokeStale = (eng.spokeStale ?? 0) + spokeStale(sim, id).n
     const f = n.primary !== null ? sim.nodes.get(n.links.get(n.primary)!.uuid) : undefined
     if (f !== undefined) for (const e of f.journal.read()) if (e.kind === JK.acquire) eng.feederAcquires = (eng.feederAcquires ?? 0) + 1
   }

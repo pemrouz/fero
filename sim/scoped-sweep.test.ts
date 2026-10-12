@@ -114,7 +114,7 @@ const SPOKED = new Set(['A11-spoke', 'A12-spoke-handoff'])
 for (const fam of FAMILIES) {
   test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
     const unsafe: string[] = [], notLive: string[] = [], newlySafe: number[] = []
-    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0, spokeCells = 0, feederAcquires = 0, stale = 0
+    let engaged = 0, cells = 0, advances = 0, resyncs = 0, resyncRows = 0, floorLanes = 0, markPairs = 0, rge2 = 0, spokeCells = 0, feederAcquires = 0, spokeStale = 0
     const pins = KNOWN_UNSAFE[fam.name] ?? {}
     const known = new Set(Object.keys(pins).map(Number))
     //! every pinned unsafe seed runs in every battery, whatever SEEDS is: a pin that never runs proves nothing, and
@@ -133,7 +133,7 @@ for (const fam of FAMILIES) {
       if (ENGAGED[fam.name](o.eng)) engaged++
       cells += o.eng.cells; advances += o.eng.advances; resyncs += o.eng.resyncs; resyncRows += o.eng.resyncRows
       floorLanes += o.eng.floorLanes; markPairs += o.eng.markPairs; if (o.R >= 2) rge2++
-      spokeCells += o.eng.spokeCells; feederAcquires += o.eng.feederAcquires ?? 0; stale += o.eng.stale ?? 0
+      spokeCells += o.eng.spokeCells; feederAcquires += o.eng.feederAcquires ?? 0; spokeStale += o.eng.spokeStale ?? 0
     }
     assert.deepEqual(unsafe, [], 'UNSAFE: a monitor fired or M1\'s horizon form disagrees')
     assert.deepEqual(newlySafe, [], 'a schedule pinned unsafe is safe now: take it off KNOWN_UNSAFE, with the why')
@@ -145,14 +145,14 @@ for (const fam of FAMILIES) {
     }
     //! M12 (wave 6a): on every family with a spoke it compared cells; on the hand-off family the spoke's feeder folded
     // through the latch on some seed (the forward had records to carry), and the rows of partitions that moved off the
-    // feeder are counted, not judged (eng.stale — a STATUS gap, not this oracle's verdict)
+    // feeder are counted, not judged (eng.spokeStale — a STATUS gap, not this oracle's verdict)
     if (SPOKED.has(fam.name)) assert.ok(spokeCells > 0, `${fam.name}: non-vacuity — M12 compared ${spokeCells} spoke cells against the feeders' held subsets`)
     if (fam.name === 'A12-spoke-handoff') {
       assert.ok(feederAcquires > 0, `non-vacuity: the spoke's feeder acquired ${feederAcquires} partitions through the latch over the seeds`)
       //! KNOWN (STATUS, wave 6a): the rows of a partition that moved OFF the spoke's feeder at the join (an orphan there,
       // then shed) stay on the spoke — nothing tells it — until a failover's resync wipes them. Counted by spokeStale,
       // never judged by M12. Seeds 1 and 2 read 0 and 1 (seed 3 reads 6). If this reads 0, the gap closed: flip the pin.
-      assert.ok(stale > 0, `the spoke kept ${stale} rows of partitions that moved off its feeder (known gap; 0 means it closed — flip this pin)`)
+      assert.ok(spokeStale > 0, `the spoke kept ${spokeStale} rows of partitions that moved off its feeder (known gap; 0 means it closed — flip this pin)`)
     }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
     //! M7 compares nothing on an R=1 seed (one holder per partition): the row bites only where some seed drew R ≥ 2
