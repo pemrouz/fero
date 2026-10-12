@@ -2181,6 +2181,23 @@ other pin of the harness moved: the opener never fires where a hold's view major
 where the held member is itself the lowest (its gate is `held`, and its eviction ballot is the joint
 one), or where the hold's proposer is a member (then it is a suspect, and the eviction is the
 ballot; or it is linked to the held member, and the ask reaches it).
+The trigger reads the holds my linked MEMBERS named (`#heldPeers`), never my own, while the ballot it
+opens is joint over both (`#jointViews`) — and my own holds need no trigger (the seventh review,
+2026-10-12). A hold of mine is a vote for ANOTHER proposer's ballot. That proposer is a member of my
+view, and linked: then my ask goes on its link (`#askTargets`) and it answers with a VIEW or a disown
+in one round trip. Or a member of my view, and lost: then it is my suspect in `suspectTicks` ticks and
+its eviction, joint over my holds, is the ballot the opener would have opened — the opener waits for
+it, as above. Or no member of my view: then form (β) (its view at or above mine when I voted) and the
+rule that every proposer is a member of its own view (the lowest live member proposes; a leaver its
+own exit) make its view one ABOVE mine that I never installed, and the chain from my view up to it
+starts with a ballot over my view by one of my own members, who committed and installed it before
+anyone above could propose — linked, it is above me and answers my ask with its VIEW, which I install
+and re-read the hold against; lost, it is a suspect again. At epoch 0 the formation ballot is the joint
+one (`genesisProposerDies`), and the opener never fires there (a member of an empty view is nobody).
+So the shape the trigger would miss — I am the lowest live member, the only one held, every member
+of my view linked and my vote's proposer gone — cannot be built, and folding my own holds into the
+trigger would add a guard no pin can turn red. The asymmetry is kept on purpose: the holds I was told
+of OPEN my ballot, my own holds WIDEN it.
 
 Where supersession cannot fire, it must not, and that has THREE shapes, not one. The far side of a
 cut: `evictTwo`'s n03 (held) opens `{n03,n04,n05}`@3 joint over `{n01,n02,n03}` and needs n01 or n02,
@@ -2543,7 +2560,9 @@ these items open, each with the reviewer's probe under the session's scratch fol
    fails as `bad-proof` (or bump the label to `fero-door/2`); mixed versions are unsupported before
    1.0 (V4-14).
 
-**2026-10-12, BUILT (V4-51; branch `w6/relbuild` on v4 at 35d7300, eleven commits).** The rule of §10.10 is in the
+**2026-10-12, BUILT (V4-51; branch `w6/relbuild` on v4 at 35d7300: eleven commits for the build itself; the three
+reviews below add nine more, twenty in all, and the counts in THEIR notes are the tree's — this note's are the build's
+at the time: 46 membership pins, 18 harness pins, 964 tests).** The rule of §10.10 is in the
 kernel, applied by hand commit by commit (`docs/leave-release.diff` was built on 145a70b and no longer applies after
 the knock window; it stays as the measured record). What landed, in the kernel's words: `Vote.prior` (§10.10.7) and
 `Vote.f` (the disown); `holds()` with its common-case fast path and the gate word `held`; form (β) at the voter (`o` on
