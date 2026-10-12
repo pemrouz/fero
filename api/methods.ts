@@ -35,11 +35,11 @@
 // object-born (substrate.applyStreamRec, I-27); the one-shot stays the bare number.
 
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { VERB, copyOf } from '../kernel/codec.ts'
+import { VERB, copyOf, encodable, sizeOf, Unsendable } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
 import { applyStreamRec, disposeMinted, errText, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
-import { ARG, RESULT, lostAssignment, type Coords, type Refused } from './data.ts'
+import { atCap, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 import { FULL } from '../kernel/codec.ts'
 
@@ -64,11 +64,15 @@ const settle = async (tracked: Promise<Coords>[]): Promise<void> => {
   }
 }
 
-//! answer — a server-local call's result as a client's call decodes it (V4-52): copyOf with RESULT's limits, so
-// what a reply could not carry (a bigint, a getter that throws, a value too deep or too big for one frame) is
-// refused here too, with the remote reply's words
-const answer = (m: string, v: unknown): unknown => {
-  try { return copyOf(v, RESULT) } catch (e) { throw new Error(`methods.${m}: the result could not be sent: ${(e as Error).message}`) }
+//! answer — a server-local call's result as a client's call decodes it (V4-52): copyOf with RESULT's limits at the
+// node's cap, so what a reply could not carry is refused here too, in the remote reply's words: too big for one frame
+// is the same typed 'too-large' (V4-51), anything else 'the result could not be sent: <why>' (#invoke derives the same
+// why for a remote reply that failed)
+const answer = (m: string, v: unknown, node: Runtime['node']): unknown => {
+  try { return copyOf(v, atCap(node.tune.frame).result) } catch (e) {
+    if (e instanceof Unsendable && e.over) throw tooLarge(m, node.replicas, node.tune.frame, 'the answer')
+    throw new Error(`methods.${m}: the result could not be sent: ${(e as Error).message}`)
+  }
 }
 
 //! SYSTEM — the reserved method-name prefix (unreachable from fero() opts: the composer rejects it):
@@ -88,8 +92,6 @@ export const tooLarge = (m: string, replicas: number, frame: number, what: strin
 export const isTooLarge = (e: unknown): boolean => {
   try { return typeof e === 'object' && e !== null && (e as { scoped?: unknown }).scoped === true && (e as { reason?: unknown }).reason === 'too-large' } catch { return false }
 }
-//! sizeOf — a byte count as people say it: MiB, or KiB under one MiB
-export const sizeOf = (n: number): string => n >= 1 << 20 ? `${+(n / (1 << 20)).toFixed(1)} MiB` : `${+(n / 1024).toFixed(1)} KiB`
 
 //! Context — the second argument every handler receives. `data` is the server's own resource surface
 // (writes route through the ONE ingest: validation + the write-route join + owner routing all apply); `flush()`
@@ -258,8 +260,12 @@ export class Host {
           this.#report(FULL, `refused a read whose answer is bigger than one frame, ${sizeOf(frame)} (methods.${m}) — the caller was told to read a smaller part`)
           return this.#reply(link, id, false, tooLarge(m, this.#rt.node.replicas, frame, 'the answer'))
         }
+        //! the reply's words are the local answer's (answer above): what stopped a plain result, by encodable's walk —
+        // asked only here, on the failure, so a reply that encodes pays nothing for it
+        let why: string | null = null
+        if (!isProxy(result)) try { why = encodable(result, atCap(this.#rt.node.tune.frame).result) } catch { why = null }
         this.#report(err, `a method's result could not be sent (methods.${m}) — the call was refused`)
-        this.#reply(link, id, false, `the result could not be sent: ${errText(err)}`)
+        this.#reply(link, id, false, `the result could not be sent: ${why ?? errText(err)}`)
       }
     })()
   }
@@ -355,7 +361,7 @@ export class Host {
     const fn = this.#methods[m]
     if (!fn) throw new Error(`unknown method '${m}'`)
     let arg: unknown
-    try { arg = copyOf(a, ARG) } catch (e) { throw new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`) }
+    try { arg = copyOf(a, atCap(this.#rt.node.tune.frame).arg) } catch (e) { throw new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`) }
     const tracked: Promise<Coords>[] = []
     const minted = mark(this.#data)
     //! peer is this node: a local call's caller IS the server (the Context doc above)
@@ -364,11 +370,11 @@ export class Host {
     if (!isProxy(result) && result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function')
       result = await result
     await settle(tracked) // flush-on-return — a refused write fails the call (V4-5)
-    if (!isProxy(result)) return answer(m, result) // a plain value keeps the views it minted (#invoke's note)
+    if (!isProxy(result)) return answer(m, result, this.#rt.node) // a plain value keeps the views it minted (#invoke's note)
     //! a view data has stopped answers a frozen picture: refused, as for a remote call
     if (stopped(result)) { if (disposeMinted(result, minted)) reapStopped(); throw new Error(`methods.${m}: ${STOPPED_CALL}`) }
     //! the view minted for this call is dead once copied (I-29), and released even when the copy is refused
-    try { return answer(m, snapshot(result)) } finally { if (disposeMinted(result, minted)) reapStopped() }
+    try { return answer(m, snapshot(result), this.#rt.node) } finally { if (disposeMinted(result, minted)) reapStopped() }
   }
 
   //! #end — end one live sub loudly: the caller's handle fails with the reason (Caller.#onResult: mode
@@ -504,7 +510,7 @@ export class Caller {
     // retried one, re-encoded the caller's object when it replayed, so a change made meanwhile was sent, and a
     // change to something fero cannot send (a bigint) threw from the socket handler while the call hung.
     let arg: unknown
-    try { arg = copyOf(a, ARG) } catch (e) { return Promise.reject(new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`)) }
+    try { arg = copyOf(a, atCap(this.#rt.node.tune.frame).arg) } catch (e) { return Promise.reject(new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`)) }
     const id = ++this.#seq
     const ms = opts.timeout ?? 10_000
     return new Promise((resolve, reject) => {
@@ -533,7 +539,7 @@ export class Caller {
     //! the same question as call(), and the same copy (a re-subscribe on the next primary sends it): a sub whose
     // argument cannot be sent fails at once and nothing is stepped. The handle's touch throws the reason, so its
     // `ready` is marked handled: one failure, told once.
-    try { sub.a = copyOf(a, ARG) } catch (e) {
+    try { sub.a = copyOf(a, atCap(this.#rt.node.tune.frame).arg) } catch (e) {
       sub.ready.catch(noop)
       this.#fail(sub, new Error(`methods.${m}: the argument cannot be sent: ${(e as Error).message}`))
       return sub

@@ -324,7 +324,7 @@ test('encodable agrees with Writer.value on every edge within the codec\'s bound
 test('encodable charges bytes as the writer reserves them and stops when the budget runs out: a sparse array a billion long and a value of shared parts are refused at once', () => {
   const small = { depth: MAX_DEPTH, bytes: 300 }
   assert.equal(encodable('x'.repeat(98), small), null, '4 + 3 × 98 = 298 bytes fit in 300')
-  assert.equal(encodable('x'.repeat(99), small), 'bigger than 0 MiB (a string counts 3 bytes a character)')
+  assert.equal(encodable('x'.repeat(99), small), 'bigger than 300 bytes (a string counts 3 bytes a character)', 'a size under one KiB in bytes, never "0 MiB"')
   assert.equal(encodable('x'.repeat(98), small, 0, 2), null)
   assert.match(encodable('x'.repeat(98), small, 0, 3)!, /^bigger than/, 'what the key already spent counts')
   const t0 = performance.now()
@@ -655,7 +655,7 @@ test('copyOf builds what decode(encode(v)) builds for every value the codec carr
     assert.notEqual(why, null)
     assert.throws(() => copyOf(v, limit, from), (e: Error) => e instanceof Unsendable && e.message === why, String(why))
   }
-  assert.throws(() => copyOf('x'.repeat(98), small, 0, 3), /^Error: bigger than 0 MiB \(a string counts 3 bytes a character\)$/, 'what the key already spent counts')
+  assert.throws(() => copyOf('x'.repeat(98), small, 0, 3), /^Error: bigger than 300 bytes \(a string counts 3 bytes a character\)$/, 'what the key already spent counts')
   //! a getter may copy too: the inner copy's bytes are its own, never the outer's
   const nested = { a: 'x'.repeat(20), get g() { copyOf('y'.repeat(1000), CODEC); return 1 } }
   assert.equal(encodable(nested, { depth: MAX_DEPTH, bytes: 100 }), null)

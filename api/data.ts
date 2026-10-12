@@ -32,7 +32,7 @@
 import { types } from 'node:util'
 import { proxy, applyRec, lens, holeAt, errText, isProxy, unfoldable, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
-import { encodable, copyOf, Unsendable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
+import { encodable, copyOf, roomOf, Unsendable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -123,12 +123,21 @@ export const partOf = (o: object, array: boolean): string | null => {
 // as deep — and a field write's value sits under its row: a value 61 deep was written, replicated, and then
 // could not be read back. A CALL frame wraps its argument once. Both leave a MiB under the frame cap for the
 // frame's header, the record's key and the envelopes. Both ask partOf of every array and object (V4-52).
-export const WRITE: Limit = { depth: MAX_DEPTH - 4, bytes: MAX_FRAME - (1 << 20), part: partOf }
-export const ARG: Limit = { depth: MAX_DEPTH - 1, bytes: MAX_FRAME - (1 << 20), part: partOf }
+export const WRITE: Limit = { depth: MAX_DEPTH - 4, bytes: roomOf(MAX_FRAME), part: partOf }
+export const ARG: Limit = { depth: MAX_DEPTH - 1, bytes: roomOf(MAX_FRAME), part: partOf }
 //! RESULT — what a server's own read hands out (api/methods.ts invokeLocal, api/fold.ts): the copy a client's
 // call decodes from the RESULT frame, which wraps the value once, as a CALL wraps its argument. No part rule: a
 // result travels as the codec carries it (a Date in a view arrives as {}, locally as remotely, V4-52).
-export const RESULT: Limit = { depth: MAX_DEPTH - 1, bytes: MAX_FRAME - (1 << 20) }
+export const RESULT: Limit = { depth: MAX_DEPTH - 1, bytes: roomOf(MAX_FRAME) }
+//! atCap — WRITE, ARG and RESULT at a node's frame cap (kernel/tune.ts `frame`, the test seam; V4-51): the same
+// depths, and the bytes one value may take and still go alone in a frame of that cap (kernel/codec.ts roomOf, the
+// relay's own count). At MAX_FRAME — every production node — they are the three constants themselves. So a write,
+// a call and a server's own read are refused at the size the node's frames are cut at, typed, never stamped first
+// and then thrown out of the encoder.
+export interface Limits { write: Limit; arg: Limit; result: Limit }
+const AT_MAX: Limits = { write: WRITE, arg: ARG, result: RESULT }
+export const atCap = (frame: number): Limits => frame === MAX_FRAME ? AT_MAX
+  : { write: { ...WRITE, bytes: roomOf(frame) }, arg: { ...ARG, bytes: roomOf(frame) }, result: { ...RESULT, bytes: roomOf(frame) } }
 
 //! CARRIES — what fero sends, said once for every refusal of a value (the lens, a methods.* reject, the seed)
 export const CARRIES = `fero sends null, undefined, true and false, numbers, strings, Uint8Array, and arrays and objects of these (an object sends its own fields, so not a Date, a Map, a Set or another built-in), at most ${WRITE.depth} levels deep counted from the row and ${WRITE.bytes >> 20} MiB in all (a string counts 3 bytes a character)`
@@ -144,12 +153,12 @@ export const CARRIES = `fero sends null, undefined, true and false, numbers, str
 // frames and this node's own fold hold one value, the one every other copy decodes; a later change to the
 // program's object reaches none of them. The record is fero's own (the lens, methods.* and the seed build it),
 // never the program's.
-export const unsendable = (r: Rec): string | null => {
+export const unsendable = (r: Rec, limit: Limit = WRITE): string | null => {
   let n = r.at === undefined ? 0 : 4 + r.at.length * 3
   for (const k of r.key) n += 4 + k.length * 3
-  if (r.type === REC.remove) return encodable(undefined, WRITE, 0, n)
+  if (r.type === REC.remove) return encodable(undefined, limit, 0, n)
   try {
-    r.value = copyOf(r.value, WRITE, r.key.length > 1 ? r.key.length - 1 : 0, n)
+    r.value = copyOf(r.value, limit, r.key.length > 1 ? r.key.length - 1 : 0, n)
     return null
   } catch (e) {
     if (e instanceof Unsendable) return e.message
@@ -240,6 +249,8 @@ export class Bind {
   data: any
   #handle: any // the raw data v4 source handle beneath the lens
   #rt: Runtime
+  //! #write — WRITE at this node's frame cap (atCap): MAX_FRAME's own constant on every production node
+  #write: Limit
   #iss: string
   //! pending — 'iss|cid' → the unsettled write; inflight — cell → the NEWEST pending write on it (the
   // settlement index, see the banner: it decides promises, never what the proxy shows)
@@ -288,6 +299,7 @@ export class Bind {
 
   constructor(rt: Runtime, opts: { validate?: (rec: Rec) => true | string; tracked?: () => Promise<Coords>[] | undefined; onOutcome?: (id: number) => void; onFault?: Fault } = {}) {
     this.#rt = rt
+    this.#write = atCap(rt.node.tune.frame).write
     this.#validate = opts.validate
     this.#tracked = opts.tracked
     this.#onOutcome = opts.onOutcome
@@ -403,7 +415,7 @@ export class Bind {
     const t = this.#tracked?.()
     for (let i = 0; i < recs.length; i++) {
       //! a record that cannot be sent is refused before the user's rule sees it, and before any stamp
-      const v = !checked && unsendable(recs[i]) !== null ? UNENCODABLE : this.admit(recs[i])
+      const v = !checked && unsendable(recs[i], this.#write) !== null ? UNENCODABLE : this.admit(recs[i])
       if (v !== true) {
         //! refused: an outcome row with the reason, and nothing else — the record never touched the
         // proxy, so there is nothing to undo (a refused write is invisible, not bounced)
@@ -616,7 +628,7 @@ export class Bind {
     // for a patch() of several pairs. Nothing is stamped. Each record it takes now carries fero's own copy of its
     // value (unsendable, V4-52), so a change the program makes to its object afterwards is never sent.
     for (const r of recs) {
-      const why = unsendable(r)
+      const why = unsendable(r, this.#write)
       if (why !== null) throw new TypeError(`fero: ${JSON.stringify(r.key)} cannot be sent: ${why}\n  ${CARRIES}`)
     }
     //! assignments have no await surface — swallow the coordinate promises (their journal/outcome

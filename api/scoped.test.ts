@@ -14,6 +14,7 @@ import { fero, WriteRejectError, type Fero, type ScopedError } from './index.ts'
 import { snapshot } from './substrate.ts'
 import { diag } from './diagnostics.ts'
 import { Ring } from '../kernel/ring.ts'
+import { TUNE } from '../kernel/tune.ts'
 import { ports, until } from '#utils'
 
 const spawn = async (n: number, replicas: number, extra: Record<string, unknown> = {}): Promise<Fero[]> => {
@@ -348,7 +349,7 @@ test('COVERAGE ATTESTATION [0/28/53] — an answerer that does not ATTEST a part
   const { Gather } = await import('./fold.ts')
   //! a minimal fake node: self is an armed member holding nothing; h1/h2 are p's holders
   const fake = {
-    uuid: 'self', epoch: 1, armed: true, replicas: 2,
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: TUNE,
     membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
     writes: { ring: { epoch: 1, build: () => {}, holders: () => ['h1', 'h2'] } },
     scope: { entries: new Map() },
@@ -429,7 +430,7 @@ test('TOO-LARGE [V4-51] — the gather names a member whose rows do not fit one 
 test("the gather's one-shot answer is what a client's whole read decodes: the codec's copy of the union, refused when a reply could not carry it", async () => {
   const { Gather } = await import('./fold.ts')
   const fake = {
-    uuid: 'self', epoch: 1, armed: true, replicas: 2,
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: TUNE,
     membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
     writes: { ring: { epoch: 1, build: () => {}, holders: () => ['h1', 'h2'] } },
     scope: { entries: new Map() },
@@ -453,7 +454,7 @@ test("the gather's one-shot answer is what a client's whole read decodes: the co
 test('OVERLAPPING CELLS (V4-18) — the gather folds claims by depth with the kernel\'s stamp rule: a field remove newer than its row takes the field out, a field at or below an ancestor\'s stamp is hidden, a parked field never tears into a live row', async () => {
   const { Gather } = await import('./fold.ts')
   const fake = {
-    uuid: 'self', epoch: 1, armed: true, replicas: 2,
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: TUNE,
     membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
     writes: { ring: { epoch: 1, build: () => {}, holders: () => ['h1', 'h2'] } },
     scope: { entries: new Map() },

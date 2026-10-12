@@ -41,6 +41,9 @@ export const HEADER = 11
 // test cap (a node's tune row `frame`) a sixteenth less, never less than 256 bytes — what an envelope with two
 // uuid-sized names takes. The relay asks it before a client's record is stamped (kernel/write.ts onWrite).
 export const roomOf = (cap: number): number => cap - Math.min(1 << 20, Math.max(256, cap >> 4))
+//! sizeOf — a byte count as people say it: MiB, KiB under one MiB, bytes under one KiB (every size a refusal names)
+export const sizeOf = (n: number): string =>
+  n >= 1 << 20 ? `${+(n / (1 << 20)).toFixed(1)} MiB` : n >= 1024 ? `${+(n / 1024).toFixed(1)} KiB` : `${n} bytes`
 
 //! VERB: dense 1-byte frame verbs, append-only. The codec fails closed on unknowns at dispatch, not here.
 // DIGEST carries {d: {origin: highestHeldSeq}, r: 0|1} — "here is what I hold; r=1 means please answer with yours".
@@ -311,7 +314,7 @@ const reasonOf = (e: unknown, limit: Limit): string => {
   if (e === REFUSED) {
     //! no path for depth (it is the path) or for size (the sum of every part)
     if (refusedWhy === DEEP) return `deeper than ${limit.depth} levels`
-    if (refusedWhy === OVER) return `bigger than ${limit.bytes >> 20} MiB${text ? ' (a string counts 3 bytes a character)' : ''}`
+    if (refusedWhy === OVER) return `bigger than ${sizeOf(limit.bytes)}${text ? ' (a string counts 3 bytes a character)' : ''}`
     return refusedWhy + where
   }
   let m: string
@@ -382,7 +385,9 @@ const walk = (v: unknown, depth: number, n: number, limit: Limit): number => {
 }
 
 //! Unsendable — what copyOf throws for a value it cannot copy; the message is encodable's reason, word for word
-export class Unsendable extends Error {}
+//! `over` — refused for its size alone: a server's own read too big for a reply answers the typed 'too-large' a
+// remote one gets (api/methods.ts answer, api/fold.ts answer)
+export class Unsendable extends Error { over = false }
 
 //! copyOf — the value Cursor.value would build from Writer.value's bytes, built directly, with no bytes: the copy
 // a server's own read hands out, so it equals a client's read, and the copy a local write takes, so a change the
@@ -406,7 +411,10 @@ export const copyOf = (v: unknown, limit: Limit, from = 0, spent = 0): unknown =
   try {
     return copy(v, from, limit)
   } catch (e) {
-    throw new Unsendable(reasonOf(e, limit))
+    const over = e === REFUSED && refusedWhy === OVER
+    const u = new Unsendable(reasonOf(e, limit))
+    u.over = over
+    throw u
   } finally {
     copied = outer
   }
