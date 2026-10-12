@@ -107,22 +107,41 @@ const nameOf = (p: object): string => {
 // the fast path: its inherited fields do not travel, and the write's copy leaves them behind on the writer too.
 //! userClass — is this prototype a class the program wrote? Its own `constructor` is a function that is neither native
 // code nor a global of the same name (Node writes URLSearchParams, Headers, Blob and the like in JavaScript, so only
-// the global tells them apart). Read through the property's descriptor, so no getter runs, and once per prototype.
+// the global tells them apart). Read through the properties' descriptors, so no getter runs, and once per prototype.
+// A program's class set on globalThis under its own name reads as a built-in: the tag rule then asks its tag, which is
+// 'Object' unless the class names one, so it is still taken.
 const USER = new WeakMap<object, boolean>()
 const NATIVE = /\{\s*\[native code\]\s*\}$/
 const userClass = (p: object): boolean => {
   let u = USER.get(p)
   if (u === undefined) {
     const c = Object.getOwnPropertyDescriptor(p, 'constructor')?.value
-    u = typeof c === 'function' && !NATIVE.test(Function.prototype.toString.call(c)) && (globalThis as Record<string, unknown>)[c.name] !== c
+    const name = typeof c === 'function' ? Object.getOwnPropertyDescriptor(c, 'name')?.value : undefined
+    u = typeof c === 'function' && !NATIVE.test(Function.prototype.toString.call(c)) && !(typeof name === 'string' && (globalThis as Record<string, unknown>)[name] === c)
     USER.set(p, u)
   }
   return u
 }
+//! hiddenBase — the nearest prototype up the chain that is not a class the program wrote, when its data is out of
+// sight: a program's class extending URLSearchParams, Headers, Blob or WeakRef keeps that built-in's data in its
+// internal state, not its own fields, and arrived as {} (the last check). Object.prototype and null are plain, and an
+// EventTarget subclass keeps its data in its own fields: those answer null. Once per prototype.
+const BASE = new WeakMap<object, object | null>()
+const hiddenBase = (p: object): object | null => {
+  let b = BASE.get(p)
+  if (b === undefined) {
+    let q: object | null = p
+    while (q !== null && userClass(q)) q = Object.getPrototypeOf(q)
+    b = q === null || q === Object.prototype || (typeof EventTarget === 'function' && q === EventTarget.prototype) ? null : q
+    BASE.set(p, b)
+  }
+  return b
+}
 //! hintOf — what to send instead of a built-in the KINDS list does not name, where it is known
 const hintOf = (tag: string): string =>
   tag === 'URLSearchParams' || tag === 'Headers' || tag === 'FormData' ? 'send Object.fromEntries(it)'
-  : /Iterator$|^Generator$|^AsyncGenerator$/.test(tag) ? 'send [...it]'
+  : /^Async/.test(tag) ? 'send await Array.fromAsync(it)'
+  : /Iterator( Helper)?$|^Generator$/.test(tag) ? 'send [...it]'
   : tag.startsWith('Temporal.') ? 'send it.toString()'
   : 'it keeps its data where fero cannot see it: send a plain copy of what it holds'
 export const partOf = (o: object, array: boolean): string | null => {
@@ -135,9 +154,10 @@ export const partOf = (o: object, array: boolean): string | null => {
   if (Object.getPrototypeOf(p) === null) return null
   //! a built-in KINDS does not name keeps its data where Object.keys cannot see it — a URLSearchParams, Headers, a Blob,
   // a WeakRef, a generator or an iterator arrived as {} on every copy, the writer's too (the V4-51/52 review). Its tag
-  // says what it is. Asked only when its own prototype is not a user class: a class instance keeps its data in its own
-  // fields, whatever tag it names or built-in it extends (an EventTarget subclass), and is taken (INSTANCES).
-  if (!userClass(p)) {
+  // says what it is. Asked when the nearest prototype that is not a class the program wrote is such a built-in
+  // (hiddenBase): a program's class over a plain object or an EventTarget keeps its data in its own fields, whatever
+  // tag it names, and is taken (INSTANCES); one over a URLSearchParams is refused as the built-in it is.
+  if (hiddenBase(p) !== null) {
     const tag = tagOf(o)
     if (tag !== 'Object') return `${an(tag)} (${hintOf(tag)})`
   }

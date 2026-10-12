@@ -885,6 +885,34 @@ test('a built-in that keeps its data out of sight is refused by its tag; a class
   await h.destroy()
 })
 
+//! the last check: a class the program wrote over a built-in that hides its data (URLSearchParams, Headers, Blob,
+// WeakRef) was taken as {}, silently, on every copy; an async generator was told [...it], which throws; an iterator
+// helper got the generic words; the rule ran a class's static `name` getter. The nearest built-in up the chain decides.
+test('a class over a built-in that hides its data is refused as that built-in; the hints name what works', async () => {
+  const h = harness()
+  class Params extends URLSearchParams { extra = 1 }
+  class Deeper extends Params {}
+  class MyHeaders extends Headers {}
+  class MyBlob extends Blob {}
+  class Ref extends WeakRef<object> {}
+  async function* agen() { yield 1 }
+  const refused: [string, unknown, string][] = [
+    ['a URLSearchParams', new Params('a=1'), 'send Object.fromEntries(it)'], ['a URLSearchParams', new Deeper('a=1'), 'send Object.fromEntries(it)'],
+    ['a Headers', new MyHeaders({ a: '1' }), 'send Object.fromEntries(it)'], ['a Blob', new MyBlob(['x']), 'it keeps its data where fero cannot see it'],
+    ['a WeakRef', new Ref({}), 'it keeps its data where fero cannot see it'],
+    ['an AsyncGenerator', agen(), 'send await Array.fromAsync(it)'], ['an Iterator Helper', [1, 2].values().map((x) => x * 2), 'send [...it]'],
+  ]
+  for (const [kind, v, hint] of refused)
+    assert.throws(() => { h.bind.data.x = { v } }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["x"] cannot be sent: ${kind} (${hint}`) && e.message.includes(') at v'), kind)
+  //! a class whose static `name` is a getter is a class like any other: taken, the getter never run
+  let ran = 0
+  class Odd { n = 1; static get name() { ran++; return 'Odd' } }
+  h.bind.data.o = { v: new Odd() }
+  assert.deepEqual([snapshot(h.bind.data).o, ran], [{ v: { n: 1 } }, 0])
+  assert.equal(h.jk(JK.writeLocal).length, 1, 'only the class instance was stamped')
+  await h.destroy()
+})
+
 //! the fix check: no test reached a write taken after three passes (a part copy, the walk, the whole copy), and a
 // mutant that kept the program's object there passed every test. At a 16 MiB frame cap the budget is 15 MiB and the
 // share 960 KiB: a value just past the share is taken as fero's own copy, its getter run three times; one whose third
