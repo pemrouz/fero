@@ -687,11 +687,13 @@ const inLane = (n: Node, origin: string, seq: number): boolean => {
 //! A spoke of a SCOPED feeder covers nothing per event either (wave 6a, 2026-10-12): its copy of each lane is the
 // feeder's held subset, sparse by design, and an interior record lawfully lands at any time — the feeder forwards
 // what it folds through the latch (kernel/scope.ts onAcqDone), a partition's history in lane order, one frame per
-// contiguous run, so a write and its later remove on one lane arrive in two events while the spoke's fence already
-// sits above both (other partitions' records raised it). The kernel's own client leg says the same (write.ts #splice:
-// a scoped feeder re-forwards out of seq order), so the applied watermark there is a dedup fence, not a claim on what
-// is below it. The spoke's oracle is M12 (spokeMirror) at the quiet point, cell for cell against its feeder — which
-// M1's horizon form, M3 and M6 judge. An UNSCOPED spoke's applied is still coverage: its feeder shows it whole lanes.
+// contiguous run, so an older value of a row and its later remove on one lane arrive in separate events while the
+// spoke's fence already sits above both (other partitions' records raised it): the row shows for as many events as
+// there are frames between them (A12 seeds 2, 4 and 5 under the old reading; seed 4 showed p27 at two older stamps in
+// two events before its remove). The kernel's own client leg says the same (write.ts #splice: a scoped feeder
+// re-forwards out of seq order), so the applied watermark there is a dedup fence, not a claim on what is below it. The
+// spoke's oracle is M12 (spokeMirror) at the quiet point, cell for cell against its feeder — which M1's horizon form,
+// M3 and M6 judge. An UNSCOPED spoke's applied is still coverage: its feeder shows it whole lanes.
 const covers = (n: Node, origin: string, p: string): number =>
   n.armed ? (n.streams.get(origin)?.parts?.get(p)?.s ?? 0) : n.client && (n.resync !== null || n.feederScoped) ? 0 : (n.streams.get(origin)?.applied ?? 0)
 const isRemove = (rec: Rec) => rec.type === REC.remove
