@@ -632,6 +632,11 @@ export const drained = (sim     )                => {
 //                      the way. Not one of the record's nine; added when the sweep found it (A11).
 //                      Fixed 2026-10-10: a client's r=1 carries `q`, the reply echoes it, the end is a
 //                      reply whose q is at or above the resync's own (kernel/node.ts `resync`).
+//   M12 spoke-mirror   (horizon, spokes)         a spoke of a scoped cluster shows its feeder's HELD subset, cell for
+//                      cell by value (`spokeMirror`, wave 6a 2026-10-12). The one oracle that compares a spoke to its
+//                      feeder: a row the feeder folded through the latch and never tapped was missing at every spoke
+//                      and nothing fired. `spokeStale` counts the other direction (rows of partitions that moved OFF
+//                      the feeder, which the spoke keeps) without judging it.
 //   M11 resync-behind  (at each resync end, spokes) the FOLD form of M10, read from the kernel at the
 //                      end (n.state, n.versions, the log), not from the screen: when a spoke's resync
 //                      ends, every row it held at the reset that its feeder still holds (in the feeder's
@@ -679,8 +684,18 @@ const inLane = (n      , origin        , seq        )          => {
 // #splice, the client leg). The screen lawfully shows a row at an older stamp until its newer record lands —
 // the re-download flicker, a design property noted in STATUS — and M1 would read that as a resurrection.
 // Coverage returns with the end (#resyncEnd), where M10 and M11 judge the result.
+//! A spoke of a SCOPED feeder covers nothing per event either (wave 6a, 2026-10-12): its copy of each lane is the
+// feeder's held subset, sparse by design, and an interior record lawfully lands at any time — the feeder forwards
+// what it folds through the latch (kernel/scope.ts onAcqDone), a partition's history in lane order, one frame per
+// contiguous run, so an older value of a row and its later remove on one lane arrive in separate events while the
+// spoke's fence already sits above both (other partitions' records raised it): the row shows for as many events as
+// there are frames between them (A12 seeds 2, 4 and 5 under the old reading; seed 4 showed p27 at two older stamps in
+// two events before its remove). The kernel's own client leg says the same (write.ts #splice: a scoped feeder
+// re-forwards out of seq order), so the applied watermark there is a dedup fence, not a claim on what is below it. The
+// spoke's oracle is M12 (spokeMirror) at the quiet point, cell for cell against its feeder — which M1's horizon form,
+// M3 and M6 judge. An UNSCOPED spoke's applied is still coverage: its feeder shows it whole lanes.
 const covers = (n      , origin        , p        )         =>
-  n.armed ? (n.streams.get(origin)?.parts?.get(p)?.s ?? 0) : n.client && n.resync !== null ? 0 : (n.streams.get(origin)?.applied ?? 0)
+  n.armed ? (n.streams.get(origin)?.parts?.get(p)?.s ?? 0) : n.client && (n.resync !== null || n.feederScoped) ? 0 : (n.streams.get(origin)?.applied ?? 0)
 const isRemove = (rec     ) => rec.type === REC.remove
 
 export class Ledger {
@@ -1159,8 +1174,13 @@ const resyncEnd = {
 // one at or below d[lane] was shipped before the reply and must have landed — the one exact line, where "on the
 // wire" would excuse the re-download itself behind a stale reply. For every cell of `old` (the kernel's set of
 // cells held at the reset) whose live version at the feeder is in the feeder's log, for a partition the feeder
-// holds (an armed feeder ships a spoke only its held subset), at or below the reply's tail for its lane, the
-// spoke must contain-or-cover that record: in its log, or a version at the cell or an ancestor at or above it.
+// FEEDS a spoke (Scope.feeds, wave 6a: held, or acquiring from a held base or from nothing — the answer ships those,
+// so their rows are judged too; an orphan's frozen copy and a re-entry from one are withheld, so theirs are not), at
+// or below the reply's tail for its lane, the spoke must contain-or-cover that record: in its log, or a version at the
+// cell or an ancestor at or above it. A latch fold between the reply's build and the end puts a record at or below the
+// tail into the feeder's lane that the answer did not ship: M11 fires on it, rightly — the spoke's fold IS behind, the
+// ghost sweep took the row and only the fold's forward brings it back (the KNOWN vanish-and-return in
+// sim/scale-probes.test.ts).
 // Fails at a stale end: the ghost sweep removed rows the feeder holds, and the rows the re-download then re-applies
 // land at older stamps first. Reads the kernel only (n.state, n.versions, the log — not the screen, and only at
 // the end); nothing here moves a trajectory. The screen against the kernel is `screenMatches` at the horizon.
@@ -1183,7 +1203,7 @@ const resyncBehind = {
         const vF = F.versions.get(cell)
         if (vF === undefined || !F.state.has(cell) || vF.seq > (D[vF.origin] ?? 0) || !inLane(F, vF.origin, vF.seq)) continue
         const path = JSON.parse(cell)            
-        if (F.armed && !F.scope .held(path[0])) continue
+        if (F.armed && !F.scope .feeds(path[0])) continue
         L.counts.resyncRows++
         const e = L.recs.get(vF.origin + '|' + vF.seq)
         if (e === undefined || containsOrCovers(L, n, e)) continue
@@ -1338,6 +1358,67 @@ export const marksAgree = (sim     , counts                    )                
   }
   return null
 }
+
+//! spokeMirror — M12 (wave 6a, 2026-10-12): the oracle for a spoke of a SCOPED cluster. At a quiet point the spoke
+// shows its feeder's held subset, cell for cell: every cell of every partition its feeder HOLDS is at the spoke with
+// the feeder's value (stable(): NaN-aware, bytes-aware), and the spoke shows no cell of such a partition that the
+// feeder does not. Read from the kernel (n.state), never the screen (that is screenMatches). Why a spoke needed its
+// own oracle: no check compared a spoke to anyone — scopedConverged ranges over holders, stampOracle skips a spoke of
+// a scoped cluster (it sees a subset), the per-event M1 checks only what a spoke SHOWS against its fence, M10/M11
+// judge a resync's end and M11 only the rows held at the reset — so a row a feeder learnt through the latch and never
+// tapped was missing at its spokes on every seed and no monitor fired (STATUS's two sightings; the wave-5e review's
+// probe P2). A spoke still in resync at the quiet point is reported (the point should have ended it); a spoke with no
+// feeder, or whose feeder is not armed, is skipped. `counts` is the non-vacuity row: the (spoke, partition) pairs and
+// the cells compared. The spoke's cells of partitions the feeder does NOT hold are not judged here — `spokeStale`
+// below counts them: a partition that moved OFF the feeder (a join: an orphan, then its shed) leaves its rows at the
+// spoke, which nothing tells, an older gap named on STATUS by wave 6a.
+export const spokeMirror = (sim     , id        , counts                                   )                => {
+  const s = sim.nodes.get(id)
+  if (!s || !s.client) return null
+  if (s.resync !== null) return `${id} is still in resync at the quiet point (its ask #${s.resync.q} has no reply yet)`
+  if (s.primary === null) return null
+  const fu = s.links.get(s.primary)?.uuid
+  const F = fu !== undefined ? sim.nodes.get(fu) : undefined
+  if (!F || !F.armed || !F.scope) return null
+  const judged = new Set        ()
+  for (const [k, v] of F.state) {
+    const p = partOfKey(k)
+    if (!F.scope.held(p)) continue
+    if (counts) { counts.cells++; if (!judged.has(p)) { judged.add(p); counts.parts++ } }
+    const vF = F.versions.get(k)
+    const at = vF ? ' @' + stampOf(vF) : ''
+    if (!s.state.has(k)) return `M12: ${id} lacks ${k}, which its feeder ${fu} holds = ${clip(stable(v))}${at} for '${p}', a partition ${fu} holds`
+    if (stable(s.state.get(k)) !== stable(v)) return `M12: ${id} shows ${k} = ${clip(stable(s.state.get(k)))}; its feeder ${fu} holds ${clip(stable(v))}${at}`
+  }
+  for (const k of s.state.keys()) {
+    const p = partOfKey(k)
+    if (!F.scope.held(p) || F.state.has(k)) continue
+    return `M12: ${id} shows ${k} = ${clip(stable(s.state.get(k)))} of '${p}', a partition its feeder ${fu} holds without that cell`
+  }
+  return null
+}
+
+//! spokeStale — the other direction of M12, counted, not judged (wave 6a): the spoke's cells of partitions its feeder
+// does not HOLD now — an orphan at the feeder (frozen: no new record of it reaches the feeder, so none reaches the
+// spoke), or shed (gone from the feeder, kept at the spoke: a shed tells no spoke). Both are rows the spoke keeps
+// showing while the cluster moves on, until a failover's resync wipes them. Returns the count and the first few, with
+// the feeder's entry state for each partition ('orphan', or 'gone' when the feeder has no entry).
+export const spokeStale = (sim     , id        )                                => {
+  const out = { n: 0, some: []             }
+  const s = sim.nodes.get(id)
+  if (!s || !s.client || s.primary === null) return out
+  const fu = s.links.get(s.primary)?.uuid
+  const F = fu !== undefined ? sim.nodes.get(fu) : undefined
+  if (!F || !F.armed || !F.scope) return out
+  for (const k of s.state.keys()) {
+    const p = partOfKey(k)
+    if (F.scope.held(p)) continue
+    out.n++
+    if (out.some.length < 3) out.some.push(`${k} ('${p}' is ${F.scope.entries.get(p)?.state === SCOPE.orphan ? 'an orphan' : 'gone'} at ${fu})`)
+  }
+  return out
+}
+const partOfKey = (k        )         => (JSON.parse(k)            )[0] ?? ''
 
 //! boundedLogs — M8's horizon form (I12): at every armed node every lane holds at most winners + compactAt
 // entries, and every tombstone is fenced (a live row still needs it) or pinned by a named uuid. No pin surface

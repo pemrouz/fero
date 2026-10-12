@@ -2113,7 +2113,9 @@ export class Node {
   // only through the one-teacher latch with its attested cut — the digest only syncs the link (an admit, a drain), and
   // the round that follows it is the repair. A suffix shipped from a ring-filtered walk was the second teacher the H3
   // resurrection needs once compaction runs (stage 3 requires this). A CLIENT link is unchanged: it gets this node's
-  // HELD subset (an orphan's frozen copy is a teacher for holders, never a spoke feed), with each entry's STORED pp.
+  // FED subset (Scope.feeds, wave 6a: everything but an orphan's frozen copy, which is a teacher for holders and never
+  // a spoke feed, and a latch re-entering from one; held() alone skipped a partition being repaired through the latch,
+  // and a spoke that synced then missed its base for good), with each entry's STORED pp.
   //! A TORN ship (the third re-check of stage 2, 2026-10-10; its costs fixed 2026-10-11). The shell steps `pause`
   // inside a send, so this link can pause partway through the ship, and then every further frame waits in the link's
   // bounded queue. The ship never overflows that queue on purpose: when the link is paused and the queue is full it
@@ -2138,7 +2140,7 @@ export class Node {
     let tear                = null // the origin the ship stopped in ('' = the lanes are done, only the reply waits)
     let tearSeq = 0 // and the first seq it did not ship
     if (!this.armed || link.client) {
-      const scopedTo = this.armed ? (p        ) => this.scope .held(p) : null
+      const scopedTo = this.armed ? (p        ) => this.scope .feeds(p) : null
       const run                                                                                                      = []
       lanes: for (const [origin, entries] of this.logs) {
         const theirs = typeof d[origin] === 'number' ? (d[origin]          ) : 0
