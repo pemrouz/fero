@@ -486,7 +486,12 @@ export class Membership {
       // is no such change, so nobody ever opened the ballot that supersedes it: bb `minority`, cc and dd `held`, for
       // good, with cc and dd two of the held view's three (keptBallotProposerGone). The lowest live member re-proposes
       // the view it holds at the next epoch, joint over those holds (#propose), when the ballot CAN commit — its
-      // commit is the supersession of §10.10.2, and nothing new is granted or counted. Guarded like the eviction above.
+      // commit is the supersession of §10.10.2, and nothing new is granted or counted. Guarded like the eviction above,
+      // and only with EVERY member of my view linked (#openOverHolds, the sixth review): an unlinked member is a
+      // membership change in the making — a suspect in suspectTicks ticks, then its eviction, joint over the same holds,
+      // is the ballot (held back while its chain is dialing, as above) — or it is back in a tick. Else a held member's
+      // ask landing in either window re-proposed the FULL view, the lost member included, and the eviction came one
+      // epoch later: safe, one doubled ballot (openerBesideSuspect).
       if (!this.#proposal && !this.epochStale && !this.leaving && this.#heldPeers.size && this.#lowestLive() === node.uuid) this.#openOverHolds(node)
     }
     //! proposal upkeep: re-offer to members that have not voted (idempotent re-grants make this safe and
@@ -1006,12 +1011,15 @@ export class Membership {
   }
 
   //! #openOverHolds — the opener (see tick): the same members at the next epoch, joint over the holds of my view's
-  // linked members, when and only when the ballot can commit — a majority of my view linked COUNTING the held members
-  // (the old and the new set are the same), and a majority of EACH view the ballot is joint over linked, or me. Not for
-  // a hold whose proposer is me: my disown answers that ask in one frame (onPull). Not when some held view's majority
-  // is out of reach — the far side of a cut, the CP shapes of §10.10.4 — where a ballot that cannot commit would only
-  // burn epochs. The epoch starts PAST the holds' epochs: a held voter's vote there is spent on another proposer, so a
-  // ballot at that epoch is refused for sure (and would teach the same by its `ve`, a proposal age later).
+  // linked members, when and only when the ballot can commit and no membership change is in the making — EVERY member
+  // of my view linked (a lost member is a suspect in suspectTicks ticks and its eviction, joint over the same holds, is
+  // the ballot; or it is back in a tick: the sixth review — a majority would do for the commit, and let the opener
+  // re-propose the FULL view with the lost member in it, burning the eviction already in flight on the other side),
+  // and a majority of EACH view the ballot is joint over linked, or me. Not for a hold whose proposer is me: my disown
+  // answers that ask in one frame (onPull). Not when some held view's majority is out of reach — the far side of a
+  // cut, the CP shapes of §10.10.4 — where a ballot that cannot commit would only burn epochs. The epoch starts PAST
+  // the holds' epochs: a held voter's vote there is spent on another proposer, so a ballot at that epoch is refused
+  // for sure (and would teach the same by its `ve`, a proposal age later).
   #openOverHolds(node: Node) {
     const linked = new Set<string>([node.uuid])
     let reachable = 1, freeing = false, past = this.view.epoch
@@ -1023,7 +1031,7 @@ export class Membership {
       const hs = this.#heldPeers.get(l.uuid)
       if (hs) for (const x of hs) if (x.e > this.view.epoch) { past = Math.max(past, x.e); if (x.p !== node.uuid) freeing = true }
     }
-    if (!freeing || reachable * 2 <= this.view.members.length) return
+    if (!freeing || reachable !== this.view.members.length) return
     for (const hh of this.#jointViews(node)) if (!majority(hh.split(','), linked)) return
     this.#propose(node, { epoch: Math.max(this.#nextEpoch(node), past + 1), members: this.view.members })
   }

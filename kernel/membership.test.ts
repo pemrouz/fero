@@ -1300,3 +1300,30 @@ test('the opener (the fifth review, DESIGN-LEAVE §10.10.4): bb, the lowest live
   a.tick()
   assert.deepEqual(a.jk(JK.propose), [], 'mine to disown, not to supersede')
 })
+
+test('the opener waits for a LOST member as the eviction does (the sixth review): aa at view 1 of five loses bb and keeps redialing it; dd\'s ask names a hold on bb\'s {bb,dd,ee}@2 — nothing opens while bb is unlinked but not yet a suspect, nor while it is a suspect whose chain still runs (the eviction is held back by the dialing window of V4-39, and the opener waits with it: a lost member is the membership change, and its eviction is the ballot); the tick after the chain gives up, the eviction of bb opens at 2, joint over {bb,dd,ee} — never the full view again at 3', () => {
+  const h = fiveAt1('aa')
+  h.node.step({ kind: 'linkDown', link: h.link.bb, reason: 'cut' })
+  assert.equal(h.node.dialing('sim:bb'), true, 'a lost member link: the short redial chain runs')
+  h.node.step({ kind: 'bytesIn', link: h.link.dd, bytes: encodeControl(VERB.PULL, { e: 1, vs: [{ e: 2, h: 'bb,dd,ee', p: 'bb' }] }) })
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' }, 'aa, cc and ee: three of five without the held dd')
+  //! the first window: bb unlinked, not yet a suspect — a majority of my view linked would let a ballot commit
+  h.tick()
+  assert.deepEqual(h.jk(JK.suspect), [], 'not yet a suspect')
+  assert.deepEqual(h.jk(JK.propose), [], 'nothing while a member of my view is unlinked: its eviction may be the next ballot')
+  //! the second window: bb a suspect, its chain to it still dialing — the eviction is held back, and so is the opener
+  for (let i = 0; i < h.node.tune.suspectTicks + 1; i++) h.tick()
+  assert.ok(h.jk(JK.suspect).some((e) => e.a === 'bb'), 'bb is a suspect')
+  assert.equal(h.node.dialing('sim:bb'), true, 'still dialing')
+  assert.deepEqual(h.jk(JK.propose), [], 'nothing while the chain to the suspect runs: not the eviction, and not the opener')
+  for (let i = 0; i < 11; i++) {
+    const t = h.of('timer').filter((x) => x[2] === TAG.redial).pop()
+    if (t) h.node.step({ kind: 'timer', id: t[1] as number, tag: TAG.redial })
+    h.node.step({ kind: 'linkDown', link: 900 + i, reason: 'refused', to: 'sim:bb' })
+  }
+  assert.equal(h.node.dialing('sim:bb'), false, 'the chain gave up')
+  h.tick()
+  assert.deepEqual(h.jk(JK.propose).map((e) => [e.a, e.b]), [[2, 4]], 'the eviction of bb is the ballot, at 2')
+  const p = h.sentOn(h.link.dd, VERB.PROPOSE).pop()!.value as { e: number; o: number; j?: string[] }
+  assert.deepEqual([p.e, p.o, p.j], [2, 1, ['bb,dd,ee']], 'joint over dd\'s hold')
+})
