@@ -295,7 +295,7 @@ export class Node {
   // the per-snapshot metadata {floors at build, dirty counters at build} its echo commits.
   #inflightParts = new Map<number, Map<string, Map<string, number>>>()
   #dirty = new Map<string, number>()
-  #snapMeta = new Map<number, { floors: Map<string, Map<string, number>>; clears: Map<string, number> }>()
+  #snapMeta = new Map<number, { floors: Map<string, Map<string, number>>; clears: Map<string, number>; boot: boolean }>()
   //! boot-restored M6 facts (C10): the foldable set of the previous life (held ∪ orphaned — null =
   // record absent / unscoped), the FROZEN half (finding 48: restored orphans re-enter only through
   // the latch, even when the restored ring re-assigns them), and the partitions whose replay floors
@@ -414,6 +414,19 @@ export class Node {
     this.#dirty.set(p, (n ?? 0) + 1)
     this.#walRows = this.tune.snapshotAt // arm: the next heartbeat tick swaps the WAL
     if (n === undefined) this.persistBoot()
+  }
+
+  //! compacted — a compacting pass dropped entries at this ARMED node (kernel/log.ts compactScoped, DESIGN-SCALE
+  // stage 3). Durable bookkeeping: the snapshot swap is armed so the compacted lanes reach disk atomically (the tick
+  // checks the counter right after the pass), and the swap's echo REWRITES THE BOOT RECORD (snapshot() carries the
+  // flag into its meta): replay rebuilds floors from the boot record's seed and then only through chain-verified
+  // rows, and compaction opened pp gaps at or below the frontier — the seed must cover them, or a restore would
+  // chain from a stale seed, stall at the first gap and come back with floors below its content (a re-latch).
+  #compacted = false
+  compacted() {
+    if (!this.durable) return
+    this.#compacted = true
+    this.#walRows = this.tune.snapshotAt
   }
 
   //! replayHeld — the C10 replay classification: is partition p this life's to fold? The boot record
@@ -650,6 +663,7 @@ export class Node {
         // the shed's swap purged — M6-review findings 16/20), and any advance past the possession
         // floor (pe.d ≤ pe.s per instant: durable evidence never exceeds the possession claim).
         const pcov = this.#inflightParts.get(e.batch)
+        let rose = false // a durable floor advanced: the compaction frontier's own term moved (the memo's evidence, stage 3)
         if (pcov) {
           this.#inflightParts.delete(e.batch)
           for (const [origin, parts] of pcov) {
@@ -660,7 +674,7 @@ export class Node {
               if (st !== SCOPE.held && st !== SCOPE.orphan) continue
               const pe = d.part(p)
               const cap = Math.min(maxSeq, pe.s)
-              if (cap > pe.d) pe.d = cap
+              if (cap > pe.d) { pe.d = cap; rose = true }
             }
           }
         }
@@ -678,17 +692,21 @@ export class Node {
               if (st !== SCOPE.held && st !== SCOPE.orphan) continue
               const pe = d.part(p)
               const cap = Math.min(s, pe.s)
-              if (cap > pe.d) pe.d = cap
+              if (cap > pe.d) { pe.d = cap; rose = true }
             }
           }
           let cleared = false
           const sealedNow: string[] = []
           for (const [p, n] of snap.clears) if (this.#dirty.get(p) === n) { this.#dirty.delete(p); cleared = true; sealedNow.push(p) }
-          if (cleared) this.persistBoot()
+          //! the boot record follows a dirty clear, and the echo of a swap a COMPACTING pass armed (DESIGN-SCALE stage
+          // 3, `compacted`): the floor seed now reads the durable floors the swap just proved, above every gap the pass
+          // opened, so a restore chains from it and never re-latches what it holds
+          if (cleared || snap.boot) this.persistBoot()
           //! the SEAL (findings 19/37/46): a dirty-clear proves the disk restores this partition's
           // whole base — a pending ACQDONE attestation gate opens now (announce + boot-list re-entry)
           for (const p of sealedNow) this.scope!.sealed(this, p)
         }
+        if (rose && this.scope !== null) this.scope.evidence++
         j.armed && j.emit(JK.persisted, e.batch)
         this.confirm.recount(this) // own durable advanced — a persisted probe may now have its quorum
         return
@@ -1207,7 +1225,8 @@ export class Node {
         for (const [p, pe] of d.parts) if (pe.s > 0) per.set(p, pe.s)
         if (per.size) floors.set(origin, per)
       }
-      this.#snapMeta.set(batch, { floors, clears: new Map(this.#dirty) })
+      this.#snapMeta.set(batch, { floors, clears: new Map(this.#dirty), boot: this.#compacted })
+      this.#compacted = false
     }
     this.#walRows = 0
     this.journal.armed && this.journal.emit(JK.snapshot, batch, rows.length)
@@ -1238,6 +1257,7 @@ export class Node {
     this.logs.clear()
     this.byPart?.clear()
     this.tombs?.clear()
+    this.scope?.memo.clear() // the compaction memo keyed on lanes that no longer exist
     this.state.clear()
     this.versions.clear()
     this.deep.clear()

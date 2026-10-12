@@ -39,6 +39,7 @@ import { JK } from './journal.ts'
 import { VERB, encodeControl, encodeRuns } from './codec.ts'
 import { partitionOf, type Rec } from './env.ts'
 import { LS, type Link } from './link.ts'
+import { keep, scopedFrontier } from './log.ts'
 import type { Node } from './node.ts'
 
 //! SCOPE: the state discriminants (journal/capture-stable).
@@ -120,8 +121,27 @@ export class Scope {
   // fold compares it per step instead of re-walking the map (tallies drift on plain held-mints, which
   // journal nothing scope-specific).
   n = 0
+  //! evidence (DESIGN-SCALE stage 3) — a counter bumped wherever the compaction frontier's inputs can RISE or a
+  // partition can become compactable: a mark or durable mark raised (onHaveQ, onHaveA), voided (#void), cleared
+  // (rescope), a seal, a fold, a shed, and a durable floor advance at the snapshot or persist echo (node.ts). The
+  // memo below keys a lane's last fruitless pass on (length, evidence), so a lane at compactAt whose frontier is
+  // pinned costs one Map.get per tick until something that could unpin it happens (kernel/log.ts maybeCompact).
+  evidence = 0
+  //! memo — lane → the length and evidence version at its last compaction pass (kernel/log.ts); cleared with the fold
+  memo = new Map<string, { len: number; v: number }>()
 
   #entry(state: number): ScopeEntry { return { state, marks: new Map(), marksD: new Map(), gl: new Set() } }
+
+  //! stableMarks — one peer's CRASH-STABLE attested marks for p (DESIGN-SCALE §4 C3; the shed bar and the drain read
+  // the same ladder): a peer that has announced durable floors for p (HAVEQ `d`, HAVEA `md`), or that confirm has
+  // ever seen a durable digest from, is durable — its durable marks are what its disk restores, and its volatile
+  // marks can overclaim rows a crash eats (the seed-27 resurrection's class). A peer that never has is a memory node:
+  // its crash is a total refold, so its volatile marks are sound. Undefined = nothing attested = 0 everywhere.
+  stableMarks(node: Node, e: ScopeEntry, uuid: string): Map<string, number> | undefined {
+    return e.marksD.has(uuid) || node.confirm.durablePeer(uuid) ? e.marksD.get(uuid) : e.marks.get(uuid)
+  }
+  //! stableMark — one peer's crash-stable floor for (lane o, partition p): the frontier's unit. Absent is 0 and pins.
+  stableMark(node: Node, e: ScopeEntry, uuid: string, o: string): number { return this.stableMarks(node, e, uuid)?.get(o) ?? 0 }
 
   //! held — the api/monitor view: is p live here (folds records, serves reads, attests possession)?
   held(p: string): boolean { return this.entries.get(p)?.state === SCOPE.held }
@@ -210,6 +230,7 @@ export class Scope {
     for (const k of node.versions.keys()) this.#ensure(node, keyPartition(k))
     for (const p of node.byPart!.keys()) this.#ensure(node, p) // the partition census through the index (stage 1): O(partitions), not O(entries)
     const j = node.journal
+    this.evidence++ // the marks clear and partitions change state: the compaction memo re-reads (kernel/log.ts)
     for (const [p, e] of this.entries) {
       const assigned = ring.holdsAny(node.uuid, p, node.replicas)
       e.marks.clear()
@@ -278,7 +299,7 @@ export class Scope {
 
   //! #void — one peer's attestations for one partition are gone: its marks, its durable marks, its gapless bit.
   // Three callers: a rebirth (forget), a release the peer announced (HAVEQ `x`), a `none` answer (HAVEA `x: 1`).
-  #void(e: ScopeEntry, uuid: string) { e.marks.delete(uuid); e.marksD.delete(uuid); e.gl.delete(uuid) }
+  #void(e: ScopeEntry, uuid: string) { e.marks.delete(uuid); e.marksD.delete(uuid); e.gl.delete(uuid); this.evidence++ }
 
   //! #gapless — does this node's CONTENT for p reach its floor on every lane that holds p? (The `g` bit, DESIGN-
   // SCALE stage 2.) Through the per-partition index: each (lane, p) array is ascending, so its tail is its last
@@ -494,6 +515,7 @@ export class Scope {
     const gset = Array.isArray(v.g) ? new Set(v.g) : null
     const dmap = typeof v.d === 'object' && v.d !== null ? v.d : null
     const a: Record<string, Answer> = {}
+    let rose = false // a mark or durable mark rose: the compaction frontier may have moved (the memo's evidence)
     for (const [p, asked] of Object.entries(v.q)) {
       const e = this.entries.get(p)
       //! feed marks: the asker possesses what it declares (frozen or live, floors are sound claims)
@@ -501,12 +523,12 @@ export class Scope {
         let per = e.marks.get(link.uuid)
         if (!per) { per = new Map(); e.marks.set(link.uuid, per) }
         let attested = false
-        for (const [o, s] of Object.entries(asked)) if (typeof s === 'number') { attested = true; if (s > (per.get(o) ?? 0)) per.set(o, s) }
+        for (const [o, s] of Object.entries(asked)) if (typeof s === 'number') { attested = true; if (s > (per.get(o) ?? 0)) { per.set(o, s); rose = true } }
         const dd = dmap?.[p]
         if (typeof dd === 'object' && dd !== null) {
           let perD = e.marksD.get(link.uuid)
-          if (!perD) { perD = new Map(); e.marksD.set(link.uuid, perD) }
-          for (const [o, s] of Object.entries(dd)) if (typeof s === 'number' && s > (perD.get(o) ?? 0)) perD.set(o, s)
+          if (!perD) { perD = new Map(); e.marksD.set(link.uuid, perD); rose = true }
+          for (const [o, s] of Object.entries(dd)) if (typeof s === 'number' && s > (perD.get(o) ?? 0)) { perD.set(o, s); rose = true }
         }
         //! the gapless bit is last-value, judged only on an attestation (a pure probe `{}` says nothing about content)
         if (attested) { if (gset?.has(p)) e.gl.add(link.uuid); else e.gl.delete(link.uuid) }
@@ -543,6 +565,7 @@ export class Scope {
       }
       a[p] = ans
     }
+    if (rose) this.evidence++
     if (Object.keys(a).length) {
       link.ship(encodeControl(VERB.HAVEA, { e: node.epoch, a }), node.env.sink, j)
       link.flush(node.env.sink, j)
@@ -561,6 +584,7 @@ export class Scope {
     }
     const ring = node.writes.ring
     if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+    let rose = false // a mark or durable mark rose: the compaction frontier may have moved (the memo's evidence)
     for (const [p, ans] of Object.entries(v.a)) {
       const e = this.entries.get(p)
       //! `x: 1` — none: the answerer neither holds nor is assigned p; whatever it attested for p here is a stale pin
@@ -569,11 +593,11 @@ export class Scope {
       if (ans.ok === 1 && e) {
         let per = e.marks.get(link.uuid)
         if (!per) { per = new Map(); e.marks.set(link.uuid, per) }
-        for (const [o, s] of Object.entries(ans.m ?? {})) if (typeof s === 'number' && s > (per.get(o) ?? 0)) per.set(o, s)
+        for (const [o, s] of Object.entries(ans.m ?? {})) if (typeof s === 'number' && s > (per.get(o) ?? 0)) { per.set(o, s); rose = true }
         if (ans.md) {
           let perD = e.marksD.get(link.uuid)
-          if (!perD) { perD = new Map(); e.marksD.set(link.uuid, perD) }
-          for (const [o, s] of Object.entries(ans.md)) if (typeof s === 'number' && s > (perD.get(o) ?? 0)) perD.set(o, s)
+          if (!perD) { perD = new Map(); e.marksD.set(link.uuid, perD); rose = true }
+          for (const [o, s] of Object.entries(ans.md)) if (typeof s === 'number' && s > (perD.get(o) ?? 0)) { perD.set(o, s); rose = true }
         }
         if (ans.g === 1) e.gl.add(link.uuid); else e.gl.delete(link.uuid)
         //! the ASKER-BEHIND leg: the answerer's echoed floors exceed ours on a partition that is OURS
@@ -605,6 +629,7 @@ export class Scope {
         }
       }
     }
+    if (rose) this.evidence++
     node.confirm.recount(node) // attested marks are scoped confirm evidence
     this.evaluateSheds(node)
   }
@@ -654,25 +679,48 @@ export class Scope {
     //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p, only its
     // entries — the ship is O(entries of p), not O(entries of the node). Lane order is node.logs order,
     // as before, so the frames leave in the same order they always did.
+    //! THE TEACHER SHIPS EXACTLY WHAT COMPACTION KEEPS (DESIGN-SCALE stage 3, §4): above the learner's marks, each
+    // entry passes the one keep() predicate of kernel/log.ts — the lane's last entry, anything above this node's
+    // frontier for (lane, p), or its cell's winner — so the learner's fold equals this node's state whether or not a
+    // pass has run here yet. The learner is a current holder that attests nothing while it acquires, so in stage 3
+    // the frontier it pins at 0 makes keep() pass everything above its marks (what a teach always shipped); the
+    // filter bites in stage 4, when a released cell's entry is no winner and must reach nobody.
     const per = node.byPart!.get(p)
-    for (const origin of node.logs.keys()) {
+    const logs = node.logs
+    for (const [origin, lane] of logs) {
       const entries = per?.get(origin)
       if (entries === undefined) continue
       const above = marks[origin] ?? 0
       let lo = 0, hi = entries.length
       while (lo < hi) { const mid = (lo + hi) >>> 1; if (entries[mid].seq <= above) lo = mid + 1; else hi = mid }
       if (lo === entries.length) continue
-      const ship = lo === 0 ? entries : entries.slice(lo)
+      const f = scopedFrontier(node, origin, p)
+      const tail = lane[lane.length - 1]
+      const runs: { rec: Rec; origin: string; seq: number; epoch: number; iss?: string; cid?: number; pp?: number }[] = []
+      for (let i = lo; i < entries.length; i++) {
+        const x = entries[i]
+        if (!keep(node, origin, x, f, x === tail)) continue
+        runs.push({ rec: x.rec, origin, seq: x.seq, epoch: x.epoch, iss: x.iss, cid: x.cid, pp: x.pp })
+      }
+      if (!runs.length) continue
       //! stored pp rides the teach (the floor law): the learner's post-fold lane re-ships to OTHERS
       // with intact chain evidence. The fold itself trusts the CUT, not the chain. Cut at this node's frame cap
       // (V4-51): ACQDONE's n counts records, so cut frames change nothing at the learner, and a clear mid-teach still
       // aborts its latch ('torn') and the partition is offered again.
-      const runs = ship.map((x) => ({ rec: x.rec, origin, seq: x.seq, epoch: x.epoch, iss: x.iss, cid: x.cid, pp: x.pp }))
       for (const bytes of encodeRuns(runs, VERB.ACQ, true, node.tune.frame)) link.ship(bytes, node.env.sink, j)
-      n += ship.length
+      n += runs.length
     }
     const cut = this.#myFloors(node, p)
-    link.ship(encodeControl(VERB.ACQDONE, { p, e: node.epoch, t: cut, n }), node.env.sink, j)
+    //! `w` (DESIGN-SCALE stage 3, §4 "the dedup window"): this node's dedup-window entries for p, as [issuer, cid, seq,
+    // epoch, lane] tuples, so a from-zero learner dedups a retry whose original commit compaction dropped here (a
+    // loser that carried an attempt identity feeds no window once it is gone from the lane): after an owner move the
+    // new owner dup-acks the issuer's retry with the ORIGINAL coordinates instead of re-committing an old value on
+    // top of a newer one (A9). The lane rides along (the stage-1 review's K1: a dup WACK must name it). Bounded by
+    // the window (dedupKeep × issuers); omitted when the window holds nothing of p.
+    const w = node.writes.windowOf(p)
+    const done: { p: string; e: number; t: Record<string, number>; n: number; w?: (string | number)[][] } = { p, e: node.epoch, t: cut, n }
+    if (w.length) done.w = w
+    link.ship(encodeControl(VERB.ACQDONE, done), node.env.sink, j)
     link.flush(node.env.sink, j)
     j.armed && j.emit(JK.teachShip, p, n)
   }
@@ -703,7 +751,7 @@ export class Scope {
   //   lawfully compacted by the teacher); replay the rest through the normal ingest;
   //   then held (durable: after the snapshot swap's echo — never attest what disk can't restore)
   //   and the post-fold round announces possession + trues the floor up.
-  onAcqDone(node: Node, link: Link, v: { p?: string; e?: number; t?: Record<string, number>; n?: number }) {
+  onAcqDone(node: Node, link: Link, v: { p?: string; e?: number; t?: Record<string, number>; n?: number; w?: unknown }) {
     const j = node.journal
     const p = v.p
     if (typeof p !== 'string') return
@@ -768,13 +816,20 @@ export class Scope {
       lane.splice(lo, 0, entry)
       node.indexInsert(s.origin, entry)
       node.apply(s.rec, s.origin, s.seq, s.epoch, s.iss, s.cid)
-      if (s.iss) node.writes.remember(node, s.iss, s.cid!, s.seq, s.epoch, s.origin) // the lane too: a dup WACK from here must name it
+      if (s.iss) node.writes.remember(node, s.iss, s.cid!, s.seq, s.epoch, s.origin, p) // the lane too: a dup WACK from here must name it
       if (taps && !reentry)
         for (const cl of node.clientLinks)
           if (cl.state === LS.admitted && cl.synced && !cl.dead)
             cl.add(s.rec, { origin: s.origin, baseSeq: s.seq, epoch: s.epoch }, s.iss ? { issuer: s.iss, baseCid: s.cid! } : undefined)
     }
     if (taps && reentry) this.#forwardWhole(node, p)
+    //! the teacher's dedup-window tuples for p (`w`, see #teach): a retry whose original commit compaction dropped at
+    // the teacher is still dedup'd here, with its original coordinates and lane
+    if (Array.isArray(v.w))
+      for (const t of v.w)
+        if (Array.isArray(t) && typeof t[0] === 'string' && typeof t[1] === 'number' && typeof t[2] === 'number' && typeof t[3] === 'number')
+          node.writes.remember(node, t[0], t[1], t[2], t[3], typeof t[4] === 'string' && t[4] !== '' ? t[4] : undefined, p)
+    this.evidence++ // a fold: the partition is held now and its floors moved (the compaction memo re-reads)
     //! floors advance to the CUT (the teacher's attestation), never past it on the teacher's word; the scalar fence
     // merges up to the cut so replayed-live below the cut dedups, then to the lane's tail (the lane rule, below)
     for (const [o, c] of Object.entries(cut)) {
@@ -859,6 +914,7 @@ export class Scope {
     const e = this.entries.get(p)
     if (!e || e.sealed !== false) return
     e.sealed = true
+    this.evidence++ // a sealed base may compact now (C1)
     if (node.durable) node.persistBoot()
     this.round(node, undefined, new Set([p])) // the sealed round, to p's holders only (DESIGN-SCALE stage 2)
     node.confirm.recount(node)
@@ -917,7 +973,9 @@ export class Scope {
       if (lanes.length) // no content anywhere: a true husk sheds at once
         for (const holder of ring.holders(p, node.replicas)) {
           if (holder === node.uuid) { covered = false; break } // still assigned?! never shed our own duty
-          if (!covers(e.marks.get(holder), lanes)) { covered = false; break }
+          //! on CRASH-STABLE marks (DESIGN-SCALE stage 3, §4): a durable holder counts at its durable floors — what
+          // its disk restores — never at the volatile ones a crash before the fsync would take with it
+          if (!covers(this.stableMarks(node, e, holder), lanes)) { covered = false; break }
         }
       if (!covered) continue
       //! the release rides to p's CURRENT holders as HAVEQ `x` (DESIGN-SCALE stage 2): the marks this orphan's
@@ -966,7 +1024,7 @@ export class Scope {
         const link = id === undefined ? undefined : node.links.get(id)
         if (!link || link.state !== LS.admitted || link.dead) continue
         reachable = true
-        if (!covers(e.marks.get(holder), lanes)) { behind = true; break }
+        if (!covers(this.stableMarks(node, e, holder), lanes)) { behind = true; break } // the shed bar's ladder (crash-stable)
       }
       if (behind) waiting++
       else if (!reachable) stranded++
@@ -982,6 +1040,7 @@ export class Scope {
     let dropped = 0
     this.entries.delete(p)
     this.n++
+    this.evidence++ // lanes are filtered: the compaction memo re-reads them
     if (node.durable) node.persistBoot()
     //! through the per-partition index (DESIGN-SCALE stage 1): only the lanes that hold p are touched, and
     // each of those is filtered whole (a lane is an array, so taking entries out of it is O(that lane)
@@ -1123,7 +1182,7 @@ export class Scope {
       if (e.state !== SCOPE.orphan) continue
       const lanes = Object.entries(e.tails ??= this.#tailsOf(node, p))
       for (const holder of ring.holders(p, node.replicas)) {
-        if (holder !== node.uuid && !covers(e.marks.get(holder), lanes)) waiting.add(holder)
+        if (holder !== node.uuid && !covers(this.stableMarks(node, e, holder), lanes)) waiting.add(holder)
       }
     }
     return [...waiting]
