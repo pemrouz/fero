@@ -1019,7 +1019,11 @@ export class Membership {
   // answers that ask in one frame (onPull). Not when some held view's majority is out of reach — the far side of a
   // cut, the CP shapes of §10.10.4 — where a ballot that cannot commit would only burn epochs. The epoch starts PAST
   // the holds' epochs: a held voter's vote there is spent on another proposer, so a ballot at that epoch is refused
-  // for sure (and would teach the same by its `ve`, a proposal age later).
+  // for sure (and would teach the same by its `ve`, a proposal age later). The trigger reads my linked members' holds
+  // and not my own (the joint set below reads both): a hold of mine is for another proposer's ballot, and that proposer
+  // is a linked member (my ask reaches it), a lost member (a suspect: its eviction is the joint ballot, and I wait for
+  // it), or no member of mine (then its view is above mine, and a linked member of mine that installed it tells me on
+  // my ask) — so my own holds never need the opener (§10.10.4, the seventh review).
   #openOverHolds(node: Node) {
     const linked = new Set<string>([node.uuid])
     let reachable = 1, freeing = false, past = this.view.epoch
