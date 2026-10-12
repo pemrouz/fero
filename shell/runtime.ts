@@ -188,7 +188,7 @@ const heldError = (who: string, dir: string, h: Holder, why: Why): DirHeld =>
     ? `${who}: dir ${dir} is held by this process already (pid ${h.pid} on ${h.host}); one dir is one node: stop the fero that holds it first, or give this one a dir of its own`
     : `${who}: dir ${dir} is held by another process — pid ${h.pid} on ${h.host}; one dir is one node: stop that process first, or give this one a dir of its own${
       why === 'elsewhere' ? ` (a lock from another machine is never taken over: remove ${path.join(dir, LOCK)} by hand once that machine is gone)`
-      : why === 'ns' ? ' (a container on this kernel: it still touches its lock)' : ''}`), { code: 'dir-held' as const, pid: h.pid, host: h.host })
+      : why === 'ns' ? ' (a process in another pid namespace on this kernel: it still touches its lock)' : ''}`), { code: 'dir-held' as const, pid: h.pid, host: h.host })
 const UNKNOWN: Holder = { pid: 0, host: HOST, boot: BOOT, ns: NS, start: null }
 const sameHolder = (a: Holder, b: Holder): boolean => a.pid === b.pid && a.host === b.host && a.boot === b.boot && a.ns === b.ns && a.start === b.start
 //! lockDir — take the dir for this process (made if missing); returns the release, which is also run at process exit.

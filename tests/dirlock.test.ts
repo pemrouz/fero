@@ -395,7 +395,7 @@ test('a container restart: the node is pid 1 of its namespace, killed -9, and pi
     assert.ok(await until(() => held!.out.includes('up 1'), 20_000), `c-a never said up (${held.out})`)
     const second = await inNs([CHILD, dir, 'exit'], 'c-b')
     assert.ok(second.out.includes('refused dir-held 1 c-a') && second.code === 2, `c-b was refused naming c-a (${second.out})`)
-    assert.ok(second.out.includes('(a container on this kernel: it still touches its lock)'), second.out)
+    assert.ok(second.out.includes('(a process in another pid namespace on this kernel: it still touches its lock)'), second.out)
     //! and a process on the host opening the container's bind-mounted dir
     const host = fero.spawn(CHILD, [dir, 'exit']); kids.push(host)
     assert.ok(await until(() => host.out.includes('refused') || host.out.includes('up '), 20_000), host.out)
