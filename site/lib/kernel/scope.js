@@ -743,9 +743,20 @@ export class Scope {
     // owner-to-holder frame repaired through the latch; an acquire in a hand-off).
     const taps = node.clientLinks.size !== 0
     const reentry = e.preState === SCOPE.orphan
+    //! THE LANE RULE (wave 6b, 2026-10-12): a lane holds each (origin, seq) ONCE, so the scalar fence (streams.applied)
+    // never sits below the lane's tail. The fast path appends at the tail on `seq > applied` alone (write.ts inbound), and
+    // the teacher ships every entry of p it holds with its OWN floor as the cut — an entry above its floor (a gapped
+    // chain there) arrives above the cut. With the fence raised only to the cut, the same record staged live during the
+    // latch was appended again by the replay below ([3, 5, 7, 7] in the wave-6a review's probe; the forward shipped it
+    // twice), a later re-ship of it a third time, and a record between the cut and it landed out of order. So the fence
+    // rises to the top of what the teacher shipped on each lane (`top`); everything at or under it takes the dual fence
+    // (#splice: present ⇒ dropped, absent ⇒ spliced at its seq, forwarded once). The FLOOR stays at the cut: the fold
+    // attests what the teacher attested, never the chain (the floor law), and the next announce trues it up.
+    const top = new Map                ()
     //! fold the teacher records: insert into lanes at seq position through the LWW election. The
     // teacher walked each lane ascending, so per-lane order is preserved by construction.
     for (const s of teach) {
+      if (s.seq > (top.get(s.origin) ?? 0)) top.set(s.origin, s.seq)
       const lane = node.logFor(s.origin)
       let lo = 0, hi = lane.length
       while (lo < hi) { const mid = (lo + hi) >>> 1; if (lane[mid].seq < s.seq) lo = mid + 1; else hi = mid }
@@ -764,8 +775,8 @@ export class Scope {
             cl.add(s.rec, { origin: s.origin, baseSeq: s.seq, epoch: s.epoch }, s.iss ? { issuer: s.iss, baseCid: s.cid  } : undefined)
     }
     if (taps && reentry) this.#forwardWhole(node, p)
-    //! floors and fences advance to the CUT (the teacher's attestation), never past it on the
-    // teacher's word; the scalar fence merges up so replayed-live below the cut dedups
+    //! floors advance to the CUT (the teacher's attestation), never past it on the teacher's word; the scalar fence
+    // merges up to the cut so replayed-live below the cut dedups, then to the lane's tail (the lane rule, below)
     for (const [o, c] of Object.entries(cut)) {
       if (typeof c !== 'number') continue
       const d = node.streams.for(o)
@@ -774,6 +785,8 @@ export class Scope {
       if (c > d.applied) d.applied = c
       if (c > d.shippable) d.shippable = c
     }
+    //! the fence to the lane's tail (the lane rule above): the fast path below must never append what the fold holds
+    for (const [o, t] of top) { const d = node.streams.for(o); if (t > d.applied) d.applied = t }
     const live = e.buf .filter((s) => s.live)
     e.state = SCOPE.held
     this.n++
@@ -793,7 +806,8 @@ export class Scope {
     if (node.durable) e.sealed = false
     j.armed && j.emit(JK.acquire, p, teach.length, link.uuid)
     //! replay the staged live span through the NORMAL ingest law (held now): ≤ cut discards as
-    // covered; above-cut folds/splices, feeds dedup windows, and forwards to spokes — pp intact
+    // covered; above-cut folds/splices, feeds dedup windows, and forwards to spokes — pp intact; a record the fold
+    // already holds (a teacher entry above the cut) is under the fence now and drops as present (the lane rule)
     for (const s of live) {
       if (s.seq <= (cut[s.origin] ?? 0)) continue
       node.writes.inbound(node, s.origin, s.seq, s.epoch, { rec: () => s.rec, issuer: s.iss ?? '', cid: s.cid ?? 0, pp: s.pp })

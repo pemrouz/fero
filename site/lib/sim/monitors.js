@@ -37,6 +37,7 @@ import { foldInto,             } from './fold.js'
 //   one-view-per-epoch      LOCAL   the node's view, into a first-seen-per-epoch memory
 //   epoch-monotone          LOCAL   the node's epoch, against its own last
 //   log-monotone            LOCAL   the node's lane tails, by cursor
+//   lane-unique             LOCAL   the node's lanes, by tail identity (the whole lane when the last entry moved or the array changed)
 //   single-writer           LOCAL   the node's lane tails, into a writer-per-(partition, epoch) memory
 //   attempt-exactly-once    LOCAL   the node's lane tails, into a commit-per-attempt memory
 //   watermark-monotone      LOCAL   the node's applied marks, against its own last
@@ -173,6 +174,55 @@ export const perEvent = () => [
         }
         return null
       })
+    })(),
+  },
+  {
+    //! THE LANE RULE (wave 6b, 2026-10-12): a lane holds each (origin, seq) ONCE — what stage 3's compaction will assume
+    // when it rewrites a lane (a seq held twice is a winner beside its own copy, and the per-partition index holds both).
+    // log-monotone proves it for the tail it scans (strictly ascending ⇒ no repeat), but it scans from the length it
+    // last saw, so a copy an interior insert puts BELOW that length is outside its window. This monitor keeps the entry
+    // it last saw at the tail: while that entry is still at that index the lane only grew at the end and the new tail is
+    // scanned; otherwise (an interior insert moved it, a replaced array) the whole lane is. The scan is STRICTLY
+    // ASCENDING over every pair it reads (`<=`, the same test as log-monotone's), not "equal neighbours": a lane that is
+    // strictly ascending holds each seq once, wherever a copy sits. An equal pair is named as the repeat it is; a lesser
+    // one as an entry out of place — which is what a copy put anywhere but beside its original reads as ([l0, l2', l1,
+    // l2]: `l1 after l2'`). The 2026-10-12 review's probe showed `===` alone misses such a copy, and no other monitor
+    // reads a lane's interior. Found by the wave-6a review: the fold spliced a teacher record above the cut and the
+    // live replay appended it again (lane bb at aa [3, 5, 7, 7]); fixed in kernel/scope.ts onAcqDone (the fence rises
+    // to the fold's top). Counted: `counts.pairs` is the neighbouring pairs compared, `counts.lanes` the lane scans
+    // (laneUniqueCounts reads them). The limit (the third review, 2026-10-12): an in-place rewrite that keeps the
+    // array, its length AND its last entry is seen by no per-event monitor — the tail stands, so the lane is not read
+    // again — so a rewrite of a lane must replace the array (compact() builds a new one) or bring its own check.
+    ...(() => {
+      const counts = { lanes: 0, pairs: 0 }
+      const tails = new Map                                                                               ()
+      const due = new Due()
+      return {
+        name: 'lane-unique',
+        counts,
+        check: (sim     )                => due.walk(sim, (id, n) => {
+          let per = tails.get(id)
+          if (per === undefined) { per = new Map(); tails.set(id, per) }
+          for (const [origin, entries] of n.logs) {
+            let prev = per.get(origin)
+            if (prev === undefined || prev.node !== n || prev.arr !== entries) { prev = { node: n, arr: entries, len: 0, last: undefined }; per.set(origin, prev) }
+            const tailStands = prev.len > 0 && prev.len <= entries.length && entries[prev.len - 1] === prev.last
+            if (tailStands && entries.length === prev.len) continue
+            const from = tailStands ? prev.len : 1
+            counts.lanes++
+            counts.pairs += Math.max(0, entries.length - from)
+            for (let i = from; i < entries.length; i++) {
+              if (entries[i].seq === entries[i - 1].seq)
+                return `${id} lane ${origin} holds seq ${entries[i].seq} TWICE (at ${i - 1} and ${i}; epochs ${entries[i - 1].epoch} and ${entries[i].epoch}) — the lane rule`
+              if (entries[i].seq < entries[i - 1].seq)
+                return `${id} lane ${origin} holds seq ${entries[i].seq} OUT OF PLACE at ${i}: after ${entries[i - 1].seq} (a copy away from its original, or a misplaced insert) — the lane rule`
+            }
+            prev.len = entries.length
+            prev.last = entries.length ? entries[entries.length - 1] : undefined
+          }
+          return null
+        }),
+      }
     })(),
   },
   {
@@ -349,6 +399,13 @@ export const perEvent = () => [
     })(),
   },
 ]
+
+//! laneUniqueCounts — the lane rule's non-vacuity counts off the Sim's own monitor set (null when perEvent() is not
+// installed): `lanes` scans made, `pairs` neighbouring (seq, seq) pairs compared.
+export const laneUniqueCounts = (sim     )                                          => {
+  const m = sim.monitors.find((x) => x.name === 'lane-unique')                                                             
+  return m?.counts ?? null
+}
 
 //! scopedConverged — the R-SCOPED quiescence check (M6): for every partition, every node HOLDING it
 // agrees cell-for-cell. Orphans are deliberately outside the comparison — a frozen copy is lawfully
