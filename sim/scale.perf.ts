@@ -13,9 +13,10 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Sim } from './exec.ts'
 import { cluster, formed, writes } from './harness.ts'
-import { converged } from './monitors.ts'
+import { converged, scopedConverged, exactlyR, boundedLanes } from './monitors.ts'
 import { toyDoor } from './door.ts'
 import { JK } from '../kernel/journal.ts'
+import { REC } from '../kernel/env.ts'
 import type { Node } from '../kernel/node.ts'
 
 const formOnly = (n: number, secured = false): { sim: Sim; nodes: Node[] } => {
@@ -109,4 +110,36 @@ test('wall tripwire: the 100-node headline trajectory (formation + 40 writes, mo
   assert.deepEqual(violations, [])
   assert.ok(formed(nodes) && converged(sim) === null, 'the trajectory is the real one — formed and converged')
   assert.ok(ms < 20_000, `100-node headline trajectory took ${ms.toFixed(0)}ms (ceiling 20,000ms)`)
+})
+
+//! P4 bounded logs (DESIGN-SCALE stage 3, §8): 50,000 updates over 500 cells at n=8 R=3. At the horizon every node
+// holds at most its cells + (compactAt − 1) per lane — the law of the size-armed trigger (kernel/log.ts maybeCompact:
+// a lane under compactAt is never walked, a lane at or over it compacts to its winners under the holders' frontier) —
+// and every lane is within M8's lane half (sim/monitors.ts boundedLanes). Counted, machine-independent; here because it
+// takes about a minute (the writes, not the passes). Measured 2026-10-12: 3,566 entries for 1,500 held cells over the
+// eight nodes, the worst node 311 entries over its cells, with compactAt 128 (the default 4,096 would hide the trigger
+// behind 50,000 writes: 6,250 per owner lane).
+test('counted P4: 50,000 updates over 500 cells at n=8 R=3 leave every node at most its cells + (compactAt − 1) per lane, every lane within winners + compactAt', () => {
+  const sim = new Sim(33)
+  const compactAt = 128
+  const nodes = cluster(sim, 8, { heartbeatMs: 50, replicas: 3, tune: { compactAt }, fault: { delay: [1, 1] } })
+  sim.monitors.length = 0 // a measurement, not a law (the law runs in the scoped sweep on every seed)
+  sim.run({ until: 1500, maxEvents: 5_000_000 })
+  assert.ok(formed(nodes) && nodes.every((n) => n.armed), 'armed')
+  for (let i = 0; i < 50_000; i++) sim.post(nodes[i % 8].uuid, { kind: 'write', recs: [{ type: REC.update, key: ['c' + (i % 500)], value: i }] }, i)
+  sim.run({ until: sim.now + 53_000, maxEvents: 20_000_000 })
+  assert.equal(scopedConverged(sim), null)
+  assert.equal(exactlyR(sim), null)
+  assert.equal(boundedLanes(sim), null, 'every lane at every node within winners + compactAt')
+  let worst = 0, totalEntries = 0, totalCells = 0, passes = 0
+  for (const n of nodes) {
+    let entries = 0, lanes = 0
+    for (const [, lane] of n.logs) if (lane.length) { entries += lane.length; lanes++ }
+    const cells = n.state.size
+    const bound = cells + lanes * (compactAt - 1)
+    assert.ok(entries <= bound, `${n.uuid} holds ${entries} entries over ${lanes} lanes for ${cells} cells: over ${bound}`)
+    worst = Math.max(worst, entries - cells); totalEntries += entries; totalCells += cells; passes += jtotal(sim, JK.compacted)
+  }
+  console.log(`  P4: ${totalEntries} entries for ${totalCells} held cells over 8 nodes after 50,000 updates (worst node ${worst} entries over its cells; ${jtotal(sim, JK.compacted)} compaction passes)`)
+  assert.ok(passes > 0)
 })
