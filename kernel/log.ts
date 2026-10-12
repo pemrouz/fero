@@ -179,7 +179,7 @@ export const keep = (node: Node, o: string, e: LogEntry, f: number, last: boolea
 // b=entries dropped, c=the partitions dropped from — a count, not a name: a pass over a lane holding thousands
 // of partitions would otherwise flood the bounded journal ring with one row each and evict everything else), and
 // the durable snapshot armed (node.compacted) so the compacted lane reaches disk atomically and the boot record's
-// floor seed is rewritten at its echo (replay chains from the seed, and compaction opened pp gaps below it).
+// floor seed is written when that swap is issued (replay chains from the seed, and compaction opened pp gaps below it).
 // Returns the number of entries dropped.
 export const compactScoped = (node: Node, o: string): number => {
   const entries = node.logs.get(o)
