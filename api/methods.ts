@@ -38,7 +38,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { VERB, MAX_DEPTH, encodable, sizeOf, Unsendable } from '../kernel/codec.ts'
 import type { Rec } from '../kernel/env.ts'
 import type { Runtime } from '../shell/runtime.ts'
-import { applyStreamRec, disposeMinted, errText, handlerScope, handlerView, isProxy, mark, proxy, records, snapshot, stopped, type Fault } from './substrate.ts'
+import { applyStreamRec, disposeMinted, errText, handlerScope, handlerView, isProxy, mark, proxy, records, snapshot, stopped, unwrap, type Fault } from './substrate.ts'
 import { atCap, copyBounded, replyCopy, lostAssignment, type Coords, type Refused } from './data.ts'
 import type { ScopedError } from './types.ts'
 import { FULL } from '../kernel/codec.ts'
@@ -431,10 +431,14 @@ export class Host {
   }
 
   //! endLive — end every live sub streaming `proxy` with `reason` (V4-51): the scoped gather's union could not take a
-  // member's share (bigger than one frame), and a live whole read must never show a silent partial (plan §9)
+  // member's share (bigger than one frame), and a live whole read must never show a silent partial (plan §9).
+  // Matched by the handle under the surface, not by identity: a handler's whole read returns ctx.data, the scope
+  // over the surface (V4-54), while the gather's hook passes the surface itself; both unwrap to one handle, and a
+  // derived view (ctx.data.map(…)) unwraps to its own, so its sub streams on.
   endLive(proxy: unknown, reason: unknown) {
+    const handle = unwrap(proxy)
     for (const [skey, sub] of this.#subs) {
-      if (sub.live !== proxy) continue
+      if (sub.live === undefined || unwrap(sub.live) !== handle) continue
       const bar = skey.indexOf('|')
       this.#end(skey, Number(skey.slice(0, bar)), Number(skey.slice(bar + 1)), reason)
     }
