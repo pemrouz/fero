@@ -482,6 +482,21 @@ test('a refusal names the holder that touched: an opener watching a dead contain
   }
 })
 
+//! a thread that cannot start (Node's permission model without --allow-worker): the open throws, and the lock it had
+// claimed goes back with it — a retry in the same process meets the same error, and a process that exits leaves no lock
+const canPermit = spawnSync(process.execPath, ['--permission', '--allow-fs-read=*', '--allow-fs-write=*', '-e', '0'], { stdio: 'ignore' }).status === 0
+test('a lease thread that cannot start gives the lock back: the open throws its own error, a retry in the same process meets that error again (never "held by this process already"), and no lock is left', { skip: !canPermit && 'no --permission here' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-perm-'))
+  try {
+    const r = spawnSync(process.execPath, ['--permission', '--allow-fs-read=*', '--allow-fs-write=*', CHILD, dir, 'retry'], { encoding: 'utf8', timeout: 30_000 })
+    assert.match(r.stdout, /^first ERR_ACCESS_DENIED /m, r.stdout + r.stderr)
+    assert.match(r.stdout, /^second ERR_ACCESS_DENIED /m, `the retry met the thread's own error (${r.stdout})`)
+    assert.equal(lockOf(dir), null, 'no lock is left behind')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 //! the container shapes: the node runs as pid 1 of its own pid namespace (docker, kubernetes, a Fly VM), is killed -9,
 // and the same image restarts as pid 1 again on the same volume; or a recreate gives the new container a new host name
 const NSARGS = ['-Urpf', '--mount-proc'] // a user namespace with root mapped, a new pid namespace, fork, /proc of that namespace

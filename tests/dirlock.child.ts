@@ -13,9 +13,10 @@
 // it enters the block; `touch` opens nothing: it plays a holder in another pid namespace, touching the dir's `lock`
 // every 100 ms until Ctrl-C (the lease); `swap` opens nothing either: it prints `ready`, and 800 ms later puts the record
 // the test left at `lock.next` in place of `lock` (one rename: another heir's takeover) and touches it every 100 ms until
-// Ctrl-C; `two` also takes the lock of a second dir, `<dir>/second`, before it says up
-// (one thread touches both); `release` gives its dir back by a clean destroy() after it is up, prints `released`, and
-// lives on until Ctrl-C. Not a test file (the battery's glob is tests/*.test.ts).
+// Ctrl-C; `two` also takes the lock of a second dir, `<dir>/second`, before it says up (one thread touches both); `release`
+// gives its dir back by a clean destroy() after it is up, prints `released`, and lives on until Ctrl-C; `retry` calls
+// fero() twice and prints what each threw, as `first <code> <message>` and `second <code> <message>` (a thread that cannot
+// start). Not a test file (the battery's glob is tests/*.test.ts).
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -38,6 +39,15 @@ if (mode === 'swap') {
     setInterval(() => { const now = Date.now() / 1000; try { fs.utimesSync(p, now, now) } catch { /* gone */ } }, 100)
   }, 800)
   process.on('SIGINT', () => process.exit(0))
+}
+if (mode === 'retry') {
+  for (const which of ['first', 'second']) {
+    try { await fero('locked', { dir, listen: false }); console.log(`${which} up`) } catch (e) {
+      const err = e as Error & { code?: string }
+      console.log(`${which} ${err.code} ${err.message}`)
+    }
+  }
+  process.exit(0)
 }
 if (mode === 'take-slow') {
   const unlink = fs.unlinkSync

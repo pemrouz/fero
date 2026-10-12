@@ -140,6 +140,7 @@ setInterval(() => {
 `
 let toucher: Worker | null = null
 const touch = (m: { add: string; mine: string } | { remove: string }): void => {
+  if ('remove' in m) { toucher?.postMessage(m); return } // no thread: nothing to tell (a remove never makes one)
   if (toucher === null) {
     const w = new Worker(TOUCHER, { eval: true, execArgv: [], workerData: { TOUCH, LEASE } })
     w.unref()
@@ -269,8 +270,10 @@ export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
   const held = () => {
     locks.set(p, release)
     //! the lease: the toucher thread touches the lock every TOUCH ms for a reader in another pid namespace, from now
-    // until the release — through the WAL replay that follows this call on the main thread
-    touch({ add: p, mine: MINE })
+    // until the release — through the WAL replay that follows this call on the main thread. A thread that cannot start
+    // (Node's permission model without --allow-worker) gives the lock back with its error: a retry in this process then
+    // meets that error again, never 'held by this process already', and an exit leaves no lock behind
+    try { touch({ add: p, mine: MINE }) } catch (e) { release(); throw e }
     if (!exitHooked) { exitHooked = true; process.on('exit', () => { for (const r of [...locks.values()]) r() }) }
     return release
   }
