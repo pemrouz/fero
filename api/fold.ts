@@ -124,8 +124,11 @@ export class Gather {
   // caught: `await data` racing a shed re-gather answered with a partial union).
   #chain: Promise<unknown> = Promise.resolve()
   //! `key` — one row of the union, for keyedRead's handover branch (api/index.ts): its answer is that row's copy, never
-  // the whole union's, so a one-key read is never refused because the whole resource would not fit one frame
-  refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number; key?: string }): Promise<unknown> {
+  // the whole union's, so a one-key read is not refused because the union would not fit one frame. It still gathers
+  // every member's WHOLE share, so a member whose share passes one frame refuses it until the handover ends (STATUS).
+  //! `want: false` — the caller drops the answer (a live tick, a heal, a view install): it is not built. Copying the
+  // whole union for nobody cost a live tick about 5x past the charge (the V4-51/52 review).
+  refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number; key?: string; want?: boolean }): Promise<unknown> {
     const next = this.#chain.then(() => this.#refresh(rt, opts), () => this.#refresh(rt, opts))
     this.#chain = next.catch(() => {}) // the chain never rejects; each caller sees its own outcome
     return next
@@ -135,7 +138,7 @@ export class Gather {
   // answerer's claim set wholesale, then fold. An unreachable member fails the ONE-SHOT caller typed
   // (never a silent partial — plan §5/§9); the LIVE path keeps the last-good claims (parking) and
   // retries on its cadence, which is the availability-honest reading of the same rule.
-  async #refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number; key?: string }): Promise<unknown> {
+  async #refresh(rt: Runtime, opts: { throwOnPartial: boolean; timeoutMs?: number; key?: string; want?: boolean }): Promise<unknown> {
     const node = this.#rt.node
     const gen = ++this.#gen
     const members = node.membership.view.members.map((m) => m[0])
@@ -152,7 +155,9 @@ export class Gather {
     if (tooBig.length) {
       const r: ScopedError = {
         scoped: true, op: 'gather', reason: 'too-large', replicas: node.replicas, missing: tooBig,
-        hint: `the rows ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds are' : 'hold are'} bigger than one frame (${sizeOf(node.tune.frame)}), so the whole-resource read cannot gather them: read one key at a time (methods.read(key))`,
+        hint: opts.key === undefined
+          ? `the rows ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds are' : 'hold are'} bigger than one frame (${sizeOf(node.tune.frame)}), so the whole-resource read cannot gather them: read one key at a time (methods.read(key))`
+          : `the rows ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds are' : 'hold are'} bigger than one frame (${sizeOf(node.tune.frame)}), and this key is changing owner: retry in a moment`,
       }
       this.refused = r
       if (opts.throwOnPartial) throw r
@@ -165,7 +170,7 @@ export class Gather {
       } satisfies ScopedError
     //! superseded mid-flight by a newer refresh — answer a COPY, never the live union root
     // (M6-review finding 8: the one-shot paths hand this value to user code)
-    if (gen !== this.#gen) return answer(this.#pick(opts.key), node)
+    if (gen !== this.#gen) return opts.want === false ? undefined : answer(this.#pick(opts.key), node, opts.key !== undefined)
     //! per-generation attestations: uuid → the partitions that member attests (null = ALL). Built
     // from the answers of THIS generation only — attestation never survives a refresh (findings 0/28/53)
     const att = new Map<string, Set<string> | null>()
@@ -289,12 +294,13 @@ export class Gather {
     // path copies into frame bytes anyway; local must match (V4-52: the very value a client's read
     // decodes — see answer). (The live SUB path hands out `proxy` itself — a read-only projection by
     // contract — and stays as-is.)
-    return answer(this.#pick(opts.key), this.#rt.node)
+    return opts.want === false ? undefined : answer(this.#pick(opts.key), this.#rt.node, opts.key !== undefined)
   }
-  //! #pick — the union's value, or one row of it
+  //! #pick — the union's value, or one row of it: its OWN row only (an absent 'constructor' row is absent, never
+  // Object.prototype's function)
   #pick(key: string | undefined): unknown {
     const all = snapshot(this.proxy) as Record<string, unknown>
-    return key === undefined ? all : all[key]
+    return key === undefined ? all : Object.hasOwn(all, key) ? all[key] : undefined
   }
 
   //! #unvivify — take back the levels a deleted field cell alone had made up (see the projection above).
@@ -330,7 +336,7 @@ export class Gather {
   // Callers compute intervalMs via liveCadence() — never hand a raw heartbeat multiple in here.
   live(intervalMs: number) {
     if (this.#timer) return
-    this.#timer = setInterval(() => { void this.refresh(this.#rt, { throwOnPartial: false }).catch(() => {}) }, intervalMs)
+    this.#timer = setInterval(() => { void this.refresh(this.#rt, { throwOnPartial: false, want: false }).catch(() => {}) }, intervalMs)
     this.#timer.unref?.()
   }
 
@@ -343,9 +349,9 @@ export class Gather {
 //! answer — the gather's one-shot answer as a client's whole read decodes it (V4-52): replyCopy (api/data.ts), a fresh
 // copy like structuredClone was, but the codec's (structuredClone kept a Date a client gets as {}, and threw on a Proxy
 // the wire carries as a plain object), and refused when a reply could not carry it — for size, by its real size
-const answer = (v: unknown, node: Runtime['node']): unknown => {
+const answer = (v: unknown, node: Runtime['node'], keyed = false): unknown => {
   try { return replyCopy(v, node.tune.frame) } catch (e) {
-    if (e instanceof Unsendable && e.over) throw tooLarge('read', node.replicas, node.tune.frame, 'the whole resource')
+    if (e instanceof Unsendable && e.over) throw tooLarge('read', node.replicas, node.tune.frame, keyed ? 'the answer' : 'the whole resource')
     throw new Error(`the result could not be sent: ${(e as Error).message}`)
   }
 }

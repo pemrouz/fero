@@ -808,7 +808,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       // even when no live read keeps the paced re-gather running.
       if (ctx.live) {
         const g = gatherOf()
-        if (g.refused !== null) { void g.refresh(rt, { throwOnPartial: false }).catch(() => {}); throw g.refused }
+        if (g.refused !== null) { void g.refresh(rt, { throwOnPartial: false, want: false }).catch(() => {}); throw g.refused }
         g.live(liveCadence(heartbeatMs))
         return g.proxy
       }
@@ -1041,7 +1041,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         //! M6: a view install re-gathers the LIVE union against the new ring (the Q3a leg) — but
         // ONLY when the gather was ever consumed (M6-review finding 41): `gather` stays null until
         // read()/`await data` materializes it, so an idle scoped cluster pays nothing on churn
-        else if (e.kind === JK.viewInstall && gather) void gather.refresh(rt, { throwOnPartial: false }).catch(() => {})
+        else if (e.kind === JK.viewInstall && gather) void gather.refresh(rt, { throwOnPartial: false, want: false }).catch(() => {})
       }
       if (node.primary !== lastPrimary) {
         lastPrimary = node.primary
@@ -1063,7 +1063,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
           for (const p of Object.keys(snapshotOf(bind.data) as object)) if (!kept.has(p)) { shedEver++; bind.shedPartition(p) }
         }
         //! a lost view install: re-gather against the ring, as the install would have
-        if (gather) void gather.refresh(rt, { throwOnPartial: false }).catch(() => {})
+        if (gather) void gather.refresh(rt, { throwOnPartial: false, want: false }).catch(() => {})
       }
     }
     //! cluster.partitions: ONE O(P) recompute per fold() invocation, AFTER the event loop (M6-review

@@ -687,3 +687,29 @@ test('DRAIN, the verdict rides destroy(): an UNSCOPED pair resolves true on both
     assert.equal((snapshot(nodes[0].cluster) as { me: { undrained: number } }).me.undrained, 0)
   } finally { await Promise.all(nodes.map((n) => n.destroy())) }
 })
+
+//! the fix check: a keyed refresh read the union with `all[key]`, so an absent 'constructor' row answered (or was
+// refused as) Object.prototype's function; a live tick built a whole-union answer nobody reads; a keyed read refused
+// because a member's whole share does not fit told its caller to read one key at a time — it did. Own rows only, no
+// answer for `want: false`, and a keyed caller is told to retry.
+test('a keyed gather reads only its own row, a refresh nobody reads builds no answer, and a keyed read refused for a member\'s share is told to retry', async () => {
+  const { Gather } = await import('./fold.ts')
+  const fake = {
+    uuid: 'self', epoch: 1, armed: true, replicas: 2, tune: { frame: 8192 },
+    membership: { view: { epoch: 1, members: [['self', ''], ['h1', ''], ['h2', '']] } },
+    writes: { ring: { epoch: 1, build: () => {}, holders: () => ['h1', 'h2'] } },
+    scope: { entries: new Map() },
+    versions: new Map(), state: new Map(),
+  }
+  const rows = { c: { [JSON.stringify(['a'])]: { v: { x: 1 }, st: [1, 1, 'h1'] } }, att: ['a'] }
+  let h1: () => Promise<unknown> = async () => rows
+  const g = new Gather({ node: fake } as never, async (uuid: string) => (uuid === 'h1' ? h1() : { c: {}, att: ['a'] }) as never)
+  try {
+    for (const key of ['constructor', 'toString', '__proto__', 'nope'])
+      assert.equal(await g.refresh({ node: fake } as never, { throwOnPartial: true, key }), undefined, key)
+    assert.deepStrictEqual(await g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'a' }), { x: 1 })
+    assert.equal(await g.refresh({ node: fake } as never, { throwOnPartial: false, want: false }), undefined, 'no answer is built for nobody')
+    h1 = async () => { throw { scoped: true, op: 'rows', reason: 'too-large', replicas: 2, hint: 'the answer is bigger than one frame' } }
+    await assert.rejects(g.refresh({ node: fake } as never, { throwOnPartial: true, key: 'a' }), (e: ScopedError) => e.reason === 'too-large' && /this key is changing owner: retry in a moment$/.test(e.hint))
+  } finally { g.destroy() }
+})
