@@ -2147,7 +2147,25 @@ when, and only when, the ballot can commit: a majority of its own view linked CO
 members, and a majority of EACH held view's members linked or itself. Not for a hold whose proposer
 is itself (its disown answers that ask in one frame); nothing where some held view's majority is out
 of reach, so the far side of a cut and the two CP shapes below burn no epochs; nothing while a
-ballot is in flight, so a suspect's eviction (which is joint over the same holds) is never doubled.
+ballot is in flight, and nothing while a member of my view is LOST (the sixth review, 2026-10-12):
+the opener fires only with every member of my view linked. A lost member is a membership change in
+the making — a suspect in `suspectTicks` ticks, and its eviction, joint over the same holds, is the
+ballot; the eviction waits on the dialing hold of V4-39 (the pending-redial window right after a
+heal: an un-exhausted chain means reachability is unknown), and the opener waits with it — or it is
+back in a tick, and the opener fires then over the full view it holds, rightly. A majority linked
+would do for the commit, and before this the opener asked no more: it stood in for an eviction that
+was only HELD BACK or not yet due, not in flight. At n=5 with bb cut from aa and cc, bb proposes
+`{bb,dd,ee}`@2 and dd grants, held; dd's ask lands at aa while bb is aa's lost member — not yet its
+suspect, or a suspect it is still redialing — and aa re-proposes the FULL view, bb included, at 3:
+it commits everywhere, bb's ballot is burned, and bb is evicted again at 4. Safe (no split, the
+quiet point clean), one doubled ballot and one epoch with the lost member back in. With the wait aa
+proposes nothing in either window, and the ballot already in flight wins the duel: ee grants bb and
+`{bb,dd,ee}`@2 commits, aa and cc evicted across the cut (`openerBesideSuspect`, the `fresh` and
+`dialing` variants; the given-up control is the ordinary duel in the same tick — aa `P(2,4)` joint
+over `{bb,dd,ee}`, dd's vote already bb's, both escalate — `{aa,cc,dd,ee}`@3 with bb evicted; the mid
+is aa's proposal list, nothing against `P(2,4)`). In life the windows are `suspectTicks` heartbeats
+and then the give-up jitter between the two ends of a lost member link (both redial, `memberRedials`
+5); in the mesh they are forced.
 It does NOT wait for the opener's own gate to close (the reviewer's sketch had it fire only at a
 `minority` stayer): a held member in a cluster that is writable without it is still a member whose
 writes park and, past the bounded queue, drop, and no membership change may ever come; the ballot is
@@ -2620,3 +2638,28 @@ and a hold whose proposer is me), two steps in existing ones (the malformed hold
 ballot widening nothing), and one in `sim/leave-harness.test.ts` (18 → 19). Every new guard was mutation-checked once
 (the memo twice: never read, never dropped). What the opener costs: one same-members ballot, once, in a shape no
 membership change would reach — and `tick` reads one map size (`#heldPeers`) to know it has nothing to do.
+
+**2026-10-12, the sixth review (the skeptic's second pass, over the five fix commits): ship, one minor — closed
+in the argument (§10.10.4 above), the harness and the kernel, two commits on top.** The opener did not wait on the
+eviction's `dialing` hold-back (V4-39): while the lowest member was still redialing a suspect, a held member's ask
+made it re-propose the FULL view, suspect included, which burned an epoch and undid the suspect's own two-member
+eviction for one epoch before that eviction won again — safe, but the doubled ballot the page said never happens
+(it said "nothing while a ballot is in flight"; here the eviction was held back, not in flight). The pin for it
+found the window wider than the review said: a member whose link is lost is neither linked nor a suspect for
+`suspectTicks` ticks, and in that window a suspect guard (the review's fix, and the first draft here) still let the
+opener fire — the kernel pin's first tick read `P(3,5)`. So the guard is one comparison in `#openOverHolds`:
+`reachable` must be EVERY member of my view, not a majority. A lost member is a membership change in the making
+(a suspect, then its eviction, joint over the same holds, held back while its chain dials) or it is back in a tick;
+either way the opener has nothing to stand in for. Every other case the review's narrower guard covered is already
+stopped: when the eviction fires it sets the proposal, which the opener yields to; when the live set is a minority
+or I am not its lowest, the opener's own checks stop it. Pinned twice: `kernel/membership.test.ts` (49 → 50: aa at
+view 1 of five, bb's link lost and its chain running, dd's ask naming bb's `{bb,dd,ee}`@2 — nothing at the first
+tick with bb not yet a suspect, nothing through `suspectTicks` more with bb a suspect still dialing, then `P(2,4)`
+joint over `{bb,dd,ee}` the tick after the chain gives up) and `sim/leave-harness.test.ts` (19 → 20:
+`openerBesideSuspect` — `fresh` (bb not yet aa's suspect) and `dialing` (a suspect, the chain running): aa proposes
+nothing at the mid, and bb's ballot, already in flight, wins, `{bb,dd,ee}`@2 with aa and cc evicted across the cut;
+the given-up control: `P(2,4)` at the mid, the ordinary duel, `{aa,cc,dd,ee}`@3 with bb evicted; without the guard
+`fresh` and `dialing` read `P(3,5)` at the mid and end at `{aa,cc,dd,ee}`@4, with `{aa,bb,cc,dd,ee}`@3 installed
+everywhere in between). Which side of a cut wins the duel was never the opener's to decide; the guard only stops it
+from entering one. Mutation-checked once (the comparison back to a majority: both pins red, no other). No other pin
+moved.
