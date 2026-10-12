@@ -1232,7 +1232,9 @@ a STATUS line.
 *What moves.* Only scoped trajectories with a spoke whose feeder folds
 through the latch (more frames to the spoke, in the fold's step; the
 sim's random delays are drawn per frame, so the trajectory after the
-first forward shifts). Members are untouched. Unscoped: byte-identical
+first forward shifts), or whose digest is answered while its feeder has
+a partition under repair (the answer now carries that partition's base:
+more frames in the answer, after the review). Members are untouched. Unscoped: byte-identical
 — the golden, the 300-seed sweep, 59,500 and 104,050 stand (sim/scale,
 kernel/node, kernel/scope, kernel/alloc and tests/baseline perf files
 run alone: all pass; no pin moved). The debugger's scopedTenure fixture
