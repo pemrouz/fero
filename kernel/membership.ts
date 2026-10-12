@@ -252,11 +252,21 @@ export class Membership {
     //! the common case first — no vote above the view and nothing behind it, which is every member of a settled
     // cluster — allocates nothing: gate() calls this on every write drain and every inbound write run (kernel/write.ts)
     if (this.votedFor.e <= this.view.epoch && !this.votedFor.prior?.length) return NO_HOLDS
+    //! then the memo: the same vote against the same view is the same answer. A vote above the view that is NO hold
+    // (one apart — the common state after a failed one-member ballot, until the next install) cost a split and a Set
+    // per call without it, five times the fast path on every write drain (the fifth review)
+    const memo = this.#holdsMemo
+    if (memo !== null && memo.vf === this.votedFor && memo.view === this.view) return memo.out
     const out: Vote[] = []
     for (const x of [this.votedFor, ...(this.votedFor.prior ?? [])])
       if (x.e > this.view.epoch && x.p !== node.uuid && x.p !== '' && !x.f && this.#apart(x.h) >= 2) out.push(x)
-    return out
+    this.#holdsMemo = { vf: this.votedFor, view: this.view, out: out.length ? out : NO_HOLDS }
+    return this.#holdsMemo.out
   }
+  //! #holdsMemo — holds() as last computed, good while `votedFor` and `view` are the SAME objects: every grant, every
+  // ballot of my own and every install replace them (#remember, install), so identity is the whole check; the one
+  // in-place change, a disown marking a vote `f` (onNack), drops the memo by hand
+  #holdsMemo: { vf: Vote; view: View; out: readonly Vote[] } | null = null
   held(node: Node): boolean { return this.holds(node).length > 0 }
   //! #jointOk — the commit rule's third majority: of every held view the ballot is joint over. A held view can be
   // live only while a majority of its members may hold it; once a majority of them consent to this ballot it cannot
@@ -728,6 +738,7 @@ export class Membership {
     const hit = [this.votedFor, ...(this.votedFor.prior ?? [])].find((x) => x.e === v.e && x.p === link.uuid && x.h === v.h && !x.f)
     if (!hit) return
     hit.f = 1
+    this.#holdsMemo = null // the one in-place change to a vote: the memo is stale
     node.persistBoot()
     node.journal.armed && node.journal.emit(JK.release, v.e, link.uuid)
     this.#ask(node, 'change')
