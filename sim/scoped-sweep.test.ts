@@ -90,8 +90,12 @@ const RESYNC_SEEDS: Record<string, number[]> = { 'A11-spoke': [2, 5, 6, 10] }
 // them. A7 seed 4 is n=2 R=1 (seeds 1-3 are all R=2): the one shape where the leaver alone holds rows, so the only
 // one on which M9's leave-drain check can bite. With the drain removed it is the seed that goes red (checked
 // 2026-10-10: base tree red=[leave-drain] on seed 4 alone of seeds 1-4; the branch green).
+// A12 seed 3 is the shape on which the spoke keeps rows of partitions that moved off its feeder (6 rows; the known gap the
+// pin below counts): seeds 1 and 2 read 0 since V4-55 moved seed 2's join and leave (it read 1 before), so without it
+// the count is vacuous in a two-seed battery (measured 2026-10-12 on seeds 1-12: 3, 5, 6, 8 and 11 keep 6, 5, 1, 2, 1).
 const ALWAYS: Record<string, number[]> = {
   'A7-down-to-one': [4],
+  'A12-spoke-handoff': [3],
 }
 
 //! the engagement key each family must hit on at least one seed: a family whose chaos never bit proves nothing
@@ -158,7 +162,8 @@ for (const fam of FAMILIES) {
       assert.ok(feederAcquires > 0, `non-vacuity: the spoke's feeder acquired ${feederAcquires} partitions through the latch over the seeds`)
       //! KNOWN (STATUS, wave 6a): the rows of a partition that moved OFF the spoke's feeder at the join (an orphan there,
       // then shed) stay on the spoke — nothing tells it — until a failover's resync wipes them. Counted by spokeStale,
-      // never judged by M12. Seeds 1 and 2 read 0 and 1 (seed 3 reads 6). If this reads 0, the gap closed: flip the pin.
+      // never judged by M12. Seed 3 (ALWAYS) reads 6; seeds 1 and 2 read 0 since V4-55 moved seed 2's trajectory (it read 1).
+      // If this reads 0, the gap closed: flip the pin.
       assert.ok(spokeStale > 0, `the spoke kept ${spokeStale} rows of partitions that moved off its feeder (known gap; 0 means it closed — flip this pin)`)
     }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
