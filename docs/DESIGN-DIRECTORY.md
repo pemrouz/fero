@@ -609,3 +609,73 @@ Not reproduced: no fix, and the guard in `#client` stays.
   takes no `diag.allow`).
 - An askable directory is still unauthenticated (V4-30).
 - A silenced client link has no journal row of its own.
+
+## §13 The genesis gate: a target that refused this node leaves the count (2026-10-12, wave 6b)
+
+The bug. Genesis at the lowest-uuid member waits for `links ≥ hosts` (§2), and `hosts` counts the
+discovered set, so a squatter the directory handed out — a process on that address that is not one
+of us — held the first view for good; found by the door family (`sim/door.test.ts`), which told a
+non-lowest member about the squatter on purpose to stay clear of it. STATUS carried the line "A
+discovered target that never admits holds genesis at the lowest-uuid member for good" with the
+dead entry beside the squatter.
+
+The rule. A DIALED target that refused this node as a stranger leaves the genesis count
+(`kernel/node.ts` `#refused`, fed by `#refuse`; read by `kernel/membership.ts` at genesis):
+the address I dialed answered for another name (`nameReject`), another cluster contract
+(`contractReject`), or at the door (DESIGN-DOOR §3) — no secret where I have one, a secret where I
+have none, the address rule, or a refusal notice for my proof. Such a target can never be admitted
+here, so it can never be in a view with me; waiting for it could only block. Two refusals are NOT
+strangers and stay counted: a proving `timeout` (a lost frame — the peer may be one of us), and a
+`uuid-taken` notice (the far side holds a member running as me: my misconfiguration). Only my own
+dial's outcome at the address I dialed counts, never a claim on an ACCEPTED link: a stranger that
+can merely connect could otherwise send a HELLO naming a real member's listen with a bad proof and
+shrink my count. The entry leaves when the target admits (a fixed secret or config heals at the
+heartbeat's revival cadence, as the name-reject park always did, §9) or when the directory forgets
+the target (a `discover` without it; a static host keeps its refusal, as it is never forgotten).
+
+What stays. A target that merely never answers — a closed port, a cut — stays in the count. Two
+rules were weighed and refused:
+
+1. *A target leaves the count once its redial chain gave up.* Unsafe. Take four members told of
+   each other and a cut {a,b} | {c,d} at genesis: every chain gives up on both sides, a's count
+   drops to {b} and c's to {d}, a proposes `{a,b}`@1 and c proposes `{c,d}`@1 — two views at one
+   epoch, both writable, and when the cut heals an equal-epoch VIEW with other members is ignored
+   (one view per epoch is the safety rule), so two clusters for good. V4-55's genesis hold guards
+   only a second ballot over a set that holds a member of the first (the granter's HELLO or refusal
+   teaches the hold, and the ballot becomes joint over the first view); two disjoint halves share no
+   voter, so no hold reaches either. The guard does not hold here, and the task's premise that it
+   would was wrong.
+2. *Genesis proceeds on a majority of the host list once a chain gave up.* Safe when every member
+   holds the same list — two majorities of one set overlap, and the overlap's vote-once plus the
+   genesis hold makes the second ballot joint over the first — but the kernel cannot know the lists
+   agree. With the cross-box shape of §11 (every member of box A told the address of box B, and the
+   reverse), a cut between the boxes at genesis gives each box a majority of its own list, and two
+   views form where today both boxes wait. The directory's lists agree on one box; static lists are
+   whatever each operator wrote.
+
+So dead and cut stay the same from the dialer's seat, and CP at genesis is kept for them: the first
+view waits for every target that might be one of us. The dead-entry half of the STATUS line is
+answered elsewhere: the directory's failure detector over client links (§12) drops a registrant
+that has gone silent within `WATCH_TICKS` host heartbeats (10 s at the default), the lookup's next
+snapshot takes it off every member's discovered set (`discover`), and genesis proceeds; a dead
+STATIC host is the operator's to remove, as it always was.
+
+Safety of what changed, in one paragraph. Genesis under the rule proposes exactly when today's
+rule would propose with the refused targets struck from the host list — and a refused target is
+not a candidate member of this cluster (another name, another contract, another secret). So for
+the members of this cluster the count is today's count: the lowest member proposes over its
+admitted set when every host that could be one of us is admitted, the ballot is the same ballot,
+one view per epoch rests on vote-once as before, and two halves of one list can never each form
+(neither half's count ever drops below the other half). The only new behaviour is for a target
+that is not one of us, and it is to stop waiting for it.
+
+Pinned: `kernel/discover.test.ts` — the squatter at the lowest member forms `{aa,bb}`@1 at the next
+heartbeat once zz refused it (red on the base: no ballot, ever), a chain that gave up stays counted,
+the door's five answers sorted (no-secret and the notice refuse; timeout and uuid-taken do not; a
+forgotten target takes its refusal with it, a static one keeps it), and the guard: four members cut
+in two halves form nothing until the heal, then one view of four. `sim/door.test.ts` — the family
+tells the LOWEST member about the squatter on even seeds (with the pair's delay fixed so the DOOR
+notice lands before the close, as TCP delivers it; the sim's random-delay close model loses it,
+DESIGN-DOOR §3) and asserts it read the refusal and formed; and a focused 30-seed test with the
+lowest member told alone, red on every seed on the base. The `#directory` example checks are
+unchanged. The STATUS line narrows to the operator's dead static host.
