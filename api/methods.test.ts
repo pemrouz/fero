@@ -647,10 +647,12 @@ test("a live subscription whose view data stops fails loudly: the handle reads '
   const unlucky = (x: { n: number }, y: { n: number }) => { if (x.n === 13 || y.n === 13) throw new Error('unlucky'); return x.n - y.n }
   //! a long-lived view per server (made outside any handler, through the server's own f.data) that a one-shot
   // call returns. ctx.data is the handler scope, one object per server and not f.data itself (I-29), so it
-  // keys the board, and a local `prime` call hands each server its own
+  // keys the board; a local call with no argument tells the test each server's scope (the board itself cannot
+  // be handed in through a call: a live view is no argument a method can take, V4-52)
   const boards = new Map<unknown, unknown>()
+  let scope: unknown
   const { a, b, addrs } = await pair({
-    prime: (board: unknown, ctx: { data: any }) => { boards.set(ctx.data, board) },
+    whose: (_: unknown, ctx: { data: any }) => { scope = ctx.data },
     frozen: (_: unknown, ctx: { data: any }) => boards.get(ctx.data),
     board: (_: unknown, ctx: { data: any }) => ctx.data.filter((r: unknown) => r !== null).za(unlucky),
     //! the handler's own write stops the view before its stream opens
@@ -667,8 +669,8 @@ test("a live subscription whose view data stops fails loudly: the handle reads '
     // count; data stops them too, so after the stop the count is back where it was.
     const views = () => derived(a.data) + derived(b.data)
     const before = views()
-    await a.methods.prime(a.data.za(unlucky))
-    await b.methods.prime(b.data.za(unlucky))
+    await a.methods.whose(); boards.set(scope, a.data.za(unlucky))
+    await b.methods.whose(); boards.set(scope, b.data.za(unlucky))
     const errs: string[] = []
     const live = c.methods.board(undefined, { onError: (e: Error) => errs.push(e.message) })
     //! a mirror is a keyed source: an ordered view arrives as { 0: …, 1: … }
