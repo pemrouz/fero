@@ -1469,6 +1469,150 @@ lane-unique skips a lane whose tail stands, and M4 reads the entries, not
 their order — so a rewrite of a lane must replace the array (compact()
 builds a new one) or bring its own check.
 
+**Note, 2026-10-12 (stage 3 built: compaction on scoped nodes).** The §7
+stage-3 row is in the tree (kernel/log.ts `compactScoped`,
+`scopedFrontier`, `keep`; kernel/scope.ts `stableMarks`, `evidence`,
+`memo`, `#teach`, `onAcqDone`; kernel/node.ts `compacted`, the snapshot
+echo; kernel/write.ts `windowOf`), on top of the lane rule above. A
+scoped node forgets now. Terms used once: a **pass** is one walk of one
+lane by compaction; the **frontier** F(o, p) is the highest seq of lane
+o that every current holder of p has attested it is past, on floors a
+crash cannot take back.
+
+*What landed, against §4.* Rule C1-C4 as written. C1: a partition
+compacts only while held and sealed here with no latch open; orphans,
+acquiring and unsealed bases never (the compactor's own open latch pins
+it: kernel/scoped.test.ts COMPACTION PIN (d)). C2: `winner()`, the one
+test both passes share. C3: F ranges over the current holders at the
+pass, self included; self counts at its durable floor when durable, else
+its possession floor; a peer at its durable marks when it has announced
+any for p (HAVEQ `d`, HAVEA `md`) or confirm has ever seen a `p` map
+from it, else at its marks; absent is 0 and pins, so a holder that has
+attested nothing this epoch (acquiring, unsealed, never heard) pins F at
+0. C4: the lane's last entry stays. One `keep(e)` = tail ∨ above F ∨
+winner, used by `compactScoped` and by `#teach` above the learner's
+marks. The memo keys a lane's last fruitless pass on (length,
+`Scope.evidence`), the counter bumped where a mark rises or is voided,
+at an install, a seal, a fold, a shed, and where a durable floor
+advances. A compacting pass on a durable node arms the snapshot swap and
+the swap's echo rewrites the boot record, so the floor seed sits above
+the pp gaps the pass opened. ACQDONE gains `w`, the teacher's
+dedup-window tuples for p, and armed window entries record their
+partition. The shed bar, the drain and `shedWaitingOn` read the same
+crash-stable ladder as C3. Tombstone GC stays pinned while armed (stage
+4). `Link.torn` and `Link.inQueue` are maps of tails and the resume is a
+binary search for the first entry above each, so compaction leaves a
+stopped answer resumable (V4-40's note for this stage: answered, no
+change needed).
+
+*Where it differs from §4 and §7, and why.*
+
+1. **`JK.compacted` carries a count, not the partition.** The row said
+   "carries the partition". As first built the pass emitted one row per
+   (lane, partition) it dropped from, and P4's probe put 62,494 rows
+   into the journal over 50,000 updates: a lane on a node holding
+   thousands of partitions would push thousands of rows per pass into a
+   4,096-row drop-oldest ring and evict every other kind. Now a=lane,
+   b=entries dropped, c=how many partitions the pass dropped from. M2
+   never read the row (it diffs the replaced lane against the holders'
+   real floors), so nothing the harness checks moved.
+2. **`w` tuples carry the lane** as a fifth element, `[issuer, cid, seq,
+   epoch, lane]`: a dup WACK must name the lane (the stage-1 review's
+   K1), and the learner's `remember` wants it.
+3. **`keep()` in `#teach` filters nothing in stage 3.** This follows
+   from C3 itself: the learner is a current holder that attests nothing
+   while it acquires, so it pins the teacher's F for p at 0, and `keep`
+   passes everything above its marks — what a teach always shipped. The
+   predicate is shared all the same: the day stage 4 releases a stamp,
+   a released cell's entry is no winner and reaches nobody. The kernel
+   test shows both halves (a compacted teacher ships its compacted lane;
+   an uncompacted twin ships every entry above the marks).
+4. **The evidence counter is node-wide**, not per lane. A winner on lane
+   o that a newer record on ANOTHER lane supersedes waits for the next
+   evidence change or growth of lane o before its pass; under writes
+   marks move every tick. Per-lane versions were not worth the
+   bookkeeping before a measurement asks for them.
+5. **The durability discriminator** reads two sources: a peer is durable
+   for p when it has announced `d` or `md` for p, or when confirm has
+   seen a `p` map on any of its digests. Either alone would do (a
+   durable sender puts `d` beside every `q` it attests, and `md` beside
+   every sealed ok), the pair fails toward pinning.
+6. **P4 lives in the perf tier** (sim/scale.perf.ts), at compactAt 128:
+   the 50,000 writes take about a minute here, and the default 4,096
+   would hide the trigger behind 6,250 writes per owner lane. The lane
+   law itself (M8's lane half, `boundedLanes`) runs on every seed of the
+   scoped sweep as a liveness assertion — but at the sweep's workload it
+   holds with compaction off too (checked with the frontier forced to
+   0), so the sweep's catch for "compaction off" is its per-family
+   `compactions > 0` count, and P4 is where the bound bites.
+
+*The numbers.* Every family of the sweep compacts (2 to 111 passes per
+seed at compactAt 16) and every family is safe and live at the battery's
+seeds and the pinned ones, M2 green on every pass. compact.perf: the
+scoped pass over a 100,000-winner lane that drops nothing costs 0.94× the
+unscoped pass, 1.61 µs per entry (tmpfs, low priority). P4: 3,566
+entries for 1,500 held cells over eight nodes after 50,000 updates, the
+worst node 311 entries over its cells. A durable holder restarted after
+its lanes compacted below their floors and its WAL swapped restores its
+floors from the seed and re-latches nothing (5 re-latches with the boot
+rewrite at the echo removed). A client of a scoped server across its
+feeder's passes: zero resyncs, M12 green. Mutation checks, each once:
+the acquiring/absent pin removed turns M2 red on 2 of 26 sweep runs
+(A2 seed 1: "n01 compacted (n01, 51) of 'p114' while holder n02's real
+floor for that lane is 0"; A13 seed 1); volatile marks for a durable
+co-holder drop the whole lane at once where the durable mark allows
+1,000; `w` not fed leaves the retry's coordinates unknown at the new
+owner; the memo on length alone turns four kernel tests red; C4 removed
+empties a lane whose last entry lost; the shed on volatile marks sheds
+an orphan a durable holder covers in memory only.
+
+*The sweep's pins moved with the trajectory*, each re-recorded with its
+why in sim/scoped-sweep.test.ts. `version-only` (G1) bites across the
+families now, as this record predicted: the released stamp makes the
+remove's entry a loser, the next pass drops it, and the next teach or
+spoke forward ships the older record without it — caught on A1 seeds
+1-8, A3 seeds 5-7, A11 seeds 5-7, A12 seeds 1, 2, 5, 7 (before: A1 and
+A11 only); A3 seed 5 and A12 seed 1 join the pins. `drop-one` lost its
+bite on most seeds for the same reason read the other way: the older
+write under the dropped remove is already compacted at that holder when
+the mutation fires, so its later teach has nothing to resurrect; it is
+caught where an older record survives outside the frontier (A1 seed 8,
+the zombie's stranded lane; A2 seed 14), and A6 seed 3 and A7 seed 4
+leave the table. `release-all` moves from A7 seed 2 to seed 5 (both
+monitors catch there; on seed 2 stamp-oracle alone named a joiner lacking
+a row). M8 splits into its lane half (a law now) and its tombstone half
+(red today until stage 4).
+
+*Found while building, not fixed here.* (1) The mutation runner's
+`inject` matches the remove's lane entry by the TOMBSTONE's stamp; a
+field a row write swept carries the row's stamp as its tombstone
+(V4-18), so for such a cell `inject` drops the parent row's winning
+entry. M2 names that drop in mutated runs and always did (M2 is not a
+CATCHER). A harness flaw, pre-existing; fixing it moves every mutation
+pin again, so it is a STATUS line. (2) A HAVEQ that attests a partition
+above the owner's own floor for it (a mark of seq 8 for (aa, r) when
+r's last record is 7) reads at the owner as "I am behind" and opens a
+latch, which pins r under C1. Not a bug — a hand-built attestation can
+say it, a real one cannot — but it bit twice while writing tests; the
+tests say so.
+
+*What stage 4 will need from this stage.* The `g` (gapless) bit's
+definition, "content tail = floor on every lane of p", reads false at a
+compacted holder whenever a partition's top entry on a lane was a loser
+(C4 keeps the LANE's tail, not each partition's); nothing reads `g` yet,
+and R2 must redefine it before it does — the stage-2 review's note,
+now live. The release step drops dead entries on every lane through
+`byPart`; it must bump `Scope.evidence` (a release makes entries
+compactable) and must respect C4 or re-derive the client digest's tail,
+since a released cell's entry that is a lane's last entry stays until
+the lane grows. `keep()` in `#teach` becomes load-bearing at the first
+release. `stableMarks` is R2's "crash-stable floor per lane" and
+`scopedFrontier` its per-(lane, partition) minimum. `gcTombstones` keeps
+the unscoped rule and must gain the armed per-partition one (R0-R4);
+`boundedTombs` is the red-today pin that flips. Stage 3 is the resting
+point the record names: logs are bounded, tombstones are not, and
+nothing here is unsound if stage 4 never lands.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
