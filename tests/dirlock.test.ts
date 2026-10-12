@@ -16,7 +16,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
-import { Runtime, lockDir } from '../shell/runtime.ts'
+import { Runtime, lockDir, leaseThread } from '../shell/runtime.ts'
 import { fero } from '../api/index.ts'
 import { until } from '#utils'
 
@@ -381,6 +381,73 @@ test('the lease is held from a thread of its own: the lock is touched while the 
   } finally {
     await holder?.stop()
     fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+//! the thread's own failures never end the node. Its one stderr write can fail (fd 2 on /dev/full, a full pipe, a pipe
+// whose reader died): the line is lost, the thread lives on and still touches the other dirs. A thread that dies anyway
+// (a fault inside it, or it was ended) is let go, and the next lock this process takes makes a new one that touches
+// every lock still held.
+test('the lease thread outlives a stderr it cannot write: a holder whose lock was taken while fd 2 is /dev/full lives on, and its thread still touches the other dir it holds', { skip: !fs.existsSync('/dev/full') && 'no /dev/full here' }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-full-'))
+  const full = fs.openSync('/dev/full', 'w')
+  const c = spawn(process.execPath, [CHILD, dir, 'two'], { stdio: ['ignore', 'pipe', full] })
+  fs.closeSync(full)
+  let out = ''
+  c.stdout.setEncoding('utf8').on('data', (d: string) => { out += d })
+  const lives = () => c.exitCode === null && c.signalCode === null
+  try {
+    assert.ok(await until(() => out.includes('up '), 20_000), `the holder never said up (${out})`)
+    const second = path.join(dir, 'second')
+    assert.equal(lockOf(second)?.pid, c.pid, 'the child holds both dirs')
+    plant(dir, { pid: 4242, host: 'taker' }, 'lock.taker'); fs.renameSync(path.join(dir, 'lock.taker'), path.join(dir, 'lock'))
+    //! the next touch meets the taker's record and its one write to fd 2 fails (ENOSPC); a thread that died there died
+    // before it touched the second dir in that round, so look from one round on
+    await new Promise((r) => setTimeout(r, 700))
+    assert.ok(lives(), `the holder lives on after a stderr write that failed (exit ${c.exitCode} signal ${c.signalCode}; ${out})`)
+    const m0 = mtimeOf(second)
+    await new Promise((r) => setTimeout(r, 1200))
+    assert.ok(lives(), `the holder lives on after a stderr write that failed (exit ${c.exitCode} signal ${c.signalCode}; ${out})`)
+    assert.ok(mtimeOf(second) > m0, `the thread still touches the other dir it holds (mtime moved ${mtimeOf(second) - m0} ms in 1.2 s)`)
+    const code = new Promise<number | null>((resolve) => c.once('close', resolve))
+    c.kill('SIGINT')
+    assert.equal(await code, 0, 'and it stops cleanly')
+  } finally {
+    if (lives()) c.kill('SIGKILL')
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a lease thread that dies is let go: the next lock this process takes makes a new thread, which touches every lock still held — after a fault inside the thread, and after a thread that was ended', async () => {
+  const dirs = [0, 1, 2].map(() => fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-redo-')))
+  const releases: (() => void)[] = []
+  const moved = async (ds: string[], why: string) => {
+    const m0 = ds.map(mtimeOf)
+    await new Promise((r) => setTimeout(r, 1200))
+    ds.forEach((d, i) => assert.ok(mtimeOf(d) > m0[i], `${why}: ${d} touched (mtime moved ${mtimeOf(d) - m0[i]} ms in 1.2 s)`))
+  }
+  try {
+    releases.push(lockDir(dirs[0], 'test'))
+    const w1 = leaseThread()
+    assert.ok(w1 !== null, 'a held lock has a thread')
+    //! a fault inside the thread (a message it cannot read): its 'error' reaches this process, which must not die of it
+    const gone1 = new Promise((r) => w1.once('exit', r))
+    w1.postMessage(null)
+    await gone1
+    assert.equal(leaseThread(), null, 'a thread that failed is let go')
+    releases.push(lockDir(dirs[1], 'test'))
+    const w2 = leaseThread()
+    assert.ok(w2 !== null && w2 !== w1, 'the next lock made a new thread')
+    await moved(dirs.slice(0, 2), 'after a fault')
+    //! a thread that was ended ('exit' alone, no 'error')
+    await w2.terminate()
+    assert.equal(leaseThread(), null, 'a thread that ended is let go')
+    releases.push(lockDir(dirs[2], 'test'))
+    assert.ok(leaseThread() !== null && leaseThread() !== w2, 'the next lock made a new thread')
+    await moved(dirs, 'after an end')
+  } finally {
+    for (const r of releases) r()
+    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true })
   }
 })
 

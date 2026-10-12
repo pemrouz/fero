@@ -11,11 +11,13 @@
 // create of the empty lock and the write of its record (the gap a second opener may meet there); `boot-slow` blocks the
 // main thread six seconds right after the lock is taken (at the wal.log open: a long WAL replay), printing `booting` as
 // it enters the block; `touch` opens nothing: it plays a holder in another pid namespace, touching the dir's `lock`
-// every 100 ms until Ctrl-C (the lease). Not a test file (the battery's glob is tests/*.test.ts).
+// every 100 ms until Ctrl-C (the lease); `two` also takes the lock of a second dir, `<dir>/second`, before it says up
+// (one thread touches both). Not a test file (the battery's glob is tests/*.test.ts).
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { fero } from '../api/index.ts'
+import { lockDir } from '../shell/runtime.ts'
 
 const [dir, mode] = process.argv.slice(2)
 const nap = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
@@ -69,6 +71,7 @@ if (mode === 'nolink' || mode === 'nolink-slow') {
 if (mode !== 'touch') {
   try {
     await fero('locked', { dir, listen: false })
+    if (mode === 'two') lockDir(path.join(dir, 'second'), 'second')
     console.log(`up ${process.pid}`)
     if (mode === 'exit') process.exit(0)
     //! a crash leaves the lock: no exit hook runs (pid 1 of a namespace ignores a SIGKILL it sends itself, so not kill -9)

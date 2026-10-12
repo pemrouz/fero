@@ -113,6 +113,10 @@ const TOUCH = 500, LEASE = 4000
 // paused longer than LEASE), and it says so on stderr ONCE, straight to fd 2 (loud even while the main loop is blocked),
 // and stops touching that path (a touch would keep the taker's lease alive); a path gone for the moment (a release, a
 // takeover in flight, the dir deleted) is looked at again next time. The thread never keeps the process alive.
+// Its own failures never end the node: the one stderr write is guarded (fd 2 on /dev/full, a full pipe, a pipe whose
+// reader died: the line is lost, the thread lives on and still touches the other dirs), and a thread that dies anyway
+// (a fault inside it, or it was ended) is let go — its 'error' said in one guarded line, never thrown at the main
+// thread — and the next lock this process takes makes a new thread, fed every lock still held.
 const TOUCHER = `
 const { parentPort, workerData } = require('node:worker_threads')
 const fs = require('node:fs'), path = require('node:path')
@@ -127,7 +131,7 @@ setInterval(() => {
       held.delete(p)
       let by = 'another record'
       try { const h = JSON.parse(got); by = 'pid ' + h.pid + ' on ' + h.host } catch {}
-      fs.writeSync(2, 'fero: the lock on ' + path.dirname(p) + ' was taken over by ' + by + ' while this process (pid ' + process.pid + ') still held the dir — its lease ran out (the process was frozen or paused longer than ' + workerData.LEASE + ' ms); two nodes may now run on one dir: stop one of them\\n')
+      try { fs.writeSync(2, 'fero: the lock on ' + path.dirname(p) + ' was taken over by ' + by + ' while this process (pid ' + process.pid + ') still held the dir — its lease ran out (the process was frozen or paused longer than ' + workerData.LEASE + ' ms); two nodes may now run on one dir: stop one of them\\n') } catch { /* stderr cannot be written: the line is lost, the thread lives on */ }
       continue
     }
     try { fs.utimesSync(p, now, now) } catch { /* gone between the look and the touch */ }
@@ -136,9 +140,22 @@ setInterval(() => {
 `
 let toucher: Worker | null = null
 const touch = (m: { add: string; mine: string } | { remove: string }): void => {
-  if (toucher === null) { toucher = new Worker(TOUCHER, { eval: true, execArgv: [], workerData: { TOUCH, LEASE } }); toucher.unref() }
+  if (toucher === null) {
+    const w = new Worker(TOUCHER, { eval: true, execArgv: [], workerData: { TOUCH, LEASE } })
+    w.unref()
+    const letGo = () => { if (toucher === w) toucher = null }
+    w.on('error', (e) => {
+      letGo()
+      try { fs.writeSync(2, `fero: the thread that touches this process's dir locks failed (${String((e as Error)?.message ?? e)}); a new one starts with the next dir this process opens\n`) } catch { /* stderr cannot be written */ }
+    })
+    w.on('exit', letGo)
+    toucher = w
+    for (const p of locks.keys()) w.postMessage({ add: p, mine: MINE }) // a new thread after one that died: every lock still held
+  }
   toucher.postMessage(m)
 }
+//! leaseThread — the thread, for the tests
+export const leaseThread = (): Worker | null => toucher
 interface Holder { pid: number; host: string; boot: string | null; ns: string | null; start: number | null }
 export interface DirHeld extends Error { code: 'dir-held'; pid: number; host: string }
 const alivePid = (pid: number): boolean => { try { process.kill(pid, 0); return true } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM' } }
@@ -174,6 +191,7 @@ let exitHooked = false
 // second release deleted the lock the first ran on); a life before this one (a container restarts its node as pid 1
 // again, on the same volume) started at another time and is stale. Without a start time (no /proc) the path decides.
 const ME: Holder = { pid: process.pid, host: HOST, boot: BOOT, ns: NS, start: startOf(process.pid) }
+const MINE = JSON.stringify(ME) + '\n'
 //! liveHolder — may the process the record names still be running? 'mine' = this process holds it; 'alive' = another
 // process in this pid namespace; 'ns' = a process in another pid namespace on this kernel, live by its lease (leaseOf
 // waited for the touch); 'elsewhere' = another machine (never checked); null = stale.
@@ -234,26 +252,25 @@ const sameHolder = (a: Holder, b: Holder): boolean => a.pid === b.pid && a.host 
 export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
   fs.mkdirSync(dir, { recursive: true })
   const p = path.join(path.resolve(dir), LOCK), take = p + '.take'
-  const mine = JSON.stringify(ME) + '\n'
   //! release only what is still mine: a crash and a takeover may have put another holder's record there since
   const release = () => {
     locks.delete(p)
     touch({ remove: p })
-    try { if (fs.readFileSync(p, 'utf8') === mine) fs.unlinkSync(p) } catch { /* gone already */ }
+    try { if (fs.readFileSync(p, 'utf8') === MINE) fs.unlinkSync(p) } catch { /* gone already */ }
   }
   const held = () => {
     locks.set(p, release)
     //! the lease: the toucher thread touches the lock every TOUCH ms for a reader in another pid namespace, from now
     // until the release — through the WAL replay that follows this call on the main thread
-    touch({ add: p, mine })
+    touch({ add: p, mine: MINE })
     if (!exitHooked) { exitHooked = true; process.on('exit', () => { for (const r of [...locks.values()]) r() }) }
     return release
   }
-  if (claim(p, mine)) return held()
+  if (claim(p, MINE)) return held()
   const h = holderAt(p), why = liveHolder(p, h)
   if (why !== null) throw heldError(who, dir, h!, why)
   //! stale — take it over, one heir at a time
-  if (!claim(take, mine)) {
+  if (!claim(take, MINE)) {
     const t = holderAt(take), tw = liveHolder(take, t)
     if (tw !== null) throw heldError(who, dir, t!, tw)
     //! a stale marker (its heir crashed inside the takeover) is removed by a RENAME to a name of my own and a look at what
@@ -267,13 +284,13 @@ export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
       throw heldError(who, dir, got, 'alive')
     }
     try { fs.unlinkSync(gone) } catch { /* never renamed */ }
-    if (!claim(take, mine)) throw heldError(who, dir, holderAt(take) ?? UNKNOWN, 'alive')
+    if (!claim(take, MINE)) throw heldError(who, dir, holderAt(take) ?? UNKNOWN, 'alive')
   }
   try {
     const now = holderAt(p), nw = liveHolder(p, now) // read again under the marker: a holder that started between the two looks is live
     if (nw !== null) throw heldError(who, dir, now!, nw)
     try { fs.unlinkSync(p) } catch { /* gone */ }
-    if (!claim(p, mine)) throw heldError(who, dir, holderAt(p) ?? UNKNOWN, 'alive') // a fresh opener slipped in: it holds
+    if (!claim(p, MINE)) throw heldError(who, dir, holderAt(p) ?? UNKNOWN, 'alive') // a fresh opener slipped in: it holds
     return held()
   } finally { try { fs.unlinkSync(take) } catch { /* gone */ } }
 }
