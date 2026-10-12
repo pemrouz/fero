@@ -1070,6 +1070,11 @@ test('the joint commit (DESIGN-LEAVE §10.10.2, §10.10.4 supersession): a refus
   assert.equal(first.o, 1); assert.equal(first.j, undefined)
   q('aa', 'cc').shift()
   const feed = (from: string, body: object) => aa.step({ kind: 'bytesIn', link: m.linkOf.get('aa')!.get(from)!, bytes: encodeControl(VERB.VOTE, body) })
+  //! a late refusal of ANOTHER same-epoch ballot of aa's (a different member set) names a hold: not this ballot's
+  // business — its re-offer is joint over nothing (the fifth review: a phantom joint set would hold it a proposal age)
+  feed('bb', { e: 2, g: 0, ce: 1, h: 'aa,bb', ve: 1, hm: ['zz,yy,xx'] })
+  m.tick('aa'); m.tick('aa')
+  assert.equal((q('aa', 'bb').pop()!.value as { j?: string[] }).j, undefined, 'a refusal of another ballot widens nothing')
   //! bb refuses, naming the view it holds a vote for (a ballot of cc's, say): aa's ballot becomes joint over it
   feed('bb', { e: 2, g: 0, ce: 1, h: 'aa,bb,cc', ve: 1, hm: ['bb,cc,dd,ee'] })
   m.tick('aa'); m.tick('aa')

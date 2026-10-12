@@ -654,8 +654,11 @@ export class Membership {
       this.#burned = v.ve
     const p = this.#proposal
     //! a held voter's refusal names the views it holds a vote for (`hm`): my ballot becomes joint over them — the
-    // next re-offer carries them (`j`), and the commit below needs a majority of each too (DESIGN-LEAVE §10.10.2)
-    if (p && p.view.epoch === v.e && v.g !== 1 && Array.isArray(v.hm)) for (const hh of v.hm) if (typeof hh === 'string' && hh) p.joint.add(hh)
+    // next re-offer carries them (`j`), and the commit below needs a majority of each too (DESIGN-LEAVE §10.10.2).
+    // Only a refusal of THIS ballot (its identity, `h`): a late refusal of an earlier same-epoch ballot of mine
+    // speaks of holds as they were then — this ballot's own re-offer draws its own refusal if they still stand, and
+    // a phantom joint set would hold the ballot for a proposal age (the fifth review)
+    if (p && p.view.epoch === v.e && v.g !== 1 && v.h === p.h && Array.isArray(v.hm)) for (const hh of v.hm) if (typeof hh === 'string' && hh) p.joint.add(hh)
     //! count only grants that echo THIS proposal's identity — a stale grant for an earlier same-epoch
     // ballot (different members) must not commit a view nobody voted for
     if (!p || p.view.epoch !== v.e || v.g !== 1 || v.h !== p.h) return
