@@ -867,17 +867,20 @@ test('a key with half of a surrogate pair in it is refused at the write — a ro
 test('a built-in that keeps its data out of sight is refused by its tag; a class instance is still taken as its own fields', async () => {
   const h = harness()
   function* gen() { yield 1 }
-  const hidden: [string, unknown][] = [
-    ['URLSearchParams', new URLSearchParams('a=1')], ['Headers', new Headers({ a: '1' })], ['Blob', new Blob(['x'])],
-    ['WeakRef', new WeakRef({})], ['Generator', gen()], ['Map Iterator', new Map([[1, 2]]).entries()],
+  const hidden: [string, unknown, string][] = [
+    ['a URLSearchParams', new URLSearchParams('a=1'), 'send Object.fromEntries(it)'], ['a Headers', new Headers({ a: '1' }), 'send Object.fromEntries(it)'],
+    ['a Blob', new Blob(['x']), 'it keeps its data where fero cannot see it'], ['a WeakRef', new WeakRef({}), 'it keeps its data where fero cannot see it'],
+    ['a Generator', gen(), 'send [...it]'], ['a Map Iterator', new Map([[1, 2]]).entries(), 'send [...it]'],
+    ['an AbortSignal', new AbortController().signal, 'it keeps its data where fero cannot see it'],
   ]
-  for (const [tag, v] of hidden)
-    assert.throws(() => { h.bind.data.x = { v } }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["x"] cannot be sent: a ${tag} (it keeps its data where fero cannot see it`) && e.message.includes(') at v'), tag)
+  for (const [kind, v, hint] of hidden)
+    assert.throws(() => { h.bind.data.x = { v } }, (e: Error) => e instanceof TypeError && e.message.startsWith(`fero: ["x"] cannot be sent: ${kind} (${hint}`) && e.message.includes(') at v'), kind)
+  //! a class instance keeps its data in its own fields — whatever tag it names or built-in it extends — and is taken
   class Point { x = 1; y = 2 }
   class Money { amount = 5; get [Symbol.toStringTag]() { return 'Money' } }
-  h.bind.data.p = { at: new Point() }
-  assert.deepEqual(snapshot(h.bind.data).p, { at: { x: 1, y: 2 } }, 'a class instance is its own fields')
-  assert.throws(() => { h.bind.data.m = new Money() }, /cannot be sent: a Money \(it keeps its data/, 'a class that names its own tag says what it is')
+  class Store extends EventTarget { items = [1, 2] }
+  h.bind.data.p = { at: new Point(), m: new Money(), s: new Store() }
+  assert.deepEqual(snapshot(h.bind.data).p, { at: { x: 1, y: 2 }, m: { amount: 5 }, s: { items: [1, 2] } })
   assert.equal(h.jk(JK.writeLocal).length, 1)
   await h.destroy()
 })
