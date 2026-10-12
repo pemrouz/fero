@@ -125,6 +125,10 @@ export interface FeroConfig {
   // box to bind the address hosts it — a discovery role only; the data role never depends on timing.
   // A user resource may not listen on a rendezvous socket under any spelling (`0.0.0.0:3376` too).
   rendezvous?: string | false
+  //! dir — the folder for the write-ahead log and the boot record (durable mode). One process at a time (wave 6b): a
+  // node holds its dir with a `lock` file naming its pid and host; a second process that opens the dir while the first
+  // holds it is refused at fero() with an error whose `code` is 'dir-held' and whose `pid` and `host` name the holder;
+  // a clean stop or the process exit releases it; a lock a crashed process left is taken over once its pid is gone.
   dir?: string
   //! heartbeat.ms (V4-10 spelling; was heartbeatMs) — the one clock: pings, membership ticks, the write
   // retry clock, compaction and WAL-snapshot arming all run on it. 500 by default; 0 = off (an
