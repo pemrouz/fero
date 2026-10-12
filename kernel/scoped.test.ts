@@ -1503,3 +1503,24 @@ test('an ACQ teach bigger than one frame leaves in cuts; the learner\'s count ma
   assert.equal(L.node.state.size, 10)
   assert.equal(L.node.streams.get('aa')!.parts!.get('p')!.s, lane[9], 'the teacher\'s cut is attested')
 })
+
+test('SHED on crash-stable marks (stage 3) — a DURABLE holder covers an orphan\'s frozen tails only with its durable marks: an ok answer whose volatile floors reach the tail but whose md does not keeps the orphan (and shedWaitingOn names it); md reaching the tail sheds', () => {
+  const h = armedView1({ tune: { aeFan: 0 } })
+  h.node.membership.rejoinFloor = 0
+  h.node.writes.ring.place('p', 'aa', 'bb')
+  h.node.step({ kind: 'write', recs: [rec(['p', 'x'], 1)] })
+  h.node.step({ kind: 'write', recs: [rec(['p', 'x'], 2)] })
+  const tail = h.node.logs.get('aa')!.at(-1)!.seq
+  //! the R-set moves off aa: p freezes into an orphan with its content tail aa:tail
+  h.node.writes.ring.place('p', 'bb', 'cc')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 2, m: [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']] }) })
+  assert.equal(h.node.scope!.entries.get('p')!.state, SCOPE.orphan)
+  //! cc (memory: no md ever) covers at its floors; bb (durable: md rides its answer) reaches the tail in memory only
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: havea(2, { p: { ok: 1, need: 0, m: { aa: tail } } }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(2, { p: { ok: 1, need: 0, m: { aa: tail }, md: { aa: tail - 1 } } }) })
+  assert.equal(h.jk(JK.shed).length, 0, 'bb\'s volatile floors cover the tail, its durable ones do not: a crash before its fsync would lose the row — no shed')
+  assert.deepEqual(h.node.scope!.shedWaitingOn(h.node), ['bb'], 'the surface reads the same ladder and names bb')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: havea(2, { p: { ok: 1, need: 0, m: { aa: tail }, md: { aa: tail } } }) })
+  assert.equal(h.jk(JK.shed).length, 1, 'bb\'s disk covers the tail: shed')
+  assert.deepEqual(h.node.scope!.shedWaitingOn(h.node), [])
+})

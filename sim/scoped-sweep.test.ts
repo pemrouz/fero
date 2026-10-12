@@ -8,9 +8,11 @@
 // Lawful runs, per seed: no monitor fires and M1's horizon form agrees (SAFE); holders converge, exactly-R holds,
 // the holders' floors agree at the horizon and every holder's marks of each co-holder equal that co-holder's floors
 // (M7's two forms: floors-agree and marks-agree — LIVE); M8's LANE half is green (since DESIGN-SCALE stage 3,
-// 2026-10-12: every lane at or under winners + compactAt at the horizon — a lane over it is NOT LIVE) and its
-// TOMBSTONE half red (RED TODAY by design: no pin surface until stage 4; M2 frontier-sound judges every compaction
-// pass in every family, and every family compacts — eng.compactions). M9 (leave drain) was red at R=1 until the drain landed (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): a
+// 2026-10-12: every lane at or under winners + compactAt at the horizon — a lane over it is NOT LIVE; at this
+// workload it would hold with compaction off too, so the per-family compaction count below is what proves the pass
+// runs, and P4 is where the bound bites) and its TOMBSTONE half red (RED TODAY by design: no pin surface until stage
+// 4; M2 frontier-sound judges every compaction pass in every family, and every family compacts — eng.compactions).
+// M9 (leave drain) was red at R=1 until the drain landed (DESIGN-SCALE §7 stage 1 (b), 2026-10-10): a
 // clean leaver now hands what it held to the new holders before it goes, so a leave-drain violation is UNSAFE
 // like any other; A7 always runs its seed 4 (n=2 R=1), the one shape at the battery's seed count where that check
 // can bite. Per family, an engagement count proves the chaos bit.
@@ -176,8 +178,12 @@ for (const fam of FAMILIES) {
       assert.ok(spokeStale > 0, `the spoke kept ${spokeStale} rows of partitions that moved off its feeder (known gap; 0 means it closed — flip this pin)`)
     }
     assert.ok(cells > 0 && advances > 0, `${fam.name}: non-vacuity — M1 checked ${cells} cells, M5 ${advances} floor advances`)
-    //! stage 3: compaction fired on this family (compactAt 16), so M2 frontier-sound judged real passes and the lane bound above was tested
-    assert.ok(compactions > 0, `${fam.name}: non-vacuity — ${compactions} (lane, partition) compaction rows over the seeds`)
+    //! stage 3: compaction fired on this family (compactAt 16), so M2 frontier-sound judged real passes. This count is
+    // ALSO the sweep's catch for "compaction switched off": at this workload (60-120 writes over 50-500 partitions) no
+    // lane outgrows winners + 16 even with the pass off, so the lane law above stays green either way (checked
+    // 2026-10-12 with scopedFrontier forced to 0: A1 seed 1 and A8 seed 1 read 0 passes, every lane within the bound);
+    // where the lane law bites is P4 (sim/scale.perf.ts: 50,000 updates over 500 cells).
+    assert.ok(compactions > 0, `${fam.name}: non-vacuity — ${compactions} compaction passes over the seeds (0 = compaction is off)`)
     //! the lane rule (wave 6b): the lane-unique monitor compared neighbouring pairs on every family (a lane holds each seq once)
     assert.ok(lanePairs > 0, `${fam.name}: non-vacuity — the lane rule compared ${lanePairs} neighbouring pairs across every node's lanes`)
     //! M7 compares nothing on an R=1 seed (one holder per partition): the row bites only where some seed drew R ≥ 2
