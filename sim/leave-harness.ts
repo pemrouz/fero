@@ -1195,23 +1195,24 @@ export const askAfterHello = (): OutcomeM => {
 //! lostRelease — a release that dies on the link, and the fresh HELLO that must stand in for it (item 2 of the note,
 // the `onAdmit` line that takes a peer's old word back when its HELLO names no hold). aa opens the two-evictee ballot
 // `{aa,bb,cc}`@2; dd is cut from cc and ee, so once aa re-links to it its count rests on aa and bb alone. bb and cc
-// grant (held; bb's ask reaches dd), bb's VOTE lands, dd and ee come back and aa abandons the ballot. bb and cc ask aa
-// on their tick and aa disowns both; bb's empty ask — the release — is queued to dd and the bb-dd link is CUT before it
-// lands. Then the link comes back: bb's HELLO names no hold, and dd must count bb again. A kernel that only ever ADDS
-// what a HELLO names keeps bb's old word for good (bb holds nothing, so it never asks again) and dd sits `minority`
-// with aa and bb linked, three of five. Today's kernel reads no hold: dd writable throughout.
+// grant (held), and bb's ask reaches dd — the only frame that lands before the abandon, so dd knows bb is held and
+// nothing has been released yet. dd and ee come back and aa abandons the ballot; bb's ask reaches aa and aa's disown
+// comes back; bb's empty ask — the release — is queued to dd and the bb-dd link is CUT before it lands. Then the link
+// comes back: bb's HELLO names no hold, and dd must count bb again. A kernel that only ever ADDS what a HELLO names
+// keeps bb's old word for good (bb holds nothing, so it never asks again) and dd sits `minority` with aa and bb
+// linked, three of five. The base reads no hold: dd writable but where its links alone make it a minority.
 export const lostRelease = (): OutcomeM => {
   const shape: string[] = []
   const m = evictionBallot(shape, 2)
   m.cut('cc', 'dd'); m.cut('dd', 'ee')
   m.deliver('aa', 'bb'); m.deliver('aa', 'cc'); m.deliver('bb', 'aa')
   for (const u of ['bb', 'cc']) if (m.nodes.get(u)!.membership.votedFor.e !== 2 || m.nodes.get(u)!.membership.votedFor.p !== 'aa') shape.push(`${u} did not grant aa at 2: ${meshState(m)}`)
+  allOf(m, 'bb', 'dd') // bb's word reaches dd: held
   m.connect('aa', 'dd'); m.connect('aa', 'ee'); m.tick('aa') // dd and ee are back: the ballot is abandoned; cc's VOTE lands on no ballot below
   if (m.nodes.get('aa')!.epoch !== 1) shape.push(`aa committed before the abandon: ${meshState(m)}`)
-  drain(m)
   const mid = [`abandoned: ${meshState(m)}`]
-  for (const u of ['bb', 'cc']) m.tick(u) // the ask on the tick
-  allOf(m, 'bb', 'aa'); allOf(m, 'cc', 'aa'); allOf(m, 'aa', 'bb'); allOf(m, 'aa', 'cc') // the asks land, the disowns come back
+  allOf(m, 'bb', 'aa'); allOf(m, 'aa', 'bb') // bb's ask lands at aa, which holds no such ballot: the disown comes back, bb is released
+  if (m.nodes.get('bb')!.membership.held(m.nodes.get('bb')!)) shape.push(`bb was not released by aa's disown: ${meshState(m)}`)
   m.cut('bb', 'dd') // bb's release toward dd dies with the link
   drain(m)
   mid.push(`released, the bb-dd frame lost: ${meshState(m)}`)

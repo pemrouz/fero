@@ -631,7 +631,7 @@ test('leave harness, the fourth review\'s shapes: a client\'s word at epoch 0 (c
 // and cc `minority` the instant dd's install has landed (the ask went on every member link; a kernel that kept the
 // HELLO's key as the last word shows cc writable there, counting a held dd, until dd's next tick), and a live end
 // once bb is back to disown; lostRelease — dd `minority` after the abandon (bb and cc held), and writable again
-// once the fresh HELLO took bb's old word back; askAtAdmit — dd `minority` at the admit (it knows the hold bb's HELLO
+// once the fresh HELLO took bb's old word back (ee still counts bb and cc at the abandon: their asks to it have not landed); askAtAdmit — dd `minority` at the admit (it knows the hold bb's HELLO
 // carried) and writable once bb's ask on that link landed. The base read no hold: writable at every point but where
 // the links alone made dd a minority.
 const ASK_AFTER_HELLO_MIDS = [
@@ -641,7 +641,7 @@ const ASK_AFTER_HELLO_MIDS = [
 const ASK_AFTER_HELLO_END = 'aa@3{aa,cc,dd}W bb@3{aa,cc,dd}r:evicted cc@3{aa,cc,dd}W dd@3{aa,cc,dd}W ee@3{aa,cc,dd}r:joining'
 const FIVE_W = 'aa@1{aa,bb,cc,dd,ee}W bb@1{aa,bb,cc,dd,ee}W cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}W ee@1{aa,bb,cc,dd,ee}W'
 const DD_MINORITY = 'aa@1{aa,bb,cc,dd,ee}W bb@1{aa,bb,cc,dd,ee}W cc@1{aa,bb,cc,dd,ee}W dd@1{aa,bb,cc,dd,ee}r:minority ee@1{aa,bb,cc,dd,ee}W'
-const LOST_RELEASE_MIDS = [`abandoned: ${FIVE_W}`, `released, the bb-dd frame lost: ${DD_MINORITY}`, `re-linked: ${FIVE_W}`]
+const LOST_RELEASE_MIDS = ['abandoned: aa@1{aa,bb,cc,dd,ee}W bb@1{aa,bb,cc,dd,ee}r:held cc@1{aa,bb,cc,dd,ee}r:held dd@1{aa,bb,cc,dd,ee}r:minority ee@1{aa,bb,cc,dd,ee}W', `released, the bb-dd frame lost: ${DD_MINORITY}`, `re-linked: ${FIVE_W}`]
 const ASK_AT_ADMIT_MIDS = [`released before the admit: ${DD_MINORITY}`, `admitted: ${DD_MINORITY}`, `landed: ${FIVE_W}`]
 
 test('leave harness, the fifth round\'s shapes: a hold announced by one HELLO reaches every member link at the next change (askAfterHello), a release lost on a cut is learned from the fresh HELLO (lostRelease), and holds that changed while the HELLO was in flight are asked at admit (askAtAdmit) — SAFE, pinned exactly: a held dd, a minority cc, and dd writable again once the word is taken back', () => {
