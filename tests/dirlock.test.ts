@@ -218,6 +218,32 @@ test('two heirs at once after a crash: the takeover is one at a time — the sec
   }
 })
 
+test('a stale takeover marker (an heir crashed inside its takeover) and two heirs at once: the slow one finds a FRESH marker where the stale one was and gives way — never both holding', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-marker-'))
+  const kids: ReturnType<typeof fero.spawn>[] = []
+  try {
+    const dead = deadPid()
+    plant(dir, { pid: dead }); plant(dir, { pid: dead }, 'lock.take')
+    //! c looks at the stale marker and pauses before removing it; b removes it meanwhile, claims its own marker and pauses
+    // inside the takeover; c then resumes and meets b's fresh marker where the stale one was
+    const c = fero.spawn(CHILD, [dir, 'marker-slow']); kids.push(c)
+    assert.ok(await until(() => c.out.includes('pausing'), 20_000), `c never met the stale marker (${c.out})`)
+    const b = fero.spawn(CHILD, [dir, 'take-slow']); kids.push(b)
+    assert.ok(await until(() => b.out.includes('taking'), 20_000), `b never entered the takeover (${b.out})`)
+    assert.ok(await until(() => b.out.includes('up ') && (c.out.includes('refused') || c.out.includes('up ')), 20_000), `no answer (b: ${b.out} c: ${c.out})`)
+    assert.ok(b.out.includes('up '), `b holds the dir (${b.out})`)
+    assert.ok(c.out.includes(`refused dir-held ${b.pid} ${HOST}`), `c gave way, naming b (${c.out})`)
+    assert.equal(await c.exited, 2)
+    assert.deepEqual(lockOf(dir), mine(b.pid))
+    assert.equal(await b.stop(), 0)
+    assert.equal(lockOf(dir), null)
+    assert.deepEqual(fs.readdirSync(dir).filter((f) => f.startsWith('lock')), [], 'no marker or side file left')
+  } finally {
+    for (const k of kids) await k.stop()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('a filesystem without hard links: the lock falls back to the exclusive create and the write; a second opener that meets the empty file in that gap waits for the record and is refused', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-nolink-'))
   const kids: ReturnType<typeof fero.spawn>[] = []
