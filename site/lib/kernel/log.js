@@ -44,8 +44,42 @@
 // (WAL) counterpart — snapshot+truncate of the on-disk rows — lands with M4e's
 // restore proof, where its correctness must be demonstrated anyway.
 
+//! SCOPED COMPACTION (DESIGN-SCALE stage 3, §4; the owner's yes, §14 Q2). On an ARMED node the member-ranged
+// frontier above is unsound (a non-holder's lane tail says nothing about a holder's possession), so the pass was
+// pinned until the handshake evidence plane fed per-(lane, partition) marks. It does now. Rule C, per lane o and
+// partition p, entry e = (o, seq, p) drops iff:
+//   C1  p is HELD and SEALED here with no latch open — an orphan is frozen (its content tails are the shed evidence),
+//       an acquiring or unsealed base attests nothing, so none of them compacts;
+//   C2  e is not its cell's current winner (the test below; a remove is a winner while its tombstone lives, so it
+//       stays until stage 4 releases it; V4-18: a field a row write swept carries the row's stamp, so its entry is a
+//       loser; a fenced field remove keeps its stamp and its entry);
+//   C3  seq ≤ F(o, p) = the minimum over every CURRENT holder of p, self included, of its CRASH-STABLE attested
+//       floor for (o, p): self reads its durable floor when durable, else its possession floor; a peer reads the
+//       marks it announced through the handshake (kernel/scope.ts stableMark: durable marks for a peer that has
+//       announced any, volatile for a memory peer). Absent is 0 and pins; so an acquiring or unsealed holder, which
+//       attests nothing this epoch, pins F at 0. Orphans are not in F (they never advance and never learn);
+//   C4  e is not the lane's last entry: the digest to a client reports the lane tail as the last entry's seq, and a
+//       spoke resyncs when its applied runs past its feeder's tail, so the tail entry keeps the spoke contract.
+// Why F holds when the holder set can change: it ranges over the holders at the pass; every one of them holds or
+// covers e; a future holder learns through the one-teacher fold (its cut sets its floors, its records are the
+// winners), never through a seq chain, since stage 2 retired the member digest's suffixes; the stored pp chains of
+// later entries are needed only by nodes below F, and there are none among the current holders. A lane holds each
+// seq once and the fence covers its tail (the lane rule, wave 6b), so a pass reasons about lanes as sets.
+// ONE predicate, keep(), decides what compaction keeps AND what a teacher ships (kernel/scope.ts #teach): the
+// learner's fold equals the teacher's state while a pass is mid-way, and in stage 4 a released cell's dead entry
+// is shipped to nobody. In stage 3 the acquiring learner itself pins the teacher's F at 0 (C3), so the teacher
+// ships everything above the learner's marks, as before: the filter bites the day a stamp is released.
+// Tombstone GC stays PINNED while armed (stage 4: census + holder quorum + lane accounting).
+// The memo: a lane at or over compactAt whose pass dropped nothing is not re-walked until its length or the
+// evidence changes (Scope.evidence: a counter bumped where a mark rises or is voided, at an install, a seal, a fold,
+// a shed, and where a durable floor advances) — keyed on BOTH, since a memo on length alone can stop compaction
+// for good when F was pinned at the pass (the storage critique). A winner on lane o that a newer record on ANOTHER
+// lane supersedes waits for the next evidence change or growth of lane o; under writes marks move every tick.
+
 import { JK } from './journal.js'
-                                     
+import { partitionOf } from './env.js'
+import { SCOPE } from './scope.js'
+                                               
 
 //! COMPACT_AT: per-origin entry count that arms a compaction pass (the size-aware trigger). The default of the tune row `compactAt` (kernel/tune.ts); maybeCompact reads node.tune.compactAt.
 export const COMPACT_AT = 4096
@@ -84,10 +118,17 @@ export const frontier = (node      , o        )         => {
   return f === Infinity ? 0 : f
 }
 
+//! winner — C2: is entry e of lane o still the current winner of its cell (its stamp is the cell's version)?
+export const winner = (node      , o        , e          )          => {
+  const v = node.versions.get(JSON.stringify(e.rec.key.length ? e.rec.key : [e.rec.at ?? '']))
+  return v !== undefined && v.origin === o && v.seq === e.seq && v.epoch === e.epoch
+}
+
 //! compact — rewrite origin `o`'s prefix ≤ upTo: keep each entry only if it is still the current
 // winner of its cell (the snapshot record, original stamps — attempt identity kept so catch-up feeds
 // dedup windows too); drop the rest. Returns the number of entries dropped. Ascending order is
-// preserved by construction (a filtered subsequence of an ascending log).
+// preserved by construction (a filtered subsequence of an ascending log). The UNSCOPED pass (and the
+// tests that drive a pass by hand); an armed node compacts through compactScoped below.
 export const compact = (node      , o        , upTo        )         => {
   const entries = node.logs.get(o)
   if (!entries || entries.length === 0) return 0
@@ -95,10 +136,7 @@ export const compact = (node      , o        , upTo        )         => {
   let dropped = 0
   let gone                        = null // the dropped entries, for the per-partition index (scoped only)
   for (const e of entries) {
-    if (e.seq > upTo) { kept.push(e); continue }
-    const k = JSON.stringify(e.rec.key.length ? e.rec.key : [e.rec.at ?? ''])
-    const v = node.versions.get(k)
-    if (v && v.origin === o && v.seq === e.seq && v.epoch === e.epoch) kept.push(e)
+    if (e.seq > upTo || winner(node, o, e)) kept.push(e)
     else { dropped++; if (node.byPart !== null) (gone ??= []).push(e) }
   }
   if (dropped) {
@@ -107,6 +145,66 @@ export const compact = (node      , o        , upTo        )         => {
     node.journal.armed && node.journal.emit(JK.compacted, o, dropped)
   }
   return dropped
+}
+
+//! scopedFrontier — F(o, p) at an armed node (C1 + C3 of the banner): the highest seq of lane o that every
+// CURRENT holder of p, self included, has attested it is past, on crash-stable floors. 0 (nothing may drop) when
+// p is not held and sealed here, when self is not among p's holders, or when any holder's mark is absent.
+export const scopedFrontier = (node      , o        , p        )         => {
+  const scope = node.scope 
+  const e = scope.entries.get(p)
+  if (e === undefined || e.state !== SCOPE.held || e.sealed === false) return 0 // C1: orphans, acquiring, unsealed never
+  const pe = node.streams.get(o)?.parts?.get(p)
+  let f = pe === undefined ? 0 : node.durable ? pe.d : pe.s
+  if (f === 0) return 0
+  const ring = node.writes.ring
+  if (ring.epoch !== node.epoch) ring.build(node.epoch, node.membership.view.members)
+  let mine = false
+  for (const h of ring.holders(p, node.replicas)) {
+    if (h === node.uuid) { mine = true; continue }
+    const m = scope.stableMark(node, e, h, o)
+    if (m < f) { f = m; if (f === 0) return 0 }
+  }
+  return mine ? f : 0
+}
+
+//! keep — THE ONE predicate (C2-C4): entry e of lane o stays when it is the lane's last entry, above the
+// frontier f for its partition, or the current winner of its cell. compactScoped keeps exactly these; the
+// teacher (kernel/scope.ts #teach) ships exactly these above the learner's marks.
+export const keep = (node      , o        , e          , f        , last         )          =>
+  last || e.seq > f || winner(node, o, e)
+
+//! compactScoped — one pass over lane o at an armed node: F per partition memoized for the pass, the entries
+// keep() refuses dropped, the per-partition index following, one `compacted` row per lane per pass (a=lane,
+// b=entries dropped, c=the partitions dropped from — a count, not a name: a pass over a lane holding thousands
+// of partitions would otherwise flood the bounded journal ring with one row each and evict everything else), and
+// the durable snapshot armed (node.compacted) so the compacted lane reaches disk atomically and the boot record's
+// floor seed is written when that swap is issued (replay chains from the seed, and compaction opened pp gaps below it).
+// Returns the number of entries dropped.
+export const compactScoped = (node      , o        )         => {
+  const entries = node.logs.get(o)
+  if (!entries || entries.length === 0) return 0
+  const F = new Map                ()
+  const kept                 = []
+  let gone                        = null
+  let parts                     = null
+  const last = entries.length - 1
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i]
+    if (i === last) { kept.push(e); continue } // C4
+    const p = partitionOf(e.rec)
+    let f = F.get(p)
+    if (f === undefined) F.set(p, f = scopedFrontier(node, o, p))
+    if (keep(node, o, e, f, false)) { kept.push(e); continue }
+    ;(gone ??= []).push(e)
+    ;(parts ??= new Set()).add(p)
+  }
+  if (gone === null) return 0
+  node.logs.set(o, kept)
+  node.indexDrop(o, gone)
+  node.compacted()
+  node.journal.armed && node.journal.emit(JK.compacted, o, gone.length, parts .size)
+  return gone.length
 }
 
 //! gcTombstones — drop version stamps of REMOVED cells that nothing can ever contest again (see the
@@ -151,16 +249,26 @@ export const gcTombstones = (node      )         => {
   return dropped
 }
 
-//! maybeCompact — the tick hook: size-armed, frontier-bounded, then the tombstone pass. One cheap
+//! maybeCompact — the tick hook: size-armed, frontier-bounded, then (unscoped) the tombstone pass. One cheap
 // length check per origin in the steady state.
 export const maybeCompact = (node      ) => {
   if (node.membership.view.members.length === 0) return
-  //! M6 (armed): compaction and tombstone GC are PINNED until the handshake evidence plane (slice 3b)
-  // feeds per-(origin, partition) attested marks — the member-ranged frontier above is unsound under
-  // scoping (a non-holder's lane tail says nothing about a holder's possession, and vice versa), and
-  // pinning is the safe direction (memory over loss; DESIGN-M6 C3 lands the scoped frontier: min over
-  // holdersOf(p) ∪ announcers of the per-(o,p) stable marks, with acquiring holders contributing 0).
-  if (node.armed) return
+  //! ARMED (DESIGN-SCALE stage 3): the per-(lane, partition) frontier over the current holders' crash-stable
+  // attested marks (the banner's rule C), one lane at a time, the memo skipping a lane the last pass could not
+  // advance. Tombstone GC stays PINNED under scoping until stage 4 (the global-quiescence rule below never
+  // settles at scale and is unsound under scoping): memory over loss, journal-visible in the tombstone count.
+  if (node.armed) {
+    const scope = node.scope 
+    const compactAt = node.tune.compactAt
+    for (const [o, entries] of node.logs) {
+      if (entries.length < compactAt) continue
+      const m = scope.memo.get(o)
+      if (m !== undefined && m.len === entries.length && m.v === scope.evidence) continue
+      compactScoped(node, o)
+      scope.memo.set(o, { len: node.logs.get(o) .length, v: scope.evidence })
+    }
+    return
+  }
   const compactAt = node.tune.compactAt
   for (const [o, entries] of node.logs) {
     if (entries.length < compactAt) continue

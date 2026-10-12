@@ -416,6 +416,25 @@ export class Node {
     if (n === undefined) this.persistBoot()
   }
 
+  //! compacted — a compacting pass dropped entries at this ARMED node (kernel/log.ts compactScoped, DESIGN-SCALE
+  // stage 3). Durable bookkeeping: the snapshot swap is armed so the compacted lanes reach disk atomically (the tick
+  // checks the counter right after the pass), and the BOOT RECORD IS WRITTEN WHEN THAT SWAP IS ISSUED (snapshot()
+  // reads the flag): replay rebuilds floors from the boot record's seed and then only through chain-verified rows,
+  // and compaction opened pp gaps at or below the frontier — the seed must cover them, or a restore would chain
+  // from a stale seed, stall at the first gap and come back with floors below its content (a re-latch). The seed
+  // written at the issue is the pre-swap durable floor, which is at or above every gap (the pass dropped at or under
+  // it), and either file on disk backs it: the old WAL has no gap above it, the new one none at all. So a crash at
+  // ANY point — before the swap lands, or after it and before its echo — restores floors that chain to the content,
+  // and the durable marks this node announced are never above what its disk restores (the stage-3 review's window:
+  // a write at the ECHO left the fsync-to-echo gap under the old seed, one re-latch and, for stage 4's R2, marks
+  // peers had already counted as crash-stable).
+  #compacted = false
+  compacted() {
+    if (!this.durable) return
+    this.#compacted = true
+    this.#walRows = this.tune.snapshotAt
+  }
+
   //! replayHeld — the C10 replay classification: is partition p this life's to fold? The boot record
   // is the data authority for FOREIGN lanes — ring-assigned-but-absent partitions are `out` (window 5:
   // a crash mid-latch leaves staged records inside mixed WAL rows; folding them on the ring's say-so
@@ -650,6 +669,7 @@ export class Node {
         // the shed's swap purged — M6-review findings 16/20), and any advance past the possession
         // floor (pe.d ≤ pe.s per instant: durable evidence never exceeds the possession claim).
         const pcov = this.#inflightParts.get(e.batch)
+        let rose = false // a durable floor advanced: the compaction frontier's own term moved (the memo's evidence, stage 3)
         if (pcov) {
           this.#inflightParts.delete(e.batch)
           for (const [origin, parts] of pcov) {
@@ -660,7 +680,7 @@ export class Node {
               if (st !== SCOPE.held && st !== SCOPE.orphan) continue
               const pe = d.part(p)
               const cap = Math.min(maxSeq, pe.s)
-              if (cap > pe.d) pe.d = cap
+              if (cap > pe.d) { pe.d = cap; rose = true }
             }
           }
         }
@@ -678,17 +698,20 @@ export class Node {
               if (st !== SCOPE.held && st !== SCOPE.orphan) continue
               const pe = d.part(p)
               const cap = Math.min(s, pe.s)
-              if (cap > pe.d) pe.d = cap
+              if (cap > pe.d) { pe.d = cap; rose = true }
             }
           }
           let cleared = false
           const sealedNow           = []
           for (const [p, n] of snap.clears) if (this.#dirty.get(p) === n) { this.#dirty.delete(p); cleared = true; sealedNow.push(p) }
+          //! the boot record follows a dirty clear (a swap a COMPACTING pass armed wrote its seed when it was issued,
+          // not here — `compacted` says why the echo is too late)
           if (cleared) this.persistBoot()
           //! the SEAL (findings 19/37/46): a dirty-clear proves the disk restores this partition's
           // whole base — a pending ACQDONE attestation gate opens now (announce + boot-list re-entry)
           for (const p of sealedNow) this.scope .sealed(this, p)
         }
+        if (rose && this.scope !== null) this.scope.evidence++
         j.armed && j.emit(JK.persisted, e.batch)
         this.confirm.recount(this) // own durable advanced — a persisted probe may now have its quorum
         return
@@ -1212,6 +1235,11 @@ export class Node {
     this.#walRows = 0
     this.journal.armed && this.journal.emit(JK.snapshot, batch, rows.length)
     this.env.sink.snapshot(batch, rows)
+    //! a swap a COMPACTING pass armed (DESIGN-SCALE stage 3, `compacted`): the boot record is written NOW, with the
+    // seed at the pre-swap durable floors — at or above every gap the pass opened, backed by either file — so no
+    // crash window is left between the swap and its echo. The shell writes the record synchronously and queues the
+    // swap, so on disk the seed lands first; the sim lands the swap at once: both orders restore honestly.
+    if (this.#compacted) { this.#compacted = false; this.persistBoot() }
   }
 
   //! condemn — the fsyncgate verdict on a lying disk (see `tainted`): reset the fold to empty, swap
@@ -1238,6 +1266,7 @@ export class Node {
     this.logs.clear()
     this.byPart?.clear()
     this.tombs?.clear()
+    this.scope?.memo.clear() // the compaction memo keyed on lanes that no longer exist
     this.state.clear()
     this.versions.clear()
     this.deep.clear()

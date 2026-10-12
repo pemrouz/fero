@@ -289,13 +289,17 @@ export const verifyReplay = (capture) => {
 // EMPTY lanes with no journal row (boot floors, the replay entry, a staged record) — lane PRESENCE at an
 // intermediate step is a lower bound there; (3) `synced` flips at the END of the digestIn step, after any
 // aeShip row the same step emits — one row early at row granularity; (4) the hand-off's cut is not journaled:
-// the replay raises each lane to the highest seq the acquire folded (armed nodes never compact, so the book keeps
-// them). The teacher's cut can sit above that seq (its floor for the row covers seqs past the row's last record —
-// the common case, the lane trails), or below it when its floor waits on a gap (the lane leads; no chaos seed has
-// shown it), and a row shed again before capture end has left the book — the jump is then too low or too high until
-// the lane's next row (the ∞ guard refuses a node whose END tables it misses); when the same row is acquired twice,
-// an entry with no row of its own is folded at the LAST acquire of that row (handoffs()), so between the two the
-// lane may trail the kernel, never lead it (a per-step chaos oracle, 30 seeds: 0 steps ahead).
+// the replay raises each lane to the highest seq the acquire folded, read off the entries the book still holds.
+// Since DESIGN-SCALE stage 3 (2026-10-12) an armed node compacts too: a taught entry a later pass dropped (a
+// loser, no longer its cell's winner) is absent from the book, so the jump reads lower than the kernel's on that
+// lane until its next row — the "too low" side below, now reachable without a shed; a dropped loser never changes
+// stateAt (its winner is in the book and the election would have skipped it). The teacher's cut can sit above the
+// highest folded seq (its floor for the row covers seqs past the row's last record — the common case, the lane
+// trails), or below it when its floor waits on a gap (the lane leads; no chaos seed has shown it), and a row shed
+// again before capture end has left the book — the jump is then too low or too high until the lane's next row (the
+// ∞ guard refuses a node whose END tables it misses); when the same row is acquired twice, an entry with no row of
+// its own is folded at the LAST acquire of that row (handoffs()), so between the two the lane may trail the kernel,
+// never lead it (a per-step chaos oracle, 30 seeds: 0 steps ahead).
 export const topologyAt = (capture, uuid, t) => {
   const node = capture.nodes.find((n) => n.uuid === uuid)
   const K = capture.vocab

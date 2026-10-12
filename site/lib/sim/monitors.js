@@ -651,10 +651,12 @@ export const drained = (sim     )                => {
 //                      watermark; nothing for a spoke in resync — see `covers`). Fires at the exact event
 //                      a resurrection lands. Red today on the two unscoped probes (sim/scale-probes.test.ts).
 //   M2 frontier-sound  (per event, armed)       an entry compaction dropped at an armed node was not its
-//                      cell's winner and sits at or below every CURRENT holder's REAL floor for its
-//                      (lane, partition) — the sim reads the holders' floors, not their marks. Today an
-//                      armed node never compacts (kernel/log.ts:160), so the counter stays 0 and the
-//                      planted test calls compact() by hand; stage 3 makes it live.
+//                      cell's winner and sits at or below every CURRENT holder's REAL crash-stable floor
+//                      for its (lane, partition): a durable holder at its durable floor (pe.d), a memory
+//                      holder at its possession floor (pe.s) — the sim reads the holders' floors, not
+//                      their announced marks. Live since stage 3 (2026-10-12): every family of the
+//                      scoped sweep compacts and M2 judges every pass; a frontier built on a durable
+//                      holder's volatile marks is caught by sim/compaction.test.ts's slow-disk schedule.
 //   M3 release-safety  (per event, every node)  after any node released tombstone t for cell k, no node
 //                      shows k or a cell under k with a stamp below t. Red today on both probes.
 //   M4 index-oracle    (stage 1)                inert until node.byPart exists; see the stub.
@@ -885,7 +887,7 @@ const containsOrCovers = (L        , n      , e        )          => {
   return false
 }
 
-//! holdersNow — the live armed nodes the ring assigns p to at `n`'s epoch (M2's frontier reads their REAL floors).
+//! holdersNow — the live armed nodes the ring assigns p to at `n`'s epoch (M2's frontier reads their REAL crash-stable floors).
 const holdersNow = (sim     , n      , p        )                   => {
   const ring = n.writes.ring
   if (ring.epoch !== n.epoch) ring.build(n.epoch, n.membership.view.members)
@@ -944,7 +946,7 @@ export const scaleMonitors = () => [
               if (v !== undefined && v.origin === o && v.seq === e.seq && v.epoch === e.epoch)
                 return `${id} compacted lane ${o} and dropped seq ${e.seq}, which is still the WINNER of ${cell}`
               for (const [hu, h] of holdersNow(sim, n, p)) {
-                const f = h.streams.get(o)?.parts?.get(p)?.s ?? 0
+                const pe = h.streams.get(o)?.parts?.get(p); const f = pe === undefined ? 0 : h.durable ? pe.d : pe.s
                 if (f < e.seq) return `${id} compacted (${o}, ${e.seq}) of '${p}' while holder ${hu}'s real floor for that lane is ${f} — below the frontier`
               }
             }
@@ -1477,11 +1479,12 @@ export const spokeStale = (sim     , id        )                                
 }
 const partOfKey = (k        )         => (JSON.parse(k)            )[0] ?? ''
 
-//! boundedLogs — M8's horizon form (I12): at every armed node every lane holds at most winners + compactAt
-// entries, and every tombstone is fenced (a live row still needs it) or pinned by a named uuid. No pin surface
-// exists today, so an unfenced tombstone reads as unbounded: RED TODAY wherever a scoped run removed a cell or
-// a lane outgrew compactAt. The sweep pins the count of red seeds; stage 3 and stage 4 flip them.
-export const boundedLogs = (sim     )                => {
+//! boundedLogs — M8's horizon form (I12), in two halves: boundedLanes — at every armed node every lane holds at
+// most winners + compactAt entries (GREEN since DESIGN-SCALE stage 3, 2026-10-12: scoped compaction drops the
+// losers under the holders' crash-stable frontier; the sweep asserts it on every seed) — and boundedTombs — every
+// tombstone is fenced (a live row still needs it) or pinned by a named uuid. No pin surface exists yet, so an
+// unfenced tombstone reads as unbounded: RED TODAY wherever a scoped run removed a cell; stage 4 flips it.
+export const boundedLanes = (sim     )                => {
   let worst                = null, worstBy = 0
   for (const [id, n] of sim.nodes) {
     if (!n.armed) continue
@@ -1492,10 +1495,13 @@ export const boundedLogs = (sim     )                => {
       if (over > worstBy) { worstBy = over; worst = `${id} lane ${o} holds ${entries.length} entries: ${winners} winners + compactAt ${n.tune.compactAt}, ${over} over — unbounded` }
     }
   }
-  if (worst) return worst
+  return worst
+}
+export const boundedTombs = (sim     )                => {
   for (const [id, n] of sim.nodes) {
     if (!n.armed) continue
     for (const [k, v] of n.versions) if (!n.state.has(k) && !n.fenced(k)) return `${id} holds the tombstone of ${k} @${stampOf(v)}, neither fenced nor pinned by a named uuid`
   }
   return null
 }
+export const boundedLogs = (sim     )                => boundedLanes(sim) ?? boundedTombs(sim)
