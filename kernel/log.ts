@@ -175,8 +175,10 @@ export const keep = (node: Node, o: string, e: LogEntry, f: number, last: boolea
   last || e.seq > f || winner(node, o, e)
 
 //! compactScoped — one pass over lane o at an armed node: F per partition memoized for the pass, the entries
-// keep() refuses dropped, the per-partition index following, one `compacted` row per (lane, partition), and the
-// durable snapshot armed (node.compacted) so the compacted lane reaches disk atomically and the boot record's
+// keep() refuses dropped, the per-partition index following, one `compacted` row per lane per pass (a=lane,
+// b=entries dropped, c=the partitions dropped from — a count, not a name: a pass over a lane holding thousands
+// of partitions would otherwise flood the bounded journal ring with one row each and evict everything else), and
+// the durable snapshot armed (node.compacted) so the compacted lane reaches disk atomically and the boot record's
 // floor seed is rewritten at its echo (replay chains from the seed, and compaction opened pp gaps below it).
 // Returns the number of entries dropped.
 export const compactScoped = (node: Node, o: string): number => {
@@ -185,7 +187,7 @@ export const compactScoped = (node: Node, o: string): number => {
   const F = new Map<string, number>()
   const kept: typeof entries = []
   let gone: typeof entries | null = null
-  let byP: Map<string, number> | null = null
+  let parts: Set<string> | null = null
   const last = entries.length - 1
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i]
@@ -195,13 +197,13 @@ export const compactScoped = (node: Node, o: string): number => {
     if (f === undefined) F.set(p, f = scopedFrontier(node, o, p))
     if (keep(node, o, e, f, false)) { kept.push(e); continue }
     ;(gone ??= []).push(e)
-    ;(byP ??= new Map()).set(p, (byP.get(p) ?? 0) + 1)
+    ;(parts ??= new Set()).add(p)
   }
   if (gone === null) return 0
   node.logs.set(o, kept)
   node.indexDrop(o, gone)
   node.compacted()
-  if (node.journal.armed) for (const [p, n] of byP!) node.journal.emit(JK.compacted, o, n, p)
+  node.journal.armed && node.journal.emit(JK.compacted, o, gone.length, parts!.size)
   return gone.length
 }
 

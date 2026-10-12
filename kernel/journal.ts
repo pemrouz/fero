@@ -75,7 +75,7 @@ export const JK = {
   confirmReq: 49,    // a=id, b=level (CONFIRM.*), c=origin — a probe opened
   confirmed: 50,     // a=id, b=ok(0|1), c=memberCount — a probe answered (false = cancel/overflow, an honest reject)
   //! ── M4d compaction vocabulary ──
-  compacted: 51,     // a=origin, b=droppedEntries — a prefix ≤ the frontier collapsed to its snapshot records; c=partition on an ARMED node (DESIGN-SCALE stage 3: one row per (lane, partition) a pass dropped from; unscoped rows carry no c)
+  compacted: 51,     // a=origin, b=droppedEntries — a prefix ≤ the frontier collapsed to its snapshot records; on an ARMED node (DESIGN-SCALE stage 3) c=how many partitions the pass dropped from (a count, never a name: a lane holds thousands, and one row each would flood this ring); unscoped rows carry no c
   tombstoneGC: 52,   // a=droppedStamps — remove-versions nothing can contest anymore were released
   //! ── M4e WAL snapshot vocabulary ──
   snapshot: 53,      // a=batch, b=rows — a whole-WAL snapshot+swap left for the store (the disk counterpart of compaction)
