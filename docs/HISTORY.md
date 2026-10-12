@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 on 2026-10-12 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 then 1043 on 2026-10-12 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -754,6 +754,13 @@ working as designed.
   own reads copy as a client decodes, a key data cannot fold is refused before the stamp
   (V4-52). 1014/1014 + 18/18, perf 57/57, 1000/1000 seeds (209,313 events, as on
   v4), sim:scale green (11 scenarios, 53.6M events).
+
+- 2026-10-12 — wave 6a part 1, Fable back: the scoped latch tap fix (a feeder forwards what it folds
+  through the latch to its spokes; the feeds rule for the client answer; M12 spoke-mirror, A12/A13)
+  as V4-53, after two Opus review rounds; the I-29 release fix (a handler's views released by the
+  collector) rebased onto V4-47..V4-50 and reviewed once more by Fable, as V4-54. Another session's
+  V4-51/V4-52 (frames cut by size, values copied at the write) landed first; renumbered at the merge.
+  1043/1043 + 18/18, perf 60/60, 1000/1000 seeds, sim:scale green.
 
 ## The debug tool
 
