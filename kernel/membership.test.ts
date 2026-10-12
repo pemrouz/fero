@@ -610,7 +610,7 @@ test('the knock window\'s end: a linked member that never answers → `left` b=0
   assert.deepEqual(h.of('left'), [['left', false]], 'the window ran out: it goes like a crash')
   assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b]), [[1, 0]])
   assert.equal(h.node.epoch, 1, 'nothing committed: the view is unchanged')
-  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, drain: undefined })
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, why: 'unanswered', drain: undefined })
   assert.equal(LEAVE_WINDOW, 16, 'the record\'s default: 16 ticks, 8 s at the default cadence (DESIGN-LEAVE §10.7)')
   //! the row: leaveWindow 6 ends it at 7
   const w = formedPair({ tune: { leaveWindow: 6 } })
@@ -660,7 +660,7 @@ test('the knock window counts only links to members that could ANSWER: a fellow 
   h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.LEAVE, {}) })
   h.tick()
   assert.deepEqual(h.of('left'), [['left', false]], 'the bound ran out among leavers: nobody linked could commit anything')
-  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 4, done: true, drain: undefined })
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 4, done: true, why: 'unanswered', drain: undefined })
   assert.ok(h.node.membership.leaving!.total < LEAVE_WINDOW, 'well inside the window: the bound ended it, not the window')
 })
 
@@ -677,7 +677,7 @@ test('the knock window closes with the link: a link loss is not a tick, but from
   }
   h.tick()
   assert.deepEqual(h.of('left'), [['left', false]], 'LEAVE_TICKS + 1 unlinked ticks: it goes like a crash, as before')
-  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 3, done: true, drain: undefined })
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 3, done: true, why: 'unanswered', drain: undefined })
   assert.ok(h.node.membership.leaving!.total < LEAVE_WINDOW, 'the bound ended it, not the window')
 })
 
@@ -699,7 +699,7 @@ test('the knock window counts no link that is DEAD on a wire fault: the kernel m
   }
   h.tick()
   assert.deepEqual(h.of('left'), [['left', false]], 'LEAVE_TICKS + 1 ticks after the fault: it goes like a crash')
-  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 3, done: true, drain: undefined }, 'every tick since the fault counted toward the bound')
+  assert.deepEqual(h.node.membership.leaving, { ticks: LEAVE_TICKS + 1, total: LEAVE_TICKS * 2 + 3, done: true, why: 'unanswered', drain: undefined }, 'every tick since the fault counted toward the bound')
 })
 
 test('the knock window needs the clock: with heartbeats off a leaver knocks once and waits, as before — no tick is counted either way, and the answer still ends it', () => {

@@ -205,7 +205,7 @@ test('DRAIN after a vote that never came back (wave 6b, 2026-10-12): a scoped le
   assert.deepEqual(h.of('left'), [['left', false]], 'leaveWindow + 1: it goes like a crash')
   assert.equal(h.node.epoch, 1, 'the view never changed')
   assert.equal(h.node.scope!.entries.get('p')?.state, SCOPE.held, 'p is still held: no install froze it into an orphan')
-  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, drain: undefined }, 'no drain was entered (nobody to drain to); no tick counted toward the bound (a member was linked throughout)')
+  assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, why: 'unanswered', drain: undefined }, 'no drain was entered (nobody to drain to); no tick counted toward the bound (a member was linked throughout)')
   assert.deepEqual(h.jk(JK.undrained).map((e) => [e.a, e.b]), [[1, 1]], 'p goes with it, counted: at R=1 nobody else holds it')
   assert.deepEqual(h.jk(JK.left).map((e) => [e.a, e.b, e.c]), [[1, 0, 'unanswered']], 'and the row says why: the vote never came back')
   //! a late vote changes nothing: the leave is over
@@ -241,13 +241,40 @@ test('DRAIN after a vote that never came back (wave 6b, 2026-10-12): a scoped le
   w.node.step({ kind: 'leave' })
   for (let i = 0; i <= LEAVE_WINDOW; i++) w.tick()
   assert.equal(w.of('left').length, 0, 'the window ended; bb is reachable and has not proved it holds p — the drain begins')
-  assert.deepEqual(w.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, drain: 0, clean: false })
+  assert.deepEqual(w.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, why: 'unanswered', drain: 0, clean: false })
   w.tick(); w.tick()
   assert.equal(w.of('left').length, 0)
   w.bytes(1, havea(1, { p: { ok: 1, need: 0, m: { bb: 5 } } }))
   assert.deepEqual(w.of('left'), [['left', false]], 'bb covers: the wait ends')
   assert.equal(w.jk(JK.undrained).length, 0)
   assert.deepEqual(w.jk(JK.left).map((e) => [e.a, e.b, e.c]), [[1, 0, 'unanswered']])
+})
+
+//! the `left` row's why is RECORDED when the view half ends and carried on `leaving`, not re-derived at the exit (wave 6b's
+// first review, the nit): an `unanswered` leaver at R≥2 drains; a LATE vote then commits the shrunk view here (its exit
+// ballot is alive for a proposal age after the last knock), so the leaver is no member of its own view by the time the
+// drain ends — re-deriving the word then read `unechoed` ("no survivor echoed": true, but the leave's verdict was that
+// the vote never came back inside the window). Red before: `leaving` without `why`, and the row [[2, 0, 'unechoed']].
+test('DRAIN, the why is recorded at the window\'s end: an `unanswered` scoped leaver at R=2 is draining when a late vote commits the shrunk view here — its `left` row still says `unanswered`, at the epoch it then holds', () => {
+  const w = harness('aa', { replicas: 2, boot: { epoch: 1, members: ALL }, tune: { drainTicks: 4 } })
+  w.node.step({ kind: 'start' })
+  w.admit(1, 'bb')
+  w.admit(2, 'cc')
+  w.bytes(1, view(1, 'aa', 'bb', 'cc'))
+  w.node.writes.ring.place('p', 'aa', 'bb')
+  w.bytes(1, frame('bb', [{ seq: 5, rec: rec(['p', 'x'], 1), pp: 0 }]))
+  w.node.step({ kind: 'leave' })
+  for (let i = 0; i <= LEAVE_WINDOW; i++) w.tick()
+  assert.deepEqual(w.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, drain: 0, clean: false, why: 'unanswered' }, 'the drain began; the why is on the record')
+  //! the late votes: aa's exit ballot {bb,cc}@2 is still alive (re-proposed at a knock, a proposal age after it)
+  w.bytes(1, vote(2, 'bb', 'cc'))
+  w.bytes(2, vote(2, 'bb', 'cc'))
+  assert.equal(w.node.epoch, 2, 'committed here, late')
+  assert.equal(w.node.membership.isMember('aa'), false)
+  assert.equal(w.of('left').length, 0, 'still draining: p is an orphan now, bb its holder, not yet attested')
+  w.bytes(1, havea(2, { p: { ok: 1, need: 0, m: { bb: 5 } } }))
+  assert.deepEqual(w.of('left'), [['left', false]], 'bb covers: the wait ends')
+  assert.deepEqual(w.jk(JK.left).map((e) => [e.a, e.b, e.c]), [[2, 0, 'unanswered']], 'the row keeps the view half\'s verdict: the vote never came back in time (before: unechoed)')
 })
 
 test('DRAIN after a timed-out view half: the votes came back and the leaver installed its own shrunk view, but no survivor echo arrived inside the knock window — p is an orphan with a reachable new holder all the same, so it drains; the verdict stays false (the view half was never proved) and `undrained` counts what was not copied', () => {
@@ -269,7 +296,7 @@ test('DRAIN after a timed-out view half: the votes came back and the leaver inst
     h.tick() // leaveWindow + 1: the view half times out
     assert.equal(h.of('left').length, 0, 'not gone: bb is reachable and has not proved it holds p — the drain begins')
     assert.deepEqual(h.node.scope!.undrained(h.node), { waiting: 1, stranded: 0 })
-    assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, drain: 0, clean: false }, 'the drain carries the view half\'s verdict')
+    assert.deepEqual(h.node.membership.leaving, { ticks: 0, total: LEAVE_WINDOW + 1, done: true, why: 'unechoed', drain: 0, clean: false }, 'the drain carries the view half\'s verdict')
     return h
   }
   //! (a) bb attests at the frozen tail: shed, then left(false) — copied, but the stop was not clean all the way
