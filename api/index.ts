@@ -14,7 +14,7 @@
 // role (M5b) and user-method dispatch (M5c) land next.
 
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
-import { Runtime, restoreOpts, type RuntimeOpts } from '../shell/runtime.ts'
+import { Runtime, restoreOpts, lockDir, type RuntimeOpts } from '../shell/runtime.ts'
 import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
@@ -530,31 +530,37 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   const badUuid = (u: unknown) => typeof u !== 'string' || u === '' || u.includes('~')
   if (config.uuid !== undefined && badUuid(config.uuid))
     throw new Error(`fero('${name}'): uuid must be a non-empty string without '~' (the incarnation-lane separator)${at('uuid')}`)
+  //! the dir is taken BEFORE its boot record is read (wave 6b, the dir lock): one process at a time holds a dir, and the
+  // record this life restores is then the last one the previous life wrote — never one a holder still alive overwrote
+  // a moment after we looked. The Runtime adopts the lock (rtOpts.lock); a refusal below gives it back first.
+  const dirLock = config.dir ? lockDir(config.dir as string, `fero('${name}')`) : undefined
+  const refuse = (msg: string): never => { dirLock?.(); throw new Error(msg) }
   //! restore-before-network: a dir holding a previous life boots as its heir (identity recovered,
   // incarnation bumped, clock leased, votedFor honored) — the composer makes the wal.test.ts idiom
   // the default path
-  const restored = config.dir ? restoreOpts(config.dir as string) : {}
+  let restored: ReturnType<typeof restoreOpts>
+  try { restored = config.dir ? restoreOpts(config.dir as string) : {} } catch (e) { dirLock?.(); throw e }
   //! the review's legacy-poisoning finding: a pre-v4.1 boot record carries no uuid — letting the
   // RANDOM default claim such a dir would stamp the accident into boot.json on the very next write
   // and lock the true owner out behind the mismatch throw below. Refuse instead: the operator names
   // the identity ONCE; every later boot record carries it and recovery is automatic thereafter.
   if (restored.boot !== undefined && restored.uuid === undefined && config.uuid === undefined)
-    throw new Error(`fero('${name}'): this dir predates identity recovery (a v4.0 boot record carries no uuid) — pass the node's uuid once; the next boot record will carry it`)
+    refuse(`fero('${name}'): this dir predates identity recovery (a v4.0 boot record carries no uuid) — pass the node's uuid once; the next boot record will carry it`)
   //! a hand-edited or embedder-written boot record gets the SAME validation as config (the composer
   // is the public gate; the kernel trusts NodeOpts by design)
   if (restored.uuid !== undefined && badUuid(restored.uuid))
-    throw new Error(`fero('${name}'): this dir's boot record carries an invalid uuid (${JSON.stringify(restored.uuid)}) — repair boot.json`)
+    refuse(`fero('${name}'): this dir's boot record carries an invalid uuid (${JSON.stringify(restored.uuid)}) — repair boot.json`)
   if (config.uuid !== undefined && restored.uuid !== undefined && config.uuid !== restored.uuid)
-    throw new Error(`fero('${name}'): uuid '${config.uuid as string}'${at('uuid')} does not match this dir's previous life '${restored.uuid}' — one dir, one identity (use a fresh dir for a new node)`)
+    refuse(`fero('${name}'): uuid '${config.uuid as string}'${at('uuid')} does not match this dir's previous life '${restored.uuid}' — one dir, one identity (use a fresh dir for a new node)`)
   //! the dir records WHAT as well as WHO (v4.1): the same misdial class the name-echo closes on the
   // wire exists one layer down — fero('other', {dir-of-'r'}) would fold r's WAL into 'other' and
   // replicate it outward. A legacy record lacks the field: no check, stated legacy behavior.
   if (restored.name !== undefined && restored.name !== name)
-    throw new Error(`fero('${name}'): this dir belongs to resource '${restored.name}' — one dir, one resource (use a fresh dir)`)
+    refuse(`fero('${name}'): this dir belongs to resource '${restored.name}' — one dir, one resource (use a fresh dir)`)
   //! (after identity validation: a bad uuid is the earlier, more specific error) a client with nothing to dial is a dead-end — refuse loudly rather than boot a follower that can
   // never follow anything: no directory (rendezvous: false / FERO_RENDEZVOUS=off) AND no hosts
   if (isClient && rendezvous === false && (hosts === undefined || hosts.length === 0))
-    throw new Error(`fero('${name}'): a client needs something to dial — the directory is off (rendezvous: false) and hosts is ${hosts === undefined ? 'omitted' : 'empty'}`)
+    refuse(`fero('${name}'): a client needs something to dial — the directory is off (rendezvous: false) and hosts is ${hosts === undefined ? 'omitted' : 'empty'}`)
   //! the cluster contract (DESIGN-DOOR §4): what every MEMBER must agree on, as one readable string the
   // server's HELLO carries (`c`). The kernel appends `;ring=fmix32`. heartbeat.ms is the EFFECTIVE value
   // (after the 500 default below); replicas 0 = full replication; methods 1 = the door is on; validation =
@@ -582,6 +588,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
     hosts,
     client: isClient || undefined,
     dir: config.dir as string | undefined,
+    ...(dirLock !== undefined ? { lock: dirLock } : {}),
     //! the KERNEL keeps heartbeats explicit (0 = off, the sweep mode); the COMPOSER is where production
     // defaults live: 500ms drives genesis/suspicion on servers and the write-retry clock + AE floor on
     // clients. Pass heartbeat: { ms: 0 } to opt out.
