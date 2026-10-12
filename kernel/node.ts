@@ -1302,9 +1302,10 @@ export class Node {
   // the link to the shut feeder is redialed like any lost link and comes back as a non-primary, its gate still heard.
   // A second feeder cannot be elected UNDER the first (the single-feeder rule: the old one keeps tap-forwarding until
   // its side of the link is gone — two feeders fork per-origin ordering), which is why the link closes. With no open
-  // server linked the client stays: its writes wait, as they did, and land when the gate opens. The old feeder may
-  // still forward an attempt it parked when its gate reopens; the owner's cid dedup absorbs it, as it does for every
-  // relay that outlives a client's link today. One move per word, and a word comes once per heartbeat per link.
+  // server linked the client stays: its writes wait, as they did, and land when the gate opens. What the old feeder
+  // parked for this client leaves its queue at the linkDown the close causes (write.ts dropVia): the client re-sends it
+  // to the next relay, and a copy kept at the old one would commit a second time under its stale view once its gate
+  // reopened. One move per word, and a word comes once per heartbeat per link.
   #refeed() {
     if (this.primary === null) return
     const p = this.links.get(this.primary)
