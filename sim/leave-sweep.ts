@@ -224,6 +224,49 @@ export const starved = (leaver: 'n01' | 'n02', cutBefore: number, leaveWindow: n
   return { left: sim.left.get(leaver) ?? null, afterStop: leftAt < 0 ? -1 : leftAt - stop, stayer: `${stayer.uuid}@${stayer.epoch}{${members(stayer)}}`, ballots }
 }
 
+//! lowestStopsInsideDrop — the lowest member stops while ANOTHER leaver's dropped ballot is in flight (the rework
+// review of wave 6b, probe B3). n=5 at heartbeat 50 on 3 ms links, except the n01-n03 pair at `pairDelay` ms one way
+// (n03's grant round-trips in 2 × pairDelay); n04 and n05 are cut from everyone at t0 (two crashes, a bare majority
+// left); n03 stops at t0 + 200 and knocks: n01 proposes the plain `P(2,4)` = {n01,n02,n04,n05}, and when the dead
+// chains give up (about t0 + 700) the re-read drops them — `P(2,2)` = {n01,n02} — and waits for n03's slow grant. n01
+// stops at t0 + `lowestAt`. Inside that round trip the heartbeat's revival has n04 and n05 dialing again, so an exit
+// computed from the VIEW read them live and put them back — {n02,n03,n04,n05}@2, `P(2,4)` — and needed a second
+// give-up; at the 16-tick window both stops went unclean and n02 was left `@1{n01..n05}`, four of five gone, read-only
+// for good. Under the rule that the exit may only shrink too (kernel/membership.ts #knockLeave carries the members any
+// ballot of mine in flight left out), n01's exit is {n02,n03}@2 at once. A leaver is destroyed once it has left, as
+// the shell tears it down (the sweep's runner does the same). Returns both verdicts, the ms after each stop, n02's
+// end state and writability, and n01's and n02's ballots.
+export const lowestStopsInsideDrop = (lowestAt: number, leaveWindow = 16, pairDelay = 100): { n03: boolean | null; n01: boolean | null; n03After: number; n01After: number; survivor: string; writable: boolean; ballots: string } => {
+  const sim = new Sim(1)
+  const nodes = cluster(sim, 5, { heartbeatMs: 50, fault: { delay: [3, 3] }, tune: { leaveWindow } })
+  sim.fault('n01', 'n03', { delay: [pairDelay, pairDelay] })
+  sim.run({ until: 1500 })
+  if (!nodes.every((x) => x.epoch === 1)) throw new Error('never formed')
+  const t0 = sim.now
+  const ids = nodes.map((x) => x.uuid)
+  for (const dead of ['n04', 'n05']) for (const o of ids) if (o !== dead) sim.partition(dead, o)
+  const stops: Record<string, number> = { n03: t0 + 200, n01: t0 + lowestAt }
+  for (const u of Object.keys(stops)) sim.post(u, { kind: 'leave' }, stops[u] - t0)
+  const n02 = nodes[1]
+  const ballots: Record<string, string> = {}
+  const leftAt: Record<string, number> = {}
+  const end = Math.max(...Object.values(stops)) + 50 * (leaveWindow + 4)
+  for (let t = sim.now; t <= end; t += 5) {
+    sim.run({ until: t })
+    for (const u of Object.keys(stops)) {
+      if (leftAt[u] !== undefined || !sim.left.has(u)) continue
+      leftAt[u] = sim.now
+      ballots[u] = sim.nodes.get(u)!.journal.read().filter((e) => e.kind === JK.propose).map((e) => `P(${e.a},${e.b})`).join(' ')
+      for (const o of sim.nodes.keys()) if (o !== u) sim.partition(u, o)
+      sim.nodes.get(u)!.destroy(); sim.nodes.delete(u)
+    }
+    if (leftAt.n03 !== undefined && leftAt.n01 !== undefined) break
+  }
+  const after = (u: string) => (leftAt[u] === undefined ? -1 : leftAt[u] - stops[u])
+  const shown = (u: string) => `${u}: ${ballots[u] ?? sim.nodes.get(u)?.journal.read().filter((e) => e.kind === JK.propose).map((e) => `P(${e.a},${e.b})`).join(' ')}`
+  return { n03: sim.left.get('n03') ?? null, n01: sim.left.get('n01') ?? null, n03After: after('n03'), n01After: after('n01'), survivor: `n02@${n02.epoch}{${members(n02)}}`, writable: n02.membership.gate(n02).open, ballots: `${shown('n01')} | ${shown('n02')}` }
+}
+
 export const shape1 = (s: Schedule) => `${s.seed} n=${s.n} leavers=${s.leavers} stall=${s.stall ? `${s.stall.node}/${s.stall.ms}` : '-'} slow=${s.stalls.map((x) => x.join(':')).join(',')} offsets=${s.offsets} linger=${s.linger}${s.join ? ' join' : ''}`
 export const shape2 = (s: Schedule2) => `${s.seed} n=${s.n} leavers=${s.leavers} cuts=${JSON.stringify(s.cuts)} restart=${s.restart} slow=${s.delay.filter((d) => d[2] > 3).map((d) => d.join(':')).join(',')}`
 

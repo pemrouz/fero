@@ -967,16 +967,20 @@ export class Membership {
     }
     if (this.view.members.length === 1) { this.#finishLeave(node, true); return } // the last member simply goes
     if (this.#lowestLive() === node.uuid) {
-      //! the view without me — and without the dead, when the live cannot carry it (#leaveView). An EVICTION in flight
-      // (a ballot of mine that is no leave and leaves members of my view out) is replaced, as every other ballot of mine
-      // is (leaving outranks), but my exit carries its evictees: it opened on the give-up, and the heartbeat's revival
-      // (V4-20) has that chain dialing again by the time I knock, so #dead alone would keep them and doom my exit. My
-      // own exit already in flight is re-read from ITSELF (the drop is sticky): a member it left out stays out
+      //! the view without me — and without the dead, when the live cannot carry it (#leaveView). Any OTHER ballot of
+      // mine in flight is replaced (leaving outranks), but my exit LEAVES OUT every member that ballot left out — THE
+      // EXIT MAY ONLY SHRINK TOO (DESIGN-LEAVE §10.7's note of 2026-10-12, the rework review): an eviction's evictees,
+      // or the dead members another leaver's ballot dropped at its re-read. They were left out on evidence (a chain
+      // that gave up), and the heartbeat's revival (V4-20) has those chains dialing again by the time I knock, so
+      // #dead alone would read them live and put them back — a second give-up before my exit could commit, and at the
+      // default window both stops unclean (the review's probe B3). The other leaver itself stays IN my exit: it was out
+      // of its own ballot by its knock, not on evidence, and the next lowest answers its knock once my exit commits.
+      // My own exit already in flight is re-read from ITSELF (the drop is sticky): a member it left out stays out
       const p = this.#proposal
       const mine = p !== null && p.leaver === node.uuid ? p.view.members : undefined
-      const evictees = p !== null && p.leaver === undefined ? new Set(this.view.members.filter(([u]) => !p.view.members.some((m) => m[0] === u)).map((m) => m[0])) : null
+      const leftOut = p !== null && p.leaver !== node.uuid ? new Set(this.view.members.filter(([u]) => u !== p.leaver && !p.view.members.some((m) => m[0] === u)).map((m) => m[0])) : null
       const read = this.#leaveView(node, node.uuid, mine)
-      const shrunk = evictees === null ? read : read.filter(([u]) => !evictees.has(u))
+      const shrunk = leftOut === null ? read : read.filter(([u]) => !leftOut.has(u))
       if (this.#proposal && this.#proposal.h !== hashOf(shrunk)) this.#proposal = null
       if (!this.#proposal) this.#propose(node, { epoch: this.#nextEpoch(node), members: shrunk }, node.uuid)
       return
