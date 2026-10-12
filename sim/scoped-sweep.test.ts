@@ -1,5 +1,6 @@
-//! The scoped adversarial sweep (DESIGN-SCALE stage 0, §6): the adversaries A1-A11 of sim/scoped-sweep.ts (and A12, the
-// spoke across two hand-offs, since wave 6a, with M12 judging every spoke against its feeder's held subset), each run
+//! The scoped adversarial sweep (DESIGN-SCALE stage 0, §6): the adversaries A1-A11 of sim/scoped-sweep.ts (and, since
+// wave 6a, A12, the spoke across two hand-offs, and A13, the spoke whose feeder repairs and re-enters through the latch,
+// with M12 judging every spoke against its feeder's held subset), each run
 // on seeded scoped clusters (n from the family's list, R 1-3, memory or durable, 50-500 partitions, row and field
 // writes, removes, re-writes of removed cells; compactAt and snapshotAt at 16) with M1-M10 armed, and the mutation
 // runner's pinned catches.
@@ -107,9 +108,15 @@ const ENGAGED: Record<string, (e: Record<string, number>) => boolean> = {
   'A10-linger': (e) => e.killed === 1 && e.late > 0, // a killed member's record applied after the survivor's install
   'A11-spoke': (e) => e.paused === 1,
   'A12-spoke-handoff': (e) => e.handoff === 1 && e.epoch >= 3 && e.feederAcquires > 0, // the join, the leave, and the spoke's feeder folded through the latch
+  //! A13: the spoke's feeder folded a REPAIR (the delta leg) and a RE-ENTRY from an orphan (the whole-partition leg).
+  // Every seed of 1-8 reaches both (repairs 7-41, re-entries 2-27, measured 2026-10-12). Mutation-checked on seeds 1 and
+  // 2: with the re-entry forward taken out M12 names a row of a re-entered partition the spoke lacks on both; with the
+  // delta forward taken out, a row of a repaired one on both. The answer's filter (feeds vs held) is NOT what this family
+  // exercises — its spoke is synced all along — sighting 3 and the kernel tests cover that.
+  'A13-spoke-repair': (e) => e.repairFolds > 0 && e.reentryFolds > 0,
 }
 //! SPOKED — the families with a spoke: M12 (spokeMirror) must have compared something on every one of them
-const SPOKED = new Set(['A11-spoke', 'A12-spoke-handoff'])
+const SPOKED = new Set(['A11-spoke', 'A12-spoke-handoff', 'A13-spoke-repair'])
 
 for (const fam of FAMILIES) {
   test(`scoped sweep ${fam.name}: ${SEEDS} seeds${KNOWN_UNSAFE[fam.name] ? ', pinned unsafe ' + Object.keys(KNOWN_UNSAFE[fam.name]).join(',') : ''}${RESYNC_SEEDS[fam.name] ? ', resync seeds ' + RESYNC_SEEDS[fam.name].join(',') : ''}${ALWAYS[fam.name] ? ', always ' + ALWAYS[fam.name].join(',') : ''} — safe and live, M8 red today on every seed, the chaos engaged`, () => {
