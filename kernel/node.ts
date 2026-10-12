@@ -295,7 +295,7 @@ export class Node {
   // the per-snapshot metadata {floors at build, dirty counters at build} its echo commits.
   #inflightParts = new Map<number, Map<string, Map<string, number>>>()
   #dirty = new Map<string, number>()
-  #snapMeta = new Map<number, { floors: Map<string, Map<string, number>>; clears: Map<string, number>; boot: boolean }>()
+  #snapMeta = new Map<number, { floors: Map<string, Map<string, number>>; clears: Map<string, number> }>()
   //! boot-restored M6 facts (C10): the foldable set of the previous life (held ∪ orphaned — null =
   // record absent / unscoped), the FROZEN half (finding 48: restored orphans re-enter only through
   // the latch, even when the restored ring re-assigns them), and the partitions whose replay floors
@@ -418,10 +418,16 @@ export class Node {
 
   //! compacted — a compacting pass dropped entries at this ARMED node (kernel/log.ts compactScoped, DESIGN-SCALE
   // stage 3). Durable bookkeeping: the snapshot swap is armed so the compacted lanes reach disk atomically (the tick
-  // checks the counter right after the pass), and the swap's echo REWRITES THE BOOT RECORD (snapshot() carries the
-  // flag into its meta): replay rebuilds floors from the boot record's seed and then only through chain-verified
-  // rows, and compaction opened pp gaps at or below the frontier — the seed must cover them, or a restore would
-  // chain from a stale seed, stall at the first gap and come back with floors below its content (a re-latch).
+  // checks the counter right after the pass), and the BOOT RECORD IS WRITTEN WHEN THAT SWAP IS ISSUED (snapshot()
+  // reads the flag): replay rebuilds floors from the boot record's seed and then only through chain-verified rows,
+  // and compaction opened pp gaps at or below the frontier — the seed must cover them, or a restore would chain
+  // from a stale seed, stall at the first gap and come back with floors below its content (a re-latch). The seed
+  // written at the issue is the pre-swap durable floor, which is at or above every gap (the pass dropped at or under
+  // it), and either file on disk backs it: the old WAL has no gap above it, the new one none at all. So a crash at
+  // ANY point — before the swap lands, or after it and before its echo — restores floors that chain to the content,
+  // and the durable marks this node announced are never above what its disk restores (the stage-3 review's window:
+  // a write at the ECHO left the fsync-to-echo gap under the old seed, one re-latch and, for stage 4's R2, marks
+  // peers had already counted as crash-stable).
   #compacted = false
   compacted() {
     if (!this.durable) return
@@ -698,10 +704,9 @@ export class Node {
           let cleared = false
           const sealedNow: string[] = []
           for (const [p, n] of snap.clears) if (this.#dirty.get(p) === n) { this.#dirty.delete(p); cleared = true; sealedNow.push(p) }
-          //! the boot record follows a dirty clear, and the echo of a swap a COMPACTING pass armed (DESIGN-SCALE stage
-          // 3, `compacted`): the floor seed now reads the durable floors the swap just proved, above every gap the pass
-          // opened, so a restore chains from it and never re-latches what it holds
-          if (cleared || snap.boot) this.persistBoot()
+          //! the boot record follows a dirty clear (a swap a COMPACTING pass armed wrote its seed when it was issued,
+          // not here — `compacted` says why the echo is too late)
+          if (cleared) this.persistBoot()
           //! the SEAL (findings 19/37/46): a dirty-clear proves the disk restores this partition's
           // whole base — a pending ACQDONE attestation gate opens now (announce + boot-list re-entry)
           for (const p of sealedNow) this.scope!.sealed(this, p)
@@ -1225,12 +1230,16 @@ export class Node {
         for (const [p, pe] of d.parts) if (pe.s > 0) per.set(p, pe.s)
         if (per.size) floors.set(origin, per)
       }
-      this.#snapMeta.set(batch, { floors, clears: new Map(this.#dirty), boot: this.#compacted })
-      this.#compacted = false
+      this.#snapMeta.set(batch, { floors, clears: new Map(this.#dirty) })
     }
     this.#walRows = 0
     this.journal.armed && this.journal.emit(JK.snapshot, batch, rows.length)
     this.env.sink.snapshot(batch, rows)
+    //! a swap a COMPACTING pass armed (DESIGN-SCALE stage 3, `compacted`): the boot record is written NOW, with the
+    // seed at the pre-swap durable floors — at or above every gap the pass opened, backed by either file — so no
+    // crash window is left between the swap and its echo. The shell writes the record synchronously and queues the
+    // swap, so on disk the seed lands first; the sim lands the swap at once: both orders restore honestly.
+    if (this.#compacted) { this.#compacted = false; this.persistBoot() }
   }
 
   //! condemn — the fsyncgate verdict on a lying disk (see `tainted`): reset the fold to empty, swap
