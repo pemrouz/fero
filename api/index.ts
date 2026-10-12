@@ -21,7 +21,7 @@ import { JK } from '../kernel/journal.ts'
 import { TUNE } from '../kernel/tune.ts'
 import { Bind, METHODS_ONLY, UNENCODABLE, INVALID_KEY, CARRIES, atCap, unsendable, unsentWhy, reasonOf, type Coords } from './data.ts'
 import { fnv } from '../kernel/ring.ts'
-import { Caller, Host, SYSTEM, handle, reapStopped, type Context } from './methods.ts'
+import { Caller, Host, SYSTEM, handle, reapStopped, takesKey, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
 import { proxy, contract, commit, errText, snapshot as snapshotOf, unfoldable, SPARSE_HOLE, holeMessage, DATA_ROOT, FERO_ROOT, type Fault } from './substrate.ts'
 import { diagnostics, type Diagnostics } from './diagnostics.ts'
@@ -790,7 +790,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
   // method. Scoped + no key = THE GATHER (v2 Q3: read() IS the download): one-shot on CALL, the
   // live parked-union proxy on SUB (ctx.live — re-gathered on installs + a paced tick).
   const table: Record<string, (arg: unknown, ctx: Context) => unknown> = {
-    read: (a, ctx) => {
+    read: takesKey((a, ctx) => {
       if (a != null) {
         //! a keyed read on a scoped node for a NON-HELD partition routes to the owner (one hop) —
         // the same answer at R=2 and R=∞, never a silent local undefined (plan §9). The routed hop
@@ -813,7 +813,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
         return g.proxy
       }
       return gatherOf().refresh(rt, { throwOnPartial: true })
-    },
+    }),
     ...(userMethods as Record<string, (arg: unknown, ctx: Context) => unknown>),
   }
   //! the system plane: confirm-over-RPC — a spoke's ladder evidence is one digest wide (M5b residual),
@@ -827,7 +827,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       return probe({ origin: v.o, seq: v.s, epoch: 0 }, v.l, Math.min(v.t ?? 8000, 60_000), v.pt)
     },
     rows: () => rowsPartial(rt),
-    read: (a) => keyedRead(String(a)),
+    read: takesKey((a) => keyedRead(String(a))),
   }
   //! the Host receives the SCOPED facade as ctx.data (M6-review finding 4): a handler's
   // `ctx.data[id]` / `ctx.data.filter(…)` must mean the same as the public surface — typed
