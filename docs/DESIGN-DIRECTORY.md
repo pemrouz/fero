@@ -626,9 +626,11 @@ cluster contract (`contractReject`) or at the door (DESIGN-DOOR §3: no secret w
 secret where I have none, the address rule, a refusal notice for my proof, a proving timeout, a
 `uuid-taken` notice) STAYS in the count, as on the base — genesis waits for it — but no longer
 silently: the composer's refusal line for that target (`api/index.ts` `refusalLine`, one line per
-dialed address and reason, V4-30/V4-47's machinery) ends with "the first view waits on it: fix the
-mismatch, or take it out of hosts" while this node holds no view yet and the target is one it
-counts. Once per target, not per dial. Only my own dial's outcome at the address I dialed counts,
+dialed address and reason, V4-30/V4-47's machinery) ends with " — the first view waits on it" while
+this node holds no view yet and the target is one it counts. Once per target, not per dial. The
+suffix names no remedy: the same line lands on a secretless server beside a cluster with a secret
+(examples/18-secret), where "take it out of hosts" would be the wrong advice; the operator's advice
+— fix the mismatch, or take the address out of `hosts` — lives in the README's Roles bullet. Only my own dial's outcome at the address I dialed counts,
 never a claim on an ACCEPTED link: a stranger that can merely connect could otherwise send a HELLO
 naming a real member's listen and shrink my count. The name entry leaves when the target admits (a
 resource that moves onto the right port heals at the heartbeat's revival cadence, as the
