@@ -1689,6 +1689,25 @@ said the journal row carried the partition; it carries the count since
 b0291a7. The deviation list above gains a seventh entry: the row's "the
 boot record rewritten at its echo" is "written when the swap is issued".
 
+*Re-checked, 2026-10-12 (the third look: one minor, one nit; the kernel
+fix held).* The minor: two of the window test's checks, "the floor
+restored equals the pre-crash floor" and "no mark a peer held is above
+what its disk restored", read the reborn 3 s after the restart, when the
+peers' digests and the re-latch had already healed a wrong seed; with the
+write moved back to the echo both stayed green, and so did the restore
+test's floors line with no boot write at all. Both tests now read those
+lines at the restore instant (`sim.run({ until: sim.now })` right after
+`sim.restart`: replay and start done, nothing on the wire). Mutation
+check in a scratch copy: with the write at the echo, each of the window
+test's four restore checks is red on its own with the other three off
+(the seed covers the gap; n01|c1 restored 158, was 211; a peer held 162,
+the disk restored 158; 5 re-latches), and the old 3 s placement is green;
+with no boot write at all, the restore test is red at its floors line
+(restored 2, was 158) and, with that off, at "no re-latch" (5). So the
+window test is the R2 check stage 4 is handed above. The nit: I11 below
+still said the seed is rewritten at the echo; it now says it is written
+when the compaction-armed swap is issued.
+
 ## §0 The decision, in ten lines
 
 1. On a scoped cluster the heartbeat DIGEST between members stops. A holder
@@ -2277,8 +2296,9 @@ that stepped (STATUS.md:66).
   the census table and aborts latches before the new round.
 - **I11 Durability** (new). A durable holder counts at its durable floors;
   a just-folded base attests nothing until its snapshot echo (`sealed`,
-  scope.ts:580, node.ts:535-539); the boot seed is rewritten at every
-  snapshot echo that follows a compacting pass. Residual: G5.
+  scope.ts:580, node.ts:535-539); the boot seed is written when a
+  compaction-armed snapshot swap is issued (the pre-swap durable floors).
+  Residual: G5.
 - **I12 Bounded logs** (new, horizon). At quiescence with no orphan and no
   open latch, every lane at every node holds ≤ winners + `compactAt`
   entries, and every tombstone is either fenced or pinned by a named
