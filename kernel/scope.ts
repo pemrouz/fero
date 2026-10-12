@@ -126,6 +126,19 @@ export class Scope {
   //! held — the api/monitor view: is p live here (folds records, serves reads, attests possession)?
   held(p: string): boolean { return this.entries.get(p)?.state === SCOPE.held }
 
+  //! feeds — THE SPOKE FEED (wave 6a, its review): is what this node holds of p a spoke's to have? Everything but a
+  // FROZEN copy: held; or acquiring from a held base or from nothing (a repair, a hand-off: the base in the lane was
+  // served and tapped while held, or is this owner's own commits, and the fold only adds to it). An orphan's frozen
+  // copy is a teacher for holders, never a spoke feed, and a latch re-entering FROM an orphan (preState) stays so
+  // until its fold. node.ts #answer walks a client's digest answer with this, so a spoke that syncs while its feeder
+  // repairs a partition gets the base at once (held() alone skipped it: the spoke missed the base for good, or lost
+  // it at a resync's end and saw it return at the fold), and onAcqDone's forward can give every synced spoke the
+  // delta alone — a re-entry from an orphan is the one fold that owes its spokes the whole of p.
+  feeds(p: string): boolean {
+    const e = this.entries.get(p)
+    return e !== undefined && (e.state === SCOPE.held || (e.state === SCOPE.acquiring && e.preState !== SCOPE.orphan))
+  }
+
   //! verdict — THE INBOUND-GATE decision (write.ts ingest, armed only), the §0 law's first rows:
   // 1 = fold (held; a first-ever record to its lawful holder mints held), 2 = stage (an open latch
   // buffers live records for p), 0 = gate-drop (orphan freeze / not assigned / epoch skew).
@@ -702,18 +715,34 @@ export class Scope {
     const teach = e.buf!.filter((s) => !s.live)
     if (teach.length !== (v.n ?? 0)) { this.#abort(node, p, 'torn'); return }
     const cut = v.t ?? {}
-    //! THE SPOKE FORWARD (wave 6a, 2026-10-12): every teacher record this fold takes in goes to each SYNCED client
-    // link, exactly as the live tap gives a spoke a fresh inbound record (write.ts inbound): the record, its lane
-    // coordinates and its attempt identity (the spoke's write-route join reads it; V4-7's order holds — the value
-    // shows, then the write settles), no pp (a spoke attests nothing). The spoke's own dual fence takes a record
-    // below its lane tail (write.ts #splice, the client leg) and drops one it already holds. Before this, a feeder
-    // folded here through node.apply alone and its spokes never heard: a spoke's floor exchange ships only what is
-    // above its own tail on each lane, so once a later record on the lane had been tapped live, the rows the latch
-    // brought never came while that feeder lived (STATUS, two sightings: a lost owner-to-holder frame repaired
-    // through the latch; an acquire in a hand-off). An UNSYNCED client link is not fed, as the live tap does not
-    // feed it: the answer that syncs it covers these records — a resync asks with d = {}, and a stopped or queued
-    // answer's cover is lowered to just under each interior insert by node.indexInsert below.
+    //! THE SPOKE FORWARD (wave 6a, 2026-10-12; its review the same day). THE RULE: a synced client link holds the
+    // whole of every partition this node FEEDS it (`feeds`, above). The fold adds records to p, so the fold forwards:
+    //   p was fed through the latch (acquiring from a held base or from nothing: preState is not orphan) — every
+    //     synced spoke already holds p's pre-fold content (the digest answer shipped it, node.ts #answer; the tap and
+    //     the owner's own commits fed it), so each gets the records this fold ADDS, in the loop below, exactly as the
+    //     live tap gives a spoke a fresh inbound record (write.ts inbound): the record, its lane coordinates and its
+    //     attempt identity (the spoke's write-route join reads it; V4-7's order holds — the value shows, then the
+    //     write settles), no pp (a spoke attests nothing). An UNSYNCED link is not fed (the live tap does not feed it
+    //     either): the answer that syncs it covers p, and node.indexInsert lowers a stopped or queued answer's cover
+    //     under each insert made here.
+    //   p RE-ENTERS from an orphan (preState orphan): its frozen copy was no spoke's to have, so a spoke synced since
+    //     the freeze has nothing of p, and one synced before it holds the frozen rows. Every synced spoke gets the
+    //     WHOLE of p after the loop (#forwardWhole), base and delta, in lane order; the spoke's dual fence (write.ts
+    //     #splice, the client leg) takes a record below its lane tail and drops one it already holds, so a record sent
+    //     twice costs a frame, never a row. An unsynced link with a stopped or queued answer, or a clear's ceiling
+    //     (Link.torn / Link.inQueue; node.ts #answer, #clearCover), may hold a cover above p's rows on a lane that
+    //     answer walked while p was frozen: the cover is lowered to just under p's lowest entry on each lane of p, so
+    //     the answer that resumes from it ships p whole. A link with no cover has had no answer since its admit; its
+    //     first answer ships p, held by then.
+    // The review's probes (2026-10-12): with held() as the answer's filter and the delta alone forwarded, a spoke that
+    // synced mid-latch missed the base for good, showed an OVERWRITTEN value as current (the delta it got was older
+    // than a base record it never got), and at a resync ending across the fold lost the base rows it held and saw them
+    // return. Before wave 6a a feeder folded here through node.apply alone and its spokes never heard: a spoke's floor
+    // exchange ships only what is above its own tail on each lane, so once a later record on the lane had been tapped
+    // live, the rows the latch brought never came while that feeder lived (STATUS, two sightings: a lost
+    // owner-to-holder frame repaired through the latch; an acquire in a hand-off).
     const taps = node.clientLinks.size !== 0
+    const reentry = e.preState === SCOPE.orphan
     //! fold the teacher records: insert into lanes at seq position through the LWW election. The
     // teacher walked each lane ascending, so per-lane order is preserved by construction.
     for (const s of teach) {
@@ -729,11 +758,12 @@ export class Scope {
       node.indexInsert(s.origin, entry)
       node.apply(s.rec, s.origin, s.seq, s.epoch, s.iss, s.cid)
       if (s.iss) node.writes.remember(node, s.iss, s.cid!, s.seq, s.epoch, s.origin) // the lane too: a dup WACK from here must name it
-      if (taps)
+      if (taps && !reentry)
         for (const cl of node.clientLinks)
           if (cl.state === LS.admitted && cl.synced && !cl.dead)
             cl.add(s.rec, { origin: s.origin, baseSeq: s.seq, epoch: s.epoch }, s.iss ? { issuer: s.iss, baseCid: s.cid! } : undefined)
     }
+    if (taps && reentry) this.#forwardWhole(node, p)
     //! floors and fences advance to the CUT (the teacher's attestation), never past it on the
     // teacher's word; the scalar fence merges up so replayed-live below the cut dedups
     for (const [o, c] of Object.entries(cut)) {
@@ -778,6 +808,34 @@ export class Scope {
     node.persistBoot()
     this.round(node, undefined, new Set([p])) // the post-fold round, to p's holders only: announce possession (sealed-gated), true the floor up, seed confirm
     node.confirm.recount(node)
+  }
+
+  //! #forwardWhole — the fold's re-entry leg (onAcqDone, the rule above it): every client link gets the whole of p.
+  // Synced: every lane entry of p through the per-partition index, in node.logs order and ascending per lane (the
+  // order the live tap would have given them), attempt identity intact, no pp. Unsynced with a stopped or queued
+  // answer or a clear's ceiling: its cover is lowered to just under p's lowest entry on each lane of p, so the answer
+  // that resumes from it ships p whole (node.ts #answer; the DIGEST handler for a ceiling). O(entries of p) per
+  // synced link, O(lanes of p) per covered link; only at a re-entry from an orphan with a client link up.
+  #forwardWhole(node: Node, p: string) {
+    const per = node.byPart!.get(p)
+    if (per === undefined) return
+    for (const cl of node.clientLinks) {
+      if (cl.state !== LS.admitted || cl.dead) continue
+      if (cl.synced) {
+        for (const origin of node.logs.keys()) {
+          const arr = per.get(origin)
+          if (arr === undefined) continue
+          for (const x of arr) cl.add(x.rec, { origin, baseSeq: x.seq, epoch: x.epoch }, x.iss ? { issuer: x.iss, baseCid: x.cid! } : undefined)
+        }
+      } else if (cl.torn !== null || cl.inQueue !== null) {
+        for (const [origin, arr] of per) {
+          if (!arr.length) continue
+          const under = arr[0].seq - 1
+          if (cl.torn !== null && (cl.torn.d[origin] ?? 0) > under) cl.torn.d[origin] = under
+          if (cl.inQueue !== null && (cl.inQueue.d[origin] ?? 0) > under) cl.inQueue.d[origin] = under
+        }
+      }
+    }
   }
 
   //! sealed — the snapshot echo's callback (node.ts 'persisted', the dirty-clear leg): the acquired

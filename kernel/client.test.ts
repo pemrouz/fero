@@ -9,6 +9,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Node } from './node.ts'
 import { JK } from './journal.ts'
+import { SCOPE } from './scope.ts'
 import { Framer, VERB, encodeControl, encodeRuns } from './codec.ts'
 import { REC, TAG, type EffectSink, type Env, type Rec } from './env.ts'
 import { tornFeeder } from '../tools/perf/fixtures.ts'
@@ -1806,4 +1807,188 @@ test('a torn answer between two cuts of one run: the cover names the first recor
   assert.deepEqual(wireOf(F, 7, m).filter((x) => x !== 'DIGEST').flatMap((x) => x.split('+').map(Number)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'every row once')
   assert.equal(link.synced, true)
   assert.deepEqual(F.jk(JK.aeShip).map((e) => e.b), [8, 2], 'the records each round handed over')
+})
+
+//! ── the review of wave 6a (2026-10-12): a spoke that SYNCS while its feeder is not holding a partition it has rows of.
+// The digest answer shipped the HELD subset only, so a spoke synced while px was acquiring (a repair: held-found-lagging,
+// the shape of STATUS's first sighting) or an orphan got nothing of px, and the fold then forwarded only the records the
+// lane lacked: the base stayed missing while the feeder lived (the heartbeat floor exchange ships above the spoke's
+// tail only), and a forwarded delta OLDER than a base record the spoke never got showed an overwritten value as current.
+// Now the answer ships every partition the feeder FEEDS (Scope.feeds: all but an orphan's frozen copy and a latch
+// re-entering from one), so a spoke synced mid-repair has the base at once and the fold's delta completes it; a fold
+// that re-enters from an orphan forwards the whole partition, and lowers a stopped or queued answer's cover under it.
+// Red on the tree as first landed (`feeds` = held, the delta alone): S = [px.c] where F = [px.a, px.b, px.c]; px.a = 1
+// where F shows 2.
+const QX = (k: string, v: number): Rec => ({ type: REC.update, key: ['qx', k], value: v })
+const one = (origin: string, rec: Rec, seq: number, pp: number, verb: number) => encodeRuns([{ rec, origin, seq, epoch: 1, pp }], verb, true)[0]
+//! an armed feeder aa (bb and cc its peers; px and qx owned by bb, held by aa) and a spoke cl admitted on link 7 whose
+// first digest is sent when the test calls connect(): the test chooses what px is at aa at that moment
+const latching = (opts: Partial<ConstructorParameters<typeof Node>[0]> = {}, onSend?: (link: number) => void) => {
+  const members = [['aa', 'sim:aa'], ['bb', 'sim:bb'], ['cc', 'sim:cc']]
+  const F = harness('aa', { replicas: 2, boot: { epoch: 1, members }, ...opts }, onSend)
+  F.node.step({ kind: 'start' })
+  F.admit(1, 'bb'); F.digestFrom(1)
+  F.admit(2, 'cc'); F.digestFrom(2)
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.VIEW, { e: 1, m: members }) })
+  assert.equal(F.node.armed, true)
+  F.node.writes.ring.place('px', 'bb', 'aa')
+  F.node.writes.ring.place('qx', 'bb', 'aa')
+  F.node.step({ kind: 'linkUp', link: 7, dialed: false })
+  F.node.step({ kind: 'bytesIn', link: 7, bytes: encodeControl(VERB.HELLO, { u: 'cl', i: 1, l: 'sim:cl', r: 1 }) })
+  const S = harness('cl', { client: true, hosts: ['sim:aa'] })
+  S.node.step({ kind: 'start' })
+  S.node.step({ kind: 'linkUp', link: 2, dialed: true, to: 'sim:aa' })
+  const p = pump(F, 7, S, 2)
+  const link = F.node.links.get(7)!
+  const connect = () => { S.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HELLO, { u: 'aa', i: 1, l: 'sim:aa', c: SCOPED }) }); p.settle() }
+  const cells = (h: H) => [...h.node.state].map(([k, v]) => k + '=' + JSON.stringify(v)).sort()
+  const laneAt = (h: H, origin: string) => h.node.logs.get(origin)?.map((e) => e.seq) ?? []
+  const beat = (n: number) => { for (let i = 0; i < n; i++) { F.tick(); p.settle(); S.tick(); p.settle() } }
+  //! the teacher on `from` ships rows of px (ACQ) and ACQDONE with the cut
+  const teach = (from: number, rows: { seq: number; rec: Rec; pp: number; iss?: string; cid?: number }[], cut: number) => {
+    for (const r of rows) F.node.step({ kind: 'bytesIn', link: from, bytes: encodeRuns([{ rec: r.rec, origin: 'bb', seq: r.seq, epoch: 1, pp: r.pp, iss: r.iss, cid: r.cid }], VERB.ACQ, true)[0] })
+    F.node.step({ kind: 'bytesIn', link: from, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: cut }, n: rows.length }) })
+  }
+  return { F, S, p, link, connect, cells, laneAt, beat, teach }
+}
+
+for (const other of [false, true])
+  test(`wave 6a review — a spoke that syncs while its feeder RE-LATCHES a partition it held (a repair) gets the base from the answer and the delta from the fold, and nothing is left for the heartbeats (another partition on the lane: ${other})`, () => {
+    const { F, S, p, link, connect, cells, laneAt, beat, teach } = latching()
+    //! px held at aa with bb#3, bb#5 (a chained base); qx on the same lane when `other`
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+    F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+    if (other) F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+    assert.equal(F.node.scope!.held('px'), true)
+    //! cc announces px with bb at 7: aa is behind and re-latches px — its base stays in the lane, not held, still FED
+    F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+    assert.equal(F.node.scope!.held('px'), false, 'px is acquiring')
+    assert.equal(F.node.scope!.feeds('px'), true, 'a repair of a held base is still a spoke feed')
+    //! the spoke connects NOW (a fresh connect; a failover's resync asks the same d = {})
+    connect()
+    assert.equal(link.synced, true, 'the spoke link synced mid-latch')
+    assert.deepEqual(laneAt(S, 'bb'), other ? [3, 5, 6] : [3, 5], 'the answer shipped the base of the partition under repair (it shipped nothing of it before)')
+    teach(2, [{ seq: 7, rec: PX('c', 3), pp: 5 }], 7)
+    assert.equal(F.node.scope!.held('px'), true, 'the fold')
+    assert.deepEqual(laneAt(S, 'bb'), other ? [3, 5, 6] : [3, 5], 'before the pump: the delta is on the wire, sent in the fold\'s own step')
+    p.settle()
+    assert.deepEqual(cells(S), cells(F), 'the spoke mirrors its feeder right after the fold')
+    assert.deepEqual(laneAt(S, 'bb'), other ? [3, 5, 6, 7] : [3, 5, 7], 'lane bb at the spoke is whole')
+    beat(3)
+    assert.deepEqual(cells(S), cells(F), 'and stays so through the heartbeats')
+  })
+
+test('wave 6a review — a spoke that syncs while its feeder holds a partition as an ORPHAN gets nothing of it (a frozen copy is no spoke feed); the fold that re-enters it from the orphan forwards the WHOLE partition, base and delta', () => {
+  const { F, S, p, link, connect, cells, laneAt, teach } = latching()
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  F.node.step({ kind: 'linkDown', link: 2, reason: 'close' }) // the teacher dies: the latch aborts with residue, px is an orphan
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.orphan)
+  assert.equal(F.node.scope!.feeds('px'), false, 'an orphan is never a spoke feed')
+  connect()
+  assert.equal(link.synced, true)
+  assert.deepEqual(laneAt(S, 'bb'), [], 'nothing of px: its copy at aa is frozen')
+  //! cc comes back and announces px: the orphan re-enters through the latch (preState orphan)
+  F.admit(5, 'cc'); F.digestFrom(5)
+  F.node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring)
+  assert.equal(F.node.scope!.feeds('px'), false, 'a latch re-entering from an orphan is not fed until its fold')
+  teach(5, [{ seq: 7, rec: PX('c', 3), pp: 5 }], 7)
+  assert.equal(F.node.scope!.held('px'), true, 'the re-entry fold')
+  p.settle()
+  assert.deepEqual(laneAt(S, 'bb'), [3, 5, 7], 'the whole of px: the base the answer withheld and the delta')
+  assert.deepEqual(cells(S), cells(F), 'the spoke mirrors its feeder')
+})
+
+test('wave 6a review — a spoke that syncs mid-repair never shows an OVERWRITTEN value as current: the base record that supersedes a forwarded delta record came with the answer, so the older one loses the election at the spoke', () => {
+  const { F, S, p, connect, cells, teach } = latching()
+  //! bb#3 (px.a = 1) is lost on the way to aa; bb#5 (px.a = 2, pp 3) arrives and folds with a gapped floor
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX('z', 9), 6, 0, VERB.RECORDS) })
+  assert.equal(F.node.scope!.held('px'), true)
+  assert.equal(F.node.streams.get('bb')!.parts!.get('px')!.s, 0, 'the floor waits for the chain')
+  //! cc, a co-holder with the whole chain, announces px: aa re-latches
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  connect()
+  assert.equal(S.node.state.get(JSON.stringify(['px', 'a'])), 2, 'the answer brought px.a = 2 (bb#5)')
+  //! the teacher ships 3, 5 and 7: the fold adds 3 and 7 (5 is in the lane) and forwards those two
+  teach(2, [{ seq: 3, rec: PX('a', 1), pp: 0 }, { seq: 5, rec: PX('a', 2), pp: 3 }, { seq: 7, rec: PX('b', 3), pp: 5 }], 7)
+  p.settle()
+  assert.deepEqual(cells(S), cells(F), 'the spoke mirrors its feeder')
+  assert.equal(S.node.state.get(JSON.stringify(['px', 'a'])), 2, 'px.a = 2: bb#3 lost the election at the spoke (it showed 1 as current, for good, before)')
+  assert.deepEqual(S.of('apply').filter((e) => JSON.stringify((e[1] as Rec).key) === JSON.stringify(['px', 'a'])).map((e) => (e[1] as Rec).value), [2], 'the spoke never showed 1')
+})
+
+//! a stopped answer across a re-entry: the spoke's first-connect answer tears (the link pauses inside its first frame and
+// the queue holds one) while px is an orphan at aa, so the ship skipped px and the cover sits at lane bb's tail. Then px
+// re-enters through the latch and folds. The fold lowers the cover under px's rows (indexInsert lowers it only under the
+// one row the fold ADDS, 7: a resume from there ships 7 and misses the base), and the resumed answer ships px whole.
+test('wave 6a review — a spoke whose first answer STOPPED while a partition was an orphan at its feeder: the re-entry fold lowers the stopped answer\'s cover under that partition\'s rows, and the resume ships it whole', () => {
+  let armed = false, count = 0
+  const h = latching({ tune: { queued: 1 } }, (link) => { if (link === 7 && armed && ++count === 1) { armed = false; h.F.node.step({ kind: 'pause', link: 7 }) } })
+  const { F, S, p, link, connect, cells, laneAt, teach } = h
+  //! qx at bb 10, 12, 14, 16 (gappy: four frames); px at bb 3, 5, then frozen by its teacher's death
+  for (let s = 10, prev = 0; s <= 16; prev = s, s += 2) F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', QX(`q${s}`, s), s, prev, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('a', 1), 3, 0, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: one('bb', PX('b', 2), 5, 3, VERB.RECORDS) })
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  F.node.step({ kind: 'linkDown', link: 2, reason: 'close' })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.orphan)
+  armed = true
+  connect()
+  assert.equal(link.paused, true, 'the link paused inside the answer\'s first frame')
+  assert.equal(link.synced, false, 'the ship stopped: the link is not synced')
+  assert.ok(link.torn !== null && link.torn.d.bb >= 11, `the cover sits above px's rows (bb ${link.torn?.d.bb}): the ship skipped the orphan`)
+  //! cc comes back: the re-entry latch and its fold
+  F.admit(5, 'cc'); F.digestFrom(5)
+  F.node.step({ kind: 'bytesIn', link: 5, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 7 } } }) })
+  teach(5, [{ seq: 7, rec: PX('c', 3), pp: 5 }], 7)
+  assert.equal(F.node.scope!.held('px'), true)
+  assert.equal(link.torn!.d.bb, 2, 'the fold lowered the cover to just under px\'s lowest row (3), not only under the row it added (7)')
+  for (let d = 0; d < 8 && (link.paused || link.torn !== null); d++) { F.node.step({ kind: 'drain', link: 7 }); p.settle() }
+  p.settle()
+  assert.equal(link.synced, true)
+  assert.deepEqual(laneAt(S, 'bb'), [3, 5, 7, 10, 12, 14, 16], 'the resumed answer shipped px whole')
+  assert.deepEqual(cells(S), cells(F))
+})
+
+//! V4-7 through the latch (the review of wave 6a asked for the end-to-end): a spoke's write relayed by a feeder that is
+// ACQUIRING the partition. The owner's WACK reaches the relay, which expects to fold the record (scope.expects: an open
+// latch), so it hops the WACK to the spoke with `l` (wave 5e: wait for my tap) and the spoke keeps the coordinates; the
+// record reaches the relay only through the teacher's ACQ (the owner's live fan-out of it staged and was discarded under
+// the cut), and the fold's forward carries it to the spoke with its attempt identity, so the spoke's write-route join
+// settles it: the value shows, then the promise, once, never through `acked`. Before wave 6a the record was never
+// forwarded and the write hung while that feeder lived (the "or never" clause of the api's STATUS line).
+test('wave 6a — a spoke\'s write relayed through a feeder that is ACQUIRING the partition: the WACK hops with `l`, the record comes to the feeder through the teacher alone, the fold\'s forward carries its attempt identity, and the spoke settles through the join — value first, once, no `acked`', () => {
+  const { F, S, p, connect, teach } = latching()
+  connect()
+  //! cc announces px with bb at 6: aa, assigned and empty, latches from zero (the hand-off shape)
+  F.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.HAVEQ, { e: 1, q: { px: { bb: 6 } } }) })
+  assert.equal(F.node.scope!.entries.get('px')!.state, SCOPE.acquiring)
+  //! the spoke writes px.k: aa relays it to the owner bb
+  S.node.step({ kind: 'write', recs: [PX('k', 1)] })
+  p.toA()
+  assert.equal(F.sentOn(1, VERB.WRITE).length, 1, 'aa relayed the write to bb')
+  assert.equal(F.node.writes.pending.size, 1)
+  //! bb's WACK: committed at bb#7. aa expects to fold px (the latch is open), so the hop names the lane as `l`
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.WACK, { u: 'cl~1', c: 1, n: 1, s: 7, e: 1, o: 'bb' }) })
+  assert.equal(F.node.writes.pending.size, 0, 'the relay cleared its attempt')
+  const hop = F.sentOn(7, VERB.WACK).map((f) => f.value as { l?: string; o?: string })
+  assert.deepEqual(hop.map((v) => [v.l, v.o]), [['bb', undefined]], 'the hop carries `l`: wait for the tap, here is where it committed')
+  p.toB()
+  assert.equal(S.node.writes.pending.size, 0, 'the spoke cleared the attempt: nothing is re-sent')
+  assert.deepEqual(S.of('acked'), [], 'the WACK with `l` is not the settlement')
+  const joins = () => S.of('apply').filter((e) => (e[1] as { iss?: string; cid?: number }).iss === 'cl~1' && (e[1] as { cid?: number }).cid === 1)
+  assert.equal(joins().length, 0, 'the value has not shown: the record is not at the feeder')
+  //! the owner's live fan-out of bb#7 reaches aa mid-latch: it stages; the teacher ships it as ACQ with the identity
+  F.node.step({ kind: 'bytesIn', link: 1, bytes: encodeRuns([{ rec: PX('k', 1), origin: 'bb', seq: 7, epoch: 1, iss: 'cl~1', cid: 1, pp: 6 }], VERB.RECORDS, true)[0] })
+  assert.equal(joins().length, 0, 'staged, not folded, not forwarded')
+  teach(2, [{ seq: 6, rec: PX('j', 0), pp: 0 }, { seq: 7, rec: PX('k', 1), pp: 6, iss: 'cl~1', cid: 1 }], 7)
+  assert.equal(F.node.scope!.held('px'), true, 'the fold (the staged live copy of 7 is under the cut and discarded)')
+  p.settle()
+  assert.equal(S.node.state.get(JSON.stringify(['px', 'k'])), 1, 'the value shows at the spoke')
+  assert.equal(joins().length, 1, 'the apply carries the attempt identity exactly once: the join settles the write (V4-7: value, then promise)')
+  assert.deepEqual(S.of('acked'), [], 'never `acked`: the join was the settlement')
+  assert.equal(S.node.writes.stranded, false)
 })
