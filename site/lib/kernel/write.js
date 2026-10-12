@@ -164,7 +164,10 @@ export class Writes {
   // the local commit site and replicated attempt identities (the ownership-move exactly-once story)
   // (`o`: the owner of record — the lane the commit was stamped on — when this node can know it: its own
   // commits, replicated records, and a WACK straight from the owner; a spoke's WACK comes via its relay)
-  #seen = new Map                                                           ()
+  // (`p`: the record's partition, ARMED nodes only (DESIGN-SCALE stage 3): a teacher ships its window entries for the
+  // partition it hands over as ACQDONE `w`, so a retry whose original commit compaction dropped from the lane is
+  // still dedup'd at the new owner; unscoped entries carry no p, their shape untouched)
+  #seen = new Map                                                                       ()
   //! #awaiting (DESIGN-SCALE stage 1, the review's K2/K3) — attempts a WACK with a lane CLEARED whose record
   // was expected to fold here (scope.expects at the WACK) but has not folded yet, keyed like `pending`.
   // The `acked` decision is made once, at the WACK; if a view change then moves the partition off this
@@ -369,7 +372,7 @@ export class Writes {
       const s0 = node.commit(run.map((x) => x.rec), { issuer: a.issuer, baseCid: a.cid })
       for (let k = 0; k < run.length; k++) {
         const x = run[k]
-        this.#remember(node, x.issuer, x.cid, s0 + k, node.epoch, node.origin) // the lane, with its incarnation
+        this.#remember(node, x.issuer, x.cid, s0 + k, node.epoch, node.origin, node.armed ? partitionOf(x.rec) : undefined) // the lane, with its incarnation
         this.#remove(x)
       }
       //! an ARMED owner names the lane in its WACK: the issuer may never see the record (DESIGN-SCALE §11)
@@ -387,7 +390,7 @@ export class Writes {
 
   //! #remember — record a committed cid in the issuer's exact dedup window (oldest-first eviction), with
   // the lane count itself bounded: the oldest LANE evicts (journal-surfaced) past MAX_ISSUERS.
-  #remember(node      , issuer        , cid        , s        , e        , o         ) {
+  #remember(node      , issuer        , cid        , s        , e        , o         , p         ) {
     let lane = this.#seen.get(issuer)
     if (!lane) {
       lane = new Map()
@@ -398,7 +401,10 @@ export class Writes {
         node.journal.armed && node.journal.emit(JK.dedupEvict, oldest)
       }
     }
-    lane.set(cid, o === undefined ? { s, e } : { s, e, o })
+    const x                                                   = { s, e }
+    if (o !== undefined) x.o = o
+    if (p !== undefined) x.p = p
+    lane.set(cid, x)
     if (lane.size > node.tune.dedupKeep) lane.delete(lane.keys().next().value )
   }
 
@@ -406,8 +412,17 @@ export class Writes {
   // identity exactly like AE re-ships, so a healed-or-future owner rebuilds exactly-once from the
   // transfer itself (the M3 ownership-move story, kept across acquisition). `o` is the lane the record
   // sits on: a re-sent write answered from this entry must carry it, or a non-holder issuer that lost
-  // the first WACK never hears `acked` (the stage-1 skeptic's K1).
-  remember(node      , issuer        , cid        , s        , e        , o         ) { this.#remember(node, issuer, cid, s, e, o); this.#folded(issuer, cid) }
+  // the first WACK never hears `acked` (the stage-1 skeptic's K1). `p` the partition (armed; see #seen).
+  remember(node      , issuer        , cid        , s        , e        , o         , p         ) { this.#remember(node, issuer, cid, s, e, o, p); this.#folded(issuer, cid) }
+
+  //! windowOf — the ACQDONE `w` body (DESIGN-SCALE stage 3): every window entry of partition p as [issuer, cid, seq,
+  // epoch, lane]. A walk of the whole window (bounded by dedupKeep × issuers), once per teach: a cold path.
+  windowOf(p        )                        {
+    const out                        = []
+    for (const [issuer, lane] of this.#seen)
+      for (const [cid, x] of lane) if (x.p === p) out.push([issuer, cid, x.s, x.e, x.o ?? ''])
+    return out
+  }
 
   //! #await / #folded — the #awaiting bookkeeping: an attempt enters when its WACK clears it and the record
   // is still expected here; it leaves when that record folds (any ingest site that carries attempt
@@ -692,7 +707,7 @@ export class Writes {
       // coordinates, from the owner of record. This closes the WACK-before-replication window where a
       // cleared attempt had no committed() evidence — the api's drop-sweep (and any dup arriving before
       // the record replicates back) reads the answer from here.
-      this.#remember(node, v.u, v.c + i, v.s + i, v.e, lane ?? tap ?? (node.client ? undefined : link.uuid)) // a member's WACK comes from the owner
+      this.#remember(node, v.u, v.c + i, v.s + i, v.e, lane ?? tap ?? (node.client ? undefined : link.uuid), node.armed ? partitionOf(a.rec) : undefined) // a member's WACK comes from the owner
       if (a.via < 0 && lane !== undefined && (node.client || silent)) node.env.sink.acked?.(v.u, v.c + i, lane, v.s + i, v.e)
       else if (p !== undefined && !silent) this.#await(node, key, { p, via: a.via, u: v.u, c: v.c + i, s: v.s + i, e: v.e, o: lane  })
       else if (tap !== undefined && a.via < 0) this.#await(node, key, { p: '', via: -1, u: v.u, c: v.c + i, s: v.s + i, e: v.e, o: tap })
@@ -848,7 +863,7 @@ export class Writes {
         if (cl.state === LS.admitted && cl.synced && !cl.dead)
           cl.add(rec, { origin, baseSeq: seq, epoch }, rv.issuer ? { issuer: rv.issuer, baseCid: rv.cid } : undefined)
     if (rv.issuer) {
-      this.#remember(node, rv.issuer, rv.cid, seq, epoch, origin)
+      this.#remember(node, rv.issuer, rv.cid, seq, epoch, origin, node.armed ? partitionOf(rec) : undefined)
       this.#folded(rv.issuer, rv.cid) // the awaited record folded here: the join settles it
       const a = this.pending.get(rv.issuer + '|' + rv.cid)
       if (a) {
@@ -926,7 +941,7 @@ export class Writes {
         if (cl.state === LS.admitted && cl.synced && !cl.dead)
           cl.add(rec, { origin, baseSeq: seq, epoch }, rv.issuer ? { issuer: rv.issuer, baseCid: rv.cid } : undefined)
     if (rv.issuer) {
-      this.#remember(node, rv.issuer, rv.cid, seq, epoch, origin)
+      this.#remember(node, rv.issuer, rv.cid, seq, epoch, origin, node.armed ? p : undefined)
       this.#folded(rv.issuer, rv.cid) // the awaited record folded here: the join settles it
       const a = this.pending.get(rv.issuer + '|' + rv.cid)
       if (a) {
@@ -1014,7 +1029,7 @@ export class Writes {
         }
         node.apply(rec, prov.origin, rv.seq, rv.epoch, rv.issuer || undefined, rv.issuer ? rv.cid : undefined)
         j.armed && j.emit(JK.applyInbound, prov.origin, rv.seq)
-        if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch, prov.origin) // with the lane: a dup WACK after a restart names it
+        if (rv.issuer) this.#remember(node, rv.issuer, rv.cid, rv.seq, rv.epoch, prov.origin, p) // with the lane: a dup WACK after a restart names it
         count++
         continue
       }
