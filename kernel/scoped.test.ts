@@ -1169,7 +1169,7 @@ const hot = (h: ReturnType<typeof harness>, p: string, n: number) => {
 const laneSeqs = (h: ReturnType<typeof harness>, o = 'aa') => h.node.logs.get(o)!.map((e) => e.seq)
 const compactedRows = (h: ReturnType<typeof harness>) => h.jk(JK.compacted).map((e) => [e.a, e.b, e.c])
 
-test('COMPACTION PIN (stage 3) — an armed node compacts only on attested crash-stable marks: a holder that has attested nothing pins the frontier at 0, a co-holder\'s mark IS the frontier, the lane\'s last entry and every winner stay, the per-partition index and the journal row (with the partition) follow; the compactor\'s own open latch pins; the unscoped control compacts on the member frontier as before', () => {
+test('COMPACTION PIN (stage 3) — an armed node compacts only on attested crash-stable marks: a holder that has attested nothing pins the frontier at 0, a co-holder\'s mark IS the frontier, the lane\'s last entry and every winner stay, the per-partition index and the journal row (with the partition count) follow; the compactor\'s own open latch pins; the unscoped control compacts on the member frontier as before', () => {
   //! compactAt 64: the trigger stays size-armed (a lane under it is never walked), and the lane here shrinks below the
   // default 4,096 after its first pass
   const h = armedView1({ tune: { aeFan: 0, compactAt: 64 } })
