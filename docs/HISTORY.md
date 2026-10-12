@@ -14,7 +14,7 @@ live on at the `master` branch tip — v3 stays the A/B reference there). Plan
 of record: DESIGN-DATA3.md §4 (design decisions) + §5 (D0–D5), at the
 `master` tip under `v3/`; this file tracks the D-phases.*
 
-Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
+Run from the repo root: `npm test` (456 on 2026-09-28 before the V4-13 pass, 495 after, 515 then 584 on 2026-10-08, 600, 662 then 718 on 2026-10-09, 747 on 2026-10-10 then 798, 902, 924, 936 then 954 on 2026-10-11, 1014 on 2026-10-12 — the live count is in ../STATUS.md; + the 18-clause data contract ride; the directory OFF and
 the config layer OFF — utils/battery.ts pins FERO_RENDEZVOUS=off and FERO_CONFIG=off) /
 `npm run perf` (43 pins) / `npm run sim:scale` (the n=100 deep-sweep registry,
 script-tier). One install step since V4-10: `npm install` (optcascade).
@@ -746,6 +746,14 @@ working as designed.
   (branch w5f/i29) is held for one more review: two of its three reviews found an
   early-release blocker. 954/954 + 18/18, perf 52/52, 1000/1000 seeds; sim:scale green
   for the splice fix on the earlier base.
+
+- 2026-10-12 — V4-51 and V4-52, on Opus, built in two lanes and merged, then three review
+  rounds: records that travel together are cut into frames by size, a read past one frame
+  is refused `too-large`, a split frame arrives in linear time (V4-51); a write keeps
+  fero's own copy, a value that would arrive changed is refused at the write, a server's
+  own reads copy as a client decodes, a key data cannot fold is refused before the stamp
+  (V4-52). 1014/1014 + 18/18, perf 57/57, 1000/1000 seeds (209,313 events, as on
+  v4), sim:scale green (11 scenarios, 53.6M events).
 
 ## The debug tool
 
