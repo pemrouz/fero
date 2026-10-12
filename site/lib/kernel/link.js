@@ -15,12 +15,13 @@
 //
 // The link also owns the send plane for its peer: a streaming Outbox (records
 // appended during a step, one frame flushed per step — v2's microtask
-// coalescing, made deterministic) and a BOUNDED paused-queue with drop-oldest +
+// coalescing, made deterministic; a run bigger than the node's frame cap leaves
+// in several frames, V4-51) and a BOUNDED paused-queue with drop-oldest +
 // a journal loss event (plan §3.4: every buffer bounded at birth, every loss
 // journal-visible). Backpressure states: flowing → paused (env said the socket
 // buffer filled) → flowing on drain.
 
-import { Framer, Outbox, VERB,                            } from './codec.js'
+import { Framer, Outbox, VERB, MAX_FRAME,                            } from './codec.js'
 import { JK,              } from './journal.js'
                                           
                                           
@@ -45,9 +46,10 @@ export class Link {
   uuid = ''
   incarnation = 0
   listen = ''
-  //! wire machinery — one framer (inbound re-slicing) + one streaming outbox (outbound coalescing) per link, reused forever
+  //! wire machinery — one framer (inbound re-slicing) + one streaming outbox (outbound coalescing) per link, reused forever.
+  // The outbox cuts at the node's tune row `frame`, handed in at construction (MAX_FRAME unless a test asks less)
   framer = new Framer()
-  outbox = new Outbox()
+  outbox        
   //! backpressure — paused mirrors the env's socket-buffer state; queued holds finished frames while paused (bounded)
   paused = false
   queued               = []
@@ -121,17 +123,22 @@ export class Link {
   id        
   dialed         
   to         
-  //! maxQueued — the paused-queue bound, the node's tune row `queued` handed in at construction (a Link has no node)
+  //! maxQueued — the paused-queue bound, the node's tune row `queued` handed in at construction (a Link has no node);
+  // `frame` likewise — the most body bytes one of this link's frames may hold
   maxQueued        
-  constructor(id        , dialed         , to         , maxQueued = MAX_QUEUED) { this.id = id; this.dialed = dialed; this.to = to; this.maxQueued = maxQueued }
+  constructor(id        , dialed         , to         , maxQueued = MAX_QUEUED, frame = MAX_FRAME) {
+    this.id = id; this.dialed = dialed; this.to = to; this.maxQueued = maxQueued
+    this.outbox = new Outbox(frame)
+  }
 
   //! addRecord: append to the step's RECORDS frame, opening it with this run's provenance (and, for
   // committed attempt runs, its attempt identity) on first use. Run continuity is CHECKED, not
   // assumed (M6-review): the armed fan-out filter hands each link a lawfully-GAPPY subset of a
   // commit batch, and a frame's seqs/cids decode as baseSeq+i/baseCid+i — a discontinuous add
   // ROTATES the open frame into the outbox's pending list and begins fresh. Unscoped fan-out is
-  // every-record-every-link, so rotation never fires there (byte-identity preserved). `pp` is the
-  // record's sub-stream predecessor (armed senders only — undefined keeps FLAG_PP off the frame).
+  // every-record-every-link, so rotation never fires there (byte-identity preserved). A run that
+  // passes the frame cap is CUT the same way (V4-51, Outbox.add): the next frame continues the run.
+  // `pp` is the record's sub-stream predecessor (armed senders only — undefined keeps FLAG_PP off the frame).
   add(rec                              , prov      , attempt             , pp         ) {
     if (this.outbox.open && (!this.outbox.continues(prov, attempt) || this.outbox.pp !== (pp !== undefined)))
       this.outbox.rotate()
@@ -139,16 +146,23 @@ export class Link {
     this.outbox.add(rec, pp)
   }
 
-  //! flush: close the step's frame(s) and ship — rotated frames first (order kept), then the open
+  //! flush: close the step's frame(s) and ship — rotated and cut frames first (order kept), then the open
   // one — or park them (bounded) if the socket is backed up.
+  //! A flush that CLEARS the queue ships nothing more (V4-51): what is left of it is part of the lost tail. A frame
+  // queued after a clear sits ABOVE the hole: delivered at the drain, it moves the receiver's scalar fence past the
+  // lost records, and the drain digest — which re-ships only above the receiver's tails — never sends them again (an
+  // unscoped member ended with 4 of 10 rows for good, the design's probe E). One frame per flush made that rare;
+  // cut frames make several common. Later steps add nothing to the now-unsynced link until the heal. A CLIENT link
+  // (onClear set, wave 5f) ships on as before: the clear's cover lowers every lane it took, so the answer to the
+  // spoke's reply re-sends what a surviving frame leapfrogged.
   flush(sink            , j         ) {
+    let live = true
     if (this.outbox.pending.length) {
-      for (const bytes of this.outbox.pending) this.ship(bytes, sink, j)
+      for (const bytes of this.outbox.pending) if (live) live = this.ship(bytes, sink, j) || this.onClear !== null
       this.outbox.pending.length = 0
     }
     const bytes = this.outbox.finish()
-    if (!bytes) return
-    this.ship(bytes, sink, j)
+    if (bytes !== null && live) this.ship(bytes, sink, j)
   }
 
   //! ship: the ONE send gate — flowing → sink.send; paused → bounded queue. Overflow drops the WHOLE queue,
@@ -159,9 +173,11 @@ export class Link {
   // `pause` inside a send, so it checks for a full queue before every frame and stops there. A digest answer whose
   // frames this clear takes becomes the torn answer (`inQueue` → `torn`), resumed at the drain. On a client link the
   // clear also hands what it took to `onClear`, so a tap-forward it took is re-sent too (wave 5f).
-  ship(bytes            , sink            , j         ) {
-    if (this.dead) return
-    if (!this.paused) return sink.send(this.id, bytes)
+  //! Returns false when the frame is lost — the link is dead, or THIS ship cleared the queue (it went with the
+  // clear) — so a caller shipping several frames stops there (flush above).
+  ship(bytes            , sink            , j         )          {
+    if (this.dead) return false
+    if (!this.paused) { sink.send(this.id, bytes); return true }
     this.queued.push(bytes)
     if (this.queued.length > this.maxQueued) {
       j.armed && j.emit(JK.dropOldest, this.id, this.queued.length)
@@ -173,7 +189,9 @@ export class Link {
       this.synced = false
       if (this.inQueue !== null) { this.torn = this.inQueue; this.inQueue = null }
       if (dropped !== null) this.onClear (this, dropped, wasSynced)
+      return false
     }
+    return true
   }
 
   //! drain: the env's socket buffer emptied — release the parked frames in order.
