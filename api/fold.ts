@@ -153,14 +153,15 @@ export class Gather {
     // retrying cannot help, so it is never filed as unreachable — the one-shot read rejects too-large (it wins over
     // unreachable when both happen), and the live union ends its subscribers instead of parking that member silently
     if (tooBig.length) {
+      const rows = `the rows ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds are' : 'hold are'} bigger than one frame (${sizeOf(node.tune.frame)})`
       const r: ScopedError = {
         scoped: true, op: 'gather', reason: 'too-large', replicas: node.replicas, missing: tooBig,
-        hint: opts.key === undefined
-          ? `the rows ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds are' : 'hold are'} bigger than one frame (${sizeOf(node.tune.frame)}), so the whole-resource read cannot gather them: read one key at a time (methods.read(key))`
-          : `the rows ${tooBig.join(', ')} ${tooBig.length === 1 ? 'holds are' : 'hold are'} bigger than one frame (${sizeOf(node.tune.frame)}), and this key is changing owner: retry in a moment`,
+        hint: `${rows}, so the whole-resource read cannot gather them: read one key at a time (methods.read(key))`,
       }
+      //! the stored refusal is the whole read's, whoever asked: the next live read hears it (api/index.ts), and was
+      // told a key is changing owner when a keyed read had asked last (the last check). A keyed caller hears its own.
       this.refused = r
-      if (opts.throwOnPartial) throw r
+      if (opts.throwOnPartial) throw opts.key === undefined ? r : { ...r, hint: `${rows}, and this key is changing owner: retry in a moment` }
       this.#onRefused?.(r)
     } else this.refused = null
     if (missing.length && opts.throwOnPartial)
