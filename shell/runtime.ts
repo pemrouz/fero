@@ -167,6 +167,7 @@ const holderOf = (p: string): Holder | null => {
       : null
   } catch { return null }
 }
+const sameHolder = (a: Holder, b: Holder): boolean => a.pid === b.pid && a.host === b.host && a.boot === b.boot && a.ns === b.ns && a.start === b.start
 //! holderAt — the record at `p`. An empty or half-written file younger than GRACE is a writer caught between the create
 // and the write (the no-hard-link fallback of claim): wait for its record. Null = stale (nothing readable after GRACE,
 // or a file that is not this lock's shape), or gone.
@@ -194,32 +195,40 @@ const ME: Holder = { pid: process.pid, host: HOST, boot: BOOT, ns: NS, start: st
 const MINE = JSON.stringify(ME) + '\n'
 //! liveHolder — may the process the record names still be running? 'mine' = this process holds it; 'alive' = another
 // process in this pid namespace; 'ns' = a process in another pid namespace on this kernel, live by its lease (leaseOf
-// waited for the touch); 'elsewhere' = another machine (never checked); null = stale.
+// waited for the touch); 'elsewhere' = another machine (never checked); null = stale. `h` is the record judged last: the
+// lease look may have met a new one (leaseOf), and a refusal names that one.
 type Why = 'mine' | 'alive' | 'ns' | 'elsewhere'
-const liveHolder = (p: string, h: Holder | null): Why | null => {
-  if (h === null) return null
+interface Judged { why: Why | null; h: Holder | null }
+const liveHolder = (p: string, h: Holder | null): Judged => {
+  if (h === null) return { why: null, h }
   const sameKernel = h.boot !== null && BOOT !== null ? h.boot === BOOT : h.host === HOST
-  if (!sameKernel) return h.host === HOST ? null : 'elsewhere' // this host rebooted: nothing survives one; another machine
-  if (h.ns !== ME.ns) return leaseOf(p) // another pid namespace (or a record that names none): its pid means nothing here
-  if (h.pid === ME.pid) return h.start !== null && ME.start !== null ? (h.start === ME.start ? 'mine' : null) : locks.has(p) ? 'mine' : null
-  if (!alivePid(h.pid)) return null
+  if (!sameKernel) return { why: h.host === HOST ? null : 'elsewhere', h } // this host rebooted: nothing survives one; another machine
+  if (h.ns !== ME.ns) return leaseOf(p, h) // another pid namespace (or a record that names none): its pid means nothing here
+  if (h.pid === ME.pid) return { why: h.start !== null && ME.start !== null ? (h.start === ME.start ? 'mine' : null) : locks.has(p) ? 'mine' : null, h }
+  if (!alivePid(h.pid)) return { why: null, h }
   const s = startOf(h.pid)
-  return h.start === null || s === null || s === h.start ? 'alive' : null
+  return { why: h.start === null || s === null || s === h.start ? 'alive' : null, h }
 }
 //! leaseOf — a holder whose pid cannot be checked: live while it touches its lock. The look waits for the next touch, up
 // to the rest of the lease (a stale record is known at once; a touched one within TOUCH; a restart in a container waits
 // at most LEASE). One kernel is one clock, and the holder sets the time itself (utimes), so a disk whose own clock is
 // elsewhere (9p) makes no difference. An mtime in the future (the clock stepped back) is bounded to one lease from now.
-const leaseOf = (file: string): 'ns' | null => {
+// A moved mtime is a touch by the holder, or a NEW record: another heir took the stale lock over while this look
+// watched. So the record is read again: the same holder is live; a new one is judged afresh, and a refusal names the
+// process that holds the dir now, never the dead one this look was watching.
+const leaseOf = (file: string, h: Holder): Judged => {
   let m0: number
-  try { m0 = fs.statSync(file).mtimeMs } catch { return null }
+  try { m0 = fs.statSync(file).mtimeMs } catch { return { why: null, h } }
   const until = Math.min(m0, Date.now()) + LEASE
   for (;;) {
-    if (Date.now() > until) return null
+    if (Date.now() > until) return { why: null, h }
     Atomics.wait(napCell, 0, 0, 50)
     let m: number
-    try { m = fs.statSync(file).mtimeMs } catch { return null }
-    if (m !== m0) return 'ns'
+    try { m = fs.statSync(file).mtimeMs } catch { return { why: null, h } }
+    if (m !== m0) {
+      const now = holderAt(file)
+      return now !== null && sameHolder(now, h) ? { why: 'ns', h } : liveHolder(file, now)
+    }
   }
 }
 //! claim — put my record at `p` in one step: written whole to a side file, then hard-linked onto the name (link fails
@@ -246,7 +255,6 @@ const heldError = (who: string, dir: string, h: Holder, why: Why): DirHeld =>
       why === 'elsewhere' ? ` (a lock from another machine is never taken over: remove ${path.join(dir, LOCK)} by hand once that machine is gone)`
       : why === 'ns' ? ' (a process in another pid namespace on this kernel: it still touches its lock)' : ''}`), { code: 'dir-held' as const, pid: h.pid, host: h.host })
 const UNKNOWN: Holder = { pid: 0, host: HOST, boot: BOOT, ns: NS, start: null }
-const sameHolder = (a: Holder, b: Holder): boolean => a.pid === b.pid && a.host === b.host && a.boot === b.boot && a.ns === b.ns && a.start === b.start
 //! lockDir — take the dir for this process (made if missing); returns the release, which is also run at process exit.
 // `who` prefixes the refusal (the composer's fero('name')).
 export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
@@ -267,11 +275,11 @@ export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
     return release
   }
   if (claim(p, MINE)) return held()
-  const h = holderAt(p), why = liveHolder(p, h)
-  if (why !== null) throw heldError(who, dir, h!, why)
+  const first = liveHolder(p, holderAt(p))
+  if (first.why !== null) throw heldError(who, dir, first.h!, first.why)
   //! stale — take it over, one heir at a time
   if (!claim(take, MINE)) {
-    const t = holderAt(take), tw = liveHolder(take, t)
+    const { why: tw, h: t } = liveHolder(take, holderAt(take))
     if (tw !== null) throw heldError(who, dir, t!, tw)
     //! a stale marker (its heir crashed inside the takeover) is removed by a RENAME to a name of my own and a look at what
     // came: only the record I judged stale is deleted. An unlink removed whatever was there — a FRESH marker another
@@ -287,8 +295,8 @@ export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
     if (!claim(take, MINE)) throw heldError(who, dir, holderAt(take) ?? UNKNOWN, 'alive')
   }
   try {
-    const now = holderAt(p), nw = liveHolder(p, now) // read again under the marker: a holder that started between the two looks is live
-    if (nw !== null) throw heldError(who, dir, now!, nw)
+    const again = liveHolder(p, holderAt(p)) // read again under the marker: a holder that started between the two looks is live
+    if (again.why !== null) throw heldError(who, dir, again.h!, again.why)
     try { fs.unlinkSync(p) } catch { /* gone */ }
     if (!claim(p, MINE)) throw heldError(who, dir, holderAt(p) ?? UNKNOWN, 'alive') // a fresh opener slipped in: it holds
     return held()

@@ -464,6 +464,24 @@ test('a lease thread that dies is let go: the next lock this process takes makes
   }
 })
 
+test('a refusal names the holder that touched: an opener watching a dead container\'s lock run out, while another heir takes the dir over and touches it, is refused naming that heir', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-names-'))
+  const kids: ReturnType<typeof fero.spawn>[] = []
+  try {
+    plant(dir, { pid: 1, host: 'c-dead', ns: 'pid:[1]' })
+    plant(dir, { pid: 1, host: 'c-live', ns: 'pid:[2]' }, 'lock.next')
+    const heir = fero.spawn(CHILD, [dir, 'swap']); kids.push(heir)
+    assert.ok(await until(() => heir.out.includes('ready'), 20_000), heir.out)
+    //! three seconds of c-dead's lease left; the heir's record lands 800 ms into the look and is touched from then on
+    age(dir, 1)
+    assert.throws(() => lockDir(dir, 'test'), (e: Error & { code?: string; host?: string }) => e.code === 'dir-held' && e.host === 'c-live' && /pid 1 on c-live; .*it still touches its lock/.test(e.message), 'the refusal names the heir that holds the dir, not the dead holder it was watching')
+    assert.equal(lockOf(dir)?.host, 'c-live')
+  } finally {
+    for (const k of kids) await k.stop()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 //! the container shapes: the node runs as pid 1 of its own pid namespace (docker, kubernetes, a Fly VM), is killed -9,
 // and the same image restarts as pid 1 again on the same volume; or a recreate gives the new container a new host name
 const NSARGS = ['-Urpf', '--mount-proc'] // a user namespace with root mapped, a new pid namespace, fork, /proc of that namespace
