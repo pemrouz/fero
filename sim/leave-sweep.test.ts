@@ -44,7 +44,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { schedule, run, shape1, schedule2, run2, shape2, schedule3, run3, shape3, unsafe, starved } from './leave-sweep.ts'
+import { schedule, run, shape1, schedule2, run2, shape2, schedule3, run3, shape3, unsafe, starved, lowestStopsInsideDrop } from './leave-sweep.ts'
 
 //! sweep — run `count` seeds of a family; the safety problems are asserted empty, the not-live seeds are compared to the
 // pinned set in both directions (a wedge where the kernel used to heal, or a heal where it used to wedge, is a change
@@ -197,4 +197,37 @@ test('the knock starvation on a slow link (the drop is sticky): n=3 at heartbeat
       assert.equal(w16.left, w16.afterStop < 800, `${leaver} at 16 ticks, delay ${delay}: the window alone decides (unclean exactly at its end, 800 ms) — ${JSON.stringify(w16)}`)
     }
   }
+})
+
+//! THE EXIT MAY ONLY SHRINK TOO (the rework review of wave 6b, probe B3; DESIGN-LEAVE §10.7's note of 2026-10-12): the
+// lowest member stops while ANOTHER leaver's dropped ballot is in flight. n=5, n04 and n05 cut at t0, n03 stops at
+// t0 + 200 on a 100 ms pair to n01: n01 drops the dead at about t0 + 700 (`P(2,4)` then `P(2,2)` = {n01,n02}) and waits
+// 200 ms for n03's grant. n01 stopping inside that round trip (t0 + 750..900) computed its exit from the VIEW, where the
+// same step's revival had n04 and n05 dialing again, and put them back: `P(2,4) P(2,4)` — a second give-up needed —
+// and at the 16-tick window both stops went unclean at exactly 800 ms with n02 left `@1{n01,n02,n03,n04,n05}`, four of
+// five gone, read-only for good. Now n01's exit leaves out what n03's ballot left out — `P(2,2)` = {n02,n03}@2 at once —
+// and n01 is clean about 209 ms after its stop at every one of the four. n03 pays a second round trip for the new
+// ballot (its grant is one the exit needs): at t0 + 750 it is clean at 765 ms; at t0 + 800..900 its 800 ms window ends
+// at t0 + 1000, before the commit lands (t0 + 1006 and later), so it goes unclean AT the window's end and n02 is left
+// `@2{n02,n03}` with n03 dead — the crash-at-two class, the window's verdict (DESIGN-LEAVE §7; on a 60 ms pair every one
+// is clean inside 16 ticks). At 64 ticks both are clean at every one (n03 at 765 / 815 / 865 / 915) and n02 ends alone
+// at 3, writable. Either side of the round trip (t0 + 700, t0 + 950) was clean before and reads the same.
+test('the exit may only shrink too: n=5 with two dead, n03 stops on a slow pair and n01 — the lowest — stops inside the round trip of n03\'s dropped ballot; n01\'s exit is {n02,n03}@2 at once (before: the dead back in, both stops unclean at 16 ticks, the survivor read-only for good) and n01 is clean inside 16 ticks at every stop time; n03 and the survivor as the window allows — both clean at 64 ticks at every one; either side of the round trip unchanged', () => {
+  for (const at of [750, 800, 850, 900]) {
+    const r = lowestStopsInsideDrop(at, 16)
+    assert.equal(r.n01, true, `n01 at t0+${at}, 16 ticks: its exit leaves out what n03's ballot left out — ${JSON.stringify(r)}`)
+    assert.ok(r.n01After > 150 && r.n01After < 300, `n01 at t0+${at}, 16 ticks: clean in one round trip of the pair (about 209 ms) — ${JSON.stringify(r)}`)
+    assert.match(r.ballots, /^n01: P\(1,5\) P\(2,4\) P\(2,2\) P\(2,2\) \|/, `n01 at t0+${at}, 16 ticks: the plain ballot, the re-read, then the exit {n02,n03}@2 — nothing after (before: P(2,4) P(2,4)) — ${JSON.stringify(r)}`)
+    assert.equal(r.n03, r.n03After < 800, `n03 at t0+${at}, 16 ticks: the window alone decides (unclean exactly at its end, 800 ms) — ${JSON.stringify(r)}`)
+    if (r.n03) assert.ok(r.survivor === 'n02@3{n02}' && r.writable, `n03 clean ⇒ n02 alone at 3, writable — ${JSON.stringify(r)}`)
+    else assert.ok(r.survivor === 'n02@2{n02,n03}' && !r.writable, `n03 unclean ⇒ the exit committed with it dead: n02 minority at 2, the crash-at-two class — ${JSON.stringify(r)}`)
+    const w64 = lowestStopsInsideDrop(at, 64)
+    assert.deepEqual([w64.n03, w64.n01, w64.survivor, w64.writable], [true, true, 'n02@3{n02}', true], `t0+${at} at 64 ticks: both clean, n02 alone, writable — ${JSON.stringify(w64)}`)
+    assert.ok(w64.n03After > 700 && w64.n03After < 1000 && w64.n01After > 150 && w64.n01After < 300, `t0+${at} at 64 ticks: n03 one round trip after the exit opened, n01 at once — ${JSON.stringify(w64)}`)
+  }
+  assert.equal(lowestStopsInsideDrop(750, 16).n03After, 765, 'n03 at t0+750: inside its window by 35 ms')
+  const before = lowestStopsInsideDrop(700, 16)
+  assert.deepEqual([before.n03, before.n01, before.survivor, before.ballots], [true, true, 'n02@3{n02}', 'n01: P(1,5) P(2,4) P(2,2) | n02: P(3,1)'], `the stop before the drop: n01's exit replaces the plain ballot and is re-read once — ${JSON.stringify(before)}`)
+  const after = lowestStopsInsideDrop(950, 16)
+  assert.deepEqual([after.n03, after.n01, after.survivor, after.ballots], [true, true, 'n02@3{n02}', 'n01: P(1,5) P(2,4) P(2,2) P(3,1) | n02: '], `the stop after the commit: n03 is out, n01's exit is the next ballot — ${JSON.stringify(after)}`)
 })

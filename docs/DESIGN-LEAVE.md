@@ -1723,6 +1723,53 @@ eviction in flight: the tick's re-read read the view, not the evictees the exit 
   nothing); the lowest leaver's exit `{bb}@2` survives two ticks of revival, and so does the exit that carried an
   eviction's evictees.
 
+**2026-10-12, the exit may only shrink too (the rework review of wave 6b).** The amendment above closed the re-read
+and left one path that still read the view: the lowest member's OWN exit replacing ANOTHER leaver's ballot.
+`#knockLeave` replaces any other ballot of mine (leaving outranks) and carried an eviction's evictees across the
+replacement — but a leave ballot of another leaver that the re-read had already dropped the dead from was replaced by
+an exit computed from the view, where the same step's revival had the dropped members' chains dialing again: `#dead`
+read them live and the exit put them back, and a SECOND give-up was needed before it could commit. The review's probe
+(B3; `sim/leave-sweep.ts` `lowestStopsInsideDrop`): n=5 at heartbeat 50, n04 and n05 cut at t0, n03 stops at t0 + 200
+on a pair to n01 of 100 ms one way, so n01 drops the dead — `P(2,4)` then `P(2,2)` = `{n01,n02}` — and waits 200 ms
+for n03's grant; n01 stopping INSIDE that round trip (t0 + 750..900) proposed its exit as `{n02,n03,n04,n05}@2`, the
+dead back in, and at the default 16-tick window both stops went unclean at 800 ms, n02 was left at
+`@1{n01,n02,n03,n04,n05}` with four of five gone — read-only for good. Stopping either side of the round trip was
+clean, and is unchanged.
+
+- *The rule, extended: my exit leaves out every member a ballot of mine in flight left out, whatever that ballot
+  was.* An eviction's evictees (as before), the dead members another leaver's ballot dropped (the gap), or my own
+  exit's (re-read from itself, as before). The members a ballot of mine left out were left out on evidence — a chain
+  that gave up — and my exit replaces that ballot as the same proposer at the same epoch: the replacement is a re-read
+  in all but name, so the amendment's rule holds for it too — it may only remove, never put back. In one line:
+  `evictees = view − ballot.members − {ballot.leaver}`, `exit = (view − me − dead) − evictees`; for an eviction
+  `ballot.leaver` is undefined and the line reads as it did. The one member my exit does NOT leave out is the other
+  leaver itself: it was out of its own ballot by its knock, not on evidence of death, and my exit is the view without
+  ME — that leaver is a live member of it, still knocking, and the next lowest live member answers its knock the
+  moment my exit commits (`{n02,n03}@2`, then n02 proposes `{n02}@3` on n03's next knock: both clean, n02 alone,
+  writable). A leave that drops the other leaver as well would be a second rule — two leaves in one ballot — and
+  nothing asked for it.
+- *Why it is safe.* The amendment's argument, unchanged: the old-set majority is the view's; the exit is a subset of
+  the one computed from the view, so it needs fewer votes and never a dead one; it is a ballot of the same proposer at
+  the same epoch as the one it replaces (at most one commits — the same-proposer case the banner allows, which is
+  how the replacement always worked); V4-55 holds its granters until the VIEW lands. The other leaver may grant it —
+  a leaver still knocking grants a ballot that keeps it in, and rebases onto the view that commits — and the dropped
+  members come back as the amendment says, by their link, through a fresh ballot.
+- *Measured.* `lowestStopsInsideDrop`, n01 stopping at t0 + 750, 800, 850 and 900 ms on the 100 ms pair: before, at
+  the 16-tick window, n01's ballots read `P(1,5) P(2,4) P(2,2) P(2,4) P(2,4)` and both stops went `left` b=0 at
+  exactly 800 ms after each stop, n02 `@1{n01,n02,n03,n04,n05}` and not writable, at every one of the four; now
+  `P(1,5) P(2,4) P(2,2) P(2,2)` — the exit `{n02,n03}@2` at once — and n01 is clean about 209 ms after its stop at
+  every one, n03 clean at 765 ms at t0 + 750, and at 64 ticks both are clean at every one (n03 at 765 / 815 / 865 /
+  915, n02 `@3{n02}`, writable). What the window still decides: n03's grant is one the exit needs, and the exit is a
+  new ballot, so n03 pays a second round trip — 200 ms on this pair — and at t0 + 800..900 its 16-tick window ends at
+  t0 + 1000, before that commit lands (t0 + 1006 and later): n03 goes `left` b=0 at exactly 800 ms and is torn down,
+  the exit `{n02,n03}@2` commits with it dead, and n02 is left `minority` in a two-member view — the crash-at-two
+  class (§7), where before the fix n02 was left at `@1` with four of five gone. On a 60 ms pair every one of those
+  stops is clean inside the 16-tick window (n03 at 715 / 765 ms). The window is the operator's choice, as before; the
+  rule removed the ballot that was wrong, not the round trip the window must hold. Either side of the round trip —
+  the stop at t0 + 700 or earlier, at t0 + 950 or later — was clean before and reads the same now. The kernel pin
+  (`kernel/membership.test.ts`): bb's dropped ballot `{aa}@2` in flight, cc's chain revived by the same step, aa
+  leaves — its exit is `{bb}@2` at once (before: `{bb,cc}@2`), bb's grant commits it and bb's echo is the exit proof.
+
 **2026-10-12, the scoped leaver whose vote never came back (wave 6b).** STATUS carried: "still in its own view
 when its bound ends, it goes like a crash: nothing froze, so there is no orphan to drain and `undrained` reads 0
 even though at R=1 its rows go with it" (V4-38's note). Two changes in `kernel/membership.ts`, and the row says why.
