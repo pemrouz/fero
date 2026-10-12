@@ -181,11 +181,15 @@ export const perEvent = () => [
     // log-monotone proves it for the tail it scans (strictly ascending ⇒ no repeat), but it scans from the length it
     // last saw, so a copy an interior insert puts BELOW that length is outside its window. This monitor keeps the entry
     // it last saw at the tail: while that entry is still at that index the lane only grew at the end and the new tail is
-    // scanned; otherwise (an interior insert moved it, a replaced array) the whole lane is. A repeat is a seq equal to
-    // its neighbour's — lanes are ascending (log-monotone's row), so equal seqs sit side by side. Found by the wave-6a
-    // review: the fold spliced a teacher record above the cut and the live replay appended it again (lane bb at aa
-    // [3, 5, 7, 7]); fixed in kernel/scope.ts onAcqDone (the fence rises to the fold's top). Counted: `counts.pairs` is the
-    // neighbouring pairs compared, `counts.lanes` the lane scans (laneUniqueCounts reads them).
+    // scanned; otherwise (an interior insert moved it, a replaced array) the whole lane is. The scan is STRICTLY
+    // ASCENDING over every pair it reads (`<=`, the same test as log-monotone's), not "equal neighbours": a lane that is
+    // strictly ascending holds each seq once, wherever a copy sits. An equal pair is named as the repeat it is; a lesser
+    // one as an entry out of place — which is what a copy put anywhere but beside its original reads as ([l0, l2', l1,
+    // l2]: `l1 after l2'`). The 2026-10-12 review's probe showed `===` alone misses such a copy, and no other monitor
+    // reads a lane's interior. Found by the wave-6a review: the fold spliced a teacher record above the cut and the
+    // live replay appended it again (lane bb at aa [3, 5, 7, 7]); fixed in kernel/scope.ts onAcqDone (the fence rises
+    // to the fold's top). Counted: `counts.pairs` is the neighbouring pairs compared, `counts.lanes` the lane scans
+    // (laneUniqueCounts reads them).
     ...(() => {
       const counts = { lanes: 0, pairs: 0 }
       const tails = new Map<string, Map<string, { node: Node; arr: unknown; len: number; last: unknown }>>()
@@ -204,9 +208,12 @@ export const perEvent = () => [
             const from = tailStands ? prev.len : 1
             counts.lanes++
             counts.pairs += Math.max(0, entries.length - from)
-            for (let i = from; i < entries.length; i++)
+            for (let i = from; i < entries.length; i++) {
               if (entries[i].seq === entries[i - 1].seq)
                 return `${id} lane ${origin} holds seq ${entries[i].seq} TWICE (at ${i - 1} and ${i}; epochs ${entries[i - 1].epoch} and ${entries[i].epoch}) — the lane rule`
+              if (entries[i].seq < entries[i - 1].seq)
+                return `${id} lane ${origin} holds seq ${entries[i].seq} OUT OF PLACE at ${i}: after ${entries[i - 1].seq} (a copy away from its original, or a misplaced insert) — the lane rule`
+            }
             prev.len = entries.length
             prev.last = entries.length ? entries[entries.length - 1] : undefined
           }

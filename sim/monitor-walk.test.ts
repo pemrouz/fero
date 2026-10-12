@@ -109,9 +109,25 @@ const PLANTS: Plant[] = [
     // log-monotone never does: the lane-unique that scanned from log-monotone's cursor instead would miss this plant.
     // (The first shape of this plant, a lane of three from step 35, landed on a lane that had just grown — the copy sat
     // at log-monotone's cursor and both monitors fired at the same event, so it proved nothing about the rescan.)
+    // `silent` rides on Sim(11)'s trajectory: it holds while log-monotone's cursor on the chosen lane is already past
+    // the copy when the plant lands (a pass read the lane at three or more entries before step 150). A merge that moves
+    // the trajectory may put the copy at that cursor again; the check then fails loudly (never passes quietly), and the
+    // cure is a later step, not a weaker check.
     name: 'a lane that holds one seq twice, in its interior', monitor: 'lane-unique', silent: 'log-monotone',
     install: (_, late, early) => {
       const plant = (from: number) => once(from, (n) => { for (const [, lane] of n.logs) if (lane.length >= 6) { lane.splice(1, 0, { ...lane[1] }); return true } return false })
+      stepsOf(late, plant(150))
+      stepsOf(early, plant(180))
+    },
+  },
+  {
+    //! the lane rule, the copy AWAY from its original (the 2026-10-12 review's probe): a copy of lane[2] put at index 1,
+    // so the lane reads [l0, l2', l1, l2, ...]. No pair of equal neighbours, so a scan for equal seqs alone misses it
+    // (`===` passed this plant on every variant); the strictly-ascending scan names `l1 after l2'` as out of place.
+    // The same lane and steps as the plant above, so `silent` holds for the same reason.
+    name: 'a lane that holds one seq twice, the copy away from its original', monitor: 'lane-unique', silent: 'log-monotone',
+    install: (_, late, early) => {
+      const plant = (from: number) => once(from, (n) => { for (const [, lane] of n.logs) if (lane.length >= 6) { lane.splice(1, 0, { ...lane[2] }); return true } return false })
       stepsOf(late, plant(150))
       stepsOf(early, plant(180))
     },
