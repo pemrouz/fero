@@ -651,9 +651,11 @@ export class Scope {
       if (lo === entries.length) continue
       const ship = lo === 0 ? entries : entries.slice(lo)
       //! stored pp rides the teach (the floor law): the learner's post-fold lane re-ships to OTHERS
-      // with intact chain evidence. The fold itself trusts the CUT, not the chain.
+      // with intact chain evidence. The fold itself trusts the CUT, not the chain. Cut at this node's frame cap
+      // (V4-51): ACQDONE's n counts records, so cut frames change nothing at the learner, and a clear mid-teach still
+      // aborts its latch ('torn') and the partition is offered again.
       const runs = ship.map((x) => ({ rec: x.rec, origin, seq: x.seq, epoch: x.epoch, iss: x.iss, cid: x.cid, pp: x.pp }))
-      for (const bytes of encodeRuns(runs, VERB.ACQ, true)) link.ship(bytes, node.env.sink, j)
+      for (const bytes of encodeRuns(runs, VERB.ACQ, true, node.tune.frame)) link.ship(bytes, node.env.sink, j)
       n += ship.length
     }
     const cut = this.#myFloors(node, p)

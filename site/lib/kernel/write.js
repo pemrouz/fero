@@ -88,7 +88,7 @@
 // M3 machinery activates only once a view commits (which requires heartbeats,
 // which is also what clocks the retries — no view, no forwarding, no liveness debt).
 
-import { VERB, encodeControl, encodeRuns,            } from './codec.js'
+import { VERB, MAX_DEPTH, encodable, encodeControl, encodeRuns, roomOf,            } from './codec.js'
 import { SCOPE } from './scope.js'
 import { Ring } from './ring.js'
 import { JK } from './journal.js'
@@ -283,7 +283,9 @@ export class Writes {
       if (!list) return
       for (const a of list) { a.sent = 0; a.to = link.uuid; a.parked = false; this.#queued-- }
       const batch = list.map((a) => ({ rec: a.rec, origin: a.issuer, seq: a.cid, epoch: 0 }))
-      for (const bytes of encodeRuns(batch, VERB.WRITE)) link.ship(bytes, node.env.sink, j)
+      //! cut at this node's frame cap (V4-51): a cut WRITE frame's baseSeq is its first attempt's cid; the relay takes
+      // each frame as it comes
+      for (const bytes of encodeRuns(batch, VERB.WRITE, false, node.tune.frame)) link.ship(bytes, node.env.sink, j)
       j.armed && j.emit(JK.writeForward, link.uuid, list[0].cid, list.length)
       return
     }
@@ -330,7 +332,8 @@ export class Writes {
       for (const [link, list] of runs) {
         for (const a of list) { a.sent = 0; a.to = link.uuid; a.parked = false; this.#queued-- }
         const batch = list.map((a) => ({ rec: a.rec, origin: a.issuer, seq: a.cid, epoch: a.ae }))
-        for (const bytes of encodeRuns(batch, VERB.WRITE)) link.ship(bytes, node.env.sink, j)
+        //! cut at this node's frame cap (V4-51): the owner commits and WACKs each run as it comes
+        for (const bytes of encodeRuns(batch, VERB.WRITE, false, node.tune.frame)) link.ship(bytes, node.env.sink, j)
         j.armed && j.emit(JK.writeForward, link.uuid, list[0].cid, list.length)
       }
   }
@@ -503,9 +506,19 @@ export class Writes {
       j.armed && j.emit(JK.writeRelay, issuer, c0)
       const validate = node.validate
       let i = 0
-      //! no predicate: the pre-validation loop, byte-for-byte (one undefined-check per frame is the
-      // whole cost — no closure, no compare, trajectories identical)
-      if (validate === undefined) {
+      //! the SIZE GATE (V4-51): a client's record this node could not send ALONE in one of its frames must never be
+      // stamped — after the stamp it would be a loud throw from the encoder (the commit fan-out, the WAL row, an
+      // answer), out of this socket handler. Asked by size only, with V4-48's own count (encodable, a string 4 + 3 a
+      // character): it refuses what that count refuses, which is more than the encoder cannot carry (the writer sizes
+      // a string by its real bytes when its worst case would not fit), and never what an honest fero client's own check
+      // lets through. A record's
+      // encode peaks at 4 × its wire bytes + 4 at most, so a FRAME no longer than (room - 4) / 4 cannot hold one past
+      // the room: one compare per frame, and the walk runs only for a record that long (~64 MiB at MAX_FRAME).
+      const room = roomOf(node.tune.frame)
+      const big = f.buf.length > (room - 4) / 4
+      //! no predicate and no big record: the pre-validation loop, byte-for-byte (one undefined-check and one
+      // compare per frame is the whole cost — no closure, trajectories identical)
+      if (validate === undefined && !big) {
         for (const rv of f.records())
           this.#enqueue(node, { cid: c0 + i++, ae: node.epoch, issuer, rec: rv.rec(), via: link.id, sent: -1, to: '', parked: false })
         this.#drain(node)
@@ -517,7 +530,8 @@ export class Writes {
       // `invalid` with the reason, batched per contiguous same-reason run like every other NACK. A cid
       // already in the dedup window SKIPS the check — it committed once (so it passed once), and a
       // state-dependent predicate must not turn a retransmit of a committed record into a lie; the
-      // ordinary path below dup-ACKs it with its original coordinates.
+      // ordinary path below dup-ACKs it with its original coordinates. The size gate (above) comes first:
+      // a record too big to send is `invalid` with 'unencodable: …' whatever the rule says (methods-only too).
       let nack                                             = null
       const flushNack = () => {
         if (!nack) return
@@ -529,7 +543,13 @@ export class Writes {
         const cid = c0 + i++
         const rec = rv.rec()
         if (!this.#seen.get(issuer)?.has(cid)) {
-          const v = validate(rec)
+          let why                = null
+          if (big && rv.span > (room - 4) / 4) {
+            let kb = rec.at === undefined ? 0 : 4 + rec.at.length * 3
+            for (const k of rec.key) kb += 4 + k.length * 3
+            why = encodable(rec.type === REC.remove ? undefined : rec.value, { depth: MAX_DEPTH, bytes: room }, 0, kb)
+          }
+          const v = why !== null ? `unencodable: ${why}` : validate === undefined ? true : validate(rec)
           if (v !== true) {
             const m = String(v).slice(0, REASON_MAX)
             if (nack && (nack.m !== m || nack.c + nack.n !== cid)) flushNack()
