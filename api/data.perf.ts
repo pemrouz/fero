@@ -10,7 +10,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Runtime } from '../shell/runtime.ts'
 import { Bind, unsendable, copyBounded, atCap } from './data.ts'
-import { VERB, encodeControl, encodeRuns } from '../kernel/codec.ts'
+import { VERB, Unsendable, encodeControl, encodeRuns } from '../kernel/codec.ts'
 import { REC, type Rec } from '../kernel/env.ts'
 import { alloc, bench, ratio } from '#utils'
 
@@ -180,7 +180,8 @@ test('alloc: a call\'s argument and a server\'s own reply too big to send are co
   const frame = 16 << 20
   let dag: unknown = 1
   for (let i = 0; i < 24; i++) dag = [dag, dag]
-  const refused = (f: () => unknown) => { try { f(); return false } catch { return true } }
+  //! only Unsendable counts as the refusal: anything else thrown here is a broken test, never a pass
+  const refused = (f: () => unknown) => { try { f(); return false } catch (e) { if (!(e instanceof Unsendable)) throw e; return true } }
   //! a reply's copy, not its trial: past the room the real encoder decides, and that encode costs what a client's reply
   // encode costs (a frame's buffer, external memory), on both paths alike
   for (const [what, f] of [['an argument', () => copyBounded(dag, atCap(frame).arg)], ['a reply\'s copy', () => copyBounded(dag, atCap(frame).result)]] as const) {
