@@ -118,17 +118,21 @@ const holderAt = (p: string): Holder | null => {
     Atomics.wait(napCell, 0, 0, 10)
   }
 }
-//! locks — every lock this process holds, by path, with its release: the exit hook runs them, and a record naming MY pid
-// is mine only while its path is here (a container restarts its node as pid 1 again, on the same volume)
+//! locks — every lock this process holds, by resolved path, with its release: the exit hook runs them
 const locks = new Map<string, () => void>()
 let exitHooked = false
+//! ME — this process's own record. A record naming my pid is MINE when it says my start time, whatever spelling of the
+// dir it was opened under (a symlink, another letter case on a case-blind disk: one process held one dir twice and the
+// second release deleted the lock the first ran on); a life before this one (a container restarts its node as pid 1
+// again, on the same volume) started at another time and is stale. Without a start time (no /proc) the path decides.
+const ME: Holder = { pid: process.pid, host: HOST, boot: BOOT, start: startOf(process.pid) }
 //! liveHolder — may the process the record names still be running? 'mine' = this process holds it; 'alive' = another
 // process on this kernel; 'elsewhere' = another machine (never checked); null = stale.
 const liveHolder = (p: string, h: Holder | null): 'mine' | 'alive' | 'elsewhere' | null => {
   if (h === null) return null
   const sameKernel = h.boot !== null && BOOT !== null ? h.boot === BOOT : h.host === HOST
   if (!sameKernel) return h.host === HOST ? null : 'elsewhere' // this host rebooted: nothing survives one; another machine
-  if (h.pid === process.pid) return locks.has(p) ? 'mine' : null
+  if (h.pid === ME.pid) return h.start !== null && ME.start !== null ? (h.start === ME.start ? 'mine' : null) : locks.has(p) ? 'mine' : null
   if (!alivePid(h.pid)) return null
   const s = startOf(h.pid)
   return h.start === null || s === null || s === h.start ? 'alive' : null
@@ -160,7 +164,7 @@ const UNKNOWN: Holder = { pid: 0, host: HOST, boot: BOOT, start: null }
 export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
   fs.mkdirSync(dir, { recursive: true })
   const p = path.join(path.resolve(dir), LOCK), take = p + '.take'
-  const mine = JSON.stringify({ pid: process.pid, host: HOST, boot: BOOT, start: startOf(process.pid) }) + '\n'
+  const mine = JSON.stringify(ME) + '\n'
   //! release only what is still mine: a crash and a takeover may have put another holder's record there since
   const release = () => { locks.delete(p); try { if (fs.readFileSync(p, 'utf8') === mine) fs.unlinkSync(p) } catch { /* gone already */ } }
   const held = () => {
