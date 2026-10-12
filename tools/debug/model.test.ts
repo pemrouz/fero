@@ -558,10 +558,12 @@ test('clients and members that left are judged right: a client against its feede
   const epochOf = (r: Rt) => (cap.nodes.flatMap((n) => n.logs[r.origin] || []).find((x) => x.seq === r.seq) || { epoch: null }).epoch
   for (const { r, s } of stops('n04')) if (epochOf(r) != null && (epochOf(r) as number) >= leftAt) assert.equal(s.status, 'not-a-holder', `${r.origin}#${r.seq} came after n04 left`)
   //! the copies: a member that left keeps an old copy — never compared, never off. The three that stay agree. The client is
-  // compared against its feeder's rows only; here it misses a row its feeder took over in a hand-off (a real kernel gap,
-  // STATUS) — and the two folds say the same thing: off on exactly those rows, its stops for them never-arrived
+  // compared against its feeder's rows only. Until wave 6a it missed a row its feeder took over in a hand-off (the latch
+  // tap bug, closed 2026-10-12) and was off here; now it converges, so the two folds' agreement on a miss is pinned on a
+  // PLANTED one below (a row taken out of the client's capture), never on this run
   const a = agreement(cap) as Agreement
   assert.ok(!a.off.includes('n05') && !a.off.includes('n04'), 'a member that left is not compared')
+  assert.deepEqual(a.off, [], 'the client converges with its feeder: nothing is off (the real miss this fixture showed is closed)')
   //! the client IS compared, row by row, on exactly the rows its feeder holds (the assertions below pass vacuously
   // when it is never compared, so pin the participants themselves)
   const rows = a.groups[0].rows!
@@ -576,11 +578,23 @@ test('clients and members that left are judged right: a client against its feede
   zc.state[ci] = [zc.state[ci][0], 'planted']
   const pa = agreement(planted) as Agreement
   assert.ok(pa.off.includes('zc1') && pa.groups[0].bad!.includes(p0), 'the client disagrees with its row\'s holders: it is off')
-  assert.ok(a.off.every((u) => u === 'zc1'), 'the members of the newest view agree with each other')
-  for (const p of a.groups[0].bad ?? []) {
-    assert.ok(feeder.held!.includes(p), `${p}: a row the client is off on is one its feeder holds`)
-    assert.ok(rs.some((r) => r.partition === p && r.nodes.zc1?.status === 'never-arrived'), `${p}: and routes() names the write it lacks`)
-  }
+  //! a row the client LACKS on a partition its feeder holds (the miss this fixture showed before wave 6a, planted now:
+  // the cell, its record and its apply row taken out of the client's capture): the two folds say the same thing — the
+  // client is off on exactly that row, and routes() names the write as never-arrived at the client
+  const missing = structuredClone(cap)
+  const zm = missing.nodes.find((n) => n.uuid === 'zc1')!
+  const k0 = zm.state.find(([k]) => partOfKey(k) === p0)![0]
+  const w0 = rs.find((r) => r.partition === p0 && r.nodes.zc1?.status === 'applied')!
+  assert.ok(w0, 'the client applied a write of that row — the fixture is what it claims')
+  zm.state = zm.state.filter(([k]) => k !== k0)
+  zm.logs[w0.origin] = (zm.logs[w0.origin] ?? []).filter((x) => x.seq !== w0.seq)
+  zm.journal = zm.journal.filter((e) => !(e.kind === cap.vocab.applyInbound && e.a === w0.origin && e.b === w0.seq))
+  const ma = agreement(missing) as Agreement
+  assert.deepEqual(ma.off, ['zc1'], 'the client alone is off')
+  assert.deepEqual(ma.groups[0].bad, [p0], 'on exactly the row it lacks')
+  const mr = [...(routes(missing) as Map<string, Rt>).values()]
+  assert.equal(mr.find((r) => r.origin === w0.origin && r.seq === w0.seq)!.nodes.zc1?.status, 'never-arrived', 'routes() names the write the client lacks: never-arrived at zc1')
+  assert.ok(mr.filter((r) => r.nodes.zc1?.status === 'never-arrived').length === 1, 'and no other')
 })
 
 test('a capture of two resources is judged per resource: each agrees inside itself, and a write\'s stops are its own resource\'s nodes (wave 5e)', () => {
