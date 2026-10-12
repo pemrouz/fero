@@ -33,15 +33,20 @@ const deadPid = (): number => {
 }
 const mine = (pid = process.pid): Lock => ({ pid, host: HOST, boot: BOOT, start: startOf(pid) })
 
-test('one process, one dir: a second Runtime on a held dir is refused with code dir-held naming this process; destroy() releases the lock and the next open succeeds', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-'))
+test('one process, one dir: a second Runtime on a held dir is refused with code dir-held naming this process, under the same spelling or a symlinked one; destroy() releases the lock and the next open succeeds', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-')), link = dir + '-link'
+  fs.symlinkSync(dir, link)
   let a: Runtime | null = null, b: Runtime | null = null
   try {
     a = new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir })
     assert.deepEqual(lockOf(dir), mine(), 'the lock names this process: pid, host, boot id, start time')
-    assert.throws(() => new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir }), (e: Error & { code?: string; pid?: number; host?: string }) =>
-      e.code === 'dir-held' && e.pid === process.pid && e.host === HOST && /is held by this process already \(pid \d+ on \S+\); one dir is one node/.test(e.message), 'refused, typed, naming the holder')
-    assert.deepEqual(lockOf(dir), mine(), 'the refusal left the lock as it was')
+    const held = (e: Error & { code?: string; pid?: number; host?: string }) =>
+      e.code === 'dir-held' && e.pid === process.pid && e.host === HOST && /is held by this process already \(pid \d+ on \S+\); one dir is one node/.test(e.message)
+    assert.throws(() => new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir }), held, 'refused, typed, naming the holder')
+    //! another spelling of the same dir (a symlink): the record is this process's own by its fields, not by the path it
+    // was opened under — before this, the second spelling held the dir too, and its release deleted the lock the first ran on
+    assert.throws(() => new Runtime({ uuid: 'aa', listen: '127.0.0.1:0', dir: link }), held, 'refused under the symlinked spelling too')
+    assert.deepEqual(lockOf(dir), mine(), 'the refusals left the lock as it was')
     await a.destroy()
     a = null
     assert.equal(lockOf(dir), null, 'a clean stop releases the lock')
@@ -50,6 +55,7 @@ test('one process, one dir: a second Runtime on a held dir is refused with code 
   } finally {
     await a?.destroy()
     await b?.destroy()
+    fs.rmSync(link, { force: true })
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
