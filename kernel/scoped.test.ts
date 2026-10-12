@@ -764,6 +764,55 @@ test('ACQUISITION forwards to spokes — the two legs: a spoke that syncs while 
   assert.deepEqual(sent(4).slice(before.zy), [3, 5, 7, 9], 'and to the other')
 })
 
+//! THE LANE RULE (wave 6b, 2026-10-12; the wave-6a review's probe): a lane holds each (origin, seq) ONCE, and the scalar
+// fence (streams.applied) never sits below the lane's tail. A teacher ships every entry of p it holds, its own floor as
+// the cut — so an entry above its floor (a gapped chain there) arrives above the cut. The fold used to raise the fence
+// only to the cut, and the fast path appends at the tail on `seq > applied` alone (write.ts inbound), so the same record
+// staged live during the latch was appended again by the live replay (lane bb at aa read [3, 5, 7, 7]; the forward
+// shipped it twice and the spoke dropped the copy), a later re-ship of it was appended a third time, and a record
+// between the cut and it landed out of order. Now the fence rises to the top of what the teacher shipped on each lane;
+// the floor stays at the cut (the fold trusts the cut, never the chain). Red on the base at "the lane holds 7 once"
+// (actual [3, 5, 7, 7]).
+test('THE LANE RULE — a teacher record above the cut that also staged live is in the lane once: the replay drops it on the dual fence, the spoke hears it once, a later re-ship drops, a record between the cut and it splices in order; the fence is at the lane\'s tail', () => {
+  const h = armedView1()
+  h.node.writes.ring.place('px', 'bb', 'aa')
+  h.node.writes.ring.place('py', 'bb', 'aa')
+  h.node.step({ kind: 'linkUp', link: 3, dialed: false })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.HELLO, { u: 'zz', i: 1, l: 'sim:zz', r: 1 }) })
+  h.node.step({ kind: 'bytesIn', link: 3, bytes: encodeControl(VERB.DIGEST, { d: {}, r: 1, q: 1 }) })
+  const sent = () => h.of('send').filter((e) => e[1] === 3)
+    .map((e) => new Framer().push((e[2] as Uint8Array).slice())[0]).filter((f) => f && f.verb === VERB.RECORDS)
+    .flatMap((f) => [...f.records()].map((r) => r.seq))
+  const lane = () => h.node.logs.get('bb')!.map((e) => e.seq)
+  //! the latch opens on bb's announce (its floor for px on lane bb is 5); bb#7 (px.c, chained to 5) arrives LIVE mid-latch: staged
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: haveq(1, { px: { bb: 5 } }) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 7, rec: rec(['px', 'c'], 3), pp: 5 }]) })
+  assert.equal(h.node.state.size, 0, 'nothing folds during the latch')
+  //! the teacher holds bb#7 too, above its own floor (its chain to 7 is gapped: a lost frame it has not repaired yet), and
+  // ships everything it holds of px with its floor as the cut: 3, 5 and 7, cut bb: 5
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 3, rec: rec(['px', 'a'], 1), pp: 0 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 5, rec: rec(['px', 'b'], 2), pp: 3 }]) })
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: acqFrame('bb', [{ seq: 7, rec: rec(['px', 'c'], 3), pp: 5 }]) })
+  const dups = h.jk(JK.dupDrop).length
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: encodeControl(VERB.ACQDONE, { p: 'px', e: 1, t: { bb: 5 }, n: 3 }) })
+  assert.equal(h.jk(JK.acquire).length, 1, 'the fold committed')
+  assert.deepEqual(lane(), [3, 5, 7], 'the lane holds 7 once: the fold spliced it, the live replay dropped its copy')
+  assert.equal(h.jk(JK.dupDrop).length, dups + 1, 'the replayed copy went through the dual fence and dropped as present in the lane')
+  assert.deepEqual(sent(), [3, 5, 7], 'the spoke heard each record once (the forward, V4-53)')
+  const d = h.node.streams.get('bb')!
+  assert.equal(d.applied, 7, 'the fence is at the lane\'s tail, above the cut')
+  assert.equal(d.parts!.get('px')!.s, 5, 'the floor is the cut: the fold attests what the teacher attested, never the chain')
+  assert.equal(h.node.state.get(JSON.stringify(['px', 'c'])), 3)
+  //! a later re-ship of bb#7 (an AE-shaped repeat) drops; bb#6, a record of py between the cut and the tail, splices at its seq
+  h.node.step({ kind: 'bytesIn', link: 2, bytes: frame('bb', [{ seq: 7, rec: rec(['px', 'c'], 3), pp: 5 }]) })
+  assert.deepEqual(lane(), [3, 5, 7], 'a re-ship of a record above the cut drops on lane presence')
+  h.node.step({ kind: 'bytesIn', link: 1, bytes: frame('bb', [{ seq: 6, rec: rec(['py', 'a'], 6), pp: 0 }]) })
+  assert.deepEqual(lane(), [3, 5, 6, 7], 'a record between the cut and the tail lands at its seq position, the lane ascending')
+  assert.equal(d.parts!.get('py')!.s, 6, 'py\'s floor chains from 0 at the splice')
+  assert.deepEqual(sent(), [3, 5, 7, 6], 'the spoke heard the interior record once, the re-ship never')
+  assert.equal(d.applied, 7, 'the fence never regresses')
+})
+
 test('ACQUISITION aborts — torn count, foreign ACQ, teacher death, epoch flip, tick timeout: the buffer drops whole, nothing folds', () => {
   //! torn: DONE's n disagrees with the staged teacher count
   const t1 = armedView1()
