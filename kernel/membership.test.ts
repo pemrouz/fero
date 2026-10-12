@@ -1157,6 +1157,26 @@ test('the ask (DESIGN-LEAVE §10.10.6): a grant that holds me is announced at on
   assert.equal(g.sentOn(3, VERB.PULL).length, 0, 'a HELLO that said nothing and holds that are nothing: no ask at admit')
 })
 
+test('holds() is memoized (the fifth review): a vote above my view that is NO hold — one apart, the common state after a failed one-member ballot — answers at the fast path\'s cost, the same list object on every call until the vote or the view changes; a replacement vote or an install is a new answer', () => {
+  const h = fiveAt1('cc')
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: mem(['aa', 'bb', 'cc', 'dd']), p: 'aa', o: 1 }) })
+  assert.equal(h.vote(h.link.aa).g, 1)
+  const first = h.node.membership.holds(h.node)
+  assert.deepEqual(first, [], 'one apart: no hold')
+  assert.equal(h.node.membership.holds(h.node), first, 'the memo: the same object, nothing recomputed')
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+  //! aa's replacement at the same epoch is two apart: a new vote, a new answer
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.PROPOSE, { e: 2, m: mem(['aa', 'bb', 'cc']), p: 'aa', o: 1 }) })
+  const held = h.node.membership.holds(h.node)
+  assert.notEqual(held, first)
+  assert.deepEqual(held.map((x) => x.h), ['aa,bb,cc'])
+  assert.equal(h.node.membership.holds(h.node), held, 'memoized again')
+  //! the install is a new view: re-read (the vote at 2 is history, nothing above view 2)
+  h.node.step({ kind: 'bytesIn', link: h.link.aa, bytes: encodeControl(VERB.VIEW, { e: 2, m: mem(['aa', 'bb', 'cc']) }) })
+  assert.deepEqual(h.node.membership.holds(h.node), [])
+  assert.deepEqual(h.node.membership.gate(h.node), { open: true, reason: '' })
+})
+
 test('a HELLO whose v is not a list of holds is a malformed HELLO: the link closes', () => {
   const h = harness('aa', { hosts: ['sim:bb'] })
   h.node.step({ kind: 'start' })
