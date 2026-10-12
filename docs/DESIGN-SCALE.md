@@ -1414,39 +1414,55 @@ unscoped golden, the 300-seed sweep, 59,500 and 104,050 are untouched
 (`Scope` is built on scoped nodes only).
 
 *The invariant in the sim.* `lane-unique` (sim/monitors.ts `perEvent`):
-after every event, on every stepped node's lanes, a seq equal to its
-neighbour's fires ("n01 lane n02 holds seq 7 TWICE (at 2 and 3; epochs 1
-and 1) — the lane rule"). log-monotone proves uniqueness for the tail it
-scans (strictly ascending ⇒ no repeat) but scans from the length it last
-saw, so a copy an interior insert puts below that length is outside its
-window; lane-unique keeps the entry it last saw at the tail, scans the
-new tail while that entry still stands at its index, and the whole lane
-when it moved (an interior insert) or the array was replaced. The extra
-coverage over log-monotone is exactly the in-place interior copy: a
-REPLACED array (a `compact()` rewrite) is rescanned from the start by
-log-monotone too, since its cursor keys on the array's identity
-(`cursorOf`). Counted (`laneUniqueCounts`: lane scans and neighbouring
-pairs); the scoped sweep records `eng.lanePairs` and asserts it above
-zero on every family. Checked: the kernel probe (kernel/scoped.test.ts
-'THE LANE RULE', red on the base at "the lane holds 7 once", actual
-[3, 5, 7, 7]); the same frames on a formed sim node
-(sim/scale-probes.test.ts 'the lane rule in a sim': lane-unique and
+after every event, on every stepped node's lanes, the pairs it reads
+must be STRICTLY ASCENDING (`<=` fires, the same test as log-monotone's).
+A strictly ascending lane holds each seq once, wherever a copy sits: a
+copy beside its original is an equal pair ("n01 lane n02 holds seq 7
+TWICE (at 2 and 3; epochs 1 and 1) — the lane rule"); a copy put
+anywhere else reads as an entry out of place ([l0, l2', l1, l2]: "holds
+seq l1 OUT OF PLACE at 2: after l2'"). The first shape of the scan
+tested equal neighbours alone, on the argument that lanes are ascending
+so equal seqs sit side by side — but the only monitor that proves a
+lane ascending in its interior is this one, so a copy away from its
+original was seen by nothing (the 2026-10-12 review's probe: a copy of
+lane[2] at index 1, or of lane[0] at index 2, fired no monitor on any
+variant). log-monotone proves the rule for the tail it scans but scans
+from the length it last saw, so a copy an interior insert puts below
+that length is outside its window; lane-unique keeps the entry it last
+saw at the tail, scans the new tail while that entry still stands at its
+index, and the whole lane when it moved (an interior insert) or the
+array was replaced. The extra coverage over log-monotone is exactly the
+in-place interior copy: a REPLACED array (a `compact()` rewrite) is
+rescanned from the start by log-monotone too, since its cursor keys on
+the array's identity (`cursorOf`). Counted (`laneUniqueCounts`: lane
+scans and neighbouring pairs); the scoped sweep records `eng.lanePairs`
+and asserts it above zero on every family. Checked: the kernel probe
+(kernel/scoped.test.ts 'THE LANE RULE', red on the base at "the lane
+holds 7 once", actual [3, 5, 7, 7]); the same frames on a formed sim
+node (sim/scale-probes.test.ts 'the lane rule in a sim': lane-unique and
 log-monotone both fire with the fence rise reverted, since the copy
-lands at the tail; nothing fires now); and the plant in
-sim/monitor-walk.test.ts, a copy at index 1 of a lane of six or more
-that the monitors already read whole (from step 150), where lane-unique
-fires (event 973 on the seeded run) and the test pins that log-monotone
-never does (`silent`) — the scoped and full walks agreeing. The plant's
-first shape (a lane of three from step 35) landed on a lane that had just
-grown, so the copy sat at log-monotone's cursor and both fired at one
-event; a lane-unique with log-monotone's cursor rule passed it. The
-2026-10-12 review caught that; the deeper plant turns that mutant red.
+lands at the tail; nothing fires now); and two plants in
+sim/monitor-walk.test.ts on a lane of six or more that the monitors
+already read whole (from step 150): a copy of lane[1] at index 1 (beside
+its original) and a copy of lane[2] at index 1 (away from it). On both,
+lane-unique fires (event 973 on the seeded run), the test pins that
+log-monotone never does (`silent`), and the scoped and full walks agree.
+The second plant is red on the equal-neighbours scan ("the plant bit:
+the full walk saw lane-unique (it saw nothing)", four variants). The
+plants' first shape (a lane of three from step 35) landed on a lane that
+had just grown, so the copy sat at log-monotone's cursor and both fired
+at one event; a lane-unique with log-monotone's cursor rule passed it.
+The 2026-10-12 review caught that too; the deeper plant turns that
+mutant red. `silent` rides on Sim(11)'s trajectory (log-monotone's
+cursor must already be past the copy when the plant lands); a merge that
+moves the trajectory can only make it fail loudly, and the cure is a
+later plant step.
 
 *For stage 3.* Compaction may assume a lane holds each seq once and the
 fence covers the tail. A rewrite that kept a copy at the tail or
 replaced the array is named by log-monotone and lane-unique both at the
-next pass; a copy an in-place rewrite left in the interior is named by
-lane-unique alone.
+next pass; a copy an in-place rewrite left anywhere in the interior,
+beside its original or not, is named by lane-unique alone.
 
 ## §0 The decision, in ten lines
 
