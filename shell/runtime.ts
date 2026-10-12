@@ -25,6 +25,7 @@ import net from 'node:net'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { Worker } from 'node:worker_threads'
 import { Node, type NodeOpts } from '../kernel/node.ts'
 import { Cursor, Writer, HEADER, MAGIC, MAX_FRAME, crcFrame } from '../kernel/codec.ts'
 import type { Applied, BootRecord, Rec } from '../kernel/env.ts'
@@ -72,7 +73,8 @@ const STAGE = 1 << 20
 // process's own pid from a life before this one, or a boot id of this host's that is not the running one (the box
 // rebooted) is a stale lock: taken over. A holder in ANOTHER pid namespace on this kernel (a container: pid 1 is every
 // container's first process, and a container sees no pid of the host's) cannot be checked by its pid, so it is judged by
-// its LEASE: a holder touches its lock's mtime every TOUCH ms, and a record untouched for LEASE ms is stale. The look
+// its LEASE: a holder touches its lock's mtime every TOUCH ms (from a thread of its own, so a WAL replay or a snapshot
+// swap that blocks the main loop never starves the touch), and a record untouched for LEASE ms is stale. The look
 // waits for the next touch, up to the rest of the lease: a container that restarts on its volume waits at most one lease
 // before it takes its own stale lock over, and two containers started on one volume, or a container and a process on the
 // host, are told apart within one touch. Another machine (another boot id under another host name, or another host name
@@ -98,9 +100,45 @@ const startOf = (pid: number): number | null => {
   return Number.isFinite(n) ? n : null
 }
 //! TOUCH / LEASE — the holder touches its lock every TOUCH ms; a holder another namespace cannot check by pid is stale
-// once its lock went LEASE ms untouched (eight touches: a holder stalled that long has missed its cluster's heartbeats
-// too). A disk that keeps whole seconds (drvfs) is inside that slack.
+// once its lock went LEASE ms untouched (eight touches). A disk that keeps whole seconds (drvfs) is inside that slack.
+// The limit: a process frozen or paused longer than LEASE (SIGSTOP, a paused VM) can be taken over by a starter in
+// another namespace; the toucher below says so once it runs again.
 const TOUCH = 500, LEASE = 4000
+//! toucher — ONE unref'd worker thread per process touches every lock this process holds, every TOUCH ms. A thread, not
+// a timer on the main loop: fero() replays the WAL synchronously right after it takes the lock (a 32 MB WAL blocked the
+// loop five to eight seconds here), the V4-51 snapshot swap and lockDir's own lease look block it too, and a timer
+// touched nothing meanwhile — a second container that started during the replay judged the lease run out and took the
+// dir while the first still booted, both up on one wal.log. On each touch the thread first checks the record is still
+// this process's own: a foreign record means a live holder was taken over (its lease ran out: the process was frozen or
+// paused longer than LEASE), and it says so on stderr ONCE, straight to fd 2 (loud even while the main loop is blocked),
+// and stops touching that path (a touch would keep the taker's lease alive); a path gone for the moment (a release, a
+// takeover in flight, the dir deleted) is looked at again next time. The thread never keeps the process alive.
+const TOUCHER = `
+const { parentPort, workerData } = require('node:worker_threads')
+const fs = require('node:fs'), path = require('node:path')
+const held = new Map()
+parentPort.on('message', (m) => { if (m.add !== undefined) held.set(m.add, m.mine); else held.delete(m.remove) })
+setInterval(() => {
+  const now = Date.now() / 1000
+  for (const [p, mine] of held) {
+    let got
+    try { got = fs.readFileSync(p, 'utf8') } catch { continue }
+    if (got !== mine) {
+      held.delete(p)
+      let by = 'another record'
+      try { const h = JSON.parse(got); by = 'pid ' + h.pid + ' on ' + h.host } catch {}
+      fs.writeSync(2, 'fero: the lock on ' + path.dirname(p) + ' was taken over by ' + by + ' while this process (pid ' + process.pid + ') still held the dir — its lease ran out (the process was frozen or paused longer than ' + workerData.LEASE + ' ms); two nodes may now run on one dir: stop one of them\\n')
+      continue
+    }
+    try { fs.utimesSync(p, now, now) } catch { /* gone between the look and the touch */ }
+  }
+}, workerData.TOUCH)
+`
+let toucher: Worker | null = null
+const touch = (m: { add: string; mine: string } | { remove: string }): void => {
+  if (toucher === null) { toucher = new Worker(TOUCHER, { eval: true, execArgv: [], workerData: { TOUCH, LEASE } }); toucher.unref() }
+  toucher.postMessage(m)
+}
 interface Holder { pid: number; host: string; boot: string | null; ns: string | null; start: number | null }
 export interface DirHeld extends Error { code: 'dir-held'; pid: number; host: string }
 const alivePid = (pid: number): boolean => { try { process.kill(pid, 0); return true } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM' } }
@@ -198,17 +236,16 @@ export const lockDir = (dir: string, who = 'Runtime'): (() => void) => {
   const p = path.join(path.resolve(dir), LOCK), take = p + '.take'
   const mine = JSON.stringify(ME) + '\n'
   //! release only what is still mine: a crash and a takeover may have put another holder's record there since
-  let touching: NodeJS.Timeout | null = null
   const release = () => {
     locks.delete(p)
-    if (touching !== null) { clearInterval(touching); touching = null }
+    touch({ remove: p })
     try { if (fs.readFileSync(p, 'utf8') === mine) fs.unlinkSync(p) } catch { /* gone already */ }
   }
   const held = () => {
     locks.set(p, release)
-    //! the lease: touch the lock every TOUCH ms for a reader in another pid namespace (it never keeps the process alive)
-    touching = setInterval(() => { const now = Date.now() / 1000; try { fs.utimesSync(p, now, now) } catch { /* the dir is gone: nothing to hold */ } }, TOUCH)
-    touching.unref()
+    //! the lease: the toucher thread touches the lock every TOUCH ms for a reader in another pid namespace, from now
+    // until the release — through the WAL replay that follows this call on the main thread
+    touch({ add: p, mine })
     if (!exitHooked) { exitHooked = true; process.on('exit', () => { for (const r of [...locks.values()]) r() }) }
     return release
   }

@@ -3,9 +3,10 @@
 // (the platform spikes, 2026-10-12). Now the composer takes `lock` (pid, host, boot id, process start time; one atomic
 // link) before it reads the boot record; a second open is refused at fero() time with a typed error naming the holder;
 // a clean stop and the process exit release it; a lock left by a dead or reused pid, or from before a reboot, is taken
-// over; a lock from another machine is never taken over. The two-process cases run real children through fero.spawn
-// (tests/dirlock.child.ts); the container shapes run the child as pid 1 of its own pid namespace (unshare), skipped
-// where the box has no user namespaces.
+// over; a lock from another machine is never taken over; a holder in another pid namespace is judged by its lease, which
+// a thread of its own touches (a WAL replay that blocks the main loop never starves it). The two-process cases run real
+// children through fero.spawn (tests/dirlock.child.ts); the container shapes run the child as pid 1 of its own pid
+// namespace (unshare), skipped where the box has no user namespaces.
 
 import '../utils/battery.ts'
 
@@ -164,7 +165,7 @@ test('a stale lock is taken over: a dead pid, a pid the kernel gave to another p
     const toucher = fero.spawn(CHILD, [dir, 'touch']); kids.push(toucher)
     assert.ok(await until(() => toucher.out.includes('touching'), 20_000), toucher.out)
     t = performance.now()
-    assert.throws(() => lockDir(dir, 'test'), (e: Error & { code?: string }) => e.code === 'dir-held' && /pid 1 on c-live; .* \(a container on this kernel: it still touches its lock\)/.test(e.message), 'a touched lock from another namespace is live')
+    assert.throws(() => lockDir(dir, 'test'), (e: Error & { code?: string }) => e.code === 'dir-held' && /pid 1 on c-live; .* \(a process in another pid namespace on this kernel: it still touches its lock\)/.test(e.message), 'a touched lock from another namespace is live')
     assert.ok(performance.now() - t < 2000, 'the touch proved it within a touch, not a lease')
     assert.equal(await toucher.stop(), 0)
     takenOver({ pid: 1, host: 'c-live', ns: 'pid:[1]', start: startOf(1) }, 'the touching stopped: taken over after the lease')
@@ -340,6 +341,49 @@ test('a filesystem without hard links: the lock falls back to the exclusive crea
   }
 })
 
+//! holdHere — a child in THIS namespace with its stderr in `out` too (fero.spawn keeps only stdout there): the toucher
+// thread's line goes straight to fd 2. stop() is Ctrl-C, the clean stop.
+const holdHere = (args: string[]) => {
+  const c = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+  const h = { out: '', pid: c.pid!, stop: () => new Promise<number | null>((resolve) => { c.once('close', (code) => resolve(code)); c.kill('SIGINT') }) }
+  c.stdout.setEncoding('utf8').on('data', (d: string) => { h.out += d })
+  c.stderr.setEncoding('utf8').on('data', (d: string) => { h.out += d })
+  return h
+}
+const mtimeOf = (dir: string) => fs.statSync(path.join(dir, 'lock')).mtimeMs
+test('the lease is held from a thread of its own: the lock is touched while the main thread is blocked (a WAL replay); a live holder whose lock was taken over says so on stderr once, stops touching the taker\'s record, and its release leaves it', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-thread-'))
+  let holder: ReturnType<typeof holdHere> | null = null
+  try {
+    //! the main thread blocked 3 s right after the lock, as fero()'s synchronous replay of a big WAL blocks it: a timer on
+    // the main loop touched nothing meanwhile, and a starter in another namespace judged the lease run out
+    const release = lockDir(dir, 'test')
+    const m0 = mtimeOf(dir)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3000)
+    assert.ok(mtimeOf(dir) - m0 >= 2000, `the lock was touched while the main thread was blocked (mtime moved ${mtimeOf(dir) - m0} ms in 3 s)`)
+    release()
+    assert.equal(lockOf(dir), null)
+    //! a taker's record over a live holder's (what a takeover leaves behind, put there in one step): the holder's thread
+    // sees it is not its own, says so once, and touches it no more — a touch would have kept the taker's lease alive
+    holder = holdHere([CHILD, dir])
+    assert.ok(await until(() => holder!.out.includes('up '), 20_000), `the holder never said up (${holder.out})`)
+    assert.equal(lockOf(dir)?.pid, holder.pid)
+    plant(dir, { pid: 4242, host: 'taker' }, 'lock.taker'); fs.renameSync(path.join(dir, 'lock.taker'), path.join(dir, 'lock'))
+    assert.ok(await until(() => holder!.out.includes('was taken over by pid 4242 on taker'), 5000), `the holder said its lock was taken (${holder.out})`)
+    assert.match(holder.out, /fero: the lock on \S+ was taken over by pid 4242 on taker while this process \(pid \d+\) still held the dir — its lease ran out .*two nodes may now run on one dir: stop one of them/)
+    const m1 = mtimeOf(dir)
+    await new Promise((r) => setTimeout(r, 1200))
+    assert.equal(mtimeOf(dir), m1, "the holder no longer touches the taker's record")
+    assert.equal(holder.out.split('was taken over').length, 2, `said once (${holder.out})`)
+    assert.equal(await holder.stop(), 0, 'the holder still stops cleanly')
+    holder = null
+    assert.equal(lockOf(dir)?.host, 'taker', "the release left the taker's record")
+  } finally {
+    await holder?.stop()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 //! the container shapes: the node runs as pid 1 of its own pid namespace (docker, kubernetes, a Fly VM), is killed -9,
 // and the same image restarts as pid 1 again on the same volume; or a recreate gives the new container a new host name
 const NSARGS = ['-Urpf', '--mount-proc'] // a user namespace with root mapped, a new pid namespace, fork, /proc of that namespace
@@ -423,6 +467,30 @@ test('a container restart: the node is pid 1 of its namespace, killed -9, and pi
   } finally {
     await held?.kill()
     for (const k of kids) await k.stop()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a container whose boot blocks the main thread longer than the lease (a long WAL replay): a second container started one second in is still refused within a touch, and the first comes up holding — the lease is held from a thread of its own', { skip: !canUnshare && 'no user namespaces here (unshare -Urpf failed)' }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fero-lock-boot-'))
+  let held: ReturnType<typeof holdNs> | null = null
+  try {
+    //! c-a takes the lock, then blocks its main thread 6 s (the child's `boot-slow`: the wal.log open); c-b starts 1 s in.
+    // With the touch on a timer of the main loop, c-b saw the lease run out 4 s after c-a's claim and took the dir while
+    // c-a still booted; both then ran as one node on one wal.log
+    held = holdNs([CHILD, dir, 'boot-slow'], 'c-a')
+    assert.ok(await until(() => held!.out.includes('booting'), 20_000), `c-a never entered its boot (${held.out})`)
+    await new Promise((r) => setTimeout(r, 1000))
+    const t = performance.now()
+    const second = await inNs([CHILD, dir, 'exit'], 'c-b')
+    const took = performance.now() - t
+    assert.ok(second.out.includes('refused dir-held 1 c-a') && second.code === 2, `c-b was refused naming c-a while c-a still booted (${second.out})`)
+    assert.ok(took < 3000, `within a touch, not after c-a's boot (${took.toFixed(0)} ms)`)
+    assert.ok(await until(() => held!.out.includes('up 1'), 20_000), `c-a never came up (${held.out})`)
+    assert.equal(lockOf(dir)?.host, 'c-a', 'c-a holds its dir')
+    assert.ok(!held.out.includes('taken over'), `nothing took c-a's lock (${held.out})`)
+  } finally {
+    await held?.kill()
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
