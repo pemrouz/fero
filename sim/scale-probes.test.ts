@@ -574,6 +574,10 @@ const spokeCrossing = (seed: number, poke = false) => {
   sim.run({ until: 1500 })
   assert.ok(formed(members))
   const { s1, P, O, T } = spokeOf(sim, ids, ids.slice(0, 2))
+  //! T is cut from the spoke (wave 6b): a spoke leaves a feeder whose gate is shut for a linked server whose gate is
+  // open (node.ts #refeed), so with T linked the failover below would land on T — complete, open — and the crossing
+  // this plant exists for would never form. With P and O its only servers, the spoke stays on shut O as it must.
+  sim.partition(T, 's1')
   const X = Array.from({ length: 6 }, (_, i) => 'x' + i), Y = Array.from({ length: 6 }, (_, i) => 'y' + i)
   for (const [i, k] of X.entries()) sim.post(P, { kind: 'write', recs: [{ type: REC.update, key: [k], value: i }] }, i * 3)
   sim.run({ until: sim.now + 300 })
