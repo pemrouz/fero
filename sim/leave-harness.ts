@@ -963,6 +963,45 @@ export const keptBallotProposerGone = (variant: 'open' | 'committed' | 'evicted'
   return outcomeM(m, shape, quiet, mid)
 }
 
+//! openerBesideSuspect — the opener in the two windows before a lost member's eviction (the sixth review, 2026-10-12,
+// the skeptic's one finding on the fix commits, and the wider window the pin for it found): at n=5 bb is cut from aa
+// and cc at once; bb's chains to both give up, so bb (the lowest live member in its own eyes) proposes `{bb,dd,ee}`@2;
+// dd grants it from view 1 — two apart — and is held, and its ask lands at aa. At aa, bb is a lost member: not yet a
+// suspect (`fresh`: aa has not ticked since the cut), or a suspect whose chain is still running (`dialing`: the
+// pending-redial window of V4-39 holds the eviction back one tick). Before the guard the opener waited for neither:
+// aa, the lowest live member with a held member linked and no ballot in flight, re-proposed the FULL view — bb
+// included — at 3; it committed everywhere (the lost member back in for one epoch), burned bb's ballot, and bb was
+// evicted again at 4: safe, one doubled ballot. With the guard (every member of my view linked, or no opener) aa
+// proposes NOTHING in either window, and bb's ballot, already in flight, wins the duel: `{bb,dd,ee}`@2, aa and cc
+// evicted across the cut (they stay so here: their knock cannot reach bb, as keptBallotProposerGone's `evicted` aa).
+// The given-up control (`givenUp`: aa's and cc's chains exhausted before the tick) is the ordinary eviction in the
+// same tick, `P(2,4)` joint over `{bb,dd,ee}`, refused by dd whose vote is bb's; both escalate, `{aa,cc,dd,ee}`@3 with
+// bb evicted. `mid` carries aa's proposal list after dd's ask landed and aa ticked (nothing, nothing, `P(2,4)`), both
+// lists at the end, and every install.
+export const openerBesideSuspect = (variant: 'fresh' | 'dialing' | 'givenUp'): OutcomeM => {
+  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd', 'ee'])
+  const shape: string[] = [], mid: string[] = []
+  const node = (u: string) => m.nodes.get(u)!
+  m.cut('bb', 'aa'); m.cut('bb', 'cc')
+  for (let i = 0; i < 3; i++) { m.tick('bb'); if (variant !== 'fresh') { m.tick('aa'); m.tick('cc') } }
+  m.giveUp('bb', 'aa'); m.giveUp('bb', 'cc')
+  if (variant === 'givenUp') { m.giveUp('aa', 'bb'); m.giveUp('cc', 'bb') }
+  m.tick('bb')
+  if (proposals(m, 'bb') !== 'P(2,3)') shape.push(`bb did not propose {bb,dd,ee} at 2: ${proposals(m, 'bb') || 'nothing'}`)
+  if (node('aa').dialing('sim:bb') !== (variant !== 'givenUp')) shape.push(`aa's chain to bb: dialing ${node('aa').dialing('sim:bb')}`)
+  if (node('aa').journal.read().some((e) => e.kind === JK.suspect) !== (variant !== 'fresh')) shape.push(`aa's suspects before the ask: ${node('aa').journal.read().filter((e) => e.kind === JK.suspect).map((e) => e.a).join(',') || 'none'}`)
+  //! bb's PROPOSE lands at dd alone: held, and its ask goes on every member link — aa reads it, then ticks
+  if (m.deliver('bb', 'dd') !== 'PROPOSE' || node('dd').membership.gate(node('dd')).reason !== 'held') shape.push(`dd is not held on bb's ballot: ${meshState(m)}`)
+  if (m.deliver('dd', 'aa') !== 'PULL') shape.push('dd\'s ask did not land at aa')
+  m.tick('aa')
+  mid.push(`aa proposals after dd's ask: ${proposals(m, 'aa') || '-'}`)
+  const quiet = quietSplit(m)
+  settle(m, 30, [['aa', 'bb'], ['bb', 'aa'], ['cc', 'bb'], ['bb', 'cc']])
+  mid.push(`proposals: aa=${proposals(m, 'aa') || '-'} bb=${proposals(m, 'bb') || '-'}`)
+  mid.push(`installs: ${m.log.filter((l) => l.includes(' INSTALL ')).map((l) => l.replace(' INSTALL ', '@')).join(' ')}`)
+  return outcomeM(m, shape, quiet, mid)
+}
+
 // ── the third review's shapes (DESIGN-LEAVE §10.10, 2026-10-10): whose word a stayer may read, the fresh link, and
 // genesis — each one fixed schedule on real Nodes ──
 //! clientAsk — a CLIENT's word teaches nothing (I-23). zz, a client, links into aa with a HELLO and then a PULL that

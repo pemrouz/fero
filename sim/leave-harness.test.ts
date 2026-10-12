@@ -54,7 +54,7 @@
 // 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { meshState, evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, keptBallotProposerGone, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { meshState, evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, keptBallotProposerGone, openerBesideSuspect, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
@@ -688,6 +688,36 @@ test('leave harness, the fifth review\'s shape: the kept ballot in the reversed 
     assert.deepEqual([...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])], [], `${v}: not the shape, or UNSAFE`)
     if (o.mid!.join('\n') !== PROPOSER_GONE[v].mid.join('\n')) red.push(`${v}: a mid point moved; re-record with the why:\n${o.mid!.join('\n')}`)
     if (o.end !== PROPOSER_GONE[v].end) red.push(`${v}: the end state moved — the three must be writable again; re-record with the why: ${o.end}`)
+  }
+  assert.deepEqual(red, [])
+})
+
+//! the sixth review's shape (2026-10-12): the opener in the two windows before a lost member's eviction. The dialing
+// variant is the finding, and `fresh` (bb lost but not yet aa's suspect) the wider window the kernel pin found: before
+// the guard aa read `P(3,5)` at the mid — the FULL view, the lost bb back in — with `{aa,bb,cc,dd,ee}`@3 installed
+// everywhere and bb evicted again at 4; with the guard (every member of my view linked, or no opener) aa proposes
+// nothing, and bb's ballot, already in flight, wins the duel: `{bb,dd,ee}`@2, aa and cc evicted across the cut (they
+// stay so in the mesh, as keptBallotProposerGone's `evicted` aa does: their knock cannot reach bb). The given-up
+// control is the ordinary duel at 2 — dd's vote is bb's, both escalate — `{aa,cc,dd,ee}`@3 with bb evicted.
+const OPENER_SUSPECT_WAITS = {
+  mid: ['aa proposals after dd\'s ask: -', 'proposals: aa=- bb=P(2,3)', 'installs: bb@2 {bb,dd,ee} dd@2 {bb,dd,ee} ee@2 {bb,dd,ee} aa@2 {bb,dd,ee} cc@2 {bb,dd,ee}'],
+  end: 'aa@2{bb,dd,ee}r:evicted bb@2{bb,dd,ee}W cc@2{bb,dd,ee}r:evicted dd@2{bb,dd,ee}W ee@2{bb,dd,ee}W',
+}
+const OPENER_SUSPECT: Record<'fresh' | 'dialing' | 'givenUp', { mid: string[]; end: string }> = {
+  fresh: OPENER_SUSPECT_WAITS,
+  dialing: OPENER_SUSPECT_WAITS,
+  givenUp: {
+    mid: ['aa proposals after dd\'s ask: P(2,4)', 'proposals: aa=P(2,4) P(3,4) bb=P(2,3) P(3,3)', 'installs: aa@3 {aa,cc,dd,ee} cc@3 {aa,cc,dd,ee} dd@3 {aa,cc,dd,ee} ee@3 {aa,cc,dd,ee} bb@3 {aa,cc,dd,ee}'],
+    end: 'aa@3{aa,cc,dd,ee}W bb@3{aa,cc,dd,ee}r:evicted cc@3{aa,cc,dd,ee}W dd@3{aa,cc,dd,ee}W ee@3{aa,cc,dd,ee}W',
+  },
+}
+test('leave harness, the sixth review\'s shape: a held member\'s ask lands at the lowest member while one of its members is LOST — not yet a suspect, or a suspect it is still redialing (openerBesideSuspect) — the opener waits for the eviction, so aa proposes NOTHING in either window (before the guard: the full view again at 3, the lost member back in, the eviction doubled one epoch later) and the ballot already in flight wins; the given-up control is the ordinary eviction in the same tick — SAFE, one view per epoch, pinned exactly', () => {
+  const red: string[] = []
+  for (const v of ['fresh', 'dialing', 'givenUp'] as const) {
+    const o = openerBesideSuspect(v)
+    assert.deepEqual([...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])], [], `${v}: not the shape, or UNSAFE`)
+    if (o.mid!.join('\n') !== OPENER_SUSPECT[v].mid.join('\n')) red.push(`${v}: a mid point moved; re-record with the why:\n${o.mid!.join('\n')}`)
+    if (o.end !== OPENER_SUSPECT[v].end) red.push(`${v}: the end state moved; re-record with the why: ${o.end}`)
   }
   assert.deepEqual(red, [])
 })
