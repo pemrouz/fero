@@ -32,7 +32,7 @@
 import { types } from 'node:util'
 import { proxy, applyRec, lens, holeAt, errText, isProxy, unfoldable, SPARSE_HOLE, type Fault } from './substrate.ts'
 import { REC, type Applied, type Rec } from '../kernel/env.ts'
-import { encodable, copyOf, roomOf, Unsendable, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
+import { encodable, copyOf, roomOf, sizeOf, Unsendable, Writer, FULL, MAX_DEPTH, MAX_FRAME, type Limit } from '../kernel/codec.ts'
 import type { Runtime } from '../shell/runtime.ts'
 
 //! METHODS_ONLY — the terminal reason a protected server gives a client's plain write (V4-5): it rides
@@ -138,6 +138,23 @@ export interface Limits { write: Limit; arg: Limit; result: Limit }
 const AT_MAX: Limits = { write: WRITE, arg: ARG, result: RESULT }
 export const atCap = (frame: number): Limits => frame === MAX_FRAME ? AT_MAX
   : { write: { ...WRITE, bytes: roomOf(frame) }, arg: { ...ARG, bytes: roomOf(frame) }, result: { ...RESULT, bytes: roomOf(frame) } }
+
+//! replyCopy — a server's own answer as a client's reply decodes it (V4-52), refused for size only where the RESULT
+// frame would really not fit one frame at the node's cap (V4-51). copyOf's byte charge is a worst case — 3 bytes a
+// character, 8 a number, as the writer RESERVES them — and over a whole read it runs 1.5 to 4.5 times the real reply,
+// so judged by the charge alone a server refused its own read (and, through the gather, every whole read on a scoped
+// cluster) from about 57-90 MiB, where a client's reply of the same rows fit (the V4-51/52 review). So a charge past
+// the room asks the real encoder once, in a writer of its own sized to the frame less the RESULT envelope, and only a
+// FULL there is too big; under the room — every ordinary read — nothing more is paid. Throws Unsendable (`over` for size).
+const ENVELOPE = 64 // RESULT { id, ok, v } around the value: three short keys and two small numbers, with room to spare
+export const replyCopy = (v: unknown, frame: number): unknown => {
+  const limit = atCap(frame).result
+  try { return copyOf(v, limit) } catch (e) { if (!(e instanceof Unsendable) || !e.over) throw e }
+  let fits = true
+  try { new Writer(frame - ENVELOPE).value(v) } catch (e) { if (e === FULL) fits = false }
+  if (!fits) { const u = new Unsendable(`bigger than ${sizeOf(frame)}`); u.over = true; throw u }
+  return copyOf(v, { ...limit, bytes: Infinity }) // what else stops it (a bigint, too deep), in copyOf's own words
+}
 
 //! CARRIES — what fero sends, said once for every refusal of a value (the lens, a methods.* reject, the seed)
 export const CARRIES = `fero sends null, undefined, true and false, numbers, strings, Uint8Array, and arrays and objects of these (an object sends its own fields, so not a Date, a Map, a Set or another built-in), at most ${WRITE.depth} levels deep counted from the row and ${WRITE.bytes >> 20} MiB in all (a string counts 3 bytes a character)`

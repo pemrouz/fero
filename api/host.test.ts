@@ -92,7 +92,7 @@ test('M5-REVIEW #2/#6 — an uninterrupted SUB that writes-then-returns DOES ope
 // here) the host refuses with a ScopedError, reason 'too-large', and a hint — never the untyped 'the result could not
 // be sent: Error: frame exceeds MAX_FRAME' it used to send, and never a dropped link. The caller hands a `scoped: true`
 // value over as-is (Caller.rehydrate), so old clients get the same typed error: no wire change.
-const tooLargeHost = (methods: Record<string, (a: unknown, ctx: { data: any }) => unknown>, rows = 20) => {
+const tooLargeHost = (methods: Record<string, (a: unknown, ctx: { data: any }) => unknown>, rows = 20, row: (i: number) => unknown = (i) => ({ b: new Uint8Array(1024).fill(i) })) => {
   const frames: { link: number; verb: number; value: unknown; bytes: number }[] = []
   const rt = new Runtime({ uuid: 'aa', heartbeatMs: 0, tune: { frame: 8192 } })
   const node = rt.node
@@ -106,7 +106,7 @@ const tooLargeHost = (methods: Record<string, (a: unknown, ctx: { data: any }) =
   const realClose = node.env.sink.close.bind(node.env.sink)
   node.env.sink.close = (link: number, reason: string) => { closes.push(link); realClose(link, reason) }
   const bind = new Bind(rt)
-  for (let i = 0; i < rows; i++) bind.data[`r${i}`] = { b: new Uint8Array(1024).fill(i) }
+  for (let i = 0; i < rows; i++) bind.data[`r${i}`] = row(i)
   const reports: string[] = []
   const host = new Host(rt, bind.data, methods, {}, (_e, what) => reports.push(what))
   //! a client on link 2 (HELLO r:1); CALL and SUB need no digest
@@ -229,4 +229,37 @@ test('V4-51/52 — at a node\'s frame cap, a write that could not go alone in on
     bind.data.small = { b: new Uint8Array(1000) }
     assert.equal(rt.node.seq, 1, 'a write that fits is taken')
   } finally { bind.destroy(); await rt.destroy() }
+})
+
+//! the V4-51/52 review: copyOf's byte charge is a worst case — 3 bytes a character, 8 a number — and over a whole read it
+// ran 1.5 to 4.5 times the real reply, so a server refused its own read 'too-large' where a client's reply of the same
+// rows fit (from about 57-90 MiB at the production cap; a few KB at this one). The real encoder decides now, and only
+// when the charge passes the room. The rows of the test above were bytes, charged exactly, so it could not see this.
+test('V4-51/52 — a server\'s own whole read of text rows that fit one frame is answered, as a client\'s is; one that does not fit is refused on both', async () => {
+  const h = tooLargeHost({ read }, 60, (i) => ({ s: 'x'.repeat(50), n: [i, 1, 2, 3] }))
+  try {
+    const mine = await h.host.invokeLocal('read', undefined) as Record<string, unknown>
+    assert.equal(Object.keys(mine).length, 60, 'the server\'s own read is answered')
+    h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.CALL, { id: 1, m: 'read' }) })
+    await h.settle()
+    const [r] = h.results()
+    assert.equal(r.ok, 1, 'and the client\'s')
+    assert.deepEqual(r.v, mine, 'the same answer')
+    for (let i = 60; i < 200; i++) h.bind.data[`r${i}`] = { s: 'x'.repeat(50), n: [i, 1, 2, 3] }
+    await assert.rejects(h.host.invokeLocal('read', undefined), (e: { reason?: string }) => e.reason === 'too-large')
+    h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.CALL, { id: 2, m: 'read' }) })
+    await h.settle()
+    assert.equal(h.results()[1].v.reason, 'too-large', 'past one frame, both refuse')
+  } finally { await h.done() }
+})
+
+test('V4-52 — a view\'s result fero cannot send is refused in the same words on a server\'s own call and a client\'s', async () => {
+  const h = tooLargeHost({ bigs: (_a, ctx) => ctx.data.map(() => 10n) }, 2)
+  try {
+    await assert.rejects(h.host.invokeLocal('bigs', undefined), /^Error: methods\.bigs: the result could not be sent: a bigint at r0$/)
+    h.node.step({ kind: 'bytesIn', link: 2, bytes: encodeControl(VERB.CALL, { id: 1, m: 'bigs' }) })
+    await h.settle()
+    const [r] = h.results()
+    assert.deepEqual([r.ok, r.v], [0, 'the result could not be sent: a bigint at r0'])
+  } finally { await h.done() }
 })
