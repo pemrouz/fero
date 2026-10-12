@@ -661,3 +661,27 @@ test('copyOf builds what decode(encode(v)) builds for every value the codec carr
   assert.equal(encodable(nested, { depth: MAX_DEPTH, bytes: 100 }), null)
   assert.deepEqual(copyOf(nested, { depth: MAX_DEPTH, bytes: 100 }), { a: 'x'.repeat(20), g: 1 })
 })
+
+//! the V4-51/52 review: the decoder (a default TextDecoder) dropped one leading U+FEFF from every string it read, value
+// or key, as if it were a byte order mark, and copyOf dropped one too to match — so a string that began with two lost
+// one more on every hop, and the writer's copy and every other differed. It is text: the decoder keeps it now
+// (ignoreBOM; the bytes do not change), and so does the copy.
+test('a string that begins with U+FEFF arrives as it was written — one or two of them, in a value and in a key — and the copy keeps them too', () => {
+  const CODEC = { depth: MAX_DEPTH, bytes: MAX_FRAME }
+  for (const v of ['﻿ab', '﻿﻿ab', { '﻿key': '﻿﻿v' }, ['﻿' + 'z'.repeat(40)]]) {
+    const w = new Writer()
+    const vt = typeof v === 'string' ? VT.str : Array.isArray(v) ? VT.arr : VT.obj
+    w.value(v, vt)
+    assert.deepStrictEqual(new Cursor(w.buf, 0, w.len).value(vt), v, 'decoded as written')
+    assert.deepStrictEqual(copyOf(v, CODEC), v, 'copied as written')
+  }
+})
+
+//! the V4-51/52 review: the size reason's note ('a string counts 3 bytes a character') sat in a module flag that a
+// getter running a walk or a copy of its own reset, so the outer refusal lost it
+test('the size reason keeps its note about characters when a getter ran a walk of its own', () => {
+  const small = { depth: MAX_DEPTH, bytes: 100 }
+  const v = { s: 'x'.repeat(20), get n() { encodable({ inner: 1 }, small); return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } }
+  assert.equal(encodable(v, small), 'bigger than 100 bytes (a string counts 3 bytes a character)')
+  assert.throws(() => copyOf(v, small), /^Error: bigger than 100 bytes \(a string counts 3 bytes a character\)$/)
+})

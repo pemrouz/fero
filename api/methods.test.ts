@@ -245,7 +245,7 @@ test("a server's own call answers what a client's call of the same handler answe
       assert.deepStrictEqual(local, remote, `methods.${m}: the server's own call and a client's agree, prototypes and all`)
     }
     assert.deepStrictEqual(await (s.methods as M).dates(), { luna: {} })
-    assert.deepStrictEqual(await (s.methods as M).text(), { luna: { s: 'x\uFFFD', bom: 'hi' } })
+    assert.deepStrictEqual(await (s.methods as M).text(), { luna: { s: 'x\uFFFD', bom: '\uFEFFhi' } })
     const got = await (s.methods as M).plain()
     assert.notEqual(got, plain, 'a plain result is a copy, never the handler\'s object')
     await assert.rejects((s.methods as M).deeper(), /^Error: methods\.deeper: the result could not be sent: deeper than 63 levels$/)

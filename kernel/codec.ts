@@ -171,7 +171,9 @@ const vtOf = (v: unknown): number =>
   : (() => { throw new FrameError(`unencodable value type: ${typeof v}`) })()
 
 const utf8 = new TextEncoder()
-const utf8d = new TextDecoder()
+//! ignoreBOM — a leading U+FEFF is text, never a byte order mark: the default decoder dropped one from every string,
+// value or key, so a string that began with it lost one on every hop (the V4-52 build and review). The bytes are the same.
+const utf8d = new TextDecoder('utf-8', { ignoreBOM: true })
 
 //! FrameFull — a frame reached its cap while it was written (Writer.ensure). It is a FrameError, so every net that
 // takes one still takes it (diag's too-large gate, the bytesIn net), and it is thrown as the ONE instance FULL,
@@ -298,12 +300,17 @@ export interface Limit { depth: number; bytes: number; part?: (o: object, array:
 // value starts at, `spent` the bytes already counted (a record's key).
 export const encodable = (v: unknown, limit: Limit, from = 0, spent = 0): string | null => {
   if (at.length !== 0) at.length = 0 // a store to an empty array's length is a slow path, about 80 ns a call
+  //! `text` is saved and restored like copyOf's `copied`: a getter that runs a walk or a copy of its own reset it,
+  // and the outer reason lost its note about characters
+  const outerText = text
   text = false
   try {
     walk(v, from, spent, limit)
     return null
   } catch (e) {
     return reasonOf(e, limit)
+  } finally {
+    text = outerText
   }
 }
 //! reasonOf — what stopped a walk or a copy, said plainly; encodable and copyOf share it, so both give one text
@@ -404,7 +411,7 @@ export class Unsendable extends Error { over = false }
 //! `copied` — the bytes charged so far: a module slot, saved and restored per call, since a getter can copy too
 let copied = 0
 export const copyOf = (v: unknown, limit: Limit, from = 0, spent = 0): unknown => {
-  const outer = copied
+  const outer = copied, outerText = text
   if (at.length !== 0) at.length = 0
   text = false
   copied = spent
@@ -417,6 +424,7 @@ export const copyOf = (v: unknown, limit: Limit, from = 0, spent = 0): unknown =
     throw u
   } finally {
     copied = outer
+    text = outerText
   }
 }
 const copy = (v: unknown, depth: number, limit: Limit): unknown => {
@@ -471,19 +479,16 @@ const copy = (v: unknown, depth: number, limit: Limit): unknown => {
   if (copied > limit.bytes) refuse(OVER)
   return out
 }
-//! textOf — a string as it comes back from UTF-8: a lone surrogate (half of a pair) has no UTF-8 spelling, so
-// the encoder writes U+FFFD for it, and the decoder drops one leading U+FEFF (TextDecoder reads it as a byte
-// order mark). Every other copy holds this text. Most strings in a row are short keys and words: those are scanned
-// here, since only a code unit from U+D800 up can be either, and the scan costs less than a builtin call.
-const textOf = (s: string): string => {
+//! textOf — a string as it comes back from UTF-8: a lone surrogate (half of a pair) has no UTF-8 spelling, so the
+// encoder writes U+FFFD for it. Every other copy holds this text (the decoder keeps a leading U+FEFF since V4-52).
+const textOf = (s: string): string => wellFormed(s) ? s : s.toWellFormed()
+//! wellFormed — no half of a surrogate pair in it. Most strings in a row are short keys and words: those are scanned
+// here, since only a code unit from U+D800 to U+DFFF can be one, and the scan costs less than a builtin call.
+export const wellFormed = (s: string): boolean => {
   const n = s.length
-  if (n <= 32) {
-    let i = 0
-    while (i < n && s.charCodeAt(i) < 0xd800) i++
-    if (i === n) return s
-  }
-  const t = s.isWellFormed() ? s : s.toWellFormed()
-  return t.charCodeAt(0) === 0xfeff ? t.slice(1) : t
+  if (n > 32) return s.isWellFormed()
+  for (let i = 0; i < n; i++) { const c = s.charCodeAt(i); if (c >= 0xd800 && c <= 0xdfff) return s.isWellFormed() }
+  return true
 }
 
 //! ── Cursor — THE bounds-checked reader (exactly one; never inline a varint) ──
