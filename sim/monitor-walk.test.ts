@@ -49,6 +49,8 @@ const once = (from: number, try_: (n: Node) => boolean) => { let done = false; r
 interface Plant {
   name: string
   monitor: string
+  //! a monitor that must NOT fire anywhere in the run: the plant is shaped so that only `monitor` sees it
+  silent?: string
   scoped?: boolean
   //! install the plant: `late` is a node that sorts after the persistent one's neighbour (n5), `early` one that sorts before it (n2)
   install(nodes: Node[], late: Node, early: Node): void
@@ -101,13 +103,17 @@ const PLANTS: Plant[] = [
     },
   },
   {
-    //! the lane rule (wave 6b): a copy of an entry spliced into the lane's INTERIOR — below the length log-monotone last
-    // saw, so only lane-unique's rescan (the entry it last saw at the tail moved) names it
-    name: 'a lane that holds one seq twice, in its interior', monitor: 'lane-unique',
+    //! the lane rule (wave 6b): a copy of an entry spliced into the lane's INTERIOR, well below the length log-monotone
+    // last saw — a lane of six or more that a pass or two already read whole (from step 150), the copy at index 1. So
+    // only lane-unique's whole-lane rescan (the entry it last saw at the tail moved) names it, and `silent` pins that
+    // log-monotone never does: the lane-unique that scanned from log-monotone's cursor instead would miss this plant.
+    // (The first shape of this plant, a lane of three from step 35, landed on a lane that had just grown — the copy sat
+    // at log-monotone's cursor and both monitors fired at the same event, so it proved nothing about the rescan.)
+    name: 'a lane that holds one seq twice, in its interior', monitor: 'lane-unique', silent: 'log-monotone',
     install: (_, late, early) => {
-      const plant = (from: number) => once(from, (n) => { for (const [, lane] of n.logs) if (lane.length >= 3) { lane.splice(1, 0, { ...lane[1] }); return true } return false })
-      stepsOf(late, plant(35))
-      stepsOf(early, plant(50))
+      const plant = (from: number) => once(from, (n) => { for (const [, lane] of n.logs) if (lane.length >= 6) { lane.splice(1, 0, { ...lane[1] }); return true } return false })
+      stepsOf(late, plant(150))
+      stepsOf(early, plant(180))
     },
   },
   {
@@ -201,6 +207,7 @@ for (const p of PLANTS)
       assert.ok(a.full && !b.full, 'the knob picked the walk')
       assert.equal(b.watch, armed, 'armed exactly when asked')
       assert.ok(a.violations.some((v) => v.monitor === p.monitor), `the plant bit: the full walk saw ${p.monitor} (it saw ${[...new Set(a.violations.map((v) => v.monitor))].join(', ') || 'nothing'})`)
+      if (p.silent !== undefined) assert.ok(!a.violations.some((v) => v.monitor === p.silent), `${p.silent} stays silent on this plant: only ${p.monitor} sees it`)
       assert.deepEqual(rows(b.violations), rows(a.violations))
       sameTrajectory(a, b, p.name)
     })
