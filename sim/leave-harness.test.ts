@@ -54,7 +54,7 @@
 // 100 seeded isolate schedules instead of 50.
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { meshState, evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
+import { meshState, evictsplit, joinsplit, twoLeavers, pledgeTwo, evictTwo, evictTwoB, keptBallot, flapDuringBallot, proposerCrash, releasedEarly, proposerDeadStale, retrySameEpoch, twoFailedBallots, lateView, lateAsk, allHeld, genesisProposerDies, proposerAndGranterDie, keptBallotReversed, clientAsk, freshLink, genesisProposerAndGranterDie, genesisSplit, clientGenesis, serverAsk, helloHold, freshLinkSim, askAfterHello, lostRelease, askAtAdmit, keptBallotProposerGone, readOnlyOf, scheduleR, runR, shapeR, NAMED_R, namedR, H9_SEEDS, GRID_I, scheduleI, runI, shapeI, gridC, runC, shapeC, exploreQuiet } from './leave-harness.ts'
 import type { OutcomeI } from './leave-harness.ts'
 import { unsafe, split } from './leave-sweep.ts'
 import { Mesh, quietSplit } from './mesh.ts'
@@ -664,6 +664,34 @@ test('leave harness, the fifth round\'s shapes: a hold announced by one HELLO re
 
 //! the explorer's range here starts ABOVE the 1..2000 sim/explore.test.ts pins, so every seed adds coverage (the
 // one-view-per-epoch recorder on new schedules, and the quiet check on all of them) instead of re-running a pinned one
+//! keptBallotProposerGone (the fifth review, 2026-10-12, after the build): the kept ballot in the reversed order with its
+// proposer GONE — destroyed with the ballot open or after committing with its VIEW unsent, or alive but evicted at
+// view 2 and cut from bb. The rule as first built froze bb (`minority`) and cc and dd (`held`) for good although cc and
+// dd are two of the held view's three and linked: nobody opened a ballot (aa is no member of view 2, so nobody's
+// suspect; no knock, no leave) and nobody asked aa (the ask went to members only) — the page's liveness claim denied
+// the shape. Now `evicted` is released by aa's disown the moment the asks land (before any tick; bb proposes nothing
+// new), and `open` and `committed` by the ballot bb OPENS: `{bb,cc,dd}`@4, past the hold's epoch, joint over
+// `{aa,cc,dd}`, superseded on cc's and dd's consent. The proposal lists tell the two mechanisms apart: without the ask
+// to the proposer, `evicted` would show cc and dd held after the asks land and heal by the opener (`P(4,3)`); without
+// the opener, `open` and `committed` stay frozen at the held mid.
+const PROPOSER_GONE_HELD = 'bb@2{bb,cc,dd}W cc@2{bb,cc,dd}r:held dd@2{bb,cc,dd}r:held'
+const PROPOSER_GONE: Record<'open' | 'committed' | 'evicted', { mid: string[]; end: string }> = {
+  open: { mid: [`after the install: aa@1{aa,bb,cc,dd}W ${PROPOSER_GONE_HELD}`, 'proposals: bb=P(2,3) P(4,3)'], end: 'bb@4{bb,cc,dd}W cc@4{bb,cc,dd}W dd@4{bb,cc,dd}W' },
+  committed: { mid: [`after the install: aa@3{aa,cc,dd}W ${PROPOSER_GONE_HELD}`, 'proposals: bb=P(2,3) P(4,3)'], end: 'bb@4{bb,cc,dd}W cc@4{bb,cc,dd}W dd@4{bb,cc,dd}W' },
+  evicted: { mid: [`after the install: aa@2{bb,cc,dd}r:evicted ${PROPOSER_GONE_HELD}`, 'asks landed: aa@2{bb,cc,dd}r:evicted bb@2{bb,cc,dd}W cc@2{bb,cc,dd}W dd@2{bb,cc,dd}W', 'proposals: bb=P(2,3)'], end: 'aa@2{bb,cc,dd}r:evicted bb@2{bb,cc,dd}W cc@2{bb,cc,dd}W dd@2{bb,cc,dd}W' },
+}
+
+test('leave harness, the fifth review\'s shape: the kept ballot in the reversed order with its proposer GONE (keptBallotProposerGone) — destroyed open or committed, or alive but evicted — SAFE, and every live member writable again: the evicted proposer disowns the instant it is asked, the dead one\'s hold is superseded by the ballot the lowest live member OPENS over it (the rule as first built froze all three for good), pinned exactly', () => {
+  const red: string[] = []
+  for (const v of ['open', 'committed', 'evicted'] as const) {
+    const o = keptBallotProposerGone(v)
+    assert.deepEqual([...o.shape, ...o.splits, ...(o.quiet ? [o.quiet] : [])], [], `${v}: not the shape, or UNSAFE`)
+    if (o.mid!.join('\n') !== PROPOSER_GONE[v].mid.join('\n')) red.push(`${v}: a mid point moved; re-record with the why:\n${o.mid!.join('\n')}`)
+    if (o.end !== PROPOSER_GONE[v].end) red.push(`${v}: the end state moved — the three must be writable again; re-record with the why: ${o.end}`)
+  }
+  assert.deepEqual(red, [])
+})
+
 test('leave harness, explorer: 300 seeded random schedules (2001..2300) over real Nodes with the quiet-point split check — never two views at one epoch, never two nodes writable in different views once every frame has landed', () => {
   const bad: string[] = []
   for (let seed = 2001; seed <= 2300; seed++) { const o = exploreQuiet(seed); if (o.bad) bad.push(`seed ${seed} n=${o.n}: ${o.bad}`) }

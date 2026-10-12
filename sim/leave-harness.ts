@@ -913,6 +913,56 @@ export const keptBallotReversed = (): OutcomeM => {
   return outcomeM(m, shape, quiet)
 }
 
+//! keptBallotProposerGone — keptBallotReversed with aa GONE (the fifth review, 2026-10-12, after the build): cc and dd
+// grant aa's `{aa,cc,dd}`@3 from view 1 and install bb's `{bb,cc,dd}`@2 — held, two apart — and then aa is destroyed
+// with the ballot open (`open`: the VOTEs never reach it), or after committing `{aa,cc,dd}`@3 with its VIEW unsent
+// (`committed`), or aa reads cc's VOTE and then cc's VIEW 2 before dd's VOTE, installs view 2 EVICTED, drops the
+// ballot (no ballot outlives an install) and lives on, linked to cc and dd and cut from bb (`evicted`). bb, cc and dd
+// stay linked, every frame lands, everyone ticks. On the rule as first built: bb `minority` (it counts neither held
+// member), cc and dd `held`, FOR GOOD — nobody opens a ballot (aa is no member of view 2, so it is nobody's suspect;
+// no knock, no leave), and in `evicted` nobody asks aa (the ask went to members only) — although cc and dd are two of
+// the held view's three and linked: the page's own liveness claim (§10.10.4 line 6) denied it. Closed by the ask to
+// the proposer (`evicted`: aa disowns the moment the asks land — the mid, before any tick) and the opener (`open`,
+// `committed`: bb re-proposes `{bb,cc,dd}` at 4, past the holds' epoch, joint over `{aa,cc,dd}`; cc and dd consent and
+// the hold is superseded by its own majority). `mid` carries the held state after the install (the shape), the state
+// after the asks landed (`evicted`) and bb's proposal list — the two mechanisms leave different lists.
+export const keptBallotProposerGone = (variant: 'open' | 'committed' | 'evicted'): OutcomeM => {
+  const m = Mesh.formed(['aa', 'bb', 'cc', 'dd'])
+  const shape: string[] = [], mid: string[] = []
+  const node = (u: string) => m.nodes.get(u)!
+  m.cut('aa', 'bb')
+  for (let i = 0; i < 3; i++) { m.tick('aa'); m.tick('bb') }
+  m.giveUp('aa', 'bb'); m.giveUp('bb', 'aa')
+  m.tick('aa'); m.tick('bb')
+  if (proposals(m, 'aa') !== 'P(2,3)' || proposals(m, 'bb') !== 'P(2,3)') shape.push(`the duel at 2: aa ${proposals(m, 'aa')}, bb ${proposals(m, 'bb')}`)
+  allOf(m, 'bb', 'cc'); allOf(m, 'bb', 'dd'); allOf(m, 'cc', 'bb'); allOf(m, 'dd', 'bb')
+  if (node('bb').epoch !== 2) shape.push(`bb did not commit {bb,cc,dd}@2: ${meshState(m)}`)
+  allOf(m, 'aa', 'cc'); allOf(m, 'aa', 'dd'); allOf(m, 'cc', 'aa'); allOf(m, 'dd', 'aa')
+  for (let i = 0; i < 20 && !proposals(m, 'aa').includes('P(3'); i++) { m.giveUp('aa', 'bb'); m.tick('aa') }
+  if (proposals(m, 'aa') !== 'P(2,3) P(3,3)' || node('aa').epoch !== 1) shape.push(`aa did not escalate to 3 over view 1: ${proposals(m, 'aa')} at epoch ${node('aa').epoch}`)
+  //! the reversed order: granted from view 1, then view 2 installs over the grant — cc and dd are held
+  allOf(m, 'aa', 'cc'); allOf(m, 'aa', 'dd')
+  allOf(m, 'bb', 'cc'); allOf(m, 'bb', 'dd')
+  for (const u of ['cc', 'dd']) if (node(u).epoch !== 2 || node(u).membership.gate(node(u)).reason !== 'held') shape.push(`${u} is not held at view 2 on its vote at 3 for aa: ${meshState(m)}`)
+  const upToView = (a: string, b: string) => { while ((m.q.get(a + '>' + b) ?? [])[0] && m.q.get(a + '>' + b)![0].verb !== VERB.VIEW) m.deliver(a, b) }
+  if (variant === 'committed') {
+    upToView('cc', 'aa'); upToView('dd', 'aa')
+    if (node('aa').epoch !== 3) shape.push(`aa did not commit {aa,cc,dd}@3 over view 1 on the two VOTEs: ${meshState(m)}`)
+  } else if (variant === 'evicted') {
+    //! aa reads cc's VOTE (two of four old: nothing commits) and then cc's VIEW 2: installed, evicted, the ballot dropped
+    upToView('cc', 'aa'); m.deliver('cc', 'aa')
+    if (node('aa').epoch !== 2 || node('aa').membership.gate(node('aa')).reason !== 'evicted') shape.push(`aa did not install view 2 evicted: ${meshState(m)}`)
+  }
+  mid.push(`after the install: ${meshState(m)}`)
+  if (variant !== 'evicted') m.destroy('aa')
+  else { drain(m); mid.push(`asks landed: ${meshState(m)}`) } // cc's and dd's asks reach aa, their proposer: the disown, before any tick
+  const pairs: [string, string][] = variant === 'evicted' ? [['aa', 'bb'], ['bb', 'aa']] : ['bb', 'cc', 'dd'].map((u) => [u, 'aa'] as [string, string])
+  const quiet = quietSplit(m)
+  settle(m, 30, pairs)
+  mid.push(`proposals: bb=${proposals(m, 'bb') || '-'}`)
+  return outcomeM(m, shape, quiet, mid)
+}
+
 // ── the third review's shapes (DESIGN-LEAVE §10.10, 2026-10-10): whose word a stayer may read, the fresh link, and
 // genesis — each one fixed schedule on real Nodes ──
 //! clientAsk — a CLIENT's word teaches nothing (I-23). zz, a client, links into aa with a HELLO and then a PULL that

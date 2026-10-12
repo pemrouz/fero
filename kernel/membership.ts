@@ -126,10 +126,12 @@
 // PROPOSE), and I grant only a ballot joint over those views — or the same proposer's at the same epoch, or one
 // whose member set IS the held view's. A PROPOSE carries the epoch of the view it is over (`o`, form (β)), and a
 // ballot over a view below mine is refused; no ballot outlives an install. The RELEASE is never a clock: the
-// vote's proposer disowns a ballot it no longer holds (NACK, onNack: the vote stays spent and warns no more), and
-// where the proposer is gone the held view is superseded by a ballot its own majority consents to. Who leads
-// does not change. The cost is the CP answer in three shapes (§10.10.4): the far side of a cut, the proposer and
-// a granter of a two-evictee ballot dead for good, and the one survivor of a genesis ballot.
+// vote's proposer — asked on its link whether or not it is a member of my view (#askTargets) — disowns a ballot it
+// no longer holds (NACK, onNack: the vote stays spent and warns no more), and where the proposer is gone the held
+// view is superseded by a ballot its own majority consents to; the lowest live member OPENS that ballot when no
+// membership change would (#openOverHolds: the same members at the next epoch, joint, only when it can commit).
+// Who leads does not change. The cost is the CP answer in three shapes (§10.10.4): the far side of a cut, the
+// proposer and a granter of a two-evictee ballot dead for good, and the one survivor of a genesis ballot.
 //
 // Boot modes: NodeOpts.boot restores the last committed view (it WAS committed —
 // it seeds ballot arithmetic and pull targets) but the node is REJOINING: read-
@@ -326,8 +328,18 @@ export class Membership {
     const key = this.#keyOf(hs)
     if (key === '' && this.#lastAsk === '') return
     if (on === 'change' && key === this.#lastAsk) return
-    this.#send(node, this.#admitted(node).filter((l) => !l.client && this.isMember(l.uuid)), this.#askFrame(hs))
+    this.#send(node, this.#askTargets(node), this.#askFrame(hs))
     this.#lastAsk = key
+  }
+  //! #askTargets — every admitted server link to a MEMBER of my view (it counts me, or must not), and to the PROPOSER of
+  // any vote of mine above my view, member or not: it alone can disown the ballot, and the proposer of a kept or stale
+  // ballot is exactly a node the view I hold now has left out (the fifth review, 2026-10-12: the kept ballot's proposer,
+  // evicted at view 2 and linked to the voters it held, was never asked, so it never disowned, and they were held for
+  // good). A disowned vote keeps its proposer in the list while it is above my view, so the release reaches it too.
+  #askTargets(node: Node): Link[] {
+    const ps = new Set<string>()
+    for (const x of [this.votedFor, ...(this.votedFor.prior ?? [])]) if (x.e > this.view.epoch && x.p !== node.uuid && x.p !== '') ps.add(x.p)
+    return this.#admitted(node).filter((l) => !l.client && (this.isMember(l.uuid) || ps.has(l.uuid)))
   }
   //! #burned — the highest epoch known to hold SPENT votes for a ballot that never committed (the
   // proposer vanished mid-round). Vote-once-per-epoch means a burned epoch is unwinnable by any OTHER
@@ -468,6 +480,14 @@ export class Membership {
           this.#propose(node, { epoch: this.#nextEpoch(node), members: this.view.members.filter(([u]) => !gone.has(u)) })
         }
       }
+      //! THE OPENER (DESIGN-LEAVE §10.10.4, the fifth review, 2026-10-12): supersession needs a ballot, and every other
+      // ballot here answers a membership change — a suspect, a knock, a leave, a rejoin. A linked member of my view
+      // sitting on a hold whose proposer is gone from the view (the kept ballot's: no member's suspect, nobody's knock)
+      // is no such change, so nobody ever opened the ballot that supersedes it: bb `minority`, cc and dd `held`, for
+      // good, with cc and dd two of the held view's three (keptBallotProposerGone). The lowest live member re-proposes
+      // the view it holds at the next epoch, joint over those holds (#propose), when the ballot CAN commit — its
+      // commit is the supersession of §10.10.2, and nothing new is granted or counted. Guarded like the eviction above.
+      if (!this.#proposal && !this.epochStale && !this.leaving && this.#heldPeers.size && this.#lowestLive() === node.uuid) this.#openOverHolds(node)
     }
     //! proposal upkeep: re-offer to members that have not voted (idempotent re-grants make this safe and
     // make it HEAL a lost VOTE frame); abandon when the epoch passed or the ballot aged out (an aged-out
@@ -544,7 +564,10 @@ export class Membership {
     if (hs.length) this.#heldPeers.set(link.uuid, hs); else this.#heldPeers.delete(link.uuid)
     //! ...and my side of it: my HELLO on this link carried my holds as they were when it left (helloHolds); if they
     // changed while it was in flight, the ask on this link says so now — one frame, only then (askAtAdmit); at epoch 0
-    // nothing, as every ask (the HELLO exchange is the one window there; a genesis duel is a hosts question, I-22)
+    // nothing, as every ask (the HELLO exchange is the one window there; a genesis duel is a hosts question, I-22).
+    // Whoever the peer is: the HELLO told it regardless of membership, and this frame only corrects the HELLO, so the
+    // fresh link is admitted knowing my holds as they ARE (the periodic ask is narrower: members and my proposers,
+    // #askTargets; the receiver keeps any server's word and reads it once that server is a member of its view)
     const mine = this.#named(this.holds(node))
     if (this.view.epoch > 0 && this.#keyOf(mine) !== link.saidHolds) this.#send(node, [link], this.#askFrame(mine))
   }
@@ -960,12 +983,7 @@ export class Membership {
     const h = hashOf(view.members)
     this.#remember({ e: view.epoch, p: node.uuid, h }) // my own vote, the earlier ones above my view kept behind it
     node.persistBoot() // the self-vote is spent — durable before any PROPOSE frame leaves
-    //! joint over every hold of MY OWN (DESIGN-LEAVE §10.10.2: a held member leads too — the lowest live member leads,
-    // held or not — with its holds kept behind its own vote in `prior`) and every hold a linked MEMBER of my view told
-    // me of (its HELLO, its asks) — at epoch 0 every linked server, the formation set; only a member's word, never a
-    // client's or an ex-member's, may widen my ballot (§10.10.6); refusals (`hm`) add more
-    const joint = new Set<string>(this.holds(node).map((x) => x.h))
-    for (const [u, hs] of this.#heldPeers) if (node.byUuid.has(u) && (this.view.epoch === 0 || this.isMember(u))) for (const x of hs) if (x.e > this.view.epoch) joint.add(x.h)
+    const joint = this.#jointViews(node) // refusals (`hm`) add more
     this.#proposal = { view, old: this.view.members.map((m) => m[0]), oldEpoch: this.view.epoch, h, votes: new Set([node.uuid]), ticks: 0, age: 0, joint }
     node.journal.armed && node.journal.emit(JK.propose, view.epoch, view.members.length)
     //! a solo proposal (single-member old and new sets) commits immediately — solo boot mode
@@ -975,6 +993,39 @@ export class Membership {
       return
     }
     this.#send(node, this.#proposalTargets(node), this.#proposeFrame(node))
+  }
+
+  //! #jointViews — what a ballot of mine is joint over (DESIGN-LEAVE §10.10.2): every hold of MY OWN (a held member
+  // leads too — the lowest live member leads, held or not — with its holds kept behind its own vote in `prior`) and
+  // every hold a linked MEMBER of my view told me of (its HELLO, its asks) — at epoch 0 every linked server, the
+  // formation set; only a member's word, never a client's or an ex-member's, may widen my ballot (§10.10.6)
+  #jointViews(node: Node): Set<string> {
+    const joint = new Set<string>(this.holds(node).map((x) => x.h))
+    for (const [u, hs] of this.#heldPeers) if (node.byUuid.has(u) && (this.view.epoch === 0 || this.isMember(u))) for (const x of hs) if (x.e > this.view.epoch) joint.add(x.h)
+    return joint
+  }
+
+  //! #openOverHolds — the opener (see tick): the same members at the next epoch, joint over the holds of my view's
+  // linked members, when and only when the ballot can commit — a majority of my view linked COUNTING the held members
+  // (the old and the new set are the same), and a majority of EACH view the ballot is joint over linked, or me. Not for
+  // a hold whose proposer is me: my disown answers that ask in one frame (onPull). Not when some held view's majority
+  // is out of reach — the far side of a cut, the CP shapes of §10.10.4 — where a ballot that cannot commit would only
+  // burn epochs. The epoch starts PAST the holds' epochs: a held voter's vote there is spent on another proposer, so a
+  // ballot at that epoch is refused for sure (and would teach the same by its `ve`, a proposal age later).
+  #openOverHolds(node: Node) {
+    const linked = new Set<string>([node.uuid])
+    let reachable = 1, freeing = false, past = this.view.epoch
+    for (const l of node.links.values()) {
+      if (l.state !== LS.admitted || l.dead || l.client) continue
+      linked.add(l.uuid)
+      if (!this.isMember(l.uuid)) continue
+      reachable++
+      const hs = this.#heldPeers.get(l.uuid)
+      if (hs) for (const x of hs) if (x.e > this.view.epoch) { past = Math.max(past, x.e); if (x.p !== node.uuid) freeing = true }
+    }
+    if (!freeing || reachable * 2 <= this.view.members.length) return
+    for (const hh of this.#jointViews(node)) if (!majority(hh.split(','), linked)) return
+    this.#propose(node, { epoch: Math.max(this.#nextEpoch(node), past + 1), members: this.view.members })
   }
 
   //! the PROPOSE carries `o`, the epoch of the view it is over (form (β)), and `j`, the held views it is joint over
