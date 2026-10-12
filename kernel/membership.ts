@@ -369,7 +369,11 @@ export class Membership {
   // scoped leaver's second wait: defined while `left` is held for the new holders, counting its own ticks
   // against tune.drainTicks; `clean` is the view half's verdict it carries (the echo came: true; bounded out:
   // false), so the final `left` is clean only when BOTH halves were — set with `drain`, read when the drain ends.
-  leaving: { ticks: number; total: number; done: boolean; drain?: number; clean?: boolean } | null = null
+  // `why` is the view half's reason when it was not clean, RECORDED the moment it ends (#finishLeave) and carried to
+  // the `left` row: `unanswered` (the vote never came back; still in its own view then) or `unechoed` (committed here,
+  // no survivor echoed). Recorded, not re-derived at the exit: a late vote can commit the shrunk view here during the
+  // drain, and the word would then read `unechoed` for a leave whose verdict was the window (the first review's nit).
+  leaving: { ticks: number; total: number; done: boolean; drain?: number; clean?: boolean; why?: 'unanswered' | 'unechoed' } | null = null
   //! #leavers — members this node has heard are LEAVING: they knocked LEAVE at it (onLeave) or proposed their own
   // exit to it (onPropose: a ballot that leaves its proposer out). A fellow leaver can commit nothing, so its link
   // does not keep a knock window open (DESIGN-LEAVE §10.7). In-memory only: pruned of non-members on every install
@@ -1003,6 +1007,7 @@ export class Membership {
   #finishLeave(node: Node, clean: boolean) {
     if (!this.leaving || this.leaving.done) return
     this.leaving.done = true
+    if (!clean) this.leaving.why = this.isMember(node.uuid) ? 'unanswered' : 'unechoed' // the view half's reason, read NOW (a late vote may change the view during the drain)
     if (node.armed && this.#exit(node, clean)) return
     this.#left(node, clean, 0)
   }
@@ -1034,12 +1039,15 @@ export class Membership {
   // then `left` (b = clean) and the env's effect. `clean` now means the whole stop was clean: the view without
   // this node committed and echoed AND (scoped) everything it held was proved held elsewhere. `viewClean` is the
   // view half's own verdict; when it failed the row says why (c): `unanswered` — the vote never came back and this
-  // node is still in its own view — or `unechoed` — it committed the view without itself and no survivor echoed it.
+  // node was still in its own view when the window ended — or `unechoed` — it committed the view without itself and
+  // no survivor echoed it. The word is the one #finishLeave recorded on `leaving` (never re-derived here: a late vote
+  // may have committed the shrunk view during the drain).
   #left(node: Node, clean: boolean, undrained: number, viewClean = clean) {
-    this.leaving!.drain = undefined
+    const l = this.leaving!
+    l.drain = undefined
     const j = node.journal
     if (undrained > 0) j.armed && j.emit(JK.undrained, undrained, this.view.epoch)
-    if (j.armed) { if (viewClean) j.emit(JK.left, this.view.epoch, clean ? 1 : 0); else j.emit(JK.left, this.view.epoch, 0, this.isMember(node.uuid) ? 'unanswered' : 'unechoed') }
+    if (j.armed) { if (viewClean) j.emit(JK.left, this.view.epoch, clean ? 1 : 0); else j.emit(JK.left, this.view.epoch, 0, l.why!) } // every viewClean=false path came through #finishLeave(false), which recorded it
     node.env.sink.left?.(clean)
   }
 
