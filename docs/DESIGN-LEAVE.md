@@ -2476,3 +2476,63 @@ these items open, each with the reviewer's probe under the session's scratch fol
    to avoid); say what an old peer does with the new keys and that a secured pair of mixed versions
    fails as `bad-proof` (or bump the label to `fero-door/2`); mixed versions are unsupported before
    1.0 (V4-14).
+
+**2026-10-12, BUILT (V4-51; branch `w6/relbuild` on v4 at 35d7300, eleven commits).** The rule of §10.10 is in the
+kernel, applied by hand commit by commit (`docs/leave-release.diff` was built on 145a70b and no longer applies after
+the knock window; it stays as the measured record). What landed, in the kernel's words: `Vote.prior` (§10.10.7) and
+`Vote.f` (the disown); `holds()` with its common-case fast path and the gate word `held`; form (β) at the voter (`o` on
+the PROPOSE, a ballot over a view below mine refused) and no ballot outliving an install; `hm` on a refusal, `j` on the
+re-offer, the joint commit (`#jointOk`); the wire (`v` on the HELLO, `vs` on the PULL, `#heldPeers`, the stayer's
+count, `Link.saidHolds`, `HELLO_WORD`); the release (NACK, verb 27; `onNack`; the disown in `onPull`; the journal row
+`release`, 80); the door signing `v` inside the proof's array as `[[e, p, h], …]` under `fero-door/2`. The four items
+of the note above are closed first: (1) `HELLO_WORD`, pinned by `askAfterHello`; (2) `lostRelease` and `askAtAdmit`
+pin the two `onAdmit` lines (the first draft of `lostRelease` lost nothing — the drain carried the release before the
+cut — and was redrawn so the cut falls between the stayer learning the hold and the release leaving; the mutant then
+goes red); (3) `freshLinkSim` counts only a far-side node writable at view 1 beside a higher writable view and is
+"not the shape" unless n01 evicts both; (4) the signing, as above. Stripped, as §10.10.9 said: the `V` variants,
+`#voteTick`, `#tickNo` and the `tick` field of `#heldPeers`.
+
+The acceptance of §10.9 step 2, measured on the built kernel (`sim/leave-harness.test.ts`, 18 of 18): `evictTwo`
+cut and crash, `evictTwoB` and `releasedEarly` 0 of 5 (the base 1, 2, 4, 5 and 1, 2, 3, 4), the k=1 control 0;
+`keptBallot` refused at cc and dd, end `aa@2{bb,cc,dd}r:evicted bb@3{bb,cc}W cc@3{bb,cc}W dd@2 r:minority`, no split at
+any epoch; `keptBallotReversed` `aa@4{aa,dd}W bb@2 r:minority cc@2 r:held dd@4 W`; `genesisSplit` dd and ee at epoch
+0 beside `{aa,bb,cc}`@2; the quiet-point witness `cc held, dd and ee minority`, no split; `lateView`'s mid `cc held`;
+`lateAsk` and `freshLink` one writable view at every point; `freshLinkSim` 0 of 4000 on every seed that reaches the
+shape (n03 `held` before the flap, the monitors quiet; seed 3 at 3-40 reaches the shape and seed 5 does not, the
+base the other way round); `proposerDeadStale`'s mids bb and cc `held`, dd and ee `minority`, the same ends;
+`retrySameEpoch`'s mids bb and cc `held`, the same ends; `twoFailedBallots` nobody held at either mid (disowned
+within the settle); `flapDuringBallot` and `proposerCrash` writable everywhere; `pledgeTwo` safe and settled 5 of 5;
+`allHeld`, `genesisProposerDies`, `clientAsk`, `clientGenesis`, `serverAsk`, `helloHold` as on the base; NOT ONE pin of
+rebirth (20), the isolate grid (24), the seeded isolate family (8), the crash grid (10), `evictsplit` or `joinsplit`
+moved. The two CP costs, pinned on purpose: `proposerAndGranterDie` `cc, dd, ee @1 r:held` for good (the base
+re-formed `{cc,dd,ee}`@3) and `genesisProposerAndGranterDie` everyone at epoch 0 (`bb P(2,2)` six times, `a2 P(1,3)
+P(2,3)` five times at the SAME epoch, bb's vote with one earlier vote behind it — the same-members clause). The
+fifth round: `askAfterHello` cc `minority` the instant dd's install lands (the mutant that keeps the HELLO's key as
+the last word shows cc writable there, counting a held dd, for one round); `lostRelease` dd writable after the fresh
+HELLO (the mutant without the `onAdmit` delete: `minority` for good); `askAtAdmit` dd `minority` at the admit and
+writable once the ask on the fresh link landed (the mutant without that ask: `minority` for good). Eleven one-line
+mutants, each caught by its own pin: the HELLO's `v` (`freshLinkSim`: 160 split-ms and one n04 `gateOpen` on seed 4
+at 3-40), the same-members clause (`P(3,3) P(4,3)`, bb's vote at 4 with three behind it), `HELLO_WORD`, the two
+`onAdmit` lines, the gate's `held` line and the joint commit (`evictTwo` seed 1 splits), the stayer's count (`lateAsk`
+two writable views), the disown (`twoFailedBallots` bb and cc held at both mids), the client guard (`clientGenesis`
+never forms, `P(1,3)` three times), the member filter (`serverAsk` `P(2,4)` three times).
+
+What did NOT move: the golden (`sim/exec.test.ts`, 20 seeds), the 300-seed leave sweep's lists, the 59,500 and
+104,050 counted formation pins, the 1..2000 explorer, the 2001..2300 quiet explorer, the leave sweep's knock-window
+tests, and the 31 membership pins of before (now 46 with the rule's own: the vote memory, the hold and the held
+voter's grant, form (β) and the install, the joint commit, the stayer's count, the ask, the malformed `v`, the
+release; one door pin for the signing). The PROPOSE frame grows by `o` on every ballot and by `j` only when joint; a
+fresh node's HELLO is byte-identical; no ask at epoch 0. Perf: the 27 pins of `kernel/node.perf.ts`,
+`kernel/alloc.perf.ts`, `kernel/write.perf.ts`, `tests/baseline.perf.ts` and the two counted pins of
+`sim/scale.perf.ts` pass; `gate()` measured by hand on this box: 205 ns per call in the common case (four links, the
+fast path returns a shared empty list), 1.1 µs held on `votedFor` alone, 4.2 µs with four earlier votes behind it,
+11.8 µs with twenty — linear in `prior`, which grows only by one per failed joint ballot while the member learns no
+view (§10.10.7), and a held member is read-only anyway. The ask costs one PULL per member link per tick while held
+and one per change; nothing while nobody holds anything. Not measured here: the ask under the real-TCP tier (the
+battery's TCP tiers run the kernel unchanged with no held member), the growth of `prior` under the explorer with a
+hold that never ends (bounded by proposers; left unbounded on purpose).
+
+The STATUS lines this closes: the two-suspect split (`evictTwo`, `evictTwoB`), the kept ballot, the genesis split;
+the I-20 line's release sentence. What the rule costs, in one line: the far side of a cut, the third granter of a
+two-evictee ballot whose proposer and other granter are dead, and the one survivor of a genesis ballot are read-only
+until the cut heals or an operator forgets the dead — the CP answer, where the base wrote on both sides.
