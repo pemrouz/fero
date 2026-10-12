@@ -207,6 +207,10 @@ export const unsendable = (r: Rec, limit: Limit = WRITE): string | null => {
     throw e
   }
 }
+//! UNSENT — why issue() refused a record UNENCODABLE, for the caller's message (api/index.ts explain): asked again,
+// the value was walked and copied twice, and a getter ran twice more
+const UNSENT = new WeakMap<Rec, string>()
+export const unsentWhy = (r: Rec): string | undefined => UNSENT.get(r)
 const HALF_PAIR = 'a key with half of a surrogate pair in it (UTF-8 cannot carry it, so every other copy would hold another key)'
 //! firstOf — the share of a byte budget a copy may CHARGE before it stops to ask the walk (copyBounded): a sixteenth
 // of the budget, at most 16 MiB. The garbage a refused value leaves is bounded by that charge, not equal to it: an
@@ -470,7 +474,9 @@ export class Bind {
     const t = this.#tracked?.()
     for (let i = 0; i < recs.length; i++) {
       //! a record that cannot be sent is refused before the user's rule sees it, and before any stamp
-      const v = !checked && unsendable(recs[i], this.#write) !== null ? UNENCODABLE : this.admit(recs[i])
+      const why = checked ? null : unsendable(recs[i], this.#write)
+      if (why !== null) UNSENT.set(recs[i], why)
+      const v = why !== null ? UNENCODABLE : this.admit(recs[i])
       if (v !== true) {
         //! refused: an outcome row with the reason, and nothing else — the record never touched the
         // proxy, so there is nothing to undo (a refused write is invisible, not bounced)

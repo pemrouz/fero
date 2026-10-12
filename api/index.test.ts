@@ -2251,3 +2251,15 @@ test('a client method handle sends its argument as it was when the handle was ma
     await s.destroy()
   }
 })
+
+//! the fix check: a refused methods.update was walked twice — once by issue(), once more by the reject's message —
+// so a getter in it ran twice (four times past the first share). issue() keeps its reason for the message now.
+test('a methods.update refused for its value walks that value once: the reject\'s words are the ones issue() found', async () => {
+  const s = await fero('walkonce', { listen: false })
+  try {
+    let calls = 0
+    await assert.rejects(s.methods.update({ key: 'k', value: { get n() { calls++; return 10n } } }), (e: WriteReject & Error) =>
+      e.reason === 'unencodable' && e.message.includes('unencodable (a bigint at n; fero sends null'))
+    assert.equal(calls, 1)
+  } finally { await s.destroy() }
+})

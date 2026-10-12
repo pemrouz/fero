@@ -19,7 +19,7 @@ import { CONFIRM } from '../kernel/confirm.ts'
 import { REC, partitionOf, type Rec } from '../kernel/env.ts'
 import { JK } from '../kernel/journal.ts'
 import { TUNE } from '../kernel/tune.ts'
-import { Bind, METHODS_ONLY, UNENCODABLE, INVALID_KEY, CARRIES, atCap, unsendable, reasonOf, type Coords } from './data.ts'
+import { Bind, METHODS_ONLY, UNENCODABLE, INVALID_KEY, CARRIES, atCap, unsendable, unsentWhy, reasonOf, type Coords } from './data.ts'
 import { fnv } from '../kernel/ring.ts'
 import { Caller, Host, SYSTEM, handle, reapStopped, type Context } from './methods.ts'
 import { Gather, rowsPartial, liveCadence, type Rows } from './fold.ts'
@@ -847,7 +847,7 @@ const compose = async (name: string, opts: FeroOpts, isSystem: boolean): Promise
       new WriteRejectError({ guarantee: want, ...fields }, `fero('${name}') ${VERB_NAMES[rec.type]} ${JSON.stringify(key)}: ${what} — reached ${fields.reached}${tail}`)
     const explain = (reason: string): string => reason === METHODS_ONLY ? `${reason} (the server takes changes only through its methods)`
       : reason === 'validation-threw' ? `${reason} (the server's validation: rule threw on this record; the server's stderr says where)`
-      : reason === UNENCODABLE ? `${reason} (${unsendable(rec, atCap(node.tune.frame).write) ?? 'the value cannot be sent'}; ${CARRIES})`
+      : reason === UNENCODABLE ? `${reason} (${unsentWhy(rec) ?? unsendable(rec, atCap(node.tune.frame).write) ?? 'the value cannot be sent'}; ${CARRIES})`
       : reason === SPARSE_HOLE ? `${reason} (${holeMessage(key)})`
       : reason === INVALID_KEY ? `${reason} (a key data cannot fold)` : reason
     //! the one hint a timed-out client needs most (rung 04's finding): nothing is connected to write to
