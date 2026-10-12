@@ -1788,18 +1788,24 @@ fixed in the diff: a HELLO that names holds is an announcement). And two build n
    From the voter's seat a committed view whose VIEW was lost and a ballot its proposer dropped look
    the same, so no local clock is safe (§10.10.4).
 5. Candidate 1, the proposer's word, is sound and is HALF the release: a held member asks its vote's
-   proposer every tick; the proposer answers with a VIEW at or above the vote, or DISOWNS the ballot
-   when it holds no ballot of that identity and no view at or above it. A disowned vote stays spent
-   and warns no more. Only the proposer could commit that ballot, it counts only VOTE frames that
-   reach it after the ballot opened, and the voter's next VOTE for it re-reads the hold — so a
-   disowned vote can never be a committing vote (§10.10.4).
+   proposer every tick — on the proposer's link whether or not it is a member of the view the voter
+   holds (the fifth review, after the build: the kept ballot's proposer, evicted at view 2, is no
+   member of it, and asking members alone never reached it); the proposer answers with a VIEW at or
+   above the vote, or DISOWNS the ballot when it holds no ballot of that identity and no view at or
+   above it. A disowned vote stays spent and warns no more. Only the proposer could commit that
+   ballot, it counts only VOTE frames that reach it after the ballot opened, and the voter's next
+   VOTE for it re-reads the hold — so a disowned vote can never be a committing vote (§10.10.4).
 6. The other half answers "fire with the proposer dead": nothing releases the hold, and nothing
    needs to. The held view is SUPERSEDED by a ballot joint over it, which commits only when a
    majority of that view's members consent and are therefore at the new view — exactly when the held
    view cannot be live. That is Raft's answer with a configuration entry on a follower, and it is
    live whenever a majority of the held view's members are reachable, held or not: `proposerDeadStale`
    ends writable at 3 in all three variants, `allHeld` (every live member held, n=7) re-forms at 3,
-   and `genesisProposerDies` forms at 2. Where a majority of the held view is NOT reachable the rule
+   and `genesisProposerDies` forms at 2. Supersession needs a BALLOT, and the fifth review found the
+   shape where no membership change opens one — the kept ballot's proposer dead, a member of nobody's
+   view — so the lowest live member opens it (the opener, §10.10.4, `keptBallotProposerGone`): the
+   same members at the next epoch, joint, when and only when it can commit. Where a majority of the
+   held view is NOT reachable the rule
    freezes, and that is the CP answer in three shapes: the far side of a cut (`evictTwo`), where the
    held view may be live on the other side; the proposer and one granter of a two-evictee ballot
    dead for good with no cut among the living (`proposerAndGranterDie`): the third granter cannot
@@ -2120,6 +2126,39 @@ commits on four of the held view's five. `genesisProposerDies` is the same at ep
 aa comes back holding `{aa,bb,cc}`@2, a view nobody else has: a rejoiner at floor 2 (`:201`), it
 reads view 3 on admit (`:345`, `:471`), is evicted, knocks (`:329-335`), and is voted back in at 4.
 
+**Supersession needs a ballot, and someone must open it** (the fifth review, 2026-10-12, after the
+build). Every ballot the kernel opened answered a membership change: a suspect, a knock, a leave, a
+rejoin. The kept ballot in the reversed order with its proposer GONE is a hold with no such change
+behind it: cc and dd granted aa's `{aa,cc,dd}`@3 from view 1, installed bb's `{bb,cc,dd}`@2 and were
+held; aa died (open, or committed with its VIEW unsent). aa is no member of view 2, so it is nobody's
+suspect; nobody joins, nobody leaves. bb counted neither held member (`minority`), cc and dd were
+`held`, for good — with cc and dd two of the held view's three and every link among the three up.
+Line 6 above promised liveness exactly here ("whenever a majority of the held view's members are
+reachable") and the built kernel denied it; a join healed it twelve rounds later, by accident of the
+ballot it brought. The same shape with aa alive but EVICTED (it read cc's VOTE, then cc's VIEW 2, and
+dropped the ballot) froze too, for the other half's reason: the ask went to the members of the
+asker's view, and aa was no member, so the one node that could disown was never asked. Both are
+closed in the kernel, each by one line of the argument made real: the ask goes on the link of every
+proposer of a vote above my view, member or not (`#askTargets`); and the lowest live member OPENS
+the superseding ballot when no membership change would (`#openOverHolds`, from `tick`): the view it
+holds again at the next epoch, past the holds' epochs (a held voter's vote there is spent on another
+proposer, so a ballot there is refused for sure), joint over the holds its linked members named —
+when, and only when, the ballot can commit: a majority of its own view linked COUNTING the held
+members, and a majority of EACH held view's members linked or itself. Not for a hold whose proposer
+is itself (its disown answers that ask in one frame); nothing where some held view's majority is out
+of reach, so the far side of a cut and the two CP shapes below burn no epochs; nothing while a
+ballot is in flight, so a suspect's eviction (which is joint over the same holds) is never doubled.
+Safety is unchanged: the opener grants nothing and counts nothing new; its ballot commits under the
+rule above and IS the supersession of §10.10.2. `keptBallotProposerGone` pins the three variants:
+`evicted` is released by aa's disown the moment the asks land, before any tick (bb proposes nothing
+new); `open` and `committed` by bb's `{bb,cc,dd}`@4 — `P(2,3) P(4,3)` — on cc's and dd's consent;
+without the opener the end is `bb@2 r:minority cc@2 r:held dd@2 r:held`, without the ask to the
+proposer `evicted` shows the three held after the asks land and heals by the opener instead. No
+other pin of the harness moved: the opener never fires where a hold's view majority is unreachable,
+where the held member is itself the lowest (its gate is `held`, and its eviction ballot is the joint
+one), or where the hold's proposer is a member (then it is a suspect, and the eviction is the
+ballot; or it is linked to the held member, and the ask reaches it).
+
 Where supersession cannot fire, it must not, and that has THREE shapes, not one. The far side of a
 cut: `evictTwo`'s n03 (held) opens `{n03,n04,n05}`@3 joint over `{n01,n02,n03}` and needs n01 or n02,
 which are writable at 2 across the cut; n04 and n05 grant it and are held on it in turn; all three
@@ -2172,9 +2211,13 @@ sender's holds as `[{e, h, p}]`: the HELLO (`v`, *scratch* `helloHolds`), so a l
 knowing them, and the PULL (`vs`, *scratch* `#ask`), the ask of §10.10.4, on the sender's admitted
 member links. Beside `o` and `j` on the PROPOSE and `hm` on a refusal, that is the whole wire change.
 
-**When it is sent.** The HELLO carries the holds as they are when the link opens (nothing when there
+**When it is sent, and to whom.** The HELLO carries the holds as they are when the link opens (nothing when there
 are none, so a fresh node's HELLO is byte-identical with today's; at epoch 0 too, §10.10.1). The ask
-goes on every tick while the member holds anything (the refresh); the INSTANT its holds change — a
+goes to every admitted member of the sender's view AND to the proposer of every vote the sender holds
+above its view, member of that view or not (the fifth review: the proposer of a kept or stale ballot
+is exactly a node the sender's view has left out, and only it can disown; a disowned vote keeps its
+proposer in the list while it is above the view, so the release reaches it too). It goes on every
+tick while the member holds anything (the refresh); the INSTANT its holds change — a
 grant that holds it (behind the VOTE on the proposer's link), a disown, an install that re-reads
 them — so that no quiet point sees a stayer counting a member that is already held; once more, with
 an empty list, when its last hold ends — the release is this frame, never silence; and at admit, on
@@ -2524,15 +2567,51 @@ voter's grant, form (β) and the install, the joint commit, the stayer's count, 
 release; one door pin for the signing). The PROPOSE frame grows by `o` on every ballot and by `j` only when joint; a
 fresh node's HELLO is byte-identical; no ask at epoch 0. Perf: the 27 pins of `kernel/node.perf.ts`,
 `kernel/alloc.perf.ts`, `kernel/write.perf.ts`, `tests/baseline.perf.ts` and the two counted pins of
-`sim/scale.perf.ts` pass; `gate()` measured by hand on this box: 205 ns per call in the common case (four links, the
-fast path returns a shared empty list), 1.1 µs held on `votedFor` alone, 4.2 µs with four earlier votes behind it,
-11.8 µs with twenty — linear in `prior`, which grows only by one per failed joint ballot while the member learns no
-view (§10.10.7), and a held member is read-only anyway. The ask costs one PULL per member link per tick while held
-and one per change; nothing while nobody holds anything. Not measured here: the ask under the real-TCP tier (the
-battery's TCP tiers run the kernel unchanged with no held member), the growth of `prior` under the explorer with a
-hold that never ends (bounded by proposers; left unbounded on purpose).
+`sim/scale.perf.ts` pass; `gate()` measured by hand on this box (`gate()` in a loop, 1M calls, four admitted links,
+base and built back to back, the absolute numbers swinging with the box's load so only the A/B is the claim): the
+common case neutral against the base; the held case, before the fifth review's memo, 0.9-1.1 µs on `votedFor` alone
+and 4.1-4.3 µs with four earlier votes behind it — linear in `prior`, which grows only by one per failed joint ballot
+while the member learns no view (§10.10.7). The fifth review's numbers, with the memo, are in its note below. The ask
+costs one PULL per member link per tick while held and one per change; nothing while nobody holds anything. Not
+measured here: the ask under the real-TCP tier (the battery's TCP tiers run the kernel unchanged with no held member),
+the growth of `prior` under the explorer with a hold that never ends (bounded by proposers; left unbounded on purpose).
 
 The STATUS lines this closes: the two-suspect split (`evictTwo`, `evictTwoB`), the kept ballot, the genesis split;
 the I-20 line's release sentence. What the rule costs, in one line: the far side of a cut, the third granter of a
 two-evictee ballot whose proposer and other granter are dead, and the one survivor of a genesis ballot are read-only
 until the cut heals or an operator forgets the dead — the CP answer, where the base wrote on both sides.
+
+**2026-10-12, the fifth review (the skeptic's, after the build): one major, two minors, three nits — each closed
+where it lives, five commits on top of the build.** The major was a hole in the ARGUMENT, fixed in §10.10.4 first
+("supersession needs a ballot, and someone must open it"), then in the harness (`keptBallotProposerGone`), then in
+the kernel: the kept ballot in the reversed order with its proposer GONE left bb `minority` and cc and dd `held` for
+sixty rounds with every link among them up and cc and dd two of the held view's three — line 6's own liveness claim
+denied by the built kernel, because no membership change ever opened a ballot (aa was no member of view 2) and, with
+aa alive but evicted, because the ask went to members only and never reached the one node that could disown. The
+kernel gained two lines of the argument: the ask goes to the proposer of every vote above my view, member or not
+(`#askTargets`, §10.10.6), and the lowest live member opens the superseding ballot when nothing else would
+(`#openOverHolds`, §10.10.4) — the same members at the next epoch, past the holds' epochs, joint, only when it can
+commit, never for a hold of its own. The three variants are pinned (`evicted` released by the disown before any tick,
+bb proposing nothing new; `open` and `committed` superseded by `P(4,3)`); the two one-line mutants are each caught by
+the variant that names them; no other pin of the harness moved (18 of 18 before the new one, 19 with it), and the
+three CP shapes stay three. The minors: `holds()` fell off its fast path for good on a vote above the view that is
+no hold (one apart: the common state after any failed one-member ballot, until the next install) — now memoized on
+the identity of `votedFor` and `view`, which every grant, own ballot and install replace, with the disown's in-place
+`f` mark dropping the memo by hand (measured on this box, 1M `gate()` calls with four admitted links, built tree with
+the memo disabled vs enabled, back to back: one apart 1073-1078 ns → 227-260 ns, the common case's 225-282 ns; held
+on `votedFor` alone 866-1064 ns → 59-84 ns; four earlier votes behind it 4.1-4.3 µs → 65-102 ns; the base's common
+case in the same session 179-195 ns, so the absolute numbers are the box's and the A/B is the claim — this replaces
+the earlier note's "205 ns", the third nit); and a member's malformed hold was trusted — `h: ''` is a view nobody can
+be a majority of, so one such word from a member made the receiver skip it for good and every ballot joint over it
+unable to commit — now one check (`holdOk`: a positive integer epoch above the asker's, a non-empty member list)
+serves the HELLO (`holdsOk`, malformed) and the PULL (dropped). The nits: a refusal's `hm` widened the open ballot
+on any same-epoch refusal, before the identity check — a late refusal of an earlier same-epoch ballot of mine could
+leave a phantom joint set for a proposal age; now `v.h === p.h` guards it, as the grant count does. The ask at
+admit's lack of a member filter is kept and explained in place: it corrects the HELLO, which told any peer, so the
+fresh link is admitted knowing the holds as they ARE; the periodic ask is the narrower one (members and my
+proposers). Pins added: three in `kernel/membership.test.ts` (46 → 49: the memo's identity, the ask reaching a
+non-member proposer and not a bystander, the opener with its two negatives — the held view's majority out of reach,
+and a hold whose proposer is me), two steps in existing ones (the malformed hold on both frames; a refusal of another
+ballot widening nothing), and one in `sim/leave-harness.test.ts` (18 → 19). Every new guard was mutation-checked once
+(the memo twice: never read, never dropped). What the opener costs: one same-members ballot, once, in a shape no
+membership change would reach — and `tick` reads one map size (`#heldPeers`) to know it has nothing to do.
